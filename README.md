@@ -36,8 +36,7 @@ Dedicated/on-demand maps are not fully automated yet. The current MVP starts the
 Public ports:
 
 - TCP 31982: RabbitMQ game TLS
-- UDP 7777: Overmap clients
-- UDP 7778: Survival_1 clients
+- UDP 7777-7810 : Game Servers
 - UDP 7888: Survival_1 server-to-server
 - UDP 7889: Overmap server-to-server
 
