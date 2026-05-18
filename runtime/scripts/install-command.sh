@@ -8,11 +8,11 @@ cat > /usr/local/bin/dune <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 
-LAB_DIR="\${DUNE_LAB_DIR:-$LAB_DIR}"
+LAB_DIR="\${DUNE_DOCKER_DIR:-$LAB_DIR}"
 
 if [ ! -d "\$LAB_DIR" ]; then
   echo "Dune lab directory not found: \$LAB_DIR"
-  echo "Set DUNE_LAB_DIR=/path/to/dune-docker-lab if needed."
+  echo "Set DUNE_DOCKER_DIR=/path/to/dune-awakening-selfhost-docker if needed."
   exit 1
 fi
 

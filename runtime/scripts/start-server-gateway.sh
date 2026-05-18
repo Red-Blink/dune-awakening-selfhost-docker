@@ -58,7 +58,7 @@ docker run -d \
   -e "RMQ_HTTP_TOKEN_AUTH_SECRET=$RMQ_HTTP_TOKEN_AUTH_SECRET" \
   -e "fls-apikey=$FLS_APIKEY" \
   -e "gateway_farm_api_key=$FLS_APIKEY" \
-  -e "HOST_DATACENTER_ID=dune-docker" \
+  -e "HOST_DATACENTER_ID=${SERVER_PROVIDER:-dune-docker}" \
   -e "HOST_DATACENTER_IP_ADDRESS=$SERVER_IP" \
   -e "BATTLEGROUP=$BATTLEGROUP_ID" \
   -e "BATTLEGROUP_DISPLAY_NAME=$BATTLEGROUP_ID" \

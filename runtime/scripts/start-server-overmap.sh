@@ -86,7 +86,7 @@ docker run -d \
   -DatabaseHost=127.0.0.1:15432 \
   -DatabaseUser=dune \
   -DatabasePassword=dune \
-  -PartitionIndex=33 \
+  -PartitionIndex=2 \
   "-ini:engine:[URL]:Port=7777" \
   "-ini:engine:[URL]:IGWPort=7889" \
   -battlegroup-director-url=127.0.0.1:11717 \

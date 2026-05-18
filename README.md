@@ -239,7 +239,6 @@ The current MVP is a Docker-native minimal self-host stack. It starts the core s
 
 - Dedicated/on-demand maps are not automated yet.
 - The fake Kubernetes service account/IGWO behavior is a compatibility workaround.
-- Overmap and Survival_1 are always-on.
 - Update flow is scaffolded but still needs real-world testing after an actual upstream update.
 - Automatic service restart after update is not implemented yet.
 - This is experimental and should not be treated as production-ready.

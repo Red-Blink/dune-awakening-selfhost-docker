@@ -31,6 +31,24 @@ case "$cmd" in
     docker ps --filter "name=dune-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
     ;;
 
+  servers)
+    runtime/scripts/servers.sh
+    ;;
+
+  spawn)
+    shift
+    runtime/scripts/spawn-server.sh "$@"
+    ;;
+
+  despawn)
+    shift
+    runtime/scripts/despawn-server.sh "$@"
+    ;;
+
+  autoscaler)
+    runtime/scripts/autoscaler.sh
+    ;;
+
   ports)
     runtime/scripts/ports.sh
     ;;
@@ -109,6 +127,10 @@ Usage:
   runtime/scripts/dune stop
   runtime/scripts/dune status
   runtime/scripts/dune ps
+  runtime/scripts/dune servers
+  runtime/scripts/dune spawn <map-name|partition-id>
+  runtime/scripts/dune despawn <map-name|partition-id|container-name>
+  runtime/scripts/dune autoscaler
   runtime/scripts/dune ports
   runtime/scripts/dune ready
   runtime/scripts/dune logs <service>

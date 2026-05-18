@@ -84,7 +84,7 @@ check_udp 7889 "Overmap S2S"
 echo
 echo "=== Readiness log checks ==="
 check_log dune-server-survival-1 "Server farm is READY .*partition 1" "Survival_1 ready"
-check_log dune-server-overmap "Server farm is READY .*partition 33" "Overmap ready"
+check_log dune-server-overmap "Server farm is READY .*partition 2" "Overmap ready"
 check_log dune-director "Battlegroups_SendBattlegroupHeartbeat.*Request successful" "Director FLS heartbeat"
 check_log dune-server-gateway "Monitoring for servers going up or down" "Gateway monitoring DB"
 
@@ -99,7 +99,7 @@ fi
 
 echo
 if [ "$fail" -eq 0 ]; then
-  echo "READY: Dune Docker lab stack looks healthy."
+  echo "READY: Dune Awakening Self-Host Docker stack looks healthy."
 else
   echo "NOT READY: one or more checks failed."
 fi

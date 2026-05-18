@@ -14,14 +14,22 @@ docker rm -f dune-server-overmap dune-server-survival-1 2>/dev/null || true
 
 echo
 echo "=== Download/update server files with SteamCMD ==="
-docker compose exec orchestrator bash -lc "
+docker compose exec -T orchestrator bash -lc "
 set -euo pipefail
-steamcmd +force_install_dir /srv/dune/server +login anonymous +app_update ${APP_ID} validate +quit
+
+STEAMCMD=/srv/dune/steam/linux32/steamcmd
+
+if [ ! -x \"\$STEAMCMD\" ]; then
+  echo \"SteamCMD not found or not executable: \$STEAMCMD\"
+  exit 1
+fi
+
+\"\$STEAMCMD\" +force_install_dir /srv/dune/server +login anonymous +app_update ${APP_ID} validate +quit
 "
 
 echo
 echo "=== Load updated Funcom image tarballs ==="
-docker compose exec orchestrator bash -lc '
+docker compose exec -T orchestrator bash -lc '
 set -euo pipefail
 find /srv/dune/server/images -type f \( -name "*.tar" -o -name "*.tar.gz" -o -name "*.tgz" \) | sort | while read -r tar; do
   echo ">>> docker load -i $tar"

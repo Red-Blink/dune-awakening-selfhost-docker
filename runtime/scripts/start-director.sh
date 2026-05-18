@@ -153,7 +153,7 @@ docker run -d \
   -e "FuncomLiveServices__RmqTlsEnabled=true" \
   -e "RMQ_HTTP_TOKEN_AUTH_SECRET=$RMQ_HTTP_TOKEN_AUTH_SECRET" \
   -e "fls-apikey=$FLS_APIKEY" \
-  -e "HOST_DATACENTER_ID=dune-docker" \
+  -e "HOST_DATACENTER_ID=${SERVER_PROVIDER:-dune-docker}" \
   -e "HOST_DATACENTER_IP_ADDRESS=$SERVER_IP" \
   -e "ASPNETCORE_URLS=http://0.0.0.0:11717" \
   -e "DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE=false" \
