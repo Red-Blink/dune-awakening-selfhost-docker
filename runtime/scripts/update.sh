@@ -314,10 +314,19 @@ while [ "$steam_attempt" -le "$steam_max_attempts" ]; do
   fi
 
   echo
-  echo "SteamCMD failed with exit code $steam_rc."
+  if [ "$steam_attempt" -eq 1 ]; then
+    echo "SteamCMD first-run bootstrap did not complete the app install on this attempt."
+    echo "This can happen while SteamCMD updates and restarts itself."
+  else
+    echo "SteamCMD failed with exit code $steam_rc."
+  fi
 
   if [ "$steam_attempt" -lt "$steam_max_attempts" ]; then
-    echo "Retrying in ${steam_retry_sleep}s..."
+    if [ "$steam_attempt" -eq 1 ]; then
+      echo "Retrying app install in ${steam_retry_sleep}s..."
+    else
+      echo "Retrying in ${steam_retry_sleep}s..."
+    fi
     sleep "$steam_retry_sleep"
   fi
 

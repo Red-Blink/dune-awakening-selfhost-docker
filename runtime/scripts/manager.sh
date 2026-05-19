@@ -611,6 +611,70 @@ show_world_partition_count() {
   docker exec dune-postgres psql -U dune -d dune -c "select count(*) as world_partition_rows from world_partition;"
 }
 
+show_current_memory_usage() {
+  local containers=()
+  local container
+  local stats_line
+  local name
+  local mem_usage
+  local map
+  local partition_id
+  local db_row
+  local label
+  local dim
+
+  mapfile -t containers < <(docker ps --format '{{.Names}}' 2>/dev/null | grep '^dune-server-' || true)
+
+  echo
+  echo "=== Current Memory Usage ==="
+
+  if [ "${#containers[@]}" -eq 0 ]; then
+    echo "No game server containers are currently running."
+    return
+  fi
+
+  printf "%-24s %-12s %-12s %s\n" "MAP" "PARTITION" "MEMORY" "CONTAINER"
+
+  for container in "${containers[@]}"; do
+    stats_line="$(docker stats --no-stream --format '{{.Name}}\t{{.MemUsage}}' "$container" 2>/dev/null | head -n1 || true)"
+    [ -n "$stats_line" ] || continue
+
+    name="${stats_line%%$'\t'*}"
+    mem_usage="${stats_line#*$'\t'}"
+    map="Unknown"
+    partition_id="-"
+
+    case "$name" in
+      dune-server-survival-1)
+        map="Survival_1"
+        partition_id="1"
+        ;;
+      dune-server-overmap)
+        map="Overmap"
+        partition_id="2"
+        ;;
+      *)
+        if [[ "$name" =~ -([0-9]+)$ ]]; then
+          partition_id="${BASH_REMATCH[1]}"
+          if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dune-postgres; then
+            db_row="$(docker exec dune-postgres psql -U postgres -d dune -At -F $'\t' -c "select map,coalesce(label,''),coalesce(dimension_index::text,'') from dune.world_partition where partition_id = ${partition_id} limit 1;" 2>/dev/null || true)"
+            if [ -n "$db_row" ]; then
+              IFS=$'\t' read -r map label dim <<< "$db_row"
+              if [ -n "$label" ]; then
+                map="${map} (${label})"
+              elif [ -n "$dim" ]; then
+                map="${map} (dim ${dim})"
+              fi
+            fi
+          fi
+        fi
+        ;;
+    esac
+
+    printf "%-24s %-12s %-12s %s\n" "$map" "$partition_id" "$mem_usage" "$name"
+  done
+}
+
 follow_dune_logs() {
   local target="$1"
 
@@ -1212,6 +1276,7 @@ sietches_menu() {
     menu_or_back "Sietches" \
       "List Maps" \
       "Edit Map" \
+      "Current Memory Usage" \
       "Show Memory Settings" \
       "Set Default Memory" \
       "Remove Default Memory Setting" \
@@ -1229,8 +1294,9 @@ sietches_menu() {
           pause
         fi
         ;;
-      3) run_cmd "$DUNE" memory status; pause ;;
-      4)
+      3) show_current_memory_usage; pause ;;
+      4) run_cmd "$DUNE" memory status; pause ;;
+      5)
         echo
         prompt_text "Default Memory Value, Example 8g Or 4096m:" memory_value || { pause; continue; }
         if confirm "Set default memory to $memory_value?"; then
@@ -1240,7 +1306,7 @@ sietches_menu() {
         fi
         pause
         ;;
-      5)
+      6)
         if confirm "Remove default memory setting?"; then
           run_cmd env DUNE_MEMORY_ASSUME_YES=1 "$DUNE" memory unset default
         else
@@ -1248,7 +1314,7 @@ sietches_menu() {
         fi
         pause
         ;;
-      6) return ;;
+      7) return ;;
     esac
   done
 }

@@ -398,8 +398,5 @@ runtime/scripts/ready.sh || true
 cat <<EOF
 
 Next commands:
-  dune ready
-  dune status
-  dune logs survival
-  dune logs overmap
+  dune manager
 EOF

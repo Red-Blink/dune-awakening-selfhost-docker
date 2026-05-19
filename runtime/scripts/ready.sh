@@ -78,6 +78,16 @@ logs_have_fatal() {
     <<< "$logs"
 }
 
+logs_have_illegal_instruction() {
+  local logs="$1"
+  grep -Eiq 'illegal instruction' <<< "$logs"
+}
+
+cpu_has_flag() {
+  local flag="$1"
+  grep -Eq "(^| )${flag}( |$)" /proc/cpuinfo 2>/dev/null
+}
+
 check_log_ready() {
   local container="$1"
   local pattern="$2"
@@ -99,6 +109,15 @@ check_log_ready() {
   elif logs_have_fatal "$logs"; then
     mark_fail "$ok_label"
     echo "     $container logged a fatal-looking startup error."
+    if logs_have_illegal_instruction "$logs"; then
+      if ! cpu_has_flag avx || ! cpu_has_flag avx2; then
+        echo "     The host CPU exposed to this machine is missing AVX/AVX2."
+        echo "     Dune dedicated servers require those CPU features and can crash immediately without them."
+        echo "     If this is a VM, enable host CPU passthrough or expose AVX and AVX2 to the guest."
+      else
+        echo "     The game binary hit an illegal CPU instruction during startup."
+      fi
+    fi
   else
     mark_wait "$wait_label"
     echo "     $hint"

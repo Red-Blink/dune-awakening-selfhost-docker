@@ -23,6 +23,7 @@ This is an unofficial community project. It is not affiliated with, endorsed by,
 | Funcom Self-host token | Required |
 | Disk space | 100 GB+ |
 | RAM | See Guide Below |
+| CPU Features | AVX and AVX2 required |
 
 ### RAM Sizing Guide
 
@@ -70,7 +71,7 @@ The manager is organized around the main jobs most hosts need:
 |---|---|
 | Battlegroup Overview | Status, readiness, version, containers, and ports |
 | Battlegroup Settings | Battlegroup name, Start, Stop, Restart, Redeploy, dynamic maps, autoscaler, database maintenance, and current config |
-| Sietches | Map list and supported map settings |
+| Sietches | Map list, current map memory usage, and supported map settings |
 | Updates | Manual and automatic update controls |
 | Logs | Redacted logs for the main services |
 | Advanced Tools | Diagnostics and safe low-level details |
@@ -80,6 +81,8 @@ When starting or restarting from the manager, the configured player-facing IP is
 Manager menus use a colored `[X]` selector in interactive terminals. Use Up and Down to move, Enter to select, and the explicit Back items to return. Ctrl+C exits normal menu screens cleanly; inside an input prompt it cancels the current action without saving changes. Plain numbered menus are used automatically when the terminal is not interactive.
 
 Running `dune init` again later resets the local database/world after backing up local state.
+
+If map containers fail immediately with `Illegal instruction (core dumped)`, the host CPU exposed to the machine is usually missing `avx` and `avx2`. This is common with misconfigured VMs. It cannot be fixed with a package inside Ubuntu; the hypervisor must expose those CPU features to the guest.
 
 ## Public vs Local/LAN
 
@@ -218,7 +221,7 @@ dune sietches list
 dune sietches show Survival_1
 ```
 
-Inside Sietches, use `List Maps` and `Edit Map`. In the manager, `Survival_1` supports memory, display name, and password. All other maps, including `Overmap`, are memory-only in the manager. Passwords are stored locally under `runtime/generated/` and are never displayed.
+Inside Sietches, use `List Maps`, `Edit Map`, and `Current Memory Usage`. The current memory view shows live memory usage for running map containers and automatically reflects dedicated maps as they spawn and despawn. In the manager, `Survival_1` supports memory, display name, and password. All other maps, including `Overmap`, are memory-only in the manager. Passwords are stored locally under `runtime/generated/` and are never displayed.
 
 `dune sietches` still provides the backend controls for max dimensions and active dimensions, but those controls are intentionally not exposed in the manager for this version.
 
