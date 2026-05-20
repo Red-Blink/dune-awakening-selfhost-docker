@@ -160,7 +160,7 @@ backup_current_stack() {
 
 install_release_tag() {
   local tag="$1"
-  local tmpdir archive src backup_dir new_version
+  local tmpdir archive src backup_dir new_version expected_version
 
   check_dirty_git_tree
 
@@ -195,6 +195,20 @@ install_release_tag() {
 
   new_version="$CURRENT_VERSION"
   [ -f VERSION ] && new_version="$(tr -d '[:space:]' < VERSION)"
+  expected_version="$tag"
+
+  if [ "${new_version#v}" != "${expected_version#v}" ]; then
+    echo
+    echo "Downloaded release tag $expected_version, but installed VERSION is $new_version."
+    echo "This usually means the GitHub release tag points to a commit with the wrong VERSION file."
+    echo "Publish a corrected release tag from the intended commit, then try again."
+    echo
+    echo "Previous stack files backup:"
+    echo "  $backup_dir/project-files.tgz"
+    rm -rf "$tmpdir"
+    exit 4
+  fi
+
   echo
   echo "Installed stack version: $new_version"
   echo "Previous stack files backup:"

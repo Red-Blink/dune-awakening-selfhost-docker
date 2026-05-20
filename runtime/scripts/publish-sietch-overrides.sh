@@ -5,7 +5,7 @@ cd "$(dirname "$0")/../.."
 
 PID_FILE="runtime/generated/sietch-overrides.pid"
 LOG_FILE="runtime/generated/sietch-overrides.log"
-TEXT_ROUTER_LOG="runtime/text-router/director20260519.log"
+TEXT_ROUTER_LOG="runtime/text-router/director-current.log"
 CONFIG_FILE="runtime/generated/sietch-config.json"
 
 SOURCE_EXCHANGE="completions"
@@ -15,8 +15,11 @@ SINK_QUEUE="serverStateSink_Survival_1"
 FILTER_EXCHANGE="sietchOverrideFilteredState"
 
 ensure_text_router_log() {
+  local container_log
   mkdir -p runtime/text-router
-  docker cp dune-text-router:/Tools/Battlegroups/TextRouter/TextRouter/logs/director20260519.log "$TEXT_ROUTER_LOG" >/dev/null
+  container_log="$(docker exec dune-text-router sh -lc 'find /Tools/Battlegroups/TextRouter/TextRouter/logs -maxdepth 1 -type f -name "director*.log" | sort | tail -n 1' 2>/dev/null | tr -d '\r')"
+  [ -n "$container_log" ] || return 1
+  docker cp "dune-text-router:${container_log}" "$TEXT_ROUTER_LOG" >/dev/null
 }
 
 load_rmq_admin_creds() {
@@ -27,7 +30,7 @@ from pathlib import Path
 import re
 import sys
 
-log_path = Path("runtime/text-router/director20260519.log")
+log_path = Path("runtime/text-router/director-current.log")
 if not log_path.exists():
     sys.exit(1)
 

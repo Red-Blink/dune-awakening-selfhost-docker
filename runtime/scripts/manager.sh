@@ -19,6 +19,7 @@ restore_menu_tty() {
   if [ "${MENU_ALT_SCREEN_ACTIVE:-0}" -eq 1 ] && [ -t 2 ]; then
     printf '\033[?1049l' >&2
     MENU_ALT_SCREEN_ACTIVE=0
+    printf '\033[H\033[J' >&2
   fi
   if [ -n "${MENU_ACTIVE_TTY:-}" ]; then
     stty "$MENU_ACTIVE_TTY" < /dev/tty 2>/dev/null || stty "$MENU_ACTIVE_TTY" 2>/dev/null || stty sane < /dev/tty 2>/dev/null || stty sane 2>/dev/null || true

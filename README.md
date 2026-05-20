@@ -165,6 +165,8 @@ dune update auto status
 
 `dune self-update` is for this self-host stack itself. `dune update` is for Funcom game server files and images. Automatic updates apply only to game server updates and use a systemd timer when systemd is available.
 
+For stack updates, publish a GitHub Release from the same commit that contains the matching `VERSION` value. The updater validates that the downloaded release tag and extracted `VERSION` file agree.
+
 ## Autoscaler And Dynamic Maps
 
 Always-on maps:
@@ -240,7 +242,7 @@ dune memory unset DeepDesert_1
 
 Use `dune memory list-maps` or the manager to choose from known maps instead of memorizing internal names. Changing or removing a map memory setting asks for confirmation; if that map is running, only that map restarts so the new limit can apply. Default memory applies to future spawned/restarted maps and does not restart running maps.
 
-The manager's Sietches area lists maps from the current world partition state when Postgres is running, with the generated world partition catalog as a fallback:
+The manager's Sietches area lists maps from the current world partition state when Postgres is running, with the generated map catalogs as a fallback:
 
 ```bash
 dune sietches list

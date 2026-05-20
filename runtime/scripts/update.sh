@@ -408,6 +408,11 @@ select count(*) as world_partition_rows from world_partition;
 fi
 
 echo
+echo "=== Refresh generated map catalogs ==="
+runtime/scripts/extract-partition-catalog.sh
+runtime/scripts/extract-server-catalog.sh
+
+echo
 if [ "$cmd" = "install" ]; then
   echo "Install/bootstrap step finished."
   echo "The caller can now start the Dune stack."

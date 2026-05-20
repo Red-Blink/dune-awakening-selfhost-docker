@@ -7,6 +7,40 @@ PARTITION_CATALOG="runtime/generated/partition-catalog.json"
 SERVER_CATALOG="runtime/generated/server-catalog.json"
 CONFIG_FILE="runtime/generated/sietch-config.json"
 
+generate_partition_catalog_from_server_catalog() {
+  [ -s "$SERVER_CATALOG" ] || return 1
+
+  mkdir -p runtime/generated
+  python3 - "$SERVER_CATALOG" "$PARTITION_CATALOG" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+server_path = Path(sys.argv[1])
+partition_path = Path(sys.argv[2])
+servers = json.loads(server_path.read_text())
+rows = []
+
+for server in servers:
+    map_name = str(server.get("map", ""))
+    raw = server.get("raw", {}) or {}
+    partitions = raw.get("partitions") or []
+    for dim, partition_id in enumerate(partitions):
+        try:
+            rows.append({
+                "id": int(partition_id),
+                "map": map_name,
+                "dimension": dim,
+                "label": "",
+                "disable": False,
+            })
+        except (TypeError, ValueError):
+            continue
+
+partition_path.write_text(json.dumps(rows, indent=2) + "\n")
+PY
+}
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -27,9 +61,15 @@ EOF
 }
 
 require_catalog() {
-  if [ ! -s "$PARTITION_CATALOG" ]; then
+  if [ ! -s "$PARTITION_CATALOG" ] && [ -s "$SERVER_CATALOG" ]; then
+    generate_partition_catalog_from_server_catalog || true
+  fi
+
+  if [ ! -s "$PARTITION_CATALOG" ] && [ ! -s "$SERVER_CATALOG" ]; then
     echo "Map catalog not found. Run dune init first, or regenerate world partitions."
-    echo "Expected: $PARTITION_CATALOG"
+    echo "Expected one of:"
+    echo "  $PARTITION_CATALOG"
+    echo "  $SERVER_CATALOG"
     exit 1
   fi
 }
