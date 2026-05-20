@@ -118,6 +118,60 @@ clear_screen() {
   fi
 }
 
+runtime_partition_catalog_path() {
+  printf '%s' "runtime/generated/partition-catalog.json"
+}
+
+runtime_server_catalog_path() {
+  printf '%s' "runtime/generated/server-catalog.json"
+}
+
+runtime_catalogs_available() {
+  [ -s "$(runtime_partition_catalog_path)" ] || [ -s "$(runtime_server_catalog_path)" ]
+}
+
+show_runtime_files_status() {
+  local partition_catalog server_catalog
+  partition_catalog="$(runtime_partition_catalog_path)"
+  server_catalog="$(runtime_server_catalog_path)"
+
+  echo "=== Runtime Files Status ==="
+  echo
+
+  if [ -s "$partition_catalog" ]; then
+    echo "OK   $partition_catalog"
+  else
+    echo "MISS $partition_catalog"
+  fi
+
+  if [ -s "$server_catalog" ]; then
+    echo "OK   $server_catalog"
+  else
+    echo "MISS $server_catalog"
+  fi
+
+  echo
+  if runtime_catalogs_available; then
+    echo "Runtime map catalogs are present."
+    echo "Map selection and memory menus should work normally."
+  else
+    echo "Runtime map catalogs are missing."
+    echo "Map selection and some manager map actions will not work until they are rebuilt."
+  fi
+}
+
+repair_runtime_files() {
+  echo "=== Repair Runtime Files ==="
+  echo
+  echo "This rebuilds the generated map catalogs from the installed server files."
+  echo "It does not run dune init or redeploy the battlegroup."
+  echo
+  runtime/scripts/extract-server-catalog.sh
+  runtime/scripts/extract-partition-catalog.sh
+  echo
+  show_runtime_files_status
+}
+
 read_choice() {
   local prompt="${1:-Select An Option: }"
   local choice
@@ -1322,6 +1376,14 @@ sietches_menu() {
     case "$choice" in
       1) run_cmd "$DUNE" sietches list; pause ;;
       2)
+        if ! runtime_catalogs_available; then
+          echo
+          error_msg "Runtime map catalogs are missing."
+          echo "Open Updates -> Runtime Files Status for details."
+          echo "Then run Updates -> Repair Runtime Files to rebuild them."
+          pause
+          continue
+        fi
         CHOSEN_SIETCH_MAP=""
         choose_sietch_map || true
         if [ -n "$CHOSEN_SIETCH_MAP" ]; then
@@ -1432,6 +1494,8 @@ updates_menu() {
   while true; do
     menu_or_back "Updates" \
       "Show Installed Versions" \
+      "Runtime Files Status" \
+      "Repair Runtime Files" \
       "Check Stack Update" \
       "Check Game Server Update" \
       "Automatic Updates" \
@@ -1440,7 +1504,17 @@ updates_menu() {
 
     case "$choice" in
       1) run_cmd "$DUNE" version; pause ;;
-      2)
+      2) show_runtime_files_status; pause ;;
+      3)
+        echo
+        if confirm "Repair runtime files now?"; then
+          run_cmd repair_runtime_files
+        else
+          echo "Cancelled."
+        fi
+        pause
+        ;;
+      4)
         echo
         set +e
         "$DUNE" self-update check
@@ -1457,7 +1531,7 @@ updates_menu() {
         fi
         pause
         ;;
-      3)
+      5)
         echo
         set +e
         "$DUNE" update check
@@ -1474,8 +1548,8 @@ updates_menu() {
         fi
         pause
         ;;
-      4) automatic_updates_menu ;;
-      5) return ;;
+      6) automatic_updates_menu ;;
+      7) return ;;
     esac
   done
 }

@@ -57,7 +57,7 @@ for r in rows:
     )
 PY
 
-docker compose cp orchestrator:/work/partition-catalog.json runtime/generated/partition-catalog.json
+docker compose exec -T orchestrator cat /work/partition-catalog.json > runtime/generated/partition-catalog.json
 
 echo
 echo "Wrote runtime/generated/partition-catalog.json"

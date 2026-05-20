@@ -55,7 +55,7 @@ for item in catalog:
     print(f"{item['index']:02d} name={item['name']} map={item['map']}")
 PY
 
-docker compose cp orchestrator:/work/server-catalog.json runtime/generated/server-catalog.json
+docker compose exec -T orchestrator cat /work/server-catalog.json > runtime/generated/server-catalog.json
 
 echo
 echo "Wrote runtime/generated/server-catalog.json"

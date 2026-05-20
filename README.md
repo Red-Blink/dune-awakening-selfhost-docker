@@ -72,7 +72,7 @@ The manager is organized around the main jobs most hosts need:
 | Battlegroup Overview | Status, readiness, version, containers, and ports |
 | Battlegroup Settings | Battlegroup name, Start, Stop, Restart, Scheduled Restart, Redeploy, dynamic maps, autoscaler, database maintenance, and current config |
 | Sietches | Map list, current map memory usage, and supported map settings |
-| Updates | Installed versions, stack update checks, game server update checks, and automatic game updates |
+| Updates | Installed versions, runtime files status/repair, stack update checks, game server update checks, and automatic game updates |
 | Logs | Redacted logs for the main services |
 | Advanced Tools | Diagnostics and safe low-level details |
 
@@ -166,6 +166,8 @@ dune update auto status
 `dune self-update` is for this self-host stack itself. `dune update` is for Funcom game server files and images. Automatic updates apply only to game server updates and use a systemd timer when systemd is available.
 
 For stack updates, publish a GitHub Release from the same commit that contains the matching `VERSION` value. The updater validates that the downloaded release tag and extracted `VERSION` file agree.
+
+In the manager, `Updates` also includes `Runtime Files Status` and `Repair Runtime Files`. Use these when generated map catalogs are missing and `Edit Map` cannot open the picker. The repair action rebuilds the generated catalogs from the installed server files without running `dune init`.
 
 ## Autoscaler And Dynamic Maps
 
@@ -267,6 +269,8 @@ If a map setting fails validation or cannot be saved, the manager does not ask t
 | `runtime/backups/` | Init and database backups |
 
 These paths are ignored by git.
+
+If `runtime/generated/partition-catalog.json` and `runtime/generated/server-catalog.json` are missing, map-selection flows in the manager cannot build the map picker. Use `dune manager` -> `Updates` -> `Runtime Files Status` to verify, then `Repair Runtime Files` to rebuild them non-destructively.
 
 ## Security
 
