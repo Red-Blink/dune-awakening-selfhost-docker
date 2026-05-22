@@ -1381,8 +1381,8 @@ choose_dimension_for_map() {
   local ids=()
   local choice
 
-  mapfile -t labels < <("$DUNE" sietches dimensions "$map" --labels)
-  mapfile -t ids < <("$DUNE" sietches dimensions "$map" --ids)
+  mapfile -t labels < <("$DUNE" sietches dimensions "$map" --active-only --labels)
+  mapfile -t ids < <("$DUNE" sietches dimensions "$map" --active-only --ids)
   if [ "${#ids[@]}" -eq 0 ]; then
     echo "No dimensions found for $map."
     return 1

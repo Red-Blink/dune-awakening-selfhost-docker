@@ -5,6 +5,7 @@ cd "$(dirname "$0")/../.."
 
 PID_FILE="runtime/generated/sietch-overrides.pid"
 LOG_FILE="runtime/generated/sietch-overrides.log"
+LOG_POINTER_FILE="runtime/generated/sietch-overrides-current.log"
 TEXT_ROUTER_LOG="runtime/text-router/director-current.log"
 CONFIG_FILE="runtime/generated/sietch-config.json"
 
@@ -15,12 +16,17 @@ SINK_QUEUE="serverStateSink_Survival_1"
 FILTER_EXCHANGE="sietchOverrideFilteredState"
 
 prepare_runtime_generated_files() {
+  local current_log
   mkdir -p runtime/generated
 
-  if ! : >"$LOG_FILE" 2>/dev/null; then
-    LOG_FILE="runtime/generated/sietch-overrides-$$.log"
-    : >"$LOG_FILE"
+  current_log="$LOG_FILE"
+  if [ -e "$current_log" ] && [ ! -w "$current_log" ]; then
+    current_log="runtime/generated/sietch-overrides-$$.log"
   fi
+  : >"$current_log"
+
+  LOG_FILE="$current_log"
+  echo "$LOG_FILE" >"$LOG_POINTER_FILE"
 }
 
 ensure_text_router_log() {
@@ -123,7 +129,7 @@ select wp.partition_id,
        wp.map,
        coalesce(wp.server_id, ''),
        coalesce(fs.ready, false),
-       false as is_starting_map,
+       true as is_starting_map,
        coalesce(wp.label, '')
 from dune.world_partition wp
 left join dune.farm_state fs on fs.server_id = wp.server_id
@@ -255,7 +261,7 @@ for message in messages:
     password = cfg.get("password", "")
     payload["displayName"] = display_name
     payload["loginPassword"] = password
-    payload["isStartingMap"] = False
+    payload["isStartingMap"] = True
     gameplay = payload.setdefault("serverGameplaySettings", {})
     core = gameplay.setdefault("CoreSettings", {})
     core["serverDisplayName"] = display_name

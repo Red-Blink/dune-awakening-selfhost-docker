@@ -51,7 +51,7 @@ Usage:
   dune sietches
   dune sietches list
   dune sietches show <map-name>
-  dune sietches dimensions <map-name> [--numbered|--labels|--ids|--partition-at=N]
+  dune sietches dimensions <map-name> [--active-only] [--numbered|--labels|--ids|--partition-at=N]
   dune sietches set-max <map-name> <count>
   dune sietches set-active <map-name> <count>
   dune sietches set-display <partition-id> <display-name>
@@ -348,11 +348,28 @@ PY
 
 dimensions() {
   local map="$1"
-  local mode="${2:-table}"
+  shift
+  local active_only=0
+  local mode="table"
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --active-only)
+        active_only=1
+        ;;
+      --numbered|--labels|--ids|--partition-at=*)
+        mode="$1"
+        ;;
+      *)
+        mode="$1"
+        ;;
+    esac
+    shift
+  done
 
   require_catalog
   ensure_config
-  python_common "$map" "$mode" <<'PY'
+  python_common "$map" "$mode" "$active_only" <<'PY'
 import json
 import os
 import sys
@@ -363,6 +380,7 @@ server_path = Path(sys.argv[2])
 config_path = Path(sys.argv[3])
 target = sys.argv[4].lower()
 mode = sys.argv[5]
+active_only = sys.argv[6] == "1"
 
 db_partitions = os.environ.get("SIETCH_DB_PARTITIONS_JSON")
 partitions = json.loads(db_partitions) if db_partitions else json.loads(partition_path.read_text())
@@ -375,6 +393,20 @@ if not rows:
     raise SystemExit(1)
 
 rows.sort(key=lambda row: (int(row.get("dimension", 0)), int(row.get("id", 0))))
+
+server_by_map = {str(s.get("map", "")): s for s in servers if s.get("map")}
+raw = server_by_map.get(rows[0].get("map"), {}).get("raw", {})
+dedicated = bool(raw.get("dedicatedScaling"))
+map_config = config.get("maps", {}).get(rows[0].get("map"), {})
+max_dimensions = int(map_config.get("max_dimensions") or len(rows))
+if rows[0].get("map") == "Overmap":
+    active_dimensions = 1
+elif dedicated:
+    active_dimensions = len(rows)
+else:
+    active_dimensions = int(map_config.get("active_dimensions") or min(max_dimensions, len(rows)))
+if active_only:
+    rows = rows[:max(0, active_dimensions)]
 
 partition_config = config.get("partitions", {})
 def default_display_name(row):
@@ -600,7 +632,7 @@ reconcile_map_dimensions() {
     return 1
   }
 
-  safe_map="${map//\'/\'\'}"
+  safe_map="${map//'/'\'}"
   target="$(python3 - "$map" <<'PY'
 import json
 import sys
@@ -616,6 +648,13 @@ print(int(config.get("maps", {}).get(target, {}).get("active_dimensions") or 1))
 PY
 )"
   validate_positive_integer "$target" || target=1
+  if [ "$target" -le 0 ] 2>/dev/null; then
+    return 0
+  fi
+
+  if [ "$map" = "Survival_1" ]; then
+    ensure_map_partitions "$map" "$target"
+  fi
 
   available="$(psql_value "select count(*) from dune.world_partition where lower(map) = lower('$safe_map');" | tr -d '[:space:]')"
   [ -n "$available" ] || available=0
@@ -640,7 +679,6 @@ PY
         where lower(map) = lower('$safe_map')
           and partition_id <> $base_partition
           and coalesce(server_id, '') = ''
-          and blocked = false
         order by dimension_index, partition_id
         limit 1;
       " | tr -d '[:space:]')"
@@ -663,7 +701,43 @@ PY
       runtime/scripts/despawn-server.sh "$remove_partition"
       assigned_count=$((assigned_count - 1))
     done
+
+    docker exec dune-postgres psql -U postgres -d dune -v ON_ERROR_STOP=1 -c "
+set search_path = dune, public;
+
+with ranked as (
+  select
+    partition_id,
+    row_number() over (order by dimension_index, partition_id) as ord,
+    coalesce(server_id, '') as server_id
+  from dune.world_partition
+  where lower(map) = lower('$safe_map')
+)
+delete from dune.world_partition wp
+using ranked
+where wp.partition_id = ranked.partition_id
+  and ranked.ord > $target
+  and ranked.server_id = '';
+
+select dune.update_partition_labels(true);
+" >/dev/null
+  else
+    docker exec dune-postgres psql -U postgres -d dune -v ON_ERROR_STOP=1 -c "
+with ranked as (
+  select
+    partition_id,
+    row_number() over (order by dimension_index, partition_id) as ord
+  from dune.world_partition
+  where lower(map) = lower('$safe_map')
+)
+update dune.world_partition wp
+set blocked = ranked.ord > $target
+from ranked
+where wp.partition_id = ranked.partition_id;
+" >/dev/null
   fi
+
+  sync_partition_catalog_from_db
 }
 
 set_partition_value() {
@@ -746,7 +820,8 @@ case "$cmd" in
     ;;
   dimensions)
     [ "$#" -ge 2 ] || { usage; exit 2; }
-    dimensions "$2" "${3:-table}"
+    shift
+    dimensions "$@"
     ;;
   set-max)
     [ "$#" -eq 3 ] || { usage; exit 2; }

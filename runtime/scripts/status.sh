@@ -114,7 +114,13 @@ count_rmq_prefix() {
 
 recent_director_logs() {
   if is_running dune-director; then
-    docker logs --since 4h dune-director 2>&1 || true
+    docker logs --tail 5000 dune-director 2>&1 || true
+  fi
+}
+
+recent_gateway_logs() {
+  if is_running dune-server-gateway; then
+    docker logs --tail 5000 dune-server-gateway 2>&1 || true
   fi
 }
 
@@ -233,6 +239,7 @@ if [ -z "$display_mode" ] || [ "$display_mode" = "unknown" ]; then
 fi
 
 director_logs="$(recent_director_logs)"
+gateway_logs="$(recent_gateway_logs)"
 
 container_rows=""
 for c in \
@@ -337,7 +344,7 @@ if ! [ "${capacity:-0}" -gt 0 ] 2>/dev/null && [ "${configured_capacity:-0}" -gt
   capacity="$configured_capacity"
 fi
 
-if director_log_has 'Battlegroups_SendBattlegroupHeartbeat.*Request successful|Initiating heartbeat'; then
+if director_log_has 'Battlegroups_SendBattlegroupHeartbeat.*Request successful|Initiating heartbeat|Population declaration:'; then
   heartbeat_state="OK"
 else
   heartbeat_state="WAIT"
@@ -359,7 +366,7 @@ else
   capacity_state="WAIT"
 fi
 
-if is_running dune-server-gateway && docker logs --tail 5000 dune-server-gateway 2>&1 | grep -Eq 'Monitoring for servers going up or down|Starting gateway for battlegroup'; then
+if is_running dune-server-gateway && grep -Eq 'Monitoring for servers going up or down|Starting gateway for battlegroup' <<< "$gateway_logs"; then
   gateway_db_state="OK"
 else
   gateway_db_state="WAIT"

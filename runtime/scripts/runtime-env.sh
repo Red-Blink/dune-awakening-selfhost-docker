@@ -84,9 +84,15 @@ PY
 }
 
 resolve_battlegroup_id_from_logs() {
+  local override_log
+  override_log="$({
+    [ -f runtime/generated/sietch-overrides-current.log ] && cat runtime/generated/sietch-overrides-current.log
+    ls -t runtime/generated/sietch-overrides*.log 2>/dev/null | head -n 1
+  } | awk 'NF { print; exit }')"
+
   first_known_value \
     "$(log_battlegroup_id_value runtime/text-router/director-current.log 2>/dev/null || true)" \
-    "$(log_battlegroup_id_value runtime/generated/sietch-overrides.log 2>/dev/null || true)" \
+    "$(log_battlegroup_id_value "${override_log:-runtime/generated/sietch-overrides.log}" 2>/dev/null || true)" \
     || return 1
 }
 
