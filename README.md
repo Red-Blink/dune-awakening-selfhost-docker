@@ -203,9 +203,10 @@ dune db backup
 dune db list
 dune db status
 dune db delete dune-db-<scope>__YYYYMMDD-HHMMSS.dump
+dune db delete dune-db-<scope>-YYYYMMDD-HHMMSS.backup
 dune db delete --all
-dune db import runtime/backups/db/<backup-file>.dump
-dune db restore runtime/backups/db/<backup-file>.dump
+dune db import runtime/backups/db/<backup-file>.backup
+dune db restore runtime/backups/db/<backup-file>.backup
 dune db auto enable 12
 dune db auto enable 1 7
 dune db auto retention 7
@@ -214,11 +215,18 @@ dune db auto disable
 dune db auto status
 ```
 
-Backups are saved under `runtime/backups/db/` by default and do not include Funcom tokens or secret files. Backup filenames use the format `dune-db-<scope>__YYYYMMDD-HHMMSS.dump`, where `<scope>` is derived from the currently assigned map set so the file is easier to identify later. The `.meta` file next to each backup also records the full active map list and battlegroup details at backup time.
+`dune-docker` writes official-style `.backup` files with a `.backup.yaml` sidecar under `runtime/backups/db/`. These backups do not include Funcom tokens or secret files. The backup artifact keeps a scope-aware name so battlegroup and map context are still identifiable later.
+
+Import and restore accept official Funcom-style `.backup` files plus older `dune-db-*.dump` and `.sql` backups. Import/restore replaces the current battlegroup database state, requires confirmation, and creates a pre-import backup first.
+
+In the manager, `Import Database Backup` has two paths:
+
+- `Import Local Backup File` prompts for a local file path, copies the selected `.backup`, `.dump`, or `.sql` file into `runtime/backups/db/`, copies `<file>.yaml` when present, then runs the normal restore confirmation flow.
+- `Import Remote Backup Over SSH` prompts for the remote host or IP, SSH user, SSH port, and remote backup directory. It requires both `ssh` and `scp`, lists remote `.backup` files, copies the selected backup into `runtime/backups/db/`, copies `<file>.yaml` when present, then runs the same restore confirmation flow locally.
 
 Automatic backups use a systemd timer when systemd is available. Optional retention keeps backups from the last X days, for example `dune db auto enable 1 7` backs up hourly and keeps the last 7 days.
 
-In the manager, database restore is shown as `Restore A Database Backup` and uses a backup picker instead of asking for a path. Delete flows also show available backups first. Import/restore replaces the current database state, requires confirmation, and creates a pre-import backup first. Deleting backups is permanent.
+In the manager, database maintenance includes `Create Database Backup`, `Import Database Backup`, `Restore A Database Backup`, `Delete A Backup`, `Delete All Backups`, and `Automatic Database Backups`. Restore and delete flows show available backups first. `Import Database Backup` supports local files and remote SSH imports, and carries the `.yaml` sidecar along when present. Deleting backups is permanent.
 
 ## Battlegroup And Sietch Settings
 

@@ -40,22 +40,80 @@ GITHUB_REPO="$(detect_github_repo)"
 GITHUB_API_BASE="${DUNE_SELF_UPDATE_API_BASE:-https://api.github.com}"
 GITHUB_TOKEN="${DUNE_SELF_UPDATE_TOKEN:-}"
 LATEST_TAG_CACHE_FILE="runtime/generated/self-update-latest-tag.txt"
+API_LAST_STATUS=""
+
+api_curl_common_args() {
+  printf '%s\n' \
+    -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: 2022-11-28"
+  if [ -n "$GITHUB_TOKEN" ]; then
+    printf '%s\n' -H "Authorization: Bearer $GITHUB_TOKEN"
+  fi
+}
 
 api_get() {
   local path="$1"
+  local tmp_body
+  local http_code
+  local curl_rc
+  local -a curl_args
 
-  if [ -n "$GITHUB_TOKEN" ]; then
-    curl -fsSL \
-      -H "Accept: application/vnd.github+json" \
-      -H "Authorization: Bearer $GITHUB_TOKEN" \
-      -H "X-GitHub-Api-Version: 2022-11-28" \
+  API_LAST_STATUS=""
+  tmp_body="$(mktemp)"
+  mapfile -t curl_args < <(api_curl_common_args)
+
+  set +e
+  http_code="$(
+    curl -sSL \
+      "${curl_args[@]}" \
+      -o "$tmp_body" \
+      -w '%{http_code}' \
       "${GITHUB_API_BASE}/repos/${GITHUB_REPO}${path}"
-  else
-    curl -fsSL \
-      -H "Accept: application/vnd.github+json" \
-      -H "X-GitHub-Api-Version: 2022-11-28" \
-      "${GITHUB_API_BASE}/repos/${GITHUB_REPO}${path}"
+  )"
+  curl_rc=$?
+  set -e
+
+  if [ "$curl_rc" -ne 0 ]; then
+    rm -f "$tmp_body"
+    return "$curl_rc"
   fi
+
+  API_LAST_STATUS="$http_code"
+  if [ "${http_code:-000}" -lt 200 ] || [ "${http_code:-000}" -ge 300 ]; then
+    rm -f "$tmp_body"
+    return 22
+  fi
+
+  cat "$tmp_body"
+  rm -f "$tmp_body"
+}
+
+print_release_fetch_failure() {
+  local action="$1"
+
+  echo "Could not $action from GitHub."
+  echo "GitHub repo: $GITHUB_REPO"
+  case "${API_LAST_STATUS:-}" in
+    401|403)
+      echo "GitHub API access was denied or rate-limited."
+      if [ -n "$GITHUB_TOKEN" ]; then
+        echo "Check whether DUNE_SELF_UPDATE_TOKEN is valid and still has access."
+      else
+        echo "If GitHub rate limiting is the issue, set DUNE_SELF_UPDATE_TOKEN to increase the API limit."
+      fi
+      ;;
+    404)
+      echo "The repository or its published releases could not be found through the GitHub API."
+      echo "Check that the detected repo is correct and that releases are published."
+      ;;
+    "")
+      echo "The GitHub API request failed before a response was returned."
+      ;;
+    *)
+      echo "GitHub API returned HTTP ${API_LAST_STATUS}."
+      echo "Check that the repo is reachable and that published releases exist."
+      ;;
+  esac
 }
 
 latest_release_json() {
@@ -342,9 +400,7 @@ case "$cmd" in
     set -e
 
     if [ "$rc" -ne 0 ] || [ -z "${latest:-}" ]; then
-      echo "Could not check stack releases from GitHub."
-      echo "If the repo is still private, this is expected until public releases are published"
-      echo "or a GitHub token is configured in DUNE_SELF_UPDATE_TOKEN."
+      print_release_fetch_failure "check stack releases"
       exit 2
     fi
 
@@ -362,7 +418,7 @@ case "$cmd" in
 
   list|releases)
     if ! list_release_rows; then
-      echo "Could not fetch stack releases from GitHub."
+      print_release_fetch_failure "fetch stack releases"
       exit 2
     fi
     ;;
@@ -378,7 +434,14 @@ case "$cmd" in
       fi
       if [ -z "$tag" ]; then
         echo "Could not resolve the latest stack release."
-        echo "If the repo is still private, publish releases first or configure DUNE_SELF_UPDATE_TOKEN."
+        case "${API_LAST_STATUS:-}" in
+          401|403)
+            echo "GitHub API access was denied or rate-limited."
+            ;;
+          404)
+            echo "No published release could be resolved from the detected GitHub repo."
+            ;;
+        esac
         exit 2
       fi
     elif [ "$tag" = "previous" ]; then

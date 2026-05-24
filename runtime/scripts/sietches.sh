@@ -514,6 +514,9 @@ if not name:
     raise SystemExit(1)
 
 catalog_max = len(maps[name])
+maps_cfg = config.setdefault("maps", {})
+entry = maps_cfg.setdefault(name, {})
+max_dimensions = int(entry.get("max_dimensions") or catalog_max)
 if name == "Overmap":
     print("Overmap must remain at one dimension.", file=sys.stderr)
     raise SystemExit(1)
@@ -522,15 +525,12 @@ if key == "active_dimensions":
     if raw.get("dedicatedScaling"):
         print(f"{name} has dedicated scaling enabled; active dimensions are managed at runtime.", file=sys.stderr)
         raise SystemExit(1)
-if value > catalog_max:
+if value > catalog_max and not (key == "active_dimensions" and name == "Survival_1" and value <= max_dimensions):
     print(f"{name} currently has {catalog_max} available partition(s).", file=sys.stderr)
     print("Increasing beyond that requires regenerating and applying world partitions, which this command will not do automatically.", file=sys.stderr)
     raise SystemExit(1)
 
-maps_cfg = config.setdefault("maps", {})
-entry = maps_cfg.setdefault(name, {})
 if key == "active_dimensions":
-    max_dimensions = int(entry.get("max_dimensions") or catalog_max)
     if value > max_dimensions:
         print(f"Active dimensions must be less than or equal to max dimensions ({max_dimensions}).", file=sys.stderr)
         raise SystemExit(1)

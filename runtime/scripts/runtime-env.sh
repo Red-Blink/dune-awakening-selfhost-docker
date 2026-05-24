@@ -293,7 +293,11 @@ if not path.exists():
     print(fallback)
     raise SystemExit
 
-config = json.loads(path.read_text())
+try:
+    config = json.loads(path.read_text())
+except Exception:
+    print(fallback)
+    raise SystemExit
 value = str(config.get("engine", {}).get(key, "")).strip()
 if not value:
     print(fallback)

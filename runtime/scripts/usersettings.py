@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -45,16 +46,33 @@ PARTITION_FIELDS = {
 def load_config() -> dict:
     if not CONFIG_PATH.exists():
         return {"engine": {}, "maps": {}, "partitions": {}}
-    config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    try:
+        config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"engine": {}, "maps": {}, "partitions": {}}
     config.setdefault("engine", {})
     config.setdefault("maps", {})
     config.setdefault("partitions", {})
     return config
 
 
+def atomic_write_text(path: Path, content: str, mode: int = 0o664) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.parent / f".{path.name}.tmp.{os.getpid()}"
+    tmp_path.write_text(content, encoding="utf-8")
+    try:
+        tmp_path.chmod(mode)
+    except OSError:
+        pass
+    tmp_path.replace(path)
+    try:
+        path.chmod(mode)
+    except OSError:
+        pass
+
+
 def save_config(config: dict) -> None:
-    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CONFIG_PATH.write_text(json.dumps(config, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    atomic_write_text(CONFIG_PATH, json.dumps(config, indent=2, sort_keys=True) + "\n")
 
 
 def canonical_map(value: str) -> str:
@@ -184,7 +202,7 @@ def write_userengine_ini(path: Path, values: dict[str, str]) -> None:
             lines.append("")
         lines.append(f"[{section}]")
         lines.extend(entries)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(path, "\n".join(lines) + "\n")
 
 
 def truthy(value: str) -> bool:
@@ -215,7 +233,73 @@ def write_usergame_ini(path: Path, values: dict[str, str], partition_id: str | N
         f"m_BaseBackupMaxExtensions={values.get('base_backup_max_extensions', MAP_FIELDS['base_backup_max_extensions'][2])}",
         f"m_bBuildingRestrictionLimitsEnabled={values.get('building_restriction_limits_enabled', MAP_FIELDS['building_restriction_limits_enabled'][2])}",
     ])
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(path, "\n".join(lines) + "\n")
+
+
+def safe_runtime_dir_name(map_name: str, partition_id: str) -> str:
+    raw = f"{map_name}-{partition_id}".lower()
+    chars: list[str] = []
+    previous_dash = False
+    for char in raw:
+        if char.isalnum():
+            chars.append(char)
+            previous_dash = False
+        else:
+            if not previous_dash:
+                chars.append("-")
+                previous_dash = True
+    return "".join(chars).strip("-")
+
+
+def materialize_current_runtime_files() -> int:
+    config = load_config()
+    game_root = ROOT / "runtime" / "game"
+    partition_catalog_path = SIETCH_CONFIG_PATH.parent / "partition-catalog.json"
+    if not game_root.exists():
+        return 0
+
+    targets: list[tuple[str, Path, str | None]] = []
+
+    overmap_dir = game_root / "overmap" / "Saved"
+    if overmap_dir.exists():
+        targets.append(("Overmap", overmap_dir, None))
+
+    survival_dir = game_root / "survival-1" / "Saved"
+    if survival_dir.exists():
+        targets.append(("Survival_1", survival_dir, "1"))
+
+    catalog_rows = []
+    if partition_catalog_path.exists():
+        try:
+            catalog_rows = json.loads(partition_catalog_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            catalog_rows = []
+
+    seen_paths = {path.resolve() for _, path, _ in targets if path.exists()}
+    for row in catalog_rows:
+        map_name = str(row.get("map", "")).strip()
+        partition_id = str(row.get("id", "")).strip()
+        if not map_name or not partition_id:
+            continue
+        saved_dir = game_root / safe_runtime_dir_name(map_name, partition_id) / "Saved"
+        if not saved_dir.exists():
+            continue
+        resolved = saved_dir.resolve()
+        if resolved in seen_paths:
+            continue
+        targets.append((canonical_map(map_name), saved_dir, partition_id))
+        seen_paths.add(resolved)
+
+    for map_name, saved_dir, partition_id in targets:
+        user_settings_dir = saved_dir / "UserSettings"
+        user_settings_dir.mkdir(parents=True, exist_ok=True)
+        write_userengine_ini(user_settings_dir / "UserEngine.ini", merged_engine_values(config))
+        if partition_id:
+            values = merged_partition_values(config, canonical_map(map_name), str(partition_id))
+        else:
+            values = merged_map_values(config, canonical_map(map_name))
+        write_usergame_ini(user_settings_dir / "UserGame.ini", values, partition_id)
+    return 0
 
 
 def materialize(map_name: str, saved_dir: str, partition_id: str | None = None) -> int:
@@ -253,6 +337,8 @@ def main(argv: list[str]) -> int:
         return set_partition_field(argv[2], argv[3], argv[4], argv[5])
     if command == "reset-all":
         return reset_all()
+    if command == "materialize-current":
+        return materialize_current_runtime_files()
     if command == "materialize" and len(argv) == 4:
         return materialize(argv[2], argv[3])
     if command == "materialize" and len(argv) == 5:

@@ -200,7 +200,8 @@ choose_stack_release_to_install() {
 
   if [ "$rc" -ne 0 ] || [ "${#rows[@]}" -eq 0 ]; then
     echo "Could not fetch stack releases from GitHub."
-    echo "Make sure releases are published and DUNE_SELF_UPDATE_TOKEN is set if the repo is private."
+    echo "Make sure the detected GitHub repo is correct and that published releases exist."
+    echo "If GitHub API rate limiting is the issue, set DUNE_SELF_UPDATE_TOKEN."
     return 1
   fi
 
@@ -1173,10 +1174,18 @@ but this menu controls the gameplay overrides used for ${map}${partition_id:+ pa
 EOF
 }
 
+refresh_usersettings_runtime_files() {
+  if ! python3 "$USERSETTINGS_PY" materialize-current >/dev/null 2>&1; then
+    warn "Saved the override, but could not refresh the current UserEngine.ini/UserGame.ini files."
+    warn "This usually means an old runtime file has restrictive ownership or permissions."
+  fi
+}
+
 save_userengine_field() {
   local field_id="$1"
   local value="$2"
   if run_cmd_status python3 "$USERSETTINGS_PY" engine-set "$field_id" "$value"; then
+    refresh_usersettings_runtime_files
     ok_msg "Global UserEngine setting updated."
     info "Running map server containers keep the old values until they are restarted."
   fi
@@ -1189,12 +1198,14 @@ save_usergame_field() {
   local partition_id="${4:-}"
   if [ -n "$partition_id" ]; then
     if run_cmd_status python3 "$USERSETTINGS_PY" partition-set "$map" "$partition_id" "$field_id" "$value"; then
+      refresh_usersettings_runtime_files
       ok_msg "UserGame setting updated for $map partition $partition_id."
       restart_partition_if_requested "$map" "$partition_id"
     fi
     return
   fi
   if run_cmd_status python3 "$USERSETTINGS_PY" map-set "$map" "$field_id" "$value"; then
+    refresh_usersettings_runtime_files
     ok_msg "Map-specific UserGame setting updated for $map."
     info "Running containers for $map keep the old values until that map is restarted or respawned."
   fi
@@ -1280,9 +1291,9 @@ edit_userengine_port_field() {
 
   echo
   echo "$title"
-  echo "; The starting port that servers listen to for players. Each server"
-  echo "; will use the next available port in a sequence (7777, 7778 etc.). The range should"
-  echo "; not intersect with the IGWPort range bellow"
+  echo "; The port that servers listen to for other servers. Each server"
+  echo "; will use the next available port in a sequence (7888, 7889 etc.). The range should"
+  echo "; not intersect with the Port range above."
   echo
   prompt_usersettings_number "New value (/back to cancel):" int
   if [ "${USERSETTINGS_INPUT_CANCELLED:-0}" = "1" ]; then
@@ -1351,6 +1362,7 @@ reset_all_usersettings() {
   echo "The battlegroup will go back to the built-in default values."
   echo "Running maps keep their current values until they are restarted."
   if run_cmd_status python3 "$USERSETTINGS_PY" reset-all; then
+    refresh_usersettings_runtime_files
     ok_msg "All UserEngine/UserGame overrides were removed."
     info "Restart running maps to apply the default values again."
   fi
@@ -1693,13 +1705,13 @@ redeploy_battlegroup_flow() {
 }
 
 valid_backup_basename() {
-  printf '%s' "$1" | grep -Eq '^dune-db-([a-z0-9][a-z0-9_-]*__)?[0-9]{8}-[0-9]{6}\.(dump|sql)$'
+  printf '%s' "$1" | grep -Eq '^dune-db-([a-z0-9][a-z0-9_-]*__)?[0-9]{8}-[0-9]{6}\.(dump|sql)$|^[a-z0-9][a-z0-9_-]*-[0-9]{8}-[0-9]{6}\.backup$'
 }
 
 backup_names() {
   local backup_dir="runtime/backups/db"
   [ -d "$backup_dir" ] || return 0
-  find "$backup_dir" -maxdepth 1 -type f \( -name 'dune-db-*.dump' -o -name 'dune-db-*.sql' \) -printf '%f\n' \
+  find "$backup_dir" -maxdepth 1 -type f \( -name 'dune-db-*.dump' -o -name 'dune-db-*.sql' -o -name '*.backup' \) -printf '%f\n' \
     | while IFS= read -r name; do
         valid_backup_basename "$name" && printf '%s\n' "$name"
       done \
@@ -1718,6 +1730,26 @@ backup_label() {
   size="$(stat -c '%s bytes' "$path" 2>/dev/null || echo unknown)"
   modified="$(stat -c '%y' "$path" 2>/dev/null | cut -d. -f1 || echo unknown)"
   printf '%s  %s  %s' "$name" "$modified" "$size"
+}
+
+copy_backup_sidecar_if_present() {
+  local source_file="$1"
+  local destination_dir="$2"
+  local sidecar_source
+
+  sidecar_source="${source_file}.yaml"
+  if [ -f "$sidecar_source" ]; then
+    cp -p -- "$sidecar_source" "$destination_dir/$(basename "$sidecar_source")"
+  fi
+}
+
+clear_backup_sidecar_if_missing() {
+  local source_file="$1"
+  local destination_file="$2"
+
+  if [ ! -f "${source_file}.yaml" ] && [ -f "${destination_file}.yaml" ]; then
+    rm -f -- "${destination_file}.yaml"
+  fi
 }
 
 choose_backup() {
@@ -1746,6 +1778,196 @@ choose_backup() {
   CHOSEN_BACKUP="${names[$((choice - 1))]}"
 }
 
+restore_specific_backup_path() {
+  local backup_path="$1"
+  local backup_name="${2:-$(basename "$backup_path")}"
+
+  echo
+  echo "Restoring a database backup will replace the current battlegroup database."
+  if confirm "Restore backup '$backup_name'?"; then
+    run_cmd env DUNE_DB_ASSUME_YES=1 "$DUNE" db restore "$backup_path"
+  else
+    echo "Cancelled."
+  fi
+}
+
+import_local_backup_file_flow() {
+  local source_path source_dir source_name destination_dir destination_path
+
+  destination_dir="runtime/backups/db"
+  mkdir -p "$destination_dir"
+
+  echo
+  prompt_text "Local Backup File Path:" source_path || return
+  source_path="$(sanitize_prompt_value "$source_path")"
+  if [ ! -f "$source_path" ]; then
+    error_msg "Backup file not found: $source_path"
+    return 1
+  fi
+
+  source_name="$(basename "$source_path")"
+  if ! valid_backup_basename "$source_name"; then
+    error_msg "Unsupported backup filename: $source_name"
+    echo "Accepted: dune-db-<scope>__YYYYMMDD-HHMMSS.dump|sql or <artifact-id>-YYYYMMDD-HHMMSS.backup"
+    return 1
+  fi
+
+  destination_path="$destination_dir/$source_name"
+  if [ "$source_path" != "$destination_path" ]; then
+    if [ -e "$destination_path" ] && ! confirm "Overwrite existing local backup '$source_name'?"; then
+      echo "Cancelled."
+      return 1
+    fi
+    clear_backup_sidecar_if_missing "$source_path" "$destination_path"
+    cp -p -- "$source_path" "$destination_path"
+    copy_backup_sidecar_if_present "$source_path" "$destination_dir"
+  fi
+
+  restore_specific_backup_path "$destination_path" "$source_name"
+}
+
+remote_backup_rows() {
+  local remote_host="$1"
+  local remote_user="$2"
+  local remote_port="$3"
+  local remote_dir="$4"
+  local escaped_remote_dir
+
+  escaped_remote_dir="$(printf "%s" "$remote_dir" | sed "s/'/'\\\\''/g")"
+  ssh -p "$remote_port" -o ConnectTimeout=10 "$remote_user@$remote_host" \
+    "find '$escaped_remote_dir' -maxdepth 2 -type f -name '*.backup' -printf '%f\t%p\n' | sort"
+}
+
+choose_remote_backup() {
+  local remote_host="$1"
+  local remote_user="$2"
+  local remote_port="$3"
+  local remote_dir="$4"
+  local rows=()
+  local names=()
+  local paths=()
+  local labels=()
+  local row name path choice
+
+  set +e
+  mapfile -t rows < <(remote_backup_rows "$remote_host" "$remote_user" "$remote_port" "$remote_dir" 2>/dev/null)
+  local rc=$?
+  set -e
+  if [ "$rc" -ne 0 ]; then
+    error_msg "Could not list remote backups over SSH."
+    return 1
+  fi
+
+  for row in "${rows[@]}"; do
+    IFS=$'\t' read -r name path <<< "$row"
+    [ -n "${name:-}" ] || continue
+    [ -n "${path:-}" ] || continue
+    valid_backup_basename "$name" || continue
+    names+=("$name")
+    paths+=("$path")
+    labels+=("$name  $path")
+  done
+
+  if [ "${#names[@]}" -eq 0 ]; then
+    echo "No remote .backup files were found."
+    return 1
+  fi
+
+  labels+=("Back")
+  menu_or_back "Import Remote Backup Over SSH" "${labels[@]}" || return 1
+  choice="$MENU_CHOICE"
+  if [ "$choice" -eq "${#labels[@]}" ]; then
+    return 1
+  fi
+
+  CHOSEN_REMOTE_BACKUP_NAME="${names[$((choice - 1))]}"
+  CHOSEN_REMOTE_BACKUP_PATH="${paths[$((choice - 1))]}"
+}
+
+copy_remote_backup_to_local() {
+  local remote_host="$1"
+  local remote_user="$2"
+  local remote_port="$3"
+  local remote_path="$4"
+  local destination_dir="runtime/backups/db"
+  local remote_ref remote_yaml_ref local_path escaped_remote_path
+
+  mkdir -p "$destination_dir"
+  escaped_remote_path="$(printf "%s" "$remote_path" | sed "s/'/'\\\\''/g")"
+  remote_ref="$remote_user@$remote_host:'$escaped_remote_path'"
+  local_path="$destination_dir/$(basename "$remote_path")"
+
+  if [ -e "$local_path" ] && ! confirm "Overwrite existing local backup '$(basename "$local_path")'?"; then
+    echo "Cancelled."
+    return 1
+  fi
+
+  scp -P "$remote_port" -p "$remote_ref" "$destination_dir/" || return 1
+
+  remote_yaml_ref="$remote_user@$remote_host:'$escaped_remote_path.yaml'"
+  rm -f -- "$local_path.yaml"
+  scp -P "$remote_port" -p "$remote_yaml_ref" "$destination_dir/" >/dev/null 2>&1 || true
+
+  COPIED_REMOTE_BACKUP_PATH="$local_path"
+}
+
+import_remote_backup_over_ssh_flow() {
+  local remote_host remote_user remote_port remote_dir
+
+  if ! command -v ssh >/dev/null 2>&1; then
+    error_msg "ssh is required for remote database import."
+    return 1
+  fi
+  if ! command -v scp >/dev/null 2>&1; then
+    error_msg "scp is required for remote database import."
+    return 1
+  fi
+
+  echo
+  prompt_text "Remote Host Or IP:" remote_host || return
+  prompt_text "SSH User:" remote_user || return
+  prompt_text "SSH Port:" remote_port || return
+  remote_port="$(sanitize_numeric_prompt_value "$remote_port")"
+  if ! printf '%s' "$remote_port" | grep -Eq '^[1-9][0-9]*$'; then
+    error_msg "SSH port must be a positive integer."
+    return 1
+  fi
+  prompt_text "Remote Backup Directory:" remote_dir || return
+
+  if ! ssh -p "$remote_port" -o ConnectTimeout=10 "$remote_user@$remote_host" "test -d '$(printf "%s" "$remote_dir" | sed "s/'/'\\\\''/g")'"; then
+    error_msg "Remote backup directory does not exist or could not be accessed."
+    return 1
+  fi
+
+  CHOSEN_REMOTE_BACKUP_NAME=""
+  CHOSEN_REMOTE_BACKUP_PATH=""
+  choose_remote_backup "$remote_host" "$remote_user" "$remote_port" "$remote_dir" || return
+
+  if ! copy_remote_backup_to_local "$remote_host" "$remote_user" "$remote_port" "$CHOSEN_REMOTE_BACKUP_PATH"; then
+    error_msg "Remote backup copy failed."
+    return 1
+  fi
+
+  restore_specific_backup_path "$COPIED_REMOTE_BACKUP_PATH" "$(basename "$COPIED_REMOTE_BACKUP_PATH")"
+}
+
+import_remote_database_menu() {
+  local choice
+  while true; do
+    menu_or_back "Import Database Backup" \
+      "Import Remote Backup Over SSH" \
+      "Import Local Backup File" \
+      "Back" || return
+    choice="$MENU_CHOICE"
+
+    case "$choice" in
+      1) import_remote_backup_over_ssh_flow; return ;;
+      2) import_local_backup_file_flow; return ;;
+      3) return ;;
+    esac
+  done
+}
+
 restore_backup_flow() {
   local backup
 
@@ -1753,13 +1975,7 @@ restore_backup_flow() {
   choose_backup "Restore A Database Backup" || return
   backup="$CHOSEN_BACKUP"
 
-  echo
-  echo "Restoring a database backup will replace the current battlegroup database."
-  if confirm "Restore backup '$backup'?"; then
-    run_cmd env DUNE_DB_ASSUME_YES=1 "$DUNE" db restore "runtime/backups/db/$backup"
-  else
-    echo "Cancelled."
-  fi
+  restore_specific_backup_path "runtime/backups/db/$backup" "$backup"
 }
 
 delete_backup_flow() {
@@ -1998,25 +2214,29 @@ database_maintenance_menu() {
   local choice
   while true; do
     menu_or_back "Database Maintenance" \
-      "Run Database Backup Now" \
+      "Create Database Backup" \
+      "Import Database Backup" \
       "Restore A Database Backup" \
       "List Database Backups" \
       "Delete A Backup" \
       "Delete All Backups" \
       "Automatic Database Backups" \
+      "Database Health Check" \
       "Database Status" \
       "Back" || return
     choice="$MENU_CHOICE"
 
     case "$choice" in
       1) run_cmd "$DUNE" db backup; pause ;;
-      2) restore_backup_flow; pause ;;
-      3) run_cmd "$DUNE" db list; pause ;;
-      4) delete_backup_flow; pause ;;
-      5) delete_all_backups_flow; pause ;;
-      6) automatic_database_backups_menu ;;
-      7) run_cmd "$DUNE" db status; pause ;;
-      8) return ;;
+      2) import_remote_database_menu; pause ;;
+      3) restore_backup_flow; pause ;;
+      4) run_cmd "$DUNE" db list; pause ;;
+      5) delete_backup_flow; pause ;;
+      6) delete_all_backups_flow; pause ;;
+      7) automatic_database_backups_menu ;;
+      8) run_cmd "$DUNE" db health; pause ;;
+      9) run_cmd "$DUNE" db status; pause ;;
+      10) return ;;
     esac
   done
 }
