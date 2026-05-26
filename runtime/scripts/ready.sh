@@ -72,6 +72,102 @@ container_logs() {
   docker logs "$container" 2>&1 || true
 }
 
+container_partition_id() {
+  local container="$1"
+  if [[ "$container" =~ -([0-9]+)$ ]]; then
+    printf '%s' "${BASH_REMATCH[1]}"
+  fi
+}
+
+partition_map_and_server() {
+  local partition_id="$1"
+
+  [ -n "$partition_id" ] || return 1
+  docker exec dune-postgres psql -U dune -d dune -Atc "
+    select map || '|' || coalesce(server_id, '')
+    from dune.world_partition
+    where partition_id = $partition_id
+    limit 1;
+  " 2>/dev/null || true
+}
+
+server_effective_players() {
+  local server_id="$1"
+
+  [ -n "$server_id" ] || {
+    echo "0"
+    return 0
+  }
+
+  docker exec dune-postgres psql -U dune -d dune -Atc "
+    select count(*)
+    from dune.player_state
+    where server_id = '${server_id//\'/\'\'}'
+      and (
+        online_status <> 'Offline'
+        or (
+          reconnect_grace_period_end is not null
+          and reconnect_grace_period_end > (current_timestamp at time zone 'UTC')
+        )
+        or (
+          last_avatar_activity is not null
+          and last_avatar_activity > (current_timestamp - interval '5 minutes')
+        )
+      );
+  " 2>/dev/null | tr -d '[:space:]'
+}
+
+partition_effective_players() {
+  local partition_id="$1"
+  local server_id="$2"
+  local safe_server_id
+
+  safe_server_id="${server_id//\'/\'\'}"
+
+  [ -n "$partition_id" ] || {
+    echo "0"
+    return 0
+  }
+
+  docker exec dune-postgres psql -U dune -d dune -Atc "
+    select count(*)
+    from dune.player_state ps
+    left join dune.farm_state fs on fs.server_id = ps.server_id
+    where (
+      ps.server_id = '$safe_server_id'
+      or (
+        ps.previous_server_partition_id = $partition_id
+        and (
+          coalesce(ps.server_id, '') = ''
+          or fs.server_id is null
+          or ps.server_id <> '$safe_server_id'
+        )
+      )
+    )
+      and (
+        ps.online_status <> 'Offline'
+        or (
+          ps.reconnect_grace_period_end is not null
+          and ps.reconnect_grace_period_end > (current_timestamp at time zone 'UTC')
+        )
+        or (
+          ps.last_avatar_activity is not null
+          and ps.last_avatar_activity > (current_timestamp - interval '5 minutes')
+        )
+      );
+  " 2>/dev/null | tr -d '[:space:]'
+}
+
+map_has_recent_travel_demand() {
+  local map_name="$1"
+
+  [ -n "$map_name" ] || return 1
+  is_running dune-director || return 1
+
+  docker logs --since 5m dune-director 2>&1 \
+    | grep -Fq "Processing travel queue for ClassicalInstancing group ${map_name} "
+}
+
 logs_have_fatal() {
   local logs="$1"
 
@@ -276,6 +372,55 @@ while IFS= read -r c; do
   esac
 
   dynamic_found=1
+  partition_id="$(container_partition_id "$c")"
+  partition_row="$(partition_map_and_server "$partition_id")"
+  map_name=""
+  server_id=""
+  if [ -n "$partition_row" ]; then
+    IFS='|' read -r map_name server_id <<< "$partition_row"
+  fi
+
+  if [ "$map_name" = "Survival_1" ]; then
+    check_game_server_ready "$c" "$c"
+    continue
+  fi
+
+  farm_ready="f"
+  if [ -n "$server_id" ]; then
+    farm_ready="$(docker exec dune-postgres psql -U dune -d dune -Atc "
+      select coalesce(ready::text, 'f')
+      from dune.farm_state
+      where server_id = '${server_id//\'/\'\'}'
+      limit 1;
+    " 2>/dev/null | tr -d '[:space:]')"
+    farm_ready="${farm_ready:-f}"
+  fi
+
+  if [ "$farm_ready" = "t" ]; then
+    check_game_server_ready "$c" "$c"
+    continue
+  fi
+
+  connected_players="0"
+  if [ -n "$server_id" ]; then
+    connected_players="$(docker exec dune-postgres psql -U dune -d dune -Atc "
+      select coalesce(connected_players::text, '0')
+      from dune.farm_state
+      where server_id = '${server_id//\'/\'\'}'
+      limit 1;
+    " 2>/dev/null | tr -d '[:space:]')"
+    connected_players="${connected_players:-0}"
+  fi
+
+  effective_players="$(partition_effective_players "$partition_id" "$server_id")"
+  effective_players="${effective_players:-0}"
+
+  if [ "$connected_players" = "0" ] && [ "$effective_players" = "0" ] && ! map_has_recent_travel_demand "$map_name"; then
+    mark_ok "$c idle dynamic warmup ignored"
+    echo "     Optional dynamic map with no active or reconnecting players; it will not block overall readiness."
+    continue
+  fi
+
   check_game_server_ready "$c" "$c"
 done < <(docker ps --format '{{.Names}}' | grep '^dune-server-' || true)
 

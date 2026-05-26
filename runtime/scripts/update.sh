@@ -304,7 +304,7 @@ fi
 
 echo
 echo "=== Stop game servers before update ==="
-docker rm -f dune-server-overmap dune-server-survival-1 2>/dev/null || true
+runtime/scripts/recycle-world-game-servers.sh stop-all
 
 echo
 echo "=== Download/update server files with SteamCMD ==="

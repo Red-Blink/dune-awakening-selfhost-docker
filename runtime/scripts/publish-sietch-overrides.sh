@@ -15,6 +15,28 @@ SOURCE_FILTER_QUEUE="sietchOverrideSourceSurvival1"
 SINK_QUEUE="serverStateSink_Survival_1"
 FILTER_EXCHANGE="sietchOverrideFilteredState"
 
+loop_pids() {
+  pgrep -f "publish-sietch-overrides.sh loop" 2>/dev/null || true
+}
+
+loop_running() {
+  [ -n "$(loop_pids)" ]
+}
+
+write_live_pidfile() {
+  mkdir -p "$(dirname "$PID_FILE")"
+  printf '%s\n' "$$" >"$PID_FILE"
+}
+
+clear_stale_pidfile() {
+  [ -f "$PID_FILE" ] || return 0
+  local pid
+  pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+  if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
+    rm -f "$PID_FILE"
+  fi
+}
+
 prepare_runtime_generated_files() {
   local current_log
   mkdir -p runtime/generated
@@ -281,6 +303,8 @@ PY
 
 start_loop() {
   mkdir -p runtime/generated
+  write_live_pidfile
+  trap 'rm -f "$PID_FILE"' EXIT
   local route_refresh_at=0
   ensure_route
   publish_snapshot_once >>"$LOG_FILE" 2>&1 || true
@@ -315,7 +339,8 @@ case "${1:-start}" in
     fi
     ;;
   start)
-    if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    clear_stale_pidfile
+    if loop_running; then
       exit 0
     fi
     pkill -f "publish-sietch-overrides.sh loop" 2>/dev/null || true
@@ -329,11 +354,12 @@ case "${1:-start}" in
     start_loop
     ;;
   stop)
+    clear_stale_pidfile
     if [ -f "$PID_FILE" ]; then
       kill "$(cat "$PID_FILE")" 2>/dev/null || true
-      rm -f "$PID_FILE"
     fi
     pkill -f "publish-sietch-overrides.sh loop" 2>/dev/null || true
+    rm -f "$PID_FILE"
     restore_route || true
     ;;
   restart)

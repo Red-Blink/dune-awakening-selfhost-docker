@@ -73,6 +73,58 @@ psql_value() {
   docker exec dune-postgres psql -U postgres -d dune -Atc "$1"
 }
 
+purge_stale_farm_rows_for_map() {
+  local map="$1"
+  local safe_map
+  safe_map="${map//\'/\'\'}"
+
+  docker exec dune-postgres psql -U postgres -d dune -v ON_ERROR_STOP=1 -c "
+begin;
+delete from dune.farm_state fs
+where fs.map = '$safe_map'
+  and coalesce(fs.alive, false) = false
+  and fs.server_id not in (
+    select server_id
+    from dune.world_partition
+    where server_id is not null
+  );
+commit;
+" >/dev/null
+}
+
+clear_dead_partition_assignment() {
+  local partition_id="$1"
+  local assigned_server="$2"
+  local alive_state
+
+  [ -n "$partition_id" ] || return 1
+  [ -n "$assigned_server" ] || return 1
+
+  alive_state="$(psql_value "
+    select coalesce(alive::text, '')
+    from dune.farm_state
+    where server_id = '${assigned_server//\'/\'\'}'
+    limit 1;
+  ")"
+
+  if [ "$alive_state" = "true" ]; then
+    return 1
+  fi
+
+  docker exec dune-postgres psql -U postgres -d dune -v ON_ERROR_STOP=1 -c "
+begin;
+update dune.world_partition
+set server_id = null
+where partition_id = $partition_id
+  and server_id = '${assigned_server//\'/\'\'}';
+delete from dune.farm_state
+where server_id = '${assigned_server//\'/\'\'}';
+commit;
+" >/dev/null
+
+  return 0
+}
+
 if [[ "$TARGET" =~ ^[0-9]+$ ]]; then
   ROW="$(psql_value "
     select partition_id || '|' || map || '|' || dimension_index || '|' || coalesce(label,'') || '|' || coalesce(server_id,'')
@@ -111,8 +163,12 @@ fi
 IFS='|' read -r PARTITION_ID MAP_NAME DIMENSION_INDEX LABEL ASSIGNED_SERVER <<< "$ROW"
 
 if [ -n "$ASSIGNED_SERVER" ]; then
-  echo "Partition $PARTITION_ID ($MAP_NAME / $LABEL) is already assigned to server: $ASSIGNED_SERVER"
-  exit 1
+  if clear_dead_partition_assignment "$PARTITION_ID" "$ASSIGNED_SERVER"; then
+    ASSIGNED_SERVER=""
+  else
+    echo "Partition $PARTITION_ID ($MAP_NAME / $LABEL) is already assigned to server: $ASSIGNED_SERVER"
+    exit 1
+  fi
 fi
 
 safe_name="$(echo "$MAP_NAME-$PARTITION_ID" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//')"
@@ -173,7 +229,11 @@ PY
 MEMORY="$(memory_for_map "$MAP_NAME")"
 mapfile -t SIETCH_RUNTIME_ARGS < <(runtime/scripts/sietches.sh runtime-args "$MAP_NAME" "$PARTITION_ID" 2>/dev/null || true)
 if [ "$MAP_NAME" = "Survival_1" ]; then
-  SERVER_INDEX="$((DIMENSION_INDEX + 1))"
+  if [ "$DIMENSION_INDEX" -eq 0 ]; then
+    SERVER_INDEX=1
+  else
+    SERVER_INDEX="$((DIMENSION_INDEX + 2))"
+  fi
 else
   SERVER_INDEX="$PARTITION_ID"
 fi
@@ -181,7 +241,23 @@ fi
 
 port_is_free() {
   local port="$1"
-  ! ss -lnup | grep -q ":$port "
+  local db_in_use
+
+  db_in_use="$(psql_value "
+    select count(*)
+    from dune.farm_state
+    where coalesce(alive, false) = true
+      and (
+        game_port = $port
+        or igw_port = $port
+      );
+  " | tr -d '[:space:]')"
+
+  if [ "${db_in_use:-0}" != "0" ]; then
+    return 1
+  fi
+
+  ! ss -lnup 2>/dev/null | grep -q ":$port "
 }
 
 pick_port() {
@@ -267,6 +343,7 @@ mkdir -p runtime/game/artifacts
 mkdir -p "$FAKE_K8S_SERVICEACCOUNT_DIR"
 mkdir -p runtime/container
 python3 runtime/scripts/usersettings.py materialize "$MAP_NAME" "$PWD/runtime/game/$safe_name/Saved" "$PARTITION_ID"
+purge_stale_farm_rows_for_map "$MAP_NAME"
 
 cat > "$FAKE_K8S_SERVICEACCOUNT_DIR/namespace" <<EOF
 funcom-seabass-$BATTLEGROUP_ID

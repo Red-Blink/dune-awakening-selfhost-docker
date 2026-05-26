@@ -60,6 +60,19 @@ chmod -R 755 "$FAKE_K8S_SERVICEACCOUNT_DIR"
 
 mapfile -t SIETCH_RUNTIME_ARGS < <(runtime/scripts/sietches.sh runtime-args Overmap "$PARTITION_ID" 2>/dev/null || true)
 
+docker exec dune-postgres psql -U postgres -d dune -v ON_ERROR_STOP=1 -c "
+begin;
+delete from dune.farm_state
+where map = 'Overmap'
+  and coalesce(alive, false) = false
+  and server_id not in (
+    select server_id
+    from dune.world_partition
+    where coalesce(server_id, '') <> ''
+  );
+commit;
+" >/dev/null
+
 docker rm -f dune-server-overmap 2>/dev/null || true
 
 docker run -d \

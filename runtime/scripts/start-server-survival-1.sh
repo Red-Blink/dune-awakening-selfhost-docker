@@ -60,6 +60,19 @@ chmod -R 755 "$FAKE_K8S_SERVICEACCOUNT_DIR"
 
 mapfile -t SIETCH_RUNTIME_ARGS < <(runtime/scripts/sietches.sh runtime-args Survival_1 "$PARTITION_ID" 2>/dev/null || true)
 
+docker exec dune-postgres psql -U postgres -d dune -v ON_ERROR_STOP=1 -c "
+begin;
+delete from dune.farm_state
+where map = 'Survival_1'
+  and coalesce(alive, false) = false
+  and server_id not in (
+    select server_id
+    from dune.world_partition
+    where coalesce(server_id, '') <> ''
+  );
+commit;
+" >/dev/null
+
 docker rm -f dune-server-survival-1 2>/dev/null || true
 
 docker run -d \
@@ -152,4 +165,3 @@ docker ps --filter "name=dune-server-survival-1" --format "table {{.Names}}\t{{.
 echo
 echo "=== survival logs ==="
 docker logs --tail 180 dune-server-survival-1
-

@@ -18,6 +18,18 @@ echo "=== Starting Postgres ==="
 runtime/scripts/start-postgres.sh
 
 echo
+echo "=== Ensuring Database Is Up To Date ==="
+runtime/scripts/update-db.sh
+
+echo
+echo "=== Recycling Stale World Servers ==="
+runtime/scripts/recycle-world-game-servers.sh remove-stale
+
+echo
+echo "=== Clearing Non-Core World Servers ==="
+runtime/scripts/recycle-world-game-servers.sh stop-noncore
+
+echo
 echo "=== Starting RabbitMQ ==="
 runtime/scripts/start-rabbitmq.sh
 
@@ -37,7 +49,6 @@ echo
 echo "=== Starting Overmap ==="
 runtime/scripts/start-server-overmap.sh
 
-echo
 echo "=== Starting Sietch Override Publisher ==="
 runtime/scripts/publish-sietch-overrides.sh restart || {
   echo "Sietch override publisher did not start. Survival_1 custom browser names/passwords will not republish."
@@ -86,6 +97,7 @@ cat <<'EOF'
 Started. Notes:
 - Survival_1 can take several minutes to become fully READY.
 - Overmap can also take a few minutes.
+- Optional maps are not prestarted; autoscaler will spawn them on demand.
 - Autoscaler starts with the battlegroup so dynamic maps can spawn on demand.
 - Use runtime/scripts/status.sh after startup to check readiness.
 EOF

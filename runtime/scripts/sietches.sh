@@ -668,10 +668,22 @@ refresh_survival_browser_state() {
   fi
 }
 
+refresh_survival_director_state() {
+  if docker ps --format '{{.Names}}' | grep -qx dune-director; then
+    runtime/scripts/start-director.sh >/dev/null 2>&1 || true
+  fi
+}
+
 refresh_survival_gateway_state() {
   if docker ps --format '{{.Names}}' | grep -qx dune-server-gateway; then
     runtime/scripts/start-server-gateway.sh >/dev/null 2>&1 || true
   fi
+}
+
+refresh_survival_control_plane_state() {
+  refresh_survival_browser_state
+  refresh_survival_director_state
+  refresh_survival_gateway_state
 }
 
 ensure_map_partitions() {
@@ -736,7 +748,7 @@ select dune.update_partition_labels(true);
 
   sync_partition_catalog_from_db
   if [ "$map" = "Survival_1" ]; then
-    refresh_survival_browser_state
+    refresh_survival_control_plane_state
   fi
 }
 
@@ -910,8 +922,7 @@ where wp.partition_id = ranked.partition_id;
 
   sync_partition_catalog_from_db
   if [ "$map" = "Survival_1" ] && [ "$topology_changed" -eq 1 ]; then
-    refresh_survival_browser_state
-    refresh_survival_gateway_state
+    refresh_survival_control_plane_state
   fi
 }
 
@@ -1029,13 +1040,15 @@ case "$cmd" in
     shift 2
     display_name="$*"
     [ -n "$display_name" ] || { echo "Display name cannot be empty."; exit 1; }
-    set_partition_value "$partition_id" display_name "$display_name"
+  set_partition_value "$partition_id" display_name "$display_name"
+    refresh_survival_control_plane_state
     echo "Display name updated."
     ;;
   set-password)
     [ "$#" -eq 2 ] || [ "$#" -eq 3 ] || { usage; exit 2; }
     password_value="${3:-${SIETCH_PASSWORD:-}}"
     set_partition_value "$2" password "$password_value"
+    refresh_survival_control_plane_state
     if [ -n "$password_value" ]; then
       echo "Password updated."
     else

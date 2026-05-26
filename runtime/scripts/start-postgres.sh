@@ -68,6 +68,52 @@ fi
 docker exec dune-postgres pg_isready -h 127.0.0.1 -p 5432 -U postgres -d dune
 
 echo
+echo "=== Normalizing dune schema ownership and privileges ==="
+docker exec -i dune-postgres psql -h 127.0.0.1 -p 5432 -U postgres -d dune <<'SQL'
+ALTER DATABASE dune OWNER TO dune;
+ALTER SCHEMA dune OWNER TO dune;
+GRANT ALL PRIVILEGES ON DATABASE dune TO dune;
+GRANT USAGE, CREATE ON SCHEMA dune TO dune;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA dune TO dune;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA dune TO dune;
+GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA dune TO dune;
+ALTER DEFAULT PRIVILEGES IN SCHEMA dune GRANT ALL PRIVILEGES ON TABLES TO dune;
+ALTER DEFAULT PRIVILEGES IN SCHEMA dune GRANT ALL PRIVILEGES ON SEQUENCES TO dune;
+ALTER DEFAULT PRIVILEGES IN SCHEMA dune GRANT ALL PRIVILEGES ON FUNCTIONS TO dune;
+
+DO
+$$
+DECLARE
+  obj record;
+BEGIN
+  FOR obj IN
+    SELECT quote_ident(n.nspname) AS schema_name,
+           quote_ident(c.relname) AS object_name,
+           c.relkind AS relkind
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'dune'
+      AND c.relkind IN ('r','p','S','v','m','f')
+      AND pg_get_userbyid(c.relowner) <> 'dune'
+  LOOP
+    EXECUTE format(
+      'ALTER %s %s.%s OWNER TO dune',
+      CASE obj.relkind
+        WHEN 'S' THEN 'SEQUENCE'
+        WHEN 'v' THEN 'VIEW'
+        WHEN 'm' THEN 'MATERIALIZED VIEW'
+        WHEN 'f' THEN 'FOREIGN TABLE'
+        ELSE 'TABLE'
+      END,
+      obj.schema_name,
+      obj.object_name
+    );
+  END LOOP;
+END
+$$;
+SQL
+
+echo
 echo "=== Databases ==="
 docker exec dune-postgres psql -h 127.0.0.1 -p 5432 -U postgres -d dune -c '\l'
 

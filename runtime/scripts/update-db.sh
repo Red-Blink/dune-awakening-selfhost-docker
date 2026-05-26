@@ -25,7 +25,7 @@ ln -sf /usr/bin/pg_dump /tmp/pg17/bin/pg_dump
 ln -sf /usr/bin/pg_restore /tmp/pg17/bin/pg_restore
 ln -sf /usr/bin/pg_isready /tmp/pg17/bin/pg_isready
 
-python /root/PSQL/initdb.py \
+python /root/PSQL/updatedb.py \
   --host dune-postgres:5432 \
   --project-database dune \
   --project-user dune \
@@ -34,5 +34,6 @@ python /root/PSQL/initdb.py \
   --admin-password postgres \
   --admin-database postgres \
   --postgres-installation /tmp/pg17 \
+  --ignore-backup-failure \
   --unattended
 '
