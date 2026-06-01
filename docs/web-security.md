@@ -59,6 +59,18 @@ Destructive live actions require backend confirmation phrases in addition to fro
 - inventory delete: `DELETE ITEM`
 - storage give item: `GIVE ITEM TO STORAGE`
 - shutdown broadcast: `SHUTDOWN BROADCAST`
+- map mode changes: `SET MAP MODE`
+- map reconcile: `RECONCILE MAPS`
+- map spawn: `SPAWN MAP`
+- map despawn: `DESPAWN MAP`
+- autoscaler control: `AUTOSCALER CHANGE`
+- map memory set/unset: `SET MAP MEMORY` / `UNSET MAP MEMORY`
+- Sietch live-impacting changes: `UPDATE SIETCHES`
+- Deep Desert dual controls: `UPDATE DEEP DESERT`
+
+## Live Map Safety
+
+Live Map endpoints are read-only. Marker overlays use direct PostgreSQL reads with parameterized optional map filters and return explicit capability/unsupported reasons when expected tables or transform columns are unavailable. The frontend plots raw world coordinates only; it does not invent markers or assume a verified image calibration.
 
 ## Docker Socket Risk
 

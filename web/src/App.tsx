@@ -12,6 +12,7 @@ import { updatesApi } from "./api/updates";
 import { worldDataApi } from "./api/worldData";
 import { adminApi } from "./api/admin";
 import { setupApi, type Task } from "./api/setup";
+import { liveMapApi, type LiveMapMarker } from "./api/liveMap";
 import { SetupWizard } from "./components/SetupWizard";
 import { TaskProgress } from "./components/TaskProgress";
 import { LogViewer } from "./components/LogViewer";
@@ -20,7 +21,7 @@ import { PortChecklist } from "./components/PortChecklist";
 import { ReadinessTimeline } from "./components/ReadinessTimeline";
 import { ServiceHealthCard } from "./components/ServiceHealthCard";
 
-type Tab = "Home" | "Setup" | "Server Control" | "Services" | "Players" | "Admin Tools" | "Maps" | "Database" | "Storage" | "Bases" | "Blueprints" | "Backups" | "Logs" | "Updates" | "Settings";
+type Tab = "Home" | "Setup" | "Server Control" | "Services" | "Players" | "Admin Tools" | "Live Map" | "Maps" | "Database" | "Storage" | "Bases" | "Blueprints" | "Backups" | "Logs" | "Updates" | "Settings";
 
 const nav: { tab: Tab; icon: React.ReactNode }[] = [
   { tab: "Home", icon: <Home size={18} /> },
@@ -29,6 +30,7 @@ const nav: { tab: Tab; icon: React.ReactNode }[] = [
   { tab: "Services", icon: <Activity size={18} /> },
   { tab: "Players", icon: <Users size={18} /> },
   { tab: "Admin Tools", icon: <PackagePlus size={18} /> },
+  { tab: "Live Map", icon: <Map size={18} /> },
   { tab: "Maps", icon: <Map size={18} /> },
   { tab: "Database", icon: <Database size={18} /> },
   { tab: "Storage", icon: <Archive size={18} /> },
@@ -110,7 +112,8 @@ export function App() {
         {tab === "Services" && <ServicesPanel services={services} setServices={setServices} setTask={setTask} openLogs={(service) => { setSelectedLogService(service); setTab("Logs"); }} onError={setError} />}
         {tab === "Players" && <PlayersPanel setTask={setTask} onError={setError} />}
         {tab === "Admin Tools" && <AdminToolsPanel setTask={setTask} onError={setError} />}
-        {tab === "Maps" && <MapsPanel />}
+        {tab === "Live Map" && <LiveMapPanel onError={setError} />}
+        {tab === "Maps" && <MapsPanel setTask={setTask} onError={setError} />}
         {tab === "Database" && <DatabasePanel setTask={setTask} />}
         {tab === "Storage" && <StoragePanel onError={setError} />}
         {tab === "Bases" && <WorldListPanel title="Bases" load={worldDataApi.bases} exportUrl={(id) => worldDataApi.baseExportUrl(id)} onError={setError} />}
@@ -582,9 +585,134 @@ function BackupsPanel({ setTask, onError }: { setTask: (task: Task) => void; onE
   );
 }
 
-function MapsPanel() {
+function LiveMapPanel({ onError }: { onError: (text: string) => void }) {
+  const [map, setMap] = useState("");
+  const [markers, setMarkers] = useState<LiveMapMarker[]>([]);
+  const [overlays, setOverlays] = useState<Record<string, string>>({});
+  const [selected, setSelected] = useState<LiveMapMarker | null>(null);
+  const [filters, setFilters] = useState<Record<string, boolean>>({ player: true, vehicle: true, base: true, storage: true, service: true });
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  async function load() {
+    onError("");
+    try {
+      const result = await liveMapApi.markers(map);
+      setMarkers(result.rows || []);
+      setOverlays(result.overlays || {});
+    } catch (error) {
+      onError(error instanceof Error ? error.message : String(error));
+    }
+  }
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const id = window.setInterval(load, 30000);
+    return () => window.clearInterval(id);
+  }, [autoRefresh, map]);
+  const visible = markers.filter((marker) => filters[String(marker.type)] !== false);
+  const plotted = visible.filter((marker) => Number.isFinite(Number(marker.x)) && Number.isFinite(Number(marker.y)));
+  const bounds = markerBounds(plotted);
+  return <section className="panel">
+    <div className="panel-title"><h2>Live Map</h2><div className="action-row"><button onClick={load}>Refresh</button><label><input type="checkbox" checked={autoRefresh} onChange={(event) => setAutoRefresh(event.target.checked)} /> Auto-refresh</label></div></div>
+    <div className="action-row"><input value={map} onChange={(event) => setMap(event.target.value)} placeholder="Optional map filter, e.g. Survival_1" />{Object.keys(filters).map((key) => <label key={key}><input type="checkbox" checked={filters[key]} onChange={(event) => setFilters({ ...filters, [key]: event.target.checked })} /> {key}</label>)}</div>
+    {Object.entries(overlays).filter(([, reason]) => reason).map(([key, reason]) => <p className="danger-note" key={key}>{key}: {reason}</p>)}
+    <div style={{ position: "relative", height: 420, border: "1px solid var(--border)", background: "#10151d", overflow: "hidden" }}>
+      {plotted.length === 0 && <div className="empty">No plottable markers. Raw marker rows are shown below when available.</div>}
+      {plotted.map((marker, index) => {
+        const point = markerPoint(marker, bounds);
+        return <button key={`${marker.type}-${marker.id}-${index}`} title={`${marker.type}: ${marker.name || marker.id}`} onClick={() => setSelected(marker)} style={{ position: "absolute", left: `${point.x}%`, top: `${point.y}%`, transform: "translate(-50%, -50%)", width: 12, height: 12, borderRadius: "50%", border: "1px solid white", background: markerColor(String(marker.type)), cursor: "pointer" }} />;
+      })}
+    </div>
+    <p className="danger-note">Coordinates use raw Dune world positions from actor transforms. Exact image/world calibration is not verified, so this plot is for relative position and inspection.</p>
+    {selected && <section className="drawer"><div className="panel-title"><h3>{String(selected.name || selected.id)}</h3><button onClick={() => setSelected(null)}>Close</button></div><pre className="mini-output">{JSON.stringify(selected, null, 2)}</pre></section>}
+    <DataTable rows={visible as Record<string, unknown>[]} />
+  </section>;
+}
+
+function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onError: (text: string) => void }) {
   const [text, setText] = useState("");
-  return <section className="panel"><h2>Maps</h2><div className="action-row"><button onClick={async () => setText((await mapsApi.maps()).stdout)}>Maps</button><button onClick={async () => setText((await mapsApi.sietches()).stdout)}>Sietches</button><button onClick={async () => setText((await mapsApi.deepdesert()).stdout)}>Deep Desert</button></div><pre className="mini-output">{text}</pre></section>;
+  const [map, setMap] = useState("");
+  const [mode, setMode] = useState("dynamic");
+  const [target, setTarget] = useState("");
+  const [memory, setMemory] = useState("8g");
+  const [partitionId, setPartitionId] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [password, setPassword] = useState("");
+  const [count, setCount] = useState("1");
+  async function run(action: () => Promise<unknown>) {
+    onError("");
+    try { await action(); } catch (error) { onError(error instanceof Error ? error.message : String(error)); }
+  }
+  async function runTask(action: () => Promise<{ task: Task }>) {
+    const response = await action();
+    setTask(response.task);
+  }
+  return <section className="panel">
+    <h2>Maps & Sietches</h2>
+    <div className="action-row">
+      <button onClick={() => run(async () => setText((await mapsApi.maps()).stdout))}>Maps</button>
+      <button onClick={() => run(async () => setText((await mapsApi.mode(map)).stdout))}>Map Mode</button>
+      <button onClick={() => run(async () => setText(JSON.stringify(await mapsApi.status(), null, 2)))}>Map Status</button>
+      <button onClick={() => run(async () => setText((await mapsApi.autoscaler()).stdout))}>Autoscaler</button>
+      <button onClick={() => run(async () => setText((await mapsApi.memory()).stdout))}>Memory</button>
+      <button onClick={() => run(async () => setText((await mapsApi.sietches()).stdout))}>Sietches</button>
+      <button onClick={() => run(async () => setText((await mapsApi.deepdesert()).stdout))}>Deep Desert</button>
+    </div>
+    <div className="two-col">
+      <label>Map<input value={map} onChange={(event) => setMap(event.target.value)} placeholder="DeepDesert_1" /></label>
+      <label>Mode<select value={mode} onChange={(event) => setMode(event.target.value)}><option value="dynamic">dynamic</option><option value="always-on">always-on</option></select></label>
+      <button onClick={() => run(async () => { if (window.confirm(`Set ${map} to ${mode}? This can spawn or affect map services.`)) await runTask(() => mapsApi.setMode({ map, mode, confirmation: "SET MAP MODE" })); })}>Set Map Mode</button>
+      <button className="danger" onClick={() => run(async () => { if (window.confirm("Reconcile all always-on maps now?")) await runTask(() => mapsApi.reconcile("RECONCILE MAPS")); })}>Reconcile Maps</button>
+      <label>Spawn/Despawn Target<input value={target} onChange={(event) => setTarget(event.target.value)} placeholder="Map name or partition id" /></label>
+      <button onClick={() => run(async () => { if (window.confirm(`Spawn ${target}?`)) await runTask(() => mapsApi.spawn(target, "SPAWN MAP")); })}>Spawn</button>
+      <button className="danger" onClick={() => run(async () => { if (window.confirm(`Despawn ${target}?`)) await runTask(() => mapsApi.despawn(target, "DESPAWN MAP")); })}>Despawn</button>
+      <button onClick={() => run(async () => { if (window.confirm("Start autoscaler?")) await runTask(() => mapsApi.autoscalerAction("start", "AUTOSCALER CHANGE")); })}>Start Autoscaler</button>
+      <button className="danger" onClick={() => run(async () => { if (window.confirm("Stop autoscaler?")) await runTask(() => mapsApi.autoscalerAction("stop", "AUTOSCALER CHANGE")); })}>Stop Autoscaler</button>
+      <button onClick={() => run(async () => { if (window.confirm("Restart autoscaler?")) await runTask(() => mapsApi.autoscalerAction("restart", "AUTOSCALER CHANGE")); })}>Restart Autoscaler</button>
+      <label>Memory<input value={memory} onChange={(event) => setMemory(event.target.value)} placeholder="8g" /></label>
+      <button onClick={() => run(async () => { if (window.confirm(`Set memory for ${map || "default"} to ${memory}? Running maps may need restart.`)) await runTask(() => mapsApi.setMemory({ map: map || "default", memory, confirmation: "SET MAP MEMORY" })); })}>Set Memory</button>
+      <button className="danger" onClick={() => run(async () => { if (window.confirm(`Remove memory override for ${map || "default"}?`)) await runTask(() => mapsApi.unsetMemory({ map: map || "default", confirmation: "UNSET MAP MEMORY" })); })}>Unset Memory</button>
+      <label>Dimension Count<input value={count} onChange={(event) => setCount(event.target.value)} /></label>
+      <button onClick={() => run(async () => runTask(() => mapsApi.updateSietches({ action: "set-max", map, count: Number(count) })))}>Set Max Sietches</button>
+      <button className="danger" onClick={() => run(async () => { if (window.confirm(`Set active dimensions for ${map} to ${count}? This reconciles services.`)) await runTask(() => mapsApi.updateSietches({ action: "set-active", map, count: Number(count), confirmation: "UPDATE SIETCHES" })); })}>Set Active Sietches</button>
+      <label>Partition ID<input value={partitionId} onChange={(event) => setPartitionId(event.target.value)} /></label>
+      <label>Display Name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
+      <button onClick={() => run(async () => { if (window.confirm(`Update display name for partition ${partitionId}?`)) await runTask(() => mapsApi.updateSietches({ action: "set-display", partitionId, displayName, confirmation: "UPDATE SIETCHES" })); })}>Set Sietch Display</button>
+      <label>Password<input value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+      <button className="danger" onClick={() => run(async () => { if (window.confirm(`Update password for partition ${partitionId}? Running services may need restart.`)) await runTask(() => mapsApi.updateSietches({ action: "set-password", partitionId, password, confirmation: "UPDATE SIETCHES" })); })}>Set Sietch Password</button>
+      <button onClick={() => run(async () => runTask(() => mapsApi.updateSietches({ action: "sync" })))}>Sync Sietches</button>
+      <button onClick={() => run(async () => runTask(() => mapsApi.updateSietches({ action: "validate" })))}>Validate Sietches</button>
+      <button className="danger" onClick={() => run(async () => { if (window.confirm(`Reconcile sietches for ${map}?`)) await runTask(() => mapsApi.updateSietches({ action: "reconcile", map, confirmation: "UPDATE SIETCHES" })); })}>Reconcile Sietches</button>
+      <button onClick={() => run(async () => { if (window.confirm("Enable Dual Deep Desert?")) await runTask(() => mapsApi.updateDeepdesert({ action: "enable", confirmation: "UPDATE DEEP DESERT" })); })}>Enable Dual Deep Desert</button>
+      <button className="danger" onClick={() => run(async () => { if (window.confirm("Disable Dual Deep Desert?")) await runTask(() => mapsApi.updateDeepdesert({ action: "disable", confirmation: "UPDATE DEEP DESERT" })); })}>Disable Dual Deep Desert</button>
+      <button onClick={() => run(async () => runTask(() => mapsApi.updateDeepdesert({ action: "repair", confirmation: "UPDATE DEEP DESERT" })))}>Repair Deep Desert</button>
+      <button onClick={() => run(async () => { if (window.confirm("Bootstrap Dual Deep Desert?")) await runTask(() => mapsApi.updateDeepdesert({ action: "bootstrap", confirmation: "UPDATE DEEP DESERT" })); })}>Bootstrap Deep Desert</button>
+    </div>
+    <p className="danger-note">Map mode, spawn/despawn, autoscaler, active Sietch dimensions, passwords, and Deep Desert changes can affect live services and require backend confirmation.</p>
+    <pre className="mini-output">{text || "Load map, autoscaler, memory, Sietch, or Deep Desert state."}</pre>
+  </section>;
+}
+
+function markerBounds(markers: LiveMapMarker[]) {
+  const xs = markers.map((marker) => Number(marker.x)).filter(Number.isFinite);
+  const ys = markers.map((marker) => Number(marker.y)).filter(Number.isFinite);
+  return {
+    minX: xs.length ? Math.min(...xs) : 0,
+    maxX: xs.length ? Math.max(...xs) : 1,
+    minY: ys.length ? Math.min(...ys) : 0,
+    maxY: ys.length ? Math.max(...ys) : 1
+  };
+}
+
+function markerPoint(marker: LiveMapMarker, bounds: { minX: number; maxX: number; minY: number; maxY: number }) {
+  const spanX = Math.max(1, bounds.maxX - bounds.minX);
+  const spanY = Math.max(1, bounds.maxY - bounds.minY);
+  return {
+    x: 5 + ((Number(marker.x) - bounds.minX) / spanX) * 90,
+    y: 95 - ((Number(marker.y) - bounds.minY) / spanY) * 90
+  };
+}
+
+function markerColor(type: string) {
+  return { player: "#3b82f6", vehicle: "#22c55e", base: "#f59e0b", storage: "#a855f7", service: "#e5e7eb" }[type] || "#e5e7eb";
 }
 
 function UpdatesPanel({ setTask }: { setTask: (task: Task) => void }) {

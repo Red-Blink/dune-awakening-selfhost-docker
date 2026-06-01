@@ -35,6 +35,7 @@ const simpleOperations = {
   backupList: ["db", "list"],
   init: ["init"],
   dbStatus: ["database", "status"],
+  servers: ["servers"],
   mapsList: ["maps", "list"],
   sietchesList: ["sietches", "list"],
   deepdesertStatus: ["deepdesert", "dual", "status"],
@@ -121,6 +122,46 @@ export function buildDuneArgs(operation, payload = {}) {
       return ["admin", "skill-modules", validateCatalogQuery(payload.q)];
     case "adminSpecializationMax":
       return ["admin", "specialization-max", String(payload.character || ""), "--grant-keystones", "--yes"];
+    case "mapsMode":
+      return payload.map ? ["maps", "mode", validateMapName(payload.map)] : ["maps", "mode"];
+    case "mapsSetMode":
+      return ["maps", "set", validateMapName(payload.map), validateMapMode(payload.mode)];
+    case "mapsReconcile":
+      return ["maps", "reconcile"];
+    case "mapsSpawn":
+      return ["spawn", validateMapOrPartition(payload.target)];
+    case "mapsDespawn":
+      return ["despawn", validateMapOrPartition(payload.target), "--force"];
+    case "autoscalerStatus":
+      return ["autoscaler", "status"];
+    case "autoscalerAction":
+      return ["autoscaler", validateAutoscalerAction(payload.action)];
+    case "memoryStatus":
+      return ["memory", "status"];
+    case "memorySet":
+      return ["memory", "set", validateMemoryTarget(payload.map), validateMemoryValue(payload.memory)];
+    case "memoryUnset":
+      return ["memory", "unset", validateMemoryTarget(payload.map)];
+    case "sietchesShow":
+      return ["sietches", "show", validateMapName(payload.map)];
+    case "sietchesDimensions":
+      return ["sietches", "dimensions", validateMapName(payload.map)];
+    case "sietchesSetMax":
+      return ["sietches", "set-max", validateMapName(payload.map), String(validateInteger(payload.count, 1, 64))];
+    case "sietchesSetActive":
+      return ["sietches", "set-active", validateMapName(payload.map), String(validateInteger(payload.count, 1, 64))];
+    case "sietchesSetDisplay":
+      return ["sietches", "set-display", validatePartitionId(payload.partitionId), validateDisplayName(payload.displayName)];
+    case "sietchesSetPassword":
+      return ["sietches", "set-password", validatePartitionId(payload.partitionId), validateSietchPassword(payload.password ?? "")];
+    case "sietchesSync":
+      return ["sietches", "sync"];
+    case "sietchesValidate":
+      return ["sietches", "validate"];
+    case "sietchesReconcile":
+      return ["sietches", "reconcile", validateMapName(payload.map)];
+    case "deepdesertAction":
+      return ["deepdesert", "dual", validateDeepDesertAction(payload.action), "--yes", ...(payload.action === "disable" ? ["--force"] : [])];
     default:
       throw new Error(`Unsupported operation: ${operation}`);
   }
@@ -135,7 +176,7 @@ export function runDune(config, args, options = {}) {
     const child = spawn(config.duneScript, args, {
       cwd: config.repoRoot,
       shell: false,
-      env: { ...process.env, DUNE_ADMIN_ASSUME_YES: "1", DUNE_DB_ASSUME_YES: "1" }
+      env: { ...process.env, DUNE_ADMIN_ASSUME_YES: "1", DUNE_DB_ASSUME_YES: "1", DUNE_MEMORY_ASSUME_YES: "1" }
     });
     const timeout = setTimeout(() => child.kill("SIGTERM"), options.timeoutMs || config.commandTimeoutMs);
     let stdout = "";
@@ -259,6 +300,64 @@ function validateVehicleTemplate(value) {
   const raw = String(value || "").trim();
   if (/^[A-Za-z0-9_./:-]{1,160}$/.test(raw)) return raw;
   throw new Error("Invalid vehicle template");
+}
+
+function validateMapName(value) {
+  const raw = String(value || "").trim();
+  if (/^[A-Za-z0-9_:-]{1,80}$/.test(raw)) return raw;
+  throw new Error("Invalid map name");
+}
+
+function validateMapMode(value) {
+  const raw = String(value || "").trim();
+  if (raw === "dynamic" || raw === "always-on") return raw;
+  throw new Error("Map mode must be dynamic or always-on");
+}
+
+function validateMapOrPartition(value) {
+  const raw = String(value || "").trim();
+  if (/^[A-Za-z0-9_:-]{1,80}$/.test(raw)) return raw;
+  throw new Error("Invalid map or partition target");
+}
+
+function validateAutoscalerAction(value) {
+  const raw = String(value || "").trim();
+  if (["status", "start", "stop", "restart", "logs"].includes(raw)) return raw;
+  throw new Error("Unsupported autoscaler action");
+}
+
+function validateMemoryTarget(value) {
+  const raw = String(value || "").trim();
+  if (raw === "default" || /^[A-Za-z0-9_:-]{1,80}$/.test(raw)) return raw;
+  throw new Error("Invalid memory target");
+}
+
+function validateMemoryValue(value) {
+  const raw = String(value || "").trim();
+  if (/^[1-9][0-9]*[mMgG]$/.test(raw)) return raw;
+  throw new Error("Invalid memory value");
+}
+
+function validatePartitionId(value) {
+  return String(validateInteger(value, 1, 1000000));
+}
+
+function validateDisplayName(value) {
+  const raw = String(value || "").trim();
+  if (raw.length >= 1 && raw.length <= 80 && !/[\r\n]/.test(raw)) return raw;
+  throw new Error("Invalid display name");
+}
+
+function validateSietchPassword(value) {
+  const raw = String(value || "");
+  if (raw.length <= 80 && !/[\r\n\t]/.test(raw)) return raw;
+  throw new Error("Invalid sietch password");
+}
+
+function validateDeepDesertAction(value) {
+  const raw = String(value || "").trim();
+  if (["enable", "disable", "bootstrap", "repair"].includes(raw)) return raw;
+  throw new Error("Unsupported Deep Desert action");
 }
 
 function validateSearchQuery(value) {

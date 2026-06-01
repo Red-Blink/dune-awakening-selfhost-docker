@@ -88,9 +88,28 @@ Base path for the native RedBlink API: `/api`.
 | `/api/admin/broadcast` | POST | Live admin broadcast | Publishes RedBlink `ServiceBroadcast` Generic envelope to `dune-rmq-game` `heartbeats/notifications` |
 | `/api/admin/broadcast-shutdown` | POST | Shutdown broadcast | Publishes RedBlink `ServiceBroadcast` ServerShutdown envelope to `dune-rmq-game` `heartbeats/notifications`; requires `SHUTDOWN BROADCAST` |
 | `/api/admin/whisper` | POST | Whisper capability response | Returns unsupported until GM courier identity and `chat.whispers` route are verified |
+| `/api/map/status` | GET | Live map status bundle | `dune maps list`, `dune servers`, `dune ready`, `dune autoscaler status` |
+| `/api/map/capabilities` | GET | Live map overlay capabilities | Direct PostgreSQL table/function capability detection |
+| `/api/map/markers` | GET | Combined Live Map markers | Direct PostgreSQL player/vehicle/base/storage/service marker queries where schema support exists |
+| `/api/map/players` | GET | Player markers | Direct PostgreSQL `actors.transform` + `player_state` query |
+| `/api/map/bases` | GET | Base markers | Direct PostgreSQL building/totem actor transform query where available |
+| `/api/map/storage` | GET | Storage markers | Direct PostgreSQL storage placeable actor transform query |
+| `/api/map/services` | GET | Map service partitions | Direct PostgreSQL `world_partition` plus optional `farm_state` query |
+| `/api/map/overlays` | GET | Overlay markers and unsupported reasons | Same direct PostgreSQL marker adapter as `/api/map/markers` |
 | `/api/maps` | GET | Map list | `dune maps list` |
+| `/api/maps/mode` | GET | Map mode | `dune maps mode [map]` |
+| `/api/maps/mode` | POST | Set map mode | Task wrapping `dune maps set <map> <dynamic|always-on>`; requires `SET MAP MODE` |
+| `/api/maps/reconcile` | POST | Reconcile always-on maps | Task wrapping `dune maps reconcile`; requires `RECONCILE MAPS` |
+| `/api/maps/spawn` | POST | Spawn map/partition | Task wrapping `dune spawn <map-or-partition>`; requires `SPAWN MAP` |
+| `/api/maps/despawn` | POST | Despawn map/partition/container | Task wrapping `dune despawn <target> --force`; requires `DESPAWN MAP` |
+| `/api/maps/autoscaler` | GET | Autoscaler status | `dune autoscaler status` |
+| `/api/maps/autoscaler` | POST | Autoscaler control | Task wrapping validated `dune autoscaler start|stop|restart|logs|status`; requires `AUTOSCALER CHANGE` |
+| `/api/maps/memory` | GET | Map memory status | `dune memory status` |
+| `/api/maps/memory` | POST | Set/unset map memory | Task wrapping `dune memory set|unset`; requires `SET MAP MEMORY` or `UNSET MAP MEMORY` |
 | `/api/sietches` | GET | Sietch state | `dune sietches list` |
+| `/api/sietches/update` | POST | Sietch settings/control | Task wrapping validated `dune sietches set-max|set-active|set-display|set-password|sync|validate|reconcile`; dangerous actions require `UPDATE SIETCHES` |
 | `/api/deepdesert` | GET | Deep Desert status | `dune deepdesert dual status` |
+| `/api/deepdesert/update` | POST | Deep Desert dual control | Task wrapping validated `dune deepdesert dual enable|disable|repair|bootstrap`; requires `UPDATE DEEP DESERT` |
 | `/api/settings` | GET | Runtime settings state | Setup state/config summary |
 | `/api/storage/:id` | GET | Storage detail | Direct PostgreSQL storage list lookup |
 | `/api/storage/:id/items` | GET | Storage inventory | Direct PostgreSQL inventory query |
@@ -107,9 +126,6 @@ Base path for the native RedBlink API: `/api`.
 - `/api/players/:id/set-currency`
 - `/api/admin/whisper` returns explicit unsupported capability response until RedBlink exposes or seeds a verified GM courier identity for `chat.whispers`
 - player progression/events/stats/history deep schema mapping
-- `/api/maps/update`
-- `/api/sietches/update`
-- `/api/deepdesert/update`
 - `/api/setup/install-docker`
 
 Phase 1 cleanup must either implement these for real or remove/quarantine their frontend controls.

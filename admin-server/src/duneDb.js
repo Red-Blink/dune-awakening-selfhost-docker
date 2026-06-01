@@ -209,6 +209,186 @@ export async function playerPosition(db, id) {
   }
 }
 
+export async function liveMapCapabilities(db) {
+  const actors = await tableExists(db, "actors");
+  const playerState = await tableExists(db, "player_state");
+  const vehicles = await tableExists(db, "vehicles");
+  const placeables = await tableExists(db, "placeables");
+  const buildings = await tableExists(db, "buildings");
+  const worldPartition = await tableExists(db, "world_partition");
+  const farmState = await tableExists(db, "farm_state");
+  return {
+    players: actors && playerState,
+    vehicles: actors && vehicles,
+    storage: actors && placeables,
+    bases: actors && buildings,
+    services: worldPartition,
+    farmState,
+    coordinateTransform: "Uses raw dune.actors.transform world coordinates; calibrated image/world transform is not verified."
+  };
+}
+
+export async function liveMapPlayers(db, map = "") {
+  if (!(await tableExists(db, "actors")) || !(await tableExists(db, "player_state"))) return unsupportedMap("players", ["dune.actors", "dune.player_state"]);
+  const values = [];
+  const where = mapFilterClause(map, values, "a");
+  try {
+    const result = await db.query(`
+      select a.id,
+             'player' as type,
+             coalesce(nullif(ps.character_name, ''), 'Unknown') as name,
+             coalesce(ps.online_status::text, '') as online_status,
+             coalesce(a.map, '') as map,
+             coalesce(a.partition_id, 0) as partition_id,
+             coalesce(a.class, '') as class,
+             ((a.transform).location).x as x,
+             ((a.transform).location).y as y,
+             ((a.transform).location).z as z
+      from dune.actors a
+      join dune.player_state ps on ps.player_pawn_id = a.id
+      where a.transform is not null ${where}
+      order by coalesce(ps.online_status::text, '') desc, lower(coalesce(ps.character_name, ''))`, values);
+    return { capabilities: { players: true }, rows: result.rows.map(normalizeMarker) };
+  } catch (error) {
+    return { capabilities: { players: false }, rows: [], reason: `Player marker transform query is unsupported by this schema: ${error.message}` };
+  }
+}
+
+export async function liveMapVehicles(db, map = "") {
+  if (!(await tableExists(db, "actors")) || !(await tableExists(db, "vehicles"))) return unsupportedMap("vehicles", ["dune.actors", "dune.vehicles"]);
+  const values = [];
+  const where = mapFilterClause(map, values, "a");
+  try {
+    const result = await db.query(`
+      select a.id,
+             'vehicle' as type,
+             coalesce(a.class, '') as name,
+             coalesce(a.map, '') as map,
+             coalesce(a.partition_id, 0) as partition_id,
+             coalesce(a.class, '') as class,
+             ((a.transform).location).x as x,
+             ((a.transform).location).y as y,
+             ((a.transform).location).z as z
+      from dune.vehicles v
+      join dune.actors a on a.id = v.id
+      where a.transform is not null ${where}
+      order by a.map, a.partition_id, a.id`, values);
+    return { capabilities: { vehicles: true }, rows: result.rows.map(normalizeMarker) };
+  } catch (error) {
+    return { capabilities: { vehicles: false }, rows: [], reason: `Vehicle marker transform query is unsupported by this schema: ${error.message}` };
+  }
+}
+
+export async function liveMapStorage(db, map = "") {
+  if (!(await tableExists(db, "actors")) || !(await tableExists(db, "placeables"))) return unsupportedMap("storage", ["dune.actors", "dune.placeables"]);
+  const values = [];
+  const where = mapFilterClause(map, values, "a");
+  try {
+    const result = await db.query(`
+      select p.id,
+             'storage' as type,
+             coalesce(max(case when pa.actor_name not like '##%' and pa.actor_name <> 'None' then pa.actor_name end), p.building_type) as name,
+             coalesce(a.map, '') as map,
+             coalesce(a.partition_id, 0) as partition_id,
+             p.building_type as class,
+             count(i.id)::int as item_count,
+             ((a.transform).location).x as x,
+             ((a.transform).location).y as y,
+             ((a.transform).location).z as z
+      from dune.placeables p
+      join dune.actors a on a.id = p.id
+      left join dune.permission_actor pa on pa.actor_id = p.id
+      left join dune.inventories inv on inv.actor_id = p.id
+      left join dune.items i on i.inventory_id = inv.id
+      where p.building_type in ('SpiceSilo_Placeable','GenericContainer_Placeable','StorageContainer_Placeable','MediumStorageContainer_Placeable')
+        and a.transform is not null ${where}
+      group by p.id, p.building_type, a.map, a.partition_id, a.transform
+      order by a.map, a.partition_id, p.id`, values);
+    return { capabilities: { storage: true }, rows: result.rows.map(normalizeMarker) };
+  } catch (error) {
+    return { capabilities: { storage: false }, rows: [], reason: `Storage marker transform query is unsupported by this schema: ${error.message}` };
+  }
+}
+
+export async function liveMapBases(db, map = "") {
+  if (!(await tableExists(db, "actors")) || !(await tableExists(db, "buildings"))) return unsupportedMap("bases", ["dune.actors", "dune.buildings"]);
+  const values = [];
+  const where = mapFilterClause(map, values, "a");
+  try {
+    const result = await db.query(`
+      select b.id,
+             'base' as type,
+             coalesce(pa.actor_name, 'Base ' || b.id::text) as name,
+             coalesce(a.map, '') as map,
+             coalesce(a.partition_id, 0) as partition_id,
+             coalesce(a.class, '') as class,
+             ((a.transform).location).x as x,
+             ((a.transform).location).y as y,
+             ((a.transform).location).z as z
+      from dune.buildings b
+      join dune.building_instances bi on bi.building_id = b.id
+      join dune.actor_fgl_entities afe on afe.entity_id = bi.owner_entity_id
+      join dune.actors a on a.id = afe.actor_id
+      left join dune.permission_actor pa on pa.actor_id = a.id
+      where a.transform is not null ${where}
+      group by b.id, pa.actor_name, a.id, a.map, a.partition_id, a.class, a.transform
+      order by a.map, a.partition_id, b.id`, values);
+    return { capabilities: { bases: true }, rows: result.rows.map(normalizeMarker) };
+  } catch (error) {
+    return { capabilities: { bases: false }, rows: [], reason: `Base marker transform query is unsupported by this schema: ${error.message}` };
+  }
+}
+
+export async function liveMapServices(db, map = "") {
+  if (!(await tableExists(db, "world_partition"))) return unsupportedMap("services", ["dune.world_partition"]);
+  const hasFarm = await tableExists(db, "farm_state");
+  const values = [];
+  const where = mapFilterClause(map, values, "wp");
+  const result = await db.query(`
+    select wp.partition_id,
+           'service' as type,
+           coalesce(wp.label, wp.map || ' #' || wp.partition_id::text) as name,
+           coalesce(wp.map, '') as map,
+           coalesce(wp.dimension_index, 0) as dimension_index,
+           coalesce(wp.server_id, '') as server_id,
+           coalesce(wp.blocked, false) as blocked,
+           ${hasFarm ? "coalesce(fs.alive, false)" : "false"} as alive,
+           ${hasFarm ? "coalesce(fs.ready, false)" : "false"} as ready,
+           ${hasFarm ? "coalesce(fs.connected_players, 0)" : "0"} as connected_players
+    from dune.world_partition wp
+    ${hasFarm ? "left join dune.farm_state fs on fs.server_id = wp.server_id" : ""}
+    where 1=1 ${where}
+    order by wp.map, wp.dimension_index, wp.partition_id`, values);
+  return { capabilities: { services: true, farmState: hasFarm }, rows: result.rows };
+}
+
+export async function liveMapMarkers(db, map = "") {
+  const [players, vehicles, bases, storage, services] = await Promise.all([
+    liveMapPlayers(db, map),
+    liveMapVehicles(db, map),
+    liveMapBases(db, map),
+    liveMapStorage(db, map),
+    liveMapServices(db, map)
+  ]);
+  return {
+    capabilities: await liveMapCapabilities(db),
+    overlays: {
+      players: players.reason || "",
+      vehicles: vehicles.reason || "",
+      bases: bases.reason || "",
+      storage: storage.reason || "",
+      services: services.reason || ""
+    },
+    rows: [
+      ...(players.rows || []),
+      ...(vehicles.rows || []),
+      ...(bases.rows || []),
+      ...(storage.rows || []),
+      ...(services.rows || []).map((row) => ({ ...row, id: row.partition_id }))
+    ]
+  };
+}
+
 export async function unsupportedPlayerFeature(db, id, feature) {
   intParam(id, "player id", 1);
   return { capabilities: { [feature]: false }, rows: [], reason: `${feature} schema has not been detected in this database yet` };
@@ -580,6 +760,39 @@ function repairTarget(durability) {
   if (!Number.isFinite(target) || target <= 0) return 0;
   if (current >= target && decayed >= target) return 0;
   return target;
+}
+
+function validateMapName(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^[A-Za-z0-9_:-]{1,80}$/.test(raw)) return raw;
+  throw new Error("Invalid map name");
+}
+
+function mapFilterClause(map, values, alias) {
+  const safe = validateMapName(map);
+  if (!safe) return "";
+  values.push(safe);
+  return ` and ${alias}.map = $${values.length}`;
+}
+
+function normalizeMarker(row) {
+  return {
+    ...row,
+    id: Number(row.id),
+    partition_id: Number(row.partition_id || 0),
+    x: Number(row.x),
+    y: Number(row.y),
+    z: Number(row.z)
+  };
+}
+
+function unsupportedMap(feature, requiredTables) {
+  return {
+    capabilities: { [feature]: false },
+    rows: [],
+    reason: `Unsupported by detected schema. Missing required table(s): ${requiredTables.join(", ")}`
+  };
 }
 
 function unsupported(feature, requiredTables) {

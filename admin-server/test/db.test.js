@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError } from "../src/db.js";
-import { addCurrency, addFactionReputation, deleteInventoryItem, giveItemToStorage, listPlayers, tablePreview, UnsupportedCapabilityError } from "../src/duneDb.js";
+import { addCurrency, addFactionReputation, deleteInventoryItem, giveItemToStorage, listPlayers, liveMapPlayers, liveMapServices, tablePreview, UnsupportedCapabilityError } from "../src/duneDb.js";
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
   assert.deepEqual(discoverDbConfig({}), {
@@ -58,6 +58,33 @@ test("players query uses parameterized search input", async () => {
   assert.ok(playerQuery);
   assert.match(playerQuery.text, /\$1/);
   assert.deepEqual(playerQuery.values, ["%RedBlink'; drop table dune.actors; --%"]);
+});
+
+test("live map player markers validate map filter and use parameterized transform query", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      return { rows: [{ id: 10, type: "player", name: "Red", online_status: "Online", map: "Survival_1", partition_id: 1, class: "Player", x: "1", y: "2", z: "3" }] };
+    }
+  };
+  const result = await liveMapPlayers(db, "Survival_1");
+  assert.equal(result.rows[0].type, "player");
+  const markerQuery = calls.find((call) => call.text.includes("join dune.player_state"));
+  assert.ok(markerQuery);
+  assert.match(markerQuery.text, /a\.map = \$1/);
+  assert.deepEqual(markerQuery.values, ["Survival_1"]);
+  await assert.rejects(() => liveMapPlayers(db, "bad;map"), /Invalid map name/);
+});
+
+test("live map services returns capability response when world partitions are missing", async () => {
+  const db = {
+    query: async () => ({ rows: [{ exists: false }] })
+  };
+  const result = await liveMapServices(db);
+  assert.equal(result.capabilities.services, false);
+  assert.match(result.reason, /dune\.world_partition/);
 });
 
 test("inventory delete verifies ownership before calling dune.delete_item", async () => {

@@ -21,6 +21,8 @@ Backend tests must cover:
 - SQL destructive detection
 - direct DB mutation capability/ownership checks
 - RabbitMQ broadcast payload validation
+- map/sietch/deepdesert CLI argument validation
+- Live Map marker query validation
 
 Frontend tests must cover:
 
@@ -37,8 +39,8 @@ Current verification:
 
 - `npm test` in `admin-server/` passes.
 - `npm run build` in `web/` passes.
-- Backend tests currently cover signed sessions, CSRF rejection/acceptance, service validation, command allowlist, lifecycle/status/doctor mappings, logs command validation, noninteractive update flags, backup restore/delete name validation, admin catalog validation, item/item-id/template grant validation, XP/quantity/durability bounds, skill point/module validation, teleport/vehicle argument validation, SQL read-only/destructive detection, direct DB config discovery, identifier validation, table preview query building, player search parameterization, direct currency and faction mutation query behavior, direct inventory delete ownership validation, storage give-item validation/insert query behavior, unsupported mutation capability responses, RabbitMQ broadcast/shutdown payload validation, task creation/completion, and secret redaction.
-- Phase 5A verification on this pass: `npm test` in `admin-server/` passed and `npm run build` in `web/` passed. No live DB write or live RabbitMQ broadcast was executed from the web during automated verification.
+- Backend tests currently cover signed sessions, CSRF rejection/acceptance, service validation, command allowlist, lifecycle/status/doctor mappings, logs command validation, noninteractive update flags, backup restore/delete name validation, admin catalog validation, item/item-id/template grant validation, XP/quantity/durability bounds, skill point/module validation, teleport/vehicle argument validation, map mode/spawn/despawn/autoscaler/memory/sietch/deepdesert validation, SQL read-only/destructive detection, direct DB config discovery, identifier validation, table preview query building, player search parameterization, Live Map marker parameterization and unsupported capability responses, direct currency and faction mutation query behavior, direct inventory delete ownership validation, storage give-item validation/insert query behavior, RabbitMQ broadcast/shutdown payload validation, task creation/completion, and secret redaction.
+- Phase 5B1 verification on this pass: `npm test` in `admin-server/` passed, `npm run build` in `web/` passed, and `git diff --check` passed. No live map mutation, live DB write, or live RabbitMQ broadcast was executed from the web during automated verification.
 - Phase 3 live read-only DB smoke check connected to `127.0.0.1:15432` as `dune`, detected 179 Dune tables, listed 1 player, and verified storage/base/blueprint list queries plus actor `82` inventory/currency/faction/spec reads. No writes were run.
 - `docker compose -f docker-compose.web.yml config` passed previously.
 - HTTP bind smoke test could not run inside the sandbox because binding returned `EPERM`.

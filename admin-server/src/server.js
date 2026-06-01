@@ -175,9 +175,28 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/blueprints\/[^/]+$/)) return dbJson(res, async () => ({ blueprint: (await duneDb.listBlueprints(db)).rows.find((row) => String(row.id) === decodeURIComponent(path.split("/")[3])) || null }));
   if (path.match(/^\/api\/blueprints\/[^/]+\/export$/)) return exportJson(res, `blueprint-${decodeURIComponent(path.split("/")[3])}.json`, async () => ({ blueprint: (await duneDb.listBlueprints(db)).rows.find((row) => String(row.id) === decodeURIComponent(path.split("/")[3])) || null }));
 
+  if (path === "/api/map/status") return mapStatusRoute(res);
+  if (path === "/api/map/capabilities") return dbJson(res, () => duneDb.liveMapCapabilities(db));
+  if (path === "/api/map/markers") return dbJson(res, () => duneDb.liveMapMarkers(db, url.searchParams.get("map") || ""));
+  if (path === "/api/map/players") return dbJson(res, () => duneDb.liveMapPlayers(db, url.searchParams.get("map") || ""));
+  if (path === "/api/map/bases") return dbJson(res, () => duneDb.liveMapBases(db, url.searchParams.get("map") || ""));
+  if (path === "/api/map/storage") return dbJson(res, () => duneDb.liveMapStorage(db, url.searchParams.get("map") || ""));
+  if (path === "/api/map/services") return dbJson(res, () => duneDb.liveMapServices(db, url.searchParams.get("map") || ""));
+  if (path === "/api/map/overlays") return dbJson(res, () => duneDb.liveMapMarkers(db, url.searchParams.get("map") || ""));
+  if (path === "/api/maps/mode" && req.method === "POST") return confirmedTask(req, res, "maps", "mapsSetMode", {}, "SET MAP MODE");
   if (path === "/api/maps") return commandJson(res, "mapsList");
+  if (path === "/api/maps/mode") return commandJson(res, "mapsMode", { map: url.searchParams.get("map") || "" });
+  if (path === "/api/maps/reconcile" && req.method === "POST") return confirmedTask(req, res, "maps", "mapsReconcile", {}, "RECONCILE MAPS");
+  if (path === "/api/maps/spawn" && req.method === "POST") return confirmedTask(req, res, "maps", "mapsSpawn", {}, "SPAWN MAP");
+  if (path === "/api/maps/despawn" && req.method === "POST") return confirmedTask(req, res, "maps", "mapsDespawn", {}, "DESPAWN MAP");
+  if (path === "/api/maps/autoscaler" && req.method === "POST") return confirmedTask(req, res, "maps", "autoscalerAction", {}, "AUTOSCALER CHANGE");
+  if (path === "/api/maps/autoscaler") return commandJson(res, "autoscalerStatus");
+  if (path === "/api/maps/memory" && req.method === "POST") return memoryRoute(req, res);
+  if (path === "/api/maps/memory") return commandJson(res, "memoryStatus");
   if (path === "/api/sietches") return commandJson(res, "sietchesList");
+  if (path === "/api/sietches/update" && req.method === "POST") return sietchesUpdateRoute(req, res);
   if (path === "/api/deepdesert") return commandJson(res, "deepdesertStatus");
+  if (path === "/api/deepdesert/update" && req.method === "POST") return deepDesertUpdateRoute(req, res);
   if (path === "/api/settings") return json(res, 200, await setupState());
   if (path === "/api/settings" && req.method === "POST") return writeConfig(req, res);
 
@@ -189,6 +208,27 @@ async function commandJson(res, operation, payload = {}) {
   const args = buildDuneArgs(operation, payload);
   const result = await runDune(config, args);
   return json(res, 200, { operation, stdout: result.stdout, stderr: result.stderr, exitCode: result.code });
+}
+
+async function mapStatusRoute(res) {
+  if (config.mockMode) return json(res, 200, { maps: mockCommand("mapsList"), services: mockCommand("servers"), readiness: mockCommand("readiness") });
+  const [maps, services, readiness, autoscaler] = await Promise.all([
+    safeCommand("mapsList"),
+    safeCommand("servers"),
+    safeCommand("readiness"),
+    safeCommand("autoscalerStatus")
+  ]);
+  return json(res, 200, { maps, services, readiness, autoscaler });
+}
+
+async function safeCommand(operation, payload = {}) {
+  try {
+    const args = buildDuneArgs(operation, payload);
+    const result = await runDune(config, args);
+    return { operation, stdout: result.stdout, stderr: result.stderr, exitCode: result.code };
+  } catch (error) {
+    return { operation, stdout: "", stderr: redact(error.stderr || error.message || error), exitCode: error.code || 1 };
+  }
 }
 
 async function discoverServices() {
@@ -312,6 +352,38 @@ async function confirmedTask(req, res, type, operation, payload, phrase) {
     return json(res, 400, { error: `Confirmation phrase required: ${phrase}` });
   }
   return task(req, res, type, operation, { ...payload, ...body });
+}
+
+async function memoryRoute(req, res) {
+  const body = await readJson(req);
+  const operation = body.action === "unset" ? "memoryUnset" : "memorySet";
+  const phrase = operation === "memoryUnset" ? "UNSET MAP MEMORY" : "SET MAP MEMORY";
+  if (body.confirmation !== phrase) return json(res, 400, { error: `Confirmation phrase required: ${phrase}` });
+  return task(req, res, "maps", operation, body);
+}
+
+async function sietchesUpdateRoute(req, res) {
+  const body = await readJson(req);
+  const operationByAction = {
+    "set-max": "sietchesSetMax",
+    "set-active": "sietchesSetActive",
+    "set-display": "sietchesSetDisplay",
+    "set-password": "sietchesSetPassword",
+    sync: "sietchesSync",
+    validate: "sietchesValidate",
+    reconcile: "sietchesReconcile"
+  };
+  const operation = operationByAction[String(body.action || "")];
+  if (!operation) return json(res, 400, { error: "Unsupported sietch update action" });
+  const dangerous = ["sietchesSetActive", "sietchesSetDisplay", "sietchesSetPassword", "sietchesReconcile"].includes(operation);
+  if (dangerous && body.confirmation !== "UPDATE SIETCHES") return json(res, 400, { error: "Confirmation phrase required: UPDATE SIETCHES" });
+  return task(req, res, "maps", operation, body);
+}
+
+async function deepDesertUpdateRoute(req, res) {
+  const body = await readJson(req);
+  if (body.confirmation !== "UPDATE DEEP DESERT") return json(res, 400, { error: "Confirmation phrase required: UPDATE DEEP DESERT" });
+  return task(req, res, "maps", "deepdesertAction", body);
 }
 
 async function playerTask(req, res, path, operation, phrase = "") {

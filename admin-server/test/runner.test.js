@@ -28,6 +28,15 @@ test("builds allowlisted command arguments without shell interpolation", () => {
   assert.deepEqual(buildDuneArgs("adminSpawnVehicle", { playerId: "FLS_TEST", vehicleId: "Sandbike", template: "T6", offset: 400 }), ["admin", "spawn-vehicle", "FLS_TEST", "Sandbike", "T6", "400"]);
   assert.deepEqual(buildDuneArgs("adminCleanInventory", { playerId: "FLS_TEST" }), ["admin", "clean-inventory", "FLS_TEST"]);
   assert.deepEqual(buildDuneArgs("adminResetProgression", { playerId: "FLS_TEST" }), ["admin", "reset-progression", "FLS_TEST"]);
+  assert.deepEqual(buildDuneArgs("mapsMode", { map: "DeepDesert_1" }), ["maps", "mode", "DeepDesert_1"]);
+  assert.deepEqual(buildDuneArgs("mapsSetMode", { map: "DeepDesert_1", mode: "always-on" }), ["maps", "set", "DeepDesert_1", "always-on"]);
+  assert.deepEqual(buildDuneArgs("mapsSpawn", { target: "30" }), ["spawn", "30"]);
+  assert.deepEqual(buildDuneArgs("mapsDespawn", { target: "DeepDesert_1" }), ["despawn", "DeepDesert_1", "--force"]);
+  assert.deepEqual(buildDuneArgs("autoscalerAction", { action: "restart" }), ["autoscaler", "restart"]);
+  assert.deepEqual(buildDuneArgs("memorySet", { map: "DeepDesert_1", memory: "8g" }), ["memory", "set", "DeepDesert_1", "8g"]);
+  assert.deepEqual(buildDuneArgs("sietchesSetActive", { map: "Survival_1", count: 2 }), ["sietches", "set-active", "Survival_1", "2"]);
+  assert.deepEqual(buildDuneArgs("sietchesSetDisplay", { partitionId: 38, displayName: "Sietch Alpha" }), ["sietches", "set-display", "38", "Sietch Alpha"]);
+  assert.deepEqual(buildDuneArgs("deepdesertAction", { action: "disable" }), ["deepdesert", "dual", "disable", "--yes", "--force"]);
   assert.throws(() => buildDuneArgs("adminAddXp", { playerId: "bad;id", amount: 1000 }));
   assert.throws(() => buildDuneArgs("backupRestore", { backup: "../dump.backup" }));
   assert.throws(() => buildDuneArgs("adminGiveItem", { playerId: "FLS_TEST", itemName: "", quantity: 1 }));
@@ -36,6 +45,13 @@ test("builds allowlisted command arguments without shell interpolation", () => {
   assert.throws(() => buildDuneArgs("adminGiveItem", { playerId: "FLS_TEST", itemName: "Water", quantity: 1, durability: 2 }));
   assert.throws(() => buildDuneArgs("adminSetSkillPoints", { playerId: "FLS_TEST", points: -1 }));
   assert.throws(() => buildDuneArgs("adminSpawnVehicle", { playerId: "FLS_TEST", vehicleId: "Sandbike;bad", template: "T6" }));
+  assert.throws(() => buildDuneArgs("mapsSetMode", { map: "DeepDesert_1;bad", mode: "dynamic" }));
+  assert.throws(() => buildDuneArgs("mapsSetMode", { map: "DeepDesert_1", mode: "bad" }));
+  assert.throws(() => buildDuneArgs("mapsSpawn", { target: "../bad" }));
+  assert.throws(() => buildDuneArgs("autoscalerAction", { action: "run" }));
+  assert.throws(() => buildDuneArgs("memorySet", { map: "DeepDesert_1", memory: "8gb" }));
+  assert.throws(() => buildDuneArgs("sietchesSetPassword", { partitionId: 1, password: "bad\npw" }));
+  assert.throws(() => buildDuneArgs("deepdesertAction", { action: "reset" }));
   assert.throws(() => buildDuneArgs("unknown"));
 });
 
