@@ -519,20 +519,34 @@ function MarketPanel({ onError }: { onError: (text: string) => void }) {
   const [view, setView] = useState("items");
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [stats, setStats] = useState<Record<string, unknown> | null>(null);
-  const [capabilities, setCapabilities] = useState<Record<string, unknown> | null>(null);
+  const [info, setInfo] = useState<Record<string, unknown> | null>(null);
   const [message, setMessage] = useState("");
+
   async function run(action: () => Promise<void>) {
     onError("");
     setMessage("");
-    try { await action(); } catch (error) { const text = error instanceof Error ? error.message : String(error); setMessage(text); onError(text); }
+    try {
+      await action();
+    } catch (error) {
+      const text = error instanceof Error ? error.message : String(error);
+      setMessage(text);
+      onError(text);
+    }
   }
-  async function load(nextView = view) {
+
+  function clearResult(nextView: string) {
     setView(nextView);
+    setRows([]);
     setStats(null);
+    setInfo(null);
+  }
+
+  async function load(nextView = view) {
+    clearResult(nextView);
+
     if (nextView === "items") {
       const result = await marketApi.items(q);
       setRows(result.rows || []);
-      setCapabilities(result.capabilities || null);
     } else if (nextView === "listings") {
       const result = await marketApi.listings(q);
       setRows(result.rows || []);
@@ -544,35 +558,59 @@ function MarketPanel({ onError }: { onError: (text: string) => void }) {
       setRows(result.rows || []);
     } else if (nextView === "categories") {
       const result = await marketApi.categories();
-      setRows(result.categories.map((category) => ({ category })));
+      setRows((result.categories || []).map((category) => ({ category })));
     } else if (nextView === "stats") {
       const result = await marketApi.stats();
-      setRows([]);
       setStats(result.stats || {});
     }
   }
+
+  async function loadCapabilities() {
+    clearResult("capabilities");
+    setInfo(await marketApi.capabilities());
+  }
+
+  async function loadAutomationStatus() {
+    clearResult("automation");
+    setInfo(await marketApi.automationStatus());
+  }
+
+  const title = view === "capabilities"
+    ? "Market Capabilities"
+    : view === "automation"
+      ? "Market Automation Status"
+      : `Market ${view.charAt(0).toUpperCase()}${view.slice(1)}`;
+
   return <section className="panel">
-    <div className="panel-title"><h2>Market</h2><button onClick={() => run(async () => setCapabilities(await marketApi.capabilities()))}>Load Capabilities</button></div>
+    <div className="panel-title">
+      <h2>Market</h2>
+      <button onClick={() => run(loadCapabilities)}>Load Capabilities</button>
+    </div>
+
     <div className="action-row">
       <input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Template id, item name, or category" />
-      <button onClick={() => run(() => load("items"))}>Items</button>
-      <button onClick={() => run(() => load("listings"))}>Listings</button>
-      <button onClick={() => run(() => load("sales"))}>Sales</button>
-      <button onClick={() => run(() => load("stats"))}>Stats</button>
-      <button onClick={() => run(() => load("categories"))}>Categories</button>
-      <button onClick={() => run(() => load("catalog"))}>Catalog</button>
+      <button className={view === "items" ? "active" : ""} onClick={() => run(() => load("items"))}>Items</button>
+      <button className={view === "listings" ? "active" : ""} onClick={() => run(() => load("listings"))}>Listings</button>
+      <button className={view === "sales" ? "active" : ""} onClick={() => run(() => load("sales"))}>Sales</button>
+      <button className={view === "stats" ? "active" : ""} onClick={() => run(() => load("stats"))}>Stats</button>
+      <button className={view === "categories" ? "active" : ""} onClick={() => run(() => load("categories"))}>Categories</button>
+      <button className={view === "catalog" ? "active" : ""} onClick={() => run(() => load("catalog"))}>Catalog</button>
     </div>
+
     <div className="action-row">
-      <button onClick={() => run(async () => setCapabilities(await marketApi.automationStatus()))}>Automation Status</button>
+      <button className={view === "automation" ? "active" : ""} onClick={() => run(loadAutomationStatus)}>Automation Status</button>
       <button disabled onClick={() => undefined}>Start Automation</button>
       <button disabled onClick={() => undefined}>Stop Automation</button>
       <button disabled onClick={() => undefined}>Run Once</button>
       <button disabled onClick={() => undefined}>Cleanup</button>
     </div>
+
     {message && <p className="danger-note">{message}</p>}
-    {capabilities && <pre className="mini-output">{JSON.stringify(capabilities, null, 2)}</pre>}
+
+    <h3>{title}</h3>
+    {info && <pre className="mini-output">{JSON.stringify(info, null, 2)}</pre>}
     {stats && <pre className="mini-output">{JSON.stringify(stats, null, 2)}</pre>}
-    <DataTable rows={rows} />
+    {!info && !stats && <DataTable rows={rows} />}
   </section>;
 }
 

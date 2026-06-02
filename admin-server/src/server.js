@@ -198,8 +198,16 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/blueprints\/[^/]+\/clone$/) && req.method === "POST") return blockedImportRoute(req, res, "blueprints.clone", "CLONE BLUEPRINT", "Blueprint clone remains blocked: clone requires verified blueprint item creation, stat wiring, and inventory ownership rules.");
 
   if (path === "/api/market/capabilities") return dbJson(res, () => duneDb.marketCapabilities(db));
-  if (path === "/api/market/items") return dbJson(res, () => duneDb.marketItems(db, queryParams(url, ["q", "limit", "offset"])));
-  if (path === "/api/market/search") return dbJson(res, () => duneDb.marketItems(db, { q: url.searchParams.get("q") || "", limit: url.searchParams.get("limit") || 100 }));
+  if (path === "/api/market/items") return dbJson(res, () => duneDb.marketItems(db, {
+    q: url.searchParams.get("q") || "",
+    limit: url.searchParams.get("limit") || 500,
+    offset: url.searchParams.get("offset") || 0
+  }));
+  if (path === "/api/market/search") return dbJson(res, () => duneDb.marketItems(db, {
+    q: url.searchParams.get("q") || "",
+    limit: url.searchParams.get("limit") || 100,
+    offset: url.searchParams.get("offset") || 0
+  }));
   if (path === "/api/market/listings") return dbJson(res, () => duneDb.marketListings(db, { templateId: url.searchParams.get("template_id") || "", owner: url.searchParams.get("owner") || "", limit: url.searchParams.get("limit") || 500, offset: url.searchParams.get("offset") || 0 }));
   if (path === "/api/market/sales") return dbJson(res, () => duneDb.marketSales(db, { limit: url.searchParams.get("limit") || 200 }));
   if (path === "/api/market/stats") return dbJson(res, () => duneDb.marketStats(db));
