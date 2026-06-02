@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildDuneArgs, isReadOnlySql, validateServiceName } from "../src/runner.js";
+import { buildDuneArgs, isReadOnlySql, parseVehicleList, validateServiceName } from "../src/runner.js";
 import { redact } from "../src/redact.js";
 
 test("validates known service names and aliases", () => {
@@ -64,6 +64,24 @@ test("validates admin catalog wrapper arguments", () => {
   assert.throws(() => buildDuneArgs("adminItemSearch", { q: "x" }));
   assert.throws(() => buildDuneArgs("adminItemSearch", { q: "water\nbad" }));
   assert.throws(() => buildDuneArgs("adminVehicleSearch", { q: "bike\nbad" }));
+});
+
+test("parses RedBlink vehicle-list output into vehicles and templates", () => {
+  const output = `Sandbike
+actor: /Game/Dune/Systems/Vehicles/Blueprints/GroundVehicles/BP_Sandbike_CHOAM.BP_Sandbike_CHOAM_C
+templates: T1_ExtraSeat, T2_Inventory, T3_Boost, T4_Scanner, T5, T6
+Buggy
+actor: /Game/Dune/Systems/Vehicles/Blueprints/GroundVehicles/BP_Buggy_CHOAM.BP_Buggy_CHOAM_C
+templates: T3_Inventory, T4_Boost, T5_Mining, T6_Combat
+Tank
+actor: /Game/Dune/Systems/Vehicles/Blueprints/GroundVehicles/BP_Tank_CHOAM.BP_Tank_CHOAM_C
+templates: T6_CombatFire, T6_CombatDart`;
+  const vehicles = parseVehicleList(output);
+  assert.equal(vehicles.length, 3);
+  assert.equal(vehicles[0].id, "Sandbike");
+  assert.match(vehicles[0].actor, /BP_Sandbike_CHOAM/);
+  assert.deepEqual(vehicles[0].templates, ["T1_ExtraSeat", "T2_Inventory", "T3_Boost", "T4_Scanner", "T5", "T6"]);
+  assert.deepEqual(vehicles[1].templates, ["T3_Inventory", "T4_Boost", "T5_Mining", "T6_Combat"]);
 });
 
 test("detects read-only SQL and requires explicit destructive allowance", () => {

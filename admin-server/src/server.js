@@ -5,10 +5,10 @@ import { loadConfig, publicConfig } from "./config.js";
 import { createAuth, setSessionCookie, clearSessionCookie, json } from "./auth.js";
 import { TaskManager, publicTask } from "./tasks.js";
 import { preflight } from "./preflight.js";
-import { buildDuneArgs, isDynamicServerService, isReadOnlySql, runDockerLogs, runDune, validateServiceName } from "./runner.js";
+import { buildDuneArgs, isDynamicServerService, isReadOnlySql, parseVehicleList, runDockerLogs, runDune, validateServiceName } from "./runner.js";
 import { createDb } from "./db.js";
 import * as duneDb from "./duneDb.js";
-import { audit } from "./audit.js";
+import { audit, recordAdminHistory } from "./audit.js";
 import { redact } from "./redact.js";
 import { listCatalogItems, resolveCatalogItem } from "./adminCatalog.js";
 import { buildBroadcastCommand, buildShutdownBroadcastCommand, publishServerCommand } from "./rmq.js";
@@ -132,12 +132,13 @@ async function handleApi(req, res) {
   if (path === "/api/players/search") return dbJson(res, () => duneDb.listPlayers(db, { q: url.searchParams.get("q") || "" }));
   if (path === "/api/admin/items/search") return commandJson(res, "adminItemSearch", { q: url.searchParams.get("q") || "" });
   if (path === "/api/admin/items") return commandJson(res, url.searchParams.get("category") ? "adminItemListCategory" : "adminItemList", { category: url.searchParams.get("category") || "" });
+  if (path === "/api/admin/vehicles/structured") return structuredVehiclesRoute(res);
   if (path === "/api/admin/vehicles") return commandJson(res, url.searchParams.get("q") ? "adminVehicleSearch" : "adminVehicleList", { q: url.searchParams.get("q") || "" });
   if (path === "/api/admin/skill-modules") return commandJson(res, url.searchParams.get("q") ? "adminSkillModulesSearch" : "adminSkillModules", { q: url.searchParams.get("q") || "" });
   if (path === "/api/admin/history") return commandJson(res, "adminHistory");
   if (path === "/api/admin/broadcast" && req.method === "POST") return broadcastRoute(req, res);
   if (path === "/api/admin/broadcast-shutdown" && req.method === "POST") return shutdownBroadcastRoute(req, res);
-  if (path === "/api/admin/whisper" && req.method === "POST") return unsupportedMutation(req, res, "admin.whisper", "Whisper remains blocked: arrakis-admin publishes courier chat to exchange chat.whispers with routing key equal to the recipient Funcom ID, AMQP type text_chat, and sender user_id set to a seeded GM hex FLS ID. RedBlink does not currently seed or expose the required GM account/persona rows, sender Funcom ID, sender hex FLS ID, and verified recipient Funcom ID mapping.");
+  if (path === "/api/admin/whisper" && req.method === "POST") return whisperRoute(req, res);
   if (path.match(/^\/api\/players\/[^/]+\/give-item$/) && req.method === "POST") return playerTask(req, res, path, "adminGiveItem");
   if (path.match(/^\/api\/players\/[^/]+\/give-items$/) && req.method === "POST") return giveItemsRoute(req, res, path);
   if (path.match(/^\/api\/players\/[^/]+\/give-item-id$/) && req.method === "POST") return playerTask(req, res, path, "adminGiveItemId");
@@ -260,6 +261,16 @@ async function commandJson(res, operation, payload = {}) {
   const args = buildDuneArgs(operation, payload);
   const result = await runDune(config, args);
   return json(res, 200, { operation, stdout: result.stdout, stderr: result.stderr, exitCode: result.code });
+}
+
+async function structuredVehiclesRoute(res) {
+  if (config.mockMode) return json(res, 200, { vehicles: [] });
+  const result = await runDune(config, buildDuneArgs("adminVehicleList"));
+  return json(res, 200, {
+    vehicles: parseVehicleList(result.stdout),
+    stdout: result.stdout,
+    stderr: result.stderr
+  });
 }
 
 async function mapStatusRoute(res) {
@@ -624,9 +635,11 @@ async function broadcastRoute(req, res) {
     const command = buildBroadcastCommand(body);
     const result = config.mockMode ? { code: 0, stdout: "mock broadcast\n", stderr: "", args: [] } : await publishServerCommand(config, command, "web-broadcast");
     audit(config, req, "admin.broadcast", { supported: true, command });
-    return json(res, 200, { supported: true, ok: true, stdout: result.stdout, stderr: result.stderr });
+    recordAdminHistory(config, { command: "web-broadcast", target: "all", friendly: "Broadcast publish test", path: "rmq:heartbeats/notifications", result: "published", message: body.message });
+    return json(res, 200, { supported: true, ok: true, stdout: result.stdout, stderr: result.stderr, note: "Broadcast publish succeeded, but in-game visibility is unverified." });
   } catch (error) {
     audit(config, req, "admin.broadcast", { supported: false, error: redact(error.message || error) });
+    recordAdminHistory(config, { command: "web-broadcast", target: "all", friendly: "Broadcast publish test", path: "rmq:heartbeats/notifications", result: "blocked", message: body.message });
     return json(res, 400, { supported: false, error: redact(error.message || error), reason: redact(error.message || error) });
   }
 }
@@ -634,17 +647,28 @@ async function broadcastRoute(req, res) {
 async function shutdownBroadcastRoute(req, res) {
   const body = await readJson(req);
   if (body.confirmation !== "SHUTDOWN BROADCAST") {
+    recordAdminHistory(config, { command: "web-shutdown-broadcast", target: "all", friendly: "Shutdown broadcast publish test", path: "rmq:heartbeats/notifications", result: "blocked", message: "missing confirmation" });
     return json(res, 400, { error: "Confirmation phrase required: SHUTDOWN BROADCAST" });
   }
   try {
     const command = buildShutdownBroadcastCommand(body);
     const result = config.mockMode ? { code: 0, stdout: "mock shutdown broadcast\n", stderr: "", args: [] } : await publishServerCommand(config, command, "web-shutdown-broadcast");
     audit(config, req, "admin.broadcast-shutdown", { supported: true, command });
-    return json(res, 200, { supported: true, ok: true, stdout: result.stdout, stderr: result.stderr });
+    recordAdminHistory(config, { command: "web-shutdown-broadcast", target: "all", friendly: "Shutdown broadcast publish test", path: "rmq:heartbeats/notifications", result: "published", message: `${body.shutdownType || "Restart"} in ${body.delayMinutes || 15} minutes` });
+    return json(res, 200, { supported: true, ok: true, stdout: result.stdout, stderr: result.stderr, note: "Shutdown broadcast publish succeeded, but in-game visibility is unverified." });
   } catch (error) {
     audit(config, req, "admin.broadcast-shutdown", { supported: false, error: redact(error.message || error) });
+    recordAdminHistory(config, { command: "web-shutdown-broadcast", target: "all", friendly: "Shutdown broadcast publish test", path: "rmq:heartbeats/notifications", result: "blocked", message: `${body.shutdownType || "Restart"} in ${body.delayMinutes || 15} minutes` });
     return json(res, 400, { supported: false, error: redact(error.message || error), reason: redact(error.message || error) });
   }
+}
+
+async function whisperRoute(req, res) {
+  const body = await readJson(req);
+  const reason = "Whisper remains blocked: arrakis-admin publishes courier chat to exchange chat.whispers with routing key equal to the recipient Funcom ID, AMQP type text_chat, and sender user_id set to a seeded GM hex FLS ID. RedBlink does not currently seed or expose the required GM account/persona rows, sender Funcom ID, sender hex FLS ID, and verified recipient Funcom ID mapping.";
+  audit(config, req, "admin.whisper", { supported: false, reason, playerId: body.playerId });
+  recordAdminHistory(config, { command: "web-whisper", target: body.playerId || "-", friendly: "Whisper blocked", path: "rmq:chat.whispers", result: "blocked", message: body.message });
+  return json(res, 501, { supported: false, reason, error: reason });
 }
 
 function taskRoute(req, res, path) {

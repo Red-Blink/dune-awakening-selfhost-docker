@@ -235,6 +235,30 @@ export function runDockerLogs(service, options = {}) {
   });
 }
 
+export function parseVehicleList(stdout = "") {
+  const vehicles = [];
+  let current = null;
+  for (const rawLine of String(stdout).split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const actorMatch = line.match(/^actor:\s*(.+)$/i);
+    if (actorMatch && current) {
+      current.actor = actorMatch[1].trim();
+      continue;
+    }
+    const templatesMatch = line.match(/^templates:\s*(.*)$/i);
+    if (templatesMatch && current) {
+      current.templates = templatesMatch[1].split(",").map((part) => part.trim()).filter(Boolean);
+      continue;
+    }
+    if (/^[A-Za-z][A-Za-z0-9_-]+$/.test(line)) {
+      current = { id: line, name: line, actor: "", templates: [] };
+      vehicles.push(current);
+    }
+  }
+  return vehicles;
+}
+
 export function isDynamicServerService(service) {
   return /^dune-server-[a-z0-9-]+$/i.test(String(service || ""));
 }

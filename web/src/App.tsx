@@ -384,15 +384,20 @@ function PlayerActions({ dbPlayerId, actionPlayerId, setTask, onError, onRefresh
     setResult("Teleport coordinates filled from the selected player's current DB position. Yaw defaults to 0 when unavailable.");
   }
   useEffect(() => {
-    adminApi.vehicles("").then((response) => {
-      const parsed = parseVehicleCatalog(response.stdout || "");
+    adminApi.structuredVehicles().then((response) => {
+      const parsed = Object.fromEntries((response.vehicles || []).map((vehicle) => [vehicle.id || vehicle.name, vehicle.templates || []]).filter(([id]) => id));
       setVehicleCatalog(parsed);
       const firstVehicle = Object.keys(parsed)[0] || "";
       if (firstVehicle && !vehicleId) {
         setVehicleId(firstVehicle);
         setVehicleTemplate(parsed[firstVehicle]?.[0] || "");
       }
-    }).catch(() => undefined);
+    }).catch(() => {
+      adminApi.vehicles("").then((response) => {
+        const parsed = parseVehicleCatalog(response.stdout || "");
+        setVehicleCatalog(parsed);
+      }).catch(() => undefined);
+    });
   }, []);
   const vehicleIds = Object.keys(vehicleCatalog);
   const selectedTemplates = vehicleCatalog[vehicleId] || [];
@@ -1068,6 +1073,11 @@ function parseVehicleCatalog(text: string) {
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line || /^vehicle/i.test(line) || /^templates?$/i.test(line)) continue;
+    if (/^actor:/i.test(line)) continue;
+    if (/^templates?:/i.test(line) && currentVehicle) {
+      catalog[currentVehicle] = uniqueValues((catalog[currentVehicle] || []).concat(splitTemplateList(line.replace(/^templates?\s*:?/i, ""))));
+      continue;
+    }
     const colon = line.match(/^([A-Za-z][A-Za-z0-9_-]+)\s*:\s*(.+)$/);
     if (colon) {
       currentVehicle = colon[1];
@@ -1077,10 +1087,6 @@ function parseVehicleCatalog(text: string) {
     const bullet = line.match(/^[-*]\s*(.+)$/);
     if (bullet && currentVehicle) {
       catalog[currentVehicle] = uniqueValues((catalog[currentVehicle] || []).concat(splitTemplateList(bullet[1])));
-      continue;
-    }
-    if (/^templates?\b/i.test(line) && currentVehicle) {
-      catalog[currentVehicle] = uniqueValues((catalog[currentVehicle] || []).concat(splitTemplateList(line.replace(/^templates?\s*:?/i, ""))));
       continue;
     }
     if (/^[A-Za-z][A-Za-z0-9_-]+$/.test(line)) {

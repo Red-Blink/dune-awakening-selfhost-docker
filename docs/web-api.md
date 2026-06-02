@@ -83,8 +83,9 @@ Base path for the native RedBlink API: `/api`.
 | `/api/admin/items/search` | GET | Search admin item catalog | `dune admin item-search <q>` |
 | `/api/admin/items` | GET | List admin item catalog/categories | `dune admin item-list [category]` |
 | `/api/admin/vehicles` | GET | List/search vehicle catalog | `dune admin vehicle-list [q]` |
+| `/api/admin/vehicles/structured` | GET | Structured vehicle catalog | Parses `dune admin vehicle-list` into `{ id, name, actor, templates[] }` for Spawn Vehicle dropdowns |
 | `/api/admin/skill-modules` | GET | List/search skill module catalog | `dune admin skill-modules [q]` |
-| `/api/admin/history` | GET | Admin history | `dune admin history` |
+| `/api/admin/history` | GET | Admin history | `dune admin history`; web broadcast/shutdown/whisper attempts append safe rows to the same TSV |
 | `/api/admin/broadcast` | POST | Broadcast publish test | Publishes RedBlink `ServiceBroadcast` Generic envelope to `dune-rmq-game` `heartbeats/notifications`; live in-game visibility remains unverified |
 | `/api/admin/broadcast-shutdown` | POST | Shutdown broadcast publish test | Publishes RedBlink `ServiceBroadcast` ServerShutdown envelope to `dune-rmq-game` `heartbeats/notifications`; requires `SHUTDOWN BROADCAST`; live in-game visibility remains unverified |
 | `/api/admin/whisper` | POST | Whisper capability response | Returns unsupported until RedBlink exposes the GM courier account/persona, sender Funcom ID, sender hex FLS ID, recipient Funcom ID mapping, and verified `chat.whispers` routing |

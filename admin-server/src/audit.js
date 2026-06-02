@@ -1,5 +1,5 @@
 import { appendFileSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { redact } from "./redact.js";
 
 export function audit(config, req, action, detail = {}) {
@@ -13,4 +13,23 @@ export function audit(config, req, action, detail = {}) {
     detail: JSON.parse(redact(JSON.stringify(detail)))
   };
   appendFileSync(config.auditLog, `${JSON.stringify(row)}\n`, { mode: 0o600 });
+}
+
+export function recordAdminHistory(config, { command, target = "-", friendly = "", path = "web", result = "ok", message = "" }) {
+  mkdirSync(config.generatedDir, { recursive: true });
+  const safeMessage = redact(String(message || "")).replace(/[\r\n\t]/g, " ").slice(0, 160);
+  const columns = [
+    new Date().toISOString(),
+    safeColumn(command),
+    safeColumn(target),
+    safeColumn(friendly),
+    safeColumn(path),
+    safeColumn(result),
+    safeMessage ? JSON.stringify({ messagePreview: safeMessage }) : "{}"
+  ];
+  appendFileSync(join(config.generatedDir, "admin-command-history.tsv"), `${columns.join("\t")}\n`, { mode: 0o600 });
+}
+
+function safeColumn(value) {
+  return redact(String(value || "-")).replace(/[\r\n\t]/g, " ").slice(0, 160);
 }
