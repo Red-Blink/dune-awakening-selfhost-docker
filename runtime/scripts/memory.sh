@@ -103,7 +103,7 @@ set_env_raw() {
   ' .env > "$tmp"
 
   mv "$tmp" .env
-  chmod 600 .env
+  chmod 644 .env
 }
 
 unset_env_raw() {
@@ -114,7 +114,7 @@ unset_env_raw() {
   tmp="$(mktemp)"
   awk -F= -v key="$key" '$1 != key { print }' .env > "$tmp"
   mv "$tmp" .env
-  chmod 600 .env
+  chmod 644 .env
 }
 
 require_catalog() {
@@ -251,6 +251,10 @@ running_info_for_map() {
 restart_map_if_running() {
   local map="$1"
   local info kind container partition
+
+  if [ "${DUNE_MEMORY_SKIP_RESTART:-0}" = "1" ]; then
+    return 0
+  fi
 
   info="$(running_info_for_map "$map" || true)"
   [ -n "$info" ] || return 0
@@ -503,6 +507,13 @@ case "$cmd" in
       exit 2
     fi
     set_memory "$2" "$3"
+    ;;
+  set-no-restart)
+    if [ "$#" -ne 3 ]; then
+      usage
+      exit 2
+    fi
+    DUNE_MEMORY_SKIP_RESTART=1 set_memory "$2" "$3"
     ;;
   unset)
     if [ "$#" -ne 2 ]; then

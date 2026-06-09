@@ -29,6 +29,7 @@ export function loadConfig() {
     auditLog: resolve(generatedDir, "web-admin-audit.jsonl"),
     taskRetention: Number(process.env.ADMIN_TASK_RETENTION || 200),
     maxJsonBytes: Number(process.env.ADMIN_MAX_JSON_BYTES || 2 * 1024 * 1024),
+    maxUploadBytes: Number(process.env.ADMIN_MAX_UPLOAD_BYTES || 1024 * 1024 * 1024),
     commandTimeoutMs: Number(process.env.ADMIN_COMMAND_TIMEOUT_MS || 120000),
     staticDir: process.env.ADMIN_STATIC_DIR || resolve(repoRoot, "web/dist")
   };

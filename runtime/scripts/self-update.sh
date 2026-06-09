@@ -328,11 +328,82 @@ backup_current_stack() {
   } > "$backup_dir/meta.env"
 }
 
-install_release_tag() {
-  local tag="$1"
-  local tmpdir archive src backup_dir new_version expected_version
+git_worktree_available() {
+  command -v git >/dev/null 2>&1 || return 1
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
+  git remote get-url origin >/dev/null 2>&1 || return 1
+}
 
-  check_dirty_git_tree
+validate_release_tag_for_git() {
+  local tag="$1"
+  git check-ref-format "refs/tags/$tag" >/dev/null 2>&1
+}
+
+verify_installed_version() {
+  local tag="$1"
+  local backup_dir="$2"
+  local new_version expected_version
+
+  new_version="$CURRENT_VERSION"
+  [ -f VERSION ] && new_version="$(tr -d '[:space:]' < VERSION)"
+  expected_version="$tag"
+
+  if [ "${new_version#v}" != "${expected_version#v}" ]; then
+    echo
+    echo "Downloaded release tag $expected_version, but installed VERSION is $new_version."
+    echo "This usually means the GitHub release tag points to a commit with the wrong VERSION file."
+    echo "Publish a corrected release tag from the intended commit, then try again."
+    echo
+    echo "Previous stack files backup:"
+    echo "  $backup_dir/project-files.tgz"
+    return 1
+  fi
+
+  echo
+  echo "Installed stack version: $new_version"
+  echo "Previous stack files backup:"
+  echo "  $backup_dir/project-files.tgz"
+  echo
+  echo "Exit and reopen dune manager so the updated scripts are reloaded."
+}
+
+install_release_tag_with_git() {
+  local tag="$1"
+  local backup_dir target remote
+
+  validate_release_tag_for_git "$tag" || {
+    echo "Invalid release tag for Git checkout: $tag"
+    exit 2
+  }
+
+  remote="$(git remote get-url origin 2>/dev/null || true)"
+  echo "Updating stack Git checkout from:"
+  echo "  $remote"
+  echo "Fetching release tag: $tag"
+  git fetch --force --tags origin
+  git fetch --force origin "refs/tags/${tag}:refs/tags/${tag}" >/dev/null 2>&1 || true
+
+  target="$(git rev-parse -q --verify "refs/tags/${tag}^{commit}" 2>/dev/null || true)"
+  if [ -z "$target" ]; then
+    echo "Could not resolve release tag in Git after fetch: $tag"
+    exit 2
+  fi
+
+  backup_dir="runtime/backups/self-update/$(date +%Y%m%d-%H%M%S)-${tag#v}"
+  echo "Backing up current stack files to:"
+  echo "  $backup_dir"
+  backup_current_stack "$backup_dir"
+
+  echo "Resetting stack checkout to release tag:"
+  echo "  $tag ($target)"
+  git reset --hard "$target"
+
+  verify_installed_version "$tag" "$backup_dir" || exit 4
+}
+
+install_release_tag_from_archive() {
+  local tag="$1"
+  local tmpdir archive src backup_dir
 
   tmpdir="$(mktemp -d)"
   archive="$tmpdir/release.tar.gz"
@@ -363,30 +434,24 @@ install_release_tag() {
     tar -xf -
   )
 
-  new_version="$CURRENT_VERSION"
-  [ -f VERSION ] && new_version="$(tr -d '[:space:]' < VERSION)"
-  expected_version="$tag"
-
-  if [ "${new_version#v}" != "${expected_version#v}" ]; then
-    echo
-    echo "Downloaded release tag $expected_version, but installed VERSION is $new_version."
-    echo "This usually means the GitHub release tag points to a commit with the wrong VERSION file."
-    echo "Publish a corrected release tag from the intended commit, then try again."
-    echo
-    echo "Previous stack files backup:"
-    echo "  $backup_dir/project-files.tgz"
+  if ! verify_installed_version "$tag" "$backup_dir"; then
     rm -rf "$tmpdir"
     exit 4
   fi
 
-  echo
-  echo "Installed stack version: $new_version"
-  echo "Previous stack files backup:"
-  echo "  $backup_dir/project-files.tgz"
-  echo
-  echo "Exit and reopen dune manager so the updated scripts are reloaded."
-
   rm -rf "$tmpdir"
+}
+
+install_release_tag() {
+  local tag="$1"
+
+  check_dirty_git_tree
+
+  if git_worktree_available; then
+    install_release_tag_with_git "$tag"
+  else
+    install_release_tag_from_archive "$tag"
+  fi
 }
 
 cmd="${1:-check}"

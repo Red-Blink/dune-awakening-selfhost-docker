@@ -62,6 +62,7 @@ BATTLEGROUP_ID="$(resolve_battlegroup_id)"
 CLIENT_PORT_BASE="$(resolve_client_port_base)"
 IGW_PORT_BASE="$(resolve_igw_port_base)"
 MULTIHOME_IP="$(resolve_bind_ip)"
+mapfile -t GAME_EXTERNAL_ADDRESS_ENV < <(game_external_address_override_env_args)
 PORT_RESERVATION_FILE="runtime/generated/spawn-port-reservations.tsv"
 PORT_LOCK_FILE="runtime/generated/spawn-port-reservations.lock"
 SPAWN_SUCCESS=0
@@ -550,6 +551,7 @@ mkdir -p "$FAKE_K8S_SERVICEACCOUNT_DIR"
 mkdir -p runtime/container
 python3 runtime/scripts/usersettings.py materialize "$MAP_NAME" "$PWD/runtime/game/$safe_name/Saved" "$PARTITION_ID"
 purge_stale_farm_rows_for_map "$MAP_NAME"
+runtime/scripts/network-addresses.sh reconcile >/dev/null 2>&1 || true
 
 cat > "$FAKE_K8S_SERVICEACCOUNT_DIR/namespace" <<EOF
 funcom-seabass-$BATTLEGROUP_ID
@@ -578,7 +580,7 @@ docker run -d \
   -e "POD_UID=docker-$safe_name" \
   -e "POD_NAME=${BATTLEGROUP_ID}-sg-${safe_name}-pod-${PARTITION_ID}" \
   -e "POD_IP=$MULTIHOME_IP" \
-  -e "EXTERNAL_ADDRESS_OVERRIDE=$SERVER_IP" \
+  "${GAME_EXTERNAL_ADDRESS_ENV[@]}" \
   -e "NODE_NAME=$(hostname)" \
   -e "SERVER_INDEX=$SERVER_INDEX" \
   -e "FARM_NAME=$BATTLEGROUP_ID" \
@@ -655,6 +657,7 @@ echo "  docker logs -f $CONTAINER_NAME"
 if live_server_id="$(bind_partition_to_live_server "$PARTITION_ID" "$MAP_NAME" "$GAME_PORT" "$IGW_PORT" 15 2)"; then
   echo "Bound partition $PARTITION_ID to warming server_id: $live_server_id"
 fi
+runtime/scripts/network-addresses.sh reconcile >/dev/null 2>&1 || true
 
 if [ "$MAP_NAME" = "Survival_1" ]; then
   runtime/scripts/sietches.sh sync >/dev/null 2>&1 || true

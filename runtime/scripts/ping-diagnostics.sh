@@ -44,6 +44,14 @@ container_arg_value() {
     | awk -v prefix="$prefix" 'index($0, prefix) == 1 { print substr($0, length(prefix) + 1); exit }'
 }
 
+container_env_value() {
+  local container="$1"
+  local key="$2"
+
+  docker inspect "$container" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+    | awk -F= -v key="$key" '$1 == key { print substr($0, length(key) + 2); exit }'
+}
+
 ss_has_udp() {
   local port="$1"
   ss -lnup 2>/dev/null | grep -Eq "[:.]${port}[[:space:]]"
@@ -52,6 +60,44 @@ ss_has_udp() {
 ss_has_tcp() {
   local port="$1"
   ss -lntp 2>/dev/null | grep -Eq "[:.]${port}[[:space:]]"
+}
+
+udp_listener_addresses_for_port() {
+  local port="$1"
+
+  awk -v port="$port" '
+    $0 ~ "[:.]" port "[[:space:]]" {
+      local = $5
+      gsub(/^\[/, "", local)
+      gsub(/\]$/, "", local)
+      sub(":" port "$", "", local)
+      print local
+    }
+  ' /tmp/dune-ping-ss-udp.out 2>/dev/null | sort -u
+}
+
+check_udp_listener_bind() {
+  local label="$1"
+  local port="$2"
+  local addresses
+
+  addresses="$(udp_listener_addresses_for_port "$port" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+  if [ -z "$addresses" ]; then
+    fail_msg "$label is not listening on UDP $port"
+    return 0
+  fi
+
+  if [ "$server_ip" != "$bind_ip" ] && printf '%s\n' "$addresses" | grep -Eq "(^|[[:space:]])${server_ip//./\\.}([[:space:]]|$)"; then
+    fail_msg "NAT address mismatch. $label UDP $port is bound to $server_ip, but SERVER_BIND_IP resolves to $bind_ip."
+    echo "     Game sockets must bind to SERVER_BIND_IP while farm_state.game_addr advertises SERVER_IP."
+    return 0
+  fi
+
+  if printf '%s\n' "$addresses" | grep -Eq "(^|[[:space:]])(${bind_ip//./\\.}|0\.0\.0\.0|\*)($|[[:space:]])"; then
+    ok "$label listening on UDP $port at ${addresses}"
+  else
+    warn_msg "$label UDP $port is listening at ${addresses}; expected $bind_ip or 0.0.0.0"
+  fi
 }
 
 ini_value() {
@@ -103,11 +149,14 @@ print_row "Local bind IP" "$bind_ip" ""
 echo
 
 if [ "$mode" = "public" ] && is_private_ipv4 "$bind_ip" && [ "$server_ip" != "$bind_ip" ]; then
+  echo "Network mode: public/NAT"
   warn_msg "Public mode advertises $server_ip while game UDP is bound on private host IP $bind_ip."
   echo "     This is valid only when the router/firewall forwards the public UDP ports to $bind_ip."
   echo "     A blank in-game ping usually means the client cannot reach ${server_ip}:${survival_game_port}/udp or ${server_ip}:${overmap_game_port}/udp."
 elif is_private_ipv4 "$server_ip" && [ "$mode" = "public" ]; then
   fail_msg "Public mode is configured but advertised IP is private: $server_ip"
+else
+  echo "Network mode: $mode"
 fi
 
 echo
@@ -130,11 +179,7 @@ if ss -lnup >/tmp/dune-ping-ss-udp.out 2>/tmp/dune-ping-ss-udp.err; then
   do
     label="${item%%:*}"
     port="${item##*:}"
-    if grep -Eq "[:.]${port}[[:space:]]" /tmp/dune-ping-ss-udp.out; then
-      ok "$label listening on UDP $port"
-    else
-      fail_msg "$label is not listening on UDP $port"
-    fi
+    check_udp_listener_bind "$label" "$port"
   done
 else
   warn_msg "Cannot inspect UDP listeners with ss: $(tr '\n' ' ' </tmp/dune-ping-ss-udp.err)"
@@ -212,6 +257,18 @@ if docker_available; then
     else
       fail_msg "$map container does not use expected IGWPort=$expected_igw"
     fi
+    pod_ip="$(container_env_value "$container" POD_IP || true)"
+    external_override="$(container_env_value "$container" EXTERNAL_ADDRESS_OVERRIDE || true)"
+    multihome="$(container_arg_value "$container" -MultiHome= || true)"
+    [ "$pod_ip" = "$bind_ip" ] && ok "$map container POD_IP=$pod_ip" || fail_msg "$map container POD_IP=$pod_ip expected $bind_ip"
+    [ "$multihome" = "$bind_ip" ] && ok "$map container MultiHome=$multihome" || fail_msg "$map container MultiHome=$multihome expected $bind_ip"
+    if [ -n "$external_override" ] && [ "$server_ip" != "$bind_ip" ]; then
+      fail_msg "$map container has dangerous EXTERNAL_ADDRESS_OVERRIDE=$external_override while bind IP is $bind_ip"
+    elif [ -n "$external_override" ]; then
+      warn_msg "$map container has EXTERNAL_ADDRESS_OVERRIDE=$external_override; this is only safe because bind and advertised IP match."
+    else
+      ok "$map container has no EXTERNAL_ADDRESS_OVERRIDE"
+    fi
   done
 
   if container_running dune-server-gateway; then
@@ -247,6 +304,7 @@ if container_running dune-postgres; then
       expected_igw="$overmap_igw_port"
       [ "$map" = "Survival_1" ] && expected_game="$survival_game_port" && expected_igw="$survival_igw_port"
       [ "$game_addr" = "$server_ip" ] && ok "$map farm_state game_addr=$game_addr" || fail_msg "$map farm_state game_addr=$game_addr expected $server_ip"
+      [ "$igw_addr" = "$bind_ip" ] && ok "$map farm_state igw_addr=$igw_addr" || fail_msg "$map farm_state igw_addr=$igw_addr expected $bind_ip"
       [ "$game_port" = "$expected_game" ] && ok "$map farm_state game_port=$game_port" || fail_msg "$map farm_state game_port=$game_port expected $expected_game"
       [ "$igw_port" = "$expected_igw" ] && ok "$map farm_state igw_port=$igw_port" || fail_msg "$map farm_state igw_port=$igw_port expected $expected_igw"
       [ "$ready" = "t" ] && [ "$alive" = "t" ] && ok "$map farm_state ready/alive" || warn_msg "$map farm_state ready=$ready alive=$alive"

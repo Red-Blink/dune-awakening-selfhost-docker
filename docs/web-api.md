@@ -4,6 +4,7 @@ The RedBlink web API is intentionally not a shell proxy. Endpoints must call all
 
 Base path for the native RedBlink API: `/api`.
 
+Compatibility work for web admin style routes is tracked in `docs/web-feature-parity-plan.md`. Routes are not considered Done until `docs/web-feature-parity-status.md` says so.
 
 ## Implemented / Partial Foundation Routes
 
@@ -31,7 +32,7 @@ Base path for the native RedBlink API: `/api`.
 | `/api/server/restart` | POST | Restart task | `dune stop` then `dune start` |
 | `/api/server/restart-service` | POST | Restart service task | `dune restart <validated-service>` |
 | `/api/server/restart-schedule` | GET | Scheduled restart status | `dune restart-schedule status`; returns command status even when timer/state cannot be read |
-| `/api/server/restart-schedule` | POST | Save scheduled restart | Task wrapping `dune restart-schedule enable <hours>` or `disable`; requires `SAVE RESTART SCHEDULE`; validates 1-168 hours |
+| `/api/server/restart-schedule` | POST | Save scheduled restart | Task wrapping `dune restart-schedule enable <HH:MM>` or `disable`; validates 24-hour local server time |
 | `/api/logs/services` | GET | Service names | Static allowlist until dynamic discovery is added |
 | `/api/logs/:service` | GET | Service logs | `dune logs <validated-service>` |
 | `/api/logs/:service/stream` | GET | Service log SSE stream | `dune logs <validated-service>` or validated Docker logs for dynamic `dune-server-*` containers |
@@ -49,7 +50,7 @@ Base path for the native RedBlink API: `/api`.
 | `/api/backups/restore` | POST | Restore backup task | `dune db restore <validated-backup>` |
 | `/api/backups/:name` | DELETE | Delete backup task | `dune db delete <validated-backup>` |
 | `/api/backups/auto` | GET | Automatic database backup status | `dune db auto status`; reports saved manager preference and timer state |
-| `/api/backups/auto` | POST | Save automatic database backup setting | Task wrapping `dune db auto enable <hours> [retention-days]` or `disable`; validates interval and retention |
+| `/api/backups/auto` | POST | Save automatic database backup setting | Task wrapping `dune db auto enable <HH:MM> [retention-days]` or `disable`; validates daily 24-hour local server time and retention |
 | `/api/backups/import-remote` | POST | Remote backup import capability response | Returns unsupported; manager SSH import is interactive and needs key-only credential/preview support before web exposure |
 | `/api/database/status` | GET | Direct DB health/config status | Direct PostgreSQL query using discovered RedBlink DB config |
 | `/api/database/schemas` | GET | List schemas | Direct PostgreSQL `information_schema` query |
@@ -60,9 +61,11 @@ Base path for the native RedBlink API: `/api`.
 | `/api/database/search` | GET | Search schemas/tables/columns | Direct PostgreSQL `information_schema.columns` query |
 | `/api/database/query` | POST | Advanced SQL execution | Direct PostgreSQL query; read-only by default, destructive SQL requires confirmation phrase and pre-query `dune db backup` |
 | `/api/database/export` | POST | Export read-only query results | Direct PostgreSQL read-only query returned as JSON |
+| `/api/players` | GET | Player list | Direct PostgreSQL query implemented for Arrakis Server Console player listing |
 | `/api/players/online` | GET | Online player list | Direct PostgreSQL query filtered by `player_state.online_status` |
 | `/api/players/search` | GET | Player search | Direct PostgreSQL parameterized search over character/account/actor |
 | `/api/players/:id` | GET | Player profile | Direct PostgreSQL actor/player_state/accounts query |
+| `/api/players/:id/inventory` | GET | Inventory | Direct PostgreSQL `items` + `inventories` query implemented for Arrakis Server Console |
 | `/api/players/:id/currency` | GET | Currency balances | Direct PostgreSQL `player_virtual_currency_balances` query where table exists |
 | `/api/players/:id/factions` | GET | Faction reputation | Direct PostgreSQL `player_faction_reputation` query where table exists |
 | `/api/players/:id/specs` | GET | Specialization tracks | Direct PostgreSQL `specialization_tracks` query |
@@ -96,6 +99,7 @@ Base path for the native RedBlink API: `/api`.
 | `/api/admin/vehicles/structured` | GET | Structured vehicle catalog | Parses `dune admin vehicle-list` into `{ id, name, actor, templates[] }` for Spawn Vehicle dropdowns |
 | `/api/admin/skill-modules` | GET | List/search skill module catalog | `dune admin skill-modules [q]` |
 | `/api/admin/history` | GET | Admin history | `dune admin history`; web broadcast/shutdown/whisper attempts append safe rows to the same TSV |
+| `/api/admin/broadcast` | POST | Experimental broadcast publish test | Body `{ message, durationSec }`; publishes the verified web-admin `ServiceBroadcast` Generic envelope to `dune-rmq-game` `heartbeats/notifications`; publish/history are verified, but live retesting showed no in-game display |
 | `/api/admin/broadcast-shutdown` | POST | Experimental shutdown broadcast publish test | Publishes RedBlink `ServiceBroadcast` ServerShutdown envelope to `dune-rmq-game` `heartbeats/notifications`; requires `SHUTDOWN BROADCAST`; publish path exists but in-game display is not verified |
 | `/api/admin/whisper` | POST | Whisper capability response | Returns unsupported until RedBlink exposes the GM courier account/persona, sender Funcom ID, sender hex FLS ID, recipient Funcom ID mapping, and verified `chat.whispers` routing |
 | `/api/map/status` | GET | Live map status bundle | `dune maps list`, `dune servers`, `dune ready`, `dune autoscaler status` |
@@ -126,20 +130,24 @@ Base path for the native RedBlink API: `/api`.
 | `/api/deepdesert/update` | POST | Deep Desert dual control | Task wrapping validated `dune deepdesert dual enable|disable|repair|bootstrap`; requires `UPDATE DEEP DESERT` |
 | `/api/settings` | GET | Runtime settings state | Setup state/config summary |
 | `/api/settings` | POST | Save allowlisted runtime settings | Same allowlisted `.env` writer as setup config |
+| `/api/storage` | GET | Storage containers | Direct PostgreSQL storage query implemented for Arrakis Server Console |
 | `/api/storage/:id` | GET | Storage detail | Direct PostgreSQL storage list lookup |
 | `/api/storage/:id/items` | GET | Storage inventory | Direct PostgreSQL inventory query |
 | `/api/storage/:id/give-item` | POST | Give item to storage | Creates `dune db backup`, validates item catalog/template and slot count, transactionally inserts into `dune.items`; requires `GIVE ITEM TO STORAGE` |
 | `/api/storage/:id/export` | GET | Export storage JSON | Direct PostgreSQL inventory query |
+| `/api/bases` | GET | Bases | Direct PostgreSQL base query implemented for Arrakis Server Console |
 | `/api/bases/:id` | GET | Base detail | Direct PostgreSQL base list lookup |
 | `/api/bases/:id/export` | GET | Export base-as-blueprint JSON | Direct PostgreSQL read-only export from `dune.building_instances`, `dune.placeables`, and `dune.actors` |
 | `/api/bases/:id/export-blueprint` | POST | Return base-as-blueprint JSON | Same read-only direct PostgreSQL export as `/export` |
 | `/api/bases/import` | POST | Base import capability response | Requires `IMPORT BASE`; returns unsupported until safe ownership/position/entity remapping is verified |
 | `/api/bases/:id` | DELETE | Base delete capability response | Requires `DELETE BASE`; returns unsupported until safe full graph deletion rules are verified |
+| `/api/blueprints` | GET | Blueprints | Direct PostgreSQL blueprint query implemented for Arrakis Server Console |
 | `/api/blueprints/:id` | GET | Blueprint detail | Direct PostgreSQL blueprint list lookup |
 | `/api/blueprints/:id/export` | GET | Export full blueprint JSON | Direct PostgreSQL read-only export from `dune.building_blueprints`, `building_blueprint_instances`, `building_blueprint_placeables`, optional `building_blueprint_pentashields`, and `items` blueprint stats |
 | `/api/blueprints/import` | POST | Blueprint import capability response | Requires `IMPORT BLUEPRINT`; validates payload shape, then returns unsupported until safe offline-player inventory/stat wiring/ID remapping is verified |
 | `/api/blueprints/:id/clone` | POST | Blueprint clone capability response | Requires `CLONE BLUEPRINT`; returns unsupported until safe clone item creation and stat wiring are verified |
 | `/api/blueprints/:id` | DELETE | Blueprint delete capability response | Requires `DELETE BLUEPRINT`; returns unsupported until safe item/blueprint graph deletion rules are verified |
+| `/api/market/capabilities` | GET | Market capability detection | Direct PostgreSQL table detection for market tables |
 | `/api/market/items` | GET | Aggregated active market items | Direct PostgreSQL query over `dune_exchange_orders`, `dune_exchange_sell_orders`, and `items`; supports `q`, `limit`, `offset` |
 | `/api/market/search` | GET | Market item search | Same market item query filtered by `q` |
 | `/api/market/listings` | GET | Active market listings | Direct PostgreSQL query over `dune_exchange_orders`, `dune_exchange_sell_orders`, `items`, `actors`, and `player_state`; supports `template_id` and `owner` |
@@ -168,6 +176,7 @@ Base path for the native RedBlink API: `/api`.
 
 ## Not Done Yet
 
+The following web-admin parity areas remain not done and must not be represented as complete UI features:
 
 - `/api/players/:id/set-currency`
 - `/api/admin/whisper` returns explicit unsupported capability response until RedBlink exposes or seeds a verified GM courier identity for `chat.whispers`
@@ -178,5 +187,6 @@ Base path for the native RedBlink API: `/api`.
 
 Phase 1 cleanup must either implement these for real or remove/quarantine their frontend controls.
 
+## Planned web-admin Compatibility Areas
 
 The full route inventory and RedBlink implementation paths are in `docs/web-feature-parity-plan.md`.

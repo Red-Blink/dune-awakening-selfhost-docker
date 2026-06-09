@@ -582,7 +582,7 @@ set_env_value() {
     }
   ' .env > "$tmp"
   mv "$tmp" .env
-  chmod 600 .env
+  chmod 644 .env
 }
 
 is_ipv4() {
@@ -3371,7 +3371,7 @@ battlegroup_overview_menu() {
 }
 
 battlegroup_settings_menu() {
-  local choice restart_hours
+  local choice scheduled_restart_time
   while true; do
     menu_or_back "Battlegroup Settings" \
       "Change Name" \
@@ -3444,17 +3444,17 @@ battlegroup_settings_menu() {
           case "$choice" in
             1) run_cmd "$DUNE" restart-schedule status; pause ;;
             2)
-              scheduled_restart_hours=""
+              scheduled_restart_time=""
               echo
-              prompt_text "Restart Every How Many Hours:" scheduled_restart_hours || { pause; continue; }
-              scheduled_restart_hours="$(sanitize_numeric_prompt_value "$scheduled_restart_hours")"
-              if ! printf '%s' "$scheduled_restart_hours" | grep -Eq '^[1-9][0-9]*$'; then
-                error_msg "Hours must be a positive integer."
+              prompt_text "Daily Restart Time (HH:MM):" scheduled_restart_time || { pause; continue; }
+              scheduled_restart_time="$(trim "$scheduled_restart_time")"
+              if ! printf '%s' "$scheduled_restart_time" | grep -Eq '^([01][0-9]|2[0-3]):[0-5][0-9]$'; then
+                error_msg "Restart time must be HH:MM in 24-hour local server time."
                 pause
                 continue
               fi
-              if confirm "Enable scheduled restart every $scheduled_restart_hours hour(s)?"; then
-                run_cmd sudo "$DUNE" restart-schedule enable "$scheduled_restart_hours"
+              if confirm "Enable scheduled restart daily at $scheduled_restart_time?"; then
+                run_cmd sudo "$DUNE" restart-schedule enable "$scheduled_restart_time"
               else
                 echo "Cancelled."
               fi
@@ -3671,14 +3671,16 @@ automatic_database_backups_menu() {
     case "$choice" in
       1)
         echo
-        prompt_text "Backup Interval In Hours:" backup_hours || { pause; continue; }
+        prompt_text "Daily Backup Time (HH:MM):" backup_time || { pause; continue; }
         prompt_text "Keep Backups For How Many Days? Leave Blank For No Automatic Cleanup:" retention_days allow-empty || { pause; continue; }
-        if [ -z "$backup_hours" ]; then
-          echo "Backup interval is required."
+        if [ -z "$backup_time" ]; then
+          echo "Backup time is required."
+        elif ! printf '%s' "$backup_time" | grep -Eq '^([01][0-9]|2[0-3]):[0-5][0-9]$'; then
+          echo "Backup time must be HH:MM in 24-hour local server time."
         elif [ -n "$retention_days" ]; then
-          run_cmd sudo "$DUNE" db auto enable "$backup_hours" "$retention_days"
+          run_cmd sudo "$DUNE" db auto enable "$backup_time" "$retention_days"
         else
-          run_cmd sudo "$DUNE" db auto enable "$backup_hours"
+          run_cmd sudo "$DUNE" db auto enable "$backup_time"
         fi
         pause
         ;;

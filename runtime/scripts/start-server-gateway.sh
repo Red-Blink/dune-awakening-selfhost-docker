@@ -40,6 +40,7 @@ SERVER_TITLE="$(resolve_server_title)"
 SERVER_REGION="$(resolve_server_region)"
 SERVER_IP="$(resolve_server_ip)"
 BATTLEGROUP_ID="$(resolve_battlegroup_id)"
+DUNE_DB_PASSWORD="${DUNE_DB_PASSWORD:-dune}"
 
 
 mkdir -p runtime/server-gateway/config
@@ -66,7 +67,7 @@ docker run -d \
   -e "DuneDatabaseInterfacePSQL_DatabaseHost=dune-postgres:5432" \
   -e "DuneDatabaseInterfacePSQL_DatabaseName=dune" \
   -e "DuneDatabaseInterfacePSQL_DatabaseUser=dune" \
-  -e "DuneDatabaseInterfacePSQL_DatabasePassword=dune" \
+  -e "DuneDatabaseInterfacePSQL_DatabasePassword=$DUNE_DB_PASSWORD" \
   -e "OnlineSubsystem_ServerName=$BATTLEGROUP_ID" \
   -e "gateway_display_name=$SERVER_TITLE" \
   -e "OnlineSubsystem_DatacenterId=$SERVER_REGION" \

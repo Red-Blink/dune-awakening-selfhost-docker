@@ -21,7 +21,7 @@ Goal: remove the remaining "CLI wrapper" feel from normal workflows without chan
 Goal: add operational controls only where existing RedBlink manager behavior is clear and testable.
 
 - Inspect `runtime/scripts/dune`, `runtime/scripts/manager.sh`, setup scripts, and compose behavior.
-- Scheduled restarts: implemented through `dune restart-schedule status|enable|disable`. The web UI saves the manager preference, validates a 1-168 hour interval, requires `SAVE RESTART SCHEDULE`, and reports whether the systemd timer is installed.
+- Scheduled restarts: implemented through `dune restart-schedule status|enable|disable`. The web UI saves the manager preference, validates a daily HH:MM local server time, and reports whether the systemd timer is installed.
 - Server title update: implement only if the stack has a safe config write/apply path and restart requirements are explicit.
 - Redeploy: implement only if existing CLI provides a safe redeploy/update command. Otherwise link users to Setup/Updates and document the intended flow.
 - Add audit events and confirmations for any disruptive action.
@@ -80,6 +80,7 @@ Goal: close remaining parity gaps without guessing.
 - Broadcast remains Partial/Experimental: RabbitMQ publish and history logging are verified, but in-game display is not working/verified.
 - Starter Kit auto-grant is partial: it runs as a web-admin scanner, not a standalone durable service.
 - Market automation remains blocked until a RedBlink-compatible market automation runtime exists.
+- Live Map includes the Hagga Basin background, but marker placement is still approximate because the exact world-coordinate transform is not verified.
 - Phase 12A2 completed low-risk selector/table cleanup for Home, Setup, Server Control, Services, Players, Admin Tools, Live Map, Starter Kit, Backups, Logs, Updates, and Settings. Remaining 12B-12F backend-heavy items are intentionally deferred until CLI behavior and safety requirements are verified.
 - Phase 12A corrective follow-up replaced loose status/readiness/ports/item parsing with stricter parser behavior and a structured item catalog endpoint. Deferred work remains focused on deeper manager-backed features, not parser guesswork.
 - Phase 12 manager feature pass added web controls for automatic database backup settings, scheduled restart settings, automatic game update settings, previous stack release listing/restore, configured map memory display, and read-only UserEngine/UserGame previews. Remote SSH backup import and UserEngine/UserGame writes remain disabled for exact safety reasons listed above.

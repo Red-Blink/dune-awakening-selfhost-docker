@@ -129,6 +129,7 @@ export function parseBackupAutoStatus(result = {}) {
   return {
     ok: Number(result.exitCode || 0) === 0,
     enabled: /^true|1$/i.test(values.enabled || ""),
+    backupTime: values.backup_time || "",
     intervalHours: values.interval_hours || "",
     retentionDays: retentionRaw.match(/(\d+)/)?.[1] || "0",
     retentionLabel: retentionRaw && !/^off$/i.test(retentionRaw) ? titleDays(retentionRaw.match(/(\d+)/)?.[1] || "") : "No Retention Limit",
@@ -143,12 +144,14 @@ function parseBackupLine(line) {
   if (!trimmed) return null;
   const name = trimmed.match(/([A-Za-z0-9_.-]+(?:\.backup|\.dump|\.sql))/)?.[1];
   if (!name) return null;
-  const timestamp = name.match(/(\d{8}-\d{6})/)?.[1] || "";
-  const createdSort = backupTimestampSort(timestamp);
+  const listTimestamp = trimmed.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})(?::(\d{2}))?\b/);
+  const filenameTimestamp = name.match(/(\d{8}-\d{6})/)?.[1] || "";
+  const created = listTimestamp ? `${listTimestamp[1]} ${listTimestamp[2]}:${listTimestamp[3] || "00"}` : formatBackupTimestamp(filenameTimestamp);
+  const createdSort = listTimestamp ? backupDisplayTimestampSort(created) : backupTimestampSort(filenameTimestamp);
   return {
     name,
     backupName: name,
-    created: formatBackupTimestamp(timestamp),
+    created,
     createdSort,
     type: friendlyBackupType(name, trimmed),
     source: backupSource(name)
@@ -161,6 +164,12 @@ function backupTimestampSort(value) {
   return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]), Number(match[6]));
 }
 
+function backupDisplayTimestampSort(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
+  if (!match) return 0;
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]), Number(match[6])).getTime();
+}
+
 function formatBackupTimestamp(value) {
   const match = String(value || "").match(/^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})$/);
   if (!match) return "Unknown";
@@ -169,12 +178,15 @@ function formatBackupTimestamp(value) {
 
 function friendlyBackupType(name, line) {
   if (/auto|scheduled/i.test(name) || /auto|scheduled/i.test(line)) return "Automatic Backup";
+  if (/restore[-_ ]?safety/i.test(name) || /restore[-_ ]?safety/i.test(line)) return "Restore Safety Backup";
+  if (/pre[-_ ]?update/i.test(name) || /pre[-_ ]?update/i.test(line)) return "Pre-update Backup";
   if (/import/i.test(name) || /import/i.test(line)) return "Imported Backup";
   if (/\.(backup|dump|sql)$/i.test(name)) return "Manual Backup";
   return "Unknown";
 }
 
 function backupSource(name) {
+  if (/import/i.test(name)) return "External";
   if (name.includes("__")) return name.split("__")[0].replace(/^dune-db-/, "") || "Unknown";
   return "Local";
 }
@@ -227,6 +239,7 @@ function summarizeDatabase(text) {
 
 function summarizeRabbit(text) {
   const lines = sectionLines(text, "RabbitMQ game connections");
+  if (lines.some((line) => /checking/i.test(line))) return "Ready";
   const director = numberAfterLabel(lines, "Director connections");
   const game = numberAfterLabel(lines, "Game server connections");
   return director >= 1 && game >= 1 ? "Ready" : "Warn";

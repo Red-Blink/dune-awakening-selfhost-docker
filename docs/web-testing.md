@@ -54,6 +54,7 @@ Current verification:
 - `docker compose -f docker-compose.web.yml config` passed previously.
 - HTTP bind smoke test could not run inside the sandbox because binding returned `EPERM`.
 
+These checks do not prove web-admin feature parity.
 
 ## Manual Verification Pattern
 
@@ -78,6 +79,7 @@ Do not run destructive checks by default. On a live admin host, verify Phase 5B2
 - Starter Kit bulk/auto review: use Preview Eligible Players first. Bulk grant requires `GRANT STARTER KIT TO ELIGIBLE PLAYERS`; one-shot scan requires `RUN STARTER KIT SCAN` and only grants when Starter Kit and auto-grant are both enabled. Disable auto-grant after live validation unless intentionally keeping it active.
 - blueprint export: load Blueprints and download one full JSON export where schema supports it
 - base export: load Bases and download one base-as-blueprint JSON export where schema supports it
+- broadcast: use Admin Tools broadcast only with a safe test message and only on a test server; set duration to 30 seconds unless testing another verified value. Treat this as Experimental: Phase 9B live retesting verified RabbitMQ publish and command history logging, but no message appeared in-game. If investigating further, capture server/RabbitMQ logs and compare against the separate web admin courier notification path.
 - command history: after broadcast/shutdown/whisper tests, refresh Admin Tools command history and confirm a safe `web-broadcast`, `web-shutdown-broadcast`, or `web-whisper` row appears
 - whisper: confirm `/api/admin/whisper` returns unsupported until GM courier identity/routing is configured
 

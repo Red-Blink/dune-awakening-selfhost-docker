@@ -14,12 +14,32 @@ if [ -f .env ]; then
 fi
 set +a
 
+MANUAL_STOP_FILE="runtime/generated/manual-stop.env"
+
+if [ -f "$MANUAL_STOP_FILE" ] && [ "${DUNE_IGNORE_MANUAL_STOP:-0}" != "1" ]; then
+  marker_boot_id="$(awk -F= '$1 == "DUNE_MANUAL_STOP_BOOT_ID" { print substr($0, length($1) + 2); exit }' "$MANUAL_STOP_FILE" 2>/dev/null || true)"
+  current_boot_id="$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)"
+  if [ -n "$marker_boot_id" ] && [ -n "$current_boot_id" ] && [ "$marker_boot_id" != "$current_boot_id" ]; then
+    rm -f "$MANUAL_STOP_FILE"
+  else
+    echo "Manual stop is active for this Linux boot. Refusing to start the Dune stack automatically."
+    echo "To start intentionally, run: runtime/scripts/dune start"
+    exit 2
+  fi
+fi
+
 echo "=== Starting Postgres ==="
 runtime/scripts/start-postgres.sh
 
 echo
 echo "=== Ensuring Database Is Up To Date ==="
 runtime/scripts/update-db.sh
+
+echo
+echo "=== Reconciling Network Advertisement Addresses ==="
+runtime/scripts/network-addresses.sh reconcile || {
+  echo "Network address reconciliation could not run yet. Startup will retry after game servers register."
+}
 
 echo
 echo "=== Synchronizing Sietch State ==="
@@ -55,6 +75,12 @@ runtime/scripts/start-server-survival-1.sh
 echo
 echo "=== Starting Overmap ==="
 runtime/scripts/start-server-overmap.sh
+
+echo
+echo "=== Rechecking Network Advertisement Addresses ==="
+runtime/scripts/network-addresses.sh reconcile || {
+  echo "Network address reconciliation could not complete. Run: runtime/scripts/network-addresses.sh status"
+}
 
 echo "=== Starting Sietch Override Publisher ==="
 runtime/scripts/publish-sietch-overrides.sh restart || {

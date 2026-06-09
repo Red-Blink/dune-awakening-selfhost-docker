@@ -18,6 +18,8 @@ DIRECTOR_HEAL_FILE="${DUNE_AUTOSCALER_DIRECTOR_HEAL_FILE:-runtime/generated/auto
 DIRECTOR_HEAL_STALE_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_HEAL_STALE_SECONDS:-15}"
 DIRECTOR_HEAL_COOLDOWN_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_HEAL_COOLDOWN_SECONDS:-300}"
 DYNAMIC_READY_HEAL_STALE_SECONDS="${DUNE_AUTOSCALER_DYNAMIC_READY_HEAL_STALE_SECONDS:-20}"
+DIRECTOR_BROWSER_SCAN_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_BROWSER_SCAN_SECONDS:-30}"
+DYNAMIC_READY_HEAL_SCAN_SECONDS="${DUNE_AUTOSCALER_DYNAMIC_READY_HEAL_SCAN_SECONDS:-30}"
 
 mkdir -p "$(dirname "$STATE_FILE")"
 touch "$STATE_FILE"
@@ -35,6 +37,8 @@ echo "Named destination log window: ${NAMED_DESTINATION_SINCE}"
 echo "Idle despawn grace: ${IDLE_SECONDS}s"
 echo "Dynamic mode-change grace: ${DESPAWN_GRACE_SECONDS}s"
 echo "Travel grace: ${TRAVEL_GRACE_SECONDS}s"
+echo "Director browser heal scan: ${DIRECTOR_BROWSER_SCAN_SECONDS}s"
+echo "Dynamic ready heal scan: ${DYNAMIC_READY_HEAL_SCAN_SECONDS}s"
 echo "State file: ${STATE_FILE}"
 echo
 
@@ -357,6 +361,19 @@ director_heal_clear() {
   mv "$tmp" "$DIRECTOR_HEAL_FILE"
 }
 
+director_heal_due() {
+  local key="$1"
+  local interval="$2"
+  local now last
+
+  now="$(date +%s)"
+  last="$(director_heal_get "scan:${key}" 2>/dev/null || true)"
+  if [ -n "$last" ] && [ $((now - last)) -lt "$interval" ]; then
+    return 1
+  fi
+  director_heal_set "scan:${key}" "$now"
+}
+
 dynamic_container_name_for_partition() {
   local partition_id="$1"
   local map_name safe
@@ -378,6 +395,8 @@ dynamic_container_name_for_partition() {
 dynamic_ready_desync_heal() {
   local now cooldown_until stale_since
   local rows partition_id map_name server_id ready alive container log_tail
+
+  director_heal_due dynamic_ready "$DYNAMIC_READY_HEAL_SCAN_SECONDS" || return 0
 
   cooldown_until="$(director_heal_get dynamic_ready_desync 2>/dev/null || true)"
   now="$(date +%s)"
@@ -1885,6 +1904,8 @@ director_logs_contain_live_ids() {
 
 scan_director_browser_state() {
   local rows ready_count capacity now first_seen last_restart age since_restart
+
+  director_heal_due browser_state "$DIRECTOR_BROWSER_SCAN_SECONDS" || return 0
 
   rows="$(director_live_server_rows)"
   ready_count="$(printf '%s\n' "$rows" | sed '/^$/d' | wc -l | tr -d '[:space:]')"

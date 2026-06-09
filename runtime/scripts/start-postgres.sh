@@ -14,17 +14,20 @@ IMAGE="registry.funcom.com/funcom/self-hosting/igw-postgres:${POSTGRES_IMAGE_TAG
 
 mkdir -p runtime/postgres/initdb
 
-cat > runtime/postgres/initdb/01-create-dune-user.sql <<'SQL'
+dune_db_password="${DUNE_DB_PASSWORD:-dune}"
+dune_db_password_sql="$(printf '%s' "$dune_db_password" | sed "s/'/''/g")"
+
+cat > runtime/postgres/initdb/01-create-dune-user.sql <<SQL
 DO
-$$
+\$\$
 BEGIN
    IF NOT EXISTS (
       SELECT FROM pg_catalog.pg_roles WHERE rolname = 'dune'
    ) THEN
-      CREATE ROLE dune LOGIN PASSWORD 'dune';
+      CREATE ROLE dune LOGIN PASSWORD '$dune_db_password_sql';
    END IF;
 END
-$$;
+\$\$;
 
 ALTER DATABASE dune OWNER TO dune;
 GRANT ALL PRIVILEGES ON DATABASE dune TO dune;

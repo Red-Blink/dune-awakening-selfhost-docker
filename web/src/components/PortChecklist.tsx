@@ -24,7 +24,7 @@ function parseStatusPorts(text: string): PortRow[] {
     if (seen.has(key)) return null;
     seen.add(key);
     const status = /^OK$/i.test(state) ? "Ready" : /missing|fail/i.test(state) ? "Failed" : "Warn";
-    return { name: friendlyPortName(rawName, port, protocol), port, protocol: protocol.toUpperCase(), status, detail: status === "Ready" ? "Open" : state, kind: kindForStatus(status) };
+    return { name: friendlyPortName(rawName, port, protocol), port, protocol: protocol.toUpperCase(), status, detail: status === "Ready" ? "Open" : friendlyPortDetail(state), kind: kindForStatus(status) };
   }).filter(Boolean) as PortRow[];
 }
 
@@ -80,7 +80,16 @@ function sectionLines(text: string, section: string) {
 }
 
 function cleanDetail(line: string) {
-  return line.replace(/^(OK|WARN|WAIT|FAIL)\s+/i, "").replace(/\s+/g, " ").trim();
+  return friendlyPortDetail(line.replace(/^(OK|WARN|WAIT|FAIL)\s+/i, ""));
+}
+
+function friendlyPortDetail(value: string) {
+  return value
+    .replace(/\bmissing\b/gi, "Missing")
+    .replace(/\bwait\b/gi, "Wait")
+    .replace(/\bready\b/gi, "Ready")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function kindForStatus(status: string) {

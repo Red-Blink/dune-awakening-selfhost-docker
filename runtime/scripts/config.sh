@@ -92,7 +92,7 @@ set_env_value() {
   ' .env > "$tmp"
 
   mv "$tmp" .env
-  chmod 600 .env
+  chmod 644 .env
 }
 
 cmd="${1:-help}"

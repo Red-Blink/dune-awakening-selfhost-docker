@@ -3,12 +3,14 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 ROOT_DIR="$(pwd)"
+HOST_ROOT_DIR="${DUNE_HOST_REPO_ROOT:-$ROOT_DIR}"
 
 BACKUP_DIR_DEFAULT="runtime/backups/db"
 AUTO_STATE_FILE="runtime/generated/db-backup.env"
 AUTO_SERVICE_FILE="/etc/systemd/system/dune-awakening-db-backup.service"
 AUTO_TIMER_FILE="/etc/systemd/system/dune-awakening-db-backup.timer"
 PENDING_TRANSFER_FILE="runtime/generated/pending-character-transfers.tsv"
+BATTLEGROUP_RESTORE_FILE="runtime/generated/battlegroup-restore-point.env"
 
 usage() {
   cat <<'EOF'
@@ -31,7 +33,7 @@ Usage:
   dune db transfer clear-pending
   dune db delete <backup-file-or-name>
   dune db delete --all
-  dune db auto enable <hours> [retention-days]
+  dune db auto enable <HH:MM> [retention-days]
   dune db auto disable
   dune db auto status
   dune db auto retention <days>
@@ -75,6 +77,42 @@ config_value() {
       exit
     }
   ' "$file"
+}
+
+backup_metadata_value() {
+  local backup_file="$1"
+  local key="$2"
+  local sidecar="${backup_file}.yaml"
+
+  [ -r "$sidecar" ] || return 1
+  awk -F': *' -v key="$key" '
+    $1 == key {
+      value = substr($0, length($1) + 2)
+      sub(/^ */, "", value)
+      print value
+      exit
+    }
+  ' "$sidecar"
+}
+
+current_battlegroup_id() {
+  config_value runtime/generated/battlegroup.env BATTLEGROUP_ID || true
+}
+
+backup_is_external() {
+  local backup_file="$1"
+  local origin=""
+  local imported_from=""
+
+  origin="$(backup_metadata_value "$backup_file" backup_origin || true)"
+  [ -n "$origin" ] || origin="$(backup_metadata_value "$backup_file" origin || true)"
+  imported_from="$(backup_metadata_value "$backup_file" imported_from_battlegroup_id || true)"
+
+  case "$(printf '%s' "$origin" | tr '[:upper:]' '[:lower:]')" in
+    external|imported) return 0 ;;
+  esac
+
+  [ -n "$imported_from" ] && [ "$imported_from" != "unknown" ]
 }
 
 valid_backup_basename() {
@@ -295,6 +333,7 @@ backup_db() {
     echo "artifact_id: $artifact_id"
     echo "backup_file: $(basename "$backup_file")"
     echo "created_at: $(date -Iseconds)"
+    echo "backup_origin: ${DB_BACKUP_ORIGIN:-manual}"
     echo "database: dune"
     echo "format: pg_dump_custom"
     echo "scope: $scope"
@@ -324,7 +363,7 @@ list_backups() {
   if [ -d "$out_dir" ]; then
     while IFS= read -r name; do
       [ -n "$name" ] || continue
-      find "$out_dir/$name" -maxdepth 0 -type f -printf '%TY-%Tm-%Td %TH:%TM  %p\n' 2>/dev/null || true
+      find "$out_dir/$name" -maxdepth 0 -type f -printf '%TY-%Tm-%Td %TH:%TM:%TS  %p\n' 2>/dev/null | sed -E 's/([0-9]{2}:[0-9]{2}:[0-9]{2})\.[0-9]+/\1/' || true
     done < <(iter_valid_backup_names "$out_dir" | sort)
   else
     echo "No backup directory found: $out_dir"
@@ -402,6 +441,7 @@ delete_all_backups() {
 prune_old_db_backups() {
   local backup_dir="${1:-$BACKUP_DIR_DEFAULT}"
   local days="${2:-0}"
+  local minutes
   local removed=0
   local file
 
@@ -414,10 +454,12 @@ prune_old_db_backups() {
     return 0
   fi
 
+  minutes=$((days * 24 * 60))
+
   while IFS= read -r name; do
     [ -n "$name" ] || continue
     file="$(backup_path_for_name "$name" "$backup_dir")"
-    if find "$file" -maxdepth 0 -type f -mtime +"$days" -print -quit 2>/dev/null | grep -q .; then
+    if find "$file" -maxdepth 0 -type f -mmin +"$minutes" -print -quit 2>/dev/null | grep -q .; then
       delete_backup_files_for_name "$name" "$backup_dir"
       removed=$((removed + 1))
     fi
@@ -573,9 +615,256 @@ where datname = 'dune'
   docker exec dune-postgres psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c "create database dune owner dune;"
 }
 
+capture_current_account_identities() {
+  local snapshot
+  snapshot="runtime/generated/pre-restore-account-identities-$(date +%Y%m%d-%H%M%S).tsv"
+  mkdir -p "$(dirname "$snapshot")"
+
+  docker exec dune-postgres psql -U postgres -d dune -At -F $'\t' -c "
+    select
+      coalesce(e.\"user\", ''),
+      coalesce(e.platform_id, ''),
+      coalesce(e.platform_name, ''),
+      coalesce(dune.decrypt_user_data(e.encrypted_funcom_id), '')
+    from dune.encrypted_accounts e
+    where coalesce(e.\"user\", '') <> ''
+      and coalesce(e.platform_id, '') <> ''
+    order by e.platform_id, e.id;
+  " > "$snapshot"
+  chmod 600 "$snapshot" 2>/dev/null || true
+
+  if [ -s "$snapshot" ]; then
+    echo "Captured current Docker account identities for automatic restore relink: $snapshot" >&2
+    printf '%s' "$snapshot"
+  else
+    rm -f "$snapshot"
+    echo "No current Docker account identities found for automatic restore relink." >&2
+    printf ''
+  fi
+}
+
+adopt_backup_battlegroup_id() {
+  local backup_file="$1"
+  local backup_battlegroup_id=""
+  local current_id=""
+  local server_title=""
+  local server_region=""
+  local server_ip=""
+  local server_ip_mode=""
+  local ts
+
+  backup_battlegroup_id="$(backup_metadata_value "$backup_file" imported_from_battlegroup_id || true)"
+  [ -n "$backup_battlegroup_id" ] || backup_battlegroup_id="$(backup_metadata_value "$backup_file" battlegroup_id || true)"
+  current_id="$(current_battlegroup_id)"
+
+  if [ -z "$backup_battlegroup_id" ] || [ "$backup_battlegroup_id" = "unknown" ]; then
+    echo "Adopt backup battlegroup: backup metadata has no usable battlegroup ID."
+    return 0
+  fi
+  if [ -z "$current_id" ] || [ "$current_id" = "unknown" ]; then
+    echo "Adopt backup battlegroup: current Docker battlegroup ID is not available."
+    return 0
+  fi
+  if [ "$backup_battlegroup_id" = "$current_id" ]; then
+    echo "Adopt backup battlegroup: Docker already uses $backup_battlegroup_id."
+    return 0
+  fi
+
+  mkdir -p runtime/generated
+  ts="$(date -Iseconds)"
+  {
+    printf 'PREVIOUS_BATTLEGROUP_ID=%q\n' "$current_id"
+    printf 'ADOPTED_BATTLEGROUP_ID=%q\n' "$backup_battlegroup_id"
+    printf 'ADOPTED_AT=%q\n' "$ts"
+    printf 'BACKUP_FILE=%q\n' "$(basename "$backup_file")"
+  } > "$BATTLEGROUP_RESTORE_FILE"
+  chmod 600 "$BATTLEGROUP_RESTORE_FILE" 2>/dev/null || true
+
+  server_title="$(config_value runtime/generated/battlegroup.env SERVER_TITLE || true)"
+  server_region="$(config_value runtime/generated/battlegroup.env SERVER_REGION || true)"
+  server_ip="$(config_value runtime/generated/battlegroup.env SERVER_IP || true)"
+  server_ip_mode="$(config_value runtime/generated/battlegroup.env SERVER_IP_MODE || true)"
+
+  {
+    printf 'BATTLEGROUP_ID=%q\n' "$backup_battlegroup_id"
+    [ -n "$server_title" ] && printf 'SERVER_TITLE=%q\n' "$server_title"
+    [ -n "$server_region" ] && printf 'SERVER_REGION=%q\n' "$server_region"
+    [ -n "$server_ip" ] && printf 'SERVER_IP=%q\n' "$server_ip"
+    [ -n "$server_ip_mode" ] && printf 'SERVER_IP_MODE=%q\n' "$server_ip_mode"
+  } > runtime/generated/battlegroup.env
+  chmod 600 runtime/generated/battlegroup.env 2>/dev/null || true
+
+  echo "Adopt backup battlegroup: $current_id -> $backup_battlegroup_id"
+  echo "Battlegroup rollback point saved: $BATTLEGROUP_RESTORE_FILE"
+}
+
+auto_relink_restored_accounts() {
+  local snapshot="${1:-}"
+  local container_snapshot="/tmp/dune-pre-restore-account-identities.tsv"
+
+  if [ -z "$snapshot" ] || [ ! -s "$snapshot" ]; then
+    echo "Automatic account relink: no pre-restore Docker identities were captured."
+    return 0
+  fi
+
+  echo "Automatic account relink: matching restored accounts by Steam ID, then Funcom display ID."
+  docker cp "$snapshot" "dune-postgres:$container_snapshot"
+  docker exec dune-postgres psql -U postgres -d dune -v ON_ERROR_STOP=1 <<SQL
+create temp table current_docker_identity (
+  current_user text,
+  platform_id text,
+  platform_name text,
+  funcom_id text
+) on commit drop;
+\\copy current_docker_identity from '$container_snapshot' with (format text, delimiter E'\\t', null '')
+
+create temp table unique_current_platform as
+select min(current_user) as current_user, platform_id, min(platform_name) as platform_name, min(funcom_id) as funcom_id
+from current_docker_identity
+where coalesce(current_user, '') <> ''
+  and coalesce(platform_id, '') <> ''
+group by platform_id
+having count(distinct current_user) = 1;
+
+create temp table unique_current_funcom as
+select min(current_user) as current_user, lower(funcom_id) as funcom_key, min(platform_name) as platform_name, min(funcom_id) as funcom_id
+from current_docker_identity
+where coalesce(current_user, '') <> ''
+  and coalesce(funcom_id, '') <> ''
+group by lower(funcom_id)
+having count(distinct current_user) = 1;
+
+create temp table account_relink_candidates (
+  id bigint,
+  old_user text,
+  new_user text,
+  platform_id text,
+  new_platform_name text,
+  new_funcom_id text,
+  match_type text
+) on commit drop;
+
+insert into account_relink_candidates
+select
+  e.id,
+  e."user" as old_user,
+  c.current_user as new_user,
+  e.platform_id,
+  c.platform_name as new_platform_name,
+  c.funcom_id as new_funcom_id,
+  'steam_id' as match_type
+from dune.encrypted_accounts e
+join unique_current_platform c on c.platform_id = e.platform_id
+where coalesce(e."user", '') <> ''
+  and e."user" <> c.current_user;
+
+insert into account_relink_candidates
+select
+  e.id,
+  e."user" as old_user,
+  c.current_user as new_user,
+  e.platform_id,
+  c.platform_name as new_platform_name,
+  c.funcom_id as new_funcom_id,
+  'funcom_display_id' as match_type
+from dune.encrypted_accounts e
+join unique_current_funcom c on c.funcom_key = lower(dune.decrypt_user_data(e.encrypted_funcom_id))
+where coalesce(e."user", '') <> ''
+  and e."user" <> c.current_user
+  and not exists (
+    select 1
+    from account_relink_candidates existing
+    where existing.id = e.id
+  );
+
+do \$\$
+declare
+  conflict_count integer;
+  relink_count integer;
+begin
+  select count(*)
+  into conflict_count
+  from account_relink_candidates c
+  where exists (
+    select 1
+    from dune.encrypted_accounts e2
+    where e2."user" = c.new_user
+      and e2.id <> c.id
+  );
+
+  if conflict_count > 0 then
+    raise notice 'Automatic account relink skipped % account(s) because the target current FLS ID already exists in the restored database.', conflict_count;
+  end if;
+
+  for conflict_count in
+    select count(*) from account_relink_candidates where match_type = 'steam_id'
+  loop
+    raise notice 'Automatic account relink Steam ID matches=%', conflict_count;
+  end loop;
+
+  for conflict_count in
+    select count(*) from account_relink_candidates where match_type = 'funcom_display_id'
+  loop
+    raise notice 'Automatic account relink Funcom display ID fallback matches=%', conflict_count;
+  end loop;
+
+  update dune.encrypted_accounts e
+  set
+    "user" = c.new_user,
+    encrypted_funcom_id = case
+      when coalesce(c.new_funcom_id, '') <> '' then dune.encrypt_user_data(c.new_funcom_id)
+      else e.encrypted_funcom_id
+    end,
+    platform_name = coalesce(nullif(c.new_platform_name, ''), e.platform_name)
+  from account_relink_candidates c
+  where e.id = c.id
+    and not exists (
+      select 1
+      from dune.encrypted_accounts e2
+      where e2."user" = c.new_user
+        and e2.id <> c.id
+    );
+
+  get diagnostics relink_count = row_count;
+  raise notice 'Automatic account relink complete. Relinked accounts=%', relink_count;
+end
+\$\$;
+SQL
+  docker exec dune-postgres rm -f "$container_snapshot" >/dev/null 2>&1 || true
+}
+
+detect_funcom_token_battlegroup_mismatch() {
+  local logs=""
+  local attempt
+  local auth_pattern='ACCESS_DENIED|AccessDenied|access denied|Invalid Authorization to manage SelfHosted Battlegroup|invalid authorization|Unauthorized|HTTP[^[:cntrl:]]*(401|403)|status[^[:cntrl:]]*(401|403)|statusCode[^[:cntrl:]]*(401|403)|response[^[:cntrl:]]*(401|403)|code[^[:cntrl:]]*(401|403)'
+  local funcom_context_pattern='Battlegroup|SelfHosted|Funcom|FuncomLiveServices'
+
+  for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    logs="$(
+      {
+        docker logs --since 10m dune-director 2>&1 || true
+        docker logs --since 10m dune-server-gateway 2>&1 || true
+      }
+    )"
+
+    if grep -Eiq "$auth_pattern" <<< "$logs" && grep -Eiq "$funcom_context_pattern" <<< "$logs"; then
+      echo "Funcom authorization log match:"
+      grep -Ei "$auth_pattern|$funcom_context_pattern" <<< "$logs" | tail -20 || true
+      echo "Attention Required: Funcom token mismatch detected. Please update your token to match the one used with the previous Battlegroup ID from the Server Controls."
+      return 1
+    fi
+
+    [ "$attempt" -eq 12 ] || sleep 10
+  done
+
+  return 0
+}
+
 import_db() {
   local backup_file="${1:-}"
+  local backup_name
   local restore_after
+  local identity_snapshot=""
   local tmp_file
   local ext
   shift || true
@@ -597,6 +886,10 @@ import_db() {
         transfer_file="$2"
         shift 2
         ;;
+      --adopt-backup-battlegroup)
+        echo "--adopt-backup-battlegroup is no longer needed. External backup restores adopt the backup battlegroup automatically when needed."
+        shift
+        ;;
       *)
         echo "Unknown import/restore option: $arg"
         exit 2
@@ -608,6 +901,14 @@ import_db() {
     usage
     exit 2
   fi
+
+  case "$backup_file" in
+    */*) ;;
+    *)
+      backup_name="$(resolve_backup_name "$backup_file" "$BACKUP_DIR_DEFAULT")" || exit 1
+      backup_file="$(backup_path_for_name "$backup_name" "$BACKUP_DIR_DEFAULT")"
+      ;;
+  esac
 
   if [ ! -f "$backup_file" ]; then
     echo "Backup file not found: $backup_file"
@@ -623,6 +924,10 @@ import_db() {
   esac
 
   require_postgres
+  identity_snapshot="$(capture_current_account_identities)"
+  if backup_is_external "$backup_file"; then
+    adopt_backup_battlegroup_id "$backup_file"
+  fi
 
   echo "WARNING: importing a database backup replaces current battlegroup database state."
   echo "A pre-import backup will be created first."
@@ -636,7 +941,7 @@ import_db() {
     esac
   fi
 
-  backup_db "$BACKUP_DIR_DEFAULT"
+  DB_BACKUP_ORIGIN=restore-safety backup_db "$BACKUP_DIR_DEFAULT"
   stop_db_dependents
   recreate_dune_database
 
@@ -659,6 +964,9 @@ import_db() {
       ;;
   esac
   docker exec dune-postgres rm -f "$tmp_file" >/dev/null 2>&1 || true
+
+  adapt_imported_battlegroup "$backup_file"
+  auto_relink_restored_accounts "$identity_snapshot"
 
   echo "Database import finished."
 
@@ -687,11 +995,95 @@ import_db() {
     }
   fi
 
-  read -r -p "Restart Dune stack now? [y/N]: " restore_after
-  case "$restore_after" in
-    y|Y|yes|YES) runtime/scripts/start-all.sh ;;
-    *) echo "Services remain stopped. Start them with: dune start" ;;
-  esac
+  if [ "${DUNE_DB_ASSUME_YES:-0}" = "1" ]; then
+    echo "Restarting Dune stack..."
+    runtime/scripts/start-all.sh
+    echo "Dune stack restart completed."
+    detect_funcom_token_battlegroup_mismatch
+  else
+    read -r -p "Restart Dune stack now? [y/N]: " restore_after
+    case "$restore_after" in
+      y|Y|yes|YES) runtime/scripts/start-all.sh; echo "Dune stack restart completed."; detect_funcom_token_battlegroup_mismatch ;;
+      *) echo "Services remain stopped. Start them with: dune start" ;;
+    esac
+  fi
+}
+
+adapt_imported_battlegroup() {
+  local backup_file="$1"
+  local old_battlegroup_id=""
+  local new_battlegroup_id=""
+
+  old_battlegroup_id="$(backup_metadata_value "$backup_file" imported_from_battlegroup_id || true)"
+  [ -n "$old_battlegroup_id" ] || old_battlegroup_id="$(backup_metadata_value "$backup_file" battlegroup_id || true)"
+  new_battlegroup_id="$(current_battlegroup_id)"
+
+  if [ -z "$old_battlegroup_id" ] || [ "$old_battlegroup_id" = "unknown" ]; then
+    echo "Battlegroup remap: no source battlegroup ID found in backup metadata."
+    return 0
+  fi
+  if [ -z "$new_battlegroup_id" ] || [ "$new_battlegroup_id" = "unknown" ]; then
+    echo "Battlegroup remap: current Docker battlegroup ID is not available."
+    return 0
+  fi
+  if [ "$old_battlegroup_id" = "$new_battlegroup_id" ]; then
+    echo "Battlegroup remap: backup already matches Docker battlegroup ID."
+    return 0
+  fi
+
+  echo "Battlegroup remap: $old_battlegroup_id -> $new_battlegroup_id"
+  docker exec dune-postgres psql -U postgres -d dune -v ON_ERROR_STOP=1 \
+    -v old_battlegroup_id="$old_battlegroup_id" \
+    -v new_battlegroup_id="$new_battlegroup_id" <<'SQL'
+select set_config('dune.old_battlegroup_id', :'old_battlegroup_id', false);
+select set_config('dune.new_battlegroup_id', :'new_battlegroup_id', false);
+do $$
+declare
+  r record;
+  affected bigint;
+  total bigint := 0;
+  old_id text := current_setting('dune.old_battlegroup_id', true);
+  new_id text := current_setting('dune.new_battlegroup_id', true);
+begin
+  old_id := coalesce(old_id, '');
+  new_id := coalesce(new_id, '');
+  if old_id = '' or new_id = '' or old_id = new_id then
+    raise notice 'Battlegroup remap skipped.';
+    return;
+  end if;
+
+  for r in
+    select table_schema, table_name, column_name, data_type
+    from information_schema.columns
+    where table_schema = 'dune'
+      and data_type in ('text', 'character varying', 'character', 'json', 'jsonb')
+    order by table_name, ordinal_position
+  loop
+    if r.data_type in ('json', 'jsonb') then
+      execute format(
+        'update %I.%I set %I = replace(%I::text, %L, %L)::%s where %I::text like %L',
+        r.table_schema, r.table_name, r.column_name,
+        r.column_name, old_id, new_id, r.data_type,
+        r.column_name, '%' || old_id || '%'
+      );
+    else
+      execute format(
+        'update %I.%I set %I = replace(%I, %L, %L) where %I like %L',
+        r.table_schema, r.table_name, r.column_name,
+        r.column_name, old_id, new_id,
+        r.column_name, '%' || old_id || '%'
+      );
+    end if;
+    get diagnostics affected = row_count;
+    if affected > 0 then
+      total := total + affected;
+      raise notice 'Battlegroup remap updated %.%.% rows=%', r.table_schema, r.table_name, r.column_name, affected;
+    end if;
+  end loop;
+
+  raise notice 'Battlegroup remap complete. Updated rows=%', total;
+end $$;
+SQL
 }
 
 transfer_function_check() {
@@ -718,7 +1110,7 @@ fls_exists() {
   [ "$(docker exec dune-postgres psql -U postgres -d dune -At -c "
     select count(*)
     from dune.encrypted_accounts
-    where convert_from(encrypted_funcom_id, 'UTF8') = '${fls//\'/\'\'}';
+    where "user" = '${fls//\'/\'\'}';
   " | tr -d '[:space:]')" != "0" ]
 }
 
@@ -730,7 +1122,7 @@ fls_character_count() {
     left join dune.player_state ps on ps.account_id = e.id
     left join dune.encrypted_player_state eps on eps.account_id = e.id
     left join dune.actors a on a.owner_account_id = e.id and a.class ilike '%PlayerCharacter%'
-    where convert_from(e.encrypted_funcom_id, 'UTF8') = '${fls//\'/\'\'}'
+    where e."user" = '${fls//\'/\'\'}'
       and (ps.account_id is not null or eps.account_id is not null or a.id is not null);
   " 2>/dev/null | tr -d '[:space:]' || echo "unknown"
 }
@@ -766,7 +1158,7 @@ begin
     from dune.encrypted_accounts e
     left join dune.player_state ps on ps.account_id = e.id
     left join dune.actors a on a.owner_account_id = e.id and a.class ilike '%PlayerCharacter%'
-    where convert_from(e.encrypted_funcom_id, 'UTF8') = '${new//\'/\'\'}'
+    where e."user" = '${new//\'/\'\'}'
       and (ps.account_id is not null or a.id is not null)
   ) then
     raise exception 'post-transfer character lookup for new FLS failed';
@@ -955,26 +1347,38 @@ can_manage_systemd_units() {
   [ -d /etc/systemd/system ] && [ -w /etc/systemd/system ]
 }
 
+docker_helper_image() {
+  printf '%s' "${DUNE_SYSTEMD_HELPER_IMAGE:-arrakis-server-console:dev}"
+}
+
+can_manage_host_systemd_with_docker() {
+  command -v docker >/dev/null 2>&1 || return 1
+  [ -S /var/run/docker.sock ] || return 1
+  docker image inspect "$(docker_helper_image)" >/dev/null 2>&1 || return 1
+}
+
 load_auto_state() {
   DB_AUTO_BACKUP_ENABLED="${DB_AUTO_BACKUP_ENABLED:-0}"
-  DB_AUTO_BACKUP_INTERVAL_HOURS="${DB_AUTO_BACKUP_INTERVAL_HOURS:-24}"
+  DB_AUTO_BACKUP_TIME="${DB_AUTO_BACKUP_TIME:-05:00}"
+  DB_AUTO_BACKUP_INTERVAL_HOURS="${DB_AUTO_BACKUP_INTERVAL_HOURS:-}"
   DB_AUTO_BACKUP_RETENTION_DAYS="${DB_AUTO_BACKUP_RETENTION_DAYS:-0}"
   DB_AUTO_BACKUP_DIR="${DB_AUTO_BACKUP_DIR:-$BACKUP_DIR_DEFAULT}"
 
-  if [ -f "$AUTO_STATE_FILE" ]; then
+  if [ -r "$AUTO_STATE_FILE" ]; then
     # shellcheck disable=SC1090
     . "$AUTO_STATE_FILE"
   fi
 
   DB_AUTO_BACKUP_ENABLED="${DB_AUTO_BACKUP_ENABLED:-0}"
-  DB_AUTO_BACKUP_INTERVAL_HOURS="${DB_AUTO_BACKUP_INTERVAL_HOURS:-24}"
+  DB_AUTO_BACKUP_TIME="${DB_AUTO_BACKUP_TIME:-05:00}"
+  DB_AUTO_BACKUP_INTERVAL_HOURS="${DB_AUTO_BACKUP_INTERVAL_HOURS:-}"
   DB_AUTO_BACKUP_RETENTION_DAYS="${DB_AUTO_BACKUP_RETENTION_DAYS:-0}"
   DB_AUTO_BACKUP_DIR="${DB_AUTO_BACKUP_DIR:-$BACKUP_DIR_DEFAULT}"
 }
 
 write_auto_state() {
   local enabled="$1"
-  local hours="$2"
+  local backup_time="$2"
   local retention_days="${3:-0}"
   local tmp_file
 
@@ -982,33 +1386,151 @@ write_auto_state() {
   tmp_file="${AUTO_STATE_FILE}.tmp.$$"
   cat > "$tmp_file" <<EOF
 DB_AUTO_BACKUP_ENABLED=$enabled
-DB_AUTO_BACKUP_INTERVAL_HOURS=$hours
+DB_AUTO_BACKUP_TIME=$backup_time
+DB_AUTO_BACKUP_INTERVAL_HOURS=
 DB_AUTO_BACKUP_RETENTION_DAYS=$retention_days
 DB_AUTO_BACKUP_DIR=$BACKUP_DIR_DEFAULT
 EOF
-  chmod 600 "$tmp_file" 2>/dev/null || true
+  chmod 644 "$tmp_file" 2>/dev/null || true
   mv -f "$tmp_file" "$AUTO_STATE_FILE"
 }
 
-validate_hours() {
-  local hours="$1"
-  validate_positive_integer "$hours"
+validate_backup_time() {
+  local backup_time="$1"
+  printf '%s' "$backup_time" | grep -Eq '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+}
+
+write_auto_units_to() {
+  local backup_time="$1"
+  local systemd_dir="$2"
+  local exec_root="$3"
+
+  mkdir -p "$systemd_dir"
+  cat > "$systemd_dir/dune-awakening-db-backup.service" <<EOF
+[Unit]
+Description=Dune Awakening battlegroup database backup
+Wants=docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=$exec_root
+Environment=DB_BACKUP_PRUNE_AFTER_SUCCESS=1
+Environment=DB_BACKUP_ORIGIN=automatic
+EnvironmentFile=$exec_root/runtime/generated/db-backup.env
+ExecStart=$exec_root/runtime/scripts/dune db backup
+EOF
+
+  cat > "$systemd_dir/dune-awakening-db-backup.timer" <<EOF
+[Unit]
+Description=Run Dune Awakening battlegroup database backup
+
+[Timer]
+OnCalendar=*-*-* ${backup_time}:00
+Persistent=true
+Unit=dune-awakening-db-backup.service
+
+[Install]
+WantedBy=timers.target
+EOF
+}
+
+install_auto_units_via_docker_host() {
+  local backup_time="$1"
+  local image
+  image="$(docker_helper_image)"
+
+  can_manage_host_systemd_with_docker || return 1
+  docker run --rm --privileged --pid=host --network=host \
+    -e DB_AUTO_BACKUP_TIME="$backup_time" \
+    -e DUNE_HOST_REPO_ROOT="$HOST_ROOT_DIR" \
+    -v /:/host \
+    --entrypoint bash \
+    "$image" -lc '
+      set -euo pipefail
+      systemd_dir=/host/etc/systemd/system
+      mkdir -p "$systemd_dir"
+      cat > "$systemd_dir/dune-awakening-db-backup.service" <<EOF
+[Unit]
+Description=Dune Awakening battlegroup database backup
+Wants=docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=${DUNE_HOST_REPO_ROOT}
+Environment=DB_BACKUP_PRUNE_AFTER_SUCCESS=1
+Environment=DB_BACKUP_ORIGIN=automatic
+EnvironmentFile=${DUNE_HOST_REPO_ROOT}/runtime/generated/db-backup.env
+ExecStart=${DUNE_HOST_REPO_ROOT}/runtime/scripts/dune db backup
+EOF
+      cat > "$systemd_dir/dune-awakening-db-backup.timer" <<EOF
+[Unit]
+Description=Run Dune Awakening battlegroup database backup
+
+[Timer]
+OnCalendar=*-*-* ${DB_AUTO_BACKUP_TIME}:00
+Persistent=true
+Unit=dune-awakening-db-backup.service
+
+[Install]
+WantedBy=timers.target
+EOF
+      chroot /host /bin/systemctl daemon-reload
+      chroot /host /bin/systemctl enable --now dune-awakening-db-backup.timer
+    '
+}
+
+disable_auto_units_via_docker_host() {
+  local image
+  image="$(docker_helper_image)"
+
+  can_manage_host_systemd_with_docker || return 1
+  docker run --rm --privileged --pid=host --network=host \
+    -v /:/host \
+    --entrypoint bash \
+    "$image" -lc '
+      set -euo pipefail
+      chroot /host /bin/systemctl disable --now dune-awakening-db-backup.timer >/dev/null 2>&1 || true
+      rm -f /host/etc/systemd/system/dune-awakening-db-backup.service /host/etc/systemd/system/dune-awakening-db-backup.timer
+      chroot /host /bin/systemctl daemon-reload
+    '
+}
+
+show_auto_timer_status_via_docker_host() {
+  local image
+  image="$(docker_helper_image)"
+
+  can_manage_host_systemd_with_docker || return 1
+  docker run --rm --privileged --pid=host --network=host \
+    -v /:/host \
+    --entrypoint bash \
+    "$image" -lc '
+      set -euo pipefail
+      if chroot /host /bin/systemctl list-unit-files dune-awakening-db-backup.timer --no-legend --no-pager 2>/dev/null | grep -q "^dune-awakening-db-backup.timer"; then
+        timer_enabled="$(chroot /host /bin/systemctl is-enabled dune-awakening-db-backup.timer 2>/dev/null || true)"
+        [ -n "$timer_enabled" ] && echo "Systemd timer:   $timer_enabled"
+        chroot /host /bin/systemctl list-timers --all dune-awakening-db-backup.timer --no-pager || true
+      else
+        echo "Systemd timer:   not installed"
+      fi
+    '
 }
 
 auto_backup_enable() {
-  local hours="${1:-}"
+  local backup_time="${1:-}"
   local retention_days="${2:-}"
 
-  if [ -z "$hours" ]; then
-    echo "Missing backup interval."
-    echo "Usage: dune db auto enable <hours>"
+  if [ -z "$backup_time" ]; then
+    echo "Missing backup time."
+    echo "Usage: dune db auto enable <HH:MM>"
     exit 2
   fi
 
-  if ! validate_hours "$hours"; then
-    echo "Invalid interval: $hours"
-    echo "Use a positive integer number of hours, for example:"
-    echo "  dune db auto enable 6"
+  if ! validate_backup_time "$backup_time"; then
+    echo "Invalid backup time: $backup_time"
+    echo "Use 24-hour local server time, for example:"
+    echo "  dune db auto enable 05:00"
     exit 1
   fi
 
@@ -1018,63 +1540,48 @@ auto_backup_enable() {
     if ! validate_positive_integer "$retention_days"; then
       echo "Invalid retention days: $retention_days"
       echo "Use a positive integer number of days, for example:"
-      echo "  dune db auto enable 6 14"
+      echo "  dune db auto enable 05:00 14"
       exit 1
     fi
   else
     retention_days="${DB_AUTO_BACKUP_RETENTION_DAYS:-0}"
   fi
 
-  write_auto_state 1 "$hours" "$retention_days"
+  write_auto_state 1 "$backup_time" "$retention_days"
 
   if ! command -v systemctl >/dev/null 2>&1; then
+    if install_auto_units_via_docker_host "$backup_time"; then
+      echo "Auto DB backups enabled."
+      echo "Backup time: $backup_time"
+      echo "Timer: dune-awakening-db-backup.timer"
+      return 0
+    fi
     echo "Auto DB backup preference saved, but systemctl was not found."
     echo "Saved: $AUTO_STATE_FILE"
     return 0
   fi
 
   if ! can_manage_systemd_units; then
+    if install_auto_units_via_docker_host "$backup_time"; then
+      echo "Auto DB backups enabled."
+      echo "Backup time: $backup_time"
+      echo "Timer: dune-awakening-db-backup.timer"
+      return 0
+    fi
     echo "Auto DB backup preference saved, but this user cannot install systemd units."
     echo "Saved: $AUTO_STATE_FILE"
     echo "To install the timer, run this command with sudo/root:"
-    echo "  runtime/scripts/dune db auto enable $hours${retention_days:+ $retention_days}"
+    echo "  runtime/scripts/dune db auto enable $backup_time${retention_days:+ $retention_days}"
     return 0
   fi
 
-  cat > "$AUTO_SERVICE_FILE" <<EOF
-[Unit]
-Description=Dune Awakening battlegroup database backup
-Wants=docker.service
-After=network-online.target docker.service
-
-[Service]
-Type=oneshot
-WorkingDirectory=$ROOT_DIR
-Environment=DB_BACKUP_PRUNE_AFTER_SUCCESS=1
-EnvironmentFile=$ROOT_DIR/runtime/generated/db-backup.env
-ExecStart=$ROOT_DIR/runtime/scripts/dune db backup
-EOF
-
-  cat > "$AUTO_TIMER_FILE" <<EOF
-[Unit]
-Description=Run Dune Awakening battlegroup database backup
-
-[Timer]
-OnBootSec=15m
-OnUnitActiveSec=${hours}h
-Persistent=true
-RandomizedDelaySec=10m
-Unit=dune-awakening-db-backup.service
-
-[Install]
-WantedBy=timers.target
-EOF
+  write_auto_units_to "$backup_time" "/etc/systemd/system" "$ROOT_DIR"
 
   systemctl daemon-reload
   systemctl enable --now dune-awakening-db-backup.timer
 
   echo "Auto DB backups enabled."
-  echo "Interval: every $hours hours"
+  echo "Backup time: $backup_time"
   if [ "${retention_days:-0}" -gt 0 ] 2>/dev/null; then
     echo "Retention: keep backups from the last $retention_days days"
   else
@@ -1084,19 +1591,21 @@ EOF
 }
 
 auto_backup_disable() {
-  local hours
+  local backup_time
   local retention_days
 
   load_auto_state
-  hours="${DB_AUTO_BACKUP_INTERVAL_HOURS:-24}"
+  backup_time="${DB_AUTO_BACKUP_TIME:-05:00}"
   retention_days="${DB_AUTO_BACKUP_RETENTION_DAYS:-0}"
 
-  write_auto_state 0 "$hours" "$retention_days"
+  write_auto_state 0 "$backup_time" "$retention_days"
 
   if command -v systemctl >/dev/null 2>&1 && can_manage_systemd_units; then
     systemctl disable --now dune-awakening-db-backup.timer >/dev/null 2>&1 || true
     rm -f "$AUTO_SERVICE_FILE" "$AUTO_TIMER_FILE"
     systemctl daemon-reload
+  elif can_manage_host_systemd_with_docker; then
+    disable_auto_units_via_docker_host
   fi
 
   echo "Auto DB backups disabled."
@@ -1111,7 +1620,10 @@ auto_backup_status() {
   else
     echo "Enabled:          false"
   fi
-  echo "Interval hours:   ${DB_AUTO_BACKUP_INTERVAL_HOURS:-24}"
+  echo "Backup time:      ${DB_AUTO_BACKUP_TIME:-05:00}"
+  if [ -n "${DB_AUTO_BACKUP_INTERVAL_HOURS:-}" ]; then
+    echo "Interval hours:   ${DB_AUTO_BACKUP_INTERVAL_HOURS}"
+  fi
   if [ "${DB_AUTO_BACKUP_RETENTION_DAYS:-0}" -gt 0 ] 2>/dev/null; then
     echo "Retention:        ${DB_AUTO_BACKUP_RETENTION_DAYS} days"
   else
@@ -1128,12 +1640,15 @@ auto_backup_status() {
     else
       echo "Systemd timer:   not installed"
     fi
+  else
+    echo
+    show_auto_timer_status_via_docker_host || echo "Systemd timer:   not installed"
   fi
 
   echo
   echo "=== Recent database backups ==="
   if [ -d "${DB_AUTO_BACKUP_DIR:-$BACKUP_DIR_DEFAULT}" ]; then
-    find "${DB_AUTO_BACKUP_DIR:-$BACKUP_DIR_DEFAULT}" -maxdepth 1 -type f \( -name 'dune-db-*.dump' -o -name 'dune-db-*.sql' \) -printf '%TY-%Tm-%Td %TH:%TM  %p\n' | sort | tail -n 5 || true
+    find "${DB_AUTO_BACKUP_DIR:-$BACKUP_DIR_DEFAULT}" -maxdepth 1 -type f \( -name 'dune-db-*.dump' -o -name 'dune-db-*.sql' -o -name '*.backup' \) -printf '%TY-%Tm-%Td %TH:%TM  %p\n' | sort | tail -n 5 || true
   else
     echo "No backup directory found: ${DB_AUTO_BACKUP_DIR:-$BACKUP_DIR_DEFAULT}"
   fi
@@ -1152,7 +1667,7 @@ auto_backup_retention() {
       exit 2
       ;;
     off|OFF|0)
-      write_auto_state "${DB_AUTO_BACKUP_ENABLED:-0}" "${DB_AUTO_BACKUP_INTERVAL_HOURS:-24}" 0
+      write_auto_state "${DB_AUTO_BACKUP_ENABLED:-0}" "${DB_AUTO_BACKUP_TIME:-05:00}" 0
       echo "Auto backup retention disabled. Old backups will not be deleted automatically."
       ;;
     *)
@@ -1161,7 +1676,7 @@ auto_backup_retention() {
         echo "Use a positive integer number of days, or: dune db auto retention off"
         exit 1
       fi
-      write_auto_state "${DB_AUTO_BACKUP_ENABLED:-0}" "${DB_AUTO_BACKUP_INTERVAL_HOURS:-24}" "$value"
+      write_auto_state "${DB_AUTO_BACKUP_ENABLED:-0}" "${DB_AUTO_BACKUP_TIME:-05:00}" "$value"
       echo "Auto backup retention set to $value days."
       ;;
   esac
@@ -1186,7 +1701,7 @@ handle_auto_backup() {
     *)
       echo "Unknown DB auto-backup command: $sub"
       echo "Usage:"
-      echo "  dune db auto enable <hours>"
+      echo "  dune db auto enable <HH:MM>"
       echo "  dune db auto disable"
       echo "  dune db auto status"
       echo "  dune db auto retention <days>"

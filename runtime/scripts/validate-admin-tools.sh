@@ -77,11 +77,11 @@ payload_checks=(
 )
 
 for args in "${payload_checks[@]}"; do
-  if DUNE_ADMIN_DRY_RUN=1 DUNE_ADMIN_ASSUME_YES=1 runtime/scripts/dune admin $args >/tmp/arrakis-admin-validate.out 2>/tmp/arrakis-admin-validate.err; then
+  if DUNE_ADMIN_DRY_RUN=1 DUNE_ADMIN_ASSUME_YES=1 runtime/scripts/dune admin $args >/tmp/admin-tools-validate.out 2>/tmp/admin-tools-validate.err; then
     ok "payload builds: dune admin $args"
   else
     fail "payload build failed: dune admin $args"
-    sed -n '1,12p' /tmp/arrakis-admin-validate.err >&2 || true
+    sed -n '1,12p' /tmp/admin-tools-validate.err >&2 || true
   fi
 done
 
@@ -111,9 +111,9 @@ else
   fail "runtime/generated is not writable"
 fi
 
-if docker ps --format '{{.Names}}' >/tmp/arrakis-admin-docker.out 2>/tmp/arrakis-admin-docker.err; then
+if docker ps --format '{{.Names}}' >/tmp/admin-tools-docker.out 2>/tmp/admin-tools-docker.err; then
   for container in dune-rmq-game dune-postgres; do
-    if grep -qx "$container" /tmp/arrakis-admin-docker.out; then
+    if grep -qx "$container" /tmp/admin-tools-docker.out; then
       ok "$container container detected"
     else
       warn "$container container is not running; live admin commands will fail until the battlegroup is running"
@@ -123,7 +123,7 @@ else
   warn "docker is unavailable; live container checks skipped"
 fi
 
-rm -f /tmp/arrakis-admin-validate.out /tmp/arrakis-admin-validate.err /tmp/arrakis-admin-docker.out /tmp/arrakis-admin-docker.err
+rm -f /tmp/admin-tools-validate.out /tmp/admin-tools-validate.err /tmp/admin-tools-docker.out /tmp/admin-tools-docker.err
 
 if [ "$failures" -ne 0 ]; then
   printf '\n%d validation failure(s).\n' "$failures" >&2

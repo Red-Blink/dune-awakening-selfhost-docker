@@ -1,6 +1,8 @@
 import { createServer } from "node:http";
-import { existsSync, writeFileSync, chmodSync, mkdirSync, createReadStream } from "node:fs";
-import { extname, join, resolve } from "node:path";
+import { spawn } from "node:child_process";
+import { existsSync, writeFileSync, chmodSync, mkdirSync, createReadStream, readFileSync, statfsSync } from "node:fs";
+import { basename, extname, join, resolve } from "node:path";
+import { gzipSync } from "node:zlib";
 import { loadConfig, publicConfig } from "./config.js";
 import { createAuth, setSessionCookie, clearSessionCookie, json } from "./auth.js";
 import { TaskManager, publicTask } from "./tasks.js";
@@ -12,14 +14,14 @@ import { audit, recordAdminHistory } from "./audit.js";
 import { redact } from "./redact.js";
 import { listCatalogItems, resolveCatalogItem } from "./adminCatalog.js";
 import { buildBroadcastCommand, buildShutdownBroadcastCommand, publishServerCommand } from "./rmq.js";
-import { enableStarterKit, grantEligibleStarterKits, grantStarterKit, retryStarterKitGrant, runStarterKitAutoScan, saveStarterKitConfig, starterKitCapabilities, starterKitConfig, starterKitEligiblePlayers, starterKitHistory } from "./starterKit.js";
+import { enableStarterKit, grantEligibleStarterKits, grantStarterKit, retryStarterKitGrant, runStarterKitAutoScan, saveStarterKitConfig, starterKitCapabilities, starterKitConfig, starterKitEligiblePlayers, starterKitHistory } from "./carePackage.js";
 import { readJsonBody, safeStaticTarget } from "./httpSafety.js";
 import { parseBackupAutoStatus, parseBackupListRows } from "./statusParsers.js";
 
 const config = loadConfig();
 const auth = createAuth(config);
 const tasks = new TaskManager(config);
-const db = createDb(config);
+let db = createDb(config);
 let starterKitAutoRunning = false;
 let starterKitAutoLastRun = 0;
 
@@ -28,7 +30,8 @@ const mime = new Map([
   [".js", "text/javascript; charset=utf-8"],
   [".css", "text/css; charset=utf-8"],
   [".json", "application/json; charset=utf-8"],
-  [".svg", "image/svg+xml"]
+  [".svg", "image/svg+xml"],
+  [".png", "image/png"]
 ]);
 
 createServer(async (req, res) => {
@@ -46,11 +49,76 @@ createServer(async (req, res) => {
   if (!config.authDisabled) {
     console.log("Initial admin password is stored in runtime/secrets/admin-web-password.txt");
   }
+  scheduleBootAutoStart();
 });
 
 setInterval(() => {
   void starterKitAutoTick();
 }, 10000).unref?.();
+
+function scheduleBootAutoStart() {
+  if (config.mockMode || process.env.ADMIN_AUTO_START_STACK_ON_BOOT === "0") return;
+  setTimeout(() => {
+    void maybeAutoStartStackOnBoot();
+  }, 5000).unref?.();
+}
+
+async function maybeAutoStartStackOnBoot() {
+  const mainContainers = [
+    "dune-postgres",
+    "dune-rmq-admin",
+    "dune-rmq-game",
+    "dune-text-router",
+    "dune-director",
+    "dune-server-gateway",
+    "dune-server-survival-1",
+    "dune-server-overmap"
+  ];
+  const names = await dockerPsNames().catch((error) => {
+    console.error(`Boot auto-start skipped: ${redact(error.message || error)}`);
+    return [];
+  });
+  if (mainContainers.some((name) => names.includes(name))) return;
+
+  const child = spawn("runtime/scripts/start-all.sh", [], {
+    cwd: config.repoRoot,
+    shell: false,
+    detached: true,
+    env: { ...process.env }
+  });
+  child.stdout.on("data", (chunk) => process.stdout.write(`[boot-autostart] ${redact(chunk.toString())}`));
+  child.stderr.on("data", (chunk) => process.stderr.write(`[boot-autostart] ${redact(chunk.toString())}`));
+  child.on("error", (error) => console.error(`Boot auto-start failed: ${redact(error.message || error)}`));
+  child.on("close", (code) => {
+    if (code === 0) console.log("Boot auto-start completed.");
+    else if (code === 2) console.log("Boot auto-start skipped because manual stop is active for this Linux boot.");
+    else console.error(`Boot auto-start exited with code ${code}.`);
+  });
+}
+
+function dockerPsNames() {
+  return new Promise((resolveNames, rejectNames) => {
+    const child = spawn("docker", ["ps", "--format", "{{.Names}}"], { cwd: config.repoRoot, shell: false });
+    let stdout = "";
+    let stderr = "";
+    const timeout = setTimeout(() => child.kill("SIGTERM"), 10000);
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", rejectNames);
+    child.on("close", (code) => {
+      clearTimeout(timeout);
+      if (code !== 0) {
+        rejectNames(new Error(stderr.trim() || `docker ps failed with exit ${code}`));
+        return;
+      }
+      resolveNames(stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
+    });
+  });
+}
 
 async function handleApi(req, res) {
   const url = new URL(req.url, "http://localhost");
@@ -89,6 +157,7 @@ async function handleApi(req, res) {
   if (path.startsWith("/api/setup/tasks/")) return taskRoute(req, res, path);
 
   if (path === "/api/server/status") return commandJson(res, "status");
+  if (path === "/api/server/performance") return json(res, 200, await performanceSnapshot());
   if (path === "/api/server/readiness") return safeCommandJson(res, "readiness");
   if (path === "/api/server/ports") return commandJson(res, "ports");
   if (path === "/api/server/services") return commandJson(res, "services");
@@ -100,6 +169,12 @@ async function handleApi(req, res) {
     const body = await readJson(req);
     return task(req, res, "server", "restartService", { service: body.service });
   }
+  if (path === "/api/server/funcom-token" && req.method === "POST") return saveServerFuncomToken(req, res);
+  if (path === "/api/server/funcom-token/check") return funcomTokenCheckRoute(req, res, url);
+  if (path === "/api/server/title" && req.method === "POST") {
+    const body = await readJson(req);
+    return task(req, res, "server", "serverTitle", { title: body.title });
+  }
   if (path === "/api/server/restart-schedule" && req.method === "POST") return restartScheduleRoute(req, res);
   if (path === "/api/server/restart-schedule") return safeCommandJson(res, "restartScheduleStatus");
 
@@ -108,6 +183,7 @@ async function handleApi(req, res) {
 
   if (path === "/api/updates/check-game" && req.method === "POST") return task(req, res, "updates", "updateCheck", {});
   if (path === "/api/updates/apply-game" && req.method === "POST") return task(req, res, "updates", "updateApply", {});
+  if (path === "/api/updates/fix-steamcmd" && req.method === "POST") return task(req, res, "updates", "updateFixSteamcmd", {});
   if (path === "/api/updates/check-stack" && req.method === "POST") return task(req, res, "updates", "selfUpdateCheck", {});
   if (path === "/api/updates/apply-stack" && req.method === "POST") return task(req, res, "updates", "selfUpdateApply", {});
   if (path === "/api/updates/auto-game" && req.method === "POST") return autoGameUpdateRoute(req, res);
@@ -118,12 +194,18 @@ async function handleApi(req, res) {
 
   if (path === "/api/backups") return backupsListRoute(res);
   if (path === "/api/backups/auto" && req.method === "POST") return autoBackupRoute(req, res);
+  if (path === "/api/backups/import-external" && req.method === "POST") return externalBackupImportRoute(req, res);
   if (path === "/api/backups/import-remote" && req.method === "POST") return remoteBackupImportRoute(req, res);
   if (path === "/api/backups/auto") return backupAutoStatusRoute(res);
   if (path === "/api/backups/create" && req.method === "POST") return task(req, res, "backup", "backupCreate", {});
+  if (path === "/api/backups/delete-all" && req.method === "POST") return task(req, res, "backup", "backupDeleteAll", {});
   if (path === "/api/backups/restore" && req.method === "POST") {
     const body = await readJson(req);
     return task(req, res, "backup", "backupRestore", { backup: body.backup });
+  }
+  if (path.match(/^\/api\/backups\/[^/]+\/download$/) && req.method === "GET") {
+    const backup = decodeURIComponent(path.split("/").at(-2));
+    return backupDownloadRoute(req, res, backup);
   }
   if (path.startsWith("/api/backups/") && req.method === "DELETE") {
     const backup = decodeURIComponent(path.split("/").pop());
@@ -135,6 +217,7 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/database\/tables\/[^/]+\/[^/]+\/columns$/)) return databaseTableRoute(req, res, path, "columns", url);
   if (path.match(/^\/api\/database\/tables\/[^/]+\/[^/]+\/preview$/)) return databaseTableRoute(req, res, path, "preview", url);
   if (path.match(/^\/api\/database\/tables\/[^/]+\/[^/]+\/count$/)) return databaseTableRoute(req, res, path, "count", url);
+  if (path.match(/^\/api\/database\/tables\/[^/]+\/[^/]+\/row$/) && req.method === "PATCH") return databaseRowUpdate(req, res, path);
   if (path === "/api/database/search") return dbJson(res, () => duneDb.searchDatabase(db, url.searchParams.get("q") || url.searchParams.get("term") || ""));
   if (path.startsWith("/api/database/table/")) return dbJson(res, () => {
     const [schema, table] = decodeURIComponent(path.split("/").pop()).split(".");
@@ -142,6 +225,7 @@ async function handleApi(req, res) {
   });
   if (path === "/api/database/query" && req.method === "POST") return databaseQuery(req, res);
   if (path === "/api/database/export" && req.method === "POST") return databaseExport(req, res);
+  if (path === "/api/database/password" && req.method === "POST") return databasePasswordRoute(req, res);
 
   if (path === "/api/players") return dbJson(res, () => duneDb.listPlayers(db, { q: url.searchParams.get("q") || "" }));
   if (path === "/api/players/online") return dbJson(res, () => duneDb.listPlayers(db, { online: true }));
@@ -190,51 +274,6 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/storage\/[^/]+\/items$/)) return dbJson(res, () => duneDb.storageItems(db, decodeURIComponent(path.split("/")[3])));
   if (path.match(/^\/api\/storage\/[^/]+\/give-item$/) && req.method === "POST") return storageGiveItemRoute(req, res, path);
   if (path.match(/^\/api\/storage\/[^/]+\/export$/)) return exportJson(res, `storage-${decodeURIComponent(path.split("/")[3])}.json`, () => duneDb.storageItems(db, decodeURIComponent(path.split("/")[3])));
-  if (path === "/api/bases") return dbJson(res, () => duneDb.listBases(db));
-  if (path.match(/^\/api\/bases\/[^/]+$/) && req.method === "GET") return dbJson(res, async () => ({ base: (await duneDb.listBases(db)).rows.find((row) => String(row.id) === decodeURIComponent(path.split("/")[3])) || null }));
-  if (path.match(/^\/api\/bases\/[^/]+\/export$/)) {
-    const id = decodeURIComponent(path.split("/")[3]);
-    audit(config, req, "bases.export", { id, format: "blueprint" });
-    return exportJson(res, `base-${id}.blueprint.json`, () => duneDb.exportBaseAsBlueprint(db, id));
-  }
-  if (path.match(/^\/api\/bases\/[^/]+\/export-blueprint$/) && req.method === "POST") {
-    const id = decodeURIComponent(path.split("/")[3]);
-    audit(config, req, "bases.export-blueprint", { id });
-    return dbJson(res, () => duneDb.exportBaseAsBlueprint(db, id));
-  }
-  if (path === "/api/bases/import" && req.method === "POST") return blockedImportRoute(req, res, "bases.import", "IMPORT BASE", "Base import remains blocked: safe ownership, position, entity ID remapping, and live-service collision rules are not verified for RedBlink databases.");
-  if (path.match(/^\/api\/bases\/[^/]+$/) && req.method === "DELETE") return blockedImportRoute(req, res, "bases.delete", "DELETE BASE", "Base delete remains blocked: deleting a full base requires verified building/placeable/inventory/object graph deletion rules.");
-  if (path === "/api/blueprints") return dbJson(res, () => duneDb.listBlueprints(db));
-  if (path.match(/^\/api\/blueprints\/[^/]+$/) && req.method === "GET") return dbJson(res, async () => ({ blueprint: (await duneDb.listBlueprints(db)).rows.find((row) => String(row.id) === decodeURIComponent(path.split("/")[3])) || null }));
-  if (path.match(/^\/api\/blueprints\/[^/]+\/export$/)) {
-    const id = decodeURIComponent(path.split("/")[3]);
-    audit(config, req, "blueprints.export", { id });
-    return exportJson(res, `blueprint-${id}.json`, () => duneDb.exportBlueprintFull(db, id));
-  }
-  if (path === "/api/blueprints/import" && req.method === "POST") return blockedImportRoute(req, res, "blueprints.import", "IMPORT BLUEPRINT", "Blueprint import remains blocked: arrakis-admin import requires verified offline-player backpack ownership, blueprint item stat shape, and ID remapping rules that RedBlink does not expose through a safe CLI path.");
-  if (path.match(/^\/api\/blueprints\/[^/]+$/) && req.method === "DELETE") return blockedImportRoute(req, res, "blueprints.delete", "DELETE BLUEPRINT", "Blueprint delete remains blocked: safe item/blueprint graph deletion rules are not verified.");
-  if (path.match(/^\/api\/blueprints\/[^/]+\/clone$/) && req.method === "POST") return blockedImportRoute(req, res, "blueprints.clone", "CLONE BLUEPRINT", "Blueprint clone remains blocked: clone requires verified blueprint item creation, stat wiring, and inventory ownership rules.");
-
-  if (path === "/api/market/capabilities") return dbJson(res, () => duneDb.marketCapabilities(db));
-  if (path === "/api/market/items") return dbJson(res, () => duneDb.marketItems(db, {
-    q: url.searchParams.get("q") || "",
-    limit: url.searchParams.get("limit") || 500,
-    offset: url.searchParams.get("offset") || 0
-  }));
-  if (path === "/api/market/search") return dbJson(res, () => duneDb.marketItems(db, {
-    q: url.searchParams.get("q") || "",
-    limit: url.searchParams.get("limit") || 100,
-    offset: url.searchParams.get("offset") || 0
-  }));
-  if (path === "/api/market/listings") return dbJson(res, () => duneDb.marketListings(db, { templateId: url.searchParams.get("template_id") || "", owner: url.searchParams.get("owner") || "", limit: url.searchParams.get("limit") || 500, offset: url.searchParams.get("offset") || 0 }));
-  if (path === "/api/market/sales") return dbJson(res, () => duneDb.marketSales(db, { limit: url.searchParams.get("limit") || 200 }));
-  if (path === "/api/market/stats") return dbJson(res, () => duneDb.marketStats(db));
-  if (path === "/api/market/categories") return json(res, 200, { categories: [...new Set(listCatalogItems(config.repoRoot, { limit: 2000 }).map((item) => item.category).filter(Boolean))].sort() });
-  if (path === "/api/market/catalog") return json(res, 200, { rows: listCatalogItems(config.repoRoot, { q: url.searchParams.get("q") || "", limit: url.searchParams.get("limit") || 500 }) });
-  if (path === "/api/market/automation/status") return json(res, 200, marketAutomationUnsupported());
-  if (path === "/api/market/automation/history") return json(res, 200, { rows: [], ...marketAutomationUnsupported() });
-  if (path.startsWith("/api/market/automation/") && req.method === "POST") return unsupportedMutation(req, res, `market.${path.split("/").pop()}`, marketAutomationUnsupported().reason);
-
   if (path === "/api/starter-kit/capabilities") return json(res, 200, starterKitCapabilities());
   if (path === "/api/starter-kit/config" && req.method === "POST") return starterKitConfigRoute(req, res);
   if (path === "/api/starter-kit/config") return json(res, 200, starterKitConfig(config));
@@ -249,13 +288,15 @@ async function handleApi(req, res) {
 
   if (path === "/api/map/status") return mapStatusRoute(res);
   if (path === "/api/map/capabilities") return dbJson(res, () => duneDb.liveMapCapabilities(db));
-  if (path === "/api/map/markers") return dbJson(res, () => duneDb.liveMapMarkers(db, url.searchParams.get("map") || ""));
+  if (path === "/api/map/partitions") return dbJson(res, () => duneDb.liveMapPartitions(db));
+  if (path === "/api/map/markers") return liveMapMarkersRoute(res, url);
   if (path === "/api/map/players") return dbJson(res, () => duneDb.liveMapPlayers(db, url.searchParams.get("map") || ""));
   if (path === "/api/map/bases") return dbJson(res, () => duneDb.liveMapBases(db, url.searchParams.get("map") || ""));
   if (path === "/api/map/storage") return dbJson(res, () => duneDb.liveMapStorage(db, url.searchParams.get("map") || ""));
   if (path === "/api/map/services") return dbJson(res, () => duneDb.liveMapServices(db, url.searchParams.get("map") || ""));
   if (path === "/api/map/overlays") return dbJson(res, () => duneDb.liveMapMarkers(db, url.searchParams.get("map") || ""));
   if (path === "/api/maps/mode" && req.method === "POST") return confirmedTask(req, res, "maps", "mapsSetMode", {}, "SET MAP MODE");
+  if (path === "/api/maps/settings" && req.method === "POST") return mapSettingsRoute(req, res);
   if (path === "/api/maps") return commandJson(res, "mapsList");
   if (path === "/api/maps/mode") return commandJson(res, "mapsMode", { map: url.searchParams.get("map") || "" });
   if (path === "/api/maps/reconcile" && req.method === "POST") return confirmedTask(req, res, "maps", "mapsReconcile", {}, "RECONCILE MAPS");
@@ -264,12 +305,19 @@ async function handleApi(req, res) {
   if (path === "/api/maps/autoscaler" && req.method === "POST") return confirmedTask(req, res, "maps", "autoscalerAction", {}, "AUTOSCALER CHANGE");
   if (path === "/api/maps/autoscaler") return commandJson(res, "autoscalerStatus");
   if (path === "/api/maps/memory" && req.method === "POST") return memoryRoute(req, res);
+  if (path === "/api/maps/memory/live") return liveMapMemoryRoute(res);
   if (path === "/api/maps/memory") return commandJson(res, "memoryStatus");
+  if (path === "/api/maps/user-settings/schema") return userSettingsSchemaRoute(res);
+  if (path === "/api/maps/user-settings/raw" && req.method === "POST") return userSettingsRawWriteRoute(req, res);
+  if (path === "/api/maps/user-settings/raw") return userSettingsRawRoute(res, url);
+  if (path === "/api/maps/user-settings/save" && req.method === "POST") return userSettingsSaveRoute(req, res);
+  if (path === "/api/maps/user-settings/reset" && req.method === "POST") return userSettingsResetRoute(req, res);
   if (path === "/api/maps/userengine") return safeCommandJson(res, "userSettingsEngineValues");
   if (path === "/api/maps/usergame") return safeCommandJson(res, url.searchParams.get("partitionId") ? "userSettingsPartitionValues" : "userSettingsMapValues", { map: url.searchParams.get("map") || "Survival_1", partitionId: url.searchParams.get("partitionId") || "1" });
   if (path === "/api/maps/user-settings/materialize" && req.method === "POST") return confirmedTask(req, res, "maps", "userSettingsMaterializeCurrent", {}, "REFRESH MAP SETTINGS");
   if (path === "/api/maps/user-settings/restore-defaults" && req.method === "POST") return userSettingsRestoreDefaultsRoute(req, res);
   if (path === "/api/sietches") return commandJson(res, "sietchesList");
+  if (path === "/api/sietches/dimensions") return commandJson(res, "sietchesDimensions", { map: url.searchParams.get("map") || "Survival_1" });
   if (path === "/api/sietches/update" && req.method === "POST") return sietchesUpdateRoute(req, res);
   if (path === "/api/deepdesert") return commandJson(res, "deepdesertStatus");
   if (path === "/api/deepdesert/update" && req.method === "POST") return deepDesertUpdateRoute(req, res);
@@ -277,6 +325,99 @@ async function handleApi(req, res) {
   if (path === "/api/settings") return json(res, 200, await setupState());
 
   return json(res, 404, { error: "Not found" });
+}
+
+let previousCpuSample = null;
+
+async function performanceSnapshot() {
+  const cpu = readCpuUsagePercent();
+  const memory = readMemoryUsage();
+  const disk = readDiskUsage(config.repoRoot);
+  const uptimeSeconds = readHostUptimeSeconds();
+  return {
+    cpuPercent: cpu,
+    memory,
+    disk,
+    uptimeSeconds,
+    uptime: formatUptime(uptimeSeconds),
+    sampledAt: new Date().toISOString()
+  };
+}
+
+async function liveMapMarkersRoute(res, url) {
+  const configPayload = duneDb.liveMapConfigPayload(url.searchParams.get("map") || "");
+  const [markers, partitions] = await Promise.all([
+    duneDb.liveMapMarkers(db, configPayload.map.actorMap || configPayload.map.key),
+    duneDb.liveMapPartitions(db).catch(() => ({ rows: [] }))
+  ]);
+  return json(res, 200, {
+    ...markers,
+    ...configPayload,
+    partitions: partitions.rows || []
+  });
+}
+
+function readCpuUsagePercent() {
+  const line = readFileSync("/proc/stat", "utf8").split(/\r?\n/).find((row) => row.startsWith("cpu "));
+  if (!line) return null;
+  const values = line.trim().split(/\s+/).slice(1).map((value) => Number(value) || 0);
+  const idle = (values[3] || 0) + (values[4] || 0);
+  const total = values.reduce((sum, value) => sum + value, 0);
+  const current = { idle, total };
+  if (!previousCpuSample) {
+    previousCpuSample = current;
+    return null;
+  }
+  const totalDelta = current.total - previousCpuSample.total;
+  const idleDelta = current.idle - previousCpuSample.idle;
+  previousCpuSample = current;
+  if (totalDelta <= 0) return null;
+  return roundPercent(((totalDelta - idleDelta) / totalDelta) * 100);
+}
+
+function readMemoryUsage() {
+  const rows = Object.fromEntries(readFileSync("/proc/meminfo", "utf8").split(/\r?\n/).map((line) => {
+    const match = line.match(/^([^:]+):\s+(\d+)/);
+    return match ? [match[1], Number(match[2]) * 1024] : null;
+  }).filter(Boolean));
+  const total = rows.MemTotal || 0;
+  const available = rows.MemAvailable || 0;
+  const used = Math.max(0, total - available);
+  return {
+    usedBytes: used,
+    totalBytes: total,
+    availableBytes: available,
+    percent: total ? roundPercent((used / total) * 100) : null
+  };
+}
+
+function readDiskUsage(path) {
+  const stats = statfsSync(path || ".");
+  const total = Number(stats.blocks) * Number(stats.bsize);
+  const free = Number(stats.bavail) * Number(stats.bsize);
+  const used = Math.max(0, total - free);
+  return {
+    usedBytes: used,
+    totalBytes: total,
+    freeBytes: free,
+    percent: total ? roundPercent((used / total) * 100) : null
+  };
+}
+
+function readHostUptimeSeconds() {
+  const value = readFileSync("/proc/uptime", "utf8").trim().split(/\s+/)[0];
+  return Math.max(0, Math.floor(Number(value) || 0));
+}
+
+function formatUptime(seconds) {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return `${days}d ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m`;
+}
+
+function roundPercent(value) {
+  return Math.round(value * 10) / 10;
 }
 
 async function commandJson(res, operation, payload = {}) {
@@ -294,13 +435,183 @@ async function safeCommandJson(res, operation, payload = {}) {
 async function backupsListRoute(res) {
   if (config.mockMode) return json(res, 200, { ...mockCommand("backupList"), rows: [] });
   const result = await runDune(config, buildDuneArgs("backupList"));
-  return json(res, 200, { operation: "backupList", stdout: result.stdout, stderr: result.stderr, exitCode: result.code, rows: parseBackupListRows(result.stdout) });
+  return json(res, 200, { operation: "backupList", stdout: result.stdout, stderr: result.stderr, exitCode: result.code, rows: enrichBackupRows(parseBackupListRows(result.stdout)) });
+}
+
+function enrichBackupRows(rows) {
+  return rows.map((row) => {
+    const metadata = readBackupMetadata(row.name);
+    const origin = String(metadata.backup_origin || metadata.origin || "").trim().toLowerCase();
+    const battlegroupId = String(metadata.imported_from_battlegroup_id || metadata.battlegroup_id || "").trim();
+    const enriched = { ...row, battlegroupId: battlegroupId || "Unknown" };
+    if (/^(automatic|scheduled)$/.test(origin)) return { ...enriched, type: "Automatic Backup" };
+    if (/^(restore-safety|restore_safety|restore safety)$/.test(origin)) return { ...enriched, type: "Restore Safety Backup" };
+    if (/^(pre-update|pre_update|preupdate)$/.test(origin)) return { ...enriched, type: "Pre-update Backup" };
+    if (/^(external|imported)$/.test(origin)) return { ...enriched, type: "Imported Backup", source: "External" };
+    return enriched;
+  });
+}
+
+function readBackupMetadata(name) {
+  if (!/^[A-Za-z0-9_.-]+\.(backup|dump|sql)$/i.test(String(name || ""))) return {};
+  const metadataPath = resolve(config.repoRoot, "runtime/backups/db", `${name}.yaml`);
+  if (!existsSync(metadataPath)) return {};
+  try {
+    return Object.fromEntries(readFileSync(metadataPath, "utf8").split(/\r?\n/).map((line) => {
+      const match = line.match(/^([A-Za-z0-9_.-]+):\s*(.*)$/);
+      return match ? [match[1], match[2].trim()] : null;
+    }).filter(Boolean));
+  } catch {
+    return {};
+  }
+}
+
+async function externalBackupImportRoute(req, res) {
+  const form = await readMultipartForm(req, config.maxUploadBytes);
+  const backup = form.files.find((file) => file.fieldName === "backup");
+  const metadata = form.files.find((file) => file.fieldName === "metadata");
+  if (!backup) return json(res, 400, { error: "Select a .backup file to import." });
+  if (!metadata) return json(res, 400, { error: "Select the matching .backup.yaml file to import." });
+
+  const backupName = basename(backup.fileName || "");
+  const metadataName = basename(metadata.fileName || "");
+  if (!/\.backup$/i.test(backupName)) return json(res, 400, { error: "The backup file must end with .backup." });
+  if (!/\.ya?ml$/i.test(metadataName)) return json(res, 400, { error: "The metadata file must end with .yaml or .yml." });
+  if (!backup.content.length) return json(res, 400, { error: "The selected .backup file is empty." });
+  if (!metadata.content.length) return json(res, 400, { error: "The selected metadata file is empty." });
+
+  const backupDir = resolve(config.repoRoot, "runtime/backups/db");
+  mkdirSync(backupDir, { recursive: true });
+  const importedName = nextImportedBackupName(backupDir);
+  const backupPath = resolve(backupDir, importedName);
+  const metadataPath = `${backupPath}.yaml`;
+  writeFileSync(backupPath, backup.content, { mode: 0o600 });
+  writeFileSync(metadataPath, normalizeImportedBackupMetadata(metadata.content), { mode: 0o600 });
+  chmodSync(backupPath, 0o600);
+  chmodSync(metadataPath, 0o600);
+  audit(config, req, "backup.import-external", { backup: importedName, sourceBackup: backupName, sourceMetadata: metadataName });
+
+  const result = await runDune(config, buildDuneArgs("backupList"));
+  const rows = enrichBackupRows(parseBackupListRows(result.stdout));
+  return json(res, 200, { ok: true, backup: importedName, rows, row: rows.find((row) => row.name === importedName) || null });
+}
+
+function normalizeImportedBackupMetadata(content) {
+  const metadata = parseBackupMetadata(content);
+  const currentBattlegroupId = readCurrentBattlegroupId();
+  const originalBattlegroupId = String(metadata.battlegroup_id || "").trim();
+  if (originalBattlegroupId && currentBattlegroupId && originalBattlegroupId !== currentBattlegroupId && !metadata.imported_from_battlegroup_id) {
+    metadata.imported_from_battlegroup_id = originalBattlegroupId;
+  }
+  metadata.backup_origin = "external";
+  metadata.imported_at = new Date().toISOString();
+  return stringifyBackupMetadata(metadata);
+}
+
+function parseBackupMetadata(content) {
+  return Object.fromEntries(String(content || "").split(/\r?\n/).map((line) => {
+    const match = line.match(/^([A-Za-z0-9_.-]+):\s*(.*)$/);
+    return match ? [match[1], match[2].trim()] : null;
+  }).filter(Boolean));
+}
+
+function stringifyBackupMetadata(metadata) {
+  return `${Object.entries(metadata).map(([key, value]) => `${key}: ${String(value || "")}`).join("\n")}\n`;
+}
+
+function readCurrentBattlegroupId() {
+  try {
+    const text = readFileSync(resolve(config.generatedDir, "battlegroup.env"), "utf8");
+    return text.match(/^BATTLEGROUP_ID=(.*)$/m)?.[1]?.replace(/\\ /g, " ").trim() || "";
+  } catch {
+    return "";
+  }
+}
+
+async function backupDownloadRoute(req, res, backupName) {
+  if (!validBackupDownloadName(backupName)) return json(res, 400, { error: "Invalid backup name." });
+  const backupDir = resolve(config.repoRoot, "runtime/backups/db");
+  const backupPath = resolve(backupDir, backupName);
+  const metadataPath = `${backupPath}.yaml`;
+  if (!backupPath.startsWith(`${backupDir}/`)) return json(res, 400, { error: "Invalid backup path." });
+  if (!existsSync(backupPath)) return json(res, 404, { error: "Backup file was not found." });
+  if (!existsSync(metadataPath)) return json(res, 404, { error: "Backup metadata .yaml file was not found." });
+
+  const archiveName = `${backupName}.tar.gz`;
+  const archive = gzipSync(createTarArchive([
+    { name: backupName, content: readFileSync(backupPath) },
+    { name: `${backupName}.yaml`, content: readFileSync(metadataPath) }
+  ]));
+  res.writeHead(200, {
+    "content-type": "application/gzip",
+    "content-length": archive.length,
+    "content-disposition": `attachment; filename="${archiveName.replace(/"/g, "")}"`
+  });
+  res.end(archive);
 }
 
 async function backupAutoStatusRoute(res) {
-  if (config.mockMode) return json(res, 200, { ...mockCommand("backupAutoStatus"), status: { ok: true, enabled: false, intervalHours: "", retentionDays: "0", retentionLabel: "No Retention Limit", timer: "" } });
+  if (config.mockMode) return json(res, 200, { ...mockCommand("backupAutoStatus"), status: { ok: true, enabled: false, backupTime: "05:00", intervalHours: "", retentionDays: "0", retentionLabel: "No Retention Limit", timer: "" } });
   const result = await safeCommand("backupAutoStatus");
   return json(res, 200, { ...result, status: parseBackupAutoStatus(result) });
+}
+
+function nextImportedBackupName(backupDir) {
+  const now = new Date();
+  for (let offset = 0; offset < 86400; offset += 1) {
+    const candidateDate = new Date(now.getTime() + offset * 1000);
+    const stamp = [
+      candidateDate.getFullYear(),
+      String(candidateDate.getMonth() + 1).padStart(2, "0"),
+      String(candidateDate.getDate()).padStart(2, "0")
+    ].join("") + "-" + [
+      String(candidateDate.getHours()).padStart(2, "0"),
+      String(candidateDate.getMinutes()).padStart(2, "0"),
+      String(candidateDate.getSeconds()).padStart(2, "0")
+    ].join("");
+    const name = `imported-backup-${stamp}.backup`;
+    if (!existsSync(resolve(backupDir, name)) && !existsSync(resolve(backupDir, `${name}.yaml`))) return name;
+  }
+  throw new Error("Could not allocate imported backup filename.");
+}
+
+function validBackupDownloadName(name) {
+  return /^dune-db-([a-z0-9][a-z0-9_-]*__)?[0-9]{8}-[0-9]{6}\.(dump|sql)$/i.test(name) ||
+    /^[a-z0-9][a-z0-9_-]*-[0-9]{8}-[0-9]{6}\.backup$/i.test(name);
+}
+
+function createTarArchive(files) {
+  const blocks = [];
+  for (const file of files) {
+    const header = Buffer.alloc(512, 0);
+    writeTarString(header, 0, 100, file.name);
+    writeTarOctal(header, 100, 8, 0o600);
+    writeTarOctal(header, 108, 8, 0);
+    writeTarOctal(header, 116, 8, 0);
+    writeTarOctal(header, 124, 12, file.content.length);
+    writeTarOctal(header, 136, 12, Math.floor(Date.now() / 1000));
+    header.fill(32, 148, 156);
+    header[156] = 48;
+    writeTarString(header, 257, 6, "ustar");
+    writeTarString(header, 263, 2, "00");
+    const checksum = header.reduce((sum, byte) => sum + byte, 0);
+    writeTarOctal(header, 148, 8, checksum);
+    blocks.push(header, file.content);
+    const padding = (512 - (file.content.length % 512)) % 512;
+    if (padding) blocks.push(Buffer.alloc(padding, 0));
+  }
+  blocks.push(Buffer.alloc(1024, 0));
+  return Buffer.concat(blocks);
+}
+
+function writeTarString(buffer, offset, length, value) {
+  buffer.write(String(value).slice(0, length - 1), offset, length, "utf8");
+}
+
+function writeTarOctal(buffer, offset, length, value) {
+  const text = value.toString(8).padStart(length - 1, "0").slice(0, length - 1);
+  buffer.write(text, offset, length - 1, "ascii");
+  buffer[offset + length - 1] = 0;
 }
 
 async function structuredVehiclesRoute(res) {
@@ -399,6 +710,63 @@ async function databaseExport(req, res) {
   res.end(content);
 }
 
+async function databaseRowUpdate(req, res, path) {
+  const parts = path.split("/");
+  const schema = decodeURIComponent(parts[4]);
+  const table = decodeURIComponent(parts[5]);
+  const body = await readJson(req);
+  audit(config, req, "database.row-update", { schema, table, columns: Object.keys(body.values || {}) });
+  return dbJson(res, () => duneDb.updateTableRow(db, schema, table, body.rowId, body.values));
+}
+
+async function databasePasswordRoute(req, res) {
+  const body = await readJson(req);
+  const password = validateDatabasePassword(body.password);
+  if (process.env.ADMIN_DATABASE_URL) {
+    return json(res, 400, { error: "Database password changes are unavailable while ADMIN_DATABASE_URL is set. Update the connection URL instead." });
+  }
+  await duneDb.changeDunePassword(db, password);
+  updateEnvFileValue("DUNE_DB_PASSWORD", password);
+  process.env.DUNE_DB_PASSWORD = password;
+  const previousDb = db;
+  db = createDb(config);
+  try { await previousDb.close(); } catch {}
+  audit(config, req, "database.change-password", { user: "dune", password: "<redacted>" });
+  return json(res, 202, { ok: true, user: "dune", task: tasks.create("server", "restartAll", {}) });
+}
+
+function validateDatabasePassword(value) {
+  const password = String(value || "");
+  if (password.length < 4) {
+    const error = new Error("Database password must be at least 4 characters.");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (password.length > 256 || /[\r\n\0]/.test(password)) {
+    const error = new Error("Database password contains unsupported characters.");
+    error.statusCode = 400;
+    throw error;
+  }
+  return password;
+}
+
+function updateEnvFileValue(key, value) {
+  const envPath = resolve(config.repoRoot, ".env");
+  const current = existsSync(envPath) ? readFileSync(envPath, "utf8").split(/\r?\n/) : [];
+  const line = `${key}=${quoteEnv(String(value))}`;
+  let found = false;
+  const next = current.map((existing) => {
+    if (existing.match(new RegExp(`^${key}=`))) {
+      found = true;
+      return line;
+    }
+    return existing;
+  });
+  if (!found) next.push(line);
+  writeFileSync(envPath, `${next.filter((entry, index) => entry !== "" || index < next.length - 1).join("\n")}\n`, { mode: 0o644 });
+  try { chmodSync(envPath, 0o644); } catch {}
+}
+
 async function dbJson(res, fn) {
   try {
     return json(res, 200, await fn());
@@ -467,6 +835,182 @@ async function memoryRoute(req, res) {
   return task(req, res, "maps", operation, body);
 }
 
+async function mapSettingsRoute(req, res) {
+  const body = await readJson(req);
+  if (body.confirmation !== "SAVE MAP SETTINGS") return json(res, 400, { error: "Confirmation phrase required: SAVE MAP SETTINGS" });
+  const map = String(body.map || "");
+  const partitionId = String(body.partitionId || "").trim();
+  const memoryChanged = Boolean(body.memoryChanged);
+  const modeChanged = Boolean(body.modeChanged);
+  if (!map) return json(res, 400, { error: "Map is required." });
+  if (!memoryChanged && !modeChanged) return json(res, 400, { error: "No map setting changes were submitted." });
+  const restart = memoryChanged && Boolean(body.running);
+  const payload = {
+    map,
+    partitionId,
+    mode: String(body.mode || ""),
+    memory: String(body.memory || ""),
+    modeChanged,
+    memoryChanged,
+    ...(restart ? restartPayload("map", map, partitionId) : { restartMode: "none", restartLabel: map })
+  };
+  audit(config, req, "maps.settings.save", { map, partitionId, modeChanged, memoryChanged, restartMode: payload.restartMode });
+  return json(res, 202, { task: tasks.create("maps", "mapsApplySettings", payload) });
+}
+
+async function userSettingsSchemaRoute(res) {
+  try {
+    const result = await runDune(config, buildDuneArgs("userSettingsMetadata"), { timeoutMs: 8000 });
+    return json(res, 200, JSON.parse(result.stdout || "{}"));
+  } catch (error) {
+    return json(res, 500, { error: redact(error.message || error) });
+  }
+}
+
+async function userSettingsRawRoute(res, url) {
+  const kind = String(url.searchParams.get("kind") || "engine");
+  const map = url.searchParams.get("map") || "Survival_1";
+  const partitionId = url.searchParams.get("partitionId") || "";
+  const operation = kind === "profile" ? "userSettingsProfileRaw" : kind === "engine" ? "userSettingsRawEngine" : "userSettingsRawGame";
+  try {
+    const result = await runDune(config, buildDuneArgs(operation, { map, partitionId }), { timeoutMs: 8000 });
+    return json(res, 200, { content: result.stdout || "" });
+  } catch (error) {
+    return json(res, 500, { error: redact(error.message || error) });
+  }
+}
+
+async function userSettingsSaveRoute(req, res) {
+  const body = await readJson(req);
+  const payload = userSettingsTaskPayload(body);
+  audit(config, req, "maps.user-settings.save", { scope: payload.scope, map: payload.map, partitionId: payload.partitionId, restartMode: payload.restartMode });
+  return json(res, 202, { task: tasks.create("maps", "userSettingsSaveAndRestart", payload) });
+}
+
+async function userSettingsResetRoute(req, res) {
+  const body = await readJson(req);
+  if (body.confirmation !== "RESTORE MAP DEFAULTS") return json(res, 400, { error: "Confirmation phrase required: RESTORE MAP DEFAULTS" });
+  const payload = userSettingsTaskPayload({ ...body, values: {} });
+  audit(config, req, "maps.user-settings.reset", { scope: payload.scope, map: payload.map, partitionId: payload.partitionId, restartMode: payload.restartMode });
+  return json(res, 202, { task: tasks.create("maps", "userSettingsResetAndRestart", payload) });
+}
+
+async function userSettingsRawWriteRoute(req, res) {
+  const body = await readJson(req);
+  const payload = userSettingsTaskPayload({ ...body, values: {}, content: String(body.content || "") });
+  audit(config, req, "maps.user-settings.raw-write", { scope: payload.scope, map: payload.map, partitionId: payload.partitionId, restartMode: payload.restartMode });
+  return json(res, 202, { task: tasks.create("maps", "userSettingsRawAndRestart", payload) });
+}
+
+function userSettingsTaskPayload(body) {
+  const scope = ["engine", "global", "map", "partition", "profile"].includes(String(body.scope || "")) ? String(body.scope) : "map";
+  const map = String(body.map || "Survival_1");
+  const partitionId = String(body.partitionId || "").trim();
+  const values = body.values && typeof body.values === "object" && !Array.isArray(body.values) ? body.values : {};
+  return {
+    scope,
+    map,
+    partitionId,
+    values,
+    content: String(body.content || ""),
+    ...restartPayload(scope, map, partitionId)
+  };
+}
+
+function restartPayload(scope, map, partitionId) {
+  if (scope === "profile") return { restartMode: "stack", restartLabel: "all game services" };
+  if (scope === "engine") return { restartMode: "stack", restartLabel: "all game services" };
+  if (scope === "global") return { restartMode: "stack", restartLabel: "all game services" };
+  const normalizedMap = String(map || "").toLowerCase();
+  const normalizedPartition = String(partitionId || "").trim();
+  if (normalizedMap === "survival_1" && (!normalizedPartition || normalizedPartition === "1")) {
+    return { restartMode: "service", service: "survival", restartLabel: "Survival_1" };
+  }
+  if ((normalizedMap === "overmap" || normalizedMap.startsWith("deepdesert_")) && (!normalizedPartition || normalizedPartition === "2")) {
+    return { restartMode: "service", service: "overmap", restartLabel: "Deep Desert" };
+  }
+  if (normalizedPartition) {
+    return { restartMode: "respawn", target: normalizedPartition, restartLabel: `partition ${normalizedPartition}` };
+  }
+  return { restartMode: "respawn", target: map, restartLabel: map };
+}
+
+async function liveMapMemoryRoute(res) {
+  try {
+    const stdout = await runProcessText("docker", ["stats", "--no-stream", "--format", "{{json .}}"], 10000);
+    const rows = stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map(parseDockerStatsRow).filter(Boolean);
+    return json(res, 200, { rows, sampledAt: new Date().toISOString() });
+  } catch (error) {
+    return json(res, 200, { rows: [], sampledAt: new Date().toISOString(), error: redact(error.message || error) });
+  }
+}
+
+function parseDockerStatsRow(line) {
+  try {
+    const row = JSON.parse(line);
+    const name = String(row.Name || row.Container || "");
+    if (!name.startsWith("dune-server-")) return null;
+    const memory = parseMemoryUsage(row.MemUsage || row.MemUsageBytes || "");
+    return {
+      container: name,
+      map: mapFromContainerName(name),
+      usedBytes: memory.usedBytes,
+      limitBytes: memory.limitBytes,
+      percent: Number.parseFloat(String(row.MemPerc || "").replace("%", "")) || memory.percent || 0,
+      raw: String(row.MemUsage || "")
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseMemoryUsage(value) {
+  const [usedRaw, limitRaw] = String(value || "").split("/").map((part) => part.trim());
+  const usedBytes = parseDockerBytes(usedRaw);
+  const limitBytes = parseDockerBytes(limitRaw);
+  return {
+    usedBytes,
+    limitBytes,
+    percent: limitBytes > 0 ? roundPercent((usedBytes / limitBytes) * 100) : 0
+  };
+}
+
+function parseDockerBytes(value) {
+  const match = String(value || "").match(/^([\d.]+)\s*([KMGTPE]?i?B)?$/i);
+  if (!match) return 0;
+  const amount = Number.parseFloat(match[1]) || 0;
+  const unit = String(match[2] || "B").toLowerCase();
+  const multipliers = { b: 1, kb: 1000, kib: 1024, mb: 1000 ** 2, mib: 1024 ** 2, gb: 1000 ** 3, gib: 1024 ** 3, tb: 1000 ** 4, tib: 1024 ** 4 };
+  return Math.round(amount * (multipliers[unit] || 1));
+}
+
+function mapFromContainerName(name) {
+  if (name === "dune-server-survival-1") return "Survival_1";
+  if (name === "dune-server-overmap") return "Overmap";
+  return name.replace(/^dune-server-/, "");
+}
+
+function runProcessText(command, args, timeoutMs = 10000) {
+  return new Promise((resolveText, rejectText) => {
+    const child = spawn(command, args, { cwd: config.repoRoot, shell: false });
+    let stdout = "";
+    let stderr = "";
+    const timeout = setTimeout(() => child.kill("SIGTERM"), timeoutMs);
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", rejectText);
+    child.on("close", (code) => {
+      clearTimeout(timeout);
+      if (code === 0) resolveText(stdout);
+      else rejectText(new Error(stderr.trim() || `${command} ${args.join(" ")} failed with exit ${code}`));
+    });
+  });
+}
+
 async function autoBackupRoute(req, res) {
   const body = await readJson(req);
   const operation = body.enabled ? "backupAutoEnable" : "backupAutoDisable";
@@ -488,9 +1032,6 @@ async function remoteBackupImportRoute(req, res) {
 
 async function restartScheduleRoute(req, res) {
   const body = await readJson(req);
-  if (body.confirmation !== "SAVE RESTART SCHEDULE") {
-    return json(res, 400, { error: "Confirmation phrase required: SAVE RESTART SCHEDULE" });
-  }
   const operation = body.enabled ? "restartScheduleEnable" : "restartScheduleDisable";
   return task(req, res, "server", operation, body);
 }
@@ -552,32 +1093,6 @@ async function playerTask(req, res, path, operation, phrase = "") {
   return task(req, res, "admin", operation, { ...body, playerId });
 }
 
-async function unsupportedMutation(req, res, action, reason, phrase = "") {
-  const body = await readJson(req);
-  if (phrase && body.confirmation !== phrase) {
-    return json(res, 400, { error: `Confirmation phrase required: ${phrase}` });
-  }
-  audit(config, req, action, { supported: false, reason });
-  return json(res, 501, { supported: false, reason, error: reason });
-}
-
-async function blockedImportRoute(req, res, action, phrase, reason) {
-  const body = await readJson(req);
-  if (body.confirmation !== phrase) {
-    return json(res, 400, { error: `Confirmation phrase required: ${phrase}` });
-  }
-  if (action.includes("import")) {
-    try {
-      if (action.startsWith("blueprints")) duneDb.validateBlueprintPayload(body.payload || body);
-      if (action.startsWith("bases")) duneDb.validateBasePayload(body.payload || body);
-    } catch (error) {
-      return json(res, 400, { error: redact(error.message || error) });
-    }
-  }
-  audit(config, req, action, { supported: false, reason });
-  return json(res, 501, { supported: false, reason, error: reason });
-}
-
 async function starterKitConfigRoute(req, res) {
   const body = await readJson(req);
   if (body.confirmation !== "SAVE STARTER KIT") return json(res, 400, { error: "Confirmation phrase required: SAVE STARTER KIT" });
@@ -607,7 +1122,9 @@ async function starterKitEnableRoute(req, res, enabled) {
 async function starterKitGrantRoute(req, res, path) {
   const playerId = decodeURIComponent(path.split("/")[4]);
   try {
-    const result = await grantStarterKit(config, playerId, await readJson(req));
+    const body = await readJson(req);
+    const identity = await resolveStarterKitPlayerIdentity(playerId).catch(() => ({}));
+    const result = await grantStarterKit(config, playerId, { ...body, ...identity }, { db });
     audit(config, req, "starter-kit.grant", { supported: true, playerId, ok: result.ok, grantId: result.id });
     return json(res, result.ok ? 200 : 207, result);
   } catch (error) {
@@ -620,7 +1137,7 @@ async function starterKitEligibleRoute(req, res) {
   try {
     const players = await duneDb.listPlayers(db, {});
     if (players.capabilities?.players === false) return json(res, 501, { supported: false, reason: players.reason || "Player list is unavailable" });
-    return json(res, 200, starterKitEligiblePlayers(config, players.rows || []));
+    return json(res, 200, starterKitEligiblePlayers(config, players.rows || [], { ruleId: new URL(req.url, "http://localhost").searchParams.get("ruleId") || "" }));
   } catch (error) {
     return json(res, 500, { supported: false, error: redact(error.message || error), reason: redact(error.message || error) });
   }
@@ -630,7 +1147,7 @@ async function starterKitGrantEligibleRoute(req, res) {
   try {
     const players = await duneDb.listPlayers(db, {});
     if (players.capabilities?.players === false) return json(res, 501, { supported: false, reason: players.reason || "Player list is unavailable" });
-    const result = await grantEligibleStarterKits(config, players.rows || [], await readJson(req));
+    const result = await grantEligibleStarterKits(config, players.rows || [], await readJson(req), { db });
     audit(config, req, "starter-kit.grant-eligible", { supported: true, granted: result.granted, skipped: result.skipped, failed: result.failed });
     return json(res, result.failed ? 207 : 200, result);
   } catch (error) {
@@ -645,7 +1162,7 @@ async function starterKitRunRoute(req, res) {
   try {
     const players = await duneDb.listPlayers(db, {});
     if (players.capabilities?.players === false) return json(res, 501, { supported: false, reason: players.reason || "Player list is unavailable" });
-    const result = await runStarterKitAutoScan(config, players.rows || [], "manual-scan");
+    const result = await runStarterKitAutoScan(config, players.rows || [], "manual-scan", { db });
     audit(config, req, "starter-kit.run", { supported: true, ...result, results: undefined });
     return json(res, result.failed ? 207 : 200, result);
   } catch (error) {
@@ -657,7 +1174,7 @@ async function starterKitRunRoute(req, res) {
 async function starterKitRetryRoute(req, res, path) {
   const grantId = decodeURIComponent(path.split("/")[4]);
   try {
-    const result = await retryStarterKitGrant(config, grantId, await readJson(req));
+    const result = await retryStarterKitGrant(config, grantId, await readJson(req), { db });
     audit(config, req, "starter-kit.retry", { supported: true, grantId, ok: result.ok, retryGrantId: result.id });
     return json(res, result.ok ? 200 : 207, result);
   } catch (error) {
@@ -666,20 +1183,25 @@ async function starterKitRetryRoute(req, res, path) {
   }
 }
 
+async function resolveStarterKitPlayerIdentity(playerId) {
+  const players = await duneDb.listPlayers(db, {});
+  const rows = players.rows || [];
+  const target = String(playerId || "").toLowerCase();
+  const player = rows.find((row) => [row.action_player_id, row.funcom_id, row.fls_id, row.account_id, row.actor_id, row.player_pawn_id]
+    .some((value) => String(value || "").toLowerCase() === target));
+  if (!player) return {};
+  return {
+    funcomId: player.funcom_id || player.fls_id || player.action_player_id || "",
+    flsId: player.fls_id || player.funcom_id || player.action_player_id || "",
+    characterName: player.character_name || "",
+    actorId: player.actor_id || player.player_pawn_id || ""
+  };
+}
+
 function queryParams(url, names) {
   const out = {};
   for (const name of names) out[name] = url.searchParams.get(name) || "";
   return out;
-}
-
-function marketAutomationUnsupported() {
-  return {
-    supported: false,
-    running: false,
-    enabled: false,
-    mode: "none",
-    reason: "Market automation is blocked: arrakis-admin uses an embedded or remote market-bot runtime with its own config, lifecycle, cleanup, and history APIs. RedBlink does not currently provide a compatible market-bot service or CLI wrapper in this Docker stack."
-  };
 }
 
 async function playerDbMutation(req, res, path, action, phrase, fn) {
@@ -795,7 +1317,7 @@ async function shutdownBroadcastRoute(req, res) {
 
 async function whisperRoute(req, res) {
   const body = await readJson(req);
-  const reason = "Whisper remains blocked: arrakis-admin publishes courier chat to exchange chat.whispers with routing key equal to the recipient Funcom ID, AMQP type text_chat, and sender user_id set to a seeded GM hex FLS ID. RedBlink does not currently seed or expose the required GM account/persona rows, sender Funcom ID, sender hex FLS ID, and verified recipient Funcom ID mapping.";
+  const reason = "Whisper remains blocked: the web admin publishes courier chat to exchange chat.whispers with routing key equal to the recipient Funcom ID, AMQP type text_chat, and sender user_id set to a seeded GM hex FLS ID. RedBlink does not currently seed or expose the required GM account/persona rows, sender Funcom ID, sender hex FLS ID, and verified recipient Funcom ID mapping.";
   audit(config, req, "admin.whisper", { supported: false, reason, playerId: body.playerId });
   recordAdminHistory(config, { command: "web-whisper", target: body.playerId || "-", friendly: "Whisper blocked", path: "rmq:chat.whispers", result: "blocked", message: body.message });
   return json(res, 501, { supported: false, reason, error: reason });
@@ -895,7 +1417,7 @@ async function starterKitAutoTick() {
   try {
     const players = await duneDb.listPlayers(db, {});
     if (players.capabilities?.players === false) return;
-    const result = await runStarterKitAutoScan(config, players.rows || [], "auto");
+    const result = await runStarterKitAutoScan(config, players.rows || [], "auto", { db });
     if (result.granted || result.failed) {
       console.log(`Starter Kit auto-grant scan: granted=${result.granted || 0} skipped=${result.skipped || 0} failed=${result.failed || 0}`);
     }
@@ -916,24 +1438,136 @@ async function writeConfig(req, res) {
   for (const key of allowed) {
     if (body[key] !== undefined) lines.push(`${key}=${quoteEnv(String(body[key]))}`);
   }
-  writeFileSync(resolve(config.repoRoot, ".env"), `${lines.join("\n")}\n`, { mode: 0o600 });
+  writeFileSync(resolve(config.repoRoot, ".env"), `${lines.join("\n")}\n`, { mode: 0o644 });
   audit(config, req, "setup.write-config", { keys: Object.keys(body).filter((key) => allowed.includes(key)) });
   return json(res, 200, { ok: true });
 }
 
 async function saveToken(req, res) {
   const body = await readJson(req);
-  if (!body.token || String(body.token).length < 20) return json(res, 400, { error: "Token looks too short" });
-  mkdirSync(config.secretsDir, { recursive: true });
-  const path = resolve(config.secretsDir, "funcom-token.txt");
-  writeFileSync(path, `${String(body.token).trim()}\n`, { mode: 0o600 });
-  try { chmodSync(path, 0o600); } catch {}
+  saveFuncomTokenValue(body.token);
   audit(config, req, "setup.save-token", { token: "<redacted>" });
   return json(res, 200, { ok: true });
 }
 
+async function saveServerFuncomToken(req, res) {
+  const body = await readJson(req);
+  saveFuncomTokenValue(body.token);
+  audit(config, req, "server.save-funcom-token", { token: "<redacted>" });
+  return json(res, 202, { task: tasks.create("server", "restartAll", {}) });
+}
+
+async function funcomTokenCheckRoute(req, res, url) {
+  const since = validDockerSince(url.searchParams.get("since")) || "5m";
+  const logs = await Promise.all([
+    runDockerLogs("director", { since, tail: 600, timeoutMs: 10000 }).catch((error) => ({ stdout: "", stderr: error.message || String(error) })),
+    runDockerLogs("gateway", { since, tail: 600, timeoutMs: 10000 }).catch((error) => ({ stdout: "", stderr: error.message || String(error) }))
+  ]);
+  const text = logs.map((result) => `${result.stdout || ""}\n${result.stderr || ""}`).join("\n");
+  const mismatch = funcomAuthMismatchDetected(text);
+  return json(res, 200, {
+    ok: !mismatch,
+    mismatch,
+    checkedSince: since,
+    details: mismatch ? matchingFuncomAuthLines(text) : ""
+  });
+}
+
+function validDockerSince(value) {
+  const text = String(value || "").trim();
+  if (/^\d+[smhdw]$/i.test(text)) return text;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/i.test(text)) return text;
+  return "";
+}
+
+function funcomAuthMismatchDetected(text) {
+  return isFuncomAuthMismatchText(text);
+}
+
+function matchingFuncomAuthLines(text) {
+  return String(text || "").split(/\r?\n/)
+    .filter((line) => isFuncomAuthMismatchText(line))
+    .slice(-20)
+    .join("\n");
+}
+
+function isFuncomAuthMismatchText(text) {
+  const value = String(text || "");
+  if (!value) return false;
+  if (/Invalid Authorization to manage SelfHosted Battlegroup/i.test(value)) return true;
+  if (/ACCESS_DENIED|AccessDenied|access denied|invalid authorization|Unauthorized/i.test(value)) {
+    return /Battlegroup|SelfHosted|Funcom|FuncomLiveServices/i.test(value);
+  }
+  if (/(?:HTTP|status|statusCode|response|code)[^,\n]*(?:401|403)\b/i.test(value)) {
+    return /Battlegroup|SelfHosted|Funcom|FuncomLiveServices/i.test(value);
+  }
+  return false;
+}
+
+function saveFuncomTokenValue(token) {
+  if (!token || String(token).length < 20) {
+    const error = new Error("Token looks too short");
+    error.statusCode = 400;
+    throw error;
+  }
+  mkdirSync(config.secretsDir, { recursive: true });
+  const path = resolve(config.secretsDir, "funcom-token.txt");
+  writeFileSync(path, `${String(token).trim()}\n`, { mode: 0o600 });
+  try { chmodSync(path, 0o600); } catch {}
+}
+
 async function readJson(req) {
   return readJsonBody(req, config.maxJsonBytes);
+}
+
+async function readMultipartForm(req, maxBytes) {
+  const contentType = String(req.headers["content-type"] || "");
+  const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+  const boundary = boundaryMatch?.[1] || boundaryMatch?.[2];
+  if (!boundary) {
+    const error = new Error("Expected multipart/form-data upload.");
+    error.statusCode = 400;
+    throw error;
+  }
+  const body = await readRawBody(req, maxBytes);
+  const boundaryBuffer = Buffer.from(`--${boundary}`);
+  const files = [];
+  let cursor = body.indexOf(boundaryBuffer);
+  while (cursor >= 0) {
+    cursor += boundaryBuffer.length;
+    if (body[cursor] === 45 && body[cursor + 1] === 45) break;
+    if (body[cursor] === 13 && body[cursor + 1] === 10) cursor += 2;
+    const next = body.indexOf(boundaryBuffer, cursor);
+    if (next < 0) break;
+    let part = body.slice(cursor, next);
+    if (part.length >= 2 && part[part.length - 2] === 13 && part[part.length - 1] === 10) part = part.slice(0, -2);
+    const headerEnd = part.indexOf(Buffer.from("\r\n\r\n"));
+    if (headerEnd > 0) {
+      const headers = part.slice(0, headerEnd).toString("utf8");
+      const disposition = headers.split(/\r?\n/).find((line) => /^content-disposition:/i.test(line)) || "";
+      const fieldName = disposition.match(/\bname="([^"]*)"/i)?.[1] || "";
+      const fileName = disposition.match(/\bfilename="([^"]*)"/i)?.[1] || "";
+      if (fieldName && fileName) files.push({ fieldName, fileName, content: part.slice(headerEnd + 4) });
+    }
+    cursor = next;
+  }
+  return { files };
+}
+
+async function readRawBody(req, maxBytes) {
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of req) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += buffer.length;
+    if (total > maxBytes) {
+      const error = new Error(`Upload exceeds ${maxBytes} bytes`);
+      error.statusCode = 413;
+      throw error;
+    }
+    chunks.push(buffer);
+  }
+  return Buffer.concat(chunks);
 }
 
 function quoteEnv(value) {

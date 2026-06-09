@@ -6,6 +6,57 @@ cd "$(dirname "$0")/../.."
 cmd="${1:-help}"
 target="${2:-}"
 
+auto_repair_stack_git_state() {
+  local version tag_commit head backup_dir remote
+
+  [ "${DUNE_SKIP_STACK_GIT_REPAIR:-0}" != "1" ] || return 0
+  [ -f VERSION ] || return 0
+  command -v git >/dev/null 2>&1 || return 0
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  remote="$(git remote get-url origin 2>/dev/null || true)"
+  [ -n "$remote" ] || return 0
+
+  version="$(tr -d '[:space:]' < VERSION)"
+  case "$version" in
+    v*) ;;
+    *) return 0 ;;
+  esac
+  [ -n "$(git status --porcelain -- VERSION 2>/dev/null || true)" ] || return 0
+
+  head="$(git rev-parse HEAD 2>/dev/null || true)"
+  tag_commit="$(git rev-parse -q --verify "refs/tags/${version}^{commit}" 2>/dev/null || true)"
+  if [ -z "$tag_commit" ]; then
+    git fetch --force --tags origin >/dev/null 2>&1 || return 0
+    git fetch --force origin "refs/tags/${version}:refs/tags/${version}" >/dev/null 2>&1 || true
+    tag_commit="$(git rev-parse -q --verify "refs/tags/${version}^{commit}" 2>/dev/null || true)"
+  fi
+  [ -n "$tag_commit" ] || return 0
+  [ "$head" != "$tag_commit" ] || return 0
+
+  echo "Stack Git state does not match installed VERSION ${version}."
+  echo "Repairing Git checkout so future stack updates track the correct release."
+  backup_dir="runtime/backups/self-update/git-state-repair-$(date +%Y%m%d-%H%M%S)-${version#v}"
+  mkdir -p "$backup_dir"
+  tar -czf "$backup_dir/project-files.tgz" \
+    --exclude='./.git' \
+    --exclude='./.env' \
+    --exclude='./runtime/generated' \
+    --exclude='./runtime/secrets' \
+    --exclude='./runtime/backups' \
+    --exclude='./runtime/game' \
+    --exclude='./work' \
+    . 2>/dev/null || true
+  echo "Current stack files backup:"
+  echo "  $backup_dir/project-files.tgz"
+  git reset --hard "$tag_commit"
+  echo "Stack Git state repaired to ${version}."
+}
+
+case "$cmd" in
+  init|help|--help|-h) ;;
+  *) auto_repair_stack_git_state ;;
+esac
+
 case "$cmd" in
   init)
     runtime/scripts/init.sh
@@ -16,11 +67,12 @@ case "$cmd" in
     ;;
 
   start)
-    runtime/scripts/start-all.sh
+    rm -f runtime/generated/manual-stop.env
+    DUNE_IGNORE_MANUAL_STOP=1 runtime/scripts/start-all.sh
     ;;
 
   stop)
-    runtime/scripts/stop-all.sh
+    DUNE_MANUAL_STOP=1 runtime/scripts/stop-all.sh
     ;;
 
   status)
@@ -198,7 +250,7 @@ Usage:
   runtime/scripts/dune restart <service>
   runtime/scripts/dune update [check|auto enable|auto disable|auto status|--yes]
   runtime/scripts/dune self-update [check|list|install [latest|previous|<tag>]]
-  runtime/scripts/dune restart-schedule [enable <hours>|disable|status]
+  runtime/scripts/dune restart-schedule [enable <HH:MM>|disable|status]
   runtime/scripts/dune db backup [output-dir]
   runtime/scripts/dune db list
   runtime/scripts/dune db status
@@ -207,7 +259,7 @@ Usage:
   runtime/scripts/dune db restore <backup-file>
   runtime/scripts/dune db delete <backup-file>
   runtime/scripts/dune db delete --all
-  runtime/scripts/dune db auto enable <hours> [retention-days]
+  runtime/scripts/dune db auto enable <HH:MM> [retention-days]
   runtime/scripts/dune db auto disable
   runtime/scripts/dune db auto status
   runtime/scripts/dune db auto retention <days>

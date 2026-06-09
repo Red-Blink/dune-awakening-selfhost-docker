@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildBroadcastCommand, buildShutdownBroadcastCommand, validateBroadcastMessage, validateLocalizedTexts, validatePublishLabel } from "../src/rmq.js";
+import { buildBroadcastCommand, buildCarePackageWhisperPayload, buildShutdownBroadcastCommand, validateBroadcastMessage, validateLocalizedTexts, validatePublishLabel } from "../src/rmq.js";
 
 test("builds verified ServiceBroadcast generic command payload", () => {
   const command = buildBroadcastCommand({ message: "Server event starts soon", durationSec: 45, title: "Event" });
@@ -47,6 +47,28 @@ test("builds shutdown ServiceBroadcast with strict shutdown type", () => {
   assert.equal(command.BroadcastPayload.ShutdownDuration, 15);
   assert.ok(command.BroadcastPayload.ShutdownTimestamp >= before);
   assert.throws(() => buildShutdownBroadcastCommand({ shutdownType: "RebootEverything" }));
+});
+
+test("builds Care Package private whisper courier payload", () => {
+  const payload = buildCarePackageWhisperPayload({
+    recipientFuncomId: "RedBlink#75570",
+    recipientCharacterName: "RedBlink",
+    senderFuncomId: "Server#00000",
+    message: "Welcome",
+    now: "2026-06-08T12:00:00.000Z",
+    messageId: "care-package-test"
+  });
+  assert.equal(payload.outer.Type, "ECourierMessageType::TextChat");
+  const inner = JSON.parse(payload.outer.Content);
+  assert.equal(inner.m_Id, "care-package-test");
+  assert.equal(inner.m_ChannelType, "ETextChatChannelType::Whispers");
+  assert.equal(inner.m_SubChannelId, "RedBlink#75570");
+  assert.equal(inner.m_bUseSpoofedUserName, false);
+  assert.equal(inner.m_FuncomIdFrom, "Server#00000");
+  assert.equal(inner.m_UserNameTo, "RedBlink");
+  assert.equal(inner.m_Message.CultureInvariantString, "Welcome");
+  assert.equal(inner.m_TimeStamp, "2026-06-08T12:00:00.000Z");
+  assert.equal(inner.m_HasSeenMessage, false);
 });
 
 test("validates RabbitMQ publish labels before eval construction", () => {

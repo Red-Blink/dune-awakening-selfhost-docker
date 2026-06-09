@@ -244,7 +244,13 @@ resolve_server_ip_mode() {
 }
 
 resolve_server_ip() {
-  local mode detected
+  local mode configured detected
+
+  configured="$(first_known_value "${SERVER_IP:-}" "$(config_value .env SERVER_IP 2>/dev/null || true)" || true)"
+  if value_is_known "$configured" && [ "$configured" != "auto" ]; then
+    printf '%s' "$configured"
+    return 0
+  fi
 
   mode="$(resolve_server_ip_mode 2>/dev/null || true)"
   case "$mode" in
@@ -285,6 +291,37 @@ resolve_bind_ip() {
   fi
 
   printf '%s' "127.0.0.1"
+}
+
+resolve_advertised_ip() {
+  resolve_server_ip
+}
+
+resolve_game_listen_ip() {
+  resolve_bind_ip
+}
+
+resolve_game_addr_ip() {
+  resolve_advertised_ip
+}
+
+resolve_igw_addr_ip() {
+  resolve_game_listen_ip
+}
+
+game_external_address_override_env_args() {
+  local bind_ip advertised_ip
+
+  [ "${DUNE_ALLOW_GAME_EXTERNAL_ADDRESS_OVERRIDE:-0}" = "1" ] || return 0
+
+  bind_ip="$(resolve_game_listen_ip)"
+  advertised_ip="$(resolve_advertised_ip)"
+  if [ "$bind_ip" != "$advertised_ip" ]; then
+    echo "Skipping EXTERNAL_ADDRESS_OVERRIDE: bind IP $bind_ip differs from advertised IP $advertised_ip." >&2
+    return 0
+  fi
+
+  printf '%s\n' -e "EXTERNAL_ADDRESS_OVERRIDE=$advertised_ip"
 }
 
 usersettings_engine_value() {

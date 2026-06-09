@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 export function resolveCatalogItem(repoRoot, { itemName = "", itemId = "" } = {}) {
@@ -9,27 +9,27 @@ export function resolveCatalogItem(repoRoot, { itemName = "", itemId = "" } = {}
   const mode = itemId ? "id" : "name";
   if (mode === "id") {
     const exact = items.find((item) => String(item.id || "") === value);
-    return normalizeItem(exact || { id: value, name: value, category: "manual", source: "manual" });
+    return normalizeItem(exact || { id: value, name: value, category: "manual", source: "manual" }, repoRoot);
   }
 
   const folded = value.toLowerCase();
   const exactNames = items.filter((item) => String(item.name || "").toLowerCase() === folded);
-  if (exactNames.length === 1) return normalizeItem(exactNames[0]);
+  if (exactNames.length === 1) return normalizeItem(exactNames[0], repoRoot);
   if (exactNames.length > 1) {
     const nonSchematics = exactNames.filter((item) => String(item.category || "").toLowerCase() !== "schematics");
-    if (nonSchematics.length === 1) return normalizeItem(nonSchematics[0]);
+    if (nonSchematics.length === 1) return normalizeItem(nonSchematics[0], repoRoot);
     throw new Error(`Ambiguous item name: ${value}`);
   }
 
   const exactId = items.find((item) => String(item.id || "") === value);
-  if (exactId) return normalizeItem(exactId);
+  if (exactId) return normalizeItem(exactId, repoRoot);
   throw new Error(`No item found for: ${value}`);
 }
 
 export function listCatalogItems(repoRoot, { q = "", limit = 500 } = {}) {
   const items = JSON.parse(readFileSync(resolve(repoRoot, "runtime/data/admin-items.json"), "utf8"));
   const term = String(q || "").trim().toLowerCase();
-  const max = Math.max(1, Math.min(Number(limit) || 500, 2000));
+  const max = Math.max(1, Math.min(Number(limit) || 500, 10000));
   return items
     .filter((item) => {
       if (!term) return true;
@@ -38,17 +38,27 @@ export function listCatalogItems(repoRoot, { q = "", limit = 500 } = {}) {
         String(item.category || "").toLowerCase().includes(term);
     })
     .slice(0, max)
-    .map(normalizeItem);
+    .map((item) => normalizeItem(item, repoRoot));
 }
 
-function normalizeItem(item) {
+function normalizeItem(item, repoRoot = "") {
   const id = String(item.id || "").trim();
   if (!/^[A-Za-z0-9_./:-]{1,240}$/.test(id)) throw new Error("Invalid resolved item id");
+  const image = itemImagePath(repoRoot, id);
   return {
     id,
     itemId: id,
     name: String(item.name || id),
     category: String(item.category || "manual"),
-    source: String(item.source || "manual")
+    source: String(item.source || "manual"),
+    image
   };
+}
+
+function itemImagePath(repoRoot, id) {
+  if (!repoRoot) return "/images/items/image-unavailable.png";
+  const filename = `${id}.png`;
+  const relativePath = `images/items/${filename}`;
+  const absolutePath = resolve(repoRoot, "web/public", relativePath);
+  return existsSync(absolutePath) ? `/${relativePath}` : "/images/items/image-unavailable.png";
 }

@@ -54,8 +54,8 @@ function buildReadinessGroups(readyText: string, statusText: string) {
 
 function parseReadyRows(text: string): GroupedCheckRow[] {
   return stripAnsi(text).split(/\r?\n/).map((line) => line.trim()).filter((line) => /^(OK|WAIT|FAIL)\s+/i.test(line)).map((line) => {
-    const status: CheckRow["status"] = /^FAIL\s+/i.test(line) ? "Failed" : /^WAIT\s+/i.test(line) ? "Warn" : "Ready";
     const raw = line.replace(/^(OK|WAIT|FAIL)\s+/i, "").trim();
+    const status: CheckRow["status"] = /^FAIL\s+/i.test(line) ? "Failed" : /^WAIT\s+/i.test(line) && /warming/i.test(raw) ? "Info" : /^WAIT\s+/i.test(line) ? "Warn" : "Ready";
     const group = readyGroupFor(raw);
     const name = friendlyReadyName(raw);
     return { name, detail: detailForReady(raw, name, status), status, kind: kindForStatus(status), group };
@@ -79,7 +79,7 @@ function parseStatusContainers(text: string): CheckRow[] {
     const [, id, state] = match;
     return {
       name: CONTAINER_LABELS[id] || friendlyName(id),
-      detail: state,
+      detail: friendlyCheckDetail(state),
       status: /up\b/i.test(state) ? "Ready" : /missing|exited|stopped|dead/i.test(state) ? "Failed" : "Warn",
       kind: kindForStatus(/up\b/i.test(state) ? "Ready" : /missing|exited|stopped|dead/i.test(state) ? "Failed" : "Warn")
     };
@@ -97,7 +97,7 @@ function parseStatusListeners(text: string): CheckRow[] {
     seen.add(key);
     return {
       name: friendlyListenerName(name.trim(), port, protocol),
-      detail: `${port}/${protocol.toLowerCase()}`,
+      detail: `${port}/${protocol.toUpperCase()}`,
       status: /^OK$/i.test(state) ? "Ready" : /missing|fail/i.test(state) ? "Failed" : "Warn",
       kind: kindForStatus(/^OK$/i.test(state) ? "Ready" : /missing|fail/i.test(state) ? "Failed" : "Warn")
     };
@@ -109,8 +109,8 @@ function parseStatusGameServers(text: string, readyRows: ReturnType<typeof parse
     const match = line.match(/^(\S+)\s+(.+?)\s{2,}(.+)$/);
     if (!match) return null;
     const [, map, state, uptime] = match;
-    const status: CheckRow["status"] = /ready/i.test(state) ? "Ready" : /not running|missing/i.test(state) ? "Failed" : "Warn";
-    return { name: friendlyName(map), detail: `${state.trim()} - ${uptime.trim()}`, status, kind: kindForStatus(status) };
+    const status: CheckRow["status"] = /ready/i.test(state) ? "Ready" : /not running|missing/i.test(state) ? "Failed" : /warming/i.test(state) ? "Info" : "Warn";
+    return { name: friendlyName(map), detail: `${friendlyCheckDetail(state)} - ${formatGameUptime(uptime)}`, status, kind: kindForStatus(status) };
   }).filter(Boolean) as CheckRow[];
   return rows.length ? rows : readyRows.filter((row) => row.group === "Game Server Checks").map(({ group: _group, ...row }) => row);
 }
@@ -119,13 +119,13 @@ function parseStatusRabbit(text: string, readyRows: ReturnType<typeof parseReady
   const section = sectionLines(text, "RabbitMQ game connections");
   if (!section.length) return readyRows.filter((row) => row.group === "RabbitMQ Game Connections").map(({ group: _group, ...row }) => row);
   if (section.some((line) => /not running|missing|failed/i.test(line))) {
-    return [{ name: "RabbitMQ Game", detail: friendlyIssue(section[0]), status: "Failed", kind: "fail" }];
+    return [{ name: "RabbitMQ Game", detail: friendlyCheckDetail(friendlyIssue(section[0])), status: "Failed", kind: "fail" }];
   }
   const readyFailed = readyRows.find((row) => row.group === "RabbitMQ Game Connections" && row.status !== "Ready");
   return section.map((line) => {
     const [name, value = ""] = line.split(":").map((part) => part.trim());
     const status: CheckRow["status"] = readyFailed ? readyFailed.status : "Ready";
-    return { name: friendlyName(name), detail: value, status, kind: kindForStatus(status) };
+    return { name: friendlyName(name), detail: friendlyCheckDetail(value), status, kind: kindForStatus(status) };
   });
 }
 
@@ -135,7 +135,7 @@ function parseStatusFls(text: string, readyRows: ReturnType<typeof parseReadyRow
   return section.map((line) => {
     const [name, value = ""] = line.split(":").map((part) => part.trim());
     const status: CheckRow["status"] = /^OK$/i.test(value) ? "Ready" : /fail|error/i.test(value) ? "Failed" : "Warn";
-    return { name: friendlyName(name), detail: value, status, kind: kindForStatus(status) };
+    return { name: friendlyName(name), detail: friendlyCheckDetail(value), status, kind: kindForStatus(status) };
   });
 }
 
@@ -144,7 +144,7 @@ function friendlyReadyName(raw: string) {
     .replace(/^container\s+/i, "")
     .replace(/^TCP\s+(\d+)\s+/i, "TCP $1 ")
     .replace(/^UDP\s+(\d+)\s+/i, "UDP $1 ")
-    .replace(/^no dynamic game maps currently running$/i, "No dynamic maps running")
+    .replace(/^no dynamic game maps currently running$/i, "No Active Maps")
     .replace(/dune-postgres/gi, "Dune Postgres")
     .replace(/dune-rmq-admin/gi, "RabbitMQ Admin")
     .replace(/dune-rmq-game/gi, "RabbitMQ Game")
@@ -160,7 +160,7 @@ function friendlyReadyName(raw: string) {
 
 function detailForReady(raw: string, name: string, status: string) {
   if (status === "Ready") return "";
-  const clean = friendlyIssue(raw);
+  const clean = friendlyCheckDetail(friendlyIssue(raw));
   return clean === name ? "Attention needed" : clean;
 }
 
@@ -181,6 +181,28 @@ function friendlyListenerName(name: string, port: string, protocol: string) {
   return known[key] || friendlyName(name);
 }
 
+function formatGameUptime(value: string) {
+  const clean = value.trim().replace(/^up\s+/i, "").replace(/^about\s+/i, "");
+  const number = clean.match(/\b(\d+)\s*(second|minute|hour|day|week|month|year)s?\b/i);
+  if (number) return `Up ${number[1]}${timeUnitShort(number[2])} ago`;
+  if (/^an?\s+hour$/i.test(clean)) return "Up 1h ago";
+  if (/^an?\s+minute$/i.test(clean)) return "Up 1m ago";
+  if (/^an?\s+second$/i.test(clean)) return "Up 1s ago";
+  if (/^a\s+day$/i.test(clean)) return "Up 1d ago";
+  if (/^less than a minute$/i.test(clean)) return "Up 1m ago";
+  return normalizeDisplayText(value.trim());
+}
+
+function timeUnitShort(value: string) {
+  if (/second/i.test(value)) return "s";
+  if (/minute/i.test(value)) return "m";
+  if (/hour/i.test(value)) return "h";
+  if (/day/i.test(value)) return "d";
+  if (/week/i.test(value)) return "w";
+  if (/month/i.test(value)) return "mo";
+  return "y";
+}
+
 function sectionLines(text: string, section: string) {
   const lines = stripAnsi(text).split(/\r?\n/);
   const start = lines.findIndex((line) => line.trim().toLowerCase() === `=== ${section.toLowerCase()} ===`);
@@ -199,6 +221,26 @@ function friendlyName(value: string) {
 
 function friendlyIssue(value: string) {
   return value.replace(/\s+/g, " ").trim();
+}
+
+function friendlyCheckDetail(value: string) {
+  return normalizeDisplayText(value
+    .replace(/\bmissing\b/gi, "Missing")
+    .replace(/\bwait\b/gi, "Wait")
+    .replace(/\bnot running\b/gi, "Not Running")
+    .replace(/\bwarming\b/gi, "Warming")
+    .replace(/\bready\b/gi, "Ready")
+    .replace(/\bRestarting\s+\(\d+\)\s+\d+\s+seconds?\s+ago\b/i, "Restarting")
+    .replace(/\s+/g, " ")
+    .trim());
+}
+
+function normalizeDisplayText(value: string) {
+  return value
+    .replace(/\bRabbitMQ game\b/g, "RabbitMQ Game")
+    .replace(/\bRabbitMQ Game is Not Running\b/g, "RabbitMQ Game is not running")
+    .replace(/\bNot Running\s+-\s+missing\b/gi, "Not Running - Missing")
+    .replace(/^Up\s+About\b/, "Up about");
 }
 
 function kindForStatus(status: string): CheckRow["kind"] {

@@ -261,14 +261,24 @@ test("server partition parser derives status from real ready/alive fields", () =
 test("backup list parser sorts newest first and formats filename timestamps", () => {
   const rows = parseBackupListRows(`dune-db-overmap_and_survival_1-20260603-115203.backup
 dune-db-overmap_and_survival_1-20260603-115318.backup
+dune-db-pre-update-20260603-115400.backup
 dune-db-imported-20260531-010203.backup`);
   assert.deepEqual(rows.map((row) => row.backupName), [
+    "dune-db-pre-update-20260603-115400.backup",
     "dune-db-overmap_and_survival_1-20260603-115318.backup",
     "dune-db-overmap_and_survival_1-20260603-115203.backup",
     "dune-db-imported-20260531-010203.backup"
   ]);
-  assert.equal(rows[0].created, "2026-06-03 11:53:18");
-  assert.equal(rows[0].type, "Manual Backup");
+  assert.equal(rows[0].created, "2026-06-03 11:54:00");
+  assert.equal(rows[0].type, "Pre-update Backup");
+  assert.equal(rows[1].type, "Manual Backup");
+  assert.equal(rows[3].type, "Imported Backup");
+  assert.equal(rows[3].source, "External");
+});
+
+test("backup list parser prefers server-local file timestamps", () => {
+  const rows = parseBackupListRows(`2026-06-06 18:06:33  runtime/backups/db/dune-db-overmap_and_survival_1-20260606-150633.backup`);
+  assert.equal(rows[0].created, "2026-06-06 18:06:33");
 });
 
 test("auto backup status parser handles retention, timer, and permission failures", () => {
@@ -276,14 +286,14 @@ test("auto backup status parser handles retention, timer, and permission failure
     exitCode: 0,
     stdout: `=== Automatic database backups ===
 Enabled:          true
-Interval hours:   6
+Backup time:      05:30
 Retention:        3 days
 Backup directory: runtime/backups/db
 
 Systemd timer:   enabled`
   });
   assert.equal(status.enabled, true);
-  assert.equal(status.intervalHours, "6");
+  assert.equal(status.backupTime, "05:30");
   assert.equal(status.retentionDays, "3");
   assert.equal(status.retentionLabel, "3 Days");
   assert.equal(status.timer, "enabled");

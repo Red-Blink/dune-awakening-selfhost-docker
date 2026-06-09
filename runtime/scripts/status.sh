@@ -136,7 +136,7 @@ count_rmq_prefix() {
   fi
 
   if [ "$rmq_game_connections_cache" = "__unset__" ]; then
-    rmq_game_connections_cache="$(timeout 8 docker exec dune-rmq-game rabbitmqctl list_connections user state 2>/dev/null || true)"
+    rmq_game_connections_cache="$(timeout 60 docker exec dune-rmq-game rabbitmqctl list_connections user state 2>/dev/null || true)"
   fi
 
   printf '%s\n' "$rmq_game_connections_cache" \
@@ -412,6 +412,18 @@ fi
 
 population="${active:-unknown}/${capacity:-unknown}"
 
+main_stack_stopped=0
+if ! is_running dune-postgres \
+  && ! is_running dune-rmq-admin \
+  && ! is_running dune-rmq-game \
+  && ! is_running dune-text-router \
+  && ! is_running dune-director \
+  && ! is_running dune-server-gateway \
+  && ! is_running dune-server-survival-1 \
+  && ! is_running dune-server-overmap; then
+  main_stack_stopped=1
+fi
+
 case "$container_rows" in
   *missing*|*stopped*) issue=1 ;;
 esac
@@ -442,7 +454,9 @@ esac
 [ "$gateway_db_state" = "OK" ] || warming=1
 
 overall="READY"
-if [ "$issue" -ne 0 ]; then
+if [ "$main_stack_stopped" -eq 1 ]; then
+  overall="STOPPED"
+elif [ "$issue" -ne 0 ]; then
   overall="ISSUE"
 elif [ "$warming" -ne 0 ]; then
   overall="WARMING"
@@ -496,13 +510,7 @@ echo "Auto updates: $(auto_update_state)"
 echo
 echo "=== RabbitMQ game connections ==="
 if is_running dune-rmq-game; then
-  rmq_game_connections_cache="$(timeout 8 docker exec dune-rmq-game rabbitmqctl list_connections user state 2>/dev/null || true)"
-  director_connections="$(printf '%s\n' "$rmq_game_connections_cache" | awk '$1 != "user" && index($1, "bgd.") == 1 && $2 == "running" { n++ } END { print n + 0 }')"
-  game_server_connections="$(printf '%s\n' "$rmq_game_connections_cache" | awk '$1 != "user" && index($1, "sg.") == 1 && $2 == "running" { n++ } END { print n + 0 }')"
-  text_router_connections="$(printf '%s\n' "$rmq_game_connections_cache" | awk '$1 != "user" && index($1, "tr.") == 1 && $2 == "running" { n++ } END { print n + 0 }')"
-  echo "Director connections:    $director_connections"
-  echo "Game server connections: $game_server_connections"
-  echo "TextRouter connections:  $text_router_connections"
+  echo "RabbitMQ connection details: Checked by readiness"
 else
   echo "RabbitMQ game is not running"
 fi

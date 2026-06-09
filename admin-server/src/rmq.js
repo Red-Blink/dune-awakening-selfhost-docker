@@ -63,6 +63,48 @@ export function buildShutdownBroadcastCommand({ shutdownType = "Restart", delayM
   };
 }
 
+export function buildCarePackageWhisperPayload({ recipientFuncomId, recipientCharacterName, senderFuncomId, message, now = new Date(), messageId } = {}) {
+  const recipientId = validateWhisperIdentity(recipientFuncomId, "recipient Funcom ID");
+  const recipientName = validateWhisperName(recipientCharacterName, "recipient character name");
+  const senderId = validateWhisperIdentity(senderFuncomId, "sender Funcom ID");
+  const text = validateBroadcastMessage(message);
+  const id = validateMessageId(messageId || `care-package-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  const timestamp = new Date(now).toISOString();
+  const inner = {
+    m_Id: id,
+    m_ChannelType: "ETextChatChannelType::Whispers",
+    m_SubChannelId: recipientId,
+    m_bUseSpoofedUserName: false,
+    m_FuncomIdFrom: senderId,
+    m_UserNameTo: recipientName,
+    m_Message: {
+      CultureInvariantString: text
+    },
+    m_TimeStamp: timestamp,
+    m_HasSeenMessage: false
+  };
+  return {
+    inner,
+    outer: {
+      Content: JSON.stringify(inner),
+      Type: "ECourierMessageType::TextChat"
+    }
+  };
+}
+
+export async function publishCarePackageWhisper(config, fields) {
+  const senderHexFlsId = validateHexFlsId(fields?.senderHexFlsId);
+  const routingKey = validateWhisperIdentity(fields?.recipientFuncomId, "recipient Funcom ID");
+  const payload = buildCarePackageWhisperPayload(fields);
+  const outerB64 = Buffer.from(JSON.stringify(payload.outer), "utf8").toString("base64");
+  const routingB64 = Buffer.from(routingKey, "utf8").toString("base64");
+  const senderB64 = Buffer.from(senderHexFlsId, "utf8").toString("base64");
+  const evalCode = `Outer = base64:decode(<<"${outerB64}">>), Routing = base64:decode(<<"${routingB64}">>), Sender = base64:decode(<<"${senderB64}">>), XName = rabbit_misc:r(<<"/">>, exchange, <<"chat.whispers">>), X = rabbit_exchange:lookup_or_die(XName), MsgId = list_to_binary("web-care-package-whisper-" ++ integer_to_list(erlang:system_time(millisecond))), P = {list_to_atom("P_basic"), <<"Content">>, undefined, [], undefined, undefined, undefined, undefined, undefined, MsgId, undefined, <<"text_chat">>, Sender, <<"arrakis-server-console">>, undefined}, Content = rabbit_basic:build_content(P, Outer), {ok, Msg} = rabbit_basic:message(XName, Routing, Content), Result = rabbit_queue_type:publish_at_most_once(X, Msg), io:format("publish=~p exchange=chat.whispers routing=~s type=text_chat user_id=~s~n", [Result, Routing, Sender]).`;
+  const output = await dockerExec(["exec", RMQ_CONTAINER, "rabbitmqctl", "eval", evalCode], config.commandTimeoutMs);
+  if (!/publish=ok/.test(output.stdout)) throw new Error("RabbitMQ whisper publish did not report publish=ok");
+  return { ...output, payload };
+}
+
 export async function publishServerCommand(config, fields, label = "web-admin") {
   const safeLabel = validatePublishLabel(label);
   const inner = JSON.stringify(fields);
@@ -130,4 +172,28 @@ function validateShutdownType(value) {
   const raw = String(value || "").trim();
   if (["Restart", "Maintenance", "Update"].includes(raw)) return raw;
   throw new Error("shutdownType must be Restart, Maintenance, or Update");
+}
+
+function validateWhisperIdentity(value, label) {
+  const raw = String(value || "").trim();
+  if (/^[A-Za-z0-9_#.@:+/-]{1,180}$/.test(raw)) return raw;
+  throw new Error(`Care Package welcome whisper cannot be sent: ${label} is unavailable or invalid`);
+}
+
+function validateWhisperName(value, label) {
+  const raw = String(value || "").trim();
+  if (raw.length >= 1 && raw.length <= 80 && !/[\u0000-\u001f]/.test(raw)) return raw;
+  throw new Error(`Care Package welcome whisper cannot be sent: ${label} is unavailable or invalid`);
+}
+
+function validateHexFlsId(value) {
+  const raw = String(value || "").trim();
+  if (/^[A-Fa-f0-9]{16,64}$/.test(raw)) return raw;
+  throw new Error("Care Package welcome whisper cannot be sent: sender hex FLS ID is unavailable or invalid");
+}
+
+function validateMessageId(value) {
+  const raw = String(value || "").trim();
+  if (/^[A-Za-z0-9_.:-]{1,120}$/.test(raw)) return raw;
+  throw new Error("Invalid whisper message id");
 }

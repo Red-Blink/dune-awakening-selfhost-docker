@@ -29,6 +29,7 @@ const simpleOperations = {
   stop: ["stop"],
   updateCheck: ["update", "check"],
   updateApply: ["update", "--yes"],
+  updateFixSteamcmd: ["update", "fix-steamcmd"],
   updateAutoStatus: ["update", "auto", "status"],
   updateAutoDisable: ["update", "auto", "disable"],
   selfUpdateCheck: ["self-update", "check"],
@@ -37,6 +38,7 @@ const simpleOperations = {
   selfUpdatePrevious: ["self-update", "install", "previous"],
   backupCreate: ["db", "backup"],
   backupList: ["db", "list"],
+  backupDeleteAll: ["db", "delete", "--all"],
   backupAutoStatus: ["db", "auto", "status"],
   backupAutoDisable: ["db", "auto", "disable"],
   init: ["init"],
@@ -70,19 +72,23 @@ export function buildDuneArgs(operation, payload = {}) {
   switch (operation) {
     case "restartService":
       return ["restart", validateServiceName(payload.service)];
+    case "serverTitle":
+      return ["config", "title", validateServerTitle(payload.title), "--yes"];
     case "restartScheduleEnable":
-      return ["restart-schedule", "enable", String(validateInteger(payload.hours, 1, 168))];
+      return ["restart-schedule", "enable", validateUpdateTime(payload.time || "05:00")];
     case "restartAll":
       return ["restart", "gateway"];
     case "logs":
       return ["logs", validateServiceName(payload.service)];
     case "backupRestore":
-      return ["db", "restore", validateBackupName(payload.backup)];
+      {
+        return ["db", "restore", validateBackupName(payload.backup)];
+      }
     case "backupDelete":
       return ["db", "delete", validateBackupName(payload.backup)];
     case "backupAutoEnable":
       {
-        const args = ["db", "auto", "enable", String(validateInteger(payload.hours, 1, 168))];
+        const args = ["db", "auto", "enable", validateUpdateTime(payload.time || "05:00")];
         const retentionDays = validateInteger(payload.retentionDays ?? 0, 0, 3650);
         if (retentionDays > 0) args.push(String(retentionDays));
         return args;
@@ -90,7 +96,7 @@ export function buildDuneArgs(operation, payload = {}) {
     case "backupAutoRetention":
       return ["db", "auto", "retention", String(validateInteger(payload.retentionDays, 0, 3650))];
     case "updateAutoEnable":
-      return ["update", "auto", "enable", validateUpdateTime(payload.time || "05:00:00")];
+      return ["update", "auto", "enable", validateUpdateTime(payload.time || "05:00")];
     case "databaseTables":
       return ["database", "tables", payload.schema || "dune"];
     case "databasePreview":
@@ -147,6 +153,8 @@ export function buildDuneArgs(operation, payload = {}) {
       return payload.map ? ["maps", "mode", validateMapName(payload.map)] : ["maps", "mode"];
     case "mapsSetMode":
       return ["maps", "set", validateMapName(payload.map), validateMapMode(payload.mode)];
+    case "mapsApplySettings":
+      return ["true"];
     case "mapsReconcile":
       return ["maps", "reconcile"];
     case "mapsSpawn":
@@ -161,6 +169,8 @@ export function buildDuneArgs(operation, payload = {}) {
       return ["memory", "status"];
     case "memorySet":
       return ["memory", "set", validateMemoryTarget(payload.map), validateMemoryValue(payload.memory)];
+    case "memorySetNoRestart":
+      return ["memory", "set-no-restart", validateMemoryTarget(payload.map), validateMemoryValue(payload.memory)];
     case "memoryUnset":
       return ["memory", "unset", validateMemoryTarget(payload.map)];
     case "sietchesShow":
@@ -185,10 +195,44 @@ export function buildDuneArgs(operation, payload = {}) {
       return ["deepdesert", "dual", validateDeepDesertAction(payload.action), "--yes", ...(payload.action === "disable" ? ["--force"] : [])];
     case "userSettingsEngineValues":
       return ["usersettings", "engine-values"];
+    case "userSettingsMetadata":
+      return ["usersettings", "metadata"];
+    case "userSettingsProfileRaw":
+      return ["usersettings", "profile-raw"];
+    case "userSettingsProfileWrite":
+      return ["usersettings", "profile-write-b64", encodeTextArg(payload.content || "")];
+    case "userSettingsProfileGameRaw":
+      return ["usersettings", "profile-game-raw"];
+    case "userSettingsProfileGameWrite":
+      return ["usersettings", "profile-game-write-b64", encodeTextArg(payload.content || "")];
+    case "userSettingsProfileEngineRaw":
+      return ["usersettings", "profile-engine-raw"];
+    case "userSettingsProfileEngineWrite":
+      return ["usersettings", "profile-engine-write-b64", encodeTextArg(payload.content || "")];
     case "userSettingsMapValues":
       return ["usersettings", "map-values", validateMapName(payload.map)];
     case "userSettingsPartitionValues":
       return ["usersettings", "partition-values", validateMapName(payload.map), validatePartitionId(payload.partitionId)];
+    case "userSettingsSave":
+      return ["usersettings", "bulk-save", validateSettingsScope(payload.scope), validateMapName(payload.map || "Survival_1"), payload.partitionId ? validatePartitionId(payload.partitionId) : "", encodeJsonArg(payload.values || {})];
+    case "userSettingsSaveAndRestart":
+      return buildDuneArgs("userSettingsSave", payload);
+    case "userSettingsResetEngineGameplay":
+      return ["usersettings", "reset-engine-gameplay"];
+    case "userSettingsResetGame":
+      return payload.partitionId ? ["usersettings", "reset-game", validateMapName(payload.map), validatePartitionId(payload.partitionId)] : ["usersettings", "reset-game", validateMapName(payload.map)];
+    case "userSettingsResetAndRestart":
+      return payload.scope === "engine" ? buildDuneArgs("userSettingsResetEngineGameplay", payload) : buildDuneArgs("userSettingsResetGame", payload);
+    case "userSettingsRawEngine":
+      return buildDuneArgs("userSettingsProfileEngineRaw", payload);
+    case "userSettingsRawGame":
+      return buildDuneArgs("userSettingsProfileGameRaw", payload);
+    case "userSettingsRawEngineWrite":
+      return buildDuneArgs("userSettingsProfileEngineWrite", payload);
+    case "userSettingsRawGameWrite":
+      return buildDuneArgs("userSettingsProfileGameWrite", payload);
+    case "userSettingsRawAndRestart":
+      return payload.scope === "profile" ? buildDuneArgs("userSettingsProfileWrite", payload) : payload.scope === "engine" ? buildDuneArgs("userSettingsRawEngineWrite", payload) : buildDuneArgs("userSettingsRawGameWrite", payload);
     case "userSettingsResetAll":
       return ["usersettings", "reset-all"];
     case "userSettingsMaterializeCurrent":
@@ -196,6 +240,20 @@ export function buildDuneArgs(operation, payload = {}) {
     default:
       throw new Error(`Unsupported operation: ${operation}`);
   }
+}
+
+function encodeJsonArg(value) {
+  return Buffer.from(JSON.stringify(value), "utf8").toString("base64");
+}
+
+function encodeTextArg(value) {
+  return Buffer.from(String(value), "utf8").toString("base64");
+}
+
+function validateSettingsScope(value) {
+  const raw = String(value || "").trim();
+  if (["engine", "global", "map", "partition", "profile"].includes(raw)) return raw;
+  throw new Error(`Unsupported settings scope: ${raw}`);
 }
 
 export function runDune(config, args, options = {}) {
@@ -214,9 +272,10 @@ export function runDune(config, args, options = {}) {
     const child = spawn(command, commandArgs, {
       cwd: config.repoRoot,
       shell: false,
-      env: { ...process.env, DUNE_ADMIN_ASSUME_YES: "1", DUNE_DB_ASSUME_YES: "1", DUNE_MEMORY_ASSUME_YES: "1" }
+      detached: true,
+      env: { ...process.env, ...(options.env || {}), DUNE_ADMIN_ASSUME_YES: "1", DUNE_DB_ASSUME_YES: "1", DUNE_MEMORY_ASSUME_YES: "1" }
     });
-    const timeout = setTimeout(() => child.kill("SIGTERM"), options.timeoutMs || config.commandTimeoutMs);
+    const timeout = setTimeout(() => killProcessTree(child), options.timeoutMs || config.commandTimeoutMs);
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk) => {
@@ -240,9 +299,23 @@ export function runDune(config, args, options = {}) {
   });
 }
 
+function killProcessTree(child) {
+  if (!child.pid) return;
+  try {
+    process.kill(-child.pid, "SIGTERM");
+  } catch {
+    try {
+      child.kill("SIGTERM");
+    } catch {
+      // Process already exited.
+    }
+  }
+}
+
 export function runDockerLogs(service, options = {}) {
   const container = dockerContainerForLogService(service);
   const args = ["logs", "--tail", String(options.tail || 400)];
+  if (options.since) args.push("--since", String(options.since));
   if (options.follow) args.push("-f");
   args.push(container);
 
@@ -321,6 +394,14 @@ export function dockerContainerForLogService(service) {
   if (containers.has(normalized)) return containers.get(normalized);
   if (/^dune-server-[a-z0-9-]+$/i.test(normalized)) return normalized;
   throw new Error(`Docker log access is not configured for service: ${raw}`);
+}
+
+function validateServerTitle(value) {
+  const raw = String(value || "").trim();
+  if (!raw) throw new Error("Server title cannot be empty");
+  if (raw.length > 80) throw new Error("Server title must be 80 characters or fewer");
+  if (/[\r\n]/.test(raw)) throw new Error("Server title cannot contain line breaks");
+  return raw;
 }
 
 function validatePlayerId(value) {
@@ -443,8 +524,8 @@ function validateDeepDesertAction(value) {
 
 function validateUpdateTime(value) {
   const raw = String(value || "").trim();
-  if (/^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$/.test(raw)) return raw;
-  throw new Error("Auto update time must be HH:MM:SS");
+  if (/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(raw)) return raw;
+  throw new Error("Auto update time must be HH:MM");
 }
 
 function validateSearchQuery(value) {

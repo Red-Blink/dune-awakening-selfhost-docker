@@ -1,48 +1,46 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { Activity, Archive, Database, FileText, Gift, Home, Map, PackagePlus, Play, RefreshCw, Server, Settings, Shield, ShoppingCart, Users } from "lucide-react";
+import { Archive, ChevronDown, ChevronUp, Database, FileText, Gift, Home, Map as MapIcon, PackagePlus, Play, RefreshCw, Server, Settings, Shield, Sparkles, Users, X } from "lucide-react";
 import { api, post, setCsrfToken } from "./api/client";
 import { serverApi } from "./api/server";
+import type { PerformanceSnapshot } from "./api/server";
 import { playersApi } from "./api/players";
 import { logsApi } from "./api/logs";
 import { backupsApi } from "./api/backups";
 import { databaseApi } from "./api/database";
-import { mapsApi } from "./api/maps";
+import { mapsApi, type LiveMapMemoryRow, type UserSettingField, type UserSettingsSchema } from "./api/maps";
 import { updatesApi } from "./api/updates";
 import { worldDataApi } from "./api/worldData";
 import { adminApi } from "./api/admin";
-import { marketApi } from "./api/market";
-import { starterKitApi, type StarterKitConfig } from "./api/starterKit";
+import { starterKitApi, type StarterKitConfig, type StarterKitEntry } from "./api/carePackage";
+import type { StarterKitAutoGrantRule } from "./api/carePackage";
 import { setupApi, type Task } from "./api/setup";
-import { liveMapApi, type LiveMapMarker } from "./api/liveMap";
+import { liveMapApi, type LiveMapConfig, type LiveMapMarker, type LiveMapPartition } from "./api/liveMap";
 import { SetupWizard } from "./components/SetupWizard";
 import { TaskProgress } from "./components/TaskProgress";
 import { LogViewer } from "./components/LogViewer";
-import { BackupRestorePanel } from "./components/BackupRestorePanel";
 import { PortChecklist } from "./components/PortChecklist";
 import { ReadinessTimeline } from "./components/ReadinessTimeline";
+import { SecretInput } from "./components/SecretInput";
 
-type Tab = "Home" | "Setup" | "Server Control" | "Services" | "Players" | "Admin Tools" | "Live Map" | "Maps" | "Market" | "Starter Kit" | "Database" | "Storage" | "Bases" | "Blueprints" | "Backups" | "Logs" | "Updates" | "Settings";
+type Tab = "Home" | "Setup" | "Server Control" | "Services" | "Players" | "Admin Tools" | "Live Map" | "Maps" | "Care Package" | "Addons" | "Database" | "Storage" | "Backups" | "Logs" | "Updates" | "Settings";
 type HomeLoadResult = { statusLoaded: boolean; readinessLoaded: boolean; statusError: string; readinessError: string; statusText: string; readinessText: string };
-type CatalogItem = { name: string; id: string; itemId?: string; category?: string; source?: string };
-type BackupResult = { status: "running" | "succeeded" | "failed"; title: string; message?: string; details?: string };
+type CatalogItem = { name: string; id: string; itemId?: string; category?: string; source?: string; image?: string };
+type BackupResult = { status: "running" | "succeeded" | "failed"; title: string; message?: string; details?: string; tone?: "danger" | "attention" };
 type HomeTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
+type DatabasePasswordState = { taskId?: string; result: HomeTaskResult | null };
 
 const nav: { tab: Tab; icon: React.ReactNode }[] = [
   { tab: "Home", icon: <Home size={18} /> },
   { tab: "Setup", icon: <Shield size={18} /> },
   { tab: "Server Control", icon: <Server size={18} /> },
-  { tab: "Services", icon: <Activity size={18} /> },
   { tab: "Players", icon: <Users size={18} /> },
   { tab: "Admin Tools", icon: <PackagePlus size={18} /> },
-  { tab: "Live Map", icon: <Map size={18} /> },
-  { tab: "Maps", icon: <Map size={18} /> },
-  { tab: "Market", icon: <ShoppingCart size={18} /> },
-  { tab: "Starter Kit", icon: <Gift size={18} /> },
+  { tab: "Live Map", icon: <MapIcon size={18} /> },
+  { tab: "Maps", icon: <MapIcon size={18} /> },
+  { tab: "Care Package", icon: <Gift size={18} /> },
+  { tab: "Addons", icon: <Sparkles size={18} /> },
   { tab: "Database", icon: <Database size={18} /> },
-  { tab: "Storage", icon: <Archive size={18} /> },
-  { tab: "Bases", icon: <Server size={18} /> },
-  { tab: "Blueprints", icon: <FileText size={18} /> },
   { tab: "Backups", icon: <Archive size={18} /> },
   { tab: "Logs", icon: <FileText size={18} /> },
   { tab: "Updates", icon: <RefreshCw size={18} /> },
@@ -59,6 +57,9 @@ const RESTARTABLE_SERVICES = [
   { value: "rmq-game", label: "RabbitMQ Game" },
   { value: "postgres", label: "Postgres" }
 ];
+
+const FUNCOM_TOKEN_AUTH_ERROR_KEY = "arrakis.funcomTokenAuthError";
+const DATABASE_PASSWORD_STATE_KEY = "arrakis.databasePasswordState";
 
 const SERVICE_LABELS: Record<string, string> = {
   postgres: "Postgres",
@@ -96,8 +97,13 @@ export function App() {
   const [selectedLogService, setSelectedLogService] = useState("gateway");
   const [logs, setLogs] = useState("");
   const [task, setTask] = useState<Task | null>(null);
+  const [backupRestoreTask, setBackupRestoreTask] = useState<Task | null>(null);
   const [homeTaskResult, setHomeTaskResult] = useState<HomeTaskResult | null>(null);
+  const [funcomTokenResult, setFuncomTokenResult] = useState<HomeTaskResult | null>(() => loadPersistedFuncomTokenResult());
   const [homeRunningAction, setHomeRunningAction] = useState<"start" | "stop" | "restart" | "">("");
+  const stackActionStartedAt = useRef(0);
+  const stackStatusLoadRef = useRef<Promise<HomeLoadResult> | null>(null);
+  const [setupJump, setSetupJump] = useState({ step: 0, nonce: 0 });
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -106,6 +112,10 @@ export function App() {
       setCsrfToken(state.csrfToken);
     }).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    persistFuncomTokenResult(funcomTokenResult);
+  }, [funcomTokenResult]);
 
   async function login() {
     const result = await post<{ authenticated: boolean; csrfToken: string }>("/api/auth/login", { password });
@@ -117,6 +127,64 @@ export function App() {
     setError("");
     try { await action(); } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
   }
+
+  const loadStackStatus = useCallback(async () => {
+    if (stackStatusLoadRef.current) return stackStatusLoadRef.current;
+    stackStatusLoadRef.current = (async () => {
+      setError("");
+      const [nextStatus, nextReadiness] = await Promise.allSettled([
+        withTimeout(serverApi.status(), 90000, "Server status check timed out."),
+        withTimeout(serverApi.readiness(), 90000, "Readiness check timed out.")
+      ]);
+      const result: HomeLoadResult = { statusLoaded: false, readinessLoaded: false, statusError: "", readinessError: "", statusText: "", readinessText: "" };
+      if (nextStatus.status === "fulfilled") {
+        setStatus(nextStatus.value.stdout);
+        result.statusText = nextStatus.value.stdout;
+        result.statusLoaded = true;
+      } else {
+        result.statusError = nextStatus.reason instanceof Error ? nextStatus.reason.message : String(nextStatus.reason);
+      }
+      if (nextReadiness.status === "fulfilled") {
+        const readinessText = nextReadiness.value.stdout || nextReadiness.value.stderr || "";
+        result.readinessText = readinessText;
+        setReadiness(readinessText);
+        result.readinessLoaded = Number(nextReadiness.value.exitCode || 0) === 0;
+        if (!result.readinessLoaded) result.readinessError = nextReadiness.value.stderr || nextReadiness.value.stdout || "Readiness checks are not ready yet.";
+      } else {
+        result.readinessError = nextReadiness.reason instanceof Error ? nextReadiness.reason.message : String(nextReadiness.reason);
+      }
+      return result;
+    })().finally(() => {
+      stackStatusLoadRef.current = null;
+    });
+    return stackStatusLoadRef.current;
+  }, []);
+
+  useEffect(() => {
+    if (!homeRunningAction) return;
+    stackActionStartedAt.current = Date.now();
+    let active = true;
+    async function refreshRunningAction() {
+      const result = await loadStackStatus().catch(() => null);
+      if (!active || !result) return;
+      const statusText = result.statusText;
+      const readinessText = result.readinessText;
+      const elapsedMs = Date.now() - stackActionStartedAt.current;
+      if (homeRunningAction === "stop" && isHomeStopComplete(statusText, readinessText)) {
+        setHomeTaskResult({ status: "stopped", title: "Server Stopped" });
+        setHomeRunningAction("");
+      } else if ((homeRunningAction === "start" || homeRunningAction === "restart") && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText)) {
+        setHomeTaskResult({ status: "succeeded", title: homeRunningAction === "start" ? "Server Started Successfully" : "Server Restarted Successfully" });
+        setHomeRunningAction("");
+      }
+    }
+    const id = window.setInterval(refreshRunningAction, 3000);
+    refreshRunningAction();
+    return () => {
+      active = false;
+      window.clearInterval(id);
+    };
+  }, [homeRunningAction, loadStackStatus]);
 
   if (!auth) {
     return (
@@ -136,9 +204,18 @@ export function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <h1>Arrakis Server Console</h1>
-        <nav>{nav.map((item) => <button key={item.tab} className={tab === item.tab ? "active" : ""} onClick={() => setTab(item.tab)}>{item.icon}{item.tab}</button>)}</nav>
+        <nav>{nav.map((item) => <button key={item.tab} className={tab === item.tab ? "active" : ""} onClick={() => {
+          if (item.tab === "Setup") setSetupJump((current) => ({ step: 0, nonce: current.nonce + 1 }));
+          setTab(item.tab);
+        }}>{item.icon}{item.tab}</button>)}</nav>
       </aside>
-      <main>
+      <main className={tab === "Home" ? "home-main" : undefined}>
+        {tab === "Home" && (
+          <div className="home-backdrop" aria-hidden="true">
+            <span className="home-sand-fine" />
+            <span className="home-sand-near" />
+          </div>
+        )}
         <header className="topbar">
           <div>
             <strong>{tab}</strong>
@@ -146,43 +223,22 @@ export function App() {
           </div>
         </header>
         {error && <div className="error-banner">{error}</div>}
-        {tab === "Home" && <HomePanel status={status} readiness={readiness} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} runningAction={homeRunningAction} setRunningAction={setHomeRunningAction} onLoad={async () => {
-          setError("");
-          const [nextStatus, nextReadiness] = await Promise.allSettled([serverApi.status(), serverApi.readiness()]);
-          const result: HomeLoadResult = { statusLoaded: false, readinessLoaded: false, statusError: "", readinessError: "", statusText: "", readinessText: "" };
-          if (nextStatus.status === "fulfilled") {
-            setStatus(nextStatus.value.stdout);
-            result.statusText = nextStatus.value.stdout;
-            result.statusLoaded = true;
-          } else {
-            result.statusError = nextStatus.reason instanceof Error ? nextStatus.reason.message : String(nextStatus.reason);
-          }
-          if (nextReadiness.status === "fulfilled") {
-            const readinessText = nextReadiness.value.stdout || nextReadiness.value.stderr || "";
-            result.readinessText = readinessText;
-            setReadiness(readinessText);
-            result.readinessLoaded = Number(nextReadiness.value.exitCode || 0) === 0;
-            if (!result.readinessLoaded) result.readinessError = nextReadiness.value.stderr || nextReadiness.value.stdout || "Readiness checks are not ready yet.";
-          } else {
-            setReadiness("");
-            result.readinessError = nextReadiness.reason instanceof Error ? nextReadiness.reason.message : String(nextReadiness.reason);
-          }
-          return result;
+        {tab === "Home" && <HomePanel status={status} readiness={readiness} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} setRunningAction={setHomeRunningAction} onLoad={loadStackStatus} />}
+        {tab === "Setup" && <SetupWizard initialStep={setupJump.step} jumpNonce={setupJump.nonce} />}
+        {tab === "Server Control" && <ServerPanel setTask={setTask} setStatus={setStatus} status={status} setReadiness={setReadiness} setPorts={setPorts} setDoctor={setDoctor} ports={ports} readiness={readiness} doctor={doctor} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} setRunningAction={setHomeRunningAction} onError={setError} onRedeploy={() => {
+          setSetupJump((current) => ({ step: 4, nonce: current.nonce + 1 }));
+          setTab("Setup");
         }} />}
-        {tab === "Setup" && <SetupWizard />}
-        {tab === "Server Control" && <ServerPanel setTask={setTask} setStatus={setStatus} status={status} setReadiness={setReadiness} setPorts={setPorts} setDoctor={setDoctor} ports={ports} readiness={readiness} doctor={doctor} onError={setError} />}
         {tab === "Services" && <ServicesPanel services={services} setServices={setServices} setTask={setTask} openLogs={(service) => { setSelectedLogService(service); setTab("Logs"); }} onError={setError} />}
         {tab === "Players" && <PlayersPanel setTask={setTask} onError={setError} />}
         {tab === "Admin Tools" && <AdminToolsPanel setTask={setTask} onError={setError} />}
         {tab === "Live Map" && <LiveMapPanel onError={setError} />}
         {tab === "Maps" && <MapsPanel setTask={setTask} onError={setError} />}
-        {tab === "Market" && <MarketPanel onError={setError} />}
-        {tab === "Starter Kit" && <StarterKitPanel onError={setError} />}
-        {tab === "Database" && <DatabasePanel setTask={setTask} />}
+        {tab === "Care Package" && <StarterKitPanel onError={setError} />}
+        {tab === "Addons" && <AddonsPanel />}
+        {tab === "Database" && <DatabasePanel />}
         {tab === "Storage" && <StoragePanel onError={setError} />}
-        {tab === "Bases" && <WorldListPanel title="Bases" load={worldDataApi.bases} exportUrl={(id) => worldDataApi.baseExportUrl(id)} exportLabel="Export Blueprint JSON" blockedText="Base import and delete remain blocked until ownership, position, entity ID remapping, and full object graph deletion rules are verified." onError={setError} />}
-        {tab === "Blueprints" && <WorldListPanel title="Blueprints" load={worldDataApi.blueprints} exportUrl={(id) => worldDataApi.blueprintExportUrl(id)} exportLabel="Export Full JSON" blockedText="Blueprint import, clone, and delete remain blocked until offline-player inventory ownership, blueprint item stat wiring, and ID remapping rules are verified." onError={setError} />}
-        {tab === "Backups" && <BackupsPanel setTask={setTask} onError={setError} />}
+        {tab === "Backups" && <BackupsPanel backupRestoreTask={backupRestoreTask} setBackupRestoreTask={setBackupRestoreTask} onError={setError} />}
         {tab === "Logs" && <LogsPanel selectedService={selectedLogService} setSelectedService={setSelectedLogService} text={logs} setText={setLogs} onError={setError} />}
         {tab === "Updates" && <UpdatesPanel setTask={setTask} />}
         {tab === "Settings" && <SettingsPanel />}
@@ -192,11 +248,13 @@ export function App() {
   );
 }
 
-function HomePanel({ status, readiness, taskResult, setTaskResult, runningAction, setRunningAction, onLoad }: {
+function HomePanel({ status, readiness, taskResult, setTaskResult, funcomTokenResult, setFuncomTokenResult, runningAction, setRunningAction, onLoad }: {
   status: string;
   readiness: string;
   taskResult: HomeTaskResult | null;
   setTaskResult: Dispatch<SetStateAction<HomeTaskResult | null>>;
+  funcomTokenResult: HomeTaskResult | null;
+  setFuncomTokenResult: Dispatch<SetStateAction<HomeTaskResult | null>>;
   runningAction: "start" | "stop" | "restart" | "";
   setRunningAction: Dispatch<SetStateAction<"start" | "stop" | "restart" | "">>;
   onLoad: () => Promise<HomeLoadResult>;
@@ -204,9 +262,12 @@ function HomePanel({ status, readiness, taskResult, setTaskResult, runningAction
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState("");
   const [readinessWarning, setReadinessWarning] = useState("");
+  const [performance, setPerformance] = useState<PerformanceSnapshot | null>(null);
+  const [performanceError, setPerformanceError] = useState("");
   const [hasLoaded, setHasLoaded] = useState(Boolean(status || readiness));
   const homeActionRunId = useRef(0);
   const homeActionStartedAt = useRef(0);
+  const refreshRunId = useRef(0);
   const activeHomeAction = useRef<"start" | "stop" | "restart" | "">(runningAction);
 
   function setHomeAction(action: "start" | "stop" | "restart" | "") {
@@ -216,21 +277,24 @@ function HomePanel({ status, readiness, taskResult, setTaskResult, runningAction
 
   useEffect(() => {
     activeHomeAction.current = runningAction;
+    if (runningAction && homeActionStartedAt.current === 0) homeActionStartedAt.current = Date.now();
+    if (!runningAction) homeActionStartedAt.current = 0;
   }, [runningAction]);
 
   function applyHomeLoadResult(result: HomeLoadResult) {
     if (result.statusLoaded || result.readinessLoaded) setHasLoaded(true);
     setReadinessWarning(!result.readinessLoaded && result.readinessError ? result.readinessError : "");
-    if (!result.statusLoaded && result.statusError) setLocalError(friendlyHomeStatusError(result.statusError));
+    if (!result.statusLoaded && !result.readinessLoaded && result.statusError) setLocalError(friendlyHomeStatusError(result.statusError));
   }
 
   async function refresh(isActive = () => true) {
+    const runId = ++refreshRunId.current;
     setLoading(true);
     setLocalError("");
     setReadinessWarning("");
     try {
       const result = await onLoad();
-      if (!isActive()) return;
+      if (!isActive() || refreshRunId.current !== runId) return;
       if (result.statusLoaded || result.readinessLoaded) {
         applyHomeLoadResult(result);
         const loadedState = getHomeServerState(result.statusText || status, result.readinessText || readiness);
@@ -252,9 +316,9 @@ function HomePanel({ status, readiness, taskResult, setTaskResult, runningAction
         setLocalError(friendlyHomeStatusError(result.statusError || result.readinessError || "Server status and readiness checks failed."));
       }
     } catch (error) {
-      if (isActive()) setLocalError(friendlyHomeStatusError(error instanceof Error ? error.message : String(error)));
+      if (isActive() && refreshRunId.current === runId) setLocalError(friendlyHomeStatusError(error instanceof Error ? error.message : String(error)));
     } finally {
-      if (isActive()) setLoading(false);
+      if (isActive() && refreshRunId.current === runId) setLoading(false);
     }
   }
 
@@ -292,9 +356,10 @@ function HomePanel({ status, readiness, taskResult, setTaskResult, runningAction
       if (postLoad) applyHomeLoadResult(postLoad);
       const postState = getHomeServerState(postLoad?.statusText || status, postLoad?.readinessText || readiness);
       const postReady = isHomeActionComplete(postLoad?.statusText || status, postLoad?.readinessText || readiness);
+      const elapsedMs = Date.now() - homeActionStartedAt.current;
       if (action === "stop" && isHomeStopComplete(postLoad?.statusText || status, postLoad?.readinessText || readiness)) {
         setTaskResult({ status: "stopped", title: copy.success, details });
-      } else if ((action === "start" || action === "restart") && postReady) {
+      } else if ((action === "start" || action === "restart") && elapsedMs >= 8000 && postReady) {
         setTaskResult({ status: "succeeded", title: copy.success, details });
       } else if (final.status !== "succeeded") {
         if ((action === "start" || action === "restart") && (postState.starting || postState.running)) {
@@ -330,6 +395,27 @@ function HomePanel({ status, readiness, taskResult, setTaskResult, runningAction
   }, []);
 
   useEffect(() => {
+    let active = true;
+    async function checkRecentFuncomAuthLogs() {
+      const authCheck = await serverApi.checkFuncomToken("10m").catch(() => null);
+      if (!active || !authCheck) return;
+      if (authCheck.mismatch) {
+        setFuncomTokenResult(funcomTokenMismatchFromLogResult(authCheck.details || ""));
+        return;
+      }
+      if (authCheck.ok && (isFuncomTokenAuthFailure(funcomTokenResult) || hasPersistedFuncomTokenAuthFailure())) {
+        setFuncomTokenResult(null);
+      }
+    }
+    checkRecentFuncomAuthLogs();
+    const id = window.setInterval(checkRecentFuncomAuthLogs, 10000);
+    return () => {
+      active = false;
+      window.clearInterval(id);
+    };
+  }, [status, readiness, funcomTokenResult?.status, funcomTokenResult?.title, funcomTokenResult?.message, setFuncomTokenResult]);
+
+  useEffect(() => {
     if (!runningAction) return;
     let active = true;
     const id = window.setInterval(async () => {
@@ -337,10 +423,11 @@ function HomePanel({ status, readiness, taskResult, setTaskResult, runningAction
       if (!active || !result) return;
       applyHomeLoadResult(result);
       const currentAction = activeHomeAction.current;
+      const elapsedMs = Date.now() - homeActionStartedAt.current;
       if (currentAction === "stop" && isHomeStopComplete(result.statusText || status, result.readinessText || readiness)) {
         setTaskResult({ status: "stopped", title: "Server Stopped" });
         setHomeAction("");
-      } else if ((currentAction === "start" || currentAction === "restart") && isHomeActionComplete(result.statusText || status, result.readinessText || readiness)) {
+      } else if ((currentAction === "start" || currentAction === "restart") && elapsedMs >= 8000 && isHomeActionComplete(result.statusText || status, result.readinessText || readiness)) {
         setTaskResult({ status: "succeeded", title: currentAction === "start" ? "Server Started Successfully" : "Server Restarted Successfully" });
         setHomeAction("");
       }
@@ -380,11 +467,32 @@ function HomePanel({ status, readiness, taskResult, setTaskResult, runningAction
     return () => window.clearTimeout(id);
   }, [taskResult?.status, taskResult?.title, setTaskResult]);
 
+  useEffect(() => {
+    let active = true;
+    async function refreshPerformance() {
+      try {
+        const next = await serverApi.performance();
+        if (!active) return;
+        setPerformance(next);
+        setPerformanceError("");
+      } catch (error) {
+        if (!active) return;
+        setPerformanceError(error instanceof Error ? error.message : String(error));
+      }
+    }
+    refreshPerformance();
+    const id = window.setInterval(refreshPerformance, 3000);
+    return () => {
+      active = false;
+      window.clearInterval(id);
+    };
+  }, []);
+
   const serverState = getHomeServerState(status, readiness);
   const controlsState = taskResult?.status === "stopped" && !runningAction ? { running: false, stopped: true, starting: false } : serverState;
   const actionRunning = Boolean(runningAction);
   const refreshDisabled = loading || actionRunning;
-  const startDisabled = loading || actionRunning || controlsState.running;
+  const startDisabled = loading || actionRunning || controlsState.running || controlsState.starting;
   const stopDisabled = runningAction === "stop" || (!actionRunning && (loading || controlsState.stopped));
   const restartDisabled = loading || actionRunning || controlsState.stopped;
 
@@ -425,9 +533,68 @@ function HomePanel({ status, readiness, taskResult, setTaskResult, runningAction
         {taskResult && <HomeTaskResultCard result={taskResult} />}
         {localError && <p className="error">{localError}</p>}
       </article>
-      <HomeHealthCards status={status} readiness={readiness} readinessWarning={readinessWarning} loading={loading} runningAction={runningAction} taskResult={taskResult} />
+      <PerformanceCards performance={performance} error={performanceError} />
+      <HomeHealthCards status={status} readiness={readiness} readinessWarning={readinessWarning} loading={loading} runningAction={runningAction} taskResult={taskResult} funcomTokenResult={funcomTokenResult} />
     </section>
   );
+}
+
+function PerformanceCards({ performance, error }: { performance: PerformanceSnapshot | null; error: string }) {
+  const cards = [
+    {
+      label: "CPU Usage",
+      value: performance?.cpuPercent == null ? "Sampling..." : `${performance.cpuPercent.toFixed(1)}%`,
+      percent: performance?.cpuPercent ?? 0,
+      detail: "Host Processor Load"
+    },
+    {
+      label: "Memory",
+      value: performance?.memory.percent == null ? "Unknown" : `${performance.memory.percent.toFixed(1)}%`,
+      percent: performance?.memory.percent ?? 0,
+      detail: performance ? `${formatBytes(performance.memory.usedBytes)} / ${formatBytes(performance.memory.totalBytes)}` : "Waiting for sample"
+    },
+    {
+      label: "Disk",
+      value: performance?.disk.percent == null ? "Unknown" : `${performance.disk.percent.toFixed(1)}%`,
+      percent: performance?.disk.percent ?? 0,
+      detail: performance ? `${formatBytes(performance.disk.usedBytes)} / ${formatBytes(performance.disk.totalBytes)}` : "Waiting for sample"
+    },
+    {
+      label: "Uptime",
+      value: performance?.uptime || "0d 00h 00m",
+      percent: null,
+      detail: "Host Uptime"
+    }
+  ];
+  return <section className="dashboard-band performance-band wide">
+    <h3>Performance</h3>
+    {error && !performance && <p className="error">{error}</p>}
+    <div className="health-grid health-grid-compact">
+      {cards.map((item) => <article className="status-card performance-card" key={item.label}>
+        <div className="status-card-title"><span>{item.label}</span><StatusPill value={performance ? "OK" : "INFO"} /></div>
+        <strong>{item.value}</strong>
+        <p>{item.detail}</p>
+        {item.percent !== null && <div className="metric-track" aria-hidden="true"><span style={{ width: `${clampPercent(item.percent)}%` }} /></div>}
+      </article>)}
+    </div>
+  </section>;
+}
+
+function formatBytes(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let next = value;
+  let index = 0;
+  while (next >= 1024 && index < units.length - 1) {
+    next /= 1024;
+    index += 1;
+  }
+  return `${next >= 10 || index === 0 ? next.toFixed(0) : next.toFixed(1)} ${units[index]}`;
+}
+
+function clampPercent(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
 }
 
 function HomeTaskResultCard({ result }: { result: HomeTaskResult }) {
@@ -438,78 +605,437 @@ function HomeTaskResultCard({ result }: { result: HomeTaskResult }) {
   </div>;
 }
 
-function ServerPanel(props: { setTask: (task: Task) => void; setStatus: (text: string) => void; status: string; setReadiness: (text: string) => void; setPorts: (text: string) => void; setDoctor: (text: string) => void; ports: string; readiness: string; doctor: string; onError: (text: string) => void }) {
+function ServerPanel(props: {
+  setTask: (task: Task) => void;
+  setStatus: (text: string) => void;
+  status: string;
+  setReadiness: (text: string) => void;
+  setPorts: (text: string) => void;
+  setDoctor: (text: string) => void;
+  ports: string;
+  readiness: string;
+  doctor: string;
+  taskResult: HomeTaskResult | null;
+  setTaskResult: Dispatch<SetStateAction<HomeTaskResult | null>>;
+  funcomTokenResult: HomeTaskResult | null;
+  setFuncomTokenResult: Dispatch<SetStateAction<HomeTaskResult | null>>;
+  runningAction: "start" | "stop" | "restart" | "";
+  setRunningAction: Dispatch<SetStateAction<"start" | "stop" | "restart" | "">>;
+  onError: (text: string) => void;
+  onRedeploy: () => void;
+}) {
   const [service, setService] = useState(RESTARTABLE_SERVICES[0].value);
   const [restartSchedule, setRestartSchedule] = useState<{ stdout?: string; stderr?: string; exitCode?: number } | null>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(true);
   const [restartEnabled, setRestartEnabled] = useState(false);
-  const [restartHours, setRestartHours] = useState("24");
+  const [restartTime, setRestartTime] = useState("05:00");
+  const [scheduleResult, setScheduleResult] = useState<HomeTaskResult | null>(null);
+  const [serverTitle, setServerTitle] = useState("");
+  const [titleResult, setTitleResult] = useState<HomeTaskResult | null>(null);
+  const [funcomToken, setFuncomToken] = useState("");
+  const [serviceRestartResult, setServiceRestartResult] = useState<HomeTaskResult | null>(null);
+  const [serviceRestartingService, setServiceRestartingService] = useState("");
+  const controlActionRunId = useRef(0);
+  const controlActionStartedAt = useRef(0);
+  const serviceRestartRunId = useRef(0);
+  const { taskResult, setTaskResult, funcomTokenResult, setFuncomTokenResult, runningAction, setRunningAction } = props;
+  const activeControlAction = useRef<"start" | "stop" | "restart" | "">(runningAction);
+  const actionRunning = Boolean(runningAction);
+  const serviceRestartRunning = serviceRestartResult?.status === "running";
+  const titleSaving = titleResult?.status === "running";
+  const funcomTokenSaving = funcomTokenResult?.status === "running";
+  const scheduleSaving = scheduleResult?.status === "running";
   const restartScheduleValues = parseKeyValueText(restartSchedule?.stdout || "");
+  const scheduleTimerValue = restartScheduleValues.systemd_timer || "";
+  const scheduleTimerLabel = scheduleTimerValue ? formatTimerStatus(scheduleTimerValue) : "Not Installed";
+  const scheduleTimerInstalled = Boolean(scheduleTimerValue) && !/not installed/i.test(scheduleTimerValue);
+  const scheduleTimerActive = /^active$/i.test(scheduleTimerValue);
+  const scheduleActive = restartEnabled && scheduleTimerActive;
+  const scheduleLoaded = Boolean(restartSchedule);
+  const scheduleDisplayActive = scheduleSaving ? restartEnabled : scheduleActive;
+  const scheduleStatusLabel = !scheduleLoaded && !scheduleSaving ? "Checking" : scheduleDisplayActive ? "Enabled" : "Disabled";
+  const scheduleDisplayTimerLabel = !scheduleLoaded && !scheduleSaving ? "Checking" : scheduleSaving ? restartEnabled ? "Activating" : "Deactivating" : scheduleTimerLabel;
+  const serverState = getHomeServerState(props.status, props.readiness);
   async function run(action: () => Promise<unknown>) {
     props.onError("");
     try { await action(); } catch (error) { props.onError(error instanceof Error ? error.message : String(error)); }
   }
+  function setControlAction(action: "start" | "stop" | "restart" | "") {
+    activeControlAction.current = action;
+    setRunningAction(action);
+  }
+  async function loadControlStatus(includeDiagnostics = false): Promise<HomeLoadResult> {
+    const requests = includeDiagnostics
+      ? [serverApi.status(), serverApi.readiness(), serverApi.ports(), serverApi.doctor()] as const
+      : [serverApi.status(), serverApi.readiness()] as const;
+    const results = await Promise.allSettled(requests);
+    const [nextStatus, nextReadiness, nextPorts, nextDoctor] = results;
+    const result: HomeLoadResult = { statusLoaded: false, readinessLoaded: false, statusError: "", readinessError: "", statusText: "", readinessText: "" };
+    if (nextStatus?.status === "fulfilled") {
+      result.statusText = nextStatus.value.stdout;
+      result.statusLoaded = true;
+      props.setStatus(nextStatus.value.stdout);
+    } else if (nextStatus) {
+      result.statusError = nextStatus.reason instanceof Error ? nextStatus.reason.message : String(nextStatus.reason);
+    }
+    if (nextReadiness?.status === "fulfilled") {
+      const readinessText = nextReadiness.value.stdout || nextReadiness.value.stderr || "";
+      result.readinessText = readinessText;
+      result.readinessLoaded = Number(nextReadiness.value.exitCode || 0) === 0;
+      if (!result.readinessLoaded) result.readinessError = nextReadiness.value.stderr || nextReadiness.value.stdout || "Readiness checks are not ready yet.";
+      props.setReadiness(readinessText);
+    } else if (nextReadiness) {
+      result.readinessError = nextReadiness.reason instanceof Error ? nextReadiness.reason.message : String(nextReadiness.reason);
+    }
+    if (nextPorts?.status === "fulfilled") props.setPorts(nextPorts.value.stdout);
+    if (nextDoctor?.status === "fulfilled") props.setDoctor(nextDoctor.value.stdout);
+    if (!result.statusLoaded && result.statusError) props.onError(friendlyHomeStatusError(result.statusError));
+    return result;
+  }
+  async function saveServerTitle() {
+    const title = serverTitle.trim();
+    if (!title) {
+      setTitleResult({ status: "failed", title: "Title Save Failed", message: "Server title cannot be empty." });
+      return;
+    }
+    if (!window.confirm(`Change server title to "${title}"? This restarts Director and Gateway so the new title can be published.`)) return;
+    setTitleResult({ status: "running", title: "Saving Title" });
+    props.onError("");
+    try {
+      const final = await waitForTaskSilently((await serverApi.saveTitle(title)).task);
+      const details = taskTechnicalDetails(final);
+      await loadControlStatus(false).catch(() => null);
+      setTitleResult(final.status === "succeeded"
+        ? { status: "succeeded", title: "Title Saved Successfully", details }
+        : { status: "failed", title: "Title Save Failed", details });
+    } catch (error) {
+      setTitleResult({ status: "failed", title: "Title Save Failed", details: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  async function saveFuncomToken() {
+    const token = funcomToken.trim();
+    if (!token) {
+      setFuncomTokenResult({ status: "failed", title: "Token Save Failed", message: "Funcom token cannot be empty." });
+      return;
+    }
+    if (!window.confirm("Save the new Funcom token and restart the Dune stack so services reload it?")) return;
+    const checkSince = new Date().toISOString();
+    setFuncomTokenResult({ status: "running", title: "Saving Funcom Token..." });
+    props.onError("");
+    try {
+      const response = await serverApi.saveFuncomToken(token);
+      setFuncomToken("");
+      setFuncomTokenResult({ status: "running", title: "Restarting Server" });
+      const final = await waitForTaskWithUpdates(response.task, (next) => setFuncomTokenResult(funcomTokenRestartTaskResult(next)));
+      const details = taskTechnicalDetails(final);
+      if (final.status !== "succeeded") {
+        setFuncomTokenResult({ status: "failed", title: "Funcom Token Change Failed", message: "The token was saved, but the server restart failed. Check the task details and try again.", details });
+        return;
+      }
+      const validation = await waitForFuncomTokenRestartValidation(checkSince, details, loadControlStatus, setFuncomTokenResult);
+      setFuncomTokenResult(validation);
+    } catch (error) {
+      setFuncomTokenResult({ status: "failed", title: "Funcom Token Change Failed", message: "Double-check the token and try again.", details: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  async function loadControlVisibleSections() {
+    const [statusResult, portsResult] = await Promise.allSettled([loadControlStatus(false), serverApi.ports()]);
+    if (portsResult.status === "fulfilled") props.setPorts(portsResult.value.stdout);
+    if (statusResult.status === "rejected") throw statusResult.reason;
+  }
+  async function runServerAction(action: "start" | "stop" | "restart") {
+    if (action === "stop" && !window.confirm("Stop the Dune server stack?")) return;
+    if (action === "restart" && !window.confirm("Restart the Dune server stack?")) return;
+    serviceRestartRunId.current += 1;
+    setServiceRestartingService("");
+    const actionRunId = ++controlActionRunId.current;
+    controlActionStartedAt.current = Date.now();
+    const copy = {
+      start: { running: "Starting", success: "Server Started Successfully", failure: "Start Failed" },
+      stop: { running: "Stopping", success: "Server Stopped", failure: "Server stop failed." },
+      restart: { running: "Restarting", success: "Server Restarted Successfully", failure: "Restart Failed" }
+    }[action];
+    props.onError("");
+    setControlAction(action);
+    setTaskResult({ status: "running", title: copy.running });
+    let keepPolling = false;
+    try {
+      const response = action === "start" ? await serverApi.start() : action === "stop" ? await serverApi.stop() : await serverApi.restart();
+      const final = await waitForTaskSilently(response.task);
+      if (controlActionRunId.current !== actionRunId) return;
+      const details = taskTechnicalDetails(final);
+      const postLoad = await loadControlStatus(false).catch(() => null);
+      if (controlActionRunId.current !== actionRunId) return;
+      const statusText = postLoad?.statusText || props.status;
+      const readinessText = postLoad?.readinessText || props.readiness;
+      const elapsedMs = Date.now() - controlActionStartedAt.current;
+      if (action === "stop" && isHomeStopComplete(statusText, readinessText)) {
+        setTaskResult({ status: "stopped", title: copy.success, details });
+      } else if ((action === "start" || action === "restart") && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText)) {
+        setTaskResult({ status: "succeeded", title: copy.success, details });
+      } else if (final.status !== "succeeded") {
+        const postState = getHomeServerState(statusText, readinessText);
+        if ((action === "start" || action === "restart") && (postState.starting || postState.running)) {
+          keepPolling = true;
+          setTaskResult({ status: "running", title: copy.running, details });
+        } else {
+          setTaskResult({ status: "failed", title: copy.failure, details });
+        }
+      } else {
+        keepPolling = true;
+        setTaskResult({ status: "running", title: copy.running, details });
+      }
+    } catch (error) {
+      if (controlActionRunId.current !== actionRunId) return;
+      setTaskResult({ status: "failed", title: copy.failure, details: error instanceof Error ? error.message : String(error) });
+    } finally {
+      if (controlActionRunId.current === actionRunId && !keepPolling) setControlAction("");
+    }
+  }
+  async function restartSelectedService() {
+    if (!window.confirm(`Restart ${friendlyServiceName(service)}?`)) return;
+    const selectedService = service;
+    const runId = ++serviceRestartRunId.current;
+    setServiceRestartingService(selectedService);
+    setServiceRestartResult({ status: "running", title: "Restarting" });
+    props.onError("");
+    try {
+      const final = await waitForTaskSilently((await serverApi.restartService(selectedService)).task);
+      if (serviceRestartRunId.current !== runId) return;
+      const postLoad = await loadControlStatus(true).catch(() => null);
+      if (serviceRestartRunId.current !== runId) return;
+      const statusText = postLoad?.statusText || props.status;
+      if (final.status === "succeeded" && isServiceReady(statusText, selectedService)) {
+        setServiceRestartingService("");
+        setServiceRestartResult({ status: "succeeded", title: "Service Restarted Successfully", details: taskTechnicalDetails(final) });
+      } else if (final.status !== "succeeded") {
+        setServiceRestartingService("");
+        setServiceRestartResult({ status: "failed", title: "Restart Failed", details: taskTechnicalDetails(final) });
+      } else {
+        setServiceRestartResult({ status: "running", title: "Restarting", details: taskTechnicalDetails(final) });
+      }
+    } catch (error) {
+      setServiceRestartingService("");
+      setServiceRestartResult({ status: "failed", title: "Restart Failed", details: error instanceof Error ? error.message : String(error) });
+    }
+  }
   async function loadRestartSchedule() {
-    const result = await serverApi.restartSchedule();
-    setRestartSchedule(result);
-    const values = parseKeyValueText(result.stdout || "");
-    setRestartEnabled(/^true$/i.test(values.scheduled_restart_enabled || ""));
-    if (values.restart_interval_hours && values.restart_interval_hours !== "unset") setRestartHours(values.restart_interval_hours);
+    setScheduleLoading(true);
+    try {
+      const result = await serverApi.restartSchedule();
+      setRestartSchedule(result);
+      const values = parseKeyValueText(result.stdout || "");
+      const timerActive = /^active$/i.test(values.systemd_timer || "");
+      setRestartEnabled(/^true$/i.test(values.scheduled_restart_enabled || "") && timerActive);
+      if (values.restart_time && values.restart_time !== "unset") setRestartTime(toHourMinuteTime(values.restart_time));
+    } finally {
+      setScheduleLoading(false);
+    }
+  }
+  async function saveSchedule() {
+    const sanitizedTime = toHourMinuteTime(restartTime);
+    if (restartEnabled && !isValidHourMinuteTime(sanitizedTime)) {
+      setScheduleResult({ status: "failed", title: "Schedule Save Failed", message: "Daily restart time must be a valid 24-hour time, for example 05:00 or 23:30." });
+      return;
+    }
+    setRestartTime(sanitizedTime);
+    setScheduleResult({ status: "running", title: "Saving Schedule" });
+    const requestedEnabled = restartEnabled;
+    props.onError("");
+    try {
+      const final = await waitForTaskSilently((await serverApi.saveRestartSchedule({ enabled: requestedEnabled, time: sanitizedTime })).task);
+      const details = taskTechnicalDetails(final);
+      const nextSchedule = await serverApi.restartSchedule();
+      setRestartSchedule(nextSchedule);
+      const nextValues = parseKeyValueText(nextSchedule.stdout || "");
+      const timerActive = /^active$/i.test(nextValues.systemd_timer || "");
+      const timerInactive = /^inactive$/i.test(nextValues.systemd_timer || "");
+      if (requestedEnabled && !timerActive) setRestartEnabled(false);
+      if (!requestedEnabled && timerInactive) setRestartEnabled(false);
+      setScheduleResult(final.status === "succeeded" && (!requestedEnabled ? timerInactive : timerActive)
+        ? { status: "succeeded", title: "Schedule Saved Successfully", details }
+        : { status: "failed", title: requestedEnabled ? "Timer Install Failed" : "Schedule Save Failed", details: details || nextSchedule.stdout || nextSchedule.stderr || "" });
+    } catch (error) {
+      setScheduleResult({ status: "failed", title: "Schedule Save Failed", details: error instanceof Error ? error.message : String(error) });
+    }
   }
   useEffect(() => {
     run(async () => {
-      props.setStatus((await serverApi.status()).stdout);
-      props.setReadiness((await serverApi.readiness()).stdout);
-      props.setPorts((await serverApi.ports()).stdout);
-      props.setDoctor((await serverApi.doctor()).stdout);
-      await loadRestartSchedule();
+      await Promise.all([loadControlStatus(true), loadRestartSchedule()]);
     });
   }, []);
+  useEffect(() => {
+    activeControlAction.current = runningAction;
+    if (runningAction && controlActionStartedAt.current === 0) controlActionStartedAt.current = Date.now();
+    if (!runningAction) controlActionStartedAt.current = 0;
+  }, [runningAction]);
+  useEffect(() => {
+    const title = findLineValue(props.status, ["title", "server title", "SERVER_TITLE"]);
+    if (title && !titleSaving) setServerTitle(title);
+  }, [props.status, titleSaving]);
+  useEffect(() => {
+    if (!runningAction) return;
+    let active = true;
+    const id = window.setInterval(async () => {
+      const result = await loadControlStatus(true).catch(() => null);
+      if (!active || !result) return;
+      const currentAction = activeControlAction.current;
+      const statusText = result.statusText || props.status;
+      const readinessText = result.readinessText || props.readiness;
+      const elapsedMs = Date.now() - controlActionStartedAt.current;
+      if (currentAction === "stop" && isHomeStopComplete(statusText, readinessText)) {
+        setTaskResult({ status: "stopped", title: "Server Stopped" });
+        setControlAction("");
+      } else if ((currentAction === "start" || currentAction === "restart") && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText)) {
+        setTaskResult({ status: "succeeded", title: currentAction === "start" ? "Server Started Successfully" : "Server Restarted Successfully" });
+        setControlAction("");
+      } else {
+        setTaskResult((current) => {
+          if (current?.status !== "running") return current;
+          return { ...current, title: currentAction === "start" ? "Starting" : currentAction === "stop" ? "Stopping" : "Restarting" };
+        });
+      }
+    }, 3000);
+    return () => {
+      active = false;
+      window.clearInterval(id);
+    };
+  }, [runningAction, props.status, props.readiness]);
+  useEffect(() => {
+    if (runningAction || !homeNeedsWarmRefresh(props.status, props.readiness)) return;
+    let active = true;
+    const id = window.setInterval(async () => {
+      if (active) await loadControlStatus(true).catch(() => null);
+    }, 5000);
+    return () => {
+      active = false;
+      window.clearInterval(id);
+    };
+  }, [runningAction, props.status, props.readiness]);
+  useEffect(() => {
+    if (runningAction || homeNeedsWarmRefresh(props.status, props.readiness)) return;
+    let active = true;
+    const id = window.setInterval(async () => {
+      if (active) await loadControlVisibleSections().catch(() => null);
+    }, 5000);
+    return () => {
+      active = false;
+      window.clearInterval(id);
+    };
+  }, [runningAction, props.status, props.readiness]);
+  useEffect(() => {
+    let active = true;
+    const id = window.setInterval(async () => {
+      if (!active) return;
+      const result = await serverApi.doctor().catch(() => null);
+      if (active && result) props.setDoctor(result.stdout || result.stderr || "");
+    }, 30000);
+    return () => {
+      active = false;
+      window.clearInterval(id);
+    };
+  }, []);
+  useEffect(() => {
+    if (!serviceRestartingService || serviceRestartResult?.status !== "running") return;
+    let active = true;
+    const id = window.setInterval(async () => {
+      const result = await loadControlStatus(false).catch(() => null);
+      if (!active || !result) return;
+      if (isServiceReady(result.statusText || props.status, serviceRestartingService)) {
+        setServiceRestartResult({ status: "succeeded", title: "Service Restarted Successfully" });
+        setServiceRestartingService("");
+      }
+    }, 1000);
+    return () => {
+      active = false;
+      window.clearInterval(id);
+    };
+  }, [serviceRestartingService, serviceRestartResult?.status, props.status]);
+  useEffect(() => {
+    if (!serviceRestartingService || serviceRestartResult?.status !== "running") return;
+    if (!isServiceReady(props.status, serviceRestartingService)) return;
+    setServiceRestartResult({ status: "succeeded", title: "Service Restarted Successfully" });
+    setServiceRestartingService("");
+  }, [serviceRestartingService, serviceRestartResult?.status, props.status]);
+  useEffect(() => {
+    if (!taskResult || taskResult.status === "running" || taskResult.status === "failed") return;
+    const id = window.setTimeout(() => setTaskResult(null), 10400);
+    return () => window.clearTimeout(id);
+  }, [taskResult?.status, taskResult?.title]);
+  useEffect(() => {
+    if (!serviceRestartResult || serviceRestartResult.status === "running" || serviceRestartResult.status === "failed") return;
+    const id = window.setTimeout(() => setServiceRestartResult(null), 10400);
+    return () => window.clearTimeout(id);
+  }, [serviceRestartResult?.status, serviceRestartResult?.title]);
+  useEffect(() => {
+    if (!titleResult || titleResult.status === "running" || titleResult.status === "failed") return;
+    const id = window.setTimeout(() => setTitleResult(null), 10400);
+    return () => window.clearTimeout(id);
+  }, [titleResult?.status, titleResult?.title]);
+  useEffect(() => {
+    if (!scheduleResult || scheduleResult.status === "running" || scheduleResult.status === "failed") return;
+    const id = window.setTimeout(() => setScheduleResult(null), 10400);
+    return () => window.clearTimeout(id);
+  }, [scheduleResult?.status, scheduleResult?.title]);
   return (
-    <section className="panel">
+    <section className="panel server-control-panel">
       <h2>Server Controls</h2>
+      <section className="action-section server-title-section">
+        <h4>Server Title</h4>
+        <div className="action-line title-action-line">
+          <label>Current Server Title<input value={serverTitle} onChange={(event) => setServerTitle(event.target.value)} /></label>
+          <button disabled={actionRunning || serviceRestartRunning || titleSaving} onClick={saveServerTitle}>Save Title</button>
+          {titleResult && <span className={`inline-task-result result-${titleResult.status === "succeeded" ? "ok" : titleResult.status === "failed" ? "fail" : "running"}`}>
+            <strong className={titleResult.status === "running" ? "loading-dots" : ""}>{titleResult.title}</strong>
+          </span>}
+        </div>
+      </section>
       <div className="action-row">
-        <button onClick={() => run(async () => props.setTask((await serverApi.start()).task))}><Play size={16} /> Start</button>
-        <button onClick={() => run(async () => { if (window.confirm("Stop the Dune server stack?")) props.setTask((await serverApi.stop()).task); })}>Stop</button>
-        <button onClick={() => run(async () => { if (window.confirm("Restart the Dune server stack?")) props.setTask((await serverApi.restart()).task); })}>Restart</button>
-        <button onClick={() => run(async () => props.setReadiness((await serverApi.readiness()).stdout))}>Readiness</button>
-        <button onClick={() => run(async () => props.setPorts((await serverApi.ports()).stdout))}>Ports</button>
-        <button onClick={() => run(async () => props.setDoctor((await serverApi.doctor()).stdout))}>Doctor</button>
+        <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || serverState.running || serverState.starting} onClick={() => runServerAction("start")}><Play size={16} /> Start</button>
+        <button disabled={titleSaving || funcomTokenSaving || scheduleSaving || serviceRestartRunning || runningAction === "stop" || (!actionRunning && serverState.stopped)} onClick={() => runServerAction("stop")}>Stop</button>
+        <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || serverState.stopped} onClick={() => runServerAction("restart")}>Restart</button>
+        <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving} onClick={props.onRedeploy}>Redeploy</button>
       </div>
+      {taskResult && <HomeTaskResultCard result={taskResult} />}
       <div className="action-line restart-service-line">
         <label className="compact-select">Restart Service<select value={service} onChange={(event) => setService(event.target.value)}>
           {RESTARTABLE_SERVICES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select></label>
-        <button onClick={() => run(async () => { if (window.confirm(`Restart ${friendlyServiceName(service)}?`)) props.setTask((await serverApi.restartService(service)).task); })}>Restart Service</button>
+        <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving} onClick={restartSelectedService}>Restart Service</button>
+        {serviceRestartResult && <span className={`inline-task-result result-${serviceRestartResult.status === "succeeded" ? "ok" : serviceRestartResult.status === "failed" ? "fail" : "running"}`}>
+          <strong className={serviceRestartResult.status === "running" ? "loading-dots" : ""}>{serviceRestartResult.title}</strong>
+        </span>}
       </div>
       <section className="action-section">
-        <div className="panel-title"><h4>Scheduled Restarts</h4><StatusPill value={restartEnabled ? "Enabled" : "Disabled"} /></div>
-        <p className="muted">Uses the Dune Manager restart schedule. Saving stores the preference; installing the systemd timer depends on host permissions reported by the command.</p>
+        <div className="panel-title"><h4>Scheduled Restarts</h4><StatusPill value={scheduleStatusLabel} /></div>
         <KeyValueGrid items={[
-          ["Current status", restartEnabled ? "Enabled" : "Disabled"],
-          ["Interval", restartScheduleValues.restart_interval_hours && restartScheduleValues.restart_interval_hours !== "unset" ? `${restartScheduleValues.restart_interval_hours} hours` : "Not configured"],
-          ["Timer", restartScheduleValues.systemd_timer || "Not installed"]
+          ["Current Status", scheduleStatusLabel],
+          ["Restart Time (Local Server Time)", toHourMinuteTime(restartScheduleValues.restart_time || restartTime)],
+          ["Timer", scheduleDisplayTimerLabel]
         ]} />
         {commandStatusSummary(restartSchedule).reason && <p className="danger-note">{commandStatusSummary(restartSchedule).reason}</p>}
-        <div className="action-line">
-          <label className="checkbox-row"><input type="checkbox" checked={restartEnabled} onChange={(event) => setRestartEnabled(event.target.checked)} /> Enable scheduled restarts</label>
-          <label className="memory-number-field">Every<input type="number" min="1" max="168" step="1" value={restartHours} onChange={(event) => setRestartHours(event.target.value)} /></label>
-          <span className="unit-label">hours</span>
-          <button onClick={() => run(async () => {
-            const confirmation = window.prompt("Type SAVE RESTART SCHEDULE to save scheduled restart settings.");
-            if (confirmation !== "SAVE RESTART SCHEDULE") return;
-            const response = await serverApi.saveRestartSchedule({ enabled: restartEnabled, hours: Number(restartHours), confirmation });
-            await waitForTask(response.task, props.setTask);
-            await loadRestartSchedule();
-          })}>Save Schedule</button>
-          <button onClick={() => run(loadRestartSchedule)}>Refresh Schedule</button>
+        <div className="action-line schedule-action-line">
+          <label className="checkbox-row"><input type="checkbox" disabled={scheduleLoading || scheduleSaving} checked={restartEnabled} onChange={(event) => setRestartEnabled(event.target.checked)} /> Enable</label>
+          <label className="compact-select">Daily Restart Time<input type="time" step="60" pattern="[0-2][0-9]:[0-5][0-9]" disabled={scheduleSaving} value={restartTime} onChange={(event) => setRestartTime(sanitizeTimeInput(event.target.value))} placeholder="05:00" /></label>
+          <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || scheduleLoading} onClick={saveSchedule}>Save Schedule</button>
+          {scheduleResult && <span className={`inline-task-result result-${scheduleResult.status === "succeeded" ? "ok" : scheduleResult.status === "failed" ? "fail" : "running"}`}>
+            <strong className={scheduleResult.status === "running" ? "loading-dots" : ""}>{scheduleResult.title}</strong>
+          </span>}
         </div>
-      </section>
-      <section className="action-section">
-        <h4>Server Title and Redeploy</h4>
-        <p className="muted">Planned. These remain disabled until the web flow can preview config changes, required restarts, and rollback behavior from the Dune Manager setup flow.</p>
       </section>
       <ReadinessTimeline text={props.readiness} statusText={props.status} />
       <PortChecklist text={props.ports} statusText={props.status} />
+      <section className="action-section">
+        <div className="panel-title"><h4>Change Funcom Token</h4></div>
+        <div className="action-line funcom-token-action-line">
+          <label className="funcom-token-field"><SecretInput aria-label="Funcom token" value={funcomToken} onChange={(event) => setFuncomToken(event.target.value)} placeholder="Paste new token" /></label>
+          <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving} onClick={saveFuncomToken}>Save Token</button>
+          {funcomTokenResult && <span className={`inline-task-result result-${funcomTokenResult.status === "succeeded" ? "ok" : funcomTokenResult.status === "failed" ? "fail" : "running"}`}>
+            <strong className={funcomTokenResult.status === "running" ? "loading-dots" : ""}>{funcomTokenResult.title}</strong>
+            {funcomTokenResult.message && <span className="inline-task-message">{funcomTokenResult.message}</span>}
+          </span>}
+        </div>
+      </section>
       <DoctorSummary text={props.doctor} readiness={props.readiness} />
     </section>
   );
@@ -588,7 +1114,7 @@ function AdminToolsPanel({ setTask, onError }: { setTask: (task: Task) => void; 
     setItemId(item?.id || "");
   }
   async function loadItemCatalog() {
-    const response = await adminApi.itemCatalog(search, 2000);
+    const response = await adminApi.itemCatalog(search, 10000);
     setCatalogColumns(["itemName", "itemId", "category", "source"]);
     setCatalogRows((response.rows || []).map((item) => ({ itemName: item.name, itemId: item.itemId || item.id, category: titleCase(item.category || ""), source: item.source })));
   }
@@ -952,6 +1478,200 @@ async function waitForTaskSilently(task: Task) {
   return current;
 }
 
+async function waitForTaskWithUpdates(task: Task, onUpdate: (task: Task) => void) {
+  let current = task;
+  onUpdate(current);
+  for (let i = 0; i < 3600 && !isTerminalTask(current.status); i += 1) {
+    await new Promise((resolvePromise) => window.setTimeout(resolvePromise, 1000));
+    current = (await setupApi.task(current.id)).task;
+    onUpdate(current);
+  }
+  return current;
+}
+
+function loadDatabasePasswordState(): DatabasePasswordState {
+  if (typeof window === "undefined") return { result: null };
+  try {
+    const raw = window.localStorage.getItem(DATABASE_PASSWORD_STATE_KEY);
+    if (!raw) return { result: null };
+    const parsed = JSON.parse(raw) as DatabasePasswordState;
+    return parsed && parsed.result ? parsed : { result: null };
+  } catch {
+    return { result: null };
+  }
+}
+
+function persistDatabasePasswordState(state: DatabasePasswordState) {
+  if (typeof window === "undefined") return;
+  if (!state.result) {
+    window.localStorage.removeItem(DATABASE_PASSWORD_STATE_KEY);
+    return;
+  }
+  window.localStorage.setItem(DATABASE_PASSWORD_STATE_KEY, JSON.stringify(state));
+}
+
+async function pollDatabasePasswordRestart(
+  taskId: string,
+  setState: (state: DatabasePasswordState) => void,
+  onFinished: () => Promise<void>
+) {
+  let current: Task;
+  try {
+    current = (await setupApi.task(taskId)).task;
+    for (let i = 0; i < 3600 && !isTerminalTask(current.status); i += 1) {
+      const runningState = { taskId, result: { status: "running", title: "Restarting Server..." } satisfies HomeTaskResult };
+      persistDatabasePasswordState(runningState);
+      setState(runningState);
+      await new Promise((resolvePromise) => window.setTimeout(resolvePromise, 1000));
+      current = (await setupApi.task(taskId)).task;
+    }
+  } catch (error) {
+    const failed = { result: { status: "failed", title: "Password Change Failed", message: error instanceof Error ? error.message : String(error) } satisfies HomeTaskResult };
+    persistDatabasePasswordState(failed);
+    setState(failed);
+    return;
+  }
+  const next = current.status === "succeeded"
+    ? { result: { status: "succeeded", title: "Password Changed Successfully" } satisfies HomeTaskResult }
+    : { result: { status: "failed", title: "Password Change Failed", message: conciseTaskError(current) } satisfies HomeTaskResult };
+  persistDatabasePasswordState(next);
+  setState(next);
+  await onFinished().catch(() => undefined);
+}
+
+function funcomTokenRestartTaskResult(task: Task): HomeTaskResult {
+  const details = taskTechnicalDetails(task);
+  if (funcomTokenMismatchDetected(details) || funcomTokenMismatchDetected(task.errorMessage || "")) {
+    return funcomTokenMismatchResult(details);
+  }
+  if (task.status === "failed") {
+    return {
+      status: "failed",
+      title: "Funcom Token Change Failed",
+      message: "The token was saved, but the server restart failed. Check the task details and try again.",
+      details
+    };
+  }
+  if (task.status === "succeeded") {
+    return {
+      status: "running",
+      title: "Checking Funcom Token",
+      details
+    };
+  }
+  return {
+    status: "running",
+    title: "Restarting Server",
+    details
+  };
+}
+
+async function waitForFuncomTokenRestartValidation(
+  checkSince: string,
+  details: string,
+  loadControlStatus: (includeDiagnostics?: boolean) => Promise<HomeLoadResult>,
+  setResult: Dispatch<SetStateAction<HomeTaskResult | null>>
+): Promise<HomeTaskResult> {
+  for (let attempt = 0; attempt < 72; attempt += 1) {
+    const authCheck = await serverApi.checkFuncomToken(checkSince).catch((error) => ({ ok: false, mismatch: false, checkedSince: checkSince, details: error instanceof Error ? error.message : String(error) }));
+    if (authCheck.mismatch) return funcomTokenMismatchResult([details, authCheck.details || ""].filter(Boolean).join("\n"));
+
+    const status = await loadControlStatus(false).catch(() => null);
+    if (status && isHomeActionComplete(status.statusText, status.readinessText)) {
+      setResult({ status: "running", title: "Checking Funcom Token", details });
+      await new Promise((resolvePromise) => window.setTimeout(resolvePromise, 2500));
+      const finalCheck = await serverApi.checkFuncomToken(checkSince).catch((error) => ({ ok: false, mismatch: false, checkedSince: checkSince, details: error instanceof Error ? error.message : String(error) }));
+      if (finalCheck.mismatch) return funcomTokenMismatchResult([details, finalCheck.details || ""].filter(Boolean).join("\n"));
+      return {
+        status: "succeeded",
+        title: "Funcom Token Changed Successfully",
+        message: "The Funcom token was changed successfully and the server is up and running.",
+        details
+      };
+    }
+
+    setResult({
+      status: "running",
+      title: "Restarting Server",
+      details
+    });
+    await new Promise((resolvePromise) => window.setTimeout(resolvePromise, 5000));
+  }
+
+  const finalCheck = await serverApi.checkFuncomToken(checkSince).catch((error) => ({ ok: false, mismatch: false, checkedSince: checkSince, details: error instanceof Error ? error.message : String(error) }));
+  if (finalCheck.mismatch) return funcomTokenMismatchResult([details, finalCheck.details || ""].filter(Boolean).join("\n"));
+  return {
+    status: "failed",
+    title: "Funcom Token Change Needs Review",
+    message: "The token was saved, but the server did not become fully ready. Check Server Control status and logs.",
+    details
+  };
+}
+
+function funcomTokenMismatchResult(details: string): HomeTaskResult {
+  return {
+    status: "failed",
+    title: "Authorization Failed",
+    message: "Please make sure the Funcom token belongs to the current Battlegroup ID, then save it again.",
+    details
+  };
+}
+
+function funcomTokenMismatchFromLogResult(details: string): HomeTaskResult {
+  return {
+    status: "failed",
+    title: "Authorization Failed",
+    message: "Please make sure the Funcom token belongs to the current Battlegroup ID, then save it again.",
+    details
+  };
+}
+
+function isFuncomTokenAuthFailure(result: HomeTaskResult | null) {
+  return Boolean(result && result.status === "failed" && funcomTokenMismatchDetected(result.details || ""));
+}
+
+function loadPersistedFuncomTokenResult(): HomeTaskResult | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(FUNCOM_TOKEN_AUTH_ERROR_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as HomeTaskResult;
+    return isFuncomTokenAuthFailure(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function hasPersistedFuncomTokenAuthFailure() {
+  return Boolean(loadPersistedFuncomTokenResult());
+}
+
+function persistFuncomTokenResult(result: HomeTaskResult | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (isFuncomTokenAuthFailure(result)) {
+      window.localStorage.setItem(FUNCOM_TOKEN_AUTH_ERROR_KEY, JSON.stringify(result));
+    } else if (!result || result.status === "succeeded") {
+      window.localStorage.removeItem(FUNCOM_TOKEN_AUTH_ERROR_KEY);
+    }
+  } catch {
+    // Ignore storage failures; the visible in-page result still works.
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const id = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise.then((value) => {
+      window.clearTimeout(id);
+      resolve(value);
+    }).catch((error) => {
+      window.clearTimeout(id);
+      reject(error);
+    });
+  });
+}
+
 function parseUpdateTask(task: Task) {
   const text = task.logLines.map((line) => line.line).join("\n");
   if (task.status === "failed") return { status: "Check Failed", current: "", latest: "", reason: task.errorMessage || summarizeCommandText(text) };
@@ -960,14 +1680,311 @@ function parseUpdateTask(task: Task) {
   const latest = firstVersionMatch(text, [/latest(?: release| build| version)?\s*[:=]\s*([^\n]+)/i, /remote(?: build| version)?\s*[:=]\s*([^\n]+)/i, /available(?: build| version)?\s*[:=]\s*([^\n]+)/i]);
   const updateAvailable = /update available|newer|can update|available update/i.test(text);
   const latestStatus = /up to date|already latest|no update|latest/i.test(text) && !updateAvailable;
+  if (sameUpdateVersion(current, latest)) return { status: "Latest", current, latest, reason: summarizeCommandText(text) };
   if (updateAvailable) return { status: "Update Available", current, latest, reason: summarizeCommandText(text) };
   if (latestStatus) return { status: "Latest", current, latest, reason: summarizeCommandText(text) };
   return { status: current || latest ? "Completed" : "Version details unavailable", current, latest, reason: current || latest ? summarizeCommandText(text) : "Unable to parse version details from completed check." };
 }
 
+function GameUpdateProgress({ task, repairTask, onRetry, onFixSteamcmd }: { task: Task; repairTask: Task | null; onRetry: () => Promise<void>; onFixSteamcmd: () => Promise<void> }) {
+  const progress = summarizeGameUpdateProgress(task);
+  const running = !isTerminalTask(task.status);
+  const repairRunning = Boolean(repairTask && !isTerminalTask(repairTask.status));
+  const repairSucceeded = repairTask?.status === "succeeded";
+  const repairable = task.status === "failed" && isSteamcmdManifestFailure(task);
+  return <div className={`result-panel game-update-progress result-${task.status === "succeeded" ? "ok" : task.status === "failed" ? "fail" : "running"}`} aria-live="polite">
+    <div className="panel-title">
+      <h4 className={running ? "loading-dots" : ""}>{progress.title}</h4>
+      <StatusPill value={task.status === "failed" ? "Failed" : task.status === "succeeded" ? "Succeeded" : "Running"} />
+    </div>
+    <div className="progress-row">
+      <div className="progress-track" aria-label={`Game update progress ${progress.percent}%`}>
+        <div className="progress-fill" style={{ width: `${progress.percent}%` }} />
+      </div>
+      <strong>{progress.percent}%</strong>
+    </div>
+    <p>{progress.message}</p>
+    {repairRunning && <p className="muted">Fixing SteamCMD...</p>}
+    {repairSucceeded && <p className="muted">SteamCMD manifest reset. Retry the game update when ready.</p>}
+    {task.status === "failed" && <div className="action-line">
+      {repairable && <button disabled={repairRunning} onClick={onFixSteamcmd}>Fix SteamCMD</button>}
+      <button disabled={repairRunning} onClick={onRetry}>Retry Game Update</button>
+    </div>}
+  </div>;
+}
+
+function summarizeGameUpdateProgress(task: Task) {
+  const text = task.logLines.map((line) => line.line).join("\n");
+  const latestLine = [...task.logLines].reverse().map((line) => line.line.trim()).find(Boolean) || task.progressMessage || task.currentStep || "";
+  if (task.status === "succeeded") {
+    return { title: "Update Complete", percent: 100, message: "The game server update finished and the stack restart was started." };
+  }
+  if (task.status === "failed") {
+    return { title: "Update Failed", percent: Math.max(5, gameUpdatePercent(text)), message: conciseTaskError(task) };
+  }
+
+  const retryMatch = text.match(/Retrying(?: app install)? in (\d+)s/i);
+  if (retryMatch) {
+    return { title: "Updating", percent: Math.max(45, gameUpdatePercent(text)), message: `Steam download hit a temporary problem. Retrying in ${retryMatch[1]} seconds.` };
+  }
+  const attemptMatch = text.match(/SteamCMD install attempt\s+(\d+)\/(\d+)/i);
+  const steamcmdStage = isSteamcmdUpdateActive(text) ? summarizeSteamcmdStage(task.logLines.map((line) => line.line), attemptMatch) : null;
+  if (steamcmdStage) {
+    return { title: steamcmdStage.title, percent: Math.max(42, gameUpdatePercent(text), steamcmdStage.percent), message: steamcmdStage.message };
+  }
+  if (attemptMatch) {
+    return { title: "Updating", percent: Math.max(42, gameUpdatePercent(text)), message: `Downloading server files with SteamCMD. Attempt ${attemptMatch[1]} of ${attemptMatch[2]}.` };
+  }
+  return { title: "Updating", percent: gameUpdatePercent(text), message: friendlyGameUpdateMessage(text, latestLine) };
+}
+
+function isSteamcmdUpdateActive(text: string) {
+  const clean = stripAnsi(text);
+  const steamStart = clean.lastIndexOf("=== Download/update server files with SteamCMD ===");
+  if (steamStart < 0) return false;
+  const laterText = clean.slice(steamStart);
+  return !/===\s+(Load updated Funcom image tarballs|Detect loaded image tags|Run database update\/migration|Refresh generated map catalogs|Restarting Dune stack)\s+===/i.test(laterText);
+}
+
+function summarizeSteamcmdStage(lines: string[], attemptMatch: RegExpMatchArray | null) {
+  const attemptText = attemptMatch ? ` Attempt ${attemptMatch[1]} of ${attemptMatch[2]}.` : "";
+  const cleanLines = lines.flatMap((line) => stripAnsi(line).split(/\r+/).map((part) => part.trim()).filter(Boolean));
+
+  for (const line of [...cleanLines].reverse()) {
+    const progressMatches = [...line.matchAll(/Update state\s+\([^)]+\)\s+([^,]+),\s+progress:\s+([0-9.]+)/gi)];
+    const progressMatch = progressMatches[progressMatches.length - 1];
+    if (progressMatch) {
+      const state = progressMatch[1].trim().toLowerCase();
+      const steamPercent = Math.max(0, Math.min(100, Number(progressMatch[2]) || 0));
+      const scaledPercent = 42 + Math.round(steamPercent * 0.18);
+      if (/download/i.test(state)) return { title: "Downloading Server Files", percent: scaledPercent, message: `SteamCMD is downloading updated server files (${steamPercent.toFixed(1)}%).${attemptText}` };
+      if (/verif/i.test(state)) return { title: "Verifying Server Files", percent: Math.max(56, scaledPercent), message: `SteamCMD is verifying downloaded server files (${steamPercent.toFixed(1)}%).${attemptText}` };
+      if (/install|commit|staging|reconfig/i.test(state)) return { title: "Installing Server Files", percent: Math.max(48, scaledPercent), message: `SteamCMD is ${state} (${steamPercent.toFixed(1)}%).${attemptText}` };
+      return { title: "Updating Server Files", percent: scaledPercent, message: `SteamCMD update state: ${state} (${steamPercent.toFixed(1)}%).${attemptText}` };
+    }
+
+    if (/Success!\s+App\s+'?\d+'?.*fully installed/i.test(line)) {
+      return { title: "Server Files Installed", percent: 62, message: `SteamCMD finished installing the server files.${attemptText}` };
+    }
+    if (/Validating|validation/i.test(line)) {
+      return { title: "Validating Server Files", percent: 56, message: `SteamCMD is validating the installed server files.${attemptText}` };
+    }
+    if (/Downloading item|download item|download depot|downloading/i.test(line)) {
+      return { title: "Downloading Server Files", percent: 46, message: `SteamCMD is downloading server file content.${attemptText}` };
+    }
+    if (/Connecting anonymously|Connecting to Steam/i.test(line)) {
+      return { title: "Connecting To Steam", percent: 43, message: `SteamCMD is connecting to Steam.${attemptText}` };
+    }
+    if (/Waiting for (client config|user info)/i.test(line)) {
+      return { title: "Loading Steam Metadata", percent: 44, message: `SteamCMD is loading Steam account and depot metadata.${attemptText}` };
+    }
+    if (/Logging in user|login anonymous|Logged in OK/i.test(line)) {
+      return { title: "Logging In To Steam", percent: 44, message: `SteamCMD is logging in anonymously to Steam.${attemptText}` };
+    }
+    if (/Loading Steam API/i.test(line)) {
+      return { title: "Starting SteamCMD", percent: 42, message: `SteamCMD is starting and loading the Steam API.${attemptText}` };
+    }
+  }
+
+  return null;
+}
+
+function gameUpdatePercent(text: string) {
+  const stages: [RegExp, number][] = [
+    [/Pre-flight: check Steam/i, 8],
+    [/Update is available/i, 15],
+    [/Check Docker volume free space/i, 22],
+    [/Stop game servers before update/i, 30],
+    [/Download\/update server files with SteamCMD/i, 40],
+    [/SteamCMD install attempt\s+2\//i, 52],
+    [/SteamCMD install attempt\s+3\//i, 60],
+    [/Load updated Funcom image tarballs/i, 70],
+    [/Detect loaded image tags/i, 78],
+    [/Run database update\/migration/i, 86],
+    [/Refresh generated map catalogs/i, 94],
+    [/Restarting Dune stack/i, 98]
+  ];
+  let percent = 3;
+  for (const [pattern, value] of stages) {
+    if (pattern.test(text)) percent = Math.max(percent, value);
+  }
+  return percent;
+}
+
+function friendlyGameUpdateMessage(text: string, latestLine: string) {
+  if (/Pre-flight: check Steam/i.test(text)) return "Checking Steam for the latest available server build.";
+  if (/Check Docker volume free space/i.test(text)) return "Checking available disk space before downloading files.";
+  if (/Stop game servers before update/i.test(text)) return "Stopping game servers before replacing server files.";
+  if (/Download\/update server files with SteamCMD/i.test(text)) return "Downloading updated game server files.";
+  if (/Load updated Funcom image tarballs/i.test(text)) return "Loading updated game container images.";
+  if (/Detect loaded image tags/i.test(text)) return "Detecting updated image versions.";
+  if (/Run database update\/migration/i.test(text)) return "Running database migrations for the updated build.";
+  if (/Refresh generated map catalogs/i.test(text)) return "Refreshing generated map catalogs.";
+  if (/Restarting Dune stack/i.test(text)) return "Restarting the Dune stack with the updated build.";
+  return latestLine && !/^\s*Task started/i.test(latestLine) ? friendlyGameUpdateLine(latestLine) : "Preparing the game update.";
+}
+
+function friendlyGameUpdateLine(line: string) {
+  if (/^Running updateApply$/i.test(line)) return "Preparing the game update.";
+  if (/^Task started$/i.test(line)) return "Preparing the game update.";
+  if (/Steam app id:/i.test(line)) return "Preparing Steam update metadata.";
+  return "Working on the game update.";
+}
+
+function isSteamcmdManifestFailure(task: Task) {
+  const text = stripAnsi(task.logLines.map((line) => line.line).join("\n"));
+  return /SteamCMD failed|App\s+'[^']+'\s+state is\s+0x6|appmanifest_\d+\.acf|SteamCMD cache\/metadata is stale/i.test(text);
+}
+
+function StackUpdateProgress({ task, onRetry }: { task: Task; onRetry: () => Promise<void> }) {
+  const progress = summarizeStackUpdateProgress(task);
+  const running = !isTerminalTask(task.status);
+  return <div className={`result-panel stack-update-progress result-${task.status === "succeeded" ? "ok" : task.status === "failed" ? "fail" : "running"}`} aria-live="polite">
+    <div className="panel-title">
+      <h4 className={running ? "loading-dots" : ""}>{progress.title}</h4>
+      <StatusPill value={task.status === "failed" ? "Failed" : task.status === "succeeded" ? "Succeeded" : "Running"} />
+    </div>
+    <div className="progress-row">
+      <div className="progress-track" aria-label={`Stack update progress ${progress.percent}%`}>
+        <div className="progress-fill" style={{ width: `${progress.percent}%` }} />
+      </div>
+      <strong>{progress.percent}%</strong>
+    </div>
+    <p>{progress.message}</p>
+    {task.status === "failed" && <div className="action-line"><button onClick={onRetry}>Retry Stack Update</button></div>}
+  </div>;
+}
+
+function summarizeStackUpdateProgress(task: Task) {
+  const text = task.logLines.map((line) => line.line).join("\n");
+  const latestLine = [...task.logLines].reverse().map((line) => line.line.trim()).find(Boolean) || task.progressMessage || task.currentStep || "";
+  if (task.status === "succeeded") {
+    const installedVersion = firstVersionMatch(text, [/Installed stack version:\s*([^\n]+)/i]);
+    return { title: "Stack Update Complete", percent: 100, message: installedVersion ? `Stack files were updated to ${installedVersion}. Restart or rebuild the web console to run the new stack version.` : "Stack files were updated. Restart or rebuild the web console to run the new stack version." };
+  }
+  if (task.status === "failed") {
+    return { title: "Stack Update Failed", percent: Math.max(5, stackUpdatePercent(text)), message: conciseTaskError(task) };
+  }
+  const stackStage = summarizeStackUpdateStage(task.logLines.map((line) => line.line));
+  if (stackStage) return stackStage;
+  return { title: "Updating Stack", percent: stackUpdatePercent(text), message: friendlyStackUpdateMessage(text, latestLine) };
+}
+
+function stackUpdatePercent(text: string) {
+  const stages: [RegExp, number][] = [
+    [/Running selfUpdateApply/i, 5],
+    [/Downloading stack release/i, 20],
+    [/Backing up current stack files/i, 42],
+    [/Installing stack release into/i, 66],
+    [/Installed stack version/i, 88],
+    [/Previous stack files backup/i, 94],
+    [/Exit and reopen dune manager/i, 98]
+  ];
+  let percent = 3;
+  for (const [pattern, value] of stages) {
+    if (pattern.test(text)) percent = Math.max(percent, value);
+  }
+  return percent;
+}
+
+function friendlyStackUpdateMessage(text: string, latestLine: string) {
+  if (/Downloading stack release/i.test(text)) return "Downloading the selected GitHub release.";
+  if (/Backing up current stack files/i.test(text)) return "Backing up the current stack files before replacing them.";
+  if (/Installing stack release into/i.test(text)) return "Installing the downloaded stack release files.";
+  if (/Installed stack version/i.test(text)) return "Verifying the installed stack version.";
+  if (/Previous stack files backup/i.test(text)) return "Finishing the stack update and recording the backup location.";
+  return latestLine && !/^\s*Task started/i.test(latestLine) ? friendlyStackUpdateLine(latestLine) : "Preparing the stack update.";
+}
+
+function summarizeStackUpdateStage(lines: string[]) {
+  const cleanLines = lines.map((line) => stripAnsi(line).replace(/\s+$/g, "")).filter((line) => line.trim());
+  const latestIndex = (pattern: RegExp) => {
+    for (let index = cleanLines.length - 1; index >= 0; index -= 1) {
+      if (pattern.test(cleanLines[index].trim())) return index;
+    }
+    return -1;
+  };
+  const backupIndex = latestIndex(/^Backing up current stack files to:/i);
+  const installIndex = latestIndex(/^Installing stack release into:/i);
+  const installedIndex = latestIndex(/^Installed stack version:\s*/i);
+  const backupDoneIndex = latestIndex(/^Previous stack files backup:/i);
+  const downloadIndex = latestIndex(/^Downloading stack release:\s*/i);
+  const dirtyIndex = latestIndex(/^Local repo has uncommitted tracked changes\./i);
+
+  if (backupDoneIndex >= 0) {
+    const backupFile = nextIndentedLine(cleanLines, backupDoneIndex);
+    return { title: "Finishing Stack Update", percent: 94, message: backupFile ? `Recorded backup at ${backupFile}.` : "Recording the previous stack backup location." };
+  }
+  if (installedIndex >= 0) {
+    const version = cleanLines[installedIndex].trim().replace(/^Installed stack version:\s*/i, "").trim();
+    return { title: "Verifying Stack Version", percent: 88, message: version ? `Installed stack version ${version}. Verifying the update before finishing.` : "Verifying the installed stack version." };
+  }
+  if (installIndex >= 0) {
+    const target = nextIndentedLine(cleanLines, installIndex);
+    return { title: "Installing Stack Release", percent: 66, message: target ? `Installing the downloaded stack release into ${target}.` : "Installing the downloaded stack release files." };
+  }
+  if (backupIndex >= 0) {
+    const backupDir = nextIndentedLine(cleanLines, backupIndex);
+    return { title: "Backing Up Stack Files", percent: 42, message: backupDir ? `Backing up current stack files to ${backupDir}.` : "Backing up the current stack files before replacing them." };
+  }
+  if (downloadIndex >= 0) {
+    const tag = cleanLines[downloadIndex].trim().replace(/^Downloading stack release:\s*/i, "").trim();
+    return { title: "Downloading Stack Release", percent: 20, message: tag ? `Downloading stack release ${tag} from GitHub.` : "Downloading the selected GitHub release." };
+  }
+  if (dirtyIndex >= 0) {
+    return { title: "Preparing Stack Backup", percent: 12, message: "Local tracked changes were detected; the updater will back up the current project files first." };
+  }
+  return null;
+}
+
+function nextIndentedLine(lines: string[], index: number) {
+  const next = lines[index + 1] || "";
+  return /^\S/.test(next) ? "" : next.trim();
+}
+
+function friendlyStackUpdateLine(line: string) {
+  if (/^Running selfUpdateApply$/i.test(line)) return "Preparing the stack update.";
+  if (/^Task started$/i.test(line)) return "Preparing the stack update.";
+  if (/Could not|failed|denied|rate-limited/i.test(line)) return line;
+  return "Working on the stack update.";
+}
+
 function updateDisplayValue(status: Record<string, string>, key: "current" | "latest") {
-  if (/checking/i.test(status.status)) return "Loading...";
+  if (/checking/i.test(status.status)) return "Checking...";
   return status[key] || "Unknown";
+}
+
+function canApplyUpdateStatus(status: Record<string, string>) {
+  return status.status === "Update Available" && !sameUpdateVersion(status.current, status.latest);
+}
+
+function sameUpdateVersion(current: string, latest: string) {
+  const normalizedCurrent = normalizeUpdateVersion(current);
+  const normalizedLatest = normalizeUpdateVersion(latest);
+  return Boolean(normalizedCurrent && normalizedLatest && normalizedCurrent === normalizedLatest);
+}
+
+function normalizeUpdateVersion(value: string) {
+  return String(value || "")
+    .trim()
+    .replace(/^v/i, "")
+    .replace(/\s+\(.+\)$/i, "")
+    .toLowerCase();
+}
+
+function toHourMinuteTime(value: unknown) {
+  const text = String(value || "").trim();
+  if (!text || /^unset$/i.test(text)) return "Unset";
+  const match = text.match(/^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
+  return match ? `${match[1]}:${match[2]}` : text;
+}
+
+function sanitizeTimeInput(value: string) {
+  return value.replace(/[^\d:]/g, "").slice(0, 5);
+}
+
+function isValidHourMinuteTime(value: string) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
 function firstVersionMatch(text: string, patterns: RegExp[]) {
@@ -1025,9 +2042,29 @@ function LogsPanel({ selectedService, setSelectedService, text, setText, onError
   const [streaming, setStreaming] = useState(false);
   const [paused, setPaused] = useState(false);
   const [filter, setFilter] = useState("");
+  const loadSelectedLogs = useCallback(async (service = selectedService) => {
+    onError("");
+    try {
+      setText((current) => current ? current : "Loading logs...");
+      setText((await logsApi.get(service)).stdout);
+    } catch (error) {
+      onError(error instanceof Error ? error.message : String(error));
+    }
+  }, [onError, selectedService, setText]);
   useEffect(() => {
     logsApi.services().then((result) => setServices(result.services)).catch(() => undefined);
   }, []);
+  useEffect(() => {
+    let active = true;
+    onError("");
+    setText("Loading logs...");
+    logsApi.get(selectedService).then((result) => {
+      if (active) setText(result.stdout);
+    }).catch((error) => {
+      if (active) onError(error instanceof Error ? error.message : String(error));
+    });
+    return () => { active = false; };
+  }, [selectedService, onError, setText]);
   useEffect(() => {
     if (!streaming) return;
     const source = new EventSource(logsApi.streamUrl(selectedService), { withCredentials: true });
@@ -1047,18 +2084,18 @@ function LogsPanel({ selectedService, setSelectedService, text, setText, onError
         <select value={selectedService} onChange={(event) => setSelectedService(event.target.value)}>
           {services.map((service) => <option key={service} value={service}>{friendlyServiceName(service)}</option>)}
         </select>
-        <button onClick={async () => { onError(""); try { setText((await logsApi.get(selectedService)).stdout); } catch (error) { onError(error instanceof Error ? error.message : String(error)); } }}>Refresh Logs</button>
+        <button onClick={() => loadSelectedLogs()}>Refresh Logs</button>
         <button onClick={() => setStreaming(!streaming)}>{streaming ? "Stop Stream" : "Live Stream"}</button>
         <button onClick={() => setPaused(!paused)}>{paused ? "Resume" : "Pause"}</button>
         <a className="button-link" href={logsApi.downloadUrl(selectedService)}>Download</a>
       </div>
-      <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Search logs" />
+      <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Search Logs" />
       <LogViewer text={shown} />
     </section>
   );
 }
 
-function DatabasePanel({ setTask }: { setTask: (task: Task) => void }) {
+function DatabasePanel() {
   const [schema, setSchema] = useState("dune");
   const [tables, setTables] = useState<Record<string, unknown>[]>([]);
   const [selected, setSelected] = useState("");
@@ -1068,14 +2105,48 @@ function DatabasePanel({ setTask }: { setTask: (task: Task) => void }) {
   const [sql, setSql] = useState("select * from dune.player_state limit 25");
   const [confirmation, setConfirmation] = useState("");
   const [queryResult, setQueryResult] = useState<{ columns?: { name: string }[]; rows?: Record<string, unknown>[] } | null>(null);
+  const [queryRan, setQueryRan] = useState(false);
+  const [databaseStatus, setDatabaseStatus] = useState<Record<string, unknown> | null>(null);
+  const [databaseStatusError, setDatabaseStatusError] = useState("");
+  const [databaseStatusLoading, setDatabaseStatusLoading] = useState(false);
+  const [passwordPanelOpen, setPasswordPanelOpen] = useState(false);
+  const [databasePassword, setDatabasePassword] = useState("");
+  const [databasePasswordConfirm, setDatabasePasswordConfirm] = useState("");
+  const [databasePasswordState, setDatabasePasswordState] = useState<DatabasePasswordState>(() => loadDatabasePasswordState());
   const [search, setSearch] = useState("");
   const [searchRows, setSearchRows] = useState<Record<string, unknown>[]>([]);
+  const [searchRan, setSearchRan] = useState(false);
+  const [advancedSqlOpen, setAdvancedSqlOpen] = useState(false);
+  const [editRow, setEditRow] = useState<Record<string, unknown> | null>(null);
+  const [editValues, setEditValues] = useState<Record<string, string>>({});
+  const [editResult, setEditResult] = useState<HomeTaskResult | null>(null);
+  const previewRef = useRef<HTMLHeadingElement | null>(null);
+  const editRef = useRef<HTMLElement | null>(null);
+  const databasePasswordResult = databasePasswordState.result;
   async function loadTables() { setTables(await databaseApi.tables(schema)); }
   useEffect(() => {
     loadTables().catch(() => undefined);
   }, []);
+  useEffect(() => {
+    let cancelled = false;
+    if (!databasePasswordState.taskId || databasePasswordState.result?.status !== "running") return undefined;
+    void pollDatabasePasswordRestart(databasePasswordState.taskId, (next) => {
+      if (!cancelled) setDatabasePasswordState(next);
+    }, async () => {
+      if (!cancelled) await loadDatabaseStatus();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [databasePasswordState.taskId, databasePasswordState.result?.status]);
+  function updateDatabasePasswordState(next: DatabasePasswordState) {
+    setDatabasePasswordState(next);
+    persistDatabasePasswordState(next);
+  }
   async function open(table: string) {
     setSelected(table);
+    setEditRow(null);
+    setEditResult(null);
     const [nextPreview, nextColumns, nextCount] = await Promise.all([
       databaseApi.preview(schema, table, 50, 0),
       databaseApi.columns(schema, table),
@@ -1084,144 +2155,209 @@ function DatabasePanel({ setTask }: { setTask: (task: Task) => void }) {
     setPreview(nextPreview);
     setColumns(nextColumns);
     setCount(String(nextCount.count));
+    window.setTimeout(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }
+  async function loadDatabaseStatus() {
+    setDatabaseStatusLoading(true);
+    setDatabaseStatusError("");
+    try {
+      setDatabaseStatus(await databaseApi.status());
+    } catch (error) {
+      setDatabaseStatus(null);
+      setDatabaseStatusError(error instanceof Error ? error.message : String(error));
+    } finally {
+    setDatabaseStatusLoading(false);
+    }
+  }
+  async function changeDatabasePassword() {
+    if (databasePassword.length < 4) {
+      updateDatabasePasswordState({ result: { status: "failed", title: "Password Change Failed", message: "Database password must be at least 4 characters." } });
+      return;
+    }
+    if (databasePassword !== databasePasswordConfirm) {
+      updateDatabasePasswordState({ result: { status: "failed", title: "Password Change Failed", message: "Passwords do not match." } });
+      return;
+    }
+    updateDatabasePasswordState({ result: { status: "running", title: "Changing Password..." } });
+    try {
+      const response = await databaseApi.changePassword(databasePassword);
+      setDatabasePassword("");
+      setDatabasePasswordConfirm("");
+      const runningState = { taskId: response.task.id, result: { status: "running", title: "Restarting Server..." } satisfies HomeTaskResult };
+      updateDatabasePasswordState(runningState);
+      setDatabaseStatus((current) => current ? { ...current, usesDefaultPassword: false } : current);
+    } catch (error) {
+      updateDatabasePasswordState({ result: { status: "failed", title: "Password Change Failed", message: error instanceof Error ? error.message : String(error) } });
+    }
+  }
+  function startEdit(row: Record<string, unknown>) {
+    setEditRow(row);
+    setEditResult(null);
+    setEditValues(Object.fromEntries(databasePreviewColumns(preview).map((column) => [column, serializeEditableDbValue(row[column])])));
+    window.setTimeout(() => editRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
+  async function saveEditedRow() {
+    if (!selected || !editRow) return;
+    const rowId = String(editRow.__rowid || "");
+    setEditResult({ status: "running", title: "Saving Row..." });
+    try {
+      const originalValues = Object.fromEntries(databasePreviewColumns(preview).map((column) => [column, editRow[column]]));
+      const nextValues = Object.fromEntries(Object.entries(editValues).map(([key, value]) => [key, parseEditableDbValue(value, originalValues[key])]));
+      const result = await databaseApi.updateRow(schema, selected, rowId, nextValues);
+      await open(selected);
+      setEditResult(result.updatedRows > 0
+        ? { status: "succeeded", title: "Row Saved Successfully" }
+        : { status: "failed", title: "Row Save Failed", message: "The row was not updated. Refresh the table and try again." });
+    } catch (error) {
+      setEditResult({ status: "failed", title: "Row Save Failed", message: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  async function runQuery() {
+    setQueryRan(true);
+    setQueryResult(await databaseApi.query(sql, confirmation));
+  }
+  async function searchColumns() {
+    setSearchRan(true);
+    setSearchRows(await databaseApi.search(search));
+  }
+  const databaseServer = databaseStatus?.server as Record<string, unknown> | undefined;
+  const databaseConfig = databaseStatus?.config as Record<string, unknown> | undefined;
+  const showDefaultDatabasePasswordNote = !databaseStatus || databaseStatus.usesDefaultPassword !== false;
+  const previewColumns = databasePreviewColumns(preview);
+  const previewRows = preview?.rows || [];
+  const queryColumns = queryResult?.columns?.map((column) => column.name).filter((name) => name !== "__rowid");
+  const queryRows = (queryResult?.rows || []).map((row) => omitInternalRowFields(row));
   return <section className="panel">
     <h2>Database Browser</h2>
-    <div className="action-row"><input value={schema} onChange={(event) => setSchema(event.target.value)} /><button onClick={loadTables}>Refresh Tables</button><button onClick={async () => setQueryResult(await databaseApi.status() as never)}>Status</button></div>
+    <div className="action-row"><button onClick={loadTables}>Refresh Tables</button><button onClick={() => setPasswordPanelOpen((open) => !open)}>Change Password</button><button disabled={databaseStatusLoading} onClick={loadDatabaseStatus}>{databaseStatusLoading ? "Checking..." : "Status"}</button></div>
+    {passwordPanelOpen && <section className="result-panel database-password-panel">
+      <div className="panel-title database-status-title"><strong>Change Database Password</strong><StatusPill value={databasePasswordResult?.status === "failed" ? "Failed" : databasePasswordResult?.status === "succeeded" ? "Saved" : "Info"} /></div>
+      {showDefaultDatabasePasswordNote && <p className="muted">The default password is "dune".</p>}
+      <div className="action-line">
+        <label className="wide-field">New Password<SecretInput value={databasePassword} onChange={(event) => setDatabasePassword(event.target.value)} placeholder="New password" /></label>
+        <label className="wide-field">Confirm Password<SecretInput value={databasePasswordConfirm} onChange={(event) => setDatabasePasswordConfirm(event.target.value)} placeholder="Confirm password" /></label>
+        <button disabled={databasePasswordResult?.status === "running"} onClick={changeDatabasePassword}>Save Password</button>
+      </div>
+      {databasePasswordResult && <span className={`inline-task-result result-${databasePasswordResult.status === "succeeded" ? "ok" : databasePasswordResult.status === "failed" ? "fail" : "running"}`}>
+        <strong className={databasePasswordResult.status === "running" ? "loading-dots" : ""}>{databasePasswordResult.title}</strong>
+        {databasePasswordResult.message && <span className="inline-task-message">{databasePasswordResult.message}</span>}
+      </span>}
+    </section>}
+    {(databaseStatus || databaseStatusError) && <section className={`result-panel ${databaseStatusError ? "result-fail" : "result-ok"}`}>
+      <div className="panel-title database-status-title"><strong>Database Status</strong><StatusPill value={databaseStatusError ? "Failed" : "Connected"} /></div>
+      {databaseStatusError ? <p>{databaseStatusError}</p> : <KeyValueGrid items={[
+        ["Connected", databaseStatus?.connected ? "Yes" : "No"],
+        ["Database", databaseServer?.current_database || databaseConfig?.database || "Unknown"],
+        ["User", databaseServer?.current_user || databaseConfig?.user || "Unknown"],
+        ["Dune Tables", databaseStatus?.duneTableCount ?? "Unknown"],
+        ["Host", databaseConfig?.host || "Unknown"],
+        ["Port", databaseConfig?.port || "Unknown"]
+      ]} />}
+      {!databaseStatusError && Boolean(databaseServer?.version) && <TechnicalDetails title="Postgres version" text={String(databaseServer?.version)} />}
+    </section>}
+    <h3>Tables</h3>
     <DataTable rows={tables} columns={["schema", "name", "estimated_rows"]} onRowClick={(row) => open(String(row.name))} />
-    <h3>{selected ? `${schema}.${selected} (${count} rows)` : "Table Preview"}</h3>
-    <DataTable rows={columns} />
-    <DataTable rows={preview?.rows || []} columns={preview?.columns?.map((column) => column.name)} />
+    <h3 ref={previewRef}>{selected ? `${schema}.${selected} (${count} rows)` : "Table Preview"}</h3>
+    {!selected && <div className="empty database-empty">No table selected. Select a table to preview and edit rows.</div>}
+    {selected && <section className="database-table-panel">
+      <details className="technical-details">
+        <summary>Columns</summary>
+        <DataTable rows={columns} />
+      </details>
+      {previewRows.length ? <DataTable rows={previewRows} columns={previewColumns} action={(row) => <button onClick={(event) => { event.stopPropagation(); startEdit(row); }}>Edit</button>} actionClassName="backup-table-actions" tableClassName="backup-table" /> : <div className="empty database-empty">This table has no rows to preview.</div>}
+      {editRow && <section ref={editRef} className="result-panel database-edit-panel">
+        <div className="panel-title"><strong>Edit Row</strong><StatusPill value={editResult?.status === "failed" ? "Failed" : editResult?.status === "succeeded" ? "Saved" : "Editing"} /></div>
+        <div className="database-edit-grid">
+          {previewColumns.map((column) => <label key={column}>{column}<textarea rows={2} value={editValues[column] || ""} onChange={(event) => setEditValues({ ...editValues, [column]: event.target.value })} /></label>)}
+        </div>
+        <div className="action-line">
+          <button disabled={editResult?.status === "running"} onClick={saveEditedRow}>Save Row</button>
+          <button onClick={() => setEditRow(null)}>Cancel</button>
+        </div>
+        {editResult && <span className={`inline-task-result result-${editResult.status === "succeeded" ? "ok" : editResult.status === "failed" ? "fail" : "running"}`}>
+          <strong className={editResult.status === "running" ? "loading-dots" : ""}>{editResult.title}</strong>
+          {editResult.message && <span className="inline-task-message">{editResult.message}</span>}
+        </span>}
+      </section>}
+    </section>}
     <h3>Search Columns</h3>
-    <div className="action-row"><input value={search} onChange={(event) => setSearch(event.target.value)} /><button onClick={async () => setSearchRows(await databaseApi.search(search))}>Search</button></div>
-    <DataTable rows={searchRows} />
-    <h3>Advanced SQL Console</h3>
-    <textarea value={sql} onChange={(event) => setSql(event.target.value)} rows={5} />
-    <input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="RUN DESTRUCTIVE SQL for write queries" />
-    <div className="action-row"><button onClick={async () => setQueryResult(await databaseApi.query(sql, confirmation))}>Run Query</button><button onClick={async () => setQueryResult(await databaseApi.export(sql))}>Export Query JSON</button><BackupRestorePanel onTask={setTask} /></div>
-    <DataTable rows={queryResult?.rows || []} columns={queryResult?.columns?.map((column) => column.name)} />
+    <div className="action-row"><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tables or columns" /><button onClick={searchColumns}>Search</button></div>
+    {searchRan && (searchRows.length ? <DataTable rows={searchRows} /> : <div className="empty database-empty">No matching tables or columns found.</div>)}
+    <section className={`action-section database-advanced-section ${advancedSqlOpen ? "" : "collapsed-section"}`}>
+      <div className="panel-title">
+        <h3>Advanced SQL Console</h3>
+        <button className={`icon-toggle-button ${advancedSqlOpen ? "active" : ""}`} aria-label={advancedSqlOpen ? "Collapse Advanced SQL Console" : "Expand Advanced SQL Console"} title={advancedSqlOpen ? "Collapse" : "Expand"} onClick={() => setAdvancedSqlOpen(!advancedSqlOpen)}>{advancedSqlOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</button>
+      </div>
+      {advancedSqlOpen && <>
+        <textarea value={sql} onChange={(event) => setSql(event.target.value)} rows={5} />
+        <input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="RUN DESTRUCTIVE SQL for write queries" />
+        <div className="action-row"><button onClick={runQuery}>Run Query</button><button onClick={async () => setQueryResult(await databaseApi.export(sql))}>Export Query JSON</button></div>
+        {queryRan && (queryRows.length ? <DataTable rows={queryRows} columns={queryColumns} /> : <div className="empty database-empty">Query completed. No rows returned.</div>)}
+      </>}
+    </section>
   </section>;
 }
 
-function MarketPanel({ onError }: { onError: (text: string) => void }) {
-  const [q, setQ] = useState("");
-  const [view, setView] = useState("items");
-  const [rows, setRows] = useState<Record<string, unknown>[]>([]);
-  const [stats, setStats] = useState<Record<string, unknown> | null>(null);
-  const [info, setInfo] = useState<Record<string, unknown> | null>(null);
-  const [message, setMessage] = useState("");
+function databasePreviewColumns(preview: { columns?: { name: string }[] } | null) {
+  return (preview?.columns || []).map((column) => column.name).filter((name) => name !== "__rowid");
+}
 
-  async function run(action: () => Promise<void>) {
-    onError("");
-    setMessage("");
-    try {
-      await action();
-    } catch (error) {
-      const text = error instanceof Error ? error.message : String(error);
-      setMessage(text);
-      onError(text);
-    }
+function omitInternalRowFields(row: Record<string, unknown>) {
+  const { __rowid, ...visible } = row;
+  void __rowid;
+  return visible;
+}
+
+function serializeEditableDbValue(value: unknown) {
+  if (value === null || value === undefined) return "NULL";
+  if (typeof value === "object") return JSON.stringify(value, null, 2);
+  return String(value);
+}
+
+function parseEditableDbValue(value: string, original: unknown) {
+  const text = String(value);
+  if (/^NULL$/i.test(text.trim())) return null;
+  if (typeof original === "object" && original !== null) {
+    try { return JSON.parse(text); } catch { return text; }
   }
-
-  function clearResult(nextView: string) {
-    setView(nextView);
-    setRows([]);
-    setStats(null);
-    setInfo(null);
-  }
-
-  async function load(nextView = view) {
-    clearResult(nextView);
-
-    if (nextView === "items") {
-      const result = await marketApi.items(q);
-      setRows(result.rows || []);
-    } else if (nextView === "listings") {
-      const result = await marketApi.listings(q);
-      setRows(result.rows || []);
-    } else if (nextView === "sales") {
-      const result = await marketApi.sales();
-      setRows(result.rows || []);
-    } else if (nextView === "catalog") {
-      const result = await marketApi.catalog(q);
-      setRows(result.rows || []);
-    } else if (nextView === "categories") {
-      const result = await marketApi.categories();
-      setRows((result.categories || []).map((category) => ({ category })));
-    } else if (nextView === "stats") {
-      const result = await marketApi.stats();
-      setStats(result.stats || {});
-    }
-  }
-
-  async function loadCapabilities() {
-    clearResult("capabilities");
-    setInfo(await marketApi.capabilities());
-  }
-
-  async function loadAutomationStatus() {
-    clearResult("automation");
-    setInfo(await marketApi.automationStatus());
-  }
-
-  useEffect(() => {
-    run(() => load("items"));
-  }, []);
-
-  const title = view === "capabilities"
-    ? "Market Capabilities"
-    : view === "automation"
-      ? "Market Automation Status"
-      : `Market ${view.charAt(0).toUpperCase()}${view.slice(1)}`;
-  const marketEmptyText = view === "items" || view === "listings" || view === "sales"
-    ? "No market item rows found. This can be normal if no exchange listings or sales exist yet. Use Catalog for item definitions; Market Items/Listings/Sales are live exchange data."
-    : "No rows.";
-
-  return <section className="panel">
-    <div className="panel-title">
-      <h2>Market</h2>
-      <button onClick={() => run(loadCapabilities)}>Refresh Capabilities</button>
-    </div>
-
-    <div className="action-row">
-      <input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Template id, item name, or category" />
-      <button className={view === "items" ? "active" : ""} onClick={() => run(() => load("items"))}>Items</button>
-      <button className={view === "listings" ? "active" : ""} onClick={() => run(() => load("listings"))}>Listings</button>
-      <button className={view === "sales" ? "active" : ""} onClick={() => run(() => load("sales"))}>Sales</button>
-      <button className={view === "stats" ? "active" : ""} onClick={() => run(() => load("stats"))}>Stats</button>
-      <button className={view === "categories" ? "active" : ""} onClick={() => run(() => load("categories"))}>Categories</button>
-      <button className={view === "catalog" ? "active" : ""} onClick={() => run(() => load("catalog"))}>Catalog</button>
-    </div>
-
-    <div className="action-row">
-      <button className={view === "automation" ? "active" : ""} onClick={() => run(loadAutomationStatus)}>Automation Status</button>
-      <button disabled onClick={() => undefined}>Start Automation</button>
-      <button disabled onClick={() => undefined}>Stop Automation</button>
-      <button disabled onClick={() => undefined}>Run Once</button>
-      <button disabled onClick={() => undefined}>Cleanup</button>
-    </div>
-    <p className="danger-note">Market automation remains blocked: no RedBlink-compatible market-bot runtime or CLI wrapper is available. Catalog and categories are definitions; Items/Listings/Sales are live exchange data.</p>
-
-    {message && <p className="danger-note">{message}</p>}
-
-    <h3>{title}</h3>
-    {info && <MarketCapabilitySummary info={info} />}
-    {stats && <MarketStats stats={stats} />}
-    {!info && !stats && (rows.length ? <DataTable rows={rows} /> : <div className="empty">{marketEmptyText}</div>)}
-  </section>;
+  return text;
 }
 
 function StarterKitPanel({ onError }: { onError: (text: string) => void }) {
-  const [config, setConfig] = useState<StarterKitConfig>({ enabled: false, version: "starter-kit-v1", items: [], xp: 0, allowRepeatGrants: false, autoGrantEnabled: false, autoGrantIntervalSeconds: 60, grantWhen: "first_seen" });
+  const [config, setConfig] = useState<StarterKitConfig>({
+    enabled: false,
+    version: "starter-kit-v1",
+    activeKitId: "starter-kit-v1",
+    autoGrantKitId: "starter-kit-v1",
+    kits: [{ id: "starter-kit-v1", name: "Care Package", items: [], xp: 0, welcomeMessage: "" }],
+    items: [],
+    xp: 0,
+    allowRepeatGrants: false,
+    autoGrantEnabled: false,
+    autoGrantIntervalSeconds: 60,
+    grantWhen: "first_online",
+    autoGrantRules: [{ id: "auto-rule-1", enabled: true, kitId: "starter-kit-v1", grantWhen: "first_online", lastSeenDays: 30 }]
+  });
   const [itemsText, setItemsText] = useState("");
   const [selectedStarterItem, setSelectedStarterItem] = useState<CatalogItem | null>(null);
   const [starterDraft, setStarterDraft] = useState({ itemName: "", itemId: "", quantity: "1", durability: "1" });
+  const [editingStarterIndex, setEditingStarterIndex] = useState<number | null>(null);
+  const [starterEditDraft, setStarterEditDraft] = useState({ quantity: "1", durability: "1" });
   const [players, setPlayers] = useState<Record<string, unknown>[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [manualPlayerId, setManualPlayerId] = useState("");
-  const [grantId, setGrantId] = useState("");
-  const [eligible, setEligible] = useState<Record<string, unknown>[]>([]);
+  const [manualKitId, setManualKitId] = useState("starter-kit-v1");
+  const [eligibleByRule, setEligibleByRule] = useState<Record<string, Record<string, unknown>[]>>({});
   const [history, setHistory] = useState<Record<string, unknown>[]>([]);
+  const [starterGrantTab, setStarterGrantTab] = useState<"auto" | "manual">("auto");
+  const [starterKitTab, setStarterKitTab] = useState<"create" | "configure">("configure");
+  const [starterItemsOpen, setStarterItemsOpen] = useState(false);
+  const [kitSaveResult, setKitSaveResult] = useState<HomeTaskResult | null>(null);
+  const [packageCreateResult, setPackageCreateResult] = useState<HomeTaskResult | null>(null);
+  const [autoGrantResult, setAutoGrantResult] = useState<HomeTaskResult | null>(null);
+  const [newKitName, setNewKitName] = useState("");
+  const [newAutoRule, setNewAutoRule] = useState<{ kitId: string; grantWhen: StarterKitAutoGrantRule["grantWhen"]; lastSeenDays: number }>({ kitId: "starter-kit-v1", grantWhen: "first_online", lastSeenDays: 30 });
+  const [expandedRuleIds, setExpandedRuleIds] = useState<Record<string, boolean>>({});
   const [output, setOutput] = useState("");
   const [technicalOutput, setTechnicalOutput] = useState("");
   const [outputScope, setOutputScope] = useState<"config" | "grant" | "auto" | "history" | "">("");
@@ -1234,127 +2370,357 @@ function StarterKitPanel({ onError }: { onError: (text: string) => void }) {
   }
   async function load() {
     const next = await starterKitApi.config();
-    setConfig(next);
-    setItemsText(next.items.map((item) => `${item.itemId || item.itemName || ""},${item.quantity},${item.durability}`).join("\n"));
+    const normalized = normalizeStarterKitConfig(next);
+    const lastKit = normalized.kits.at(-1);
+    const displayConfig = lastKit ? { ...normalized, activeKitId: lastKit.id, version: lastKit.id, items: lastKit.items, xp: lastKit.xp } : normalized;
+    setConfig(displayConfig);
+    setStarterKitTab(lastKit ? "configure" : "create");
+    setNewAutoRule({ kitId: lastKit?.id || normalized.autoGrantKitId || normalized.activeKitId, grantWhen: normalized.grantWhen, lastSeenDays: 30 });
+    setManualKitId(lastKit?.id || normalized.activeKitId || "");
+    setItemsText((lastKit?.items || normalized.items || []).map((item) => `${item.itemId || item.itemName || ""},${item.quantity},${item.durability}`).join("\n"));
     setHistory((await starterKitApi.history()).rows || []);
     setPlayers((await playersApi.list()).rows || []);
   }
   useEffect(() => {
     run(load);
   }, []);
-  function nextConfig(): StarterKitConfig {
+  useEffect(() => {
+    if (!kitSaveResult || kitSaveResult.status === "running") return undefined;
+    const timer = window.setTimeout(() => setKitSaveResult(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [kitSaveResult]);
+  useEffect(() => {
+    if (!packageCreateResult || packageCreateResult.status === "running") return undefined;
+    const timer = window.setTimeout(() => setPackageCreateResult(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [packageCreateResult]);
+  useEffect(() => {
+    if (!autoGrantResult || autoGrantResult.status === "running") return undefined;
+    const timer = window.setTimeout(() => setAutoGrantResult(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [autoGrantResult]);
+  function nextConfig(source = config): StarterKitConfig {
+    const sourceActiveKit = starterKitActiveKit(source);
     return {
-      ...config,
-      items: config.items?.length ? config.items : itemsText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+      ...source,
+      allowRepeatGrants: false,
+      grantWhen: source.grantWhen,
+      items: source.kits.length === 0 ? [] : sourceActiveKit.items?.length ? sourceActiveKit.items : itemsText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
         const [nameOrId, qty = "1", durability = "1"] = line.split(",").map((part) => part.trim());
         const item = /^[A-Za-z0-9_./:-]{16,}$/.test(nameOrId) ? { itemId: nameOrId } : { itemName: nameOrId };
         return { ...item, quantity: Number(qty), durability: Number(durability) };
-      })
+      }),
+      xp: sourceActiveKit.xp,
+      kits: source.kits
     };
+  }
+  async function saveStarterConfigDraft(draft: StarterKitConfig, successTitle: string, resultTarget: "package" | "auto" | "create" | "setup" = "package") {
+    const setResult = resultTarget === "auto" ? setAutoGrantResult : resultTarget === "create" || resultTarget === "setup" ? setPackageCreateResult : setKitSaveResult;
+    setResult({ status: "running", title: resultTarget === "auto" ? "Saving Auto Grant..." : resultTarget === "create" ? "Creating Package..." : "Saving Package..." });
+    try {
+      const saved = normalizeStarterKitConfig(await starterKitApi.saveConfig(nextConfig(draft), "SAVE STARTER KIT"));
+      setConfig(saved);
+      const savedActiveKit = starterKitActiveKit(saved);
+      setNewAutoRule((current) => ({
+        kitId: saved.kits.some((kit) => kit.id === current.kitId) ? current.kitId : saved.autoGrantKitId || savedActiveKit.id,
+        grantWhen: current.grantWhen,
+        lastSeenDays: current.lastSeenDays
+      }));
+      setManualKitId((current) => saved.kits.some((kit) => kit.id === current) ? current : savedActiveKit.id);
+      setItemsText(savedActiveKit.items.map((item) => `${item.itemId || item.itemName || ""},${item.quantity},${item.durability}`).join("\n"));
+      if (!saved.kits.length) setStarterKitTab("create");
+      setResult({ status: "succeeded", title: successTitle });
+      return saved;
+    } catch (error) {
+      setResult({ status: "failed", title: resultTarget === "auto" ? "Auto Grant Save Failed." : resultTarget === "create" ? "Package Create Failed." : "Package Save Failed.", message: formatStarterKitError(error instanceof Error ? error.message : String(error)) });
+      throw error;
+    }
+  }
+  function setActiveKitId(nextId: string) {
+    const nextKit = config.kits.find((kit) => kit.id === nextId) || config.kits[0];
+    if (!nextKit) return;
+    setConfig({ ...config, activeKitId: nextKit.id, version: nextKit.id, items: nextKit.items, xp: nextKit.xp });
+    setManualKitId(nextKit.id);
+    setItemsText(nextKit.items.map((entry) => `${entry.itemId || entry.itemName || ""},${entry.quantity},${entry.durability}`).join("\n"));
+    setEditingStarterIndex(null);
+  }
+  function updateActiveKit(patch: Partial<StarterKitEntry>) {
+    const nextKits = config.kits.map((kit) => kit.id === activeKit.id ? { ...kit, ...patch } : kit);
+    const nextActive = nextKits.find((kit) => kit.id === activeKit.id) || nextKits[0];
+    setConfig({ ...config, kits: nextKits, activeKitId: nextActive.id, version: nextActive.id, items: nextActive.items, xp: nextActive.xp });
+  }
+  function addStarterKit() {
+    const name = newKitName.trim();
+    if (!name) {
+      setPackageCreateResult({ status: "failed", title: "Package Create Failed.", message: "Package name is required." });
+      return;
+    }
+    const nextIndex = config.kits.length + 1;
+    const id = uniqueStarterKitId(config.kits, name || `starter-kit-${nextIndex}`);
+    const nextKit = { id, name, items: [], xp: 0, welcomeMessage: "" };
+    const draft = { ...config, kits: [...config.kits, nextKit], activeKitId: id, version: id, items: [], xp: 0 };
+    run(async () => {
+      await saveStarterConfigDraft(draft, "Package was created.", "create");
+      setNewKitName("");
+      setStarterKitTab("configure");
+      setEditingStarterIndex(null);
+      setSelectedStarterItem(null);
+      setStarterDraft({ itemName: "", itemId: "", quantity: "1", durability: "1" });
+    });
+  }
+  function deleteActiveKit() {
+    const attachedRule = config.autoGrantRules.find((rule) => rule.kitId === activeKit.id);
+    if (attachedRule) {
+      setPackageCreateResult({ status: "failed", title: "Package Delete Failed.", message: "Delete the Auto Grant rule first." });
+      return;
+    }
+    if (!window.confirm(`Delete ${activeKit.name || "this package"}?`)) return;
+    const nextKits = config.kits.filter((kit) => kit.id !== activeKit.id);
+    const nextActive = nextKits.at(-1);
+    const autoGrantRules = config.autoGrantRules.filter((rule) => nextKits.some((kit) => kit.id === rule.kitId));
+    const draft = {
+      ...config,
+      kits: nextKits,
+      activeKitId: nextActive?.id || "",
+      autoGrantKitId: nextKits.some((kit) => kit.id === config.autoGrantKitId) ? config.autoGrantKitId : nextActive?.id || "",
+      version: nextActive?.id || "",
+      items: nextActive?.items || [],
+      xp: nextActive?.xp || 0,
+      autoGrantRules
+    };
+    run(async () => {
+      await saveStarterConfigDraft(draft, "Package was deleted.", "setup");
+      setEditingStarterIndex(null);
+      setEligibleByRule({});
+      if (!nextKits.length) setStarterKitTab("create");
+    });
+  }
+  function addAutoGrantRule() {
+    const kitId = config.kits.some((kit) => kit.id === newAutoRule.kitId) ? newAutoRule.kitId : activeKit.id;
+    const id = uniqueStarterRuleId(config.autoGrantRules, `auto-rule-${config.autoGrantRules.length + 1}`);
+    const draft = { ...config, autoGrantEnabled: true, autoGrantRules: [...config.autoGrantRules, { id, enabled: false, kitId, grantWhen: newAutoRule.grantWhen, lastSeenDays: newAutoRule.lastSeenDays }] };
+    run(async () => { await saveStarterConfigDraft(draft, "Auto grant rule was created.", "auto"); });
+  }
+  function updateAutoGrantRule(id: string, patch: Partial<StarterKitAutoGrantRule>) {
+    const currentRule = config.autoGrantRules.find((rule) => rule.id === id);
+    const nextEnabled = typeof patch.enabled === "boolean" ? patch.enabled : currentRule?.enabled;
+    const resultTitle = typeof patch.enabled === "boolean"
+      ? `${starterKitRuleName(currentRule, config.kits)} was ${patch.enabled ? "enabled" : "disabled"}.`
+      : "Auto grant rule was saved.";
+    const draft = { ...config, autoGrantEnabled: patch.enabled === true ? true : config.autoGrantEnabled, autoGrantRules: config.autoGrantRules.map((rule) => rule.id === id ? { ...rule, ...patch } : rule) };
+    run(async () => {
+      await saveStarterConfigDraft(draft, resultTitle, "auto");
+      if (typeof nextEnabled === "boolean") setAutoGrantResult({ status: nextEnabled ? "succeeded" : "failed", title: resultTitle });
+    });
+  }
+  function deleteAutoGrantRule(id: string) {
+    if (!window.confirm("Delete this Auto Grant rule?")) return;
+    const draft = { ...config, autoGrantRules: config.autoGrantRules.filter((rule) => rule.id !== id) };
+    run(async () => {
+      await saveStarterConfigDraft(draft, "Auto grant rule was deleted.", "auto");
+      setEligibleByRule((current) => {
+        const { [id]: _removed, ...rest } = current;
+        void _removed;
+        return rest;
+      });
+      setExpandedRuleIds((current) => {
+        const { [id]: _removed, ...rest } = current;
+        void _removed;
+        return rest;
+      });
+    });
+  }
+  function toggleRuleEligible(ruleId: string) {
+    const nextOpen = !expandedRuleIds[ruleId];
+    setExpandedRuleIds({ ...expandedRuleIds, [ruleId]: nextOpen });
+    if (!nextOpen || eligibleByRule[ruleId]) return;
+    run(async () => {
+      const result = await starterKitApi.eligible(ruleId);
+      setEligibleByRule((current) => ({ ...current, [ruleId]: result.rows || [] }));
+    });
   }
   function chooseStarterItem(item: CatalogItem | null) {
     setSelectedStarterItem(item);
     setStarterDraft({ ...starterDraft, itemName: item?.name || "", itemId: item?.id || "" });
   }
   function addStarterItem() {
-    const item = starterDraft.itemId ? { itemId: starterDraft.itemId, itemName: starterDraft.itemName } : { itemName: starterDraft.itemName };
+    const item = starterDraft.itemId ? { itemId: starterDraft.itemId, itemName: starterDraft.itemName, image: selectedStarterItem?.image } : { itemName: starterDraft.itemName, image: selectedStarterItem?.image };
     if (!starterDraft.itemName && !starterDraft.itemId) return;
-    const nextItems = [...(config.items || []), { ...item, quantity: Number(starterDraft.quantity), durability: Number(starterDraft.durability) }];
-    setConfig({ ...config, items: nextItems });
+    const nextItems = [...(activeKit.items || []), { ...item, quantity: Number(starterDraft.quantity), durability: Number(starterDraft.durability) }];
+    updateActiveKit({ items: nextItems });
     setItemsText(nextItems.map((entry) => `${entry.itemId || entry.itemName || ""},${entry.quantity},${entry.durability}`).join("\n"));
   }
-  const starterItemCount = config.items?.length || 0;
+  function editStarterItem(index: number) {
+    const item = activeKit.items?.[index];
+    if (!item) return;
+    setEditingStarterIndex(index);
+    setStarterEditDraft({ quantity: String(item.quantity ?? 1), durability: String(item.durability ?? 1) });
+  }
+  function saveStarterItemEdit(index: number) {
+    const nextItems = (activeKit.items || []).map((item, itemIndex) => itemIndex === index ? { ...item, quantity: Number(starterEditDraft.quantity), durability: Number(starterEditDraft.durability) } : item);
+    updateActiveKit({ items: nextItems });
+    setItemsText(nextItems.map((entry) => `${entry.itemId || entry.itemName || ""},${entry.quantity},${entry.durability}`).join("\n"));
+    setEditingStarterIndex(null);
+  }
+  const activeKit = starterKitActiveKit(config);
+  const manualKit = config.kits.find((kit) => kit.id === manualKitId) || activeKit;
+  const starterItemCount = activeKit.items?.length || 0;
   const selected = players.find((player) => String(player.actor_id || player.player_pawn_id || "") === selectedPlayer) || null;
   const grantPlayerId = manualPlayerId.trim() || String(selected?.action_player_id || "");
   const selectedLabel = selected ? `${selected.character_name || "Unknown"} (${selected.online_status || "unknown"}) - actor ${selected.actor_id || "-"} - admin ${selected.action_player_id || "-"}` : "";
-  const eligibleCount = eligible.filter((row) => row.eligible).length;
+  const historyRows = starterKitHistoryRows(history).slice(0, 10);
   return <section className="panel">
-    <div className="panel-title"><h2>Starter Kit</h2><button onClick={() => run(load)}>Refresh Starter Kit</button></div>
+    <div className="panel-title"><h2>Care Package</h2></div>
     <div className="action-sections">
       <section className="action-section">
-        <h4>Starter Kit Status</h4>
-        <p>{config.enabled ? "Starter Kit is enabled." : "Starter Kit is disabled."}</p>
-        <p>{starterItemCount ? `${starterItemCount} starter item${starterItemCount === 1 ? "" : "s"} configured.` : "No starter items configured."}</p>
-        <p>{config.autoGrantEnabled ? `Auto-grant scans every ${config.autoGrantIntervalSeconds} seconds when enabled.` : "Auto-grant is off by default."}</p>
-      </section>
-
-      <section className="action-section">
-        <h4>Starter Kit Configuration</h4>
-        <div className="action-line">
-          <label>Version<input value={config.version} onChange={(event) => setConfig({ ...config, version: event.target.value })} /></label>
-          <label>XP<input type="number" min="0" value={String(config.xp)} onChange={(event) => setConfig({ ...config, xp: Number(event.target.value) })} /></label>
-          <label className="checkbox-line"><input type="checkbox" checked={config.allowRepeatGrants} onChange={(event) => setConfig({ ...config, allowRepeatGrants: event.target.checked })} /> <span>Allow repeat manual grants</span></label>
+        <div className="panel-title">
+          <h4>Care Package Configuration</h4>
+          <button className={`starter-kit-toggle ${config.enabled ? "enabled" : "disabled"}`} onClick={() => run(async () => {
+            const confirmation = config.enabled ? "DISABLE STARTER KIT" : "ENABLE STARTER KIT";
+            const message = config.enabled ? "Disable Care Package?" : "Enable Care Package?";
+            if (window.confirm(message)) setConfig(normalizeStarterKitConfig(await starterKitApi[config.enabled ? "disable" : "enable"](confirmation)));
+          })}>Care Package: {config.enabled ? "On" : "Off"}</button>
         </div>
-        <h4>Starter Items</h4>
-        <ItemCatalogSelector selected={selectedStarterItem} onSelect={chooseStarterItem} />
-        <div className="action-line">
-          <label>Quantity<input type="number" min="1" value={starterDraft.quantity} onChange={(event) => setStarterDraft({ ...starterDraft, quantity: event.target.value })} /></label>
-          <label>Durability / Quality<input type="number" min="0" value={starterDraft.durability} onChange={(event) => setStarterDraft({ ...starterDraft, durability: event.target.value })} /></label>
-          <button disabled={!selectedStarterItem} onClick={addStarterItem}>Add Item</button>
+        <div className="settings-tabs" role="tablist" aria-label="Care Package setup">
+          <button className={starterKitTab === "create" ? "active" : ""} role="tab" aria-selected={starterKitTab === "create"} onClick={() => setStarterKitTab("create")}>Create</button>
+          <button className={starterKitTab === "configure" ? "active" : ""} role="tab" aria-selected={starterKitTab === "configure"} disabled={!config.kits.length} onClick={() => setStarterKitTab("configure")}>Configure</button>
+          {packageCreateResult && <span className={`inline-task-result result-${packageCreateResult.status === "succeeded" ? "ok" : packageCreateResult.status === "failed" ? "fail" : "running"}`}>
+            <strong className={packageCreateResult.status === "running" ? "loading-dots" : ""}>{packageCreateResult.title}</strong>
+            {packageCreateResult.message && <span className="inline-task-message">{packageCreateResult.message}</span>}
+          </span>}
         </div>
-        {config.items?.length ? <div className="table-wrap starter-items-table"><table><thead><tr><th>Item Name</th><th>Item ID</th><th>Quantity</th><th>Durability</th><th>Actions</th></tr></thead><tbody>{config.items.map((item, index) => <tr key={`${item.itemName || item.itemId}-${index}`}><td>{starterItemName(item)}</td><td>{starterItemId(item)}</td><td>{item.quantity}</td><td>{item.durability}</td><td><button className="danger" onClick={() => {
-          const nextItems = config.items.filter((_, itemIndex) => itemIndex !== index);
-          setConfig({ ...config, items: nextItems });
+        {starterKitTab === "create" ? <div className="starter-kit-builder starter-kit-create">
+          <label className="starter-kit-new-field">New Package Name<input value={newKitName} onChange={(event) => setNewKitName(event.target.value)} placeholder="New package" /></label>
+          <button onClick={addStarterKit}>Add Package</button>
+        </div> : <>
+        <div className="starter-kit-builder">
+          <label className="compact-select">Select Package<select value={activeKit.id} onChange={(event) => setActiveKitId(event.target.value)}>{config.kits.map((kit) => <option key={kit.id} value={kit.id}>{kit.name || "Name Required"}</option>)}</select></label>
+          <button className="danger" onClick={deleteActiveKit}>Delete Package</button>
+        </div>
+        <label className="starter-kit-name-field">Package Name<input value={activeKit.name} onChange={(event) => updateActiveKit({ name: event.target.value })} placeholder="Enter package name" /></label>
+        <div className="starter-xp-row">
+          <span>Grant</span>
+          <input type="number" min="0" value={String(activeKit.xp)} onChange={(event) => updateActiveKit({ xp: Number(event.target.value) })} />
+          <span>XP</span>
+        </div>
+        <label className="starter-welcome-field">Send Message<textarea value={activeKit.welcomeMessage || ""} onChange={(event) => updateActiveKit({ welcomeMessage: event.target.value })} placeholder="Optional private whisper after this package is granted" /></label>
+        <div className={`starter-items-toggle-panel ${starterItemsOpen ? "open" : ""}`}>
+          <div className="starter-items-toggle-row">
+            <h4>Starter Items</h4>
+            <button className={`icon-toggle-button ${starterItemsOpen ? "active" : ""}`} aria-label={starterItemsOpen ? "Collapse Starter Items" : "Expand Starter Items"} title={starterItemsOpen ? "Collapse" : "Expand"} onClick={() => setStarterItemsOpen(!starterItemsOpen)}>{starterItemsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</button>
+          </div>
+          {starterItemsOpen && <div className="starter-items-picker-panel">
+            <ItemCatalogSelector selected={selectedStarterItem} onSelect={chooseStarterItem} />
+            <div className="action-line">
+              <label>Quantity<input type="number" min="1" value={starterDraft.quantity} onChange={(event) => setStarterDraft({ ...starterDraft, quantity: event.target.value })} /></label>
+              <label>Durability / Quality<input type="number" min="0" value={starterDraft.durability} onChange={(event) => setStarterDraft({ ...starterDraft, durability: event.target.value })} /></label>
+              <button disabled={!selectedStarterItem} onClick={addStarterItem}>Add Item</button>
+            </div>
+          </div>}
+        </div>
+        {activeKit.items?.length ? <div className="table-wrap starter-items-table"><table><thead><tr><th>Preview</th><th>Item Name</th><th>Item ID</th><th>Quantity</th><th>Durability</th><th>Actions</th></tr></thead><tbody>{activeKit.items.map((item, index) => {
+          const editing = editingStarterIndex === index;
+          return <tr key={`${item.itemName || item.itemId}-${index}`}><td><StarterItemPreview item={item} /></td><td>{starterItemName(item)}</td><td>{starterItemId(item)}</td><td>{editing ? <input className="starter-item-quantity-input" type="number" min="1" value={starterEditDraft.quantity} onChange={(event) => setStarterEditDraft({ ...starterEditDraft, quantity: event.target.value })} /> : item.quantity}</td><td>{editing ? <input className="starter-item-durability-input" type="number" min="0" value={starterEditDraft.durability} onChange={(event) => setStarterEditDraft({ ...starterEditDraft, durability: event.target.value })} /> : item.durability}</td><td className="starter-actions-cell"><div className="service-actions">{editing ? <><button onClick={() => saveStarterItemEdit(index)}>Save</button><button onClick={() => setEditingStarterIndex(null)}>Cancel</button></> : <button onClick={() => editStarterItem(index)}>Edit</button>}<button className="danger" onClick={() => {
+          const nextItems = activeKit.items.filter((_, itemIndex) => itemIndex !== index);
+          updateActiveKit({ items: nextItems });
           setItemsText(nextItems.map((entry) => `${entry.itemId || entry.itemName || ""},${entry.quantity},${entry.durability}`).join("\n"));
-        }}>Remove</button></td></tr>)}</tbody></table></div> : <div className="empty">No starter items configured. Search for an item, set quantity/quality, then Add Item.</div>}
+          if (editingStarterIndex === index) setEditingStarterIndex(null);
+        }}>Remove</button></div></td></tr>;
+        })}</tbody></table></div> : null}
         <details className="technical-details"><summary>Developer raw starter item textarea</summary><p>One item per line: item name or raw item ID, quantity, durability.</p><label>Starter Items<textarea value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder="Plant Fiber,10,1&#10;cup of water,1,1" /></label></details>
         <div className="action-line">
-          <button onClick={() => run(async () => { if (window.confirm("Save Starter Kit config?")) { const saved = await starterKitApi.saveConfig(nextConfig(), "SAVE STARTER KIT"); setConfig(saved); setItemsText(saved.items.map((item) => `${item.itemId || item.itemName || ""},${item.quantity},${item.durability}`).join("\n")); setOutputScope("config"); setOutput("Starter Kit config saved."); } })}>Save Config</button>
-          <button onClick={() => run(async () => { if (window.confirm("Enable Starter Kit config? Manual grants remain confirmation-gated.")) setConfig(await starterKitApi.enable("ENABLE STARTER KIT")); })}>Enable</button>
-          <button className="danger" onClick={() => run(async () => { if (window.confirm("Disable Starter Kit?")) setConfig(await starterKitApi.disable("DISABLE STARTER KIT")); })}>Disable</button>
+          <button onClick={() => run(async () => {
+            if (!window.confirm("Save Care Package?")) return;
+            if (selectedStarterItem && !activeKit.items.some((item) => (item.itemId && item.itemId === starterDraft.itemId) || (item.itemName && item.itemName === starterDraft.itemName))) {
+              setKitSaveResult({ status: "failed", title: "Package Save Failed.", message: "Click Add Item before saving the package." });
+              return;
+            }
+            setKitSaveResult({ status: "running", title: "Saving Package..." });
+            try {
+              const saved = normalizeStarterKitConfig(await starterKitApi.saveConfig(nextConfig(), "SAVE STARTER KIT"));
+              setConfig(saved);
+              const savedActiveKit = starterKitActiveKit(saved);
+              setItemsText(savedActiveKit.items.map((item) => `${item.itemId || item.itemName || ""},${item.quantity},${item.durability}`).join("\n"));
+              setKitSaveResult({ status: "succeeded", title: "Package was saved successfully." });
+            } catch (error) {
+              setKitSaveResult({ status: "failed", title: "Package Save Failed.", message: formatStarterKitError(error instanceof Error ? error.message : String(error)) });
+            }
+          })}>Save Package</button>
+          {kitSaveResult && <span className={`inline-task-result result-${kitSaveResult.status === "succeeded" ? "ok" : kitSaveResult.status === "failed" ? "fail" : "running"}`}>
+            <strong className={kitSaveResult.status === "running" ? "loading-dots" : ""}>{kitSaveResult.title}</strong>
+            {kitSaveResult.message && <span className="inline-task-message">{kitSaveResult.message}</span>}
+          </span>}
         </div>
-        <StarterKitResult output={outputScope === "config" ? output : ""} technicalOutput={outputScope === "config" ? technicalOutput : ""} />
+        </>}
       </section>
 
       <section className="action-section">
-        <h4>Manual Grant</h4>
-        <p>Select a player from the current player list. Grants use the Admin action ID, not the DB actor ID.</p>
-        <div className="action-line">
-          <label className="wide-field">Player<select value={selectedPlayer} onChange={(event) => setSelectedPlayer(event.target.value)}>
-            <option value="">Select player</option>
-            {players.map((player) => <option key={String(player.actor_id || player.player_pawn_id || player.action_player_id)} value={String(player.actor_id || player.player_pawn_id || "")}>
-              {String(player.character_name || "Unknown")} - {String(player.online_status || "unknown")} - actor {String(player.actor_id || "-")} - admin {String(player.action_player_id || "missing")}
-            </option>)}
-          </select></label>
-          <button disabled={!grantPlayerId} onClick={() => run(async () => { if (window.confirm(`Grant Starter Kit to ${selectedLabel || grantPlayerId}?`)) showGrantResult("grant", await starterKitApi.grant(grantPlayerId, "GRANT STARTER KIT")); })}>Grant Starter Kit</button>
+        <div className="starter-grant-header">
+          <div className="settings-tabs" role="tablist" aria-label="Care Package grants">
+            <button className={starterGrantTab === "auto" ? "active" : ""} role="tab" aria-selected={starterGrantTab === "auto"} onClick={() => setStarterGrantTab("auto")}>Auto Grant</button>
+            <button className={starterGrantTab === "manual" ? "active" : ""} role="tab" aria-selected={starterGrantTab === "manual"} onClick={() => setStarterGrantTab("manual")}>Manual Grant</button>
+          </div>
+          {autoGrantResult && <span className={`inline-task-result result-${autoGrantResult.status === "succeeded" ? "ok" : autoGrantResult.status === "failed" ? "fail" : "running"}`}>
+            <strong className={autoGrantResult.status === "running" ? "loading-dots" : ""}>{autoGrantResult.title}</strong>
+            {autoGrantResult.message && <span className="inline-task-message">{autoGrantResult.message}</span>}
+          </span>}
         </div>
-        {selected && !selected.action_player_id && <p className="danger-note">Selected player has no Admin action ID, so CLI-backed grants are disabled.</p>}
-        <details className="technical-details">
-          <summary>Advanced manual player ID override</summary>
-          <label>Admin action ID<input value={manualPlayerId} onChange={(event) => setManualPlayerId(event.target.value)} placeholder="RedBlink#75570" /></label>
-        </details>
-        <StarterKitResult output={outputScope === "grant" ? output : ""} technicalOutput={outputScope === "grant" ? technicalOutput : ""} />
+        {starterGrantTab === "auto" ? <>
+          <div className="action-line starter-auto-line">
+            <label className="compact-field">Interval Seconds<input type="number" min="60" max="3600" value={String(config.autoGrantIntervalSeconds)} onChange={(event) => setConfig({ ...config, autoGrantIntervalSeconds: Number(event.target.value) })} /></label>
+            <label className="compact-select">Package<select value={newAutoRule.kitId} onChange={(event) => setNewAutoRule({ ...newAutoRule, kitId: event.target.value })}>{config.kits.map((kit) => <option key={kit.id} value={kit.id}>{kit.name || "Name Required"}</option>)}</select></label>
+            <label className="compact-select">Grant When<select value={newAutoRule.grantWhen} onChange={(event) => setNewAutoRule({ ...newAutoRule, grantWhen: event.target.value as StarterKitAutoGrantRule["grantWhen"] })}><option value="first_online">First Online</option><option value="last_seen">Last Seen</option></select></label>
+            {newAutoRule.grantWhen === "last_seen" && <label className="compact-field">Days Ago<input type="number" min="1" max="3650" value={String(newAutoRule.lastSeenDays)} onChange={(event) => setNewAutoRule({ ...newAutoRule, lastSeenDays: Number(event.target.value) })} /></label>}
+            <button disabled={!config.kits.length} onClick={addAutoGrantRule}>Create Rule</button>
+          </div>
+          <div className="starter-auto-rules">
+            {config.autoGrantRules.map((rule) => {
+              const kit = config.kits.find((entry) => entry.id === rule.kitId);
+              const ruleEligible = eligibleByRule[rule.id] || [];
+              const expanded = Boolean(expandedRuleIds[rule.id]);
+              return <article className="starter-auto-rule" key={rule.id}>
+                <button className={`starter-rule-toggle ${rule.enabled ? "enabled" : "disabled"}`} onClick={() => updateAutoGrantRule(rule.id, { enabled: !rule.enabled })}>{rule.enabled ? "Enabled" : "Disabled"}</button>
+                <span className="starter-rule-summary">Grants {starterKitGrantSummary(kit)} based on {starterKitConditionLabel(rule)}</span>
+            <button className="icon-toggle-button danger starter-rule-delete" aria-label="Delete Auto Grant rule" title="Delete" onClick={() => deleteAutoGrantRule(rule.id)}><X size={18} /></button>
+                <button className={`icon-toggle-button ${expanded ? "active" : ""}`} aria-label={expanded ? "Collapse Eligibility" : "Expand Eligibility"} title={expanded ? "Collapse" : "Expand"} onClick={() => toggleRuleEligible(rule.id)}>{expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</button>
+                {expanded && <div className="starter-rule-eligible"><h5>Eligibility</h5>{ruleEligible.length ? <DataTable rows={starterKitEligibleRows(ruleEligible)} /> : <div className="empty starter-history-empty">No eligible players for this rule right now.</div>}</div>}
+              </article>;
+            })}
+          </div>
+        </> : <>
+          <div className="action-line">
+            <label className="compact-select">Package<select value={manualKit.id} onChange={(event) => setManualKitId(event.target.value)}>{config.kits.map((kit) => <option key={kit.id} value={kit.id}>{kit.name || "Name Required"}</option>)}</select></label>
+            <label className="wide-field">Player<select value={selectedPlayer} onChange={(event) => setSelectedPlayer(event.target.value)}>
+              <option value="">Select player</option>
+              {players.map((player) => <option key={String(player.actor_id || player.player_pawn_id || player.action_player_id)} value={String(player.actor_id || player.player_pawn_id || "")}>
+                {String(player.character_name || "Unknown")} - {String(player.online_status || "unknown")} - actor {String(player.actor_id || "-")} - admin {String(player.action_player_id || "missing")}
+              </option>)}
+            </select></label>
+            <button disabled={!grantPlayerId || !manualKit.id} onClick={() => run(async () => { if (window.confirm(`Grant ${manualKit.name} to ${selectedLabel || grantPlayerId}?`)) showGrantResult("grant", await starterKitApi.grant(grantPlayerId, "GRANT STARTER KIT", manualKit.id)); })}>Grant Package</button>
+          </div>
+          {selected && !selected.action_player_id && <p className="danger-note">Selected player has no Admin action ID, so CLI-backed grants are disabled.</p>}
+          <details className="technical-details">
+            <summary>Advanced manual player ID override</summary>
+            <label>Admin action ID<input value={manualPlayerId} onChange={(event) => setManualPlayerId(event.target.value)} placeholder="RedBlink#75570" /></label>
+          </details>
+          <StarterKitResult output={outputScope === "grant" ? output : ""} technicalOutput={outputScope === "grant" ? technicalOutput : ""} />
+        </>}
       </section>
 
       <section className="action-section">
-        <h4>Auto Grant</h4>
-        <p>Auto-grant is disabled by default. It only runs when Starter Kit is enabled and Auto Grant is enabled.</p>
-        <div className="action-line">
-          <label className="checkbox-line"><input type="checkbox" checked={config.autoGrantEnabled} onChange={(event) => setConfig({ ...config, autoGrantEnabled: event.target.checked })} /> <span>Enable auto-grant for future players</span></label>
-          <label>Interval seconds<input type="number" min="60" max="3600" value={String(config.autoGrantIntervalSeconds)} onChange={(event) => setConfig({ ...config, autoGrantIntervalSeconds: Number(event.target.value) })} /></label>
-          <label>Grant when<select value={config.grantWhen} onChange={(event) => setConfig({ ...config, grantWhen: event.target.value as StarterKitConfig["grantWhen"] })}><option value="first_seen">First seen</option><option value="first_online">First online</option></select></label>
-          <button onClick={() => run(async () => { const result = await starterKitApi.eligible(); setEligible(result.rows || []); })}>Preview Eligible Players</button>
-          <button className="danger" disabled={!eligibleCount} onClick={() => run(async () => { const phrase = window.prompt("Type GRANT STARTER KIT TO ELIGIBLE PLAYERS to bulk grant."); if (phrase) showGrantResult("auto", await starterKitApi.grantEligible(phrase)); setHistory((await starterKitApi.history()).rows || []); })}>Grant to Eligible Players</button>
-          <button onClick={() => run(async () => showGrantResult("auto", await starterKitApi.run("RUN STARTER KIT SCAN")))}>Run Auto Scan Now</button>
-        </div>
-        {eligible.length > 0 && <DataTable rows={eligible} />}
-        <StarterKitResult output={outputScope === "auto" ? output : ""} technicalOutput={outputScope === "auto" ? technicalOutput : ""} />
-      </section>
-
-      <section className="action-section">
-        <h4>Grant History</h4>
-        <div className="action-line">
-          <input value={grantId} onChange={(event) => setGrantId(event.target.value)} placeholder="Failed grant id" />
-          <button onClick={() => run(async () => { if (window.confirm(`Retry Starter Kit grant ${grantId}?`)) showGrantResult("history", await starterKitApi.retry(grantId, "RETRY STARTER KIT")); })}>Retry Failed Grant</button>
-          <button onClick={() => run(async () => setHistory((await starterKitApi.history()).rows || []))}>Refresh History</button>
+        <div className="panel-title">
+          <h4>Grant History</h4>
+          <button onClick={() => run(async () => setHistory((await starterKitApi.history()).rows || []))}>Refresh</button>
         </div>
         <StarterKitResult output={outputScope === "history" ? output : ""} technicalOutput={outputScope === "history" ? technicalOutput : ""} />
-        <DataTable rows={history} columns={["timestamp", "character_name", "action_player_id", "source", "version", "status", "summary"]} />
+        <div className="starter-history-table">
+          {historyRows.length ? <DataTable rows={historyRows} columns={["timestamp", "character_name", "action_player_id", "source", "status", "summary"]} action={(row) => String(row.status || "").toLowerCase() === "failed" ? <button onClick={() => run(async () => { if (window.confirm(`Retry Care Package grant ${row.id}?`)) showGrantResult("history", await starterKitApi.retry(String(row.id), "RETRY STARTER KIT")); })}>Retry</button> : null} /> : <div className="empty starter-history-empty">Grant history is clear. Care Package grants will appear here after they run.</div>}
+        </div>
       </section>
     </div>
     <details className="technical-details">
-      <summary>Raw Starter Kit JSON</summary>
-      <pre className="mini-output">{JSON.stringify(config, null, 2)}</pre>
+      <summary>Raw Care Package JSON</summary>
+      <pre className="mini-output">{JSON.stringify(displayStarterKitConfig(config), null, 2)}</pre>
     </details>
   </section>;
 
@@ -1365,11 +2731,131 @@ function StarterKitPanel({ onError }: { onError: (text: string) => void }) {
   }
 }
 
+function AddonsPanel() {
+  return <section className="panel">
+    <div className="panel-title"><h2>Addons</h2></div>
+    <section className="action-section info-panel">
+      <h4>Something is stirring beneath the sand.</h4>
+      <p>The next layer of Arrakis is not ready to reveal itself yet. Future updates will unlock new ways to extend, shape, and command your server.</p>
+    </section>
+  </section>;
+}
+
+function normalizeStarterKitConfig(config: StarterKitConfig): StarterKitConfig {
+  const fallbackKit: StarterKitEntry = { id: config.version || "starter-kit-v1", name: "Care Package", items: config.items || [], xp: Number(config.xp) || 0, welcomeMessage: "" };
+  const kits = (Array.isArray(config.kits) ? config.kits : [fallbackKit]).map((kit, index) => ({
+    id: kit.id || `starter-kit-${index + 1}`,
+    name: typeof kit.name === "string" ? kit.name : (index === 0 ? "Care Package" : `Care Package ${index + 1}`),
+    items: kit.items || [],
+    xp: Number(kit.xp) || 0,
+    welcomeMessage: normalizeCarePackageWelcomeMessage(kit.welcomeMessage)
+  }));
+  const activeKitId = kits.some((kit) => kit.id === config.activeKitId) ? config.activeKitId : kits[0]?.id || "";
+  const autoGrantKitId = kits.some((kit) => kit.id === config.autoGrantKitId) ? config.autoGrantKitId : activeKitId;
+  const activeKit = kits.find((kit) => kit.id === activeKitId) || kits[0] || { id: "", name: "", items: [], xp: 0, welcomeMessage: "" };
+  const autoGrantRules = (kits.length ? (Array.isArray(config.autoGrantRules) ? config.autoGrantRules : [{ id: "auto-rule-1", enabled: true, kitId: autoGrantKitId, grantWhen: "first_online" as const, lastSeenDays: 30 }]) : []).map((rule, index) => ({
+    id: rule.id || `auto-rule-${index + 1}`,
+    enabled: rule.enabled !== false,
+    kitId: kits.some((kit) => kit.id === rule.kitId) ? rule.kitId : autoGrantKitId,
+    grantWhen: rule.grantWhen === "last_seen" || String(rule.grantWhen) === "first_seen" ? "last_seen" as const : "first_online" as const,
+    lastSeenDays: Number(rule.lastSeenDays) || 30
+  }));
+  const grantWhen = config.grantWhen === "last_seen" || String(config.grantWhen) === "first_seen" ? "last_seen" : "first_online";
+  return { ...config, version: activeKit.id, activeKitId, autoGrantKitId, kits, items: activeKit.items, xp: activeKit.xp, allowRepeatGrants: false, grantWhen, autoGrantRules };
+}
+
+function normalizeCarePackageWelcomeMessage(value: unknown) {
+  const text = typeof value === "string" ? value : "";
+  return text.trim() === "Welcome to the server" ? "" : text;
+}
+
+function displayStarterKitConfig(config: StarterKitConfig) {
+  const { version, allowRepeatGrants, ...visible } = config;
+  void version;
+  void allowRepeatGrants;
+  return visible;
+}
+
+function formatStarterKitError(value: string) {
+  const text = String(value || "").trim()
+    .replaceAll("Starter Kit", "Care Package")
+    .replaceAll("starter kit", "care package")
+    .replaceAll(" kit", " package")
+    .replaceAll(" Kit", " Package");
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "Care Package save failed.";
+}
+
+function starterKitActiveKit(config: StarterKitConfig) {
+  return config.kits.find((kit) => kit.id === config.activeKitId) || config.kits[0] || { id: "", name: "", items: [], xp: 0 };
+}
+
+function starterKitGrantSummary(kit?: StarterKitEntry) {
+  if (!kit) return "Unknown Package";
+  const parts = [];
+  if (kit.xp) parts.push(`${kit.xp} XP`);
+  if (kit.items?.length) parts.push(`${kit.items.length} item${kit.items.length === 1 ? "" : "s"}`);
+  return `${kit.name || "Name Required"}${parts.length ? ` (${parts.join(", ")})` : ""}`;
+}
+
+function starterKitRuleName(rule: StarterKitAutoGrantRule | undefined, kits: StarterKitEntry[]) {
+  const kit = kits.find((entry) => entry.id === rule?.kitId);
+  return kit?.name ? `${kit.name} rule` : "Auto Grant rule";
+}
+
+function starterKitConditionLabel(rule: StarterKitAutoGrantRule) {
+  if (rule.grantWhen === "last_seen") return `Last Seen ${Number(rule.lastSeenDays) || 30} Days Ago`;
+  return "First Online";
+}
+
+function uniqueStarterKitId(kits: StarterKitEntry[], base: string) {
+  const normalized = base.toLowerCase().replace(/[^a-z0-9_.:-]+/g, "-").replace(/^-+|-+$/g, "") || "starter-kit";
+  let id = normalized;
+  let index = 2;
+  while (kits.some((kit) => kit.id === id)) {
+    id = `${normalized}-${index}`;
+    index += 1;
+  }
+  return id;
+}
+
+function uniqueStarterRuleId(rules: StarterKitAutoGrantRule[], base: string) {
+  const normalized = base.toLowerCase().replace(/[^a-z0-9_.:-]+/g, "-").replace(/^-+|-+$/g, "") || "auto-rule";
+  let id = normalized;
+  let index = 2;
+  while (rules.some((rule) => rule.id === id)) {
+    id = `${normalized}-${index}`;
+    index += 1;
+  }
+  return id;
+}
+
+function starterKitEligibleRows(rows: Record<string, unknown>[]) {
+  return rows.map((row) => ({
+    character_name: row.character_name || "Unknown",
+    online_status: row.online_status || "",
+    eligible: row.eligible ? "True" : "False",
+    reason: row.reason || "",
+    action_player_id: row.action_player_id || "",
+    actor_id: row.actor_id || ""
+  }));
+}
+
+function starterKitHistoryRows(rows: Record<string, unknown>[]) {
+  return rows.map((row) => ({
+    ...row,
+    timestamp: String(row.local_timestamp || row.timestamp || ""),
+    character_name: titleCaseWords(String(row.character_name || "Unknown")),
+    source: titleCaseWords(String(row.source || "")),
+    status: titleCaseWords(String(row.status || "")),
+    summary: titleCaseWords(String(row.summary || ""))
+  }));
+}
+
 function StarterKitResult({ output, technicalOutput }: { output: string; technicalOutput: string }) {
   if (!output) return null;
   const rows = output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   return <div className="result-panel starter-result">
-    <strong>Starter Kit Result</strong>
+    <strong>Care Package Result</strong>
     <ul className="result-list">
       {rows.map((line, index) => {
         const status = /^OK:/i.test(line) ? "ok" : /^FAIL:/i.test(line) || /failed/i.test(line) ? "fail" : "info";
@@ -1398,7 +2884,7 @@ function ItemCatalogSelector({ label = "Select Item", selected, onSelect, placeh
   async function load() {
     setLoading(true);
     try {
-      const result = await adminApi.itemCatalog("", 2000);
+      const result = await adminApi.itemCatalog("", 10000);
       setItems((result.rows || []).map((item) => ({ ...item, id: item.itemId || item.id })));
     } finally {
       setLoading(false);
@@ -1407,34 +2893,55 @@ function ItemCatalogSelector({ label = "Select Item", selected, onSelect, placeh
   useEffect(() => {
     load().catch(() => undefined);
   }, []);
-  const selectedValue = selected ? `${selected.name}::${selected.id}` : "";
-  const categories = ["all", ...Array.from(new Set(items.map((item) => item.category).filter((value): value is string => Boolean(value)))).sort()];
+  const categoryCounts = items.reduce<Record<string, number>>((counts, item) => {
+    const key = item.category || "uncategorized";
+    counts[key] = (counts[key] || 0) + 1;
+    return counts;
+  }, {});
+  const categories = ["all", ...Object.keys(categoryCounts).sort()];
   const filteredItems = items.filter((item) => {
     const matchesCategory = category === "all" || item.category === category;
     const haystack = `${item.name} ${item.id} ${item.category || ""} ${item.source || ""}`.toLowerCase();
     return matchesCategory && (!query.trim() || haystack.includes(query.trim().toLowerCase()));
-  });
+  }).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) || a.id.localeCompare(b.id, undefined, { sensitivity: "base" }));
   return <div className="catalog-selector">
-    <label className="compact-select">Choose Category
-      <select value={category} onChange={(event) => { setCategory(event.target.value); onSelect(null); }}>
-        {categories.map((option) => <option key={option} value={option}>{option === "all" ? "All Categories" : titleCase(option)}</option>)}
-      </select>
-    </label>
-    <label className="wide-field">Filter Items
-      <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={placeholder} />
-    </label>
-    <label className="wide-field">{label}
-      <select value={selectedValue} onChange={(event) => {
-        const item = filteredItems.find((candidate) => `${candidate.name}::${candidate.id}` === event.target.value) || null;
-        onSelect(item);
-      }}>
-        <option value="">{loading ? "Loading items..." : "Choose an item from catalog"}</option>
-        {filteredItems.map((item) => <option key={`${item.id}-${item.name}-${item.source}`} value={`${item.name}::${item.id}`}>
-          {item.name} - {item.id}{item.category ? ` - ${titleCase(item.category)}` : ""}{item.source ? ` (${item.source})` : ""}
-        </option>)}
-      </select>
-    </label>
-    {selected && <KeyValueGrid items={[["Item Name", selected.name], ["Item ID", selected.id], ["Category", selected.category ? titleCase(selected.category) : ""], ["Source", selected.source || ""]]} />}
+    <div className="catalog-filter-row">
+      <label className="compact-select catalog-category-select">Choose Category
+        <select value={category} onChange={(event) => { setCategory(event.target.value); onSelect(null); }}>
+          {categories.map((option) => <option key={option} value={option}>{option === "all" ? `All Categories (${items.length})` : `${titleCase(option)} (${categoryCounts[option] || 0})`}</option>)}
+        </select>
+      </label>
+      <input className="catalog-filter-input" aria-label="Filter Items" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={placeholder} />
+    </div>
+    <div className="catalog-item-picker" aria-label={label}>
+      {loading ? <div className="catalog-loading">Loading Items...</div> : filteredItems.map((item) => {
+        const active = selected?.id === item.id && selected?.name === item.name;
+        return <button type="button" className={`catalog-item-option ${active ? "active" : ""}`} key={`${item.id}-${item.name}-${item.source}`} onClick={() => onSelect(item)}>
+          <CatalogItemThumb item={item} />
+          <span>
+            <strong>{item.name}</strong>
+            <small>{item.id}{item.category ? ` - ${titleCase(item.category)}` : ""}</small>
+          </span>
+        </button>;
+      })}
+      {!loading && !filteredItems.length && <div className="catalog-empty">No items match your filters.</div>}
+    </div>
+    {selected && <div className="catalog-selected-item">
+      <CatalogItemThumb item={selected} large />
+      <KeyValueGrid items={[["Item Name", selected.name], ["Item ID", selected.id], ["Category", selected.category ? titleCase(selected.category) : ""], ["Source", selected.source || ""]]} />
+    </div>}
+  </div>;
+}
+
+function CatalogItemThumb({ item, large = false, small = false }: { item: CatalogItem; large?: boolean; small?: boolean }) {
+  const fallback = "/images/items/image-unavailable.png";
+  const src = item.image || `/images/items/${encodeURIComponent(item.itemId || item.id)}.png`;
+  const [imageSrc, setImageSrc] = useState(src);
+  useEffect(() => {
+    setImageSrc(src);
+  }, [src]);
+  return <div className={large ? "catalog-item-preview large" : small ? "catalog-item-preview small" : "catalog-item-preview"}>
+    <img src={imageSrc} alt="" onError={() => { if (imageSrc !== fallback) setImageSrc(fallback); }} />
   </div>;
 }
 
@@ -1442,7 +2949,7 @@ function formatStarterKitGrantResult(result: Record<string, unknown>) {
   if (Array.isArray(result.results) && result.results.some((row) => row && typeof row === "object" && "status" in row)) {
     const rows = result.results as Record<string, unknown>[];
     const lines = [
-      `Starter Kit bulk grant finished: ${result.granted || 0} granted, ${result.skipped || 0} skipped, ${result.failed || 0} failed.`
+      `Care Package bulk grant finished: ${result.granted || 0} granted, ${result.skipped || 0} skipped, ${result.failed || 0} failed.`
     ];
     rows.slice(0, 20).forEach((row) => {
       const name = row.character_name || row.action_player_id || row.playerId || "Unknown player";
@@ -1451,15 +2958,16 @@ function formatStarterKitGrantResult(result: Record<string, unknown>) {
     return lines.join("\n");
   }
   const status = String(result.status || (result.ok ? "granted" : "failed"));
-  const heading = status === "granted" ? "Starter Kit grant completed." :
-    status === "partial_failed" ? "Starter Kit grant partially completed." :
-      status === "skipped" ? "Starter Kit grant skipped." : "Starter Kit grant failed.";
-  const lines = [heading, String(result.summary || "")].filter(Boolean);
+  const lines: string[] = [];
   if (Array.isArray(result.results)) {
     for (const action of result.results as Record<string, unknown>[]) {
-      if (action.ok) lines.push(`OK: ${describeStarterKitAction(action)} granted`);
-      else lines.push(`FAIL: ${describeStarterKitAction(action)} failed: ${action.error || "unknown error"}${action.item ? " (use Admin Tools -> Item Search for exact item names)" : ""}`);
+      if (action.ok) lines.push(`OK: ${describeStarterKitAction(action)}`);
+      else lines.push(`FAIL: to grant ${describeStarterKitAction(action)}`);
     }
+  }
+  if (!lines.length) {
+    if (status === "skipped") lines.push(`FAIL: ${result.reason || "grant was skipped"}`);
+    else lines.push(`FAIL: ${result.summary || "grant failed"}`);
   }
   return lines.join("\n");
 }
@@ -1468,13 +2976,18 @@ function describeStarterKitAction(action: Record<string, unknown>) {
   const item = action.item as Record<string, unknown> | undefined;
   if (item) return `${item.itemName || item.itemId || "Item"} x${item.quantity || 1}`;
   if (action.operation === "adminAddXp") return `${action.amount || 0} XP`;
-  return String(action.operation || "Starter Kit action");
+  return String(action.operation || "Care Package action");
 }
 
 function starterItemName(item: { itemName?: string; itemId?: string }) {
   if (item.itemName) return item.itemName;
   if (item.itemId) return friendlyCatalogName(item.itemId);
   return "Unknown";
+}
+
+function StarterItemPreview({ item }: { item: { itemId?: string; image?: string } }) {
+  const catalogItem = { id: item.itemId || "", name: item.itemId || "Item", image: item.image } as CatalogItem;
+  return <CatalogItemThumb item={catalogItem} small />;
 }
 
 function starterItemId(item: { itemId?: string }) {
@@ -1521,36 +3034,30 @@ function StoragePanel({ onError }: { onError: (text: string) => void }) {
   return <section className="panel"><div className="panel-title"><h2>Storage</h2><button onClick={load}>Refresh Storage</button></div><p className="danger-note">{storageResult}</p><DataTable rows={rows} onRowClick={open} />{selected && <section className="drawer"><h3>Storage {String(selected.id)}</h3><div className="action-row"><a className="button-link" href={worldDataApi.storageExportUrl(String(selected.id))}>Export JSON</a><input value={itemName} onChange={(event) => setItemName(event.target.value)} placeholder="Item name" /><button disabled={!canGiveItem} onClick={giveStorageItem}>Give Item to Storage</button></div><DataTable rows={items} /></section>}</section>;
 }
 
-function WorldListPanel({ title, load, exportUrl, exportLabel = "Export", blockedText = "", onError }: { title: string; load: () => Promise<{ rows: Record<string, unknown>[]; reason?: string }>; exportUrl: (id: string) => string; exportLabel?: string; blockedText?: string; onError: (text: string) => void }) {
+function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError }: { backupRestoreTask: Task | null; setBackupRestoreTask: (task: Task | null) => void; onError: (text: string) => void }) {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
-  const [reason, setReason] = useState("");
-  async function refresh() {
-    onError("");
-    try {
-      const result = await load();
-      setRows(result.rows || []);
-      setReason(result.reason || "");
-    } catch (error) {
-      onError(error instanceof Error ? error.message : String(error));
-    }
-  }
-  useEffect(() => {
-    refresh();
-  }, []);
-  return <section className="panel"><div className="panel-title"><h2>{title}</h2><button onClick={refresh}>Refresh {title}</button></div>{reason && <p className="danger-note">{reason}</p>}{blockedText && <p className="danger-note">{blockedText}</p>}<DataTable rows={rows} action={(row) => <a className="button-link" href={exportUrl(String(row.id))}>{exportLabel}</a>} /></section>;
-}
-
-function BackupsPanel({ setTask, onError }: { setTask: (task: Task) => void; onError: (text: string) => void }) {
-  void setTask;
-  const [rows, setRows] = useState<Record<string, unknown>[]>([]);
+  const [backupsLoading, setBackupsLoading] = useState(true);
   const [autoBackup, setAutoBackup] = useState<{ stdout?: string; stderr?: string; exitCode?: number } | null>(null);
   const [autoEnabled, setAutoEnabled] = useState(false);
-  const [autoHours, setAutoHours] = useState("24");
+  const [autoTime, setAutoTime] = useState("05:00");
   const [autoRetentionDays, setAutoRetentionDays] = useState("0");
   const [backupResult, setBackupResult] = useState<BackupResult | null>(null);
   const [autoResult, setAutoResult] = useState<BackupResult | null>(null);
+  const [importResult, setImportResult] = useState<BackupResult | null>(null);
+  const [importBackupFile, setImportBackupFile] = useState<File | null>(null);
+  const [importMetadataFile, setImportMetadataFile] = useState<File | null>(null);
+  const importBackupInputRef = useRef<HTMLInputElement | null>(null);
+  const importMetadataInputRef = useRef<HTMLInputElement | null>(null);
+  const backupsRefreshRef = useRef<Promise<void> | null>(null);
   const [busyAction, setBusyAction] = useState("");
   const autoStatus = (autoBackup as { status?: Record<string, unknown> } | null)?.status || {};
+  const autoTimerValue = String(autoStatus.timer || "");
+  const autoTimerActive = autoEnabled && /^(active|enabled)$/i.test(autoTimerValue);
+  const autoTimerLabel = commandStatusSummary(autoBackup).reason
+    ? "Unavailable"
+    : busyAction === "auto" && autoResult?.status === "running"
+      ? autoEnabled ? "Activating" : "Deactivating"
+      : autoTimerActive ? "Active" : "Inactive";
   async function run(action: () => Promise<void>) {
     onError("");
     try { await action(); } catch (error) { onError(error instanceof Error ? error.message : String(error)); }
@@ -1560,23 +3067,36 @@ function BackupsPanel({ setTask, onError }: { setTask: (task: Task) => void; onE
     setAutoBackup(result);
     const status = result.status || {};
     setAutoEnabled(Boolean(status.enabled));
-    if (status.intervalHours) setAutoHours(String(status.intervalHours));
+    if (status.backupTime) setAutoTime(toHourMinuteTime(status.backupTime));
     if (status.retentionDays !== undefined) setAutoRetentionDays(String(status.retentionDays || "0"));
   }
   async function refresh() {
-    const result = await backupsApi.list();
-    setRows(result.rows?.length ? result.rows : parseBackupRows(result.stdout || ""));
-    await refreshAutoBackup();
+    if (backupsRefreshRef.current) return backupsRefreshRef.current;
+    setBackupsLoading(true);
+    backupsRefreshRef.current = (async () => {
+      const result = await withTimeout(backupsApi.list(), 60000, "Loading backups timed out.");
+      setRows(result.rows?.length ? result.rows : parseBackupRows(result.stdout || ""));
+      try {
+        await withTimeout(refreshAutoBackup(), 60000, "Loading automatic backup status timed out.");
+      } catch (error) {
+        setAutoBackup({ exitCode: 1, stderr: error instanceof Error ? error.message : String(error) });
+      }
+    })().finally(() => {
+      backupsRefreshRef.current = null;
+      setBackupsLoading(false);
+    });
+    return backupsRefreshRef.current;
   }
-  async function runBackupTask(action: "create" | "delete" | "restore" | "auto", taskFactory: () => Promise<{ task: Task }>, successTitle: string, failureTitle: string) {
+  async function runBackupTask(action: "create" | "delete" | "deleteAll" | "restore" | "auto", taskFactory: () => Promise<{ task: Task }>, successTitle: string, failureTitle: string) {
     setBusyAction(action);
     const setter = action === "auto" ? setAutoResult : setBackupResult;
-    setter({ status: "running", title: action === "restore" ? "Restoring backup..." : action === "delete" ? "Deleting backup..." : action === "auto" ? "Saving automatic backup settings..." : "Creating backup..." });
+    setter({ status: "running", title: action === "restore" ? "Restoring Backup..." : action === "delete" || action === "deleteAll" ? "Deleting Backup..." : action === "auto" ? "Saving Automatic Backup Settings..." : "Creating Backup..." });
     try {
       const response = await taskFactory();
-      const final = await waitForTaskSilently(response.task);
-      const result = summarizeBackupTask(final, successTitle, failureTitle);
-      setter(result);
+      const final = action === "restore" ? await waitForTaskWithUpdates(response.task, setBackupRestoreTask) : await waitForTaskSilently(response.task);
+      const result = action === "restore" ? backupRestoreTaskResult(final) : summarizeBackupTask(final, successTitle, failureTitle);
+      if (action === "restore" && isTerminalTask(final.status)) setBackupRestoreTask(null);
+      setter((final.status === "succeeded" && (action === "delete" || action === "deleteAll")) ? { ...result, tone: "danger" } : result);
       if (final.status === "succeeded") await refresh();
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
@@ -1586,60 +3106,187 @@ function BackupsPanel({ setTask, onError }: { setTask: (task: Task) => void; onE
       setBusyAction("");
     }
   }
+  async function saveAutomaticBackups() {
+    const sanitizedTime = toHourMinuteTime(autoTime);
+    if (autoEnabled && !isValidHourMinuteTime(sanitizedTime)) {
+      setAutoResult({ status: "failed", title: "Automatic Backup Settings Failed", message: "Daily backup time must be a valid 24-hour time, for example 05:00 or 23:30." });
+      return;
+    }
+    setAutoTime(sanitizedTime);
+    await runBackupTask("auto", () => backupsApi.saveAuto({ enabled: autoEnabled, time: sanitizedTime, retentionDays: Number(autoRetentionDays) }), "Automatic Backup Settings Saved", "Automatic Backup Settings Failed");
+  }
+  async function importExternalBackup() {
+    if (!importBackupFile) {
+      setImportResult({ status: "failed", title: "Import Failed", message: "Select a .backup file." });
+      return;
+    }
+    if (!importMetadataFile) {
+      setImportResult({ status: "failed", title: "Import Failed", message: "Select the matching .backup.yaml file." });
+      return;
+    }
+    if (!/\.backup$/i.test(importBackupFile.name)) {
+      setImportResult({ status: "failed", title: "Import Failed", message: "The backup file must end with .backup." });
+      return;
+    }
+    if (!/\.ya?ml$/i.test(importMetadataFile.name)) {
+      setImportResult({ status: "failed", title: "Import Failed", message: "The metadata file must end with .yaml or .yml." });
+      return;
+    }
+    setBusyAction("import");
+    setImportResult({ status: "running", title: "Importing Backup" });
+    try {
+      const form = new FormData();
+      form.append("backup", importBackupFile);
+      form.append("metadata", importMetadataFile);
+      const result = await backupsApi.importExternal(form);
+      if (result.rows) setRows(result.rows);
+      else await refresh();
+      setImportResult({ status: "succeeded", title: "Backup Imported Successfully" });
+      setImportBackupFile(null);
+      setImportMetadataFile(null);
+      if (importBackupInputRef.current) importBackupInputRef.current.value = "";
+      if (importMetadataInputRef.current) importMetadataInputRef.current.value = "";
+    } catch (error) {
+      setImportResult({ status: "failed", title: "Import Failed", message: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setBusyAction("");
+    }
+  }
   useEffect(() => {
     run(refresh);
   }, []);
+  useEffect(() => {
+    if (!backupResult || backupResult.status === "running" || backupResult.tone === "attention") return;
+    const id = window.setTimeout(() => setBackupResult(null), 5400);
+    return () => window.clearTimeout(id);
+  }, [backupResult?.status, backupResult?.title]);
+  useEffect(() => {
+    if (!autoResult || autoResult.status === "running") return;
+    const id = window.setTimeout(() => setAutoResult(null), 5400);
+    return () => window.clearTimeout(id);
+  }, [autoResult?.status, autoResult?.title]);
+  useEffect(() => {
+    if (!importResult || importResult.status === "running") return;
+    const id = window.setTimeout(() => setImportResult(null), 5400);
+    return () => window.clearTimeout(id);
+  }, [importResult?.status, importResult?.title]);
   return (
     <section className="panel">
-      <div className="panel-title"><h2>Backups</h2><div className="action-row"><button disabled={Boolean(busyAction)} onClick={() => run(refresh)}>Refresh Backups</button><button disabled={Boolean(busyAction)} onClick={() => run(() => runBackupTask("create", backupsApi.create, "Backup created successfully", "Backup failed"))}>Create Backup</button></div></div>
-      {backupResult && <BackupResultCard result={backupResult} />}
-      {rows.length ? <DataTable rows={rows} columns={["backupName", "created", "type", "source"]} action={(row) => <div className="service-actions">
-        <button className="danger" disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); run(async () => {
-          if (!window.confirm(`Restore backup ${String(row.name)}? This replaces the current battlegroup database and is destructive.`)) return;
-          await runBackupTask("restore", () => backupsApi.restore(String(row.name)), "Backup restored successfully", "Backup restore failed");
-        }); }}>Restore</button>
-        <button className="danger" disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); run(async () => {
+      <div className="panel-title"><h2>Backups</h2><div className="action-row"><button disabled={Boolean(busyAction)} onClick={() => run(refresh)}>Refresh Backups</button><button disabled={Boolean(busyAction)} onClick={() => run(() => runBackupTask("create", backupsApi.create, "Backup Created Successfully", "Backup failed"))}>Create Backup</button><button className="danger" disabled={Boolean(busyAction) || !rows.length} onClick={() => run(async () => {
+        if (!window.confirm("Delete all backup files? This cannot be undone.")) return;
+        await runBackupTask("deleteAll", backupsApi.deleteAll, "Backup Deleted", "Backup Delete Failed");
+      })}>Delete All Backups</button></div></div>
+      {backupRestoreTask ? <BackupResultCard result={backupRestoreTaskResult(backupRestoreTask)} /> : backupResult && <BackupResultCard result={backupResult} />}
+      {rows.length ? <DataTable rows={rows} columns={["backupName", "battlegroupId", "created", "type", "source"]} action={(row) => <div className="service-actions">
+        <button className="icon-action restore-action" title="Restore" aria-label="Restore backup" disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); run(async () => {
+          const sourceText = /^external$/i.test(String(row.source || "")) ? " External backups automatically use the backup battlegroup ID when it differs from Docker." : "";
+          if (!window.confirm(`Restore backup ${String(row.name)}? This replaces the current battlegroup database and is destructive.${sourceText}`)) return;
+          await runBackupTask("restore", () => backupsApi.restore(String(row.name)), "Restore Completed", "Backup Restore Failed");
+        }); }}><img src="/images/icons/backup-restore.png" alt="" /></button>
+        <a className="button-link icon-action download-action" title="Download" aria-label="Download backup" href={backupsApi.downloadUrl(String(row.name))} onClick={(event) => event.stopPropagation()}><img src="/images/icons/backup-download.png" alt="" /></a>
+        <button className="icon-action danger" title="Delete" aria-label="Delete backup" disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); run(async () => {
           if (!window.confirm(`Delete backup ${String(row.name)}? This cannot be undone.`)) return;
-          await runBackupTask("delete", () => backupsApi.delete(String(row.name)), "Backup deleted", "Backup delete failed");
-        }); }}>Delete</button>
-      </div>} /> : <div className="empty">No database backups found yet.</div>}
+          await runBackupTask("delete", () => backupsApi.delete(String(row.name)), "Backup Deleted", "Backup Delete Failed");
+        }); }}><img src="/images/icons/backup-delete.png" alt="" /></button>
+      </div>} actionClassName="backup-table-actions" tableClassName="backup-table" /> : backupsLoading ? <div className="empty backups-loading">Loading Backups...</div> : <div className="empty backups-empty">No database backups have been created yet.</div>}
       <section className="action-section">
         <div className="panel-title"><h4>Automatic Backups</h4><StatusPill value={autoEnabled ? "Enabled" : "Disabled"} /></div>
-        <p className="muted">Uses the Dune Manager automatic database backup setting. Auto backups stay disabled unless this saved manager preference is enabled.</p>
         <KeyValueGrid items={[
           ["Current Status", commandStatusSummary(autoBackup).reason ? "Unavailable" : autoEnabled ? "Enabled" : "Disabled"],
-          ["Interval", autoStatus.intervalHours ? `${autoStatus.intervalHours} ${Number(autoStatus.intervalHours) === 1 ? "Hour" : "Hours"}` : "Not Configured"],
+          ["Backup Time (Local Server Time)", toHourMinuteTime(autoStatus.backupTime || autoTime)],
           ["Retention", autoStatus.retentionLabel || "No Retention Limit"],
-          ["Timer", autoStatus.timer ? titleCase(String(autoStatus.timer)) : commandStatusSummary(autoBackup).reason ? "Unavailable" : "Not Installed"],
+          ["Timer", autoTimerLabel],
           ["Last Run", autoStatus.lastRun],
           ["Next Run", autoStatus.nextRun]
         ]} />
         {commandStatusSummary(autoBackup).reason && <p className="danger-note">{commandStatusSummary(autoBackup).reason}</p>}
-        {autoResult && <BackupResultCard result={autoResult} />}
         <div className="action-line backup-auto-controls">
           <label className="checkbox-row"><input type="checkbox" checked={autoEnabled} onChange={(event) => setAutoEnabled(event.target.checked)} /> Enable</label>
-          <label className="memory-number-field">Every<input type="number" min="1" max="168" step="1" value={autoHours} onChange={(event) => setAutoHours(event.target.value)} /></label>
-          <span className="unit-label">Hours</span>
+          <label className="compact-select">Daily Backup Time<input type="time" step="60" pattern="[0-2][0-9]:[0-5][0-9]" value={autoTime} onChange={(event) => setAutoTime(sanitizeTimeInput(event.target.value))} placeholder="05:00" /></label>
           <label className="memory-number-field">Keep<input type="number" min="0" max="3650" step="1" value={autoRetentionDays} onChange={(event) => setAutoRetentionDays(event.target.value)} /></label>
           <span className="unit-label">Days</span>
-          <button disabled={Boolean(busyAction)} onClick={() => run(() => runBackupTask("auto", () => backupsApi.saveAuto({ enabled: autoEnabled, hours: Number(autoHours), retentionDays: Number(autoRetentionDays) }), "Automatic backup settings saved", "Automatic backup settings failed"))}>Save Settings</button>
-          <button disabled={Boolean(busyAction)} onClick={() => run(() => runBackupTask("create", backupsApi.create, "Backup created successfully", "Backup failed"))}>Run Backup Now</button>
+          <button disabled={Boolean(busyAction)} onClick={() => run(saveAutomaticBackups)}>Save Settings</button>
+          {autoResult && <span className={`inline-task-result result-${autoResult.status === "succeeded" ? "ok" : autoResult.status === "failed" ? "fail" : "running"}`}>
+            <strong className={autoResult.status === "running" ? "loading-dots" : ""}>{autoResult.title}</strong>
+          </span>}
         </div>
       </section>
-      <section className="action-section planned-card">
-        <strong>Remote Backup Import</strong>
-        <span>Disabled. The Dune Manager SSH import flow is interactive and uses scp after collecting host/user/path. A web wrapper needs key-only credential selection, remote preview, secret redaction, and restore preflight coverage before it is safe to expose.</span>
+      <section className="action-section backup-remote-import">
+        <div className="panel-title"><h4>Import External Backup</h4></div>
+        <div className="action-line backup-import-controls">
+          <label className="wide-field">Backup File (.backup)<input ref={importBackupInputRef} type="file" accept=".backup" onChange={(event) => setImportBackupFile(event.target.files?.[0] || null)} /></label>
+          <label className="wide-field">Metadata File (.yaml)<input ref={importMetadataInputRef} type="file" accept=".yaml,.yml" onChange={(event) => setImportMetadataFile(event.target.files?.[0] || null)} /></label>
+          <div className="backup-import-actions">
+            <button disabled={Boolean(busyAction)} onClick={() => run(importExternalBackup)}>Import</button>
+            {importResult && <span className={`inline-task-result result-${importResult.status === "succeeded" ? "ok" : importResult.status === "failed" ? "fail" : "running"}`}>
+              <strong className={importResult.status === "running" ? "loading-dots" : ""}>{importResult.title}</strong>
+            </span>}
+          </div>
+        </div>
       </section>
     </section>
   );
 }
 
 function BackupResultCard({ result }: { result: BackupResult }) {
-  return <section className={`result-panel backup-result ${result.status === "failed" ? "warning-panel" : ""}`}>
-    <div className="panel-title"><h4>{result.title}</h4><StatusPill value={result.status === "failed" ? "Failed" : result.status === "running" ? "Running" : "Succeeded"} /></div>
-    {result.message && <p>{result.message}</p>}
+  const danger = result.tone === "danger";
+  const attention = result.tone === "attention";
+  return <section className={`result-panel backup-result ${attention ? "warning-panel result-attention" : danger ? "result-danger" : result.status === "failed" ? "warning-panel result-fail" : result.status === "succeeded" ? "result-ok" : "result-running"}`}>
+    <div className="panel-title backup-result-title">
+      <div className="backup-result-copy">
+        <h4 className={result.status === "running" ? "loading-dots" : ""}>{result.title}</h4>
+        {result.message && <p>{result.message}</p>}
+      </div>
+      <StatusPill value={attention ? "Action Required" : danger ? "Deleted" : result.status === "failed" ? "Failed" : result.status === "running" ? "Running" : "Succeeded"} />
+    </div>
     {result.details && <TechnicalDetails title="Technical details" text={result.details} />}
   </section>;
+}
+
+function backupRestoreTaskResult(task: Task): BackupResult {
+  const details = task.logLines.map((line) => line.line).join("\n");
+  if (funcomTokenMismatchDetected(details) || funcomTokenMismatchDetected(task.errorMessage || "")) {
+    return {
+      status: "failed",
+      title: "Attention Required",
+      message: "Funcom token mismatch detected. Please update your token to match the one used with the previous Battlegroup ID from the Server Controls.",
+      details,
+      tone: "attention"
+    };
+  }
+  if (task.status === "succeeded") {
+    return { status: "succeeded", title: "Restore Completed", message: "Database restore finished and the Dune stack restart completed.", details };
+  }
+  if (task.status === "failed") {
+    return { status: "failed", title: "Backup Restore Failed", message: task.errorMessage || conciseTaskError(task), details };
+  }
+  return { status: "running", title: "Restoring Backup...", message: backupRestoreStageMessage(task), details };
+}
+
+function funcomTokenMismatchDetected(text: string) {
+  const value = text || "";
+  if (/Funcom token mismatch detected|Invalid Authorization to manage SelfHosted Battlegroup/i.test(value)) return true;
+  if (/ACCESS_DENIED|AccessDenied|access denied|invalid authorization|Unauthorized/i.test(value)) {
+    return /Battlegroup|SelfHosted|Funcom|FuncomLiveServices/i.test(value);
+  }
+  if (/(?:HTTP|status|statusCode|response|code)[^,\n]*(?:401|403)\b/i.test(value)) {
+    return /Battlegroup|SelfHosted|Funcom|FuncomLiveServices/i.test(value);
+  }
+  return false;
+}
+
+function backupRestoreStageMessage(task: Task) {
+  const lines = task.logLines.map((row) => row.line).join("\n");
+  if (/Starting Dune stack|Restarting Dune stack|Starting services/i.test(lines)) return "Restarting Dune services and waiting for the stack to come back up.";
+  if (/Database import finished/i.test(lines)) return "Database restore finished. Restarting services.";
+  if (/Automatic account relink/i.test(lines)) return "Relinking restored characters to current Docker player identities.";
+  if (/Adopt backup battlegroup:/i.test(lines)) return "Changing Docker to use the backup battlegroup ID.";
+  if (/Battlegroup remap:/i.test(lines)) return "Adapting imported backup to this Docker battlegroup.";
+  if (/Restoring database/i.test(lines)) return "Restoring database contents from the selected backup.";
+  if (/Recreating dune database/i.test(lines)) return "Recreating the Dune database before import.";
+  if (/Stopping services that depend on the database/i.test(lines)) return "Stopping Dune services before the database restore.";
+  if (/Creating database backup/i.test(lines)) return "Creating a pre-restore safety backup.";
+  return task.progressMessage || "Preparing database restore.";
 }
 
 function summarizeBackupTask(task: Task, successTitle: string, failureTitle: string): BackupResult {
@@ -1669,87 +3316,242 @@ function extractBackupName(text: string) {
 }
 
 function conciseTaskError(task: Task) {
-  const lines = task.logLines.map((line) => line.line.trim()).filter(Boolean);
-  const candidates = [task.errorMessage || "", ...lines].filter(Boolean).map((line) => line.replace(/^dune\s+.+?\s+failed with exit \d+$/i, "").trim()).filter(Boolean);
+  const text = task.logLines.map((line) => line.line).join("\n");
+  const steamState = stripAnsi(text).match(/Error!\s+App\s+'[^']+'\s+state is\s+[^.]+(?:\s+after update job)?/i)?.[0];
+  const steamAttempts = stripAnsi(text).match(/SteamCMD failed after \d+ attempts\./i)?.[0];
+  if (steamAttempts && steamState) return `${steamAttempts} ${steamState}`;
+  if (steamState) return steamState;
+  if (steamAttempts) return steamAttempts;
+
+  const lines = task.logLines.map((line) => stripAnsi(line.line).trim()).filter(Boolean);
+  const candidates = [task.errorMessage || "", ...lines].filter(Boolean).map((line) => line.replace(/^dune\s+.+?\s+failed with exit \d+$/i, "").trim()).filter((line) => {
+    if (!line) return false;
+    if (/^===.*===$/.test(line)) return false;
+    if (/^Steam app id:/i.test(line)) return false;
+    if (/^Running \w+$/i.test(line)) return false;
+    if (/^Task started$/i.test(line)) return false;
+    return true;
+  });
   const seen = new Set<string>();
   const unique = candidates.filter((line) => {
     if (seen.has(line)) return false;
     seen.add(line);
     return true;
   });
-  return unique[0] || "Task failed.";
+  return unique.find((line) => /failed|error|could not|cannot|denied|unavailable/i.test(line)) || unique[0] || "Task failed.";
 }
 
 function LiveMapPanel({ onError }: { onError: (text: string) => void }) {
-  const [map, setMap] = useState("");
+  const [mapKey, setMapKey] = useState("HaggaBasin");
+  const [mapConfig, setMapConfig] = useState<LiveMapConfig | null>(null);
+  const [maps, setMaps] = useState<Record<string, LiveMapConfig>>({});
+  const [partitions, setPartitions] = useState<LiveMapPartition[]>([]);
+  const [partitionId, setPartitionId] = useState("");
   const [markers, setMarkers] = useState<LiveMapMarker[]>([]);
   const [overlays, setOverlays] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<LiveMapMarker | null>(null);
-  const [filters, setFilters] = useState<Record<string, boolean>>({ player: true, vehicle: true, base: true, storage: true, service: true });
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [drag, setDrag] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null);
-  const mapRef = useRef<HTMLDivElement | null>(null);
+  const [filters, setFilters] = useState<Record<string, boolean>>({ player: true, vehicle: true, base: true, storage: true });
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [zoom, setZoom] = useState(0.16);
+  const [target, setTarget] = useState<{ x: number; y: number } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [drag, setDrag] = useState<{ x: number; y: number; left: number; top: number } | null>(null);
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const zoomAnchorRef = useRef<{ mapX: number; mapY: number; viewportX: number; viewportY: number } | null>(null);
   async function load() {
     onError("");
+    setLoading(true);
     try {
-      const result = await liveMapApi.markers(map);
+      const result = await liveMapApi.markers(mapKey);
       setMarkers(result.rows || []);
       setOverlays(result.overlays || {});
+      setMapConfig(result.map || null);
+      setMaps(result.maps || {});
+      setPartitions(result.partitions || []);
+      if (!partitionId && result.map?.defaultPartitionId) setPartitionId(String(result.map.defaultPartitionId));
     } catch (error) {
       onError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setLoading(false);
     }
   }
   useEffect(() => {
     load();
-  }, []);
+  }, [mapKey]);
   useEffect(() => {
     if (!autoRefresh) return;
-    const id = window.setInterval(load, 30000);
+    const id = window.setInterval(load, 5000);
     return () => window.clearInterval(id);
-  }, [autoRefresh, map]);
-  const visible = markers.filter((marker) => filters[String(marker.type)] !== false);
+  }, [autoRefresh, mapKey, partitionId]);
+  const activeMap = mapConfig || maps[mapKey];
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return undefined;
+    function handleWheel(event: WheelEvent) {
+      const currentFrame = frameRef.current;
+      const canvas = canvasRef.current;
+      if (!currentFrame || !canvas) return;
+      const canvasRect = canvas.getBoundingClientRect();
+      const isInsideCanvas =
+        event.clientX >= canvasRect.left &&
+        event.clientX <= canvasRect.right &&
+        event.clientY >= canvasRect.top &&
+        event.clientY <= canvasRect.bottom;
+      if (!isInsideCanvas) return;
+      event.preventDefault();
+      setZoomAround(zoom * (event.deltaY < 0 ? 1.12 : 0.88), { clientX: event.clientX, clientY: event.clientY });
+    }
+    frame.addEventListener("wheel", handleWheel, { passive: false });
+    return () => frame.removeEventListener("wheel", handleWheel);
+  }, [zoom, activeMap?.key]);
+  useEffect(() => {
+    function syncMinimumZoom() {
+      const min = liveMapMinimumZoom(activeMap, frameRef.current);
+      setZoom((current) => current < min ? min : current);
+    }
+    const id = window.requestAnimationFrame(syncMinimumZoom);
+    window.addEventListener("resize", syncMinimumZoom);
+    return () => {
+      window.cancelAnimationFrame(id);
+      window.removeEventListener("resize", syncMinimumZoom);
+    };
+  }, [activeMap?.key]);
+  useLayoutEffect(() => {
+    const frame = frameRef.current;
+    const anchor = zoomAnchorRef.current;
+    if (!frame || !anchor) return;
+    frame.scrollLeft = anchor.mapX * zoom - anchor.viewportX;
+    frame.scrollTop = anchor.mapY * zoom - anchor.viewportY;
+    zoomAnchorRef.current = null;
+  }, [zoom]);
+  const mapOptions = Object.values(maps);
+  const partitionOptions = partitions.filter((row) => row.map === (activeMap?.actorMap || activeMap?.key));
+  const visible = markers
+    .filter((marker) => filters[String(marker.type)] !== false)
+    .filter((marker) => !partitionId || String(marker.partition_id || "") === partitionId);
   const plotted = visible.filter((marker) => Number.isFinite(Number(marker.x)) && Number.isFinite(Number(marker.y)));
   const displayRows = visible.map((marker) => ({ ...marker, display_name: friendlyMarkerName(marker), raw_name: marker.name || marker.id }));
-  const bounds = markerBounds(plotted);
+  const markerCounts = countMarkers(visible);
+  const inBounds = activeMap ? plotted.map((marker) => ({ marker, point: worldToLiveMapPoint(marker, activeMap) })).filter((item) => item.point?.inBounds) as { marker: LiveMapMarker; point: LiveMapPoint }[] : [];
+  const targetPoint = target && activeMap ? worldToLiveMapPoint({ x: target.x, y: target.y }, activeMap) : null;
+  const minimumZoom = liveMapMinimumZoom(activeMap, frameRef.current);
+  const zoomMinPercent = Math.round(minimumZoom * 100);
+  const zoomValuePercent = Math.round(zoom * 100);
+  const zoomProgressPercent = Math.max(0, Math.min(100, ((zoomValuePercent - zoomMinPercent) / Math.max(1, 100 - zoomMinPercent)) * 100));
+  const zoomDisplayPercent = Math.round(zoomProgressPercent);
+  function chooseMap(nextKey: string) {
+    const nextMap = maps[nextKey];
+    setMapKey(nextKey);
+    setPartitionId(nextMap?.defaultPartitionId ? String(nextMap.defaultPartitionId) : "");
+    setSelected(null);
+    setTarget(null);
+  }
+  function centerMarker(marker: LiveMapMarker) {
+    if (!activeMap || !frameRef.current) return;
+    const point = worldToLiveMapPoint(marker, activeMap);
+    if (!point) return;
+    setSelected(marker);
+    requestAnimationFrame(() => {
+      if (!frameRef.current) return;
+      frameRef.current.scrollLeft = Math.max(0, point.px * zoom - frameRef.current.clientWidth / 2);
+      frameRef.current.scrollTop = Math.max(0, point.py * zoom - frameRef.current.clientHeight / 2);
+    });
+  }
+  function handleMapDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
+    if (!activeMap || !canvasRef.current) return;
+    if ((event.target as HTMLElement).closest(".live-map-marker")) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const px = (event.clientX - rect.left) / zoom;
+    const py = (event.clientY - rect.top) / zoom;
+    const world = liveMapPixelsToWorld(px, py, activeMap);
+    if (!world) return;
+    setTarget(world);
+  }
+  function setZoomAround(nextZoom: number, anchor?: { clientX: number; clientY: number }) {
+    const frame = frameRef.current;
+    const canvas = canvasRef.current;
+    const oldZoom = zoom;
+    const next = clampLiveMapZoom(nextZoom, liveMapMinimumZoom(activeMap, frame));
+    if (!frame) {
+      setZoom(next);
+      return;
+    }
+    if (next === oldZoom) {
+      zoomAnchorRef.current = null;
+      return;
+    }
+    const canvasRect = canvas?.getBoundingClientRect();
+    const frameRect = frame.getBoundingClientRect();
+    const anchorViewportX = anchor ? anchor.clientX - frameRect.left : frame.clientWidth / 2;
+    const anchorViewportY = anchor ? anchor.clientY - frameRect.top : frame.clientHeight / 2;
+    const anchorMapX = anchor && canvasRect ? (anchor.clientX - canvasRect.left) / oldZoom : (frame.scrollLeft + frame.clientWidth / 2) / oldZoom;
+    const anchorMapY = anchor && canvasRect ? (anchor.clientY - canvasRect.top) / oldZoom : (frame.scrollTop + frame.clientHeight / 2) / oldZoom;
+    zoomAnchorRef.current = { mapX: anchorMapX, mapY: anchorMapY, viewportX: anchorViewportX, viewportY: anchorViewportY };
+    setZoom(next);
+  }
   return <section className="panel">
-    <div className="panel-title"><h2>Live Map</h2><div className="action-row"><button onClick={load}>Refresh</button><label><input type="checkbox" checked={autoRefresh} onChange={(event) => setAutoRefresh(event.target.checked)} /> Auto-refresh</label></div></div>
-    <div className="action-row"><input value={map} onChange={(event) => setMap(event.target.value)} placeholder="Optional map filter, e.g. Survival_1" /></div>
-    <div className="toggle-row">{Object.keys(filters).map((key) => <button key={key} className={filters[key] ? "active" : ""} onClick={() => setFilters({ ...filters, [key]: !filters[key] })}>{friendlyMarkerType(key)}</button>)}</div>
-    {Object.entries(overlays).filter(([, reason]) => reason).map(([key, reason]) => <p className="danger-note" key={key}>{key}: {reason}</p>)}
-    <div className="map-canvas" style={{ "--map-image": "url('/hagga-basin.png')" } as React.CSSProperties}
-      ref={mapRef}
-      onMouseDown={(event) => { if (zoom > 1) setDrag({ x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y }); }}
-      onMouseMove={(event) => { if (drag) setPan(clampPan({ x: drag.panX + event.clientX - drag.x, y: drag.panY + event.clientY - drag.y }, zoom, mapRef.current)); }}
-      onMouseUp={() => setDrag(null)}
-      onMouseLeave={() => setDrag(null)}>
-      <div className="map-zoom-layer" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
-      {plotted.length === 0 && <div className="empty">No plottable markers. Raw marker rows are shown below when available.</div>}
-      {plotted.map((marker, index) => {
-        const point = markerPoint(marker, bounds);
-        return <button key={`${marker.type}-${marker.id}-${index}`} title={`${marker.type}: ${friendlyMarkerName(marker)}`} onClick={() => setSelected(marker)} style={{ position: "absolute", left: `${point.x}%`, top: `${point.y}%`, transform: "translate(-50%, -50%)", width: 12, height: 12, borderRadius: "50%", border: "1px solid white", background: markerColor(String(marker.type)), cursor: "pointer" }} />;
-      })}
+    <div className="panel-title">
+      <div><h2>Live Map</h2><p className="muted">Live world markers, partition filtering, zoom, pan, and coordinate selection.</p></div>
+      <div className="action-row"><button disabled={loading} onClick={load}>{loading ? "Refreshing..." : "Refresh Map"}</button><button className={`live-map-auto-toggle ${autoRefresh ? "enabled" : "disabled"}`} onClick={() => setAutoRefresh(!autoRefresh)}>{autoRefresh ? "Auto-Refresh On" : "Auto-Refresh Off"}</button></div>
+    </div>
+    <div className="live-map-layout">
+      <aside className="live-map-sidebar">
+        <section className="action-section">
+          <h4>Map View</h4>
+          <div className="live-map-map-buttons">{mapOptions.map((option) => <button key={option.key} className={option.key === mapKey ? "active" : ""} onClick={() => chooseMap(option.key)}>{option.label}</button>)}</div>
+          <label className="compact-select">Partition<select value={partitionId} onChange={(event) => setPartitionId(event.target.value)}><option value="">All Partitions</option>{partitionOptions.map((row) => <option key={`${row.map}-${row.partition_id}`} value={String(row.partition_id)}>{row.name || `Partition ${row.partition_id}`} ({row.marker_count})</option>)}</select></label>
+          <div className="key-value-grid live-map-stats">
+            <div className="key-value-item"><span>Visible</span><strong>{visible.length}</strong></div>
+            <div className="key-value-item"><span>In Bounds</span><strong>{inBounds.length}</strong></div>
+            <div className="key-value-item"><span>Zoom</span><strong>{zoomDisplayPercent}%</strong></div>
+          </div>
+        </section>
+        <section className="action-section">
+          <h4>Layers</h4>
+          <div className="live-map-layer-list">{Object.keys(filters).map((key) => <label key={key} className="checkbox-row live-map-layer"><input type="checkbox" checked={filters[key]} onChange={() => setFilters({ ...filters, [key]: !filters[key] })} /><span>{friendlyMarkerType(key)}</span><span className="muted">{markerCounts[key] || 0}</span><span className={`live-map-legend-dot marker-${key}`} /></label>)}</div>
+        </section>
+        <section className="action-section">
+          <h4>Coordinates</h4>
+          {target ? <KeyValueGrid items={[["X", target.x.toFixed(0)], ["Y", target.y.toFixed(0)], ["Partition", partitionId || "All"]]} /> : <p className="muted">Double-click the map to pick world coordinates.</p>}
+        </section>
+      </aside>
+      <div className="live-map-main">
+        <div className="live-map-toolbar">
+          <button onClick={() => setZoomAround(zoom * 1.18)}>Zoom In</button>
+          <button onClick={() => setZoomAround(zoom * 0.84)}>Zoom Out</button>
+          <button onClick={() => setZoomAround(minimumZoom)}>Fit Map</button>
+          <label>Zoom<input className="live-map-zoom-range" type="range" min={zoomMinPercent} max="100" value={zoomValuePercent} style={{ "--zoom-progress": `${zoomProgressPercent}%` } as React.CSSProperties} onChange={(event) => setZoomAround(Number(event.target.value) / 100)} /></label>
+          <span className="muted">Drag to pan. Mouse Wheel Zooms.</span>
+        </div>
+        <div className={`live-map-frame ${drag ? "dragging" : ""}`} ref={frameRef}
+          onDoubleClick={handleMapDoubleClick}
+          onMouseDown={(event) => { if ((event.target as HTMLElement).closest(".live-map-marker")) return; setDrag({ x: event.clientX, y: event.clientY, left: frameRef.current?.scrollLeft || 0, top: frameRef.current?.scrollTop || 0 }); }}
+          onMouseMove={(event) => { if (!drag || !frameRef.current) return; frameRef.current.scrollLeft = drag.left - (event.clientX - drag.x); frameRef.current.scrollTop = drag.top - (event.clientY - drag.y); }}
+          onMouseUp={() => setDrag(null)}
+          onMouseLeave={() => setDrag(null)}>
+          {activeMap ? <div className="live-map-canvas" ref={canvasRef} style={{ width: Math.floor(activeMap.width * zoom), height: Math.floor(activeMap.height * zoom) }}>
+            {activeMap.image ? <img className="live-map-image" src={activeMap.image} alt={activeMap.label} draggable={false} /> : <div className="live-map-placeholder">{activeMap.label}</div>}
+            <div className="live-map-marker-layer">
+              {targetPoint && <span className="live-map-target" style={{ left: `${targetPoint.px * zoom}px`, top: `${targetPoint.py * zoom}px` }} />}
+              {inBounds.map(({ marker, point }, index) => <button key={`${marker.type}-${marker.id}-${index}`} className={`live-map-marker marker-${marker.type} ${String(marker.online_status || "").toLowerCase()}`} title={`${friendlyMarkerType(String(marker.type))}: ${friendlyMarkerName(marker)}`} onClick={(event) => { event.stopPropagation(); setSelected(marker); }} style={{ left: `${point.px * zoom}px`, top: `${point.py * zoom}px` }} />)}
+            </div>
+          </div> : <div className="empty">Loading map configuration...</div>}
+        </div>
       </div>
     </div>
-    <div className="action-line map-controls">
-      <button onClick={() => { const nextZoom = Math.min(3, Number((zoom + 0.2).toFixed(2))); setZoom(nextZoom); setPan(clampPan(pan, nextZoom, mapRef.current)); }}>Zoom In</button>
-      <button onClick={() => { const nextZoom = Math.max(1, Number((zoom - 0.2).toFixed(2))); setZoom(nextZoom); setPan(clampPan(pan, nextZoom, mapRef.current)); }}>Zoom Out</button>
-      <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}>Fit Map</button>
-      <span className="muted">Zoom: {Math.round(zoom * 100)}%</span>
-      {zoom > 1 && <span className="muted">Drag map to pan.</span>}
-    </div>
-    <p className="danger-note">Marker positions are approximate. Coordinates use raw Dune world positions from actor transforms; exact image/world calibration is not verified.</p>
+    {Object.entries(overlays).filter(([, reason]) => reason).map(([key, reason]) => <p className="danger-note" key={key}>{key}: {reason}</p>)}
     {selected && <section className="drawer"><div className="panel-title"><h3>{friendlyMarkerName(selected)}</h3><button onClick={() => setSelected(null)}>Close</button></div><KeyValueGrid items={[
       ["Type", selected.type],
       ["Name", friendlyMarkerName(selected)],
       ["ID", selected.id],
       ["Map", selected.map],
+      ["Partition", selected.partition_id],
       ["X", selected.x],
       ["Y", selected.y],
       ["Z", selected.z]
     ]} /><TechnicalDetails title="Marker technical details" text={JSON.stringify(selected, null, 2)} /></section>}
-    <DataTable rows={displayRows.map((row) => ({ ...row, type: friendlyMarkerType(String(row.type)) })) as Record<string, unknown>[]} columns={["type", "display_name", "map", "x", "y", "z"]} />
+    {displayRows.length > 0 && <DataTable rows={displayRows.map((row) => ({ ...row, type: friendlyMarkerType(String(row.type)) })) as Record<string, unknown>[]} columns={["type", "display_name", "map", "partition_id", "x", "y", "z"]} />}
   </section>;
 }
 
@@ -1758,29 +3560,80 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
   const [memoryText, setMemoryText] = useState("");
   const [serversText, setServersText] = useState("");
   const [deepText, setDeepText] = useState("");
-  const [userEngine, setUserEngine] = useState<{ stdout?: string; stderr?: string; exitCode?: number } | null>(null);
-  const [userGame, setUserGame] = useState<{ stdout?: string; stderr?: string; exitCode?: number } | null>(null);
+  const [schema, setSchema] = useState<UserSettingsSchema | null>(null);
+  const [engineValues, setEngineValues] = useState<Record<string, string>>({});
+  const [engineDraft, setEngineDraft] = useState<Record<string, string>>({});
+  const [gameValues, setGameValues] = useState<Record<string, string>>({});
+  const [gameDraft, setGameDraft] = useState<Record<string, string>>({});
+  const [rawEngine, setRawEngine] = useState("");
+  const [rawGame, setRawGame] = useState("");
+  const [rawEngineOriginal, setRawEngineOriginal] = useState("");
+  const [rawGameOriginal, setRawGameOriginal] = useState("");
+  const [liveMemory, setLiveMemory] = useState<LiveMapMemoryRow[]>([]);
+  const [memoryError, setMemoryError] = useState("");
+  const [sietchesText, setSietchesText] = useState("");
+  const [sietchDimensionsText, setSietchDimensionsText] = useState("");
+  const [activeSietches, setActiveSietches] = useState("1");
+  const [sietchDrafts, setSietchDrafts] = useState<Record<string, { displayName: string; password: string }>>({});
   const [selectedMapName, setSelectedMapName] = useState("");
+  const [selectedPartitionId, setSelectedPartitionId] = useState("");
+  const [userGameMapName, setUserGameMapName] = useState("");
+  const [userGamePartitionId, setUserGamePartitionId] = useState("");
+  const [selectedGameCategory, setSelectedGameCategory] = useState("");
+  const [settingsTab, setSettingsTab] = useState<"engine" | "game">("engine");
+  const [modifiersOpen, setModifiersOpen] = useState(true);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [deepDesertDualAction, setDeepDesertDualAction] = useState("enable");
   const [memory, setMemory] = useState("8");
   const [modeDraft, setModeDraft] = useState("dynamic");
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
-  const [refreshMessage, setRefreshMessage] = useState("");
+  const [mapsResult, setMapsResult] = useState<HomeTaskResult | null>(() => loadPersistedMapsResult());
+  const mapsLoadRef = useRef<Promise<void> | null>(null);
   async function run(action: () => Promise<unknown>) {
     onError("");
     try { await action(); } catch (error) { onError(error instanceof Error ? error.message : String(error)); }
   }
-  async function runTaskAndRefresh(action: () => Promise<{ task: Task }>) {
+  async function runTaskAndRefresh(action: () => Promise<{ task: Task }>, runningTitle = "Applying Map Changes", successTitle = "Map Changes Applied") {
     const response = await action();
-    await waitForTask(response.task, setTask);
+    setMapsResult({ status: "running", title: runningTitle });
+    persistMapsResult({ status: "running", title: runningTitle });
+    const final = await waitForTask(response.task, setTask);
+    const next: HomeTaskResult = final.status === "succeeded"
+      ? { status: "succeeded", title: successTitle, details: taskTechnicalDetails(final) }
+      : { status: "failed", title: "Map Change Failed", details: taskTechnicalDetails(final) || final.errorMessage || final.progressMessage };
+    setMapsResult(next);
+    persistMapsResult(next);
     await loadMaps();
+    await loadUserEngine();
+    if (userGameMapName) await loadSelectedSettings(userGameMapName, userGamePartitionId);
+  }
+  async function runTaskSequenceAndRefresh(actions: Array<() => Promise<{ task: Task }>>, runningTitle = "Applying Map Changes", successTitle = "Map Changes Applied") {
+    if (!actions.length) return;
+    setMapsResult({ status: "running", title: runningTitle });
+    persistMapsResult({ status: "running", title: runningTitle });
+    let final: Task | null = null;
+    for (const action of actions) {
+      final = await waitForTask((await action()).task, setTask);
+      if (final.status !== "succeeded") break;
+    }
+    const next: HomeTaskResult = final?.status === "succeeded"
+      ? { status: "succeeded", title: successTitle, details: taskTechnicalDetails(final) }
+      : { status: "failed", title: "Map Change Failed", details: final ? taskTechnicalDetails(final) || final.errorMessage || final.progressMessage : "No task result." };
+    setMapsResult(next);
+    persistMapsResult(next);
+    await loadMaps();
+    await loadSietches();
   }
   async function loadMaps() {
+    if (mapsLoadRef.current) return mapsLoadRef.current;
     setLoading(true);
     setLoadError("");
-    setRefreshMessage("");
-    try {
-      const [status, memoryStatus] = await Promise.allSettled([mapsApi.status(), mapsApi.memory()]);
+    mapsLoadRef.current = (async () => {
+      const [status, memoryStatus] = await Promise.allSettled([
+        withTimeout(mapsApi.status(), 60000, "Loading maps timed out."),
+        withTimeout(mapsApi.memory(), 60000, "Loading map memory timed out.")
+      ]);
       if (status.status !== "fulfilled" && memoryStatus.status !== "fulfilled") {
         const reason = status.status === "rejected" ? status.reason : memoryStatus.reason;
         throw new Error(reason instanceof Error ? reason.message : String(reason));
@@ -1793,65 +3646,272 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
         const failed = status.status === "rejected" ? status.reason : memoryStatus.status === "rejected" ? memoryStatus.reason : "";
         setLoadError(failed instanceof Error ? failed.message : String(failed));
       }
-      setRefreshMessage("Maps refreshed.");
-    } finally {
+    })().finally(() => {
+      mapsLoadRef.current = null;
       setLoading(false);
-    }
+    });
+    return mapsLoadRef.current;
+  }
+  async function loadSchema() {
+    const next = await mapsApi.userSettingsSchema();
+    setSchema(next);
   }
   async function loadUserEngine() {
-    setUserEngine(await mapsApi.userEngine());
+    const [values, raw] = await Promise.all([mapsApi.userEngine(), mapsApi.rawUserSettings("engine")]);
+    const parsed = parseUserSettingsMap(values.stdout || "");
+    setEngineValues(parsed);
+    setEngineDraft(parsed);
+    setRawEngine(raw.content || "");
+    setRawEngineOriginal(raw.content || "");
   }
-  async function loadUserGame(mapName: string, partitionId?: string) {
-    setUserGame(await mapsApi.userGame(mapName, partitionId));
+  async function loadSelectedSettings(mapName: string, partitionId?: string) {
+    const [values, raw] = await Promise.all([mapsApi.userGame(mapName, partitionId), mapsApi.rawUserSettings("game", mapName, partitionId)]);
+    const parsed = parseUserSettingsMap(values.stdout || "");
+    setGameValues(parsed);
+    setGameDraft(parsed);
+    setRawGame(raw.content || "");
+    setRawGameOriginal(raw.content || "");
+  }
+  async function loadSietches() {
+    const [list, dimensions] = await Promise.all([mapsApi.sietches(), mapsApi.sietchDimensions("Survival_1")]);
+    setSietchesText(list.stdout || "");
+    setSietchDimensionsText(dimensions.stdout || "");
+    const rows = parseSietchRows(dimensions.stdout || list.stdout || "");
+    const drafts = Object.fromEntries(rows.map((row) => [row.partitionId, { displayName: row.displayName, password: row.password }]));
+    if (rows.length) {
+      setActiveSietches(String(rows.filter((row) => row.active).length || rows.length));
+      setSietchDrafts(drafts);
+    }
+  }
+  async function loadLiveMemory() {
+    const result = await mapsApi.liveMemory();
+    setLiveMemory(result.rows || []);
+    setMemoryError(result.error || "");
   }
   useEffect(() => {
     run(loadMaps);
+    run(loadSchema);
     run(loadUserEngine);
+    run(loadLiveMemory);
+    run(loadSietches);
+  }, []);
+  useEffect(() => {
+    const id = window.setInterval(() => { void loadLiveMemory().catch(() => {}); }, 5000);
+    return () => window.clearInterval(id);
   }, []);
   const mapRows = mergeMapAndMemoryRows(mapsText, memoryText, serversText);
   const selectedMap = mapRows.find((row) => String(row.map) === selectedMapName) || null;
   const selectedName = String(selectedMap?.map || "");
+  const userGameMap = mapRows.find((row) => String(row.map) === userGameMapName) || null;
+  const userGameName = String(userGameMap?.map || "");
   const isSurvival = selectedName === "Survival_1";
   const isDeepDesert = /^DeepDesert_/i.test(selectedName);
+  const isDeepDesertRuntime = /^(DeepDesert_|Overmap$)/i.test(selectedName);
+  const isUserGameSurvival = userGameName === "Survival_1";
+  const isUserGameDeepDesertRuntime = /^(DeepDesert_|Overmap$)/i.test(userGameName);
+  const sietchRows = parseSietchRows(sietchDimensionsText || sietchesText);
+  const partitionOptions = isSurvival ? sietchRows.filter((row) => row.partitionId) : [];
+  const userGamePartitionOptions = isUserGameSurvival ? sietchRows.filter((row) => row.partitionId) : [];
+  const effectivePartitionId = isSurvival ? (selectedPartitionId || partitionOptions[0]?.partitionId || "1") : isDeepDesertRuntime ? "2" : selectedPartitionId;
+  const effectiveUserGamePartitionId = isUserGameSurvival ? (userGamePartitionId || userGamePartitionOptions[0]?.partitionId || "1") : isUserGameDeepDesertRuntime ? "2" : userGamePartitionId;
+  const gameFields = schema ? (effectivePartitionId ? schema.partition : schema.game).filter((field) => field.id !== "partition_pve_enabled" || effectivePartitionId) : [];
+  const userGameFields = schema && userGameName ? (effectiveUserGamePartitionId ? schema.partition : schema.game).filter((field) => field.id !== "partition_pve_enabled" || effectiveUserGamePartitionId) : [];
+  const gameGroups = groupSettingsFields(userGameFields);
+  const activeGameCategory = gameGroups.some(([category]) => category === selectedGameCategory) ? selectedGameCategory : gameGroups[0]?.[0] || "";
+  const activeGameFields = gameGroups.find(([category]) => category === activeGameCategory)?.[1] || [];
+  const engineFields = (schema?.engine || []).filter((field) => !["server_display_name", "server_login_password", "port", "igw_port"].includes(field.id));
+  const engineDirty = changedKeys(engineValues, engineDraft, engineFields.map((field) => field.id));
+  const gameDirty = changedKeys(gameValues, gameDraft, userGameFields.map((field) => field.id));
+  const sietchesDirty = activeSietches !== String(partitionOptions.filter((row) => row.active).length || partitionOptions.length || "") || partitionOptions.some((sietch) => {
+    const draft = sietchDrafts[sietch.partitionId] || { displayName: sietch.displayName, password: sietch.password };
+    return draft.displayName !== sietch.displayName || draft.password !== sietch.password;
+  });
+  const rawEngineDirty = rawEngine !== rawEngineOriginal;
+  const rawGameDirty = rawGame !== rawGameOriginal;
+  const dirtySummary = [
+    engineDirty.length ? `${engineDirty.length} UserEngine value${engineDirty.length === 1 ? "" : "s"}` : "",
+    gameDirty.length ? `${gameDirty.length} UserGame value${gameDirty.length === 1 ? "" : "s"}` : "",
+    rawEngineDirty ? "UserEngine.ini" : "",
+    rawGameDirty ? "UserGame.ini" : ""
+  ].filter(Boolean).join(", ");
   function selectMap(row: Record<string, unknown>) {
     const name = String(row.map || "");
     if (selectedMapName === name) {
       setSelectedMapName("");
+      setSelectedPartitionId("");
       return;
     }
     setSelectedMapName(name);
+    const rowPartition = String(row.partitionId || row.partition || "").trim();
+    const defaultPartition = name === "Survival_1" ? "1" : /^(DeepDesert_|Overmap$)/i.test(name) ? "2" : rowPartition;
+    setSelectedPartitionId(defaultPartition);
+    setSelectedGameCategory("");
     setMemory(memoryInputValue(String(row.memory || "")));
     setModeDraft(modeInputValue(String(row.mode || "")));
-    void loadUserGame(name).catch((error) => onError(error instanceof Error ? error.message : String(error)));
+    void loadSelectedSettings(name, defaultPartition || undefined).catch((error) => onError(error instanceof Error ? error.message : String(error)));
   }
-  return <section className="panel">
+  function selectPartition(next: string) {
+    setSelectedPartitionId(next);
+    setSelectedGameCategory("");
+    if (selectedMapName) void loadSelectedSettings(selectedMapName, next || undefined).catch((error) => onError(error instanceof Error ? error.message : String(error)));
+  }
+  function selectUserGameMap(next: string) {
+    if (!next) {
+      setUserGameMapName("");
+      setUserGamePartitionId("");
+      setSelectedGameCategory("");
+      setGameValues({});
+      setGameDraft({});
+      return;
+    }
+    const row = mapRows.find((item) => String(item.map) === next);
+    const rowPartition = String(row?.partitionId || row?.partition || "").trim();
+    const defaultPartition = next === "Survival_1" ? "1" : /^(DeepDesert_|Overmap$)/i.test(next) ? "2" : rowPartition;
+    setUserGameMapName(next);
+    setUserGamePartitionId(defaultPartition);
+    setSelectedGameCategory("");
+    if (next) void loadSelectedSettings(next, defaultPartition || undefined).catch((error) => onError(error instanceof Error ? error.message : String(error)));
+  }
+  function selectUserGamePartition(next: string) {
+    setUserGamePartitionId(next);
+    setSelectedGameCategory("");
+    if (userGameName) void loadSelectedSettings(userGameName, next || undefined).catch((error) => onError(error instanceof Error ? error.message : String(error)));
+  }
+  async function saveEngine() {
+    await runTaskAndRefresh(() => mapsApi.saveUserSettings({ scope: "engine", values: valuesForFields(engineDraft, engineFields) }), "Saving UserEngine and restarting servers", "UserEngine Saved");
+    await loadUserEngine();
+  }
+  async function saveSelectedMapSettings(row: Record<string, unknown>) {
+    const rowName = String(row.map || "");
+    const originalMode = modeInputValue(String(row.mode || ""));
+    const originalMemory = memoryInputValue(String(row.memory || ""));
+    const modeChanged = modeDraft !== originalMode && String(row.mode) !== "Core Map";
+    const memoryChanged = memory !== originalMemory;
+    if (!modeChanged && !memoryChanged) return;
+    const running = /^(Ready|Running|Starting|Assigned)$/i.test(String(row.status || ""));
+    const partitionId = String(row.partitionId || row.partition || "").trim();
+    if (window.confirm(`Save map settings for ${rowName}${memoryChanged && running ? " and restart the affected map once" : ""}?`)) {
+      await runTaskAndRefresh(() => mapsApi.saveMapSettings({
+        map: rowName,
+        partitionId: partitionId || undefined,
+        mode: modeDraft,
+        memory: `${memory}g`,
+        modeChanged,
+        memoryChanged,
+        running,
+        confirmation: "SAVE MAP SETTINGS"
+      }), `Saving ${rowName} Settings`, "Map Settings Saved");
+    }
+  }
+  async function saveSurvivalSietches() {
+    const actions: Array<() => Promise<{ task: Task }>> = [];
+    const currentActive = String(partitionOptions.filter((row) => row.active).length || partitionOptions.length || "");
+    if (activeSietches && activeSietches !== currentActive) {
+      actions.push(() => mapsApi.updateSietches({ action: "set-active", map: "Survival_1", count: Number(activeSietches), confirmation: "UPDATE SIETCHES" }));
+    }
+    for (const sietch of partitionOptions) {
+      const draft = sietchDrafts[sietch.partitionId] || { displayName: sietch.displayName, password: sietch.password };
+      if (draft.displayName !== sietch.displayName) {
+        actions.push(() => mapsApi.updateSietches({ action: "set-display", partitionId: sietch.partitionId, displayName: draft.displayName, confirmation: "UPDATE SIETCHES" }));
+      }
+      if (draft.password !== sietch.password) {
+        actions.push(() => mapsApi.updateSietches({ action: "set-password", partitionId: sietch.partitionId, password: draft.password, confirmation: "UPDATE SIETCHES" }));
+      }
+    }
+    if (!actions.length) return;
+    if (window.confirm(`Save ${actions.length} Survival_1 Sietch change${actions.length === 1 ? "" : "s"}?`)) {
+      await runTaskSequenceAndRefresh(actions, "Saving Sietch Changes", "Sietches Saved");
+    }
+  }
+  async function saveGame() {
+    if (!userGameName) return;
+    const scope = effectiveUserGamePartitionId ? "partition" : "map";
+    await runTaskAndRefresh(() => mapsApi.saveUserSettings({ scope, map: userGameName, partitionId: effectiveUserGamePartitionId || undefined, values: valuesForFields(gameDraft, userGameFields) }), `Saving ${userGameName} UserGame`, "UserGame Saved");
+    await loadSelectedSettings(userGameName, effectiveUserGamePartitionId || undefined);
+  }
+  async function saveRaw(kind: "engine" | "game") {
+    if (kind === "engine") {
+      await runTaskAndRefresh(() => mapsApi.saveRawUserSettings({ scope: "engine", content: rawEngine }), "Saving raw UserEngine and restarting servers", "Raw UserEngine Saved");
+      await loadUserEngine();
+    } else {
+      await runTaskAndRefresh(() => mapsApi.saveRawUserSettings({ scope: "game", map: userGameName || "Survival_1", partitionId: effectiveUserGamePartitionId || undefined, content: rawGame }), "Saving raw UserGame and restarting servers", "Raw UserGame Saved");
+      if (userGameName) await loadSelectedSettings(userGameName, effectiveUserGamePartitionId || undefined);
+    }
+  }
+  async function importIni(kind: "engine" | "game", file: File | null) {
+    if (!file) return;
+    const text = await file.text();
+    if (kind === "engine") setRawEngine(text);
+    else setRawGame(text);
+  }
+  function downloadIni(kind: "engine" | "game") {
+    const text = kind === "engine" ? rawEngine : rawGame;
+    const name = kind === "engine" ? "UserEngine.ini" : "UserGame.ini";
+    downloadText(name, text);
+  }
+  async function toggleAdvanced() {
+    if (advancedOpen) {
+      setAdvancedOpen(false);
+      return;
+    }
+    await loadUserEngine();
+    const raw = await mapsApi.rawUserSettings("game");
+    setRawGame(raw.content || "");
+    setRawGameOriginal(raw.content || "");
+    setModifiersOpen(false);
+    setAdvancedOpen(true);
+  }
+  function toggleModifiers() {
+    const nextOpen = !modifiersOpen;
+    setModifiersOpen(nextOpen);
+    if (nextOpen) setAdvancedOpen(false);
+  }
+  return <section className="panel maps-panel">
     <div className="panel-title"><h2>Maps & Sietches</h2><button disabled={loading} onClick={() => run(loadMaps)}>{loading ? "Refreshing..." : "Refresh Maps"}</button></div>
-    {refreshMessage && !loading && <p className="muted">{refreshMessage}</p>}
+    {dirtySummary && <p className="dirty-note">Unsaved changes: {dirtySummary}</p>}
+    {mapsResult && <HomeTaskResultCard result={mapsResult} />}
     <section className="action-section">
       <h4>Maps Overview</h4>
       {loading && !mapRows.length && <div className="empty">Loading maps...</div>}
       {!loading && loadError && !mapRows.length && <div className="result-panel"><strong>Map list could not be loaded.</strong><p>{loadError}</p><button onClick={() => run(loadMaps)}>Retry</button></div>}
-      {mapRows.length ? <div className="table-wrap"><table><thead><tr><th>Map</th><th>Status</th><th>Mode</th><th>Memory</th><th>Actions</th></tr></thead><tbody>{mapRows.map((row) => {
+      {mapRows.length ? <div className="table-wrap maps-overview-table-wrap"><table className="maps-overview-table"><thead><tr><th>Map</th><th>Status</th><th>Mode</th><th>Memory</th><th className="actions-column">Action</th></tr></thead><tbody>{mapRows.map((row) => {
         const rowName = String(row.map || "");
         const isSelected = selectedMapName === rowName;
-        return <Fragment key={rowName}><tr><td>{rowName}</td><td>{String(row.status || "Not Available")}</td><td>{String(row.mode || "Not Available")}</td><td>{String(row.memory || "Not Available")}</td><td><button onClick={() => selectMap(row)}>{isSelected ? "Close" : "Edit"}</button></td></tr>
+        const memoryRow = memoryForMap(liveMemory, rowName, row);
+        const mapSettingsDirty = isSelected && ((modeDraft !== modeInputValue(String(row.mode || "")) && String(row.mode) !== "Core Map") || memory !== memoryInputValue(String(row.memory || "")));
+        return <Fragment key={rowName}><tr><td>{rowName}</td><td>{String(row.status || "Not Available")}</td><td>{String(row.mode || "Not Available")}</td><td><MemoryUsageBar row={memoryRow} fallback={liveMemoryFallback(row)} /></td><td className="actions-column"><button className="stable-action-button" onClick={() => selectMap(row)}>{isSelected ? "Close" : "Edit"}</button></td></tr>
           {isSelected && <tr className="inline-edit-row" key={`${rowName}-edit`}><td colSpan={5}>
             <section className="inline-edit-panel">
               <div className="panel-title"><h4>Edit {rowName}</h4></div>
               <KeyValueGrid items={[["Status", row.status], ["Mode", row.mode], ["Memory", row.memory], ["Dimensions", row.dimensions]]} />
               <div className="action-line">
                 <label className="compact-select">Mode<select value={modeDraft} disabled={String(row.mode) === "Core Map"} onChange={(event) => setModeDraft(event.target.value)}><option value="dynamic">Dynamic</option><option value="always-on">Always On</option></select></label>
-                <button disabled={String(row.mode) === "Core Map"} onClick={() => run(async () => { if (window.confirm(`Set ${rowName} to ${friendlyMapMode(modeDraft)}?`)) await runTaskAndRefresh(() => mapsApi.setMode({ map: rowName, mode: modeDraft, confirmation: "SET MAP MODE" })); })}>Save Mode</button>
                 <label className="memory-number-field">Memory<input type="number" min="1" step="1" value={memory} onChange={(event) => setMemory(event.target.value)} placeholder="8" /></label>
                 <span className="unit-label">GB</span>
-                <button onClick={() => run(async () => { if (window.confirm(`Set memory for ${rowName} to ${memory || "0"} GB? Running maps may need restart.`)) await runTaskAndRefresh(() => mapsApi.setMemory({ map: rowName, memory: `${memory}g`, confirmation: "SET MAP MEMORY" })); })}>Save Memory</button>
+                <button disabled={!mapSettingsDirty} onClick={() => run(() => saveSelectedMapSettings(row))}>Save Map Settings</button>
               </div>
               {String(row.mode) === "Core Map" && <p className="muted">Core map mode is managed by the base server stack; only memory changes are exposed here.</p>}
-              {isSurvival && <PlannedPanel title="Survival Dimensions and Passwords" reason="The local manager supports Sietch max/active dimensions, display names, and passwords. Web controls remain disabled until restart impact for Survival, Director, and Gateway is confirmed with preview and rollback behavior." />}
-              {isDeepDesert && <section className="planned-card">
-                <strong>Deep Desert Settings</strong>
-                <span>Dual Desert script support exists, but write controls remain disabled until bootstrap/repair/restart behavior is fully audited.</span>
-                <button onClick={() => run(async () => setDeepText((await mapsApi.deepdesert()).stdout))}>Refresh Deep Desert Status</button>
+              {isSurvival && <section className="action-section nested-action">
+                <div className="panel-title"><h4>Sietches</h4><button onClick={() => run(loadSietches)}>Refresh Sietches</button></div>
+                <div className="action-line">
+                  <label className="memory-number-field">Active Sietches<input type="number" min="1" max="64" step="1" value={activeSietches} onChange={(event) => setActiveSietches(event.target.value)} /></label>
+                  <button disabled={!sietchesDirty} onClick={() => run(saveSurvivalSietches)}>Save Sietches</button>
+                </div>
+                {partitionOptions.length ? <div className="settings-grid">{partitionOptions.map((sietch) => {
+                  const draft = sietchDrafts[sietch.partitionId] || { displayName: sietch.displayName, password: sietch.password };
+                  return <article className="settings-field" key={sietch.partitionId}>
+                    <strong>Partition {sietch.partitionId}</strong>
+                    <label>Name<input value={draft.displayName} onChange={(event) => setSietchDrafts({ ...sietchDrafts, [sietch.partitionId]: { ...draft, displayName: event.target.value } })} /></label>
+                    <label>Password<SecretInput value={draft.password} onChange={(event) => setSietchDrafts({ ...sietchDrafts, [sietch.partitionId]: { ...draft, password: event.target.value } })} /></label>
+                  </article>;
+                })}</div> : <MapCommandSummary text={sietchesText || "No Sietch dimensions reported yet."} />}
+              </section>}
+              {isDeepDesert && <section className="action-section nested-action">
+                <div className="action-line deep-desert-dual-line">
+                  <strong>Deep Desert Dual Setup:</strong>
+                  <label className="compact-select"><select value={deepDesertDualAction} onChange={(event) => setDeepDesertDualAction(event.target.value)}><option value="enable">Enable</option><option value="disable">Disable</option></select></label>
+                  <button className={deepDesertDualAction === "disable" ? "danger" : ""} onClick={() => run(async () => { if (window.confirm(`${titleCase(deepDesertDualAction)} dual Deep Desert setup?`)) await runTaskAndRefresh(() => mapsApi.updateDeepdesert({ action: deepDesertDualAction, confirmation: "UPDATE DEEP DESERT" }), `Running Deep Desert ${deepDesertDualAction}`, "Deep Desert Updated"); })}>Save</button>
+                </div>
                 {deepText && <MapCommandSummary text={deepText} />}
               </section>}
             </section>
@@ -1859,69 +3919,235 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
         </Fragment>;
       })}</tbody></table></div> : null}
       {loadError && mapRows.length ? <p className="danger-note">Some map data could not be refreshed: {loadError}</p> : null}
-    </section>
-
-    <section className="action-section">
-      <div className="panel-title"><h4>Current Memory Configuration</h4><button onClick={() => run(loadMaps)}>Refresh Memory</button></div>
-      {memoryText ? <DataTable rows={parseMemoryRows(memoryText).slice(0, 12)} columns={["map", "memory"]} /> : <div className="empty">Memory configuration is not available yet.</div>}
+      {memoryError && <p className="danger-note">Live memory could not be read: {memoryError}</p>}
     </section>
     <section className="action-section">
-      <div className="panel-title"><h4>Edit UserEngine</h4><button onClick={() => run(loadUserEngine)}>Refresh UserEngine</button></div>
-      <p className="muted">Read-only preview of Dune Manager UserEngine global defaults. Saving is disabled until backup-before-write and restart impact handling are added to the web route.</p>
-      {commandStatusSummary(userEngine).reason && <p className="danger-note">{commandStatusSummary(userEngine).reason}</p>}
-      {userEngine?.stdout ? <DataTable rows={parseUserSettingRows(userEngine.stdout).slice(0, 16)} columns={["setting", "value"]} /> : <div className="empty">UserEngine settings have not loaded yet.</div>}
+      <div className="panel-title">
+        <h4>Interactive Modifiers</h4>
+        <button className={`icon-toggle-button ${modifiersOpen ? "active" : ""}`} aria-label={modifiersOpen ? "Collapse Interactive Modifiers" : "Expand Interactive Modifiers"} title={modifiersOpen ? "Collapse" : "Expand"} onClick={toggleModifiers}>{modifiersOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</button>
+      </div>
+      {modifiersOpen && <><div className="settings-tabs" role="tablist" aria-label="INI modifier editor">
+        <button className={settingsTab === "engine" ? "active" : ""} role="tab" aria-selected={settingsTab === "engine"} onClick={() => setSettingsTab("engine")}>UserEngine</button>
+        <button className={settingsTab === "game" ? "active" : ""} role="tab" aria-selected={settingsTab === "game"} onClick={() => setSettingsTab("game")}>UserGame</button>
+      </div>
+      {settingsTab === "engine" ? <>
+        <SettingsEditor fields={engineFields} values={engineDraft} onChange={(id, value) => setEngineDraft({ ...engineDraft, [id]: value })} />
+        <div className="action-row"><button disabled={!engineDirty.length} onClick={() => run(saveEngine)}>Save</button><button disabled={!engineDirty.length} onClick={() => setEngineDraft(engineValues)}>Discard Changes</button></div>
+      </> : <>
+        <div className="settings-selector-row">
+          <label className="compact-select">Map<select value={userGameName} onChange={(event) => selectUserGameMap(event.target.value)}><option value="">Select Map</option>{mapRows.map((row) => {
+            const name = String(row.map || "");
+            return <option key={name} value={name}>{name}</option>;
+          })}</select></label>
+          {isUserGameSurvival && <label className="compact-select">Sietch / Partition<select value={effectiveUserGamePartitionId} onChange={(event) => selectUserGamePartition(event.target.value)}>{userGamePartitionOptions.map((option) => <option key={option.partitionId} value={option.partitionId}>{option.displayName || `Partition ${option.partitionId}`} ({option.partitionId})</option>)}</select></label>}
+          <label className="compact-select">Modifier Category<select disabled={!userGameName} value={activeGameCategory} onChange={(event) => setSelectedGameCategory(event.target.value)}>{gameGroups.map(([category, fields]) => <option key={category} value={category}>{category} ({fields.length})</option>)}</select></label>
+        </div>
+        {userGameName && <SettingsCardGrid fields={activeGameFields} values={gameDraft} onChange={(id, value) => setGameDraft({ ...gameDraft, [id]: value })} />}
+        <div className="action-row"><button disabled={!gameDirty.length || !userGameName} onClick={() => run(saveGame)}>Save</button><button disabled={!gameDirty.length} onClick={() => setGameDraft(gameValues)}>Discard Changes</button></div>
+      </>}</>}
     </section>
-    {selectedMapName && <section className="action-section">
-      <div className="panel-title"><h4>Edit UserGame for {selectedMapName}</h4><button onClick={() => run(() => loadUserGame(selectedMapName))}>Refresh UserGame</button></div>
-      <p className="muted">Read-only preview of merged UserGame values for the selected map. Per-dimension editing remains disabled until the web route can resolve partition IDs, back up UserGame.ini, and handle required restarts safely.</p>
-      {commandStatusSummary(userGame).reason && <p className="danger-note">{commandStatusSummary(userGame).reason}</p>}
-      {userGame?.stdout ? <DataTable rows={parseUserSettingRows(userGame.stdout).slice(0, 16)} columns={["setting", "value"]} /> : <div className="empty">Select a map to preview UserGame settings.</div>}
-    </section>}
-    <div className="planned-grid spaced-section">
-      <article className="planned-card"><strong>UserEngine Save</strong><span>Disabled. usersettings.py can write fields, but it does not create backups or preview restart impact for the web UI yet.</span></article>
-      <article className="planned-card"><strong>UserGame Per-Dimension Save</strong><span>Disabled. Needs dynamic partition selector, UserGame.ini backup-before-write, and restart confirmation.</span></article>
-      <article className="planned-card"><strong>Restore Defaults</strong><span>Disabled. reset-all exists, but destructive web exposure needs preview and backup of current UserEngine/UserGame overrides.</span></article>
-      <article className="planned-card"><strong>Live Memory Usage</strong><span>Planned. Manager reads Docker stats directly; current web page shows configured memory from dune memory status.</span></article>
-    </div>
+    <section className="action-section">
+      <div className="panel-title">
+        <h4>Advanced</h4>
+        <div className="action-row advanced-toggle-row">
+          <button className={`icon-toggle-button ${advancedOpen ? "active" : ""}`} aria-label={advancedOpen ? "Collapse Advanced" : "Expand Advanced"} title={advancedOpen ? "Collapse" : "Expand"} onClick={() => run(toggleAdvanced)}>{advancedOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</button>
+        </div>
+      </div>
+      {advancedOpen && <div className="advanced-grid">
+        <article className="raw-editor-card"><div className="panel-title"><h4>UserEngine.ini</h4><div className="action-row"><button onClick={() => downloadIni("engine")}>Download</button><label className="button-link">Import<input className="hidden-file-input" type="file" accept=".ini,text/plain" onChange={(event) => run(async () => { await importIni("engine", event.target.files?.[0] || null); })} /></label></div></div><textarea value={rawEngine} onChange={(event) => setRawEngine(event.target.value)} rows={14} /><div className="action-row"><button disabled={!rawEngineDirty} onClick={() => run(() => saveRaw("engine"))}>Save</button><button disabled={!rawEngineDirty} onClick={() => setRawEngine(rawEngineOriginal)}>Discard Changes</button><button className="danger" onClick={() => run(async () => { if (window.confirm("Restore UserEngine gameplay defaults? Server name, password, Port, and IGWPort will be preserved.")) await runTaskAndRefresh(() => mapsApi.resetUserSettings({ scope: "engine", confirmation: "RESTORE MAP DEFAULTS" }), "Restoring UserEngine defaults", "UserEngine Defaults Restored"); await loadUserEngine(); })}>Restore Defaults</button></div></article>
+        <article className="raw-editor-card"><div className="panel-title"><h4>UserGame.ini</h4><div className="action-row"><button onClick={() => downloadIni("game")}>Download</button><label className="button-link">Import<input className="hidden-file-input" type="file" accept=".ini,text/plain" onChange={(event) => run(async () => { await importIni("game", event.target.files?.[0] || null); })} /></label></div></div><textarea value={rawGame} onChange={(event) => setRawGame(event.target.value)} rows={14} /><div className="action-row"><button disabled={!rawGameDirty} onClick={() => run(() => saveRaw("game"))}>Save</button><button disabled={!rawGameDirty} onClick={() => setRawGame(rawGameOriginal)}>Discard Changes</button><button disabled={!userGameName} className="danger" onClick={() => run(async () => { if (window.confirm(`Restore UserGame defaults for ${userGameName}${effectiveUserGamePartitionId ? ` partition ${effectiveUserGamePartitionId}` : ""}?`)) await runTaskAndRefresh(() => mapsApi.resetUserSettings({ scope: effectiveUserGamePartitionId ? "partition" : "map", map: userGameName, partitionId: effectiveUserGamePartitionId || undefined, confirmation: "RESTORE MAP DEFAULTS" }), "Restoring UserGame defaults", "UserGame Defaults Restored"); await loadSelectedSettings(userGameName, effectiveUserGamePartitionId || undefined); })}>Restore Defaults</button></div></article>
+      </div>}
+    </section>
   </section>;
 }
 
-function PlannedPanel({ title, reason }: { title: string; reason: string }) {
-  return <section className="action-section planned-card"><h4>{title}</h4><p>Planned / not exposed in this pass.</p><p>{reason}</p></section>;
+function SettingsEditor({ fields, values, onChange }: { fields: UserSettingField[]; values: Record<string, string>; onChange: (id: string, value: string) => void }) {
+  if (!fields.length) return <div className="empty">Settings schema is loading.</div>;
+  const groups = groupSettingsFields(fields);
+  return <div className="settings-category-list">{groups.map(([category, categoryFields]) => <details className="settings-category" key={category} open>
+    <summary><span>{category}</span><strong>{categoryFields.length}</strong></summary>
+    <div className="settings-grid settings-grid-roomy">{categoryFields.map((field) => <SettingControl key={field.id} field={field} value={values[field.id] ?? field.default ?? ""} onChange={(value) => onChange(field.id, value)} />)}</div>
+  </details>)}</div>;
 }
 
-function markerBounds(markers: LiveMapMarker[]) {
-  const xs = markers.map((marker) => Number(marker.x)).filter(Number.isFinite);
-  const ys = markers.map((marker) => Number(marker.y)).filter(Number.isFinite);
+function SettingsCardGrid({ fields, values, onChange }: { fields: UserSettingField[]; values: Record<string, string>; onChange: (id: string, value: string) => void }) {
+  if (!fields.length) return <div className="empty">Select a modifier category.</div>;
+  return <div className="settings-grid settings-grid-roomy">{fields.map((field) => <SettingControl key={field.id} field={field} value={values[field.id] ?? field.default ?? ""} onChange={(value) => onChange(field.id, value)} />)}</div>;
+}
+
+function SettingControl({ field, value, onChange }: { field: UserSettingField; value: string; onChange: (value: string) => void }) {
+  const label = friendlySettingLabel(field.id, field.key || field.id);
+  const inputId = `setting-${field.scope}-${field.id}`;
+  return <label className="settings-field" htmlFor={inputId}>
+    <span><strong>{label}</strong><small>{field.key || field.id}</small></span>
+    {field.type === "boolean"
+      ? <select id={inputId} value={normalizeBooleanText(value)} onChange={(event) => onChange(event.target.value)}><option value="True">True</option><option value="False">False</option></select>
+      : field.type === "integer" || field.type === "number"
+        ? <input id={inputId} type="number" step={field.type === "integer" ? "1" : "any"} value={value} onChange={(event) => onChange(event.target.value)} />
+        : String(value).length > 72 || value.includes("(")
+          ? <textarea id={inputId} rows={3} value={value} onChange={(event) => onChange(event.target.value)} />
+          : <input id={inputId} value={value} onChange={(event) => onChange(event.target.value)} />}
+  </label>;
+}
+
+function MemoryUsageBar({ row, fallback }: { row: LiveMapMemoryRow | null; fallback: string }) {
+  if (!row) return <span className="muted">{fallback}</span>;
+  const percent = Math.max(0, Math.min(100, Number(row.percent) || 0));
+  return <div className="memory-usage-cell">
+    <div className="memory-usage-bar"><span style={{ width: `${percent}%` }} /></div>
+    <strong>{percent.toFixed(1)}%</strong>
+    <span>{formatBytes(row.usedBytes)} / {formatBytes(row.limitBytes)}</span>
+  </div>;
+}
+
+function groupSettingsFields(fields: UserSettingField[]): [string, UserSettingField[]][] {
+  const grouped = new globalThis.Map<string, UserSettingField[]>();
+  for (const field of fields) {
+    const category = settingsCategory(field.section || field.key || field.id);
+    grouped.set(category, [...(grouped.get(category) || []), field]);
+  }
+  return [...grouped.entries()];
+}
+
+function settingsCategory(value: string) {
+  const raw = value.replace(/^\/Script\/DuneSandbox\./, "").replace(/^\/Script\//, "").replace(/^\/DeteriorationSystem\./, "");
+  const cleaned = raw.split(".").pop() || raw;
+  if (cleaned === "ConsoleVariables") return "Global";
+  return titleCaseWords(cleaned.replace(/Subsystem$/, "").replace(/Settings$/, " Settings").replace(/Config$/, " Config").replace(/([a-z])([A-Z])/g, "$1 $2"));
+}
+
+function friendlySettingLabel(id: string, fallback: string) {
+  return titleCaseWords(id.replace(/^partition_/, "").replace(/_/g, " ")) || titleCaseWords(fallback);
+}
+
+function normalizeBooleanText(value: string) {
+  return /^(1|true|yes|on)$/i.test(String(value)) ? "True" : "False";
+}
+
+function parseUserSettingsMap(text: string) {
+  return Object.fromEntries(parseUserSettingRows(text).map((row) => [String(row.setting), String(row.value ?? "")]));
+}
+
+function changedKeys(original: Record<string, string>, draft: Record<string, string>, keys: string[]) {
+  return keys.filter((key) => String(original[key] ?? "") !== String(draft[key] ?? ""));
+}
+
+function valuesForFields(values: Record<string, string>, fields: UserSettingField[]) {
+  return Object.fromEntries(fields.map((field) => [field.id, String(values[field.id] ?? field.default ?? "")]));
+}
+
+type SietchRow = { partitionId: string; displayName: string; password: string; active: boolean };
+
+function parseSietchRows(text: string): SietchRow[] {
+  const rows: SietchRow[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const partitionMatch = line.match(/\b(?:partition|id)\s*[:=]?\s*(\d+)\b/i) || line.match(/^\s*(\d+)\s+/);
+    if (!partitionMatch) continue;
+    const partitionId = partitionMatch[1];
+    const displayName = (line.match(/\b(?:display|name)\s*[:=]\s*([^|,\t]+)/i)?.[1] || line.match(/\bSietch\s+([A-Za-z0-9 _-]+)/i)?.[0] || `Sietch ${partitionId}`).trim();
+    const password = (line.match(/\bpassword\s*[:=]\s*([^|,\t]+)/i)?.[1] || "").trim();
+    const active = !/\binactive|disabled|stopped\b/i.test(line);
+    rows.push({ partitionId, displayName, password, active });
+  }
+  const unique = new globalThis.Map<string, SietchRow>();
+  for (const row of rows) unique.set(row.partitionId, row);
+  return [...unique.values()].sort((a, b) => Number(a.partitionId) - Number(b.partitionId));
+}
+
+function memoryForMap(rows: LiveMapMemoryRow[], map: string, row?: Record<string, unknown>) {
+  const normalized = map.toLowerCase();
+  const partitionId = String(row?.partitionId || row?.partition || "").trim();
+  return rows.find((memoryRow) => {
+    const memoryMap = memoryRow.map.toLowerCase();
+    const container = memoryRow.container.toLowerCase();
+    const containerMap = normalized.replace(/_/g, "-");
+    if (partitionId && new RegExp(`-${escapeRegExp(partitionId)}$`).test(container)) return true;
+    if (memoryMap === normalized) return true;
+    if (container === `dune-server-${containerMap}`) return true;
+    if (!partitionId && container.startsWith(`dune-server-${containerMap}-`)) return true;
+    return false;
+  }) || null;
+}
+
+function liveMemoryFallback(row: Record<string, unknown>) {
+  const status = String(row.status || "");
+  if (/^(Ready|Running|Starting)$/i.test(status)) return "Unavailable";
+  return "Not Running";
+}
+
+function downloadText(filename: string, text: string) {
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+const MAPS_RESULT_KEY = "dune.maps.result";
+
+function loadPersistedMapsResult(): HomeTaskResult | null {
+  try {
+    const raw = window.localStorage.getItem(MAPS_RESULT_KEY);
+    return raw ? JSON.parse(raw) as HomeTaskResult : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistMapsResult(result: HomeTaskResult | null) {
+  try {
+    if (result) window.localStorage.setItem(MAPS_RESULT_KEY, JSON.stringify(result));
+    else window.localStorage.removeItem(MAPS_RESULT_KEY);
+  } catch {
+    // Browser storage can be unavailable in hardened modes.
+  }
+}
+
+type LiveMapPoint = { px: number; py: number; inBounds: boolean };
+
+function worldToLiveMapPoint(marker: Pick<LiveMapMarker, "x" | "y">, config: LiveMapConfig): LiveMapPoint | null {
+  const x = Number(marker.x);
+  const y = Number(marker.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  if (config.maxX === config.minX || config.maxY === config.minY) return null;
+  const px = ((x - config.minX) / (config.maxX - config.minX)) * config.width;
+  let py = ((y - config.minY) / (config.maxY - config.minY)) * config.height;
+  if (config.flipY) py = config.height - py;
   return {
-    minX: xs.length ? Math.min(...xs) : 0,
-    maxX: xs.length ? Math.max(...xs) : 1,
-    minY: ys.length ? Math.min(...ys) : 0,
-    maxY: ys.length ? Math.max(...ys) : 1
+    px,
+    py,
+    inBounds: px >= 0 && px <= config.width && py >= 0 && py <= config.height
   };
 }
 
-function clampPan(next: { x: number; y: number }, zoom: number, element: HTMLElement | null) {
-  if (!element || zoom <= 1) return { x: 0, y: 0 };
-  const maxX = Math.max(0, (element.clientWidth * (zoom - 1)) / 2);
-  const maxY = Math.max(0, (element.clientHeight * (zoom - 1)) / 2);
+function liveMapPixelsToWorld(px: number, py: number, config: LiveMapConfig) {
+  if (!Number.isFinite(px) || !Number.isFinite(py) || config.width === 0 || config.height === 0) return null;
+  let normalizedY = py / config.height;
+  if (config.flipY) normalizedY = 1 - normalizedY;
   return {
-    x: Math.max(-maxX, Math.min(maxX, next.x)),
-    y: Math.max(-maxY, Math.min(maxY, next.y))
+    x: config.minX + (px / config.width) * (config.maxX - config.minX),
+    y: config.minY + normalizedY * (config.maxY - config.minY)
   };
 }
 
-function markerPoint(marker: LiveMapMarker, bounds: { minX: number; maxX: number; minY: number; maxY: number }) {
-  const spanX = Math.max(1, bounds.maxX - bounds.minX);
-  const spanY = Math.max(1, bounds.maxY - bounds.minY);
-  return {
-    x: 5 + ((Number(marker.x) - bounds.minX) / spanX) * 90,
-    y: 95 - ((Number(marker.y) - bounds.minY) / spanY) * 90
-  };
+function liveMapMinimumZoom(config: LiveMapConfig | null | undefined, frame: HTMLElement | null) {
+  if (!config || !frame) return 0.16;
+  return Math.max(0.05, frame.clientWidth / config.width, frame.clientHeight / config.height);
 }
 
-function markerColor(type: string) {
-  return { player: "#3b82f6", vehicle: "#22c55e", base: "#f59e0b", storage: "#a855f7", service: "#e5e7eb" }[type] || "#e5e7eb";
+function clampLiveMapZoom(value: number, minimum = 0.16) {
+  if (!Number.isFinite(value)) return minimum;
+  return Math.max(minimum, Math.min(1, value));
+}
+
+function countMarkers(markers: LiveMapMarker[]) {
+  return markers.reduce<Record<string, number>>((acc, marker) => {
+    const key = String(marker.type || "unknown");
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
 }
 
 function friendlyMarkerName(marker: LiveMapMarker) {
@@ -1951,28 +4177,107 @@ function friendlyMarkerType(type: string) {
 function UpdatesPanel({ setTask }: { setTask: (task: Task) => void }) {
   const [gameStatus, setGameStatus] = useState<Record<string, string>>({ status: "Not checked", current: "", latest: "", reason: "" });
   const [stackStatus, setStackStatus] = useState<Record<string, string>>({ status: "Not checked", current: "", latest: "", reason: "" });
+  const [gameUpdateTask, setGameUpdateTask] = useState<Task | null>(null);
+  const [gameSteamcmdFixTask, setGameSteamcmdFixTask] = useState<Task | null>(null);
+  const [stackUpdateTask, setStackUpdateTask] = useState<Task | null>(null);
   const [autoGame, setAutoGame] = useState<{ stdout?: string; stderr?: string; exitCode?: number } | null>(null);
+  const [autoGameLoading, setAutoGameLoading] = useState(true);
   const [autoGameEnabled, setAutoGameEnabled] = useState(false);
-  const [autoGameTime, setAutoGameTime] = useState("05:00:00");
+  const [autoGameTime, setAutoGameTime] = useState("05:00");
+  const [autoGameResult, setAutoGameResult] = useState<HomeTaskResult | null>(null);
   const [previousStack, setPreviousStack] = useState<Record<string, string>[]>([]);
   const [previousStackReason, setPreviousStackReason] = useState("");
   const autoGameValues = parseKeyValueText(autoGame?.stdout || "");
+  const autoGameTimerValue = autoGameValues.systemd_timer || "";
+  const autoGameTimerLabel = autoGameTimerValue ? formatTimerStatus(autoGameTimerValue) : "Not Installed";
+  const autoGameTimerReady = /^(active|enabled)$/i.test(autoGameTimerValue);
+  const autoGameSaving = autoGameResult?.status === "running";
+  const autoGameLoaded = Boolean(autoGame);
+  const autoGameDisplayActive = autoGameSaving ? autoGameEnabled : autoGameEnabled && autoGameTimerReady;
+  const autoGameStatusLabel = !autoGameLoaded && !autoGameSaving ? "Checking" : autoGameDisplayActive ? "Enabled" : "Disabled";
+  const autoGameDisplayTimerLabel = !autoGameLoaded && !autoGameSaving ? "Checking" : autoGameSaving ? autoGameEnabled ? "Activating" : "Deactivating" : autoGameTimerLabel;
   async function checkGame() {
     setGameStatus({ status: "Checking...", current: "", latest: "", reason: "" });
     const final = await waitForTaskSilently((await updatesApi.checkGame()).task);
     setGameStatus(parseUpdateTask(final));
+  }
+  async function refreshGameStatus() {
+    try {
+      await checkGame();
+    } catch (error) {
+      setGameStatus({ status: "Check Failed", current: "", latest: "", reason: error instanceof Error ? error.message : String(error) });
+    }
   }
   async function checkStack() {
     setStackStatus({ status: "Checking...", current: "", latest: "", reason: "" });
     const final = await waitForTaskSilently((await updatesApi.checkStack()).task);
     setStackStatus(parseUpdateTask(final));
   }
+  async function refreshStackStatus() {
+    try {
+      await checkStack();
+    } catch (error) {
+      setStackStatus({ status: "Check Failed", current: "", latest: "", reason: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  async function applyGameUpdate() {
+    if (!window.confirm("Apply the game server update now?")) return;
+    setGameSteamcmdFixTask(null);
+    const response = await updatesApi.applyGame();
+    setGameUpdateTask(response.task);
+    const final = await waitForTaskWithUpdates(response.task, setGameUpdateTask);
+    if (final.status === "succeeded") refreshGameStatus();
+  }
+  async function fixSteamcmd() {
+    const response = await updatesApi.fixSteamcmd();
+    setGameSteamcmdFixTask(response.task);
+    await waitForTaskWithUpdates(response.task, setGameSteamcmdFixTask);
+  }
+  async function applyStackUpdate() {
+    if (!window.confirm("Apply the latest RedBlink stack update now?")) return;
+    const response = await updatesApi.applyStack();
+    setStackUpdateTask(response.task);
+    const final = await waitForTaskWithUpdates(response.task, setStackUpdateTask);
+    if (final.status === "succeeded") refreshStackStatus();
+  }
   async function loadAutoGame() {
-    const result = await updatesApi.autoGameStatus();
-    setAutoGame(result);
-    const values = parseKeyValueText(result.stdout || "");
-    setAutoGameEnabled(/^1|true|enabled$/i.test(values.auto_updates_enabled || values.enabled || ""));
-    if (values.auto_update_time) setAutoGameTime(values.auto_update_time);
+    try {
+      const result = await updatesApi.autoGameStatus();
+      setAutoGame(result);
+      const values = parseKeyValueText(result.stdout || "");
+      const preferenceEnabled = /^(1|true|enabled)$/i.test(values.auto_updates_enabled || values.enabled || "");
+      const timerReady = /^(active|enabled)$/i.test(values.systemd_timer || "");
+      setAutoGameEnabled(preferenceEnabled && timerReady);
+      if (values.auto_update_time) setAutoGameTime(toHourMinuteTime(values.auto_update_time));
+    } finally {
+      setAutoGameLoading(false);
+    }
+  }
+  async function saveAutoGame() {
+    const sanitizedTime = toHourMinuteTime(autoGameTime);
+    if (autoGameEnabled && !isValidHourMinuteTime(sanitizedTime)) {
+      setAutoGameResult({ status: "failed", title: "Auto Updates Save Failed", message: "Daily check time must be a valid 24-hour time, for example 05:00 or 23:30." });
+      return;
+    }
+    setAutoGameTime(sanitizedTime);
+    setAutoGameResult({ status: "running", title: "Saving Auto Updates" });
+    const requestedEnabled = autoGameEnabled;
+    try {
+      const final = await waitForTaskSilently((await updatesApi.saveAutoGame({ enabled: requestedEnabled, time: sanitizedTime, confirmation: "SAVE AUTO GAME UPDATES" })).task);
+      const details = taskTechnicalDetails(final);
+      const nextAutoGame = await updatesApi.autoGameStatus();
+      setAutoGame(nextAutoGame);
+      const nextValues = parseKeyValueText(nextAutoGame.stdout || "");
+      const timerReady = /^(active|enabled)$/i.test(nextValues.systemd_timer || "");
+      const timerDisabled = !timerReady || /^(disabled|inactive|not installed)$/i.test(nextValues.systemd_timer || "");
+      if (requestedEnabled && !timerReady) setAutoGameEnabled(false);
+      if (!requestedEnabled && timerDisabled) setAutoGameEnabled(false);
+      setAutoGameResult(final.status === "succeeded" && (!requestedEnabled ? timerDisabled : timerReady)
+        ? { status: "succeeded", title: "Auto Updates Saved Successfully", details }
+        : { status: "failed", title: requestedEnabled ? "Timer Install Failed" : "Auto Updates Save Failed", details: details || nextAutoGame.stdout || nextAutoGame.stderr || "" });
+    } catch (error) {
+      setAutoGameResult({ status: "failed", title: "Auto Updates Save Failed", details: error instanceof Error ? error.message : String(error) });
+    }
   }
   async function loadPreviousStack() {
     const result = await updatesApi.previousStack();
@@ -1980,70 +4285,84 @@ function UpdatesPanel({ setTask }: { setTask: (task: Task) => void }) {
     setPreviousStackReason(Number(result.exitCode || 0) === 0 ? "" : result.stderr || result.stdout || "Previous stack list unavailable");
   }
   useEffect(() => {
-    checkGame().catch((error) => setGameStatus({ status: "Check Failed", current: "", latest: "", reason: error instanceof Error ? error.message : String(error) }));
-    checkStack().catch((error) => setStackStatus({ status: "Check Failed", current: "", latest: "", reason: error instanceof Error ? error.message : String(error) }));
+    refreshGameStatus();
+    refreshStackStatus();
     loadAutoGame().catch((error) => setAutoGame({ stdout: "", stderr: error instanceof Error ? error.message : String(error), exitCode: 1 }));
     loadPreviousStack().catch((error) => setPreviousStackReason(error instanceof Error ? error.message : String(error)));
   }, []);
-  const gameCanApply = gameStatus.status === "Update Available";
-  const stackCanApply = stackStatus.status === "Update Available";
+  useEffect(() => {
+    if (gameUpdateTask?.status !== "succeeded") return;
+    const id = window.setTimeout(() => setGameUpdateTask(null), 10400);
+    return () => window.clearTimeout(id);
+  }, [gameUpdateTask?.id, gameUpdateTask?.status]);
+  useEffect(() => {
+    if (stackUpdateTask?.status !== "succeeded") return;
+    const id = window.setTimeout(() => setStackUpdateTask(null), 10400);
+    return () => window.clearTimeout(id);
+  }, [stackUpdateTask?.id, stackUpdateTask?.status]);
+  useEffect(() => {
+    if (!autoGameResult || autoGameResult.status === "running" || autoGameResult.status === "failed") return;
+    const id = window.setTimeout(() => setAutoGameResult(null), 10400);
+    return () => window.clearTimeout(id);
+  }, [autoGameResult?.status, autoGameResult?.title]);
+  const gameUpdateRunning = Boolean(gameUpdateTask && !isTerminalTask(gameUpdateTask.status));
+  const gameCanApply = canApplyUpdateStatus(gameStatus) && !gameUpdateRunning;
+  const stackUpdateRunning = Boolean(stackUpdateTask && !isTerminalTask(stackUpdateTask.status));
+  const stackCanApply = canApplyUpdateStatus(stackStatus) && !stackUpdateRunning;
   return <section className="panel">
     <h2>Updates</h2>
     <div className="action-sections">
       <section className="action-section">
         <div className="panel-title"><h4>Game Update</h4><StatusPill value={gameStatus.status} /></div>
-        <KeyValueGrid items={[["Current build", updateDisplayValue(gameStatus, "current")], ["Latest build", updateDisplayValue(gameStatus, "latest")], ["Status", gameStatus.status]]} />
+        <KeyValueGrid items={[["Current Build", updateDisplayValue(gameStatus, "current")], ["Latest Build", updateDisplayValue(gameStatus, "latest")], ["Status", gameStatus.status]]} />
         {gameStatus.status === "Check Failed" && gameStatus.reason && <p className="danger-note">{gameStatus.reason}</p>}
         {gameStatus.status === "Version details unavailable" && <p className="muted">{gameStatus.reason}</p>}
         <div className="action-line">
-          <button onClick={checkGame}>Refresh Game Check</button>
-          {gameCanApply && <button className="danger" onClick={async () => window.confirm("Apply the game server update now?") && setTask((await updatesApi.applyGame()).task)}>Apply Game Update</button>}
+          <button disabled={gameUpdateRunning} onClick={checkGame}>Refresh Game Check</button>
+          {gameCanApply && <button className="update-action" onClick={applyGameUpdate}>Apply Game Update</button>}
         </div>
+        {gameUpdateTask && <GameUpdateProgress task={gameUpdateTask} repairTask={gameSteamcmdFixTask} onRetry={applyGameUpdate} onFixSteamcmd={fixSteamcmd} />}
       </section>
       <section className="action-section">
         <div className="panel-title"><h4>Stack Update</h4><StatusPill value={stackStatus.status} /></div>
-        <KeyValueGrid items={[["Current version", updateDisplayValue(stackStatus, "current")], ["Latest version", updateDisplayValue(stackStatus, "latest")], ["Status", stackStatus.status]]} />
+        <KeyValueGrid items={[["Current Version", updateDisplayValue(stackStatus, "current")], ["Latest Version", updateDisplayValue(stackStatus, "latest")], ["Status", stackStatus.status]]} />
         {stackStatus.status === "Check Failed" && stackStatus.reason && <p className="danger-note">{stackStatus.reason}</p>}
         {stackStatus.status === "Version details unavailable" && <p className="muted">{stackStatus.reason}</p>}
         <div className="action-line">
-          <button onClick={checkStack}>Refresh Stack Check</button>
-          {stackCanApply && <button className="danger" onClick={async () => window.confirm("Apply the latest RedBlink stack update now?") && setTask((await updatesApi.applyStack()).task)}>Apply Stack Update</button>}
+          <button disabled={stackUpdateRunning} onClick={checkStack}>Refresh Stack Check</button>
+          {stackCanApply && <button className="update-action" onClick={applyStackUpdate}>Apply Stack Update</button>}
         </div>
+        {stackUpdateTask && <StackUpdateProgress task={stackUpdateTask} onRetry={applyStackUpdate} />}
       </section>
       <section className="action-section">
-        <div className="panel-title"><h4>Automatic Game Updates</h4><StatusPill value={autoGameEnabled ? "Enabled" : "Disabled"} /></div>
-        <p className="muted">Uses the Dune Manager automatic game update timer. Enabling saves the manager preference and may install a systemd timer when host permissions allow it.</p>
+        <div className="panel-title"><h4>Automatic Game Updates</h4><StatusPill value={autoGameStatusLabel} /></div>
         <KeyValueGrid items={[
-          ["Current status", autoGameEnabled ? "Enabled" : "Disabled"],
-          ["Check time", autoGameValues.auto_update_time || autoGameTime],
-          ["Timer", autoGameValues.systemd_timer || "Not installed"]
+          ["Current Status", autoGameStatusLabel],
+          ["Check Time (Local Server Time)", toHourMinuteTime(autoGameValues.auto_update_time || autoGameTime)],
+          ["Timer", autoGameDisplayTimerLabel]
         ]} />
         {commandStatusSummary(autoGame).reason && <p className="danger-note">{commandStatusSummary(autoGame).reason}</p>}
-        <div className="action-line">
-          <label className="checkbox-row"><input type="checkbox" checked={autoGameEnabled} onChange={(event) => setAutoGameEnabled(event.target.checked)} /> Enable automatic game updates</label>
-          <label className="compact-select">Daily check time<input value={autoGameTime} onChange={(event) => setAutoGameTime(event.target.value)} placeholder="05:00:00" /></label>
-          <button onClick={async () => {
-            const confirmation = window.prompt("Type SAVE AUTO GAME UPDATES to save automatic update settings.");
-            if (confirmation !== "SAVE AUTO GAME UPDATES") return;
-            const response = await updatesApi.saveAutoGame({ enabled: autoGameEnabled, time: autoGameTime, confirmation });
-            await waitForTask(response.task, setTask);
-            await loadAutoGame();
-          }}>Save Auto Updates</button>
-          <button onClick={loadAutoGame}>Refresh Auto Status</button>
+        <div className="action-line schedule-action-line auto-game-action-line">
+          <label className="checkbox-row"><input type="checkbox" disabled={autoGameLoading || autoGameSaving} checked={autoGameEnabled} onChange={(event) => setAutoGameEnabled(event.target.checked)} /> Enable</label>
+          <label className="compact-select">Daily Check Time<input type="time" step="60" pattern="[0-2][0-9]:[0-5][0-9]" disabled={autoGameSaving} value={autoGameTime} onChange={(event) => setAutoGameTime(sanitizeTimeInput(event.target.value))} placeholder="05:00" /></label>
+          <button disabled={autoGameLoading || autoGameSaving} onClick={saveAutoGame}>Save Auto Updates</button>
+          {autoGameResult && <span className={`inline-task-result result-${autoGameResult.status === "succeeded" ? "ok" : autoGameResult.status === "failed" ? "fail" : "running"}`}>
+            <strong className={autoGameResult.status === "running" ? "loading-dots" : ""}>{autoGameResult.title}</strong>
+          </span>}
         </div>
       </section>
       <section className="action-section">
         <div className="panel-title"><h4>Restore Previous Stack</h4><button onClick={loadPreviousStack}>Refresh Releases</button></div>
         <p className="danger-note">Restoring the previous stack changes the RedBlink stack version. Use only after reviewing backups and release history.</p>
         {previousStackReason && <p className="danger-note">{previousStackReason}</p>}
-        {previousStack.length ? <DataTable rows={previousStack.slice(0, 8)} columns={["version", "date", "title"]} /> : <div className="empty">No previous stack releases found.</div>}
-        <div className="action-line">
+        {previousStack.length ? <DataTable rows={previousStack.slice(0, 3)} columns={["version", "date", "title"]} /> : <div className="empty">No previous stack releases found.</div>}
+        <div className="action-line restore-stack-line">
           <button className="danger" disabled={previousStack.length < 2} onClick={async () => {
             const confirmation = window.prompt("Type RESTORE PREVIOUS STACK to restore the previous stack release.");
             if (confirmation !== "RESTORE PREVIOUS STACK") return;
             setTask((await updatesApi.restorePreviousStack(confirmation)).task);
           }}>Restore Previous Stack</button>
-          {previousStack[1]?.version && <span className="muted">Previous release: {previousStack[1].version}</span>}
+          {previousStack[1]?.version && <span className="muted">Previous Release: {previousStack[1].version}</span>}
         </div>
       </section>
     </div>
@@ -2064,15 +4383,16 @@ function SettingsPanel() {
   </section>;
 }
 
-function HomeHealthCards({ status, readiness, readinessWarning, loading, runningAction, taskResult }: { status: string; readiness: string; readinessWarning: string; loading: boolean; runningAction: "start" | "stop" | "restart" | ""; taskResult: HomeTaskResult | null }) {
-  const summary = summarizeHomeStatus(status, readiness, readinessWarning, loading, runningAction, taskResult);
+function HomeHealthCards({ status, readiness, readinessWarning, loading, runningAction, taskResult, funcomTokenResult }: { status: string; readiness: string; readinessWarning: string; loading: boolean; runningAction: "start" | "stop" | "restart" | ""; taskResult: HomeTaskResult | null; funcomTokenResult: HomeTaskResult | null }) {
+  const funcomTokenCheckRunning = funcomTokenResult?.status === "running";
+  const summary = summarizeHomeStatus(status, readiness, readinessWarning, loading, runningAction, taskResult, !funcomTokenCheckRunning && (isFuncomTokenAuthFailure(funcomTokenResult) || hasPersistedFuncomTokenAuthFailure()));
   return <div className="home-health wide">
     <section className="dashboard-band">
       <h3>Server Identity</h3>
       <div className="health-grid">
         {summary.identity.map((item) => <article className="status-card" key={item.label}>
           <div className="status-card-title"><span>{item.label}</span><StatusPill value={item.status} /></div>
-          <strong>{item.value}</strong>
+          <strong>{formatDisplayValue(item.value)}</strong>
           {item.detail && <p>{item.detail}</p>}
         </article>)}
       </div>
@@ -2082,7 +4402,7 @@ function HomeHealthCards({ status, readiness, readinessWarning, loading, running
       <div className="health-grid health-grid-compact">
         {summary.health.map((item) => <article className="status-card" key={item.label}>
           <div className="status-card-title"><span>{item.label}</span><StatusPill value={item.status} /></div>
-          <strong>{item.value}</strong>
+          <strong>{formatDisplayValue(item.value)}</strong>
           {item.detail && <p>{item.detail}</p>}
         </article>)}
       </div>
@@ -2101,7 +4421,7 @@ function DoctorSummary({ text, readiness }: { text: string; readiness: string })
     {text ? <p>{issues.length ? `${issues.length} diagnostic item${issues.length === 1 ? "" : "s"} need attention.` : "No obvious warning lines detected in the latest doctor output."}</p> : <p>Run Doctor to show diagnostics.</p>}
     {issues.length > 0 && <div className="check-grid">{issues.map((issue, index) => {
       const advice = doctorAdvice(issue);
-      return <article className="check-card" key={`${issue}-${index}`}><div><strong>{advice.title}</strong><p>{advice.message}</p>{advice.nextStep && <span className="muted">{advice.nextStep}</span>}</div><StatusPill value={advice.status} /></article>;
+      return <article className="check-card" key={`${issue}-${index}`}><div><strong>{advice.title}</strong><p>{advice.message}</p>{advice.nextStep && <span className="muted">{advice.nextStep}</span>}</div><StatusPill value="WARN" /></article>;
     })}</div>}
   </section>;
 }
@@ -2165,25 +4485,6 @@ function PlayerCapabilities({ capabilities }: { capabilities: Record<string, unk
   </section>;
 }
 
-function MarketCapabilitySummary({ info }: { info: Record<string, unknown> }) {
-  const supported = firstDefined(info.supported, info.ok, info.available);
-  const reason = firstDefined(info.reason, info.message, info.error, "Market automation remains blocked unless a compatible RedBlink market-bot runtime is added.");
-  return <section className="warning-panel action-section">
-    <div className="panel-title"><h4>Market Capability Status</h4><StatusPill value={supported === true ? "Ready" : "Blocked"} /></div>
-    <p>{String(reason)}</p>
-    <KeyValueGrid items={Object.entries(info).filter(([key]) => !["reason", "message", "error"].includes(key)).slice(0, 8)} />
-    <TechnicalDetails text={JSON.stringify(info, null, 2)} />
-  </section>;
-}
-
-function MarketStats({ stats }: { stats: Record<string, unknown> }) {
-  return <section className="action-section">
-    <h4>Market Stats</h4>
-    <KeyValueGrid items={Object.entries(stats)} />
-    <TechnicalDetails text={JSON.stringify(stats, null, 2)} />
-  </section>;
-}
-
 function RuntimeSettingsSummary({ settings }: { settings: Record<string, unknown> | null }) {
   const config = (settings?.config as Record<string, unknown> | undefined) || {};
   const files = (settings?.files as Record<string, unknown> | undefined) || {};
@@ -2194,9 +4495,9 @@ function RuntimeSettingsSummary({ settings }: { settings: Record<string, unknown
         ["App name", firstDefined(config.appName, config.app_name, "Arrakis Server Console")],
         ["Repo root", config.repoRoot],
         ["Auth", config.authEnabled === false ? "Disabled" : "Enabled"],
-        ["Secure cookies", booleanLabel(config.secureCookies)],
-        ["Host bootstrap", booleanLabel(config.allowHostBootstrap)],
-        ["Mock mode", booleanLabel(config.mockMode)],
+        ["Secure Cookies", booleanLabel(config.secureCookies)],
+        ["Host Bootstrap", booleanLabel(config.allowHostBootstrap)],
+        ["Mock Mode", booleanLabel(config.mockMode)],
         ["Runtime path", config.runtimePath],
         ["Task retention", config.taskRetention]
       ]} />
@@ -2236,7 +4537,8 @@ function parseMapRows(text: string): Record<string, unknown>[] {
         map: firstDefined(item.map, item.name, item.service, item.id),
         status: firstDefined(item.status, item.ready, item.state, "Checked"),
         mode: firstDefined(item.mode, item.serverMode, item.kind, "Unknown"),
-        memory: firstDefined(item.memory, item.mem, item.memoryLimit, "Unknown")
+        memory: firstDefined(item.memory, item.mem, item.memoryLimit, "Unknown"),
+        partitionId: firstDefined(item.partitionId, item.partition_id, item.partition, "")
       };
     });
   }
@@ -2320,6 +4622,7 @@ function mergeMapAndMemoryRows(mapsText: string, memoryText: string, serversText
       status: server?.status || "Not Available",
       mode: map === "Survival_1" || map === "Overmap" ? "Core Map" : "Not Listed",
       memory: row.memory,
+      partitionId: server?.partitionId || "",
       dimensions: server?.dimensions || "Not Available"
     });
   }
@@ -2333,6 +4636,7 @@ function mergeMapAndMemoryRows(mapsText: string, memoryText: string, serversText
       status: server?.status || row.status || rows.get(map)?.status || "Not Available",
       mode: row.mode || rows.get(map)?.mode || "Not Available",
       memory: row.memory ? formatMemoryValue(String(row.memory)) : rows.get(map)?.memory || "Not Available",
+      partitionId: row.partitionId || row.partition || server?.partitionId || rows.get(map)?.partitionId || "",
       dimensions: row.dimensions || server?.dimensions || rows.get(map)?.dimensions || "Not Available"
     });
   }
@@ -2364,6 +4668,7 @@ function friendlyMapMode(value: string) {
 
 function modeInputValue(value: string) {
   const normalized = String(value || "").toLowerCase();
+  if (/core/.test(normalized)) return "always-on";
   if (/always/.test(normalized)) return "always-on";
   return "dynamic";
 }
@@ -2406,7 +4711,7 @@ function parseReleaseRows(text: string) {
   return stripAnsi(text).split(/\r?\n/).map((line) => {
     const [version, date, title] = line.trim().split(/\t+/);
     return version ? { version, date: date || "", title: title || "" } : null;
-  }).filter(Boolean) as Record<string, string>[];
+  }).filter(Boolean).sort((a, b) => String(b?.date || "").localeCompare(String(a?.date || ""))) as Record<string, string>[];
 }
 
 function parseUserSettingRows(text: string) {
@@ -2440,7 +4745,7 @@ function KeyValueGrid({ items }: { items: [string, unknown][] }) {
 }
 
 function StatusPill({ value }: { value: unknown }) {
-  const text = String(value || "Unknown");
+  const text = formatDisplayValue(value || "Unknown");
   const normalized = normalizeStatus(text);
   return <span className={`badge badge-${normalized}`}>{text}</span>;
 }
@@ -2453,16 +4758,16 @@ function OutputPanel({ title, text, action, onAction }: { title: string; text: s
   return <section className="panel"><h2>{title}</h2><button onClick={onAction}>{action}</button><TechnicalDetails text={text} /></section>;
 }
 
-function DataTable({ rows, columns, onRowClick, action }: { rows: Record<string, unknown>[]; columns?: string[]; onRowClick?: (row: Record<string, unknown>) => void; action?: (row: Record<string, unknown>) => React.ReactNode }) {
+function DataTable({ rows, columns, onRowClick, action, actionClassName = "", tableClassName = "" }: { rows: Record<string, unknown>[]; columns?: string[]; onRowClick?: (row: Record<string, unknown>) => void; action?: (row: Record<string, unknown>) => React.ReactNode; actionClassName?: string; tableClassName?: string }) {
   const cols = columns?.length ? columns : Array.from(new Set(rows.flatMap((row) => Object.keys(row)))).slice(0, 8);
   if (!rows.length) return <div className="empty">No rows.</div>;
-  return <div className="table-wrap"><table><thead><tr>{cols.map((col) => <th key={col}>{friendlyColumnName(col)}</th>)}{action && <th>Actions</th>}</tr></thead><tbody>{rows.map((row, index) => <tr key={index} onClick={() => onRowClick?.(row)} className={onRowClick ? "clickable" : ""}>{cols.map((col) => <td key={col}>{formatCell(row[col])}</td>)}{action && <td>{action(row)}</td>}</tr>)}</tbody></table></div>;
+  return <div className="table-wrap"><table className={tableClassName}><thead><tr>{cols.map((col) => <th key={col}>{friendlyColumnName(col)}</th>)}{action && <th className={actionClassName}>Actions</th>}</tr></thead><tbody>{rows.map((row, index) => <tr key={index} onClick={() => onRowClick?.(row)} className={onRowClick ? "clickable" : ""}>{cols.map((col) => <td key={col}>{formatCell(row[col])}</td>)}{action && <td className={actionClassName}>{action(row)}</td>}</tr>)}</tbody></table></div>;
 }
 
 function formatCell(value: unknown) {
   if (value === null || value === undefined) return "";
   if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
+  return formatDisplayValue(value);
 }
 
 function friendlyColumnName(value: string) {
@@ -2478,6 +4783,7 @@ function friendlyColumnName(value: string) {
     id: "ID",
     raw_name: "Raw Name",
     backupName: "Backup Name",
+    battlegroupId: "Battlegroup ID",
     vehicle: "Vehicle",
     actor: "Actor",
     templates: "Templates",
@@ -2527,25 +4833,34 @@ function formatTechnicalText(sections: [string, string][]) {
   return sections.map(([title, text]) => `# ${title}\n${text}`).join("\n\n");
 }
 
-function summarizeHomeStatus(status: string, readiness: string, readinessWarning: string, loading: boolean, runningAction: "start" | "stop" | "restart" | "" = "", taskResult: HomeTaskResult | null = null) {
+function summarizeHomeStatus(status: string, readiness: string, readinessWarning: string, loading: boolean, runningAction: "start" | "stop" | "restart" | "" = "", taskResult: HomeTaskResult | null = null, funcomTokenAuthFailure = false) {
   void readinessWarning;
   const serverState = getHomeServerState(status, readiness);
-  const isStarting = runningAction === "start" || runningAction === "restart";
+  const bootStarting = isHomeBootStarting(status, readiness);
+  const isStarting = runningAction === "start" || runningAction === "restart" || bootStarting;
   const actionFailed = taskResult?.status === "failed" && !serverState.running;
   const actionStopped = taskResult?.status === "stopped";
   const rawOverall = findLineValue(status, ["overall"]);
   const liveOverall = /^READY:/m.test(readiness) ? "OK" : friendlyHomeOverall(rawOverall || (readiness ? "Readiness checked" : readinessWarning ? "Status loaded, readiness warning" : status ? "Status loaded" : loading ? "Checking" : "Unknown"));
   const transitionOverall = runningAction === "restart" ? "Restarting" : runningAction === "stop" ? "Stopping" : isStarting ? "Starting" : "";
-  const rawGames = summarizeGameServers(status);
+  const rawContainers = preferKnownHomeHealth(summarizeContainers(status), summarizeReadinessContainers(readiness));
+  const rawListeners = preferKnownHomeHealth(summarizeListeners(status), summarizeReadinessListeners(readiness));
+  const rawDatabase = preferKnownHomeHealth(summarizeDatabase(status), summarizeReadinessDatabase(readiness));
+  const rawGames = preferKnownHomeHealth(summarizeGameServers(status), summarizeReadinessGameServers(readiness));
+  const rawRabbit = preferKnownHomeHealth(summarizeRabbit(status), summarizeReadinessRabbit(readiness));
+  const rawFls = preferKnownHomeHealth(summarizeFls(status), summarizeReadinessFls(readiness));
   const warmingOverall = /^Warming$/i.test(rawGames.label) ? "Warming" : "";
-  const overall = serverState.stopped || actionStopped ? "Stopped" : warmingOverall || (runningAction === "restart" ? "Restarting" : runningAction === "stop" ? "Stopping" : (isStarting && !/^(OK|Warming)$/i.test(liveOverall) ? transitionOverall : liveOverall));
+  const overall = isStarting ? transitionOverall : runningAction ? transitionOverall : serverState.stopped || actionStopped ? "Stopped" : warmingOverall || liveOverall;
   const attentionHealth = !isStarting && (serverState.stopped || actionStopped || actionFailed) ? attentionHomeHealthCards() : null;
-  const containers = transitionHomeHealthCard(summarizeContainers(status), runningAction) || attentionHealth?.containers || summarizeContainers(status);
-  const listeners = transitionHomeHealthCard(summarizeListeners(status), runningAction) || attentionHealth?.listeners || summarizeListeners(status);
-  const database = transitionHomeHealthCard(summarizeDatabase(status), runningAction) || attentionHealth?.database || summarizeDatabase(status);
-  const games = transitionHomeHealthCard(rawGames, runningAction) || attentionHealth?.games || rawGames;
-  const rabbit = transitionHomeHealthCard(summarizeRabbit(status), runningAction) || attentionHealth?.rabbit || summarizeRabbit(status);
-  const fls = transitionHomeHealthCard(summarizeFls(status), runningAction) || attentionHealth?.fls || summarizeFls(status);
+  const transitionAction: "start" | "stop" | "restart" | "" = runningAction || (bootStarting ? "start" : "");
+  const containers = transitionHomeHealthCard(rawContainers, transitionAction) || attentionHealth?.containers || rawContainers;
+  const listeners = transitionHomeHealthCard(rawListeners, transitionAction) || attentionHealth?.listeners || rawListeners;
+  const database = transitionHomeHealthCard(rawDatabase, transitionAction) || attentionHealth?.database || rawDatabase;
+  const games = transitionHomeHealthCard(rawGames, transitionAction) || attentionHealth?.games || rawGames;
+  const rabbit = transitionHomeHealthCard(rawRabbit, transitionAction) || attentionHealth?.rabbit || rawRabbit;
+  const fls = funcomTokenAuthFailure
+    ? { label: "Token Mismatch Detected", status: "FAILED", detail: "" }
+    : transitionHomeHealthCard(rawFls, transitionAction) || attentionHealth?.fls || rawFls;
   const population = formatHomePopulation(findPopulation(status) || findLineValue(status, ["population", "players"]));
   return {
     identity: [
@@ -2578,19 +4893,16 @@ function homeNeedsWarmRefresh(status: string, readiness: string) {
   const gameServerText = sectionLines(status, "Game servers").join("\n");
   const warming = /Overall:\s*(WARMING|WAIT|STARTING)/i.test(status) ||
     /\b(WARMING|WAIT|STARTING)\b/i.test(gameServerText) ||
-    /^(Warming|Starting)$/i.test(String(games?.value || ""));
+    /^(Warming|Starting)$/i.test(String(games?.value || "")) ||
+    isHomeBootStarting(status, readiness);
   return warming && (!overallOk || !gamesOk);
 }
 
 function isHomeActionComplete(status: string, readiness: string) {
-  if (isHomeStartComplete(status, readiness)) return true;
-  if (isHomeReadinessOperational(readiness)) return true;
-  if (/^READY:/m.test(readiness) || /Overall:\s*(READY|OK)/i.test(status)) return true;
+  const statusReady = isHomeStartComplete(status, readiness);
+  const readinessReady = isHomeReadinessOperational(readiness);
   const summary = summarizeHomeStatus(status, readiness, "", false);
-  const overall = summary.identity.find((item) => item.label === "Overall");
   const games = summary.health.find((item) => item.label === "Game Servers");
-  const overallOk = /^OK$/i.test(String(overall?.value || "")) || /^Ready$/i.test(String(overall?.status || ""));
-  const gamesOk = /^OK$/i.test(String(games?.value || "")) && /^Ready$/i.test(String(games?.status || ""));
   const healthOk = summary.health.length > 0 && summary.health.every((item) =>
     /^OK$/i.test(String(item.value || "")) && /^Ready$/i.test(String(item.status || ""))
   );
@@ -2598,12 +4910,10 @@ function isHomeActionComplete(status: string, readiness: string) {
     /^OK$/i.test(String(item.value || "")) && /^Ready$/i.test(String(item.status || ""))
   );
   const gamesWarming = /^Warming$/i.test(String(games?.value || ""));
-  return healthOk || (overallOk && gamesOk) || (overallOk && gamesWarming && nonGameHealthOk);
+  return statusReady || readinessReady || (healthOk || (gamesWarming && nonGameHealthOk));
 }
 
 function isHomeReadinessOperational(readiness: string) {
-  if (/^READY:/m.test(readiness)) return true;
-  if (!/^WARMING:/m.test(readiness)) return false;
   if (/^\s*FAIL\b/m.test(readiness)) return false;
   const requiredSignals = [
     /OK\s+container\s+dune-postgres/i,
@@ -2651,7 +4961,6 @@ function isHomeStopComplete(status: string, readiness: string) {
 function isHomeStartComplete(status: string, readiness: string) {
   const serverState = getHomeServerState(status, readiness);
   if (serverState.stopped) return false;
-  if (/Overall:\s*READY/i.test(status) || /^READY:/m.test(readiness)) return true;
 
   const containerLines = sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
   const requiredContainers = [
@@ -2677,7 +4986,10 @@ function isHomeStartComplete(status: string, readiness: string) {
   const flsLines = sectionLines(status, "Funcom/FLS summary");
   const flsReady = flsLines.length > 0 && !flsLines.some((line) => /:\s*(WAIT|FAIL|ERROR|MISSING)/i.test(line));
 
-  return containersReady && listenersReady && databaseReady && flsReady;
+  const rabbit = summarizeRabbit(status);
+  const rabbitReady = /^OK$/i.test(rabbit.label) && /^Ready$/i.test(rabbit.status);
+
+  return containersReady && listenersReady && databaseReady && flsReady && rabbitReady;
 }
 
 function attentionHomeHealthCards() {
@@ -2701,11 +5013,16 @@ function transitionHomeHealthCard(item: { label: string; status: string; detail:
   return { label, status, detail: "" };
 }
 
+function preferKnownHomeHealth(primary: { label: string; status: string; detail: string }, fallback: { label: string; status: string; detail: string }) {
+  return /^Unknown$/i.test(primary.label) && !/^Unknown$/i.test(fallback.label) ? fallback : primary;
+}
+
 function getHomeServerState(status: string, readiness: string) {
   const text = `${status}\n${readiness}`;
   const overall = findLineValue(status, ["overall"]);
   const containerLines = sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
   const allContainersMissing = containerLines.length >= 4 && containerLines.every((line) => /\b(missing|stopped|exited|dead)\b/i.test(line));
+  const bootStarting = isHomeBootStarting(status, readiness);
   const runningSignals = [
     !allContainersMissing && /^READY:/m.test(readiness),
     !allContainersMissing && /Overall:\s*(READY|WARMING)/i.test(status),
@@ -2719,10 +5036,28 @@ function getHomeServerState(status: string, readiness: string) {
     /\b(all|dune)\s+containers\s+(are\s+)?(stopped|down)\b/i.test(text),
     allContainersMissing
   ];
-  const stopped = stoppedSignals.some(Boolean);
+  const stopped = !bootStarting && stoppedSignals.some(Boolean);
   const running = !stopped && runningSignals.some(Boolean);
-  const starting = !stopped && !running && (/\bUp\s+\d+/i.test(text) || /\b(WARMING|WAIT|STARTING)\b/i.test(text));
+  const starting = bootStarting || (!stopped && !running && (/\bUp\s+\d+/i.test(text) || /\b(WARMING|WAIT|STARTING)\b/i.test(text)));
   return { running, stopped, starting };
+}
+
+function isHomeBootStarting(status: string, readiness: string) {
+  const text = `${status}\n${readiness}`;
+  if (!text.trim()) return false;
+  if (/\b(server|stack)\s+(is\s+)?(stopped|offline)\b/i.test(text) || /\bNo\s+(running\s+)?containers\b/i.test(text)) return false;
+  if (/Overall:\s*(READY|STOPPED|OFFLINE)/i.test(status) || /^READY:/m.test(readiness)) return false;
+  const containerLines = sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
+  const anyContainerUp = containerLines.some((line) => /\bUp\b/i.test(line));
+  const missingContainers = containerLines.filter((line) => /\b(missing|stopped|exited|dead|not running)\b/i.test(line)).length;
+  if (containerLines.length >= 8 && missingContainers >= 8 && !anyContainerUp) return false;
+  const listenerLines = sectionLines(status, "Listeners").filter((line) => !/^CHECK\s+PORT\s+STATUS/i.test(line));
+  const missingListeners = listenerLines.filter((line) => /\bMISSING\b/i.test(line)).length;
+  const gameServersStopped = /Survival_1\s+NOT RUNNING/i.test(text) && /Overmap\s+NOT RUNNING/i.test(text);
+  if (gameServersStopped && listenerLines.length > 0 && missingListeners === listenerLines.length && !anyContainerUp) return false;
+  if (/\b(WARMING|WAIT|STARTING)\b/i.test(text)) return true;
+  const readinessStarting = /^\s*(WARN|FAIL)\s+container\s+dune-/im.test(readiness) && !/^\s*OK\s+container\s+dune-server-(survival-1|overmap)\b/im.test(readiness);
+  return anyContainerUp || readinessStarting || (containerLines.length > 0 && missingContainers > 0) || (listenerLines.length > 0 && missingListeners > 0);
 }
 
 function homeOverallBadge(value: string) {
@@ -2810,6 +5145,58 @@ function summarizeFls(text: string) {
   const bad = lines.find((line) => /:\s*(WAIT|FAIL|ERROR|MISSING)/i.test(line));
   if (bad) return { label: "Needs Review", status: "WARN", detail: "" };
   return { label: "OK", status: "Ready", detail: "" };
+}
+
+function summarizeReadinessContainers(text: string) {
+  const lines = readinessRows(text, /container\s+dune-/i);
+  if (!lines.length) return { label: "Unknown", status: "Unknown", detail: "" };
+  return lines.every((line) => /^OK\s+/i.test(line))
+    ? { label: "OK", status: "Ready", detail: "" }
+    : { label: "Needs Review", status: "WARN", detail: "" };
+}
+
+function summarizeReadinessListeners(text: string) {
+  const lines = readinessRows(text, /\b(TCP|UDP)\s+\d+/i);
+  if (!lines.length) return { label: "Unknown", status: "Unknown", detail: "" };
+  return lines.every((line) => /^OK\s+/i.test(line))
+    ? { label: "OK", status: "Ready", detail: "" }
+    : { label: "Needs Review", status: "WARN", detail: "" };
+}
+
+function summarizeReadinessDatabase(text: string) {
+  const lines = readinessRows(text, /world_partition rows:/i);
+  if (!lines.length) return { label: "Unknown", status: "Unknown", detail: "" };
+  return lines.every((line) => /^OK\s+/i.test(line))
+    ? { label: "OK", status: "Ready", detail: "" }
+    : { label: "Needs Review", status: "WARN", detail: "" };
+}
+
+function summarizeReadinessGameServers(text: string) {
+  const lines = readinessRows(text, /\b(Survival_1|Overmap)\s+ready\b/i);
+  if (!lines.length) return { label: "Unknown", status: "Unknown", detail: "" };
+  return lines.every((line) => /^OK\s+/i.test(line))
+    ? { label: "OK", status: "Ready", detail: "" }
+    : { label: "Needs Review", status: "WARN", detail: "" };
+}
+
+function summarizeReadinessRabbit(text: string) {
+  const lines = readinessRows(text, /game server sg\.\* RMQ connections/i);
+  if (!lines.length) return { label: "Unknown", status: "Unknown", detail: "" };
+  return lines.every((line) => /^OK\s+/i.test(line))
+    ? { label: "OK", status: "Ready", detail: "" }
+    : { label: "Needs Review", status: "WARN", detail: "" };
+}
+
+function summarizeReadinessFls(text: string) {
+  const lines = readinessRows(text, /\b(Director FLS|Gateway monitoring DB)\b/i);
+  if (!lines.length) return { label: "Unknown", status: "Unknown", detail: "" };
+  return lines.every((line) => /^OK\s+/i.test(line))
+    ? { label: "OK", status: "Ready", detail: "" }
+    : { label: "Needs Review", status: "WARN", detail: "" };
+}
+
+function readinessRows(text: string, pattern: RegExp) {
+  return stripAnsi(text).split(/\r?\n/).map((line) => line.trim()).filter((line) => /^(OK|WARN|FAIL)\s+/i.test(line) && pattern.test(line));
 }
 
 function numberAfterLabel(lines: string[], label: string) {
@@ -2954,12 +5341,44 @@ function titleCase(value: string) {
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
 }
 
+function titleCaseWords(value: string) {
+  const smallWords = new Set(["a", "an", "and", "as", "at", "but", "by", "for", "from", "in", "nor", "of", "on", "or", "the", "to", "with"]);
+  const acronyms = new Set(["pvp", "pve"]);
+  return String(value || "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim().split(" ").map((word, index) => {
+    const lower = word.toLowerCase();
+    if (acronyms.has(lower)) return lower.toUpperCase();
+    if (index > 0 && smallWords.has(lower)) return lower;
+    return lower ? lower.charAt(0).toUpperCase() + lower.slice(1) : word;
+  }).join(" ");
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function formatTimerStatus(value: string) {
+  const text = String(value || "").trim();
+  if (/^not installed$/i.test(text)) return "Not Installed";
+  return titleCase(text);
+}
+
+function formatDisplayValue(value: unknown) {
+  const text = String(value);
+  if (/^stopped$/.test(text)) return "Stopped";
+  if (/^unset$/.test(text)) return "Unset";
+  return text;
+}
+
 function friendlyIssueLine(line: string) {
   return line
     .replace(/^OK\s+/i, "")
     .replace(/^WARN\s+/i, "")
     .replace(/^WAIT\s+/i, "")
     .replace(/^FAIL\s+/i, "")
+    .replace(/\bRabbitMQ game\b/g, "RabbitMQ Game")
+    .replace(/\bRabbitMQ Game is Not Running\b/g, "RabbitMQ Game is not running")
+    .replace(/\bNot Running\s+-\s+missing\b/gi, "Not Running - Missing")
+    .replace(/^Up\s+About\b/, "Up about")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -3115,12 +5534,13 @@ function parseBackupRows(text: string) {
   return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
     const name = line.match(/([A-Za-z0-9_.-]+(?:\.backup|\.dump|\.sql))/)?.[1];
     if (!name) return null;
+    const listTimestamp = line.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})(?::(\d{2}))?\b/);
     const timestamp = name.match(/(\d{8}-\d{6})/)?.[1] || "";
-    const created = formatBackupTimestamp(timestamp);
-    const createdSort = backupTimestampSort(timestamp);
+    const created = listTimestamp ? `${listTimestamp[1]} ${listTimestamp[2]}:${listTimestamp[3] || "00"}` : formatBackupTimestamp(timestamp);
+    const createdSort = listTimestamp ? backupDisplayTimestampSort(created) : backupTimestampSort(timestamp);
     const type = friendlyBackupType(name, line);
-    const source = name.includes("__") ? name.split("__")[0].replace(/^dune-db-/, "") : "Local";
-    return { name, backupName: name, created, createdSort, type, source };
+    const source = /import/i.test(name) ? "External" : name.includes("__") ? name.split("__")[0].replace(/^dune-db-/, "") : "Local";
+    return { name, backupName: name, battlegroupId: "Unknown", created, createdSort, type, source };
   }).filter(Boolean).sort((a, b) => Number((b as Record<string, unknown>).createdSort || 0) - Number((a as Record<string, unknown>).createdSort || 0)) as Record<string, unknown>[];
 }
 
@@ -3136,8 +5556,16 @@ function backupTimestampSort(value: string) {
   return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]), Number(match[6]));
 }
 
+function backupDisplayTimestampSort(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
+  if (!match) return 0;
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]), Number(match[6])).getTime();
+}
+
 function friendlyBackupType(name: string, line: string) {
   if (/auto|scheduled/i.test(name) || /auto|scheduled/i.test(line)) return "Automatic Backup";
+  if (/restore[-_ ]?safety/i.test(name) || /restore[-_ ]?safety/i.test(line)) return "Restore Safety Backup";
+  if (/pre[-_ ]?update/i.test(name) || /pre[-_ ]?update/i.test(line)) return "Pre-update Backup";
   if (/import/i.test(name) || /import/i.test(line)) return "Imported Backup";
   if (name.endsWith(".backup") || name.endsWith(".dump") || name.endsWith(".sql")) return "Manual Backup";
   return "Unknown";
@@ -3168,6 +5596,29 @@ function parseHistoryRows(text: string) {
 
 function friendlyServiceName(name: string) {
   return SERVICE_LABELS[name] || SERVICE_LABELS[name.replace(/^dune-/, "")] || name.replace(/^dune-server-/, "").replace(/^dune-/, "").replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function isServiceReady(status: string, service: string) {
+  const container = serviceContainerName(service);
+  return sectionLines(status, "Containers").some((line) => {
+    const match = line.match(/^(\S+)\s+(.+)$/);
+    return Boolean(match && match[1] === container && /\bUp\b/i.test(match[2]));
+  });
+}
+
+function serviceContainerName(service: string) {
+  const normalized = service.replace(/^dune-/, "");
+  const containers: Record<string, string> = {
+    postgres: "dune-postgres",
+    "rmq-admin": "dune-rmq-admin",
+    "rmq-game": "dune-rmq-game",
+    "text-router": "dune-text-router",
+    director: "dune-director",
+    gateway: "dune-server-gateway",
+    "survival-1": "dune-server-survival-1",
+    overmap: "dune-server-overmap"
+  };
+  return containers[normalized] || service;
 }
 
 function serviceActionName(name: string, action: "logs" | "restart") {

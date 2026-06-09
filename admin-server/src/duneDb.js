@@ -1,4 +1,4 @@
-import { assertIdentifier, intParam, isReadOnlySql, quoteQualified, rowsResult } from "./db.js";
+import { assertIdentifier, intParam, isReadOnlySql, quoteIdentifier, quoteQualified, rowsResult } from "./db.js";
 
 export class UnsupportedCapabilityError extends Error {
   constructor(message, details = {}) {
@@ -12,7 +12,13 @@ export class UnsupportedCapabilityError extends Error {
 export async function dbStatus(db) {
   const result = await db.query("select current_user, current_database(), version()");
   const tables = await db.query("select count(*)::int as count from information_schema.tables where table_schema = 'dune'");
-  return { connected: true, config: db.config, server: result.rows[0], duneTableCount: tables.rows[0]?.count ?? 0 };
+  return { connected: true, config: db.config, server: result.rows[0], duneTableCount: tables.rows[0]?.count ?? 0, usesDefaultPassword: process.env.DUNE_DB_PASSWORD ? process.env.DUNE_DB_PASSWORD === "dune" : true };
+}
+
+export async function changeDunePassword(db, password) {
+  const escaped = String(password).replaceAll("'", "''");
+  await db.query(`alter role dune with password '${escaped}'`);
+  return { ok: true, user: "dune" };
 }
 
 export async function listSchemas(db) {
@@ -54,8 +60,33 @@ export async function tablePreview(db, schema, table, limit = 50, offset = 0) {
   const safe = quoteQualified(schema, table);
   const maxLimit = intParam(limit, "limit", 1, 500);
   const safeOffset = intParam(offset, "offset", 0);
-  const result = await db.query(`select * from ${safe} limit $1 offset $2`, [maxLimit, safeOffset]);
+  const result = await db.query(`select ctid::text as __rowid, * from ${safe} limit $1 offset $2`, [maxLimit, safeOffset]);
   return { schema, table, limit: maxLimit, offset: safeOffset, ...rowsResult(result) };
+}
+
+export async function updateTableRow(db, schema, table, rowId, values = {}) {
+  assertIdentifier(schema, "schema");
+  assertIdentifier(table, "table");
+  const safe = quoteQualified(schema, table);
+  const targetRow = String(rowId || "").trim();
+  if (!/^\(\d+,\d+\)$/.test(targetRow)) throw new Error("Invalid row identifier");
+  const columns = await tableColumns(db, schema, table);
+  const editable = new Map(columns.map((column) => [column.name, column]));
+  const entries = Object.entries(values || {}).filter(([key]) => key !== "__rowid" && editable.has(key));
+  if (!entries.length) throw new Error("No editable column values were provided");
+  if (entries.length > 100) throw new Error("Too many columns in one row update");
+
+  const assignments = entries.map(([key], index) => `${quoteIdentifier(key)} = $${index + 1}`);
+  const params = entries.map(([, value]) => normalizeEditableValue(value));
+  params.push(targetRow);
+  const result = await db.query(`update ${safe} set ${assignments.join(", ")} where ctid = $${params.length}::tid`, params);
+  return { ok: true, updatedRows: result.rowCount || 0, schema, table };
+}
+
+function normalizeEditableValue(value) {
+  if (value === undefined) return null;
+  if (typeof value === "object" && value !== null) return JSON.stringify(value);
+  return value;
 }
 
 export async function searchDatabase(db, q) {
@@ -96,6 +127,7 @@ export async function listPlayers(db, { online = false, q = "" } = {}) {
   if (!(await tableExists(db, "actors")) || !(await tableExists(db, "player_state"))) {
     return unsupported("players", ["dune.actors", "dune.player_state"]);
   }
+  const lastSeenSelect = await playerLastSeenSelect(db);
   const values = [];
   let where = "a.class ilike '%PlayerCharacter%'";
   if (online) where += " and coalesce(ps.online_status::text, '') = 'Online'";
@@ -118,7 +150,8 @@ export async function listPlayers(db, { online = false, q = "" } = {}) {
            end as action_player_id,
            a.class,
            coalesce(a.map, '') as map,
-           coalesce(ps.online_status::text, 'Offline') as online_status
+           coalesce(ps.online_status::text, 'Offline') as online_status,
+           ${lastSeenSelect} as last_seen
     from dune.actors a
     left join dune.player_state ps on ps.account_id = a.owner_account_id
     left join dune.accounts ac on ac.id = a.owner_account_id
@@ -126,6 +159,21 @@ export async function listPlayers(db, { online = false, q = "" } = {}) {
     order by lower(coalesce(ps.character_name, '')), a.id
     limit 500`, values);
   return { capabilities: { players: true, online }, rows: result.rows };
+}
+
+async function playerLastSeenSelect(db) {
+  const candidates = [
+    ["player_state", "ps", ["last_seen", "last_seen_at", "last_online", "last_online_at", "last_login", "last_login_at", "last_activity", "last_activity_at", "updated_at"]],
+    ["actors", "a", ["last_seen", "last_seen_at", "last_online", "last_online_at", "last_login", "last_login_at", "last_activity", "last_activity_at", "updated_at"]],
+    ["accounts", "ac", ["last_seen", "last_seen_at", "last_online", "last_online_at", "last_login", "last_login_at", "last_activity", "last_activity_at", "updated_at"]]
+  ];
+  for (const [table, alias, names] of candidates) {
+    if (!(await tableExists(db, table))) continue;
+    const columns = await columnsFor(db, table);
+    const found = names.find((name) => columns.has(name));
+    if (found) return `${alias}.${quoteIdentifier(found)}::text`;
+  }
+  return "''";
 }
 
 export async function playerProfile(db, id) {
@@ -240,6 +288,62 @@ export async function liveMapCapabilities(db) {
     farmState,
     coordinateTransform: "Uses raw dune.actors.transform world coordinates; calibrated image/world transform is not verified."
   };
+}
+
+const LIVE_MAP_CONFIGS = {
+  HaggaBasin: {
+    key: "HaggaBasin",
+    label: "Hagga Basin",
+    actorMap: "HaggaBasin",
+    image: "/images/maps/hagga-basin.png",
+    width: 4096,
+    height: 4096,
+    minX: -456752.21,
+    maxX: 354547.46,
+    minY: -450630.14,
+    maxY: 353821.95,
+    flipY: false,
+    defaultPartitionId: 1
+  },
+  DeepDesert: {
+    key: "DeepDesert",
+    label: "The Deep Desert",
+    actorMap: "DeepDesert",
+    image: "/images/maps/deep-desert.png",
+    width: 4096,
+    height: 4096,
+    minX: -1268624.82,
+    maxX: 1163312.83,
+    minY: -1266548.17,
+    maxY: 1162416.13,
+    flipY: false,
+    defaultPartitionId: 8
+  }
+};
+
+export function liveMapConfigPayload(selected = "") {
+  const key = LIVE_MAP_CONFIGS[selected] ? selected : "HaggaBasin";
+  return {
+    map: LIVE_MAP_CONFIGS[key],
+    maps: LIVE_MAP_CONFIGS,
+    defaultMap: "HaggaBasin"
+  };
+}
+
+export async function liveMapPartitions(db) {
+  if (!(await tableExists(db, "actors"))) return { rows: [] };
+  const hasWorldPartition = await tableExists(db, "world_partition");
+  const result = await db.query(`
+    select coalesce(a.map, '') as map,
+           coalesce(a.partition_id, 0) as partition_id,
+           ${hasWorldPartition ? "coalesce(nullif(wp.label, ''), nullif(wp.map, ''), 'Partition ' || coalesce(a.partition_id, 0)::text)" : "'Partition ' || coalesce(a.partition_id, 0)::text"} as name,
+           count(*)::int as marker_count
+    from dune.actors a
+    ${hasWorldPartition ? "left join dune.world_partition wp on wp.partition_id = a.partition_id" : ""}
+    where a.transform is not null
+    group by a.map, a.partition_id${hasWorldPartition ? ", wp.label, wp.map" : ""}
+    order by map, partition_id`);
+  return { rows: result.rows.map((row) => ({ ...row, partition_id: Number(row.partition_id || 0), marker_count: Number(row.marker_count || 0) })) };
 }
 
 export async function liveMapPlayers(db, map = "") {
@@ -377,12 +481,11 @@ export async function liveMapServices(db, map = "") {
 }
 
 export async function liveMapMarkers(db, map = "") {
-  const [players, vehicles, bases, storage, services] = await Promise.all([
+  const [players, vehicles, bases, storage] = await Promise.all([
     liveMapPlayers(db, map),
     liveMapVehicles(db, map),
     liveMapBases(db, map),
-    liveMapStorage(db, map),
-    liveMapServices(db, map)
+    liveMapStorage(db, map)
   ]);
   return {
     capabilities: await liveMapCapabilities(db),
@@ -390,15 +493,13 @@ export async function liveMapMarkers(db, map = "") {
       players: players.reason || "",
       vehicles: vehicles.reason || "",
       bases: bases.reason || "",
-      storage: storage.reason || "",
-      services: services.reason || ""
+      storage: storage.reason || ""
     },
     rows: [
       ...(players.rows || []),
       ...(vehicles.rows || []),
       ...(bases.rows || []),
-      ...(storage.rows || []),
-      ...(services.rows || []).map((row) => ({ ...row, id: row.partition_id }))
+      ...(storage.rows || [])
     ]
   };
 }
@@ -441,299 +542,6 @@ export async function storageCapabilities(db) {
   return {
     storageGiveItem: await supportsStorageGiveItem(db)
   };
-}
-
-export async function listBases(db) {
-  if (!(await tableExists(db, "buildings"))) return unsupported("bases", ["dune.buildings"]);
-  const result = await db.query(`
-    select b.id,
-           coalesce(pa.actor_name, '') as name,
-           coalesce(inst.cnt, 0)::int as pieces,
-           coalesce(plac.cnt, 0)::int as placeables
-    from dune.buildings b
-    left join (
-      select building_id, min(owner_entity_id) as owner_entity_id, count(*) as cnt
-      from dune.building_instances
-      group by building_id
-    ) inst on inst.building_id = b.id
-    left join dune.actor_fgl_entities afe on afe.entity_id = inst.owner_entity_id
-    left join dune.actors t on t.id = afe.actor_id and t.class ilike '%Totem%'
-    left join dune.permission_actor pa on pa.actor_id = t.id
-    left join (
-      select bi.building_id, count(*) as cnt
-      from dune.building_instances bi
-      join dune.placeables p on p.owner_entity_id = bi.owner_entity_id
-      group by bi.building_id
-    ) plac on plac.building_id = b.id
-    order by b.id`);
-  return { capabilities: { bases: true }, rows: result.rows };
-}
-
-export async function listBlueprints(db) {
-  if (!(await tableExists(db, "building_blueprints"))) return unsupported("blueprints", ["dune.building_blueprints"]);
-  const result = await db.query(`
-    select bb.id,
-           coalesce(ps.character_name, '') as owner_name,
-           coalesce(bb.item_id, 0) as item_id,
-           coalesce(inst.cnt, 0)::int as pieces,
-           coalesce(plac.cnt, 0)::int as placeables,
-           coalesce(i.stats->'FBuildingBlueprintItemStats'->1->>'BuildingBlueprintName', '') as name
-    from dune.building_blueprints bb
-    left join dune.items i on i.id = bb.item_id
-    left join dune.inventories inv on inv.id = i.inventory_id
-    left join dune.actors a on a.id = inv.actor_id
-    left join dune.player_state ps on ps.player_pawn_id = a.id
-    left join (
-      select building_blueprint_id, count(*) as cnt
-      from dune.building_blueprint_instances
-      group by building_blueprint_id
-    ) inst on inst.building_blueprint_id = bb.id
-    left join (
-      select building_blueprint_id, count(*) as cnt
-      from dune.building_blueprint_placeables
-      group by building_blueprint_id
-    ) plac on plac.building_blueprint_id = bb.id
-    order by bb.id`);
-  return { capabilities: { blueprints: true }, rows: result.rows };
-}
-
-export async function marketCapabilities(db) {
-  const orders = await tableExists(db, "dune_exchange_orders");
-  const sellOrders = await tableExists(db, "dune_exchange_sell_orders");
-  const fulfilled = await tableExists(db, "dune_exchange_fulfilled_orders");
-  const items = await tableExists(db, "items");
-  return {
-    items: orders && sellOrders,
-    listings: orders && sellOrders,
-    sales: fulfilled && orders,
-    stats: orders && sellOrders,
-    catalog: true,
-    automation: false,
-    requiredTables: {
-      orders: "dune.dune_exchange_orders",
-      sellOrders: "dune.dune_exchange_sell_orders",
-      fulfilledOrders: "dune.dune_exchange_fulfilled_orders",
-      items: "dune.items"
-    },
-    reason: orders && sellOrders
-      ? "Market read views use verified arrakis-admin PostgreSQL queries. Automation is unsupported because RedBlink does not ship a compatible embedded or remote market-bot runtime."
-      : "Market read views require dune.dune_exchange_orders and dune.dune_exchange_sell_orders."
-  };
-}
-
-export async function marketItems(db, { q = "", limit = 500, offset = 0 } = {}) {
-  await requireCapability((await marketCapabilities(db)).items, "Market items require dune.dune_exchange_orders and dune.dune_exchange_sell_orders.");
-  const maxLimit = intParam(limit, "limit", 1, 500);
-  const safeOffset = intParam(offset, "offset", 0);
-  const search = String(q || "").trim();
-  const values = [];
-  let where = "";
-  if (search) {
-    values.push(`%${search}%`);
-    where = `where o.template_id ilike $${values.length}`;
-  }
-  values.push(maxLimit, safeOffset);
-  const limitIndex = values.length - 1;
-  const offsetIndex = values.length;
-  const result = await db.query(`
-    select
-      o.template_id,
-      coalesce(o.quality_level, 0)::bigint as quality,
-      min(o.item_price)::bigint as lowest_price,
-      coalesce(sum(coalesce(i.stack_size, s.initial_stack_size)), 0)::bigint as total_stock,
-      coalesce(sum(case when o.is_npc_order then coalesce(i.stack_size, s.initial_stack_size) else 0 end), 0)::bigint as bot_stock,
-      count(*)::bigint as listing_count
-    from dune.dune_exchange_orders o
-    join dune.dune_exchange_sell_orders s on s.order_id = o.id
-    left join dune.items i on i.id = o.item_id
-    ${where}
-    group by o.template_id, o.quality_level
-    order by o.template_id, o.quality_level
-    limit $${limitIndex} offset $${offsetIndex}`, values);
-  return { capabilities: await marketCapabilities(db), rows: result.rows, limit: maxLimit, offset: safeOffset };
-}
-
-export async function marketListings(db, { templateId = "", owner = "", limit = 500, offset = 0 } = {}) {
-  await requireCapability((await marketCapabilities(db)).listings, "Market listings require dune.dune_exchange_orders and dune.dune_exchange_sell_orders.");
-  const maxLimit = intParam(limit, "limit", 1, 500);
-  const safeOffset = intParam(offset, "offset", 0);
-  const values = [];
-  const clauses = [];
-  const safeTemplate = String(templateId || "").trim();
-  if (safeTemplate) {
-    if (!/^[A-Za-z0-9_./:-]{1,240}$/.test(safeTemplate)) throw new Error("Invalid market template id");
-    values.push(safeTemplate);
-    clauses.push(`o.template_id = $${values.length}`);
-  }
-  const safeOwner = String(owner || "").trim().toLowerCase();
-  if (safeOwner === "bot" || safeOwner === "player") {
-    clauses.push(`o.is_npc_order = ${safeOwner === "bot" ? "true" : "false"}`);
-  } else if (safeOwner && safeOwner !== "all") {
-    throw new Error("Market owner filter must be bot, player, or all");
-  }
-  values.push(maxLimit, safeOffset);
-  const where = clauses.length ? `where ${clauses.join(" and ")}` : "";
-  const result = await db.query(`
-    select
-      o.id as order_id,
-      o.template_id,
-      case when o.is_npc_order then 'bot' else 'player' end as owner_type,
-      case when o.is_npc_order then 'Revy' else coalesce(ps.character_name, a.class, 'Unknown') end as owner_name,
-      o.item_price::bigint as price,
-      coalesce(i.stack_size, s.initial_stack_size)::bigint as stock,
-      coalesce(o.quality_level, 0)::bigint as quality
-    from dune.dune_exchange_orders o
-    join dune.dune_exchange_sell_orders s on s.order_id = o.id
-    left join dune.items i on i.id = o.item_id
-    left join dune.actors a on a.id = o.owner_id
-    left join dune.player_state ps on ps.account_id = a.owner_account_id
-    ${where}
-    order by o.template_id, o.item_price
-    limit $${values.length - 1} offset $${values.length}`, values);
-  return { capabilities: await marketCapabilities(db), rows: result.rows, limit: maxLimit, offset: safeOffset };
-}
-
-export async function marketSales(db, { limit = 200 } = {}) {
-  await requireCapability((await marketCapabilities(db)).sales, "Market sales require dune.dune_exchange_fulfilled_orders and dune.dune_exchange_orders.");
-  const maxLimit = intParam(limit, "limit", 1, 500);
-  const result = await db.query(`
-    select
-      f.order_id,
-      o.template_id,
-      case when o.is_npc_order then 'bot' else 'player' end as seller_type,
-      case when o.is_npc_order then 'Revy' else coalesce(ps.character_name, a.class, 'Unknown') end as seller_name,
-      o.item_price::bigint as price,
-      f.stack_size::bigint as quantity
-    from dune.dune_exchange_fulfilled_orders f
-    join dune.dune_exchange_orders o on o.id = f.order_id
-    left join dune.actors a on a.id = o.owner_id
-    left join dune.player_state ps on ps.account_id = a.owner_account_id
-    order by f.order_id desc
-    limit $1`, [maxLimit]);
-  return { capabilities: await marketCapabilities(db), rows: result.rows, limit: maxLimit };
-}
-
-export async function marketStats(db) {
-  await requireCapability((await marketCapabilities(db)).stats, "Market stats require dune.dune_exchange_orders and dune.dune_exchange_sell_orders.");
-  const result = await db.query(`
-    select
-      count(*)::bigint as total_listings,
-      count(*) filter (where o.is_npc_order)::bigint as bot_listings,
-      count(*) filter (where not o.is_npc_order)::bigint as player_listings,
-      coalesce(sum(coalesce(i.stack_size, s.initial_stack_size)), 0)::bigint as total_stock,
-      coalesce(sum(case when o.is_npc_order then coalesce(i.stack_size, s.initial_stack_size) else 0 end), 0)::bigint as bot_stock,
-      coalesce(sum(case when not o.is_npc_order then coalesce(i.stack_size, s.initial_stack_size) else 0 end), 0)::bigint as player_stock,
-      count(distinct o.template_id)::bigint as unique_items
-    from dune.dune_exchange_orders o
-    join dune.dune_exchange_sell_orders s on s.order_id = o.id
-    left join dune.items i on i.id = o.item_id`);
-  return { capabilities: await marketCapabilities(db), stats: result.rows[0] || {} };
-}
-
-export async function exportBlueprintFull(db, id) {
-  const blueprintId = intParam(id, "blueprint id", 1);
-  const required = ["building_blueprints", "building_blueprint_instances", "building_blueprint_placeables", "items"];
-  for (const table of required) {
-    if (!(await tableExists(db, table))) throw new UnsupportedCapabilityError("Full blueprint export requires verified arrakis-admin blueprint tables.", { missingTable: `dune.${table}` });
-  }
-  const hasPentashields = await tableExists(db, "building_blueprint_pentashields");
-  const exists = await db.query("select id from dune.building_blueprints where id = $1", [blueprintId]);
-  if (!exists.rows[0]) throw new Error("Blueprint not found");
-  const name = await db.query(`
-    select coalesce(i.stats->'FBuildingBlueprintItemStats'->1->>'BuildingBlueprintName', '') as name
-    from dune.building_blueprints bb
-    left join dune.items i on i.id = bb.item_id
-    where bb.id = $1`, [blueprintId]);
-  const instances = await db.query(`
-    select instance_id, building_type, transform, provides_stability
-    from dune.building_blueprint_instances
-    where building_blueprint_id = $1
-    order by instance_id`, [blueprintId]);
-  const placeables = await db.query(`
-    select placeable_id, building_type, transform
-    from dune.building_blueprint_placeables
-    where building_blueprint_id = $1
-    order by placeable_id`, [blueprintId]);
-  const pentashields = hasPentashields ? await db.query(`
-    select placeable_id, scale
-    from dune.building_blueprint_pentashields
-    where building_blueprint_id = $1
-    order by placeable_id`, [blueprintId]) : { rows: [] };
-  return {
-    format: "arrakis-admin-blueprint",
-    supported: true,
-    source: "dune.building_blueprints",
-    id: blueprintId,
-    name: name.rows[0]?.name || `Blueprint ${blueprintId}`,
-    instances: instances.rows.map((row) => ({ ...row, transform: normalizeVector(row.transform) })),
-    placeables: placeables.rows.map((row) => ({ ...row, transform: normalizeVector(row.transform) })),
-    pentashields: pentashields.rows.map((row) => ({ ...row, scale: normalizeVector(row.scale) }))
-  };
-}
-
-export async function exportBaseAsBlueprint(db, id) {
-  const baseId = intParam(id, "base id", 1);
-  const required = ["buildings", "building_instances", "placeables", "actors"];
-  for (const table of required) {
-    if (!(await tableExists(db, table))) throw new UnsupportedCapabilityError("Base export-to-blueprint requires verified building/placeable actor tables.", { missingTable: `dune.${table}` });
-  }
-  const instances = await db.query(`
-    select instance_id, building_type, transform, provides_stability, owner_entity_id
-    from dune.building_instances
-    where building_id = $1
-    order by instance_id`, [baseId]);
-  if (!instances.rows.length) throw new Error("Base has no building instances to export");
-  const ownerEntityId = instances.rows[0].owner_entity_id;
-  const placeables = await db.query(`
-    select p.id as placeable_id,
-           p.building_type,
-           (a.transform).location::text as location,
-           (a.transform).rotation::text as rotation,
-           a.properties
-    from dune.placeables p
-    join dune.actors a on a.id = p.id
-    where p.owner_entity_id = $1
-    order by p.id`, [ownerEntityId]);
-  return {
-    format: "arrakis-admin-blueprint",
-    supported: true,
-    source: "dune.building_instances",
-    baseId,
-    name: `Base ${baseId}`,
-    limitations: "Read-only export-to-blueprint shape. Import and ID remapping remain blocked until ownership, position, and inventory remapping rules are verified.",
-    instances: instances.rows.map((row) => ({
-      instance_id: row.instance_id,
-      building_type: row.building_type,
-      transform: normalizeVector(row.transform),
-      provides_stability: row.provides_stability
-    })),
-    placeables: placeables.rows.map((row) => ({
-      placeable_id: row.placeable_id,
-      building_type: row.building_type,
-      transform: buildPlaceableTransform(row.location, row.rotation),
-      properties: row.properties || {}
-    })),
-    pentashields: placeables.rows
-      .filter((row) => String(row.building_type || "").toLowerCase().includes("pentashield"))
-      .map((row) => ({ placeable_id: row.placeable_id, scale: extractPentashieldScale(row.properties) }))
-  };
-}
-
-export function validateBlueprintPayload(payload) {
-  const raw = payload && typeof payload === "object" ? payload : null;
-  if (!raw) throw new Error("Blueprint import payload must be a JSON object");
-  if (JSON.stringify(raw).length > 5 * 1024 * 1024) throw new Error("Blueprint import payload is too large");
-  if (!Array.isArray(raw.instances) || !Array.isArray(raw.placeables)) throw new Error("Blueprint import payload requires instances and placeables arrays");
-  if (raw.instances.length > 5000 || raw.placeables.length > 5000) throw new Error("Blueprint import payload has too many rows");
-  return true;
-}
-
-export function validateBasePayload(payload) {
-  const raw = payload && typeof payload === "object" ? payload : null;
-  if (!raw) throw new Error("Base import payload must be a JSON object");
-  if (JSON.stringify(raw).length > 10 * 1024 * 1024) throw new Error("Base import payload is too large");
-  if (!Array.isArray(raw.instances) && !Array.isArray(raw.placeables)) throw new Error("Base import payload requires instances or placeables arrays");
-  return true;
 }
 
 export async function exportRows(db, query) {
@@ -1038,51 +846,6 @@ function normalizeMarker(row) {
     y: Number(row.y),
     z: Number(row.z)
   };
-}
-
-function normalizeVector(value) {
-  if (Array.isArray(value)) return value.map((item) => Number(item));
-  if (value && typeof value === "object") return value;
-  const text = String(value || "").trim();
-  if (!text) return [];
-  return text
-    .replace(/[(){}]/g, "")
-    .split(/[, ]+/)
-    .filter(Boolean)
-    .map(Number)
-    .filter(Number.isFinite);
-}
-
-function buildPlaceableTransform(location, rotation) {
-  const loc = normalizeVector(location);
-  const rot = normalizeVector(rotation);
-  return [
-    loc[0] || 0,
-    loc[1] || 0,
-    loc[2] || 0,
-    rot[0] || 0,
-    rot[1] || 0,
-    rot[2] || 0,
-    rot[3] ?? 1
-  ];
-}
-
-function extractPentashieldScale(properties) {
-  const candidates = [
-    properties?.PentashieldPlaceable,
-    properties?.Pentashield_Placeable,
-    properties?.BP_PentashieldPlaceable_C,
-    properties
-  ];
-  for (const candidate of candidates) {
-    if (!candidate || typeof candidate !== "object") continue;
-    for (const key of ["m_Scale", "Scale", "scale"]) {
-      const value = candidate[key];
-      if (Array.isArray(value) || typeof value === "string") return normalizeVector(value);
-      if (value && typeof value === "object") return value;
-    }
-  }
-  return [1, 1, 1];
 }
 
 function unsupportedMap(feature, requiredTables) {

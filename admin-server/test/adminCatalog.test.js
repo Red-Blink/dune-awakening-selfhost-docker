@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { listCatalogItems, resolveCatalogItem } from "../src/adminCatalog.js";
 
 function fixtureRepo() {
-  const root = mkdtempSync(join(tmpdir(), "arrakis-admin-catalog-"));
+  const root = mkdtempSync(join(tmpdir(), "web-admin-catalog-"));
   mkdirSync(join(root, "runtime/data"), { recursive: true });
   writeFileSync(join(root, "runtime/data/admin-items.json"), JSON.stringify([
     { id: "PlantFiber", name: "Plant Fiber", category: "materials", source: "Resources" },

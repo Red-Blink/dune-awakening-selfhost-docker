@@ -367,7 +367,7 @@ EOF
 
 printf '%s' "$FUNCOM_TOKEN" > runtime/secrets/funcom-token.txt
 
-chmod 600 .env
+chmod 644 .env
 chmod 600 runtime/generated/battlegroup.env
 chmod 600 runtime/secrets/funcom-token.txt
 

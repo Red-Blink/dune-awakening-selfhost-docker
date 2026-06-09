@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError } from "../src/db.js";
-import { addCurrency, addFactionReputation, deleteInventoryItem, exportBaseAsBlueprint, exportBlueprintFull, giveItemToStorage, listPlayers, liveMapPlayers, liveMapServices, marketItems, marketListings, tablePreview, UnsupportedCapabilityError, validateBasePayload, validateBlueprintPayload } from "../src/duneDb.js";
+import { addCurrency, addFactionReputation, deleteInventoryItem, giveItemToStorage, listPlayers, liveMapPlayers, liveMapServices, tablePreview, UnsupportedCapabilityError } from "../src/duneDb.js";
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
   assert.deepEqual(discoverDbConfig({}), {
@@ -159,71 +159,6 @@ test("faction mutation clamps reputation and syncs actor component JSON", async 
   assert.equal(result.newValue, 12474);
   assert.ok(calls.some((call) => call.text.includes("set_player_faction_reputation") && call.values[2] === 12474));
   assert.ok(calls.some((call) => call.text.includes("FactionPlayerComponent,m_FactionDataArray")));
-});
-
-test("market queries use verified exchange tables and parameterized filters", async () => {
-  const calls = [];
-  const db = {
-    query: async (text, values = []) => {
-      calls.push({ text, values });
-      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
-      if (text.includes("from dune.dune_exchange_orders o") && text.includes("group by")) return { rows: [{ template_id: "WaterBottle_1", quality: 0 }] };
-      if (text.includes("case when o.is_npc_order")) return { rows: [{ order_id: 10, template_id: "WaterBottle_1" }] };
-      return { rows: [] };
-    }
-  };
-  const items = await marketItems(db, { q: "WaterBottle_1", limit: 25, offset: 5 });
-  assert.equal(items.rows[0].template_id, "WaterBottle_1");
-  const itemQuery = calls.find((call) => call.text.includes("group by o.template_id"));
-  assert.ok(itemQuery);
-  assert.deepEqual(itemQuery.values, ["%WaterBottle_1%", 25, 5]);
-  await marketListings(db, { templateId: "WaterBottle_1", owner: "bot" });
-  const listingQuery = calls.find((call) => call.text.includes("o.template_id = $1"));
-  assert.ok(listingQuery);
-  assert.deepEqual(listingQuery.values.slice(0, 1), ["WaterBottle_1"]);
-  await assert.rejects(() => marketListings(db, { templateId: "bad;template" }), /Invalid market template id/);
-});
-
-test("blueprint full export reads arrakis-admin object graph", async () => {
-  const calls = [];
-  const db = {
-    query: async (text, values = []) => {
-      calls.push({ text, values });
-      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
-      if (text.includes("select id from dune.building_blueprints")) return { rows: [{ id: 7 }] };
-      if (text.includes("FBuildingBlueprintItemStats")) return { rows: [{ name: "Test Blueprint" }] };
-      if (text.includes("from dune.building_blueprint_instances")) return { rows: [{ instance_id: 1, building_type: "Wall", transform: "{1,2,3}", provides_stability: true }] };
-      if (text.includes("from dune.building_blueprint_placeables")) return { rows: [{ placeable_id: 2, building_type: "Chest", transform: "{4,5,6}" }] };
-      if (text.includes("from dune.building_blueprint_pentashields")) return { rows: [{ placeable_id: 3, scale: "{1,1,1}" }] };
-      return { rows: [] };
-    }
-  };
-  const result = await exportBlueprintFull(db, 7);
-  assert.equal(result.name, "Test Blueprint");
-  assert.deepEqual(result.instances[0].transform, [1, 2, 3]);
-  assert.ok(calls.some((call) => call.text.includes("where building_blueprint_id = $1") && call.values[0] === 7));
-});
-
-test("base export builds read-only blueprint-shaped payload", async () => {
-  const db = {
-    query: async (text) => {
-      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
-      if (text.includes("from dune.building_instances")) return { rows: [{ instance_id: 1, building_type: "Floor", transform: "{1,2,3}", provides_stability: true, owner_entity_id: 99 }] };
-      if (text.includes("from dune.placeables")) return { rows: [{ placeable_id: 2, building_type: "StorageContainer_Placeable", location: "(10,20,30)", rotation: "(0,0,0,1)", properties: {} }] };
-      return { rows: [] };
-    }
-  };
-  const result = await exportBaseAsBlueprint(db, 5);
-  assert.equal(result.baseId, 5);
-  assert.equal(result.placeables[0].placeable_id, 2);
-  assert.deepEqual(result.placeables[0].transform, [10, 20, 30, 0, 0, 0, 1]);
-});
-
-test("blueprint and base payload validators reject unsafe shapes", () => {
-  assert.equal(validateBlueprintPayload({ instances: [], placeables: [] }), true);
-  assert.equal(validateBasePayload({ instances: [] }), true);
-  assert.throws(() => validateBlueprintPayload({ instances: [] }), /placeables/);
-  assert.throws(() => validateBasePayload({}), /instances or placeables/);
 });
 
 function fakeMutationDb(calls, fixtures = {}) {

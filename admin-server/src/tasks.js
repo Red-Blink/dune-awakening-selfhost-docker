@@ -49,7 +49,7 @@ export class TaskManager {
     task.currentStep = "Running";
     this.emit(task, "Task started");
     try {
-      const operations = task.operation === "restartAll" ? ["stop", "start"] : [task.operation];
+      const operations = taskOperations(task.operation, payload);
       let lastCode = 0;
       for (const operation of operations) {
         task.currentStep = operation;
@@ -97,10 +97,39 @@ export class TaskManager {
 }
 
 export function taskTimeoutMs(config, operation) {
-  if (["start", "stop", "restartAll", "restartService", "init", "updateApply", "selfUpdateApply", "selfUpdatePrevious"].includes(operation)) {
+  if (["start", "stop", "restartAll", "restartService", "serverTitle", "init", "updateApply", "updateFixSteamcmd", "selfUpdateApply", "selfUpdatePrevious", "backupRestore", "userSettingsSaveAndRestart", "userSettingsResetAndRestart", "userSettingsRawAndRestart", "mapsApplySettings"].includes(operation)) {
     return Math.max(config.commandTimeoutMs, 30 * 60 * 1000);
   }
   return config.commandTimeoutMs;
+}
+
+function taskOperations(operation, payload = {}) {
+  if (operation === "restartAll") return ["stop", "start"];
+  if (operation === "mapsApplySettings") {
+    return [
+      ...(payload.modeChanged ? ["mapsSetMode"] : []),
+      ...(payload.memoryChanged ? ["memorySetNoRestart"] : []),
+      ...(payload.memoryChanged ? restartOperations(payload) : [])
+    ];
+  }
+  if (operation === "userSettingsSaveAndRestart") return ["userSettingsSave", "userSettingsMaterializeCurrent", ...restartOperations(payload)];
+  if (operation === "userSettingsResetAndRestart") {
+    const resetOperation = payload.scope === "engine" ? "userSettingsResetEngineGameplay" : "userSettingsResetGame";
+    return [resetOperation, "userSettingsMaterializeCurrent", ...restartOperations(payload)];
+  }
+  if (operation === "userSettingsRawAndRestart") {
+    const rawOperation = payload.scope === "profile" ? "userSettingsProfileWrite" : payload.scope === "engine" ? "userSettingsRawEngineWrite" : "userSettingsRawGameWrite";
+    return [rawOperation, "userSettingsMaterializeCurrent", ...restartOperations(payload)];
+  }
+  return [operation];
+}
+
+function restartOperations(payload = {}) {
+  if (payload.restartMode === "none") return [];
+  if (payload.restartMode === "stack") return ["stop", "start"];
+  if (payload.restartMode === "service") return ["restartService"];
+  if (payload.restartMode === "respawn") return ["mapsDespawn", "mapsSpawn"];
+  return [];
 }
 
 export function publicTask(task) {

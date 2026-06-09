@@ -43,6 +43,7 @@ fi
 
 
 MULTIHOME_IP="$(resolve_bind_ip)"
+mapfile -t GAME_EXTERNAL_ADDRESS_ENV < <(game_external_address_override_env_args)
 
 psql_value() {
   docker exec dune-postgres psql -U postgres -d dune -Atc "$1"
@@ -109,6 +110,7 @@ chmod -R 755 "$FAKE_K8S_SERVICEACCOUNT_DIR"
 
 mapfile -t SIETCH_RUNTIME_ARGS < <(runtime/scripts/sietches.sh runtime-args Overmap "$PARTITION_ID" 2>/dev/null || true)
 mapfile -t LOG_RUNTIME_ARGS < <(full_stdout_log_args)
+runtime/scripts/network-addresses.sh reconcile >/dev/null 2>&1 || true
 
 docker exec dune-postgres psql -U postgres -d dune -v ON_ERROR_STOP=1 -c "
 begin;
@@ -141,7 +143,7 @@ docker run -d \
   -e "POD_UID=docker-overmap" \
   -e "POD_NAME=${BATTLEGROUP_ID}-sg-overmap-pod-2" \
   -e "POD_IP=$MULTIHOME_IP" \
-  -e "EXTERNAL_ADDRESS_OVERRIDE=$SERVER_IP" \
+  "${GAME_EXTERNAL_ADDRESS_ENV[@]}" \
   -e "NODE_NAME=$(hostname)" \
   -e "SERVER_INDEX=2" \
   -e "FARM_NAME=$BATTLEGROUP_ID" \
@@ -212,6 +214,7 @@ sleep 20
 if live_server_id="$(bind_partition_to_live_server "$PARTITION_ID" Overmap "$GAME_PORT" "$IGW_PORT" 20 2)"; then
   echo "Bound Overmap partition $PARTITION_ID to server_id: $live_server_id"
 fi
+runtime/scripts/network-addresses.sh reconcile >/dev/null 2>&1 || true
 
 docker ps --filter "name=dune-server-overmap" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 

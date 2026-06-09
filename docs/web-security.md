@@ -40,6 +40,7 @@ Direct Postgres features must:
 
 Phase 5A direct DB admin mutations follow the same pattern: the API first verifies the backend confirmation phrase, creates a RedBlink DB backup with `dune db backup`, then runs a parameterized transaction. Supported write paths are Solaris/currency via `dune.adjust_player_virtual_currency_balance`, faction reputation via `dune.set_player_faction_reputation`, inventory delete via `dune.delete_item`, storage item insert into verified `dune.items`/`dune.inventories`, gear durability JSON repair, and owned vehicle fuel JSON update. If required tables/functions/columns are not detected, the endpoint returns a clear unsupported capability response instead of attempting a write.
 
+Phase 5B2 market endpoints are read-only direct PostgreSQL queries implemented for Arrakis Server Console and require the verified `dune_exchange_*` tables. Blueprint and base full exports are read-only. Blueprint/base import, clone, and delete endpoints validate confirmation and payload shape, then return unsupported until safe graph mutation and ID remapping rules are verified. Starter Kit config/history writes are file-backed under `runtime/generated`; manual, bulk, and controlled auto-grants execute existing RedBlink `dune admin` commands with `action_player_id` and are audited/history logged.
 
 ## RabbitMQ Safety
 
@@ -50,7 +51,9 @@ RabbitMQ live commands must:
 - audit every broadcast, whisper, kick, item grant, teleport, or live command
 - avoid exposing a generic message publisher to the browser
 
+Phase 4 web actions use the existing RedBlink `dune admin` CLI for RabbitMQ-backed live commands. Broadcast and shutdown broadcast use the verified server-command envelope and publish only to `dune-rmq-game` exchange `heartbeats`, routing key `notifications`, with `app_id=fls_backend`, `user_id=fls`, and a `ServiceBroadcast` payload. Live Phase 9B validation confirmed RabbitMQ publish success and command history logging, but no in-game display, so the web UI labels broadcast as Experimental / publish-verified only. Arrakis Server Console does not currently expose a separate courier-style `/api/v1/notify` path on exchange `notifications`; that capability requires AMQP broker credentials/config and is not enabled in this Docker web admin. The API does not expose a generic RabbitMQ publisher. Whisper still returns an explicit unsupported capability response because the web admin path depends on a GM courier persona and `chat.whispers` recipient routing that are not yet verified in RedBlink.
 
+Whisper verification result: the web admin publishes courier chat to exchange `chat.whispers` using routing key equal to the recipient Funcom ID, AMQP type `text_chat`, and AMQP `user_id` equal to the sender GM hex FLS ID. The body includes the sender GM Funcom ID, recipient Funcom ID, and recipient character name. RedBlink does not currently seed or expose the required GM account/persona rows, sender Funcom ID, sender hex FLS ID, and verified recipient Funcom ID mapping, so the web API refuses to send whispers.
 
 Destructive live actions require backend confirmation phrases in addition to frontend confirmation:
 

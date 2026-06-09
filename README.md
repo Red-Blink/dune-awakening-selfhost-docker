@@ -116,6 +116,45 @@ Dynamic maps can use additional sequential game ports. Check **Home**, **Service
 
 For remote admin access, use a VPN such as Tailscale/WireGuard, SSH tunnel, reverse proxy with strong auth, or firewall allowlisting. Do not leave `8088/tcp` open to the public internet.
 
+## Network IP Setup
+
+The stack separates the local bind address from the public/client address.
+
+- `SERVER_BIND_IP` is the local IP the Docker host listens on.
+- `SERVER_IP` is the address players should connect to.
+- `SERVER_IP_MODE=local` is for LAN-only servers.
+- `SERVER_IP_MODE=public` is for internet/NAT/direct-public servers.
+
+For LAN-only hosting, both addresses are normally the LAN IP:
+
+```env
+SERVER_BIND_IP=10.0.0.240
+SERVER_IP_MODE=local
+SERVER_IP=10.0.0.240
+```
+
+For NAT, router, OPNsense, pfSense, or home-server hosting, bind to the host LAN IP and advertise the WAN IP:
+
+```env
+SERVER_BIND_IP=10.0.0.240
+SERVER_IP_MODE=public
+SERVER_IP=109.150.247.52
+```
+
+Do not bind game sockets to the public IP unless the Docker host actually owns that IP. In NAT mode, router/firewall DNAT should forward the public UDP ports to `SERVER_BIND_IP`.
+
+For dynamic public IPs, use:
+
+```env
+SERVER_BIND_IP=10.0.0.240
+SERVER_IP_MODE=public
+SERVER_IP=auto
+```
+
+On startup, the stack resolves the current public IP, keeps game sockets bound to `SERVER_BIND_IP`, updates public metadata, and reconciles `dune.farm_state` so map travel advertises `SERVER_IP` while IGW traffic stays on the bind IP.
+
+Same-LAN players connecting through the public address may need NAT reflection/hairpin NAT enabled on the router.
+
 ## Common Web Tasks
 
 | Task | Where |
@@ -194,7 +233,7 @@ Free space carefully. Do not delete runtime backups or generated state unless yo
 docker compose -f docker-compose.web.yml restart arrakis-console
 ```
 
-## Advanced Docs
+## Documentation
 
 - [Web Admin Deployment](docs/web-deployment.md)
 - [Web UI Guide](docs/web-ui.md)

@@ -33,6 +33,7 @@ SERVER_TITLE="$(resolve_server_title)"
 SERVER_REGION="$(resolve_server_region)"
 SERVER_IP="$(resolve_server_ip)"
 BATTLEGROUP_ID="$(resolve_battlegroup_id)"
+DUNE_DB_PASSWORD="${DUNE_DB_PASSWORD:-dune}"
 if [ -n "${DUNE_FAKE_K8S_SERVICEACCOUNT_DIR:-}" ]; then
   FAKE_K8S_SERVICEACCOUNT_DIR="$DUNE_FAKE_K8S_SERVICEACCOUNT_DIR"
 else
@@ -99,7 +100,7 @@ docker run -d \
   -e "Database_address=dune-postgres:5432" \
   -e "Database_name=dune" \
   -e "Database_user=dune" \
-  -e "Database_password=dune" \
+  -e "Database_password=$DUNE_DB_PASSWORD" \
   "$IMAGE" \
   --RMQAdminHostname=dune-rmq-admin \
   --RMQAdminPort=5672 \

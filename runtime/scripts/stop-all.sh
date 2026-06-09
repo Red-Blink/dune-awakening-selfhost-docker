@@ -3,16 +3,29 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
+mkdir -p runtime/generated
+
+if [ "${DUNE_MANUAL_STOP:-0}" = "1" ]; then
+  boot_id="$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)"
+  {
+    echo "DUNE_MANUAL_STOP=1"
+    echo "DUNE_MANUAL_STOP_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "DUNE_MANUAL_STOP_BOOT_ID=$boot_id"
+  } > runtime/generated/manual-stop.env
+fi
+
 echo "=== Stopping autoscaler ==="
 runtime/scripts/autoscaler-control.sh stop || true
 
 echo
 echo "=== Stopping sietch override publisher ==="
 runtime/scripts/publish-sietch-overrides.sh stop || true
+pkill -f "publish-sietch-overrides.sh loop" 2>/dev/null || true
 
 echo
 echo "=== Stopping Deep Desert warm-up publisher ==="
 runtime/scripts/publish-deepdesert-overrides.sh stop || true
+pkill -f "publish-deepdesert-overrides.sh loop" 2>/dev/null || true
 
 echo
 echo "=== Stopping game servers first ==="

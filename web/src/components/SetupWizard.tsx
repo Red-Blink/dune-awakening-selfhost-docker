@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { setupApi, type Check, type Task } from "../api/setup";
 import { PreflightCheckCard } from "./PreflightCheckCard";
 import { SecretInput } from "./SecretInput";
@@ -9,12 +9,16 @@ const steps = ["Welcome", "Host Check", "Docker Setup", "Runtime Location", "Ser
 const regions = ["Europe", "North America", "South America", "Asia", "Oceania", "Africa"];
 type SetupConfig = { SERVER_TITLE: string; SERVER_REGION: string; SERVER_IP: string; SERVER_IP_MODE: string; SERVER_PROVIDER: string; STEAM_APP_ID: string };
 
-export function SetupWizard() {
-  const [step, setStep] = useState(0);
+export function SetupWizard({ initialStep = 0, jumpNonce = 0 }: { initialStep?: number; jumpNonce?: number }) {
+  const [step, setStep] = useState(initialStep);
   const [checks, setChecks] = useState<Check[]>([]);
   const [task, setTask] = useState<Task | null>(null);
   const [token, setToken] = useState("");
   const [config, setConfig] = useState<SetupConfig>({ SERVER_TITLE: "My Dune Server", SERVER_REGION: "Europe", SERVER_IP: "auto", SERVER_IP_MODE: "public", SERVER_PROVIDER: "dune-docker", STEAM_APP_ID: "4754530" });
+
+  useEffect(() => {
+    setStep(Math.max(0, Math.min(initialStep, steps.length - 1)));
+  }, [initialStep, jumpNonce]);
 
   async function runPreflight() {
     const result = await setupApi.preflight();

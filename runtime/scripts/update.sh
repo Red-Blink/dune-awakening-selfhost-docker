@@ -3,6 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 ROOT_DIR="$(pwd)"
+HOST_ROOT_DIR="${DUNE_HOST_REPO_ROOT:-$ROOT_DIR}"
 
 [ -f .env ] && . ./.env
 [ -f runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
@@ -15,15 +16,169 @@ export SERVER_TITLE SERVER_REGION SERVER_IP
 
 APP_ID="${STEAM_APP_ID:-4754530}"
 
-echo "=== Dune update scaffold ==="
-echo "Steam app id: $APP_ID"
-
 cmd="${1:-run}"
 
 AUTO_STATE_FILE="runtime/generated/update-auto.env"
-AUTO_SERVICE_FILE="/etc/systemd/system/dune-awakening-auto-update.service"
-AUTO_TIMER_FILE="/etc/systemd/system/dune-awakening-auto-update.timer"
-AUTO_DEFAULT_TIME="${DUNE_AUTO_UPDATE_TIME:-05:00:00}"
+AUTO_SERVICE_NAME="dune-awakening-auto-update.service"
+AUTO_TIMER_NAME="dune-awakening-auto-update.timer"
+AUTO_SERVICE_FILE="/etc/systemd/system/$AUTO_SERVICE_NAME"
+AUTO_TIMER_FILE="/etc/systemd/system/$AUTO_TIMER_NAME"
+AUTO_DEFAULT_TIME="${DUNE_AUTO_UPDATE_TIME:-05:00}"
+
+write_auto_state() {
+  local enabled="$1"
+  local time_value="$2"
+  local timer_installed="${3:-${DUNE_AUTO_UPDATE_TIMER_INSTALLED:-0}}"
+  local tmp
+
+  mkdir -p runtime/generated
+  tmp="${AUTO_STATE_FILE}.$$"
+  cat > "$tmp" <<EOF
+DUNE_AUTO_UPDATE_ENABLED=$enabled
+DUNE_AUTO_UPDATE_TIME=$time_value
+DUNE_AUTO_UPDATE_TIMER_INSTALLED=$timer_installed
+EOF
+  chmod 644 "$tmp" 2>/dev/null || true
+  mv -f "$tmp" "$AUTO_STATE_FILE"
+}
+
+read_auto_state() {
+  DUNE_AUTO_UPDATE_ENABLED=0
+  DUNE_AUTO_UPDATE_TIME="$AUTO_DEFAULT_TIME"
+  DUNE_AUTO_UPDATE_TIMER_INSTALLED=""
+  if [ -f "$AUTO_STATE_FILE" ]; then
+    # shellcheck disable=SC1090
+    . "$AUTO_STATE_FILE"
+  fi
+}
+
+can_manage_systemd_units() {
+  [ -d /etc/systemd/system ] && [ -w /etc/systemd/system ]
+}
+
+write_auto_units_to() {
+  local time_value="$1"
+  local systemd_dir="$2"
+  local exec_root="$3"
+
+  mkdir -p "$systemd_dir"
+  cat > "$systemd_dir/$AUTO_SERVICE_NAME" <<EOF
+[Unit]
+Description=Dune Awakening self-host auto update
+Wants=docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=$exec_root
+ExecStart=$exec_root/runtime/scripts/dune update --yes
+EOF
+
+  cat > "$systemd_dir/$AUTO_TIMER_NAME" <<EOF
+[Unit]
+Description=Run Dune Awakening self-host auto update
+
+[Timer]
+OnCalendar=*-*-* $time_value
+Persistent=true
+Unit=$AUTO_SERVICE_NAME
+
+[Install]
+WantedBy=timers.target
+EOF
+}
+
+docker_helper_image() {
+  printf '%s' "${DUNE_SYSTEMD_HELPER_IMAGE:-arrakis-server-console:dev}"
+}
+
+can_manage_host_systemd_with_docker() {
+  command -v docker >/dev/null 2>&1 || return 1
+  [ -S /var/run/docker.sock ] || return 1
+  docker image inspect "$(docker_helper_image)" >/dev/null 2>&1 || return 1
+}
+
+install_auto_units_via_docker_host() {
+  local time_value="$1"
+  local image
+  image="$(docker_helper_image)"
+
+  can_manage_host_systemd_with_docker || return 1
+  docker run --rm --privileged --pid=host --network=host \
+    -e DUNE_AUTO_UPDATE_TIME="$time_value" \
+    -e DUNE_HOST_REPO_ROOT="$HOST_ROOT_DIR" \
+    -v /:/host \
+    --entrypoint bash \
+    "$image" -lc '
+      set -euo pipefail
+      systemd_dir=/host/etc/systemd/system
+      mkdir -p "$systemd_dir"
+      cat > "$systemd_dir/dune-awakening-auto-update.service" <<EOF
+[Unit]
+Description=Dune Awakening self-host auto update
+Wants=docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=${DUNE_HOST_REPO_ROOT}
+ExecStart=${DUNE_HOST_REPO_ROOT}/runtime/scripts/dune update --yes
+EOF
+      cat > "$systemd_dir/dune-awakening-auto-update.timer" <<EOF
+[Unit]
+Description=Run Dune Awakening self-host auto update
+
+[Timer]
+OnCalendar=*-*-* ${DUNE_AUTO_UPDATE_TIME}
+Persistent=true
+Unit=dune-awakening-auto-update.service
+
+[Install]
+WantedBy=timers.target
+EOF
+      chroot /host /bin/systemctl daemon-reload
+      chroot /host /bin/systemctl enable --now dune-awakening-auto-update.timer
+    '
+}
+
+disable_auto_units_via_docker_host() {
+  local image
+  image="$(docker_helper_image)"
+
+  can_manage_host_systemd_with_docker || return 1
+  docker run --rm --privileged --pid=host --network=host \
+    -v /:/host \
+    --entrypoint bash \
+    "$image" -lc '
+      set -euo pipefail
+      chroot /host /bin/systemctl disable --now dune-awakening-auto-update.timer >/dev/null 2>&1 || true
+      chroot /host /bin/systemctl daemon-reload
+    '
+}
+
+show_auto_timer_status_via_docker() {
+  local image
+  image="$(docker_helper_image)"
+
+  can_manage_host_systemd_with_docker || return 1
+  docker run --rm --privileged --pid=host --network=host \
+    -v /:/host \
+    --entrypoint bash \
+    "$image" -lc '
+      set -euo pipefail
+      if chroot /host /bin/systemctl list-unit-files dune-awakening-auto-update.timer --no-legend --no-pager 2>/dev/null | grep -q "^dune-awakening-auto-update.timer"; then
+        timer_active="$(chroot /host /bin/systemctl is-active dune-awakening-auto-update.timer 2>/dev/null || true)"
+        if [ "$timer_active" = "active" ]; then
+          echo "Systemd timer: active"
+        else
+          echo "Systemd timer: inactive"
+        fi
+        chroot /host /bin/systemctl list-timers --all dune-awakening-auto-update.timer --no-pager || true
+      else
+        echo "Systemd timer: not installed"
+      fi
+    '
+}
 
 handle_auto_update() {
   sub="${1:-status}"
@@ -33,93 +188,99 @@ handle_auto_update() {
 
   case "$sub" in
     enable|on)
-      cat > "$AUTO_STATE_FILE" <<EOF
-DUNE_AUTO_UPDATE_ENABLED=1
-DUNE_AUTO_UPDATE_TIME=$time_value
-EOF
-
-      if [ "$(id -u)" -ne 0 ] && command -v systemctl >/dev/null 2>&1; then
-        echo "Automatic updates need sudo because they install systemd units under /etc/systemd/system."
-        echo "Run: sudo runtime/scripts/dune update auto enable${time_value:+ $time_value}"
-        return 1
-      fi
-
       if ! command -v systemctl >/dev/null 2>&1; then
-        echo "Auto-update preference saved, but systemctl was not found."
-        echo "Saved: $AUTO_STATE_FILE"
-        return 0
+        if install_auto_units_via_docker_host "$time_value"; then
+          write_auto_state 1 "$time_value" 1
+          echo "Auto updates enabled."
+          echo "Daily time: $time_value"
+          echo "Timer: $AUTO_TIMER_NAME"
+          return 0
+        else
+          write_auto_state 1 "$time_value" 0
+          echo "Auto-update preference saved, but systemctl was not found and the host timer could not be installed through Docker."
+          echo "Saved: $AUTO_STATE_FILE"
+          echo "To install the timer, run this command with sudo/root:"
+          echo "  runtime/scripts/update.sh auto enable $time_value"
+          return 1
+        fi
       fi
 
-      cat > "$AUTO_SERVICE_FILE" <<EOF
-[Unit]
-Description=Dune Awakening self-host auto update
-Wants=docker.service
-After=network-online.target docker.service
+      if ! can_manage_systemd_units; then
+        if install_auto_units_via_docker_host "$time_value"; then
+          write_auto_state 1 "$time_value" 1
+          echo "Auto updates enabled."
+          echo "Daily time: $time_value"
+          echo "Timer: $AUTO_TIMER_NAME"
+          return 0
+        else
+          write_auto_state 1 "$time_value" 0
+          echo "Auto-update preference saved, but this user cannot install systemd units."
+          echo "Saved: $AUTO_STATE_FILE"
+          echo "To install the timer, run this command with sudo/root:"
+          echo "  runtime/scripts/update.sh auto enable $time_value"
+          return 1
+        fi
+      fi
 
-[Service]
-Type=oneshot
-WorkingDirectory=$ROOT_DIR
-ExecStart=$ROOT_DIR/runtime/scripts/dune update --yes
-EOF
-
-      cat > "$AUTO_TIMER_FILE" <<EOF
-[Unit]
-Description=Run Dune Awakening self-host auto update
-
-[Timer]
-OnCalendar=*-*-* $time_value
-Persistent=true
-RandomizedDelaySec=10m
-Unit=dune-awakening-auto-update.service
-
-[Install]
-WantedBy=timers.target
-EOF
-
+      write_auto_units_to "$time_value" "/etc/systemd/system" "$HOST_ROOT_DIR"
       systemctl daemon-reload
-      systemctl enable --now dune-awakening-auto-update.timer
+      systemctl enable --now "$AUTO_TIMER_NAME"
+      write_auto_state 1 "$time_value" 1
 
       echo "Auto updates enabled."
       echo "Daily time: $time_value"
-      echo "Timer: dune-awakening-auto-update.timer"
+      echo "Timer: $AUTO_TIMER_NAME"
       ;;
 
     disable|off)
-      cat > "$AUTO_STATE_FILE" <<EOF
-DUNE_AUTO_UPDATE_ENABLED=0
-DUNE_AUTO_UPDATE_TIME=$time_value
-EOF
-
-      if command -v systemctl >/dev/null 2>&1; then
-        systemctl disable --now dune-awakening-auto-update.timer >/dev/null 2>&1 || true
+      read_auto_state
+      if command -v systemctl >/dev/null 2>&1 && can_manage_systemd_units; then
+        systemctl disable --now "$AUTO_TIMER_NAME" >/dev/null 2>&1 || true
         rm -f "$AUTO_SERVICE_FILE" "$AUTO_TIMER_FILE"
         systemctl daemon-reload
+        write_auto_state 0 "${DUNE_AUTO_UPDATE_TIME:-$time_value}" 1
+      elif can_manage_host_systemd_with_docker; then
+        disable_auto_units_via_docker_host
+        write_auto_state 0 "${DUNE_AUTO_UPDATE_TIME:-$time_value}" 1
+      elif [ "${DUNE_AUTO_UPDATE_TIMER_INSTALLED:-0}" != "1" ] && [ "${DUNE_AUTO_UPDATE_ENABLED:-0}" != "1" ]; then
+        write_auto_state 0 "${DUNE_AUTO_UPDATE_TIME:-$time_value}" 0
+      else
+        echo "Auto updates could not be disabled because the host timer cannot be managed from this environment."
+        return 1
       fi
 
       echo "Auto updates disabled."
       ;;
 
     status)
-      DUNE_AUTO_UPDATE_ENABLED=0
-      DUNE_AUTO_UPDATE_TIME="$AUTO_DEFAULT_TIME"
-
-      if [ -f "$AUTO_STATE_FILE" ]; then
-        # shellcheck disable=SC1090
-        . "$AUTO_STATE_FILE"
-      fi
+      read_auto_state
 
       echo "Auto updates enabled: $DUNE_AUTO_UPDATE_ENABLED"
       echo "Auto update time:      $DUNE_AUTO_UPDATE_TIME"
 
-      if command -v systemctl >/dev/null 2>&1; then
+      if [ "${DUNE_AUTO_UPDATE_TIMER_INSTALLED:-}" = "1" ]; then
         echo
-        if systemctl list-unit-files dune-awakening-auto-update.timer --no-legend --no-pager 2>/dev/null | grep -q '^dune-awakening-auto-update.timer'; then
-          timer_enabled="$(systemctl is-enabled dune-awakening-auto-update.timer 2>/dev/null || true)"
-          [ -n "$timer_enabled" ] && echo "Systemd timer: $timer_enabled"
-          systemctl list-timers --all dune-awakening-auto-update.timer --no-pager || true
+        if [ "${DUNE_AUTO_UPDATE_ENABLED:-0}" = "1" ]; then
+          echo "Systemd timer: active"
+        else
+          echo "Systemd timer: inactive"
+        fi
+      elif command -v systemctl >/dev/null 2>&1; then
+        echo
+        if systemctl list-unit-files "$AUTO_TIMER_NAME" --no-legend --no-pager 2>/dev/null | grep -q "^$AUTO_TIMER_NAME"; then
+          timer_active="$(systemctl is-active "$AUTO_TIMER_NAME" 2>/dev/null || true)"
+          if [ "$timer_active" = "active" ]; then
+            echo "Systemd timer: active"
+          else
+            echo "Systemd timer: inactive"
+          fi
+          systemctl list-timers --all "$AUTO_TIMER_NAME" --no-pager || true
         else
           echo "Systemd timer: not installed"
         fi
+      else
+        echo
+        show_auto_timer_status_via_docker || echo "Systemd timer: not installed"
       fi
       ;;
 
@@ -127,7 +288,7 @@ EOF
       echo "Unknown auto-update command: $sub"
       echo "Usage:"
       echo "  dune update auto enable"
-      echo "  dune update auto enable HH:MM:SS"
+      echo "  dune update auto enable HH:MM"
       echo "  dune update auto disable"
       echo "  dune update auto status"
       return 2
@@ -137,6 +298,21 @@ EOF
 
 if [ "$cmd" = "auto" ]; then
   handle_auto_update "${2:-status}" "${3:-$AUTO_DEFAULT_TIME}"
+  exit $?
+fi
+
+if [ "$cmd" = "fix-steamcmd" ]; then
+  docker compose exec -T -e APP_ID="$APP_ID" orchestrator bash -lc '
+set -euo pipefail
+APP_ID="${APP_ID:-4754530}"
+MANIFEST="/srv/dune/server/steamapps/appmanifest_${APP_ID}.acf"
+if [ -f "$MANIFEST" ]; then
+  rm -f "$MANIFEST"
+  echo "SteamCMD app manifest removed. It will be regenerated on the next game update."
+else
+  echo "SteamCMD app manifest was already absent. The next game update will generate it."
+fi
+'
   exit $?
 fi
 
@@ -253,6 +429,7 @@ if [ "$cmd" != "run" ] && [ "$cmd" != "apply" ] && [ "$cmd" != "install" ]; then
   echo "  dune update check"
   echo "  dune update --yes"
   echo "  dune update install"
+  echo "  dune update fix-steamcmd"
   echo "  dune update auto enable"
   echo "  dune update auto disable"
   echo "  dune update auto status"
@@ -308,6 +485,12 @@ docker compose exec -T \
   -e DUNE_MIN_FREE_GB="${DUNE_MIN_FREE_GB:-25}" \
   -e DUNE_SKIP_DISK_CHECK="${DUNE_SKIP_DISK_CHECK:-}" \
   orchestrator dune preflight
+
+if [ "$cmd" != "install" ]; then
+  echo
+  echo "=== Create pre-update database backup ==="
+  DB_BACKUP_ORIGIN=pre-update runtime/scripts/db.sh backup
+fi
 
 echo
 echo "=== Stop game servers before update ==="
