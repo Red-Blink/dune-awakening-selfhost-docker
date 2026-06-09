@@ -237,6 +237,7 @@ async function handleApi(req, res) {
   if (path === "/api/admin/vehicles") return commandJson(res, url.searchParams.get("q") ? "adminVehicleSearch" : "adminVehicleList", { q: url.searchParams.get("q") || "" });
   if (path === "/api/admin/skill-modules") return commandJson(res, url.searchParams.get("q") ? "adminSkillModulesSearch" : "adminSkillModules", { q: url.searchParams.get("q") || "" });
   if (path === "/api/admin/history") return commandJson(res, "adminHistory");
+  if (path === "/api/admin/history/clear" && req.method === "POST") return clearAdminHistoryRoute(req, res);
   if (path === "/api/admin/broadcast" && req.method === "POST") return broadcastRoute(req, res);
   if (path === "/api/admin/broadcast-shutdown" && req.method === "POST") return shutdownBroadcastRoute(req, res);
   if (path === "/api/admin/whisper" && req.method === "POST") return whisperRoute(req, res);
@@ -425,6 +426,15 @@ async function commandJson(res, operation, payload = {}) {
   const args = buildDuneArgs(operation, payload);
   const result = await runDune(config, args);
   return json(res, 200, { operation, stdout: result.stdout, stderr: result.stderr, exitCode: result.code });
+}
+
+async function clearAdminHistoryRoute(req, res) {
+  const historyDir = join(config.repoRoot, "runtime/generated");
+  mkdirSync(historyDir, { recursive: true });
+  writeFileSync(join(historyDir, "admin-command-history.tsv"), "");
+  writeFileSync(join(historyDir, "admin-command-audit.jsonl"), "");
+  audit(config, req, "admin.history.clear", { ok: true });
+  return json(res, 200, { ok: true });
 }
 
 async function safeCommandJson(res, operation, payload = {}) {
@@ -1283,15 +1293,16 @@ async function giveItemsRoute(req, res, path) {
 
 async function broadcastRoute(req, res) {
   const body = await readJson(req);
+  const message = body.body ?? body.message;
   try {
-    const command = buildBroadcastCommand(body);
+    const command = buildBroadcastCommand({ ...body, message });
     const result = config.mockMode ? { code: 0, stdout: "mock broadcast\n", stderr: "", args: [] } : await publishServerCommand(config, command, "web-broadcast");
     audit(config, req, "admin.broadcast", { supported: true, command });
-    recordAdminHistory(config, { command: "web-broadcast", target: "all", friendly: "Broadcast publish test", path: "rmq:heartbeats/notifications", result: "published", message: body.message });
-    return json(res, 200, { supported: true, ok: true, stdout: result.stdout, stderr: result.stderr, note: "Broadcast was published to RabbitMQ, but it has not been verified to appear in-game." });
+    recordAdminHistory(config, { command: "web-broadcast", target: "all", friendly: body.title || "Broadcast", path: "rmq:heartbeats/notifications", result: "published", message });
+    return json(res, 200, { supported: true, ok: true, stdout: result.stdout, stderr: result.stderr, note: "Broadcast was published to RabbitMQ." });
   } catch (error) {
     audit(config, req, "admin.broadcast", { supported: false, error: redact(error.message || error) });
-    recordAdminHistory(config, { command: "web-broadcast", target: "all", friendly: "Broadcast publish test", path: "rmq:heartbeats/notifications", result: "blocked", message: body.message });
+    recordAdminHistory(config, { command: "web-broadcast", target: "all", friendly: body.title || "Broadcast", path: "rmq:heartbeats/notifications", result: "blocked", message });
     return json(res, 400, { supported: false, error: redact(error.message || error), reason: redact(error.message || error) });
   }
 }

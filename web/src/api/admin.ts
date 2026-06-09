@@ -25,8 +25,7 @@ export const adminApi = {
   structuredVehicles: () => api<{ vehicles: VehicleCatalogEntry[]; stdout?: string; stderr?: string }>("/api/admin/vehicles/structured"),
   skillModules: (q = "") => api<{ stdout: string }>(`/api/admin/skill-modules${q ? `?q=${encodeURIComponent(q)}` : ""}`),
   history: () => api<{ stdout: string }>("/api/admin/history"),
+  clearHistory: () => post<{ ok: boolean }>("/api/admin/history/clear", {}),
   kickAllOnline: (confirmation: string) => post<{ task: Task }>("/api/players/kick-all-online", { confirmation }),
-  broadcast: (message: string, durationSec: number) => post<{ supported: boolean; reason?: string; ok?: boolean; stdout?: string; stderr?: string; note?: string }>("/api/admin/broadcast", { message, durationSec }),
-  shutdownBroadcast: (body: { confirmation: string; delayMinutes: number; shutdownType: string }) => post<{ supported: boolean; reason?: string; ok?: boolean; stdout?: string; stderr?: string; note?: string }>("/api/admin/broadcast-shutdown", body),
-  whisper: (playerId: string, message: string) => post<{ supported: false; reason: string }>("/api/admin/whisper", { playerId, message })
+  broadcast: (title: string, body: string, durationSec: number) => post<{ supported: boolean; reason?: string; ok?: boolean; stdout?: string; stderr?: string; note?: string }>("/api/admin/broadcast", { title, body, durationSec })
 };

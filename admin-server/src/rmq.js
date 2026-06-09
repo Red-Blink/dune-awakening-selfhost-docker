@@ -31,16 +31,18 @@ export function validateLocalizedTexts(texts, message, title = "Admin Broadcast"
   if (Array.isArray(texts) && texts.length > 0) {
     if (texts.length > 10) throw new Error("texts must contain 1-10 entries");
     return texts.map((entry) => ({
-      Key: validateLocalizedTextField(entry?.Key || "AdminBroadcast", "Key", 120),
+      Key: validateLocaleKey(entry?.Key || "en"),
       Title: validateLocalizedTextField(entry?.Title || title || "Admin Broadcast", "Title", 80),
       Body: validateBroadcastMessage(entry?.Body)
     }));
   }
-  return [{
-    Key: "AdminBroadcast",
-    Title: validateLocalizedTextField(title || "Admin Broadcast", "Title", 80),
-    Body: validateBroadcastMessage(message)
-  }];
+  const validatedTitle = validateLocalizedTextField(title || "Admin Broadcast", "Title", 80);
+  const validatedBody = validateBroadcastMessage(message);
+  return ["en", "en-US"].map((key) => ({
+    Key: key,
+    Title: validatedTitle,
+    Body: validatedBody
+  }));
 }
 
 export function buildShutdownBroadcastCommand({ shutdownType = "Restart", delayMinutes = 15, frequency = 60, duration = 30, cancel = false }) {
@@ -166,6 +168,12 @@ function validateLocalizedTextField(value, label, maxLength) {
     throw new Error(`${label} must be 1-${maxLength} printable characters`);
   }
   return raw;
+}
+
+function validateLocaleKey(value) {
+  const raw = String(value || "").trim();
+  if (/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(raw)) return raw;
+  throw new Error("LocalizedText Key must be a locale key like en or en-US");
 }
 
 function validateShutdownType(value) {

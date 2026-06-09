@@ -15,7 +15,7 @@ services:
       DUNE_HOST_REPO_ROOT: "${DUNE_HOST_REPO_ROOT:-${PWD}}"
       # Make RedBlink dune scripts target the main Dune stack, not this web-only compose project.
       COMPOSE_PROJECT_NAME: "${DUNE_COMPOSE_PROJECT_NAME:-dune-awakening-selfhost-docker}"
-      ADMIN_BIND_HOST: "${ADMIN_BIND_HOST:-0.0.0.0}"
+      ADMIN_BIND_HOST: "${ADMIN_BIND_HOST:-auto}"
       ADMIN_BIND_PORT: "${ADMIN_BIND_PORT:-8088}"
       ADMIN_AUTH_DISABLED: "${ADMIN_AUTH_DISABLED:-0}"
       ADMIN_SECURE_COOKIES: "${ADMIN_SECURE_COOKIES:-0}"

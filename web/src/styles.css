@@ -24,6 +24,8 @@ button, .button-link {
 button:hover, .button-link:hover { border-color: #c68b4a; }
 button.active { background: #9b5f2a; border-color: #d49a5c; }
 button.danger { border-color: #8d3434; color: #ffc9c9; }
+button.success { border-color: #3d8b62; color: #d8f0c8; }
+button.success:hover { border-color: #63b57f; }
 button.restore-action, .icon-action.danger, .download-action { border-color: #f7e7c7; color: #f7e7c7; }
 button.restore-action:hover, .icon-action.danger:hover, .download-action:hover { border-color: #fff3d7; }
 .icon-action { width: 38px; height: 38px; padding: 7px; flex: 0 0 38px; }
@@ -571,11 +573,48 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
 .admin-tools-panel h3 + button { margin-top: 10px; }
 .admin-tools-panel .table-wrap { background: #171a1d; }
 .admin-tools-panel .empty { margin: 10px 0; }
-.global-live-tools { display: grid; gap: 8px; }
+.admin-xp-row, .admin-player-tools-row { align-items: end; }
+.admin-xp-row .inline-action-result, .admin-player-tools-row .inline-action-result { min-height: 40px; display: inline-flex; align-items: center; }
+.admin-xp-field { display: inline-flex; flex-direction: row; align-items: center; gap: 10px; width: auto; flex: 0 0 auto; white-space: nowrap; }
+.admin-xp-field input { width: 120px; }
+.admin-live-toggle-panel { border: 1px solid #302b25; border-radius: 8px; background: #14171a; overflow: hidden; }
+.admin-live-toggle-panel.open { background: #121416; }
+.admin-live-toggle-panel.open .admin-live-toggle-row { border-bottom: 1px solid #302b25; }
+.admin-live-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 42px; padding: 4px 10px; }
+.admin-live-toggle-row h3 { margin: 0; color: #ffd08a; font-size: 1em; line-height: 38px; }
+.admin-live-toggle-row .icon-toggle-button { align-self: center; display: inline-grid; place-items: center; width: 34px; height: 34px; flex: 0 0 34px; padding: 0; margin: 0; line-height: 1; }
+.admin-live-toggle-panel .icon-toggle-button svg { display: block; }
+.global-live-tools { display: grid; gap: 10px; padding: 12px; }
 .global-live-tools .danger-note { margin: 0; }
-.live-tool-buttons { margin-top: 4px; }
-.history-controls { display: flex; justify-content: flex-start; margin-top: 8px; }
-.history-controls button { width: auto; flex: 0 0 auto; }
+.admin-global-actions { margin-top: 0; }
+.admin-global-actions button { width: auto; flex: 0 0 auto; }
+.admin-tools-panel .broadcast-line { display: grid; grid-template-columns: minmax(260px, 560px); align-items: end; }
+.admin-tools-panel .broadcast-title { width: min(360px, 100%); min-width: 0; flex: 0 1 360px; }
+.admin-tools-panel .broadcast-message { width: min(560px, 100%); min-width: 0; flex: 0 1 560px; }
+.admin-tools-panel .broadcast-message textarea { min-height: 96px; }
+.broadcast-controls-row { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.admin-history-toggle-panel { margin-top: 0; }
+.admin-history-actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.admin-history-actions button { width: auto; flex: 0 0 auto; }
+.admin-history-content { display: grid; gap: 10px; padding: 12px; }
+.admin-history-empty { margin: 0; color: #d9c8aa; }
+.inline-action-result-wrap { align-self: end; min-height: 40px; display: inline-flex; align-items: center; }
+.inline-action-result { color: #d8f0c8; font-weight: 600; }
+.inline-action-result.danger { color: #ffc9c9; }
+.inline-action-result.neutral { color: #ffd08a; }
+.inline-action-result.pending::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: pendingDots 1.2s steps(4, end) infinite; }
+@keyframes pendingDots {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75%, 100% { content: "..."; }
+}
+.admin-history-table { max-height: 300px; overflow: auto; border: 1px solid #302b25; border-radius: 8px; }
+.admin-history-table .table-wrap { border: 0; border-radius: 0; margin: 0; max-height: none; overflow: visible; }
+.admin-history-grid th:first-child, .admin-history-grid td:first-child { width: 132px; white-space: nowrap; }
+.admin-history-grid th:nth-child(2), .admin-history-grid td:nth-child(2) { min-width: 128px; padding-left: 14px; }
+.admin-history-grid th:nth-child(3), .admin-history-grid td:nth-child(3) { min-width: 180px; white-space: nowrap; }
+.admin-history-grid td:last-child { max-width: 420px; }
 .selected-map-panel { margin-top: 16px; }
 .item-grant-row { justify-content: flex-start; max-width: 520px; }
 .item-grant-row button { align-self: end; }

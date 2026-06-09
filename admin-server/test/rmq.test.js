@@ -7,22 +7,23 @@ test("builds verified ServiceBroadcast generic command payload", () => {
   assert.equal(command.ServerCommand, "ServiceBroadcast");
   assert.equal(command.BroadcastType, "Generic");
   assert.equal(command.BroadcastPayload.BroadcastDuration, 45);
-  assert.equal(command.BroadcastPayload.LocalizedText[0].Key, "AdminBroadcast");
-  assert.equal(command.BroadcastPayload.LocalizedText[0].Title, "Event");
-  assert.equal(command.BroadcastPayload.LocalizedText[0].Body, "Server event starts soon");
+  assert.deepEqual(command.BroadcastPayload.LocalizedText, [
+    { Key: "en", Title: "Event", Body: "Server event starts soon" },
+    { Key: "en-US", Title: "Event", Body: "Server event starts soon" }
+  ]);
 });
 
-test("builds reference multi-text ServiceBroadcast generic payload", () => {
+test("builds locale-keyed multi-text ServiceBroadcast generic payload", () => {
   const command = buildBroadcastCommand({
     durationSec: 30,
     texts: [
-      { Key: "AdminBroadcast", Title: "Event", Body: "Server event starts soon" },
-      { Key: "AdminBroadcastShort", Title: "Event", Body: "Travel safely" }
+      { Key: "en", Title: "Event", Body: "Server event starts soon" },
+      { Key: "en-US", Title: "Event", Body: "Travel safely" }
     ]
   });
   assert.deepEqual(command.BroadcastPayload.LocalizedText, [
-    { Key: "AdminBroadcast", Title: "Event", Body: "Server event starts soon" },
-    { Key: "AdminBroadcastShort", Title: "Event", Body: "Travel safely" }
+    { Key: "en", Title: "Event", Body: "Server event starts soon" },
+    { Key: "en-US", Title: "Event", Body: "Travel safely" }
   ]);
 });
 
@@ -34,7 +35,8 @@ test("validates broadcast and whisper-style message bounds", () => {
   assert.throws(() => buildBroadcastCommand({ message: "hello", durationSec: 0 }));
   assert.throws(() => buildBroadcastCommand({ message: "hello", durationSec: 3601 }));
   assert.throws(() => validateLocalizedTexts([{ Key: "bad\u0001key", Title: "Event", Body: "hello" }]));
-  assert.throws(() => validateLocalizedTexts([{ Key: "AdminBroadcast", Title: "Event", Body: "" }]));
+  assert.throws(() => validateLocalizedTexts([{ Key: "AdminBroadcast", Title: "Event", Body: "hello" }]));
+  assert.throws(() => validateLocalizedTexts([{ Key: "en", Title: "Event", Body: "" }]));
 });
 
 test("builds shutdown ServiceBroadcast with strict shutdown type", () => {

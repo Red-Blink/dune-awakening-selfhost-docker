@@ -1270,6 +1270,7 @@ grant_item() {
   local durability="${5:-1.0}"
   local original_player_id item_json item_id item_name item_category item_source inner_json
   local verify_account_id before_count after_count
+  local status_row status_rc online_status online_map error_text
 
   if [ -z "$player_id" ] || [ -z "$item_value" ]; then
     usage >&2
@@ -1314,6 +1315,32 @@ grant_item() {
   fi
 
   echo
+  set +e
+  status_row="$(player_status_for_fls "$player_id")"
+  status_rc=$?
+  set -e
+  if [ "$status_rc" -eq 2 ]; then
+    error_text="Cannot verify whether the player is online because Postgres is unavailable."
+    echo "$error_text" >&2
+    audit_admin_action "AddItemToInventory" "$(redact_fls "$player_id")" "$item_name x$quantity" "$inner_json" "$ADMIN_COMMAND_PATH" "failed" "$error_text"
+    exit 1
+  fi
+  if [ -z "$status_row" ]; then
+    error_text="Cannot verify whether the player is online. Item grants require an online player."
+    echo "$error_text" >&2
+    audit_admin_action "AddItemToInventory" "$(redact_fls "$player_id")" "$item_name x$quantity" "$inner_json" "$ADMIN_COMMAND_PATH" "failed" "$error_text"
+    exit 1
+  fi
+  IFS='|' read -r online_status online_map <<< "$status_row"
+  echo "  Player status: ${online_status:-Unknown}"
+  echo "  Player map: ${online_map:-unknown}"
+  if ! printf '%s' "${online_status:-Offline}" | grep -Eiq '^online$'; then
+    error_text="Player is ${online_status:-Offline}."
+    echo "$error_text" >&2
+    audit_admin_action "AddItemToInventory" "$(redact_fls "$player_id")" "$item_name x$quantity" "$inner_json" "$ADMIN_COMMAND_PATH" "failed" "$error_text"
+    exit 1
+  fi
+
   require_token_file
   verify_account_id="$(account_id_for_player_id "$player_id")"
   before_count="$(player_item_stack_count "$verify_account_id" "$item_id")"
@@ -1470,7 +1497,7 @@ publish_player_command() {
   local player_id="$2"
   local destructive="${3:-0}"
   shift 3
-  local resolved_player inner_json answer audit_target output rc result error_text status_row status map
+  local resolved_player inner_json answer audit_target output rc result error_text status_row status map require_online=0
 
   [ -n "$player_id" ] || { echo "PlayerId is required." >&2; exit 2; }
   resolved_player="$(resolve_player_id "$player_id")"
@@ -1489,12 +1516,35 @@ publish_player_command() {
   fi
 
   inner_json="$(build_passthrough_json "$command_id" "PlayerId=$resolved_player=string" "$@")"
+  case "$command_id" in
+    AwardXP|UpdateAllWaterFillables) require_online=1 ;;
+  esac
 
   if [ "$resolved_player" != "*" ]; then
-    status_row="$(player_status_for_fls "$resolved_player" || true)"
+    set +e
+    status_row="$(player_status_for_fls "$resolved_player")"
+    rc=$?
+    set -e
+    if [ "$rc" -eq 2 ] && [ "$require_online" = "1" ]; then
+      error_text="Cannot verify whether the player is online."
+      echo "$error_text" >&2
+      audit_admin_action "$command_id" "$audit_target" "$command_id" "$inner_json" "$ADMIN_COMMAND_PATH" "failed" "$error_text"
+      exit 1
+    fi
     if [ -n "$status_row" ]; then
       IFS='|' read -r status map <<< "$status_row"
       echo "Target state: status=${status:-Unknown} map=${map:-unknown}"
+      if [ "$require_online" = "1" ] && ! printf '%s' "${status:-Offline}" | grep -Eiq '^online$'; then
+        error_text="Player is ${status:-Offline}."
+        echo "$error_text" >&2
+        audit_admin_action "$command_id" "$audit_target" "$command_id" "$inner_json" "$ADMIN_COMMAND_PATH" "failed" "$error_text"
+        exit 1
+      fi
+    elif [ "$require_online" = "1" ]; then
+      error_text="Cannot verify whether the player is online."
+      echo "$error_text" >&2
+      audit_admin_action "$command_id" "$audit_target" "$command_id" "$inner_json" "$ADMIN_COMMAND_PATH" "failed" "$error_text"
+      exit 1
     else
       echo "WARNING: target was not found in local player_state/accounts; publishing by FLS id anyway." >&2
     fi

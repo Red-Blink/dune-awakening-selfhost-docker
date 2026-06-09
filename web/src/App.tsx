@@ -231,7 +231,7 @@ export function App() {
         }} />}
         {tab === "Services" && <ServicesPanel services={services} setServices={setServices} setTask={setTask} openLogs={(service) => { setSelectedLogService(service); setTab("Logs"); }} onError={setError} />}
         {tab === "Players" && <PlayersPanel setTask={setTask} onError={setError} />}
-        {tab === "Admin Tools" && <AdminToolsPanel setTask={setTask} onError={setError} />}
+        {tab === "Admin Tools" && <AdminToolsPanel onError={setError} />}
         {tab === "Live Map" && <LiveMapPanel onError={setError} />}
         {tab === "Maps" && <MapsPanel setTask={setTask} onError={setError} />}
         {tab === "Care Package" && <StarterKitPanel onError={setError} />}
@@ -1074,7 +1074,7 @@ function ServicesPanel({ services, setServices, setTask, openLogs, onError }: { 
   );
 }
 
-function AdminToolsPanel({ setTask, onError }: { setTask: (task: Task) => void; onError: (text: string) => void }) {
+function AdminToolsPanel({ onError }: { onError: (text: string) => void }) {
   const [playerId, setPlayerId] = useState("");
   const [players, setPlayers] = useState<Record<string, unknown>[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState("");
@@ -1083,26 +1083,63 @@ function AdminToolsPanel({ setTask, onError }: { setTask: (task: Task) => void; 
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [grantQuantity, setGrantQuantity] = useState("1");
   const [grantDurability, setGrantDurability] = useState("1");
-  const [search, setSearch] = useState("");
-  const [catalogRows, setCatalogRows] = useState<Record<string, unknown>[]>([]);
-  const [catalogColumns, setCatalogColumns] = useState<string[]>(["itemName", "itemId", "category", "source"]);
-  const [liveToolSummary, setLiveToolSummary] = useState("");
-  const [liveToolDetails, setLiveToolDetails] = useState("");
+  const [liveToolsOpen, setLiveToolsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [xp, setXp] = useState("1000");
-  const [message, setMessage] = useState("");
+  const [broadcastTitle, setBroadcastTitle] = useState("");
+  const [broadcastBody, setBroadcastBody] = useState("");
   const [broadcastDuration, setBroadcastDuration] = useState("30");
   const [history, setHistory] = useState("");
+  const [actionResult, setActionResult] = useState<{ key: string; tone: "success" | "danger" | "neutral"; text: string; pending?: boolean } | null>(null);
+  const resultTimer = useRef<number | null>(null);
   async function run(action: () => Promise<unknown>) {
     onError("");
     try { await action(); } catch (error) { onError(error instanceof Error ? error.message : String(error)); }
   }
-  function showLiveToolResult(result: unknown) {
-    setLiveToolSummary(formatLiveToolResult(result));
-    setLiveToolDetails(JSON.stringify(result, null, 2));
+  function showActionResult(key: string, text: string, tone: "success" | "danger" | "neutral" = "success", pending = false) {
+    setActionResult({ key, text, tone, pending });
+    if (resultTimer.current) window.clearTimeout(resultTimer.current);
+    resultTimer.current = null;
+    if (!pending) resultTimer.current = window.setTimeout(() => setActionResult(null), 5000);
+  }
+  async function runAdminAction(key: string, pendingText: string, action: () => Promise<unknown>, successText: string, successTone: "success" | "danger" = "success", failureText?: string | ((error: unknown) => string)) {
+    showActionResult(key, pendingText, "neutral", true);
+    try {
+      await action();
+      showActionResult(key, successText, successTone);
+    } catch (error) {
+      showActionResult(key, typeof failureText === "function" ? failureText(error) : failureText || friendlyInlineError(error), "danger");
+    }
+  }
+  async function loadHistory(open = false) {
+    setHistory((await adminApi.history()).stdout || "");
+    if (open) setHistoryOpen(true);
+  }
+  async function clearHistory() {
+    if (!window.confirm("Clear command history?")) return;
+    await adminApi.clearHistory();
+    setHistory("");
+    setHistoryOpen(false);
+  }
+  async function runInlineTask(taskFactory: () => Promise<{ task: Task }>) {
+    const response = await taskFactory();
+    const final = await waitForTaskSilently(response.task);
+    if (final.status !== "succeeded") {
+      await loadHistory(true).catch(() => undefined);
+      throw new Error(adminTaskFailureDetail(final) || final.errorMessage || final.progressMessage || "Admin action failed.");
+    }
+    await loadHistory(true);
+    return final;
   }
   useEffect(() => {
     playersApi.list().then((result) => setPlayers(result.rows || [])).catch(() => undefined);
+    loadHistory().catch(() => undefined);
+    return () => {
+      if (resultTimer.current) window.clearTimeout(resultTimer.current);
+    };
   }, []);
+  const selectedPlayerRow = players.find((player) => String(player.actor_id || player.player_pawn_id || player.action_player_id) === selectedPlayer);
+  const selectedPlayerName = String(selectedPlayerRow?.character_name || playerId || "Selected Player");
   function selectPlayer(value: string) {
     setSelectedPlayer(value);
     const row = players.find((player) => String(player.actor_id || player.player_pawn_id || player.action_player_id) === value);
@@ -1113,22 +1150,44 @@ function AdminToolsPanel({ setTask, onError }: { setTask: (task: Task) => void; 
     setItemName(item?.name || "");
     setItemId(item?.id || "");
   }
-  async function loadItemCatalog() {
-    const response = await adminApi.itemCatalog(search, 10000);
-    setCatalogColumns(["itemName", "itemId", "category", "source"]);
-    setCatalogRows((response.rows || []).map((item) => ({ itemName: item.name, itemId: item.itemId || item.id, category: titleCase(item.category || ""), source: item.source })));
+  async function hydrateOnlinePlayers() {
+    const response = await playersApi.online();
+    const targets = (response.rows || []).map((player) => String(player.action_player_id || player.funcom_id || player.fls_id || "")).filter(Boolean);
+    if (!targets.length) {
+      showActionResult("global", "No players are currently online.", "neutral");
+      return;
+    }
+    if (!window.confirm(`Give 10 cups of water to ${targets.length} online player${targets.length === 1 ? "" : "s"}?`)) return;
+    await runAdminAction("global", `Hydrating ${targets.length} online player${targets.length === 1 ? "" : "s"}`, async () => {
+      const results = await Promise.allSettled(targets.map((target) => playersApi.giveItems(target, [{ itemId: "WaterPack_Consumable", quantity: 10, durability: 1 }])));
+      const failed = results.filter((result) => result.status === "rejected" || (result.status === "fulfilled" && result.value.ok === false)).length;
+      await loadHistory(true);
+      if (failed) throw new Error(`Hydration completed with ${failed} failed player${failed === 1 ? "" : "s"}.`);
+    }, `Hydrated ${targets.length} online player${targets.length === 1 ? "" : "s"} successfully.`);
   }
-  async function loadVehicleCatalog() {
-    const response = await adminApi.structuredVehicles();
-    setCatalogColumns(["vehicle", "actor", "templates"]);
-    setCatalogRows((response.vehicles || []).map((vehicle) => ({ vehicle: vehicle.name || vehicle.id, actor: vehicle.actor || "Unknown", templates: (vehicle.templates || []).join(", ") || "None reported" })));
+  async function kickAllPlayers() {
+    const response = await playersApi.online();
+    const onlineCount = (response.rows || []).filter((player) => String(player.action_player_id || player.funcom_id || player.fls_id || "")).length;
+    if (!onlineCount) {
+      showActionResult("global", "No players are currently online.", "neutral");
+      return;
+    }
+    if (!window.confirm(`Kick ${onlineCount} online player${onlineCount === 1 ? "" : "s"}?`)) return;
+    await runAdminAction("global", `Kicking ${onlineCount} online player${onlineCount === 1 ? "" : "s"}`, () => runInlineTask(() => adminApi.kickAllOnline("KICK ALL ONLINE PLAYERS")), "All online players were kicked.", "danger");
   }
+  async function sendBroadcast() {
+    await runAdminAction("broadcast", "Sending broadcast message", async () => {
+      await adminApi.broadcast(broadcastTitle, broadcastBody, Number(broadcastDuration || 30));
+      await loadHistory(true);
+    }, "Broadcast message was sent successfully.");
+  }
+  const historyRows = parseHistoryRows(history, players);
   return (
     <section className="panel admin-tools-panel">
       <h2>Admin Tools</h2>
       <div className="action-section">
         <h4>Quick Player Actions</h4>
-        <p>Select a known player to populate the Admin action ID used by live admin commands.</p>
+        <p>Select a player before running item, XP, water, or kick actions.</p>
         <div className="action-line">
           <label className="wide-field">Player<select value={selectedPlayer} onChange={(event) => selectPlayer(event.target.value)}>
             <option value="">Select player</option>
@@ -1145,60 +1204,89 @@ function AdminToolsPanel({ setTask, onError }: { setTask: (task: Task) => void; 
         <div className="action-line">
           <label className="compact-field">Quantity<input type="number" min="1" value={grantQuantity} onChange={(event) => setGrantQuantity(event.target.value)} /></label>
           <label className="compact-field">Durability<input type="number" min="0" value={grantDurability} onChange={(event) => setGrantDurability(event.target.value)} /></label>
-          <button disabled={!selectedItem || !playerId} onClick={() => run(async () => window.confirm(`Give ${grantQuantity} x ${itemName} to ${playerId}?`) && setTask((await playersApi.giveItem(playerId, { itemName, quantity: Number(grantQuantity), durability: Number(grantDurability) })).task))}>Grant Item</button>
+          <button disabled={!selectedItem || !playerId} onClick={() => run(async () => {
+            if (!window.confirm(`Give ${grantQuantity} x ${itemName} to ${selectedPlayerName}?`)) return;
+            await runAdminAction("grant", `Granting x${Number(grantQuantity) || 1} ${itemName} to ${selectedPlayerName}`, () => runInlineTask(() => playersApi.giveItem(playerId, { itemName, quantity: Number(grantQuantity), durability: Number(grantDurability) })), `x${Number(grantQuantity) || 1} ${itemName} was granted to ${selectedPlayerName}.`, "success", (error) => `Failed to grant x${Number(grantQuantity) || 1} ${itemName} to ${selectedPlayerName}. ${friendlyInlineError(error)}`);
+          })}>Grant Item</button>
+          <InlineActionResult result={actionResult} resultKey="grant" />
         </div>
         <details className="technical-details"><summary>Developer raw item ID</summary><div className="action-line">
           <label>Raw Item ID<input value={itemId} onChange={(event) => setItemId(event.target.value)} placeholder="ItemTemplate_5" /></label>
-          <button onClick={() => run(async () => window.confirm(`Give item id ${itemId} to ${playerId}?`) && setTask((await playersApi.giveItemId(playerId, { itemId, quantity: 1, durability: 1 })).task))}>Give Item by ID</button>
+          <button disabled={!itemId || !playerId} onClick={() => run(async () => {
+            if (!window.confirm(`Give item id ${itemId} to ${selectedPlayerName}?`)) return;
+            await runAdminAction("grantRaw", `Granting x1 ${itemId} to ${selectedPlayerName}`, () => runInlineTask(() => playersApi.giveItemId(playerId, { itemId, quantity: 1, durability: 1 })), `x1 ${itemId} was granted to ${selectedPlayerName}.`, "success", (error) => `Failed to grant x1 ${itemId} to ${selectedPlayerName}. ${friendlyInlineError(error)}`);
+          })}>Give Item by ID</button>
+          <InlineActionResult result={actionResult} resultKey="grantRaw" />
         </div></details>
       </div>
       <div className="action-section">
         <h4>XP / Player Tools</h4>
-        <div className="action-line">
-        <label className="compact-field">XP Amount<input value={xp} onChange={(event) => setXp(event.target.value)} /></label>
-        <button onClick={() => run(async () => window.confirm(`Add ${xp} XP to ${playerId}?`) && setTask((await playersApi.addXp(playerId, Number(xp))).task))}>Add XP</button>
-        <button onClick={() => run(async () => window.confirm(`Refill water for ${playerId}?`) && setTask((await playersApi.refillWater(playerId)).task))}>Refill Water</button>
-        <button className="danger" onClick={() => run(async () => window.confirm(`Kick ${playerId} from the server?`) && setTask((await playersApi.kick(playerId)).task))}>Kick Player</button>
+        <div className="action-line admin-xp-row">
+          <label className="admin-xp-field"><span>XP Amount</span><input type="number" min="1" value={xp} onChange={(event) => setXp(event.target.value)} /></label>
+          <button disabled={!playerId} onClick={() => run(async () => {
+            if (!window.confirm(`Add ${xp} XP to ${selectedPlayerName}?`)) return;
+            await runAdminAction("xp", `Adding ${Number(xp) || 0} XP to ${selectedPlayerName}`, () => runInlineTask(() => playersApi.addXp(playerId, Number(xp))), `${selectedPlayerName} received ${Number(xp) || 0} XP.`);
+          })}>Add XP</button>
+          <InlineActionResult result={actionResult} resultKey="xp" />
+        </div>
+        <div className="action-line admin-player-tools-row">
+          <button disabled={!playerId} onClick={() => run(async () => {
+            if (!window.confirm(`Give 10 cups of water to ${selectedPlayerName}?`)) return;
+            await runAdminAction("playerTools", `Giving 10 cups of water to ${selectedPlayerName}`, () => runInlineTask(() => playersApi.giveItemId(playerId, { itemId: "WaterPack_Consumable", quantity: 10, durability: 1 })), `${selectedPlayerName} received 10 cups of water.`);
+          })}>Give Water</button>
+          <button disabled={!playerId} onClick={() => run(async () => {
+            if (!window.confirm(`Refill container for ${selectedPlayerName}?`)) return;
+            await runAdminAction("playerTools", `Refilling ${selectedPlayerName}'s container`, () => runInlineTask(() => playersApi.refillWater(playerId)), `${selectedPlayerName}'s container was filled successfully.`);
+          })}>Refill Container</button>
+          <button disabled={!playerId} className="danger" onClick={() => run(async () => {
+            if (!window.confirm(`Kick ${selectedPlayerName} from the server?`)) return;
+            await runAdminAction("playerTools", `Kicking ${selectedPlayerName}`, () => runInlineTask(() => playersApi.kick(playerId)), `${selectedPlayerName} was kicked from the server.`, "danger");
+          })}>Kick Player</button>
+          <InlineActionResult result={actionResult} resultKey="playerTools" />
         </div>
       </div>
-      <h3>Catalogs</h3>
-      <div className="action-row">
-        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Filter item catalog, vehicles, or skill modules" />
-        <button onClick={() => run(loadItemCatalog)}>Items</button>
-        <button onClick={() => run(loadVehicleCatalog)}>Vehicles</button>
-        <button onClick={() => run(async () => { const response = await adminApi.skillModules(search); setCatalogColumns(["skillModule", "category", "maxLevel", "id"]); setCatalogRows(parseSkillModuleRows(response.stdout || "")); })}>Skill Modules</button>
-      </div>
-      <div className="result-panel">
-        <strong>Catalog Results</strong>
-        {catalogRows.length ? <DataTable rows={catalogRows} columns={catalogColumns} /> : <div className="empty">Use catalog tools to find item names, item IDs, vehicles, and skill modules.</div>}
-      </div>
-      <h3>Global Live Tools</h3>
-      <div className="global-live-tools">
-        <p className="danger-note">Experimental: RabbitMQ publish works, but in-game display is not working/verified on the live server.</p>
-        <div className="action-line">
-          <button className="danger" onClick={() => run(async () => window.confirm("Kick every online player? This publishes PlayerId='*'.") && setTask((await adminApi.kickAllOnline("KICK ALL ONLINE PLAYERS")).task))}>Kick All Online Players</button>
+      <div className={`admin-live-toggle-panel ${liveToolsOpen ? "open" : ""}`}>
+        <div className="admin-live-toggle-row">
+          <h3>Global Live Tools</h3>
+          <button className={`icon-toggle-button ${liveToolsOpen ? "active" : ""}`} aria-label={liveToolsOpen ? "Collapse Global Live Tools" : "Expand Global Live Tools"} title={liveToolsOpen ? "Collapse" : "Expand"} onClick={() => setLiveToolsOpen(!liveToolsOpen)}>{liveToolsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</button>
         </div>
-        <div className="action-line broadcast-line">
-          <label className="broadcast-message">Broadcast Message<input value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Broadcast or whisper message" /></label>
-          <label className="inline-field">Duration seconds<input type="number" min="1" max="3600" value={broadcastDuration} onChange={(event) => setBroadcastDuration(event.target.value)} /></label>
-          <button onClick={() => run(async () => showLiveToolResult(await adminApi.broadcast(message, Number(broadcastDuration || 30))))}>Broadcast Publish Test</button>
-        </div>
-        <div className="action-line live-tool-buttons">
-          <button className="danger" onClick={() => run(async () => { if (window.confirm("Send shutdown broadcast publish test? In-game visibility is unverified.")) showLiveToolResult(await adminApi.shutdownBroadcast({ confirmation: "SHUTDOWN BROADCAST", delayMinutes: 15, shutdownType: "Restart" })); })}>Shutdown Broadcast Publish Test</button>
-          <button onClick={() => run(async () => showLiveToolResult(await adminApi.whisper(playerId, message)))}>Whisper</button>
-        </div>
+        {liveToolsOpen && <div className="global-live-tools">
+          <div className="action-line admin-global-actions">
+            <button className="danger" onClick={() => run(kickAllPlayers)}>Kick All</button>
+            <button className="success" onClick={() => run(hydrateOnlinePlayers)}>Hydrate All Players</button>
+            <InlineActionResult result={actionResult} resultKey="global" />
+          </div>
+          <div className="action-line broadcast-line">
+            <label className="broadcast-title">Broadcast Title<input value={broadcastTitle} onChange={(event) => setBroadcastTitle(event.target.value)} placeholder="Title shown in-game" /></label>
+            <label className="broadcast-message">Broadcast Body<textarea rows={3} value={broadcastBody} onChange={(event) => setBroadcastBody(event.target.value)} placeholder="Message shown to online players" /></label>
+            <div className="broadcast-controls-row">
+              <label className="inline-field">Duration Seconds<input type="number" min="1" max="3600" value={broadcastDuration} onChange={(event) => setBroadcastDuration(event.target.value)} /></label>
+              <button onClick={() => run(sendBroadcast)}>Send Broadcast</button>
+              <InlineActionResult result={actionResult} resultKey="broadcast" />
+            </div>
+          </div>
+        </div>}
       </div>
-      <div className="result-panel">
-        <strong>Global Live Tool Result</strong>
-        <p>{liveToolSummary || "Broadcast, shutdown broadcast, and whisper results appear here. Broadcast publish success does not prove in-game display."}</p>
-        {liveToolDetails && <TechnicalDetails text={liveToolDetails} />}
+      <div className={`admin-live-toggle-panel admin-history-toggle-panel ${historyOpen ? "open" : ""}`}>
+        <div className="admin-live-toggle-row admin-history-toggle-row">
+          <h3>Command History</h3>
+          <div className="admin-history-actions">
+            {historyRows.length > 0 && <button onClick={() => run(clearHistory)}>Clear</button>}
+            <button className={`icon-toggle-button ${historyOpen ? "active" : ""}`} aria-label={historyOpen ? "Collapse Command History" : "Expand Command History"} title={historyOpen ? "Collapse" : "Expand"} onClick={() => setHistoryOpen(!historyOpen)}>{historyOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</button>
+          </div>
+        </div>
+        {historyOpen && <div className="admin-history-content">
+          {historyRows.length ? <div className="admin-history-table"><DataTable rows={historyRows} columns={["time", "action", "target", "status", "summary"]} tableClassName="admin-history-grid" /></div> : <div className="admin-history-empty">Command history will appear here after an admin action runs.</div>}
+          {history && <TechnicalDetails title="Advanced history output" text={history} />}
+        </div>}
       </div>
-      <h3>Command History</h3>
-      <div className="history-controls"><button onClick={() => run(async () => setHistory((await adminApi.history()).stdout))}>Refresh Command History</button></div>
-      {parseHistoryRows(history).length ? <DataTable rows={parseHistoryRows(history)} columns={["time", "action", "target", "status", "summary"]} /> : <div className="empty">No command history rows found yet.</div>}
-      {history && <TechnicalDetails title="Advanced history output" text={history} />}
     </section>
   );
+}
+
+function InlineActionResult({ result, resultKey }: { result: { key: string; tone: "success" | "danger" | "neutral"; text: string; pending?: boolean } | null; resultKey: string }) {
+  if (!result || result.key !== resultKey) return null;
+  return <span className="inline-action-result-wrap"><span className={`inline-action-result ${result.tone} ${result.pending ? "pending" : ""}`}>{result.text}</span></span>;
 }
 
 function PlayersPanel({ setTask, onError }: { setTask: (task: Task) => void; onError: (text: string) => void }) {
@@ -1377,9 +1465,9 @@ function PlayerActions({ dbPlayerId, actionPlayerId, setTask, onError, onRefresh
 
       <section className="action-section">
         <h4>Survival</h4>
-        <p>Refill Water uses the live admin CLI and was verified in-game.</p>
+        <p>Give Water uses the live admin CLI and was verified in-game.</p>
         <div className="action-line">
-          <button disabled={!canRunCliAction} title={!canRunCliAction ? cliDisabledReason : undefined} onClick={() => run(async () => { if (window.confirm(`Refill water for player ${actionPlayerId}?`)) await runTask(() => playersApi.refillWater(actionPlayerId)); })}>Refill Water</button>
+          <button disabled={!canRunCliAction} title={!canRunCliAction ? cliDisabledReason : undefined} onClick={() => run(async () => { if (window.confirm(`Give water to player ${actionPlayerId}?`)) await runTask(() => playersApi.refillWater(actionPlayerId)); })}>Give Water</button>
         </div>
       </section>
 
@@ -4799,7 +4887,7 @@ function friendlyColumnName(value: string) {
     source: "Source",
     time: "Time",
     action: "Action",
-    target: "Target/User",
+    target: "Player",
     status: "Status",
     summary: "Summary"
   };
@@ -5286,18 +5374,6 @@ function normalizeStatus(value: string) {
   return "info";
 }
 
-function formatLiveToolResult(result: unknown) {
-  const record = result && typeof result === "object" ? result as Record<string, unknown> : {};
-  if (record.supported === false) return `Unsupported: ${String(record.reason || record.error || "This live tool is not available.")}`;
-  if (record.ok === false) return `Failed: ${String(record.error || record.stderr || "The live tool did not complete.")}`;
-  const note = String(record.note || "");
-  if (/broadcast/i.test(note) || /publish=ok/i.test(String(record.stdout || ""))) {
-    return note || "RabbitMQ publish succeeded, but in-game display has not been verified.";
-  }
-  if (record.ok === true) return "Live tool request completed. Review technical details if troubleshooting is needed.";
-  return summarizeCommandText(JSON.stringify(record || result));
-}
-
 function formatMutationResult(result: unknown) {
   const record = result && typeof result === "object" ? result as Record<string, unknown> : {};
   if (record.supported === false) return `Unsupported: ${String(record.reason || record.error || "This action is not available.")}`;
@@ -5307,6 +5383,22 @@ function formatMutationResult(result: unknown) {
   if (record.backup) return "Action completed after creating a database backup.";
   if (record.ok === true) return "Action completed.";
   return summarizeCommandText(JSON.stringify(record || result));
+}
+
+function friendlyInlineError(error: unknown) {
+  const text = error instanceof Error ? error.message : String(error || "Action failed.");
+  return text.replace(/^Error:\s*/i, "").trim() || "Action failed.";
+}
+
+function adminTaskFailureDetail(task: Task) {
+  const lines = [...(task.logLines || [])].reverse().map((row) => String(row.line || "").trim()).filter(Boolean);
+  const usefulLines = lines.filter((line) =>
+    !/^dune\s+.+?\s+failed with exit \d+$/i.test(line) &&
+    !/^Running\s+/i.test(line) &&
+    !/^Task started$/i.test(line) &&
+    !/^Task failed$/i.test(line)
+  );
+  return usefulLines.find((line) => /failed|failure|offline|cannot verify|requires?|refusing|unavailable|not found/i.test(line)) || usefulLines[0] || "";
 }
 
 function summarizeCommandText(text: string) {
@@ -5571,27 +5663,107 @@ function friendlyBackupType(name: string, line: string) {
   return "Unknown";
 }
 
-function parseHistoryRows(text: string) {
-  return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).filter((line) => !/^time\s+/i.test(line)).map((line) => {
+function parseHistoryRows(text: string, players: Record<string, unknown>[] = []) {
+  return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).filter((line) => !/^time\s+/i.test(line) && !/^no admin command history found\.?$/i.test(line)).map((line) => {
     const parts = line.split(/\t/);
     if (parts.length >= 6) {
       return {
-        time: parts[0],
-        action: parts[1],
-        target: parts[2],
-        status: parts[5],
-        summary: parts.slice(3, 5).concat(parts.slice(6)).filter(Boolean).join(" ")
+        time: formatAdminHistoryTime(parts[0]),
+        action: friendlyAdminHistoryAction(parts[1]),
+        target: friendlyAdminHistoryTarget(parts[2], players),
+        status: friendlyAdminHistoryValue(parts[5]),
+        summary: friendlyAdminHistorySummary(parts[3], parts[4], parts.slice(6).join(" "))
       };
     }
     const loose = line.split(/\s{2,}/).filter(Boolean);
     return {
-      time: loose[0] || "",
-      action: loose[1] || "",
-      target: loose[2] || "",
-      status: loose[5] || "",
-      summary: loose.slice(3).join(" ")
+      time: formatAdminHistoryTime(loose[0] || ""),
+      action: friendlyAdminHistoryAction(loose[1] || ""),
+      target: friendlyAdminHistoryTarget(loose[2] || "", players),
+      status: friendlyAdminHistoryValue(loose[5] || ""),
+      summary: friendlyAdminHistorySummary(loose[3] || "", loose[4] || "", loose.slice(6).join(" "))
     };
-  }).filter((row) => row.action || row.summary);
+  }).filter((row) => row.action || row.summary).reverse();
+}
+
+function formatAdminHistoryTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function friendlyAdminHistoryValue(value: string) {
+  const text = String(value || "-").replace(/^web[-_]/i, "").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  if (!text || text === "-") return "-";
+  return titleCaseWords(text);
+}
+
+function friendlyAdminHistoryAction(value: string) {
+  const raw = String(value || "").trim();
+  const labels: Record<string, string> = {
+    AddItemToInventory: "Grant Item",
+    AwardXP: "Award XP",
+    UpdateAllWaterFillables: "Refill Container",
+    KickPlayer: "Kick Player",
+    GrantTemplate: "Grant Template",
+    SkillsSetUnspentSkillPoints: "Set Skill Points",
+    SkillsSetModuleLevel: "Set Skill Module",
+    CleanPlayerInventory: "Clean Inventory",
+    ResetProgression: "Reset Progression",
+    TeleportTo: "Teleport Player",
+    SpawnVehicleAt: "Spawn Vehicle",
+    SpecializationXP: "Specialization XP"
+  };
+  if (labels[raw]) return labels[raw];
+  const cleaned = raw.replace(/^web[-_]/i, "").replace(/[-_]+/g, " ").replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/\bXP\b/i, "XP").replace(/\s+/g, " ").trim();
+  return cleaned ? titleCaseWords(cleaned).replace(/\bXp\b/g, "XP") : "-";
+}
+
+function friendlyAdminHistoryTarget(value: string, players: Record<string, unknown>[]) {
+  const text = String(value || "-").trim();
+  if (!text || text === "-") return "-";
+  if (/^(all|\*)$/i.test(text)) return "All";
+  const row = players.find((player) => adminHistoryTargetCandidates(player).some((candidate) => matchesAdminHistoryTarget(candidate, text)));
+  return row ? String(row.character_name || text) : friendlyAdminHistoryValue(text);
+}
+
+function adminHistoryTargetCandidates(player: Record<string, unknown>) {
+  return [
+    player.action_player_id,
+    player.funcom_id,
+    player.fls_id,
+    player.account_id,
+    player.actor_id,
+    player.player_pawn_id,
+    player.id
+  ].map((candidate) => String(candidate || "").trim()).filter(Boolean);
+}
+
+function matchesAdminHistoryTarget(candidate: string, target: string) {
+  const normalizedCandidate = candidate.toLowerCase();
+  const normalizedTarget = target.toLowerCase();
+  if (normalizedCandidate === normalizedTarget) return true;
+
+  const masked = normalizedTarget.match(/^(.{4,})\.\.\.(.{4,})$/);
+  if (!masked) return false;
+  return normalizedCandidate.startsWith(masked[1]) && normalizedCandidate.endsWith(masked[2]);
+}
+
+function friendlyAdminHistorySummary(friendly: string, path: string, payload: string) {
+  const label = String(friendly || "").replace(/\bpublish test\b/gi, "").replace(/\s+/g, " ").trim();
+  const message = parseJsonMaybe(payload)?.messagePreview;
+  const messageText = typeof message === "string" && message.trim() ? `: "${message.trim().slice(0, 80)}${message.trim().length > 80 ? "..." : ""}"` : "";
+  if (/broadcast/i.test(label)) return `Broadcast${messageText}`;
+  if (/kick/i.test(label)) return "Kick command";
+  if (/grant/i.test(label)) return label || "Grant command";
+  if (label) return label;
+  if (/rmq/i.test(path)) return "RabbitMQ command";
+  return "Admin command";
 }
 
 function friendlyServiceName(name: string) {
