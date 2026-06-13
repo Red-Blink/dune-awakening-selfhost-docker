@@ -264,7 +264,8 @@ export async function grantCarePackage(config, playerId, body = {}, context = {}
         itemId: resolved.itemId,
         itemName: resolved.name,
         quantity: item.quantity,
-        durability: item.durability
+        quality: item.quality,
+        durability: 1
       };
       const command = buildDuneArgs(operation, payload);
       const result = config.mockMode ? { code: 0, stdout: "mock package item grant\n", stderr: "" } : await runDune(config, command);
@@ -305,6 +306,7 @@ export function validateCarePackageConfig(body = {}) {
   const autoGrantKitId = validKitId(body.autoGrantKitId, kits) || activeKitId;
   const activeKit = kits.find((kit) => kit.id === activeKitId) || kits[0] || { id: "", items: [], xp: 0 };
   const grantWhen = validateGrantWhen(body.grantWhen || DEFAULT_CONFIG.grantWhen);
+  const autoGrantRules = validateAutoGrantRules(body, kits, autoGrantKitId, grantWhen);
   return {
     enabled,
     version: activeKit.id,
@@ -314,10 +316,10 @@ export function validateCarePackageConfig(body = {}) {
     items: activeKit.items,
     xp: activeKit.xp,
     allowRepeatGrants: false,
-    autoGrantEnabled: Boolean(body.autoGrantEnabled),
+    autoGrantEnabled: autoGrantRules.some((rule) => rule.enabled),
     autoGrantIntervalSeconds: validateInteger(body.autoGrantIntervalSeconds ?? DEFAULT_CONFIG.autoGrantIntervalSeconds, "autoGrantIntervalSeconds", 60, 3600),
     grantWhen,
-    autoGrantRules: validateAutoGrantRules(body, kits, autoGrantKitId, grantWhen)
+    autoGrantRules
   };
 }
 
@@ -559,8 +561,15 @@ function validateCarePackageItem(item = {}) {
     itemName,
     itemId,
     quantity: validateInteger(item.quantity ?? 1, "quantity", 1, 1000000),
-    durability: validateNumber(item.durability ?? 1, "durability", 0, 1)
+    quality: validateItemQuality(item.quality ?? item.grade ?? item.durability ?? 1),
+    durability: 1
   };
+}
+
+function validateItemQuality(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 1;
+  return Math.max(1, Math.min(5, Math.trunc(number)));
 }
 
 function validateSendMessage(value) {

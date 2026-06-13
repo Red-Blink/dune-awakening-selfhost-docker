@@ -136,6 +136,31 @@ function isSetupComplete() {
     && existsSync(resolve(config.generatedDir, "battlegroup.env"));
 }
 
+async function isInitializedStackPresent() {
+  if (isSetupComplete()) return true;
+  if (
+    existsSync(resolve(config.generatedDir, "image-tags.env")) ||
+    existsSync(resolve(config.generatedDir, "server-catalog.json")) ||
+    existsSync(resolve(config.generatedDir, "partition-catalog.json"))
+  ) return true;
+  try {
+    const names = await dockerPsNames();
+    return names.some((name) => [
+      "dune-postgres",
+      "dune-rmq-admin",
+      "dune-rmq-game",
+      "dune-text-router",
+      "dune-director",
+      "dune-server-gateway",
+      "dune-server-survival-1",
+      "dune-server-overmap",
+      "dune-orchestrator"
+    ].includes(name));
+  } catch {
+    return false;
+  }
+}
+
 function dockerPsNames() {
   return new Promise((resolveNames, rejectNames) => {
     const child = spawn("docker", ["ps", "--format", "{{.Names}}"], { cwd: config.repoRoot, shell: false });
@@ -1609,7 +1634,8 @@ async function giveItemsRoute(req, res, path) {
         itemId: resolved.itemId,
         itemName: item.itemName,
         quantity: item.quantity ?? 1,
-        durability: item.durability ?? 1
+        quality: item.quality ?? item.grade ?? item.durability ?? 1,
+        durability: 1
       };
       const command = buildDuneArgs(operation, payload);
       if (config.mockMode) {
@@ -1740,12 +1766,18 @@ function readLogs(service, options) {
 }
 
 async function setupState() {
+  const env = existsSync(resolve(config.repoRoot, ".env"));
+  const token = existsSync(resolve(config.secretsDir, "funcom-token.txt"));
+  const battlegroup = existsSync(resolve(config.generatedDir, "battlegroup.env"));
+  const initialized = await isInitializedStackPresent();
   return {
     config: publicConfig(config),
     files: {
-      env: existsSync(resolve(config.repoRoot, ".env")),
-      token: existsSync(resolve(config.secretsDir, "funcom-token.txt")),
-      battlegroup: existsSync(resolve(config.generatedDir, "battlegroup.env")),
+      env,
+      token,
+      battlegroup,
+      complete: (env && token && battlegroup) || initialized,
+      initialized,
       duneScript: existsSync(config.duneScript)
     }
   };
@@ -1760,7 +1792,8 @@ async function carePackageAutoTick() {
     console.error(`Care Package auto-grant config read failed: ${redact(error.message || error)}`);
     return;
   }
-  if (!kit.enabled || !kit.autoGrantEnabled) return;
+  const hasEnabledRule = Array.isArray(kit.autoGrantRules) && kit.autoGrantRules.some((rule) => rule.enabled);
+  if (!kit.enabled || !hasEnabledRule) return;
   const intervalMs = Math.max(60, Number(kit.autoGrantIntervalSeconds) || 60) * 1000;
   if (Date.now() - carePackageAutoLastRun < intervalMs) return;
   carePackageAutoRunning = true;

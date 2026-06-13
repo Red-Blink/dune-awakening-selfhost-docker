@@ -26,7 +26,10 @@ test("care package config validation rejects unsafe items and bounds", () => {
     version: "care-package-v1",
     items: [{ itemName: "Water", quantity: 2, durability: 1 }],
     xp: 100
-  }).items[0], { itemName: "Water", itemId: "", quantity: 2, durability: 1 });
+  }).items[0], { itemName: "Water", itemId: "", quantity: 2, quality: 1, durability: 1 });
+  assert.deepEqual(validateCarePackageConfig({
+    items: [{ itemName: "Water", quantity: 2, grade: 5, durability: 0 }]
+  }).items[0], { itemName: "Water", itemId: "", quantity: 2, quality: 5, durability: 1 });
   assert.equal(validateCarePackageConfig({ autoGrantEnabled: true, autoGrantIntervalSeconds: 60, grantWhen: "first_online" }).grantWhen, "first_online");
   assert.equal(validateCarePackageConfig({ version: "bad version with spaces" }).version, "care-package-v1");
   assert.throws(() => validateCarePackageConfig({ items: [{ itemName: "Bad\nName" }] }), /Invalid Care Package item name/);
@@ -403,6 +406,28 @@ test("care package auto scan only grants when enabled and players have action id
     assert.equal(result.granted, 1);
     const duplicate = await runCarePackageAutoScan(config, [{ actor_id: 1, character_name: "A", action_player_id: "A#1", online_status: "Online" }]);
     assert.equal(duplicate.granted, 0);
+  } finally {
+    rmSync(config.repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("care package auto scan uses enabled rules even when legacy global flag is off", async () => {
+  const config = tempConfig();
+  try {
+    saveCarePackageConfig(config, {
+      enabled: true,
+      autoGrantEnabled: false,
+      activeKitId: "first-online-kit",
+      autoGrantKitId: "first-online-kit",
+      kits: [{ id: "first-online-kit", name: "First Online Kit", xp: 10, items: [] }],
+      autoGrantRules: [{ id: "first-online-rule", enabled: true, kitId: "first-online-kit", grantWhen: "first_online", lastSeenDays: 30 }]
+    });
+    const saved = carePackageConfig(config);
+    assert.equal(saved.autoGrantEnabled, true);
+    const result = await runCarePackageAutoScan(config, [
+      { actor_id: 1, character_name: "New", action_player_id: "New#1", online_status: "Online" }
+    ]);
+    assert.equal(result.granted, 1);
   } finally {
     rmSync(config.repoRoot, { recursive: true, force: true });
   }

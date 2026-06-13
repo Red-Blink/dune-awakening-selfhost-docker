@@ -336,6 +336,7 @@ def read_profile_text() -> str:
 
 
 def write_profile(profile: dict) -> None:
+    prune_empty_profile_sections(profile)
     atomic_write_text(PROFILE_PATH, serialize_profile(profile))
 
 
@@ -354,6 +355,13 @@ def serialize_profile(profile: dict) -> str:
         lines.append(f"[{section['header']}]")
         lines.extend(section.get("lines", []))
     return "\n".join(lines).rstrip() + "\n"
+
+
+def prune_empty_profile_sections(profile: dict) -> None:
+    profile["sections"] = [
+        section for section in profile.get("sections", [])
+        if any(str(line).strip() for line in section.get("lines", []))
+    ]
 
 
 def sorted_profile_sections(sections: list[dict]) -> list[dict]:

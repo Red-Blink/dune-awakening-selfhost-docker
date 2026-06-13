@@ -82,6 +82,7 @@ const navGroups: { title: string; items: { tab: Tab; icon: React.ReactNode }[] }
   {
     title: "Server Operations",
     items: [
+      { tab: "Home", icon: <Home size={18} /> },
       { tab: "Setup", icon: <Shield size={18} /> },
       { tab: "Server Control", icon: <Server size={18} /> },
       { tab: "Backups", icon: <Archive size={18} /> },
@@ -251,7 +252,7 @@ export function App() {
   const [setupJump, setSetupJump] = useState({ step: 0, nonce: 0 });
   const [error, setError] = useState("");
   const [confirmRequest, setConfirmRequest] = useState<ConfirmDialogRequest | null>(null);
-  const setupComplete = Boolean(setupState?.files?.env && setupState?.files?.token && setupState?.files?.battlegroup);
+  const setupComplete = Boolean(setupState?.files?.complete ?? (setupState?.files?.env && setupState?.files?.token && setupState?.files?.battlegroup));
   const firstRunSetup = auth && setupStateLoaded && !setupComplete;
 
   useEffect(() => {
@@ -277,7 +278,7 @@ export function App() {
       if (cancelled) return;
       setSetupState(state);
       setSetupStateLoaded(true);
-      if (!(state.files?.env && state.files?.token && state.files?.battlegroup)) setTab("Setup");
+      if (!(state.files?.complete ?? (state.files?.env && state.files?.token && state.files?.battlegroup))) setTab("Setup");
     }).catch((err) => {
       if (cancelled) return;
       setError(err instanceof Error ? err.message : String(err));
@@ -400,7 +401,7 @@ export function App() {
       <main className="login-screen">
         <section className="login-panel">
           <h1>Dune Docker Console</h1>
-          <p>Enter your admin password.</p>
+          <p>Please enter your admin password to continue</p>
           <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Admin Password" />
           <button onClick={() => safe(login)}>Sign In</button>
           {error && <p className="error">{error}</p>}
@@ -442,7 +443,7 @@ export function App() {
             onSetupComplete={async () => {
               const state = await setupApi.state();
               setSetupState(state);
-              if (state.files?.env && state.files?.token && state.files?.battlegroup) setTab("Home");
+              if (state.files?.complete ?? (state.files?.env && state.files?.token && state.files?.battlegroup)) setTab("Home");
             }}
           />
           <footer className="app-footer"><Heart size={16} fill="currentColor" /><span>Created with love by <a href={REDBLINK_REPO_URL} target="_blank" rel="noreferrer">RedBlink</a></span></footer>
@@ -1614,10 +1615,10 @@ function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId, player
   const [playerAdmin_itemName, playerAdmin_setItemName] = useState("");
   const [playerAdmin_itemId, playerAdmin_setItemId] = useState("");
   const [playerAdmin_quantity, playerAdmin_setQuantity] = useState("1");
-  const [playerAdmin_durability, playerAdmin_setDurability] = useState("1");
-  const [playerAdmin_multiList, playerAdmin_setMultiList] = useState<{ itemName?: string; itemId?: string; image?: string; quantity: number; durability: number }[]>([]);
+  const [playerAdmin_grade, playerAdmin_setGrade] = useState("1");
+  const [playerAdmin_multiList, playerAdmin_setMultiList] = useState<{ itemName?: string; itemId?: string; image?: string; quantity: number; durability?: number; quality?: number; grade?: number }[]>([]);
   const [playerAdmin_itemEditIndex, playerAdmin_setItemEditIndex] = useState<number | null>(null);
-  const [playerAdmin_itemEditDraft, playerAdmin_setItemEditDraft] = useState({ quantity: "1", durability: "1" });
+  const [playerAdmin_itemEditDraft, playerAdmin_setItemEditDraft] = useState({ quantity: "1", grade: "1" });
   const [playerAdmin_actionResult, playerAdmin_setActionResult] = useState<{ key: string; tone: "success" | "danger" | "neutral"; text: string; pending?: boolean } | null>(null);
   const [playerAdmin_characterLog, playerAdmin_setCharacterLog] = useState<Record<string, string>[]>([]);
   const [playerAdmin_adminLog, playerAdmin_setAdminLog] = useState<Record<string, string>[]>([]);
@@ -1700,17 +1701,17 @@ function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId, player
       itemId: playerAdmin_itemId,
       image: playerAdmin_selectedItem.image,
       quantity: Number(playerAdmin_quantity) || 1,
-      durability: Number(playerAdmin_durability) || 1
+      quality: normalizeItemGrade(playerAdmin_grade)
     }]);
   }
   function playerAdmin_editQueuedItem(index: number) {
     const item = playerAdmin_multiList[index];
     if (!item) return;
     playerAdmin_setItemEditIndex(index);
-    playerAdmin_setItemEditDraft({ quantity: String(item.quantity ?? 1), durability: String(item.durability ?? 1) });
+    playerAdmin_setItemEditDraft({ quantity: String(item.quantity ?? 1), grade: String(itemGrade(item)) });
   }
   function playerAdmin_saveQueuedItem(index: number) {
-    playerAdmin_setMultiList((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, quantity: Number(playerAdmin_itemEditDraft.quantity) || 1, durability: Number(playerAdmin_itemEditDraft.durability) || 1 } : item));
+    playerAdmin_setMultiList((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, quantity: Number(playerAdmin_itemEditDraft.quantity) || 1, quality: normalizeItemGrade(playerAdmin_itemEditDraft.grade), durability: undefined } : item));
     playerAdmin_setItemEditIndex(null);
   }
   async function playerAdmin_giveMultipleItems() {
@@ -1719,7 +1720,7 @@ function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId, player
       itemId: playerAdmin_itemId,
       image: playerAdmin_selectedItem.image,
       quantity: Number(playerAdmin_quantity) || 1,
-      durability: Number(playerAdmin_durability) || 1
+      quality: normalizeItemGrade(playerAdmin_grade)
     }] : [];
     if (!items.length) {
       playerAdmin_showResult("giveMultiple", "Select at least one item before granting.", "danger");
@@ -1729,7 +1730,7 @@ function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId, player
       "giveMultiple",
       `Granting ${items.length} item entr${items.length === 1 ? "y" : "ies"} to ${playerName}`,
       async () => {
-        const result = await playersApi.giveItems(actionPlayerId, items.map((item) => ({ itemName: item.itemName, itemId: item.itemId, quantity: item.quantity, durability: item.durability })));
+        const result = await playersApi.giveItems(actionPlayerId, items.map((item) => ({ itemName: item.itemName, itemId: item.itemId, quantity: item.quantity, quality: itemGrade(item), durability: grantItemDurability() })));
         if (!result.ok) throw new Error(playerAdmin_bulkItemFailure(result.results));
       },
       `${items.length} item entr${items.length === 1 ? "y was" : "ies were"} granted to ${playerName}.`,
@@ -2376,10 +2377,10 @@ function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId, player
           {playerAdmin_actionRow("intel", "Give Intel", <input type="number" min="1" value={playerAdmin_intelAmount} onChange={(event) => playerAdmin_setIntelAmount(event.target.value)} />, "Give", () => playerAdmin_runAction("intel", `Giving ${Number(playerAdmin_intelAmount) || 0} Intel to ${playerName}`, () => playersApi.addIntel(dbPlayerId, { amount: Number(playerAdmin_intelAmount) || 0, confirmation: "ADD INTEL" }), `${playerName}'s Intel was updated. Relog required.`, { actionType: "Give Intel", target: playerName, amount: String(Number(playerAdmin_intelAmount) || 0) }), !dbPlayerId, "A relog is required to see the change.")}
           {playerAdmin_actionRow("faction", "Give Faction Reputation", <><select value={playerAdmin_factionName} onChange={(event) => playerAdmin_setFactionName(event.target.value)}><option>Atreides</option><option>Harkonnen</option><option>Smuggler</option></select><input type="number" min="1" max="12474" value={playerAdmin_factionAmount} onChange={(event) => playerAdmin_setFactionAmount(event.target.value)} /></>, "Give", () => playerAdmin_runAction("faction", `Giving ${Number(playerAdmin_factionAmount) || 0} ${playerAdmin_factionName} reputation to ${playerName}`, () => playersApi.addFactionReputation(dbPlayerId, { factionId: playerAdmin_factionIds[playerAdmin_factionName] || 1, amount: Number(playerAdmin_factionAmount) || 0, confirmation: "ADD FACTION REPUTATION" }), `${playerName}'s faction reputation was updated. Relog required.`, { actionType: "Give Faction Reputation", target: playerAdmin_factionName, amount: String(Number(playerAdmin_factionAmount) || 0) }), !dbPlayerId, "A relog is required to see the change.")}
         </div></section>
-        <div className={`playerAdmin_toggle ${playerAdmin_openToggles.give_items ? "open" : ""}`}><button className="playerAdmin_toggleHeader" onClick={() => playerAdmin_toggle("give_items")}>{playerAdmin_openToggles.give_items ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Give Items</span></button>{playerAdmin_openToggles.give_items && <div className="playerAdmin_toggleBody"><div className="playerAdmin_section"><p className="action-help-note">The player must be online.</p><ItemCatalogSelector selected={playerAdmin_selectedItem} onSelect={playerAdmin_chooseItem} /><div className="playerAdmin_itemActionStack"><div className="playerAdmin_itemInputLine"><span className="playerAdmin_actionLabel playerAdmin_itemSelectedLabel">Selected Item</span><label className="playerAdmin_itemNumberField">Quantity<input className="package-item-quantity-input" type="number" min="1" value={playerAdmin_quantity} onChange={(event) => playerAdmin_setQuantity(event.target.value)} /></label><label className="playerAdmin_itemNumberField">Durability<input className="package-item-durability-input" type="number" min="0" value={playerAdmin_durability} onChange={(event) => playerAdmin_setDurability(event.target.value)} /></label><div className="playerAdmin_actionRow playerAdmin_itemActionRow"><button disabled={!playerAdmin_canRunLiveAction || (!playerAdmin_multiList.length && !playerAdmin_selectedItem) || playerAdmin_actionResult?.pending} onClick={() => void playerAdmin_giveMultipleItems()}>{playerAdmin_multiList.length ? "Give Package" : "Give Item"}</button><button disabled={!playerAdmin_selectedItem} onClick={playerAdmin_addSelectedItem}>Add Item</button><InlineActionResult result={playerAdmin_actionResult} resultKey="giveMultiple" /></div></div></div>
-          {playerAdmin_multiList.length ? <div className="table-wrap package-items-table playerAdmin_itemsTable"><table><thead><tr><th>Preview</th><th>Item Name</th><th>Item ID</th><th>Quantity</th><th>Durability</th><th>Actions</th></tr></thead><tbody>{playerAdmin_multiList.map((item, index) => {
+        <div className={`playerAdmin_toggle ${playerAdmin_openToggles.give_items ? "open" : ""}`}><button className="playerAdmin_toggleHeader" onClick={() => playerAdmin_toggle("give_items")}>{playerAdmin_openToggles.give_items ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Give Items</span></button>{playerAdmin_openToggles.give_items && <div className="playerAdmin_toggleBody"><div className="playerAdmin_section"><p className="action-help-note">The player must be online.</p><ItemCatalogSelector selected={playerAdmin_selectedItem} onSelect={playerAdmin_chooseItem} /><div className="playerAdmin_itemActionStack"><div className="playerAdmin_itemInputLine"><span className="playerAdmin_actionLabel playerAdmin_itemSelectedLabel">Selected Item</span><label className="playerAdmin_itemNumberField">Quantity<input className="package-item-quantity-input" type="number" min="1" value={playerAdmin_quantity} onChange={(event) => playerAdmin_setQuantity(event.target.value)} /></label><label className="playerAdmin_itemNumberField">Grade<ItemGradeSelect value={playerAdmin_grade} onChange={playerAdmin_setGrade} /></label><div className="playerAdmin_actionRow playerAdmin_itemActionRow"><button disabled={!playerAdmin_canRunLiveAction || (!playerAdmin_multiList.length && !playerAdmin_selectedItem) || playerAdmin_actionResult?.pending} onClick={() => void playerAdmin_giveMultipleItems()}>{playerAdmin_multiList.length ? "Give Package" : "Give Item"}</button><button disabled={!playerAdmin_selectedItem} onClick={playerAdmin_addSelectedItem}>Add Item</button><InlineActionResult result={playerAdmin_actionResult} resultKey="giveMultiple" /></div></div></div>
+          {playerAdmin_multiList.length ? <div className="table-wrap package-items-table playerAdmin_itemsTable"><table><thead><tr><th>Preview</th><th>Item Name</th><th>Item ID</th><th>Quantity</th><th>Grade</th><th>Actions</th></tr></thead><tbody>{playerAdmin_multiList.map((item, index) => {
             const editing = playerAdmin_itemEditIndex === index;
-            return <tr key={`${item.itemName || item.itemId}-${index}`}><td><PackageItemPreview item={item} /></td><td>{catalogItemName(item)}</td><td>{catalogItemId(item)}</td><td>{editing ? <input className="package-item-quantity-input" type="number" min="1" value={playerAdmin_itemEditDraft.quantity} onChange={(event) => playerAdmin_setItemEditDraft({ ...playerAdmin_itemEditDraft, quantity: event.target.value })} /> : item.quantity}</td><td>{editing ? <input className="package-item-durability-input" type="number" min="0" value={playerAdmin_itemEditDraft.durability} onChange={(event) => playerAdmin_setItemEditDraft({ ...playerAdmin_itemEditDraft, durability: event.target.value })} /> : item.durability}</td><td className="package-actions-cell"><div className="service-actions">{editing ? <><button onClick={() => playerAdmin_saveQueuedItem(index)}>Save</button><button onClick={() => playerAdmin_setItemEditIndex(null)}>Cancel</button></> : <button onClick={() => playerAdmin_editQueuedItem(index)}>Edit</button>}<button className="danger" onClick={() => playerAdmin_setMultiList(playerAdmin_multiList.filter((_, itemIndex) => itemIndex !== index))}>Remove</button></div></td></tr>;
+            return <tr key={`${item.itemName || item.itemId}-${index}`}><td><PackageItemPreview item={item} /></td><td>{catalogItemName(item)}</td><td>{catalogItemId(item)}</td><td>{editing ? <input className="package-item-quantity-input" type="number" min="1" value={playerAdmin_itemEditDraft.quantity} onChange={(event) => playerAdmin_setItemEditDraft({ ...playerAdmin_itemEditDraft, quantity: event.target.value })} /> : item.quantity}</td><td>{editing ? <ItemGradeSelect value={playerAdmin_itemEditDraft.grade} onChange={(grade) => playerAdmin_setItemEditDraft({ ...playerAdmin_itemEditDraft, grade })} /> : itemGrade(item)}</td><td className="package-actions-cell"><div className="service-actions">{editing ? <><button onClick={() => playerAdmin_saveQueuedItem(index)}>Save</button><button onClick={() => playerAdmin_setItemEditIndex(null)}>Cancel</button></> : <button onClick={() => playerAdmin_editQueuedItem(index)}>Edit</button>}<button className="danger" onClick={() => playerAdmin_setMultiList(playerAdmin_multiList.filter((_, itemIndex) => itemIndex !== index))}>Remove</button></div></td></tr>;
           })}</tbody></table></div> : null}
         </div></div>}</div>
         {playerAdmin_toggleBox("character_inventory", "Inventory", <PlayerDetailTab playerId={dbPlayerId} tab="inventory" onError={onError} onActionLog={(actionType, target, amount, notes) => playerAdmin_addLog(actionType, target, amount, notes)} />)}
@@ -2390,7 +2391,7 @@ function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId, player
           <section className="playerAdmin_box">
             <h4>Crafting Schematics</h4>
             <div className="playerAdmin_boxHeaderLine">
-              <p>The player must be offline.</p>
+              <p>The player must be online.</p>
               <div className="playerAdmin_filterRow playerAdmin_filterRowRight">
                 <span className="playerAdmin_note">{playerAdmin_filteredCraftingRows.length} Schematic{playerAdmin_filteredCraftingRows.length === 1 ? "" : "s"} Detected</span>
                 <button disabled={!dbPlayerId || playerAdmin_craftingLoading} onClick={() => playerAdmin_loadCraftingRecipes()}>{playerAdmin_craftingLoading ? "Loading..." : "Reload"}</button>
@@ -2412,7 +2413,7 @@ function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId, player
           <section className="playerAdmin_box">
             <h4>Research Schematics</h4>
             <div className="playerAdmin_boxHeaderLine">
-              <p>The player must be offline.</p>
+              <p>The player must be online.</p>
               <div className="playerAdmin_filterRow playerAdmin_filterRowRight">
                 <span className="playerAdmin_note">{playerAdmin_filteredResearchRows.length} Research Entr{playerAdmin_filteredResearchRows.length === 1 ? "y" : "ies"} Detected</span>
                 {playerAdmin_researchCategory && <select value={playerAdmin_productGroup} onChange={(playerAdmin_event) => playerAdmin_setProductGroup(playerAdmin_event.target.value)}><option value="">All Product Groups</option>{playerAdmin_researchGroups[playerAdmin_researchCategory].map((playerAdmin_option) => <option key={playerAdmin_option}>{playerAdmin_option}</option>)}</select>}
@@ -2551,9 +2552,9 @@ function PlayerActions({ dbPlayerId, actionPlayerId, playerName, setTask, onErro
   const [itemId, setItemId] = useState("");
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [quantity, setQuantity] = useState("1");
-  const [durability, setDurability] = useState("1");
+  const [grade, setGrade] = useState("1");
   const [multiItems, setMultiItems] = useState("");
-  const [multiList, setMultiList] = useState<{ itemName?: string; itemId?: string; quantity: number; durability: number }[]>([]);
+  const [multiList, setMultiList] = useState<{ itemName?: string; itemId?: string; quantity: number; durability?: number; quality?: number; grade?: number }[]>([]);
   const [xp, setXp] = useState("1000");
   const [points, setPoints] = useState("0");
   const [module, setModule] = useState("");
@@ -2607,9 +2608,9 @@ function PlayerActions({ dbPlayerId, actionPlayerId, playerName, setTask, onErro
   function parsedMultiItems() {
     if (multiList.length) return multiList;
     return multiItems.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
-      const [nameOrId, qty = "1", durability = "1"] = line.split(",").map((part) => part.trim());
+      const [nameOrId, qty = "1", gradeValue = "1"] = line.split(",").map((part) => part.trim());
       const item = /^[A-Za-z0-9_./:-]{16,}$/.test(nameOrId) ? { itemId: nameOrId } : { itemName: nameOrId };
-      return { ...item, quantity: Number(qty), durability: Number(durability) };
+      return { ...item, quantity: Number(qty), quality: normalizeItemGrade(gradeValue), durability: grantItemDurability() };
     });
   }
   async function useCurrentPosition() {
@@ -2659,10 +2660,10 @@ function PlayerActions({ dbPlayerId, actionPlayerId, playerName, setTask, onErro
         <ItemCatalogSelector selected={selectedItem} onSelect={choosePlayerItem} />
         <div className="action-line item-grant-row">
           <label className="compact-field">Quantity<input type="number" min="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label>
-          <label className="compact-field">Durability<input type="number" min="0" value={durability} onChange={(event) => setDurability(event.target.value)} /></label>
+          <label className="compact-field">Grade<ItemGradeSelect value={grade} onChange={setGrade} /></label>
           <button disabled={!canRunCliAction || !selectedItem || actionResult?.pending} title={!canRunCliAction ? cliDisabledReason : !selectedItem ? "Select an item from the catalog first." : undefined} onClick={() => run(async () => {
             if (!(await confirmDialog(`Give ${quantity} x ${itemName} to ${playerName}?`))) return;
-            await runPlayerAction("giveItem", `Giving x${Number(quantity) || 1} ${itemName} to ${playerName}`, () => runTask(() => playersApi.giveItem(actionPlayerId, { itemName, quantity: Number(quantity), durability: Number(durability) })), `x${Number(quantity) || 1} ${itemName} was granted to ${playerName}.`, "success", (error) => `Failed to grant x${Number(quantity) || 1} ${itemName} to ${playerName}. ${friendlyInlineError(error)}`);
+            await runPlayerAction("giveItem", `Giving x${Number(quantity) || 1} ${itemName} to ${playerName}`, () => runTask(() => playersApi.giveItem(actionPlayerId, { itemName, quantity: Number(quantity), quality: normalizeItemGrade(grade), durability: grantItemDurability() })), `x${Number(quantity) || 1} ${itemName} was granted to ${playerName}.`, "success", (error) => `Failed to grant x${Number(quantity) || 1} ${itemName} to ${playerName}. ${friendlyInlineError(error)}`);
           })}>Give Item</button>
           <InlineActionResult result={actionResult} resultKey="giveItem" />
         </div>
@@ -2670,17 +2671,17 @@ function PlayerActions({ dbPlayerId, actionPlayerId, playerName, setTask, onErro
           <label>Raw Item ID<input value={itemId} onChange={(event) => setItemId(event.target.value)} /></label>
           <button disabled={!canRunCliAction || actionResult?.pending} title={!canRunCliAction ? cliDisabledReason : undefined} onClick={() => run(async () => {
             if (!(await confirmDialog(`Give raw item id ${itemId} to ${playerName}?`))) return;
-            await runPlayerAction("giveItemId", `Giving x${Number(quantity) || 1} ${itemId} to ${playerName}`, () => runTask(() => playersApi.giveItemId(actionPlayerId, { itemId, quantity: Number(quantity), durability: 1 })), `x${Number(quantity) || 1} ${itemId} was granted to ${playerName}.`, "success", (error) => `Failed to grant x${Number(quantity) || 1} ${itemId} to ${playerName}. ${friendlyInlineError(error)}`);
+            await runPlayerAction("giveItemId", `Giving x${Number(quantity) || 1} ${itemId} to ${playerName}`, () => runTask(() => playersApi.giveItemId(actionPlayerId, { itemId, quantity: Number(quantity), quality: normalizeItemGrade(grade), durability: grantItemDurability() })), `x${Number(quantity) || 1} ${itemId} was granted to ${playerName}.`, "success", (error) => `Failed to grant x${Number(quantity) || 1} ${itemId} to ${playerName}. ${friendlyInlineError(error)}`);
           })}>Give Item by ID</button>
           <InlineActionResult result={actionResult} resultKey="giveItemId" />
         </div></details>
         <h4>Give Multiple Items</h4>
         <div className="action-line">
-          <button disabled={!selectedItem} onClick={() => setMultiList([...multiList, { itemName, itemId, quantity: Number(quantity), durability: Number(durability) }])}>Add Selected Item</button>
+          <button disabled={!selectedItem} onClick={() => setMultiList([...multiList, { itemName, itemId, quantity: Number(quantity), quality: normalizeItemGrade(grade) }])}>Add Selected Item</button>
           <button disabled={!multiList.length} onClick={() => setMultiList([])}>Clear List</button>
         </div>
-        {multiList.length ? <div className="table-wrap package-items-table"><table><thead><tr><th>Item Name</th><th>Item ID</th><th>Quantity</th><th>Durability</th><th>Actions</th></tr></thead><tbody>{multiList.map((item, index) => <tr key={`${item.itemName || item.itemId}-${index}`}><td>{catalogItemName(item)}</td><td>{catalogItemId(item)}</td><td>{item.quantity}</td><td>{item.durability}</td><td><button className="danger" onClick={() => setMultiList(multiList.filter((_, itemIndex) => itemIndex !== index))}>Remove</button></td></tr>)}</tbody></table></div> : <div className="empty">No multi-item entries yet. Search/select an item, set quantity, then Add Selected Item.</div>}
-        <details className="technical-details"><summary>Developer raw multi-item textarea</summary><label>Multiple Items<textarea value={multiItems} onChange={(event) => setMultiItems(event.target.value)} placeholder="One item per line: name or raw id, quantity, durability" rows={4} /></label></details>
+        {multiList.length ? <div className="table-wrap package-items-table"><table><thead><tr><th>Item Name</th><th>Item ID</th><th>Quantity</th><th>Grade</th><th>Actions</th></tr></thead><tbody>{multiList.map((item, index) => <tr key={`${item.itemName || item.itemId}-${index}`}><td>{catalogItemName(item)}</td><td>{catalogItemId(item)}</td><td>{item.quantity}</td><td>{itemGrade(item)}</td><td><button className="danger" onClick={() => setMultiList(multiList.filter((_, itemIndex) => itemIndex !== index))}>Remove</button></td></tr>)}</tbody></table></div> : <div className="empty">No multi-item entries yet. Search/select an item, set quantity, then Add Selected Item.</div>}
+        <details className="technical-details"><summary>Developer raw multi-item textarea</summary><label>Multiple Items<textarea value={multiItems} onChange={(event) => setMultiItems(event.target.value)} placeholder="One item per line: name or raw id, quantity, grade" rows={4} /></label></details>
         <div className="action-line">
           <button disabled={!canRunCliAction || actionResult?.pending} title={!canRunCliAction ? cliDisabledReason : undefined} onClick={() => run(async () => {
             const items = parsedMultiItems();
@@ -3873,9 +3874,9 @@ function CarePackagePanel({ onError }: { onError: (text: string) => void }) {
   });
   const [itemsText, setItemsText] = useState("");
   const [selectedPackageItem, setSelectedPackageItem] = useState<CatalogItem | null>(null);
-  const [packageDraft, setPackageDraft] = useState({ itemName: "", itemId: "", quantity: "1", durability: "1" });
+  const [packageDraft, setPackageDraft] = useState({ itemName: "", itemId: "", quantity: "1", grade: "1" });
   const [editingPackageIndex, setEditingPackageIndex] = useState<number | null>(null);
-  const [packageEditDraft, setPackageEditDraft] = useState({ quantity: "1", durability: "1" });
+  const [packageEditDraft, setPackageEditDraft] = useState({ quantity: "1", grade: "1" });
   const [players, setPlayers] = useState<Record<string, unknown>[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [manualPlayerId, setManualPlayerId] = useState("");
@@ -3911,7 +3912,7 @@ function CarePackagePanel({ onError }: { onError: (text: string) => void }) {
     setCarePackageTab(lastKit ? "configure" : "create");
     setNewAutoRule({ kitId: lastKit?.id || normalized.autoGrantKitId || normalized.activeKitId, grantWhen: normalized.grantWhen, lastSeenDays: 30 });
     setManualKitId(lastKit?.id || normalized.activeKitId || "");
-    setItemsText((lastKit?.items || normalized.items || []).map((item) => `${item.itemId || item.itemName || ""},${item.quantity},${item.durability}`).join("\n"));
+    setItemsText((lastKit?.items || normalized.items || []).map(packageItemTextLine).join("\n"));
     setHistory((await carePackageApi.history()).rows || []);
     setPlayers((await playersApi.list()).rows || []);
   }
@@ -3949,9 +3950,9 @@ function CarePackagePanel({ onError }: { onError: (text: string) => void }) {
       allowRepeatGrants: false,
       grantWhen: source.grantWhen,
       items: source.kits.length === 0 ? [] : sourceActiveKit.items?.length ? sourceActiveKit.items : itemsText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
-        const [nameOrId, qty = "1", durability = "1"] = line.split(",").map((part) => part.trim());
+        const [nameOrId, qty = "1", gradeValue = "1"] = line.split(",").map((part) => part.trim());
         const item = /^[A-Za-z0-9_./:-]{16,}$/.test(nameOrId) ? { itemId: nameOrId } : { itemName: nameOrId };
-        return { ...item, quantity: Number(qty), durability: Number(durability) };
+        return { ...item, quantity: Number(qty), quality: normalizeItemGrade(gradeValue), durability: grantItemDurability() };
       }),
       xp: sourceActiveKit.xp,
       kits: source.kits
@@ -3970,7 +3971,7 @@ function CarePackagePanel({ onError }: { onError: (text: string) => void }) {
         lastSeenDays: current.lastSeenDays
       }));
       setManualKitId((current) => saved.kits.some((kit) => kit.id === current) ? current : savedActiveKit.id);
-      setItemsText(savedActiveKit.items.map((item) => `${item.itemId || item.itemName || ""},${item.quantity},${item.durability}`).join("\n"));
+      setItemsText(savedActiveKit.items.map(packageItemTextLine).join("\n"));
       if (!saved.kits.length) setCarePackageTab("create");
       setResult({ status: "succeeded", title: successTitle });
       return saved;
@@ -3984,7 +3985,7 @@ function CarePackagePanel({ onError }: { onError: (text: string) => void }) {
     if (!nextKit) return;
     setConfig({ ...config, activeKitId: nextKit.id, version: nextKit.id, items: nextKit.items, xp: nextKit.xp });
     setManualKitId(nextKit.id);
-    setItemsText(nextKit.items.map((entry) => `${entry.itemId || entry.itemName || ""},${entry.quantity},${entry.durability}`).join("\n"));
+    setItemsText(nextKit.items.map(packageItemTextLine).join("\n"));
     setEditingPackageIndex(null);
   }
   function updateActiveKit(patch: Partial<CarePackageEntry>) {
@@ -4008,7 +4009,7 @@ function CarePackagePanel({ onError }: { onError: (text: string) => void }) {
       setCarePackageTab("configure");
       setEditingPackageIndex(null);
       setSelectedPackageItem(null);
-      setPackageDraft({ itemName: "", itemId: "", quantity: "1", durability: "1" });
+      setPackageDraft({ itemName: "", itemId: "", quantity: "1", grade: "1" });
     });
   }
   async function deleteActiveKit() {
@@ -4034,6 +4035,7 @@ function CarePackagePanel({ onError }: { onError: (text: string) => void }) {
       version: nextActive?.id || "",
       items: nextActive?.items || [],
       xp: nextActive?.xp || 0,
+      autoGrantEnabled: autoGrantRules.some((rule) => rule.enabled),
       autoGrantRules
     };
     run(async () => {
@@ -4064,7 +4066,8 @@ function CarePackagePanel({ onError }: { onError: (text: string) => void }) {
       return;
     }
     const id = uniquePackageRuleId(config.autoGrantRules, `auto-rule-${config.autoGrantRules.length + 1}`);
-    const draft = { ...config, autoGrantRules: [...config.autoGrantRules, { id, enabled: false, kitId, grantWhen, lastSeenDays }] };
+    const autoGrantRules = [...config.autoGrantRules, { id, enabled: false, kitId, grantWhen, lastSeenDays }];
+    const draft = { ...config, autoGrantEnabled: autoGrantRules.some((rule) => rule.enabled), autoGrantRules };
     run(async () => { await saveCarePackageConfigDraft(draft, "Auto grant rule was created.", "auto"); });
   }
   function updateAutoGrantRule(id: string, patch: Partial<CarePackageAutoGrantRule>) {
@@ -4073,7 +4076,8 @@ function CarePackagePanel({ onError }: { onError: (text: string) => void }) {
     const resultTitle = typeof patch.enabled === "boolean"
       ? `${carePackageRuleName(currentRule, config.kits)} was ${patch.enabled ? "enabled" : "disabled"}.`
       : "Auto grant rule was saved.";
-    const draft = { ...config, autoGrantRules: config.autoGrantRules.map((rule) => rule.id === id ? { ...rule, ...patch } : rule) };
+    const autoGrantRules = config.autoGrantRules.map((rule) => rule.id === id ? { ...rule, ...patch } : rule);
+    const draft = { ...config, autoGrantEnabled: autoGrantRules.some((rule) => rule.enabled), autoGrantRules };
     run(async () => {
       await saveCarePackageConfigDraft(draft, resultTitle, "auto");
       if (typeof nextEnabled === "boolean") setAutoGrantResult({ status: nextEnabled ? "succeeded" : "failed", title: resultTitle });
@@ -4081,7 +4085,8 @@ function CarePackagePanel({ onError }: { onError: (text: string) => void }) {
   }
   async function deleteAutoGrantRule(id: string) {
     if (!(await confirmDialog("Delete this Auto Grant rule?"))) return;
-    const draft = { ...config, autoGrantRules: config.autoGrantRules.filter((rule) => rule.id !== id) };
+    const autoGrantRules = config.autoGrantRules.filter((rule) => rule.id !== id);
+    const draft = { ...config, autoGrantEnabled: autoGrantRules.some((rule) => rule.enabled), autoGrantRules };
     run(async () => {
       await saveCarePackageConfigDraft(draft, "Auto grant rule was deleted.", "auto");
       setEligibleByRule((current) => {
@@ -4112,20 +4117,20 @@ function CarePackagePanel({ onError }: { onError: (text: string) => void }) {
   function addPackageItem() {
     const item = packageDraft.itemId ? { itemId: packageDraft.itemId, itemName: packageDraft.itemName, image: selectedPackageItem?.image } : { itemName: packageDraft.itemName, image: selectedPackageItem?.image };
     if (!packageDraft.itemName && !packageDraft.itemId) return;
-    const nextItems = [...(activeKit.items || []), { ...item, quantity: Number(packageDraft.quantity), durability: Number(packageDraft.durability) }];
+    const nextItems = [...(activeKit.items || []), { ...item, quantity: Number(packageDraft.quantity), quality: normalizeItemGrade(packageDraft.grade), durability: grantItemDurability() }];
     updateActiveKit({ items: nextItems });
-    setItemsText(nextItems.map((entry) => `${entry.itemId || entry.itemName || ""},${entry.quantity},${entry.durability}`).join("\n"));
+    setItemsText(nextItems.map(packageItemTextLine).join("\n"));
   }
   function editPackageItem(index: number) {
     const item = activeKit.items?.[index];
     if (!item) return;
     setEditingPackageIndex(index);
-    setPackageEditDraft({ quantity: String(item.quantity ?? 1), durability: String(item.durability ?? 1) });
+    setPackageEditDraft({ quantity: String(item.quantity ?? 1), grade: String(itemGrade(item)) });
   }
   function savePackageItemEdit(index: number) {
-    const nextItems = (activeKit.items || []).map((item, itemIndex) => itemIndex === index ? { ...item, quantity: Number(packageEditDraft.quantity), durability: Number(packageEditDraft.durability) } : item);
+    const nextItems = (activeKit.items || []).map((item, itemIndex) => itemIndex === index ? { ...item, quantity: Number(packageEditDraft.quantity), quality: normalizeItemGrade(packageEditDraft.grade), durability: grantItemDurability() } : item);
     updateActiveKit({ items: nextItems });
-    setItemsText(nextItems.map((entry) => `${entry.itemId || entry.itemName || ""},${entry.quantity},${entry.durability}`).join("\n"));
+    setItemsText(nextItems.map(packageItemTextLine).join("\n"));
     setEditingPackageIndex(null);
   }
   const activeKit = carePackageActiveKit(config);
@@ -4176,21 +4181,21 @@ function CarePackagePanel({ onError }: { onError: (text: string) => void }) {
             <ItemCatalogSelector selected={selectedPackageItem} onSelect={choosePackageItem} />
             <div className="action-line">
               <label>Quantity<input type="number" min="1" value={packageDraft.quantity} onChange={(event) => setPackageDraft({ ...packageDraft, quantity: event.target.value })} /></label>
-              <label>Durability / Quality<input type="number" min="0" value={packageDraft.durability} onChange={(event) => setPackageDraft({ ...packageDraft, durability: event.target.value })} /></label>
+              <label>Grade<ItemGradeSelect value={packageDraft.grade} onChange={(grade) => setPackageDraft({ ...packageDraft, grade })} /></label>
               <button disabled={!selectedPackageItem} onClick={addPackageItem}>Add Item</button>
             </div>
           </div></div>}
         </div>
-        {activeKit.items?.length ? <div className="table-wrap package-items-table"><table><thead><tr><th>Preview</th><th>Item Name</th><th>Item ID</th><th>Quantity</th><th>Durability</th><th>Actions</th></tr></thead><tbody>{activeKit.items.map((item, index) => {
+        {activeKit.items?.length ? <div className="table-wrap package-items-table"><table><thead><tr><th>Preview</th><th>Item Name</th><th>Item ID</th><th>Quantity</th><th>Grade</th><th>Actions</th></tr></thead><tbody>{activeKit.items.map((item, index) => {
           const editing = editingPackageIndex === index;
-          return <tr key={`${item.itemName || item.itemId}-${index}`}><td><PackageItemPreview item={item} /></td><td>{catalogItemName(item)}</td><td>{catalogItemId(item)}</td><td>{editing ? <input className="package-item-quantity-input" type="number" min="1" value={packageEditDraft.quantity} onChange={(event) => setPackageEditDraft({ ...packageEditDraft, quantity: event.target.value })} /> : item.quantity}</td><td>{editing ? <input className="package-item-durability-input" type="number" min="0" value={packageEditDraft.durability} onChange={(event) => setPackageEditDraft({ ...packageEditDraft, durability: event.target.value })} /> : item.durability}</td><td className="package-actions-cell"><div className="service-actions">{editing ? <><button onClick={() => savePackageItemEdit(index)}>Save</button><button onClick={() => setEditingPackageIndex(null)}>Cancel</button></> : <button onClick={() => editPackageItem(index)}>Edit</button>}<button className="danger" onClick={() => {
+          return <tr key={`${item.itemName || item.itemId}-${index}`}><td><PackageItemPreview item={item} /></td><td>{catalogItemName(item)}</td><td>{catalogItemId(item)}</td><td>{editing ? <input className="package-item-quantity-input" type="number" min="1" value={packageEditDraft.quantity} onChange={(event) => setPackageEditDraft({ ...packageEditDraft, quantity: event.target.value })} /> : item.quantity}</td><td>{editing ? <ItemGradeSelect value={packageEditDraft.grade} onChange={(grade) => setPackageEditDraft({ ...packageEditDraft, grade })} /> : itemGrade(item)}</td><td className="package-actions-cell"><div className="service-actions">{editing ? <><button onClick={() => savePackageItemEdit(index)}>Save</button><button onClick={() => setEditingPackageIndex(null)}>Cancel</button></> : <button onClick={() => editPackageItem(index)}>Edit</button>}<button className="danger" onClick={() => {
           const nextItems = activeKit.items.filter((_, itemIndex) => itemIndex !== index);
           updateActiveKit({ items: nextItems });
-          setItemsText(nextItems.map((entry) => `${entry.itemId || entry.itemName || ""},${entry.quantity},${entry.durability}`).join("\n"));
+          setItemsText(nextItems.map(packageItemTextLine).join("\n"));
           if (editingPackageIndex === index) setEditingPackageIndex(null);
         }}>Remove</button></div></td></tr>;
         })}</tbody></table></div> : null}
-        <details className="technical-details"><summary>Developer raw package item textarea</summary><p>One item per line: item name or raw item ID, quantity, durability.</p><label>Package Items<textarea value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder="Plant Fiber,10,1&#10;cup of water,1,1" /></label></details>
+        <details className="technical-details"><summary>Developer raw package item textarea</summary><p>One item per line: item name or raw item ID, quantity, grade.</p><label>Package Items<textarea value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder="Plant Fiber,10,1&#10;cup of water,1,1" /></label></details>
         <div className="action-line">
           <button onClick={() => run(async () => {
             if (!(await confirmDialog("These settings will be saved.", {
@@ -4203,7 +4208,7 @@ function CarePackagePanel({ onError }: { onError: (text: string) => void }) {
               const saved = normalizeCarePackageConfig(await carePackageApi.saveConfig(nextConfig(), "SAVE CARE PACKAGE"));
               setConfig(saved);
               const savedActiveKit = carePackageActiveKit(saved);
-              setItemsText(savedActiveKit.items.map((item) => `${item.itemId || item.itemName || ""},${item.quantity},${item.durability}`).join("\n"));
+              setItemsText(savedActiveKit.items.map(packageItemTextLine).join("\n"));
               setKitSaveResult({ status: "succeeded", title: "Package was saved successfully." });
             } catch (error) {
               setKitSaveResult({ status: "failed", title: "Package Save Failed.", message: formatCarePackageError(error instanceof Error ? error.message : String(error)) });
@@ -4361,13 +4366,13 @@ function normalizeCarePackageConfig(config: CarePackageConfig): CarePackageConfi
   const activeKit = kits.find((kit) => kit.id === activeKitId) || kits[0] || { id: "", name: "", items: [], xp: 0, sendMessage: "" };
   const autoGrantRules = (kits.length ? (Array.isArray(config.autoGrantRules) ? config.autoGrantRules : [{ id: "auto-rule-1", enabled: false, kitId: autoGrantKitId, grantWhen: "first_online" as const, lastSeenDays: 30 }]) : []).map((rule, index) => ({
     id: rule.id || `auto-rule-${index + 1}`,
-    enabled: rule.enabled !== false,
+    enabled: rule.enabled === true,
     kitId: kits.some((kit) => kit.id === rule.kitId) ? rule.kitId : autoGrantKitId,
     grantWhen: rule.grantWhen === "last_seen" ? "last_seen" as const : "first_online" as const,
     lastSeenDays: Number(rule.lastSeenDays) || 30
   }));
   const grantWhen = config.grantWhen === "last_seen" ? "last_seen" : "first_online";
-  return { ...config, version: activeKit.id, activeKitId, autoGrantKitId, kits, items: activeKit.items, xp: activeKit.xp, allowRepeatGrants: false, grantWhen, autoGrantRules };
+  return { ...config, version: activeKit.id, activeKitId, autoGrantKitId, kits, items: activeKit.items, xp: activeKit.xp, allowRepeatGrants: false, autoGrantEnabled: autoGrantRules.some((rule) => rule.enabled), grantWhen, autoGrantRules };
 }
 
 function normalizeCarePackageSendMessage(value: unknown) {
@@ -4589,9 +4594,33 @@ function formatCarePackageGrantResult(result: Record<string, unknown>) {
 
 function describeCarePackageAction(action: Record<string, unknown>) {
   const item = action.item as Record<string, unknown> | undefined;
-  if (item) return `${item.itemName || item.itemId || "Item"} x${item.quantity || 1}`;
+  if (item) return `${item.itemName || item.itemId || "Item"} x${item.quantity || 1} Grade ${itemGrade(item)}`;
   if (action.operation === "adminAddXp") return `${action.amount || 0} XP`;
   return String(action.operation || "Care Package action");
+}
+
+function normalizeItemGrade(value: unknown) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 1;
+  return Math.max(1, Math.min(5, Math.trunc(numeric)));
+}
+
+function itemGrade(item: { quality?: unknown; grade?: unknown; durability?: unknown }) {
+  return normalizeItemGrade(item.quality ?? item.grade ?? item.durability ?? 1);
+}
+
+function grantItemDurability() {
+  return 1;
+}
+
+function packageItemTextLine(item: { itemName?: string; itemId?: string; quantity?: unknown; quality?: unknown; grade?: unknown; durability?: unknown }) {
+  return `${item.itemId || item.itemName || ""},${Number(item.quantity) || 1},${itemGrade(item)}`;
+}
+
+function ItemGradeSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return <select className="package-item-durability-input" value={String(normalizeItemGrade(value))} onChange={(event) => onChange(event.target.value)}>
+    {[1, 2, 3, 4, 5].map((grade) => <option key={grade} value={grade}>{grade}</option>)}
+  </select>;
 }
 
 function catalogItemName(item: { itemName?: string; itemId?: string }) {
@@ -4982,13 +5011,14 @@ function LiveMapPanel({ onError }: { onError: (text: string) => void }) {
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const zoomAnchorRef = useRef<{ mapX: number; mapY: number; viewportX: number; viewportY: number } | null>(null);
   const liveMapDraggingPlayerRef = useRef(false);
+  const pendingPlayerTeleportsRef = useRef<Record<string, { x: number; y: number; z: number; partitionId: number; expiresAt: number }>>({});
   async function load() {
     if (liveMapDraggingPlayerRef.current) return;
     onError("");
     setLoading(true);
     try {
       const result = await liveMapApi.markers(mapKey);
-      setMarkers(result.rows || []);
+      setMarkers(applyPendingPlayerTeleports(result.rows || []));
       setOverlays(result.overlays || {});
       setMapConfig(result.map || null);
       setMaps(result.maps || {});
@@ -5162,6 +5192,31 @@ function LiveMapPanel({ onError }: { onError: (text: string) => void }) {
   function playerMarkerId(marker: LiveMapMarker) {
     return String(firstDefined(marker.action_player_id, marker.fls_id, marker.funcom_id, marker.account_id, marker.id) || "");
   }
+  function applyPendingPlayerTeleports(rows: LiveMapMarker[]) {
+    const now = Date.now();
+    return rows.map((marker) => {
+      if (String(marker.type || "").toLowerCase() !== "player") return marker;
+      const markerId = playerMarkerId(marker);
+      const pending = markerId ? pendingPlayerTeleportsRef.current[markerId] : null;
+      if (!pending) return marker;
+      if (pending.expiresAt <= now) {
+        delete pendingPlayerTeleportsRef.current[markerId];
+        return marker;
+      }
+      const currentX = Number(marker.x);
+      const currentY = Number(marker.y);
+      const currentPartition = Number(marker.partition_id || 0);
+      const caughtUp = Number.isFinite(currentX) && Number.isFinite(currentY) && Math.hypot(currentX - pending.x, currentY - pending.y) < 100 && (!pending.partitionId || currentPartition === pending.partitionId);
+      if (caughtUp) delete pendingPlayerTeleportsRef.current[markerId];
+      return {
+        ...marker,
+        x: pending.x,
+        y: pending.y,
+        z: pending.z,
+        partition_id: pending.partitionId || marker.partition_id
+      };
+    });
+  }
   function liveMapPointerPoint(event: MouseEvent | React.MouseEvent) {
     if (!canvasRef.current) return null;
     const rect = canvasRef.current.getBoundingClientRect();
@@ -5199,7 +5254,8 @@ function LiveMapPanel({ onError }: { onError: (text: string) => void }) {
     }
     setTeleportResult({ status: "running", title: "Teleporting Player" });
     try {
-      const response = await liveMapApi.teleportPlayer({ playerId, x: Math.round(world.x), y: Math.round(world.y), z: 5000, yaw: 0, partitionId: Number(marker.partition_id || partitionId || 0), online });
+      const teleportPosition = { x: Math.round(world.x), y: Math.round(world.y), z: 5000, partitionId: Number(marker.partition_id || partitionId || 0) };
+      const response = await liveMapApi.teleportPlayer({ playerId, ...teleportPosition, yaw: 0, online });
       if (response.task) {
         const final = await waitForTaskSilently(response.task);
         if (final.status !== "succeeded") throw new Error(taskTechnicalDetails(final) || final.errorMessage || final.progressMessage || "Teleport failed.");
@@ -5212,6 +5268,9 @@ function LiveMapPanel({ onError }: { onError: (text: string) => void }) {
       } else {
         setTeleportResult({ status: "succeeded", title: "Respawn Location Saved", message: response.message || `${playerName}'s respawn location was saved.` });
       }
+      pendingPlayerTeleportsRef.current[playerId] = { ...teleportPosition, expiresAt: Date.now() + 20000 };
+      setMarkers((current) => applyPendingPlayerTeleports(current));
+      setSelected((current) => current && playerMarkerId(current) === playerId ? applyPendingPlayerTeleports([current])[0] : current);
       liveMapDraggingPlayerRef.current = false;
       await load();
       setPlayerTeleportPreview(null);
@@ -5666,23 +5725,31 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
   const selectedMap = mapRows.find((row) => String(row.map) === selectedMapName) || null;
   const selectedName = String(selectedMap?.map || "");
   const userGameMap = mapRows.find((row) => String(row.map) === userGameMapName) || null;
-  const userGameName = String(userGameMap?.map || "");
+  const userGameName = String(userGameMap?.map || userGameMapName || "");
   const isSurvival = selectedName === "Survival_1";
   const isDeepDesert = /^DeepDesert_/i.test(selectedName);
   const isDeepDesertRuntime = /^(DeepDesert_|Overmap$)/i.test(selectedName);
   const isUserGameSurvival = userGameName === "Survival_1";
+  const isUserGameDeepDesert = /^DeepDesert_/i.test(userGameName);
   const isUserGameDeepDesertRuntime = /^(DeepDesert_|Overmap$)/i.test(userGameName);
   const sietchRows = parseSietchRows(sietchDimensionsText || sietchesText, sietchDimensionIdsText);
   const survivalSietchRows = sietchRows.filter((row) => row.partitionId);
   const primarySurvivalSietch = survivalSietchRows.find((row) => String(row.dimension) === "0") || survivalSietchRows[0] || null;
   const dynamicSurvivalSietchRows = survivalSietchRows.filter((row) => String(row.dimension) !== "0");
   const deepDesertPartitionRows = serverPartitionRows.filter((row) => String(row.map || "") === "DeepDesert_1").sort((a, b) => Number(a.dimension ?? 0) - Number(b.dimension ?? 0));
+  const userGameDeepDesertPartitionOptions = isUserGameDeepDesert ? deepDesertPartitionRows.filter((row) => row.partitionId) : [];
   const dynamicDeepDesertRows = deepDesertPartitionRows.filter((row) => String(row.dimension || "") !== "0");
   const deepDesertDualEnabled = dynamicDeepDesertRows.length > 0;
   const partitionOptions = isSurvival ? survivalSietchRows : [];
   const userGamePartitionOptions = isUserGameSurvival ? sietchRows.filter((row) => row.partitionId) : [];
+  const userGameTargets = buildUserGameTargets(mapRows, serverPartitionRows, survivalSietchRows, deepDesertPartitionRows);
   const effectivePartitionId = isSurvival ? (selectedPartitionId || partitionOptions[0]?.partitionId || "1") : isDeepDesertRuntime ? "2" : selectedPartitionId;
-  const effectiveUserGamePartitionId = isUserGameSurvival ? (userGamePartitionId || userGamePartitionOptions[0]?.partitionId || "1") : isUserGameDeepDesertRuntime ? "2" : userGamePartitionId;
+  const effectiveUserGamePartitionId = isUserGameSurvival
+    ? (userGamePartitionId || userGamePartitionOptions[0]?.partitionId || "1")
+    : isUserGameDeepDesert
+      ? (userGamePartitionId || String(userGameDeepDesertPartitionOptions[0]?.partitionId || "8"))
+      : isUserGameDeepDesertRuntime ? "2" : userGamePartitionId;
+  const userGameTargetKey = userGameName ? settingsTargetKey(userGameName, effectiveUserGamePartitionId) : "";
   const gameFields = schema ? (effectivePartitionId ? schema.partition : schema.game).filter((field) => field.id !== "partition_pve_enabled" || effectivePartitionId) : [];
   const userGameFields = schema && userGameName ? (effectiveUserGamePartitionId ? schema.partition : schema.game).filter((field) => field.id !== "partition_pve_enabled" || effectiveUserGamePartitionId) : [];
   const gameGroups = groupSettingsFields(userGameFields);
@@ -5758,8 +5825,9 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
     setSelectedGameCategory("");
     if (selectedMapName) void loadSelectedSettings(selectedMapName, next || undefined).catch((error) => onError(error instanceof Error ? error.message : String(error)));
   }
-  function selectUserGameMap(next: string) {
-    if (!next) {
+  function selectUserGameTarget(next: string) {
+    const target = userGameTargets.find((item) => item.key === next);
+    if (!target) {
       setUserGameMapName("");
       setUserGamePartitionId("");
       setSelectedGameCategory("");
@@ -5767,21 +5835,13 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
       setGameDraft({});
       return;
     }
-    const row = mapRows.find((item) => String(item.map) === next);
-    const rowPartition = String(row?.partitionId || row?.partition || "").trim();
-    const defaultPartition = next === "Survival_1" ? "1" : /^(DeepDesert_|Overmap$)/i.test(next) ? "2" : rowPartition;
-    setUserGameMapName(next);
-    setUserGamePartitionId(defaultPartition);
+    setUserGameMapName(target.map);
+    setUserGamePartitionId(target.partitionId);
     setSelectedGameCategory("");
-    if (next) void loadSelectedSettings(next, defaultPartition || undefined).catch((error) => onError(error instanceof Error ? error.message : String(error)));
-  }
-  function selectUserGamePartition(next: string) {
-    setUserGamePartitionId(next);
-    setSelectedGameCategory("");
-    if (userGameName) void loadSelectedSettings(userGameName, next || undefined).catch((error) => onError(error instanceof Error ? error.message : String(error)));
+    void loadSelectedSettings(target.map, target.partitionId || undefined).catch((error) => onError(error instanceof Error ? error.message : String(error)));
   }
   async function saveEngine() {
-    await runTaskAndRefresh(() => mapsApi.saveUserSettings({ scope: "engine", values: valuesForFields(engineDraft, engineFields) }), "Saving UserEngine and restarting servers", "UserEngine Saved");
+    await runTaskAndRefresh(() => mapsApi.saveUserSettings({ scope: "engine", values: valuesForDirtyFields(engineValues, engineDraft, engineFields) }), "Saving UserEngine and restarting servers", "UserEngine Saved");
     await loadUserEngine();
   }
   async function saveSelectedMapSettings(row: Record<string, unknown>) {
@@ -6009,7 +6069,7 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
   async function saveGame() {
     if (!userGameName) return;
     const scope = effectiveUserGamePartitionId ? "partition" : "map";
-    await runTaskAndRefresh(() => mapsApi.saveUserSettings({ scope, map: userGameName, partitionId: effectiveUserGamePartitionId || undefined, values: valuesForFields(gameDraft, userGameFields) }), `Saving ${userGameName} UserGame`, "UserGame Saved");
+    await runTaskAndRefresh(() => mapsApi.saveUserSettings({ scope, map: userGameName, partitionId: effectiveUserGamePartitionId || undefined, values: valuesForDirtyFields(gameValues, gameDraft, userGameFields) }), `Saving ${userGameName} UserGame`, "UserGame Saved");
     await loadSelectedSettings(userGameName, effectiveUserGamePartitionId || undefined);
   }
   async function saveRaw(kind: "engine" | "game") {
@@ -6151,11 +6211,7 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
         <div className="action-row"><button disabled={!engineDirty.length} onClick={() => run(saveEngine)}>Save</button><button disabled={!engineDirty.length} onClick={() => setEngineDraft(engineValues)}>Discard Changes</button></div>
       </> : <>
         <div className="settings-selector-row">
-          <label className="compact-select">Map<select value={userGameName} onChange={(event) => selectUserGameMap(event.target.value)}><option value="">Select Map</option>{mapRows.map((row) => {
-            const name = String(row.map || "");
-            return <option key={name} value={name}>{name}</option>;
-          })}</select></label>
-          {isUserGameSurvival && <label className="compact-select">Sietch / Partition<select value={effectiveUserGamePartitionId} onChange={(event) => selectUserGamePartition(event.target.value)}>{userGamePartitionOptions.map((option) => <option key={option.partitionId} value={option.partitionId}>{option.displayName || `Partition ${option.partitionId}`} ({option.partitionId})</option>)}</select></label>}
+          <label className="compact-select">Target<select value={userGameTargetKey} onChange={(event) => selectUserGameTarget(event.target.value)}><option value="">Select Map Or Partition</option>{userGameTargets.map((target) => <option key={target.key} value={target.key}>{target.label}</option>)}</select></label>
           <label className="compact-select">Modifier Category<select disabled={!userGameName} value={activeGameCategory} onChange={(event) => setSelectedGameCategory(event.target.value)}>{gameGroups.map(([category, fields]) => <option key={category} value={category}>{category} ({fields.length})</option>)}</select></label>
         </div>
         {userGameName && <SettingsCardGrid fields={activeGameFields} values={gameDraft} onChange={(id, value) => setGameDraft({ ...gameDraft, [id]: value })} />}
@@ -6291,8 +6347,10 @@ function changedKeys(original: Record<string, string>, draft: Record<string, str
   return keys.filter((key) => String(original[key] ?? "") !== String(draft[key] ?? ""));
 }
 
-function valuesForFields(values: Record<string, string>, fields: UserSettingField[]) {
-  return Object.fromEntries(fields.map((field) => [field.id, String(values[field.id] ?? field.default ?? "")]));
+function valuesForDirtyFields(original: Record<string, string>, draft: Record<string, string>, fields: UserSettingField[]) {
+  return Object.fromEntries(fields
+    .filter((field) => String(original[field.id] ?? "") !== String(draft[field.id] ?? ""))
+    .map((field) => [field.id, String(draft[field.id] ?? field.default ?? "")]));
 }
 
 type SietchRow = { partitionId: string; dimension: string; displayName: string; password: string; passwordSet: boolean; active: boolean };
@@ -6353,6 +6411,54 @@ function deepDesertPartitionName(row: Record<string, unknown>) {
   if (dimension === 0) return "Deep Desert PvP";
   if (dimension === 1) return "Deep Desert PvE";
   return `Deep Desert ${Number.isFinite(dimension) ? dimension + 1 : "Instance"}`;
+}
+
+type UserGameTarget = { key: string; map: string; partitionId: string; label: string };
+
+function settingsTargetKey(map: string, partitionId = "") {
+  return `${map}::${partitionId}`;
+}
+
+function buildUserGameTargets(
+  mapRows: Record<string, unknown>[],
+  serverPartitionRows: Record<string, unknown>[],
+  sietchRows: SietchRow[],
+  deepDesertRows: Record<string, unknown>[]
+): UserGameTarget[] {
+  const targets: UserGameTarget[] = [];
+  const seen = new Set<string>();
+  function add(map: string, partitionId: string, label: string) {
+    const normalizedMap = String(map || "").trim();
+    const normalizedPartition = String(partitionId || "").trim();
+    if (!normalizedMap) return;
+    const key = settingsTargetKey(normalizedMap, normalizedPartition);
+    if (seen.has(key)) return;
+    seen.add(key);
+    targets.push({ key, map: normalizedMap, partitionId: normalizedPartition, label });
+  }
+
+  for (const sietch of sietchRows) {
+    add("Survival_1", sietch.partitionId, `Survival_1 - ${sietch.displayName || `Sietch ${sietch.dimension}`} (${sietch.partitionId})`);
+  }
+  for (const row of deepDesertRows) {
+    const partitionId = String(row.partitionId || "").trim();
+    if (partitionId) add("DeepDesert_1", partitionId, `DeepDesert_1 - ${deepDesertPartitionName(row)} (${partitionId})`);
+  }
+  for (const row of serverPartitionRows) {
+    const map = String(row.map || "").trim();
+    const partitionId = String(row.partitionId || "").trim();
+    if (!map || !partitionId || map === "Survival_1" || /^DeepDesert_/i.test(map)) continue;
+    const label = String(row.label || "").trim();
+    add(map, partitionId, `${map}${label ? ` - ${label}` : ""} (${partitionId})`);
+  }
+  for (const row of mapRows) {
+    const map = String(row.map || "").trim();
+    const partitionId = String(row.partitionId || row.partition || (map === "Overmap" ? "2" : "")).trim();
+    if (!map || map === "Survival_1" || /^DeepDesert_/i.test(map)) continue;
+    add(map, partitionId, partitionId ? `${map} (${partitionId})` : map);
+  }
+
+  return targets;
 }
 
 function liveMemoryFallback(row: Record<string, unknown>) {

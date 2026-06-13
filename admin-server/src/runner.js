@@ -106,11 +106,11 @@ export function buildDuneArgs(operation, payload = {}) {
     case "databaseExport":
       return ["database", "export", validateSql(payload.query, false)];
     case "adminGiveItem":
-      return ["admin", "grant-item", validatePlayerId(payload.playerId), validateItemName(payload.itemName), String(validateInteger(payload.quantity ?? 1, 1, 1000000)), String(validateDurability(payload.durability ?? 1))];
+      return ["admin", "grant-item", validatePlayerId(payload.playerId), validateItemName(payload.itemName), String(validateInteger(payload.quantity ?? 1, 1, 1000000)), String(validateDurability(1))];
     case "adminGiveItems":
       return ["admin", "grant-template", validatePlayerId(payload.playerId), validateTemplateName(payload.template || "scout-ornithopter-mk6")];
     case "adminGiveItemId":
-      return ["admin", "grant-item-id", validatePlayerId(payload.playerId), validateItemId(payload.itemId), String(validateInteger(payload.quantity ?? 1, 1, 1000000)), String(validateDurability(payload.durability ?? 1))];
+      return ["admin", "grant-item-id", validatePlayerId(payload.playerId), validateItemId(payload.itemId), String(validateInteger(payload.quantity ?? 1, 1, 1000000)), String(validateDurability(1))];
     case "adminAddXp":
       return ["admin", "award-xp", validatePlayerId(payload.playerId), String(validateInteger(payload.amount, 1, 100000000))];
     case "adminSetSkillPoints":
