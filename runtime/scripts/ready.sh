@@ -478,9 +478,7 @@ elif [ "$fail" -eq 0 ]; then
   echo
   if partition_mismatch_hint_needed; then
     echo "Possible runtime partition mismatch detected."
-    echo "If maps stay WARMING after an update, run:"
-    echo "  dune manager"
-    echo "  Updates -> Repair Runtime Files"
+    echo "If maps stay WARMING after an update, open Dune Docker Console and use Updates repair actions."
     echo
   fi
   echo "After READY, population and sietch availability may still take a few minutes"

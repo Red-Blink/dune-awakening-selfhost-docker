@@ -364,7 +364,52 @@ verify_installed_version() {
   echo "Previous stack files backup:"
   echo "  $backup_dir/project-files.tgz"
   echo
-  echo "Exit and reopen dune manager so the updated scripts are reloaded."
+  echo "Dune Docker Console files were updated."
+}
+
+web_console_service_name() {
+  local service
+  [ -f docker-compose.web.yml ] || return 1
+  if ! command -v docker >/dev/null 2>&1; then
+    return 1
+  fi
+  service="$(docker compose -f docker-compose.web.yml config --services 2>/dev/null | grep -E '^redblink-dune-docker-console$' | head -n1 || true)"
+  [ -n "$service" ] || return 1
+  printf '%s\n' "$service"
+}
+
+rebuild_web_console_now() {
+  local service="$1"
+  docker compose -f docker-compose.web.yml up -d --build --force-recreate "$service"
+}
+
+rebuild_web_console_after_update() {
+  local service log_file
+  service="$(web_console_service_name 2>/dev/null || true)"
+  if [ -z "$service" ]; then
+    echo
+    echo "Dune Docker Console rebuild was skipped because docker-compose.web.yml or Docker Compose is unavailable."
+    echo "Run this manually after the update if you use the web panel:"
+    echo "  docker compose -f docker-compose.web.yml up -d --build --force-recreate redblink-dune-docker-console"
+    return 0
+  fi
+
+  mkdir -p runtime/generated
+  log_file="runtime/generated/web-console-rebuild.log"
+  echo
+  echo "Rebuilding Dune Docker Console container: $service"
+  if [ -n "${DUNE_CONTAINER_REPO_ROOT:-}" ] || [ -f /.dockerenv ]; then
+    echo "The rebuild will continue in the background because this update is running from the web console."
+    echo "Rebuild log: $log_file"
+    (
+      sleep 2
+      cd "$ROOT_DIR"
+      rebuild_web_console_now "$service"
+    ) >"$log_file" 2>&1 &
+  else
+    rebuild_web_console_now "$service"
+    echo "Dune Docker Console was rebuilt successfully."
+  fi
 }
 
 install_release_tag_with_git() {
@@ -523,6 +568,7 @@ case "$cmd" in
 
     cache_latest_release_tag "$tag"
     install_release_tag "$tag"
+    rebuild_web_console_after_update
     ;;
 
   *)

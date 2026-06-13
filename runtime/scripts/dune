@@ -63,7 +63,33 @@ case "$cmd" in
     ;;
 
   manager|menu)
-    runtime/scripts/manager.sh
+    cat <<'EOF'
+The interactive CLI manager has moved to Dune Docker Console.
+
+Use dune --help to see available CLI commands for automation and troubleshooting.
+EOF
+    if [ -f docker-compose.web.yml ] && command -v docker >/dev/null 2>&1; then
+      service="$(docker compose -f docker-compose.web.yml config --services 2>/dev/null | grep -E '^redblink-dune-docker-console$' | head -n1 || true)"
+      if [ -n "$service" ]; then
+        echo
+        echo "Starting Dune Docker Console..."
+        if docker compose -f docker-compose.web.yml up -d --build --force-recreate "$service"; then
+          echo "Dune Docker Console is running. Open the web panel on your configured admin URL, usually port 8088."
+        else
+          echo "Dune Docker Console could not be started automatically."
+          echo "Run: docker compose -f docker-compose.web.yml up -d --build --force-recreate redblink-dune-docker-console"
+          exit 1
+        fi
+      else
+        echo
+        echo "Dune Docker Console service was not found in docker-compose.web.yml."
+      fi
+    else
+      echo
+      echo "Docker Compose or docker-compose.web.yml is unavailable."
+      echo "Run this from the repo root after Docker is available:"
+      echo "  docker compose -f docker-compose.web.yml up -d --build --force-recreate redblink-dune-docker-console"
+    fi
     ;;
 
   start)
@@ -231,87 +257,91 @@ case "$cmd" in
   help|--help|-h)
     cat <<'EOF'
 Usage:
-  runtime/scripts/dune init
-  runtime/scripts/dune manager
-  runtime/scripts/dune start
-  runtime/scripts/dune stop
-  runtime/scripts/dune status
-  runtime/scripts/dune version
-  runtime/scripts/dune doctor
-  runtime/scripts/dune ps
-  runtime/scripts/dune servers
-  runtime/scripts/dune spawn <map-name|partition-id>
-  runtime/scripts/dune despawn <map-name|partition-id|container-name>
-  runtime/scripts/dune autoscaler [status|start|stop|restart|logs|run]
-  runtime/scripts/dune ports
-  runtime/scripts/dune ping
-  runtime/scripts/dune ready
-  runtime/scripts/dune logs <service> [--raw]
-  runtime/scripts/dune restart <service>
-  runtime/scripts/dune update [check|auto enable|auto disable|auto status|--yes]
-  runtime/scripts/dune self-update [check|list|install [latest|previous|<tag>]]
-  runtime/scripts/dune restart-schedule [enable <HH:MM> [notify-minutes]|disable|status]
-  runtime/scripts/dune db backup [output-dir]
-  runtime/scripts/dune db list
-  runtime/scripts/dune db status
-  runtime/scripts/dune db health
-  runtime/scripts/dune db import <backup-file>
-  runtime/scripts/dune db restore <backup-file>
-  runtime/scripts/dune db delete <backup-file>
-  runtime/scripts/dune db delete --all
-  runtime/scripts/dune db auto enable <HH:MM> [retention-days]
-  runtime/scripts/dune db auto disable
-  runtime/scripts/dune db auto status
-  runtime/scripts/dune db auto retention <days>
-  runtime/scripts/dune db auto retention off
-  runtime/scripts/dune db transfer [--dry-run] [--yes] [--no-backup] <old-fls-id> <new-fls-id>
-  runtime/scripts/dune db transfer --file <plan.tsv> [--dry-run] [--yes]
-  runtime/scripts/dune db transfer pending|apply-pending|clear-pending
-  runtime/scripts/dune database [status|schemas|tables|counts|columns|preview|sql|export]
-  runtime/scripts/dune maps list
-  runtime/scripts/dune maps mode [map]
-  runtime/scripts/dune maps set <map> <dynamic|always-on>
-  runtime/scripts/dune maps reconcile
-  runtime/scripts/dune deepdesert dual [status|enable|disable|bootstrap|repair]
-  runtime/scripts/dune config title ["New Server Name"]
-  runtime/scripts/dune memory status
-  runtime/scripts/dune memory list-maps
-  runtime/scripts/dune memory set <map-name> <memory>
-  runtime/scripts/dune memory unset <map-name>
-  runtime/scripts/dune memory set default <memory>
-  runtime/scripts/dune memory unset default
-  runtime/scripts/dune sietches [list|show <map-name>|dimensions <map-name>]
-  runtime/scripts/dune sietches set-max <map-name> <count>
-  runtime/scripts/dune sietches set-active <map-name> <count>
-  runtime/scripts/dune sietches set-display <partition-id> <display-name>
-  runtime/scripts/dune sietches set-password <partition-id> [password]
-  runtime/scripts/dune sietches sync
-  runtime/scripts/dune sietches validate
-  runtime/scripts/dune admin item-search <query>
-  runtime/scripts/dune admin players [--online] [--show-full-ids]
-  runtime/scripts/dune admin kick <player-fls-id> [--dry-run] [--yes] [--force] [--label <name>]
-  runtime/scripts/dune admin kick --all-online [--yes] [--dry-run]
-  runtime/scripts/dune admin item-list [category]
-  runtime/scripts/dune admin grant-item <player-id|*> <item-name> [quantity] [durability]
-  runtime/scripts/dune admin grant-item-id <player-id|*> <item-id> [quantity] [durability]
-  runtime/scripts/dune admin grant-template <player-id|*> scout-ornithopter-mk6
-  runtime/scripts/dune admin player-location <player-id>
-  runtime/scripts/dune admin award-xp <player-id|*> <amount>
-  runtime/scripts/dune admin skill-points <player-id|*> <points>
-  runtime/scripts/dune admin skill-module <player-id|*> <module> <level>
-  runtime/scripts/dune admin skill-modules [query]
-  runtime/scripts/dune admin specialization-xp <character-name> (--all|--track <track>) [--level <level>] [--xp <xp>] [--grant-keystones] [--unlock-faction <Atreides|Harkonnen>] [--dry-run] [--yes] [--actor-id <id>]
-  runtime/scripts/dune admin specialization-max <character-name> [--grant-keystones] [--unlock-faction <Atreides|Harkonnen>] [--dry-run] [--yes]
-  runtime/scripts/dune admin refill-water <player-id|*> [amount]
-  runtime/scripts/dune admin clean-inventory <player-id|*>
-  runtime/scripts/dune admin reset-progression <player-id|*>
-  runtime/scripts/dune admin teleport <player-id> <x> <y> <z> [yaw]
-  runtime/scripts/dune admin spawn-vehicle <player-id> <vehicle-id> <template-name> [offset-units]
-  runtime/scripts/dune admin spawn-vehicle-at <player-id> <vehicle-id> <template-name> <x> <y> <z> [rotation]
-  runtime/scripts/dune admin broadcast-restart-warning <minutes>
-  runtime/scripts/dune admin vehicle-list
-  runtime/scripts/dune admin unsupported
-  runtime/scripts/dune admin history
+  dune --help
+  dune init
+  dune start
+  dune stop
+  dune status
+  dune version
+  dune doctor
+  dune ps
+  dune servers
+  dune spawn <map-name|partition-id>
+  dune despawn <map-name|partition-id|container-name>
+  dune autoscaler [status|start|stop|restart|logs|run]
+  dune ports
+  dune ping
+  dune ready
+  dune logs <service> [--raw]
+  dune restart <service>
+  dune update [check|auto enable|auto disable|auto status|--yes]
+  dune self-update [check|list|install [latest|previous|<tag>]]
+  dune restart-schedule [enable <HH:MM> [notify-minutes]|disable|status]
+  dune db backup [output-dir]
+  dune db list
+  dune db status
+  dune db health
+  dune db import <backup-file>
+  dune db restore <backup-file>
+  dune db delete <backup-file>
+  dune db delete --all
+  dune db auto enable <HH:MM> [retention-days]
+  dune db auto disable
+  dune db auto status
+  dune db auto retention <days>
+  dune db auto retention off
+  dune db transfer [--dry-run] [--yes] [--no-backup] <old-fls-id> <new-fls-id>
+  dune db transfer --file <plan.tsv> [--dry-run] [--yes]
+  dune db transfer pending|apply-pending|clear-pending
+  dune database [status|schemas|tables|counts|columns|preview|sql|export]
+  dune maps list
+  dune maps mode [map]
+  dune maps set <map> <dynamic|always-on>
+  dune maps reconcile
+  dune deepdesert dual [status|enable|disable|bootstrap|repair]
+  dune config title ["New Server Name"]
+  dune memory status
+  dune memory list-maps
+  dune memory set <map-name> <memory>
+  dune memory unset <map-name>
+  dune memory set default <memory>
+  dune memory unset default
+  dune sietches [list|show <map-name>|dimensions <map-name>]
+  dune sietches set-max <map-name> <count>
+  dune sietches set-active <map-name> <count>
+  dune sietches set-display <partition-id> <display-name>
+  dune sietches set-password <partition-id> [password]
+  dune sietches sync
+  dune sietches validate
+  dune admin item-search <query>
+  dune admin players [--online] [--show-full-ids]
+  dune admin kick <player-fls-id> [--dry-run] [--yes] [--force] [--label <name>]
+  dune admin kick --all-online [--yes] [--dry-run]
+  dune admin item-list [category]
+  dune admin grant-item <player-id|*> <item-name> [quantity] [durability]
+  dune admin grant-item-id <player-id|*> <item-id> [quantity] [durability]
+  dune admin grant-template <player-id|*> scout-ornithopter-mk6
+  dune admin player-location <player-id>
+  dune admin award-xp <player-id|*> <amount>
+  dune admin skill-points <player-id|*> <points>
+  dune admin skill-module <player-id|*> <module> <level>
+  dune admin skill-modules [query]
+  dune admin specialization-xp <character-name> (--all|--track <track>) [--level <level>] [--xp <xp>] [--grant-keystones] [--unlock-faction <Atreides|Harkonnen>] [--dry-run] [--yes] [--actor-id <id>]
+  dune admin specialization-max <character-name> [--grant-keystones] [--unlock-faction <Atreides|Harkonnen>] [--dry-run] [--yes]
+  dune admin refill-water <player-id|*> [amount]
+  dune admin clean-inventory <player-id|*>
+  dune admin reset-progression <player-id|*>
+  dune admin teleport <player-id> <x> <y> <z> [yaw]
+  dune admin spawn-vehicle <player-id> <vehicle-id> <template-name> [offset-units]
+  dune admin spawn-vehicle-at <player-id> <vehicle-id> <template-name> <x> <y> <z> [rotation]
+  dune admin broadcast-restart-warning <minutes>
+  dune admin vehicle-list
+  dune admin unsupported
+  dune admin history
+
+Web admin panel:
+  Use Dune Docker Console for guided server management.
+  CLI commands remain available for automation, support, and troubleshooting.
 
 Services for logs/restart:
   postgres
@@ -327,7 +357,7 @@ EOF
 
   *)
     echo "Unknown command: $cmd"
-    echo "Run: runtime/scripts/dune help"
+    echo "Run: dune --help"
     exit 1
     ;;
 esac

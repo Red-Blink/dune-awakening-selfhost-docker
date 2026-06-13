@@ -1837,7 +1837,7 @@ case "$cmd" in
     list_sietches "$cmd"
     ;;
   edit)
-    echo "Use dune manager and open Sietches for the guided edit flow."
+    echo "Use Dune Docker Console Maps for the guided Sietch edit flow."
     ;;
   help|--help|-h)
     usage

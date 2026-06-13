@@ -405,5 +405,6 @@ runtime/scripts/ready.sh || true
 cat <<EOF
 
 Next commands:
-  dune manager
+  Open Dune Docker Console in your browser for guided management.
+  Run dune --help for CLI commands.
 EOF

@@ -3218,7 +3218,7 @@ function summarizeStackUpdateProgress(task: Task) {
   const latestLine = [...task.logLines].reverse().map((line) => line.line.trim()).find(Boolean) || task.progressMessage || task.currentStep || "";
   if (task.status === "succeeded") {
     const installedVersion = firstVersionMatch(text, [/Installed stack version:\s*([^\n]+)/i]);
-    return { title: "Console Update Complete", percent: 100, message: installedVersion ? `Console files were updated to ${installedVersion}. Restart or rebuild the web console to run the new console version.` : "Console files were updated. Restart or rebuild the web console to run the new console version." };
+    return { title: "Console Update Complete", percent: 100, message: installedVersion ? `Console files were updated to ${installedVersion}. Dune Docker Console is rebuilding and may ask you to refresh and sign in again.` : "Console files were updated. Dune Docker Console is rebuilding and may ask you to refresh and sign in again." };
   }
   if (task.status === "failed") {
     return { title: "Console Update Failed", percent: Math.max(5, stackUpdatePercent(text)), message: conciseTaskError(task) };
@@ -3236,7 +3236,7 @@ function stackUpdatePercent(text: string) {
     [/Installing stack release into/i, 66],
     [/Installed stack version/i, 88],
     [/Previous stack files backup/i, 94],
-    [/Exit and reopen dune manager/i, 98]
+    [/Rebuilding Dune Docker Console|Dune Docker Console was rebuilt/i, 98]
   ];
   let percent = 3;
   for (const [pattern, value] of stages) {
@@ -3250,6 +3250,8 @@ function friendlyStackUpdateMessage(text: string, latestLine: string) {
   if (/Backing up current stack files/i.test(text)) return "Backing up the current console files before replacing them.";
   if (/Installing stack release into/i.test(text)) return "Installing the downloaded console release files.";
   if (/Installed stack version/i.test(text)) return "Verifying the installed console version.";
+  if (/Rebuilding Dune Docker Console/i.test(text)) return "Rebuilding and restarting the web console container.";
+  if (/Dune Docker Console was rebuilt/i.test(text)) return "The web console container was rebuilt successfully.";
   if (/Previous stack files backup/i.test(text)) return "Finishing the console update and recording the backup location.";
   return latestLine && !/^\s*Task started/i.test(latestLine) ? friendlyStackUpdateLine(latestLine) : "Preparing the console update.";
 }
@@ -5945,7 +5947,7 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
       await runTaskAndRefresh(() => mapsApi.saveRawUserSettings({ scope: "engine", content: rawEngine }), "Saving raw UserEngine and restarting servers", "Raw UserEngine Saved");
       await loadUserEngine();
     } else {
-      await runTaskAndRefresh(() => mapsApi.saveRawUserSettings({ scope: "game", map: userGameName || "Survival_1", partitionId: effectiveUserGamePartitionId || undefined, content: rawGame }), "Saving raw UserGame and restarting servers", "Raw UserGame Saved");
+      await runTaskAndRefresh(() => mapsApi.saveRawUserSettings({ scope: "global", map: userGameName || "Survival_1", partitionId: effectiveUserGamePartitionId || undefined, content: rawGame }), "Saving raw UserGame and restarting servers", "Raw UserGame Saved");
       if (userGameName) await loadSelectedSettings(userGameName, effectiveUserGamePartitionId || undefined);
     }
   }

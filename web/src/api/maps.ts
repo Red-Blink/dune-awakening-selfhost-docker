@@ -58,7 +58,7 @@ export const mapsApi = {
   rawUserSettings: (kind: "engine" | "game" | "profile", map?: string, partitionId?: string) => api<{ content: string }>(`/api/maps/user-settings/raw?kind=${encodeURIComponent(kind)}${map ? `&map=${encodeURIComponent(map)}` : ""}${partitionId ? `&partitionId=${encodeURIComponent(partitionId)}` : ""}`),
   saveUserSettings: (body: { scope: "engine" | "global" | "map" | "partition"; map?: string; partitionId?: string; values: Record<string, string> }) => post<{ task: Task }>("/api/maps/user-settings/save", body),
   resetUserSettings: (body: { scope: "engine" | "global" | "map" | "partition"; map?: string; partitionId?: string; confirmation: string }) => post<{ task: Task }>("/api/maps/user-settings/reset", body),
-  saveRawUserSettings: (body: { scope: "engine" | "game" | "profile"; map?: string; partitionId?: string; content: string }) => post<{ task: Task }>("/api/maps/user-settings/raw", body),
+  saveRawUserSettings: (body: { scope: "engine" | "game" | "global" | "profile"; map?: string; partitionId?: string; content: string }) => post<{ task: Task }>("/api/maps/user-settings/raw", body),
   materializeUserSettings: (confirmation: string) => post<{ task: Task }>("/api/maps/user-settings/materialize", { confirmation }),
   restoreUserSettingsDefaults: (confirmation: string) => post<{ supported: boolean; reason: string }>("/api/maps/user-settings/restore-defaults", { confirmation }),
   sietches: () => api<{ stdout: string }>("/api/sietches"),
