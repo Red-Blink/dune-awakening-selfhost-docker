@@ -946,6 +946,7 @@ export async function playerSpecs(db, id) {
       keystones: await tableExists(db, "purchased_specialization_keystones")
     },
     player,
+    skillModules: await playerSkillModules(db, player),
     rows: tracks.map((track) => {
       const row = byTrack.get(track);
       return {
@@ -956,6 +957,31 @@ export async function playerSpecs(db, id) {
       };
     })
   };
+}
+
+async function playerSkillModules(db, player) {
+  if (!(await tableExists(db, "actor_fgl_entities")) || !(await tableExists(db, "fgl_entities"))) return [];
+  const result = await db.query(`
+    select regexp_replace(module.key, '^\\(TagName="(.+)"\\)$', '\\1') as module_id,
+           case
+             when module.value ? 'SkillPointsSpent'
+              and module.value->>'SkillPointsSpent' ~ '^-?[0-9]+$'
+             then (module.value->>'SkillPointsSpent')::int
+             else 0
+           end as skill_points_spent
+    from dune.actor_fgl_entities afe
+    join dune.fgl_entities fe on fe.entity_id = afe.entity_id
+    cross join lateral jsonb_each(coalesce(fe.components->'FLevelComponent'->1->'ModuleData', '{}'::jsonb)) as module(key, value)
+    where afe.slot_name = 'DuneCharacter'
+      and afe.actor_id = $1
+      and module.key like '(TagName="Skills.%")'
+    order by module_id`, [player.actorId]);
+  return result.rows
+    .map((row) => ({
+      module_id: String(row.module_id || ""),
+      skill_points_spent: Number(row.skill_points_spent || 0)
+    }))
+    .filter((row) => row.module_id && row.skill_points_spent > 0);
 }
 
 export async function addSpecializationXp(db, id, { trackType, amount }) {

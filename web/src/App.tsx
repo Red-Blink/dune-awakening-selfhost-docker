@@ -32,6 +32,7 @@ type ResearchItemRow = { itemKey: string; displayName: string; category: string;
 type SkillModuleCatalogRow = { skillModule: string; category: string; id: string; maxLevel: number };
 type SkillCard = { name: string; type: string; rank: string };
 type SpecializationTrackRow = { trackType: string; xp: number; level: number };
+type LearnedSkillModuleRow = { module_id?: string; moduleId?: string; id?: string; skill_points_spent?: number; skillPointsSpent?: number; level?: number; rank?: number };
 type JourneyRow = { id: string; name: string; rawName: string; category: string; depth: number; parentId: string; dependency?: string; status: string; complete: boolean; revealed?: boolean; pendingReward?: boolean; tags?: number; state?: number | null };
 type BackupResult = { status: "running" | "succeeded" | "failed"; title: string; message?: string; details?: string; tone?: "danger" | "attention" };
 type HomeTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
@@ -1666,6 +1667,7 @@ function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId, player
   const playerAdmin_factionIds: Record<string, number> = { Atreides: 1, Harkonnen: 2, Smuggler: 4 };
   const playerAdmin_craftingCategories = ["Essentials", "Water Discipline", "Combat", "Construction", "Exploration", "Vehicles"];
   const playerAdmin_canRunLiveAction = Boolean(actionPlayerId);
+  const playerAdmin_skillChangeCount = Object.keys(playerAdmin_skillChanges).length;
   const playerAdmin_toggle = (playerAdmin_key: string) => playerAdmin_setOpenToggles((playerAdmin_current) => ({ ...playerAdmin_current, [playerAdmin_key]: !playerAdmin_current[playerAdmin_key] }));
   const playerAdmin_toggleJourney = (key: string) => playerAdmin_setExpandedJourney((current) => ({ ...current, [key]: !current[key] }));
   function playerAdmin_showResult(key: string, text: string, tone: "success" | "danger" | "neutral" = "success", pending = false) {
@@ -1875,12 +1877,25 @@ function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId, player
         xp: Number(row.xp_amount ?? row.xp ?? 0),
         level: Number(row.level ?? 0)
       })).filter((row) => row.trackType));
+      const learnedRows = Array.isArray(response.skillModules) ? response.skillModules as LearnedSkillModuleRow[] : [];
+      playerAdmin_setSkillBaseline(Object.fromEntries(learnedRows.map((row) => {
+        const moduleId = String(row.module_id || row.moduleId || row.id || "");
+        const level = Number(row.level ?? row.rank ?? row.skill_points_spent ?? row.skillPointsSpent ?? 0);
+        return [moduleId, Math.max(0, level)];
+      }).filter(([moduleId, level]) => moduleId && Number(level) > 0)));
+      playerAdmin_setSkillChanges({});
     } catch (error) {
       playerAdmin_setSpecializationRows([]);
       playerAdmin_setSpecializationError(friendlyInlineError(error));
     } finally {
       playerAdmin_setSpecializationLoading(false);
     }
+  }
+  async function playerAdmin_reloadSkills() {
+    await Promise.all([
+      playerAdmin_loadSkillCatalog(),
+      playerAdmin_loadSpecializations()
+    ]);
   }
   async function playerAdmin_addSpecializationXp(trackType: string) {
     const amount = Number(playerAdmin_specializationXpAmount) || 0;
@@ -1965,17 +1980,26 @@ function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId, player
     const nameKey = normalizeSkillName(card.name);
     return playerAdmin_skillCatalog.find((row) => normalizeSkillSchool(row.category) === schoolKey && normalizeSkillName(row.skillModule) === nameKey);
   }
+  function playerAdmin_skillMaxRank(school: string, card: SkillCard) {
+    const module = playerAdmin_findSkillModule(school, card);
+    return Math.max(1, Number(module?.maxLevel || card.rank || 1));
+  }
+  function playerAdmin_skillBaselineRank(school: string, card: SkillCard) {
+    const module = playerAdmin_findSkillModule(school, card);
+    const key = module?.id || playerAdmin_skillKey(school, card.name);
+    return Math.max(0, Math.min(playerAdmin_skillMaxRank(school, card), playerAdmin_skillBaseline[key] ?? 0));
+  }
   function playerAdmin_skillValue(school: string, card: SkillCard) {
     const module = playerAdmin_findSkillModule(school, card);
     const key = module?.id || playerAdmin_skillKey(school, card.name);
-    return playerAdmin_skillChanges[key] ?? playerAdmin_skillBaseline[key] ?? 0;
+    return playerAdmin_skillChanges[key] ?? playerAdmin_skillBaselineRank(school, card);
   }
   function playerAdmin_setSkillValue(school: string, card: SkillCard, rank: number) {
     const module = playerAdmin_findSkillModule(school, card);
     const key = module?.id || playerAdmin_skillKey(school, card.name);
-    const maxRank = Math.max(1, Number(module?.maxLevel || card.rank || 1));
+    const maxRank = playerAdmin_skillMaxRank(school, card);
     const nextRank = Math.max(0, Math.min(maxRank, rank));
-    const baseline = playerAdmin_skillBaseline[key] ?? 0;
+    const baseline = playerAdmin_skillBaselineRank(school, card);
     playerAdmin_setSkillChanges((current) => {
       const next = { ...current };
       if (nextRank === baseline) delete next[key];
@@ -2129,6 +2153,25 @@ function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId, player
     }
   }, [playerAdmin_activeTab, dbPlayerId]);
   useEffect(() => {
+    if (playerAdmin_activeTab !== "Skills" || !dbPlayerId) return;
+    const refreshVisibleSkills = () => {
+      if (document.visibilityState === "visible" && playerAdmin_skillChangeCount === 0) {
+        void playerAdmin_loadSpecializations();
+      }
+    };
+    const refreshFocusedSkills = () => {
+      if (playerAdmin_skillChangeCount === 0) {
+        void playerAdmin_loadSpecializations();
+      }
+    };
+    document.addEventListener("visibilitychange", refreshVisibleSkills);
+    window.addEventListener("focus", refreshFocusedSkills);
+    return () => {
+      document.removeEventListener("visibilitychange", refreshVisibleSkills);
+      window.removeEventListener("focus", refreshFocusedSkills);
+    };
+  }, [playerAdmin_activeTab, dbPlayerId, playerAdmin_skillChangeCount]);
+  useEffect(() => {
     if (playerAdmin_activeTab === "Skills" && playerAdmin_skillSchool) playerAdmin_openSkillTreeToggles(playerAdmin_skillSchool);
   }, [playerAdmin_activeTab, playerAdmin_skillSchool]);
   useEffect(() => {
@@ -2160,8 +2203,8 @@ function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId, player
     <div className="playerAdmin_cardGrid">{playerAdmin_items.map((playerAdmin_item) => {
       const module = playerAdmin_findSkillModule(playerAdmin_school, playerAdmin_item);
       const key = module?.id || playerAdmin_skillKey(playerAdmin_school, playerAdmin_item.name);
-      const maxRank = Math.max(1, Number(module?.maxLevel || playerAdmin_item.rank || 1));
-      const value = playerAdmin_skillChanges[key] ?? playerAdmin_skillBaseline[key] ?? 0;
+      const maxRank = playerAdmin_skillMaxRank(playerAdmin_school, playerAdmin_item);
+      const value = playerAdmin_skillValue(playerAdmin_school, playerAdmin_item);
       const dirty = key in playerAdmin_skillChanges;
       return <article className={`playerAdmin_card playerAdmin_skillCard ${dirty ? "dirty" : ""}`} key={`${playerAdmin_school}-${playerAdmin_item.name}-${playerAdmin_item.type}`}>
         <div className="playerAdmin_skillCardHeader"><strong>{playerAdmin_item.name}</strong><span>{value}/{maxRank}</span></div>
@@ -2462,8 +2505,8 @@ function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId, player
             <div className="playerAdmin_boxHeaderLine">
               <p>The player must be offline.</p>
               <div className="playerAdmin_filterRow playerAdmin_filterRowRight">
-                <span className="playerAdmin_note">{Object.keys(playerAdmin_skillChanges).length} Unsaved Change{Object.keys(playerAdmin_skillChanges).length === 1 ? "" : "s"}</span>
-                <button disabled={playerAdmin_skillCatalogLoading} onClick={() => playerAdmin_loadSkillCatalog()}>{playerAdmin_skillCatalogLoading ? "Loading..." : "Reload"}</button>
+                <span className="playerAdmin_note">{playerAdmin_skillChangeCount} Unsaved Change{playerAdmin_skillChangeCount === 1 ? "" : "s"}</span>
+                <button disabled={playerAdmin_skillCatalogLoading || playerAdmin_specializationLoading} onClick={() => playerAdmin_reloadSkills()}>{playerAdmin_skillCatalogLoading || playerAdmin_specializationLoading ? "Loading..." : "Reload"}</button>
               </div>
             </div>
             <PlayerCategoryIconRail
@@ -2477,7 +2520,7 @@ function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId, player
               includeAll={false}
             />
             {playerAdmin_skillCatalogError && <p className="playerAdmin_note danger">{playerAdmin_skillCatalogError}</p>}
-            {playerAdmin_skillSchool && <div className="playerAdmin_section"><h5>{playerAdmin_skillSchool}</h5>{playerAdmin_skillTrees[playerAdmin_skillSchool].map((playerAdmin_tree) => playerAdmin_toggleBox(`skill_${playerAdmin_skillSchool}_${playerAdmin_tree.tree}`, playerAdmin_tree.tree, playerAdmin_tree.cards.length ? playerAdmin_skillCards(playerAdmin_skillSchool, playerAdmin_tree.cards) : <p>Leave empty for now.</p>))}{Object.keys(playerAdmin_skillChanges).length > 0 && <div className="playerAdmin_saveBar"><button disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={() => playerAdmin_saveSkillChanges()}>Save</button><button disabled={playerAdmin_actionResult?.pending} onClick={() => playerAdmin_discardSkillChanges()}>Discard</button><InlineActionResult result={playerAdmin_actionResult} resultKey="skillSave" /></div>}</div>}
+            {playerAdmin_skillSchool && <div className="playerAdmin_section"><h5>{playerAdmin_skillSchool}</h5>{playerAdmin_skillTrees[playerAdmin_skillSchool].map((playerAdmin_tree) => playerAdmin_toggleBox(`skill_${playerAdmin_skillSchool}_${playerAdmin_tree.tree}`, playerAdmin_tree.tree, playerAdmin_tree.cards.length ? playerAdmin_skillCards(playerAdmin_skillSchool, playerAdmin_tree.cards) : <p>Leave empty for now.</p>))}{playerAdmin_skillChangeCount > 0 && <div className="playerAdmin_saveBar"><button disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={() => playerAdmin_saveSkillChanges()}>Save</button><button disabled={playerAdmin_actionResult?.pending} onClick={() => playerAdmin_discardSkillChanges()}>Discard</button><InlineActionResult result={playerAdmin_actionResult} resultKey="skillSave" /></div>}</div>}
           </section>
           {playerAdmin_toggleBox("skills_specializations", "Specializations", <div className="playerAdmin_section">
             <div className="playerAdmin_boxHeaderLine">
