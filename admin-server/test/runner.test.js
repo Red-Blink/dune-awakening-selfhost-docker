@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildDuneArgs, dockerContainerForLogService, isReadOnlySql, parseVehicleList, validateServiceName } from "../src/runner.js";
 import { redact } from "../src/redact.js";
+import { taskOperations } from "../src/tasks.js";
 
 test("validates known service names and aliases", () => {
   assert.equal(validateServiceName("gateway"), "gateway");
@@ -63,8 +64,10 @@ test("builds allowlisted command arguments without shell interpolation", () => {
   assert.deepEqual(buildDuneArgs("sietchesSetDisplay", { partitionId: 38, displayName: "" }), ["sietches", "set-display", "38", ""]);
   assert.deepEqual(buildDuneArgs("deepdesertAction", { action: "disable" }), ["deepdesert", "dual", "disable", "--yes", "--force"]);
   assert.deepEqual(buildDuneArgs("userSettingsEngineValues"), ["usersettings", "engine-values"]);
+  assert.deepEqual(buildDuneArgs("userSettingsGlobalValues"), ["usersettings", "global-values"]);
   assert.deepEqual(buildDuneArgs("userSettingsMapValues", { map: "Survival_1" }), ["usersettings", "map-values", "Survival_1"]);
   assert.deepEqual(buildDuneArgs("userSettingsPartitionValues", { map: "Survival_1", partitionId: 1 }), ["usersettings", "partition-values", "Survival_1", "1"]);
+  assert.deepEqual(buildDuneArgs("userSettingsResetAndRestart", { scope: "global" }), ["usersettings", "reset-global-game"]);
   assert.throws(() => buildDuneArgs("adminAddXp", { playerId: "bad;id", amount: 1000 }));
   assert.throws(() => buildDuneArgs("backupRestore", { backup: "../dump.backup" }));
   assert.throws(() => buildDuneArgs("adminGiveItem", { playerId: "FLS_TEST", itemName: "", quantity: 1 }));
@@ -98,6 +101,13 @@ test("validates admin catalog wrapper arguments", () => {
   assert.throws(() => buildDuneArgs("adminItemSearch", { q: "x" }));
   assert.throws(() => buildDuneArgs("adminItemSearch", { q: "water\nbad" }));
   assert.throws(() => buildDuneArgs("adminVehicleSearch", { q: "bike\nbad" }));
+});
+
+test("uses the global UserGame reset operation in restart tasks", () => {
+  assert.deepEqual(taskOperations("userSettingsResetAndRestart", { scope: "global", restartMode: "none" }), [
+    "userSettingsResetGlobalGame",
+    "userSettingsMaterializeCurrent"
+  ]);
 });
 
 test("parses RedBlink vehicle-list output into vehicles and templates", () => {

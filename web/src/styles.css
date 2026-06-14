@@ -1287,11 +1287,24 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 .settings-category .settings-grid-roomy { padding: 14px; }
 .settings-selector-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 12px; }
 .settings-selector-row .compact-select { min-width: min(100%, 280px); }
+.modifier-search-tools { display: grid; grid-template-columns: minmax(220px, 1fr) auto; gap: 8px; align-items: end; flex: 1 1 420px; min-width: min(100%, 320px); }
+.modifier-filter-input { width: 100%; min-height: 42px; }
 .settings-field { display: grid; gap: 9px; align-content: start; min-width: 0; border: 1px solid rgba(214, 185, 140, .13); background: rgba(255,255,255,.03); border-radius: 8px; padding: 14px; }
 .settings-field span { display: grid; gap: 2px; }
 .settings-field strong { overflow-wrap: anywhere; }
 .settings-field small { color: #a99577; overflow-wrap: anywhere; }
 .settings-field input, .settings-field select, .settings-field textarea, .raw-editor-card textarea { width: 100%; }
+.settings-list-wrap { overflow: auto; border: 1px solid rgba(214, 185, 140, .16); border-radius: 8px; background: rgba(0,0,0,.12); }
+.settings-list-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.settings-list-table th, .settings-list-table td { padding: 10px 12px; border-bottom: 1px solid rgba(214, 185, 140, .12); vertical-align: top; }
+.settings-list-table th { color: #ffd08a; text-align: left; font-size: 12px; text-transform: uppercase; }
+.settings-list-table th:nth-child(1), .settings-list-table td:nth-child(1) { width: 30%; }
+.settings-list-table th:nth-child(2), .settings-list-table td:nth-child(2) { width: 32%; }
+.settings-list-table th:nth-child(3), .settings-list-table td:nth-child(3) { width: 38%; }
+.settings-list-table td { overflow-wrap: anywhere; }
+.settings-list-table td strong, .settings-list-table td small { display: block; }
+.settings-list-table td small { color: #a99577; margin-top: 3px; }
+.settings-list-table input, .settings-list-table select, .settings-list-table textarea { width: 100%; }
 .memory-usage-cell { min-width: 180px; display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center; }
 .memory-usage-bar { grid-column: 1 / -1; height: 8px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.11); }
 .memory-usage-bar span { display: block; height: 100%; background: linear-gradient(90deg, #6f8f5f, #c68b4a); }

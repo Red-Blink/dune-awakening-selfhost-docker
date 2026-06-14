@@ -36,7 +36,8 @@ type JourneyRow = { id: string; name: string; rawName: string; category: string;
 type BackupResult = { status: "running" | "succeeded" | "failed"; title: string; message?: string; details?: string; tone?: "danger" | "attention" };
 type HomeTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
 type DatabasePasswordState = { taskId?: string; result: HomeTaskResult | null };
-type PersistedMapsTask = { taskId?: string; result: HomeTaskResult | null; runningTitle?: string; successTitle?: string };
+type MapsResultScope = "maps" | "modifiers";
+type PersistedMapsTask = { taskId?: string; result: HomeTaskResult | null; runningTitle?: string; successTitle?: string; resultScope?: MapsResultScope };
 type ConfirmDialogDetail = { label: string; value: string; tone?: "accent" | "success" | "danger" };
 type ConfirmDialogRequest = { title: string; message: string; confirmLabel: string; cancelLabel: string; danger: boolean; details?: ConfirmDialogDetail[]; resolve: (confirmed: boolean) => void };
 
@@ -1139,15 +1140,16 @@ function ServerPanel(props: {
       setScheduleLoading(false);
     }
   }
-  async function saveSchedule() {
+  async function saveSchedule(nextEnabled = restartEnabled) {
     const sanitizedTime = toHourMinuteTime(restartTime);
-    if (restartEnabled && !isValidHourMinuteTime(sanitizedTime)) {
+    if (nextEnabled && !isValidHourMinuteTime(sanitizedTime)) {
       setScheduleResult({ status: "failed", title: "Schedule Save Failed", message: "Daily restart time must be a valid 24-hour time, for example 05:00 or 23:30." });
       return;
     }
     setRestartTime(sanitizedTime);
     setScheduleResult({ status: "running", title: "Saving Schedule" });
-    const requestedEnabled = restartEnabled;
+    const requestedEnabled = nextEnabled;
+    setRestartEnabled(requestedEnabled);
     props.onError("");
     try {
       const final = await waitForTaskSilently((await serverApi.saveRestartSchedule({ enabled: requestedEnabled, time: sanitizedTime })).task);
@@ -1163,6 +1165,7 @@ function ServerPanel(props: {
         ? { status: "succeeded", title: "Schedule Saved Successfully", details }
         : { status: "failed", title: requestedEnabled ? "Timer Install Failed" : "Schedule Save Failed", details: details || nextSchedule.stdout || nextSchedule.stderr || "" });
     } catch (error) {
+      setRestartEnabled(!requestedEnabled);
       setScheduleResult({ status: "failed", title: "Schedule Save Failed", details: error instanceof Error ? error.message : String(error) });
     }
   }
@@ -1453,21 +1456,22 @@ function AdminToolsPanel({ onError }: { onError: (text: string) => void }) {
       setScheduleLoading(false);
     }
   }
-  async function saveSchedule() {
+  async function saveSchedule(nextEnabled = restartEnabled) {
     const sanitizedTime = toHourMinuteTime(restartTime);
     const notifyMinutes = Number(restartNotifyMinutes);
-    if (restartEnabled && !isValidHourMinuteTime(sanitizedTime)) {
+    if (nextEnabled && !isValidHourMinuteTime(sanitizedTime)) {
       setScheduleResult({ status: "failed", title: "Schedule Save Failed", message: "Restart time must be a valid 24-hour time, for example 05:00 or 23:30." });
       return;
     }
-    if (restartEnabled && (!Number.isInteger(notifyMinutes) || notifyMinutes < 1 || notifyMinutes > 1440)) {
+    if (nextEnabled && (!Number.isInteger(notifyMinutes) || notifyMinutes < 1 || notifyMinutes > 1440)) {
       setScheduleResult({ status: "failed", title: "Schedule Save Failed", message: "Notification time must be between 1 and 1440 minutes." });
       return;
     }
     setRestartTime(sanitizedTime);
     setRestartNotifyMinutes(String(Number.isInteger(notifyMinutes) ? notifyMinutes : 15));
     setScheduleResult({ status: "running", title: "Saving Schedule" });
-    const requestedEnabled = restartEnabled;
+    const requestedEnabled = nextEnabled;
+    setRestartEnabled(requestedEnabled);
     onError("");
     try {
       const final = await waitForTaskSilently((await serverApi.saveRestartSchedule({ enabled: requestedEnabled, time: sanitizedTime, notifyMinutes })).task);
@@ -1485,6 +1489,7 @@ function AdminToolsPanel({ onError }: { onError: (text: string) => void }) {
         ? { status: "succeeded", title: "Schedule Saved Successfully", details }
         : { status: "failed", title: requestedEnabled ? "Timer Install Failed" : "Schedule Save Failed", details: details || nextSchedule.stdout || nextSchedule.stderr || "" });
     } catch (error) {
+      setRestartEnabled(!requestedEnabled);
       setScheduleResult({ status: "failed", title: "Schedule Save Failed", details: error instanceof Error ? error.message : String(error) });
     }
   }
@@ -1553,7 +1558,7 @@ function AdminToolsPanel({ onError }: { onError: (text: string) => void }) {
         {scheduleOpen && <div className="playerAdmin_toggleBody">
           <div className="panel-title schedule-panel-title">
             <h4>Schedule Server Restart</h4>
-            <label className={`switch-checkbox ${restartEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={scheduleLoading || scheduleSaving} checked={restartEnabled} onChange={(event) => setRestartEnabled(event.target.checked)} /><span className="switch-label">Daily Restart</span><strong className="switch-state">{restartEnabled ? "ON" : "OFF"}</strong></label>
+            <label className={`switch-checkbox ${restartEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={scheduleLoading || scheduleSaving} checked={restartEnabled} onChange={(event) => run(() => saveSchedule(event.target.checked))} /><span className="switch-label">Daily Restart</span><strong className="switch-state">{restartEnabled ? "ON" : "OFF"}</strong></label>
           </div>
           <KeyValueGrid items={[
             ["Current Status", scheduleStatusLabel],
@@ -1565,7 +1570,7 @@ function AdminToolsPanel({ onError }: { onError: (text: string) => void }) {
           <div className="action-line schedule-action-line">
             <label className="compact-select">Daily Restart Time<input type="time" step="60" pattern="[0-2][0-9]:[0-5][0-9]" disabled={scheduleSaving} value={restartTime} onChange={(event) => setRestartTime(sanitizeTimeInput(event.target.value))} placeholder="05:00" /></label>
             <label className="compact-select schedule-notify-field">In-Game Notice Before (Min)<input type="number" min="1" max="1440" step="1" disabled={scheduleSaving} value={restartNotifyMinutes} onChange={(event) => setRestartNotifyMinutes(event.target.value)} /></label>
-            <button disabled={scheduleSaving || scheduleLoading} onClick={saveSchedule}>Save Schedule</button>
+            <button disabled={scheduleSaving || scheduleLoading} onClick={() => saveSchedule()}>Save Schedule</button>
             {scheduleResult && <span className={`inline-task-result result-${scheduleResult.status === "succeeded" ? "ok" : scheduleResult.status === "failed" ? "fail" : "running"}`}>
               <strong className={scheduleResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(scheduleResult.title, scheduleResult.status === "running")}</strong>
             </span>}
@@ -3909,7 +3914,7 @@ function CarePackagePanel({ onError }: { onError: (text: string) => void }) {
   const [output, setOutput] = useState("");
   const [technicalOutput, setTechnicalOutput] = useState("");
   const [outputScope, setOutputScope] = useState<"config" | "grant" | "auto" | "history" | "">("");
-  async function run(action: () => Promise<void>) {
+  async function run(action: () => Promise<unknown>) {
     onError("");
     setOutput("");
     setTechnicalOutput("");
@@ -4737,7 +4742,7 @@ function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError }: { ba
     : busyAction === "auto" && autoResult?.status === "running"
       ? autoEnabled ? "Activating" : "Deactivating"
       : autoTimerActive ? "Active" : "Inactive";
-  async function run(action: () => Promise<void>) {
+  async function run(action: () => Promise<unknown>) {
     onError("");
     try { await action(); } catch (error) { onError(error instanceof Error ? error.message : String(error)); }
   }
@@ -4777,22 +4782,28 @@ function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError }: { ba
       if (action === "restore" && isTerminalTask(final.status)) setBackupRestoreTask(null);
       setter((final.status === "succeeded" && (action === "delete" || action === "deleteAll")) ? { ...result, tone: "danger" } : result);
       if (final.status === "succeeded") await refresh();
+      return final;
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       setter({ status: "failed", title: failureTitle, message: reason });
       onError(reason);
+      return null;
     } finally {
       setBusyAction("");
     }
   }
-  async function saveAutomaticBackups() {
+  async function saveAutomaticBackups(nextEnabled = autoEnabled) {
     const sanitizedTime = toHourMinuteTime(autoTime);
-    if (autoEnabled && !isValidHourMinuteTime(sanitizedTime)) {
+    if (nextEnabled && !isValidHourMinuteTime(sanitizedTime)) {
       setAutoResult({ status: "failed", title: "Automatic Backup Settings Failed", message: "Daily backup time must be a valid 24-hour time, for example 05:00 or 23:30." });
       return;
     }
     setAutoTime(sanitizedTime);
-    await runBackupTask("auto", () => backupsApi.saveAuto({ enabled: autoEnabled, time: sanitizedTime, retentionDays: Number(autoRetentionDays) }), "Automatic Backup Settings Saved", "Automatic Backup Settings Failed");
+    setAutoEnabled(nextEnabled);
+    const final = await runBackupTask("auto", () => backupsApi.saveAuto({ enabled: nextEnabled, time: sanitizedTime, retentionDays: Number(autoRetentionDays) }), "Automatic Backup Settings Saved", "Automatic Backup Settings Failed");
+    if (final?.status !== "succeeded") {
+      setAutoEnabled(!nextEnabled);
+    }
   }
   async function importExternalBackup() {
     if (!importBackupFile) {
@@ -4874,7 +4885,7 @@ function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError }: { ba
         }); }}><img src="/images/icons/backup-delete.png" alt="" /></button>
       </div>} actionClassName="backup-table-actions" tableClassName="backup-table" /> : backupsLoading ? <div className="empty backups-loading">Loading Backups...</div> : <div className="empty backups-empty">No database backups have been created yet.</div>}
       <section className="action-section">
-        <div className="panel-title"><h4>Automatic Backups</h4><label className={`switch-checkbox ${autoEnabled ? "enabled" : "disabled"}`}><input type="checkbox" checked={autoEnabled} onChange={(event) => setAutoEnabled(event.target.checked)} /><span className="switch-label">Automatic Backups</span><strong className="switch-state">{autoEnabled ? "ON" : "OFF"}</strong></label></div>
+        <div className="panel-title"><h4>Automatic Backups</h4><label className={`switch-checkbox ${autoEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={Boolean(busyAction)} checked={autoEnabled} onChange={(event) => run(() => saveAutomaticBackups(event.target.checked))} /><span className="switch-label">Automatic Backups</span><strong className="switch-state">{autoEnabled ? "ON" : "OFF"}</strong></label></div>
         <KeyValueGrid items={[
           ["Current Status", commandStatusSummary(autoBackup).reason ? "Unavailable" : autoEnabled ? "Enabled" : "Disabled"],
           ["Backup Time (Local Server Time)", toHourMinuteTime(autoStatus.backupTime || autoTime)],
@@ -4888,7 +4899,7 @@ function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError }: { ba
           <label className="compact-select">Daily Backup Time<input type="time" step="60" pattern="[0-2][0-9]:[0-5][0-9]" value={autoTime} onChange={(event) => setAutoTime(sanitizeTimeInput(event.target.value))} placeholder="05:00" /></label>
           <label className="memory-number-field">Keep<input type="number" min="0" max="3650" step="1" value={autoRetentionDays} onChange={(event) => setAutoRetentionDays(event.target.value)} /></label>
           <span className="unit-label">Days</span>
-          <button disabled={Boolean(busyAction)} onClick={() => run(saveAutomaticBackups)}>Save Settings</button>
+          <button disabled={Boolean(busyAction)} onClick={() => run(() => saveAutomaticBackups())}>Save Settings</button>
           {autoResult && <span className={`inline-task-result result-${autoResult.status === "succeeded" ? "ok" : autoResult.status === "failed" ? "fail" : "running"}`}>
             <strong className={autoResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(autoResult.title, autoResult.status === "running")}</strong>
           </span>}
@@ -5458,6 +5469,8 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
   const [userGameMapName, setUserGameMapName] = useState("");
   const [userGamePartitionId, setUserGamePartitionId] = useState("");
   const [selectedGameCategory, setSelectedGameCategory] = useState("");
+  const [modifierFilter, setModifierFilter] = useState("");
+  const [modifierViewMode, setModifierViewMode] = useState<"grid" | "list">("grid");
   const [settingsTab, setSettingsTab] = useState<"engine" | "game">("engine");
   const [modifiersOpen, setModifiersOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -5468,6 +5481,7 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
   const [mapsLoaded, setMapsLoaded] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [mapsResult, setMapsResult] = useState<HomeTaskResult | null>(() => loadPersistedMapsResult());
+  const [mapsResultScope, setMapsResultScope] = useState<MapsResultScope>(() => loadPersistedMapsResultScope());
   const mapsLoadRef = useRef<Promise<void> | null>(null);
   const mapsRuntimeRefreshRef = useRef<Promise<void> | null>(null);
   const mapsDisplayedTerminalTaskRef = useRef<Set<string>>(new Set());
@@ -5479,49 +5493,70 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
     if (!updates.length) return;
     setMemoryText((current) => updateMemoryStatusText(current, updates));
   }
-  async function runTaskAndRefresh(action: () => Promise<{ task: Task }>, runningTitle = "Applying Map Changes", successTitle = "Map Changes Applied", options: { memoryUpdates?: Array<{ map: string; partitionId?: string; memory: string }> } = {}) {
+  async function runTaskAndRefresh(action: () => Promise<{ task: Task }>, runningTitle = "Applying Map Changes", successTitle = "Map Changes Applied", options: { memoryUpdates?: Array<{ map: string; partitionId?: string; memory: string }>; resultScope?: MapsResultScope; restartAcceptedMessage?: string } = {}) {
+    const resultScope = options.resultScope || "maps";
     const response = await action();
     const started: HomeTaskResult = { status: "running", title: runningTitle };
+    setMapsResultScope(resultScope);
     setMapsResult(started);
-    persistMapsTask({ taskId: response.task.id, result: started, runningTitle, successTitle });
+    persistMapsTask({ taskId: response.task.id, result: started, runningTitle, successTitle, resultScope });
+    let restartAcceptedShown = false;
     const final = await waitForTaskWithUpdates(response.task, (task) => {
+      if (options.restartAcceptedMessage && isSettingsRestartHandoffTask(task)) {
+        if (!restartAcceptedShown) {
+          restartAcceptedShown = true;
+          mapsDisplayedTerminalTaskRef.current.add(task.id);
+          setMapsResultScope(resultScope);
+          setMapsResult({ status: "succeeded", title: successTitle, message: options.restartAcceptedMessage });
+          persistMapsTask(null);
+        }
+        return;
+      }
+      if (restartAcceptedShown) return;
       const details = taskTechnicalDetails(task);
       const nextProgress: HomeTaskResult = {
         status: "running",
         title: runningTitle,
         details: details || task.progressMessage || task.currentStep
       };
+      setMapsResultScope(resultScope);
       setMapsResult(nextProgress);
-      persistMapsTask({ taskId: task.id, result: nextProgress, runningTitle, successTitle });
+      persistMapsTask({ taskId: task.id, result: nextProgress, runningTitle, successTitle, resultScope });
     });
     const next: HomeTaskResult = final.status === "succeeded"
       ? { status: "succeeded", title: successTitle, details: taskTechnicalDetails(final) }
       : { status: "failed", title: "Map Change Failed", details: taskTechnicalDetails(final) || final.errorMessage || final.progressMessage };
     mapsDisplayedTerminalTaskRef.current.add(final.id);
     if (next.status === "succeeded") applyOptimisticMemoryUpdates(options.memoryUpdates);
-    setMapsResult(next);
+    if (!restartAcceptedShown || next.status !== "succeeded") {
+      setMapsResultScope(resultScope);
+      setMapsResult(next);
+    }
     persistMapsTask(null);
     await loadMaps();
     await loadUserEngine();
     if (userGameMapName) await loadSelectedSettings(userGameMapName, userGamePartitionId);
   }
-  async function runTaskSequenceAndRefresh(actions: Array<{ label: string; run: () => Promise<{ task: Task }> }>, runningTitle = "Applying Map Changes", successTitle = "Map Changes Applied", options: { saveAcceptedMessage?: string; memoryUpdates?: Array<{ map: string; partitionId?: string; memory: string }> } = {}) {
+  async function runTaskSequenceAndRefresh(actions: Array<{ label: string; run: () => Promise<{ task: Task }> }>, runningTitle = "Applying Map Changes", successTitle = "Map Changes Applied", options: { saveAcceptedMessage?: string; memoryUpdates?: Array<{ map: string; partitionId?: string; memory: string }>; resultScope?: MapsResultScope } = {}) {
     if (!actions.length) return;
+    const resultScope = options.resultScope || "maps";
     const savingMessage = "Saving settings.";
+    setMapsResultScope(resultScope);
     setMapsResult({ status: "running", title: runningTitle, message: savingMessage });
-    persistMapsTask({ result: { status: "running", title: runningTitle, message: savingMessage }, runningTitle, successTitle });
+    persistMapsTask({ result: { status: "running", title: runningTitle, message: savingMessage }, runningTitle, successTitle, resultScope });
     let final: Task | null = null;
     let handedOffToWarming = false;
     let acceptedShown = false;
     for (const [index, action] of actions.entries()) {
       const progressMessage = `Step ${index + 1} of ${actions.length}: ${action.label}`;
       if (!handedOffToWarming) {
+        setMapsResultScope(resultScope);
         setMapsResult({ status: "running", title: runningTitle, message: progressMessage });
-        persistMapsTask({ result: { status: "running", title: runningTitle, message: progressMessage }, runningTitle, successTitle });
+        persistMapsTask({ result: { status: "running", title: runningTitle, message: progressMessage }, runningTitle, successTitle, resultScope });
       }
       const response = await action.run();
       if (!handedOffToWarming) {
-        persistMapsTask({ taskId: response.task.id, result: { status: "running", title: runningTitle, message: progressMessage }, runningTitle, successTitle });
+        persistMapsTask({ taskId: response.task.id, result: { status: "running", title: runningTitle, message: progressMessage }, runningTitle, successTitle, resultScope });
       }
       final = await waitForTaskWithUpdates(response.task, (task) => {
         if (options.saveAcceptedMessage && isMapRuntimeHandoffTask(task)) {
@@ -5530,6 +5565,7 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
           if (!acceptedShown) {
             acceptedShown = true;
             const accepted: HomeTaskResult = { status: "succeeded", title: successTitle, message: options.saveAcceptedMessage };
+            setMapsResultScope(resultScope);
             setMapsResult(accepted);
             persistMapsTask(null);
             void refreshMapRuntime().catch(() => undefined);
@@ -5546,8 +5582,9 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
           message: progressMessage,
           details: details || task.progressMessage || task.currentStep
         };
+        setMapsResultScope(resultScope);
         setMapsResult(nextProgress);
-        persistMapsTask({ taskId: task.id, result: nextProgress, runningTitle, successTitle });
+        persistMapsTask({ taskId: task.id, result: nextProgress, runningTitle, successTitle, resultScope });
       });
       if (final.status !== "succeeded") break;
     }
@@ -5556,7 +5593,10 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
       : { status: "failed", title: "Map Change Failed", details: final ? taskTechnicalDetails(final) || final.errorMessage || final.progressMessage : "No task result." };
     if (final?.id) mapsDisplayedTerminalTaskRef.current.add(final.id);
     if (next.status === "succeeded") applyOptimisticMemoryUpdates(options.memoryUpdates);
-    if (!handedOffToWarming || next.status !== "succeeded") setMapsResult(next);
+    if (!handedOffToWarming || next.status !== "succeeded") {
+      setMapsResultScope(resultScope);
+      setMapsResult(next);
+    }
     persistMapsTask(null);
     await loadMaps();
     await loadSietches();
@@ -5683,6 +5723,7 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
     let cancelled = false;
     const runningTitle = persisted.runningTitle || persisted.result.title || "Applying Map Changes";
     const successTitle = persisted.successTitle || "Map Changes Applied";
+    const resultScope = persisted.resultScope || "maps";
     (async () => {
       let current = (await setupApi.task(persisted.taskId || "")).task;
       while (!cancelled && !isTerminalTask(current.status)) {
@@ -5693,8 +5734,9 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
           message: persisted.result?.message,
           details: details || current.progressMessage || current.currentStep
         };
+        setMapsResultScope(resultScope);
         setMapsResult(nextProgress);
-        persistMapsTask({ taskId: current.id, result: nextProgress, runningTitle, successTitle });
+        persistMapsTask({ taskId: current.id, result: nextProgress, runningTitle, successTitle, resultScope });
         await new Promise((resolvePromise) => window.setTimeout(resolvePromise, 1000));
         current = (await setupApi.task(current.id)).task;
       }
@@ -5706,6 +5748,7 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
       const next: HomeTaskResult = current.status === "succeeded"
         ? { status: "succeeded", title: successTitle, details: taskTechnicalDetails(current) }
         : { status: "failed", title: "Map Change Failed", details: taskTechnicalDetails(current) || current.errorMessage || current.progressMessage };
+      setMapsResultScope(resultScope);
       setMapsResult(next);
       persistMapsTask(null);
       await loadMaps();
@@ -5722,12 +5765,14 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
   }, []);
   useEffect(() => {
     if (!mapsResult || mapsResult.status === "running") return;
+    const clearDelayMs = mapsResultScope === "modifiers" && mapsResult.status === "succeeded" ? 5000 : 10400;
     const id = window.setTimeout(() => {
       setMapsResult(null);
+      setMapsResultScope("maps");
       persistMapsTask(null);
-    }, 10400);
+    }, clearDelayMs);
     return () => window.clearTimeout(id);
-  }, [mapsResult]);
+  }, [mapsResult, mapsResultScope]);
   useEffect(() => {
     const id = window.setInterval(() => { void loadLiveMemory().catch(() => {}); }, 5000);
     return () => window.clearInterval(id);
@@ -5790,12 +5835,14 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
     : isUserGameDeepDesert
       ? (userGamePartitionId || String(userGameDeepDesertPartitionOptions[0]?.partitionId || "8"))
       : isUserGameDeepDesertRuntime ? "2" : userGamePartitionId;
-  const userGameTargetKey = userGameName ? settingsTargetKey(userGameName, effectiveUserGamePartitionId) : "";
+  const isUserGameGlobal = userGameName === "__global__";
+  const userGameTargetKey = userGameName ? settingsTargetKey(userGameName, isUserGameGlobal ? "" : effectiveUserGamePartitionId) : "";
   const gameFields = schema ? (effectivePartitionId ? schema.partition : schema.game).filter((field) => field.id !== "partition_pve_enabled" || effectivePartitionId) : [];
-  const userGameFields = schema && userGameName ? (effectiveUserGamePartitionId ? schema.partition : schema.game).filter((field) => field.id !== "partition_pve_enabled" || effectiveUserGamePartitionId) : [];
-  const gameGroups = groupSettingsFields(userGameFields);
+  const userGameFields = schema && userGameName ? (!isUserGameGlobal && effectiveUserGamePartitionId ? schema.partition : schema.game).filter((field) => field.id !== "partition_pve_enabled" || (!isUserGameGlobal && effectiveUserGamePartitionId)) : [];
+  const gameGroups = groupSettingsFields(userGameFields, true);
   const activeGameCategory = gameGroups.some(([category]) => category === selectedGameCategory) ? selectedGameCategory : gameGroups[0]?.[0] || "";
-  const activeGameFields = gameGroups.find(([category]) => category === activeGameCategory)?.[1] || [];
+  const activeGameFields = activeGameCategory === "All" ? userGameFields : gameGroups.find(([category]) => category === activeGameCategory)?.[1] || [];
+  const filteredGameFields = filterSettingsFields(activeGameFields, modifierFilter);
   const engineFields = (schema?.engine || []).filter((field) => !["server_display_name", "server_login_password", "port", "igw_port"].includes(field.id));
   const engineDirty = changedKeys(engineValues, engineDraft, engineFields.map((field) => field.id));
   const gameDirty = changedKeys(gameValues, gameDraft, userGameFields.map((field) => field.id));
@@ -5810,7 +5857,7 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
   });
   const rawEngineDirty = rawEngine !== rawEngineOriginal;
   const rawGameDirty = rawGame !== rawGameOriginal;
-  const dirtySummary = [
+  const modifierDirtySummary = [
     engineDirty.length ? `${engineDirty.length} UserEngine value${engineDirty.length === 1 ? "" : "s"}` : "",
     gameDirty.length ? `${gameDirty.length} UserGame value${gameDirty.length === 1 ? "" : "s"}` : "",
     rawEngineDirty ? "UserEngine.ini" : "",
@@ -5883,7 +5930,12 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
   }
   async function saveEngine() {
     if (!(await confirmSettingsRestart("UserEngine"))) return;
-    await runTaskAndRefresh(() => mapsApi.saveUserSettings({ scope: "engine", values: valuesForDirtyFields(engineValues, engineDraft, engineFields) }), "Saving UserEngine and restarting servers", "UserEngine Saved");
+    await runTaskAndRefresh(
+      () => mapsApi.saveUserSettings({ scope: "engine", values: valuesForDirtyFields(engineValues, engineDraft, engineFields) }),
+      "Saving UserEngine changes",
+      "UserEngine Saved",
+      { resultScope: "modifiers", restartAcceptedMessage: "Changes saved successfully. The maps are restarting and should be back up soon." }
+    );
     await loadUserEngine();
   }
   async function saveSelectedMapSettings(row: Record<string, unknown>) {
@@ -6118,25 +6170,50 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
   async function saveGame() {
     if (!userGameName) return;
     if (!(await confirmSettingsRestart("UserGame"))) return;
-    const scope = effectiveUserGamePartitionId ? "partition" : "map";
-    await runTaskAndRefresh(() => mapsApi.saveUserSettings({ scope, map: userGameName, partitionId: effectiveUserGamePartitionId || undefined, values: valuesForDirtyFields(gameValues, gameDraft, userGameFields) }), `Saving ${userGameName} UserGame`, "UserGame Saved");
-    await loadSelectedSettings(userGameName, effectiveUserGamePartitionId || undefined);
+    const scope = isUserGameGlobal ? "global" : effectiveUserGamePartitionId ? "partition" : "map";
+    const map = isUserGameGlobal ? "Survival_1" : userGameName;
+    const partitionId = isUserGameGlobal ? undefined : effectiveUserGamePartitionId || undefined;
+    await runTaskAndRefresh(
+      () => mapsApi.saveUserSettings({ scope, map, partitionId, values: valuesForDirtyFields(gameValues, gameDraft, userGameFields) }),
+      `Saving ${isUserGameGlobal ? "Global" : userGameName} UserGame changes`,
+      "UserGame Saved",
+      { resultScope: "modifiers", restartAcceptedMessage: "Changes saved successfully. The maps are restarting and should be back up soon." }
+    );
+    await loadSelectedSettings(userGameName, partitionId);
   }
   async function saveRaw(kind: "engine" | "game") {
     if (!(await confirmSettingsRestart(kind === "engine" ? "UserEngine" : "UserGame"))) return;
     if (kind === "engine") {
-      await runTaskAndRefresh(() => mapsApi.saveRawUserSettings({ scope: "engine", content: rawEngine }), "Saving raw UserEngine and restarting servers", "Raw UserEngine Saved");
+      await runTaskAndRefresh(
+        () => mapsApi.saveRawUserSettings({ scope: "engine", content: rawEngine }),
+        "Saving UserEngine changes",
+        "UserEngine Saved",
+        { resultScope: "modifiers", restartAcceptedMessage: "Changes saved successfully. The maps are restarting and should be back up soon." }
+      );
       await loadUserEngine();
     } else {
-      await runTaskAndRefresh(() => mapsApi.saveRawUserSettings({ scope: "global", map: userGameName || "Survival_1", partitionId: effectiveUserGamePartitionId || undefined, content: rawGame }), "Saving raw UserGame and restarting servers", "Raw UserGame Saved");
+      await runTaskAndRefresh(
+        () => mapsApi.saveRawUserSettings({ scope: "global", map: userGameName || "Survival_1", partitionId: effectiveUserGamePartitionId || undefined, content: rawGame }),
+        "Saving UserGame changes",
+        "UserGame Saved",
+        { resultScope: "modifiers", restartAcceptedMessage: "Changes saved successfully. The maps are restarting and should be back up soon." }
+      );
       if (userGameName) await loadSelectedSettings(userGameName, effectiveUserGamePartitionId || undefined);
     }
   }
   async function restoreRawGameDefaults() {
     if (userGameName) {
-      if (!(await confirmDialog(`Restore UserGame defaults for ${userGameName}${effectiveUserGamePartitionId ? ` partition ${effectiveUserGamePartitionId}` : ""}?`))) return;
-      await runTaskAndRefresh(() => mapsApi.resetUserSettings({ scope: effectiveUserGamePartitionId ? "partition" : "map", map: userGameName, partitionId: effectiveUserGamePartitionId || undefined, confirmation: "RESTORE MAP DEFAULTS" }), "Restoring UserGame defaults", "UserGame Defaults Restored");
-      await loadSelectedSettings(userGameName, effectiveUserGamePartitionId || undefined);
+      const scope = isUserGameGlobal ? "global" : effectiveUserGamePartitionId ? "partition" : "map";
+      const map = isUserGameGlobal ? "Survival_1" : userGameName;
+      const partitionId = isUserGameGlobal ? undefined : effectiveUserGamePartitionId || undefined;
+      if (!(await confirmDialog(`Restore UserGame defaults for ${isUserGameGlobal ? "Global" : userGameName}${partitionId ? ` partition ${partitionId}` : ""}?`))) return;
+      await runTaskAndRefresh(
+        () => mapsApi.resetUserSettings({ scope, map, partitionId, confirmation: "RESTORE MAP DEFAULTS" }),
+        "Restoring UserGame defaults",
+        "UserGame Defaults Restored",
+        { resultScope: "modifiers", restartAcceptedMessage: "Defaults restored successfully. The maps are restarting and should be back up soon." }
+      );
+      await loadSelectedSettings(userGameName, partitionId);
       return;
     }
     if (!(await confirmDialog("Restore all UserGame defaults? This removes custom UserGame overrides for maps and partitions."))) return;
@@ -6146,7 +6223,12 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
       "; Docker applies the correct values to each server when maps start or restart.",
       ""
     ].join("\n");
-    await runTaskAndRefresh(() => mapsApi.saveRawUserSettings({ scope: "global", map: "Survival_1", content: defaultGameProfile }), "Restoring all UserGame defaults", "UserGame Defaults Restored");
+    await runTaskAndRefresh(
+      () => mapsApi.saveRawUserSettings({ scope: "global", map: "Survival_1", content: defaultGameProfile }),
+      "Restoring all UserGame defaults",
+      "UserGame Defaults Restored",
+      { resultScope: "modifiers", restartAcceptedMessage: "Defaults restored successfully. The maps are restarting and should be back up soon." }
+    );
     setRawGame(defaultGameProfile);
     setRawGameOriginal(defaultGameProfile);
     setGameValues({});
@@ -6164,7 +6246,7 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
     downloadText(name, text);
   }
   async function toggleAdvanced() {
-    if (!mapsLoaded || loading) return;
+    if (!mapsLoaded) return;
     if (advancedOpen) {
       setAdvancedOpen(false);
       return;
@@ -6177,17 +6259,16 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
     setAdvancedOpen(true);
   }
   function toggleModifiers() {
-    if (!mapsLoaded || loading) return;
+    if (!mapsLoaded) return;
     const nextOpen = !modifiersOpen;
     setModifiersOpen(nextOpen);
     if (nextOpen) setAdvancedOpen(false);
   }
-  const modifiersAvailable = mapsLoaded && !loading;
-  const advancedAvailable = mapsLoaded && !loading;
+  const modifiersAvailable = mapsLoaded;
+  const advancedAvailable = mapsLoaded;
   return <section className="panel maps-panel">
     <div className="panel-title"><h2>Maps & Sietches</h2><div className="maps-title-actions">{swapMemory?.enabled && <span className={`maps-swap-status ${swapMemory.lastError ? "danger" : ""}`}>{swapMemory.lastError ? `Memory Balancer error: ${swapMemory.lastError}` : swapMemory.lastMessage || "Memory Balancer is monitoring running maps"}</span>}<button className={`switch-toggle maps-swap-toggle ${swapMemory?.enabled ? "enabled" : "disabled"}`} disabled={swapMemorySaving} onClick={() => run(toggleSwapMemory)}><span className="switch-label">Memory Balancer</span><strong className="switch-state">{swapMemory?.enabled ? "ON" : "OFF"}</strong></button><button disabled={loading} onClick={() => run(loadMaps)}>{loading ? "Refreshing..." : "Refresh Maps"}</button></div></div>
-    {dirtySummary && <p className="dirty-note">Unsaved changes: {dirtySummary}</p>}
-    {mapsResult ? <div className="maps-result-slot"><HomeTaskResultCard result={mapsResult} /></div> : null}
+    {mapsResult && mapsResultScope === "maps" ? <div className="maps-result-slot"><HomeTaskResultCard result={mapsResult} /></div> : null}
     <section className="action-section">
       <h4>Maps Overview</h4>
       {loading && !mapRows.length && <div className="empty"><span className="loading-dots">Loading Maps</span></div>}
@@ -6271,9 +6352,14 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
       {loadError && mapRows.length ? <p className="danger-note">Some map data could not be refreshed: {loadError}</p> : null}
       {memoryError && <p className="danger-note">Live memory could not be read: {memoryError}</p>}
     </section>
+    {(modifierDirtySummary || (mapsResult && mapsResultScope === "modifiers")) && <div className="maps-modifier-status-slot">
+      {modifierDirtySummary && <p className="dirty-note">Unsaved changes: {modifierDirtySummary}</p>}
+      {mapsResult && mapsResultScope === "modifiers" ? <div className="maps-result-slot"><HomeTaskResultCard result={mapsResult} /></div> : null}
+    </div>}
     <div className={`playerAdmin_toggle maps-modifiers-toggle ${modifiersOpen && modifiersAvailable ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" disabled={!modifiersAvailable} aria-label={modifiersOpen && modifiersAvailable ? "Collapse Interactive Modifiers" : "Expand Interactive Modifiers"} onClick={toggleModifiers}>{modifiersOpen && modifiersAvailable ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Interactive Modifiers</span></button>
-      {modifiersOpen && modifiersAvailable && <div className="playerAdmin_toggleBody"><div className="settings-tabs" role="tablist" aria-label="INI modifier editor">
+      {modifiersOpen && modifiersAvailable && <div className="playerAdmin_toggleBody">
+      <div className="settings-tabs" role="tablist" aria-label="INI modifier editor">
         <button className={settingsTab === "engine" ? "active" : ""} role="tab" aria-selected={settingsTab === "engine"} onClick={() => setSettingsTab("engine")}>UserEngine</button>
         <button className={settingsTab === "game" ? "active" : ""} role="tab" aria-selected={settingsTab === "game"} onClick={() => setSettingsTab("game")}>UserGame</button>
       </div>
@@ -6284,15 +6370,22 @@ function MapsPanel({ setTask, onError }: { setTask: (task: Task) => void; onErro
         <div className="settings-selector-row">
           <label className="compact-select">Target<select value={userGameTargetKey} onChange={(event) => selectUserGameTarget(event.target.value)}><option value="">Select Map Or Partition</option>{userGameTargets.map((target) => <option key={target.key} value={target.key}>{target.label}</option>)}</select></label>
           <label className="compact-select">Modifier Category<select disabled={!userGameName} value={activeGameCategory} onChange={(event) => setSelectedGameCategory(event.target.value)}>{gameGroups.map(([category, fields]) => <option key={category} value={category}>{category} ({fields.length})</option>)}</select></label>
+          <div className="modifier-search-tools">
+            <input className="modifier-filter-input" disabled={!userGameName} aria-label="Filter Modifiers" value={modifierFilter} onChange={(event) => setModifierFilter(event.target.value)} placeholder="Filter modifiers" />
+            <div className="catalog-view-toggle" aria-label="Modifier view">
+              <button type="button" className={modifierViewMode === "grid" ? "active" : ""} title="Grid view" aria-label="Grid view" aria-pressed={modifierViewMode === "grid"} onClick={() => setModifierViewMode("grid")}><Grid2X2 size={17} /></button>
+              <button type="button" className={modifierViewMode === "list" ? "active" : ""} title="List view" aria-label="List view" aria-pressed={modifierViewMode === "list"} onClick={() => setModifierViewMode("list")}><List size={18} /></button>
+            </div>
+          </div>
         </div>
-        {userGameName && <SettingsCardGrid fields={activeGameFields} values={gameDraft} onChange={(id, value) => setGameDraft({ ...gameDraft, [id]: value })} />}
+        {userGameName && <SettingsCardGrid fields={filteredGameFields} values={gameDraft} onChange={(id, value) => setGameDraft({ ...gameDraft, [id]: value })} viewMode={modifierViewMode} emptyMessage={modifierFilter.trim() ? "No modifiers match your filter." : "Select a modifier category."} />}
         <div className="action-row"><button disabled={!gameDirty.length || !userGameName} onClick={() => run(saveGame)}>Save</button><button disabled={!gameDirty.length} onClick={() => setGameDraft(gameValues)}>Discard Changes</button></div>
       </>}</div>}
     </div>
     <div className={`playerAdmin_toggle maps-advanced-toggle ${advancedOpen && advancedAvailable ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" disabled={!advancedAvailable} onClick={() => run(toggleAdvanced)}>{advancedOpen && advancedAvailable ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Advanced</span></button>
       {advancedOpen && advancedAvailable && <div className="playerAdmin_toggleBody"><div className="advanced-grid">
-        <article className="raw-editor-card"><div className="panel-title"><h4>UserEngine.ini</h4><div className="action-row"><button onClick={() => downloadIni("engine")}>Download</button><label className="button-link">Import<input className="hidden-file-input" type="file" accept=".ini,text/plain" onChange={(event) => run(async () => { await importIni("engine", event.target.files?.[0] || null); })} /></label></div></div><textarea value={rawEngine} onChange={(event) => setRawEngine(event.target.value)} rows={14} /><div className="action-row"><button disabled={!rawEngineDirty} onClick={() => run(() => saveRaw("engine"))}>Save</button><button disabled={!rawEngineDirty} onClick={() => setRawEngine(rawEngineOriginal)}>Discard Changes</button><button className="danger" onClick={() => run(async () => { if (await confirmDialog("Restore UserEngine gameplay defaults? Server name, password, Port, and IGWPort will be preserved.")) await runTaskAndRefresh(() => mapsApi.resetUserSettings({ scope: "engine", confirmation: "RESTORE MAP DEFAULTS" }), "Restoring UserEngine defaults", "UserEngine Defaults Restored"); await loadUserEngine(); })}>Restore Defaults</button></div></article>
+        <article className="raw-editor-card"><div className="panel-title"><h4>UserEngine.ini</h4><div className="action-row"><button onClick={() => downloadIni("engine")}>Download</button><label className="button-link">Import<input className="hidden-file-input" type="file" accept=".ini,text/plain" onChange={(event) => run(async () => { await importIni("engine", event.target.files?.[0] || null); })} /></label></div></div><textarea value={rawEngine} onChange={(event) => setRawEngine(event.target.value)} rows={14} /><div className="action-row"><button disabled={!rawEngineDirty} onClick={() => run(() => saveRaw("engine"))}>Save</button><button disabled={!rawEngineDirty} onClick={() => setRawEngine(rawEngineOriginal)}>Discard Changes</button><button className="danger" onClick={() => run(async () => { if (await confirmDialog("Restore UserEngine gameplay defaults? Server name, password, Port, and IGWPort will be preserved.")) await runTaskAndRefresh(() => mapsApi.resetUserSettings({ scope: "engine", confirmation: "RESTORE MAP DEFAULTS" }), "Restoring UserEngine defaults", "UserEngine Defaults Restored", { resultScope: "modifiers", restartAcceptedMessage: "Defaults restored successfully. The maps are restarting and should be back up soon." }); await loadUserEngine(); })}>Restore Defaults</button></div></article>
         <article className="raw-editor-card"><div className="panel-title"><h4>UserGame.ini</h4><div className="action-row"><button onClick={() => downloadIni("game")}>Download</button><label className="button-link">Import<input className="hidden-file-input" type="file" accept=".ini,text/plain" onChange={(event) => run(async () => { await importIni("game", event.target.files?.[0] || null); })} /></label></div></div><textarea value={rawGame} onChange={(event) => setRawGame(event.target.value)} rows={14} /><div className="action-row"><button disabled={!rawGameDirty} onClick={() => run(() => saveRaw("game"))}>Save</button><button disabled={!rawGameDirty} onClick={() => setRawGame(rawGameOriginal)}>Discard Changes</button><button className="danger" onClick={() => run(restoreRawGameDefaults)}>{userGameName ? "Restore Defaults" : "Restore All UserGame Defaults"}</button></div></article>
       </div></div>}
     </div>
@@ -6308,8 +6401,15 @@ function SettingsEditor({ fields, values, onChange }: { fields: UserSettingField
   </details>)}</div>;
 }
 
-function SettingsCardGrid({ fields, values, onChange }: { fields: UserSettingField[]; values: Record<string, string>; onChange: (id: string, value: string) => void }) {
-  if (!fields.length) return <div className="empty">Select a modifier category.</div>;
+function SettingsCardGrid({ fields, values, onChange, viewMode = "grid", emptyMessage = "Select a modifier category." }: { fields: UserSettingField[]; values: Record<string, string>; onChange: (id: string, value: string) => void; viewMode?: "grid" | "list"; emptyMessage?: string }) {
+  if (!fields.length) return <div className="empty">{emptyMessage}</div>;
+  if (viewMode === "list") {
+    return <div className="settings-list-wrap"><table className="settings-list-table"><thead><tr><th>Modifier</th><th>Setting Key</th><th>Value</th></tr></thead><tbody>{fields.map((field) => <tr key={field.id}>
+      <td><strong>{friendlySettingLabel(field.id, field.key || field.id)}</strong><small>{settingsCategory(field.section || field.key || field.id)}</small></td>
+      <td>{field.key || field.id}</td>
+      <td><SettingInput field={field} value={values[field.id] ?? field.default ?? ""} inputId={`setting-list-${field.scope}-${field.id}`} onChange={(value) => onChange(field.id, value)} /></td>
+    </tr>)}</tbody></table></div>;
+  }
   return <div className="settings-grid settings-grid-roomy">{fields.map((field) => <SettingControl key={field.id} field={field} value={values[field.id] ?? field.default ?? ""} onChange={(value) => onChange(field.id, value)} />)}</div>;
 }
 
@@ -6318,14 +6418,18 @@ function SettingControl({ field, value, onChange }: { field: UserSettingField; v
   const inputId = `setting-${field.scope}-${field.id}`;
   return <label className="settings-field" htmlFor={inputId}>
     <span><strong>{label}</strong><small>{field.key || field.id}</small></span>
-    {field.type === "boolean"
-      ? <select id={inputId} value={normalizeBooleanText(value)} onChange={(event) => onChange(event.target.value)}><option value="True">True</option><option value="False">False</option></select>
-      : field.type === "integer" || field.type === "number"
-        ? <input id={inputId} type="number" step={field.type === "integer" ? "1" : "any"} value={value} onChange={(event) => onChange(event.target.value)} />
-        : String(value).length > 72 || value.includes("(")
-          ? <textarea id={inputId} rows={3} value={value} onChange={(event) => onChange(event.target.value)} />
-          : <input id={inputId} value={value} onChange={(event) => onChange(event.target.value)} />}
+    <SettingInput field={field} value={value} inputId={inputId} onChange={onChange} />
   </label>;
+}
+
+function SettingInput({ field, value, inputId, onChange }: { field: UserSettingField; value: string; inputId: string; onChange: (value: string) => void }) {
+  return field.type === "boolean"
+    ? <select id={inputId} value={normalizeBooleanText(value)} onChange={(event) => onChange(event.target.value)}><option value="True">True</option><option value="False">False</option></select>
+    : field.type === "integer" || field.type === "number"
+      ? <input id={inputId} type="number" step={field.type === "integer" ? "1" : "any"} value={value} onChange={(event) => onChange(event.target.value)} />
+      : String(value).length > 72 || value.includes("(")
+        ? <textarea id={inputId} rows={3} value={value} onChange={(event) => onChange(event.target.value)} />
+        : <input id={inputId} value={value} onChange={(event) => onChange(event.target.value)} />;
 }
 
 function MemoryUsageBar({ row, fallback, configuredLimit }: { row: LiveMapMemoryRow | null; fallback: string; configuredLimit?: unknown }) {
@@ -6386,13 +6490,25 @@ function passwordPlaceholder(passwordSet: boolean) {
   return "Empty for none";
 }
 
-function groupSettingsFields(fields: UserSettingField[]): [string, UserSettingField[]][] {
+function groupSettingsFields(fields: UserSettingField[], includeAll = false): [string, UserSettingField[]][] {
   const grouped = new globalThis.Map<string, UserSettingField[]>();
   for (const field of fields) {
     const category = settingsCategory(field.section || field.key || field.id);
     grouped.set(category, [...(grouped.get(category) || []), field]);
   }
-  return [...grouped.entries()];
+  const groups = [...grouped.entries()];
+  return includeAll && fields.length ? [["All", fields], ...groups] : groups;
+}
+
+function filterSettingsFields(fields: UserSettingField[], query: string) {
+  const needle = String(query || "").trim().toLowerCase();
+  if (!needle) return fields;
+  return fields.filter((field) => {
+    const label = friendlySettingLabel(field.id, field.key || field.id);
+    const category = settingsCategory(field.section || field.key || field.id);
+    const haystack = `${label} ${field.id} ${field.key || ""} ${field.section || ""} ${category}`.toLowerCase();
+    return haystack.includes(needle);
+  });
 }
 
 function settingsCategory(value: string) {
@@ -6508,6 +6624,7 @@ function buildUserGameTargets(
     targets.push({ key, map: normalizedMap, partitionId: normalizedPartition, label });
   }
 
+  add("__global__", "", "Global");
   for (const sietch of sietchRows) {
     add("Survival_1", sietch.partitionId, `Survival_1 - ${sietch.displayName || `Sietch ${sietch.dimension}`} (${sietch.partitionId})`);
   }
@@ -6552,6 +6669,10 @@ const MAPS_RESULT_KEY = "dune.maps.result";
 
 function loadPersistedMapsResult(): HomeTaskResult | null {
   return loadPersistedMapsTask()?.result || null;
+}
+
+function loadPersistedMapsResultScope(): MapsResultScope {
+  return loadPersistedMapsTask()?.resultScope || "maps";
 }
 
 function loadPersistedMapsTask(): PersistedMapsTask | null {
@@ -6738,15 +6859,16 @@ function UpdatesPanel({ setTask }: { setTask: (task: Task) => void }) {
       setAutoGameLoading(false);
     }
   }
-  async function saveAutoGame() {
+  async function saveAutoGame(nextEnabled = autoGameEnabled) {
     const sanitizedTime = toHourMinuteTime(autoGameTime);
-    if (autoGameEnabled && !isValidHourMinuteTime(sanitizedTime)) {
+    if (nextEnabled && !isValidHourMinuteTime(sanitizedTime)) {
       setAutoGameResult({ status: "failed", title: "Auto Updates Save Failed", message: "Daily check time must be a valid 24-hour time, for example 05:00 or 23:30." });
       return;
     }
     setAutoGameTime(sanitizedTime);
     setAutoGameResult({ status: "running", title: "Saving Auto Updates" });
-    const requestedEnabled = autoGameEnabled;
+    const requestedEnabled = nextEnabled;
+    setAutoGameEnabled(requestedEnabled);
     try {
       const final = await waitForTaskSilently((await updatesApi.saveAutoGame({ enabled: requestedEnabled, time: sanitizedTime, confirmation: "SAVE AUTO GAME UPDATES" })).task);
       const details = taskTechnicalDetails(final);
@@ -6761,6 +6883,7 @@ function UpdatesPanel({ setTask }: { setTask: (task: Task) => void }) {
         ? { status: "succeeded", title: "Auto Updates Saved Successfully", details }
         : { status: "failed", title: requestedEnabled ? "Timer Install Failed" : "Auto Updates Save Failed", details: details || nextAutoGame.stdout || nextAutoGame.stderr || "" });
     } catch (error) {
+      setAutoGameEnabled(!requestedEnabled);
       setAutoGameResult({ status: "failed", title: "Auto Updates Save Failed", details: error instanceof Error ? error.message : String(error) });
     }
   }
@@ -6867,7 +6990,7 @@ function UpdatesPanel({ setTask }: { setTask: (task: Task) => void }) {
         {stackUpdateTask && <StackUpdateProgress task={stackUpdateTask} onRetry={applyStackUpdate} />}
       </section>
       <section className="action-section">
-        <div className="panel-title"><h4>Automatic Game Updates</h4><label className={`switch-checkbox ${autoGameEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={autoGameLoading || autoGameSaving} checked={autoGameEnabled} onChange={(event) => setAutoGameEnabled(event.target.checked)} /><span className="switch-label">Auto Updates</span><strong className="switch-state">{autoGameEnabled ? "ON" : "OFF"}</strong></label></div>
+        <div className="panel-title"><h4>Automatic Game Updates</h4><label className={`switch-checkbox ${autoGameEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={autoGameLoading || autoGameSaving} checked={autoGameEnabled} onChange={(event) => saveAutoGame(event.target.checked)} /><span className="switch-label">Auto Updates</span><strong className="switch-state">{autoGameEnabled ? "ON" : "OFF"}</strong></label></div>
         <KeyValueGrid items={[
           ["Current Status", autoGameStatusLabel],
           ["Check Time (Local Server Time)", toHourMinuteTime(autoGameValues.auto_update_time || autoGameTime)],
@@ -6876,7 +6999,7 @@ function UpdatesPanel({ setTask }: { setTask: (task: Task) => void }) {
         {commandStatusSummary(autoGame).reason && <p className="danger-note">{commandStatusSummary(autoGame).reason}</p>}
         <div className="action-line schedule-action-line auto-game-action-line">
           <label className="compact-select">Daily Check Time<input type="time" step="60" pattern="[0-2][0-9]:[0-5][0-9]" disabled={autoGameSaving} value={autoGameTime} onChange={(event) => setAutoGameTime(sanitizeTimeInput(event.target.value))} placeholder="05:00" /></label>
-          <button disabled={autoGameLoading || autoGameSaving} onClick={saveAutoGame}>Save Auto Updates</button>
+          <button disabled={autoGameLoading || autoGameSaving} onClick={() => saveAutoGame()}>Save Auto Updates</button>
           {autoGameResult && <span className={`inline-task-result result-${autoGameResult.status === "succeeded" ? "ok" : autoGameResult.status === "failed" ? "fail" : "running"}`}>
             <strong className={autoGameResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(autoGameResult.title, autoGameResult.status === "running")}</strong>
           </span>}
@@ -7777,6 +7900,18 @@ function isMapRuntimeHandoffTask(task: Task) {
     /\bStarting\b.+\b(Survival_1|sietch|map|server)\b/i.test(text) ||
     /\bSpawned\b.+\bdune-server-/i.test(text) ||
     /\bActive dimensions for\b.+\bset to\b/i.test(text);
+}
+
+function isSettingsRestartHandoffTask(task: Task) {
+  const text = [
+    task.currentStep,
+    task.progressMessage,
+    ...((task.logLines || []).slice(-20).map((line) => line.line))
+  ].filter(Boolean).join("\n");
+  return /^(stop|start|restartService|mapsDespawn|mapsSpawn)$/i.test(String(task.currentStep || "")) ||
+    /\bRunning (stop|start|restartService|mapsDespawn|mapsSpawn)\b/i.test(text) ||
+    /\bStopping\b.+\bDune\b/i.test(text) ||
+    /\bStarting\b.+\b(game|server|stack|services|Dune)\b/i.test(text);
 }
 
 function friendlyHomeStatusError(error: string) {

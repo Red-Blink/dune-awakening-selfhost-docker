@@ -215,6 +215,8 @@ export function buildDuneArgs(operation, payload = {}) {
       return ["usersettings", "profile-engine-write-b64", encodeTextArg(payload.content || "")];
     case "userSettingsMapValues":
       return ["usersettings", "map-values", validateMapName(payload.map)];
+    case "userSettingsGlobalValues":
+      return ["usersettings", "global-values"];
     case "userSettingsPartitionValues":
       return ["usersettings", "partition-values", validateMapName(payload.map), validatePartitionId(payload.partitionId)];
     case "userSettingsSave":
@@ -223,10 +225,16 @@ export function buildDuneArgs(operation, payload = {}) {
       return buildDuneArgs("userSettingsSave", payload);
     case "userSettingsResetEngineGameplay":
       return ["usersettings", "reset-engine-gameplay"];
+    case "userSettingsResetGlobalGame":
+      return ["usersettings", "reset-global-game"];
     case "userSettingsResetGame":
       return payload.partitionId ? ["usersettings", "reset-game", validateMapName(payload.map), validatePartitionId(payload.partitionId)] : ["usersettings", "reset-game", validateMapName(payload.map)];
     case "userSettingsResetAndRestart":
-      return payload.scope === "engine" ? buildDuneArgs("userSettingsResetEngineGameplay", payload) : buildDuneArgs("userSettingsResetGame", payload);
+      return payload.scope === "engine"
+        ? buildDuneArgs("userSettingsResetEngineGameplay", payload)
+        : payload.scope === "global"
+          ? buildDuneArgs("userSettingsResetGlobalGame", payload)
+          : buildDuneArgs("userSettingsResetGame", payload);
     case "userSettingsRawEngine":
       return buildDuneArgs("userSettingsProfileEngineRaw", payload);
     case "userSettingsRawGame":

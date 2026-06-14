@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from base64 import b64decode
 from pathlib import Path
@@ -705,6 +706,9 @@ def canonical_map(value: str) -> str:
         "survival": "Survival_1",
         "survival-1": "Survival_1",
         "survival_1": "Survival_1",
+        "deepdesert": "DeepDesert_1",
+        "deepdesert-1": "DeepDesert_1",
+        "deepdesert_1": "DeepDesert_1",
         "overmap": "Overmap",
     }
     if target in aliases:
@@ -836,6 +840,18 @@ def profile_map_values(profile: dict, map_name: str) -> dict[str, str]:
     return values
 
 
+def profile_global_values(profile: dict) -> dict[str, str]:
+    values = {key: spec[2] for key, spec in MAP_FIELDS.items()}
+    for key, spec in MAP_FIELDS.items():
+        section, ini_key, _ = spec
+        if not section or not ini_key:
+            continue
+        global_value = profile_get_key(profile, "global", section, ini_key)
+        if global_value is not None:
+            values[key] = global_value
+    return values
+
+
 def profile_partition_values(profile: dict, map_name: str, partition_id: str) -> dict[str, str]:
     target_map = canonical_map(map_name)
     target_partition = str(partition_id)
@@ -868,6 +884,10 @@ def merged_engine_values(config: dict) -> dict[str, str]:
 
 def merged_map_values(config: dict, map_name: str) -> dict[str, str]:
     return profile_map_values(read_profile(), map_name)
+
+
+def merged_global_values(config: dict) -> dict[str, str]:
+    return profile_global_values(read_profile())
 
 
 def merged_partition_values(config: dict, map_name: str, partition_id: str) -> dict[str, str]:
@@ -1008,6 +1028,16 @@ def reset_game(map_name: str, partition_id: str | None = None) -> int:
             block for block in profile.get("sections", [])
             if not (block.get("scope") == "Map" and block.get("map") == target_map)
         ]
+    write_profile(profile)
+    return 0
+
+
+def reset_global_game() -> int:
+    profile = read_profile()
+    profile["sections"] = [
+        block for block in profile.get("sections", [])
+        if block.get("scope") != "Global"
+    ]
     write_profile(profile)
     return 0
 
@@ -1255,6 +1285,21 @@ def saved_dir_for(map_name: str, partition_id: str | None = None) -> Path:
     return game_root / safe_runtime_dir_name(target_map, "global") / "Saved"
 
 
+def infer_runtime_target(saved_dir: Path) -> tuple[str, str | None] | None:
+    runtime_name = saved_dir.parent.name
+    if runtime_name == "survival-1":
+        return ("Survival_1", "1")
+    if runtime_name == "overmap":
+        return ("Overmap", "2")
+    survival_match = re.fullmatch(r"survival-1-(\d+)", runtime_name)
+    if survival_match:
+        return ("Survival_1", survival_match.group(1))
+    deep_desert_match = re.fullmatch(r"deepdesert-1-(\d+)", runtime_name)
+    if deep_desert_match:
+        return ("DeepDesert_1", deep_desert_match.group(1))
+    return None
+
+
 def live_userengine_path(partition_id: str | None = None, map_name: str = "Survival_1") -> Path:
     return saved_dir_for(map_name, partition_id or "1") / "UserSettings" / "UserEngine.ini"
 
@@ -1463,13 +1508,17 @@ Dune.GlobalVehicleMiningOutputMultiplier=10
     profile_set_key(reparsed, "global", "/Script/DuneSandbox.DuneGameMode", "m_GlobalFameMultiplier", "3.0")
     if "UnknownGlobal=abc" not in serialize_profile(reparsed):
         raise SystemExit("Interactive profile update dropped unknown keys.")
+    if infer_runtime_target(Path("/tmp/runtime/game/survival-1-34/Saved")) != ("Survival_1", "34"):
+        raise SystemExit("Dynamic Survival runtime folder was not inferred.")
+    if infer_runtime_target(Path("/tmp/runtime/game/deepdesert-1-58/Saved")) != ("DeepDesert_1", "58"):
+        raise SystemExit("Dynamic Deep Desert runtime folder was not inferred.")
     print("profile selftest ok")
     return 0
 
 
 def materialize_current_runtime_files() -> int:
     profile = read_profile()
-    game_root = ROOT / "runtime" / "game"
+    game_root = Path(os.environ.get("DUNE_USERSETTINGS_GAME_ROOT", str(ROOT / "runtime" / "game")))
     partition_catalog_path = SIETCH_CONFIG_PATH.parent / "partition-catalog.json"
     if not game_root.exists():
         return 0
@@ -1504,6 +1553,19 @@ def materialize_current_runtime_files() -> int:
         if resolved in seen_paths:
             continue
         targets.append((canonical_map(map_name), saved_dir, partition_id))
+        seen_paths.add(resolved)
+
+    for saved_dir in game_root.glob("*/Saved"):
+        if not saved_dir.is_dir():
+            continue
+        resolved = saved_dir.resolve()
+        if resolved in seen_paths:
+            continue
+        inferred = infer_runtime_target(saved_dir)
+        if not inferred:
+            continue
+        map_name, partition_id = inferred
+        targets.append((map_name, saved_dir, partition_id))
         seen_paths.add(resolved)
 
     expected_engine_paths: set[Path] = set()
@@ -1566,6 +1628,8 @@ def main(argv: list[str]) -> int:
         return profile_selftest()
     if command == "engine-values":
         return print_rows(merged_engine_values(config), ENGINE_FIELDS)
+    if command == "global-values":
+        return print_rows(merged_global_values(config), MAP_FIELDS)
     if command == "map-values" and len(argv) == 3:
         return print_rows(merged_map_values(config, canonical_map(argv[2])), MAP_FIELDS)
     if command == "partition-values" and len(argv) == 4:
@@ -1584,6 +1648,8 @@ def main(argv: list[str]) -> int:
         return reset_all()
     if command == "reset-engine-gameplay":
         return reset_engine_gameplay()
+    if command == "reset-global-game":
+        return reset_global_game()
     if command == "reset-game" and len(argv) == 3:
         return reset_game(argv[2])
     if command == "reset-game" and len(argv) == 4:

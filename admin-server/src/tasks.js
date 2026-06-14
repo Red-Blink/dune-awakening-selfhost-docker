@@ -104,7 +104,7 @@ export function taskTimeoutMs(config, operation) {
   return config.commandTimeoutMs;
 }
 
-function taskOperations(operation, payload = {}) {
+export function taskOperations(operation, payload = {}) {
   if (operation === "restartAll") return ["stop", "start"];
   if (operation === "mapsApplySettings") {
     return [
@@ -115,7 +115,7 @@ function taskOperations(operation, payload = {}) {
   }
   if (operation === "userSettingsSaveAndRestart") return ["userSettingsSave", "userSettingsMaterializeCurrent", ...restartOperations(payload)];
   if (operation === "userSettingsResetAndRestart") {
-    const resetOperation = payload.scope === "engine" ? "userSettingsResetEngineGameplay" : "userSettingsResetGame";
+    const resetOperation = payload.scope === "engine" ? "userSettingsResetEngineGameplay" : payload.scope === "global" ? "userSettingsResetGlobalGame" : "userSettingsResetGame";
     return [resetOperation, "userSettingsMaterializeCurrent", ...restartOperations(payload)];
   }
   if (operation === "userSettingsRawAndRestart") {

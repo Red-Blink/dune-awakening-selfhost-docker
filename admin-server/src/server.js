@@ -410,7 +410,11 @@ async function handleApi(req, res) {
   if (path === "/api/maps/user-settings/save" && req.method === "POST") return userSettingsSaveRoute(req, res);
   if (path === "/api/maps/user-settings/reset" && req.method === "POST") return userSettingsResetRoute(req, res);
   if (path === "/api/maps/userengine") return safeCommandJson(res, "userSettingsEngineValues");
-  if (path === "/api/maps/usergame") return safeCommandJson(res, url.searchParams.get("partitionId") ? "userSettingsPartitionValues" : "userSettingsMapValues", { map: url.searchParams.get("map") || "Survival_1", partitionId: url.searchParams.get("partitionId") || "1" });
+  if (path === "/api/maps/usergame") {
+    const map = url.searchParams.get("map") || "Survival_1";
+    const operation = map === "__global__" ? "userSettingsGlobalValues" : url.searchParams.get("partitionId") ? "userSettingsPartitionValues" : "userSettingsMapValues";
+    return safeCommandJson(res, operation, { map, partitionId: url.searchParams.get("partitionId") || "1" });
+  }
   if (path === "/api/maps/user-settings/materialize" && req.method === "POST") return confirmedTask(req, res, "maps", "userSettingsMaterializeCurrent", {}, "REFRESH MAP SETTINGS");
   if (path === "/api/maps/user-settings/restore-defaults" && req.method === "POST") return userSettingsRestoreDefaultsRoute(req, res);
   if (path === "/api/sietches") return commandJson(res, "sietchesList");
