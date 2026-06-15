@@ -1770,6 +1770,7 @@ case "$cmd" in
     fi
     python3 runtime/scripts/usersettings.py materialize-current >/dev/null 2>&1 || true
     if [ "$(partition_map_name "$partition_id")" = "Survival_1" ]; then
+      restart_sietch_partition_if_running "$partition_id"
       refresh_survival_sietch_metadata_state
     fi
     echo "Display name updated."
@@ -1781,6 +1782,7 @@ case "$cmd" in
     set_partition_value "$2" password "$password_value"
     python3 runtime/scripts/usersettings.py materialize-current >/dev/null 2>&1 || true
     if [ "$(partition_map_name "$2")" = "Survival_1" ]; then
+      restart_sietch_partition_if_running "$2"
       refresh_survival_sietch_metadata_state
     fi
     if [ -n "$password_value" ]; then
@@ -1809,6 +1811,7 @@ case "$cmd" in
     fi
     python3 runtime/scripts/usersettings.py materialize-current >/dev/null 2>&1 || true
     if [ "$(partition_map_name "$partition_id")" = "Survival_1" ]; then
+      restart_sietch_partition_if_running "$partition_id"
       refresh_survival_sietch_metadata_state
     fi
     echo "Sietch settings updated."
