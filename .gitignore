@@ -1,5 +1,7 @@
 # Local config / secrets
+.cursor/
 .env
+.wsl/
 runtime/secrets/
 runtime/generated/
 runtime/backups/

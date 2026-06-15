@@ -68,6 +68,31 @@ bash -c 'set -euo pipefail; if ! command -v curl >/dev/null 2>&1; then sudo apt-
 
 The installer downloads the latest release, prepares the server, starts the Web UI, and tells you what address to open in your browser. If you are on the same network as the server, use the same-network address. If you are connecting over the internet, use the public address and allow TCP `8088` in your firewall.
 
+### Windows (WSL2)
+
+See **[WSL_README.md](WSL_README.md)** for the full Windows workflow, parameters, troubleshooting, and `.wsl/` state layout.
+
+Quick start from the repo root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+This installs **Docker Engine inside WSL** by default (not Docker Desktop on Windows). Use `-ContainerRuntime podman` to opt in to Podman inside WSL instead.
+
+**Updates**
+
+```powershell
+.\update.ps1
+.\update.ps1 -RebuildConsole      # when admin-server / web / Dockerfile changed
+.\update.ps1 -RebuildOrchestrator
+.\update.ps1 -FullStack
+```
+
+Open the Web UI from Windows at **http://localhost:8088**.
+
+For Docker Desktop/WSL2 RabbitMQ overrides, see [`.env.example`](.env.example).
+
 ## Contributing & Project Notes
 
 - Issues, fixes, and improvements are welcome.

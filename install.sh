@@ -8,7 +8,20 @@ WEB_COMPOSE="docker-compose.web.yml"
 WEB_SERVICE="redblink-dune-docker-console"
 WEB_PORT="${ADMIN_BIND_PORT:-8088}"
 DOCKER=(docker)
+CONTAINER_RUNTIME=docker
 DOCKER_GROUP_UPDATED=0
+
+if [ -n "${DUNE_CONTAINER_RUNTIME:-}" ]; then
+  CONTAINER_RUNTIME="$DUNE_CONTAINER_RUNTIME"
+  export CONTAINER_RUNTIME
+fi
+
+preferred_container_runtime() {
+  case "${DUNE_CONTAINER_RUNTIME:-}" in
+    docker|podman) printf '%s' "$DUNE_CONTAINER_RUNTIME" ;;
+    *) printf '%s' '' ;;
+  esac
+}
 
 say() {
   printf '\n%s\n' "$1"
@@ -53,6 +66,24 @@ install_basic_tools() {
   fi
 }
 
+install_podman() {
+  if command -v podman >/dev/null 2>&1; then
+    return
+  fi
+
+  step "Podman is missing. Installing Podman now."
+  install_basic_tools
+
+  if command -v apt-get >/dev/null 2>&1; then
+    need_sudo apt-get update
+    need_sudo apt-get install -y podman podman-compose podman-docker
+    return
+  fi
+
+  echo "Podman is missing and this operating system is not supported for automatic Podman installation."
+  return 1
+}
+
 install_docker() {
   if command -v docker >/dev/null 2>&1; then
     return
@@ -70,50 +101,162 @@ install_docker() {
   curl -fsSL https://get.docker.com | need_sudo sh
 }
 
-select_docker_command() {
-  if docker info >/dev/null 2>&1; then
-    DOCKER=(docker)
+install_container_runtime() {
+  if select_container_command; then
+    return
+  fi
+
+  case "$(preferred_container_runtime)" in
+    docker)
+      install_docker
+      ;;
+    podman)
+      install_podman || true
+      if select_container_command; then
+        return
+      fi
+      install_docker
+      ;;
+    *)
+      install_podman || true
+      if select_container_command; then
+        return
+      fi
+      install_docker
+      ;;
+  esac
+}
+
+select_podman_command() {
+  if podman info >/dev/null 2>&1; then
+    DOCKER=(podman)
+    CONTAINER_RUNTIME=podman
     return 0
   fi
-  if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
-    DOCKER=(sudo docker)
-    return 0
-  fi
-  if [ "$(id -u)" -eq 0 ] && docker info >/dev/null 2>&1; then
-    DOCKER=(docker)
+  if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && sudo podman info >/dev/null 2>&1; then
+    DOCKER=(sudo podman)
+    CONTAINER_RUNTIME=podman
     return 0
   fi
   return 1
 }
 
-start_docker() {
-  if select_docker_command; then
+select_docker_command() {
+  if docker info >/dev/null 2>&1; then
+    DOCKER=(docker)
+    CONTAINER_RUNTIME=docker
+    return 0
+  fi
+  if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
+    DOCKER=(sudo docker)
+    CONTAINER_RUNTIME=docker
+    return 0
+  fi
+  if [ "$(id -u)" -eq 0 ] && docker info >/dev/null 2>&1; then
+    DOCKER=(docker)
+    CONTAINER_RUNTIME=docker
+    return 0
+  fi
+  return 1
+}
+
+select_container_command() {
+  case "$(preferred_container_runtime)" in
+    docker)
+      if select_docker_command; then
+        return 0
+      fi
+      if select_podman_command; then
+        return 0
+      fi
+      ;;
+    podman)
+      if select_podman_command; then
+        return 0
+      fi
+      if select_docker_command; then
+        return 0
+      fi
+      ;;
+    *)
+      if select_podman_command; then
+        return 0
+      fi
+      if select_docker_command; then
+        return 0
+      fi
+      ;;
+  esac
+  return 1
+}
+
+ensure_podman_socket() {
+  if [ "$CONTAINER_RUNTIME" != "podman" ]; then
     return
   fi
 
-  step "Docker is installed but is not running yet. Starting Docker now."
-
-  if has_systemd; then
-    need_sudo systemctl enable --now docker || true
-  elif command -v service >/dev/null 2>&1; then
-    need_sudo service docker start || true
+  if [ -f runtime/scripts/ensure-podman-socket.sh ]; then
+    # shellcheck disable=SC1091
+    . runtime/scripts/ensure-podman-socket.sh
+    configure_podman_for_compose || true
+    export_podman_docker_host || true
+  elif has_systemd; then
+    need_sudo systemctl enable --now podman.socket >/dev/null 2>&1 || true
   fi
 
-  if select_docker_command; then
+  if [ "$CONTAINER_RUNTIME" = "podman" ] && ! command -v docker >/dev/null 2>&1; then
+    if command -v apt-get >/dev/null 2>&1; then
+      need_sudo apt-get install -y podman-docker >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
+start_container_runtime() {
+  if select_container_command; then
+    ensure_podman_socket
     return
   fi
 
-  if [ "$(id -u)" -ne 0 ] && getent group docker >/dev/null 2>&1; then
-    step "Giving your user access to Docker."
-    need_sudo usermod -aG docker "$USER" || true
+  install_container_runtime
+
+  if select_container_command; then
+    ensure_podman_socket
+    return
+  fi
+
+  if [ "$CONTAINER_RUNTIME" = "docker" ] || command -v docker >/dev/null 2>&1; then
+    step "Docker is installed but is not running yet. Starting Docker now."
+
+    if has_systemd; then
+      need_sudo systemctl enable --now docker || true
+    elif command -v service >/dev/null 2>&1; then
+      need_sudo service docker start || true
+    fi
+
     if select_docker_command; then
-      echo "Docker is ready. Setup can continue."
+      return
+    fi
+
+    if [ "$(id -u)" -ne 0 ] && getent group docker >/dev/null 2>&1; then
+      step "Giving your user access to Docker."
+      need_sudo usermod -aG docker "$USER" || true
+      if select_docker_command; then
+        echo "Docker is ready. Setup can continue."
+        return
+      fi
+    fi
+  fi
+
+  if [ "$CONTAINER_RUNTIME" = "podman" ] || command -v podman >/dev/null 2>&1; then
+    ensure_podman_socket
+    if select_podman_command; then
       return
     fi
   fi
 
-  echo "Docker is installed, but this installer still cannot reach the Docker engine."
+  echo "A container runtime is installed, but this installer still cannot reach it."
   echo "If you use Docker Desktop, start Docker Desktop and wait until it says it is running."
+  echo "If you use Podman, make sure podman.socket is enabled inside WSL."
   echo "Then run this installer again."
   exit 1
 }
@@ -137,13 +280,26 @@ ensure_docker_group_access() {
 }
 
 ensure_compose() {
+  if [ -f runtime/scripts/ensure-podman-socket.sh ]; then
+    # shellcheck disable=SC1091
+    . runtime/scripts/ensure-podman-socket.sh
+    if should_use_podman_compose; then
+      configure_podman_for_compose 2>/dev/null || true
+      export_podman_docker_host 2>/dev/null || true
+      podman-compose --version >/dev/null 2>&1 && return
+    fi
+  fi
+
   if "${DOCKER[@]}" compose version >/dev/null 2>&1; then
     return
   fi
 
   step "Docker Compose is missing. Installing the Compose plugin now."
 
-  if command -v apt-get >/dev/null 2>&1; then
+  if [ "$CONTAINER_RUNTIME" = "podman" ] && command -v apt-get >/dev/null 2>&1; then
+    need_sudo apt-get update
+    need_sudo apt-get install -y podman-compose podman-docker
+  elif command -v apt-get >/dev/null 2>&1; then
     need_sudo apt-get update
     need_sudo apt-get install -y docker-compose-plugin
   elif command -v dnf >/dev/null 2>&1; then
@@ -203,7 +359,14 @@ start_console() {
 
   step "Starting the Web UI."
   export DUNE_HOST_REPO_ROOT="${DUNE_HOST_REPO_ROOT:-$(pwd -P)}"
-  "${DOCKER[@]}" compose -f "$WEB_COMPOSE" up -d --build "$WEB_SERVICE"
+  export CONTAINER_RUNTIME="${CONTAINER_RUNTIME:-docker}"
+  if [ -f runtime/scripts/ensure-podman-socket.sh ]; then
+    # shellcheck disable=SC1091
+    . runtime/scripts/ensure-podman-socket.sh
+    run_compose_up "$WEB_COMPOSE" "$WEB_SERVICE"
+  else
+    "${DOCKER[@]}" compose -f "$WEB_COMPOSE" up -d --build "$WEB_SERVICE"
+  fi
 }
 
 read_admin_password() {
@@ -223,6 +386,10 @@ read_admin_password() {
 }
 
 show_finish() {
+  if [ "${DUNE_INSTALL_FROM_WINDOWS:-0}" = "1" ]; then
+    return
+  fi
+
   local ip public password_file admin_password
   ip="$(host_ip)"
   public="$(public_ip)"
@@ -262,14 +429,17 @@ say "Starting Dune Docker Console Installer."
 
 if ! is_linux; then
   echo "This automatic installer runs on Linux servers."
-  echo "For Docker Desktop on Windows or another VM setup, start Docker Desktop first, then start the Web UI from the extracted release folder."
+  echo "On Windows, run: powershell -ExecutionPolicy Bypass -File .\\install.ps1"
   exit 1
 fi
 
-install_docker
-start_docker
-ensure_docker_group_access
+install_container_runtime
+start_container_runtime
+if [ "$CONTAINER_RUNTIME" = "docker" ]; then
+  ensure_docker_group_access
+fi
 ensure_compose
+ensure_podman_socket
 install_cli_command
 start_console
 show_finish
