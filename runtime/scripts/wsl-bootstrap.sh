@@ -41,6 +41,10 @@ has_systemd() {
   command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]
 }
 
+force_embedded_docker_runtime() {
+  [ "${DUNE_CONTAINER_RUNTIME:-${CONTAINER_RUNTIME:-}}" = "docker" ]
+}
+
 ensure_podman_packages() {
   command -v apt-get >/dev/null 2>&1 || return 0
   step "Updating package lists (apt-get update)..."
@@ -85,13 +89,36 @@ ensure_docker_service() {
 }
 
 bootstrap_docker() {
-  step "Container runtime: Docker Engine (default for WSL)."
+  step "Container runtime: Docker Engine (embedded in WSL via get.docker.com when needed)."
+  if force_embedded_docker_runtime; then
+    export DOCKER_HOST=unix:///var/run/docker.sock
+    if command -v is_docker_desktop_daemon >/dev/null 2>&1 && is_docker_desktop_daemon; then
+      echo "Docker Desktop is active; install.sh will install embedded Docker Engine (https://get.docker.com)."
+    elif docker info >/dev/null 2>&1; then
+      echo "Embedded Docker is available."
+      ensure_docker_service
+      return
+    fi
+    echo "install.sh will install and start embedded Docker Engine."
+    return
+  fi
   if docker info >/dev/null 2>&1; then
     echo "Docker is available."
     ensure_docker_service
     return
   fi
   echo "Docker is not running yet; install.sh will install and start Docker Engine."
+}
+
+bootstrap_docker_desktop() {
+  step "Container runtime: Docker Desktop (WSL integration)."
+  # shellcheck disable=SC1091
+  . runtime/scripts/docker-desktop-wsl.sh
+  if ! ensure_docker_desktop_cli; then
+    exit 1
+  fi
+  disable_embedded_docker_engine
+  step "Docker Desktop is ready via WSL integration."
 }
 
 bootstrap_podman() {
@@ -135,10 +162,22 @@ step "Repository root: $DUNE_HOST_REPO_ROOT"
 RUNTIME="${DUNE_CONTAINER_RUNTIME:-docker}"
 step "Configured container runtime: $RUNTIME"
 
+step "Ensuring WSL DNS configuration..."
+if [ -f runtime/scripts/configure-wsl-dns.sh ]; then
+  bash runtime/scripts/configure-wsl-dns.sh || true
+fi
+
 case "$RUNTIME" in
   podman) bootstrap_podman ;;
+  docker-desktop) bootstrap_docker_desktop ;;
   *) bootstrap_docker ;;
 esac
+
+if [ -f runtime/scripts/docker-desktop-wsl.sh ]; then
+  # shellcheck disable=SC1091
+  . runtime/scripts/docker-desktop-wsl.sh
+  verify_wsl_dns_for_docker || true
+fi
 
 step "WSL bootstrap finished."
 

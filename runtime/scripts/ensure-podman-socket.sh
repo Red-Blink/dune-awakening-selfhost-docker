@@ -163,6 +163,10 @@ export_console_compose_env() {
   export ADMIN_BIND_HOST="${ADMIN_BIND_HOST:-0.0.0.0}"
   export ADMIN_BIND_PORT="${ADMIN_BIND_PORT:-8088}"
   export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-dune-awakening-selfhost-docker}"
+  if [ "${DUNE_INSTALL_FROM_WINDOWS:-0}" = "1" ]; then
+    export BUILDKIT_PROGRESS=plain
+    export COMPOSE_PROGRESS=plain
+  fi
 }
 
 run_compose_up() {
@@ -183,10 +187,14 @@ run_compose_up() {
   fi
 
   echo "Using docker compose to start the Web UI on port ${ADMIN_BIND_PORT}."
+  compose_progress=()
+  if [ "${DUNE_INSTALL_FROM_WINDOWS:-0}" = "1" ]; then
+    compose_progress=(--progress plain)
+  fi
   if declare -p DOCKER >/dev/null 2>&1; then
-    "${DOCKER[@]}" compose -f "$compose_file" up -d --build --force-recreate "$service"
+    "${DOCKER[@]}" compose "${compose_progress[@]}" -f "$compose_file" up -d --build --force-recreate "$service"
   else
-    docker compose -f "$compose_file" up -d --build --force-recreate "$service"
+    docker compose "${compose_progress[@]}" -f "$compose_file" up -d --build --force-recreate "$service"
   fi
   if ! verify_console_container "$service"; then
     echo "Warning: console container verification failed; check logs above." >&2

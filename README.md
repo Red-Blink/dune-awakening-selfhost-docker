@@ -78,7 +78,7 @@ Quick start from the repo root:
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-This installs **Docker Engine inside WSL** by default (not Docker Desktop on Windows). Use `-ContainerRuntime podman` to opt in to Podman inside WSL instead.
+**Docker Desktop is required** on Windows/WSL. `install.ps1` uses it via WSL integration so containers appear in the Docker Desktop UI. If Docker Desktop is missing, the installer stops with a link to [download Docker Desktop](https://www.docker.com/products/docker-desktop/). Use `-ContainerRuntime docker` only as an advanced opt-in for embedded Engine, or `-ContainerRuntime podman` for Podman. See **[WSL_README.md](WSL_README.md)** for integration setup and troubleshooting.
 
 **Updates**
 

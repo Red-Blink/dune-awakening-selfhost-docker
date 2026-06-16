@@ -16,11 +16,45 @@ if [ -n "${DUNE_CONTAINER_RUNTIME:-}" ]; then
   export CONTAINER_RUNTIME
 fi
 
+if [ -f runtime/scripts/docker-desktop-wsl.sh ]; then
+  # shellcheck disable=SC1091
+  . runtime/scripts/docker-desktop-wsl.sh
+fi
+
 preferred_container_runtime() {
   case "${DUNE_CONTAINER_RUNTIME:-}" in
-    docker|podman) printf '%s' "$DUNE_CONTAINER_RUNTIME" ;;
+    docker|docker-desktop|podman) printf '%s' "$DUNE_CONTAINER_RUNTIME" ;;
     *) printf '%s' '' ;;
   esac
+}
+
+using_docker_desktop_runtime() {
+  [ "$(preferred_container_runtime)" = "docker-desktop" ] || [ "$CONTAINER_RUNTIME" = "docker-desktop" ]
+}
+
+force_embedded_docker_runtime() {
+  [ "$(preferred_container_runtime)" = "docker" ]
+}
+
+configure_embedded_docker_env() {
+  if force_embedded_docker_runtime; then
+    export DOCKER_HOST=unix:///var/run/docker.sock
+    CONTAINER_RUNTIME=docker
+  fi
+}
+
+configure_embedded_docker_env
+
+set_docker_runtime_kind() {
+  if force_embedded_docker_runtime; then
+    CONTAINER_RUNTIME=docker
+    return
+  fi
+  if command -v is_docker_desktop_daemon >/dev/null 2>&1 && is_docker_desktop_daemon; then
+    CONTAINER_RUNTIME=docker-desktop
+  else
+    CONTAINER_RUNTIME=docker
+  fi
 }
 
 say() {
@@ -85,11 +119,18 @@ install_podman() {
 }
 
 install_docker() {
-  if command -v docker >/dev/null 2>&1; then
-    return
+  if force_embedded_docker_runtime; then
+    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+      if ! docker info --format '{{.OperatingSystem}}' 2>/dev/null | grep -qi 'docker desktop'; then
+        return 0
+      fi
+      step "Docker Desktop is active; installing embedded Docker Engine via https://get.docker.com ..."
+    fi
+  elif command -v docker >/dev/null 2>&1; then
+    return 0
   fi
 
-  step "Docker is missing. Installing Docker now."
+  step "Installing Docker Engine via https://get.docker.com ..."
   install_basic_tools
 
   if ! command -v curl >/dev/null 2>&1; then
@@ -107,6 +148,13 @@ install_container_runtime() {
   fi
 
   case "$(preferred_container_runtime)" in
+    docker-desktop)
+      echo "Docker Desktop is required but the docker CLI is not reachable in WSL." >&2
+      if command -v print_docker_desktop_integration_help >/dev/null 2>&1; then
+        print_docker_desktop_integration_help
+      fi
+      exit 1
+      ;;
     docker)
       install_docker
       ;;
@@ -142,19 +190,38 @@ select_podman_command() {
 }
 
 select_docker_command() {
+  if force_embedded_docker_runtime; then
+    export DOCKER_HOST=unix:///var/run/docker.sock
+    if docker info >/dev/null 2>&1; then
+      if ! docker info --format '{{.OperatingSystem}}' 2>/dev/null | grep -qi 'docker desktop'; then
+        DOCKER=(docker)
+        CONTAINER_RUNTIME=docker
+        return 0
+      fi
+    fi
+    if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && sudo DOCKER_HOST=unix:///var/run/docker.sock docker info >/dev/null 2>&1; then
+      if ! sudo DOCKER_HOST=unix:///var/run/docker.sock docker info --format '{{.OperatingSystem}}' 2>/dev/null | grep -qi 'docker desktop'; then
+        DOCKER=(sudo docker)
+        CONTAINER_RUNTIME=docker
+        return 0
+      fi
+    fi
+    return 1
+  fi
+
   if docker info >/dev/null 2>&1; then
     DOCKER=(docker)
-    CONTAINER_RUNTIME=docker
+    set_docker_runtime_kind
     return 0
   fi
   if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
     DOCKER=(sudo docker)
-    CONTAINER_RUNTIME=docker
+    set_docker_runtime_kind
     return 0
   fi
   if [ "$(id -u)" -eq 0 ] && docker info >/dev/null 2>&1; then
     DOCKER=(docker)
-    CONTAINER_RUNTIME=docker
+    set_docker_runtime_kind
     return 0
   fi
   return 1
@@ -162,6 +229,11 @@ select_docker_command() {
 
 select_container_command() {
   case "$(preferred_container_runtime)" in
+    docker-desktop)
+      if select_docker_command; then
+        return 0
+      fi
+      ;;
     docker)
       if select_docker_command; then
         return 0
@@ -212,6 +284,19 @@ ensure_podman_socket() {
 }
 
 start_container_runtime() {
+  if using_docker_desktop_runtime; then
+    if select_docker_command; then
+      disable_embedded_docker_engine
+      ensure_podman_socket
+      return
+    fi
+    echo "Docker Desktop WSL integration is required but docker is not reachable." >&2
+    if command -v print_docker_desktop_integration_help >/dev/null 2>&1; then
+      print_docker_desktop_integration_help
+    fi
+    exit 1
+  fi
+
   if select_container_command; then
     ensure_podman_socket
     return
@@ -262,6 +347,9 @@ start_container_runtime() {
 }
 
 ensure_docker_group_access() {
+  if using_docker_desktop_runtime; then
+    return
+  fi
   local target_user
   target_user="${SUDO_USER:-${USER:-}}"
   if [ -z "$target_user" ] || [ "$target_user" = "root" ]; then
@@ -365,7 +453,13 @@ start_console() {
     . runtime/scripts/ensure-podman-socket.sh
     run_compose_up "$WEB_COMPOSE" "$WEB_SERVICE"
   else
-    "${DOCKER[@]}" compose -f "$WEB_COMPOSE" up -d --build "$WEB_SERVICE"
+    compose_progress=()
+    if [ "${DUNE_INSTALL_FROM_WINDOWS:-0}" = "1" ]; then
+      export BUILDKIT_PROGRESS=plain
+      export COMPOSE_PROGRESS=plain
+      compose_progress=(--progress plain)
+    fi
+    "${DOCKER[@]}" compose "${compose_progress[@]}" -f "$WEB_COMPOSE" up -d --build "$WEB_SERVICE"
   fi
 }
 
@@ -437,6 +531,9 @@ install_container_runtime
 start_container_runtime
 if [ "$CONTAINER_RUNTIME" = "docker" ]; then
   ensure_docker_group_access
+fi
+if using_docker_desktop_runtime; then
+  disable_embedded_docker_engine
 fi
 ensure_compose
 ensure_podman_socket

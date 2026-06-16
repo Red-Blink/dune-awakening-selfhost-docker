@@ -6,9 +6,12 @@ services:
     image: redblink-dune-docker-console:dev
     container_name: redblink-dune-docker-console
     restart: unless-stopped
-    # Host networking lets the console reach RedBlink defaults such as
-    # Postgres on 127.0.0.1:15432 and bind ADMIN_BIND_PORT directly.
-    network_mode: host
+    # Bridge + published port so Windows can open http://localhost:8088 through Docker Desktop.
+    # (host network binds inside the Docker Desktop VM; Windows localhost does not reach it.)
+    ports:
+      - "${ADMIN_BIND_PORT:-8088}:${ADMIN_BIND_PORT:-8088}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       DUNE_DOCKER_DIR: /repo
       DUNE_CONTAINER_REPO_ROOT: /repo
@@ -27,7 +30,7 @@ services:
       ADMIN_MOCK_MODE: "${ADMIN_MOCK_MODE:-0}"
       ADMIN_STATIC_DIR: /app/web-dist
       ADMIN_DATABASE_URL: "${ADMIN_DATABASE_URL:-}"
-      DUNE_DB_HOST: "${DUNE_DB_HOST:-}"
+      DUNE_DB_HOST: "${DUNE_DB_HOST:-host.docker.internal}"
       DUNE_DB_PORT: "${DUNE_DB_PORT:-}"
       DUNE_DB_NAME: "${DUNE_DB_NAME:-}"
       DUNE_DB_USER: "${DUNE_DB_USER:-}"
