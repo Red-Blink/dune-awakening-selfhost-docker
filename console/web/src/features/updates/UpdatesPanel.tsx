@@ -473,6 +473,9 @@ function summarizeStackUpdateProgress(task: Task) {
   const latestLine = [...task.logLines].reverse().map((line) => line.line.trim()).find(Boolean) || task.progressMessage || task.currentStep || "";
   if (task.status === "succeeded") {
     const installedVersion = firstVersionMatch(text, [/Installed stack version:\s*([^\n]+)/i]);
+    if (!installedVersion && /Update helper started/i.test(text)) {
+      return { title: "Console Update Started", percent: 20, message: "The console update helper has started in the background. Wait a minute, then refresh the page and check the version again." };
+    }
     return { title: "Console Update Complete", percent: 100, message: installedVersion ? `Console files were updated to ${installedVersion}. Refresh this page to load the new Web UI. You may need to sign in again.` : "Console files were updated. Refresh this page to load the new Web UI. You may need to sign in again." };
   }
   if (task.status === "failed") {
