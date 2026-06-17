@@ -1,0 +1,888 @@
+{
+  "schemaVersion": "github-actions-findings/v1",
+  "generatedAt": "2026-06-17T21:21:32.068Z",
+  "repository": "yacketrj/dune-awakening-selfhost-docker-WSL",
+  "sources": [
+    "pr:3"
+  ],
+  "summary": {
+    "runs": 6,
+    "failedJobs": 0,
+    "failedSteps": 0,
+    "artifacts": 1,
+    "sourceErrors": 0,
+    "byWorkflow": {
+      "STRIDE Threat Scan": "in_progress",
+      "Semgrep SAST": "in_progress",
+      "Discord Bot Security Gates": "queued",
+      "Trivy Vulnerability Scan": "queued",
+      "SOC 2 Readiness Check": "in_progress",
+      "SBOM Generation": "in_progress"
+    }
+  },
+  "requestTelemetry": {
+    "requestCount": 14,
+    "cacheEntries": 14,
+    "authenticated": true,
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4954,
+      "resetEpochSeconds": 1781733832,
+      "resetAt": "2026-06-17T22:03:52.000Z",
+      "resource": "core"
+    }
+  },
+  "findings": [
+    {
+      "type": "artifact_available",
+      "severity": "info",
+      "repository": "yacketrj/dune-awakening-selfhost-docker-WSL",
+      "runId": 27720572424,
+      "artifactId": 7708182784,
+      "artifactName": "stride-threat-model-report",
+      "message": "Artifact available: stride-threat-model-report",
+      "url": "https://api.github.com/repos/yacketrj/dune-awakening-selfhost-docker-WSL/actions/artifacts/7708182784/zip",
+      "expired": false
+    }
+  ],
+  "runs": [
+    {
+      "id": 27720572424,
+      "name": "STRIDE Threat Scan",
+      "workflowId": 297621297,
+      "runNumber": 92,
+      "event": "pull_request",
+      "status": "in_progress",
+      "conclusion": null,
+      "branch": "feature/discord-control-bot",
+      "headSha": "a0e64e1b30dff7fcb7d5cd526d27b83a3dd2df39",
+      "createdAt": "2026-06-17T21:21:23Z",
+      "updatedAt": "2026-06-17T21:21:27Z",
+      "url": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572424",
+      "apiUrl": "https://api.github.com/repos/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572424",
+      "jobs": [
+        {
+          "id": 82004674323,
+          "name": "Generate STRIDE threat model report",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-06-17T21:21:26Z",
+          "completedAt": null,
+          "url": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572424/job/82004674323",
+          "runnerName": "GitHub Actions 1000011009",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "failedSteps": [],
+          "steps": [
+            {
+              "name": "Set up job",
+              "number": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:26Z",
+              "completedAt": "2026-06-17T21:21:27Z"
+            },
+            {
+              "name": "Checkout",
+              "number": 2,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:27Z",
+              "completedAt": "2026-06-17T21:21:29Z"
+            },
+            {
+              "name": "Setup Node.js",
+              "number": 3,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:29Z",
+              "completedAt": "2026-06-17T21:21:29Z"
+            },
+            {
+              "name": "Generate STRIDE report",
+              "number": 4,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:29Z",
+              "completedAt": "2026-06-17T21:21:30Z"
+            },
+            {
+              "name": "Track open MEDIUM/HIGH/CRITICAL STRIDE findings as GitHub issues",
+              "number": 5,
+              "status": "completed",
+              "conclusion": "skipped",
+              "startedAt": "2026-06-17T21:21:30Z",
+              "completedAt": "2026-06-17T21:21:30Z"
+            },
+            {
+              "name": "Preview STRIDE issue sync for pull requests",
+              "number": 6,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:30Z",
+              "completedAt": "2026-06-17T21:21:30Z"
+            },
+            {
+              "name": "Append STRIDE summary",
+              "number": 7,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:30Z",
+              "completedAt": "2026-06-17T21:21:30Z"
+            },
+            {
+              "name": "Upload STRIDE artifacts",
+              "number": 8,
+              "status": "in_progress",
+              "conclusion": null,
+              "startedAt": "2026-06-17T21:21:30Z",
+              "completedAt": null
+            },
+            {
+              "name": "Post Setup Node.js",
+              "number": 15,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Post Checkout",
+              "number": 16,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            }
+          ]
+        }
+      ],
+      "artifacts": [
+        {
+          "id": 7708182784,
+          "name": "stride-threat-model-report",
+          "sizeInBytes": 4932,
+          "expired": false,
+          "createdAt": "2026-06-17T21:21:30Z",
+          "expiresAt": "2026-09-15T21:21:23Z",
+          "updatedAt": "2026-06-17T21:21:30Z",
+          "url": "https://api.github.com/repos/yacketrj/dune-awakening-selfhost-docker-WSL/actions/artifacts/7708182784/zip"
+        }
+      ]
+    },
+    {
+      "id": 27720572419,
+      "name": "Semgrep SAST",
+      "workflowId": 297601330,
+      "runNumber": 129,
+      "event": "pull_request",
+      "status": "in_progress",
+      "conclusion": null,
+      "branch": "feature/discord-control-bot",
+      "headSha": "a0e64e1b30dff7fcb7d5cd526d27b83a3dd2df39",
+      "createdAt": "2026-06-17T21:21:23Z",
+      "updatedAt": "2026-06-17T21:21:27Z",
+      "url": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572419",
+      "apiUrl": "https://api.github.com/repos/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572419",
+      "jobs": [
+        {
+          "id": 82004674303,
+          "name": "Semgrep CE SAST",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-06-17T21:21:26Z",
+          "completedAt": null,
+          "url": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572419/job/82004674303",
+          "runnerName": "GitHub Actions 1000011006",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "failedSteps": [],
+          "steps": [
+            {
+              "name": "Set up job",
+              "number": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:27Z",
+              "completedAt": "2026-06-17T21:21:29Z"
+            },
+            {
+              "name": "Checkout",
+              "number": 2,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:29Z",
+              "completedAt": "2026-06-17T21:21:31Z"
+            },
+            {
+              "name": "Prepare artifact directory",
+              "number": 3,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:31Z",
+              "completedAt": "2026-06-17T21:21:31Z"
+            },
+            {
+              "name": "Run Semgrep JSON scan",
+              "number": 4,
+              "status": "in_progress",
+              "conclusion": null,
+              "startedAt": "2026-06-17T21:21:31Z",
+              "completedAt": null
+            },
+            {
+              "name": "Generate Semgrep vulnerability report",
+              "number": 5,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Track Semgrep CRITICAL/HIGH/MEDIUM equivalent findings as GitHub issues",
+              "number": 6,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Preview Semgrep issue sync for pull requests",
+              "number": 7,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Run Semgrep SARIF scan",
+              "number": 8,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Upload Semgrep SARIF to code scanning",
+              "number": 9,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Upload Semgrep artifacts",
+              "number": 10,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Post Checkout",
+              "number": 20,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            }
+          ]
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "id": 27720572409,
+      "name": "Discord Bot Security Gates",
+      "workflowId": 297521653,
+      "runNumber": 167,
+      "event": "pull_request",
+      "status": "queued",
+      "conclusion": null,
+      "branch": "feature/discord-control-bot",
+      "headSha": "a0e64e1b30dff7fcb7d5cd526d27b83a3dd2df39",
+      "createdAt": "2026-06-17T21:21:23Z",
+      "updatedAt": "2026-06-17T21:21:23Z",
+      "url": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572409",
+      "apiUrl": "https://api.github.com/repos/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572409",
+      "jobs": [
+        {
+          "id": 82004674298,
+          "name": "NPM / SCA Gates",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-06-17T21:21:26Z",
+          "completedAt": null,
+          "url": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572409/job/82004674298",
+          "runnerName": "GitHub Actions 1000011010",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "failedSteps": [],
+          "steps": [
+            {
+              "name": "Set up job",
+              "number": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:26Z",
+              "completedAt": "2026-06-17T21:21:27Z"
+            },
+            {
+              "name": "Checkout",
+              "number": 2,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:27Z",
+              "completedAt": "2026-06-17T21:21:29Z"
+            },
+            {
+              "name": "Setup Node.js",
+              "number": 3,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:29Z",
+              "completedAt": "2026-06-17T21:21:30Z"
+            },
+            {
+              "name": "Install locked dependencies",
+              "number": 4,
+              "status": "in_progress",
+              "conclusion": null,
+              "startedAt": "2026-06-17T21:21:30Z",
+              "completedAt": null
+            },
+            {
+              "name": "Run unit/security tests",
+              "number": 5,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Run npm audit",
+              "number": 6,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Post Setup Node.js",
+              "number": 11,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Post Checkout",
+              "number": 12,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            }
+          ]
+        },
+        {
+          "id": 82004674340,
+          "name": "Container Policy Gate",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-06-17T21:21:26Z",
+          "completedAt": null,
+          "url": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572409/job/82004674340",
+          "runnerName": "GitHub Actions 1000011012",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "failedSteps": [],
+          "steps": [
+            {
+              "name": "Set up job",
+              "number": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:27Z",
+              "completedAt": "2026-06-17T21:21:28Z"
+            },
+            {
+              "name": "Checkout",
+              "number": 2,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:28Z",
+              "completedAt": "2026-06-17T21:21:30Z"
+            },
+            {
+              "name": "Check Dockerfile hardening markers",
+              "number": 3,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:30Z",
+              "completedAt": "2026-06-17T21:21:30Z"
+            },
+            {
+              "name": "Build bot image",
+              "number": 4,
+              "status": "in_progress",
+              "conclusion": null,
+              "startedAt": "2026-06-17T21:21:30Z",
+              "completedAt": null
+            },
+            {
+              "name": "Trivy image scan",
+              "number": 5,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Post Checkout",
+              "number": 10,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            }
+          ]
+        },
+        {
+          "id": 82004674342,
+          "name": "CodeQL SAST",
+          "status": "queued",
+          "conclusion": null,
+          "startedAt": "2026-06-17T21:21:23Z",
+          "completedAt": null,
+          "url": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572409/job/82004674342",
+          "runnerName": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "failedSteps": [],
+          "steps": []
+        },
+        {
+          "id": 82004674393,
+          "name": "Console API Discord Adapter Tests",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-06-17T21:21:26Z",
+          "completedAt": null,
+          "url": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572409/job/82004674393",
+          "runnerName": "GitHub Actions 1000011015",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "failedSteps": [],
+          "steps": [
+            {
+              "name": "Set up job",
+              "number": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:27Z",
+              "completedAt": "2026-06-17T21:21:27Z"
+            },
+            {
+              "name": "Checkout",
+              "number": 2,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:27Z",
+              "completedAt": "2026-06-17T21:21:29Z"
+            },
+            {
+              "name": "Setup Node.js",
+              "number": 3,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:29Z",
+              "completedAt": "2026-06-17T21:21:30Z"
+            },
+            {
+              "name": "Install dependencies",
+              "number": 4,
+              "status": "in_progress",
+              "conclusion": null,
+              "startedAt": "2026-06-17T21:21:30Z",
+              "completedAt": null
+            },
+            {
+              "name": "Run Discord adapter tests",
+              "number": 5,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Post Setup Node.js",
+              "number": 9,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Post Checkout",
+              "number": 10,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            }
+          ]
+        },
+        {
+          "id": 82004674490,
+          "name": "Policy Gates",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-06-17T21:21:26Z",
+          "completedAt": null,
+          "url": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572409/job/82004674490",
+          "runnerName": "GitHub Actions 1000011013",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "failedSteps": [],
+          "steps": [
+            {
+              "name": "Set up job",
+              "number": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:27Z",
+              "completedAt": "2026-06-17T21:21:28Z"
+            },
+            {
+              "name": "Checkout",
+              "number": 2,
+              "status": "in_progress",
+              "conclusion": null,
+              "startedAt": "2026-06-17T21:21:28Z",
+              "completedAt": null
+            },
+            {
+              "name": "Ensure bot workspace exists",
+              "number": 3,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Ensure adapter scaffold exists",
+              "number": 4,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Block Docker socket mounts in bot runtime assets",
+              "number": 5,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Block privileged container mode in bot runtime assets",
+              "number": 6,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Block obvious secret material",
+              "number": 7,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Enforce lockfile presence",
+              "number": 8,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Validate security documentation keywords",
+              "number": 9,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Post Checkout",
+              "number": 18,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            }
+          ]
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "id": 27720572399,
+      "name": "Trivy Vulnerability Scan",
+      "workflowId": 297601650,
+      "runNumber": 116,
+      "event": "pull_request",
+      "status": "queued",
+      "conclusion": null,
+      "branch": "feature/discord-control-bot",
+      "headSha": "a0e64e1b30dff7fcb7d5cd526d27b83a3dd2df39",
+      "createdAt": "2026-06-17T21:21:23Z",
+      "updatedAt": "2026-06-17T21:21:23Z",
+      "url": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572399",
+      "apiUrl": "https://api.github.com/repos/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572399",
+      "jobs": [
+        {
+          "id": 82004674156,
+          "name": "Trivy filesystem and image scan",
+          "status": "queued",
+          "conclusion": null,
+          "startedAt": "2026-06-17T21:21:23Z",
+          "completedAt": null,
+          "url": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572399/job/82004674156",
+          "runnerName": "",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "failedSteps": [],
+          "steps": []
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "id": 27720572397,
+      "name": "SOC 2 Readiness Check",
+      "workflowId": 297598415,
+      "runNumber": 118,
+      "event": "pull_request",
+      "status": "in_progress",
+      "conclusion": null,
+      "branch": "feature/discord-control-bot",
+      "headSha": "a0e64e1b30dff7fcb7d5cd526d27b83a3dd2df39",
+      "createdAt": "2026-06-17T21:21:23Z",
+      "updatedAt": "2026-06-17T21:21:27Z",
+      "url": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572397",
+      "apiUrl": "https://api.github.com/repos/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572397",
+      "jobs": [
+        {
+          "id": 82004674348,
+          "name": "SOC 2 readiness evidence gate",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-06-17T21:21:26Z",
+          "completedAt": null,
+          "url": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572397/job/82004674348",
+          "runnerName": "GitHub Actions 1000011011",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "failedSteps": [],
+          "steps": [
+            {
+              "name": "Set up job",
+              "number": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:27Z",
+              "completedAt": "2026-06-17T21:21:28Z"
+            },
+            {
+              "name": "Checkout",
+              "number": 2,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:28Z",
+              "completedAt": "2026-06-17T21:21:30Z"
+            },
+            {
+              "name": "Setup Node.js",
+              "number": 3,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:30Z",
+              "completedAt": "2026-06-17T21:21:30Z"
+            },
+            {
+              "name": "Run SOC 2 readiness evidence check",
+              "number": 4,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:30Z",
+              "completedAt": "2026-06-17T21:21:31Z"
+            },
+            {
+              "name": "Run Console Discord adapter tests",
+              "number": 5,
+              "status": "in_progress",
+              "conclusion": null,
+              "startedAt": "2026-06-17T21:21:31Z",
+              "completedAt": null
+            },
+            {
+              "name": "Run bot tests and evidence gates",
+              "number": 6,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Generate consolidated security evidence bundle",
+              "number": 7,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Append evidence bundle summary",
+              "number": 8,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Upload security evidence bundle",
+              "number": 9,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Post Setup Node.js",
+              "number": 17,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Post Checkout",
+              "number": 18,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            }
+          ]
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "id": 27720572384,
+      "name": "SBOM Generation",
+      "workflowId": 297646390,
+      "runNumber": 52,
+      "event": "pull_request",
+      "status": "in_progress",
+      "conclusion": null,
+      "branch": "feature/discord-control-bot",
+      "headSha": "a0e64e1b30dff7fcb7d5cd526d27b83a3dd2df39",
+      "createdAt": "2026-06-17T21:21:23Z",
+      "updatedAt": "2026-06-17T21:21:27Z",
+      "url": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572384",
+      "apiUrl": "https://api.github.com/repos/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572384",
+      "jobs": [
+        {
+          "id": 82004674154,
+          "name": "Generate software bill of materials",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-06-17T21:21:26Z",
+          "completedAt": null,
+          "url": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL/actions/runs/27720572384/job/82004674154",
+          "runnerName": "GitHub Actions 1000011008",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "failedSteps": [],
+          "steps": [
+            {
+              "name": "Set up job",
+              "number": 1,
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-06-17T21:21:27Z",
+              "completedAt": "2026-06-17T21:21:28Z"
+            },
+            {
+              "name": "Checkout",
+              "number": 2,
+              "status": "in_progress",
+              "conclusion": null,
+              "startedAt": "2026-06-17T21:21:28Z",
+              "completedAt": null
+            },
+            {
+              "name": "Setup Node.js",
+              "number": 3,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Generate SBOM",
+              "number": 4,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Append SBOM summary",
+              "number": 5,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Upload SBOM artifacts",
+              "number": 6,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            },
+            {
+              "name": "Post Checkout",
+              "number": 12,
+              "status": "pending",
+              "conclusion": null,
+              "startedAt": null,
+              "completedAt": null
+            }
+          ]
+        }
+      ],
+      "artifacts": []
+    }
+  ],
+  "sourceErrors": []
+}

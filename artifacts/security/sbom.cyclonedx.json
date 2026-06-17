@@ -1,0 +1,323 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:58c8121c-3d68-4b88-a9c5-3c7bcc812e80",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-06-17T19:38:55.534Z",
+    "tools": [
+      {
+        "vendor": "Dune Discord Control Bot",
+        "name": "repository-local npm lockfile SBOM generator",
+        "version": "1.0.0"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "name": "dune-discord-control-bot",
+      "version": "local"
+    },
+    "properties": [
+      {
+        "name": "scope",
+        "value": "Experimental read-only Discord companion bot and Console API adapter"
+      },
+      {
+        "name": "generator-cost",
+        "value": "free / repository-local"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/pg@8.21.0",
+      "name": "pg",
+      "version": "8.21.0",
+      "scope": "required",
+      "purl": "pkg:npm/pg@8.21.0",
+      "properties": [
+        {
+          "name": "source-lockfile",
+          "value": "console/api/package-lock.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "AUP1EYJuHraQGsVoCQVIcM7TEJVGtDzxWtGFZd8rds9d+CCXlU5Js1rYgfLNvxy9iJrpHjGrRjoi/3BT9fRyiA=="
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/pg-cloudflare@1.4.0",
+      "name": "pg-cloudflare",
+      "version": "1.4.0",
+      "scope": "required",
+      "purl": "pkg:npm/pg-cloudflare@1.4.0",
+      "properties": [
+        {
+          "name": "source-lockfile",
+          "value": "console/api/package-lock.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "Vo7z/6rrQYxpNRylp4Tlob2elzbh+N/MOQbxFVWCxS7oEx6jF53GTJFxK2WWpKuBRkmiin4Mt+xofFDjx09R0A=="
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/pg-connection-string@2.13.0",
+      "name": "pg-connection-string",
+      "version": "2.13.0",
+      "scope": "required",
+      "purl": "pkg:npm/pg-connection-string@2.13.0",
+      "properties": [
+        {
+          "name": "source-lockfile",
+          "value": "console/api/package-lock.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "EMnU9E2fSULdsbErBbMaXJvFeD9B4+nPcM3f+4lsiCR0BHLPrLVjv3DbyM2hgQQviKJaTWIRRTjKjWlHg3p2ig=="
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/pg-int8@1.0.1",
+      "name": "pg-int8",
+      "version": "1.0.1",
+      "scope": "required",
+      "purl": "pkg:npm/pg-int8@1.0.1",
+      "properties": [
+        {
+          "name": "source-lockfile",
+          "value": "console/api/package-lock.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw=="
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/pg-pool@3.14.0",
+      "name": "pg-pool",
+      "version": "3.14.0",
+      "scope": "required",
+      "purl": "pkg:npm/pg-pool@3.14.0",
+      "properties": [
+        {
+          "name": "source-lockfile",
+          "value": "console/api/package-lock.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "gKtPkFdQPU3DksooVLi9LsjZxrsBUZIpa+7aVx+LV5pNh0KzP4Zleud2po+ConrxbuXGBJ6Hfer6hdgpIBpBaw=="
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/pg-protocol@1.14.0",
+      "name": "pg-protocol",
+      "version": "1.14.0",
+      "scope": "required",
+      "purl": "pkg:npm/pg-protocol@1.14.0",
+      "properties": [
+        {
+          "name": "source-lockfile",
+          "value": "console/api/package-lock.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "n5taZ1kO3s9ngDTVxsEznOqCyToTgz0FLuPq0B33COy5pPpuWJpY3/2oRBVETuOgzdqRXfWpM9HIhp2LBBT1BA=="
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/pg-types@2.2.0",
+      "name": "pg-types",
+      "version": "2.2.0",
+      "scope": "required",
+      "purl": "pkg:npm/pg-types@2.2.0",
+      "properties": [
+        {
+          "name": "source-lockfile",
+          "value": "console/api/package-lock.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA=="
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/pgpass@1.0.5",
+      "name": "pgpass",
+      "version": "1.0.5",
+      "scope": "required",
+      "purl": "pkg:npm/pgpass@1.0.5",
+      "properties": [
+        {
+          "name": "source-lockfile",
+          "value": "console/api/package-lock.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "FdW9r/jQZhSeohs1Z3sI1yxFQNFvMcnmfuj4WBMUTxOrAyLMaTcE1aAMBiTlbMNaXvBCQuVi0R7hd8udDSP7ug=="
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/postgres-array@2.0.0",
+      "name": "postgres-array",
+      "version": "2.0.0",
+      "scope": "required",
+      "purl": "pkg:npm/postgres-array@2.0.0",
+      "properties": [
+        {
+          "name": "source-lockfile",
+          "value": "console/api/package-lock.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "VpZrUqU5A69eQyW2c5CA1jtLecCsN2U/bD6VilrFDWq5+5UIEVO7nazS3TEcHf1zuPYO/sqGvUvW62g86RXZuA=="
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/postgres-bytea@1.0.1",
+      "name": "postgres-bytea",
+      "version": "1.0.1",
+      "scope": "required",
+      "purl": "pkg:npm/postgres-bytea@1.0.1",
+      "properties": [
+        {
+          "name": "source-lockfile",
+          "value": "console/api/package-lock.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "5+5HqXnsZPE65IJZSMkZtURARZelel2oXUEO8rH83VS/hxH5vv1uHquPg5wZs8yMAfdv971IU+kcPUczi7NVBQ=="
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/postgres-date@1.0.7",
+      "name": "postgres-date",
+      "version": "1.0.7",
+      "scope": "required",
+      "purl": "pkg:npm/postgres-date@1.0.7",
+      "properties": [
+        {
+          "name": "source-lockfile",
+          "value": "console/api/package-lock.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "suDmjLVQg78nMK2UZ454hAG+OAW+HQPZ6n++TNDUX+L0+uUlLywnoxJKDou51Zm+zTCjrCl0Nq6J9C5hP9vK/Q=="
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/postgres-interval@1.2.0",
+      "name": "postgres-interval",
+      "version": "1.2.0",
+      "scope": "required",
+      "purl": "pkg:npm/postgres-interval@1.2.0",
+      "properties": [
+        {
+          "name": "source-lockfile",
+          "value": "console/api/package-lock.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "9ZhXKM/rw350N1ovuWHbGxnGh/SNJ4cnxHiM0rxE4VN41wsg8P8zWn9hv/buK00RP4WvlOyr/RBDiptyxVbkZQ=="
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/split2@4.2.0",
+      "name": "split2",
+      "version": "4.2.0",
+      "scope": "required",
+      "purl": "pkg:npm/split2@4.2.0",
+      "properties": [
+        {
+          "name": "source-lockfile",
+          "value": "console/api/package-lock.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg=="
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/xtend@4.0.2",
+      "name": "xtend",
+      "version": "4.0.2",
+      "scope": "required",
+      "purl": "pkg:npm/xtend@4.0.2",
+      "properties": [
+        {
+          "name": "source-lockfile",
+          "value": "console/api/package-lock.json"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ=="
+        }
+      ]
+    }
+  ],
+  "properties": [
+    {
+      "name": "lockfile:discord-bot/package-lock.json",
+      "value": "parsed; components=0"
+    },
+    {
+      "name": "lockfile:console/api/package-lock.json",
+      "value": "parsed; components=14"
+    }
+  ]
+}

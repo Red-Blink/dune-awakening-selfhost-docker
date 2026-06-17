@@ -33,5 +33,7 @@ RUN useradd -m -s /bin/bash dune \
 COPY dune_orchestrator.py /usr/local/bin/dune
 RUN chmod +x /usr/local/bin/dune
 
+USER dune
+
 ENTRYPOINT ["/usr/local/bin/dune"]
 CMD ["help"]

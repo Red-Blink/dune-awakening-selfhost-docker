@@ -1,0 +1,438 @@
+{
+  "generatedAt": "2026-06-17T20:22:12.363Z",
+  "scope": "Experimental read-only Discord companion bot and Console API adapter",
+  "compliancePosition": "SOC 2 readiness evidence bundle; not a SOC 2 report or certification assertion.",
+  "readiness": {
+    "status": "passed",
+    "exitCode": 0,
+    "command": "node scripts/soc2-readiness-check.mjs",
+    "stdout": "SOC 2 readiness check passed. Evidence files, runtimes, issue tracking, vulnerability tracking, STRIDE output, STRIDE issue tracking, evidence bundle, automation validation, and read-only safety markers are present.",
+    "stderr": ""
+  },
+  "evidence": [
+    {
+      "type": "workflow",
+      "path": ".github/workflows/discord-bot-security-gates.yml",
+      "description": "Discord bot security gates workflow",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 7093
+    },
+    {
+      "type": "workflow",
+      "path": ".github/workflows/soc2-readiness-check.yml",
+      "description": "SOC 2 readiness workflow",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 2745
+    },
+    {
+      "type": "workflow",
+      "path": ".github/workflows/semgrep-sast.yml",
+      "description": "Semgrep SAST workflow",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 3181
+    },
+    {
+      "type": "workflow",
+      "path": ".github/workflows/trivy-vulnerability-scan.yml",
+      "description": "Trivy vulnerability workflow",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 5385
+    },
+    {
+      "type": "workflow",
+      "path": ".github/workflows/stride-threat-scan.yml",
+      "description": "STRIDE threat scan workflow",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 2427
+    },
+    {
+      "type": "script",
+      "path": "scripts/soc2-readiness-check.mjs",
+      "description": "SOC 2 readiness local gate",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 9689
+    },
+    {
+      "type": "script",
+      "path": "scripts/generate-vulnerability-report.mjs",
+      "description": "CVSS-ranked vulnerability report generator",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 9659
+    },
+    {
+      "type": "script",
+      "path": "scripts/sync-vulnerability-issues.mjs",
+      "description": "Vulnerability issue lifecycle sync",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 11873
+    },
+    {
+      "type": "script",
+      "path": "scripts/generate-stride-report.mjs",
+      "description": "Repository-local STRIDE scanner",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 16207
+    },
+    {
+      "type": "script",
+      "path": "scripts/sync-stride-issues.mjs",
+      "description": "STRIDE issue lifecycle sync",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 11636
+    },
+    {
+      "type": "script",
+      "path": "scripts/validate-security-automation.mjs",
+      "description": "Security automation regression validator",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 9904
+    },
+    {
+      "type": "script",
+      "path": "scripts/ensure-security-runtimes.sh",
+      "description": "Local security runtime bootstrap",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 4864
+    },
+    {
+      "type": "documentation",
+      "path": "docs/discord-control-bot/soc2-control-matrix.md",
+      "description": "SOC 2 readiness control matrix",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 12999
+    },
+    {
+      "type": "documentation",
+      "path": "docs/discord-control-bot/security-gates.md",
+      "description": "Security gates documentation",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 8114
+    },
+    {
+      "type": "documentation",
+      "path": "docs/discord-control-bot/issue-tracking-policy.md",
+      "description": "Issue tracking policy",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 4967
+    },
+    {
+      "type": "template",
+      "path": ".github/ISSUE_TEMPLATE/vulnerability-remediation.yml",
+      "description": "Vulnerability remediation issue template",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 2183
+    },
+    {
+      "type": "template",
+      "path": ".github/ISSUE_TEMPLATE/threat-remediation.yml",
+      "description": "STRIDE threat remediation issue template",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 2121
+    },
+    {
+      "type": "template",
+      "path": ".github/ISSUE_TEMPLATE/security-exception.yml",
+      "description": "Security exception issue template",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 1616
+    },
+    {
+      "type": "template",
+      "path": ".github/ISSUE_TEMPLATE/access-review.yml",
+      "description": "Access review issue template",
+      "required": true,
+      "exists": true,
+      "sizeBytes": 1759
+    },
+    {
+      "type": "artifact",
+      "path": "artifacts/security/vulnerability-report.json",
+      "description": "Generated vulnerability report JSON",
+      "required": false,
+      "exists": true,
+      "sizeBytes": 473
+    },
+    {
+      "type": "artifact",
+      "path": "artifacts/security/vulnerability-report.md",
+      "description": "Generated vulnerability report Markdown",
+      "required": false,
+      "exists": true,
+      "sizeBytes": 470
+    },
+    {
+      "type": "artifact",
+      "path": "artifacts/security/stride-report.json",
+      "description": "Generated STRIDE report JSON",
+      "required": false,
+      "exists": true,
+      "sizeBytes": 9452
+    },
+    {
+      "type": "artifact",
+      "path": "artifacts/security/stride-report.md",
+      "description": "Generated STRIDE report Markdown",
+      "required": false,
+      "exists": true,
+      "sizeBytes": 9344
+    }
+  ],
+  "summary": {
+    "requiredEvidencePresent": 19,
+    "requiredEvidenceMissing": 0,
+    "optionalEvidencePresent": 4,
+    "optionalEvidenceMissing": 0,
+    "vulnerabilityFindings": {
+      "total": 0,
+      "byScanner": {},
+      "bySeverity": {
+        "CRITICAL": 0,
+        "HIGH": 0,
+        "MEDIUM": 0,
+        "LOW": 0,
+        "UNKNOWN": 0
+      },
+      "byCvss": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "none": 0,
+        "unknown": 0
+      },
+      "fixable": {
+        "total": 0
+      }
+    },
+    "strideFindings": {
+      "total": 10,
+      "byCategory": {
+        "Spoofing": 2,
+        "Tampering": 2,
+        "Repudiation": 1,
+        "Information Disclosure": 2,
+        "Denial of Service": 1,
+        "Elevation of Privilege": 2
+      },
+      "bySeverity": {
+        "high": 4,
+        "critical": 2,
+        "medium": 4
+      },
+      "byStatus": {
+        "open": 2,
+        "mitigated": 8
+      }
+    }
+  },
+  "controls": [
+    {
+      "controlId": "DC-SOC2-SEC-001",
+      "objective": "Access control",
+      "files": [
+        {
+          "path": "discord-bot/src/security/authorization.ts",
+          "exists": true
+        },
+        {
+          "path": "console/api/src/integrations/discord/policy.js",
+          "exists": true
+        },
+        {
+          "path": "console/api/test/discordPolicy.test.js",
+          "exists": true
+        }
+      ],
+      "status": "present"
+    },
+    {
+      "controlId": "DC-SOC2-SEC-002",
+      "objective": "Backend authority",
+      "files": [
+        {
+          "path": "console/api/src/integrations/discord/routes.js",
+          "exists": true
+        },
+        {
+          "path": "console/api/src/integrations/discord/adapter.js",
+          "exists": true
+        },
+        {
+          "path": "docs/discord-control-bot/api-adapter-contract.md",
+          "exists": true
+        }
+      ],
+      "status": "present"
+    },
+    {
+      "controlId": "DC-SOC2-SEC-003",
+      "objective": "Read-only scope",
+      "files": [
+        {
+          "path": "discord-bot/src/security/authorization.ts",
+          "exists": true
+        },
+        {
+          "path": "console/api/src/integrations/discord/adapter.js",
+          "exists": true
+        },
+        {
+          "path": "discord-bot/scripts/validate-scaffold.mjs",
+          "exists": true
+        }
+      ],
+      "status": "present"
+    },
+    {
+      "controlId": "DC-SOC2-SEC-004",
+      "objective": "Secret protection",
+      "files": [
+        {
+          "path": "discord-bot/scripts/check-secrets.mjs",
+          "exists": true
+        },
+        {
+          "path": "discord-bot/src/security/redaction.ts",
+          "exists": true
+        },
+        {
+          "path": "console/api/src/integrations/discord/sanitize.js",
+          "exists": true
+        }
+      ],
+      "status": "present"
+    },
+    {
+      "controlId": "DC-SOC2-SEC-006",
+      "objective": "Vulnerability management",
+      "files": [
+        {
+          "path": ".github/workflows/semgrep-sast.yml",
+          "exists": true
+        },
+        {
+          "path": ".github/workflows/trivy-vulnerability-scan.yml",
+          "exists": true
+        },
+        {
+          "path": "scripts/generate-vulnerability-report.mjs",
+          "exists": true
+        },
+        {
+          "path": "scripts/sync-vulnerability-issues.mjs",
+          "exists": true
+        }
+      ],
+      "status": "present"
+    },
+    {
+      "controlId": "DC-SOC2-SEC-008",
+      "objective": "Auditability",
+      "files": [
+        {
+          "path": "console/api/src/integrations/discord/audit.js",
+          "exists": true
+        },
+        {
+          "path": "console/api/test/discordAudit.test.js",
+          "exists": true
+        },
+        {
+          "path": "docs/discord-control-bot/issue-tracking-policy.md",
+          "exists": true
+        }
+      ],
+      "status": "present"
+    },
+    {
+      "controlId": "DC-SOC2-C-001",
+      "objective": "Confidentiality/redaction",
+      "files": [
+        {
+          "path": "console/api/src/integrations/discord/sanitize.js",
+          "exists": true
+        },
+        {
+          "path": "console/api/src/integrations/discord/statusProvider.js",
+          "exists": true
+        },
+        {
+          "path": "console/api/test/discordStatusProvider.test.js",
+          "exists": true
+        }
+      ],
+      "status": "present"
+    },
+    {
+      "controlId": "E-013",
+      "objective": "Threat model evidence",
+      "files": [
+        {
+          "path": "scripts/generate-stride-report.mjs",
+          "exists": true
+        },
+        {
+          "path": ".github/workflows/stride-threat-scan.yml",
+          "exists": true
+        },
+        {
+          "path": "artifacts/security/stride-report.md",
+          "exists": true
+        }
+      ],
+      "status": "present"
+    },
+    {
+      "controlId": "E-016",
+      "objective": "CVSS vulnerability evidence",
+      "files": [
+        {
+          "path": "scripts/generate-vulnerability-report.mjs",
+          "exists": true
+        },
+        {
+          "path": "artifacts/security/vulnerability-report.md",
+          "exists": true
+        }
+      ],
+      "status": "present"
+    },
+    {
+      "controlId": "E-017",
+      "objective": "STRIDE artifact evidence",
+      "files": [
+        {
+          "path": "artifacts/security/stride-report.json",
+          "exists": true
+        },
+        {
+          "path": "artifacts/security/stride-report.md",
+          "exists": true
+        },
+        {
+          "path": "scripts/sync-stride-issues.mjs",
+          "exists": true
+        }
+      ],
+      "status": "present"
+    }
+  ]
+}

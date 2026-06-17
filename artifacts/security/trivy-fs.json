@@ -1,0 +1,2428 @@
+{
+  "SchemaVersion": 2,
+  "Trivy": {
+    "Version": "0.71.1"
+  },
+  "ReportID": "019ed5a2-5be8-7e6d-8f57-a14268836170",
+  "CreatedAt": "2026-06-17T05:50:47.912947543-07:00",
+  "ArtifactID": "sha256:f9a73bfcd1f99380a4f8b5ef27e86c533bbae835bae2f90cb8a5d4d6fe70cc2f",
+  "ArtifactName": ".",
+  "ArtifactType": "repository",
+  "Metadata": {
+    "RepoURL": "https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL.git",
+    "Branch": "feature/discord-control-bot",
+    "Commit": "57a60fbcf2ea901531e8ab0f196243306952e2a0",
+    "CommitMsg": "Require vulnerability issue sync in SOC 2 readiness check",
+    "Author": "Ron Yacketta \u003cyacketrj@users.noreply.github.com\u003e",
+    "Committer": "Ron Yacketta \u003cyacketrj@users.noreply.github.com\u003e"
+  },
+  "Results": [
+    {
+      "Target": "console/api/package-lock.json",
+      "Class": "lang-pkgs",
+      "Type": "npm",
+      "Packages": [
+        {
+          "ID": "pg@8.21.0",
+          "Name": "pg",
+          "Identifier": {
+            "PURL": "pkg:npm/pg@8.21.0",
+            "UID": "631b70de3d03b66"
+          },
+          "Version": "8.21.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Relationship": "direct",
+          "DependsOn": [
+            "pg-cloudflare@1.4.0",
+            "pg-connection-string@2.13.0",
+            "pg-pool@3.14.0",
+            "pg-protocol@1.14.0",
+            "pg-types@2.2.0",
+            "pgpass@1.0.5"
+          ],
+          "Locations": [
+            {
+              "StartLine": 17,
+              "EndLine": 42
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "pg-cloudflare@1.4.0",
+          "Name": "pg-cloudflare",
+          "Identifier": {
+            "PURL": "pkg:npm/pg-cloudflare@1.4.0",
+            "UID": "905fcbb30dcc858a"
+          },
+          "Version": "1.4.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 43,
+              "EndLine": 48
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "pg-connection-string@2.13.0",
+          "Name": "pg-connection-string",
+          "Identifier": {
+            "PURL": "pkg:npm/pg-connection-string@2.13.0",
+            "UID": "a7624a2752a8986d"
+          },
+          "Version": "2.13.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 49,
+              "EndLine": 53
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "pg-int8@1.0.1",
+          "Name": "pg-int8",
+          "Identifier": {
+            "PURL": "pkg:npm/pg-int8@1.0.1",
+            "UID": "86ec17ca78eb8f5"
+          },
+          "Version": "1.0.1",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 54,
+              "EndLine": 61
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "pg-pool@3.14.0",
+          "Name": "pg-pool",
+          "Identifier": {
+            "PURL": "pkg:npm/pg-pool@3.14.0",
+            "UID": "4addc55637abb59e"
+          },
+          "Version": "3.14.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "pg@8.21.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 62,
+              "EndLine": 69
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "pg-protocol@1.14.0",
+          "Name": "pg-protocol",
+          "Identifier": {
+            "PURL": "pkg:npm/pg-protocol@1.14.0",
+            "UID": "53184bf169a2b383"
+          },
+          "Version": "1.14.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 70,
+              "EndLine": 74
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "pg-types@2.2.0",
+          "Name": "pg-types",
+          "Identifier": {
+            "PURL": "pkg:npm/pg-types@2.2.0",
+            "UID": "9545ac15c27f7e5"
+          },
+          "Version": "2.2.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "pg-int8@1.0.1",
+            "postgres-array@2.0.0",
+            "postgres-bytea@1.0.1",
+            "postgres-date@1.0.7",
+            "postgres-interval@1.2.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 75,
+              "EndLine": 89
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "pgpass@1.0.5",
+          "Name": "pgpass",
+          "Identifier": {
+            "PURL": "pkg:npm/pgpass@1.0.5",
+            "UID": "34f9c874d4a308b3"
+          },
+          "Version": "1.0.5",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "split2@4.2.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 90,
+              "EndLine": 97
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "postgres-array@2.0.0",
+          "Name": "postgres-array",
+          "Identifier": {
+            "PURL": "pkg:npm/postgres-array@2.0.0",
+            "UID": "71731155554bb018"
+          },
+          "Version": "2.0.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 98,
+              "EndLine": 105
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "postgres-bytea@1.0.1",
+          "Name": "postgres-bytea",
+          "Identifier": {
+            "PURL": "pkg:npm/postgres-bytea@1.0.1",
+            "UID": "9d754234075e2336"
+          },
+          "Version": "1.0.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 106,
+              "EndLine": 113
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "postgres-date@1.0.7",
+          "Name": "postgres-date",
+          "Identifier": {
+            "PURL": "pkg:npm/postgres-date@1.0.7",
+            "UID": "e89ed4502be6dd8"
+          },
+          "Version": "1.0.7",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 114,
+              "EndLine": 121
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "postgres-interval@1.2.0",
+          "Name": "postgres-interval",
+          "Identifier": {
+            "PURL": "pkg:npm/postgres-interval@1.2.0",
+            "UID": "53e9d482b2b6e909"
+          },
+          "Version": "1.2.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "xtend@4.0.2"
+          ],
+          "Locations": [
+            {
+              "StartLine": 122,
+              "EndLine": 132
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "split2@4.2.0",
+          "Name": "split2",
+          "Identifier": {
+            "PURL": "pkg:npm/split2@4.2.0",
+            "UID": "9526300b977ae689"
+          },
+          "Version": "4.2.0",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 133,
+              "EndLine": 140
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "xtend@4.0.2",
+          "Name": "xtend",
+          "Identifier": {
+            "PURL": "pkg:npm/xtend@4.0.2",
+            "UID": "9c999a11489b6c17"
+          },
+          "Version": "4.0.2",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 141,
+              "EndLine": 148
+            }
+          ],
+          "AnalyzedBy": "npm"
+        }
+      ]
+    },
+    {
+      "Target": "console/web/package-lock.json",
+      "Class": "lang-pkgs",
+      "Type": "npm",
+      "Packages": [
+        {
+          "ID": "@vitejs/plugin-react@6.0.2",
+          "Name": "@vitejs/plugin-react",
+          "Identifier": {
+            "PURL": "pkg:npm/%40vitejs/plugin-react@6.0.2",
+            "UID": "fb076d8738c8cf3e"
+          },
+          "Version": "6.0.2",
+          "Relationship": "direct",
+          "DependsOn": [
+            "@rolldown/pluginutils@1.0.1",
+            "vite@8.0.16"
+          ],
+          "Locations": [
+            {
+              "StartLine": 338,
+              "EndLine": 361
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "lucide-react@0.468.0",
+          "Name": "lucide-react",
+          "Identifier": {
+            "PURL": "pkg:npm/lucide-react@0.468.0",
+            "UID": "3945c43dfe85ef41"
+          },
+          "Version": "0.468.0",
+          "Relationship": "direct",
+          "DependsOn": [
+            "react@19.2.7"
+          ],
+          "Locations": [
+            {
+              "StartLine": 642,
+              "EndLine": 649
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "react@19.2.7",
+          "Name": "react",
+          "Identifier": {
+            "PURL": "pkg:npm/react@19.2.7",
+            "UID": "7073512ac9d3e2df"
+          },
+          "Version": "19.2.7",
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 710,
+              "EndLine": 717
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "react-dom@19.2.7",
+          "Name": "react-dom",
+          "Identifier": {
+            "PURL": "pkg:npm/react-dom@19.2.7",
+            "UID": "4d2386d4c8884a67"
+          },
+          "Version": "19.2.7",
+          "Relationship": "direct",
+          "DependsOn": [
+            "react@19.2.7",
+            "scheduler@0.27.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 718,
+              "EndLine": 728
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "typescript@5.9.3",
+          "Name": "typescript",
+          "Identifier": {
+            "PURL": "pkg:npm/typescript@5.9.3",
+            "UID": "cbbc0a9dfbe2c520"
+          },
+          "Version": "5.9.3",
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 795,
+              "EndLine": 806
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "vite@8.0.16",
+          "Name": "vite",
+          "Identifier": {
+            "PURL": "pkg:npm/vite@8.0.16",
+            "UID": "81a469a3f8650d96"
+          },
+          "Version": "8.0.16",
+          "Relationship": "direct",
+          "DependsOn": [
+            "fsevents@2.3.3",
+            "lightningcss@1.32.0",
+            "picomatch@4.0.4",
+            "postcss@8.5.15",
+            "rolldown@1.0.3",
+            "tinyglobby@0.2.17"
+          ],
+          "Locations": [
+            {
+              "StartLine": 807,
+              "EndLine": 882
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@emnapi/core@1.10.0",
+          "Name": "@emnapi/core",
+          "Identifier": {
+            "PURL": "pkg:npm/%40emnapi/core@1.10.0",
+            "UID": "1130e387a072504f"
+          },
+          "Version": "1.10.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@emnapi/wasi-threads@1.2.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 26,
+              "EndLine": 35
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@emnapi/runtime@1.10.0",
+          "Name": "@emnapi/runtime",
+          "Identifier": {
+            "PURL": "pkg:npm/%40emnapi/runtime@1.10.0",
+            "UID": "66923f3474780378"
+          },
+          "Version": "1.10.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 36,
+              "EndLine": 44
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@emnapi/wasi-threads@1.2.1",
+          "Name": "@emnapi/wasi-threads",
+          "Identifier": {
+            "PURL": "pkg:npm/%40emnapi/wasi-threads@1.2.1",
+            "UID": "d046d2d45fa7dfff"
+          },
+          "Version": "1.2.1",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 45,
+              "EndLine": 53
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@napi-rs/wasm-runtime@1.1.5",
+          "Name": "@napi-rs/wasm-runtime",
+          "Identifier": {
+            "PURL": "pkg:npm/%40napi-rs/wasm-runtime@1.1.5",
+            "UID": "67454e1b0d94f720"
+          },
+          "Version": "1.1.5",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@emnapi/core@1.10.0",
+            "@emnapi/runtime@1.10.0",
+            "@tybys/wasm-util@0.10.2"
+          ],
+          "Locations": [
+            {
+              "StartLine": 54,
+              "EndLine": 70
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@oxc-project/types@0.133.0",
+          "Name": "@oxc-project/types",
+          "Identifier": {
+            "PURL": "pkg:npm/%40oxc-project/types@0.133.0",
+            "UID": "eb20df7418415173"
+          },
+          "Version": "0.133.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 71,
+              "EndLine": 78
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@rolldown/binding-android-arm64@1.0.3",
+          "Name": "@rolldown/binding-android-arm64",
+          "Identifier": {
+            "PURL": "pkg:npm/%40rolldown/binding-android-arm64@1.0.3",
+            "UID": "20662fa40be69b3e"
+          },
+          "Version": "1.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 79,
+              "EndLine": 93
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@rolldown/binding-darwin-arm64@1.0.3",
+          "Name": "@rolldown/binding-darwin-arm64",
+          "Identifier": {
+            "PURL": "pkg:npm/%40rolldown/binding-darwin-arm64@1.0.3",
+            "UID": "c843e7df08852d4"
+          },
+          "Version": "1.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 94,
+              "EndLine": 108
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@rolldown/binding-darwin-x64@1.0.3",
+          "Name": "@rolldown/binding-darwin-x64",
+          "Identifier": {
+            "PURL": "pkg:npm/%40rolldown/binding-darwin-x64@1.0.3",
+            "UID": "bdeb0527d5a7885"
+          },
+          "Version": "1.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 109,
+              "EndLine": 123
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@rolldown/binding-freebsd-x64@1.0.3",
+          "Name": "@rolldown/binding-freebsd-x64",
+          "Identifier": {
+            "PURL": "pkg:npm/%40rolldown/binding-freebsd-x64@1.0.3",
+            "UID": "1b99390fc9d2604d"
+          },
+          "Version": "1.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 124,
+              "EndLine": 138
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@rolldown/binding-linux-arm-gnueabihf@1.0.3",
+          "Name": "@rolldown/binding-linux-arm-gnueabihf",
+          "Identifier": {
+            "PURL": "pkg:npm/%40rolldown/binding-linux-arm-gnueabihf@1.0.3",
+            "UID": "7d0ac1d1849aeabe"
+          },
+          "Version": "1.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 139,
+              "EndLine": 153
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@rolldown/binding-linux-arm64-gnu@1.0.3",
+          "Name": "@rolldown/binding-linux-arm64-gnu",
+          "Identifier": {
+            "PURL": "pkg:npm/%40rolldown/binding-linux-arm64-gnu@1.0.3",
+            "UID": "518427829dbbc1fd"
+          },
+          "Version": "1.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 154,
+              "EndLine": 168
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@rolldown/binding-linux-arm64-musl@1.0.3",
+          "Name": "@rolldown/binding-linux-arm64-musl",
+          "Identifier": {
+            "PURL": "pkg:npm/%40rolldown/binding-linux-arm64-musl@1.0.3",
+            "UID": "8dfe2b7c3f2374d5"
+          },
+          "Version": "1.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 169,
+              "EndLine": 183
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@rolldown/binding-linux-ppc64-gnu@1.0.3",
+          "Name": "@rolldown/binding-linux-ppc64-gnu",
+          "Identifier": {
+            "PURL": "pkg:npm/%40rolldown/binding-linux-ppc64-gnu@1.0.3",
+            "UID": "f614fb114b4f1a40"
+          },
+          "Version": "1.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 184,
+              "EndLine": 198
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@rolldown/binding-linux-s390x-gnu@1.0.3",
+          "Name": "@rolldown/binding-linux-s390x-gnu",
+          "Identifier": {
+            "PURL": "pkg:npm/%40rolldown/binding-linux-s390x-gnu@1.0.3",
+            "UID": "b193541a6037a924"
+          },
+          "Version": "1.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 199,
+              "EndLine": 213
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@rolldown/binding-linux-x64-gnu@1.0.3",
+          "Name": "@rolldown/binding-linux-x64-gnu",
+          "Identifier": {
+            "PURL": "pkg:npm/%40rolldown/binding-linux-x64-gnu@1.0.3",
+            "UID": "c2fec1da422d0bed"
+          },
+          "Version": "1.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 214,
+              "EndLine": 228
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@rolldown/binding-linux-x64-musl@1.0.3",
+          "Name": "@rolldown/binding-linux-x64-musl",
+          "Identifier": {
+            "PURL": "pkg:npm/%40rolldown/binding-linux-x64-musl@1.0.3",
+            "UID": "24df961bc615b114"
+          },
+          "Version": "1.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 229,
+              "EndLine": 243
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@rolldown/binding-openharmony-arm64@1.0.3",
+          "Name": "@rolldown/binding-openharmony-arm64",
+          "Identifier": {
+            "PURL": "pkg:npm/%40rolldown/binding-openharmony-arm64@1.0.3",
+            "UID": "281a28e5c3cd9a9c"
+          },
+          "Version": "1.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 244,
+              "EndLine": 258
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@rolldown/binding-wasm32-wasi@1.0.3",
+          "Name": "@rolldown/binding-wasm32-wasi",
+          "Identifier": {
+            "PURL": "pkg:npm/%40rolldown/binding-wasm32-wasi@1.0.3",
+            "UID": "868659e19e9201cf"
+          },
+          "Version": "1.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@emnapi/core@1.10.0",
+            "@emnapi/runtime@1.10.0",
+            "@napi-rs/wasm-runtime@1.1.5"
+          ],
+          "Locations": [
+            {
+              "StartLine": 259,
+              "EndLine": 275
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@rolldown/binding-win32-arm64-msvc@1.0.3",
+          "Name": "@rolldown/binding-win32-arm64-msvc",
+          "Identifier": {
+            "PURL": "pkg:npm/%40rolldown/binding-win32-arm64-msvc@1.0.3",
+            "UID": "ef952f1dfff8507d"
+          },
+          "Version": "1.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 276,
+              "EndLine": 290
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@rolldown/binding-win32-x64-msvc@1.0.3",
+          "Name": "@rolldown/binding-win32-x64-msvc",
+          "Identifier": {
+            "PURL": "pkg:npm/%40rolldown/binding-win32-x64-msvc@1.0.3",
+            "UID": "56c95c78c07625e8"
+          },
+          "Version": "1.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 291,
+              "EndLine": 305
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@rolldown/pluginutils@1.0.1",
+          "Name": "@rolldown/pluginutils",
+          "Identifier": {
+            "PURL": "pkg:npm/%40rolldown/pluginutils@1.0.1",
+            "UID": "99e7e38c54a13186"
+          },
+          "Version": "1.0.1",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 306,
+              "EndLine": 310
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@tybys/wasm-util@0.10.2",
+          "Name": "@tybys/wasm-util",
+          "Identifier": {
+            "PURL": "pkg:npm/%40tybys/wasm-util@0.10.2",
+            "UID": "ee3c14b1f6587a91"
+          },
+          "Version": "0.10.2",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 311,
+              "EndLine": 319
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "detect-libc@2.1.2",
+          "Name": "detect-libc",
+          "Identifier": {
+            "PURL": "pkg:npm/detect-libc@2.1.2",
+            "UID": "5b573a64a1fb95f"
+          },
+          "Version": "2.1.2",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 368,
+              "EndLine": 375
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "fdir@6.5.0",
+          "Name": "fdir",
+          "Identifier": {
+            "PURL": "pkg:npm/fdir@6.5.0",
+            "UID": "ac11b79f2c940992"
+          },
+          "Version": "6.5.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "picomatch@4.0.4"
+          ],
+          "Locations": [
+            {
+              "StartLine": 376,
+              "EndLine": 391
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "fsevents@2.3.3",
+          "Name": "fsevents",
+          "Identifier": {
+            "PURL": "pkg:npm/fsevents@2.3.3",
+            "UID": "c9da3a04d65e5353"
+          },
+          "Version": "2.3.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 392,
+              "EndLine": 404
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "lightningcss@1.32.0",
+          "Name": "lightningcss",
+          "Identifier": {
+            "PURL": "pkg:npm/lightningcss@1.32.0",
+            "UID": "8e3ab9bbcbc40043"
+          },
+          "Version": "1.32.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "detect-libc@2.1.2",
+            "lightningcss-android-arm64@1.32.0",
+            "lightningcss-darwin-arm64@1.32.0",
+            "lightningcss-darwin-x64@1.32.0",
+            "lightningcss-freebsd-x64@1.32.0",
+            "lightningcss-linux-arm-gnueabihf@1.32.0",
+            "lightningcss-linux-arm64-gnu@1.32.0",
+            "lightningcss-linux-arm64-musl@1.32.0",
+            "lightningcss-linux-x64-gnu@1.32.0",
+            "lightningcss-linux-x64-musl@1.32.0",
+            "lightningcss-win32-arm64-msvc@1.32.0",
+            "lightningcss-win32-x64-msvc@1.32.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 405,
+              "EndLine": 432
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "lightningcss-android-arm64@1.32.0",
+          "Name": "lightningcss-android-arm64",
+          "Identifier": {
+            "PURL": "pkg:npm/lightningcss-android-arm64@1.32.0",
+            "UID": "6a92949c75c5a85b"
+          },
+          "Version": "1.32.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 433,
+              "EndLine": 451
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "lightningcss-darwin-arm64@1.32.0",
+          "Name": "lightningcss-darwin-arm64",
+          "Identifier": {
+            "PURL": "pkg:npm/lightningcss-darwin-arm64@1.32.0",
+            "UID": "625b0ee3bf512c3f"
+          },
+          "Version": "1.32.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 452,
+              "EndLine": 470
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "lightningcss-darwin-x64@1.32.0",
+          "Name": "lightningcss-darwin-x64",
+          "Identifier": {
+            "PURL": "pkg:npm/lightningcss-darwin-x64@1.32.0",
+            "UID": "99350e1f4407d550"
+          },
+          "Version": "1.32.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 471,
+              "EndLine": 489
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "lightningcss-freebsd-x64@1.32.0",
+          "Name": "lightningcss-freebsd-x64",
+          "Identifier": {
+            "PURL": "pkg:npm/lightningcss-freebsd-x64@1.32.0",
+            "UID": "db3e8fc3123e27ab"
+          },
+          "Version": "1.32.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 490,
+              "EndLine": 508
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "lightningcss-linux-arm-gnueabihf@1.32.0",
+          "Name": "lightningcss-linux-arm-gnueabihf",
+          "Identifier": {
+            "PURL": "pkg:npm/lightningcss-linux-arm-gnueabihf@1.32.0",
+            "UID": "9e1935570beb720b"
+          },
+          "Version": "1.32.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 509,
+              "EndLine": 527
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "lightningcss-linux-arm64-gnu@1.32.0",
+          "Name": "lightningcss-linux-arm64-gnu",
+          "Identifier": {
+            "PURL": "pkg:npm/lightningcss-linux-arm64-gnu@1.32.0",
+            "UID": "389804c5520c96ce"
+          },
+          "Version": "1.32.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 528,
+              "EndLine": 546
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "lightningcss-linux-arm64-musl@1.32.0",
+          "Name": "lightningcss-linux-arm64-musl",
+          "Identifier": {
+            "PURL": "pkg:npm/lightningcss-linux-arm64-musl@1.32.0",
+            "UID": "c360e9f6e103f417"
+          },
+          "Version": "1.32.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 547,
+              "EndLine": 565
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "lightningcss-linux-x64-gnu@1.32.0",
+          "Name": "lightningcss-linux-x64-gnu",
+          "Identifier": {
+            "PURL": "pkg:npm/lightningcss-linux-x64-gnu@1.32.0",
+            "UID": "e0c1b9fa55e01213"
+          },
+          "Version": "1.32.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 566,
+              "EndLine": 584
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "lightningcss-linux-x64-musl@1.32.0",
+          "Name": "lightningcss-linux-x64-musl",
+          "Identifier": {
+            "PURL": "pkg:npm/lightningcss-linux-x64-musl@1.32.0",
+            "UID": "1617a497858ebead"
+          },
+          "Version": "1.32.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 585,
+              "EndLine": 603
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "lightningcss-win32-arm64-msvc@1.32.0",
+          "Name": "lightningcss-win32-arm64-msvc",
+          "Identifier": {
+            "PURL": "pkg:npm/lightningcss-win32-arm64-msvc@1.32.0",
+            "UID": "ccc81ee4cba175e8"
+          },
+          "Version": "1.32.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 604,
+              "EndLine": 622
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "lightningcss-win32-x64-msvc@1.32.0",
+          "Name": "lightningcss-win32-x64-msvc",
+          "Identifier": {
+            "PURL": "pkg:npm/lightningcss-win32-x64-msvc@1.32.0",
+            "UID": "4ce42618a065e45e"
+          },
+          "Version": "1.32.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 623,
+              "EndLine": 641
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "nanoid@3.3.12",
+          "Name": "nanoid",
+          "Identifier": {
+            "PURL": "pkg:npm/nanoid@3.3.12",
+            "UID": "447fa0b209126b61"
+          },
+          "Version": "3.3.12",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 650,
+              "EndLine": 666
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "picocolors@1.1.1",
+          "Name": "picocolors",
+          "Identifier": {
+            "PURL": "pkg:npm/picocolors@1.1.1",
+            "UID": "677e6fe4650582f8"
+          },
+          "Version": "1.1.1",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 667,
+              "EndLine": 671
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "picomatch@4.0.4",
+          "Name": "picomatch",
+          "Identifier": {
+            "PURL": "pkg:npm/picomatch@4.0.4",
+            "UID": "70edcff5800517a4"
+          },
+          "Version": "4.0.4",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 672,
+              "EndLine": 682
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "postcss@8.5.15",
+          "Name": "postcss",
+          "Identifier": {
+            "PURL": "pkg:npm/postcss@8.5.15",
+            "UID": "1a32ef139074553e"
+          },
+          "Version": "8.5.15",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "nanoid@3.3.12",
+            "picocolors@1.1.1",
+            "source-map-js@1.2.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 683,
+              "EndLine": 709
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "rolldown@1.0.3",
+          "Name": "rolldown",
+          "Identifier": {
+            "PURL": "pkg:npm/rolldown@1.0.3",
+            "UID": "e10ab0144eca4019"
+          },
+          "Version": "1.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@oxc-project/types@0.133.0",
+            "@rolldown/binding-android-arm64@1.0.3",
+            "@rolldown/binding-darwin-arm64@1.0.3",
+            "@rolldown/binding-darwin-x64@1.0.3",
+            "@rolldown/binding-freebsd-x64@1.0.3",
+            "@rolldown/binding-linux-arm-gnueabihf@1.0.3",
+            "@rolldown/binding-linux-arm64-gnu@1.0.3",
+            "@rolldown/binding-linux-arm64-musl@1.0.3",
+            "@rolldown/binding-linux-ppc64-gnu@1.0.3",
+            "@rolldown/binding-linux-s390x-gnu@1.0.3",
+            "@rolldown/binding-linux-x64-gnu@1.0.3",
+            "@rolldown/binding-linux-x64-musl@1.0.3",
+            "@rolldown/binding-openharmony-arm64@1.0.3",
+            "@rolldown/binding-wasm32-wasi@1.0.3",
+            "@rolldown/binding-win32-arm64-msvc@1.0.3",
+            "@rolldown/binding-win32-x64-msvc@1.0.3",
+            "@rolldown/pluginutils@1.0.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 729,
+              "EndLine": 760
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "scheduler@0.27.0",
+          "Name": "scheduler",
+          "Identifier": {
+            "PURL": "pkg:npm/scheduler@0.27.0",
+            "UID": "2d3217306ae6bf56"
+          },
+          "Version": "0.27.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 761,
+              "EndLine": 765
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "source-map-js@1.2.1",
+          "Name": "source-map-js",
+          "Identifier": {
+            "PURL": "pkg:npm/source-map-js@1.2.1",
+            "UID": "92cadeea4b4c4e60"
+          },
+          "Version": "1.2.1",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 766,
+              "EndLine": 773
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "tinyglobby@0.2.17",
+          "Name": "tinyglobby",
+          "Identifier": {
+            "PURL": "pkg:npm/tinyglobby@0.2.17",
+            "UID": "29b0e2835407d1c1"
+          },
+          "Version": "0.2.17",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "fdir@6.5.0",
+            "picomatch@4.0.4"
+          ],
+          "Locations": [
+            {
+              "StartLine": 774,
+              "EndLine": 788
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "tslib@2.8.1",
+          "Name": "tslib",
+          "Identifier": {
+            "PURL": "pkg:npm/tslib@2.8.1",
+            "UID": "3e3383ead0d59d1c"
+          },
+          "Version": "2.8.1",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 789,
+              "EndLine": 794
+            }
+          ],
+          "AnalyzedBy": "npm"
+        }
+      ]
+    },
+    {
+      "Target": "console/api/Dockerfile",
+      "Class": "config",
+      "Type": "dockerfile",
+      "MisconfSummary": {
+        "Successes": 25,
+        "Failures": 2
+      },
+      "Misconfigurations": [
+        {
+          "Type": "Dockerfile Security Check",
+          "ID": "DS-0002",
+          "Title": "Image user should not be 'root'",
+          "Description": "Running containers with 'root' user can lead to a container escape situation. It is a best practice to run containers as non-root users, which can be done by adding a 'USER' statement to the Dockerfile.",
+          "Message": "Specify at least 1 USER command in Dockerfile with non-root user as argument",
+          "Namespace": "builtin.dockerfile.DS002",
+          "Query": "data.builtin.dockerfile.DS002.deny",
+          "Resolution": "Add 'USER \u003cnon root user name\u003e' line to the Dockerfile",
+          "Severity": "HIGH",
+          "PrimaryURL": "https://avd.aquasec.com/misconfig/ds-0002",
+          "References": [
+            "https://docs.docker.com/develop/develop-images/dockerfile_best-practices/",
+            "https://avd.aquasec.com/misconfig/ds-0002"
+          ],
+          "Status": "FAIL",
+          "CauseMetadata": {
+            "Provider": "Dockerfile",
+            "Service": "general"
+          }
+        },
+        {
+          "Type": "Dockerfile Security Check",
+          "ID": "DS-0026",
+          "Title": "No HEALTHCHECK defined",
+          "Description": "You should add HEALTHCHECK instruction in your docker container images to perform the health check on running containers.",
+          "Message": "Add HEALTHCHECK instruction in your Dockerfile",
+          "Namespace": "builtin.dockerfile.DS026",
+          "Query": "data.builtin.dockerfile.DS026.deny",
+          "Resolution": "Add HEALTHCHECK instruction in Dockerfile",
+          "Severity": "LOW",
+          "PrimaryURL": "https://avd.aquasec.com/misconfig/ds-0026",
+          "References": [
+            "https://blog.aquasec.com/docker-security-best-practices",
+            "https://avd.aquasec.com/misconfig/ds-0026"
+          ],
+          "Status": "FAIL",
+          "CauseMetadata": {
+            "Provider": "Dockerfile",
+            "Service": "general"
+          }
+        }
+      ]
+    },
+    {
+      "Target": "discord-bot/Dockerfile",
+      "Class": "config",
+      "Type": "dockerfile",
+      "MisconfSummary": {
+        "Successes": 27,
+        "Failures": 0
+      }
+    },
+    {
+      "Target": "orchestrator/Dockerfile",
+      "Class": "config",
+      "Type": "dockerfile",
+      "MisconfSummary": {
+        "Successes": 24,
+        "Failures": 3
+      },
+      "Misconfigurations": [
+        {
+          "Type": "Dockerfile Security Check",
+          "ID": "DS-0002",
+          "Title": "Image user should not be 'root'",
+          "Description": "Running containers with 'root' user can lead to a container escape situation. It is a best practice to run containers as non-root users, which can be done by adding a 'USER' statement to the Dockerfile.",
+          "Message": "Specify at least 1 USER command in Dockerfile with non-root user as argument",
+          "Namespace": "builtin.dockerfile.DS002",
+          "Query": "data.builtin.dockerfile.DS002.deny",
+          "Resolution": "Add 'USER \u003cnon root user name\u003e' line to the Dockerfile",
+          "Severity": "HIGH",
+          "PrimaryURL": "https://avd.aquasec.com/misconfig/ds-0002",
+          "References": [
+            "https://docs.docker.com/develop/develop-images/dockerfile_best-practices/",
+            "https://avd.aquasec.com/misconfig/ds-0002"
+          ],
+          "Status": "FAIL",
+          "CauseMetadata": {
+            "Provider": "Dockerfile",
+            "Service": "general"
+          }
+        },
+        {
+          "Type": "Dockerfile Security Check",
+          "ID": "DS-0026",
+          "Title": "No HEALTHCHECK defined",
+          "Description": "You should add HEALTHCHECK instruction in your docker container images to perform the health check on running containers.",
+          "Message": "Add HEALTHCHECK instruction in your Dockerfile",
+          "Namespace": "builtin.dockerfile.DS026",
+          "Query": "data.builtin.dockerfile.DS026.deny",
+          "Resolution": "Add HEALTHCHECK instruction in Dockerfile",
+          "Severity": "LOW",
+          "PrimaryURL": "https://avd.aquasec.com/misconfig/ds-0026",
+          "References": [
+            "https://blog.aquasec.com/docker-security-best-practices",
+            "https://avd.aquasec.com/misconfig/ds-0026"
+          ],
+          "Status": "FAIL",
+          "CauseMetadata": {
+            "Provider": "Dockerfile",
+            "Service": "general"
+          }
+        },
+        {
+          "Type": "Dockerfile Security Check",
+          "ID": "DS-0029",
+          "Title": "'apt-get' missing '--no-install-recommends'",
+          "Description": "'apt-get' install should use '--no-install-recommends' to minimize image size.",
+          "Message": "'--no-install-recommends' flag is missed: 'dpkg --add-architecture i386  \u0026\u0026 apt-get update -y  \u0026\u0026 apt-get install -y     ca-certificates     curl     tar     gzip     unzip     jq     git     python3     python3-yaml     procps     util-linux     lib32gcc-s1     lib32stdc++6     docker.io  \u0026\u0026 rm -rf /var/lib/apt/lists/*'",
+          "Namespace": "builtin.dockerfile.DS029",
+          "Query": "data.builtin.dockerfile.DS029.deny",
+          "Resolution": "Add '--no-install-recommends' flag to 'apt-get'",
+          "Severity": "HIGH",
+          "PrimaryURL": "https://avd.aquasec.com/misconfig/ds-0029",
+          "References": [
+            "https://docs.docker.com/develop/develop-images/dockerfile_best-practices/",
+            "https://avd.aquasec.com/misconfig/ds-0029"
+          ],
+          "Status": "FAIL",
+          "CauseMetadata": {
+            "Provider": "Dockerfile",
+            "Service": "general",
+            "StartLine": 5,
+            "EndLine": 22,
+            "Code": {
+              "Lines": [
+                {
+                  "Number": 5,
+                  "Content": "RUN dpkg --add-architecture i386 \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[38;5;64mRUN\u001b[0m dpkg --add-architecture i386 \u001b[38;5;124m\\",
+                  "FirstCause": true,
+                  "LastCause": false
+                },
+                {
+                  "Number": 6,
+                  "Content": " \u0026\u0026 apt-get update -y \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[0m \u001b[38;5;245m\u0026\u0026\u001b[0m apt-get update -y \u001b[38;5;124m\\",
+                  "FirstCause": false,
+                  "LastCause": false
+                },
+                {
+                  "Number": 7,
+                  "Content": " \u0026\u0026 apt-get install -y \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[0m \u001b[38;5;245m\u0026\u0026\u001b[0m apt-get install -y \u001b[38;5;124m\\",
+                  "FirstCause": false,
+                  "LastCause": false
+                },
+                {
+                  "Number": 8,
+                  "Content": "    ca-certificates \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[0m    ca-certificates \u001b[38;5;124m\\",
+                  "FirstCause": false,
+                  "LastCause": false
+                },
+                {
+                  "Number": 9,
+                  "Content": "    curl \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[0m    curl \u001b[38;5;124m\\",
+                  "FirstCause": false,
+                  "LastCause": false
+                },
+                {
+                  "Number": 10,
+                  "Content": "    tar \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[0m    tar \u001b[38;5;124m\\",
+                  "FirstCause": false,
+                  "LastCause": false
+                },
+                {
+                  "Number": 11,
+                  "Content": "    gzip \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[0m    gzip \u001b[38;5;124m\\",
+                  "FirstCause": false,
+                  "LastCause": false
+                },
+                {
+                  "Number": 12,
+                  "Content": "    unzip \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[0m    unzip \u001b[38;5;124m\\",
+                  "FirstCause": false,
+                  "LastCause": false
+                },
+                {
+                  "Number": 13,
+                  "Content": "    jq \\",
+                  "IsCause": true,
+                  "Annotation": "",
+                  "Truncated": false,
+                  "Highlighted": "\u001b[0m    jq \u001b[38;5;124m\\",
+                  "FirstCause": false,
+                  "LastCause": true
+                },
+                {
+                  "Number": 14,
+                  "Content": "",
+                  "IsCause": false,
+                  "Annotation": "",
+                  "Truncated": true,
+                  "FirstCause": false,
+                  "LastCause": false
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "Target": "runtime/game/overmap/Saved/Logs/DuneSandbox_PIDX-2-backup-2026.06.17-02.41.51.log",
+      "Class": "secret",
+      "Secrets": [
+        {
+          "RuleID": "jwt-token",
+          "Category": "JWT",
+          "Severity": "MEDIUM",
+          "Title": "JWT token",
+          "StartLine": 213,
+          "EndLine": 213,
+          "Code": {
+            "Lines": [
+              {
+                "Number": 211,
+                "Content": "LogInit: Log: Build Configuration: Shipping",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Build Configuration: Shipping",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 212,
+                "Content": "LogInit: Log: Branch Name: UE5",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Branch Name: UE5",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 213,
+                "Content": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "FirstCause": true,
+                "LastCause": true
+              },
+              {
+                "Number": 214,
+                "Content": "LogInit: Log: Base Directory: /home/dune/server/DuneSandbox/Binaries/Linux/",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Base Directory: /home/dune/server/DuneSandbox/Binaries/Linux/",
+                "FirstCause": false,
+                "LastCause": false
+              }
+            ]
+          },
+          "Match": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+          "Offset": 13398
+        }
+      ]
+    },
+    {
+      "Target": "runtime/game/overmap/Saved/Logs/DuneSandbox_PIDX-2-backup-2026.06.17-11.23.15.log",
+      "Class": "secret",
+      "Secrets": [
+        {
+          "RuleID": "jwt-token",
+          "Category": "JWT",
+          "Severity": "MEDIUM",
+          "Title": "JWT token",
+          "StartLine": 213,
+          "EndLine": 213,
+          "Code": {
+            "Lines": [
+              {
+                "Number": 211,
+                "Content": "LogInit: Log: Build Configuration: Shipping",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Build Configuration: Shipping",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 212,
+                "Content": "LogInit: Log: Branch Name: UE5",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Branch Name: UE5",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 213,
+                "Content": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "FirstCause": true,
+                "LastCause": true
+              },
+              {
+                "Number": 214,
+                "Content": "LogInit: Log: Base Directory: /home/dune/server/DuneSandbox/Binaries/Linux/",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Base Directory: /home/dune/server/DuneSandbox/Binaries/Linux/",
+                "FirstCause": false,
+                "LastCause": false
+              }
+            ]
+          },
+          "Match": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+          "Offset": 13398
+        }
+      ]
+    },
+    {
+      "Target": "runtime/game/overmap/Saved/Logs/DuneSandbox_PIDX-2.log",
+      "Class": "secret",
+      "Secrets": [
+        {
+          "RuleID": "jwt-token",
+          "Category": "JWT",
+          "Severity": "MEDIUM",
+          "Title": "JWT token",
+          "StartLine": 213,
+          "EndLine": 213,
+          "Code": {
+            "Lines": [
+              {
+                "Number": 211,
+                "Content": "LogInit: Log: Build Configuration: Shipping",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Build Configuration: Shipping",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 212,
+                "Content": "LogInit: Log: Branch Name: UE5",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Branch Name: UE5",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 213,
+                "Content": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "FirstCause": true,
+                "LastCause": true
+              },
+              {
+                "Number": 214,
+                "Content": "LogInit: Log: Base Directory: /home/dune/server/DuneSandbox/Binaries/Linux/",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Base Directory: /home/dune/server/DuneSandbox/Binaries/Linux/",
+                "FirstCause": false,
+                "LastCause": false
+              }
+            ]
+          },
+          "Match": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+          "Offset": 13398
+        }
+      ]
+    },
+    {
+      "Target": "runtime/game/overmap/Saved/dune-launch.sh",
+      "Class": "secret",
+      "Secrets": [
+        {
+          "RuleID": "jwt-token",
+          "Category": "JWT",
+          "Severity": "MEDIUM",
+          "Title": "JWT token",
+          "StartLine": 2,
+          "EndLine": 2,
+          "Code": {
+            "Lines": [
+              {
+                "Number": 1,
+                "Content": "#!/bin/bash",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "#!/bin/bash",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 2,
+                "Content": "veServices\\]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "veServices\\]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "FirstCause": true,
+                "LastCause": true
+              },
+              {
+                "Number": 3,
+                "Content": "",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "FirstCause": false,
+                "LastCause": false
+              }
+            ]
+          },
+          "Match": "veServices\\]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+          "Offset": 143
+        }
+      ]
+    },
+    {
+      "Target": "runtime/game/survival-1/Saved/Logs/DuneSandbox_PIDX-1-backup-2026.06.17-02.27.23.log",
+      "Class": "secret",
+      "Secrets": [
+        {
+          "RuleID": "jwt-token",
+          "Category": "JWT",
+          "Severity": "MEDIUM",
+          "Title": "JWT token",
+          "StartLine": 213,
+          "EndLine": 213,
+          "Code": {
+            "Lines": [
+              {
+                "Number": 211,
+                "Content": "LogInit: Log: Build Configuration: Shipping",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Build Configuration: Shipping",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 212,
+                "Content": "LogInit: Log: Branch Name: UE5",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Branch Name: UE5",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 213,
+                "Content": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "FirstCause": true,
+                "LastCause": true
+              },
+              {
+                "Number": 214,
+                "Content": "LogInit: Log: Base Directory: /home/dune/server/DuneSandbox/Binaries/Linux/",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Base Directory: /home/dune/server/DuneSandbox/Binaries/Linux/",
+                "FirstCause": false,
+                "LastCause": false
+              }
+            ]
+          },
+          "Match": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+          "Offset": 13401
+        }
+      ]
+    },
+    {
+      "Target": "runtime/game/survival-1/Saved/Logs/DuneSandbox_PIDX-1-backup-2026.06.17-02.41.58.log",
+      "Class": "secret",
+      "Secrets": [
+        {
+          "RuleID": "jwt-token",
+          "Category": "JWT",
+          "Severity": "MEDIUM",
+          "Title": "JWT token",
+          "StartLine": 213,
+          "EndLine": 213,
+          "Code": {
+            "Lines": [
+              {
+                "Number": 211,
+                "Content": "LogInit: Log: Build Configuration: Shipping",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Build Configuration: Shipping",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 212,
+                "Content": "LogInit: Log: Branch Name: UE5",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Branch Name: UE5",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 213,
+                "Content": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "FirstCause": true,
+                "LastCause": true
+              },
+              {
+                "Number": 214,
+                "Content": "LogInit: Log: Base Directory: /home/dune/server/DuneSandbox/Binaries/Linux/",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Base Directory: /home/dune/server/DuneSandbox/Binaries/Linux/",
+                "FirstCause": false,
+                "LastCause": false
+              }
+            ]
+          },
+          "Match": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+          "Offset": 13401
+        }
+      ]
+    },
+    {
+      "Target": "runtime/game/survival-1/Saved/Logs/DuneSandbox_PIDX-1-backup-2026.06.17-11.23.30.log",
+      "Class": "secret",
+      "Secrets": [
+        {
+          "RuleID": "jwt-token",
+          "Category": "JWT",
+          "Severity": "MEDIUM",
+          "Title": "JWT token",
+          "StartLine": 213,
+          "EndLine": 213,
+          "Code": {
+            "Lines": [
+              {
+                "Number": 211,
+                "Content": "LogInit: Log: Build Configuration: Shipping",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Build Configuration: Shipping",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 212,
+                "Content": "LogInit: Log: Branch Name: UE5",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Branch Name: UE5",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 213,
+                "Content": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "FirstCause": true,
+                "LastCause": true
+              },
+              {
+                "Number": 214,
+                "Content": "LogInit: Log: Base Directory: /home/dune/server/DuneSandbox/Binaries/Linux/",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Base Directory: /home/dune/server/DuneSandbox/Binaries/Linux/",
+                "FirstCause": false,
+                "LastCause": false
+              }
+            ]
+          },
+          "Match": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+          "Offset": 13401
+        }
+      ]
+    },
+    {
+      "Target": "runtime/game/survival-1/Saved/Logs/DuneSandbox_PIDX-1.log",
+      "Class": "secret",
+      "Secrets": [
+        {
+          "RuleID": "jwt-token",
+          "Category": "JWT",
+          "Severity": "MEDIUM",
+          "Title": "JWT token",
+          "StartLine": 213,
+          "EndLine": 213,
+          "Code": {
+            "Lines": [
+              {
+                "Number": 211,
+                "Content": "LogInit: Log: Build Configuration: Shipping",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Build Configuration: Shipping",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 212,
+                "Content": "LogInit: Log: Branch Name: UE5",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Branch Name: UE5",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 213,
+                "Content": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "FirstCause": true,
+                "LastCause": true
+              },
+              {
+                "Number": 214,
+                "Content": "LogInit: Log: Base Directory: /home/dune/server/DuneSandbox/Binaries/Linux/",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "LogInit: Log: Base Directory: /home/dune/server/DuneSandbox/Binaries/Linux/",
+                "FirstCause": false,
+                "LastCause": false
+              }
+            ]
+          },
+          "Match": "iveServices]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+          "Offset": 13401
+        }
+      ]
+    },
+    {
+      "Target": "runtime/game/survival-1/Saved/dune-launch.sh",
+      "Class": "secret",
+      "Secrets": [
+        {
+          "RuleID": "jwt-token",
+          "Category": "JWT",
+          "Severity": "MEDIUM",
+          "Title": "JWT token",
+          "StartLine": 2,
+          "EndLine": 2,
+          "Code": {
+            "Lines": [
+              {
+                "Number": 1,
+                "Content": "#!/bin/bash",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "#!/bin/bash",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 2,
+                "Content": "veServices\\]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "veServices\\]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+                "FirstCause": true,
+                "LastCause": true
+              },
+              {
+                "Number": 3,
+                "Content": "",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "FirstCause": false,
+                "LastCause": false
+              }
+            ]
+          },
+          "Match": "veServices\\]:ServiceAuthToken=**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************** -RMQGameTlsEnabled=",
+          "Offset": 146
+        }
+      ]
+    },
+    {
+      "Target": "runtime/rabbitmq-game/certs/key.pem",
+      "Class": "secret",
+      "Secrets": [
+        {
+          "RuleID": "private-key",
+          "Category": "AsymmetricPrivateKey",
+          "Severity": "HIGH",
+          "Title": "Asymmetric Private Key",
+          "StartLine": 2,
+          "EndLine": 27,
+          "Code": {
+            "Lines": [
+              {
+                "Number": 1,
+                "Content": "-----BEGIN PRIVATE KEY-----",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "-----BEGIN PRIVATE KEY-----",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 2,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": true,
+                "LastCause": false
+              },
+              {
+                "Number": 3,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 4,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 5,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 6,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 7,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 8,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 9,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 10,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 11,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 12,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 13,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 14,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 15,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 16,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 17,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 18,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 19,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 20,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 21,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 22,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 23,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 24,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 25,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 26,
+                "Content": "****************************************************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "****************************************************************",
+                "FirstCause": false,
+                "LastCause": false
+              },
+              {
+                "Number": 27,
+                "Content": "************************",
+                "IsCause": true,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "************************",
+                "FirstCause": false,
+                "LastCause": true
+              },
+              {
+                "Number": 28,
+                "Content": "-----END PRIVATE KEY-----",
+                "IsCause": false,
+                "Annotation": "",
+                "Truncated": false,
+                "Highlighted": "-----END PRIVATE KEY-----",
+                "FirstCause": false,
+                "LastCause": false
+              }
+            ]
+          },
+          "Match": "****************************************************************",
+          "Offset": 28
+        }
+      ]
+    }
+  ]
+}

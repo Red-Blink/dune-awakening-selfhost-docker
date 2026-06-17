@@ -1,0 +1,301 @@
+{
+  "generatedAt": "2026-06-17T20:22:12.334Z",
+  "scanner": {
+    "name": "Dune STRIDE Threat Model Scanner",
+    "cost": "free / repository-local",
+    "methodology": "STRIDE",
+    "scope": "Experimental read-only Discord companion bot and protected Console API adapter"
+  },
+  "assets": [
+    {
+      "id": "discord-user",
+      "name": "Discord user/member",
+      "sensitivity": "identity and role context"
+    },
+    {
+      "id": "discord-bot",
+      "name": "Discord companion bot",
+      "sensitivity": "operational command client"
+    },
+    {
+      "id": "console-adapter",
+      "name": "Dune Console Discord API adapter",
+      "sensitivity": "protected operational API"
+    },
+    {
+      "id": "bot-api-token",
+      "name": "Dune bot API token",
+      "sensitivity": "shared service credential"
+    },
+    {
+      "id": "console-runtime",
+      "name": "Dune Docker Console runtime",
+      "sensitivity": "server operations and status data"
+    },
+    {
+      "id": "security-artifacts",
+      "name": "Security evidence artifacts",
+      "sensitivity": "SOC 2 readiness evidence"
+    },
+    {
+      "id": "github-actions",
+      "name": "GitHub Actions automation",
+      "sensitivity": "CI permissions and issue automation"
+    }
+  ],
+  "trustBoundaries": [
+    {
+      "id": "tb-discord-bot",
+      "from": "Discord",
+      "to": "Discord companion bot",
+      "protocol": "Discord interactions / future client runtime"
+    },
+    {
+      "id": "tb-bot-console",
+      "from": "Discord companion bot",
+      "to": "Console adapter",
+      "protocol": "HTTP with bot API bearer token"
+    },
+    {
+      "id": "tb-console-runtime",
+      "from": "Console adapter",
+      "to": "Dune runtime files and commands",
+      "protocol": "local process/runtime access"
+    },
+    {
+      "id": "tb-ci-repo",
+      "from": "GitHub Actions",
+      "to": "repository issues/code scanning/artifacts",
+      "protocol": "GITHUB_TOKEN and workflow permissions"
+    }
+  ],
+  "findings": [
+    {
+      "id": "STRIDE-S-001",
+      "category": "Spoofing",
+      "title": "Discord actor or role spoofing across bot-to-adapter boundary",
+      "asset": "console-adapter",
+      "trustBoundary": "tb-bot-console",
+      "severity": "high",
+      "status": "open",
+      "evidence": [
+        "GAP: adapter validates actor context",
+        "PASS: backend policy exists",
+        "PASS: role-policy health exists without exposing IDs"
+      ],
+      "recommendation": "Keep final authorization in the Console adapter. Never rely on client-side Discord role checks only.",
+      "controls": [
+        "DC-SOC2-SEC-001",
+        "DC-SOC2-SEC-002",
+        "DC-SOC2-SEC-006",
+        "E-013"
+      ]
+    },
+    {
+      "id": "STRIDE-S-002",
+      "category": "Spoofing",
+      "title": "Bot API token disclosure or static token misuse",
+      "asset": "bot-api-token",
+      "trustBoundary": "tb-bot-console",
+      "severity": "high",
+      "status": "mitigated",
+      "evidence": [
+        "PASS: file-based token configuration",
+        "PASS: bearer token used for adapter calls",
+        "PASS: secret scanner exists"
+      ],
+      "recommendation": "Continue using file-based runtime secrets and rotate the bot API token after suspected exposure.",
+      "controls": [
+        "DC-SOC2-SEC-001",
+        "DC-SOC2-SEC-002",
+        "DC-SOC2-SEC-006",
+        "E-013"
+      ]
+    },
+    {
+      "id": "STRIDE-T-001",
+      "category": "Tampering",
+      "title": "Write/destructive behavior exposed through Discord command surface",
+      "asset": "discord-bot",
+      "trustBoundary": "tb-discord-bot",
+      "severity": "critical",
+      "status": "mitigated",
+      "evidence": [
+        "PASS: adapter writes disabled",
+        "PASS: adapter read-only marker",
+        "PASS: bot auth has no write/destructive/broadcast capability strings"
+      ],
+      "recommendation": "Any future write behavior requires separate approval, threat model, confirmation policy, DAST cases, audit policy, and rollback plan.",
+      "controls": [
+        "DC-SOC2-SEC-003",
+        "DC-SOC2-SEC-005",
+        "DC-SOC2-SEC-006",
+        "E-013"
+      ]
+    },
+    {
+      "id": "STRIDE-T-002",
+      "category": "Tampering",
+      "title": "Docker socket or privileged container access from bot",
+      "asset": "discord-bot",
+      "trustBoundary": "tb-console-runtime",
+      "severity": "critical",
+      "status": "mitigated",
+      "evidence": [
+        "PASS: no Docker socket reference in bot Docker/Compose files",
+        "PASS: no privileged mode in bot Docker/Compose files"
+      ],
+      "recommendation": "Keep the bot as an API client. Do not mount Docker socket or run privileged.",
+      "controls": [
+        "DC-SOC2-SEC-003",
+        "DC-SOC2-SEC-005",
+        "DC-SOC2-SEC-006",
+        "E-013"
+      ]
+    },
+    {
+      "id": "STRIDE-R-001",
+      "category": "Repudiation",
+      "title": "Discord-originated adapter access lacks audit evidence",
+      "asset": "console-adapter",
+      "trustBoundary": "tb-bot-console",
+      "severity": "medium",
+      "status": "open",
+      "evidence": [
+        "GAP: audit module exists",
+        "PASS: adapter/routes reference audit"
+      ],
+      "recommendation": "Maintain structured audit events containing Discord actor, command, capability, route, result, and timestamp.",
+      "controls": [
+        "DC-SOC2-SEC-008",
+        "DC-SOC2-SEC-006",
+        "E-013"
+      ]
+    },
+    {
+      "id": "STRIDE-I-001",
+      "category": "Information Disclosure",
+      "title": "Public Discord responses expose internal topology or secrets",
+      "asset": "console-runtime",
+      "trustBoundary": "tb-discord-bot",
+      "severity": "high",
+      "status": "mitigated",
+      "evidence": [
+        "PASS: sanitize/redaction module exists",
+        "PASS: public/diagnostic response split exists",
+        "PASS: bot redaction helper exists"
+      ],
+      "recommendation": "Keep public status minimal. Gate diagnostic details to admin/owner and prefer ephemeral Discord responses.",
+      "controls": [
+        "DC-SOC2-C-001",
+        "DC-SOC2-C-002",
+        "DC-SOC2-C-003",
+        "DC-SOC2-SEC-006",
+        "E-013"
+      ]
+    },
+    {
+      "id": "STRIDE-I-002",
+      "category": "Information Disclosure",
+      "title": "Security artifacts expose sensitive runtime details",
+      "asset": "security-artifacts",
+      "trustBoundary": "tb-ci-repo",
+      "severity": "medium",
+      "status": "mitigated",
+      "evidence": [
+        "PASS: security artifacts ignored by git",
+        "PASS: artifact directory placeholder allowed"
+      ],
+      "recommendation": "Keep generated scan artifacts in workflow artifacts, not committed source, unless explicitly reviewed and sanitized.",
+      "controls": [
+        "DC-SOC2-C-001",
+        "DC-SOC2-C-002",
+        "DC-SOC2-C-003",
+        "DC-SOC2-SEC-006",
+        "E-013"
+      ]
+    },
+    {
+      "id": "STRIDE-D-001",
+      "category": "Denial of Service",
+      "title": "Discord command abuse or repeated status/log requests overload adapter/runtime",
+      "asset": "console-adapter",
+      "trustBoundary": "tb-discord-bot",
+      "severity": "medium",
+      "status": "mitigated",
+      "evidence": [
+        "PASS: rate limits documented/planned",
+        "GAP: runtime rate-limit implementation present"
+      ],
+      "recommendation": "Implement command-level rate limits before production Discord deployment. Treat current state as planned mitigation, not full runtime control.",
+      "controls": [
+        "DC-SOC2-AV-001",
+        "DC-SOC2-AV-004",
+        "DC-SOC2-SEC-006",
+        "E-013"
+      ]
+    },
+    {
+      "id": "STRIDE-E-001",
+      "category": "Elevation of Privilege",
+      "title": "Observer/moderator gains admin-only diagnostic data",
+      "asset": "console-adapter",
+      "trustBoundary": "tb-bot-console",
+      "severity": "high",
+      "status": "mitigated",
+      "evidence": [
+        "PASS: admin/owner roles represented in policy/auth",
+        "PASS: diagnostic mode exists",
+        "PASS: authorization tests exist"
+      ],
+      "recommendation": "Keep detailed status behind admin/owner capability and enforce that check server-side.",
+      "controls": [
+        "DC-SOC2-SEC-001",
+        "DC-SOC2-SEC-005",
+        "DC-SOC2-SEC-006",
+        "E-013"
+      ]
+    },
+    {
+      "id": "STRIDE-E-002",
+      "category": "Elevation of Privilege",
+      "title": "GitHub Actions issue automation over-permissioned or abused",
+      "asset": "github-actions",
+      "trustBoundary": "tb-ci-repo",
+      "severity": "medium",
+      "status": "mitigated",
+      "evidence": [
+        "PASS: issue automation permission explicit",
+        "PASS: pull request issue sync is dry-run",
+        "PASS: push/schedule sync uses repository token"
+      ],
+      "recommendation": "Keep issue creation disabled on pull_request context and avoid pull_request_target for untrusted code.",
+      "controls": [
+        "DC-SOC2-SEC-001",
+        "DC-SOC2-SEC-005",
+        "DC-SOC2-SEC-006",
+        "E-013"
+      ]
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "byCategory": {
+      "Spoofing": 2,
+      "Tampering": 2,
+      "Repudiation": 1,
+      "Information Disclosure": 2,
+      "Denial of Service": 1,
+      "Elevation of Privilege": 2
+    },
+    "bySeverity": {
+      "high": 4,
+      "critical": 2,
+      "medium": 4
+    },
+    "byStatus": {
+      "open": 2,
+      "mitigated": 8
+    }
+  }
+}
