@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { TaskManager, taskTimeoutMs } from "../src/tasks.js";
+import { buildSelfUpdateHelperDockerArgs, TaskManager, taskTimeoutMs } from "../src/tasks.js";
 
 test("task manager creates and completes allowlisted dune tasks", async () => {
   const dir = mkdtempSync(join(tmpdir(), "arrakis-task-"));
@@ -54,6 +54,21 @@ test("long-running server tasks get an extended timeout", () => {
   assert.equal(taskTimeoutMs(config, "start"), 30 * 60 * 1000);
   assert.equal(taskTimeoutMs(config, "stop"), 30 * 60 * 1000);
   assert.equal(taskTimeoutMs(config, "restartAll"), 30 * 60 * 1000);
+});
+
+test("web self-update helper mounts the host repo path", () => {
+  const args = buildSelfUpdateHelperDockerArgs({
+    helperName: "dune-web-self-update-test",
+    hostRepoRoot: "/home/ubuntu/dune-awakening-selfhost-docker",
+    composeProjectName: "dune-awakening-selfhost-docker",
+    helperImage: "redblink-dune-docker-console:dev",
+    command: "runtime/scripts/dune self-update install latest"
+  });
+
+  assert(args.includes("-v"));
+  assert(args.includes("/home/ubuntu/dune-awakening-selfhost-docker:/repo"));
+  assert(args.includes("DUNE_HOST_REPO_ROOT=/home/ubuntu/dune-awakening-selfhost-docker"));
+  assert(!args.includes("/repo:/repo"));
 });
 
 function waitForTask(manager, id) {

@@ -446,7 +446,7 @@ rebuild_web_console_after_update() {
   log_file="runtime/generated/web-console-rebuild.log"
   echo
   echo "Rebuilding Dune Docker Console container: $service"
-  if [ -n "${DUNE_CONTAINER_REPO_ROOT:-}" ] || [ -f /.dockerenv ]; then
+  if { [ -n "${DUNE_CONTAINER_REPO_ROOT:-}" ] || [ -f /.dockerenv ]; } && [ "${DUNE_WEB_SELF_UPDATE_HELPER:-0}" != "1" ]; then
     echo "The rebuild will continue in a helper container because this update is running from the web console."
     echo "Rebuild log: $log_file"
     rebuild_web_console_with_helper "$service" >"$log_file" 2>&1 || {
