@@ -837,22 +837,24 @@ export async function addonLeadershipPlayers(db) {
   const result = await listPlayers(db, {});
   if (!result?.capabilities?.players) return result;
   const rows = result.rows || [];
-  const [levels, factions] = await Promise.all([
+  const [levels, factions, guilds] = await Promise.all([
     leadershipLevels(db).catch(() => new Map()),
-    leadershipFactions(db).catch(() => new Map())
+    leadershipFactions(db).catch(() => new Map()),
+    leadershipGuilds(db).catch(() => new Map())
   ]);
   return {
     capabilities: { players: true, leadership: true },
     rows: rows.map((row) => {
       const controllerId = String(row.player_controller_id || "");
       const actorId = String(row.actor_id || "");
+      const accountId = String(row.account_id || "");
       return {
         actorId,
         controllerId,
         name: row.character_name || `Player ${actorId}`,
         level: levels.get(controllerId) || levels.get(actorId) || 0,
         faction: factions.get(controllerId) || factions.get(actorId) || "Unassigned",
-        guild: "Unavailable",
+        guild: guilds.get(controllerId) || guilds.get(actorId) || guilds.get(accountId) || "Unavailable",
         status: row.online_status || "Offline",
         map: row.map || "",
         lastSeen: row.last_seen || ""
@@ -926,6 +928,32 @@ async function leadershipReputationFactions(db) {
     order by pfr.actor_id, coalesce(pfr.reputation_amount, 0) desc, pfr.faction_id`);
   for (const row of result.rows) factions.set(String(row.actor_id), factionDisplayName(row));
   return factions;
+}
+
+async function leadershipGuilds(db) {
+  const guilds = new Map();
+  if (!(await tableExists(db, "guild_members")) || !(await tableExists(db, "guilds"))) return guilds;
+  const memberColumns = await columnsFor(db, "guild_members");
+  const guildColumns = await columnsFor(db, "guilds");
+  const memberPlayerColumn = firstExistingColumn(memberColumns, ["player_id", "player_controller_id", "actor_id", "account_id", "player_pawn_id"]);
+  const memberGuildColumn = firstExistingColumn(memberColumns, ["guild_id", "id"]);
+  const guildIdColumn = firstExistingColumn(guildColumns, ["guild_id", "id"]);
+  const guildNameColumn = firstExistingColumn(guildColumns, ["guild_name", "name", "display_name"]);
+  if (!memberPlayerColumn || !memberGuildColumn || !guildIdColumn || !guildNameColumn) return guilds;
+  const result = await db.query(`
+    select gm.${quoteIdentifier(memberPlayerColumn)}::text as player_id,
+           coalesce(g.${quoteIdentifier(guildNameColumn)}, '') as guild_name
+    from dune.guild_members gm
+    join dune.guilds g on g.${quoteIdentifier(guildIdColumn)} = gm.${quoteIdentifier(memberGuildColumn)}
+    where nullif(g.${quoteIdentifier(guildNameColumn)}, '') is not null`);
+  for (const row of result.rows) {
+    if (row.player_id && row.guild_name) guilds.set(String(row.player_id), String(row.guild_name));
+  }
+  return guilds;
+}
+
+function firstExistingColumn(columns, names) {
+  return names.find((name) => columns.has(name)) || "";
 }
 
 async function playerLastSeenSelect(db) {

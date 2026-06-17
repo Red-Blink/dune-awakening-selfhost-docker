@@ -9,6 +9,8 @@ const MAX_COMMUNITY_ADDONS = 200;
 const MAX_ADDON_ARCHIVE_BYTES = 50 * 1024 * 1024;
 const ADDON_ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,63}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/i;
+const ADDON_LIFECYCLE_STATES = new Set(["active", "deprecated", "unsupported", "removed", "blocked"]);
+const INSTALL_BLOCKED_LIFECYCLES = new Set(["unsupported", "removed", "blocked"]);
 const ALLOWED_ADDON_PERMISSIONS = new Set([
   "players:read",
   "database:read",
@@ -79,6 +81,7 @@ export function listInstalledAddons(config) {
         const addonState = state[manifest.id] || {};
         const enabled = Boolean(addonState.enabled);
         const approvedPermissions = approvedPermissionsForState(manifest, addonState);
+        const lifecycle = normalizeAddonLifecycle(addonState.lifecycle || "active");
         return {
           id: manifest.id,
           name: manifest.name,
@@ -88,6 +91,9 @@ export function listInstalledAddons(config) {
           type: manifest.type,
           status: enabled ? "Enabled" : "Disabled",
           enabled,
+          lifecycle,
+          lifecycleMessage: stringField(addonState.lifecycleMessage, "lifecycleMessage", { optional: true }),
+          lifecycleUrl: addonState.lifecycleUrl ? httpsUrl(addonState.lifecycleUrl, "lifecycleUrl") : "",
           entryPath: manifest.entry.path,
           permissions: manifest.permissions,
           approvedPermissions
@@ -122,6 +128,7 @@ export async function installCommunityAddon(config, addonId, options = {}, fetch
   const index = await fetchCommunityAddons(fetchImpl);
   const summary = index.addons.find((addon) => addon.id === requestedId);
   if (!summary) throw new Error(`Community addon not found: ${requestedId}`);
+  assertCommunityAddonInstallable(summary);
   const manifestResponse = await fetchImpl(summary.manifestUrl, { headers: { accept: "application/json" } });
   if (!manifestResponse?.ok) throw new Error(`Addon manifest returned HTTP ${manifestResponse?.status || "unknown"}.`);
   const remoteManifest = normalizeCommunityAddonManifest(await manifestResponse.json());
@@ -162,7 +169,10 @@ export async function installCommunityAddon(config, addonId, options = {}, fetch
     enabled: false,
     approvedPermissions,
     installedAt: new Date().toISOString(),
-    sha256: actualSha
+    sha256: actualSha,
+    lifecycle: summary.lifecycle,
+    lifecycleMessage: summary.lifecycleMessage,
+    lifecycleUrl: summary.lifecycleUrl
   });
   return {
     ok: true,
@@ -175,6 +185,9 @@ export async function installCommunityAddon(config, addonId, options = {}, fetch
       type: installedManifest.type,
       status: "Disabled",
       enabled: false,
+      lifecycle: summary.lifecycle,
+      lifecycleMessage: summary.lifecycleMessage,
+      lifecycleUrl: summary.lifecycleUrl,
       entryPath: installedManifest.entry.path,
       permissions: installedManifest.permissions,
       approvedPermissions
@@ -189,6 +202,7 @@ export function setInstalledAddonEnabled(config, addonId, enabled) {
   if (!existsSync(addonPath)) throw new Error(`Installed addon not found: ${id}`);
   const manifest = normalizeAddonManifest(JSON.parse(readFileSync(addonPath, "utf8")));
   const addonState = readAddonState(config)[id] || {};
+  if (enabled) assertInstalledAddonRunnable(id, addonState);
   const approvedPermissions = approvedPermissionsForState(manifest, addonState);
   if (enabled) requireApprovedPermissions(manifest.permissions, approvedPermissions);
   setAddonEnabled(config, id, enabled);
@@ -203,6 +217,9 @@ export function setInstalledAddonEnabled(config, addonId, enabled) {
       type: manifest.type,
       status: enabled ? "Enabled" : "Disabled",
       enabled: Boolean(enabled),
+      lifecycle: normalizeAddonLifecycle(addonState.lifecycle || "active"),
+      lifecycleMessage: stringField(addonState.lifecycleMessage, "lifecycleMessage", { optional: true }),
+      lifecycleUrl: addonState.lifecycleUrl ? httpsUrl(addonState.lifecycleUrl, "lifecycleUrl") : "",
       entryPath: manifest.entry.path,
       permissions: manifest.permissions,
       approvedPermissions
@@ -225,6 +242,7 @@ export function installedAddonContentPath(config, addonId, contentPath) {
   const id = normalizeAddonId(addonId);
   const state = readAddonState(config);
   if (!state[id]?.enabled) throw new Error(`Installed addon is disabled: ${id}`);
+  assertInstalledAddonRunnable(id, state[id]);
   const root = resolve(addonsInstalledRoot(config), id);
   const target = resolve(root, safeAddonRelativePath(contentPath, "content path"));
   const rel = relative(root, target);
@@ -240,6 +258,7 @@ export function assertInstalledAddonPermission(config, addonId, permission) {
   const manifest = normalizeAddonManifest(JSON.parse(readFileSync(addonPath, "utf8")));
   const state = readAddonState(config)[id] || {};
   if (!state.enabled) throw new Error(`Installed addon is disabled: ${id}`);
+  assertInstalledAddonRunnable(id, state);
   if (!manifest.permissions.includes(requestedPermission)) throw new Error(`${manifest.name} did not request ${requestedPermission} permission.`);
   const approvedPermissions = approvedPermissionsForState(manifest, state);
   if (!approvedPermissions.includes(requestedPermission)) throw new Error(`${manifest.name} is not approved for ${requestedPermission} permission.`);
@@ -316,8 +335,38 @@ function normalizeCommunityAddonSummary(addon, index, seen) {
     version: stringField(addon.version, "version"),
     sourceUrl: addon.sourceUrl ? httpsUrl(addon.sourceUrl, "sourceUrl") : "",
     manifestUrl: httpsUrl(addon.manifestUrl, "manifestUrl"),
+    lifecycle: normalizeAddonLifecycle(addon.lifecycle || "active"),
+    lifecycleMessage: stringField(addon.lifecycleMessage || addon.lifecycleReason, "lifecycleMessage", { optional: true }),
+    lifecycleUrl: addon.lifecycleUrl ? httpsUrl(addon.lifecycleUrl, "lifecycleUrl") : "",
     permissions: normalizeAddonPermissions(addon.permissions || [])
   };
+}
+
+export function syncInstalledAddonLifecycle(config, communityIndex) {
+  if (!Array.isArray(communityIndex?.addons)) return { updated: false };
+  const installedRoot = addonsInstalledRoot(config);
+  if (!existsSync(installedRoot)) return { updated: false };
+  const communityById = new Map(communityIndex.addons.map((addon) => [addon.id, addon]));
+  const state = readAddonState(config);
+  let updated = false;
+  for (const entry of readdirSync(installedRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !ADDON_ID_PATTERN.test(entry.name)) continue;
+    const addon = communityById.get(entry.name);
+    const lifecycle = addon ? addon.lifecycle : "removed";
+    const lifecycleMessage = addon ? addon.lifecycleMessage : "This addon is no longer listed in the community catalog.";
+    const lifecycleUrl = addon ? addon.lifecycleUrl : "";
+    const previous = state[entry.name] || {};
+    if (previous.lifecycle !== lifecycle || previous.lifecycleMessage !== lifecycleMessage || previous.lifecycleUrl !== lifecycleUrl) {
+      state[entry.name] = { ...previous, lifecycle, lifecycleMessage, lifecycleUrl };
+      updated = true;
+    }
+    if (lifecycle === "blocked" && previous.enabled) {
+      state[entry.name] = { ...state[entry.name], enabled: false };
+      updated = true;
+    }
+  }
+  if (updated) writeAddonState(config, state);
+  return { updated };
 }
 
 export function normalizeAddonPermissions(value) {
@@ -346,6 +395,28 @@ function requireApprovedPermissions(requested, approved) {
   const approvedSet = new Set(normalizeAddonPermissions(approved));
   const missing = normalizeAddonPermissions(requested).filter((permission) => !approvedSet.has(permission));
   if (missing.length) throw new Error(`Addon permissions must be approved before install or enable: ${missing.join(", ")}`);
+}
+
+function assertCommunityAddonInstallable(addon) {
+  const lifecycle = normalizeAddonLifecycle(addon.lifecycle || "active");
+  if (INSTALL_BLOCKED_LIFECYCLES.has(lifecycle)) {
+    throw new Error(`${addon.name || addon.id} cannot be installed because its community status is ${formatLifecycleLabel(lifecycle)}.`);
+  }
+}
+
+function assertInstalledAddonRunnable(id, state = {}) {
+  const lifecycle = normalizeAddonLifecycle(state.lifecycle || "active");
+  if (lifecycle === "blocked") throw new Error(`Installed addon is blocked and cannot be enabled or opened: ${id}`);
+}
+
+function normalizeAddonLifecycle(value) {
+  const lifecycle = String(value || "active").trim().toLowerCase();
+  if (!ADDON_LIFECYCLE_STATES.has(lifecycle)) throw new Error(`Unsupported addon lifecycle state: ${lifecycle}`);
+  return lifecycle;
+}
+
+function formatLifecycleLabel(value) {
+  return String(value || "").replaceAll("-", " ");
 }
 
 function approvedPermissionsForState(manifest, state = {}) {

@@ -480,10 +480,13 @@ main { padding: 22px; min-width: 0; }
 .addons-title-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .addons-title-status { color: #8fffd2; font-size: .72em; font-weight: 700; }
 .addons-owner-copy { display: grid; gap: 6px; min-width: 0; }
+.addon-catalog-status-row { margin-top: 10px; }
 .addon-result-panel { margin-top: 12px; animation: addonNoticeFade 5s ease forwards; }
-.addons-table th:nth-child(6), .addons-table td:nth-child(6) { text-align: center; }
+.addons-table th:nth-child(6), .addons-table td:nth-child(6), .addons-table th:nth-child(7), .addons-table td:nth-child(7) { text-align: center; }
 .addon-status-cell { display: flex; justify-content: center; }
+.addon-status-stack { display: grid; justify-items: center; gap: 6px; }
 .addon-status-toggle { min-width: 124px; }
+.addon-catalog-cell { display: flex; justify-content: center; }
 .addon-pin-column { text-align: center; }
 .addon-source-link { color: var(--accent); font-weight: 800; text-decoration: none; }
 .addon-source-link:hover { color: #f1c96f; text-decoration: underline; }
@@ -498,6 +501,10 @@ main { padding: 22px; min-width: 0; }
 .addon-description-field span:last-child { min-width: 0; flex: 1 1 auto; }
 .addon-description-field:not(.expanded) span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .addon-description-field.expanded span:last-child { white-space: normal; }
+.addon-lifecycle-description { color: #ffd08a; }
+.addon-lifecycle-description a { color: var(--accent); font-weight: 800; text-decoration: none; }
+.addon-lifecycle-description a:hover { text-decoration: underline; }
+.addon-lifecycle-pill { width: fit-content; }
 .addon-description-toggle { flex: 0 0 24px; }
 .addon-description-spacer { flex: 0 0 32px; }
 @keyframes addonNoticeFade {
@@ -718,6 +725,9 @@ main { padding: 22px; min-width: 0; }
 .key-value-item strong { color: #fff1d4; overflow-wrap: anywhere; }
 .badge-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .badge { border-radius: 999px; padding: 4px 9px; font-size: 12px; text-transform: uppercase; border: 1px solid #555; color: #ddd; white-space: nowrap; }
+.badge.ok { border-color: #3d8b62; color: #9be6bd; }
+.badge.warn { border-color: #a97932; color: #ffd08a; }
+.badge.bad { border-color: var(--danger); color: var(--danger-text); }
 .badge-pass, .badge-succeeded { border-color: #3d8b62; color: #9be6bd; }
 .badge-warn, .badge-running { border-color: #a97932; color: #ffd08a; }
 .badge-fail, .badge-failed { border-color: var(--danger); color: var(--danger-text); }

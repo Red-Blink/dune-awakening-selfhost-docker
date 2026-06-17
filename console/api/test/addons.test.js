@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertInstalledAddonPermission, fetchCommunityAddons, installedAddonContentPath, listInstalledAddons, normalizeAddonManifest, normalizeAddonPermissions, normalizeCommunityAddonManifest, normalizeCommunityAddonsIndex, removeInstalledAddon, setInstalledAddonEnabled, validateZipEntries } from "../src/addons.js";
+import { assertInstalledAddonPermission, fetchCommunityAddons, installedAddonContentPath, listInstalledAddons, normalizeAddonManifest, normalizeAddonPermissions, normalizeCommunityAddonManifest, normalizeCommunityAddonsIndex, removeInstalledAddon, setInstalledAddonEnabled, syncInstalledAddonLifecycle, validateZipEntries } from "../src/addons.js";
 
 test("normalizes community addons index summaries", () => {
   const result = normalizeCommunityAddonsIndex({
@@ -15,17 +15,23 @@ test("normalizes community addons index summaries", () => {
       description: "Demo addon.",
       author: "Red-Blink",
       version: "1.0.0",
+      lifecycle: "deprecated",
+      lifecycleMessage: "Maintenance only.",
+      lifecycleUrl: "https://example.test/addons/leadership-board-demo",
       manifestUrl: "https://raw.githubusercontent.com/Red-Blink/dune-docker-addons/main/addons/leadership-board-demo.json"
     }]
   }, "https://example.test/index.json");
   assert.equal(result.sourceUrl, "https://example.test/index.json");
   assert.equal(result.addons.length, 1);
   assert.equal(result.addons[0].id, "leadership-board-demo");
+  assert.equal(result.addons[0].lifecycle, "deprecated");
+  assert.equal(result.addons[0].lifecycleMessage, "Maintenance only.");
 });
 
 test("rejects unsafe or malformed community addon entries", () => {
   assert.throws(() => normalizeCommunityAddonsIndex({ schemaVersion: 1, addons: [{ id: "../bad", name: "Bad", version: "1", manifestUrl: "https://example.test/a.json" }] }), /invalid id/);
   assert.throws(() => normalizeCommunityAddonsIndex({ schemaVersion: 1, addons: [{ id: "good-addon", name: "Bad", version: "1", manifestUrl: "http://example.test/a.json" }] }), /HTTPS/);
+  assert.throws(() => normalizeCommunityAddonsIndex({ schemaVersion: 1, addons: [{ id: "good-addon", name: "Bad", version: "1", lifecycle: "invalid-lifecycle", manifestUrl: "https://example.test/a.json" }] }), /Unsupported addon lifecycle/);
   assert.throws(() => normalizeCommunityAddonsIndex({ schemaVersion: 2, addons: [] }), /Unsupported/);
 });
 
@@ -149,6 +155,64 @@ test("tracks installed addon enable disable and removal state", () => {
     assert.throws(() => installedAddonContentPath(config, "leadership-board-demo", "web/index.html"), /disabled/);
     assert.deepEqual(removeInstalledAddon(config, "leadership-board-demo"), { ok: true, id: "leadership-board-demo" });
     assert.deepEqual(listInstalledAddons(config).addons, []);
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("syncs installed addon lifecycle from community index and blocks unsafe execution", () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), "dune-addons-"));
+  try {
+    const addonDir = join(repoRoot, "runtime/addons/installed/blocked-addon");
+    mkdirSync(join(addonDir, "web"), { recursive: true });
+    writeFileSync(join(addonDir, "addon.json"), JSON.stringify({
+      id: "blocked-addon",
+      name: "Blocked Addon",
+      version: "1.0.0",
+      type: "ui",
+      entry: { path: "web/index.html" },
+      permissions: ["players:read"]
+    }));
+    writeFileSync(join(addonDir, "web/index.html"), "<html></html>");
+    const config = { repoRoot };
+    writeFileSync(join(repoRoot, "runtime/addons/state.json"), JSON.stringify({ "blocked-addon": { enabled: true, approvedPermissions: ["players:read"] } }));
+    syncInstalledAddonLifecycle(config, {
+      addons: [{
+        id: "blocked-addon",
+        lifecycle: "blocked",
+        lifecycleMessage: "Security issue.",
+        lifecycleUrl: "https://example.test/security"
+      }]
+    });
+    const addon = listInstalledAddons(config).addons[0];
+    assert.equal(addon.lifecycle, "blocked");
+    assert.equal(addon.lifecycleMessage, "Security issue.");
+    assert.equal(addon.enabled, false);
+    assert.throws(() => setInstalledAddonEnabled(config, "blocked-addon", true), /blocked/);
+    assert.throws(() => assertInstalledAddonPermission(config, "blocked-addon", "players:read"), /disabled|blocked/);
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("marks locally installed addons missing from community index as removed", () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), "dune-addons-"));
+  try {
+    const addonDir = join(repoRoot, "runtime/addons/installed/local-only-addon");
+    mkdirSync(addonDir, { recursive: true });
+    writeFileSync(join(addonDir, "addon.json"), JSON.stringify({
+      id: "local-only-addon",
+      name: "Local Only Addon",
+      version: "1.0.0",
+      type: "ui",
+      entry: { path: "web/index.html" },
+      permissions: []
+    }));
+    const config = { repoRoot };
+    syncInstalledAddonLifecycle(config, { addons: [] });
+    const addon = listInstalledAddons(config).addons[0];
+    assert.equal(addon.lifecycle, "removed");
+    assert.match(addon.lifecycleMessage, /no longer listed/);
   } finally {
     rmSync(repoRoot, { recursive: true, force: true });
   }

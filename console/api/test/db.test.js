@@ -243,9 +243,14 @@ test("addon leadership players include level and faction summaries", async () =>
     query: async (text, values = []) => {
       if (text.includes("to_regclass")) {
         const name = String(values[0] || "");
-        return { rows: [{ exists: ["dune.actors", "dune.player_state", "dune.specialization_tracks", "dune.player_faction", "dune.factions"].includes(name) }] };
+        return { rows: [{ exists: ["dune.actors", "dune.player_state", "dune.specialization_tracks", "dune.player_faction", "dune.factions", "dune.guild_members", "dune.guilds"].includes(name) }] };
       }
-      if (text.includes("information_schema.columns")) return { rows: [] };
+      if (text.includes("information_schema.columns")) {
+        const table = String(values[1] || "");
+        if (table === "guild_members") return { rows: ["player_id", "guild_id", "role_id"].map((column_name) => ({ column_name })) };
+        if (table === "guilds") return { rows: ["guild_id", "guild_name", "guild_description"].map((column_name) => ({ column_name })) };
+        return { rows: [] };
+      }
       if (text.includes("from dune.actors a")) {
         return { rows: [
           { actor_id: 101, player_pawn_id: 101, account_id: 201, character_name: "Test One", player_controller_id: 301, map: "Survival_1", online_status: "Online", last_seen: "" },
@@ -264,6 +269,12 @@ test("addon leadership players include level and faction summaries", async () =>
           { actor_id: "302", faction_id: "2", faction_name: "Harkonnen" }
         ] };
       }
+      if (text.includes("from dune.guild_members gm")) {
+        return { rows: [
+          { player_id: "301", guild_name: "Water Sellers" },
+          { player_id: "302", guild_name: "Spice Guild" }
+        ] };
+      }
       return { rows: [] };
     }
   };
@@ -273,7 +284,7 @@ test("addon leadership players include level and faction summaries", async () =>
     ["Test One", 18, "Atreides"],
     ["Test Two", 7, "Harkonnen"]
   ]);
-  assert.equal(result.rows[0].guild, "Unavailable");
+  assert.deepEqual(result.rows.map((row) => row.guild), ["Water Sellers", "Spice Guild"]);
 });
 
 test("addon leadership players derive character level from level component XP", async () => {

@@ -18,7 +18,7 @@ import { buildBroadcastCommand, buildShutdownBroadcastCommand, publishServerComm
 import { clearCarePackageHistory, enableCarePackage, grantEligibleCarePackages, grantCarePackage, retryCarePackageGrant, runCarePackageAutoScan, saveCarePackageConfig, carePackageCapabilities, carePackageConfig, carePackageEligiblePlayers, carePackageHistory } from "./carePackage.js";
 import { readJsonBody, readMultipartForm } from "./httpSafety.js";
 import { parseBackupAutoStatus, parseBackupListRows } from "./statusParsers.js";
-import { assertInstalledAddonPermission, fetchCommunityAddons, installCommunityAddon, installedAddonContentPath, listInstalledAddons, removeInstalledAddon, setInstalledAddonEnabled } from "./addons.js";
+import { assertInstalledAddonPermission, fetchCommunityAddons, installCommunityAddon, installedAddonContentPath, listInstalledAddons, removeInstalledAddon, setInstalledAddonEnabled, syncInstalledAddonLifecycle } from "./addons.js";
 import { performanceSnapshot as collectPerformanceSnapshot } from "./services/performance.js";
 import { serveStatic, contentTypeForPath } from "./http/staticFiles.js";
 import { discoverServices } from "./services/serviceDiscovery.js";
@@ -302,7 +302,7 @@ async function handleApi(req, res) {
   if (path === "/api/admin/broadcast" && req.method === "POST") return broadcastRoute(req, res);
   if (path === "/api/admin/broadcast-shutdown" && req.method === "POST") return shutdownBroadcastRoute(req, res);
   if (path === "/api/addons/community") return json(res, 200, await fetchCommunityAddons());
-  if (path === "/api/addons/installed") return json(res, 200, listInstalledAddons(config));
+  if (path === "/api/addons/installed") return json(res, 200, await installedAddonsRoute());
   if (path === "/api/addons/community/install" && req.method === "POST") {
     const body = await readJson(req);
     const result = await installCommunityAddon(config, body.id, { approvedPermissions: body.approvedPermissions || [] });
@@ -311,6 +311,7 @@ async function handleApi(req, res) {
   }
   if (path.match(/^\/api\/addons\/installed\/[^/]+\/enable$/) && req.method === "POST") {
     const id = decodeURIComponent(path.split("/").at(-2));
+    await syncInstalledAddonLifecycleFromCommunity();
     const result = setInstalledAddonEnabled(config, id, true);
     audit(config, req, "addons.enable", { id: result.addon.id, version: result.addon.version, ok: true });
     return json(res, 200, result);
@@ -463,6 +464,19 @@ async function addonBridgeRoute(req, res, path) {
   }
   audit(config, req, "addons.bridge", { id, action, ok: false, reason: "Unsupported addon action" });
   return json(res, 400, { error: `Unsupported addon action: ${action || "unknown"}` });
+}
+
+async function installedAddonsRoute() {
+  await syncInstalledAddonLifecycleFromCommunity();
+  return listInstalledAddons(config);
+}
+
+async function syncInstalledAddonLifecycleFromCommunity() {
+  try {
+    syncInstalledAddonLifecycle(config, await fetchCommunityAddons());
+  } catch {
+    // Keep the last known local lifecycle state when the community catalog is unreachable.
+  }
 }
 
 function addonContentRoute(req, res, path) {

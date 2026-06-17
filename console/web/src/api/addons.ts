@@ -8,8 +8,13 @@ export type CommunityAddonSummary = {
   version: string;
   sourceUrl: string;
   manifestUrl: string;
+  lifecycle: AddonLifecycle;
+  lifecycleMessage: string;
+  lifecycleUrl: string;
   permissions: string[];
 };
+
+export type AddonLifecycle = "active" | "deprecated" | "unsupported" | "removed" | "blocked";
 
 export type CommunityAddonsIndex = {
   schemaVersion: number;
@@ -27,6 +32,9 @@ export type InstalledAddon = {
   type: string;
   status: string;
   enabled: boolean;
+  lifecycle: AddonLifecycle;
+  lifecycleMessage: string;
+  lifecycleUrl: string;
   entryPath: string;
   permissions: string[];
   approvedPermissions: string[];

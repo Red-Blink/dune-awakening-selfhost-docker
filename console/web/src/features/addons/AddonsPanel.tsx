@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { addonsApi, type CommunityAddonSummary, type InstalledAddon } from "../../api/addons";
+import { addonsApi, type AddonLifecycle, type CommunityAddonSummary, type InstalledAddon } from "../../api/addons";
 import type { PinnedAddon } from "./pinnedAddons";
 
 type AddonsPanelProps = {
@@ -44,6 +44,10 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
   }
 
   async function installAddon(addon: CommunityAddonSummary) {
+    if (isInstallBlocked(addon.lifecycle)) {
+      setNotice({ title: "Install Blocked", message: lifecycleInstallMessage(addon), tone: "fail" });
+      return;
+    }
     const permissions = addon.permissions || [];
     const permissionText = permissions.length
       ? ` It requests: ${permissions.map(formatPermissionLabel).join(", ")}.`
@@ -121,6 +125,7 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
   }, [notice]);
 
   const installedById = new Map(installed.map((addon) => [addon.id, addon]));
+  const communityById = new Map(addons.map((addon) => [addon.id, addon]));
   const openAddon = installed.find((addon) => addon.id === openAddonId && addon.enabled);
 
   useEffect(() => {
@@ -155,10 +160,28 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
     return () => window.removeEventListener("message", onMessage);
   }, [openAddon]);
 
-  const rows = addons.map((addon) => {
+  const rows: AddonTableRow[] = addons.map((addon) => {
     const installedAddon = installedById.get(addon.id);
-    return { ...addon, status: installedAddon ? installedAddon.status || "Installed" : "Available" };
+    return { ...addon, status: installedAddon ? installedAddon.status || "Installed" : "Available", installedOnly: false };
   });
+  rows.push(...installed
+    .filter((addon) => !communityById.has(addon.id))
+    .map((addon) => ({
+      id: addon.id,
+      name: addon.name,
+      description: addon.description,
+      author: addon.author,
+      version: addon.version,
+      sourceUrl: "",
+      manifestUrl: "",
+      lifecycle: addon.lifecycle || "removed",
+      lifecycleMessage: addon.lifecycleMessage || "This addon is installed locally but is no longer listed in the community catalog.",
+      lifecycleUrl: addon.lifecycleUrl || "",
+      permissions: addon.permissions,
+      status: addon.status || "Installed",
+      installedOnly: true
+    })));
+  const lifecycleSummary = addonLifecycleSummary(rows);
 
   if (selectedAddonId) {
     return <section className="panel addon-view-panel">
@@ -177,6 +200,9 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
       <h4>Community Addons</h4>
       <div className="addons-owner-copy">
         <p>Add community-built tools to your Dune Docker Console. Install addons you trust, review what each addon can access, and turn them on only when you want them available.</p>
+      </div>
+      <div className="badge-row addon-catalog-status-row" aria-label="Addon catalog lifecycle summary">
+        {lifecycleSummary.map((item) => <span key={item.lifecycle} className={`badge ${lifecycleBadgeKind(item.lifecycle)}`}>{formatLifecycleLabel(item.lifecycle)}: {item.count}</span>)}
       </div>
     </section>
     {notice && <div className={`result-panel addon-result-panel result-${notice.tone}`}><strong>{notice.title}.</strong><p>{notice.message}</p></div>}
@@ -203,8 +229,10 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
   </section>;
 }
 
+type AddonTableRow = CommunityAddonSummary & { status: string; installedOnly: boolean };
+
 function AddonsTable({ rows, loading, installedById, pinnedAddons, installingId, busyAddonId, openAddonId, expandedDescriptions, setExpandedDescriptions, installAddon, setAddonEnabled, removeAddon, setOpenAddonId, toggleAddonPin }: {
-  rows: CommunityAddonSummary[];
+  rows: AddonTableRow[];
   loading: boolean;
   installedById: Map<string, InstalledAddon>;
   pinnedAddons: PinnedAddon[];
@@ -220,19 +248,22 @@ function AddonsTable({ rows, loading, installedById, pinnedAddons, installingId,
   toggleAddonPin: (addon: InstalledAddon, pinned: boolean) => void;
 }) {
   if (!rows.length) return <div className="empty">{loading ? "Loading community addons..." : "No community addons are listed yet."}</div>;
-  return <div className="table-wrap"><table className="addons-table"><thead><tr><th>Name</th><th>Description</th><th>Author</th><th>Version</th><th>Permissions</th><th>Status</th><th className="backup-table-actions">Actions</th><th className="addon-pin-column">Sub-Menu</th></tr></thead><tbody>{rows.map((row) => {
+  return <div className="table-wrap"><table className="addons-table"><thead><tr><th>Name</th><th>Description</th><th>Author</th><th>Version</th><th>Permissions</th><th>Status</th><th>Catalog</th><th className="backup-table-actions">Actions</th><th className="addon-pin-column">Sub-Menu</th></tr></thead><tbody>{rows.map((row) => {
     const installedAddon = installedById.get(row.id);
     const busy = busyAddonId === row.id;
     const pinned = Boolean(installedAddon && pinnedAddons.some((addon) => addon.id === installedAddon.id));
     return <tr key={row.id}>
       <td><AddonNameCell addon={row} /></td>
-      <td><AddonDescriptionCell value={row.description} expanded={Boolean(expandedDescriptions[row.id])} onToggle={() => setExpandedDescriptions((current) => ({ ...current, [row.id]: !current[row.id] }))} /></td>
+      <td><AddonDescriptionCell addon={row} expanded={Boolean(expandedDescriptions[row.id])} onToggle={() => setExpandedDescriptions((current) => ({ ...current, [row.id]: !current[row.id] }))} /></td>
       <td>{row.author}</td>
       <td>{row.version}</td>
       <td><PermissionList permissions={installedAddon?.permissions || row.permissions || []} approvedPermissions={installedAddon?.approvedPermissions || []} /></td>
-      <td>{installedAddon ? <div className="addon-status-cell"><label className={`switch-checkbox addon-status-toggle ${installedAddon.enabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={busy} checked={installedAddon.enabled} onChange={(event) => void setAddonEnabled(installedAddon, event.target.checked)} /><span className="switch-label">{busy ? "Working" : installedAddon.enabled ? "Enabled" : "Disabled"}</span><strong className="switch-state">{installedAddon.enabled ? "ON" : "OFF"}</strong></label></div> : <div className="addon-status-cell"><StatusPill value="Available" /></div>}</td>
+      <td>
+        {installedAddon ? <div className="addon-status-cell"><label className={`switch-checkbox addon-status-toggle ${installedAddon.enabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={busy || installedAddon.lifecycle === "blocked"} checked={installedAddon.enabled} onChange={(event) => void setAddonEnabled(installedAddon, event.target.checked)} /><span className="switch-label">{busy ? "Working" : installedAddon.enabled ? "Enabled" : "Disabled"}</span><strong className="switch-state">{installedAddon.enabled ? "ON" : "OFF"}</strong></label></div> : <div className="addon-status-cell"><StatusPill value="Available" /></div>}
+      </td>
+      <td><div className="addon-catalog-cell"><LifecyclePill lifecycle={installedAddon?.lifecycle || row.lifecycle} /></div></td>
       <td className="backup-table-actions"><div className="service-actions">
-        {!installedAddon && <button disabled={installingId === row.id} onClick={() => void installAddon(row)}>{installingId === row.id ? "Installing..." : "Install"}</button>}
+        {!installedAddon && <button disabled={installingId === row.id || isInstallBlocked(row.lifecycle)} title={isInstallBlocked(row.lifecycle) ? lifecycleInstallMessage(row) : undefined} onClick={() => void installAddon(row)}>{installingId === row.id ? "Installing..." : "Install"}</button>}
         {installedAddon?.enabled && <button disabled={busy} onClick={() => setOpenAddonId(openAddonId === installedAddon.id ? "" : installedAddon.id)}>{openAddonId === installedAddon.id ? "Close" : "Open"}</button>}
         {installedAddon && <button className="danger" disabled={busy} onClick={() => void removeAddon(installedAddon)}>Uninstall</button>}
       </div></td>
@@ -284,15 +315,66 @@ function normalizeAddonBridgeRequest(value: unknown) {
   return { addonId, requestId, action, payload };
 }
 
-function AddonDescriptionCell({ value, expanded, onToggle }: { value: unknown; expanded: boolean; onToggle: () => void }) {
-  const text = String(value ?? "").trim();
-  if (!text) return "";
-  const canExpand = text.length > 96;
-  const preview = canExpand && !expanded ? `${text.slice(0, 96).replace(/\s+\S*$/, "")}.....` : text;
-  return <div className={`addon-description-field ${expanded ? "expanded" : ""}`}>
+function AddonDescriptionCell({ addon, expanded, onToggle }: { addon: Pick<AddonTableRow, "description" | "lifecycle" | "lifecycleMessage" | "lifecycleUrl" | "installedOnly">; expanded: boolean; onToggle: () => void }) {
+  const text = String(addon.description ?? "").trim();
+  const lifecycleText = addonLifecycleMessage(addon);
+  const fullText = [text, lifecycleText].filter(Boolean).join(" ");
+  if (!fullText) return "";
+  const canExpand = fullText.length > 96;
+  const preview = canExpand && !expanded ? `${fullText.slice(0, 96).replace(/\s+\S*$/, "")}.....` : fullText;
+  return <div className={`addon-description-field ${expanded ? "expanded" : ""} ${addon.lifecycle !== "active" ? "addon-lifecycle-description" : ""}`}>
     {canExpand ? <button className="playerAdmin_expanderButton addon-description-toggle" type="button" onClick={onToggle}>{expanded ? "-" : "+"}</button> : <span className="playerAdmin_expanderSpacer addon-description-spacer" />}
-    <span>{preview}</span>
+    <span>{preview}{addon.lifecycleUrl && expanded ? <> <a href={addon.lifecycleUrl} target="_blank" rel="noreferrer">Details</a></> : null}</span>
   </div>;
+}
+
+function LifecyclePill({ lifecycle }: { lifecycle: AddonLifecycle }) {
+  return <span className={`badge addon-lifecycle-pill ${lifecycleBadgeKind(lifecycle || "active")}`}>{formatLifecycleLabel(lifecycle || "active")}</span>;
+}
+
+function lifecycleBadgeKind(lifecycle: AddonLifecycle) {
+  if (lifecycle === "active") return "ok";
+  if (lifecycle === "blocked" || lifecycle === "removed") return "bad";
+  return "warn";
+}
+
+function addonLifecycleSummary(rows: AddonTableRow[]) {
+  const counts = rows.reduce<Record<AddonLifecycle, number>>((current, row) => {
+    const lifecycle = row.lifecycle || "active";
+    current[lifecycle] += 1;
+    return current;
+  }, { active: 0, deprecated: 0, unsupported: 0, removed: 0, blocked: 0 });
+  return (Object.entries(counts) as [AddonLifecycle, number][])
+    .filter(([, count]) => count > 0)
+    .sort(([left], [right]) => lifecycleSortOrder(left) - lifecycleSortOrder(right))
+    .map(([lifecycle, count]) => ({ lifecycle, count }));
+}
+
+function lifecycleSortOrder(lifecycle: AddonLifecycle) {
+  return ["active", "deprecated", "unsupported", "removed", "blocked"].indexOf(lifecycle);
+}
+
+function addonLifecycleMessage(addon: Pick<AddonTableRow, "lifecycle" | "lifecycleMessage" | "installedOnly">) {
+  if (!addon.lifecycle || addon.lifecycle === "active") return "";
+  if (addon.lifecycleMessage) return addon.lifecycleMessage;
+  if (addon.installedOnly) return "This addon is installed locally but is no longer listed in the community catalog.";
+  if (addon.lifecycle === "deprecated") return "This addon is deprecated and may stop receiving updates.";
+  if (addon.lifecycle === "unsupported") return "This addon is no longer supported by its maintainer.";
+  if (addon.lifecycle === "removed") return "This addon was removed from the community catalog.";
+  if (addon.lifecycle === "blocked") return "This addon was blocked for safety and cannot be installed or opened.";
+  return "";
+}
+
+function isInstallBlocked(lifecycle: AddonLifecycle) {
+  return lifecycle === "unsupported" || lifecycle === "removed" || lifecycle === "blocked";
+}
+
+function lifecycleInstallMessage(addon: Pick<AddonTableRow | CommunityAddonSummary, "name" | "lifecycle" | "lifecycleMessage">) {
+  return addon.lifecycleMessage || `${addon.name} cannot be installed because its community status is ${formatLifecycleLabel(addon.lifecycle)}.`;
+}
+
+function formatLifecycleLabel(lifecycle: AddonLifecycle) {
+  return lifecycle.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 }
 
 function addonContentUrl(addon: InstalledAddon) {
