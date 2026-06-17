@@ -228,7 +228,7 @@ export function UpdatesPanel({
 
   useEffect(() => {
     if (!stackUpdateTask || !isTerminalTask(stackUpdateTask.status)) return;
-    if (stackUpdateTask.status === "succeeded") return;
+    if (stackUpdateTask.status === "succeeded") refreshStackStatus();
     const id = window.setTimeout(() => setStackUpdateTask(null), UPDATE_RESULT_DISMISS_MS);
     return () => window.clearTimeout(id);
   }, [stackUpdateTask?.id, stackUpdateTask?.status]);
