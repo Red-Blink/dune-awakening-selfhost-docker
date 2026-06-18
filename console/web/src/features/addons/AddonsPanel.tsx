@@ -230,6 +230,7 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
 }
 
 type AddonTableRow = CommunityAddonSummary & { status: string; installedOnly: boolean };
+const ADDON_DESCRIPTION_EXPAND_THRESHOLD = 48;
 
 function AddonsTable({ rows, loading, installedById, pinnedAddons, installingId, busyAddonId, openAddonId, expandedDescriptions, setExpandedDescriptions, installAddon, setAddonEnabled, removeAddon, setOpenAddonId, toggleAddonPin }: {
   rows: AddonTableRow[];
@@ -320,8 +321,8 @@ function AddonDescriptionCell({ addon, expanded, onToggle }: { addon: Pick<Addon
   const lifecycleText = addonLifecycleMessage(addon);
   const fullText = [text, lifecycleText].filter(Boolean).join(" ");
   if (!fullText) return "";
-  const canExpand = fullText.length > 96;
-  const preview = canExpand && !expanded ? `${fullText.slice(0, 96).replace(/\s+\S*$/, "")}.....` : fullText;
+  const canExpand = fullText.length > ADDON_DESCRIPTION_EXPAND_THRESHOLD;
+  const preview = canExpand && !expanded ? `${fullText.slice(0, ADDON_DESCRIPTION_EXPAND_THRESHOLD).replace(/\s+\S*$/, "")}.....` : fullText;
   return <div className={`addon-description-field ${expanded ? "expanded" : ""} ${addon.lifecycle !== "active" ? "addon-lifecycle-description" : ""}`}>
     {canExpand ? <button className="playerAdmin_expanderButton addon-description-toggle" type="button" onClick={onToggle}>{expanded ? "-" : "+"}</button> : <span className="playerAdmin_expanderSpacer addon-description-spacer" />}
     <span>{preview}{addon.lifecycleUrl && expanded ? <> <a href={addon.lifecycleUrl} target="_blank" rel="noreferrer">Details</a></> : null}</span>
