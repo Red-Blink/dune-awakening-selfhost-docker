@@ -1,0 +1,26 @@
+{
+  "name": "dune-discord-control-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Read-only Discord companion for Dune Docker Console.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "test": "node --test",
+    "security:secrets": "node scripts/check-secrets.mjs",
+    "start": "node scripts/discord-runtime.mjs",
+    "build": "node scripts/validate-scaffold.mjs",
+    "discord:invite": "node scripts/discord-install-url.mjs",
+    "discord:discover": "node scripts/discord-discover.mjs",
+    "discord:channel": "node scripts/discord-channel-access.mjs",
+    "smoke:health": "node scripts/command-smoke.mjs health public",
+    "smoke:status": "node scripts/command-smoke.mjs status public",
+    "smoke:status-detail": "node scripts/command-smoke.mjs statusDetail admin",
+    "smoke:readiness": "node scripts/command-smoke.mjs readiness observer",
+    "smoke:services": "node scripts/command-smoke.mjs services observer"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

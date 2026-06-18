@@ -1,0 +1,209 @@
+name: Discord Bot Security Gates
+
+on:
+  pull_request:
+    paths:
+      - "discord-bot/**"
+      - "console/api/src/integrations/discord/**"
+      - "console/api/test/discord*.test.js"
+      - "docs/discord-control-bot/**"
+      - ".github/workflows/discord-bot-security-gates.yml"
+      - ".github/PULL_REQUEST_TEMPLATE.md"
+  push:
+    branches:
+      - feature/discord-control-bot
+    paths:
+      - "discord-bot/**"
+      - "console/api/src/integrations/discord/**"
+      - "console/api/test/discord*.test.js"
+      - "docs/discord-control-bot/**"
+      - ".github/workflows/discord-bot-security-gates.yml"
+      - ".github/PULL_REQUEST_TEMPLATE.md"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  policy-gates:
+    name: Policy Gates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure bot workspace exists
+        run: |
+          test -d discord-bot
+          test -f discord-bot/package.json
+          test -f docs/discord-control-bot/security-gates.md
+          test -f docs/discord-control-bot/feature-priority.md
+          test -f docs/discord-control-bot/roadmap.md
+          test -f docs/discord-control-bot/development-standards.md
+          test -f docs/discord-control-bot/soc2-control-matrix.md
+          test -f docs/discord-control-bot/templates/adr-template.md
+          test -f docs/discord-control-bot/templates/threat-model-template.md
+          test -f docs/discord-control-bot/templates/release-checklist.md
+          test -f docs/discord-control-bot/api-adapter-contract.md
+          test -f docs/discord-control-bot/adr/0001-experimental-read-only-companion-bot.md
+          test -f .github/PULL_REQUEST_TEMPLATE.md
+
+      - name: Ensure adapter scaffold exists
+        run: |
+          test -f console/api/src/integrations/discord/policy.js
+          test -f console/api/src/integrations/discord/sanitize.js
+          test -f console/api/src/integrations/discord/audit.js
+          test -f console/api/src/integrations/discord/adapter.js
+          test -f console/api/src/integrations/discord/routes.js
+          test -f console/api/test/discordPolicy.test.js
+          test -f console/api/test/discordSanitize.test.js
+          test -f console/api/test/discordAudit.test.js
+          test -f console/api/test/discordAdapter.test.js
+          test -f console/api/test/discordRoutes.test.js
+
+      - name: Block Docker socket mounts in bot runtime assets
+        run: |
+          if grep -R --line-number --fixed-strings \
+            --include='Dockerfile' \
+            --include='*.yml' \
+            --include='*.yaml' \
+            --include='*.json' \
+            "/var/run/docker.sock" discord-bot; then
+            echo "::error::Discord bot runtime assets must not mount /var/run/docker.sock."
+            exit 1
+          fi
+
+      - name: Block privileged container mode in bot runtime assets
+        run: |
+          if grep -R --line-number -E \
+            --include='Dockerfile' \
+            --include='*.yml' \
+            --include='*.yaml' \
+            --include='*.json' \
+            "privileged:[[:space:]]*true" discord-bot; then
+            echo "::error::Discord bot container must not use privileged mode."
+            exit 1
+          fi
+
+      - name: Block obvious secret material
+        run: |
+          node discord-bot/scripts/check-secrets.mjs
+
+      - name: Enforce lockfile presence
+        run: |
+          test -f discord-bot/package-lock.json
+
+      - name: Validate security documentation keywords
+        run: |
+          grep -q "SCA" docs/discord-control-bot/security-gates.md
+          grep -q "SAST" docs/discord-control-bot/security-gates.md
+          grep -q "DCA" docs/discord-control-bot/security-gates.md
+          grep -q "DAST" docs/discord-control-bot/security-gates.md
+          grep -q "Docker socket" docs/discord-control-bot/security-gates.md
+          grep -q "SOC 2" docs/discord-control-bot/soc2-control-matrix.md
+          grep -q "DC-SOC2-SEC-001" docs/discord-control-bot/soc2-control-matrix.md
+          grep -q "Definition of Done" docs/discord-control-bot/development-standards.md
+          grep -q "Milestone P0.1" docs/discord-control-bot/roadmap.md
+          grep -q "Authorization" docs/discord-control-bot/api-adapter-contract.md
+          grep -q "DAST Requirements" docs/discord-control-bot/api-adapter-contract.md
+          grep -q "experimental read-only" docs/discord-control-bot/adr/0001-experimental-read-only-companion-bot.md
+
+  npm-gates:
+    name: NPM / SCA Gates
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: discord-bot
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: discord-bot/package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run unit/security tests
+        run: npm test
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+
+  console-api-adapter-tests:
+    name: Console API Discord Adapter Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: console/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: console/api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run Discord adapter tests
+        run: node --test test/discord*.test.js
+
+  codeql:
+    name: CodeQL SAST
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  container-policy:
+    name: Container Policy Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Dockerfile hardening markers
+        run: |
+          test -f discord-bot/Dockerfile
+          grep -q "USER" discord-bot/Dockerfile
+          grep -q "HEALTHCHECK" discord-bot/Dockerfile
+          if grep -n "FROM .*:latest" discord-bot/Dockerfile; then
+            echo "::error::Release Dockerfile must not use latest tag."
+            exit 1
+          fi
+
+      - name: Build bot image
+        run: docker build -t dune-discord-control-bot:ci discord-bot
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: dune-discord-control-bot:ci
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true

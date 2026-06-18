@@ -1,0 +1,33 @@
+services:
+  dune-discord-control-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dune-discord-control-bot:dev
+    container_name: dune-discord-control-bot
+    restart: unless-stopped
+    read_only: true
+    user: "100:101"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    environment:
+      DISCORD_BOT_TOKEN_FILE: /run/secrets/discord-bot-token.txt
+      DUNE_BOT_API_TOKEN_FILE: /run/secrets/dune-bot-api-token.txt
+      DUNE_CONSOLE_API_URL: "${DUNE_CONSOLE_API_URL:-http://127.0.0.1:8088}"
+      DISCORD_CLIENT_ID: "${DISCORD_CLIENT_ID:-}"
+      DISCORD_GUILD_ID: "${DISCORD_GUILD_ID:-}"
+      DISCORD_OWNER_ROLE_IDS: "${DISCORD_OWNER_ROLE_IDS:-}"
+      DISCORD_ADMIN_ROLE_IDS: "${DISCORD_ADMIN_ROLE_IDS:-}"
+      DISCORD_MODERATOR_ROLE_IDS: "${DISCORD_MODERATOR_ROLE_IDS:-}"
+      DISCORD_OBSERVER_ROLE_IDS: "${DISCORD_OBSERVER_ROLE_IDS:-}"
+      DISCORD_PUBLIC_STATUS_CHANNEL_ID: "${DISCORD_PUBLIC_STATUS_CHANNEL_ID:-}"
+      DISCORD_ADMIN_ALERT_CHANNEL_ID: "${DISCORD_ADMIN_ALERT_CHANNEL_ID:-}"
+      DUNE_DISCORD_WRITES_ENABLED: "${DUNE_DISCORD_WRITES_ENABLED:-false}"
+    volumes:
+      - ../runtime/secrets:/run/secrets:ro
+      - ../runtime/discord-bot:/data
+    network_mode: host
