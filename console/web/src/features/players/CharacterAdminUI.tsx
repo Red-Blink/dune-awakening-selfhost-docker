@@ -16,6 +16,7 @@ type CraftingRecipeRow = { recipeId: string; displayName: string; category: stri
 type ResearchItemRow = { itemKey: string; displayName: string; category: string; productGroup: string; type: string; unlockedState: string; unlocked: boolean; isNew: boolean };
 type SkillModuleCatalogRow = { skillModule: string; category: string; id: string; maxLevel: number };
 type SkillCard = { name: string; type: string; rank: string };
+type StarterSkillPreset = { label: string; modules: { id: string; level: number }[] };
 type SpecializationTrackRow = { trackType: string; xp: number; level: number };
 type LearnedSkillModuleRow = { module_id?: string; moduleId?: string; id?: string; skill_points_spent?: number; skillPointsSpent?: number; level?: number; rank?: number };
 type JourneyRow = { id: string; name: string; rawName: string; category: string; depth: number; parentId: string; dependency?: string; status: string; complete: boolean; revealed?: boolean; pendingReward?: boolean; tags?: number; state?: number | null };
@@ -695,6 +696,73 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
   const playerAdmin_journeyEntryCount = playerAdmin_journeyRows.story.length + playerAdmin_journeyRows.contract.length + playerAdmin_journeyRows.codex.length + playerAdmin_journeyRows.tutorial.length;
   const playerAdmin_vehicleIds = Object.keys(playerAdmin_vehicleCatalog).sort((a, b) => friendlyVehicleName(a).localeCompare(friendlyVehicleName(b)));
   const playerAdmin_selectedTemplates = [...(playerAdmin_vehicleCatalog[playerAdmin_vehicleId] || [])].sort((a, b) => friendlyVehicleTemplateName(a).localeCompare(friendlyVehicleTemplateName(b)));
+  const playerAdmin_starterSkillPresets: Record<string, StarterSkillPreset> = {
+    Trooper: {
+      label: "Trooper starter skills",
+      modules: [
+        { id: "Skills.Key.Trooper1", level: 1 },
+        { id: "Skills.Ability.CablePull", level: 1 }
+      ]
+    },
+    Mentat: {
+      label: "Mentat starter skills",
+      modules: [
+        { id: "Skills.Key.Mentat1", level: 1 },
+        { id: "Skills.Ability.TurretSeeker", level: 1 }
+      ]
+    },
+    Planetologist: {
+      label: "Planetologist starter skills",
+      modules: [
+        { id: "Skills.Key.Planetologist1", level: 1 },
+        { id: "Skills.Ability.SuspensorPad", level: 1 }
+      ]
+    },
+    "Bene Gesserit": {
+      label: "Bene Gesserit starter skills",
+      modules: [
+        { id: "Skills.Key.BeneGesserit1", level: 1 },
+        { id: "Skills.Ability.VoiceCompel", level: 1 }
+      ]
+    },
+    Swordmaster: {
+      label: "Swordmaster starter skills",
+      modules: [
+        { id: "Skills.Key.Swordmaster1", level: 1 },
+        { id: "Skills.Ability.KneeCharge", level: 1 }
+      ]
+    }
+  };
+  const playerAdmin_starterSkillPreset = playerAdmin_starterSkillPresets[playerAdmin_skillSchool];
+  async function playerAdmin_restoreStarterSkills() {
+    if (!playerAdmin_starterSkillPreset) {
+      playerAdmin_showResult("starterSkills", `No verified starter preset is available for ${playerAdmin_skillSchool}.`, "danger");
+      return;
+    }
+    if (!(await confirmAction(`Restore the ${playerAdmin_skillSchool} starter unlocks for ${playerName}. This will set the starter phase and starter ability to Rank 1.`, {
+      title: "Restore Starter Skills",
+      confirmLabel: "Restore",
+      details: [{
+        label: "Modules",
+        value: playerAdmin_starterSkillPreset.modules.map((module) => `${module.id} -> Rank ${module.level}`).join(", "),
+        tone: "accent"
+      }]
+    }))) return;
+    onError("");
+    playerAdmin_showResult("starterSkills", `Restoring ${playerAdmin_starterSkillPreset.label} for ${playerName}`, "neutral", true);
+    try {
+      for (const module of playerAdmin_starterSkillPreset.modules) {
+        await playerAdmin_runTask(() => playersApi.setSkillModule(actionPlayerId, { module: module.id, level: module.level }));
+      }
+      playerAdmin_showResult("starterSkills", `${playerAdmin_starterSkillPreset.label} restored for ${playerName}.`, "success");
+      playerAdmin_addLog("Restore Starter Skills", playerAdmin_skillSchool, String(playerAdmin_starterSkillPreset.modules.length), "Succeeded");
+      await playerAdmin_loadSpecializations();
+    } catch (error) {
+      const message = friendlyInlineError(error);
+      playerAdmin_showResult("starterSkills", message, "danger");
+      playerAdmin_addLog("Restore Starter Skills", playerAdmin_skillSchool, String(playerAdmin_starterSkillPreset.modules.length), `Failed: ${message}`);
+    }
+  }
   const playerAdmin_craftingTable = (
     <div className="playerAdmin_tableWrap">
       <table className="playerAdmin_table playerAdmin_compactTable playerAdmin_fullResultTable playerAdmin_schematicTable">
@@ -917,10 +985,12 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
           <section className="playerAdmin_box">
             <h4>Skill Browser</h4>
             <div className="playerAdmin_boxHeaderLine">
-              <p>The player must be offline.</p>
+              <p>Use Restore Starter Skills after a progression reset leaves the starting tree locked.</p>
               <div className="playerAdmin_filterRow playerAdmin_filterRowRight">
                 <span className="playerAdmin_note">{playerAdmin_skillChangeCount} Unsaved Change{playerAdmin_skillChangeCount === 1 ? "" : "s"}</span>
+                <button disabled={!playerAdmin_canRunLiveAction || !playerAdmin_starterSkillPreset || playerAdmin_actionResult?.pending} onClick={() => playerAdmin_restoreStarterSkills()}>Restore Starter Skills</button>
                 <button disabled={playerAdmin_skillCatalogLoading || playerAdmin_specializationLoading} onClick={() => playerAdmin_reloadSkills()}>{playerAdmin_skillCatalogLoading || playerAdmin_specializationLoading ? "Loading..." : "Reload"}</button>
+                <InlineActionResult result={playerAdmin_actionResult} resultKey="starterSkills" />
               </div>
             </div>
             <PlayerCategoryIconRail
