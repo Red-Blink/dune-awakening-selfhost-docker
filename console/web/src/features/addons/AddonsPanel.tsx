@@ -178,6 +178,7 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
       lifecycleMessage: addon.lifecycleMessage || "This addon is installed locally but is no longer listed in the community catalog.",
       lifecycleUrl: addon.lifecycleUrl || "",
       permissions: addon.permissions,
+      provenance: addon.provenance || {},
       status: addon.status || "Installed",
       installedOnly: true
     })));

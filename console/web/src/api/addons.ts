@@ -12,9 +12,20 @@ export type CommunityAddonSummary = {
   lifecycleMessage: string;
   lifecycleUrl: string;
   permissions: string[];
+  provenance: AddonProvenance;
 };
 
 export type AddonLifecycle = "active" | "deprecated" | "unsupported" | "removed" | "blocked";
+
+export type AddonProvenance = {
+  indexUrl?: string;
+  manifestUrl?: string;
+  sourceUrl?: string;
+  downloadUrl?: string;
+  version?: string;
+  sha256?: string;
+  installedAt?: string;
+};
 
 export type CommunityAddonsIndex = {
   schemaVersion: number;
@@ -38,6 +49,7 @@ export type InstalledAddon = {
   entryPath: string;
   permissions: string[];
   approvedPermissions: string[];
+  provenance: AddonProvenance;
 };
 
 export type LeadershipPlayer = {

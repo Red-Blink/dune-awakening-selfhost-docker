@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertInstalledAddonPermission, fetchCommunityAddons, installedAddonContentPath, listInstalledAddons, normalizeAddonManifest, normalizeAddonPermissions, normalizeCommunityAddonManifest, normalizeCommunityAddonsIndex, removeInstalledAddon, setInstalledAddonEnabled, syncInstalledAddonLifecycle, validateZipEntries } from "../src/addons.js";
+import { assertInstalledAddonPermission, fetchCommunityAddons, installedAddonContentPath, listInstalledAddons, normalizeAddonManifest, normalizeAddonPermissions, normalizeAddonProvenance, normalizeCommunityAddonManifest, normalizeCommunityAddonsIndex, removeInstalledAddon, setInstalledAddonEnabled, syncInstalledAddonLifecycle, validateZipEntries } from "../src/addons.js";
 
 test("normalizes community addons index summaries", () => {
   const result = normalizeCommunityAddonsIndex({
@@ -61,6 +61,14 @@ test("fetches and validates community addons with injected fetch", async () => {
   }), "https://example.test/index.json");
   assert.equal(result.addons[0].name, "Demo");
   assert.equal(result.addons[0].sourceUrl, "https://github.com/Red-Blink/demo-addon");
+  assert.deepEqual(result.addons[0].provenance, {
+    indexUrl: "https://example.test/index.json",
+    manifestUrl: "https://example.test/demo.json",
+    sourceUrl: "https://github.com/Red-Blink/demo-addon",
+    downloadUrl: "https://github.com/Red-Blink/demo-addon/releases/download/v1.0.0/demo.zip",
+    version: "1.0.0",
+    sha256: "862cbb38adab95ffc7b584aa374d3a1fb4437cf33f0360e3a8f5120ab83e4bd4"
+  });
 });
 
 test("enriches community addon permissions from manifest when index omits them", async () => {
@@ -113,6 +121,31 @@ test("validates community addon manifests for pinned install assets", () => {
   assert.equal(manifest.permissions[0], "players:read");
 });
 
+test("normalizes addon provenance fields", () => {
+  assert.deepEqual(normalizeAddonProvenance({
+    provenance: {
+      indexUrl: "https://example.test/index.json",
+      manifestUrl: "https://example.test/demo.json",
+      sourceUrl: "https://github.com/Red-Blink/demo-addon",
+      downloadUrl: "https://github.com/Red-Blink/demo-addon/releases/download/v1.0.0/demo.zip",
+      version: "1.0.0",
+      sha256: "862CBB38ADAB95FFC7B584AA374D3A1FB4437CF33F0360E3A8F5120AB83E4BD4",
+      installedAt: "2026-06-21T00:00:00.000Z"
+    }
+  }), {
+    indexUrl: "https://example.test/index.json",
+    manifestUrl: "https://example.test/demo.json",
+    sourceUrl: "https://github.com/Red-Blink/demo-addon",
+    downloadUrl: "https://github.com/Red-Blink/demo-addon/releases/download/v1.0.0/demo.zip",
+    version: "1.0.0",
+    sha256: "862cbb38adab95ffc7b584aa374d3a1fb4437cf33f0360e3a8f5120ab83e4bd4",
+    installedAt: "2026-06-21T00:00:00.000Z"
+  });
+  assert.deepEqual(normalizeAddonProvenance({}), {});
+  assert.throws(() => normalizeAddonProvenance({ provenance: { indexUrl: "http://example.test/index.json" } }), /HTTPS/);
+  assert.throws(() => normalizeAddonProvenance({ sha256: "bad" }), /sha256/);
+});
+
 test("normalizes addon permission arrays and structured permissions", () => {
   assert.deepEqual(normalizeAddonPermissions(["players:read", "players:read"]), ["players:read"]);
   assert.deepEqual(normalizeAddonPermissions({ database: ["read", "write"], server: ["status"] }), ["database:read", "database:write", "server:status"]);
@@ -145,9 +178,25 @@ test("tracks installed addon enable disable and removal state", () => {
     const config = { repoRoot };
     assert.equal(listInstalledAddons(config).addons[0].status, "Disabled");
     assert.throws(() => setInstalledAddonEnabled(config, "leadership-board-demo", true), /must be approved/);
-    writeFileSync(join(repoRoot, "runtime/addons/state.json"), JSON.stringify({ "leadership-board-demo": { approvedPermissions: ["players:read"] } }));
+    writeFileSync(join(repoRoot, "runtime/addons/state.json"), JSON.stringify({
+      "leadership-board-demo": {
+        approvedPermissions: ["players:read"],
+        provenance: {
+          indexUrl: "https://example.test/index.json",
+          manifestUrl: "https://example.test/leadership-board-demo.json",
+          sourceUrl: "https://github.com/Red-Blink/leadership-board-demo",
+          downloadUrl: "https://github.com/Red-Blink/leadership-board-demo/releases/download/v1.0.0/leadership-board-demo.zip",
+          version: "1.0.0",
+          sha256: "862cbb38adab95ffc7b584aa374d3a1fb4437cf33f0360e3a8f5120ab83e4bd4",
+          installedAt: "2026-06-21T00:00:00.000Z"
+        }
+      }
+    }));
     assert.equal(setInstalledAddonEnabled(config, "leadership-board-demo", true).addon.status, "Enabled");
-    assert.equal(listInstalledAddons(config).addons[0].enabled, true);
+    const installedAddon = listInstalledAddons(config).addons[0];
+    assert.equal(installedAddon.enabled, true);
+    assert.equal(installedAddon.provenance.sha256, "862cbb38adab95ffc7b584aa374d3a1fb4437cf33f0360e3a8f5120ab83e4bd4");
+    assert.equal(installedAddon.provenance.manifestUrl, "https://example.test/leadership-board-demo.json");
     assert.equal(assertInstalledAddonPermission(config, "leadership-board-demo", "players:read").permission, "players:read");
     assert.equal(installedAddonContentPath(config, "leadership-board-demo", "web/index.html"), join(addonDir, "web/index.html"));
     assert.throws(() => installedAddonContentPath(config, "leadership-board-demo", "../addon.json"), /unsafe/);

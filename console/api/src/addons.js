@@ -46,7 +46,14 @@ async function enrichCommunityAddonSourceUrls(index, fetchImpl, signal) {
       const response = await fetchImpl(addon.manifestUrl, { headers: { accept: "application/json" }, signal });
       if (!response?.ok) return addon;
       const manifest = normalizeCommunityAddonManifest(await response.json());
-      return manifest.id === addon.id ? { ...addon, sourceUrl: manifest.sourceUrl, permissions: manifest.permissions } : addon;
+      return manifest.id === addon.id
+        ? {
+          ...addon,
+          sourceUrl: manifest.sourceUrl,
+          permissions: manifest.permissions,
+          provenance: communityAddonProvenance(index.sourceUrl, addon, manifest)
+        }
+        : addon;
     } catch {
       return addon;
     }
@@ -96,7 +103,8 @@ export function listInstalledAddons(config) {
           lifecycleUrl: addonState.lifecycleUrl ? httpsUrl(addonState.lifecycleUrl, "lifecycleUrl") : "",
           entryPath: manifest.entry.path,
           permissions: manifest.permissions,
-          approvedPermissions
+          approvedPermissions,
+          provenance: normalizeAddonProvenance(addonState)
         };
       } catch {
         return {
@@ -110,7 +118,8 @@ export function listInstalledAddons(config) {
           enabled: false,
           entryPath: "",
           permissions: [],
-          approvedPermissions: []
+          approvedPermissions: [],
+          provenance: {}
         };
       }
     })
@@ -165,11 +174,16 @@ export async function installCommunityAddon(config, addonId, options = {}, fetch
   const destination = resolve(installedRoot, installedManifest.id);
   rmSync(destination, { recursive: true, force: true });
   renameSync(stagingRoot, destination);
+  const installedAt = new Date().toISOString();
   setAddonState(config, installedManifest.id, {
     enabled: false,
     approvedPermissions,
-    installedAt: new Date().toISOString(),
+    installedAt,
     sha256: actualSha,
+    provenance: communityAddonProvenance(index.sourceUrl, summary, remoteManifest, {
+      sha256: actualSha,
+      installedAt
+    }),
     lifecycle: summary.lifecycle,
     lifecycleMessage: summary.lifecycleMessage,
     lifecycleUrl: summary.lifecycleUrl
@@ -190,7 +204,11 @@ export async function installCommunityAddon(config, addonId, options = {}, fetch
       lifecycleUrl: summary.lifecycleUrl,
       entryPath: installedManifest.entry.path,
       permissions: installedManifest.permissions,
-      approvedPermissions
+      approvedPermissions,
+      provenance: communityAddonProvenance(index.sourceUrl, summary, remoteManifest, {
+        sha256: actualSha,
+        installedAt
+      })
     },
     sha256: actualSha
   };
@@ -222,7 +240,8 @@ export function setInstalledAddonEnabled(config, addonId, enabled) {
       lifecycleUrl: addonState.lifecycleUrl ? httpsUrl(addonState.lifecycleUrl, "lifecycleUrl") : "",
       entryPath: manifest.entry.path,
       permissions: manifest.permissions,
-      approvedPermissions
+      approvedPermissions,
+      provenance: normalizeAddonProvenance(addonState)
     }
   };
 }
@@ -327,7 +346,7 @@ function normalizeCommunityAddonSummary(addon, index, seen) {
   if (!ADDON_ID_PATTERN.test(id)) throw new Error(`Addon entry ${index + 1} has an invalid id.`);
   if (seen.has(id)) throw new Error(`Duplicate addon id: ${id}`);
   seen.add(id);
-  return {
+  const summary = {
     id,
     name: stringField(addon.name, "name"),
     description: stringField(addon.description, "description", { optional: true }),
@@ -340,6 +359,40 @@ function normalizeCommunityAddonSummary(addon, index, seen) {
     lifecycleUrl: addon.lifecycleUrl ? httpsUrl(addon.lifecycleUrl, "lifecycleUrl") : "",
     permissions: normalizeAddonPermissions(addon.permissions || [])
   };
+  return {
+    ...summary,
+    provenance: addon.provenance ? normalizeAddonProvenance({ provenance: addon.provenance }) : {}
+  };
+}
+
+function communityAddonProvenance(indexUrl, summary, manifest, { sha256 = manifest.sha256, installedAt = "" } = {}) {
+  return normalizeAddonProvenance({
+    provenance: {
+      indexUrl,
+      manifestUrl: summary.manifestUrl,
+      sourceUrl: manifest.sourceUrl,
+      downloadUrl: manifest.downloadUrl,
+      version: manifest.version,
+      sha256,
+      installedAt
+    }
+  });
+}
+
+export function normalizeAddonProvenance(state = {}) {
+  const value = state.provenance && typeof state.provenance === "object" && !Array.isArray(state.provenance)
+    ? state.provenance
+    : state;
+  const provenance = {
+    indexUrl: value.indexUrl ? httpsUrl(value.indexUrl, "provenance.indexUrl") : "",
+    manifestUrl: value.manifestUrl ? httpsUrl(value.manifestUrl, "provenance.manifestUrl") : "",
+    sourceUrl: value.sourceUrl ? httpsUrl(value.sourceUrl, "provenance.sourceUrl") : "",
+    downloadUrl: value.downloadUrl ? httpsUrl(value.downloadUrl, "provenance.downloadUrl") : "",
+    version: value.version ? stringField(value.version, "provenance.version") : "",
+    sha256: value.sha256 ? sha256Field(value.sha256) : "",
+    installedAt: value.installedAt ? stringField(value.installedAt, "provenance.installedAt") : ""
+  };
+  return Object.fromEntries(Object.entries(provenance).filter(([, fieldValue]) => fieldValue));
 }
 
 export function syncInstalledAddonLifecycle(config, communityIndex) {
