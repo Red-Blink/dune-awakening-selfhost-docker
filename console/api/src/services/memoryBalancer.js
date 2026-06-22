@@ -264,7 +264,7 @@ function mapFromContainerName(name) {
 function runProcessText(config, command, args, timeoutMs = 10000) {
   return new Promise((resolveText, rejectText) => {
     const child = spawn(command, args, {
-      cwd: config.rootDir,
+      cwd: config.repoRoot,
       env: process.env,
       shell: false
     });
