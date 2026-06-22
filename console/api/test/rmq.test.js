@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildBroadcastCommand, buildCarePackageWhisperPayload, buildMapChatPayload, buildShutdownBroadcastCommand, publishCarePackageWhisper, publishMapChat, validateBroadcastMessage, validateLocalizedTexts, validatePublishLabel } from "../src/rmq.js";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { buildBroadcastCommand, buildCarePackageWhisperPayload, buildMapChatPayload, buildShutdownBroadcastCommand, commandAuthToken, publishCarePackageWhisper, publishMapChat, validateBroadcastMessage, validateLocalizedTexts, validatePublishLabel } from "../src/rmq.js";
 
 test("builds verified ServiceBroadcast generic command payload", () => {
   const command = buildBroadcastCommand({ message: "Server event starts soon", durationSec: 45, title: "Event" });
@@ -105,6 +108,46 @@ test("validates RabbitMQ publish labels before eval construction", () => {
   assert.equal(validatePublishLabel("web_shutdown_1"), "web_shutdown_1");
   assert.throws(() => validatePublishLabel("bad label"));
   assert.throws(() => validatePublishLabel("bad\"), halt(). %"));
+});
+
+test("command auth token generates and reuses a local secret file", () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), "arrakis-rmq-token-"));
+  const previous = process.env.DUNE_COMMAND_AUTH_TOKEN;
+  delete process.env.DUNE_COMMAND_AUTH_TOKEN;
+  try {
+    const tokenFile = resolve(repoRoot, "runtime/secrets/command-auth-token.txt");
+    const token = commandAuthToken(repoRoot);
+    assert.match(token, /^[A-Za-z0-9_-]{40,}$/);
+    assert.equal(existsSync(tokenFile), true);
+    assert.equal(readFileSync(tokenFile, "utf8").trim(), token);
+    assert.equal(statSync(tokenFile).mode & 0o777, 0o600);
+    assert.equal(commandAuthToken(repoRoot), token);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.DUNE_COMMAND_AUTH_TOKEN;
+    } else {
+      process.env.DUNE_COMMAND_AUTH_TOKEN = previous;
+    }
+    rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("command auth token honors explicit environment override", () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), "arrakis-rmq-token-env-"));
+  const previous = process.env.DUNE_COMMAND_AUTH_TOKEN;
+  process.env.DUNE_COMMAND_AUTH_TOKEN = "explicit-token";
+  try {
+    const tokenFile = resolve(repoRoot, "runtime/secrets/command-auth-token.txt");
+    assert.equal(commandAuthToken(repoRoot), "explicit-token");
+    assert.equal(existsSync(tokenFile), false);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.DUNE_COMMAND_AUTH_TOKEN;
+    } else {
+      process.env.DUNE_COMMAND_AUTH_TOKEN = previous;
+    }
+    rmSync(repoRoot, { recursive: true, force: true });
+  }
 });
 
 test("publishes map chat to chat.map routing key", async () => {
