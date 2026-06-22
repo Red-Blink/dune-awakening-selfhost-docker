@@ -50,7 +50,6 @@ install_rules() {
   iptables_cmd -t nat -A "$CHAIN_NAME" -p udp --dport "${CLIENT_PORT_BASE}:${CLIENT_PORT_END}" -j DNAT --to-destination "$BIND_IP"
   iptables_cmd -t nat -A "$CHAIN_NAME" -p udp --dport "${IGW_PORT_BASE}:${IGW_PORT_END}" -j DNAT --to-destination "$BIND_IP"
   iptables_cmd -t nat -A "$CHAIN_NAME" -p tcp --dport 31982 -j DNAT --to-destination "$BIND_IP"
-  iptables_cmd -t nat -A "$CHAIN_NAME" -p tcp --dport 31983 -j DNAT --to-destination "$BIND_IP"
 }
 
 main() {

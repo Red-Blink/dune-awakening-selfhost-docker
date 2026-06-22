@@ -382,7 +382,6 @@ if [ "$SERVER_IP_MODE" = "public" ]; then
 
 Public hosting reminder:
   Open or forward TCP 31982.
-  Open or forward TCP 31983.
   Open or forward UDP 7777-7810.
 EOF
 fi

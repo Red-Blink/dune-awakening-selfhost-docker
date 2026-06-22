@@ -39,7 +39,7 @@ OK   container dune-server-overmap
 OK   TCP 15432 Postgres localhost
 OK   TCP 32573 RabbitMQ admin localhost
 OK   TCP 31982 RabbitMQ game public
-OK   TCP 31983 RabbitMQ game HTTP public
+OK   TCP 31983 RabbitMQ game HTTP local
 OK   TCP 5059 TextRouter localhost
 OK   TCP 11717 Director localhost
 OK   UDP 7777 Overmap clients
@@ -83,7 +83,7 @@ CHECK                    PORT     STATUS
 Postgres localhost       15432/tcp OK
 RabbitMQ admin           32573/tcp OK
 RabbitMQ game            31982/tcp OK
-RabbitMQ game HTTP       31983/tcp OK
+RabbitMQ game HTTP local 31983/tcp OK
 TextRouter               5059/tcp OK
 Director                 11717/tcp OK
 Overmap clients          7777/udp OK
@@ -191,7 +191,7 @@ test("status fixture exposes exact logical listeners and game servers", () => {
     "Postgres localhost:15432/TCP",
     "RabbitMQ admin:32573/TCP",
     "RabbitMQ game:31982/TCP",
-    "RabbitMQ game HTTP:31983/TCP",
+    "RabbitMQ game HTTP local:31983/TCP",
     "TextRouter:5059/TCP",
     "Director:11717/TCP",
     "Overmap clients:7777/UDP",

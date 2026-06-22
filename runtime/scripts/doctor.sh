@@ -135,7 +135,7 @@ echo "=== Ports ==="
 check_tcp 15432 "Postgres"
 check_tcp 32573 "RabbitMQ admin"
 check_tcp 31982 "RabbitMQ game"
-check_tcp 31983 "RabbitMQ game HTTP"
+check_tcp 31983 "RabbitMQ game HTTP local"
 check_tcp 5059 "TextRouter"
 check_tcp 11717 "Director"
 client_port_base="$(resolve_client_port_base)"
@@ -232,7 +232,7 @@ fi
 case "$mode" in
   public)
     ok "Hosting mode: public"
-    echo "     Make sure your firewall/router allows TCP 31982, TCP 31983, and the configured UDP game ranges."
+    echo "     Make sure your firewall/router allows TCP 31982 and the configured UDP game ranges."
     ;;
   local)
     ok "Hosting mode: local/LAN"

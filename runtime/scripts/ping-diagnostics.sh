@@ -166,7 +166,7 @@ print_row "Survival_1 game" "${survival_game_port}/udp" "advertised as ${server_
 print_row "Survival_1 IGW" "${survival_igw_port}/udp" "server-to-server on ${bind_ip}:${survival_igw_port}"
 print_row "Overmap IGW" "${overmap_igw_port}/udp" "server-to-server on ${bind_ip}:${overmap_igw_port}"
 print_row "RabbitMQ game" "31982/tcp" "advertised to services as ${server_ip}:31982"
-print_row "RabbitMQ game HTTP" "31983/tcp" "advertised to services as ${server_ip}:31983"
+print_row "RabbitMQ game HTTP" "31983/tcp" "local management endpoint"
 
 echo
 echo "=== Local listeners ==="
@@ -187,7 +187,7 @@ fi
 rm -f /tmp/dune-ping-ss-udp.out /tmp/dune-ping-ss-udp.err
 
 if ss -lntp >/tmp/dune-ping-ss-tcp.out 2>/tmp/dune-ping-ss-tcp.err; then
-  for item in "RabbitMQ game:31982" "RabbitMQ game HTTP:31983"; do
+  for item in "RabbitMQ game:31982" "RabbitMQ game HTTP local:31983"; do
     label="${item%%:*}"
     port="${item##*:}"
     if grep -Eq "[:.]${port}[[:space:]]" /tmp/dune-ping-ss-tcp.out; then
@@ -277,7 +277,7 @@ if docker_available; then
     gateway_http_port="$(container_arg_value dune-server-gateway --RMQGameHttpPort= || true)"
     [ "$gateway_host" = "$server_ip" ] && ok "Gateway advertises RMQ host $gateway_host" || fail_msg "Gateway RMQ host is $gateway_host expected $server_ip"
     [ "$gateway_port" = "31982" ] && ok "Gateway advertises RMQ game port 31982" || fail_msg "Gateway RMQ game port is $gateway_port expected 31982"
-    [ "$gateway_http_port" = "31983" ] && ok "Gateway advertises RMQ HTTP port 31983" || fail_msg "Gateway RMQ HTTP port is $gateway_http_port expected 31983"
+    [ "$gateway_http_port" = "31983" ] && ok "Gateway uses RMQ HTTP port 31983" || fail_msg "Gateway RMQ HTTP port is $gateway_http_port expected 31983"
   else
     fail_msg "dune-server-gateway is not running"
   fi

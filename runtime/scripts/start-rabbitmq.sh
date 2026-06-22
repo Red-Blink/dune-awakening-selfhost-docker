@@ -11,6 +11,7 @@ source runtime/scripts/host-paths.sh
 source runtime/scripts/image-tags.sh
 WORLD_IMAGE_TAG="$(resolve_world_image_tag)"
 IMAGE="registry.funcom.com/funcom/self-hosting/seabass-server-rabbitmq:${WORLD_IMAGE_TAG}"
+RMQ_GAME_HTTP_BIND="${RMQ_GAME_HTTP_BIND:-127.0.0.1}"
 
 mkdir -p runtime/rabbitmq-admin/config
 mkdir -p runtime/rabbitmq-game/config
@@ -99,7 +100,7 @@ docker run -d \
   --restart unless-stopped \
   -p 31982:5672/tcp \
   -p 127.0.0.1:15672:15672/tcp \
-  -p 31983:15672/tcp \
+  -p "${RMQ_GAME_HTTP_BIND}:31983:15672/tcp" \
   -v "$(host_path "$PWD/runtime/rabbitmq-game/config/rabbitmq.conf"):/etc/rabbitmq/rabbitmq.conf:ro" \
   -v "$(host_path "$PWD/runtime/rabbitmq-game/config/enabled_plugins"):/etc/rabbitmq/enabled_plugins:ro" \
   -v "$(host_path "$PWD/runtime/rabbitmq-game/certs/cacert.pem"):/etc/rabbitmq/cacert.pem:ro" \
