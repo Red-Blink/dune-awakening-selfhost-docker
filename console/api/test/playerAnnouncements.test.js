@@ -26,6 +26,7 @@ function player(name = "John", id = "ABCDEF1234567890") {
   return {
     actor_id: 6,
     action_player_id: id,
+    fls_id: id,
     character_name: name,
     online_status: "Online"
   };
@@ -66,9 +67,25 @@ test("player announcements publish join and leave events from online state chang
   const unchanged = await runPlayerAnnouncementScan(cfg, [player("John")], { mockMode: true });
   assert.equal(unchanged.sent, 0);
 
-  const left = await runPlayerAnnouncementScan(cfg, [], { mockMode: true });
+  const secondJoined = await runPlayerAnnouncementScan(cfg, [player("John"), player("Jane", "1234567890ABCDEF")], { mockMode: true });
+  assert.equal(secondJoined.joined, 1);
+  assert.equal(secondJoined.sent, 2);
+
+  const left = await runPlayerAnnouncementScan(cfg, [player("Jane", "1234567890ABCDEF")], { mockMode: true });
   assert.equal(left.left, 1);
   assert.equal(left.sent, 1);
+});
+
+test("player announcements report leave events even when nobody remains online", async () => {
+  const cfg = config();
+  savePlayerAnnouncements(cfg, { joinEnabled: false, joinMessage: "{playerName} joined", leaveEnabled: true, leaveMessage: "{playerName} left" });
+  primePlayerAnnouncementOnlineState(cfg, [player("John")]);
+
+  const left = await runPlayerAnnouncementScan(cfg, [], { mockMode: true });
+  assert.equal(left.left, 1);
+  assert.equal(left.sent, 0);
+  assert.equal(left.skippedNoRecipients, 1);
+  assert.equal(left.results[0].reason, "no_online_recipients");
 });
 
 test("player announcements can prime current online players after save", async () => {

@@ -54,8 +54,8 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
   const [broadcastTitle, setBroadcastTitle] = useState("");
   const [broadcastBody, setBroadcastBody] = useState("");
   const [broadcastDuration, setBroadcastDuration] = useState("30");
-  const [messageOfTheDay, setMessageOfTheDay] = useState<MessageOfTheDaySettings>({ enabled: false, title: "Message of the Day", message: "" });
-  const [messageOfTheDayOriginal, setMessageOfTheDayOriginal] = useState<MessageOfTheDaySettings>({ enabled: false, title: "Message of the Day", message: "" });
+  const [messageOfTheDay, setMessageOfTheDay] = useState<MessageOfTheDaySettings>({ enabled: false, title: "", message: "" });
+  const [messageOfTheDayOriginal, setMessageOfTheDayOriginal] = useState<MessageOfTheDaySettings>({ enabled: false, title: "", message: "" });
   const [playerAnnouncements, setPlayerAnnouncements] = useState<PlayerAnnouncementSettings>({ joinEnabled: false, joinMessage: "{playerName} has entered the sands of Arrakis.", leaveEnabled: false, leaveMessage: "{playerName} has vanished beyond the dunes." });
   const [playerAnnouncementsOriginal, setPlayerAnnouncementsOriginal] = useState<PlayerAnnouncementSettings>({ joinEnabled: false, joinMessage: "{playerName} has entered the sands of Arrakis.", leaveEnabled: false, leaveMessage: "{playerName} has vanished beyond the dunes." });
   const [mapChatOptions, setMapChatOptions] = useState<MapChatOption[]>(defaultMapChatOptions());
@@ -577,8 +577,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
           </div>
           {messageOfTheDayDirty && <p className="dirty-note">Unsaved changes: Message of the Day</p>}
           <p className="muted">Shown as a private in-game message once per player login session.</p>
-          <label className="broadcast-title">MOTD Title<input value={messageOfTheDay.title} onChange={(event) => setMessageOfTheDay((current) => ({ ...current, title: event.target.value }))} placeholder="Message of the Day" /></label>
-          <label className="broadcast-message">MOTD Body<textarea rows={3} value={messageOfTheDay.message} onChange={(event) => setMessageOfTheDay((current) => ({ ...current, message: event.target.value }))} placeholder="Message shown when a player logs in" /></label>
+          <label className="broadcast-message">Message<textarea rows={3} value={messageOfTheDay.message} onChange={(event) => setMessageOfTheDay((current) => ({ ...current, message: event.target.value }))} placeholder="Message shown when a player logs in" /></label>
           <div className="broadcast-controls-row">
             <button disabled={!messageOfTheDayDirty} onClick={() => run(saveMessageOfTheDay)}>Save MOTD</button>
             <button onClick={() => run(restoreMessageOfTheDay)}>Restore Defaults</button>
@@ -784,7 +783,7 @@ function sameTransferSettings(a: CharacterTransferSettings, b: CharacterTransfer
 }
 
 function sameMessageOfTheDay(a: MessageOfTheDaySettings, b: MessageOfTheDaySettings) {
-  return a.enabled === b.enabled && a.title === b.title && a.message === b.message;
+  return a.enabled === b.enabled && a.message === b.message;
 }
 
 function samePlayerAnnouncements(a: PlayerAnnouncementSettings, b: PlayerAnnouncementSettings) {

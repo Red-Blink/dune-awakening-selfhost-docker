@@ -37,12 +37,12 @@ function onlinePlayer(overrides = {}) {
 test("message of the day defaults are disabled with an empty draft", () => {
   const result = readMessageOfTheDay(config());
   assert.equal(result.settings.enabled, false);
-  assert.equal(result.settings.title, "Message of the Day");
+  assert.equal(result.settings.title, "");
   assert.equal(result.settings.message, "");
 });
 
 test("message of the day validates booleans and message text", () => {
-  assert.deepEqual(normalizeSettings({ enabled: true, title: "Daily", message: "Hello" }), { enabled: true, title: "Daily", message: "Hello" });
+  assert.deepEqual(normalizeSettings({ enabled: true, title: "Daily", message: "Hello" }), { enabled: true, title: "", message: "Hello" });
   assert.throws(() => normalizeSettings({ enabled: "true", title: "Daily", message: "Hello" }), /enabled must be true or false/);
   assert.throws(() => normalizeSettings({ enabled: true, title: "Daily", message: "x".repeat(501) }), /Message must be 1-500/);
 });

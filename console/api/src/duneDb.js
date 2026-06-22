@@ -829,8 +829,11 @@ export async function listPlayers(db, { online = false, q = "" } = {}) {
   const values = [];
   let where = "a.class ilike '%PlayerCharacter%'";
   where += " and coalesce(ac.\"user\", '') <> 'A5C0DE5E12A00001'";
+  where += " and coalesce(ac.\"user\", '') <> 'A5C0DE5E12A00002'";
   where += " and coalesce(ac.funcom_id, '') <> 'Server#0001'";
+  where += " and coalesce(ac.funcom_id, '') <> 'MessageOfTheDay#0001'";
   where += " and coalesce(ps.character_name, '') <> 'Server'";
+  where += " and coalesce(ps.character_name, '') <> 'Message of the Day'";
   if (online) where += " and coalesce(ps.online_status::text, '') = 'Online'";
   if (q) {
     values.push(`%${q}%`);

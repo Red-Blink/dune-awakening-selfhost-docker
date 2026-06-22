@@ -1,6 +1,7 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { buildBroadcastCommand, publishServerCommand, validateBroadcastMessage } from "../rmq.js";
+import { publishMapChat, validateBroadcastMessage } from "../rmq.js";
+import { ensureCarePackageServerPersona } from "../carePackage.js";
 
 const DEFAULT_PLAYER_ANNOUNCEMENTS = {
   joinEnabled: false,
@@ -41,7 +42,6 @@ export async function runPlayerAnnouncementScan(config, players, context = {}) {
   const settings = readSettings(config);
   const currentOnline = onlineMap(players);
   const previousOnline = readState(config).online || {};
-  writeJson(statePath(config), { online: currentOnline }, 0o600);
   if (!settings.joinEnabled && !settings.leaveEnabled) return { ok: true, skipped: true, joined: 0, left: 0, sent: 0, failed: 0 };
 
   const events = [];
@@ -58,23 +58,40 @@ export async function runPlayerAnnouncementScan(config, players, context = {}) {
 
   let sent = 0;
   let failed = 0;
+  let skippedNoRecipients = 0;
   const results = [];
+  const recipients = Object.values(currentOnline).filter((player) => player.queue);
   for (const event of events) {
     try {
-      if (context.mockMode || config.mockMode) {
-        results.push({ ok: true, mock: true, type: event.type, player: event.player.characterName });
-      } else {
-        const command = buildBroadcastCommand({ title: "Server Announcement", message: event.message, durationSec: 12 });
-        const result = await publishServerCommand(config, command, `web-player-${event.type}-announcement`);
-        results.push({ ok: true, type: event.type, player: event.player.characterName, stdout: result.stdout });
+      if (!recipients.length) {
+        skippedNoRecipients += 1;
+        results.push({ ok: true, skipped: true, reason: "no_online_recipients", type: event.type, player: event.player.characterName, recipients: 0 });
+        continue;
       }
-      sent += 1;
+      if (context.mockMode || config.mockMode) {
+        results.push({ ok: true, mock: true, type: event.type, player: event.player.characterName, recipients: recipients.length });
+        sent += recipients.length;
+      } else {
+        const persona = context.persona || await ensureCarePackageServerPersona(context.db);
+        const published = [];
+        for (const recipient of recipients) {
+          published.push(await publishMapChat(config, {
+            message: event.message,
+            senderFuncomId: persona.funcomId,
+            senderHexFlsId: persona.hexFlsId,
+            recipientQueue: recipient.queue
+          }));
+        }
+        sent += published.length;
+        results.push({ ok: true, type: event.type, player: event.player.characterName, recipients: published.length, stdout: published.map((result) => result.stdout).join("\n") });
+      }
     } catch (error) {
       failed += 1;
       results.push({ ok: false, type: event.type, player: event.player.characterName, error: String(error.message || error) });
     }
   }
 
+  writeJson(statePath(config), { online: currentOnline }, 0o600);
   return {
     ok: failed === 0,
     skipped: false,
@@ -82,6 +99,7 @@ export async function runPlayerAnnouncementScan(config, players, context = {}) {
     left: events.filter((event) => event.type === "leave").length,
     sent,
     failed,
+    skippedNoRecipients,
     results
   };
 }
@@ -128,7 +146,8 @@ function onlineMap(players = []) {
 function normalizePlayer(player = {}) {
   const key = String(player.action_player_id || player.actor_id || player.player_pawn_id || player.fls_id || player.flsId || player.funcom_id || player.funcomId || "").trim();
   const characterName = String(player.character_name || player.characterName || player.funcom_id || player.funcomId || key).trim();
-  return { key, characterName };
+  const flsId = String(player.fls_id || player.flsId || "").trim();
+  return { key, characterName, flsId, queue: flsId ? `${flsId}_queue` : "" };
 }
 
 function renderPlayerMessage(template, player) {

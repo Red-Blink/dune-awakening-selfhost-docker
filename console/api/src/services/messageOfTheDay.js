@@ -1,11 +1,11 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { publishCarePackageWhisper, validateBroadcastMessage } from "../rmq.js";
-import { ensureCarePackageServerPersona } from "../carePackage.js";
+import { ensureMessageOfTheDayPersona } from "../carePackage.js";
 
 const DEFAULT_MESSAGE_OF_THE_DAY = {
   enabled: false,
-  title: "Message of the Day",
+  title: "",
   message: ""
 };
 
@@ -63,7 +63,7 @@ export async function runMessageOfTheDayScan(config, players, context = {}) {
     return { ok: true, skipped: false, sent: 0, failed: 0 };
   }
 
-  const persona = context.persona || await ensureCarePackageServerPersona(context.db);
+  const persona = context.persona || await ensureMessageOfTheDayPersona(context.db);
   const results = [];
   let sent = 0;
   let failed = 0;
@@ -72,9 +72,8 @@ export async function runMessageOfTheDayScan(config, players, context = {}) {
       if (context.mockMode || config.mockMode) {
         results.push({ player: player.characterName, ok: true, mock: true });
       } else {
-        const message = settings.title ? `${settings.title}\n${settings.message}` : settings.message;
         const result = await publishCarePackageWhisper(config, {
-          message,
+          message: settings.message,
           senderFuncomId: persona.funcomId,
           senderHexFlsId: persona.hexFlsId,
           recipientFuncomId: player.funcomId,
@@ -101,7 +100,7 @@ export async function runMessageOfTheDayScan(config, players, context = {}) {
 export function normalizeSettings(input = {}) {
   return {
     enabled: normalizeBoolean(input.enabled, "enabled"),
-    title: normalizeTitle(input.title),
+    title: "",
     message: normalizeMessage(input.message ?? input.body ?? "")
   };
 }
@@ -154,13 +153,6 @@ function normalizePlayer(player = {}) {
 function normalizeBoolean(value, field) {
   if (value === true || value === false) return value;
   throw new Error(`${field} must be true or false`);
-}
-
-function normalizeTitle(value) {
-  const raw = String(value ?? "").trim();
-  if (!raw) return "";
-  if (raw.length > 80 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(raw)) throw new Error("Title must be 0-80 printable characters");
-  return raw;
 }
 
 function normalizeMessage(value) {

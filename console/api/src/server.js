@@ -1737,10 +1737,10 @@ async function playerAnnouncementsAutoTick() {
   try {
     const players = await duneDb.listPlayers(db, { online: true });
     if (players.capabilities?.players === false) return;
-    const result = await runPlayerAnnouncementScan(config, players.rows || []);
-    if (result.sent || result.failed) {
-      console.log(`Player announcement scan: joined=${result.joined || 0} left=${result.left || 0} sent=${result.sent || 0} failed=${result.failed || 0}`);
-      audit(config, null, "player-announcements.auto-scan", { supported: true, joined: result.joined || 0, left: result.left || 0, sent: result.sent || 0, failed: result.failed || 0 });
+    const result = await runPlayerAnnouncementScan(config, players.rows || [], { db });
+    if (result.joined || result.left || result.sent || result.failed) {
+      console.log(`Player announcement scan: joined=${result.joined || 0} left=${result.left || 0} sent=${result.sent || 0} failed=${result.failed || 0} skipped_no_recipients=${result.skippedNoRecipients || 0}`);
+      audit(config, null, "player-announcements.auto-scan", { supported: true, joined: result.joined || 0, left: result.left || 0, sent: result.sent || 0, failed: result.failed || 0, skippedNoRecipients: result.skippedNoRecipients || 0 });
     }
   } catch (error) {
     const message = String(error.message || error);
