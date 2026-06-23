@@ -907,8 +907,13 @@ async function dbJson(res, fn) {
   try {
     return json(res, 200, await fn());
   } catch (error) {
+    const rawMessage = String(error.message || error);
+    if (error.code === "ECONNREFUSED" || /ECONNREFUSED.*127\.0\.0\.1:15432/i.test(rawMessage)) {
+      const message = "Postgres is not running or is restarting. Wait for the database service to come back online, then refresh.";
+      return json(res, 503, { supported: false, error: message, reason: message });
+    }
     const status = error.unsupported ? 501 : 500;
-    return json(res, status, { supported: false, error: redact(error.message || error), reason: redact(error.message || error), details: error.details || undefined });
+    return json(res, status, { supported: false, error: redact(rawMessage), reason: redact(rawMessage), details: error.details || undefined });
   }
 }
 

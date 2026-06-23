@@ -15,7 +15,9 @@ export async function readJsonBody(req, maxBytes) {
     chunks.push(buffer);
   }
   if (!chunks.length) return {};
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  const text = Buffer.concat(chunks).toString("utf8").trim();
+  if (!text) return {};
+  return JSON.parse(text);
 }
 
 export async function readMultipartForm(req, maxBytes) {
