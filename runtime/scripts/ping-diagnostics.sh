@@ -127,6 +127,7 @@ print_row() {
 
 server_ip="$(resolve_server_ip)"
 bind_ip="$(resolve_bind_ip)"
+igw_advertised_ip="$(resolve_igw_addr_ip)"
 mode="$(resolve_server_ip_mode 2>/dev/null || printf '%s' unknown)"
 title="$(resolve_server_title)"
 region="$(resolve_server_region)"
@@ -146,6 +147,7 @@ print_row "Battlegroup" "$battlegroup" ""
 print_row "IP mode" "$mode" ""
 print_row "Advertised IP" "$server_ip" ""
 print_row "Local bind IP" "$bind_ip" ""
+print_row "Advertised IGW IP" "$igw_advertised_ip" ""
 echo
 
 if [ "$mode" = "public" ] && is_private_ipv4 "$bind_ip" && [ "$server_ip" != "$bind_ip" ]; then
@@ -163,8 +165,8 @@ echo
 echo "=== Expected endpoints ==="
 print_row "Overmap game" "${overmap_game_port}/udp" "advertised as ${server_ip}:${overmap_game_port}"
 print_row "Survival_1 game" "${survival_game_port}/udp" "advertised as ${server_ip}:${survival_game_port}"
-print_row "Survival_1 IGW" "${survival_igw_port}/udp" "server-to-server on ${bind_ip}:${survival_igw_port}"
-print_row "Overmap IGW" "${overmap_igw_port}/udp" "server-to-server on ${bind_ip}:${overmap_igw_port}"
+print_row "Survival_1 IGW" "${survival_igw_port}/udp" "advertised as ${igw_advertised_ip}:${survival_igw_port}"
+print_row "Overmap IGW" "${overmap_igw_port}/udp" "advertised as ${igw_advertised_ip}:${overmap_igw_port}"
 print_row "RabbitMQ game" "31982/tcp" "advertised to services as ${server_ip}:31982"
 print_row "RabbitMQ game HTTP" "31983/tcp" "advertised to services as ${server_ip}:31983"
 
@@ -262,24 +264,35 @@ if docker_available; then
     multihome="$(container_arg_value "$container" -MultiHome= || true)"
     [ "$pod_ip" = "$bind_ip" ] && ok "$map container POD_IP=$pod_ip" || fail_msg "$map container POD_IP=$pod_ip expected $bind_ip"
     [ "$multihome" = "$bind_ip" ] && ok "$map container MultiHome=$multihome" || fail_msg "$map container MultiHome=$multihome expected $bind_ip"
-    if [ -n "$external_override" ] && [ "$server_ip" != "$bind_ip" ]; then
-      fail_msg "$map container has dangerous EXTERNAL_ADDRESS_OVERRIDE=$external_override while bind IP is $bind_ip"
+    if [ "$mode" = "public" ]; then
+      [ "$external_override" = "$server_ip" ] && ok "$map container EXTERNAL_ADDRESS_OVERRIDE=$external_override" || fail_msg "$map container EXTERNAL_ADDRESS_OVERRIDE=${external_override:-<empty>} expected $server_ip"
+    elif [ -n "$external_override" ] && [ "$external_override" != "$server_ip" ]; then
+      warn_msg "$map container EXTERNAL_ADDRESS_OVERRIDE=$external_override differs from advertised IP $server_ip."
     elif [ -n "$external_override" ]; then
-      warn_msg "$map container has EXTERNAL_ADDRESS_OVERRIDE=$external_override; this is only safe because bind and advertised IP match."
+      ok "$map container EXTERNAL_ADDRESS_OVERRIDE=$external_override"
     else
       ok "$map container has no EXTERNAL_ADDRESS_OVERRIDE"
     fi
   done
 
   if container_running dune-server-gateway; then
+    gateway_env_host="$(container_env_value dune-server-gateway HOST_DATACENTER_IP_ADDRESS || true)"
     gateway_host="$(container_arg_value dune-server-gateway --RMQGameHostname= || true)"
     gateway_port="$(container_arg_value dune-server-gateway --RMQGamePort= || true)"
     gateway_http_port="$(container_arg_value dune-server-gateway --RMQGameHttpPort= || true)"
+    [ "$gateway_env_host" = "$server_ip" ] && ok "Gateway datacenter IP $gateway_env_host" || fail_msg "Gateway datacenter IP is ${gateway_env_host:-<empty>} expected $server_ip"
     [ "$gateway_host" = "$server_ip" ] && ok "Gateway advertises RMQ host $gateway_host" || fail_msg "Gateway RMQ host is $gateway_host expected $server_ip"
     [ "$gateway_port" = "31982" ] && ok "Gateway advertises RMQ game port 31982" || fail_msg "Gateway RMQ game port is $gateway_port expected 31982"
     [ "$gateway_http_port" = "31983" ] && ok "Gateway advertises RMQ HTTP port 31983" || fail_msg "Gateway RMQ HTTP port is $gateway_http_port expected 31983"
   else
     fail_msg "dune-server-gateway is not running"
+  fi
+
+  if container_running dune-director; then
+    director_env_host="$(container_env_value dune-director HOST_DATACENTER_IP_ADDRESS || true)"
+    [ "$director_env_host" = "$server_ip" ] && ok "Director datacenter IP $director_env_host" || fail_msg "Director datacenter IP is ${director_env_host:-<empty>} expected $server_ip"
+  else
+    fail_msg "dune-director is not running"
   fi
 else
   warn_msg "Docker is not reachable; skipped container argument checks."
@@ -304,7 +317,7 @@ if container_running dune-postgres; then
       expected_igw="$overmap_igw_port"
       [ "$map" = "Survival_1" ] && expected_game="$survival_game_port" && expected_igw="$survival_igw_port"
       [ "$game_addr" = "$server_ip" ] && ok "$map farm_state game_addr=$game_addr" || fail_msg "$map farm_state game_addr=$game_addr expected $server_ip"
-      [ "$igw_addr" = "$bind_ip" ] && ok "$map farm_state igw_addr=$igw_addr" || fail_msg "$map farm_state igw_addr=$igw_addr expected $bind_ip"
+      [ "$igw_addr" = "$igw_advertised_ip" ] && ok "$map farm_state igw_addr=$igw_addr" || fail_msg "$map farm_state igw_addr=$igw_addr expected $igw_advertised_ip"
       [ "$game_port" = "$expected_game" ] && ok "$map farm_state game_port=$game_port" || fail_msg "$map farm_state game_port=$game_port expected $expected_game"
       [ "$igw_port" = "$expected_igw" ] && ok "$map farm_state igw_port=$igw_port" || fail_msg "$map farm_state igw_port=$igw_port expected $expected_igw"
       [ "$ready" = "t" ] && [ "$alive" = "t" ] && ok "$map farm_state ready/alive" || warn_msg "$map farm_state ready=$ready alive=$alive"

@@ -20,17 +20,17 @@ farm_state_exists() {
 }
 
 reconcile_farm_state_addresses() {
-  local advertised_ip bind_ip
+  local advertised_ip igw_ip
 
   advertised_ip="$(resolve_game_addr_ip)"
-  bind_ip="$(resolve_igw_addr_ip)"
+  igw_ip="$(resolve_igw_addr_ip)"
 
   if ! is_ipv4 "$advertised_ip"; then
     echo "Cannot reconcile farm_state addresses: advertised IP is not IPv4: $advertised_ip" >&2
     return 1
   fi
-  if ! is_ipv4 "$bind_ip"; then
-    echo "Cannot reconcile farm_state addresses: bind IP is not IPv4: $bind_ip" >&2
+  if ! is_ipv4 "$igw_ip"; then
+    echo "Cannot reconcile farm_state addresses: IGW advertised IP is not IPv4: $igw_ip" >&2
     return 1
   fi
   if ! postgres_running; then
@@ -55,7 +55,7 @@ grant select, insert, update, delete on dune.network_address_config to dune;
 insert into dune.network_address_config (key, value, updated_at)
 values
   ('game_addr_ip', '$advertised_ip', now()),
-  ('igw_addr_ip', '$bind_ip', now())
+  ('igw_addr_ip', '$igw_ip', now())
 on conflict (key) do update
 set value = excluded.value,
     updated_at = now();
@@ -100,21 +100,21 @@ execute function dune.normalize_farm_state_addresses();
 
 update dune.farm_state
 set game_addr = ('$advertised_ip/0')::inet,
-    igw_addr = ('$bind_ip/0')::inet
+    igw_addr = ('$igw_ip/0')::inet
 where host(game_addr) is distinct from '$advertised_ip'
-   or host(igw_addr) is distinct from '$bind_ip';
+   or host(igw_addr) is distinct from '$igw_ip';
 SQL
 
-  echo "farm_state addresses reconciled: game_addr=${advertised_ip}/0 igw_addr=${bind_ip}/0"
+  echo "farm_state addresses reconciled: game_addr=${advertised_ip}/0 igw_addr=${igw_ip}/0"
 }
 
 status_farm_state_addresses() {
-  local advertised_ip bind_ip
+  local advertised_ip igw_ip
 
   advertised_ip="$(resolve_game_addr_ip)"
-  bind_ip="$(resolve_igw_addr_ip)"
-  echo "Resolved bind IP:       $bind_ip"
-  echo "Resolved advertised IP: $advertised_ip"
+  igw_ip="$(resolve_igw_addr_ip)"
+  echo "Resolved game address IP: $advertised_ip"
+  echo "Resolved IGW address IP:  $igw_ip"
 
   if ! postgres_running || ! farm_state_exists; then
     echo "dune.farm_state is not available."

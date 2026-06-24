@@ -183,6 +183,32 @@ restart_running_publish_services() {
   fi
 }
 
+restart_running_game_services() {
+  local restarted=0
+
+  echo
+  if is_running dune-server-survival-1; then
+    echo "Restarting Survival_1 so the updated network addresses can be used..."
+    runtime/scripts/dune restart survival
+    restarted=1
+  fi
+  if is_running dune-server-overmap; then
+    echo "Restarting Overmap so the updated network addresses can be used..."
+    runtime/scripts/dune restart overmap
+    restarted=1
+  fi
+  if [ "$restarted" = "0" ]; then
+    echo "Survival_1 and Overmap are stopped, so no game servers were restarted."
+    echo "The saved network settings will apply the next time the server starts."
+  fi
+}
+
+restart_running_network_services() {
+  restart_running_publish_services
+  restart_running_game_services
+  runtime/scripts/network-addresses.sh reconcile || true
+}
+
 cmd="${1:-help}"
 
 case "$cmd" in
@@ -356,10 +382,15 @@ EOF
     if [ -n "$new_mode" ]; then
       save_server_mode "$new_mode" "$detected_ip"
       runtime/scripts/network-addresses.sh reconcile || true
+      runtime/scripts/local-loopback-optimize.sh || true
     fi
 
     if [ "$restart_services" = "1" ]; then
-      restart_running_publish_services
+      if [ -n "$new_mode" ]; then
+        restart_running_network_services
+      else
+        restart_running_publish_services
+      fi
     fi
 
     echo
