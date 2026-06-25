@@ -3,10 +3,18 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
+[ -f .env ] && . ./.env
 source runtime/scripts/host-paths.sh
 
 CONTAINER_NAME="dune-autoscaler"
 IMAGE="dune-orchestrator:dev"
+HOST_UID="${DUNE_HOST_UID:-$(id -u)}"
+HOST_GID="${DUNE_HOST_GID:-$(id -g)}"
+DOCKER_SOCK_GID="${DOCKER_SOCKET_GID:-}"
+
+if [ -z "$DOCKER_SOCK_GID" ] && [ -S /var/run/docker.sock ]; then
+  DOCKER_SOCK_GID="$(stat -c '%g' /var/run/docker.sock 2>/dev/null || true)"
+fi
 
 mkdir -p runtime/generated runtime/logs
 
@@ -37,10 +45,17 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
 fi
 
 echo "Starting autoscaler container..."
+group_args=()
+if [ -n "$DOCKER_SOCK_GID" ]; then
+  group_args+=(--group-add "$DOCKER_SOCK_GID")
+fi
+
 docker run -d \
   --name "$CONTAINER_NAME" \
   --network host \
   --restart unless-stopped \
+  --user "${HOST_UID}:${HOST_GID}" \
+  "${group_args[@]}" \
   --entrypoint bash \
   -e "DUNE_CONTAINER_REPO_ROOT=${DUNE_CONTAINER_REPO_ROOT:-$PWD}" \
   -e "DUNE_HOST_REPO_ROOT=${DUNE_HOST_REPO_ROOT:-$PWD}" \
