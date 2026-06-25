@@ -9,9 +9,7 @@ LOG_POINTER_FILE="runtime/generated/deepdesert-overrides-current.log"
 TEXT_ROUTER_LOG="runtime/text-router/director-current.log"
 RMQ_TIMEOUT_SECONDS="${DUNE_DEEPDESERT_OVERRIDE_RMQ_TIMEOUT_SECONDS:-8}"
 
-SOURCE_EXCHANGE="completions"
 SOURCE_ROUTING_KEY="server_state.DeepDesert_1"
-SOURCE_FILTER_QUEUE="deepdesertOverrideSource"
 SINK_QUEUE="serverStateSink_DeepDesert_1"
 FILTER_EXCHANGE="deepdesertOverrideFilteredState"
 
@@ -68,21 +66,32 @@ import subprocess
 import sys
 
 log_path = Path("runtime/text-router/director-current.log")
-pattern = re.compile(r'(bgd\.[^/\s]+\.admin)/([A-Za-z0-9+/=]+) => allow administrator')
-text = ""
-if log_path.exists():
-    text = log_path.read_text(errors="ignore")
-matches = pattern.findall(text)
-if not matches:
-    try:
-        text = subprocess.check_output(
-            ["docker", "logs", "dune-text-router"],
-            text=True,
-            stderr=subprocess.STDOUT,
-        )
-    except Exception:
-        text = ""
+patterns = [
+    re.compile(r'Generated new admin credentials:\s*(bgd\.[^/\s]+\.admin)\s*/\s*([A-Za-z0-9+/=]+)'),
+    re.compile(r'(bgd\.[^/\s]+\.admin)/([A-Za-z0-9+/=]+) => allow administrator'),
+]
+text = log_path.read_text(errors="ignore") if log_path.exists() else ""
+matches = []
+for pattern in patterns:
     matches = pattern.findall(text)
+    if matches:
+        break
+if not matches:
+    logs = []
+    for container in ("dune-director", "dune-text-router"):
+        try:
+            logs.append(subprocess.check_output(
+                ["docker", "logs", container],
+                text=True,
+                stderr=subprocess.STDOUT,
+            ))
+        except Exception:
+            pass
+    text = "\n".join(logs)
+    for pattern in patterns:
+        matches = pattern.findall(text)
+        if matches:
+            break
 if not matches:
     sys.exit(1)
 
@@ -103,40 +112,18 @@ rmq_admin() {
 
 ensure_route() {
   rmq_admin declare exchange name="$FILTER_EXCHANGE" type=direct durable=true >/dev/null
-  rmq_admin declare queue name="$SOURCE_FILTER_QUEUE" durable=true >/dev/null
-  rmq_admin purge queue name="$SOURCE_FILTER_QUEUE" >/dev/null || true
-  rmq_admin declare binding \
-    source="$SOURCE_EXCHANGE" \
-    destination="$SOURCE_FILTER_QUEUE" \
-    destination_type=queue \
-    routing_key="$SOURCE_ROUTING_KEY" >/dev/null
   rmq_admin declare binding \
     source="$FILTER_EXCHANGE" \
     destination="$SINK_QUEUE" \
     destination_type=queue \
     routing_key="$SOURCE_ROUTING_KEY" >/dev/null
-  rmq_admin delete binding \
-    source="$SOURCE_EXCHANGE" \
-    destination_type=queue \
-    destination="$SINK_QUEUE" \
-    properties_key="$SOURCE_ROUTING_KEY" >/dev/null 2>&1 || true
 }
 
 restore_route() {
-  rmq_admin declare binding \
-    source="$SOURCE_EXCHANGE" \
-    destination="$SINK_QUEUE" \
-    destination_type=queue \
-    routing_key="$SOURCE_ROUTING_KEY" >/dev/null || true
   rmq_admin delete binding \
     source="$FILTER_EXCHANGE" \
     destination_type=queue \
     destination="$SINK_QUEUE" \
-    properties_key="$SOURCE_ROUTING_KEY" >/dev/null 2>&1 || true
-  rmq_admin delete binding \
-    source="$SOURCE_EXCHANGE" \
-    destination_type=queue \
-    destination="$SOURCE_FILTER_QUEUE" \
     properties_key="$SOURCE_ROUTING_KEY" >/dev/null 2>&1 || true
 }
 
@@ -147,50 +134,6 @@ publish_payload() {
     routing_key="$SOURCE_ROUTING_KEY" \
     properties='{"content_type":"Content","type":"server_state"}' \
     payload="$payload" >/dev/null
-}
-
-forward_batch_once() {
-  local messages endpoint_rows
-  messages="$(rmq_admin --format=raw_json get queue="$SOURCE_FILTER_QUEUE" count=20 ackmode=ack_requeue_false)"
-  [ "$messages" != "[]" ] || return 1
-
-  endpoint_rows="$(docker exec dune-postgres psql -U postgres -d dune -At -F $'\t' -c "
-    select wp.partition_id,
-           coalesce(host(fs.game_addr), ''),
-           coalesce(fs.game_port, 0)
-    from dune.world_partition wp
-    left join dune.farm_state fs on fs.server_id = wp.server_id
-    where wp.map = 'DeepDesert_1';
-  ")"
-
-  FILTER_MESSAGES="$messages" ENDPOINT_ROWS="$endpoint_rows" python3 - <<'PY'
-import json
-import os
-import time
-
-messages = json.loads(os.environ["FILTER_MESSAGES"])
-endpoints = {}
-for line in os.environ.get("ENDPOINT_ROWS", "").splitlines():
-    if not line.strip():
-        continue
-    partition_id, game_addr, game_port = line.split("\t", 2)
-    endpoints[str(partition_id)] = (game_addr, game_port)
-
-for message in messages:
-    payload = json.loads(message["payload"])
-    partition_id = str(payload.get("partitionId", ""))
-    game_addr, game_port = endpoints.get(partition_id, ("", "0"))
-    if game_addr:
-        payload["ip"] = game_addr
-    if game_port and game_port != "0":
-        payload["port"] = int(game_port)
-    if not payload.get("ready", False):
-        payload["isStartingMap"] = True
-        payload["reportTimestamp"] = max(int(time.time()), int(payload.get("reportTimestamp", 0)) + 1)
-    else:
-        payload["reportTimestamp"] = max(int(time.time()), int(payload.get("reportTimestamp", 0)))
-    print(json.dumps(payload, separators=(",", ":")))
-PY
 }
 
 publish_snapshot_once() {
@@ -252,19 +195,11 @@ start_loop() {
   trap 'rm -f "$PID_FILE"' EXIT
   local route_refresh_at=0
   ensure_route
-  publish_snapshot_once >>"$LOG_FILE" 2>&1 || true
   while true; do
     if [ "$(date +%s)" -ge "$route_refresh_at" ]; then
       ensure_route >>"$LOG_FILE" 2>&1 || true
       publish_snapshot_once >>"$LOG_FILE" 2>&1 || true
       route_refresh_at=$(( $(date +%s) + 10 ))
-    fi
-    if rows="$(forward_batch_once)"; then
-      while IFS= read -r payload; do
-        [ -n "$payload" ] || continue
-        publish_payload "$payload" >>"$LOG_FILE" 2>&1 || true
-      done <<< "$rows"
-      continue
     fi
     sleep 1
   done
@@ -273,19 +208,11 @@ start_loop() {
 case "${1:-start}" in
   once)
     ensure_route
-    rows="$(forward_batch_once || true)"
-    if [ -n "${rows:-}" ]; then
-      while IFS= read -r payload; do
-        [ -n "$payload" ] || continue
-        publish_payload "$payload"
-      done <<< "$rows"
-    else
-      rows="$(publish_snapshot_once || true)"
-      while IFS= read -r payload; do
-        [ -n "$payload" ] || continue
-        publish_payload "$payload"
-      done <<< "$rows"
-    fi
+    rows="$(publish_snapshot_once || true)"
+    while IFS= read -r payload; do
+      [ -n "$payload" ] || continue
+      publish_payload "$payload"
+    done <<< "$rows"
     ;;
   start)
     clear_stale_pidfile

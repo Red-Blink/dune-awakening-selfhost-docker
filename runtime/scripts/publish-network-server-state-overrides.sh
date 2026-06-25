@@ -13,7 +13,7 @@ SOURCE_EXCHANGE="completions"
 FILTER_EXCHANGE="networkServerStateFiltered"
 SOURCE_FILTER_PREFIX="networkStateOverrideSource_"
 SINK_QUEUE_PREFIX="serverStateSink_"
-EXCLUDED_MAPS_RE="^(Survival_1|DeepDesert_1)$"
+EXCLUDED_MAPS_RE="^Survival_1$"
 
 loop_pids() {
   pgrep -f "publish-network-server-state-overrides.sh loop" 2>/dev/null || true
@@ -203,7 +203,9 @@ forward_batch_for_map() {
   local source_queue="${SOURCE_FILTER_PREFIX}${map_name}"
   local messages endpoint_rows
 
+  ensure_route_for_map "$map_name" >/dev/null 2>&1 || return 1
   messages="$(rmq_admin --format=raw_json get queue="$source_queue" count=20 ackmode=ack_requeue_false)"
+  [[ "$messages" == \[* ]] || return 1
   [ "$messages" != "[]" ] || return 1
 
   endpoint_rows="$(docker exec dune-postgres psql -U postgres -d dune -At -F $'\t' -c "
@@ -215,12 +217,13 @@ forward_batch_for_map() {
     where wp.map = '${map_name//\'/\'\'}';
   ")"
 
-  FILTER_MESSAGES="$messages" ENDPOINT_ROWS="$endpoint_rows" python3 - <<'PY'
+  FILTER_MESSAGES="$messages" ENDPOINT_ROWS="$endpoint_rows" MAP_NAME="$map_name" python3 - <<'PY'
 import json
 import os
 import time
 
 messages = json.loads(os.environ["FILTER_MESSAGES"])
+map_name = os.environ.get("MAP_NAME", "")
 endpoints = {}
 for line in os.environ.get("ENDPOINT_ROWS", "").splitlines():
     if not line.strip():
@@ -236,6 +239,8 @@ for message in messages:
         payload["ip"] = game_addr
     if game_port and game_port != "0":
         payload["port"] = int(game_port)
+    if map_name == "DeepDesert_1" and not payload.get("ready", False):
+        payload["isStartingMap"] = True
     payload["reportTimestamp"] = max(int(time.time()), int(payload.get("reportTimestamp", 0)))
     print(json.dumps(payload, separators=(",", ":")))
 PY
