@@ -12,7 +12,7 @@ RMQ_BINDING_CLEANUP_TIMEOUT_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_BINDING_CLEAN
 STOP_RESTORE_TIMEOUT_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_STOP_RESTORE_TIMEOUT_SECONDS:-20}"
 PRIORITY_MAP_TIMEOUT_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_PRIORITY_MAP_TIMEOUT_SECONDS:-8}"
 BACKGROUND_MAP_TIMEOUT_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_BACKGROUND_MAP_TIMEOUT_SECONDS:-3}"
-PRIORITY_MAPS="${DUNE_NETWORK_STATE_OVERRIDE_PRIORITY_MAPS:-Overmap DeepDesert_1}"
+PRIORITY_MAPS="${DUNE_NETWORK_STATE_OVERRIDE_PRIORITY_MAPS:-Survival_1 Overmap DeepDesert_1}"
 RMQ_USER=""
 RMQ_PASSWORD=""
 
@@ -20,7 +20,7 @@ SOURCE_EXCHANGE="completions"
 FILTER_EXCHANGE="networkServerStateFiltered"
 SOURCE_FILTER_PREFIX="networkStateOverrideSource_"
 SINK_QUEUE_PREFIX="serverStateSink_"
-EXCLUDED_MAPS_RE="^Survival_1$"
+EXCLUDED_MAPS_RE="^$"
 
 loop_pids() {
   pgrep -f "publish-network-server-state-overrides.sh loop" 2>/dev/null || true
@@ -179,11 +179,6 @@ ensure_route_for_map() {
   rmq_admin declare queue name="$source_queue" durable=true >/dev/null
   rmq_admin declare binding \
     source="$SOURCE_EXCHANGE" \
-    destination="$sink_queue" \
-    destination_type=queue \
-    routing_key="$routing_key" >/dev/null
-  rmq_admin declare binding \
-    source="$SOURCE_EXCHANGE" \
     destination="$source_queue" \
     destination_type=queue \
     routing_key="$routing_key" >/dev/null
@@ -192,6 +187,7 @@ ensure_route_for_map() {
     destination="$sink_queue" \
     destination_type=queue \
     routing_key="$routing_key" >/dev/null
+  rmq_delete_binding_exact "$SOURCE_EXCHANGE" "$sink_queue" "$routing_key" >/dev/null 2>&1 || true
 }
 
 restore_route_for_map() {
@@ -343,11 +339,12 @@ kick_priority_maps_once() {
 start_loop() {
   mkdir -p runtime/generated
   write_live_pidfile
-  trap 'rm -f "$PID_FILE"' EXIT
+  trap 'restore_routes >/dev/null 2>&1 || true; rm -f "$PID_FILE"' EXIT
   local route_refresh_at=0
   local background_maps="" background_index=1 background_count=0 background_map=""
-  ensure_route_for_map Overmap >>"$LOG_FILE" 2>&1 || true
-  ensure_route_for_map DeepDesert_1 >>"$LOG_FILE" 2>&1 || true
+  for priority_map in $PRIORITY_MAPS; do
+    ensure_route_for_map "$priority_map" >>"$LOG_FILE" 2>&1 || true
+  done
   while true; do
     if [ "$(date +%s)" -ge "$route_refresh_at" ]; then
       ensure_routes >>"$LOG_FILE" 2>&1 || true
