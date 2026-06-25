@@ -11,6 +11,7 @@ RMQ_TIMEOUT_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_RMQ_TIMEOUT_SECONDS:-8}"
 RMQ_BINDING_CLEANUP_TIMEOUT_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_BINDING_CLEANUP_TIMEOUT_SECONDS:-2}"
 STOP_RESTORE_TIMEOUT_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_STOP_RESTORE_TIMEOUT_SECONDS:-20}"
 PRIORITY_MAP_TIMEOUT_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_PRIORITY_MAP_TIMEOUT_SECONDS:-8}"
+BACKGROUND_MAP_TIMEOUT_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_BACKGROUND_MAP_TIMEOUT_SECONDS:-3}"
 PRIORITY_MAPS="${DUNE_NETWORK_STATE_OVERRIDE_PRIORITY_MAPS:-Overmap DeepDesert_1}"
 RMQ_USER=""
 RMQ_PASSWORD=""
@@ -302,6 +303,17 @@ forward_once() {
   return "$any"
 }
 
+server_state_maps_background() {
+  local map_name
+  while IFS= read -r map_name; do
+    [ -n "$map_name" ] || continue
+    case " $PRIORITY_MAPS " in
+      *" $map_name "*) continue ;;
+    esac
+    printf '%s\n' "$map_name"
+  done < <(server_state_maps)
+}
+
 forward_map_once() {
   local map_name="$1"
   local rows
@@ -327,14 +339,31 @@ start_loop() {
   write_live_pidfile
   trap 'rm -f "$PID_FILE"' EXIT
   local route_refresh_at=0
+  local background_maps="" background_index=1 background_count=0 background_map=""
   ensure_route_for_map Overmap >>"$LOG_FILE" 2>&1 || true
   ensure_route_for_map DeepDesert_1 >>"$LOG_FILE" 2>&1 || true
   while true; do
     if [ "$(date +%s)" -ge "$route_refresh_at" ]; then
       ensure_routes >>"$LOG_FILE" 2>&1 || true
+      background_maps="$(server_state_maps_background)"
+      background_count="$(printf '%s\n' "$background_maps" | sed '/^$/d' | wc -l | tr -d '[:space:]')"
+      [ "${background_count:-0}" -gt 0 ] || background_count=0
+      [ "$background_index" -le "$background_count" ] || background_index=1
       route_refresh_at=$(( $(date +%s) + 10 ))
     fi
-    forward_once >>"$LOG_FILE" 2>&1 || sleep 1
+
+    kick_priority_maps_once >>"$LOG_FILE" 2>&1 || true
+
+    if [ "$background_count" -gt 0 ]; then
+      background_map="$(printf '%s\n' "$background_maps" | sed -n "${background_index}p")"
+      if [ -n "$background_map" ]; then
+        timeout --kill-after=1s "${BACKGROUND_MAP_TIMEOUT_SECONDS}s" "$0" map "$background_map" >>"$LOG_FILE" 2>&1 || true
+      fi
+      background_index=$(( background_index + 1 ))
+      [ "$background_index" -le "$background_count" ] || background_index=1
+    fi
+
+    sleep 10
   done
 }
 
