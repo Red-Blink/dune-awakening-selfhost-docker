@@ -28,6 +28,24 @@ is_running() {
   docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$name"
 }
 
+is_wsl() {
+  grep -qiE '(microsoft|wsl)' /proc/version /proc/sys/kernel/osrelease 2>/dev/null
+}
+
+wsl_visible_memory_gb() {
+  awk '/MemTotal:/ { printf "%.0f", ($2 / 1024 / 1024) }' /proc/meminfo 2>/dev/null || true
+}
+
+docker_engine_os() {
+  docker info --format '{{.OperatingSystem}}' 2>/dev/null || true
+}
+
+admin_bind_host_value() {
+  local value
+  value="$(config_value .env ADMIN_BIND_HOST 2>/dev/null || true)"
+  printf '%s' "${value:-auto}"
+}
+
 check_file() {
   local file="$1"
   local label="$2"
@@ -101,6 +119,68 @@ if docker compose version >/dev/null 2>&1; then
 else
   fail_msg "Docker Compose is not available"
   echo "     Install Docker Compose v2."
+fi
+
+echo
+echo "=== WSL diagnostics ==="
+if is_wsl; then
+  ok "Running inside WSL"
+
+  if pwd -P | grep -q '^/mnt/'; then
+    warn_msg "Repo is stored under /mnt/*"
+    echo "     Move the repo under ~/ inside WSL for better performance and safer bind mounts."
+  else
+    ok "Repo is stored on the WSL/Linux filesystem"
+  fi
+
+  if grep -qw avx2 /proc/cpuinfo 2>/dev/null; then
+    ok "AVX2 visible inside WSL"
+  elif grep -qw avx /proc/cpuinfo 2>/dev/null; then
+    warn_msg "AVX visible, but AVX2 was not detected"
+  else
+    fail_msg "AVX/AVX2 not visible inside WSL"
+  fi
+
+  mem_gb="$(wsl_visible_memory_gb)"
+  if [ -n "$mem_gb" ]; then
+    if [ "$mem_gb" -ge 20 ] 2>/dev/null; then
+      ok "WSL visible memory: ${mem_gb} GB"
+    else
+      warn_msg "WSL visible memory is low: ${mem_gb} GB"
+      echo "     Increase memory in %UserProfile%\\.wslconfig. 20 GB is the practical minimum."
+    fi
+  fi
+
+  docker_os="$(docker_engine_os)"
+  echo "     Docker engine OS: ${docker_os:-unknown}"
+  if printf '%s' "$docker_os" | grep -qi 'docker desktop'; then
+    warn_msg "Docker Desktop backend detected"
+    echo "     Ensure host networking is enabled in Docker Desktop settings."
+  else
+    ok "Native/non-Docker-Desktop Docker engine detected"
+  fi
+
+  if docker network inspect host >/dev/null 2>&1; then
+    ok "Docker host network object available"
+  else
+    fail_msg "Docker host network object missing"
+  fi
+
+  admin_host="$(admin_bind_host_value)"
+  case "$admin_host" in
+    127.0.0.1|localhost)
+      ok "Admin UI bind host is localhost-only: $admin_host"
+      ;;
+    0.0.0.0|auto|'')
+      warn_msg "Admin UI may be reachable beyond localhost: ${admin_host:-auto}"
+      echo "     Keep ADMIN_BIND_HOST=127.0.0.1 on WSL unless using a trusted LAN/VPN."
+      ;;
+    *)
+      ok "Admin UI bind host is explicit: $admin_host"
+      ;;
+  esac
+else
+  ok "Not running inside WSL"
 fi
 
 echo
@@ -238,6 +318,10 @@ case "$mode" in
   public)
     ok "Hosting mode: public"
     echo "     Make sure your firewall/router allows TCP 31982, TCP 31983, and the configured UDP game ranges."
+    if is_wsl; then
+      warn_msg "Public hosting from WSL has extra NAT/firewall complexity"
+      echo "     Native Ubuntu, a VM, or a VPS is preferred for internet-facing hosting."
+    fi
     ;;
   local)
     ok "Hosting mode: local/LAN"

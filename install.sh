@@ -38,6 +38,18 @@ has_systemd() {
   command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]
 }
 
+is_wsl() {
+  grep -qiE '(microsoft|wsl)' /proc/version /proc/sys/kernel/osrelease 2>/dev/null
+}
+
+wsl_visible_memory_gb() {
+  awk '/MemTotal:/ { printf "%.0f", ($2 / 1024 / 1024) }' /proc/meminfo 2>/dev/null || true
+}
+
+docker_engine_os() {
+  "${DOCKER[@]}" info --format '{{.OperatingSystem}}' 2>/dev/null || true
+}
+
 install_basic_tools() {
   if command -v apt-get >/dev/null 2>&1; then
     need_sudo apt-get update
@@ -152,7 +164,7 @@ ensure_compose() {
     need_sudo yum install -y docker-compose-plugin
   else
     echo "Docker Compose is missing and this operating system is not supported for automatic Compose installation."
-    echo "Install the Docker Compose v2 plugin or use Docker Desktop, then run this installer again."
+    echo "Install Docker Compose v2 plugin or use Docker Desktop, then run this installer again."
     exit 1
   fi
 
@@ -170,6 +182,50 @@ install_cli_command() {
 
   step "Installing the dune command."
   need_sudo runtime/scripts/install-command.sh
+}
+
+check_wsl_environment() {
+  if ! is_wsl; then
+    return
+  fi
+
+  step "Checking WSL environment."
+
+  if pwd -P | grep -q '^/mnt/'; then
+    echo "WARNING: This repo is running from /mnt/*. Move it under ~/ inside WSL for better performance and safer bind mounts."
+  else
+    echo "Repo path is inside the WSL/Linux filesystem."
+  fi
+
+  if grep -qw avx2 /proc/cpuinfo 2>/dev/null; then
+    echo "AVX2 is visible inside WSL."
+  elif grep -qw avx /proc/cpuinfo 2>/dev/null; then
+    echo "WARNING: AVX is visible, but AVX2 was not detected."
+  else
+    echo "WARNING: AVX/AVX2 CPU flags were not detected inside WSL."
+  fi
+
+  local mem_gb
+  mem_gb="$(wsl_visible_memory_gb)"
+  if [ -n "$mem_gb" ]; then
+    echo "WSL visible memory: ${mem_gb} GB"
+    if [ "$mem_gb" -lt 20 ] 2>/dev/null; then
+      echo "WARNING: Less than 20 GB is visible to WSL. Increase memory in %UserProfile%\\.wslconfig."
+    fi
+  fi
+
+  local engine_os
+  engine_os="$(docker_engine_os)"
+  echo "Docker engine OS: ${engine_os:-unknown}"
+  if printf '%s' "$engine_os" | grep -qi 'docker desktop'; then
+    echo "Docker Desktop backend detected. Ensure host networking is enabled in Docker Desktop settings."
+  fi
+
+  if "${DOCKER[@]}" network inspect host >/dev/null 2>&1; then
+    echo "Docker host network object is available."
+  else
+    echo "WARNING: Docker host network object was not found. This stack depends on host networking."
+  fi
 }
 
 host_ip() {
@@ -228,7 +284,7 @@ next_available_port() {
 
 existing_web_port() {
   if [ -f .env ]; then
-    awk -F= '/^ADMIN_BIND_PORT=/ {print $2; exit}' .env | sed 's/[[:space:]"'\'']//g'
+    awk -F= '$1 == "ADMIN_BIND_PORT" { value = substr($0, length($1) + 2); gsub(/[[:space:]\"\047]/, "", value); print value; exit }' .env
   fi
 }
 
@@ -365,9 +421,15 @@ show_finish() {
   else
     echo "  http://$ip:$WEB_PORT"
   fi
+  if is_wsl; then
+    echo "  WSL localhost access:   http://localhost:$WEB_PORT"
+  fi
   echo
   echo "If you are on the same local network as this server, use the same-network address."
   echo "If you are connecting over the internet, use the public address and make sure TCP $WEB_PORT is allowed by the server firewall or VPS firewall."
+  if is_wsl; then
+    echo "For WSL, start with localhost access. Use ADMIN_BIND_HOST=0.0.0.0 only for trusted LAN/VPN access."
+  fi
   if [ "$DOCKER_GROUP_UPDATED" = "1" ]; then
     echo
     echo "Docker is ready. Setup can continue."
@@ -397,6 +459,7 @@ install_docker
 start_docker
 ensure_docker_group_access
 ensure_compose
+check_wsl_environment
 install_cli_command
 choose_web_port
 start_console

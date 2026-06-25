@@ -28,6 +28,7 @@ Join our fast growing Discord: [Dune: Awakening Docker](https://discord.gg/9pQqy
 - Memory controls, including per-map memory settings and the Memory Balancer
 - Autoscaler controls for starting, stopping, and reconciling dynamic map servers
 - Database browser plus database backup, restore, import, and maintenance tools
+- WSL2-focused installer and doctor checks for host networking, AVX/AVX2 visibility, WSL memory, and Windows-mounted paths
 - And much more!
 
 ## Requirements
@@ -41,7 +42,7 @@ You do not need to be a Linux expert. Start with a fresh server and the installe
 | Funcom token | You will paste this into the browser setup wizard. |
 | CPU support | The game server needs AVX/AVX2. Most modern dedicated servers and VPS plans expose this. |
 | Disk space | 100 GB or more is recommended. |
-| Web access | Open the Web UI on port `8088` from your browser. You can use the public address or the same-network/local address shown by the installer. |
+| Web access | Open the Web UI on port `8088` from your browser. WSL defaults to localhost-first access for safety. |
 
 Memory Guide:
 
@@ -64,15 +65,81 @@ Forward these ports for public/internet hosting:
 
 Keep database and internal admin ports private.
 
-## Getting Started
+## WSL2 Ubuntu Setup
 
-Copy and paste this on a fresh Linux server:
+This fork includes WSL2-specific install guidance and diagnostics. WSL2 is a good target for local testing and LAN validation. For a stable public/internet server, native Ubuntu on bare metal, a real VM, or a VPS is still preferred.
+
+Supported WSL modes:
+
+1. **Native Docker Engine inside WSL Ubuntu** — recommended for the full stack.
+2. **Docker Desktop with WSL integration** — supported only when Docker Desktop host networking is enabled.
+
+Minimum WSL checks:
 
 ```bash
-bash -c 'set -euo pipefail; if ! command -v curl >/dev/null 2>&1; then sudo apt-get update && sudo apt-get install -y ca-certificates curl tar; fi; mkdir -p "$HOME/dune-awakening-selfhost-docker"; cd "$HOME/dune-awakening-selfhost-docker"; latest_url="$(curl -fsSLI -o /dev/null -w "%{url_effective}" https://github.com/Red-Blink/dune-awakening-selfhost-docker/releases/latest)"; version="${latest_url##*/}"; curl -fsSL "https://github.com/Red-Blink/dune-awakening-selfhost-docker/archive/refs/tags/${version}.tar.gz" | tar -xz --strip-components=1; chmod +x install.sh; ./install.sh'
+grep -qiE '(microsoft|wsl)' /proc/version /proc/sys/kernel/osrelease && echo "WSL detected"
+grep -m1 -o 'avx2' /proc/cpuinfo
+docker info
+docker compose version
+docker run --rm --network host alpine:3.20 true
 ```
 
-The installer downloads the latest release, prepares the server, starts the Web UI, and tells you what address to open in your browser. If you are on the same network as the server, use the same-network address. If you are connecting over the internet, use the public address and allow TCP `8088` in your firewall.
+Recommended Windows `%UserProfile%\.wslconfig`:
+
+```ini
+[wsl2]
+memory=32GB
+processors=8
+swap=16GB
+localhostForwarding=true
+```
+
+After changing `.wslconfig`, run this from PowerShell:
+
+```powershell
+wsl --shutdown
+```
+
+Store the repo in the WSL Linux filesystem, not under `/mnt/c`:
+
+```bash
+cd ~
+git clone https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL.git
+cd dune-awakening-selfhost-docker-WSL
+```
+
+For Docker Desktop, host networking must be enabled:
+
+1. Open Docker Desktop.
+2. Go to **Settings**.
+3. Go to **Resources**.
+4. Select **Network**.
+5. Enable **Host networking**.
+6. Apply and restart Docker Desktop.
+
+See the detailed WSL guide in [`docs/WSL2.md`](docs/WSL2.md).
+
+## Getting Started
+
+For this WSL-focused fork:
+
+```bash
+cd ~
+git clone https://github.com/yacketrj/dune-awakening-selfhost-docker-WSL.git
+cd dune-awakening-selfhost-docker-WSL
+chmod +x install.sh
+./install.sh
+```
+
+The installer prepares Docker when possible, checks the WSL environment, starts the Web UI, and tells you what address to open in your browser. If you are on WSL, start with the localhost address. If you deliberately expose the Web UI to the LAN, keep authentication enabled and restrict access to trusted admins.
+
+After the Web UI starts, run:
+
+```bash
+dune doctor
+```
+
+The doctor command checks containers, ports, Steam server files, database state, RabbitMQ, hosting mode, and WSL-specific conditions.
 
 ## Docker Socket Access
 
@@ -107,6 +174,7 @@ The template gives addon developers a ready-to-use structure, examples, validati
 - Funcom self-hosting behavior may change over time.
 - Keep secrets, generated runtime files, and backups out of git.
 - Do not expose the Web UI to untrusted users.
+- On WSL, keep the repo under the Linux filesystem and run `dune doctor` before troubleshooting individual game services.
 
 ## Credits
 
