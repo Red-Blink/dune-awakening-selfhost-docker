@@ -35,8 +35,6 @@ direct_bind_failed=0
 notification_bound=0
 notification_bind_failed=0
 rmq_timeout_seconds="${CHAT_REPAIR_RMQ_TIMEOUT_SECONDS:-10}"
-rmq_user=""
-rmq_password=""
 exchange_list_file=""
 queue_list_file=""
 
@@ -47,58 +45,19 @@ cleanup() {
 
 trap cleanup EXIT
 
-load_rmq_game_creds() {
-  python3 - <<'PY'
-from pathlib import Path
-import re
-import subprocess
-import sys
-
-pattern = re.compile(r'(bgd\.[^/\s]+\.admin)/([A-Za-z0-9+/=]+) => allow administrator')
-text = ""
-log_path = Path("runtime/text-router/director-current.log")
-if log_path.exists():
-    text = log_path.read_text(errors="ignore")
-matches = pattern.findall(text)
-if not matches:
-    try:
-        text = subprocess.check_output(
-            ["docker", "logs", "dune-text-router"],
-            text=True,
-            stderr=subprocess.STDOUT,
-        )
-    except Exception:
-        text = ""
-    matches = pattern.findall(text)
-if not matches:
-    sys.exit(1)
-username, password = matches[-1]
-print(username)
-print(password)
-PY
+rmq_ctl() {
+  timeout --kill-after=2s "${rmq_timeout_seconds}s" docker exec dune-rmq-game rabbitmqctl -q "$@"
 }
 
-ensure_rmq_game_creds() {
-  local creds
-  if [ -n "$rmq_user" ] && [ -n "$rmq_password" ]; then
-    return 0
-  fi
-  mapfile -t creds < <(load_rmq_game_creds)
-  [ "${#creds[@]}" -ge 2 ] || return 1
-  rmq_user="${creds[0]}"
-  rmq_password="${creds[1]}"
-}
-
-rmq_admin() {
-  ensure_rmq_game_creds || return 1
-  timeout --kill-after=2s "${rmq_timeout_seconds}s" docker exec dune-rmq-game rabbitmqadmin -q -u "$rmq_user" -p "$rmq_password" "$@"
+rmq_eval() {
+  timeout --kill-after=2s "${rmq_timeout_seconds}s" docker exec dune-rmq-game rabbitmqctl -q eval "$1"
 }
 
 load_rmq_metadata() {
   exchange_list_file="$(mktemp)"
   queue_list_file="$(mktemp)"
-  rmq_admin --format=tsv list exchanges name type durable >"$exchange_list_file" 2>/dev/null || return 1
-  rmq_admin --format=tsv list queues name >"$queue_list_file" 2>/dev/null || return 1
+  rmq_ctl list_exchanges name type durable >"$exchange_list_file" 2>/dev/null || return 1
+  rmq_ctl list_queues name >"$queue_list_file" 2>/dev/null || return 1
 }
 
 exchange_exists() {
@@ -135,10 +94,16 @@ declare_exchange() {
   fi
 
   if exchange_exists_any_shape "$exchange"; then
-    rmq_admin delete exchange name="$exchange" >/dev/null 2>&1 || return 1
+    rmq_eval "
+X = {resource, <<\"/\">>, exchange, <<\"${exchange}\">>},
+rabbit_exchange:delete(X, false, <<\"repair-chat-exchanges\">>).
+" >/dev/null 2>&1 || return 1
   fi
 
-  if rmq_admin declare exchange name="$exchange" type="$kind" durable="$durable" >/dev/null 2>&1; then
+  if rmq_eval "
+X = {resource, <<\"/\">>, exchange, <<\"${exchange}\">>},
+rabbit_exchange:declare(X, ${kind}, ${durable}, false, false, [], <<\"repair-chat-exchanges\">>).
+" >/dev/null 2>&1; then
     printf '%s\t%s\n' "$exchange" "$kind" >>"$exchange_list_file"
     return 0
   fi
@@ -152,7 +117,14 @@ bind_queue() {
   local queue="$3"
 
   queue_exists "$queue" || return 0
-  rmq_admin declare binding source="$exchange" destination="$queue" destination_type=queue routing_key="$routing_key" >/dev/null 2>&1
+  rmq_eval "
+B = {binding,
+  {resource, <<\"/\">>, exchange, <<\"${exchange}\">>},
+  <<\"${routing_key}\">>,
+  {resource, <<\"/\">>, queue, <<\"${queue}\">>},
+  []},
+rabbit_binding:add(B, <<\"repair-chat-exchanges\">>).
+" >/dev/null 2>&1
 }
 
 if ! load_rmq_metadata; then
