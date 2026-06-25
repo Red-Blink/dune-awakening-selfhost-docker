@@ -8,6 +8,8 @@ LOG_FILE="runtime/generated/network-server-state-overrides.log"
 LOG_POINTER_FILE="runtime/generated/network-server-state-overrides-current.log"
 TEXT_ROUTER_LOG="runtime/text-router/director-current.log"
 RMQ_TIMEOUT_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_RMQ_TIMEOUT_SECONDS:-8}"
+RMQ_USER=""
+RMQ_PASSWORD=""
 
 SOURCE_EXCHANGE="completions"
 FILTER_EXCHANGE="networkServerStateFiltered"
@@ -104,12 +106,13 @@ PY
 }
 
 rmq_admin() {
-  local rmq_user rmq_password
-  mapfile -t rmq_creds < <(load_rmq_admin_creds)
-  [ "${#rmq_creds[@]}" -ge 2 ] || return 1
-  rmq_user="${rmq_creds[0]}"
-  rmq_password="${rmq_creds[1]}"
-  timeout --kill-after=2s "${RMQ_TIMEOUT_SECONDS}s" docker exec dune-rmq-admin rabbitmqadmin -q -u "$rmq_user" -p "$rmq_password" "$@"
+  if [ -z "$RMQ_USER" ] || [ -z "$RMQ_PASSWORD" ]; then
+    mapfile -t rmq_creds < <(load_rmq_admin_creds)
+    [ "${#rmq_creds[@]}" -ge 2 ] || return 1
+    RMQ_USER="${rmq_creds[0]}"
+    RMQ_PASSWORD="${rmq_creds[1]}"
+  fi
+  timeout --kill-after=2s "${RMQ_TIMEOUT_SECONDS}s" docker exec dune-rmq-admin rabbitmqadmin -q -u "$RMQ_USER" -p "$RMQ_PASSWORD" "$@"
 }
 
 rmq_delete_binding_exact() {
@@ -277,6 +280,19 @@ forward_once() {
   return "$any"
 }
 
+forward_map_once() {
+  local map_name="$1"
+  local rows
+
+  [ -n "$map_name" ] || return 1
+  if rows="$(forward_batch_for_map "$map_name")"; then
+    while IFS= read -r payload; do
+      [ -n "$payload" ] || continue
+      publish_payload "$map_name" "$payload"
+    done <<< "$rows"
+  fi
+}
+
 start_loop() {
   mkdir -p runtime/generated
   write_live_pidfile
@@ -296,6 +312,15 @@ case "${1:-start}" in
   once)
     ensure_routes
     forward_once || true
+    ;;
+  map)
+    map_name="${2:-}"
+    if [ -z "$map_name" ]; then
+      echo "Usage: $0 map <map-name>"
+      exit 2
+    fi
+    ensure_route_for_map "$map_name"
+    forward_map_once "$map_name" || true
     ;;
   start)
     clear_stale_pidfile
@@ -328,7 +353,7 @@ case "${1:-start}" in
     "$0" start
     ;;
   *)
-    echo "Usage: $0 [once|start|stop|restart]"
+    echo "Usage: $0 [once|map <map-name>|start|stop|restart]"
     exit 2
     ;;
 esac
