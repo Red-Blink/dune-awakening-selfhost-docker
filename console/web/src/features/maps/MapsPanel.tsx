@@ -1104,9 +1104,11 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
         const memoryRow = memoryForMap(liveMemory, rowName, row);
         const mapSettingsDirty = isSelected && ((modeDraft !== modeInputValue(String(row.mode || "")) && String(row.mode) !== "Core Map") || memory !== memoryInputValue(String(row.memory || "")) || (isSurvivalRow && (activeSietchesDirty || primarySietchDirty)));
         const primaryDraft = primarySurvivalSietch ? sietchDrafts[primarySurvivalSietch.partitionId] || { displayName: primarySurvivalSietch.displayName, password: primarySurvivalSietch.password } : undefined;
+        const primaryDeepDesertPartition = isDeepDesertRow ? deepDesertPartitionRows.find((deepRow) => String(deepRow.dimension || "") === "0") || deepDesertPartitionRows[0] : undefined;
         const baseStatus = isDeepDesertRow && deepDesertDualConfiguring
           ? "Configuring"
-          : isSurvivalRow && primarySurvivalSietch ? readinessStatusByPartitionId.get(primarySurvivalSietch.partitionId) || partitionStatusById.get(primarySurvivalSietch.partitionId) || String(row.status || "Not Available") : String(row.status || "Not Available");
+          : isDeepDesertRow && primaryDeepDesertPartition ? partitionStatusById.get(String(primaryDeepDesertPartition.partitionId || "")) || String(primaryDeepDesertPartition.status || row.status || "Not Available")
+          : isSurvivalRow && primarySurvivalSietch ? partitionStatusById.get(primarySurvivalSietch.partitionId) || readinessStatusByPartitionId.get(primarySurvivalSietch.partitionId) || String(row.status || "Not Available") : String(row.status || "Not Available");
         const displayStatus = statusWithLiveMemory(baseStatus, memoryRow, row.mode);
         const canForceDespawn = isDeepDesertRow && deepDesertDualEnabled
           ? [displayStatus, ...dynamicDeepDesertRows.map((deepRow) => partitionStatusById.get(String(deepRow.partitionId || "")) || String(deepRow.status || ""))].some((status) => mapCanForceDespawn({ status }))
@@ -1190,7 +1192,7 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
             const passwordTouched = Boolean(sietchPasswordTouched[sietch.partitionId]);
             const childDirty = childMemoryDirty || draft.displayName !== sietch.displayName || sietchPasswordDraftChanged(sietch, draft, passwordTouched);
             const childMemoryRow = memoryForMap(liveMemory, "Survival_1", { ...row, partitionId: sietch.partitionId });
-            const childStatus = statusWithLiveMemory(readinessStatusByPartitionId.get(sietch.partitionId) || partitionStatusById.get(sietch.partitionId) || (sietch.active ? String(row.status || "Not Available") : "Not Running"), childMemoryRow, row.mode);
+            const childStatus = statusWithLiveMemory(partitionStatusById.get(sietch.partitionId) || readinessStatusByPartitionId.get(sietch.partitionId) || (sietch.active ? String(row.status || "Not Available") : "Not Running"), childMemoryRow, row.mode);
             const childResultActive = mapsResultTarget === mapResultTarget("Survival_1", sietch.partitionId);
             const childMapSettingsResultActive = Boolean(childResultActive && mapsResult && mapsResultScope === "maps" && isMapSettingsResult(mapsResult));
             return <Fragment key={`sietch-${sietch.partitionId}`}><tr className="sietch-child-row"><td><span className="sietch-child-name"><SietchName sietch={sietch} draft={draft} /></span><span className="sietch-child-meta">Partition {sietch.partitionId} / Dimension {sietch.dimension}</span></td><td><MapRuntimeStatus value={childStatus} /></td><td>Sietch</td><td>{sietch.active ? <MemoryUsageBar row={childMemoryRow} fallback={liveMemoryFallback(row)} configuredLimit={sietchMemory} /> : <span className="muted">Unallocated</span>}</td><td className="actions-column"><button className="stable-action-button" onClick={() => selectSietch(sietch)}>{childSelected ? "Close" : "Edit"}</button></td></tr>
@@ -1781,7 +1783,7 @@ function mapRuntimeStatus(row: { assignedServer?: unknown; ready?: unknown; aliv
   const assigned = Boolean(String(row.assignedServer || "").trim());
   const ready = isTruthyDbValue(row.ready);
   const alive = isTruthyDbValue(row.alive);
-  if (ready) return "Ready";
+  if (ready && alive) return "Ready";
   if (alive) return "Loading";
   if (assigned) return "Starting";
   return "Not Running";
