@@ -698,6 +698,8 @@ fi
 if [ "$MAP_NAME" != "Survival_1" ]; then
   if [ "${DUNE_SYNC_NETWORK_STATE_AFTER_SPAWN:-0}" = "1" ]; then
     runtime/scripts/publish-network-server-state-overrides.sh map "$MAP_NAME" >/dev/null 2>&1 || true
+  elif pgrep -f "publish-network-server-state-overrides.sh loop" >/dev/null 2>&1; then
+    timeout 20 runtime/scripts/publish-network-server-state-overrides.sh map "$MAP_NAME" >/dev/null 2>&1 || true
   else
     (
       trap - EXIT
