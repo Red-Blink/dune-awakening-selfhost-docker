@@ -57,8 +57,6 @@ button.refresh-status-button.refreshing:disabled {
   color: #fff1d4;
   border-color: #d49a5c;
   background: #2f2519;
-  box-shadow: 0 0 0 1px rgba(212, 154, 92, .24), 0 0 18px rgba(212, 154, 92, .34);
-  animation: refreshButtonGlow 1.35s ease-in-out infinite;
 }
 .icon-toggle-button { width: 38px; height: 38px; padding: 8px; flex: 0 0 38px; }
 .switch-toggle,
@@ -706,10 +704,6 @@ main { padding: 22px; min-width: 0; }
   50% { content: ".."; }
   75%, 100% { content: "..."; }
 }
-@keyframes refreshButtonGlow {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(212, 154, 92, .2), 0 0 14px rgba(212, 154, 92, .26); }
-  50% { box-shadow: 0 0 0 1px rgba(255, 208, 138, .34), 0 0 26px rgba(255, 208, 138, .48); }
-}
 @keyframes sandField {
   from { transform: translate3d(0, 0, 0); opacity: .95; }
   45% { opacity: .68; }
@@ -748,7 +742,7 @@ main { padding: 22px; min-width: 0; }
 .badge.bad { border-color: var(--danger); color: var(--danger-text); }
 .badge-pass, .badge-succeeded { border-color: #3d8b62; color: #9be6bd; }
 .badge-warn, .badge-running { border-color: #a97932; color: #ffd08a; }
-.badge-loading { border-color: #c96f2d; color: #ffb36b; }
+.badge-loading { border-color: #a97932; color: #ffd08a; }
 .badge-fail, .badge-failed { border-color: var(--danger); color: var(--danger-text); }
 .badge-info, .badge-queued { border-color: #5983b7; color: #b6d5ff; }
 .wizard { display: grid; grid-template-columns: 250px 1fr; gap: 16px; }

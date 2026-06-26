@@ -286,7 +286,13 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
           <p>{mode === "first-run"
             ? "This starts the Dune Docker deployment. The console will prepare local settings, download required server assets, update the database, and start the game services. First-time deployment can take a while, so keep this page open while the progress updates."
             : "This reapplies your server identity and Funcom token settings, then restarts the deployment flow so the console uses the updated values. Keep this page open while the progress updates."}</p>
-          <button disabled={deploymentRunning || deploymentSucceeded} onClick={init}>{deploymentSucceeded ? "Redeploy Complete" : deploymentRunning ? "Redeploying..." : mode === "first-run" ? "Start Deployment" : "Start Redeploy"}</button>
+          <button disabled={deploymentRunning || deploymentSucceeded} onClick={init}>
+            {deploymentSucceeded
+              ? mode === "first-run" ? "Deployment Complete" : "Redeploy Complete"
+              : deploymentRunning
+                ? mode === "first-run" ? "Deploying..." : "Redeploying..."
+                : mode === "first-run" ? "Start Deployment" : "Start Redeploy"}
+          </button>
           <TaskProgress task={task} />
           {deploymentSucceeded && <p className="success-note">{mode === "first-run" ? "Deployment was successful." : "Redeploy was successful."} Opening the finish step.</p>}
         </>}

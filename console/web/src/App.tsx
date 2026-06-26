@@ -301,7 +301,7 @@ export function App() {
         setHomeTaskResult({ status: "stopped", title: "Server Stopped" });
         setHomeRunningAction("");
       } else if ((homeRunningAction === "start" || homeRunningAction === "restart") && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText)) {
-        setHomeTaskResult({ status: "succeeded", title: homeRunningAction === "start" ? "Server Started Successfully" : "Server Restarted Successfully" });
+        setHomeTaskResult({ status: "succeeded", title: homeRunningAction === "start" ? "Server Started Successfully" : "Battlegroup Restarted Successfully" });
         setHomeRunningAction("");
       }
     }
