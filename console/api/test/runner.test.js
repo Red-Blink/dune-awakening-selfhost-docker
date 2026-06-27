@@ -127,6 +127,18 @@ test("does not respawn maps when changing a running map to disabled", () => {
   ]);
 });
 
+test("saves map memory before applying a mode that can spawn the map", () => {
+  assert.deepEqual(taskOperations("mapsApplySettings", {
+    memoryChanged: true,
+    modeChanged: true,
+    mode: "always-on",
+    restartMode: "none"
+  }), [
+    "memorySetNoRestart",
+    "mapsSetMode"
+  ]);
+});
+
 test("parses RedBlink vehicle-list output into vehicles and templates", () => {
   const output = `Sandbike
 actor: /Game/Dune/Systems/Vehicles/Blueprints/GroundVehicles/BP_Sandbike_CHOAM.BP_Sandbike_CHOAM_C

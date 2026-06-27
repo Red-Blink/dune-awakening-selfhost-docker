@@ -64,7 +64,7 @@ export function PlayersPanel({ onError, renderCharacterAdmin }: PlayersPanelProp
       <div className="action-row"><input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search character, FLS ID, account id, or actor id" /><button onClick={() => void load(playerFilter)}>Search</button></div>
       <DataTable rows={rows} columns={["actor_id", "character_name", "account_id", "last_seen", "online_status", "map", "fls_id"]} tableClassName="players-table" onRowClick={open} emptyMessage={playersEmptyMessage} renderCell={(row, col) => {
         if (col === "online_status") return <PlayerStatusCell value={row[col]} />;
-        if (col === "last_seen") return formatLastOnline(row[col]);
+        if (col === "last_seen") return formatLastOnline(row);
         return formatCell(row[col]);
       }} />
       {selected && renderCharacterAdmin({
@@ -80,8 +80,9 @@ export function PlayersPanel({ onError, renderCharacterAdmin }: PlayersPanelProp
   );
 }
 
-function formatLastOnline(value: unknown) {
-  const date = parseLastOnline(value);
+function formatLastOnline(row: Record<string, unknown>) {
+  if (String(row.online_status || "").toLowerCase() === "online") return "Currently Active";
+  const date = parseLastOnline(row.last_seen);
   if (!date) return "Unavailable";
   const absolute = new Intl.DateTimeFormat(undefined, {
     year: "numeric",

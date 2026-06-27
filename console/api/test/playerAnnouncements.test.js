@@ -28,7 +28,8 @@ function player(name = "John", id = "ABCDEF1234567890") {
     action_player_id: id,
     fls_id: id,
     character_name: name,
-    online_status: "Online"
+    online_status: "Online",
+    map: "Survival_1"
   };
 }
 
@@ -36,11 +37,12 @@ test("player announcements default to disabled with official text", () => {
   const result = readPlayerAnnouncements(config());
   assert.equal(result.settings.joinEnabled, false);
   assert.equal(result.settings.leaveEnabled, false);
-  assert.equal(result.settings.joinMessage, "{playerName} has entered the sands of Arrakis.");
+  assert.equal(result.settings.joinMessage, "{playerName} has entered {mapName}, their trail fresh upon the sands.");
 });
 
 test("player announcements validate booleans and templates", () => {
   assert.equal(normalizeSettings({ joinEnabled: true, joinMessage: "{playerName} joined", leaveEnabled: false, leaveMessage: "{playerName} left" }).joinEnabled, true);
+  assert.equal(normalizeSettings({ joinEnabled: true, joinMessage: "{playerName} has entered the sands of Arrakis.", leaveEnabled: true, leaveMessage: "{playerName} has vanished beyond the dunes." }).joinMessage, "{playerName} has entered {mapName}, their trail fresh upon the sands.");
   assert.throws(() => normalizeSettings({ joinEnabled: "true", joinMessage: "joined", leaveEnabled: false, leaveMessage: "left" }), /joinEnabled must be true or false/);
   assert.throws(() => normalizeSettings({ joinEnabled: true, joinMessage: "", leaveEnabled: false, leaveMessage: "left" }), /Join message is required/);
 });
@@ -53,7 +55,7 @@ test("player announcements save and restore persisted settings", () => {
 
   const restored = restorePlayerAnnouncements(cfg);
   assert.equal(restored.settings.joinEnabled, false);
-  assert.equal(restored.settings.leaveMessage, "{playerName} has vanished beyond the dunes.");
+  assert.equal(restored.settings.leaveMessage, "{playerName} has vanished from {mapName}, their tracks swallowed by the dunes.");
 });
 
 test("player announcements publish join and leave events from online state changes", async () => {
@@ -88,6 +90,29 @@ test("player announcements report leave events even when nobody remains online",
   assert.equal(left.results[0].reason, "no_online_recipients");
 });
 
+test("player announcements render map names and target the matching map only", async () => {
+  const cfg = config();
+  savePlayerAnnouncements(cfg, {
+    joinEnabled: true,
+    joinMessage: "{playerName} entered {mapName}",
+    leaveEnabled: true,
+    leaveMessage: "{playerName} left {mapName}"
+  });
+  primePlayerAnnouncementOnlineState(cfg, [player("John")]);
+
+  const jane = player("Jane", "1234567890ABCDEF");
+  jane.map = "Overmap";
+  const overlandJoin = await runPlayerAnnouncementScan(cfg, [player("John"), jane], { mockMode: true });
+  assert.equal(overlandJoin.joined, 1);
+  assert.equal(overlandJoin.sent, 1);
+  assert.equal(overlandJoin.results[0].recipients, 1);
+
+  const janeLeft = await runPlayerAnnouncementScan(cfg, [player("John")], { mockMode: true });
+  assert.equal(janeLeft.left, 1);
+  assert.equal(janeLeft.sent, 0);
+  assert.equal(janeLeft.skippedNoRecipients, 1);
+});
+
 test("player announcements ignore offline rows", async () => {
   const cfg = config();
   savePlayerAnnouncements(cfg, { joinEnabled: true, joinMessage: "{playerName} joined", leaveEnabled: true, leaveMessage: "{playerName} left" });
@@ -115,5 +140,5 @@ test("player announcements can prime current online players after save", async (
 });
 
 test("player announcement preview renders the join template", () => {
-  assert.equal(previewPlayerAnnouncement({ joinEnabled: true, joinMessage: "{playerName} arrived", leaveEnabled: false, leaveMessage: "{playerName} left" }, "John"), "John arrived");
+  assert.equal(previewPlayerAnnouncement({ joinEnabled: true, joinMessage: "{playerName} arrived in {mapName}", leaveEnabled: false, leaveMessage: "{playerName} left" }, "John", "Overland"), "John arrived in Overland");
 });

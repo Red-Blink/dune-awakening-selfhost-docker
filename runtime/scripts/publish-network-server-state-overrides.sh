@@ -7,6 +7,7 @@ PID_FILE="runtime/generated/network-server-state-overrides.pid"
 LOG_FILE="runtime/generated/network-server-state-overrides.log"
 LOG_POINTER_FILE="runtime/generated/network-server-state-overrides-current.log"
 TEXT_ROUTER_LOG="runtime/text-router/director-current.log"
+MAP_MODES_FILE="${DUNE_MAP_MODES_FILE:-runtime/generated/map-runtime-modes.json}"
 RMQ_TIMEOUT_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_RMQ_TIMEOUT_SECONDS:-8}"
 RMQ_BINDING_CLEANUP_TIMEOUT_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_BINDING_CLEANUP_TIMEOUT_SECONDS:-2}"
 STOP_RESTORE_TIMEOUT_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_STOP_RESTORE_TIMEOUT_SECONDS:-20}"
@@ -154,15 +155,45 @@ server_state_maps() {
   " 2>/dev/null || true
 }
 
+configured_always_on_maps() {
+  [ -s "$MAP_MODES_FILE" ] || return 0
+  python3 - "$MAP_MODES_FILE" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+try:
+    data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+except Exception:
+    data = {}
+
+for map_name, config in sorted(data.get("maps", {}).items()):
+    if isinstance(config, dict) and config.get("mode") == "always-on":
+        print(map_name)
+PY
+}
+
+priority_maps() {
+  {
+    local map_name
+    for map_name in $PRIORITY_MAPS; do
+      printf '%s\n' "$map_name"
+    done
+    configured_always_on_maps
+  } | sed '/^$/d' | awk '!seen[$0]++'
+}
+
 server_state_maps_ordered() {
-  local maps map_name priority_map
+  local maps map_name priority_map priority_map_list
   maps="$(server_state_maps)"
-  for priority_map in $PRIORITY_MAPS; do
+  priority_map_list="$(priority_maps | tr '\n' ' ')"
+  while IFS= read -r priority_map; do
+    [ -n "$priority_map" ] || continue
     printf '%s\n' "$maps" | grep -Fx "$priority_map" || true
-  done
+  done < <(priority_maps)
   while IFS= read -r map_name; do
     [ -n "$map_name" ] || continue
-    case " $PRIORITY_MAPS " in
+    case " $priority_map_list " in
       *" $map_name "*) continue ;;
     esac
     printf '%s\n' "$map_name"
@@ -414,10 +445,11 @@ forward_once() {
 }
 
 server_state_maps_background() {
-  local map_name
+  local map_name priority_map_list
+  priority_map_list="$(priority_maps | tr '\n' ' ')"
   while IFS= read -r map_name; do
     [ -n "$map_name" ] || continue
-    case " $PRIORITY_MAPS " in
+    case " $priority_map_list " in
       *" $map_name "*) continue ;;
     esac
     printf '%s\n' "$map_name"
@@ -457,9 +489,10 @@ publish_snapshot_for_map() {
 
 kick_priority_maps_once() {
   local map_name
-  for map_name in $PRIORITY_MAPS; do
+  while IFS= read -r map_name; do
+    [ -n "$map_name" ] || continue
     publish_snapshot_for_map "$map_name" || true
-  done
+  done < <(priority_maps)
 }
 
 start_loop() {
@@ -468,9 +501,10 @@ start_loop() {
   trap 'restore_routes >/dev/null 2>&1 || true; rm -f "$PID_FILE"' EXIT
   local route_refresh_at=0
   local background_maps="" background_index=1 background_count=0 background_map=""
-  for priority_map in $PRIORITY_MAPS; do
+  while IFS= read -r priority_map; do
+    [ -n "$priority_map" ] || continue
     ensure_route_for_map "$priority_map" >>"$LOG_FILE" 2>&1 || true
-  done
+  done < <(priority_maps)
   while true; do
     if [ "$(date +%s)" -ge "$route_refresh_at" ]; then
       ensure_routes >>"$LOG_FILE" 2>&1 || true

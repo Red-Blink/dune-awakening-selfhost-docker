@@ -193,8 +193,8 @@ export function taskOperations(operation, payload = {}) {
   if (operation === "restartAll") return ["stop", "start"];
   if (operation === "mapsApplySettings") {
     return [
-      ...(payload.modeChanged ? ["mapsSetMode"] : []),
       ...(payload.memoryChanged ? ["memorySetNoRestart"] : []),
+      ...(payload.modeChanged ? ["mapsSetMode"] : []),
       ...(payload.modeChanged ? restartOperations(payload) : [])
     ];
   }

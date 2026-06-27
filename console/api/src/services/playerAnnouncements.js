@@ -3,14 +3,59 @@ import { dirname, resolve } from "node:path";
 import { publishMapChat, validateBroadcastMessage } from "../rmq.js";
 import { ensureCarePackageServerPersona } from "../carePackage.js";
 
+const OLD_DEFAULT_JOIN_MESSAGE = "{playerName} has entered the sands of Arrakis.";
+const OLD_DEFAULT_LEAVE_MESSAGE = "{playerName} has vanished beyond the dunes.";
+const DEFAULT_JOIN_MESSAGE = "{playerName} has entered {mapName}, their trail fresh upon the sands.";
+const DEFAULT_LEAVE_MESSAGE = "{playerName} has vanished from {mapName}, their tracks swallowed by the dunes.";
+
 const DEFAULT_PLAYER_ANNOUNCEMENTS = {
   joinEnabled: false,
-  joinMessage: "{playerName} has entered the sands of Arrakis.",
+  joinMessage: DEFAULT_JOIN_MESSAGE,
   leaveEnabled: false,
-  leaveMessage: "{playerName} has vanished beyond the dunes."
+  leaveMessage: DEFAULT_LEAVE_MESSAGE
 };
 
 const EMPTY_STATE = { online: {} };
+const DEFAULT_CHAT_MAP = "HaggaBasin";
+const MAP_CHAT_REGIONS = {
+  Survival_1: "HaggaBasin",
+  Overmap: "Overland",
+  DeepDesert_1: "DeepDesert",
+  SH_Arrakeen: "Arrakeen",
+  SH_HarkoVillage: "HarkoVillage"
+};
+const FRIENDLY_MAP_NAMES = {
+  Survival_1: "Hagga Basin",
+  Overmap: "Overland",
+  DeepDesert_1: "Deep Desert",
+  SH_Arrakeen: "Arrakeen",
+  SH_HarkoVillage: "Harko Village",
+  CB_Story_Hephaestus: "Hephaestus",
+  CB_Story_Ecolab_Carthag: "Ecology Lab Carthag",
+  CB_Story_WaterFatManor: "Water Fat Manor",
+  Story_ProcesVerbal: "Proces Verbal",
+  DLC_Story_LostHarvest_EcolabA: "Lost Harvest Ecology Lab A",
+  DLC_Story_LostHarvest_EcolabB: "Lost Harvest Ecology Lab B",
+  DLC_Story_LostHarvest_ForgottenLab: "Lost Harvest Forgotten Lab",
+  Story_ArtOfKanly: "Art of Kanly",
+  CB_Dungeon_Hephaestus: "Hephaestus Dungeon",
+  CB_Dungeon_OldCarthag: "Old Carthag",
+  Story_Faction_Outpost_Atre: "Atreides Outpost",
+  Story_Faction_Outpost_Hark: "Harkonnen Outpost",
+  Story_HeighlinerDungeon: "Heighliner Dungeon",
+  CB_Ecolab_Bronze_Green_089: "Bronze Green Ecology Lab 089",
+  CB_Ecolab_Bronze_Green_152: "Bronze Green Ecology Lab 152",
+  CB_Ecolab_Bronze_Green_195: "Bronze Green Ecology Lab 195",
+  CB_Ecolab_Bronze_Green_024: "Bronze Green Ecology Lab 024",
+  CB_Ecolab_Bronze_Green_136: "Bronze Green Ecology Lab 136",
+  CB_Dungeon_ThePit: "The Pit",
+  CB_Overland_M_01: "Overland M-01",
+  CB_Overland_S_04: "Overland S-04",
+  CB_Overland_S_06: "Overland S-06",
+  CB_Overland_S_07: "Overland S-07",
+  CB_Overland_S_08: "Overland S-08",
+  CB_Story_BanditFortress01: "Bandit Fortress"
+};
 
 export function readPlayerAnnouncements(config) {
   return {
@@ -60,9 +105,10 @@ export async function runPlayerAnnouncementScan(config, players, context = {}) {
   let failed = 0;
   let skippedNoRecipients = 0;
   const results = [];
-  const recipients = Object.values(currentOnline).filter((player) => player.queue);
+  const onlineRecipients = Object.values(currentOnline).filter((player) => player.queue);
   for (const event of events) {
     try {
+      const recipients = eventRecipients(event, onlineRecipients);
       if (!recipients.length) {
         skippedNoRecipients += 1;
         results.push({ ok: true, skipped: true, reason: "no_online_recipients", type: event.type, player: event.player.characterName, recipients: 0 });
@@ -79,6 +125,8 @@ export async function runPlayerAnnouncementScan(config, players, context = {}) {
             message: event.message,
             senderFuncomId: persona.funcomId,
             senderHexFlsId: persona.hexFlsId,
+            mapName: event.player.chatMapName,
+            dimension: event.player.dimension,
             recipientQueue: recipient.queue
           }));
         }
@@ -104,17 +152,17 @@ export async function runPlayerAnnouncementScan(config, players, context = {}) {
   };
 }
 
-export function previewPlayerAnnouncement(settings, playerName = "John") {
+export function previewPlayerAnnouncement(settings, playerName = "John", mapName = "Hagga Basin") {
   const normalized = normalizeSettings(settings);
-  return renderPlayerMessage(normalized.joinMessage, { characterName: playerName });
+  return renderPlayerMessage(normalized.joinMessage, { characterName: playerName, mapName });
 }
 
 export function normalizeSettings(input = {}) {
   return {
     joinEnabled: normalizeBoolean(input.joinEnabled, "joinEnabled"),
-    joinMessage: normalizeTemplate(input.joinMessage, "Join message"),
+    joinMessage: normalizeTemplate(input.joinMessage, "Join message", OLD_DEFAULT_JOIN_MESSAGE, DEFAULT_JOIN_MESSAGE),
     leaveEnabled: normalizeBoolean(input.leaveEnabled, "leaveEnabled"),
-    leaveMessage: normalizeTemplate(input.leaveMessage, "Leave message")
+    leaveMessage: normalizeTemplate(input.leaveMessage, "Leave message", OLD_DEFAULT_LEAVE_MESSAGE, DEFAULT_LEAVE_MESSAGE)
   };
 }
 
@@ -148,16 +196,71 @@ function normalizePlayer(player = {}) {
   const characterName = String(player.character_name || player.characterName || player.funcom_id || player.funcomId || key).trim();
   const flsId = String(player.fls_id || player.flsId || "").trim();
   const onlineStatus = String(player.online_status || player.onlineStatus || "").trim().toLowerCase();
-  return { key, characterName, flsId, online: onlineStatus === "online", queue: flsId ? `${flsId}_queue` : "" };
+  const map = String(player.map || player.map_name || player.mapName || "").trim();
+  const dimension = normalizeDimension(player.dimension_index ?? player.dimensionIndex ?? player.dimension);
+  return {
+    key,
+    characterName,
+    flsId,
+    online: onlineStatus === "online",
+    queue: flsId ? `${flsId}_queue` : "",
+    map,
+    mapName: friendlyMapName(map),
+    chatMapName: chatMapName(map),
+    dimension
+  };
 }
 
 function renderPlayerMessage(template, player) {
-  return validateBroadcastMessage(String(template || "").replaceAll("{playerName}", player.characterName));
+  return validateBroadcastMessage(String(template || "")
+    .replaceAll("{playerName}", player.characterName)
+    .replaceAll("{mapName}", player.mapName || friendlyMapName(player.map))
+    .replaceAll("{map}", player.mapName || friendlyMapName(player.map))
+    .replaceAll("{mapId}", player.map || ""));
 }
 
-function normalizeTemplate(value, label) {
+function eventRecipients(event, onlineRecipients) {
+  if (!event.player.map) return onlineRecipients;
+  return onlineRecipients.filter((recipient) => sameMapAndDimension(recipient, event.player));
+}
+
+function sameMapAndDimension(a, b) {
+  return String(a.map || "") === String(b.map || "") && normalizeDimension(a.dimension) === normalizeDimension(b.dimension);
+}
+
+function normalizeDimension(value) {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 0 ? n : 0;
+}
+
+function friendlyMapName(map) {
+  const raw = String(map || "").trim();
+  if (!raw) return "Arrakis";
+  if (FRIENDLY_MAP_NAMES[raw]) return FRIENDLY_MAP_NAMES[raw];
+  return raw
+    .replace(/^SH_/, "")
+    .replace(/^CB_Story_/, "")
+    .replace(/^CB_Dungeon_/, "")
+    .replace(/^CB_Ecolab_/, "Ecolab_")
+    .replace(/^CB_Overland_/, "Overland_")
+    .replace(/^DLC_Story_/, "")
+    .replace(/^Story_/, "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function chatMapName(map) {
+  const raw = String(map || "").trim();
+  if (!raw) return DEFAULT_CHAT_MAP;
+  return MAP_CHAT_REGIONS[raw] || raw.replace(/^SH_/, "");
+}
+
+function normalizeTemplate(value, label, oldDefault, newDefault) {
   const raw = String(value ?? "").trim();
   if (!raw) throw new Error(`${label} is required`);
+  if (raw === oldDefault) return newDefault;
   return validateBroadcastMessage(raw);
 }
 

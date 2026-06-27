@@ -23,6 +23,9 @@ type AdminToolsPanelProps = {
   confirmAction: ConfirmAction;
 };
 
+const DEFAULT_PLAYER_JOIN_MESSAGE = "{playerName} has entered {mapName}, their trail fresh upon the sands.";
+const DEFAULT_PLAYER_LEAVE_MESSAGE = "{playerName} has vanished from {mapName}, their tracks swallowed by the dunes.";
+
 export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps) {
   const [players, setPlayers] = useState<Record<string, unknown>[]>([]);
   const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -56,8 +59,8 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
   const [broadcastDuration, setBroadcastDuration] = useState("30");
   const [messageOfTheDay, setMessageOfTheDay] = useState<MessageOfTheDaySettings>({ enabled: false, title: "", message: "" });
   const [messageOfTheDayOriginal, setMessageOfTheDayOriginal] = useState<MessageOfTheDaySettings>({ enabled: false, title: "", message: "" });
-  const [playerAnnouncements, setPlayerAnnouncements] = useState<PlayerAnnouncementSettings>({ joinEnabled: false, joinMessage: "{playerName} has entered the sands of Arrakis.", leaveEnabled: false, leaveMessage: "{playerName} has vanished beyond the dunes." });
-  const [playerAnnouncementsOriginal, setPlayerAnnouncementsOriginal] = useState<PlayerAnnouncementSettings>({ joinEnabled: false, joinMessage: "{playerName} has entered the sands of Arrakis.", leaveEnabled: false, leaveMessage: "{playerName} has vanished beyond the dunes." });
+  const [playerAnnouncements, setPlayerAnnouncements] = useState<PlayerAnnouncementSettings>({ joinEnabled: false, joinMessage: DEFAULT_PLAYER_JOIN_MESSAGE, leaveEnabled: false, leaveMessage: DEFAULT_PLAYER_LEAVE_MESSAGE });
+  const [playerAnnouncementsOriginal, setPlayerAnnouncementsOriginal] = useState<PlayerAnnouncementSettings>({ joinEnabled: false, joinMessage: DEFAULT_PLAYER_JOIN_MESSAGE, leaveEnabled: false, leaveMessage: DEFAULT_PLAYER_LEAVE_MESSAGE });
   const [mapChatOptions, setMapChatOptions] = useState<MapChatOption[]>(defaultMapChatOptions());
   const [mapChatTarget, setMapChatTarget] = useState(defaultMapChatOptions()[0]?.key || "HaggaBasin|0");
   const [mapChatBody, setMapChatBody] = useState("");
@@ -617,12 +620,12 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
             <input type="checkbox" checked={playerAnnouncements.joinEnabled} onChange={(event) => setPlayerAnnouncements((current) => ({ ...current, joinEnabled: event.target.checked }))} />
             <span>Enable Join Announcements</span>
           </label>
-          <label className="broadcast-message">Join Message<textarea rows={2} value={playerAnnouncements.joinMessage} onChange={(event) => setPlayerAnnouncements((current) => ({ ...current, joinMessage: event.target.value }))} placeholder="{playerName} has entered the sands of Arrakis." /></label>
+          <label className="broadcast-message">Join Message<textarea rows={2} value={playerAnnouncements.joinMessage} onChange={(event) => setPlayerAnnouncements((current) => ({ ...current, joinMessage: event.target.value }))} placeholder={DEFAULT_PLAYER_JOIN_MESSAGE} /></label>
           <label className="checkbox-line">
             <input type="checkbox" checked={playerAnnouncements.leaveEnabled} onChange={(event) => setPlayerAnnouncements((current) => ({ ...current, leaveEnabled: event.target.checked }))} />
             <span>Enable Leave Announcements</span>
           </label>
-          <label className="broadcast-message">Leave Message<textarea rows={2} value={playerAnnouncements.leaveMessage} onChange={(event) => setPlayerAnnouncements((current) => ({ ...current, leaveMessage: event.target.value }))} placeholder="{playerName} has vanished beyond the dunes." /></label>
+          <label className="broadcast-message">Leave Message<textarea rows={2} value={playerAnnouncements.leaveMessage} onChange={(event) => setPlayerAnnouncements((current) => ({ ...current, leaveMessage: event.target.value }))} placeholder={DEFAULT_PLAYER_LEAVE_MESSAGE} /></label>
           <div className="broadcast-controls-row">
             <button disabled={!playerAnnouncementsDirty} onClick={() => run(savePlayerAnnouncements)}>Save</button>
             <button onClick={() => run(restorePlayerAnnouncements)}>Restore Defaults</button>
