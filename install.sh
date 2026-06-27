@@ -60,7 +60,7 @@ install_docker() {
     return
   fi
 
-  step "Docker is missing. Installing Docker now."
+  step "Docker is missing. Installing Pre-requisites for Docker now."
   install_basic_tools
 
   if ! command -v curl >/dev/null 2>&1; then
