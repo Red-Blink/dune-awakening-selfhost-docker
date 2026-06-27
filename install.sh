@@ -207,6 +207,8 @@ ensure_compose() {
     need_sudo dnf install -y docker-compose-plugin
   elif command -v yum >/dev/null 2>&1; then
     need_sudo yum install -y docker-compose-plugin
+  elif command -v apk >/dev/null 2>&1; then
+    need_sudo apk add --no-cache docker-compose
   else
     echo "Docker Compose is missing and this operating system is not supported for automatic Compose installation."
     echo "Install the Docker Compose v2 plugin or use Docker Desktop, then run this installer again."
