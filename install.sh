@@ -151,21 +151,45 @@ start_docker() {
   exit 1
 }
 
+set_docker_group_access() {
+  local target_user="$1"
+
+  if ! getent group docker &>/dev/null; then
+    echo "Docker group does not exist yet — Is Docker installed?"
+    return
+  fi
+
+  if command -v usermod &>/dev/null; then
+    need_sudo usermod -aG docker "$target_user"
+  elif command -v addgroup &>/dev/null; then
+    need_sudo addgroup "$target_user" docker
+  else
+    echo "Cannot add user $target_user to the docker group automatically."
+    echo "Please manually add your user to the docker group and log out and back in."
+  fi
+}
+
 ensure_docker_group_access() {
   local target_user
   target_user="${SUDO_USER:-${USER:-}}"
+  step "Checking if User: $target_user is in the docker group."
   if [ -z "$target_user" ] || [ "$target_user" = "root" ]; then
     return
   fi
   if ! getent group docker >/dev/null 2>&1; then
+    echo "Docker group does not exist yet — Is Docker installed?"
     return
   fi
   if id -nG "$target_user" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
+    echo "User $target_user is already in the docker group."
     return
   fi
 
-  step "Allowing your user to run Docker commands later."
-  need_sudo usermod -aG docker "$target_user" || true
+  echo "$target_user is not in the docker group."
+  # TODO: (Remove once verify) Origional - need_sudo usermod -aG docker "$target_user" || true
+  set_docker_group_access "$target_user"
+  echo "User $target_user has been added to the docker group. Log out and back in for this change to take effect."
+
   DOCKER_GROUP_UPDATED=1
 }
 
