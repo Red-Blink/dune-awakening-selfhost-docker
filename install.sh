@@ -69,7 +69,18 @@ install_docker() {
     exit 1
   fi
 
-  curl -fsSL https://get.docker.com | need_sudo sh
+  step "Installing Docker now."
+ 
+  if ! error=$(curl -fsSL https://get.docker.com | need_sudo sh 2>&1); then
+  echo "$error" >&2
+    if echo "$error" | grep -qi "alpine"; then
+      step "Official Docker does not support Alpine Linux. Installing Docker from the Alpine community repository instead."
+      install_docker_alpine
+    else
+      echo "$error" >&2
+      exit 1
+    fi
+  fi
 }
 
 select_docker_command() {
