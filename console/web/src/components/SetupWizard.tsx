@@ -27,7 +27,8 @@ const redeploySteps: { id: StepId; label: string }[] = [
 const regions = ["Europe", "North America", "South America", "Asia", "Oceania", "Africa"];
 type SetupConfig = { SERVER_TITLE: string; SERVER_REGION: string; SERVER_IP: string; SERVER_IP_MODE: string; SERVER_PROVIDER: string; STEAM_APP_ID: string };
 const terminalStatuses = new Set(["succeeded", "failed", "cancelled"]);
-const completionRedirectSeconds = 5;
+const completionRedirectSeconds = 10;
+const defaultSetupConfig: SetupConfig = { SERVER_TITLE: "My Dune Server", SERVER_REGION: "Europe", SERVER_IP: "auto", SERVER_IP_MODE: "public", SERVER_PROVIDER: "dune-docker", STEAM_APP_ID: "4754530" };
 
 export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy", onSetupComplete }: { initialStep?: number; jumpNonce?: number; mode?: "first-run" | "redeploy"; onSetupComplete?: () => void }) {
   const steps = mode === "first-run" ? firstRunSteps : redeploySteps;
@@ -38,7 +39,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
   const [token, setToken] = useState("");
   const [existingToken, setExistingToken] = useState(false);
-  const [config, setConfig] = useState<SetupConfig>({ SERVER_TITLE: "My Dune Server", SERVER_REGION: "Europe", SERVER_IP: "auto", SERVER_IP_MODE: "public", SERVER_PROVIDER: "dune-docker", STEAM_APP_ID: "4754530" });
+  const [config, setConfig] = useState<SetupConfig>(defaultSetupConfig);
   const onSetupCompleteRef = useRef(onSetupComplete);
 
   useEffect(() => {
@@ -54,7 +55,9 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
   useEffect(() => {
     let cancelled = false;
     setupApi.state().then((state) => {
-      if (!cancelled) setExistingToken(Boolean(state.files?.token));
+      if (cancelled) return;
+      setExistingToken(Boolean(state.files?.token));
+      setConfig(configFromSetupState(state.serverConfig));
     }).catch(() => undefined);
     return () => { cancelled = true; };
   }, []);
@@ -283,7 +286,13 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
           <p>{mode === "first-run"
             ? "This starts the Dune Docker deployment. The console will prepare local settings, download required server assets, update the database, and start the game services. First-time deployment can take a while, so keep this page open while the progress updates."
             : "This reapplies your server identity and Funcom token settings, then restarts the deployment flow so the console uses the updated values. Keep this page open while the progress updates."}</p>
-          <button disabled={deploymentRunning || deploymentSucceeded} onClick={init}>{deploymentSucceeded ? "Redeploy Complete" : deploymentRunning ? "Redeploying..." : mode === "first-run" ? "Start Deployment" : "Start Redeploy"}</button>
+          <button disabled={deploymentRunning || deploymentSucceeded} onClick={init}>
+            {deploymentSucceeded
+              ? mode === "first-run" ? "Deployment Complete" : "Redeploy Complete"
+              : deploymentRunning
+                ? mode === "first-run" ? "Deploying..." : "Redeploying..."
+                : mode === "first-run" ? "Start Deployment" : "Start Redeploy"}
+          </button>
           <TaskProgress task={task} />
           {deploymentSucceeded && <p className="success-note">{mode === "first-run" ? "Deployment was successful." : "Redeploy was successful."} Opening the finish step.</p>}
         </>}
@@ -301,6 +310,15 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
       </div>
     </section>
   );
+}
+
+function configFromSetupState(values: Record<string, unknown> | undefined): SetupConfig {
+  const next = { ...defaultSetupConfig };
+  for (const key of Object.keys(next) as Array<keyof SetupConfig>) {
+    const value = values?.[key];
+    if (value !== undefined && String(value).trim()) next[key] = String(value);
+  }
+  return next;
 }
 
 function ReviewGrid({ items }: { items: [string, string][] }) {

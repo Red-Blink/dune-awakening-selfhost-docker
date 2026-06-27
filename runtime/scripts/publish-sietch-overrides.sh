@@ -9,6 +9,7 @@ LOG_POINTER_FILE="runtime/generated/sietch-overrides-current.log"
 TEXT_ROUTER_LOG="runtime/text-router/director-current.log"
 CONFIG_FILE="runtime/generated/sietch-config.json"
 TIMESTAMP_LEAD_SECONDS="${DUNE_SIETCH_OVERRIDE_TIMESTAMP_LEAD_SECONDS:-0}"
+RMQ_TIMEOUT_SECONDS="${DUNE_SIETCH_OVERRIDE_RMQ_TIMEOUT_SECONDS:-8}"
 
 SOURCE_EXCHANGE="completions"
 SOURCE_ROUTING_KEY="server_state.Survival_1"
@@ -49,7 +50,10 @@ prepare_runtime_generated_files() {
   : >"$current_log"
 
   LOG_FILE="$current_log"
-  echo "$LOG_FILE" >"$LOG_POINTER_FILE"
+  if [ -e "$LOG_POINTER_FILE" ] && [ ! -w "$LOG_POINTER_FILE" ]; then
+    rm -f "$LOG_POINTER_FILE" 2>/dev/null || true
+  fi
+  printf '%s\n' "$LOG_FILE" >"$LOG_POINTER_FILE" 2>/dev/null || true
 }
 
 ensure_text_router_log() {
@@ -69,21 +73,37 @@ import subprocess
 import sys
 
 log_path = Path("runtime/text-router/director-current.log")
-pattern = re.compile(r'(bgd\.[^/\s]+\.admin)/([A-Za-z0-9+/=]+) => allow administrator')
+patterns = [
+    re.compile(r'Generated new admin credentials:\s*(bgd\.[^/\s]+\.admin)\s*/\s*([A-Za-z0-9+/=]+)'),
+    re.compile(r'(bgd\.[^/\s]+\.admin)/([A-Za-z0-9+/=]+) => allow administrator'),
+]
 text = ""
 if log_path.exists():
     text = log_path.read_text(errors="ignore")
-matches = pattern.findall(text)
+matches = []
+for pattern in patterns:
+    matches = pattern.findall(text)
+    if matches:
+        break
 if not matches:
     try:
-        text = subprocess.check_output(
-            ["docker", "logs", "dune-text-router"],
-            text=True,
-            stderr=subprocess.STDOUT,
-        )
+        logs = []
+        for container in ("dune-director", "dune-text-router"):
+            try:
+                logs.append(subprocess.check_output(
+                    ["docker", "logs", container],
+                    text=True,
+                    stderr=subprocess.STDOUT,
+                ))
+            except Exception:
+                pass
+        text = "\n".join(logs)
     except Exception:
         text = ""
-    matches = pattern.findall(text)
+    for pattern in patterns:
+        matches = pattern.findall(text)
+        if matches:
+            break
 if not matches:
     sys.exit(1)
 
@@ -99,12 +119,12 @@ rmq_admin() {
   [ "${#rmq_creds[@]}" -ge 2 ] || return 1
   rmq_user="${rmq_creds[0]}"
   rmq_password="${rmq_creds[1]}"
-  docker exec dune-rmq-admin rabbitmqadmin -q -u "$rmq_user" -p "$rmq_password" "$@"
+  timeout --kill-after=2s "${RMQ_TIMEOUT_SECONDS}s" docker exec dune-rmq-admin rabbitmqadmin -q -u "$rmq_user" -p "$rmq_password" "$@"
 }
 
 rmq_delete_binding_exact() {
   local source="$1" destination="$2" routing_key="$3"
-  docker exec dune-rmq-admin rabbitmqctl eval "
+  timeout --kill-after=2s "${RMQ_TIMEOUT_SECONDS}s" docker exec dune-rmq-admin rabbitmqctl eval "
 Binding = {binding,
   {resource, <<\"/\">>, exchange, <<\"${source}\">>},
   <<\"${routing_key}\">>,
@@ -229,7 +249,9 @@ select wp.partition_id,
        wp.map,
        coalesce(wp.server_id, ''),
        coalesce(fs.ready, false),
-       coalesce(wp.label, '')
+       coalesce(wp.label, ''),
+       coalesce(host(fs.game_addr), ''),
+       coalesce(fs.game_port, 0)
 from dune.world_partition wp
 left join dune.farm_state fs on fs.server_id = wp.server_id
 where coalesce(wp.server_id, '') <> ''
@@ -289,7 +311,7 @@ defaults = {
 for line in result.stdout.splitlines():
     if not line.strip():
         continue
-    partition_id, map_name, server_id, ready, label = line.split("\t")
+    partition_id, map_name, server_id, ready, label, game_addr, game_port = line.split("\t")
     effective_ready = ready.lower() in ("t", "true", "1")
     if partition_id == "1" and survival_log_ready:
         effective_ready = True
@@ -310,7 +332,11 @@ for line in result.stdout.splitlines():
         "players": [],
         "serverGameplaySettings": json.loads(json.dumps(defaults)),
     }
-    payload["loginPassword"] = password if password else None
+    if game_addr:
+        payload["ip"] = game_addr
+    if game_port and game_port != "0":
+        payload["port"] = int(game_port)
+    payload["loginPassword"] = password if password else ""
     payload["serverGameplaySettings"]["CoreSettings"]["serverDisplayName"] = display_name
     print(json.dumps(payload, separators=(",", ":")))
 PY
@@ -352,12 +378,30 @@ label_rows_raw = subprocess.check_output([
     "-U", "postgres", "-d", "dune", "-At", "-F", "\t",
     "-c", "select partition_id, coalesce(label, '') from dune.world_partition where lower(map)=lower('Survival_1');"
 ], text=True)
+endpoint_rows_raw = subprocess.check_output([
+    "docker", "exec", "dune-postgres", "psql",
+    "-U", "postgres", "-d", "dune", "-At", "-F", "\t",
+    "-c", """
+      select wp.partition_id,
+             coalesce(host(fs.game_addr), ''),
+             coalesce(fs.game_port, 0)
+      from dune.world_partition wp
+      left join dune.farm_state fs on fs.server_id = wp.server_id
+      where lower(wp.map)=lower('Survival_1');
+    """
+], text=True)
 label_by_partition = {}
 for line in label_rows_raw.splitlines():
     if not line.strip():
         continue
     partition_id, label = line.split("\t", 1)
     label_by_partition[partition_id] = label
+endpoint_by_partition = {}
+for line in endpoint_rows_raw.splitlines():
+    if not line.strip():
+        continue
+    partition_id, game_addr, game_port = line.split("\t", 2)
+    endpoint_by_partition[partition_id] = (game_addr, game_port)
 
 for message in messages:
     payload = json.loads(message["payload"])
@@ -371,8 +415,13 @@ for message in messages:
         if label:
             display_name = label if label.lower().startswith("sietch ") else f"Sietch {label}"
     password = cfg.get("password", "")
+    game_addr, game_port = endpoint_by_partition.get(partition_id, ("", "0"))
+    if game_addr:
+        payload["ip"] = game_addr
+    if game_port and game_port != "0":
+        payload["port"] = int(game_port)
     payload["displayName"] = display_name
-    payload["loginPassword"] = password if password else None
+    payload["loginPassword"] = password if password else ""
     payload["isStartingMap"] = True
     gameplay = payload.setdefault("serverGameplaySettings", {})
     core = gameplay.setdefault("CoreSettings", {})

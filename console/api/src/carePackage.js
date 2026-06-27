@@ -16,6 +16,15 @@ const CARE_PACKAGE_SERVER_PERSONA = {
   playerStateId: "900000202",
   playerPawnId: "900000203"
 };
+export const MESSAGE_OF_THE_DAY_PERSONA = {
+  accountId: "9000003",
+  funcomId: "MessageOfTheDay#0001",
+  hexFlsId: "A5C0DE5E12A00002",
+  displayName: "Message of the Day",
+  playerControllerId: "900000301",
+  playerStateId: "900000302",
+  playerPawnId: "900000303"
+};
 const DEFAULT_KIT = {
   id: DEFAULT_KIT_ID,
   name: "Care Package",
@@ -71,15 +80,27 @@ export function carePackageHistory(config, limit = 100) {
   const safeLimit = Math.max(1, Math.min(Number(limit) || 100, 500));
   const file = grantsPath(config);
   if (!existsSync(file)) return { rows: [] };
-  const rows = readFileSync(file, "utf8")
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((line) => JSON.parse(line))
+  const rows = readCarePackageGrantRows(file)
     .map(normalizeHistoryRow)
     .filter((row) => String(row.status || "").toLowerCase() !== "skipped")
     .slice(-safeLimit)
     .reverse();
   return { rows };
+}
+
+function readCarePackageGrantRows(file) {
+  return readFileSync(file, "utf8")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.includes("\u0000"))
+    .map((line) => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
 }
 
 export function clearCarePackageHistory(config) {
@@ -684,54 +705,62 @@ function resolveWelcomeWhisperRecipient(playerId, body = {}) {
 }
 
 export async function ensureCarePackageServerPersona(db) {
-  if (!db?.query) throw new Error("Care Package message whisper cannot be sent: database is unavailable for Server persona setup");
+  return ensureSyntheticWhisperPersona(db, CARE_PACKAGE_SERVER_PERSONA, "Care Package message whisper");
+}
+
+export async function ensureMessageOfTheDayPersona(db) {
+  return ensureSyntheticWhisperPersona(db, MESSAGE_OF_THE_DAY_PERSONA, "Message of the Day whisper");
+}
+
+async function ensureSyntheticWhisperPersona(db, persona, label) {
+  if (!db?.query) throw new Error(`${label} cannot be sent: database is unavailable for ${persona.displayName} persona setup`);
   const encryptedColumns = await tableColumns(db, "encrypted_accounts");
   if (encryptedColumns.has("id")) {
-    const encryptedValues = [["id", CARE_PACKAGE_SERVER_PERSONA.accountId]];
-    if (encryptedColumns.has("user")) encryptedValues.push(["user", CARE_PACKAGE_SERVER_PERSONA.hexFlsId]);
-    if (encryptedColumns.has("encrypted_funcom_id")) encryptedValues.push(["encrypted_funcom_id", Buffer.from(CARE_PACKAGE_SERVER_PERSONA.funcomId, "utf8")]);
+    const encryptedValues = [["id", persona.accountId]];
+    if (encryptedColumns.has("user")) encryptedValues.push(["user", persona.hexFlsId]);
+    if (encryptedColumns.has("encrypted_funcom_id")) encryptedValues.push(["encrypted_funcom_id", Buffer.from(persona.funcomId, "utf8")]);
     if (encryptedColumns.has("takeoverable")) encryptedValues.push(["takeoverable", false]);
     if (encryptedValues.length > 1) await upsertDuneRow(db, "encrypted_accounts", encryptedValues, "id");
   }
 
   const accountsColumns = await tableColumns(db, "accounts");
-  if (!accountsColumns.has("id")) throw new Error("Care Package message whisper cannot be sent: dune.accounts.id is unavailable for Server persona setup");
+  if (!accountsColumns.has("id")) throw new Error(`${label} cannot be sent: dune.accounts.id is unavailable for ${persona.displayName} persona setup`);
   if (await isWritableDuneRelation(db, "accounts")) {
-    const accountValues = [["id", CARE_PACKAGE_SERVER_PERSONA.accountId]];
-    if (accountsColumns.has("user")) accountValues.push(["user", CARE_PACKAGE_SERVER_PERSONA.hexFlsId]);
-    if (accountsColumns.has("funcom_id")) accountValues.push(["funcom_id", CARE_PACKAGE_SERVER_PERSONA.funcomId]);
-    if (accountsColumns.has("display_name")) accountValues.push(["display_name", CARE_PACKAGE_SERVER_PERSONA.displayName]);
-    if (accountsColumns.has("name")) accountValues.push(["name", CARE_PACKAGE_SERVER_PERSONA.displayName]);
-    if (accountValues.length < 2) throw new Error("Care Package message whisper cannot be sent: dune.accounts has no Funcom ID column for Server persona setup");
+    const accountValues = [["id", persona.accountId]];
+    if (accountsColumns.has("user")) accountValues.push(["user", persona.hexFlsId]);
+    if (accountsColumns.has("funcom_id")) accountValues.push(["funcom_id", persona.funcomId]);
+    if (accountsColumns.has("display_name")) accountValues.push(["display_name", persona.displayName]);
+    if (accountsColumns.has("name")) accountValues.push(["name", persona.displayName]);
+    if (accountValues.length < 2) throw new Error(`${label} cannot be sent: dune.accounts has no Funcom ID column for ${persona.displayName} persona setup`);
     await upsertDuneRow(db, "accounts", accountValues, "id");
   } else if (!encryptedColumns.has("encrypted_funcom_id")) {
-    throw new Error("Care Package message whisper cannot be sent: writable Server persona account table is unavailable");
+    throw new Error(`${label} cannot be sent: writable ${persona.displayName} persona account table is unavailable`);
   }
 
   const playerStateColumns = await tableColumns(db, "player_state");
   if (playerStateColumns.has("account_id") && playerStateColumns.has("character_name") && await isWritableDuneRelation(db, "player_state")) {
     await upsertDuneRow(db, "player_state", [
-      ["account_id", CARE_PACKAGE_SERVER_PERSONA.accountId],
-      ["character_name", CARE_PACKAGE_SERVER_PERSONA.displayName]
+      ["account_id", persona.accountId],
+      ["character_name", persona.displayName]
     ], "account_id").catch(() => null);
   }
-  await ensureCarePackageServerPlayerRows(db);
-  return await resolveCarePackageServerPersona(db);
+  await ensureSyntheticWhisperPersonaPlayerRows(db, persona);
+  return await resolveSyntheticWhisperPersona(db, persona, label);
 }
 
-async function ensureCarePackageServerPlayerRows(db) {
-  await ensureCarePackageServerActors(db);
+async function ensureSyntheticWhisperPersonaPlayerRows(db, persona) {
+  await ensureSyntheticWhisperPersonaActors(db, persona);
 
   const encryptedPlayerStateColumns = await tableColumns(db, "encrypted_player_state");
   if (encryptedPlayerStateColumns.has("account_id") && encryptedPlayerStateColumns.has("encrypted_character_name")) {
     const playerStateValues = [
-      ["account_id", CARE_PACKAGE_SERVER_PERSONA.accountId],
+      ["account_id", persona.accountId],
       ["encrypted_character_name", { rawSql: "dune.encrypt_user_data($VALUE)" }]
     ];
     if (encryptedPlayerStateColumns.has("last_avatar_activity")) playerStateValues.push(["last_avatar_activity", new Date(0)]);
-    if (encryptedPlayerStateColumns.has("player_controller_id")) playerStateValues.push(["player_controller_id", CARE_PACKAGE_SERVER_PERSONA.playerControllerId]);
-    if (encryptedPlayerStateColumns.has("player_pawn_id")) playerStateValues.push(["player_pawn_id", CARE_PACKAGE_SERVER_PERSONA.playerPawnId]);
-    if (encryptedPlayerStateColumns.has("player_state_id")) playerStateValues.push(["player_state_id", CARE_PACKAGE_SERVER_PERSONA.playerStateId]);
+    if (encryptedPlayerStateColumns.has("player_controller_id")) playerStateValues.push(["player_controller_id", persona.playerControllerId]);
+    if (encryptedPlayerStateColumns.has("player_pawn_id")) playerStateValues.push(["player_pawn_id", persona.playerPawnId]);
+    if (encryptedPlayerStateColumns.has("player_state_id")) playerStateValues.push(["player_state_id", persona.playerStateId]);
     if (encryptedPlayerStateColumns.has("life_state")) playerStateValues.push(["life_state", { rawSql: "$VALUE::playerlifestate", value: "Alive" }]);
     if (encryptedPlayerStateColumns.has("online_status")) playerStateValues.push(["online_status", { rawSql: "$VALUE::playerconnectionstatus", value: "Offline" }]);
     if (encryptedPlayerStateColumns.has("previous_server_partition_id")) playerStateValues.push(["previous_server_partition_id", 1]);
@@ -739,18 +768,18 @@ async function ensureCarePackageServerPlayerRows(db) {
     if (encryptedPlayerStateColumns.has("return_dimension_index")) playerStateValues.push(["return_dimension_index", 0]);
     if (encryptedPlayerStateColumns.has("home_dimension_index")) playerStateValues.push(["home_dimension_index", 0]);
     await upsertDuneRow(db, "encrypted_player_state", playerStateValues, "account_id", {
-      encrypted_character_name: CARE_PACKAGE_SERVER_PERSONA.displayName
+      encrypted_character_name: persona.displayName
     });
   }
 }
 
-async function ensureCarePackageServerActors(db) {
+async function ensureSyntheticWhisperPersonaActors(db, persona) {
   const actorColumns = await tableColumns(db, "actors");
   if (!actorColumns.has("id")) return;
   const actors = [
-    [CARE_PACKAGE_SERVER_PERSONA.playerControllerId, "/Game/Dune/Characters/Player/BP_DunePlayerController.BP_DunePlayerController_C"],
-    [CARE_PACKAGE_SERVER_PERSONA.playerStateId, "/Script/DuneSandbox.DunePlayerState"],
-    [CARE_PACKAGE_SERVER_PERSONA.playerPawnId, "/Game/Dune/Characters/Player/BP_DunePlayerCharacter.BP_DunePlayerCharacter_C"]
+    [persona.playerControllerId, "/Game/Dune/Characters/Player/BP_DunePlayerController.BP_DunePlayerController_C"],
+    [persona.playerStateId, "/Script/DuneSandbox.DunePlayerState"],
+    [persona.playerPawnId, "/Game/Dune/Characters/Player/BP_DunePlayerCharacter.BP_DunePlayerCharacter_C"]
   ];
   for (const [id, actorClass] of actors) {
     const values = [["id", id]];
@@ -760,26 +789,26 @@ async function ensureCarePackageServerActors(db) {
     if (actorColumns.has("dimension_index")) values.push(["dimension_index", 0]);
     if (actorColumns.has("gas_attributes")) values.push(["gas_attributes", {}]);
     if (actorColumns.has("properties")) values.push(["properties", {}]);
-    if (actorColumns.has("owner_account_id")) values.push(["owner_account_id", CARE_PACKAGE_SERVER_PERSONA.accountId]);
+    if (actorColumns.has("owner_account_id")) values.push(["owner_account_id", persona.accountId]);
     if (actorColumns.has("serial")) values.push(["serial", 1]);
     await upsertDuneRow(db, "actors", values, "id");
   }
 }
 
-async function resolveCarePackageServerPersona(db) {
+async function resolveSyntheticWhisperPersona(db, persona, label) {
   const result = await db.query(`
     select coalesce("user", '') as hex_fls_id,
            coalesce(funcom_id, '') as funcom_id
     from dune.accounts
     where id = $1
-    limit 1`, [CARE_PACKAGE_SERVER_PERSONA.accountId]);
+    limit 1`, [persona.accountId]);
   const row = result.rows?.[0] || {};
   const hexFlsId = String(row.hex_fls_id || "").trim();
   const funcomId = String(row.funcom_id || "").trim();
-  if (!/^[A-Fa-f0-9]{16,64}$/.test(hexFlsId)) throw new Error("Care Package message whisper cannot be sent: Server sender hex FLS ID was not resolved from the database");
-  if (!funcomId) throw new Error("Care Package message whisper cannot be sent: Server sender Funcom ID was not resolved from the database");
+  if (!/^[A-Fa-f0-9]{16,64}$/.test(hexFlsId)) throw new Error(`${label} cannot be sent: ${persona.displayName} sender hex FLS ID was not resolved from the database`);
+  if (!funcomId) throw new Error(`${label} cannot be sent: ${persona.displayName} sender Funcom ID was not resolved from the database`);
   return {
-    ...CARE_PACKAGE_SERVER_PERSONA,
+    ...persona,
     hexFlsId,
     funcomId
   };
@@ -814,10 +843,32 @@ async function upsertDuneRow(db, table, entries, conflictColumn, rawSqlValues = 
   const updates = columns
     .filter((column) => column !== conflictColumn)
     .map((column) => `${quoteIdentifier(column)} = excluded.${quoteIdentifier(column)}`);
-  await db.query(
-    `insert into dune.${quoteIdentifier(table)} (${columns.map(quoteIdentifier).join(", ")}) values (${placeholders.join(", ")}) on conflict (${quoteIdentifier(conflictColumn)}) do update set ${updates.join(", ")}`,
-    values
-  );
+  const tableName = quoteIdentifier(table);
+  const conflictName = quoteIdentifier(conflictColumn);
+  try {
+    await db.query(
+      `insert into dune.${tableName} (${columns.map(quoteIdentifier).join(", ")}) values (${placeholders.join(", ")}) on conflict (${conflictName}) do update set ${updates.join(", ")}`,
+      values
+    );
+  } catch (error) {
+    if (!/no unique or exclusion constraint matching the ON CONFLICT specification/i.test(String(error.message || error))) throw error;
+    const conflictIndex = columns.indexOf(conflictColumn);
+    if (conflictIndex < 0) throw error;
+    const assignments = entries
+      .map(([name], index) => ({ name, placeholder: placeholders[index] }))
+      .filter((entry) => entry.name !== conflictColumn)
+      .map((entry) => `${quoteIdentifier(entry.name)} = ${entry.placeholder}`);
+    if (assignments.length) {
+      await db.query(
+        `update dune.${tableName} set ${assignments.join(", ")} where ${conflictName} = ${placeholders[conflictIndex]}`,
+        values
+      );
+    }
+    await db.query(
+      `insert into dune.${tableName} (${columns.map(quoteIdentifier).join(", ")}) select ${placeholders.join(", ")} where not exists (select 1 from dune.${tableName} where ${conflictName} = ${placeholders[conflictIndex]})`,
+      values
+    );
+  }
 }
 
 function quoteIdentifier(value) {

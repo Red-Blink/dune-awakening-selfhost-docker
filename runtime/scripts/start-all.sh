@@ -14,6 +14,22 @@ if [ -f .env ]; then
 fi
 set +a
 
+run_timed_step() {
+  local label="$1"
+  shift
+  local start
+  local end
+  local elapsed
+
+  start="$(date +%s)"
+  echo
+  echo "=== $label ==="
+  "$@"
+  end="$(date +%s)"
+  elapsed=$((end - start))
+  echo "Finished: $label (${elapsed}s)"
+}
+
 MANUAL_STOP_FILE="runtime/generated/manual-stop.env"
 
 if [ -f "$MANUAL_STOP_FILE" ] && [ "${DUNE_IGNORE_MANUAL_STOP:-0}" != "1" ]; then
@@ -28,75 +44,79 @@ if [ -f "$MANUAL_STOP_FILE" ] && [ "${DUNE_IGNORE_MANUAL_STOP:-0}" != "1" ]; the
   fi
 fi
 
-echo "=== Starting Postgres ==="
-runtime/scripts/start-postgres.sh
+if [ "${DUNE_START_SKIP_POSTGRES_START:-0}" = "1" ] \
+  && docker inspect -f '{{.State.Running}}' dune-postgres 2>/dev/null | grep -qx true; then
+  echo
+  echo "=== Starting Postgres ==="
+  echo "Postgres is already running from fresh install bootstrap; keeping it online."
+else
+  run_timed_step "Starting Postgres" runtime/scripts/start-postgres.sh
+fi
 
-echo
-echo "=== Ensuring Database Is Up To Date ==="
-runtime/scripts/update-db.sh
+if [ "${DUNE_START_SKIP_DB_UPDATE:-0}" = "1" ]; then
+  echo
+  echo "=== Ensuring Database Is Up To Date ==="
+  echo "Database update already completed during fresh install bootstrap; skipping duplicate migration pass."
+else
+  run_timed_step "Ensuring Database Is Up To Date" runtime/scripts/update-db.sh
+fi
 
-echo
-echo "=== Reconciling Network Advertisement Addresses ==="
+run_timed_step "Reconciling Network Advertisement Addresses" bash -c '
 runtime/scripts/network-addresses.sh reconcile || {
   echo "Network address reconciliation could not run yet. Startup will retry after game servers register."
 }
+'
 
-echo
-echo "=== Synchronizing Sietch State ==="
+run_timed_step "Synchronizing Sietch State" bash -c '
 runtime/scripts/sietches.sh sync || {
   echo "Sietch state sync failed. Refusing to start with stale Sietch state."
   exit 1
 }
+'
 
-echo
-echo "=== Recycling Stale World Servers ==="
-runtime/scripts/recycle-world-game-servers.sh remove-stale
+run_timed_step "Recycling Stale World Servers" runtime/scripts/recycle-world-game-servers.sh remove-stale
 
-echo
-echo "=== Clearing Non-Core World Servers ==="
-runtime/scripts/recycle-world-game-servers.sh stop-noncore
+run_timed_step "Clearing Non-Core World Servers" runtime/scripts/recycle-world-game-servers.sh stop-noncore
 
-echo
-echo "=== Starting RabbitMQ ==="
-runtime/scripts/start-rabbitmq.sh
+run_timed_step "Starting RabbitMQ" runtime/scripts/start-rabbitmq.sh
 
-echo
-echo "=== Starting TextRouter ==="
-runtime/scripts/start-text-router.sh
+run_timed_step "Starting TextRouter" runtime/scripts/start-text-router.sh
 
-echo
-echo "=== Starting Director ==="
-runtime/scripts/start-director.sh
+run_timed_step "Starting Director" runtime/scripts/start-director.sh
 
-echo
-echo "=== Starting Survival_1 ==="
-runtime/scripts/start-server-survival-1.sh
+run_timed_step "Starting Survival_1" runtime/scripts/start-server-survival-1.sh
 
-echo
-echo "=== Starting Overmap ==="
-runtime/scripts/start-server-overmap.sh
+run_timed_step "Starting Overmap" runtime/scripts/start-server-overmap.sh
 
-echo
-echo "=== Repairing Chat Exchanges ==="
+run_timed_step "Repairing Chat Exchanges" bash -c '
 runtime/scripts/repair-chat-exchanges.sh || {
   echo "Guild chat exchange repair could not complete. Guild chat may be unavailable until the next repair pass."
 }
+'
 
-echo
-echo "=== Rechecking Network Advertisement Addresses ==="
+run_timed_step "Rechecking Network Advertisement Addresses" bash -c '
 runtime/scripts/network-addresses.sh reconcile || {
   echo "Network address reconciliation could not complete. Run: runtime/scripts/network-addresses.sh status"
 }
+'
 
-echo "=== Starting Sietch Override Publisher ==="
+run_timed_step "Starting Sietch Override Publisher" bash -c '
 runtime/scripts/publish-sietch-overrides.sh restart || {
   echo "Sietch override publisher did not start. Survival_1 custom browser names/passwords will not republish."
 }
+'
 
-echo "=== Starting Deep Desert Warm-Up Publisher ==="
+run_timed_step "Starting Deep Desert Warm-Up Publisher" bash -c '
 runtime/scripts/publish-deepdesert-overrides.sh restart || {
   echo "Deep Desert warm-up publisher did not start. Deep Desert may show offline instead of loading while warming."
 }
+'
+
+run_timed_step "Starting Network Server-State Publisher" bash -c '
+runtime/scripts/publish-network-server-state-overrides.sh restart || {
+  echo "Network server-state publisher did not start. Non-Survival maps may advertise the local bind IP until the next restart."
+}
+'
 
 if [ -f runtime/generated/director-deepdesert-dual.ini ]; then
   echo
@@ -104,26 +124,31 @@ if [ -f runtime/generated/director-deepdesert-dual.ini ]; then
   echo "Deep Desert dual-mode config detected. Selector names/Kanly remain client/backend-controlled."
 fi
 
-echo
-echo "=== Starting ServerGateway ==="
-runtime/scripts/start-server-gateway.sh
+run_timed_step "Starting ServerGateway" runtime/scripts/start-server-gateway.sh
 
-echo
-echo "=== Applying Local Public-IP Loopback Optimization ==="
+run_timed_step "Applying Local Public-IP Loopback Optimization" bash -c '
 runtime/scripts/local-loopback-optimize.sh || {
   echo "Local public-IP loopback optimization could not be applied. Public clients are unaffected; same-host clients may need NAT hairpin support."
 }
+'
 
-echo
-echo "=== Publishing Survival Sietch State ==="
+run_timed_step "Publishing Survival Sietch State" bash -c '
 runtime/scripts/publish-sietch-overrides.sh once || {
   echo "Could not publish the latest Survival_1 browser state snapshot."
 }
+'
 
-echo "=== Publishing Deep Desert Warm-Up State ==="
+run_timed_step "Publishing Deep Desert Warm-Up State" bash -c '
 runtime/scripts/publish-deepdesert-overrides.sh once || {
   echo "Could not publish the latest Deep Desert warm-up snapshot."
 }
+'
+
+run_timed_step "Publishing Network Server-State Snapshot" bash -c '
+runtime/scripts/publish-network-server-state-overrides.sh once || {
+  echo "Could not publish the latest non-Survival network server-state snapshot."
+}
+'
 
 if [ -f runtime/generated/director-deepdesert-dual.ini ]; then
   echo
@@ -131,12 +156,12 @@ if [ -f runtime/generated/director-deepdesert-dual.ini ]; then
   echo "Deep Desert dual-mode gameplay config is active. Selector names/Kanly remain cosmetic."
 fi
 
-echo
-echo "=== Starting Autoscaler ==="
+run_timed_step "Starting Autoscaler" bash -c '
 runtime/scripts/start-autoscaler.sh || {
   echo "Autoscaler did not start. Dynamic maps will not spawn automatically."
   echo "Check with: dune autoscaler status"
 }
+'
 
 echo
 echo "=== Scheduling Deferred Dimension Reconcile ==="

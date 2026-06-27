@@ -198,9 +198,93 @@ show_mode() {
   printf '%s\t%s\n' "$map" "$(mode_for_map "$map")"
 }
 
+container_name_for_map_partition() {
+  local map="$1"
+  local partition_id="$2"
+
+  printf 'dune-server-%s-%s\n' \
+    "$(printf '%s' "$map" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g')" \
+    "$partition_id"
+}
+
+container_age_seconds() {
+  local container="$1"
+  local started
+
+  started="$(docker inspect -f '{{.State.StartedAt}}' "$container" 2>/dev/null || true)"
+  [ -n "$started" ] || { echo 0; return 0; }
+  python3 - "$started" <<'PY'
+from datetime import datetime, timezone
+import sys
+
+raw = sys.argv[1]
+try:
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    started = datetime.fromisoformat(raw)
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    print(max(0, int((datetime.now(timezone.utc) - started).total_seconds())))
+except Exception:
+    print(0)
+PY
+}
+
+adopt_live_unassigned_server() {
+  local map="$1"
+  local partition_id="$2"
+
+  docker exec dune-postgres psql -U postgres -d dune -At -v ON_ERROR_STOP=1 -c "
+with candidate as (
+  select fs.server_id
+  from dune.farm_state fs
+  cross join (
+    select count(*) as live_unassigned
+    from dune.farm_state live
+    where live.map = '${map//\'/\'\'}'
+      and coalesce(live.alive, false) = true
+      and coalesce(live.server_id, '') <> ''
+      and not exists (
+        select 1
+        from dune.world_partition assigned
+        where assigned.server_id = live.server_id
+      )
+  ) counts
+  where fs.map = '${map//\'/\'\'}'
+    and coalesce(fs.alive, false) = true
+    and coalesce(fs.server_id, '') <> ''
+    and counts.live_unassigned = 1
+    and not exists (
+      select 1
+      from dune.world_partition assigned
+      where assigned.server_id = fs.server_id
+    )
+  order by fs.ready desc, fs.server_id
+  limit 1
+)
+update dune.world_partition wp
+set server_id = candidate.server_id
+from candidate
+where wp.partition_id = $partition_id
+  and coalesce(wp.server_id, '') = ''
+returning wp.server_id;
+  " 2>/dev/null | tr -d '\r[:space:]' || true
+}
+
+assigned_server_for_partition() {
+  local partition_id="$1"
+
+  docker exec dune-postgres psql -U postgres -d dune -At -c "
+    select coalesce(server_id, '')
+    from dune.world_partition
+    where partition_id = $partition_id
+    limit 1;
+  " 2>/dev/null | tr -d '\r[:space:]' || true
+}
+
 reconcile_map() {
   local map="$1"
-  local rows assigned running
+  local rows assigned running container age adopted
 
   require_postgres
   rows="$(docker exec dune-postgres psql -U postgres -d dune -At -F '|' -c "
@@ -218,9 +302,26 @@ reconcile_map() {
 
   while IFS='|' read -r partition_id assigned; do
     [ -n "${partition_id:-}" ] || continue
-    running="$(docker ps --format '{{.Names}}' | grep -Ec "^dune-server-$(printf '%s' "$map" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g')-${partition_id}$" || true)"
-    if [ -n "$assigned" ] || [ "$running" != "0" ]; then
+    container="$(container_name_for_map_partition "$map" "$partition_id")"
+    running="$(docker ps --format '{{.Names}}' | grep -Ec "^${container}$" || true)"
+    if [ -n "$assigned" ]; then
       echo "OK   always-on map=$map partition=$partition_id"
+      continue
+    fi
+    if [ "$running" != "0" ]; then
+      adopted="$(adopt_live_unassigned_server "$map" "$partition_id")"
+      assigned="$(assigned_server_for_partition "$partition_id")"
+      if [ -n "$assigned" ]; then
+        echo "REPAIR always-on map=$map partition=$partition_id adopted=${adopted:-$assigned}"
+        continue
+      fi
+      age="$(container_age_seconds "$container")"
+      if [ "${age:-0}" -lt 60 ] 2>/dev/null; then
+        echo "WAIT always-on map=$map partition=$partition_id container=$container assigning"
+        continue
+      fi
+      echo "REPAIR always-on map=$map partition=$partition_id restarting unassigned container=$container"
+      runtime/scripts/spawn-server.sh "$partition_id" --force
       continue
     fi
     echo "SPAWN always-on map=$map partition=$partition_id"
@@ -242,7 +343,7 @@ despawn_map() {
 
   while IFS='|' read -r partition_id assigned; do
     [ -n "${partition_id:-}" ] || continue
-    running="$(docker ps --format '{{.Names}}' | grep -Ec "^dune-server-$(printf '%s' "$map" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g')-${partition_id}$" || true)"
+    running="$(docker ps --format '{{.Names}}' | grep -Ec "^$(container_name_for_map_partition "$map" "$partition_id")$" || true)"
     if [ -z "$assigned" ] && [ "$running" = "0" ]; then
       continue
     fi

@@ -10,6 +10,7 @@ import {
   formatStackVersionLabel,
   GAME_UPDATE_TASK_KEY,
   loadPersistedUpdateTask,
+  normalizeUpdateVersion,
   parseUpdateTask,
   persistUpdateTask,
   STACK_UPDATE_TASK_KEY,
@@ -18,8 +19,9 @@ import {
 } from "./updateUtils";
 
 type HomeTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
-const STACK_UPDATE_HANDOFF_SECONDS = 60;
+const STACK_UPDATE_HANDOFF_SECONDS = 180;
 const STACK_UPDATE_REFRESH_SECONDS = 5;
+const STACK_UPDATE_EXPECTED_VERSION_KEY = "arrakis.stackUpdateExpectedVersion";
 
 type UpdatesPanelProps = {
   confirmAction: (message: string) => Promise<boolean>;
@@ -59,6 +61,8 @@ export function UpdatesPanel({
   const [autoGameTime, setAutoGameTime] = useState("05:00");
   const [autoGameResult, setAutoGameResult] = useState<HomeTaskResult | null>(null);
   const [stackUpdateNow, setStackUpdateNow] = useState(() => Date.now());
+  const [stackUpdateExpectedVersion, setStackUpdateExpectedVersion] = useState(() => loadStackUpdateExpectedVersion());
+  const [stackUpdateReadyAt, setStackUpdateReadyAt] = useState<number | null>(null);
   const autoGameValues = parseKeyValueText(autoGame?.stdout || "");
   const autoGameTimerValue = autoGameValues.systemd_timer || "";
   const autoGameTimerLabel = autoGameTimerValue ? formatTimerStatus(autoGameTimerValue) : "Not Installed";
@@ -114,6 +118,10 @@ export function UpdatesPanel({
 
   async function applyStackUpdate() {
     if (!(await confirmAction("Apply the latest console update now?"))) return;
+    const expectedVersion = String(stackStatus.latest || "").trim();
+    saveStackUpdateExpectedVersion(expectedVersion);
+    setStackUpdateExpectedVersion(expectedVersion);
+    setStackUpdateReadyAt(null);
     const response = await updatesApi.applyStack();
     setStackUpdateTask(response.task);
     persistUpdateTask(STACK_UPDATE_TASK_KEY, response.task);
@@ -244,15 +252,41 @@ export function UpdatesPanel({
     return () => window.clearInterval(id);
   }, [stackUpdateTask?.id, stackUpdateTask?.status]);
 
+  useEffect(() => {
+    if (!stackUpdateTask || !isDetachedStackUpdateTask(stackUpdateTask) || stackUpdateReadyAt !== null) return;
+    let cancelled = false;
+    const startedAt = Date.now();
+    const expectedVersion = stackUpdateExpectedVersion || stackStatus.latest || "";
+    void (async () => {
+      while (!cancelled) {
+        const state = await fetchConsoleAuthState().catch(() => null);
+        const runningVersion = String(state?.config?.version || "").trim();
+        const expected = normalizeUpdateVersion(expectedVersion);
+        const running = normalizeUpdateVersion(runningVersion);
+        if (running && (!expected || running === expected)) {
+          saveStackUpdateExpectedVersion("");
+          setStackUpdateExpectedVersion("");
+          setStackUpdateReadyAt(Date.now());
+          return;
+        }
+        const elapsed = Date.now() - startedAt;
+        await new Promise((resolvePromise) => window.setTimeout(resolvePromise, elapsed < 30000 ? 2000 : 5000));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [stackUpdateTask?.id, stackUpdateTask?.status, stackUpdateExpectedVersion, stackStatus.latest, stackUpdateReadyAt]);
+
   const stackUpdateHandoffStartedAt = stackUpdateTask ? Date.parse(stackUpdateTask.finishedAt || stackUpdateTask.startedAt || "") : NaN;
   const stackUpdateHandoffSeconds = stackUpdateTask && isDetachedStackUpdateTask(stackUpdateTask)
     ? Math.max(0, Math.floor((stackUpdateNow - (Number.isFinite(stackUpdateHandoffStartedAt) ? stackUpdateHandoffStartedAt : stackUpdateNow)) / 1000))
     : 0;
   const stackUpdateHandoffPercent = stackUpdateTask && isDetachedStackUpdateTask(stackUpdateTask)
-    ? Math.min(100, 20 + Math.floor((Math.min(stackUpdateHandoffSeconds, STACK_UPDATE_HANDOFF_SECONDS) / STACK_UPDATE_HANDOFF_SECONDS) * 80))
+    ? stackUpdateReadyAt !== null
+      ? 100
+      : Math.min(99, 20 + Math.floor((Math.min(stackUpdateHandoffSeconds, STACK_UPDATE_HANDOFF_SECONDS) / STACK_UPDATE_HANDOFF_SECONDS) * 79))
     : undefined;
-  const stackUpdateRefreshCountdown = stackUpdateTask && isDetachedStackUpdateTask(stackUpdateTask) && stackUpdateHandoffPercent === 100
-    ? Math.max(0, STACK_UPDATE_REFRESH_SECONDS - (stackUpdateHandoffSeconds - STACK_UPDATE_HANDOFF_SECONDS))
+  const stackUpdateRefreshCountdown = stackUpdateTask && isDetachedStackUpdateTask(stackUpdateTask) && stackUpdateReadyAt !== null
+    ? Math.max(0, STACK_UPDATE_REFRESH_SECONDS - Math.floor((stackUpdateNow - stackUpdateReadyAt) / 1000))
     : null;
 
   useEffect(() => {
@@ -506,7 +540,7 @@ function summarizeStackUpdateProgress(task: Task, handoffPercent?: number, refre
     if (refreshCountdown !== null) {
       return { title: "Console Update Complete", percent: 100, message: `The console update is complete. This browser will refresh in ${refreshCountdown} second${refreshCountdown === 1 ? "" : "s"}. You may need to sign in again.` };
     }
-    return { title: "Finishing Console Update", percent: Math.max(20, Math.min(99, handoffPercent || 20)), message: "The update helper is rebuilding and restarting the web console. This can take about a minute." };
+    return { title: "Finishing Console Update", percent: Math.max(20, Math.min(99, handoffPercent || 20)), message: "The update helper is rebuilding and restarting the web console. This page will wait until the rebuilt console is serving the new version." };
   }
   if (task.status === "succeeded") {
     const installedVersion = firstVersionMatch(text, [/Installed stack version:\s*([^\n]+)/i]);
@@ -522,6 +556,36 @@ function summarizeStackUpdateProgress(task: Task, handoffPercent?: number, refre
 
 function isDetachedStackUpdateTask(task: Task) {
   return task.operation === "selfUpdateApply" && task.status === "succeeded" && /Update helper started/i.test(task.logLines.map((line) => line.line).join("\n"));
+}
+
+function loadStackUpdateExpectedVersion() {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(STACK_UPDATE_EXPECTED_VERSION_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function saveStackUpdateExpectedVersion(value: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const clean = String(value || "").trim();
+    if (clean) window.localStorage.setItem(STACK_UPDATE_EXPECTED_VERSION_KEY, clean);
+    else window.localStorage.removeItem(STACK_UPDATE_EXPECTED_VERSION_KEY);
+  } catch {
+    // The visible update flow still works if localStorage is unavailable.
+  }
+}
+
+async function fetchConsoleAuthState() {
+  const response = await fetch("/api/auth/state", {
+    credentials: "include",
+    cache: "no-store",
+    headers: { accept: "application/json" }
+  });
+  if (!response.ok) throw new Error(`Console state check failed: ${response.status}`);
+  return await response.json() as { config?: { version?: string } };
 }
 
 function stackUpdatePercent(text: string) {

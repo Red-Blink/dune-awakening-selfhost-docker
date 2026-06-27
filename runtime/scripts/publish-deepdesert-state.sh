@@ -5,6 +5,7 @@ cd "$(dirname "$0")/../.."
 
 TEXT_ROUTER_LOG="runtime/text-router/director-current.log"
 CONFIG_FILE="runtime/generated/sietch-config.json"
+RMQ_TIMEOUT_SECONDS="${DUNE_DEEPDESERT_STATE_RMQ_TIMEOUT_SECONDS:-8}"
 
 ensure_text_router_log() {
   local container_log
@@ -53,7 +54,7 @@ rmq_admin() {
   [ "${#rmq_creds[@]}" -ge 2 ] || return 1
   rmq_user="${rmq_creds[0]}"
   rmq_password="${rmq_creds[1]}"
-  docker exec dune-rmq-admin rabbitmqadmin -q -u "$rmq_user" -p "$rmq_password" "$@"
+  timeout --kill-after=2s "${RMQ_TIMEOUT_SECONDS}s" docker exec dune-rmq-admin rabbitmqadmin -q -u "$rmq_user" -p "$rmq_password" "$@"
 }
 
 publish_payload() {
@@ -79,6 +80,8 @@ partitions = config.get("partitions", {})
 query = """
 select wp.partition_id,
        coalesce(wp.server_id, ''),
+       coalesce(host(fs.game_addr), ''),
+       coalesce(fs.game_port, 0),
        coalesce(fs.ready, false),
        coalesce(fs.alive, false),
        coalesce(wp.label, '')
@@ -116,8 +119,10 @@ defaults = {
 for line in result.stdout.splitlines():
     if not line.strip():
         continue
-    partition_id, server_id, ready, alive, label = line.split("\t")
+    partition_id, server_id, game_addr, game_port, ready, alive, label = line.split("\t")
     if alive.lower() not in ("t", "true", "1"):
+        continue
+    if not game_addr or str(game_port) == "0":
         continue
     display_name = partitions.get(partition_id, {}).get("display_name", "")
     if not display_name:
@@ -127,6 +132,9 @@ for line in result.stdout.splitlines():
         "partitionId": int(partition_id),
         "serverId": server_id,
         "ready": ready.lower() in ("t", "true", "1"),
+        "ip": game_addr,
+        "port": int(game_port or "0"),
+        "loginPassword": "",
         "displayName": display_name,
         "isStartingMap": ready.lower() not in ("t", "true", "1"),
         "playerHardCapOverride": -1,

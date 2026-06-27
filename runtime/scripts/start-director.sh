@@ -64,6 +64,17 @@ fi
 cat > runtime/director/config/director_config.ini <<'EOF'
 [Battlegroup]
 AuthorizationPreset=BattlegroupInternal
+EOF
+
+if [ -s runtime/generated/director-character-transfer.ini ]; then
+  awk '
+    /^\[/ { next }
+    /^[[:space:]]*(;|#|$)/ { print; next }
+    { print }
+  ' runtime/generated/director-character-transfer.ini >> runtime/director/config/director_config.ini
+fi
+
+cat >> runtime/director/config/director_config.ini <<'EOF'
 
 [InstancingModes]
 Overmap=SingleServer

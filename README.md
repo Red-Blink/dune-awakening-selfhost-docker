@@ -40,7 +40,7 @@ You do not need to be a Linux expert. Start with a fresh server and the installe
 | Docker | You can start even if Docker is not ready yet. On supported Linux servers, the installer prepares Docker for you. |
 | Funcom token | You will paste this into the browser setup wizard. |
 | CPU support | The game server needs AVX/AVX2. Most modern dedicated servers and VPS plans expose this. |
-| Disk space | 100 GB or more is recommended. |
+| Disk space | 200 GB or more is recommended. |
 | Web access | Open the Web UI on port `8088` from your browser. You can use the public address or the same-network/local address shown by the installer. |
 
 Memory Guide:

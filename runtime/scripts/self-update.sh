@@ -400,6 +400,172 @@ backup_current_stack() {
     echo "from_version=$CURRENT_VERSION"
     echo "repo=$GITHUB_REPO"
   } > "$backup_dir/meta.env"
+
+  backup_local_state "$backup_dir"
+}
+
+backup_local_state() {
+  local backup_dir="$1"
+  local manifest="$backup_dir/local-state-files.txt"
+
+  : > "$manifest"
+  for path in \
+    .env \
+    runtime/generated/battlegroup.env \
+    runtime/generated/db-backup.env \
+    runtime/generated/director-character-transfer.ini \
+    runtime/generated/director-deepdesert-dual.ini \
+    runtime/generated/ip-change-restart.env \
+    runtime/generated/map-runtime-modes.json \
+    runtime/generated/memory-balancer.json \
+    runtime/generated/message-of-the-day.json \
+    runtime/generated/message-of-the-day-state.json \
+    runtime/generated/player-announcements.json \
+    runtime/generated/player-announcements-state.json \
+    runtime/generated/restart-schedule.env \
+    runtime/generated/shutdown-protection.env \
+    runtime/generated/sietch-config.json \
+    runtime/generated/update-auto.env \
+    runtime/generated/usersettings.json \
+    runtime/generated/gameplay-profile.ini \
+    runtime/generated/care-package.json \
+    runtime/generated/care-package-grants.jsonl \
+    runtime/generated/care-package-pending-returns.json \
+    runtime/addons/state.json \
+    runtime/secrets/funcom-token.txt
+  do
+    [ -e "$path" ] || continue
+    printf '%s\n' "$path" >> "$manifest"
+  done
+
+  if [ -s "$manifest" ]; then
+    tar -czf "$backup_dir/local-state.tgz" -T "$manifest"
+  else
+    rm -f "$manifest"
+  fi
+}
+
+restore_local_state_file_if_needed() {
+  local backup_dir="$1"
+  local path="$2"
+  local tmpdir
+
+  [ -s "$backup_dir/local-state.tgz" ] || return 0
+  if [ -s "$path" ]; then
+    return 0
+  fi
+
+  tmpdir="$(mktemp -d)"
+  tar -xzf "$backup_dir/local-state.tgz" -C "$tmpdir" "$path" 2>/dev/null || {
+    rm -rf "$tmpdir"
+    return 0
+  }
+  if [ -e "$tmpdir/$path" ]; then
+    mkdir -p "$(dirname "$path")"
+    cp -a "$tmpdir/$path" "$path"
+    echo "Restored local state file after update: $path"
+  fi
+  rm -rf "$tmpdir"
+}
+
+merge_env_keys_from_backup() {
+  local backup_dir="$1"
+  local path="$2"
+  local tmpdir backup_file merged
+
+  [ -s "$backup_dir/local-state.tgz" ] || return 0
+  tmpdir="$(mktemp -d)"
+  tar -xzf "$backup_dir/local-state.tgz" -C "$tmpdir" "$path" 2>/dev/null || {
+    rm -rf "$tmpdir"
+    return 0
+  }
+  backup_file="$tmpdir/$path"
+  [ -s "$backup_file" ] || {
+    rm -rf "$tmpdir"
+    return 0
+  }
+
+  mkdir -p "$(dirname "$path")"
+  [ -f "$path" ] || : > "$path"
+  merged="$(mktemp)"
+  awk -F= '
+    FNR == NR {
+      line = $0
+      if (line ~ /^[[:space:]]*($|#)/ || index(line, "=") == 0) {
+        next
+      }
+      key = $1
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+      if (!(key in backup_line)) {
+        backup_key[++backup_count] = key
+      }
+      backup_line[key] = line
+      next
+    }
+    {
+      if ($0 ~ /^[[:space:]]*($|#)/ || index($0, "=") == 0) {
+        print
+        next
+      }
+      key = $1
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+      present[key] = 1
+      if (key in backup_line) {
+        print backup_line[key]
+      } else {
+        print
+      }
+    }
+    END {
+      added = 0
+      for (i = 1; i <= backup_count; i++) {
+        key = backup_key[i]
+        if (key == "" || present[key]) continue
+        if (!added) {
+          print ""
+          print "# Restored from pre-update local state"
+          added = 1
+        }
+        print backup_line[key]
+      }
+    }
+  ' "$backup_file" "$path" > "$merged"
+  if ! cmp -s "$merged" "$path"; then
+    cp "$merged" "$path"
+    echo "Merged missing local config keys after update: $path"
+  fi
+  rm -f "$merged"
+  rm -rf "$tmpdir"
+}
+
+restore_local_state_after_install() {
+  local backup_dir="$1"
+
+  restore_local_state_file_if_needed "$backup_dir" .env
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/battlegroup.env
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/db-backup.env
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/director-character-transfer.ini
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/director-deepdesert-dual.ini
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/ip-change-restart.env
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/map-runtime-modes.json
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/memory-balancer.json
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/message-of-the-day.json
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/message-of-the-day-state.json
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/player-announcements.json
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/player-announcements-state.json
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/restart-schedule.env
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/shutdown-protection.env
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/sietch-config.json
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/update-auto.env
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/usersettings.json
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/gameplay-profile.ini
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/care-package.json
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/care-package-grants.jsonl
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/care-package-pending-returns.json
+  restore_local_state_file_if_needed "$backup_dir" runtime/addons/state.json
+  restore_local_state_file_if_needed "$backup_dir" runtime/secrets/funcom-token.txt
+  merge_env_keys_from_backup "$backup_dir" .env
+  merge_env_keys_from_backup "$backup_dir" runtime/generated/battlegroup.env
 }
 
 git_worktree_available() {
@@ -477,8 +643,91 @@ running_console_env_value() {
     2>/dev/null | awk -F= -v key="$key" '$1 == key {print $2; exit}'
 }
 
+host_repo_owner_id() {
+  local field="$1"
+  local path="${HOST_ROOT_DIR:-$ROOT_DIR}"
+
+  if command -v stat >/dev/null 2>&1; then
+    case "$field" in
+      uid)
+        stat -c '%u' "$path" 2>/dev/null || true
+        ;;
+      gid)
+        stat -c '%g' "$path" 2>/dev/null || true
+        ;;
+    esac
+  fi
+}
+
+normalize_host_owner_env() {
+  local owner_uid owner_gid
+
+  owner_uid="$(host_repo_owner_id uid)"
+  owner_gid="$(host_repo_owner_id gid)"
+
+  if [ -z "${DUNE_HOST_UID:-}" ] || { [ "${DUNE_HOST_UID:-}" = "0" ] && [ -n "$owner_uid" ] && [ "$owner_uid" != "0" ]; }; then
+    DUNE_HOST_UID="${owner_uid:-$(id -u)}"
+  fi
+  if [ -z "${DUNE_HOST_GID:-}" ] || { [ "${DUNE_HOST_GID:-}" = "0" ] && [ -n "$owner_gid" ] && [ "$owner_gid" != "0" ]; }; then
+    DUNE_HOST_GID="${owner_gid:-$(id -g)}"
+  fi
+
+  export DUNE_HOST_UID DUNE_HOST_GID
+}
+
+restore_local_state_ownership() {
+  [ -n "${DUNE_HOST_UID:-}" ] || return 0
+  [ -n "${DUNE_HOST_GID:-}" ] || return 0
+  [ "$DUNE_HOST_UID" != "0" ] || return 0
+
+  chown "$DUNE_HOST_UID:$DUNE_HOST_GID" \
+    . \
+    .env \
+    runtime/generated \
+    runtime/generated/battlegroup.env \
+    runtime/generated/db-backup.env \
+    runtime/generated/director-character-transfer.ini \
+    runtime/generated/director-deepdesert-dual.ini \
+    runtime/generated/ip-change-restart.env \
+    runtime/generated/map-runtime-modes.json \
+    runtime/generated/memory-balancer.json \
+    runtime/generated/message-of-the-day.json \
+    runtime/generated/message-of-the-day-state.json \
+    runtime/generated/player-announcements.json \
+    runtime/generated/player-announcements-state.json \
+    runtime/generated/restart-schedule.env \
+    runtime/generated/shutdown-protection.env \
+    runtime/generated/sietch-config.json \
+    runtime/generated/update-auto.env \
+    runtime/generated/usersettings.json \
+    runtime/generated/gameplay-profile.ini \
+    runtime/generated/care-package.json \
+    runtime/generated/care-package-grants.jsonl \
+    runtime/generated/care-package-pending-returns.json \
+    runtime/addons \
+    runtime/addons/state.json \
+    runtime/secrets/funcom-token.txt \
+    2>/dev/null || true
+}
+
+prepare_docker_socket_gid() {
+  if [ -z "${DOCKER_SOCKET_GID:-}" ]; then
+    DOCKER_SOCKET_GID="$(read_env_file_value DOCKER_SOCKET_GID 2>/dev/null || true)"
+  fi
+  if [ -z "${DOCKER_SOCKET_GID:-}" ]; then
+    DOCKER_SOCKET_GID="$(running_console_env_value DOCKER_SOCKET_GID 2>/dev/null || true)"
+  fi
+  if [ -z "${DOCKER_SOCKET_GID:-}" ] && [ -S /var/run/docker.sock ] && command -v stat >/dev/null 2>&1; then
+    DOCKER_SOCKET_GID="$(stat -c '%g' /var/run/docker.sock 2>/dev/null || true)"
+  fi
+  export DOCKER_SOCKET_GID="${DOCKER_SOCKET_GID:-0}"
+  persist_env_file_value DOCKER_SOCKET_GID "$DOCKER_SOCKET_GID"
+}
+
 prepare_web_console_rebuild_env() {
   local port
+  normalize_host_owner_env
+
   port="${ADMIN_BIND_PORT:-}"
   if [ -z "$port" ]; then
     port="$(read_env_file_value ADMIN_BIND_PORT 2>/dev/null || true)"
@@ -490,6 +739,11 @@ prepare_web_console_rebuild_env() {
     export ADMIN_BIND_PORT="$port"
     persist_env_file_value ADMIN_BIND_PORT "$port"
   fi
+  prepare_docker_socket_gid
+  normalize_host_owner_env
+  persist_env_file_value DUNE_HOST_UID "$DUNE_HOST_UID"
+  persist_env_file_value DUNE_HOST_GID "$DUNE_HOST_GID"
+  restore_local_state_ownership
 }
 
 rebuild_web_console_now() {
@@ -506,6 +760,8 @@ rebuild_web_console_with_helper() {
   local compose_project="${DUNE_COMPOSE_PROJECT_NAME:-dune-awakening-selfhost-docker}"
   local helper_image="${DUNE_SYSTEMD_HELPER_IMAGE:-redblink-dune-docker-console:dev}"
 
+  prepare_web_console_rebuild_env
+
   docker run --rm -d \
     --name "$helper_name" \
     --network host \
@@ -514,6 +770,7 @@ rebuild_web_console_with_helper() {
     -e "DUNE_HOST_REPO_ROOT=$HOST_ROOT_DIR" \
     -e "COMPOSE_PROJECT_NAME=$compose_project" \
     -e "DUNE_COMPOSE_PROJECT_NAME=$compose_project" \
+    -e "DOCKER_SOCKET_GID=${DOCKER_SOCKET_GID:-0}" \
     -w /repo \
     "$helper_image" \
     sh -lc "sleep 2; runtime/scripts/self-update.sh rebuild-web-console '$service' >> runtime/generated/web-console-rebuild.log 2>&1"
@@ -604,6 +861,7 @@ install_release_tag_with_git() {
   echo "Resetting stack checkout to release tag:"
   echo "  $tag ($target)"
   git reset --hard "$target"
+  restore_local_state_after_install "$backup_dir"
 
   verify_installed_version "$tag" "$backup_dir" || exit 4
 }
@@ -640,6 +898,7 @@ install_release_tag_from_archive() {
     cd "$ROOT_DIR"
     tar -xf -
   )
+  restore_local_state_after_install "$backup_dir"
 
   if ! verify_installed_version "$tag" "$backup_dir"; then
     rm -rf "$tmpdir"

@@ -35,6 +35,14 @@ set_env_file_value() {
   local mode="${4:-644}"
   local tmp
 
+  if [ -e "$file" ] && [ ! -w "$file" ]; then
+    echo "Cannot update $file because it is not writable by $(id -un)." >&2
+    echo "Repair ownership from the repo root, then retry:" >&2
+    echo "  sudo chown -R \"\$USER:\$USER\" .env runtime/generated runtime/secrets runtime/backups 2>/dev/null || true" >&2
+    echo "  chmod -R u+rwX .env runtime/generated runtime/secrets runtime/backups 2>/dev/null || true" >&2
+    return 13
+  fi
+
   touch "$file"
   tmp="$(mktemp)"
   awk -F= -v key="$key" -v value="$value" '

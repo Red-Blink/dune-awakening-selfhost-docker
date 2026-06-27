@@ -19,11 +19,41 @@ APP_ID="${STEAM_APP_ID:-4754530}"
 cmd="${1:-run}"
 
 AUTO_STATE_FILE="runtime/generated/update-auto.env"
+MANUAL_STOP_FILE="runtime/generated/manual-stop.env"
 AUTO_SERVICE_NAME="dune-awakening-auto-update.service"
 AUTO_TIMER_NAME="dune-awakening-auto-update.timer"
 AUTO_SERVICE_FILE="/etc/systemd/system/$AUTO_SERVICE_NAME"
 AUTO_TIMER_FILE="/etc/systemd/system/$AUTO_TIMER_NAME"
 AUTO_DEFAULT_TIME="${DUNE_AUTO_UPDATE_TIME:-05:00}"
+
+container_running() {
+  local name="$1"
+  docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null | grep -qx true
+}
+
+dune_stack_has_running_services() {
+  docker ps --format '{{.Names}}' 2>/dev/null \
+    | grep -Eq '^dune-(postgres|rmq-admin|rmq-game|text-router|director|server-gateway|server-|autoscaler)$'
+}
+
+stop_temporary_postgres() {
+  if [ "${update_started_postgres:-0}" = "1" ] && [ "${postgres_was_running:-0}" != "1" ]; then
+    echo
+    echo "=== Stop temporary Postgres ==="
+    docker rm -f dune-postgres >/dev/null 2>&1 || true
+    echo "Postgres was started only for the update and has been stopped again."
+  fi
+}
+
+cleanup_update_state() {
+  local rc=$?
+  if [ "$rc" -ne 0 ] && [ "${stack_was_stopped:-0}" = "1" ]; then
+    stop_temporary_postgres
+  fi
+  exit "$rc"
+}
+
+trap cleanup_update_state EXIT
 
 write_auto_state() {
   local enabled="$1"
@@ -316,6 +346,23 @@ fi
   exit $?
 fi
 
+if [ "$cmd" = "fix-install-dir" ]; then
+  docker compose exec -T -u root orchestrator sh -lc '
+set -eu
+mkdir -p /srv/dune/server /srv/dune/steam /srv/dune/cache /srv/dune/generated /home/dune/.steam
+chown -R dune:dune /srv/dune /home/dune
+runuser -u dune -- sh -lc "
+  touch /srv/dune/server/.dune-write-test &&
+  rm -f /srv/dune/server/.dune-write-test &&
+  touch /srv/dune/steam/.dune-write-test &&
+  rm -f /srv/dune/steam/.dune-write-test
+"
+df -h /srv/dune/server /srv/dune/steam /srv/dune/cache
+echo "Dune install directories are writable."
+'
+  exit $?
+fi
+
 fix_steamcmd_manifest() {
   docker compose exec -T -e APP_ID="$APP_ID" orchestrator bash -lc '
 set -euo pipefail
@@ -444,6 +491,7 @@ if [ "$cmd" != "run" ] && [ "$cmd" != "apply" ] && [ "$cmd" != "install" ]; then
   echo "  dune update --yes"
   echo "  dune update install"
   echo "  dune update fix-steamcmd"
+  echo "  dune update fix-install-dir"
   echo "  dune update auto enable"
   echo "  dune update auto disable"
   echo "  dune update auto status"
@@ -493,6 +541,18 @@ if [ "$assume_yes" != "1" ]; then
   esac
 fi
 
+postgres_was_running=0
+update_started_postgres=0
+stack_was_stopped=0
+
+if container_running dune-postgres; then
+  postgres_was_running=1
+fi
+
+if [ -f "$MANUAL_STOP_FILE" ] || ! dune_stack_has_running_services; then
+  stack_was_stopped=1
+fi
+
 echo
 echo "=== Check Docker volume free space ==="
 docker compose exec -T \
@@ -501,6 +561,13 @@ docker compose exec -T \
   orchestrator dune preflight
 
 if [ "$cmd" != "install" ]; then
+  if [ "$postgres_was_running" != "1" ]; then
+    echo
+    echo "=== Start Postgres for update backup ==="
+    runtime/scripts/start-postgres.sh
+    update_started_postgres=1
+  fi
+
   echo
   echo "=== Create pre-update database backup ==="
   DB_BACKUP_ORIGIN=pre-update runtime/scripts/db.sh backup
@@ -518,6 +585,7 @@ steam_max_attempts="${DUNE_STEAMCMD_MAX_ATTEMPTS:-3}"
 steam_retry_sleep="${DUNE_STEAMCMD_RETRY_SLEEP:-20}"
 steam_ok=0
 steam_manifest_fix_applied=0
+steam_install_dir_hint=0
 
 while [ "$steam_attempt" -le "$steam_max_attempts" ]; do
   echo
@@ -536,6 +604,10 @@ while [ "$steam_attempt" -le "$steam_max_attempts" ]; do
   fi
 
   echo
+  if grep -Eiq "force_install_dir|install[[:space:]_-]*dir|install folder|permission denied|disk write failure|not enough disk|no space left" "$steam_log"; then
+    steam_install_dir_hint=1
+  fi
+
   if [ "$steam_manifest_fix_applied" = "0" ] && grep -Eiq "App '[^']+' state is 0x6|appmanifest_${APP_ID}\.acf|SteamCMD cache/metadata is stale" "$steam_log"; then
     echo "Detected a common SteamCMD cache error while downloading the server files."
     echo "Applying the automatic SteamCMD fix now, then retrying the update."
@@ -566,9 +638,20 @@ done
 if [ "$steam_ok" != "1" ]; then
   echo
   echo "SteamCMD failed after $steam_max_attempts attempts."
+  if [ "$steam_install_dir_hint" = "1" ]; then
+    echo
+    echo "The SteamCMD output points to an install directory, permission, or disk-space problem."
+    echo "The Dune server files are installed inside the orchestrator at:"
+    echo "  /srv/dune/server"
+    echo
+    echo "Recommended repair:"
+    echo "  docker exec -u root dune-orchestrator sh -lc 'chown -R dune:dune /srv/dune /home/dune'"
+    echo "  docker exec dune-orchestrator df -h /srv/dune/server /srv/dune/steam /srv/dune/cache"
+  fi
   echo
   echo "Most common fresh-install causes:"
   echo "  - Docker volume storage has too little free disk space."
+  echo "  - Docker volumes were restored or created with the wrong owner."
   echo "  - Steam temporarily rejected the anonymous depot request."
   echo "  - SteamCMD cache/metadata is stale after a Steam-side app change."
   echo
@@ -651,11 +734,17 @@ echo
 echo "=== Refresh generated map catalogs ==="
 runtime/scripts/extract-partition-catalog.sh
 runtime/scripts/extract-server-catalog.sh
+echo "Generated map catalogs refreshed."
 
 echo
 if [ "$cmd" = "install" ]; then
   echo "Install/bootstrap step finished."
   echo "The caller can now start the Dune stack."
+elif [ "$stack_was_stopped" = "1" ]; then
+  echo "Update finished."
+  echo
+  echo "The battlegroup was stopped before the update, so it will remain stopped."
+  stop_temporary_postgres
 else
   echo "Update finished."
   echo

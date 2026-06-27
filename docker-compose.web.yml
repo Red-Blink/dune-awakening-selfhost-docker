@@ -8,9 +8,12 @@ services:
     image: redblink-dune-docker-console:dev
     container_name: redblink-dune-docker-console
     restart: unless-stopped
+    user: "${DUNE_HOST_UID:-0}:${DUNE_HOST_GID:-0}"
     # Host networking lets the console reach RedBlink defaults such as
     # Postgres on 127.0.0.1:15432 and bind ADMIN_BIND_PORT directly.
     network_mode: host
+    group_add:
+      - "${DOCKER_SOCKET_GID:-0}"
     environment:
       DUNE_DOCKER_DIR: /repo
       DUNE_CONTAINER_REPO_ROOT: /repo

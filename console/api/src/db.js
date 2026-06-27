@@ -27,6 +27,9 @@ export function createDb(config) {
     query_timeout: Number(process.env.ADMIN_DB_QUERY_TIMEOUT_MS || 15000),
     statement_timeout: Number(process.env.ADMIN_DB_STATEMENT_TIMEOUT_MS || 15000)
   });
+  pool.on("error", (error) => {
+    console.warn(`Database connection interrupted: ${redactDbError(error)}`);
+  });
 
   async function query(text, values = []) {
     try {

@@ -78,6 +78,15 @@ export function buildDuneArgs(operation, payload = {}) {
       return ["restart", validateServiceName(payload.service)];
     case "serverTitle":
       return ["config", "title", validateServerTitle(payload.title), "--yes"];
+    case "serverConfig":
+      {
+        const args = ["config", "server-settings"];
+        if (payload.title !== undefined) args.push("--title", validateServerTitle(payload.title));
+        if (payload.mode !== undefined) args.push("--mode", validateServerMode(payload.mode));
+        if (args.length === 2) throw new Error("No server configuration changes were provided");
+        args.push("--yes");
+        return args;
+      }
     case "restartScheduleEnable":
       return ["restart-schedule", "enable", validateUpdateTime(payload.time || "05:00"), String(validateInteger(payload.notifyMinutes ?? 15, 1, 1440))];
     case "ipChangeRestartEnable":
@@ -131,6 +140,8 @@ export function buildDuneArgs(operation, payload = {}) {
       return ["admin", "kick", validatePlayerId(payload.playerId), "--yes", "--force"];
     case "adminKickAllOnline":
       return ["admin", "kick", "--all-online", "--yes"];
+    case "adminRepairLoginQueue":
+      return ["admin", "repair-login-queue", validatePlayerId(payload.playerId), "--yes", "--force"];
     case "adminTeleport":
       return [
         "admin",
@@ -299,12 +310,12 @@ export function runDune(config, args, options = {}) {
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk) => {
-      const text = redact(chunk.toString());
+      const text = options.redactOutput === false ? chunk.toString() : redact(chunk.toString());
       stdout += text;
       options.onLine?.(text, "stdout");
     });
     child.stderr.on("data", (chunk) => {
-      const text = redact(chunk.toString());
+      const text = options.redactOutput === false ? chunk.toString() : redact(chunk.toString());
       stderr += text;
       options.onLine?.(text, "stderr");
     });
@@ -422,6 +433,12 @@ function validateServerTitle(value) {
   if (raw.length > 80) throw new Error("Server title must be 80 characters or fewer");
   if (/[\r\n]/.test(raw)) throw new Error("Server title cannot contain line breaks");
   return raw;
+}
+
+function validateServerMode(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === "public" || raw === "local") return raw;
+  throw new Error("Server mode must be public or local");
 }
 
 function validatePlayerId(value) {

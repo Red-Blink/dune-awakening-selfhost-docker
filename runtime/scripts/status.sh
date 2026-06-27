@@ -12,6 +12,8 @@ source runtime/scripts/runtime-env.sh
 issue=0
 warming=0
 rmq_game_connections_cache="__unset__"
+udp_check_retries="${DUNE_STATUS_UDP_CHECK_RETRIES:-3}"
+udp_check_retry_sleep="${DUNE_STATUS_UDP_CHECK_RETRY_SLEEP:-0.25}"
 
 config_value() {
   local file="$1"
@@ -74,22 +76,35 @@ container_logs_have_udp_listener() {
   [ -n "$container" ] || return 1
   is_running "$container" || return 1
 
-  docker logs "$container" 2>&1 \
+  docker logs --tail 4000 "$container" 2>&1 \
     | grep -Eq "listening for (Clients|Servers) on [0-9.]+:${port}\\b"
+}
+
+udp_socket_listening() {
+  local port="$1"
+  ss -lnup 2>/dev/null | grep -q ":$port "
 }
 
 check_udp() {
   local port="$1"
   local container="${2:-}"
+  local attempt
 
-  if ss -lnup 2>/dev/null | grep -q ":$port "; then
+  for ((attempt = 1; attempt <= udp_check_retries; attempt++)); do
+    if udp_socket_listening "$port"; then
+      echo "OK"
+      return
+    fi
+    [ "$attempt" -lt "$udp_check_retries" ] && sleep "$udp_check_retry_sleep"
+  done
+
+  if container_logs_have_udp_listener "$container" "$port"; then
     echo "OK"
-  elif container_logs_have_udp_listener "$container" "$port"; then
-    echo "OK"
-  else
-    issue=1
-    echo "MISSING"
+    return
   fi
+
+  issue=1
+  echo "MISSING"
 }
 
 map_state() {

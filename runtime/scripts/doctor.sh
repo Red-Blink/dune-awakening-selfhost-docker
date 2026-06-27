@@ -147,7 +147,8 @@ check_udp "$((igw_port_base + 1))" "Overmap server-to-server"
 
 echo
 echo "=== Steam server files ==="
-app_id="$(config_value .env STEAM_APP_ID || echo "${STEAM_APP_ID:-4754530}")"
+app_id="$(config_value .env STEAM_APP_ID || true)"
+app_id="${app_id:-${STEAM_APP_ID:-4754530}}"
 if is_running dune-orchestrator; then
   if docker compose exec -T orchestrator test -f "/srv/dune/server/steamapps/appmanifest_${app_id}.acf" 2>/dev/null; then
     ok "Steam appmanifest found for app $app_id"
@@ -219,7 +220,11 @@ fi
 echo
 echo "=== Hosting mode hints ==="
 mode="$(config_value .env SERVER_IP_MODE || true)"
-server_ip="$(config_value .env SERVER_IP || echo unknown)"
+mode="${mode:-$(config_value runtime/generated/battlegroup.env SERVER_IP_MODE || true)}"
+mode="${mode:-${SERVER_IP_MODE:-}}"
+server_ip="$(config_value .env SERVER_IP || true)"
+server_ip="${server_ip:-$(config_value runtime/generated/battlegroup.env SERVER_IP || true)}"
+server_ip="${server_ip:-${SERVER_IP:-unknown}}"
 if [ -z "$mode" ] || [ "$mode" = "unknown" ]; then
   if printf '%s' "$server_ip" | grep -Eq '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)'; then
     mode="local"

@@ -8,9 +8,14 @@ export function formatUiSentence(value: unknown, pending = false) {
 }
 
 export function normalizeStatus(value: string) {
-  if (/ready|ok|healthy|running|up|succeeded|success|checked|found|available|enabled|connected|saved/i.test(value)) return "pass";
+  const text = String(value || "").trim();
+  if (/^ready$/i.test(text)) return "pass";
+  if (/^not running$/i.test(text)) return "fail";
+  if (/^starting$/i.test(text)) return "warn";
+  if (/^loading$/i.test(text)) return "warn";
   if (/failed|failure|error|fatal|unhealthy|down|missing|blocked|disabled/i.test(value)) return "fail";
-  if (/attention|warning|warn|not ready|starting|waiting|partial|unverified|experimental|unavailable|checking/i.test(value)) return "warn";
+  if (/attention|warning|warn|not ready|loading|starting|waiting|partial|unverified|experimental|unavailable|checking/i.test(value)) return "warn";
+  if (/ready|ok|healthy|running|up|succeeded|success|checked|found|available|enabled|connected|saved/i.test(value)) return "pass";
   return "info";
 }
 
@@ -53,6 +58,7 @@ export function friendlyColumnName(value: string) {
     character_name: "Character Name",
     account_id: "Account ID",
     action_player_id: "Admin Action ID",
+    last_seen: "Last Online",
     online_status: "Status",
     fls_id: "FLS ID",
     display_name: "Name",

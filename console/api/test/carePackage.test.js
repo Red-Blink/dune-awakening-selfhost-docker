@@ -458,6 +458,32 @@ test("care package send message fails clearly without recipient identity", async
   }
 });
 
+test("care package persona setup falls back when account_id is not a conflict key", async () => {
+  const config = tempConfig();
+  try {
+    writeCatalog(config);
+    saveCarePackageConfig(config, {
+      enabled: true,
+      version: "care-package-v1",
+      xp: 0,
+      items: [{ itemName: "Plant Fiber", quantity: 10, durability: 1 }],
+      kits: [{ id: "care-package-v1", name: "Care Package", xp: 0, items: [{ itemName: "Plant Fiber", quantity: 10, durability: 1 }], sendMessage: "Welcome" }]
+    });
+    const db = fakePersonaDb({ failEncryptedPlayerStateConflict: true });
+    const result = await grantCarePackage(config, "12345", {
+      confirmation: "GRANT CARE PACKAGE",
+      characterName: "Player",
+      funcomId: "Player#1",
+      flsId: "ABCDEF1234567890"
+    }, { db });
+    assert.equal(result.status, "granted");
+    assert.ok(db.queries.some((query) => /update dune\."encrypted_player_state"/.test(query.text)));
+    assert.ok(db.queries.some((query) => /insert into dune\."encrypted_player_state".*where not exists/s.test(query.text)));
+  } finally {
+    rmSync(config.repoRoot, { recursive: true, force: true });
+  }
+});
+
 test("care package grant partial failures records partial_failed status and summary", async () => {
   const config = tempConfig();
   try {
@@ -647,17 +673,20 @@ function writeCatalog(config) {
   ]));
 }
 
-function fakePersonaDb() {
+function fakePersonaDb(options = {}) {
   const columns = {
     accounts: ["id", "user", "funcom_id"],
     encrypted_accounts: ["id", "user", "encrypted_funcom_id", "takeoverable"],
-    player_state: ["account_id", "character_name"]
+    player_state: ["account_id", "character_name"],
+    encrypted_player_state: ["account_id", "encrypted_character_name", "online_status"]
   };
   const tableTypes = {
     accounts: "VIEW",
     encrypted_accounts: "BASE TABLE",
-    player_state: "VIEW"
+    player_state: "VIEW",
+    encrypted_player_state: "BASE TABLE"
   };
+  let failedEncryptedPlayerStateConflict = false;
   return {
     queries: [],
     async query(text, params = []) {
@@ -670,6 +699,15 @@ function fakePersonaDb() {
       }
       if (/from dune\.accounts/.test(text)) {
         return { rows: [{ hex_fls_id: "A5C0DE5E12A00001", funcom_id: "Server#0001" }] };
+      }
+      if (
+        options.failEncryptedPlayerStateConflict
+        && !failedEncryptedPlayerStateConflict
+        && /insert into dune\."encrypted_player_state"/.test(text)
+        && /on conflict \("account_id"\)/.test(text)
+      ) {
+        failedEncryptedPlayerStateConflict = true;
+        throw new Error("there is no unique or exclusion constraint matching the ON CONFLICT specification");
       }
       return { rows: [], rowCount: 1 };
     }

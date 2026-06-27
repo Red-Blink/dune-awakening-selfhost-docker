@@ -38,21 +38,26 @@ def resolve_server_ip():
     if value and value.lower() != "auto":
         return value
 
-    urls = [
-        "https://api.ipify.org",
-        "https://ifconfig.me/ip",
-    ]
-
-    for url in urls:
-        try:
-            with urllib.request.urlopen(url, timeout=10) as r:
-                ip = r.read().decode("utf-8").strip()
-                if ip:
-                    return ip
-        except Exception:
-            pass
+    for resolver in [resolve_ipify_public_ip, resolve_ifconfig_public_ip]:
+        ip = resolver()
+        if ip:
+            return ip
 
     return "UNKNOWN"
+
+def resolve_ipify_public_ip():
+    try:
+        with urllib.request.urlopen("https://api.ipify.org", timeout=10) as r:
+            return r.read().decode("utf-8").strip()
+    except Exception:
+        return ""
+
+def resolve_ifconfig_public_ip():
+    try:
+        with urllib.request.urlopen("https://ifconfig.me/ip", timeout=10) as r:
+            return r.read().decode("utf-8").strip()
+    except Exception:
+        return ""
 
 def ensure_dirs():
     for p in [DUNE_ROOT, SERVER_DIR, STEAM_DIR, GENERATED_DIR, DUNE_ROOT / "cache"]:
@@ -63,12 +68,52 @@ def ensure_dirs():
     run(["chown", "-R", "dune:dune", str(DUNE_ROOT)], check=False)
     run(["chown", "-R", "dune:dune", str(DUNE_HOME)], check=False)
 
+def verify_install_dirs_writable():
+    ensure_dirs()
+
+    checks = [
+        SERVER_DIR,
+        STEAM_DIR,
+        GENERATED_DIR,
+        DUNE_ROOT / "cache",
+        DUNE_HOME / ".steam",
+    ]
+
+    failed = []
+    for path in checks:
+        marker = path / ".dune-write-test"
+        result = run([
+            "sh",
+            "-lc",
+            f"touch {sh_quote(marker)} && rm -f {sh_quote(marker)}",
+        ], check=False, user="dune")
+        if result.returncode != 0:
+            failed.append(path)
+
+    if failed:
+        print("", flush=True)
+        print("[dune] The game update cannot write to one or more install directories.", flush=True)
+        print("[dune] SteamCMD runs as the local 'dune' user, so these paths must be writable by dune:", flush=True)
+        for path in failed:
+            print(f"[dune]   {path}", flush=True)
+        print("", flush=True)
+        print("[dune] This usually happens after Docker volumes were restored, moved, or created with the wrong owner.", flush=True)
+        print("[dune] Automatic ownership repair was attempted but did not fix every path.", flush=True)
+        print("", flush=True)
+        print("[dune] Run this on the host, then retry the update:", flush=True)
+        print("[dune]   docker exec -u root dune-orchestrator sh -lc 'chown -R dune:dune /srv/dune /home/dune'", flush=True)
+        print("[dune]   runtime/scripts/update.sh install", flush=True)
+        sys.exit(13)
+
+def sh_quote(value):
+    return "'" + str(value).replace("'", "'\"'\"'") + "'"
+
 def check_free_space():
     if os.environ.get("DUNE_SKIP_DISK_CHECK", "").strip() == "1":
         print("[dune] Disk free-space check skipped by DUNE_SKIP_DISK_CHECK=1.", flush=True)
         return
 
-    ensure_dirs()
+    verify_install_dirs_writable()
 
     required_bytes = MIN_FREE_GB * 1024 * 1024 * 1024
     paths = [DUNE_ROOT, SERVER_DIR, STEAM_DIR, GENERATED_DIR, DUNE_ROOT / "cache"]
@@ -109,7 +154,7 @@ def check_free_space():
         sys.exit(3)
 
 def ensure_steamcmd():
-    ensure_dirs()
+    verify_install_dirs_writable()
 
     steamcmd = STEAM_DIR / "steamcmd.sh"
 
@@ -138,6 +183,7 @@ def ensure_steamcmd():
 
 def download():
     ensure_steamcmd()
+    verify_install_dirs_writable()
     check_free_space()
 
     print(f"[dune] Downloading/updating Steam app {STEAM_APP_ID}", flush=True)

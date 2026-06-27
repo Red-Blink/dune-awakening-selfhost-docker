@@ -74,6 +74,68 @@ print_web_console_url() {
   echo "  http://$(detect_web_console_ip):$port"
 }
 
+persist_env_value() {
+  local key="$1"
+  local value="$2"
+  local env_file=".env"
+  local tmp_file
+
+  touch "$env_file"
+  tmp_file="$(mktemp)"
+  awk -v key="$key" -v value="$value" '
+    BEGIN { found = 0 }
+    $0 ~ "^" key "=" {
+      print key "=" value
+      found = 1
+      next
+    }
+    { print }
+    END {
+      if (!found) {
+        print key "=" value
+      }
+    }
+  ' "$env_file" >"$tmp_file"
+  mv "$tmp_file" "$env_file"
+}
+
+prepare_docker_socket_gid() {
+  if [ -z "${DOCKER_SOCKET_GID:-}" ] && [ -S /var/run/docker.sock ] && command -v stat >/dev/null 2>&1; then
+    DOCKER_SOCKET_GID="$(stat -c '%g' /var/run/docker.sock 2>/dev/null || true)"
+  fi
+  export DOCKER_SOCKET_GID="${DOCKER_SOCKET_GID:-0}"
+  persist_env_value DOCKER_SOCKET_GID "$DOCKER_SOCKET_GID"
+}
+
+command_can_sudo_reexec_safely() {
+  case "$cmd" in
+    status|ps|servers|ports|ping|ping-diagnostics|ready|logs|doctor)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+ensure_docker_access_or_reexec() {
+  [ "${DUNE_SUDO_REEXEC:-0}" != "1" ] || return 0
+  [ "$(id -u)" -ne 0 ] || return 0
+  command_can_sudo_reexec_safely || return 0
+  command -v docker >/dev/null 2>&1 || return 0
+  docker info >/dev/null 2>&1 && return 0
+  command -v sudo >/dev/null 2>&1 || return 0
+  sudo -v || return 0
+  if sudo docker info >/dev/null 2>&1; then
+    echo "Docker access for this shell is not active yet; running this dune command with sudo."
+    exec sudo env \
+      "DUNE_SUDO_REEXEC=1" \
+      "DUNE_HOST_REPO_ROOT=${DUNE_HOST_REPO_ROOT:-$(pwd -P)}" \
+      "DUNE_COMPOSE_PROJECT_NAME=${DUNE_COMPOSE_PROJECT_NAME:-dune-awakening-selfhost-docker}" \
+      "$0" "$@"
+  fi
+}
+
 start_compose_service_if_available() {
   local compose_file="$1"
   local service="$2"
@@ -97,7 +159,8 @@ start_compose_service_if_available() {
   echo "Starting $service..."
   case "$env_prefix" in
     web)
-      COMPOSE_PROJECT_NAME="${DUNE_COMPOSE_PROJECT_NAME:-dune-awakening-selfhost-docker}" DUNE_HOST_REPO_ROOT="${DUNE_HOST_REPO_ROOT:-$(pwd -P)}" docker compose -f "$compose_file" up -d --build "$service"
+      prepare_docker_socket_gid
+      COMPOSE_PROJECT_NAME="${DUNE_COMPOSE_PROJECT_NAME:-dune-awakening-selfhost-docker}" DUNE_HOST_REPO_ROOT="${DUNE_HOST_REPO_ROOT:-$(pwd -P)}" DUNE_HOST_UID="${DUNE_HOST_UID:-$(id -u)}" DUNE_HOST_GID="${DUNE_HOST_GID:-$(id -g)}" docker compose -f "$compose_file" up -d --build "$service"
       ;;
     *)
       docker compose -f "$compose_file" up -d --build "$service"
@@ -107,8 +170,10 @@ start_compose_service_if_available() {
 
 case "$cmd" in
   init|help|--help|-h) ;;
-  *) auto_repair_stack_git_state ;;
+  *) [ "${DUNE_SUDO_REEXEC:-0}" = "1" ] || auto_repair_stack_git_state ;;
 esac
+
+ensure_docker_access_or_reexec "$@"
 
 case "$cmd" in
   init)
@@ -122,6 +187,7 @@ The interactive CLI manager has moved to Dune Docker Console.
 Use dune --help to see available CLI commands for automation and troubleshooting.
 EOF
     if [ -f docker-compose.web.yml ] && command -v docker >/dev/null 2>&1; then
+      prepare_docker_socket_gid
       service="$(docker compose -f docker-compose.web.yml config --services 2>/dev/null | grep -E '^redblink-dune-docker-console$' | head -n1 || true)"
       if [ -n "$service" ]; then
         echo
@@ -130,7 +196,7 @@ EOF
           print_web_console_url
         else
           echo "Starting Dune Docker Console..."
-          if COMPOSE_PROJECT_NAME="${DUNE_COMPOSE_PROJECT_NAME:-dune-awakening-selfhost-docker}" DUNE_HOST_REPO_ROOT="${DUNE_HOST_REPO_ROOT:-$(pwd -P)}" docker compose -f docker-compose.web.yml up -d --build "$service"; then
+          if COMPOSE_PROJECT_NAME="${DUNE_COMPOSE_PROJECT_NAME:-dune-awakening-selfhost-docker}" DUNE_HOST_REPO_ROOT="${DUNE_HOST_REPO_ROOT:-$(pwd -P)}" DUNE_HOST_UID="${DUNE_HOST_UID:-$(id -u)}" DUNE_HOST_GID="${DUNE_HOST_GID:-$(id -g)}" docker compose -f docker-compose.web.yml up -d --build "$service"; then
             echo "Dune Docker Console is running."
             print_web_console_url
           else
@@ -231,6 +297,8 @@ EOF
       overmap)
         set -a; [ -f .env ] && . ./.env; set +a
         runtime/scripts/start-server-overmap.sh
+        runtime/scripts/publish-network-server-state-overrides.sh restart || true
+        runtime/scripts/publish-network-server-state-overrides.sh once || true
         ;;
       gateway|sgw)
         set -a; [ -f .env ] && . ./.env; set +a
@@ -240,6 +308,9 @@ EOF
       director|bgd)
         set -a; [ -f .env ] && . ./.env; set +a
         runtime/scripts/start-director.sh
+        runtime/scripts/publish-sietch-overrides.sh restart || true
+        runtime/scripts/publish-deepdesert-overrides.sh restart || true
+        runtime/scripts/publish-network-server-state-overrides.sh restart || true
         ;;
       text-router|tr)
         set -a; [ -f .env ] && . ./.env; set +a
@@ -385,6 +456,8 @@ Usage:
   dune maps set <map> <dynamic|always-on|overmap-active|disabled>
   dune maps reconcile
   dune deepdesert dual [status|enable|disable|bootstrap|repair]
+  dune admin login-queues [--all]
+  dune admin repair-login-queue <player-fls-id|queue-name> [--yes] [--force]
   dune config title ["New Server Name"]
   dune memory status
   dune memory list-maps

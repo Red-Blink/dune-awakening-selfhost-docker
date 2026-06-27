@@ -22,6 +22,8 @@ Usage:
   runtime/scripts/dune admin players [--online] [--show-full-ids]
   runtime/scripts/dune admin kick <player-fls-id> [--dry-run] [--yes] [--force] [--label <name>]
   runtime/scripts/dune admin kick --all-online [--dry-run] [--yes]
+  runtime/scripts/dune admin login-queues [--all]
+  runtime/scripts/dune admin repair-login-queue <player-fls-id|queue-name> [--yes] [--force]
   runtime/scripts/dune admin item-search <query>
   runtime/scripts/dune admin item-list [category]
   runtime/scripts/dune admin grant-item <player-id|*> <item-name-or-id> [quantity] [durability] [grade]
@@ -812,7 +814,7 @@ normalize_faction_name() {
 
 specialization_apply_sql() {
   local actor_id="$1" account_id="$2" level="$3" xp="$4" tracks_csv="$5" grant_keystones="$6" unlock_faction="$7"
-  local track_array keystone_sql faction_sql unlock_faction_sql
+  local track_array keystone_sql faction_sql unlock_faction_sql journey_id_column journey_id_value
 
   track_array="$(specialization_track_sql_array "$tracks_csv")"
   unlock_faction_sql="${unlock_faction//\'/\'\'}"
@@ -827,6 +829,32 @@ specialization_apply_sql() {
   fi
   faction_sql=""
   if [ -n "$unlock_faction" ]; then
+    journey_id_column="$(psql_admin -At -v ON_ERROR_STOP=1 -c "
+      select case
+        when exists (
+          select 1 from information_schema.columns
+          where table_schema = 'dune' and table_name = 'journey_story_node' and column_name = 'character_id'
+        ) then 'character_id'
+        when exists (
+          select 1 from information_schema.columns
+          where table_schema = 'dune' and table_name = 'journey_story_node' and column_name = 'account_id'
+        ) then 'account_id'
+        else ''
+      end;
+    " | tr -d '\r[:space:]')"
+    if [ -z "$journey_id_column" ]; then
+      echo "Cannot unlock faction journey because dune.journey_story_node has no supported player identity column." >&2
+      exit 1
+    fi
+    if [ "$journey_id_column" = "character_id" ]; then
+      journey_id_value="$(psql_admin -At -v ON_ERROR_STOP=1 -c "select id from dune.player_state where account_id = $account_id::bigint limit 1;" | tr -d '\r[:space:]')"
+      if [ -z "$journey_id_value" ]; then
+        echo "Cannot unlock faction journey because no player_state row was found for account_id $account_id." >&2
+        exit 1
+      fi
+    else
+      journey_id_value="$account_id"
+    fi
     faction_sql="
       insert into dune.player_faction (actor_id, faction_id, utc_time_faction_change)
       select $actor_id::bigint, f.id, now()
@@ -847,7 +875,7 @@ specialization_apply_sql() {
           reveal_condition_state = 'true'::jsonb,
           has_pending_reward = false,
           fail_condition_state = '{}'::jsonb
-      where account_id = $account_id::bigint
+      where $journey_id_column = $journey_id_value::bigint
         and story_node_id like 'DA_FQ_ClimbTheRanks.JoinAHouse%';
     "
   fi
@@ -1089,6 +1117,140 @@ players_command() {
   [ "$count" -gt 0 ] || echo "No known players found."
 }
 
+normalize_login_queue_name() {
+  local target="$1"
+
+  target="${target%$'\r'}"
+  target="${target%$'\n'}"
+  [ -n "$target" ] || { echo "Player FLS id or queue name is required." >&2; exit 2; }
+  case "$target" in
+    *_queue) ;;
+    *) target="${target}_queue" ;;
+  esac
+  if ! printf '%s' "$target" | grep -Eq '^[A-Za-z0-9_+.-]+_queue$'; then
+    echo "Invalid login queue name: $target" >&2
+    exit 2
+  fi
+  printf '%s' "$target"
+}
+
+login_queue_player_id() {
+  local queue="$1"
+  printf '%s' "${queue%_queue}"
+}
+
+rmq_login_queues() {
+  require_rmq_game_running
+  docker exec "$RMQ_CONTAINER" rabbitmqctl -q list_queues name consumers messages state 2>/dev/null \
+    | awk -F '\t' '$1 ~ /_queue$/ { print }'
+}
+
+rmq_login_queue_row() {
+  local queue="$1"
+  rmq_login_queues | awk -F '\t' -v queue="$queue" '$1 == queue { print; found = 1 } END { exit found ? 0 : 1 }'
+}
+
+login_queues_command() {
+  local show_all=0 rows row queue consumers messages state player status_row online_status map shown=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --all) show_all=1 ;;
+      *) echo "Unknown login-queues option: $1" >&2; exit 2 ;;
+    esac
+    shift
+  done
+
+  rows="$(rmq_login_queues || true)"
+  if [ -z "$(printf '%s\n' "$rows" | sed '/^$/d')" ]; then
+    echo "No per-player login queues found."
+    return 0
+  fi
+
+  printf '%-24s %-9s %-9s %-10s %-12s %s\n' "Player" "Consumers" "Messages" "State" "DB Status" "Map"
+  while IFS=$'\t' read -r queue consumers messages state; do
+    [ -n "${queue:-}" ] || continue
+    player="$(login_queue_player_id "$queue")"
+    status_row="$(player_status_for_fls "$player" || true)"
+    IFS='|' read -r online_status map <<< "$status_row"
+    online_status="${online_status:-Unknown}"
+    map="${map:-}"
+
+    if [ "$show_all" != "1" ] && printf '%s' "$online_status" | grep -Eiq '^online$'; then
+      continue
+    fi
+
+    printf '%-24s %-9s %-9s %-10s %-12s %s\n' "$(redact_fls "$player")" "${consumers:-0}" "${messages:-0}" "${state:-unknown}" "$online_status" "$map"
+    shown=$((shown + 1))
+  done <<< "$rows"
+
+  if [ "$shown" -eq 0 ]; then
+    echo "No offline/unknown per-player login queues found. Use --all to include online players."
+  fi
+}
+
+repair_login_queue_command() {
+  local target="${1:-}" yes=0 force=0 queue player row consumers messages state status_row online_status map answer payload output rc
+  [ -n "$target" ] || { echo "Usage: dune admin repair-login-queue <player-fls-id|queue-name> [--yes] [--force]" >&2; exit 2; }
+  shift || true
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --yes|-y) yes=1 ;;
+      --force) force=1 ;;
+      *) echo "Unknown repair-login-queue option: $1" >&2; exit 2 ;;
+    esac
+    shift
+  done
+
+  queue="$(normalize_login_queue_name "$target")"
+  player="$(login_queue_player_id "$queue")"
+  row="$(rmq_login_queue_row "$queue" || true)"
+  if [ -z "$row" ]; then
+    echo "No RabbitMQ login queue exists for $(redact_fls "$player")."
+    return 0
+  fi
+
+  IFS=$'\t' read -r queue consumers messages state <<< "$row"
+  status_row="$(player_status_for_fls "$player" || true)"
+  IFS='|' read -r online_status map <<< "$status_row"
+  online_status="${online_status:-Unknown}"
+  map="${map:-}"
+
+  echo "Target queue: $queue"
+  echo "Player:       $(redact_fls "$player")"
+  echo "Queue state:  consumers=${consumers:-0} messages=${messages:-0} state=${state:-unknown}"
+  echo "DB status:    $online_status${map:+ on $map}"
+
+  if printf '%s' "$online_status" | grep -Eiq '^online$' && [ "$force" != "1" ]; then
+    echo "Refusing to delete the login queue because the player still appears Online." >&2
+    echo "If the player is confirmed stuck/offline from the client side, rerun with --force --yes." >&2
+    exit 1
+  fi
+
+  if [ "$yes" != "1" ]; then
+    printf 'Delete this login queue so the next login can recreate it? [y/N]: '
+    read -r answer
+    case "$answer" in
+      y|Y|yes|YES) ;;
+      *) echo "Cancelled."; return 0 ;;
+    esac
+  fi
+
+  payload="{\"Queue\":\"$queue\",\"PlayerId\":\"$player\",\"Consumers\":\"${consumers:-0}\",\"Messages\":\"${messages:-0}\",\"State\":\"${state:-unknown}\",\"DbStatus\":\"$online_status\"}"
+  set +e
+  output="$(docker exec "$RMQ_CONTAINER" rabbitmqctl -q delete_queue "$queue" 2>&1)"
+  rc=$?
+  set -e
+  if [ "$rc" -ne 0 ]; then
+    printf '%s\n' "$output" >&2
+    audit_admin_action "RepairLoginQueue" "$(redact_fls "$player")" "$queue" "$payload" "rabbitmq-game" "failed" "$output"
+    exit "$rc"
+  fi
+
+  audit_admin_action "RepairLoginQueue" "$(redact_fls "$player")" "$queue" "$payload" "rabbitmq-game" "deleted"
+  echo "Deleted stale login queue for $(redact_fls "$player")."
+  echo "Ask the player to connect again; the game client should recreate a clean queue."
+}
+
 player_status_for_fls() {
   local fls="$1"
   if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$POSTGRES_CONTAINER"; then
@@ -1184,10 +1346,10 @@ player_position_for_fls() {
 }
 
 compute_spawn_in_front() {
-  local x="$1" y="$2" z="$3" qx="$4" qy="$5" qz="$6" qw="$7" offset="$8"
-  python3 - "$x" "$y" "$z" "$qx" "$qy" "$qz" "$qw" "$offset" <<'PY'
+  local x="$1" y="$2" z="$3" qx="$4" qy="$5" qz="$6" qw="$7" offset="$8" z_offset="${9:-0}"
+  python3 - "$x" "$y" "$z" "$qx" "$qy" "$qz" "$qw" "$offset" "$z_offset" <<'PY'
 import json, math, sys
-x, y, z, qx, qy, qz, qw, offset = map(float, sys.argv[1:])
+x, y, z, qx, qy, qz, qw, offset, z_offset = map(float, sys.argv[1:])
 # Unreal uses X/Y as horizontal axes and Z as up. Use the pawn's +X forward vector,
 # projected onto the ground plane, so pitch/roll do not skew the spawn point.
 fx = 1.0 - 2.0 * (qy * qy + qz * qz)
@@ -1206,11 +1368,19 @@ sy = y + fy * offset
 print(json.dumps({
     "x": sx,
     "y": sy,
-    "z": z,
+    "z": z + z_offset,
     "rotation": math.degrees(yaw),
     "yawRadians": yaw,
 }, separators=(",", ":")))
 PY
+}
+
+is_flying_vehicle() {
+  local vehicle_id="$1" actor_class="$2"
+  case "$vehicle_id:$actor_class" in
+    *Ornithopter*|*ornithopter*|*FlyingVehicles*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 kick_command() {
@@ -1575,6 +1745,20 @@ publish_player_command() {
     AwardXP|UpdateAllWaterFillables) require_online=1 ;;
   esac
 
+  if [ "${DUNE_ADMIN_DRY_RUN:-0}" = "1" ]; then
+    echo "Payload shape:"
+    python3 - "$inner_json" <<'PY'
+import json, sys
+payload = json.loads(sys.argv[1])
+if payload.get("PlayerId") != "*":
+    payload["PlayerId"] = "<redacted>"
+print(json.dumps(payload, separators=(",", ":")))
+PY
+    echo "Dry run: not publishing."
+    audit_admin_action "$command_id" "$audit_target" "$command_id" "$inner_json" "$ADMIN_COMMAND_PATH" "dry-run"
+    return 0
+  fi
+
   if [ "$resolved_player" != "*" ]; then
     set +e
     status_row="$(player_status_for_fls "$resolved_player")"
@@ -1613,12 +1797,6 @@ if payload.get("PlayerId") != "*":
     payload["PlayerId"] = "<redacted>"
 print(json.dumps(payload, separators=(",", ":")))
 PY
-
-  if [ "${DUNE_ADMIN_DRY_RUN:-0}" = "1" ]; then
-    echo "Dry run: not publishing."
-    audit_admin_action "$command_id" "$audit_target" "$command_id" "$inner_json" "$ADMIN_COMMAND_PATH" "dry-run"
-    return 0
-  fi
 
   set +e
   output="$(publish_inner_json "$inner_json" "$command_id" 2>&1)"
@@ -1747,12 +1925,28 @@ spawn_vehicle_at_command() {
 spawn_vehicle_command() {
   local player="${1:-}" class_name="${2:-}" template="${3:-}" offset="${4:-1000}"
   local resolved_player row status map partition server x y z qx qy qz qw dimension actor_class spawn_json sx sy sz rotation
+  local vehicle_json vehicle_id vehicle_actor_class z_offset=0 original_offset
   [ -n "$player" ] && [ -n "$class_name" ] && [ -n "$template" ] || {
     echo "Usage: dune admin spawn-vehicle <player-id> <vehicle-id> <template-name> [offset-units]" >&2
     echo "Use spawn-vehicle-at for advanced manual coordinates." >&2
     exit 2
   }
   validate_float "$offset" "Offset"
+  original_offset="$offset"
+  vehicle_json="$(resolve_vehicle "$class_name" "$template")"
+  vehicle_id="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["id"])' "$vehicle_json")"
+  vehicle_actor_class="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["actor_class"])' "$vehicle_json")"
+  template="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["template"])' "$vehicle_json")"
+  if is_flying_vehicle "$vehicle_id" "$vehicle_actor_class"; then
+    z_offset="${DUNE_ADMIN_FLYING_VEHICLE_Z_OFFSET:-700}"
+    offset="$(python3 - "$offset" "${DUNE_ADMIN_FLYING_VEHICLE_MIN_OFFSET:-3000}" <<'PY'
+import sys
+offset = float(sys.argv[1])
+minimum = float(sys.argv[2])
+print(max(offset, minimum))
+PY
+)"
+  fi
   resolved_player="$(resolve_player_id "$player")"
   [ "$resolved_player" != "*" ] || { echo "Vehicle spawn requires a specific player." >&2; exit 2; }
   row="$(player_position_for_fls "$resolved_player" || true)"
@@ -1765,14 +1959,17 @@ spawn_vehicle_command() {
   for value in "$x" "$y" "$z" "$qx" "$qy" "$qz" "$qw"; do
     [ -n "$value" ] || { echo "Live location/facing is incomplete for $(redact_fls "$resolved_player")." >&2; exit 1; }
   done
-  spawn_json="$(compute_spawn_in_front "$x" "$y" "$z" "$qx" "$qy" "$qz" "$qw" "$offset")"
+  spawn_json="$(compute_spawn_in_front "$x" "$y" "$z" "$qx" "$qy" "$qz" "$qw" "$offset" "$z_offset")"
   sx="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["x"])' "$spawn_json")"
   sy="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["y"])' "$spawn_json")"
   sz="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["z"])' "$spawn_json")"
   rotation="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["rotation"])' "$spawn_json")"
   echo "Player location: map=${map:-unknown} partition=${partition:-unknown} X=$x Y=$y Z=$z"
+  if [ "$z_offset" != "0" ] || [ "$offset" != "$original_offset" ]; then
+    echo "Flying vehicle adjustment: offset=$offset units, Z lift=$z_offset units"
+  fi
   echo "Computed spawn point $offset units in front: X=$sx Y=$sy Z=$sz Rotation=$rotation"
-  spawn_vehicle_at_command "$resolved_player" "$class_name" "$template" "$sx" "$sy" "$sz" "$rotation"
+  spawn_vehicle_at_command "$resolved_player" "$vehicle_id" "$template" "$sx" "$sy" "$sz" "$rotation"
 }
 
 broadcast_restart_warning_command() {
@@ -1814,6 +2011,14 @@ case "$cmd" in
   players)
     shift || true
     players_command "$@"
+    ;;
+  login-queues)
+    shift || true
+    login_queues_command "$@"
+    ;;
+  repair-login-queue)
+    shift || true
+    repair_login_queue_command "$@"
     ;;
   kick)
     shift || true

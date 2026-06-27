@@ -263,7 +263,7 @@ test("memory status parser formats Gi defaults as friendly GB labels", () => {
 
 test("server partition parser derives status from real ready/alive fields", () => {
   const rows = parseServerPartitionRows(serversOutput);
-  assert.equal(rows.find((row) => row.map === "Survival_1").status, "Ready");
+  assert.equal(rows.find((row) => row.map === "Survival_1").status, "Starting");
   assert.equal(rows.find((row) => row.map === "Overmap").status, "Ready");
   assert.equal(rows.find((row) => row.map === "DeepDesert_1").status, "Not Running");
 });
@@ -271,7 +271,7 @@ test("server partition parser derives status from real ready/alive fields", () =
 test("server partition parser accepts Postgres t/f boolean output", () => {
   const rows = parseServerPartitionRows(postgresBooleanServersOutput);
   assert.equal(rows.find((row) => row.map === "SH_Arrakeen").status, "Ready");
-  assert.equal(rows.find((row) => row.map === "SH_HarkoVillage").status, "Running");
+  assert.equal(rows.find((row) => row.map === "SH_HarkoVillage").status, "Loading");
   assert.equal(rows.find((row) => row.map === "CB_Story_Hephaestus").status, "Not Running");
 });
 

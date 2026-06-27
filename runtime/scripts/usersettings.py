@@ -256,8 +256,8 @@ PARTITION_ENGINE_FIELDS = {
     "server_login_password": ENGINE_FIELDS["server_login_password"],
 }
 
-PROTECTED_ENGINE_FIELDS = {"port", "igw_port", "server_display_name", "server_login_password"}
-REDACTED_PLACEHOLDERS = {"<redacted>", '"<redacted>"', "'<redacted>'"}
+PROTECTED_ENGINE_FIELDS = {"server_display_name", "server_login_password"}
+RESET_PRESERVED_ENGINE_FIELDS = {"port", "igw_port", "server_display_name", "server_login_password"}
 PROFILE_HEADER_ORDER = {"Engine": 0, "Global": 1, "Map": 2, "Partition": 3}
 
 
@@ -525,25 +525,6 @@ def profile_remove_key(profile: dict, scope: str, section: str, key: str, map_na
     block["lines"] = out
 
 
-def preserve_redacted_engine_fields(incoming: dict, existing: dict) -> None:
-    for field_id in PROTECTED_ENGINE_FIELDS:
-        spec = ENGINE_FIELDS.get(field_id)
-        if not spec:
-            continue
-        section, key, _ = spec
-        if not section or not key:
-            continue
-
-        incoming_value = profile_get_key(incoming, "engine", section, key)
-        if incoming_value is None or incoming_value.strip() not in REDACTED_PLACEHOLDERS:
-            continue
-
-        profile_remove_key(incoming, "engine", section, key)
-        existing_value = profile_get_key(existing, "engine", section, key)
-        if existing_value is not None and existing_value.strip() not in REDACTED_PLACEHOLDERS:
-            profile_set_key(incoming, "engine", section, key, existing_value)
-
-
 def seed_profile_from_legacy_config() -> dict:
     profile = empty_profile()
     profile["preamble"] = [
@@ -770,6 +751,24 @@ def validate_port_ranges(config: dict, field_id: str, value: str) -> None:
         )
 
 
+def validate_profile_port_ranges(profile: dict) -> None:
+    engine = profile_engine_values(profile)
+    try:
+        client_start = int(engine.get("port") or ENGINE_FIELDS["port"][2])
+        igw_start = int(engine.get("igw_port") or ENGINE_FIELDS["igw_port"][2])
+    except ValueError as exc:
+        raise SystemExit("Port and IGWPort must be positive integers.") from exc
+    if client_start <= 0 or igw_start <= 0:
+        raise SystemExit("Port and IGWPort must be positive integers.")
+    end_offset = max_survival_dimensions()
+    client_end = client_start + end_offset
+    igw_end = igw_start + end_offset
+    if not (client_end < igw_start or igw_end < client_start):
+        raise SystemExit(
+            f"Configured Port range {client_start}-{client_end} intersects with IGWPort range {igw_start}-{igw_end}."
+        )
+
+
 def set_profile_field(profile: dict, scope: str, map_name: str, partition_id: str, field_id: str, value: str) -> None:
     if scope == "engine":
         if field_id not in ENGINE_FIELDS:
@@ -987,6 +986,7 @@ def set_field(scope: str, name: str | None, field_id: str, value: str) -> int:
         if field_id in {"port", "igw_port"}:
             validate_port_ranges(config, field_id, value)
         set_profile_field(profile, "engine", "", "", field_id, value)
+        validate_profile_port_ranges(profile)
     else:
         if field_id not in MAP_FIELDS:
             raise SystemExit(f"Unknown map field: {field_id}")
@@ -1026,7 +1026,7 @@ def reset_all() -> int:
 def reset_engine_gameplay() -> int:
     profile = read_profile()
     for key, spec in ENGINE_FIELDS.items():
-        if key in PROTECTED_ENGINE_FIELDS:
+        if key in RESET_PRESERVED_ENGINE_FIELDS:
             continue
         if spec[0] and spec[1]:
             profile_remove_key(profile, "engine", spec[0], spec[1])
@@ -1074,8 +1074,11 @@ def truthy(value: str) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def write_userengine_ini(path: Path, values: dict[str, str]) -> None:
+def userengine_ini_text(values: dict[str, str]) -> str:
     lines = [
+        "; UserEngine.ini managed by Docker.",
+        "; Values here apply to all maps unless overridden by UserEngine.ini.",
+        "",
         "; Settings in these config files will be applied to every server in the battlegroup",
         "; If you need to override different settings for different servers, use the battlegroup editor instead",
         "",
@@ -1145,7 +1148,11 @@ def write_userengine_ini(path: Path, values: dict[str, str]) -> None:
         f"Ai.BloodDoors.Enabled={values.get('blood_doors_enabled', ENGINE_FIELDS['blood_doors_enabled'][2])}",
         f"Ai.BloodDoors.DisableBlightEcolab={values.get('blood_doors_disable_blight_ecolab', ENGINE_FIELDS['blood_doors_disable_blight_ecolab'][2])}",
     ])
-    atomic_write_text(path, "\n".join(lines) + "\n")
+    return "\n".join(lines) + "\n"
+
+
+def write_userengine_ini(path: Path, values: dict[str, str]) -> None:
+    atomic_write_text(path, userengine_ini_text(values))
 
 
 def write_usergame_ini(path: Path, values: dict[str, str], partition_id: str | None = None) -> None:
@@ -1387,6 +1394,8 @@ def bulk_save(scope: str, map_name: str, partition_id: str, encoded_values: str)
             set_profile_field(profile, "map", target_map, "", field_id, serialized)
         else:
             raise SystemExit("Unknown settings scope.")
+    if scope == "engine":
+        validate_profile_port_ranges(profile)
     write_profile(profile)
     return 0
 
@@ -1422,14 +1431,7 @@ def profile_game_text() -> str:
 
 
 def profile_engine_text() -> str:
-    profile = read_profile()
-    lines: list[str] = []
-    for block in sorted_profile_sections([section for section in profile.get("sections", []) if section.get("scope") == "Engine"]):
-      if lines and lines[-1].strip():
-          lines.append("")
-      lines.append(f"[{block.get('ini_section', '')}]")
-      lines.extend(block.get("lines", []))
-    return "\n".join(lines).rstrip() + "\n" if lines else compiled_userengine_ini(profile)
+    return userengine_ini_text(profile_engine_values(read_profile()))
 
 
 def profile_game_write_encoded(encoded_content: str) -> int:
@@ -1482,7 +1484,7 @@ def profile_engine_write_encoded(encoded_content: str) -> int:
         })
     profile = read_profile()
     incoming = {"preamble": [], "sections": engine_sections}
-    preserve_redacted_engine_fields(incoming, profile)
+    validate_profile_port_ranges(incoming)
     profile["sections"] = [block for block in profile.get("sections", []) if block.get("scope") != "Engine"] + incoming.get("sections", [])
     write_profile(profile)
     return 0

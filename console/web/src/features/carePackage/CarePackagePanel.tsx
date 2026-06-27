@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { playersApi } from "../../api/players";
 import { carePackageApi, type CarePackageConfig, type CarePackageEntry } from "../../api/carePackage";
 import type { CarePackageAutoGrantRule } from "../../api/carePackage";
+import { friendlyApiError } from "../../api/client";
 import { DataTable } from "../../components/common/DataTable";
 import { TechnicalDetails } from "../../components/common/DisplayPrimitives";
 import {
@@ -75,7 +76,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
     setOutput("");
     setTechnicalOutput("");
     setOutputScope("");
-    try { await action(); } catch (error) { const text = error instanceof Error ? error.message : String(error); setOutput(text); onError(text); }
+    try { await action(); } catch (error) { const text = friendlyApiError(error); setOutput(text); onError(text); }
   }
   async function load() {
     const next = await carePackageApi.config();
@@ -553,7 +554,7 @@ function displayCarePackageConfig(config: CarePackageConfig) {
 }
 
 function formatCarePackageError(value: string) {
-  const text = String(value || "").trim()
+  const text = friendlyApiError(value || "").trim()
     .replaceAll("Care Package", "Care Package")
     .replaceAll("care package", "care package")
     .replaceAll(" kit", " package")

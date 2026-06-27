@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { buildDuneArgs, runDune } from "../runner.js";
 import { parseMemoryStatusRows } from "../statusParsers.js";
 import { redact } from "../redact.js";
@@ -12,11 +14,12 @@ const MEMORY_BALANCER_CHUNK_BYTES = 1024 ** 3;
 const MEMORY_BALANCER_MIN_HEADROOM_BYTES = 1024 ** 3;
 
 export function createMemoryBalancer(config) {
+  const persisted = readMemoryBalancerSettings(config);
   const state = {
-    enabled: false,
+    enabled: persisted.enabled,
     running: false,
     baselineLimits: new Map(),
-    lastMessage: "Memory Balancer is off.",
+    lastMessage: persisted.enabled ? "Memory Balancer is monitoring running maps" : "Memory Balancer is off.",
     lastAction: "",
     lastError: "",
     updatedAt: null
@@ -100,6 +103,7 @@ export function createMemoryBalancer(config) {
     state.enabled = enabled;
     state.lastError = "";
     state.updatedAt = new Date().toISOString();
+    writeMemoryBalancerSettings(config, { enabled });
 
     if (enabled) {
       state.baselineLimits.clear();
@@ -134,6 +138,28 @@ export function createMemoryBalancer(config) {
     setEnabled,
     tick
   };
+}
+
+function memoryBalancerSettingsPath(config) {
+  return resolve(config.generatedDir || resolve(config.repoRoot, "runtime/generated"), "memory-balancer.json");
+}
+
+function readMemoryBalancerSettings(config) {
+  const path = memoryBalancerSettingsPath(config);
+  try {
+    if (!existsSync(path)) return { enabled: false };
+    const parsed = JSON.parse(readFileSync(path, "utf8"));
+    return { enabled: parsed?.enabled === true };
+  } catch {
+    return { enabled: false };
+  }
+}
+
+function writeMemoryBalancerSettings(config, settings) {
+  const path = memoryBalancerSettingsPath(config);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify({ enabled: settings.enabled === true }, null, 2)}\n`, { mode: 0o664 });
+  try { chmodSync(path, 0o664); } catch {}
 }
 
 async function configuredMemoryLimitsByContainer(config, readLiveRows) {
@@ -226,7 +252,7 @@ export function parseDockerStatsRow(line) {
       map: mapFromContainerName(name),
       usedBytes: memory.usedBytes,
       limitBytes: memory.limitBytes,
-      percent: Number.parseFloat(String(row.MemPerc || "").replace("%", "")) || memory.percent || 0,
+      percent: Number.parseFloat(String(row.MemPerc || "").replace(/%/g, "")) || memory.percent || 0,
       raw: String(row.MemUsage || "")
     };
   } catch {
@@ -246,10 +272,10 @@ function parseMemoryUsage(value) {
 }
 
 export function parseDockerBytes(value) {
-  const match = String(value || "").match(/^([\d.]+)\s*([KMGTPE]?i?B)?$/i);
+  const match = String(value || "").match(/^[\d.]+\s*([KMGTPE]?i?B)?$/i);
   if (!match) return 0;
-  const amount = Number.parseFloat(match[1]) || 0;
-  const unit = String(match[2] || "B").toLowerCase();
+  const amount = Number.parseFloat(String(value).replace(/[^\d.]/g, "")) || 0;
+  const unit = String(match[1] || "B").toLowerCase();
   const multipliers = { b: 1, kb: 1000, kib: 1024, mb: 1000 ** 2, mib: 1024 ** 2, gb: 1000 ** 3, gib: 1024 ** 3, tb: 1000 ** 4, tib: 1024 ** 4 };
   return Math.round(amount * (multipliers[unit] || 1));
 }
@@ -263,21 +289,27 @@ function mapFromContainerName(name) {
 
 function runProcessText(config, command, args, timeoutMs = 10000) {
   return new Promise((resolveText, rejectText) => {
-    const child = spawn(command, args, { cwd: config.repoRoot, shell: false });
+    const child = spawn(command, args, {
+      cwd: config.repoRoot,
+      env: process.env,
+      shell: false
+    });
     let stdout = "";
     let stderr = "";
-    const timeout = setTimeout(() => child.kill("SIGTERM"), timeoutMs);
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk.toString();
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      rejectText(new Error(`${command} timed out`));
+    }, timeoutMs);
+    child.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
+    child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      rejectText(error);
     });
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-    child.on("error", rejectText);
     child.on("close", (code) => {
-      clearTimeout(timeout);
+      clearTimeout(timer);
       if (code === 0) resolveText(stdout);
-      else rejectText(new Error(stderr.trim() || `${command} ${args.join(" ")} failed with exit ${code}`));
+      else rejectText(new Error(stderr || stdout || `${command} exited ${code}`));
     });
   });
 }

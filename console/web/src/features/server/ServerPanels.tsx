@@ -14,6 +14,7 @@ import { conciseTaskError, funcomTokenMismatchDetected } from "../../lib/taskDis
 export type HomeLoadResult = { statusLoaded: boolean; readinessLoaded: boolean; statusError: string; readinessError: string; statusText: string; readinessText: string };
 export type HomeTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
 type ConfirmAction = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }) => Promise<boolean>;
+type ServerMode = "public" | "local";
 
 const RESTARTABLE_SERVICES = [
   { value: "gateway", label: "Gateway" },
@@ -88,16 +89,16 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
         applyHomeLoadResult(result);
         const loadedState = getHomeServerState(result.statusText || status, result.readinessText || readiness);
         if ((runningAction === "start" || runningAction === "restart") && isHomeActionComplete(result.statusText || status, result.readinessText || readiness)) {
-          setTaskResult({ status: "succeeded", title: runningAction === "start" ? "Server Started Successfully" : "Server Restarted Successfully" });
+          setTaskResult({ status: "succeeded", title: runningAction === "start" ? "Server Started Successfully" : "Battlegroup Restarted Successfully" });
           setHomeAction("");
         } else if (runningAction === "stop" && loadedState.stopped) {
           setTaskResult({ status: "stopped", title: "Server Stopped" });
           setHomeAction("");
         }
         if (taskResult?.status === "failed" && isHomeActionComplete(result.statusText || status, result.readinessText || readiness)) {
-          setTaskResult({ status: "succeeded", title: /restart/i.test(taskResult.title) ? "Server Restarted Successfully" : "Server Started Successfully" });
+          setTaskResult({ status: "succeeded", title: /restart/i.test(taskResult.title) ? "Battlegroup Restarted Successfully" : "Server Started Successfully" });
         } else if (taskResult?.status === "failed" && loadedState.running) {
-          setTaskResult({ status: "succeeded", title: /restart/i.test(taskResult.title) ? "Server Restarted Successfully" : "Server Started Successfully" });
+          setTaskResult({ status: "succeeded", title: /restart/i.test(taskResult.title) ? "Battlegroup Restarted Successfully" : "Server Started Successfully" });
         } else if (taskResult?.status === "failed" && loadedState.stopped && /stop/i.test(taskResult.title)) {
           setTaskResult({ status: "stopped", title: "Server Stopped" });
         }
@@ -113,14 +114,14 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
 
   async function runServerAction(action: "start" | "stop" | "restart") {
     if (action === "stop" && !(await confirmAction("Stop the Dune server console?"))) return;
-    if (action === "restart" && !(await confirmAction("Restart the Dune server console?"))) return;
+    if (action === "restart" && !(await confirmAction("Restart the battlegroup?"))) return;
     const actionRunId = ++homeActionRunId.current;
     homeActionStartedAt.current = Date.now();
     let commandAction = action;
     const copy = {
       start: { running: "Starting", success: "Server Started Successfully", failure: "Start Failed" },
       stop: { running: "Stopping", success: "Server Stopped", failure: "Server stop failed." },
-      restart: { running: "Restarting", success: "Server Restarted Successfully", failure: "Restart Failed" }
+      restart: { running: "Restarting Battlegroup", success: "Battlegroup Restarted Successfully", failure: "Battlegroup Restart Failed" }
     }[action];
     setLocalError("");
     setHomeAction(action);
@@ -217,7 +218,7 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
         setTaskResult({ status: "stopped", title: "Server Stopped" });
         setHomeAction("");
       } else if ((currentAction === "start" || currentAction === "restart") && elapsedMs >= 8000 && isHomeActionComplete(result.statusText || status, result.readinessText || readiness)) {
-        setTaskResult({ status: "succeeded", title: currentAction === "start" ? "Server Started Successfully" : "Server Restarted Successfully" });
+        setTaskResult({ status: "succeeded", title: currentAction === "start" ? "Server Started Successfully" : "Battlegroup Restarted Successfully" });
         setHomeAction("");
       }
     }, 3000);
@@ -260,7 +261,7 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
     const minimumTransitionMs = runningAction === "restart" ? 8000 : 0;
     const elapsedMs = Date.now() - homeActionStartedAt.current;
     if (elapsedMs < minimumTransitionMs) return;
-    setTaskResult({ status: "succeeded", title: runningAction === "start" ? "Server Started Successfully" : "Server Restarted Successfully" });
+    setTaskResult({ status: "succeeded", title: runningAction === "start" ? "Server Started Successfully" : "Battlegroup Restarted Successfully" });
     setHomeAction("");
   }, [runningAction, status, readiness, setRunningAction, setTaskResult]);
 
@@ -328,10 +329,10 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
         <h2>Server Overview</h2>
         <p>Use this dashboard for setup, service health, logs, backups, updates, and player admin actions.</p>
         <div className="action-row">
-          <button disabled={refreshDisabled} onClick={() => refresh()}>{loading ? "Refreshing..." : "Refresh Status"}</button>
+          <button className={loading ? "refresh-status-button refreshing" : "refresh-status-button"} disabled={refreshDisabled} onClick={() => refresh()}>{loading ? <span className="loading-dots">Refreshing</span> : "Refresh Status"}</button>
           <button disabled={startDisabled} title={controlsState.running ? "Server is already running." : ""} onClick={() => runServerAction("start")}><Play size={16} /> Start</button>
           <button disabled={stopDisabled} onClick={() => runServerAction("stop")}>Stop</button>
-          <button disabled={restartDisabled} onClick={() => runServerAction("restart")}>Restart</button>
+          <button disabled={restartDisabled} onClick={() => runServerAction("restart")}>Restart Battlegroup</button>
         </div>
         {taskResult && <HomeTaskResultCard result={taskResult} />}
         {localError && <p className="error">{localError}</p>}
@@ -436,6 +437,9 @@ export function ServerPanel(props: {
   const [restartTime, setRestartTime] = useState("05:00");
   const [scheduleResult, setScheduleResult] = useState<HomeTaskResult | null>(null);
   const [serverTitle, setServerTitle] = useState("");
+  const [savedServerTitle, setSavedServerTitle] = useState("");
+  const [serverMode, setServerMode] = useState<ServerMode>("public");
+  const [savedServerMode, setSavedServerMode] = useState<ServerMode>("public");
   const [titleResult, setTitleResult] = useState<HomeTaskResult | null>(null);
   const [funcomToken, setFuncomToken] = useState("");
   const [serviceRestartResult, setServiceRestartResult] = useState<HomeTaskResult | null>(null);
@@ -497,24 +501,41 @@ export function ServerPanel(props: {
     if (!result.statusLoaded && result.statusError) props.onError(friendlyHomeStatusError(result.statusError));
     return result;
   }
-  async function saveServerTitle() {
+  async function saveServerConfig() {
     const title = serverTitle.trim();
     if (!title) {
-      setTitleResult({ status: "failed", title: "Title Save Failed", message: "Server title cannot be empty." });
+      setTitleResult({ status: "failed", title: "Settings Save Failed", message: "Server title cannot be empty." });
       return;
     }
-    if (!(await confirmAction(`Change server title to "${title}"? This restarts Director and Gateway so the new title can be published.`))) return;
-    setTitleResult({ status: "running", title: "Saving Title" });
+    const titleChanged = title !== savedServerTitle.trim();
+    const modeChanged = serverMode !== savedServerMode;
+    if (!titleChanged && !modeChanged) {
+      setTitleResult({ status: "succeeded", title: "No Changes to Save" });
+      return;
+    }
+    const changeList = [
+      titleChanged ? `title to "${title}"` : "",
+      modeChanged ? `mode to ${titleCase(serverMode)}` : ""
+    ].filter(Boolean).join(" and ");
+    if (!(await confirmAction(`Change server ${changeList}? This saves the setting and refreshes Director/Gateway only if they are already running.`))) return;
+    setTitleResult({ status: "running", title: "Saving Settings" });
     props.onError("");
     try {
-      const final = await waitForTaskSilently((await serverApi.saveTitle(title)).task);
+      const final = await waitForTaskSilently((await serverApi.saveConfig({
+        ...(titleChanged ? { title } : {}),
+        ...(modeChanged ? { mode: serverMode } : {})
+      })).task);
       const details = taskTechnicalDetails(final);
       await loadControlStatus(false).catch(() => null);
+      if (final.status === "succeeded") {
+        if (titleChanged) setSavedServerTitle(title);
+        if (modeChanged) setSavedServerMode(serverMode);
+      }
       setTitleResult(final.status === "succeeded"
-        ? { status: "succeeded", title: "Title Saved Successfully", details }
-        : { status: "failed", title: "Title Save Failed", details });
+        ? { status: "succeeded", title: "Settings Saved Successfully", details }
+        : { status: "failed", title: "Settings Save Failed", details });
     } catch (error) {
-      setTitleResult({ status: "failed", title: "Title Save Failed", details: error instanceof Error ? error.message : String(error) });
+      setTitleResult({ status: "failed", title: "Settings Save Failed", details: error instanceof Error ? error.message : String(error) });
     }
   }
   async function saveFuncomToken() {
@@ -550,7 +571,7 @@ export function ServerPanel(props: {
   }
   async function runServerAction(action: "start" | "stop" | "restart") {
     if (action === "stop" && !(await confirmAction("Stop the Dune server console?"))) return;
-    if (action === "restart" && !(await confirmAction("Restart the Dune server console?"))) return;
+    if (action === "restart" && !(await confirmAction("Restart the battlegroup?"))) return;
     serviceRestartRunId.current += 1;
     setServiceRestartingService("");
     const actionRunId = ++controlActionRunId.current;
@@ -558,7 +579,7 @@ export function ServerPanel(props: {
     const copy = {
       start: { running: "Starting", success: "Server Started Successfully", failure: "Start Failed" },
       stop: { running: "Stopping", success: "Server Stopped", failure: "Server stop failed." },
-      restart: { running: "Restarting", success: "Server Restarted Successfully", failure: "Restart Failed" }
+      restart: { running: "Restarting Battlegroup", success: "Battlegroup Restarted Successfully", failure: "Battlegroup Restart Failed" }
     }[action];
     props.onError("");
     setControlAction(action);
@@ -678,8 +699,16 @@ export function ServerPanel(props: {
   }, [runningAction]);
   useEffect(() => {
     const title = findLineValue(props.status, ["title", "server title", "SERVER_TITLE"]);
-    if (title && !titleSaving) setServerTitle(title);
-  }, [props.status, titleSaving]);
+    if (!title || titleSaving) return;
+    if (!savedServerTitle || serverTitle.trim() === savedServerTitle.trim()) setServerTitle(title);
+    setSavedServerTitle(title);
+  }, [props.status, titleSaving, serverTitle, savedServerTitle]);
+  useEffect(() => {
+    const mode = normalizeServerMode(findLineValue(props.status, ["mode", "server mode", "SERVER_IP_MODE"]));
+    if (!mode || titleSaving) return;
+    if (serverMode === savedServerMode) setServerMode(mode);
+    setSavedServerMode(mode);
+  }, [props.status, titleSaving, serverMode, savedServerMode]);
   useEffect(() => {
     if (!runningAction) return;
     let active = true;
@@ -694,12 +723,12 @@ export function ServerPanel(props: {
         setTaskResult({ status: "stopped", title: "Server Stopped" });
         setControlAction("");
       } else if ((currentAction === "start" || currentAction === "restart") && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText)) {
-        setTaskResult({ status: "succeeded", title: currentAction === "start" ? "Server Started Successfully" : "Server Restarted Successfully" });
+        setTaskResult({ status: "succeeded", title: currentAction === "start" ? "Server Started Successfully" : "Battlegroup Restarted Successfully" });
         setControlAction("");
       } else {
         setTaskResult((current) => {
           if (current?.status !== "running") return current;
-          return { ...current, title: currentAction === "start" ? "Starting" : currentAction === "stop" ? "Stopping" : "Restarting" };
+          return { ...current, title: currentAction === "start" ? "Starting" : currentAction === "stop" ? "Stopping" : "Restarting Battlegroup" };
         });
       }
     }, 3000);
@@ -788,10 +817,14 @@ export function ServerPanel(props: {
     <section className="panel server-control-panel">
       <h2>Server Controls</h2>
       <section className="action-section server-title-section">
-        <h4>Server Title</h4>
+        <h4>Server Configurations</h4>
         <div className="action-line title-action-line">
           <label>Current Server Title<input value={serverTitle} onChange={(event) => setServerTitle(event.target.value)} /></label>
-          <button disabled={actionRunning || serviceRestartRunning || titleSaving} onClick={saveServerTitle}>Save Title</button>
+          <label className="compact-select">Mode<select value={serverMode} onChange={(event) => setServerMode(event.target.value as ServerMode)}>
+            <option value="public">Public</option>
+            <option value="local">Local</option>
+          </select></label>
+          <button disabled={actionRunning || serviceRestartRunning || titleSaving} onClick={saveServerConfig}>Save Settings</button>
           {titleResult && <span className={`inline-task-result result-${titleResult.status === "succeeded" ? "ok" : titleResult.status === "failed" ? "fail" : "running"}`}>
             <strong className={titleResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(titleResult.title, titleResult.status === "running")}</strong>
           </span>}
@@ -800,7 +833,7 @@ export function ServerPanel(props: {
       <div className="action-row">
         <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || serverState.running || serverState.starting} onClick={() => runServerAction("start")}><Play size={16} /> Start</button>
         <button disabled={titleSaving || funcomTokenSaving || scheduleSaving || serviceRestartRunning || runningAction === "stop" || (!actionRunning && serverState.stopped)} onClick={() => runServerAction("stop")}>Stop</button>
-        <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || serverState.stopped} onClick={() => runServerAction("restart")}>Restart</button>
+        <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || serverState.stopped} onClick={() => runServerAction("restart")}>Restart Battlegroup</button>
         <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving} onClick={props.onRedeploy}>Redeploy</button>
       </div>
       {taskResult && <HomeTaskResultCard result={taskResult} />}
@@ -1125,7 +1158,7 @@ function summarizeHomeStatus(status: string, readiness: string, readinessWarning
   const readyOverride = readinessReady ? { label: "OK", status: "Ready", detail: "" } : null;
   const coreReadyWithReview = !runningAction && isHomeCoreReadyWithReview(status, readiness, rawContainers, rawListeners, rawDatabase, rawGames, rawRabbit, rawFls);
   const isStarting = runningAction === "start" || runningAction === "restart" || (bootStarting && !coreReadyWithReview);
-  const transitionOverall = runningAction === "restart" ? "Restarting" : runningAction === "stop" ? "Stopping" : isStarting ? "Starting" : "";
+  const transitionOverall = runningAction === "restart" ? "Restarting Battlegroup" : runningAction === "stop" ? "Stopping" : isStarting ? "Starting" : "";
   const warmingOverall = /^Warming$/i.test(rawGames.label) ? "Warming" : "";
   const overall = readinessReady && !runningAction ? "OK" : isStarting ? transitionOverall : runningAction ? transitionOverall : serverState.stopped || actionStopped ? "Stopped" : coreReadyWithReview ? "Needs Review" : warmingOverall || liveOverall;
   const attentionHealth = !isStarting && (serverState.stopped || actionStopped || actionFailed) ? attentionHomeHealthCards() : null;
@@ -1355,7 +1388,7 @@ function transitionHomeHealthCard(item: { label: string; status: string; detail:
   if (runningAction !== "start" && runningAction !== "restart") return null;
   if (/^OK$/i.test(item.label) && /^Ready$/i.test(item.status)) return item;
   if (/^Warming$/i.test(item.label)) return item;
-  const label = runningAction === "restart" ? "Restarting" : "Getting Ready";
+  const label = runningAction === "restart" ? "Restarting Battlegroup" : "Getting Ready";
   const status = runningAction === "restart" ? "WARN" : "Starting";
   return { label, status, detail: "" };
 }
@@ -1369,23 +1402,31 @@ function getHomeServerState(status: string, readiness: string) {
   const overall = findLineValue(status, ["overall"]);
   const containerLines = sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
   const allContainersMissing = containerLines.length >= 4 && containerLines.every((line) => /\b(missing|stopped|exited|dead)\b/i.test(line));
+  const coreRuntimeContainerUp = containerLines.some((line) =>
+    /^(dune-postgres|dune-rmq-admin|dune-rmq-game|dune-text-router|dune-server-survival-1|dune-server-overmap)\s+.*\bUp\b/i.test(line)
+  );
+  const gameServersStopped = /Survival_1\s+NOT RUNNING/i.test(text) && /Overmap\s+NOT RUNNING/i.test(text);
+  const publishOnlyPartialState = !coreRuntimeContainerUp && gameServersStopped && containerLines.some((line) =>
+    /^(dune-director|dune-server-gateway)\s+/i.test(line)
+  );
   const bootStarting = isHomeBootStarting(status, readiness);
   const runningSignals = [
     !allContainersMissing && /^READY:/m.test(readiness),
     !allContainersMissing && /Overall:\s*(READY|WARMING)/i.test(status),
     !allContainersMissing && /\b(READY|WARMING)\b/i.test(overall),
-    /\bUp\s+\d+|\blistening\b|\bcontainer\s+\S+/i.test(text) && !/\b(stopped|exited|missing)\b/i.test(text)
+    coreRuntimeContainerUp && /\bUp\s+\d+|\blistening\b|\bcontainer\s+\S+/i.test(text) && !/\b(stopped|exited|missing)\b/i.test(text)
   ];
   const stoppedSignals = [
     /\b(server|stack)\s+(is\s+)?(stopped|not running|offline)\b/i.test(text),
     /Overall:\s*(STOPPED|OFFLINE|NOT RUNNING)/i.test(status),
     /\bNo\s+(running\s+)?containers\b/i.test(text),
     /\b(all|dune)\s+containers\s+(are\s+)?(stopped|down)\b/i.test(text),
-    allContainersMissing
+    allContainersMissing,
+    publishOnlyPartialState
   ];
   const stopped = !bootStarting && stoppedSignals.some(Boolean);
   const running = !stopped && runningSignals.some(Boolean);
-  const starting = bootStarting || (!stopped && !running && (/\bUp\s+\d+/i.test(text) || /\b(WARMING|WAIT|STARTING)\b/i.test(text)));
+  const starting = bootStarting || (!stopped && !running && coreRuntimeContainerUp && (/\bUp\s+\d+/i.test(text) || /\b(WARMING|WAIT|STARTING)\b/i.test(text)));
   return { running, stopped, starting };
 }
 
@@ -1396,15 +1437,22 @@ function isHomeBootStarting(status: string, readiness: string) {
   if (/Overall:\s*(READY|STOPPED|OFFLINE)/i.test(status) || /^READY:/m.test(readiness)) return false;
   const containerLines = sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
   const anyContainerUp = containerLines.some((line) => /\bUp\b/i.test(line));
+  const coreStartupContainerUp = containerLines.some((line) =>
+    /^(dune-postgres|dune-rmq-admin|dune-rmq-game|dune-text-router|dune-server-survival-1|dune-server-overmap)\s+.*\bUp\b/i.test(line)
+  );
   const missingContainers = containerLines.filter((line) => /\b(missing|stopped|exited|dead|not running)\b/i.test(line)).length;
   if (containerLines.length >= 8 && missingContainers >= 8 && !anyContainerUp) return false;
   const listenerLines = sectionLines(status, "Listeners").filter((line) => !/^CHECK\s+PORT\s+STATUS/i.test(line));
   const missingListeners = listenerLines.filter((line) => /\bMISSING\b/i.test(line)).length;
   const gameServersStopped = /Survival_1\s+NOT RUNNING/i.test(text) && /Overmap\s+NOT RUNNING/i.test(text);
   if (gameServersStopped && listenerLines.length > 0 && missingListeners === listenerLines.length && !anyContainerUp) return false;
-  if (/\b(WARMING|WAIT|STARTING)\b/i.test(text)) return true;
-  const readinessStarting = /^\s*(WARN|FAIL)\s+container\s+dune-/im.test(readiness) && !/^\s*OK\s+container\s+dune-server-(survival-1|overmap)\b/im.test(readiness);
-  return anyContainerUp || readinessStarting || (containerLines.length > 0 && missingContainers > 0) || (listenerLines.length > 0 && missingListeners > 0);
+  if (gameServersStopped && anyContainerUp && !coreStartupContainerUp) return false;
+  const gameServerText = sectionLines(status, "Game servers").join("\n");
+  if (/Overall:\s*(WARMING|STARTING)/i.test(status) || /\b(WARMING|STARTING)\b/i.test(gameServerText)) return true;
+  const readinessStarting = coreStartupContainerUp &&
+    /^\s*(WARN|FAIL)\s+container\s+dune-/im.test(readiness) &&
+    !/^\s*OK\s+container\s+dune-server-(survival-1|overmap)\b/im.test(readiness);
+  return coreStartupContainerUp || readinessStarting || (coreStartupContainerUp && containerLines.length > 0 && missingContainers > 0) || (coreStartupContainerUp && listenerLines.length > 0 && missingListeners > 0);
 }
 
 function homeOverallBadge(value: string) {
@@ -1602,14 +1650,19 @@ function formatHomePopulation(value: string) {
 }
 
 function findLineValue(text: string, keys: string[]) {
+  const normalizedKeys = new Set(keys.map((key) => String(key).trim().toLowerCase()));
   for (const rawLine of stripAnsi(text).split(/\r?\n/)) {
     const line = stripAnsi(rawLine).trim();
-    for (const key of keys) {
-      const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const match = line.match(new RegExp(`^\\s*${escaped}\\s*[:=]\\s*(.+)$`, "i"));
-      if (match) return match[1].trim();
-    }
+    const match = line.match(/^\s*([^:=]+)\s*[:=]\s*(.+)$/);
+    if (!match) continue;
+    if (normalizedKeys.has(match[1].trim().toLowerCase())) return match[2].trim();
   }
+  return "";
+}
+
+function normalizeServerMode(value: unknown): ServerMode | "" {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === "public" || raw === "local") return raw;
   return "";
 }
 

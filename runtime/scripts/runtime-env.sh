@@ -150,6 +150,11 @@ detect_public_ip() {
         printf '%s' "$ip"
         return 0
       fi
+      ip="$(curl -fsS --max-time 8 "$url" 2>/dev/null | tr -d '[:space:]' || true)"
+      if is_ipv4 "$ip"; then
+        printf '%s' "$ip"
+        return 0
+      fi
     done
   fi
 
@@ -395,12 +400,15 @@ resolve_rmq_admin_host() {
 }
 
 game_external_address_override_env_args() {
-  local bind_ip advertised_ip
+  local mode bind_ip advertised_ip
 
+  [ "${DUNE_DISABLE_GAME_EXTERNAL_ADDRESS_OVERRIDE:-0}" = "1" ] && return 0
   [ "${DUNE_ALLOW_GAME_EXTERNAL_ADDRESS_OVERRIDE:-0}" = "1" ] || return 0
 
+  mode="$(resolve_server_ip_mode 2>/dev/null || true)"
   bind_ip="$(resolve_game_listen_ip)"
   advertised_ip="$(resolve_advertised_ip)"
+
   if [ "$bind_ip" != "$advertised_ip" ]; then
     echo "Skipping EXTERNAL_ADDRESS_OVERRIDE: bind IP $bind_ip differs from advertised IP $advertised_ip." >&2
     return 0
@@ -412,6 +420,13 @@ game_external_address_override_env_args() {
 usersettings_engine_value() {
   local key="$1"
   local fallback="$2"
+  local value
+
+  value="$(python3 runtime/scripts/usersettings.py engine-values 2>/dev/null | awk -F '\t' -v key="$key" '$1 == key { print $2; exit }' || true)"
+  if value_is_known "$value"; then
+    printf '%s' "$value"
+    return 0
+  fi
 
   python3 - "$key" "$fallback" <<'PY2'
 import json

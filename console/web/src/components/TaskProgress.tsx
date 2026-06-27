@@ -123,6 +123,7 @@ function initTaskMessage(task: Task) {
   const lines = task.logLines.map((row) => row.line).join("\n");
   if (/Starting orchestrator container/i.test(lines)) return "Starting the deployment container.";
   if (/Downloading\/loading assets and running database setup\/update/i.test(lines)) return "Downloading server assets, loading Funcom images, and preparing the database.";
+  if (/Refresh generated map catalogs|Extracting .* catalog|Generated map catalogs refreshed/i.test(lines)) return "Refreshing generated map catalogs.";
   if (/Starting Dune stack/i.test(lines)) return "Starting Dune services.";
   if (/Wrote local config/i.test(lines)) return "Saving server settings and token.";
   if (/Preparing fresh runtime state|Backing up existing local config/i.test(lines)) return "Preparing local runtime files.";
@@ -138,6 +139,7 @@ function initTaskProgress(task: Task) {
   if (task.status === "failed" || task.status === "cancelled") return { percent: 100, label: "Deployment stopped." };
   const lines = task.logLines.map((row) => row.line).join("\n");
   if (/Starting Dune stack/i.test(lines)) return { percent: 90, label: "Starting game services." };
+  if (/Refresh generated map catalogs|Extracting .* catalog|Generated map catalogs refreshed/i.test(lines)) return { percent: 82, label: "Refreshing generated map catalogs." };
   if (/Downloading\/loading assets and running database setup\/update|SteamCMD|app_update|Loading server assets/i.test(lines)) return { percent: 68, label: "Downloading assets and preparing game data." };
   if (/Starting orchestrator container|Creating|Started|Running/i.test(lines)) return { percent: 42, label: "Starting deployment tools." };
   if (/Wrote local config|Generated battlegroup ID|Saving server settings/i.test(lines)) return { percent: 28, label: "Saving setup settings." };

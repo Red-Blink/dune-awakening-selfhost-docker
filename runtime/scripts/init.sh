@@ -29,6 +29,22 @@ require_docker_prereqs() {
   fi
 }
 
+run_timed_step() {
+  local label="$1"
+  shift
+  local start
+  local end
+  local elapsed
+
+  start="$(date +%s)"
+  echo
+  echo "=== $label ==="
+  "$@"
+  end="$(date +%s)"
+  elapsed=$((end - start))
+  echo "Finished: $label (${elapsed}s)"
+}
+
 prompt_default() {
   local prompt="$1"
   local default="$2"
@@ -187,6 +203,21 @@ fresh_reset_runtime() {
   else
     echo "No existing Postgres volume found."
   fi
+}
+
+preserve_env_extras() {
+  local source_file="$1"
+  [ -f "$source_file" ] || return 0
+  awk -F= '
+    /^[[:space:]]*($|#)/ { next }
+    $1 == "SERVER_IP" { next }
+    $1 == "SERVER_IP_MODE" { next }
+    $1 == "SERVER_TITLE" { next }
+    $1 == "SERVER_REGION" { next }
+    $1 == "STEAM_APP_ID" { next }
+    $1 == "BATTLEGROUP_ID" { next }
+    { print }
+  ' "$source_file"
 }
 
 
@@ -399,6 +430,9 @@ else
   esac
 fi
 
+preserved_env="$(mktemp)"
+preserve_env_extras .env > "$preserved_env" || true
+
 fresh_reset_runtime
 
 cat > .env <<EOF
@@ -408,6 +442,13 @@ SERVER_TITLE="$SERVER_TITLE"
 SERVER_REGION="$SERVER_REGION"
 STEAM_APP_ID=$STEAM_APP_ID
 EOF
+if [ -s "$preserved_env" ]; then
+  {
+    echo
+    cat "$preserved_env"
+  } >> .env
+fi
+rm -f "$preserved_env"
 
 cat > runtime/generated/battlegroup.env <<EOF
 BATTLEGROUP_ID=$BATTLEGROUP_ID
@@ -434,13 +475,9 @@ echo
 echo "Starting orchestrator container..."
 docker compose up -d --build orchestrator
 
-echo
-echo "Downloading/loading assets and running database setup/update..."
-runtime/scripts/update.sh install
+run_timed_step "Downloading/loading assets and running database setup/update" runtime/scripts/update.sh install
 
-echo
-echo "Starting Dune stack..."
-runtime/scripts/start-all.sh
+DUNE_START_SKIP_POSTGRES_START=1 DUNE_START_SKIP_DB_UPDATE=1 run_timed_step "Starting Dune stack" runtime/scripts/start-all.sh
 
 echo
 echo "Init complete."

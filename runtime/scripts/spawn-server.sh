@@ -692,6 +692,46 @@ fi
 
 if [ "$MAP_NAME" = "DeepDesert_1" ] && [ -x runtime/scripts/publish-deepdesert-state.sh ]; then
   runtime/scripts/publish-deepdesert-state.sh once >/dev/null 2>&1 || true
+  runtime/scripts/publish-deepdesert-overrides.sh once >/dev/null 2>&1 || true
+fi
+
+if [ "$MAP_NAME" != "Survival_1" ]; then
+  if [ "${DUNE_SYNC_NETWORK_STATE_AFTER_SPAWN:-0}" = "1" ]; then
+    runtime/scripts/publish-network-server-state-overrides.sh map "$MAP_NAME" >/dev/null 2>&1 || true
+  elif pgrep -f "publish-network-server-state-overrides.sh loop" >/dev/null 2>&1; then
+    timeout 20 runtime/scripts/publish-network-server-state-overrides.sh map "$MAP_NAME" >/dev/null 2>&1 || true
+  else
+    (
+      trap - EXIT
+      attempts="${DUNE_DYNAMIC_MAP_STATE_PUBLISH_ATTEMPTS:-12}"
+      interval="${DUNE_DYNAMIC_MAP_STATE_PUBLISH_INTERVAL_SECONDS:-10}"
+      ready_seen=0
+
+      for attempt in $(seq 1 "$attempts"); do
+        timeout 20 runtime/scripts/publish-network-server-state-overrides.sh map "$MAP_NAME" >/dev/null 2>&1 || true
+
+        if [ "$ready_seen" = "1" ]; then
+          break
+        fi
+
+        if docker exec dune-postgres psql -U postgres -d dune -Atc "
+          select exists (
+            select 1
+            from dune.world_partition wp
+            join dune.farm_state fs on fs.server_id = wp.server_id
+            where wp.map = '${MAP_NAME//\'/\'\'}'
+              and coalesce(wp.server_id, '') <> ''
+              and fs.ready = true
+              and fs.alive = true
+          );
+        " 2>/dev/null | grep -qx t; then
+          ready_seen=1
+        fi
+
+        sleep "$interval"
+      done
+    ) >/dev/null 2>&1 &
+  fi
 fi
 
 SPAWN_SUCCESS=1

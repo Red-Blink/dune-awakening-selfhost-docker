@@ -12,6 +12,7 @@ TRAVEL_GRACE_SECONDS="${DUNE_AUTOSCALER_TRAVEL_GRACE_SECONDS:-120}"
 STATE_FILE="${DUNE_AUTOSCALER_STATE_FILE:-runtime/generated/autoscaler-idle.tsv}"
 SERVER_ID_MAP_FILE="${DUNE_AUTOSCALER_SERVER_ID_MAP_FILE:-runtime/generated/autoscaler-server-ids.tsv}"
 DEMAND_FILE="${DUNE_AUTOSCALER_DEMAND_FILE:-runtime/generated/autoscaler-demand.tsv}"
+DEMAND_EVENT_FILE="${DUNE_AUTOSCALER_DEMAND_EVENT_FILE:-runtime/generated/autoscaler-demand-events.tsv}"
 HUB_TRAVEL_FILE="${DUNE_AUTOSCALER_HUB_TRAVEL_FILE:-runtime/generated/autoscaler-hub-travel.tsv}"
 DEEPDESERT_TRAVEL_FILE="${DUNE_AUTOSCALER_DEEPDESERT_TRAVEL_FILE:-runtime/generated/autoscaler-deepdesert-travel.tsv}"
 DIRECTOR_HEAL_FILE="${DUNE_AUTOSCALER_DIRECTOR_HEAL_FILE:-runtime/generated/autoscaler-director-heal.tsv}"
@@ -26,6 +27,7 @@ mkdir -p "$(dirname "$STATE_FILE")"
 touch "$STATE_FILE"
 touch "$SERVER_ID_MAP_FILE"
 touch "$DEMAND_FILE"
+touch "$DEMAND_EVENT_FILE"
 touch "$HUB_TRAVEL_FILE"
 touch "$DEEPDESERT_TRAVEL_FILE"
 touch "$DIRECTOR_HEAL_FILE"
@@ -126,7 +128,7 @@ replay_hagga_travel_handoff() {
 
   origin_id="$(hub_origin_id_for_map "$source_map" 2>/dev/null || true)"
   [ -n "$origin_id" ] || return 0
-  origin_server_id="$(hub_server_id_for_origin_id "$origin_id" 2>/dev/null || true)"
+  origin_server_id="$(origin_server_id_for_origin_id "$origin_id" 2>/dev/null || true)"
   [ -n "$origin_server_id" ] || return 0
 
   director_log_file="$(mktemp)"
@@ -491,6 +493,25 @@ map_has_recent_demand() {
   [ "$age" -lt "$TRAVEL_GRACE_SECONDS" ]
 }
 
+demand_event_seen() {
+  local event_id="$1"
+  [ -n "$event_id" ] || return 1
+  awk -F '\t' -v event="$event_id" '$1 == event { found=1; exit } END { exit(found ? 0 : 1) }' "$DEMAND_EVENT_FILE"
+}
+
+remember_demand_event() {
+  local event_id="$1"
+  local map="$2"
+  local ts="$3"
+  local tmp
+
+  [ -n "$event_id" ] || return 0
+  tmp="$(mktemp)"
+  awk -F '\t' -v now="$ts" '$3 && now - $3 < 600 { print }' "$DEMAND_EVENT_FILE" > "$tmp"
+  printf '%s\t%s\t%s\n' "$event_id" "$map" "$ts" >> "$tmp"
+  mv "$tmp" "$DEMAND_EVENT_FILE"
+}
+
 hub_container_for_map() {
   case "$1" in
     SH_Arrakeen) echo "dune-server-sh-arrakeen-3" ;;
@@ -530,11 +551,12 @@ remember_deepdesert_travel() {
   local request_token="$4"
   local ts="$5"
   local last_refresh="$6"
+  local target_partition="${7:-}"
   local tmp
 
   tmp="$(mktemp)"
   awk -F '\t' -v flow="$flow_id" '$1 != flow { print }' "$DEEPDESERT_TRAVEL_FILE" > "$tmp"
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$flow_id" "$player_id" "$origin_id" "$request_token" "$ts" "$last_refresh" >> "$tmp"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$flow_id" "$player_id" "$origin_id" "$request_token" "$ts" "$last_refresh" "$target_partition" >> "$tmp"
   mv "$tmp" "$DEEPDESERT_TRAVEL_FILE"
 }
 
@@ -548,11 +570,21 @@ forget_deepdesert_travel() {
 }
 
 deepdesert_target_json() {
-  python3 - <<'PY'
+  local target_partition="${1:-}"
+  DUNE_DEEPDESERT_TARGET_PARTITION="$target_partition" python3 - <<'PY'
 import json
+import os
 import subprocess
 
-sql = """
+target_partition = os.environ.get("DUNE_DEEPDESERT_TARGET_PARTITION", "").strip()
+partition_clause = ""
+if target_partition:
+    try:
+        partition_clause = f"  and wp.partition_id = {int(target_partition)}\n"
+    except ValueError:
+        raise SystemExit(1)
+
+sql = f"""
 select
   wp.partition_id,
   coalesce(wp.dimension_index, 0),
@@ -564,6 +596,7 @@ select
 from dune.world_partition wp
 join dune.farm_state fs on fs.server_id = wp.server_id
 where wp.map = 'DeepDesert_1'
+{partition_clause}\
 order by wp.dimension_index, wp.partition_id
 limit 1;
 """
@@ -643,7 +676,7 @@ from datetime import datetime, timedelta, timezone
 
 target = json.loads(os.environ["TARGET_JSON"])
 log_file = os.environ["LOG_FILE"]
-response_re = re.compile(r'Notified player\(s\) "([^"]+)" of travel response (SH_Arrakeen3|SH_HarkoVillage4): (\{.*\})')
+response_re = re.compile(r'Notified player\(s\) "([^"]+)" of travel response (SH_Arrakeen3|SH_HarkoVillage4|Overmap2): (\{.*\})')
 
 with open(log_file, encoding="utf-8", errors="replace") as f:
     for line in f:
@@ -656,7 +689,7 @@ with open(log_file, encoding="utf-8", errors="replace") as f:
             payload = json.loads(match.group(3))
         except json.JSONDecodeError:
             continue
-        if payload.get("Code") != 1:
+        if payload.get("Code") not in (1, 8):
             continue
         if payload.get("MapName") != "Survival_1":
             continue
@@ -699,7 +732,7 @@ PY
     hub_travel_seen "$flow_id" && continue
 
     local response_json grant_json origin_server_id
-    origin_server_id="$(hub_server_id_for_origin_id "$origin_id" 2>/dev/null || true)"
+    origin_server_id="$(origin_server_id_for_origin_id "$origin_id" 2>/dev/null || true)"
     [ -n "$origin_server_id" ] || continue
 
     response_json="$(python3 - "$payload_json" <<'PY'
@@ -738,7 +771,7 @@ if not target_json:
     raise SystemExit(0)
 
 target = json.loads(target_json)
-response_re = re.compile(r'Notified player\(s\) "([^"]+)" of travel response (SH_Arrakeen3|SH_HarkoVillage4): (\{.*\})')
+response_re = re.compile(r'Notified player\(s\) "([^"]+)" of travel response (SH_Arrakeen3|SH_HarkoVillage4|Overmap2): (\{.*\})')
 
 for line in sys.stdin:
     match = response_re.search(line)
@@ -750,7 +783,7 @@ for line in sys.stdin:
         payload = json.loads(match.group(3))
     except json.JSONDecodeError:
         continue
-    if payload.get("Code") != 1:
+    if payload.get("Code") not in (1, 8):
         continue
     if payload.get("MapName") != "Survival_1":
         continue
@@ -787,7 +820,7 @@ PY
       hub_travel_seen "$flow_id" && continue
 
       local response_json grant_json origin_server_id
-      origin_server_id="$(hub_server_id_for_origin_id "$origin_id" 2>/dev/null || true)"
+      origin_server_id="$(origin_server_id_for_origin_id "$origin_id" 2>/dev/null || true)"
       [ -n "$origin_server_id" ] || continue
 
       response_json="$(python3 - "$payload_json" <<'PY'
@@ -815,19 +848,15 @@ PY
 }
 
 scan_deepdesert_loading_responses() {
-  local director_log_file pending_rows now target_json
-
-  target_json="$(deepdesert_target_json 2>/dev/null || true)"
-  [ -n "$target_json" ] || return 0
+  local director_log_file pending_rows now
 
   director_log_file="$(mktemp)"
   docker logs --since "$SINCE" dune-director > "$director_log_file" 2>&1 || true
-  pending_rows="$(TARGET_JSON="$target_json" LOG_FILE="$director_log_file" python3 - <<'PY'
+  pending_rows="$(LOG_FILE="$director_log_file" python3 - <<'PY'
 import json
 import os
 import re
 
-target = json.loads(os.environ["TARGET_JSON"])
 log_file = os.environ["LOG_FILE"]
 response_re = re.compile(r'Notified player\(s\) "([^"]+)" of travel response (Overmap2): (\{.*\})')
 
@@ -851,14 +880,13 @@ with open(log_file, encoding="utf-8", errors="replace") as f:
         flow_id = payload.get("RequestID") or ""
         if not flow_id:
             continue
-        payload["ServerState"] = 2
-        payload["DestinationPartitionId"] = target["partition_id"]
-        payload["BroadcastExchange"] = f"status.DeepDesert_1.dim_{target['dimension']}"
-        print("{}|{}|{}|{}|{}".format(
+        destination_partition = payload.get("DestinationPartitionId") or ""
+        print("{}|{}|{}|{}|{}|{}".format(
             flow_id,
             player_id,
             origin_id,
             payload.get("QueueToken") or 0,
+            destination_partition,
             json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
         ))
 PY
@@ -866,42 +894,76 @@ PY
   rm -f "$director_log_file"
 
   now="$(date +%s)"
-  while IFS='|' read -r flow_id player_id origin_id request_token response_json; do
+  while IFS='|' read -r flow_id player_id origin_id request_token target_partition original_response_json; do
     [ -n "${flow_id:-}" ] || continue
 
-    local origin_server_id
+    local origin_server_id target_json response_json
     origin_server_id="$(origin_server_id_for_origin_id "$origin_id" 2>/dev/null || true)"
     [ -n "$origin_server_id" ] || continue
+    if [ -n "${target_partition:-}" ]; then
+      target_json="$(deepdesert_target_json "$target_partition" 2>/dev/null || true)"
+    else
+      target_json="$(deepdesert_target_json 2>/dev/null || true)"
+    fi
+    if [ -z "$target_json" ] && printf '%s' "${target_partition:-}" | grep -Eq '^[0-9]+$'; then
+      echo "SPAWN deepdesert-response partition=$target_partition flow=$flow_id"
+      runtime/scripts/spawn-server.sh "$target_partition" || {
+        echo "ERROR failed to spawn DeepDesert_1 partition=$target_partition flow=$flow_id"
+        continue
+      }
+      target_json="$(deepdesert_target_json "$target_partition" 2>/dev/null || true)"
+    fi
+    if [ -z "$target_json" ] && [ -z "${target_partition:-}" ]; then
+      target_json="$(deepdesert_target_json 2>/dev/null || true)"
+    fi
+    [ -n "$target_json" ] || continue
+
+    response_json="$(TARGET_JSON="$target_json" RESPONSE_JSON="$original_response_json" python3 - <<'PY'
+import json
+import os
+
+target = json.loads(os.environ["TARGET_JSON"])
+payload = json.loads(os.environ["RESPONSE_JSON"])
+payload["ServerState"] = 2
+payload["DestinationPartitionId"] = target["partition_id"]
+payload["BroadcastExchange"] = f"status.DeepDesert_1.dim_{target['dimension']}"
+print(json.dumps(payload, separators=(",", ":"), ensure_ascii=False))
+PY
+)"
 
     publish_rmq_json "heartbeats" "$origin_server_id" "$response_json" "travel-response-dd-${flow_id}" || true
 
     if ! deepdesert_travel_seen "$flow_id"; then
-      remember_deepdesert_travel "$flow_id" "$player_id" "$origin_id" "$request_token" "$now" "$now"
+      remember_deepdesert_travel "$flow_id" "$player_id" "$origin_id" "$request_token" "$now" "$now" "$target_partition"
     else
-      remember_deepdesert_travel "$flow_id" "$player_id" "$origin_id" "$request_token" "$now" "$now"
+      remember_deepdesert_travel "$flow_id" "$player_id" "$origin_id" "$request_token" "$now" "$now" "$target_partition"
     fi
     echo "DEEPDESERT-QUEUE flow=$flow_id origin=$origin_id server=$origin_server_id state=loading"
   done <<< "$pending_rows"
 }
 
 progress_deepdesert_travel_handoffs() {
-  local now line flow_id player_id origin_id request_token seen_at last_refresh
-  local target_json
+  local now line flow_id player_id origin_id request_token seen_at last_refresh target_partition
 
   [ -s "$DEEPDESERT_TRAVEL_FILE" ] || return 0
-  target_json="$(deepdesert_target_json 2>/dev/null || true)"
-  [ -n "$target_json" ] || return 0
   now="$(date +%s)"
 
-  while IFS=$'\t' read -r flow_id player_id origin_id request_token seen_at last_refresh; do
+  while IFS=$'\t' read -r flow_id player_id origin_id request_token seen_at last_refresh target_partition; do
     [ -n "${flow_id:-}" ] || continue
 
-    local origin_server_id
+    local origin_server_id target_json
     origin_server_id="$(origin_server_id_for_origin_id "$origin_id" 2>/dev/null || true)"
     if [ -z "$origin_server_id" ]; then
       forget_deepdesert_travel "$flow_id"
       continue
     fi
+
+    if [ -n "${target_partition:-}" ]; then
+      target_json="$(deepdesert_target_json "$target_partition" 2>/dev/null || true)"
+    else
+      target_json="$(deepdesert_target_json 2>/dev/null || true)"
+    fi
+    [ -n "$target_json" ] || continue
 
     if [ $((now - seen_at)) -gt 300 ]; then
       forget_deepdesert_travel "$flow_id"
@@ -984,7 +1046,7 @@ print(json.dumps(json.loads(Path("/tmp/deepdesert-progress.json").read_text())["
 PY
 )"
         publish_rmq_json "heartbeats" "$origin_server_id" "$response_json" "travel-response-dd-${flow_id}" || true
-        remember_deepdesert_travel "$flow_id" "$player_id" "$origin_id" "$request_token" "$seen_at" "$now"
+        remember_deepdesert_travel "$flow_id" "$player_id" "$origin_id" "$request_token" "$seen_at" "$now" "$target_partition"
         echo "DEEPDESERT-QUEUE flow=$flow_id origin=$origin_id server=$origin_server_id state=loading-refresh"
       fi
     fi
@@ -1055,6 +1117,12 @@ map_is_overmap_active() {
 map_is_disabled() {
   local map="$1"
   runtime/scripts/map-modes.sh is-disabled "$map" >/dev/null 2>&1
+}
+
+map_is_dynamic() {
+  local map="$1" mode
+  mode="$(runtime/scripts/map-modes.sh mode "$map" 2>/dev/null | awk '{ print $2 }' || true)"
+  [ "$mode" = "dynamic" ]
 }
 
 overmap_active_maps() {
@@ -1161,10 +1229,14 @@ survival_fallback_target_info() {
 handle_demand() {
   local map="$1"
   local num="$2"
+  local event_id="${3:-}"
   local dedicated_scaling
   local now
 
   now="$(date +%s)"
+  if [ -n "$event_id" ] && demand_event_seen "$event_id"; then
+    return 0
+  fi
   remember_map_demand "$map" "$now"
 
   case "$map" in
@@ -1194,37 +1266,31 @@ handle_demand() {
   running="$(container_count_for_map "$map")"
 
   if [ "$map" = "DeepDesert_1" ]; then
-    local desired_active current_active needed
+    local desired_active current_active
     desired_active="$(active_dimensions_for_map "$map" | tr -d '[:space:]')"
     [ -n "$desired_active" ] || desired_active=1
-
-    if [ "$assigned" -ge "$desired_active" ] 2>/dev/null || [ "$running" -ge "$desired_active" ] 2>/dev/null; then
-      echo "OK   demand map=$map num=$num target=$desired_active assigned=$assigned containers=$running"
-      return 0
-    fi
-
     current_active="$assigned"
     if [ "${running:-0}" -gt "${current_active:-0}" ] 2>/dev/null; then
       current_active="$running"
     fi
-    needed=$((desired_active - current_active))
-    [ "$needed" -gt 0 ] || needed=1
+    if [ "$current_active" -gt 0 ] 2>/dev/null; then
+      echo "OK   demand map=$map num=$num target=existing assigned=$assigned containers=$running"
+      remember_demand_event "$event_id" "$map" "$now"
+      return 0
+    fi
 
-    while [ "$needed" -gt 0 ]; do
-      echo "SPAWN demand map=$map num=$num target=$desired_active assigned=$assigned containers=$running"
-      runtime/scripts/spawn-server.sh "$map" || {
-        echo "ERROR failed to spawn $map"
-        return 0
-      }
-      assigned="$(map_assigned_count "$map")"
-      running="$(container_count_for_map "$map")"
-      current_active="$assigned"
-      if [ "${running:-0}" -gt "${current_active:-0}" ] 2>/dev/null; then
-        current_active="$running"
-      fi
-      needed=$((desired_active - current_active))
-    done
+    echo "SPAWN demand map=$map num=$num target=single assigned=$assigned containers=$running"
+
+    runtime/scripts/spawn-server.sh "$map" || {
+      echo "ERROR failed to spawn $map"
+      return 0
+    }
+    remember_demand_event "$event_id" "$map" "$now"
     return 0
+  fi
+
+  if [ -n "$event_id" ]; then
+    remember_demand_event "$event_id" "$map" "$now"
   fi
 
   dedicated_scaling="$(map_uses_dedicated_scaling "$map")"
@@ -1351,36 +1417,18 @@ ensure_overmap_travel_maps_prewarmed() {
   map="DeepDesert_1"
   map_is_overmap_active "$map" || return 0
   map_is_disabled "$map" && return 0
-  desired_active="$(active_dimensions_for_map "$map" | tr -d '[:space:]')"
-  [ -n "$desired_active" ] || desired_active=1
 
   assigned="$(map_assigned_count "$map")"
   running="$(container_count_for_map "$map")"
-
-  current_active="$assigned"
-  if [ "${running:-0}" -gt "${current_active:-0}" ] 2>/dev/null; then
-    current_active="$running"
-  fi
-
-  if [ "$current_active" -ge "$desired_active" ] 2>/dev/null; then
+  if [ "$assigned" != "0" ] || [ "$running" != "0" ]; then
     return 0
   fi
 
-  needed=$((desired_active - current_active))
-  while [ "$needed" -gt 0 ]; do
-    echo "SPAWN overmap-prewarm map=$map target=$desired_active assigned=$assigned containers=$running"
-    runtime/scripts/spawn-server.sh "$map" || {
-      echo "ERROR failed to prewarm map=$map source=Overmap"
-      return 0
-    }
-    assigned="$(map_assigned_count "$map")"
-    running="$(container_count_for_map "$map")"
-    current_active="$assigned"
-    if [ "${running:-0}" -gt "${current_active:-0}" ] 2>/dev/null; then
-      current_active="$running"
-    fi
-    needed=$((desired_active - current_active))
-  done
+  echo "SPAWN overmap-prewarm map=$map target=single assigned=$assigned containers=$running"
+  runtime/scripts/spawn-server.sh "$map" || {
+    echo "ERROR failed to prewarm map=$map source=Overmap"
+    return 0
+  }
 }
 
 scan_named_destination_failures() {
@@ -1499,9 +1547,34 @@ PY
             and class = '/Game/Dune/Characters/Player/BP_DunePlayerController.BP_DunePlayerController_C'
         );
 
-        delete from dune.player_respawn_locations
-        where account_id = $account_id
-          and map = 'HaggaBasin';
+        do \$\$
+        declare
+          respawn_identity_column text;
+          respawn_identity_id bigint;
+        begin
+          select column_name into respawn_identity_column
+          from information_schema.columns
+          where table_schema = 'dune'
+            and table_name = 'player_respawn_locations'
+            and column_name in ('character_id', 'account_id')
+          order by case column_name when 'character_id' then 0 else 1 end
+          limit 1;
+
+          if respawn_identity_column = 'character_id' then
+            select id into respawn_identity_id
+            from dune.player_state
+            where account_id = $account_id
+            limit 1;
+          elsif respawn_identity_column = 'account_id' then
+            respawn_identity_id := $account_id;
+          end if;
+
+          if respawn_identity_column is not null and respawn_identity_id is not null then
+            execute format('delete from dune.player_respawn_locations where %I = \$1 and map = ''HaggaBasin''', respawn_identity_column)
+            using respawn_identity_id;
+          end if;
+        end
+        \$\$;
       " >/dev/null
 
       replay_hagga_travel_handoff "$flow_id" "$source_map" "$destination_name"
@@ -1615,6 +1688,10 @@ scan_reconnect_demand() {
           echo "SKIP reconnect partition=$target_partition_id map=$target_map account=$account_id mode=disabled"
           continue
         fi
+        if map_is_dynamic "$target_map"; then
+          echo "SKIP reconnect partition=$target_partition_id map=$target_map account=$account_id mode=dynamic"
+          continue
+        fi
         running="$(container_count_for_map "$target_map")"
         if [ "$running" = "0" ]; then
           echo "SPAWN reconnect partition=$target_partition_id map=$target_map account=$account_id"
@@ -1689,6 +1766,7 @@ scan_travel_demand() {
 
   demand_rows="$(
     docker logs --since "$SINCE" dune-director 2>&1 | python3 -c '
+import hashlib
 import re
 import sys
 
@@ -1720,18 +1798,19 @@ for line in sys.stdin:
     if num <= 0:
         continue
 
-    key = (map_name, num)
+    event_id = hashlib.sha1(line.encode("utf-8", errors="replace")).hexdigest()
+    key = event_id
     if key in seen:
         continue
 
     seen.add(key)
-    print(f"{map_name}|{num}")
+    print(f"{event_id}|{map_name}|{num}")
 '
   )"
 
-  while IFS='|' read -r map num; do
+  while IFS='|' read -r event_id map num; do
     [ -n "${map:-}" ] || continue
-    handle_demand "$map" "$num"
+    handle_demand "$map" "$num" "$event_id"
   done <<< "$demand_rows"
 }
 

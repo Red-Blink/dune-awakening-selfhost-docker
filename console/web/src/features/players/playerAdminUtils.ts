@@ -1,11 +1,22 @@
 import type { Task } from "../../api/setup";
+import { friendlyApiError } from "../../api/client";
 import { friendlyCatalogName } from "../../components/common/ItemCatalog";
 import { stripAnsi } from "../../lib/display";
 
-export const VEHICLE_SPAWN_OFFSET_UNITS = 1000; // 10 meters in Unreal units.
+export const VEHICLE_SPAWN_OFFSET_UNITS = 2000; // 20 meters in Unreal units.
+export const FLYING_VEHICLE_SPAWN_OFFSET_UNITS = 2000; // 20 meters in Unreal units.
+
+export function vehicleSpawnOffsetUnits(vehicleId: string) {
+  return /ornithopter/i.test(String(vehicleId || "")) ? FLYING_VEHICLE_SPAWN_OFFSET_UNITS : VEHICLE_SPAWN_OFFSET_UNITS;
+}
+
+export function vehicleSpawnDistanceLabel(offsetUnits: number) {
+  const meters = offsetUnits / 100;
+  return `${Number.isInteger(meters) ? meters : meters.toFixed(1)} meters`;
+}
 
 export function friendlyInlineError(error: unknown) {
-  const text = error instanceof Error ? error.message : String(error || "Action failed.");
+  const text = friendlyApiError(error || "Action failed.");
   if (/crafting recipe unlocks require the player to be offline/i.test(text)) return "Player must be offline to unlock recipes.";
   if (/research unlocks require the player to be offline/i.test(text)) return "Player must be offline to unlock research.";
   return text.replace(/^Error:\s*/i, "").trim() || "Action failed.";
