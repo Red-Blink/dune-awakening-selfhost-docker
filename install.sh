@@ -50,6 +50,8 @@ install_basic_tools() {
     need_sudo zypper --non-interactive install ca-certificates curl
   elif command -v pacman >/dev/null 2>&1; then
     need_sudo pacman -Sy --noconfirm ca-certificates curl
+  elif command -v apk >/dev/null 2>&1; then
+    need_sudo apk add --no-cache ca-certificates curl
   fi
 }
 
