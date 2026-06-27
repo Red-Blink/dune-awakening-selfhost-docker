@@ -83,6 +83,26 @@ install_docker() {
   fi
 }
 
+install_docker_alpine() {
+  local repos_file="/etc/apk/repositories"
+
+  # Ensure the community repository line of the package manager is not commented out as this is needed to install Docker Package.
+  if grep -qE '^#.*community$' "$repos_file"; then
+    echo "The Alpine community repository is currently disabled in $repos_file."
+    echo "Docker is not listed in the default Alpine repository, so this installer needs to enable the community repository to install Docker."
+    printf "Allow this installer to enable it? [y/N] " #Force the user to confirm enabling the community repository so they are aware we are making a change to the default settings.
+    read -r response
+    if echo "$response" | grep -qi "^y"; then
+      need_sudo sed -i 's|^#\(.*community\)$|\1|' "$repos_file"
+    else
+      echo "Cannot install Docker without the community repository. Aborting."
+      exit 1
+    fi
+  fi
+
+  need_sudo apk add --no-cache docker
+}
+
 select_docker_command() {
   if docker info >/dev/null 2>&1; then
     DOCKER=(docker)
