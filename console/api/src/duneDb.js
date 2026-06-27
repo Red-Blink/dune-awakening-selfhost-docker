@@ -1,5 +1,8 @@
 import { assertIdentifier, intParam, isReadOnlySql, quoteIdentifier, quoteQualified, rowsResult } from "./db.js";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
+  craftingRecipeCatalogRows,
   factionDisplayName,
   factionIdByName,
   factionTierBumps,
@@ -25,6 +28,7 @@ import {
 
 const MAX_INTEL_POINTS = 2779;
 const MAX_TABLE_PREVIEW_ROWS = 10000;
+let craftingRecipeCatalogCache = null;
 
 export class UnsupportedCapabilityError extends Error {
   constructor(message, details = {}) {
@@ -445,7 +449,7 @@ async function syncChangedTutorials(db, before, after) {
 
 async function supportsJourneyLiveRefresh(db) {
   try {
-    return await tableExists(db, "journey_story_node") &&
+    return Boolean(await journeyIdentitySchema(db)) &&
       await functionExists(db, "dune.save_journey_story_node(bigint,text,boolean,boolean,jsonb,jsonb,jsonb,jsonb,dune.journeystoryresetgroup)") &&
       await functionExists(db, "dune.delete_journey_story_node(bigint,text)");
   } catch {
@@ -454,8 +458,11 @@ async function supportsJourneyLiveRefresh(db) {
 }
 
 async function journeySnapshot(db) {
+  const schema = await journeyIdentitySchema(db);
+  if (!schema) return new Map();
+  const idColumn = quoteIdentifier(schema.journeyIdColumn);
   const result = await db.query(`
-    select account_id::text as account_id,
+    select ${idColumn}::text as account_id,
            story_node_id,
            coalesce(override_reward_block, false) as override_reward_block,
            coalesce(has_pending_reward, false) as has_pending_reward,
@@ -465,7 +472,7 @@ async function journeySnapshot(db) {
            coalesce(metadata_state, '{}'::jsonb)::text as metadata_state,
            reset_group::text as reset_group
     from dune.journey_story_node
-    order by account_id, story_node_id`);
+    order by ${idColumn}, story_node_id`);
   return new Map(result.rows.map((row) => [`${row.account_id}:${row.story_node_id}`, {
     accountId: String(row.account_id),
     storyNodeId: String(row.story_node_id),
@@ -507,7 +514,8 @@ async function syncChangedJourneyNodes(db, before, after) {
 
 async function supportsTagsLiveRefresh(db) {
   try {
-    return await tableExists(db, "player_tags") &&
+    const schema = await journeyIdentitySchema(db);
+    return Boolean(schema?.tagIdColumn) &&
       await functionExists(db, "dune.update_player_tags(bigint,text[],text[])");
   } catch {
     return false;
@@ -515,10 +523,13 @@ async function supportsTagsLiveRefresh(db) {
 }
 
 async function playerTagsSnapshot(db) {
+  const schema = await journeyIdentitySchema(db);
+  if (!schema) return new Map();
+  const idColumn = quoteIdentifier(schema.tagIdColumn);
   const result = await db.query(`
-    select account_id::text as account_id, tag
+    select ${idColumn}::text as account_id, tag
     from dune.player_tags
-    order by account_id, tag`);
+    order by ${idColumn}, tag`);
   const out = new Map();
   for (const row of result.rows) {
     const accountId = String(row.account_id);
@@ -591,11 +602,36 @@ async function playerFactionSnapshot(db) {
   }]));
 }
 
+async function pledgeGuildAdminFactionIfNeeded(db, actorId, factionId) {
+  if (Number(factionId) === 3) return;
+  try {
+    if (!(await tableExists(db, "guild_members")) ||
+        !(await tableExists(db, "guilds")) ||
+        !(await functionExists(db, "dune.pledge_guild_allegiance(bigint,bigint,smallint)"))) {
+      return;
+    }
+    const result = await db.query(`
+      select gm.guild_id::text as guild_id,
+             coalesce(g.guild_faction, 3)::int as guild_faction
+      from dune.guild_members gm
+      join dune.guilds g on g.guild_id = gm.guild_id
+      where gm.player_id = $1::bigint
+        and gm.role_id = 100`, [actorId]);
+    for (const row of result.rows) {
+      if (Number(row.guild_faction) === Number(factionId)) continue;
+      await db.query("select dune.pledge_guild_allegiance($1::bigint, $2::bigint, 3::smallint)", [row.guild_id, actorId]);
+    }
+  } catch {
+    // Older schemas can still refresh faction membership without guild allegiance support.
+  }
+}
+
 async function syncChangedPlayerFaction(db, before, after) {
   for (const [actorId, next] of after) {
     const previous = before.get(actorId);
     if (previous && previous.factionId === next.factionId && previous.changedAt === next.changedAt) continue;
     await db.query("select dune.change_player_faction($1::bigint, $2::smallint, 3::smallint, coalesce($3::timestamp, now()::timestamp))", [next.actorId, next.factionId, next.changedAt || null]);
+    await pledgeGuildAdminFactionIfNeeded(db, next.actorId, next.factionId);
   }
   for (const [actorId, previous] of before) {
     if (after.has(actorId)) continue;
@@ -797,11 +833,21 @@ export async function listPlayers(db, { online = false, q = "" } = {}) {
     return unsupported("players", ["dune.actors", "dune.player_state"]);
   }
   const lastSeenSelect = await playerLastSeenSelect(db);
+  const lastSeenWithOnlineFallback = `
+    case
+      when coalesce(ps.online_status::text, '') = 'Online'
+        then coalesce(nullif(${lastSeenSelect}, ''), (current_timestamp at time zone 'UTC')::text)
+      else ${lastSeenSelect}
+    end
+  `;
   const values = [];
   let where = "a.class ilike '%PlayerCharacter%'";
   where += " and coalesce(ac.\"user\", '') <> 'A5C0DE5E12A00001'";
+  where += " and coalesce(ac.\"user\", '') <> 'A5C0DE5E12A00002'";
   where += " and coalesce(ac.funcom_id, '') <> 'Server#0001'";
+  where += " and coalesce(ac.funcom_id, '') <> 'MessageOfTheDay#0001'";
   where += " and coalesce(ps.character_name, '') <> 'Server'";
+  where += " and coalesce(ps.character_name, '') <> 'Message of the Day'";
   if (online) where += " and coalesce(ps.online_status::text, '') = 'Online'";
   if (q) {
     values.push(`%${q}%`);
@@ -823,7 +869,7 @@ export async function listPlayers(db, { online = false, q = "" } = {}) {
            a.class,
            coalesce(a.map, '') as map,
            coalesce(ps.online_status::text, 'Offline') as online_status,
-           ${lastSeenSelect} as last_seen
+           ${lastSeenWithOnlineFallback} as last_seen
     from dune.actors a
     left join dune.player_state ps on ps.account_id = a.owner_account_id
     left join dune.accounts ac on ac.id = a.owner_account_id
@@ -954,6 +1000,21 @@ async function leadershipGuilds(db) {
 
 function firstExistingColumn(columns, names) {
   return names.find((name) => columns.has(name)) || "";
+}
+
+async function journeyIdentitySchema(db) {
+  if (!(await tableExists(db, "journey_story_node")) || !(await tableExists(db, "player_tags"))) return null;
+  const journeyColumns = await columnsFor(db, "journey_story_node");
+  const tagColumns = await columnsFor(db, "player_tags");
+  const journeyIdColumn = firstExistingColumn(journeyColumns, ["character_id", "account_id"]);
+  const tagIdColumn = firstExistingColumn(tagColumns, ["character_id", "account_id"]);
+  if (!journeyIdColumn || !tagIdColumn || journeyIdColumn !== tagIdColumn) return null;
+  return { journeyIdColumn, tagIdColumn };
+}
+
+function playerJourneyIdentity(player, columnName) {
+  if (columnName === "character_id") return player.playerStateId;
+  return player.accountId;
 }
 
 async function playerLastSeenSelect(db) {
@@ -1215,9 +1276,16 @@ export async function playerPosition(db, id) {
   const actorId = intParam(id, "player id", 1);
   try {
     const result = await db.query(`
-      select id as actor_id, map, (transform).location::text as location, (transform).rotation::text as rotation
+      select id as actor_id,
+             map,
+             ((transform).location).x as x,
+             ((transform).location).y as y,
+             ((transform).location).z as z,
+             0::float8 as yaw,
+             (transform).location::text as location,
+             (transform).rotation::text as rotation
       from dune.actors
-      where id = $1`, [actorId]);
+      where id = $1 and transform is not null`, [actorId]);
     return { capabilities: { position: true }, position: result.rows[0] || null };
   } catch (error) {
     return { capabilities: { position: false }, reason: "dune.actors transform composite columns were not available", error: error.message };
@@ -1637,40 +1705,30 @@ export async function playerCraftingRecipes(db, id) {
   await requireCapability(await supportsCraftingRecipes(db), "Crafting recipes require dune.actors.properties with CraftingRecipesLibraryActorComponent.");
   const player = await resolvePlayerMutationTarget(db, id);
   const result = await db.query(`
-    with all_recipes as (
-      select distinct on (recipe->'BaseRecipeId'->>'Name')
-             recipe->'BaseRecipeId'->>'Name' as recipe_id,
-             coalesce(nullif(recipe->>'m_Source', ''), 'Unknown') as source,
-             case when recipe->>'m_QualityLevel' ~ '^-?[0-9]+$' then (recipe->>'m_QualityLevel')::int else 0 end as quality_level
-      from dune.actors a
-      cross join lateral jsonb_array_elements(coalesce(a.properties->'CraftingRecipesLibraryActorComponent'->'m_KnownItemRecipes', '[]'::jsonb)) recipe
-      where recipe->'BaseRecipeId'->>'Name' is not null
-      order by recipe->'BaseRecipeId'->>'Name', coalesce(nullif(recipe->>'m_Source', ''), 'Unknown')
-    ),
-    player_recipes as (
+    with player_recipes as (
       select recipe->'BaseRecipeId'->>'Name' as recipe_id
       from dune.actors a
       cross join lateral jsonb_array_elements(coalesce(a.properties->'CraftingRecipesLibraryActorComponent'->'m_KnownItemRecipes', '[]'::jsonb)) recipe
       where a.id = $1 and recipe->'BaseRecipeId'->>'Name' is not null
     )
-    select all_recipes.recipe_id,
-           all_recipes.source,
-           all_recipes.quality_level,
-           (player_recipes.recipe_id is not null) as unlocked
-    from all_recipes
-    left join player_recipes on player_recipes.recipe_id = all_recipes.recipe_id
-    order by all_recipes.recipe_id`, [player.actorId]);
+    select recipe_id from player_recipes
+    order by recipe_id`, [player.actorId]);
+  const unlocked = new Set(result.rows.map((row) => String(row.recipe_id || "")).filter(Boolean));
+  const catalog = craftingRecipeCatalog();
+  const rows = catalog.length
+    ? catalog.map((row) => ({ ...row, unlocked: unlocked.has(row.recipeId) }))
+    : [...unlocked].map((recipeId) => ({
+      recipeId,
+      displayName: recipeDisplayName(recipeId),
+      category: recipeCategory(recipeId),
+      source: "Known Recipes",
+      qualityLevel: 0,
+      unlocked: true
+    }));
   return {
     capabilities: { craftingRecipes: true },
     player,
-    rows: result.rows.map((row) => ({
-      recipeId: row.recipe_id,
-      displayName: recipeDisplayName(row.recipe_id),
-      category: recipeCategory(row.recipe_id),
-      source: row.source || "Unknown",
-      qualityLevel: Number(row.quality_level || 0),
-      unlocked: Boolean(row.unlocked)
-    }))
+    rows
   };
 }
 
@@ -1680,14 +1738,17 @@ export async function unlockCraftingRecipe(db, id, { recipeId }) {
   return db.transaction(async (tx) => {
     const player = await resolvePlayerMutationTarget(tx, id);
     requireOfflinePlayer(player, "Crafting recipe unlocks");
-    const known = await tx.query(`
-      select exists (
-        select 1
-        from dune.actors a
-        cross join lateral jsonb_array_elements(coalesce(a.properties->'CraftingRecipesLibraryActorComponent'->'m_KnownItemRecipes', '[]'::jsonb)) recipe
-        where recipe->'BaseRecipeId'->>'Name' = $1
-      ) as exists`, [safeRecipeId]);
-    if (!known.rows[0]?.exists) throw new Error(`Crafting recipe ${safeRecipeId} was not found in the game database.`);
+    const catalogHasRecipe = craftingRecipeCatalog().some((row) => row.recipeId === safeRecipeId);
+    if (!catalogHasRecipe) {
+      const known = await tx.query(`
+        select exists (
+          select 1
+          from dune.actors a
+          cross join lateral jsonb_array_elements(coalesce(a.properties->'CraftingRecipesLibraryActorComponent'->'m_KnownItemRecipes', '[]'::jsonb)) recipe
+          where recipe->'BaseRecipeId'->>'Name' = $1
+        ) as exists`, [safeRecipeId]);
+      if (!known.rows[0]?.exists) throw new Error(`Crafting recipe ${safeRecipeId} was not found in the game database.`);
+    }
     const current = await tx.query(`
       select properties->'CraftingRecipesLibraryActorComponent'->'m_KnownItemRecipes' as recipes
       from dune.actors
@@ -1712,6 +1773,20 @@ export async function unlockCraftingRecipe(db, id, { recipeId }) {
       where id = $1 and properties ? 'CraftingRecipesLibraryActorComponent'`, [player.actorId, JSON.stringify(nextRecipes)]);
     return { ok: true, player, recipeId: safeRecipeId, alreadyUnlocked: false };
   });
+}
+
+function craftingRecipeCatalog() {
+  if (craftingRecipeCatalogCache) return craftingRecipeCatalogCache;
+  try {
+    const path = [
+      resolve(process.cwd(), "runtime/data/admin-items.json"),
+      resolve(process.cwd(), "../../runtime/data/admin-items.json")
+    ].find((candidate) => existsSync(candidate)) || resolve(process.cwd(), "runtime/data/admin-items.json");
+    craftingRecipeCatalogCache = craftingRecipeCatalogRows(JSON.parse(readFileSync(path, "utf8")));
+  } catch {
+    craftingRecipeCatalogCache = [];
+  }
+  return craftingRecipeCatalogCache;
 }
 
 export async function playerResearchItems(db, id) {
@@ -1797,8 +1872,13 @@ export async function unlockResearchItem(db, id, { itemKey }) {
 }
 
 export async function playerJourney(db, id, journeyTagsData = {}) {
-  await requireCapability(await supportsJourney(db), "Journey data requires dune.journey_story_node, dune.player_tags, dune.tutorials, and dune.tutorial_per_player.");
+  const schema = await journeyIdentitySchema(db);
+  await requireCapability(await supportsJourneySchema(db, schema), "Journey data is unavailable for this game database schema.");
   const player = await resolvePlayerMutationTarget(db, id);
+  const journeyIdColumn = quoteIdentifier(schema.journeyIdColumn);
+  const tagIdColumn = quoteIdentifier(schema.tagIdColumn);
+  const journeyIdentityId = playerJourneyIdentity(player, schema.journeyIdColumn);
+  const tagIdentityId = playerJourneyIdentity(player, schema.tagIdColumn);
   const tagMap = journeyTagsData?.journey_node_tags || {};
   const contractTags = journeyTagsData?.contract_tags || {};
   const contractAliases = journeyTagsData?.contract_aliases || {};
@@ -1817,8 +1897,8 @@ export async function playerJourney(db, id, journeyTagsData = {}) {
            reveal_condition_state = 'true'::jsonb as is_revealed,
            coalesce(has_pending_reward, false) as has_pending_reward
     from dune.journey_story_node
-    where account_id = $1`, [player.accountId]);
-  const playerTags = await db.query("select tag from dune.player_tags where account_id = $1", [player.accountId]);
+    where ${journeyIdColumn} = $1`, [journeyIdentityId]);
+  const playerTags = await db.query(`select tag from dune.player_tags where ${tagIdColumn} = $1`, [tagIdentityId]);
   const state = new Map(playerNodes.rows.map((row) => [row.story_node_id, {
     complete: Boolean(row.is_complete),
     revealed: Boolean(row.is_revealed),
@@ -1857,53 +1937,61 @@ export async function playerJourney(db, id, journeyTagsData = {}) {
 }
 
 export async function completeJourneyNode(db, id, { nodeId }, journeyTagsData = {}) {
-  await requireCapability(await supportsJourney(db), "Journey completion requires dune.journey_story_node and dune.update_player_tags(bigint,text[],text[]).");
+  const schema = await journeyIdentitySchema(db);
+  await requireCapability(await supportsJourneySchema(db, schema), "Journey completion is unavailable for this game database schema.");
   const safeNodeId = validateJourneyNodeId(nodeId);
   return db.transaction(async (tx) => {
     const player = await resolvePlayerMutationTarget(tx, id);
+    const journeyIdColumn = quoteIdentifier(schema.journeyIdColumn);
+    const journeyIdentityId = playerJourneyIdentity(player, schema.journeyIdColumn);
+    const tagIdentityId = playerJourneyIdentity(player, schema.tagIdColumn);
     if (isContractNode(safeNodeId, journeyTagsData)) {
       const tags = contractTagsForNode(safeNodeId, journeyTagsData);
-      const tagResult = await applyJourneyTags(tx, player, tags, "add");
+      const tagResult = await applyDirectJourneyTags(tx, player, tags, "add", schema.tagIdColumn, tagIdentityId);
       return { ok: true, player, nodeId: safeNodeId, updatedRows: 0, tagsApplied: tags.length, factionBumps: tagResult.factionBumps, contract: true };
     }
     const updated = await tx.query(`
       update dune.journey_story_node
       set complete_condition_state = 'true'::jsonb,
           reveal_condition_state = 'true'::jsonb
-      where account_id = $1
-        and (story_node_id = $2 or story_node_id like $2 || '.%')`, [player.accountId, safeNodeId]);
+      where ${journeyIdColumn} = $1
+        and (story_node_id = $2 or story_node_id like $2 || '.%')`, [journeyIdentityId, safeNodeId]);
     let updatedRows = Number(updated.rowCount || 0);
     if (updatedRows === 0) {
       await tx.query(`
         insert into dune.journey_story_node
-          (account_id, story_node_id, has_pending_reward, complete_condition_state, reveal_condition_state, fail_condition_state, metadata_state, reset_group)
-        values ($1, $2, false, 'true'::jsonb, 'true'::jsonb, '{}'::jsonb, '{}'::jsonb, 'Default'::dune.JourneyStoryResetGroup)`, [player.accountId, safeNodeId]);
+          (${journeyIdColumn}, story_node_id, has_pending_reward, complete_condition_state, reveal_condition_state, fail_condition_state, metadata_state, reset_group)
+        values ($1, $2, false, 'true'::jsonb, 'true'::jsonb, '{}'::jsonb, '{}'::jsonb, 'Default'::dune.JourneyStoryResetGroup)`, [journeyIdentityId, safeNodeId]);
       updatedRows = 1;
     }
     const tags = tagsForJourneyNodeSubtree(safeNodeId, journeyTagsData);
-    const tagResult = await applyJourneyTags(tx, player, tags, "add");
+    const tagResult = await applyDirectJourneyTags(tx, player, tags, "add", schema.tagIdColumn, tagIdentityId);
     return { ok: true, player, nodeId: safeNodeId, updatedRows, tagsApplied: tags.length, factionBumps: tagResult.factionBumps };
   });
 }
 
 export async function resetJourneyNode(db, id, { nodeId }, journeyTagsData = {}) {
-  await requireCapability(await supportsJourney(db), "Journey reset requires dune.journey_story_node and dune.update_player_tags(bigint,text[],text[]).");
+  const schema = await journeyIdentitySchema(db);
+  await requireCapability(await supportsJourneySchema(db, schema), "Journey reset is unavailable for this game database schema.");
   const safeNodeId = validateJourneyNodeId(nodeId);
   return db.transaction(async (tx) => {
     const player = await resolvePlayerMutationTarget(tx, id);
+    const journeyIdColumn = quoteIdentifier(schema.journeyIdColumn);
+    const journeyIdentityId = playerJourneyIdentity(player, schema.journeyIdColumn);
+    const tagIdentityId = playerJourneyIdentity(player, schema.tagIdColumn);
     if (isContractNode(safeNodeId, journeyTagsData)) {
       const tags = contractTagsForNode(safeNodeId, journeyTagsData);
-      await applyJourneyTags(tx, player, tags, "remove");
+      await applyDirectJourneyTags(tx, player, tags, "remove", schema.tagIdColumn, tagIdentityId);
       return { ok: true, player, nodeId: safeNodeId, updatedRows: 0, tagsRemoved: tags.length, contract: true };
     }
     const updated = await tx.query(`
       update dune.journey_story_node
       set complete_condition_state = 'false'::jsonb,
           has_pending_reward = false
-      where account_id = $1
-        and (story_node_id = $2 or story_node_id like $2 || '.%')`, [player.accountId, safeNodeId]);
+      where ${journeyIdColumn} = $1
+        and (story_node_id = $2 or story_node_id like $2 || '.%')`, [journeyIdentityId, safeNodeId]);
     const tags = tagsForJourneyNodeSubtree(safeNodeId, journeyTagsData);
-    await applyJourneyTags(tx, player, tags, "remove");
+    await applyDirectJourneyTags(tx, player, tags, "remove", schema.tagIdColumn, tagIdentityId);
     return { ok: true, player, nodeId: safeNodeId, updatedRows: Number(updated.rowCount || 0), tagsRemoved: tags.length };
   });
 }
@@ -2136,10 +2224,13 @@ async function supportsResearchItems(db) {
 }
 
 async function supportsJourney(db) {
-  return await tableExists(db, "journey_story_node") &&
+  return await supportsJourneySchema(db, await journeyIdentitySchema(db));
+}
+
+async function supportsJourneySchema(db, schema) {
+  return Boolean(schema) &&
     await tableExists(db, "player_tags") &&
-    await supportsTutorials(db) &&
-    await functionExists(db, "dune.update_player_tags(bigint,text[],text[])");
+    await supportsTutorials(db);
 }
 
 async function supportsTutorials(db) {
@@ -2210,13 +2301,27 @@ function contractTagsForNode(nodeId, journeyTagsData = {}) {
   return tags.map((tag) => String(tag || "").trim()).filter(Boolean);
 }
 
-async function applyJourneyTags(db, player, tags, mode) {
+async function applyDirectJourneyTags(db, player, tags, mode, tagColumnName, identityId) {
   if (!tags.length) return { factionBumps: 0 };
+  const tagColumn = quoteIdentifier(tagColumnName);
   if (mode === "remove") {
-    await db.query("select dune.update_player_tags($1, '{}'::text[], $2::text[])", [player.accountId, tags]);
+    await db.query(`delete from dune.player_tags where ${tagColumn} = $1 and tag = any($2::text[])`, [identityId, tags]);
     return { factionBumps: 0 };
   }
-  await db.query("select dune.update_player_tags($1, $2::text[], '{}'::text[])", [player.accountId, tags]);
+  await db.query(`
+    insert into dune.player_tags (${tagColumn}, tag)
+    select $1, incoming.tag
+    from unnest($2::text[]) as incoming(tag)
+    where not exists (
+      select 1
+      from dune.player_tags existing
+      where existing.${tagColumn} = $1
+        and existing.tag = incoming.tag
+    )`, [identityId, tags]);
+  return applyJourneyFactionBumps(db, player, tags);
+}
+
+async function applyJourneyFactionBumps(db, player, tags) {
   const bumps = factionTierBumps(tags);
   let factionBumps = 0;
   for (const [name, rep] of bumps.entries()) {
@@ -2329,6 +2434,7 @@ async function resolvePlayerMutationTarget(db, id) {
     select a.id as actor_id,
            coalesce(a.owner_account_id, ps.account_id, 0) as account_id,
            coalesce(ps.player_controller_id, a.id) as controller_id,
+           coalesce(ps.id, 0) as player_state_id,
            coalesce(ps.online_status::text, 'Offline') as online_status
     from dune.actors a
     left join dune.player_state ps on ps.player_pawn_id = a.id or ps.account_id = a.owner_account_id
@@ -2340,6 +2446,7 @@ async function resolvePlayerMutationTarget(db, id) {
     actorId: Number(row.actor_id),
     accountId: Number(row.account_id || 0),
     controllerId: Number(row.controller_id || row.actor_id),
+    playerStateId: Number(row.player_state_id || 0),
     onlineStatus: row.online_status || "Offline"
   };
 }

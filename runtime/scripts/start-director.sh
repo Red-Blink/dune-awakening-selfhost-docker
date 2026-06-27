@@ -4,9 +4,9 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 [ -f .env ] && . ./.env
-[ -f runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
+[ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
 
-[ -f runtime/generated/image-tags.env ] && . runtime/generated/image-tags.env
+[ -r runtime/generated/image-tags.env ] && . runtime/generated/image-tags.env
 source runtime/scripts/host-paths.sh
 source runtime/scripts/runtime-env.sh
 source runtime/scripts/image-tags.sh
@@ -64,6 +64,17 @@ fi
 cat > runtime/director/config/director_config.ini <<'EOF'
 [Battlegroup]
 AuthorizationPreset=BattlegroupInternal
+EOF
+
+if [ -s runtime/generated/director-character-transfer.ini ]; then
+  awk '
+    /^\[/ { next }
+    /^[[:space:]]*(;|#|$)/ { print; next }
+    { print }
+  ' runtime/generated/director-character-transfer.ini >> runtime/director/config/director_config.ini
+fi
+
+cat >> runtime/director/config/director_config.ini <<'EOF'
 
 [InstancingModes]
 Overmap=SingleServer

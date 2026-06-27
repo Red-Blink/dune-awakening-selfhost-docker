@@ -140,9 +140,37 @@ export function recipeCategory(recipeId) {
   if (/(buggy|sandbike|vehicle|treadwheel|ornithopter|sandcrawler)/.test(value)) return "Vehicles";
   if (/(stillsuit|literjon|bloodsack|blood_sack|bodyfluid|dew|water|stilltent)/.test(value)) return "Water Discipline";
   if (/(ammo|rifle|pistol|shotgun|smg|weapon|lasgun|flamethrower|staticcompactor|kindjal|crysknife|knife|sword|shield|napalm|disruptor)/.test(value)) return "Combat";
-  if (/(building|basebackup|portablelight|decajon|totem|refinery|container|fabricator|placeable|structure)/.test(value)) return "Construction";
+  if (/(building|basebackup|portablelight|decajon|totem|refinery|container|fabricator|placeable|structure|generator|turbine|pentashield|silo|lighting)/.test(value)) return "Construction";
   if (/(scanner|powerpack|radiation|cutteray|miningtool|mining_tool|thumper|suspensor|fuel|harvester)/.test(value)) return "Exploration";
   return "Essentials";
+}
+
+export function schematicRecipeId(itemId) {
+  const raw = String(itemId || "").trim();
+  if (!raw) return "";
+  if (raw === "NPE_ScrapMetalKnife_Schematic") return "ScrapMetalKnifeRecipe";
+  if (raw.endsWith("_Schematic")) return `${raw.slice(0, -"_Schematic".length)}_Recipe`;
+  if (raw.endsWith("Schematic")) return `${raw.slice(0, -"Schematic".length)}Recipe`;
+  if (raw.startsWith("Schematic_")) return `${raw.slice("Schematic_".length)}Recipe`;
+  return "";
+}
+
+export function craftingRecipeCatalogRows(items = []) {
+  return items
+    .filter((item) => String(item?.category || "").toLowerCase() === "schematics")
+    .map((item) => {
+      const recipeId = schematicRecipeId(item.id);
+      if (!recipeId) return null;
+      return {
+        recipeId,
+        displayName: String(item.name || "").trim() || recipeDisplayName(recipeId),
+        category: recipeCategory(recipeId),
+        source: "Schematics",
+        qualityLevel: 0
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.displayName.localeCompare(b.displayName) || a.recipeId.localeCompare(b.recipeId));
 }
 
 export function validateResearchKey(value) {

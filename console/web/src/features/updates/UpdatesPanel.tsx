@@ -10,6 +10,7 @@ import {
   formatStackVersionLabel,
   GAME_UPDATE_TASK_KEY,
   loadPersistedUpdateTask,
+  normalizeUpdateVersion,
   parseUpdateTask,
   persistUpdateTask,
   STACK_UPDATE_TASK_KEY,
@@ -18,6 +19,9 @@ import {
 } from "./updateUtils";
 
 type HomeTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
+const STACK_UPDATE_HANDOFF_SECONDS = 180;
+const STACK_UPDATE_REFRESH_SECONDS = 5;
+const STACK_UPDATE_EXPECTED_VERSION_KEY = "arrakis.stackUpdateExpectedVersion";
 
 type UpdatesPanelProps = {
   confirmAction: (message: string) => Promise<boolean>;
@@ -56,6 +60,9 @@ export function UpdatesPanel({
   const [autoGameEnabled, setAutoGameEnabled] = useState(false);
   const [autoGameTime, setAutoGameTime] = useState("05:00");
   const [autoGameResult, setAutoGameResult] = useState<HomeTaskResult | null>(null);
+  const [stackUpdateNow, setStackUpdateNow] = useState(() => Date.now());
+  const [stackUpdateExpectedVersion, setStackUpdateExpectedVersion] = useState(() => loadStackUpdateExpectedVersion());
+  const [stackUpdateReadyAt, setStackUpdateReadyAt] = useState<number | null>(null);
   const autoGameValues = parseKeyValueText(autoGame?.stdout || "");
   const autoGameTimerValue = autoGameValues.systemd_timer || "";
   const autoGameTimerLabel = autoGameTimerValue ? formatTimerStatus(autoGameTimerValue) : "Not Installed";
@@ -111,6 +118,10 @@ export function UpdatesPanel({
 
   async function applyStackUpdate() {
     if (!(await confirmAction("Apply the latest console update now?"))) return;
+    const expectedVersion = String(stackStatus.latest || "").trim();
+    saveStackUpdateExpectedVersion(expectedVersion);
+    setStackUpdateExpectedVersion(expectedVersion);
+    setStackUpdateReadyAt(null);
     const response = await updatesApi.applyStack();
     setStackUpdateTask(response.task);
     persistUpdateTask(STACK_UPDATE_TASK_KEY, response.task);
@@ -228,10 +239,60 @@ export function UpdatesPanel({
 
   useEffect(() => {
     if (!stackUpdateTask || !isTerminalTask(stackUpdateTask.status)) return;
+    if (isDetachedStackUpdateTask(stackUpdateTask)) return;
     if (stackUpdateTask.status === "succeeded") refreshStackStatus();
     const id = window.setTimeout(() => setStackUpdateTask(null), UPDATE_RESULT_DISMISS_MS);
     return () => window.clearTimeout(id);
   }, [stackUpdateTask?.id, stackUpdateTask?.status]);
+
+  useEffect(() => {
+    if (!stackUpdateTask || !isDetachedStackUpdateTask(stackUpdateTask)) return;
+    setStackUpdateNow(Date.now());
+    const id = window.setInterval(() => setStackUpdateNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [stackUpdateTask?.id, stackUpdateTask?.status]);
+
+  useEffect(() => {
+    if (!stackUpdateTask || !isDetachedStackUpdateTask(stackUpdateTask) || stackUpdateReadyAt !== null) return;
+    let cancelled = false;
+    const startedAt = Date.now();
+    const expectedVersion = stackUpdateExpectedVersion || stackStatus.latest || "";
+    void (async () => {
+      while (!cancelled) {
+        const state = await fetchConsoleAuthState().catch(() => null);
+        const runningVersion = String(state?.config?.version || "").trim();
+        const expected = normalizeUpdateVersion(expectedVersion);
+        const running = normalizeUpdateVersion(runningVersion);
+        if (running && (!expected || running === expected)) {
+          saveStackUpdateExpectedVersion("");
+          setStackUpdateExpectedVersion("");
+          setStackUpdateReadyAt(Date.now());
+          return;
+        }
+        const elapsed = Date.now() - startedAt;
+        await new Promise((resolvePromise) => window.setTimeout(resolvePromise, elapsed < 30000 ? 2000 : 5000));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [stackUpdateTask?.id, stackUpdateTask?.status, stackUpdateExpectedVersion, stackStatus.latest, stackUpdateReadyAt]);
+
+  const stackUpdateHandoffStartedAt = stackUpdateTask ? Date.parse(stackUpdateTask.finishedAt || stackUpdateTask.startedAt || "") : NaN;
+  const stackUpdateHandoffSeconds = stackUpdateTask && isDetachedStackUpdateTask(stackUpdateTask)
+    ? Math.max(0, Math.floor((stackUpdateNow - (Number.isFinite(stackUpdateHandoffStartedAt) ? stackUpdateHandoffStartedAt : stackUpdateNow)) / 1000))
+    : 0;
+  const stackUpdateHandoffPercent = stackUpdateTask && isDetachedStackUpdateTask(stackUpdateTask)
+    ? stackUpdateReadyAt !== null
+      ? 100
+      : Math.min(99, 20 + Math.floor((Math.min(stackUpdateHandoffSeconds, STACK_UPDATE_HANDOFF_SECONDS) / STACK_UPDATE_HANDOFF_SECONDS) * 79))
+    : undefined;
+  const stackUpdateRefreshCountdown = stackUpdateTask && isDetachedStackUpdateTask(stackUpdateTask) && stackUpdateReadyAt !== null
+    ? Math.max(0, STACK_UPDATE_REFRESH_SECONDS - Math.floor((stackUpdateNow - stackUpdateReadyAt) / 1000))
+    : null;
+
+  useEffect(() => {
+    if (stackUpdateRefreshCountdown !== 0) return;
+    window.location.reload();
+  }, [stackUpdateRefreshCountdown]);
 
   useEffect(() => {
     if (!autoGameResult || autoGameResult.status === "running") return;
@@ -241,7 +302,7 @@ export function UpdatesPanel({
 
   const gameUpdateRunning = Boolean(gameUpdateTask && !isTerminalTask(gameUpdateTask.status));
   const gameCanApply = canApplyUpdateStatus(gameStatus) && !gameUpdateRunning;
-  const stackUpdateRunning = Boolean(stackUpdateTask && !isTerminalTask(stackUpdateTask.status));
+  const stackUpdateRunning = Boolean(stackUpdateTask && (!isTerminalTask(stackUpdateTask.status) || isDetachedStackUpdateTask(stackUpdateTask)));
   const stackCanApply = canApplyUpdateStatus(stackStatus) && !stackUpdateRunning;
 
   return <section className="panel">
@@ -267,7 +328,7 @@ export function UpdatesPanel({
           <button disabled={stackUpdateRunning} onClick={checkStack}>Refresh Console Check</button>
           {stackCanApply && <button className="update-action" onClick={applyStackUpdate}>Apply Console Update</button>}
         </div>
-        {stackUpdateTask && <StackUpdateProgress task={stackUpdateTask} onRetry={applyStackUpdate} formatResultTitle={formatResultTitle} formatResultMessage={formatResultMessage} />}
+        {stackUpdateTask && <StackUpdateProgress task={stackUpdateTask} handoffPercent={stackUpdateHandoffPercent} refreshCountdown={stackUpdateRefreshCountdown} onRetry={applyStackUpdate} formatResultTitle={formatResultTitle} formatResultMessage={formatResultMessage} />}
       </section>
       <section className="action-section">
         <div className="panel-title"><h4>Automatic Game Updates</h4><label className={`switch-checkbox ${autoGameEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={autoGameLoading || autoGameSaving} checked={autoGameEnabled} onChange={(event) => saveAutoGame(event.target.checked)} /><span className="switch-label">Auto Updates</span><strong className="switch-state">{autoGameEnabled ? "ON" : "OFF"}</strong></label></div>
@@ -445,16 +506,19 @@ function isSteamcmdManifestFailure(task: Task) {
 
 function StackUpdateProgress({
   task,
+  handoffPercent,
+  refreshCountdown,
   onRetry,
   formatResultTitle,
   formatResultMessage
-}: { task: Task; onRetry: () => Promise<void>; formatResultTitle: (value: unknown, pending?: boolean) => string; formatResultMessage: (value: unknown) => string }) {
-  const progress = summarizeStackUpdateProgress(task);
-  const running = !isTerminalTask(task.status);
-  return <div className={`result-panel stack-update-progress result-${task.status === "succeeded" ? "ok" : task.status === "failed" ? "fail" : "running"}`} aria-live="polite">
+}: { task: Task; handoffPercent?: number; refreshCountdown: number | null; onRetry: () => Promise<void>; formatResultTitle: (value: unknown, pending?: boolean) => string; formatResultMessage: (value: unknown) => string }) {
+  const progress = summarizeStackUpdateProgress(task, handoffPercent, refreshCountdown);
+  const running = !isTerminalTask(task.status) || (isDetachedStackUpdateTask(task) && refreshCountdown === null);
+  const resultState = task.status === "failed" ? "fail" : refreshCountdown !== null || (task.status === "succeeded" && !isDetachedStackUpdateTask(task)) ? "ok" : "running";
+  return <div className={`result-panel stack-update-progress result-${resultState}`} aria-live="polite">
     <div className="panel-title">
       <h4 className={running ? "loading-dots" : ""}>{formatResultTitle(progress.title, running)}</h4>
-      <StatusPill value={task.status === "failed" ? "Failed" : task.status === "succeeded" ? "Succeeded" : "Running"} />
+      <StatusPill value={task.status === "failed" ? "Failed" : refreshCountdown !== null ? "Succeeded" : "Running"} />
     </div>
     <div className="progress-row">
       <div className="progress-track" aria-label={`Console update progress ${progress.percent}%`}>
@@ -463,19 +527,23 @@ function StackUpdateProgress({
       <strong>{progress.percent}%</strong>
     </div>
     <p>{formatResultMessage(progress.message)}</p>
-    {task.status === "succeeded" && <div className="action-line"><button onClick={() => window.location.reload()}>Refresh Console</button></div>}
+    {refreshCountdown !== null && <div className="action-line"><button onClick={() => window.location.reload()}>Refresh Now</button></div>}
+    {task.status === "succeeded" && !isDetachedStackUpdateTask(task) && <div className="action-line"><button onClick={() => window.location.reload()}>Refresh Console</button></div>}
     {task.status === "failed" && <div className="action-line"><button onClick={onRetry}>Retry Console Update</button></div>}
   </div>;
 }
 
-function summarizeStackUpdateProgress(task: Task) {
+function summarizeStackUpdateProgress(task: Task, handoffPercent?: number, refreshCountdown: number | null = null) {
   const text = task.logLines.map((line) => line.line).join("\n");
   const latestLine = [...task.logLines].reverse().map((line) => line.line.trim()).find(Boolean) || task.progressMessage || task.currentStep || "";
+  if (task.status === "succeeded" && isDetachedStackUpdateTask(task)) {
+    if (refreshCountdown !== null) {
+      return { title: "Console Update Complete", percent: 100, message: `The console update is complete. This browser will refresh in ${refreshCountdown} second${refreshCountdown === 1 ? "" : "s"}. You may need to sign in again.` };
+    }
+    return { title: "Finishing Console Update", percent: Math.max(20, Math.min(99, handoffPercent || 20)), message: "The update helper is rebuilding and restarting the web console. This page will wait until the rebuilt console is serving the new version." };
+  }
   if (task.status === "succeeded") {
     const installedVersion = firstVersionMatch(text, [/Installed stack version:\s*([^\n]+)/i]);
-    if (!installedVersion && /Update helper started/i.test(text)) {
-      return { title: "Console Update Started", percent: 20, message: "The console update helper has started in the background. Wait a minute, then refresh the page and check the version again." };
-    }
     return { title: "Console Update Complete", percent: 100, message: installedVersion ? `Console files were updated to ${installedVersion}. Refresh this page to load the new Web UI. You may need to sign in again.` : "Console files were updated. Refresh this page to load the new Web UI. You may need to sign in again." };
   }
   if (task.status === "failed") {
@@ -484,6 +552,40 @@ function summarizeStackUpdateProgress(task: Task) {
   const stackStage = summarizeStackUpdateStage(task.logLines.map((line) => line.line));
   if (stackStage) return stackStage;
   return { title: "Updating Console", percent: stackUpdatePercent(text), message: friendlyStackUpdateMessage(text, latestLine) };
+}
+
+function isDetachedStackUpdateTask(task: Task) {
+  return task.operation === "selfUpdateApply" && task.status === "succeeded" && /Update helper started/i.test(task.logLines.map((line) => line.line).join("\n"));
+}
+
+function loadStackUpdateExpectedVersion() {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(STACK_UPDATE_EXPECTED_VERSION_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function saveStackUpdateExpectedVersion(value: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const clean = String(value || "").trim();
+    if (clean) window.localStorage.setItem(STACK_UPDATE_EXPECTED_VERSION_KEY, clean);
+    else window.localStorage.removeItem(STACK_UPDATE_EXPECTED_VERSION_KEY);
+  } catch {
+    // The visible update flow still works if localStorage is unavailable.
+  }
+}
+
+async function fetchConsoleAuthState() {
+  const response = await fetch("/api/auth/state", {
+    credentials: "include",
+    cache: "no-store",
+    headers: { accept: "application/json" }
+  });
+  if (!response.ok) throw new Error(`Console state check failed: ${response.status}`);
+  return await response.json() as { config?: { version?: string } };
 }
 
 function stackUpdatePercent(text: string) {

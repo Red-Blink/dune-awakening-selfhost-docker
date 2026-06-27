@@ -10,31 +10,57 @@ import { KeyValueGrid, TechnicalDetails } from "../../components/common/DisplayP
 import { InlineActionResult } from "../../components/common/InlineActionResult";
 import { adminTaskFailureDetail, friendlyInlineError, titleCaseWords } from "../players/playerAdminUtils";
 import { formatUiSentence, stripAnsi, titleCase } from "../../lib/display";
+import type { CharacterTransferSettings, IncomingCharacterTransferPolicy, MessageOfTheDaySettings, PlayerAnnouncementSettings } from "../../api/admin";
 
 type HomeTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
 type ConfirmAction = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }) => Promise<boolean>;
 type InlineResult = { key: string; tone: "success" | "danger" | "neutral"; text: string; pending?: boolean };
 type MapChatOption = { key: string; label: string; chatRegion: string; dimension: number; status: string; players: number };
+type TransferResult = { status: "idle" | "running" | "succeeded" | "failed"; title: string; details?: string };
 
 type AdminToolsPanelProps = {
   onError: (text: string) => void;
   confirmAction: ConfirmAction;
 };
 
+const DEFAULT_PLAYER_JOIN_MESSAGE = "{playerName} has entered {mapName}, their trail fresh upon the sands.";
+const DEFAULT_PLAYER_LEAVE_MESSAGE = "{playerName} has vanished from {mapName}, their tracks swallowed by the dunes.";
+
 export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps) {
   const [players, setPlayers] = useState<Record<string, unknown>[]>([]);
-  const [scheduleOpen, setScheduleOpen] = useState(true);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const [restartSchedule, setRestartSchedule] = useState<{ stdout?: string; stderr?: string; exitCode?: number } | null>(null);
   const [scheduleLoading, setScheduleLoading] = useState(true);
   const [restartEnabled, setRestartEnabled] = useState(false);
   const [restartTime, setRestartTime] = useState("05:00");
   const [restartNotifyMinutes, setRestartNotifyMinutes] = useState("15");
   const [scheduleResult, setScheduleResult] = useState<HomeTaskResult | null>(null);
+  const [ipChangeRestart, setIpChangeRestart] = useState<{ stdout?: string; stderr?: string; exitCode?: number } | null>(null);
+  const [ipChangeLoading, setIpChangeLoading] = useState(true);
+  const [ipChangeEnabled, setIpChangeEnabled] = useState(false);
+  const [ipChangeIntervalMinutes, setIpChangeIntervalMinutes] = useState("5");
+  const [ipChangeNotifyMinutes, setIpChangeNotifyMinutes] = useState("1");
+  const [ipChangeResult, setIpChangeResult] = useState<HomeTaskResult | null>(null);
+  const [shutdownProtection, setShutdownProtection] = useState<{ stdout?: string; stderr?: string; exitCode?: number } | null>(null);
+  const [shutdownProtectionLoading, setShutdownProtectionLoading] = useState(true);
+  const [shutdownProtectionEnabled, setShutdownProtectionEnabled] = useState(false);
+  const [shutdownProtectionResult, setShutdownProtectionResult] = useState<HomeTaskResult | null>(null);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferLoading, setTransferLoading] = useState(true);
+  const [transferSettings, setTransferSettings] = useState<CharacterTransferSettings | null>(null);
+  const [transferOriginal, setTransferOriginal] = useState<CharacterTransferSettings | null>(null);
+  const [transferDefaults, setTransferDefaults] = useState<CharacterTransferSettings | null>(null);
+  const [transferPolicies, setTransferPolicies] = useState<IncomingCharacterTransferPolicy[]>([]);
+  const [transferResult, setTransferResult] = useState<TransferResult | null>(null);
   const [liveToolsOpen, setLiveToolsOpen] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [broadcastTitle, setBroadcastTitle] = useState("");
   const [broadcastBody, setBroadcastBody] = useState("");
   const [broadcastDuration, setBroadcastDuration] = useState("30");
+  const [messageOfTheDay, setMessageOfTheDay] = useState<MessageOfTheDaySettings>({ enabled: false, title: "", message: "" });
+  const [messageOfTheDayOriginal, setMessageOfTheDayOriginal] = useState<MessageOfTheDaySettings>({ enabled: false, title: "", message: "" });
+  const [playerAnnouncements, setPlayerAnnouncements] = useState<PlayerAnnouncementSettings>({ joinEnabled: false, joinMessage: DEFAULT_PLAYER_JOIN_MESSAGE, leaveEnabled: false, leaveMessage: DEFAULT_PLAYER_LEAVE_MESSAGE });
+  const [playerAnnouncementsOriginal, setPlayerAnnouncementsOriginal] = useState<PlayerAnnouncementSettings>({ joinEnabled: false, joinMessage: DEFAULT_PLAYER_JOIN_MESSAGE, leaveEnabled: false, leaveMessage: DEFAULT_PLAYER_LEAVE_MESSAGE });
   const [mapChatOptions, setMapChatOptions] = useState<MapChatOption[]>(defaultMapChatOptions());
   const [mapChatTarget, setMapChatTarget] = useState(defaultMapChatOptions()[0]?.key || "HaggaBasin|0");
   const [mapChatBody, setMapChatBody] = useState("");
@@ -51,6 +77,30 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
   const scheduleDisplayActive = scheduleSaving ? restartEnabled : scheduleActive;
   const scheduleStatusLabel = !scheduleLoaded && !scheduleSaving ? "Checking" : scheduleDisplayActive ? "Enabled" : "Disabled";
   const scheduleDisplayTimerLabel = !scheduleLoaded && !scheduleSaving ? "Checking" : scheduleSaving ? restartEnabled ? "Activating" : "Deactivating" : restartEnabled ? scheduleTimerLabel : "Inactive";
+  const ipChangeValues = parseKeyValueText(ipChangeRestart?.stdout || "");
+  const ipChangeTimerValue = ipChangeValues.systemd_timer || "";
+  const ipChangeTimerLabel = ipChangeTimerValue ? formatTimerStatus(ipChangeTimerValue) : "Not Installed";
+  const ipChangeTimerActive = /^active$/i.test(ipChangeTimerValue);
+  const ipChangeSaving = ipChangeResult?.status === "running";
+  const ipChangeLoaded = Boolean(ipChangeRestart);
+  const ipChangeDisplayActive = ipChangeSaving ? ipChangeEnabled : ipChangeEnabled && ipChangeTimerActive;
+  const ipChangeStatusLabel = !ipChangeLoaded && !ipChangeSaving ? "Checking" : ipChangeDisplayActive ? "Enabled" : "Disabled";
+  const ipChangeDisplayTimerLabel = !ipChangeLoaded && !ipChangeSaving ? "Checking" : ipChangeSaving ? ipChangeEnabled ? "Activating" : "Deactivating" : ipChangeEnabled ? ipChangeTimerLabel : "Inactive";
+  const shutdownProtectionValues = parseKeyValueText(shutdownProtection?.stdout || "");
+  const shutdownProtectionServiceValue = shutdownProtectionValues.systemd_service || "";
+  const shutdownProtectionEnabledValue = shutdownProtectionValues.systemd_enabled || "";
+  const shutdownProtectionSaving = shutdownProtectionResult?.status === "running";
+  const shutdownProtectionLoaded = Boolean(shutdownProtection);
+  const shutdownProtectionServiceActive = /^active$/i.test(shutdownProtectionServiceValue);
+  const shutdownProtectionSystemdEnabled = /^enabled$/i.test(shutdownProtectionEnabledValue);
+  const shutdownProtectionDisplayActive = shutdownProtectionSaving ? shutdownProtectionEnabled : shutdownProtectionEnabled && shutdownProtectionServiceActive && shutdownProtectionSystemdEnabled;
+  const shutdownProtectionStatusLabel = !shutdownProtectionLoaded && !shutdownProtectionSaving ? "Checking" : shutdownProtectionDisplayActive ? "Enabled" : "Disabled";
+  const shutdownProtectionServiceLabel = !shutdownProtectionLoaded && !shutdownProtectionSaving ? "Checking" : shutdownProtectionSaving ? shutdownProtectionEnabled ? "Activating" : "Deactivating" : shutdownProtectionServiceValue ? formatTimerStatus(shutdownProtectionServiceValue) : "Not Installed";
+  const shutdownProtectionInstalled = Boolean(shutdownProtectionServiceValue && !/^not installed$/i.test(shutdownProtectionServiceValue));
+  const transferDirty = Boolean(transferSettings && transferOriginal && !sameTransferSettings(transferSettings, transferOriginal));
+  const transferSaving = transferResult?.status === "running";
+  const messageOfTheDayDirty = !sameMessageOfTheDay(messageOfTheDay, messageOfTheDayOriginal);
+  const playerAnnouncementsDirty = !samePlayerAnnouncements(playerAnnouncements, playerAnnouncementsOriginal);
 
   async function run(action: () => Promise<unknown>) {
     onError("");
@@ -151,21 +201,253 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
     }
   }
 
+  async function loadIpChangeRestart(options: { showLoading?: boolean; syncControls?: boolean } = {}) {
+    const showLoading = options.showLoading ?? true;
+    const syncControls = options.syncControls ?? true;
+    if (showLoading) setIpChangeLoading(true);
+    try {
+      const result = await serverApi.ipChangeRestart();
+      setIpChangeRestart(result);
+      const values = parseKeyValueText(result.stdout || "");
+      const timerActive = /^active$/i.test(values.systemd_timer || "");
+      setIpChangeEnabled(/^true$/i.test(values.public_ip_change_restart_enabled || "") && timerActive);
+      if (syncControls) {
+        const intervalMatch = String(values.check_interval || "").match(/\d+/);
+        if (intervalMatch) setIpChangeIntervalMinutes(intervalMatch[0]);
+        const notifyMatch = String(values.in_game_notice || "").match(/\d+/);
+        if (notifyMatch) setIpChangeNotifyMinutes(notifyMatch[0]);
+      }
+    } finally {
+      if (showLoading) setIpChangeLoading(false);
+    }
+  }
+
+  async function saveIpChangeRestart(nextEnabled = ipChangeEnabled) {
+    const intervalMinutes = Number(ipChangeIntervalMinutes);
+    const notifyMinutes = Number(ipChangeNotifyMinutes);
+    if (nextEnabled && (!Number.isInteger(intervalMinutes) || intervalMinutes < 1 || intervalMinutes > 1440)) {
+      setIpChangeResult({ status: "failed", title: "IP Monitor Save Failed", message: "Check interval must be between 1 and 1440 minutes." });
+      return;
+    }
+    if (nextEnabled && (!Number.isInteger(notifyMinutes) || notifyMinutes < 0 || notifyMinutes > 60)) {
+      setIpChangeResult({ status: "failed", title: "IP Monitor Save Failed", message: "In-game notice must be between 0 and 60 minutes." });
+      return;
+    }
+    setIpChangeIntervalMinutes(String(Number.isInteger(intervalMinutes) ? intervalMinutes : 5));
+    setIpChangeNotifyMinutes(String(Number.isInteger(notifyMinutes) ? notifyMinutes : 1));
+    setIpChangeResult({ status: "running", title: "Saving IP Monitor" });
+    const requestedEnabled = nextEnabled;
+    setIpChangeEnabled(requestedEnabled);
+    onError("");
+    try {
+      const final = await waitForTaskSilently((await serverApi.saveIpChangeRestart({ enabled: requestedEnabled, intervalMinutes, notifyMinutes })).task);
+      const details = taskTechnicalDetails(final);
+      const nextStatus = await serverApi.ipChangeRestart();
+      setIpChangeRestart(nextStatus);
+      const nextValues = parseKeyValueText(nextStatus.stdout || "");
+      const timerActive = /^active$/i.test(nextValues.systemd_timer || "");
+      const timerInactive = /^inactive$|^not installed$/i.test(nextValues.systemd_timer || "");
+      if (requestedEnabled && !timerActive) setIpChangeEnabled(false);
+      if (!requestedEnabled && timerInactive) setIpChangeEnabled(false);
+      const intervalMatch = String(nextValues.check_interval || "").match(/\d+/);
+      if (intervalMatch) setIpChangeIntervalMinutes(intervalMatch[0]);
+      const notifyMatch = String(nextValues.in_game_notice || "").match(/\d+/);
+      if (notifyMatch) setIpChangeNotifyMinutes(notifyMatch[0]);
+      setIpChangeResult(final.status === "succeeded" && (!requestedEnabled ? timerInactive : timerActive)
+        ? { status: "succeeded", title: "IP Monitor Saved Successfully", details }
+        : { status: "failed", title: requestedEnabled ? "IP Monitor Timer Failed" : "IP Monitor Save Failed", details: details || nextStatus.stdout || nextStatus.stderr || "" });
+    } catch (error) {
+      setIpChangeEnabled(!requestedEnabled);
+      setIpChangeResult({ status: "failed", title: "IP Monitor Save Failed", details: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
+  async function checkIpChangeNow() {
+    setIpChangeResult({ status: "running", title: "Checking Public IP" });
+    onError("");
+    try {
+      const final = await waitForTaskSilently((await serverApi.checkIpChangeRestartNow()).task);
+      const nextStatus = await serverApi.ipChangeRestart();
+      setIpChangeRestart(nextStatus);
+      setIpChangeResult(final.status === "succeeded"
+        ? { status: "succeeded", title: "Public IP Check Complete", details: taskTechnicalDetails(final) }
+        : { status: "failed", title: "Public IP Check Failed", details: taskTechnicalDetails(final) || final.errorMessage || "" });
+    } catch (error) {
+      setIpChangeResult({ status: "failed", title: "Public IP Check Failed", details: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
+  async function loadShutdownProtection() {
+    setShutdownProtectionLoading(true);
+    try {
+      const result = await serverApi.shutdownProtection();
+      setShutdownProtection(result);
+      const values = parseKeyValueText(result.stdout || "");
+      const active = /^active$/i.test(values.systemd_service || "");
+      const enabled = /^enabled$/i.test(values.systemd_enabled || "");
+      setShutdownProtectionEnabled(/^true$/i.test(values.shutdown_protection_enabled || "") && active && enabled);
+    } finally {
+      setShutdownProtectionLoading(false);
+    }
+  }
+
+  async function saveShutdownProtection(nextEnabled = shutdownProtectionEnabled) {
+    setShutdownProtectionResult({ status: "running", title: "Saving Shutdown Protection" });
+    const requestedEnabled = nextEnabled;
+    setShutdownProtectionEnabled(requestedEnabled);
+    onError("");
+    try {
+      const final = await waitForTaskSilently((await serverApi.saveShutdownProtection({ enabled: requestedEnabled })).task);
+      const details = taskTechnicalDetails(final);
+      const nextStatus = await serverApi.shutdownProtection();
+      setShutdownProtection(nextStatus);
+      const nextValues = parseKeyValueText(nextStatus.stdout || "");
+      const active = /^active$/i.test(nextValues.systemd_service || "");
+      const enabled = /^enabled$/i.test(nextValues.systemd_enabled || "");
+      const inactive = /^inactive$|^not installed$/i.test(nextValues.systemd_service || "");
+      if (requestedEnabled && (!active || !enabled)) setShutdownProtectionEnabled(false);
+      if (!requestedEnabled && inactive) setShutdownProtectionEnabled(false);
+      setShutdownProtectionResult(final.status === "succeeded" && (!requestedEnabled ? inactive || !enabled : active && enabled)
+        ? { status: "succeeded", title: "Shutdown Protection Saved", details }
+        : { status: "failed", title: requestedEnabled ? "Shutdown Protection Install Failed" : "Shutdown Protection Save Failed", details: details || nextStatus.stdout || nextStatus.stderr || "" });
+    } catch (error) {
+      setShutdownProtectionEnabled(!requestedEnabled);
+      setShutdownProtectionResult({ status: "failed", title: "Shutdown Protection Save Failed", details: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
+  async function removeShutdownProtection() {
+    if (!(await confirmAction("Remove the Linux shutdown protection systemd service from this host?", { title: "Remove Shutdown Protection", confirmLabel: "Remove", danger: true }))) return;
+    setShutdownProtectionResult({ status: "running", title: "Removing Shutdown Protection" });
+    onError("");
+    try {
+      const final = await waitForTaskSilently((await serverApi.removeShutdownProtection()).task);
+      const details = taskTechnicalDetails(final);
+      const nextStatus = await serverApi.shutdownProtection();
+      setShutdownProtection(nextStatus);
+      setShutdownProtectionEnabled(false);
+      setShutdownProtectionResult(final.status === "succeeded"
+        ? { status: "succeeded", title: "Shutdown Protection Removed", details }
+        : { status: "failed", title: "Shutdown Protection Remove Failed", details: details || nextStatus.stdout || nextStatus.stderr || "" });
+    } catch (error) {
+      setShutdownProtectionResult({ status: "failed", title: "Shutdown Protection Remove Failed", details: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
+  async function loadTransferSettings() {
+    setTransferLoading(true);
+    try {
+      const result = await adminApi.characterTransferSettings();
+      setTransferSettings(result.settings);
+      setTransferOriginal(result.settings);
+      setTransferDefaults(result.defaults);
+      setTransferPolicies(result.policies);
+    } finally {
+      setTransferLoading(false);
+    }
+  }
+
+  async function loadMessageOfTheDay() {
+    const result = await adminApi.messageOfTheDay();
+    setMessageOfTheDay(result.settings);
+    setMessageOfTheDayOriginal(result.settings);
+  }
+
+  async function loadPlayerAnnouncements() {
+    const result = await adminApi.playerAnnouncements();
+    setPlayerAnnouncements(result.settings);
+    setPlayerAnnouncementsOriginal(result.settings);
+  }
+
+  function updateTransferSetting<K extends keyof CharacterTransferSettings>(key: K, value: CharacterTransferSettings[K]) {
+    setTransferSettings((current) => current ? { ...current, [key]: value } : current);
+  }
+
+  async function saveTransferSettings() {
+    if (!transferSettings) return;
+    setTransferResult({ status: "running", title: "Saving Character Transfer Settings" });
+    onError("");
+    try {
+      const response = await adminApi.saveCharacterTransferSettings(transferSettings);
+      const final = await waitForTaskSilently(response.task);
+      const details = taskTechnicalDetails(final);
+      if (final.status !== "succeeded") {
+        setTransferResult({ status: "failed", title: "Character Transfer Save Failed", details: details || final.errorMessage || "" });
+        return;
+      }
+      await loadTransferSettings();
+      setTransferResult({ status: "succeeded", title: "Character Transfer Settings Saved", details });
+    } catch (error) {
+      setTransferResult({ status: "failed", title: "Character Transfer Save Failed", details: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
+  async function restoreTransferDefaults() {
+    if (!(await confirmAction("Restore official character transfer defaults and restart the Battlegroup Director?", { title: "Restore Character Transfer Defaults", confirmLabel: "Restore Defaults" }))) return;
+    setTransferResult({ status: "running", title: "Restoring Character Transfer Defaults" });
+    onError("");
+    try {
+      const response = await adminApi.restoreCharacterTransferSettings();
+      setTransferSettings(response.settings);
+      const final = await waitForTaskSilently(response.task);
+      const details = taskTechnicalDetails(final);
+      if (final.status !== "succeeded") {
+        setTransferResult({ status: "failed", title: "Character Transfer Restore Failed", details: details || final.errorMessage || "" });
+        return;
+      }
+      await loadTransferSettings();
+      setTransferResult({ status: "succeeded", title: "Character Transfer Defaults Restored", details });
+    } catch (error) {
+      setTransferResult({ status: "failed", title: "Character Transfer Restore Failed", details: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
   useEffect(() => {
     playersApi.list().then((result) => setPlayers(result.rows || [])).catch(() => undefined);
     loadMapChatOptions().catch(() => undefined);
+    loadMessageOfTheDay().catch(() => undefined);
+    loadPlayerAnnouncements().catch(() => undefined);
     loadHistory().catch(() => undefined);
     loadRestartSchedule().catch((error) => onError(error instanceof Error ? error.message : String(error)));
+    loadIpChangeRestart().catch((error) => onError(error instanceof Error ? error.message : String(error)));
+    loadShutdownProtection().catch((error) => onError(error instanceof Error ? error.message : String(error)));
+    loadTransferSettings().catch((error) => onError(error instanceof Error ? error.message : String(error)));
     return () => {
       if (resultTimer.current) window.clearTimeout(resultTimer.current);
     };
   }, []);
 
   useEffect(() => {
+    const id = window.setInterval(() => {
+      if (document.hidden || ipChangeResult?.status === "running") return;
+      loadIpChangeRestart({ showLoading: false, syncControls: false }).catch(() => undefined);
+    }, 30000);
+    return () => window.clearInterval(id);
+  }, [ipChangeResult?.status]);
+
+  useEffect(() => {
     if (!scheduleResult || scheduleResult.status === "running") return;
     const id = window.setTimeout(() => setScheduleResult(null), 10400);
     return () => window.clearTimeout(id);
   }, [scheduleResult?.status, scheduleResult?.title]);
+
+  useEffect(() => {
+    if (!ipChangeResult || ipChangeResult.status === "running") return;
+    const id = window.setTimeout(() => setIpChangeResult(null), 10400);
+    return () => window.clearTimeout(id);
+  }, [ipChangeResult?.status, ipChangeResult?.title]);
+
+  useEffect(() => {
+    if (!shutdownProtectionResult || shutdownProtectionResult.status === "running") return;
+    const id = window.setTimeout(() => setShutdownProtectionResult(null), 10400);
+    return () => window.clearTimeout(id);
+  }, [shutdownProtectionResult?.status, shutdownProtectionResult?.title]);
+
+  useEffect(() => {
+    if (!transferResult || transferResult.status === "running") return;
+    const id = window.setTimeout(() => setTransferResult(null), 10400);
+    return () => window.clearTimeout(id);
+  }, [transferResult?.status, transferResult?.title]);
 
   async function hydrateOnlinePlayers() {
     const response = await playersApi.online();
@@ -201,6 +483,59 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
     }, "Broadcast message was sent successfully.");
   }
 
+  async function saveMessageOfTheDay() {
+    await runAdminAction("message-of-the-day", "Saving Message of the Day", async () => {
+      const result = await adminApi.saveMessageOfTheDay(messageOfTheDay);
+      setMessageOfTheDay(result.settings);
+      setMessageOfTheDayOriginal(result.settings);
+      await loadHistory(true);
+    }, "Message of the Day was saved successfully.");
+  }
+
+  async function toggleMessageOfTheDay(nextEnabled: boolean) {
+    const previous = messageOfTheDay;
+    const next = { ...messageOfTheDay, enabled: nextEnabled };
+    setMessageOfTheDay(next);
+    await runAdminAction("message-of-the-day", nextEnabled ? "Enabling Message of the Day" : "Disabling Message of the Day", async () => {
+      const result = await adminApi.saveMessageOfTheDay(next);
+      setMessageOfTheDay(result.settings);
+      setMessageOfTheDayOriginal(result.settings);
+      await loadHistory(true);
+    }, nextEnabled ? "Message of the Day enabled." : "Message of the Day disabled.", "success", (error) => {
+      setMessageOfTheDay(previous);
+      return friendlyInlineError(error);
+    });
+  }
+
+  async function restoreMessageOfTheDay() {
+    if (!(await confirmAction("Restore the Message of the Day defaults?", { title: "Restore Message of the Day", confirmLabel: "Restore Defaults" }))) return;
+    await runAdminAction("message-of-the-day", "Restoring Message of the Day", async () => {
+      const result = await adminApi.restoreMessageOfTheDay();
+      setMessageOfTheDay(result.settings);
+      setMessageOfTheDayOriginal(result.settings);
+      await loadHistory(true);
+    }, "Message of the Day defaults were restored.");
+  }
+
+  async function savePlayerAnnouncements() {
+    await runAdminAction("player-announcements", "Saving player announcements", async () => {
+      const result = await adminApi.savePlayerAnnouncements(playerAnnouncements);
+      setPlayerAnnouncements(result.settings);
+      setPlayerAnnouncementsOriginal(result.settings);
+      await loadHistory(true);
+    }, "Player announcements were saved successfully.");
+  }
+
+  async function restorePlayerAnnouncements() {
+    if (!(await confirmAction("Restore the join and leave announcement defaults?", { title: "Restore Player Announcements", confirmLabel: "Restore Defaults" }))) return;
+    await runAdminAction("player-announcements", "Restoring player announcements", async () => {
+      const result = await adminApi.restorePlayerAnnouncements();
+      setPlayerAnnouncements(result.settings);
+      setPlayerAnnouncementsOriginal(result.settings);
+      await loadHistory(true);
+    }, "Player announcement defaults were restored.");
+  }
+
   async function sendMapChat() {
     const target = mapChatOptions.find((option) => option.key === mapChatTarget) || mapChatOptions[0] || defaultMapChatOptions()[0];
     await runAdminAction("map-chat", "Sending map chat message", async () => {
@@ -218,15 +553,93 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
   }
 
   const historyRows = parseHistoryRows(history, players, "admin-tools");
+  const transferBooleanRow = (key: keyof CharacterTransferSettings, label: string) => {
+    const value = Boolean(transferSettings?.[key]);
+    return <label className="character-transfer-row character-transfer-boolean-row">
+      <span>{label}</span>
+      <strong>{value ? "True" : "False"}</strong>
+      <input type="checkbox" disabled={transferSaving} checked={value} onChange={(event) => updateTransferSetting(key, event.target.checked as CharacterTransferSettings[typeof key])} />
+    </label>;
+  };
 
   return <section className="panel admin-tools-panel">
     <h2>Admin Tools</h2>
+    <div className={`playerAdmin_toggle ${liveToolsOpen ? "open" : ""}`}>
+      <button className="playerAdmin_toggleHeader" aria-label={liveToolsOpen ? "Collapse Global Live Tools" : "Expand Global Live Tools"} onClick={() => setLiveToolsOpen(!liveToolsOpen)}>{liveToolsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Global Live Tools</span></button>
+      {liveToolsOpen && <div className="playerAdmin_toggleBody"><div className="global-live-tools">
+        <div className="action-line admin-global-actions">
+          <button className="danger" onClick={() => run(kickAllPlayers)}>Kick All</button>
+          <button className="success" onClick={() => run(hydrateOnlinePlayers)}>Hydrate All</button>
+          <InlineActionResult result={actionResult} resultKey="global" />
+        </div>
+        <div className="section-divider" />
+        <div className="action-line broadcast-line motd-line">
+          <div className="panel-title schedule-panel-title motd-panel-title">
+            <h4>Message of the Day</h4>
+            <label className={`switch-checkbox ${messageOfTheDay.enabled ? "enabled" : "disabled"}`}><input type="checkbox" checked={messageOfTheDay.enabled} onChange={(event) => run(() => toggleMessageOfTheDay(event.target.checked))} /><span className="switch-label">Login Message</span><strong className="switch-state">{messageOfTheDay.enabled ? "ON" : "OFF"}</strong></label>
+          </div>
+          {messageOfTheDayDirty && <p className="dirty-note">Unsaved changes: Message of the Day</p>}
+          <p className="muted">Shown as a private in-game message once per player login session.</p>
+          <label className="broadcast-message">Message<textarea rows={3} value={messageOfTheDay.message} onChange={(event) => setMessageOfTheDay((current) => ({ ...current, message: event.target.value }))} placeholder="Message shown when a player logs in" /></label>
+          <div className="broadcast-controls-row">
+            <button disabled={!messageOfTheDayDirty} onClick={() => run(saveMessageOfTheDay)}>Save MOTD</button>
+            <button onClick={() => run(restoreMessageOfTheDay)}>Restore Defaults</button>
+            <InlineActionResult result={actionResult} resultKey="message-of-the-day" />
+          </div>
+        </div>
+        <div className="section-divider" />
+        <div className="action-line broadcast-line">
+          <h4 className="live-tool-section-title">Send Server Broadcast</h4>
+          <label className="broadcast-title">Broadcast Title<input value={broadcastTitle} onChange={(event) => setBroadcastTitle(event.target.value)} placeholder="Title shown in-game" /></label>
+          <label className="broadcast-message">Broadcast Body<textarea rows={3} value={broadcastBody} onChange={(event) => setBroadcastBody(event.target.value)} placeholder="Message shown to online players" /></label>
+          <div className="broadcast-controls-row">
+            <label className="inline-field">Duration Seconds<input type="number" min="1" max="3600" value={broadcastDuration} onChange={(event) => setBroadcastDuration(event.target.value)} /></label>
+            <button onClick={() => run(sendBroadcast)}>Send Broadcast</button>
+            <InlineActionResult result={actionResult} resultKey="broadcast" />
+          </div>
+        </div>
+        <div className="section-divider" />
+        <div className="action-line broadcast-line map-chat-line">
+          <h4 className="live-tool-section-title">Send Map Message</h4>
+          <label className="broadcast-title">Choose Map<select value={mapChatTarget} onChange={(event) => setMapChatTarget(event.target.value)}>
+            {mapChatOptions.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+          </select></label>
+          <label className="broadcast-message">Message<textarea rows={3} value={mapChatBody} onChange={(event) => setMapChatBody(event.target.value)} placeholder="Message shown in this map chat" /></label>
+          <div className="broadcast-controls-row">
+            <button onClick={() => run(sendMapChat)}>Send Message</button>
+            <InlineActionResult result={actionResult} resultKey="map-chat" />
+          </div>
+        </div>
+        <div className="section-divider" />
+        <div className="action-line broadcast-line player-announcements-line">
+          <div className="panel-title schedule-panel-title">
+            <h4>Player Arrival & Departure Messages</h4>
+          </div>
+          {playerAnnouncementsDirty && <p className="dirty-note">Unsaved changes: Player announcements</p>}
+          <label className="checkbox-line">
+            <input type="checkbox" checked={playerAnnouncements.joinEnabled} onChange={(event) => setPlayerAnnouncements((current) => ({ ...current, joinEnabled: event.target.checked }))} />
+            <span>Enable Join Announcements</span>
+          </label>
+          <label className="broadcast-message">Join Message<textarea rows={2} value={playerAnnouncements.joinMessage} onChange={(event) => setPlayerAnnouncements((current) => ({ ...current, joinMessage: event.target.value }))} placeholder={DEFAULT_PLAYER_JOIN_MESSAGE} /></label>
+          <label className="checkbox-line">
+            <input type="checkbox" checked={playerAnnouncements.leaveEnabled} onChange={(event) => setPlayerAnnouncements((current) => ({ ...current, leaveEnabled: event.target.checked }))} />
+            <span>Enable Leave Announcements</span>
+          </label>
+          <label className="broadcast-message">Leave Message<textarea rows={2} value={playerAnnouncements.leaveMessage} onChange={(event) => setPlayerAnnouncements((current) => ({ ...current, leaveMessage: event.target.value }))} placeholder={DEFAULT_PLAYER_LEAVE_MESSAGE} /></label>
+          <div className="broadcast-controls-row">
+            <button disabled={!playerAnnouncementsDirty} onClick={() => run(savePlayerAnnouncements)}>Save</button>
+            <button onClick={() => run(restorePlayerAnnouncements)}>Restore Defaults</button>
+            <InlineActionResult result={actionResult} resultKey="player-announcements" />
+          </div>
+        </div>
+      </div></div>}
+    </div>
     <div className={`playerAdmin_toggle ${scheduleOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={scheduleOpen ? "Collapse Schedule Server Restart" : "Expand Schedule Server Restart"} onClick={() => setScheduleOpen(!scheduleOpen)}>{scheduleOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Schedule Server Restart</span></button>
       {scheduleOpen && <div className="playerAdmin_toggleBody">
         <div className="panel-title schedule-panel-title">
-          <h4>Schedule Server Restart</h4>
-          <label className={`switch-checkbox ${restartEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={scheduleLoading || scheduleSaving} checked={restartEnabled} onChange={(event) => run(() => saveSchedule(event.target.checked))} /><span className="switch-label">Daily Restart</span><strong className="switch-state">{restartEnabled ? "ON" : "OFF"}</strong></label>
+          <h4>Daily Restart</h4>
+          <label className={`switch-checkbox ${restartEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={scheduleLoading || scheduleSaving} checked={restartEnabled} onChange={(event) => run(() => saveSchedule(event.target.checked))} /><span className="switch-label">Service Status</span><strong className="switch-state">{restartEnabled ? "ON" : "OFF"}</strong></label>
         </div>
         <KeyValueGrid items={[["Current Status", scheduleStatusLabel], ["Restart Time (Local Server Time)", toHourMinuteTime(restartScheduleValues.restart_time || restartTime)], ["In-Game Notice Before", `${restartNotifyMinutes} minutes`], ["Timer", scheduleDisplayTimerLabel]]} />
         {commandStatusSummary(restartSchedule).reason && <p className="danger-note">{commandStatusSummary(restartSchedule).reason}</p>}
@@ -238,36 +651,65 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
             <strong className={scheduleResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(scheduleResult.title, scheduleResult.status === "running")}</strong>
           </span>}
         </div>
+        <div className="section-divider" />
+        <div className="panel-title schedule-panel-title">
+          <h4>Restart On Public IP Change</h4>
+          <label className={`switch-checkbox ${ipChangeEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={ipChangeLoading || ipChangeSaving} checked={ipChangeEnabled} onChange={(event) => run(() => saveIpChangeRestart(event.target.checked))} /><span className="switch-label">IP Monitor</span><strong className="switch-state">{ipChangeEnabled ? "ON" : "OFF"}</strong></label>
+        </div>
+        <KeyValueGrid items={[["Current Status", ipChangeStatusLabel], ["Check Interval", `${ipChangeIntervalMinutes} minutes`], ["In-Game Notice", `${ipChangeNotifyMinutes} minutes`], ["Last Public IP", ipChangeValues.last_known_public_ip || "Unavailable"], ["Last Check", ipChangeValues.last_check || "Unavailable"], ["Last Restart", ipChangeValues.last_restart || "Unavailable"], ["Timer", ipChangeDisplayTimerLabel]]} />
+        {commandStatusSummary(ipChangeRestart).reason && <p className="danger-note">{commandStatusSummary(ipChangeRestart).reason}</p>}
+        <p className="muted">For public servers on dynamic IPs. When the public IP changes, the console updates SERVER_IP and restarts the console so the new address is advertised.</p>
+        <div className="action-line schedule-action-line">
+          <label className="compact-select schedule-notify-field">Check Every (Min)<input type="number" min="1" max="1440" step="1" disabled={ipChangeSaving} value={ipChangeIntervalMinutes} onChange={(event) => setIpChangeIntervalMinutes(event.target.value)} /></label>
+          <label className="compact-select schedule-notify-field">In-Game Notice (Min)<input type="number" min="0" max="60" step="1" disabled={ipChangeSaving} value={ipChangeNotifyMinutes} onChange={(event) => setIpChangeNotifyMinutes(event.target.value)} /></label>
+          <button disabled={ipChangeSaving || ipChangeLoading} onClick={() => saveIpChangeRestart()}>Save IP Monitor</button>
+          <button disabled={ipChangeSaving || ipChangeLoading} onClick={() => checkIpChangeNow()}>Check Now</button>
+          {ipChangeResult && <span className={`inline-task-result result-${ipChangeResult.status === "succeeded" ? "ok" : ipChangeResult.status === "failed" ? "fail" : "running"}`}>
+            <strong className={ipChangeResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(ipChangeResult.title, ipChangeResult.status === "running")}</strong>
+          </span>}
+        </div>
+        <div className="section-divider" />
+        <div className="panel-title schedule-panel-title">
+          <h4>Host Shutdown Protection</h4>
+          <label className={`switch-checkbox ${shutdownProtectionEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={shutdownProtectionLoading || shutdownProtectionSaving} checked={shutdownProtectionEnabled} onChange={(event) => run(() => saveShutdownProtection(event.target.checked))} /><span className="switch-label">Clean Stop</span><strong className="switch-state">{shutdownProtectionEnabled ? "ON" : "OFF"}</strong></label>
+        </div>
+        <KeyValueGrid items={[["Current Status", shutdownProtectionStatusLabel], ["Systemd Service", shutdownProtectionServiceLabel], ["Systemd Enabled", shutdownProtectionEnabledValue ? formatTimerStatus(shutdownProtectionEnabledValue) : "Not Installed"], ["Timeout", shutdownProtectionValues.timeout || "240 seconds"]]} />
+        {commandStatusSummary(shutdownProtection).reason && <p className="danger-note">{commandStatusSummary(shutdownProtection).reason}</p>}
+        <p className="muted">Optional Linux host integration. When the host shuts down or reboots, systemd runs the console clean-stop flow before Docker terminates containers. This is not required for Unraid, WSL, or custom environments that manage shutdown another way.</p>
+        <div className="action-line schedule-action-line">
+          {shutdownProtectionInstalled && <button className="danger" disabled={shutdownProtectionSaving || shutdownProtectionLoading} onClick={() => removeShutdownProtection()}>Remove Service</button>}
+          {shutdownProtectionResult && <span className={`inline-task-result result-${shutdownProtectionResult.status === "succeeded" ? "ok" : shutdownProtectionResult.status === "failed" ? "fail" : "running"}`}>
+            <strong className={shutdownProtectionResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(shutdownProtectionResult.title, shutdownProtectionResult.status === "running")}</strong>
+          </span>}
+        </div>
+        {shutdownProtectionResult?.status === "failed" && shutdownProtectionValues.manual_install_command && <p className="danger-note">If automatic install is not available in this environment, run this on the Linux host: <code>{shutdownProtectionValues.manual_install_command}</code></p>}
       </div>}
     </div>
-    <div className={`playerAdmin_toggle ${liveToolsOpen ? "open" : ""}`}>
-      <button className="playerAdmin_toggleHeader" aria-label={liveToolsOpen ? "Collapse Global Live Tools" : "Expand Global Live Tools"} onClick={() => setLiveToolsOpen(!liveToolsOpen)}>{liveToolsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Global Live Tools</span></button>
-      {liveToolsOpen && <div className="playerAdmin_toggleBody"><div className="global-live-tools">
-        <div className="action-line admin-global-actions">
-          <button className="danger" onClick={() => run(kickAllPlayers)}>Kick All</button>
-          <button className="success" onClick={() => run(hydrateOnlinePlayers)}>Hydrate All</button>
-          <InlineActionResult result={actionResult} resultKey="global" />
+    <div className={`playerAdmin_toggle ${transferOpen ? "open" : ""}`}>
+      <button className="playerAdmin_toggleHeader" aria-label={transferOpen ? "Collapse Character Transfer Settings" : "Expand Character Transfer Settings"} onClick={() => setTransferOpen(!transferOpen)}>{transferOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Character Transfer Settings</span></button>
+      {transferOpen && <div className="playerAdmin_toggleBody">
+        {transferDirty && <p className="dirty-note">Unsaved changes: Character Transfer Settings</p>}
+        <p className="muted">Battlegroup Director transfer policy. Saving restarts only the Director service so the battlegroup-wide transfer rules are reloaded.</p>
+        {transferSettings && <div className="character-transfer-grid">
+          {transferBooleanRow("ShouldDeleteOriginCharactersDuringTransfers", "Delete origin character after transfer")}
+          <label className="character-transfer-row"><span>Incoming character transfer policy</span><select disabled={transferSaving} value={transferSettings.IncomingCharacterTransfers} onChange={(event) => updateTransferSetting("IncomingCharacterTransfers", Number(event.target.value))}>{transferPolicies.map((policy) => <option key={policy.value} value={policy.value}>{policy.label}</option>)}</select><span className="character-transfer-spacer" /></label>
+          {transferBooleanRow("AcceptOutgoingCharacterTransfers", "Accept outgoing character transfers")}
+          <label className="character-transfer-row"><span>Export timeout, seconds</span><input type="number" min="1" step="1" disabled={transferSaving} value={transferSettings.ExportCharacterTimeout} onChange={(event) => updateTransferSetting("ExportCharacterTimeout", Number(event.target.value))} /><span className="character-transfer-spacer" /></label>
+          <label className="character-transfer-row"><span>Import timeout, seconds</span><input type="number" min="1" step="1" disabled={transferSaving} value={transferSettings.ImportCharacterTimeout} onChange={(event) => updateTransferSetting("ImportCharacterTimeout", Number(event.target.value))} /><span className="character-transfer-spacer" /></label>
+          {transferBooleanRow("FreeToTransferCharactersFrom", "Free transfers from this server")}
+          {transferBooleanRow("FreeToTransferCharactersTo", "Free transfers to this server")}
+          <label className="character-transfer-row"><span>Validate-before-import timeout, seconds</span><input type="number" min="1" step="1" disabled={transferSaving} value={transferSettings.ValidateBeforeImportCharacterTimeout} onChange={(event) => updateTransferSetting("ValidateBeforeImportCharacterTimeout", Number(event.target.value))} /><span className="character-transfer-spacer" /></label>
+          {transferBooleanRow("ForceIsWorldClosed", "Force world closed")}
+          {transferBooleanRow("ForceIsWorldClosingSoon", "Force world closing soon")}
+        </div>}
+        <div className="action-line schedule-action-line">
+          <button disabled={transferLoading || transferSaving || !transferDirty} onClick={() => saveTransferSettings()}>Save</button>
+          <button disabled={transferLoading || transferSaving || !transferDefaults} onClick={() => restoreTransferDefaults()}>Restore Defaults</button>
+          {transferResult && <span className={`inline-task-result result-${transferResult.status === "succeeded" ? "ok" : transferResult.status === "failed" ? "fail" : "running"}`}>
+            <strong className={transferResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(transferResult.title, transferResult.status === "running")}</strong>
+          </span>}
         </div>
-        <div className="action-line broadcast-line">
-          <label className="broadcast-title">Broadcast Title<input value={broadcastTitle} onChange={(event) => setBroadcastTitle(event.target.value)} placeholder="Title shown in-game" /></label>
-          <label className="broadcast-message">Broadcast Body<textarea rows={3} value={broadcastBody} onChange={(event) => setBroadcastBody(event.target.value)} placeholder="Message shown to online players" /></label>
-          <div className="broadcast-controls-row">
-            <label className="inline-field">Duration Seconds<input type="number" min="1" max="3600" value={broadcastDuration} onChange={(event) => setBroadcastDuration(event.target.value)} /></label>
-            <button onClick={() => run(sendBroadcast)}>Send Broadcast</button>
-            <InlineActionResult result={actionResult} resultKey="broadcast" />
-          </div>
-        </div>
-        <div className="action-line broadcast-line map-chat-line">
-          <label className="broadcast-title">Map Chat Destination<select value={mapChatTarget} onChange={(event) => setMapChatTarget(event.target.value)}>
-            {mapChatOptions.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
-          </select></label>
-          <label className="broadcast-message">Map Chat Message<textarea rows={3} value={mapChatBody} onChange={(event) => setMapChatBody(event.target.value)} placeholder="Message shown in this map chat" /></label>
-          <div className="broadcast-controls-row">
-            <button onClick={() => run(sendMapChat)}>Send Map Chat</button>
-            <InlineActionResult result={actionResult} resultKey="map-chat" />
-          </div>
-        </div>
-      </div></div>}
+      </div>}
     </div>
     <div className={`playerAdmin_toggle admin-history-toggle-panel ${historyOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={historyOpen ? "Collapse Command History" : "Expand Command History"} onClick={() => setHistoryOpen(!historyOpen)}>{historyOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Command History</span></button>
@@ -337,6 +779,21 @@ async function waitForTaskSilently(task: Task) {
 
 function isTerminalTask(status: string) {
   return ["succeeded", "failed", "cancelled"].includes(status);
+}
+
+function sameTransferSettings(a: CharacterTransferSettings, b: CharacterTransferSettings) {
+  return Object.keys(a).every((key) => a[key as keyof CharacterTransferSettings] === b[key as keyof CharacterTransferSettings]);
+}
+
+function sameMessageOfTheDay(a: MessageOfTheDaySettings, b: MessageOfTheDaySettings) {
+  return a.enabled === b.enabled && a.message === b.message;
+}
+
+function samePlayerAnnouncements(a: PlayerAnnouncementSettings, b: PlayerAnnouncementSettings) {
+  return a.joinEnabled === b.joinEnabled
+    && a.joinMessage === b.joinMessage
+    && a.leaveEnabled === b.leaveEnabled
+    && a.leaveMessage === b.leaveMessage;
 }
 
 function buildMapChatOptions(rows: Record<string, unknown>[]) {

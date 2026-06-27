@@ -27,6 +27,9 @@ export function createDb(config) {
     query_timeout: Number(process.env.ADMIN_DB_QUERY_TIMEOUT_MS || 15000),
     statement_timeout: Number(process.env.ADMIN_DB_STATEMENT_TIMEOUT_MS || 15000)
   });
+  pool.on("error", (error) => {
+    console.warn(`Database connection interrupted: ${redactDbError(error)}`);
+  });
 
   async function query(text, values = []) {
     try {
@@ -110,11 +113,22 @@ export function isReadOnlySql(query) {
     !/\b(insert|update|delete|drop|alter|truncate|create|grant|revoke|copy\s+.*\s+from)\b/i.test(stripped);
 }
 
+function normalizeQueryResult(result) {
+  if (!Array.isArray(result)) return result;
+  return [...result].reverse().find((entry) => Array.isArray(entry?.fields) && entry.fields.length) ||
+    [...result].reverse().find((entry) => Array.isArray(entry?.rows)) ||
+    result[result.length - 1] ||
+    { fields: [], rows: [], rowCount: 0, command: "" };
+}
+
 export function rowsResult(result) {
+  const normalized = normalizeQueryResult(result);
+  const fields = Array.isArray(normalized?.fields) ? normalized.fields : [];
+  const rows = Array.isArray(normalized?.rows) ? normalized.rows : [];
   return {
-    columns: result.fields.map((field) => ({ name: field.name, dataTypeId: field.dataTypeID })),
-    rows: result.rows,
-    rowCount: result.rowCount ?? result.rows.length,
-    command: result.command || ""
+    columns: fields.map((field) => ({ name: field.name, dataTypeId: field.dataTypeID })),
+    rows,
+    rowCount: normalized?.rowCount ?? rows.length,
+    command: normalized?.command || ""
   };
 }

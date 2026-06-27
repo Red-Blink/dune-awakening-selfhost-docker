@@ -4,9 +4,9 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 [ -f .env ] && . ./.env
-[ -f runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
+[ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
 
-[ -f runtime/generated/image-tags.env ] && . runtime/generated/image-tags.env
+[ -r runtime/generated/image-tags.env ] && . runtime/generated/image-tags.env
 source runtime/scripts/host-paths.sh
 source runtime/scripts/image-tags.sh
 WORLD_IMAGE_TAG="$(resolve_world_image_tag)"
@@ -98,6 +98,7 @@ docker run -d \
   --network dune-net \
   --restart unless-stopped \
   -p 31982:5672/tcp \
+  -p 127.0.0.1:15672:15672/tcp \
   -p 31983:15672/tcp \
   -v "$(host_path "$PWD/runtime/rabbitmq-game/config/rabbitmq.conf"):/etc/rabbitmq/rabbitmq.conf:ro" \
   -v "$(host_path "$PWD/runtime/rabbitmq-game/config/enabled_plugins"):/etc/rabbitmq/enabled_plugins:ro" \

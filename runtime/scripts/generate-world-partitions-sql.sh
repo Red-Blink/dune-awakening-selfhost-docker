@@ -6,7 +6,7 @@ cd "$(dirname "$0")/../.."
 mkdir -p runtime/generated
 
 [ -f .env ] && . ./.env
-[ -f runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
+[ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
 source runtime/scripts/runtime-env.sh
 
 SERVER_REGION="$(resolve_server_region)"

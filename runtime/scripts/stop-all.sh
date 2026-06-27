@@ -28,6 +28,11 @@ runtime/scripts/publish-deepdesert-overrides.sh stop || true
 pkill -f "publish-deepdesert-overrides.sh loop" 2>/dev/null || true
 
 echo
+echo "=== Stopping network server-state publisher ==="
+runtime/scripts/publish-network-server-state-overrides.sh stop || true
+pkill -f "publish-network-server-state-overrides.sh loop" 2>/dev/null || true
+
+echo
 echo "=== Stopping game servers first ==="
 runtime/scripts/recycle-world-game-servers.sh stop-all || true
 

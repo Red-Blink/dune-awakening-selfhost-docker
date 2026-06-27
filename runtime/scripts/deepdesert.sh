@@ -38,9 +38,18 @@ psql_value() {
   docker exec dune-postgres psql -U postgres -d dune -At -c "$1"
 }
 
+deepdesert_mode() {
+  if [ -x runtime/scripts/map-modes.sh ]; then
+    runtime/scripts/map-modes.sh mode DeepDesert_1 2>/dev/null | awk '{print $2}'
+  else
+    echo "dynamic"
+  fi
+}
+
 recycle_idle_deepdesert_servers() {
-  local rows partition_id server_id connected_players
+  local rows partition_id server_id connected_players mode
   RECYCLED_DEEPDESERT_SERVERS=0
+  mode="$(deepdesert_mode)"
   rows="$(docker exec dune-postgres psql -U postgres -d dune -At -F '|' -c "
     select
       wp.partition_id,
@@ -61,10 +70,45 @@ recycle_idle_deepdesert_servers() {
       echo "Skipping DeepDesert_1 partition $partition_id recycle because connected_players=$connected_players."
       continue
     fi
+    if [ "$mode" = "dynamic" ]; then
+      echo "Despawning idle dynamic DeepDesert_1 partition $partition_id so it remains offline until player demand."
+      runtime/scripts/despawn-server.sh "$partition_id" --force >/dev/null
+      RECYCLED_DEEPDESERT_SERVERS=1
+      continue
+    fi
     echo "Recycling idle DeepDesert_1 partition $partition_id so it republishes fresh state..."
     runtime/scripts/despawn-server.sh "$partition_id" --force >/dev/null
     runtime/scripts/spawn-server.sh "$partition_id" >/dev/null
     RECYCLED_DEEPDESERT_SERVERS=1
+  done <<< "$rows"
+}
+
+despawn_idle_dynamic_deepdesert_servers() {
+  local mode rows partition_id server_id connected_players
+  mode="$(deepdesert_mode)"
+  [ "$mode" = "dynamic" ] || return 0
+  rows="$(docker exec dune-postgres psql -U postgres -d dune -At -F '|' -c "
+    select
+      wp.partition_id,
+      coalesce(wp.server_id, ''),
+      coalesce(fs.connected_players, 0)
+    from dune.world_partition wp
+    left join dune.farm_state fs on fs.server_id = wp.server_id
+    where wp.map = 'DeepDesert_1'
+      and coalesce(wp.server_id, '') <> ''
+    order by wp.dimension_index, wp.partition_id;
+  " 2>/dev/null || true)"
+  [ -n "$rows" ] || return 0
+
+  while IFS='|' read -r partition_id server_id connected_players; do
+    [ -n "${partition_id:-}" ] || continue
+    [ -n "$(printf '%s' "${server_id:-}" | tr -d '[:space:]')" ] || continue
+    if [ "${connected_players:-0}" != "0" ]; then
+      echo "Skipping DeepDesert_1 partition $partition_id cleanup because connected_players=$connected_players."
+      continue
+    fi
+    echo "Despawning idle dynamic DeepDesert_1 partition $partition_id after dual-mode change."
+    runtime/scripts/despawn-server.sh "$partition_id" --force >/dev/null
   done <<< "$rows"
 }
 
@@ -314,6 +358,7 @@ enable_dual() {
   else
     restart_director_if_running
   fi
+  despawn_idle_dynamic_deepdesert_servers
   echo
   echo "Dual Deep Desert PvP/PvE is enabled."
   echo "Gameplay routing now matches the reference flow: only the detected dimension 0 partition is listed in m_PvpEnabledPartitions."
@@ -339,6 +384,7 @@ disable_dual() {
     rm -f "$OVERRIDE_FILE"
     reset_single_sietch_dimension
     restart_director_if_running
+    despawn_idle_dynamic_deepdesert_servers
     return 0
   }
 
@@ -412,6 +458,7 @@ disable_dual() {
   python3 runtime/scripts/usersettings.py partition-set DeepDesert_1 "$(pvp_partition_id)" partition_pvp_enabled False >/dev/null 2>&1 || true
   python3 runtime/scripts/usersettings.py materialize-current >/dev/null || true
   restart_director_if_running
+  despawn_idle_dynamic_deepdesert_servers
   echo "Dual Deep Desert PvP/PvE disabled."
 }
 

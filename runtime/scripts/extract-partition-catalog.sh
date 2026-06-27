@@ -6,14 +6,17 @@ cd "$(dirname "$0")/../.."
 mkdir -p runtime/generated
 
 [ -f .env ] && . ./.env
-[ -f runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
+[ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
 source runtime/scripts/runtime-env.sh
 
 SERVER_REGION="$(resolve_server_region)"
 SERVER_IP="$(resolve_server_ip)"
 export SERVER_REGION SERVER_IP
+catalog_extract_timeout_seconds="${DUNE_CATALOG_EXTRACT_TIMEOUT_SECONDS:-120}"
 
-docker compose exec -T orchestrator python3 - <<'PY'
+echo "Extracting partition catalog from world-template.yaml..."
+
+timeout --kill-after=2s "${catalog_extract_timeout_seconds}s" docker compose exec -T orchestrator python3 - <<'PY'
 from pathlib import Path
 import json
 import re
@@ -65,7 +68,7 @@ for r in rows:
     )
 PY
 
-docker compose exec -T orchestrator cat /work/partition-catalog.json > runtime/generated/partition-catalog.json
+timeout --kill-after=2s "${catalog_extract_timeout_seconds}s" docker compose exec -T orchestrator cat /work/partition-catalog.json > runtime/generated/partition-catalog.json
 
 echo
 echo "Wrote runtime/generated/partition-catalog.json"

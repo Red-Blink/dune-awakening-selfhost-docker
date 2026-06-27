@@ -62,7 +62,11 @@ export function PlayersPanel({ onError, renderCharacterAdmin }: PlayersPanelProp
     <section className="panel">
       <div className="panel-title"><h2>Players</h2><div className="action-row players-filter-row"><label className="inline-filter-label players-filter-label">Filter <select className="players-filter-select" value={playerFilter} onChange={(event) => { const nextFilter = event.target.value as "all" | "online" | "offline"; setPlayerFilter(nextFilter); void load(nextFilter); }}><option value="all">All Players</option><option value="online">Online</option><option value="offline">Offline</option></select></label><button onClick={() => void load(playerFilter)}>Refresh</button></div></div>
       <div className="action-row"><input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search character, FLS ID, account id, or actor id" /><button onClick={() => void load(playerFilter)}>Search</button></div>
-      <DataTable rows={rows} columns={["actor_id", "character_name", "account_id", "action_player_id", "online_status", "map", "fls_id"]} tableClassName="players-table" onRowClick={open} emptyMessage={playersEmptyMessage} renderCell={(row, col) => col === "online_status" ? <PlayerStatusCell value={row[col]} /> : formatCell(row[col])} />
+      <DataTable rows={rows} columns={["actor_id", "character_name", "account_id", "last_seen", "online_status", "map", "fls_id"]} tableClassName="players-table" onRowClick={open} emptyMessage={playersEmptyMessage} renderCell={(row, col) => {
+        if (col === "online_status") return <PlayerStatusCell value={row[col]} />;
+        if (col === "last_seen") return formatLastOnline(row);
+        return formatCell(row[col]);
+      }} />
       {selected && renderCharacterAdmin({
         detail,
         fallback: selected,
@@ -74,4 +78,47 @@ export function PlayersPanel({ onError, renderCharacterAdmin }: PlayersPanelProp
       })}
     </section>
   );
+}
+
+function formatLastOnline(row: Record<string, unknown>) {
+  if (String(row.online_status || "").toLowerCase() === "online") return "Currently Active";
+  const date = parseLastOnline(row.last_seen);
+  if (!date) return "Unavailable";
+  const absolute = new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(date);
+  return `${absolute} (${formatAgo(date)} ago)`;
+}
+
+function parseLastOnline(value: unknown) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const candidates = [
+    raw,
+    raw.includes(" ") && !raw.includes("T") ? raw.replace(" ", "T") : "",
+    raw.replace(/([+-]\d{2})$/, "$1:00")
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    const date = new Date(candidate);
+    if (Number.isFinite(date.getTime()) && date.getFullYear() >= 2000) return date;
+  }
+  return null;
+}
+
+function formatAgo(date: Date) {
+  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  const units = [
+    ["y", 365 * 24 * 60 * 60],
+    ["mo", 30 * 24 * 60 * 60],
+    ["d", 24 * 60 * 60],
+    ["h", 60 * 60],
+    ["m", 60],
+    ["s", 1]
+  ] as const;
+  const [label, size] = units.find(([, unitSeconds]) => seconds >= unitSeconds) || units[units.length - 1];
+  return `${Math.max(1, Math.floor(seconds / size))}${label}`;
 }

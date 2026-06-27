@@ -15,7 +15,7 @@ export type Task = {
 };
 
 export const setupApi = {
-  state: () => api<{ files: Record<string, boolean>; config: Record<string, unknown> }>("/api/setup/state"),
+  state: () => api<{ files: Record<string, boolean>; config: Record<string, unknown>; serverConfig?: Record<string, unknown> }>("/api/setup/state"),
   preflight: () => post<{ checks: Check[]; summary: Record<string, number> }>("/api/setup/preflight"),
   writeConfig: (body: Record<string, string>) => post<{ ok: boolean }>("/api/setup/write-config", body),
   saveToken: (token: string) => post<{ ok: boolean }>("/api/setup/save-token", { token }),

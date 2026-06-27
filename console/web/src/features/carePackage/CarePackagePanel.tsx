@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { playersApi } from "../../api/players";
 import { carePackageApi, type CarePackageConfig, type CarePackageEntry } from "../../api/carePackage";
 import type { CarePackageAutoGrantRule } from "../../api/carePackage";
+import { friendlyApiError } from "../../api/client";
 import { DataTable } from "../../components/common/DataTable";
 import { TechnicalDetails } from "../../components/common/DisplayPrimitives";
 import {
@@ -75,7 +76,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
     setOutput("");
     setTechnicalOutput("");
     setOutputScope("");
-    try { await action(); } catch (error) { const text = error instanceof Error ? error.message : String(error); setOutput(text); onError(text); }
+    try { await action(); } catch (error) { const text = friendlyApiError(error); setOutput(text); onError(text); }
   }
   async function load() {
     const next = await carePackageApi.config();
@@ -358,7 +359,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
               <label>Grade<ItemGradeSelect value={packageDraft.grade} onChange={(grade) => setPackageDraft({ ...packageDraft, grade })} /></label>
               <button disabled={!selectedPackageItem} onClick={addPackageItem}>Add Item</button>
             </div>
-            <p className="action-help-note">Grade 0 is instant for online players. Grades 1-5 are saved to the player inventory and may require a relog before they appear correctly.</p>
+            <p className="action-help-note">Normal Grade 0 items are instant for online players. Schematics, augments, and Grades 1-5 are saved to the player inventory and may require a relog before they appear correctly.</p>
           </div></div>}
         </div>
         {activeKit.items?.length ? <div className="table-wrap package-items-table"><table><thead><tr><th>Preview</th><th>Item Name</th><th>Item ID</th><th>Quantity</th><th>Grade</th><th>Actions</th></tr></thead><tbody>{activeKit.items.map((item, index) => {
@@ -370,7 +371,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
           if (editingPackageIndex === index) setEditingPackageIndex(null);
         }}>Remove</button></div></td></tr>;
         })}</tbody></table></div> : null}
-        <details className="technical-details"><summary>Developer raw package item textarea</summary><p>One item per line: item name or raw item ID, quantity, grade. Use grade 0 for instant grants.</p><label>Package Items<textarea value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder="Plant Fiber,10,0&#10;cup of water,1,0" /></label></details>
+        <details className="technical-details"><summary>Developer raw package item textarea</summary><p>One item per line: item name or raw item ID, quantity, grade. Normal Grade 0 items can grant instantly; schematics and augments are saved through the database.</p><label>Package Items<textarea value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder="Plant Fiber,10,0&#10;cup of water,1,0" /></label></details>
         <div className="action-line">
           <button onClick={() => run(async () => {
             if (!(await confirmAction("These settings will be saved.", {
@@ -553,7 +554,7 @@ function displayCarePackageConfig(config: CarePackageConfig) {
 }
 
 function formatCarePackageError(value: string) {
-  const text = String(value || "").trim()
+  const text = friendlyApiError(value || "").trim()
     .replaceAll("Care Package", "Care Package")
     .replaceAll("care package", "care package")
     .replaceAll(" kit", " package")

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync, statSync, chownSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
 import { networkInterfaces } from "node:os";
@@ -12,11 +12,13 @@ export function loadConfig() {
   const secureCookieEnv = process.env.ADMIN_SECURE_COOKIES;
   mkdirSync(generatedDir, { recursive: true });
   mkdirSync(secretsDir, { recursive: true });
+  repairRootOwnedHostState(repoRoot);
 
   const adminPasswordFile = resolve(secretsDir, "admin-web-password.txt");
   const adminPasswordEnvManaged = Boolean(process.env.ADMIN_PASSWORD);
   return {
     appName: APP_NAME,
+    version: readConsoleVersion(repoRoot),
     repoRoot,
     duneScript: resolve(repoRoot, "runtime/scripts/dune"),
     host: resolveAdminBindHost(process.env.ADMIN_BIND_HOST),
@@ -38,6 +40,89 @@ export function loadConfig() {
     commandTimeoutMs: Number(process.env.ADMIN_COMMAND_TIMEOUT_MS || 120000),
     staticDir: process.env.ADMIN_STATIC_DIR || resolve(repoRoot, "console/web/dist")
   };
+}
+
+function repairRootOwnedHostState(repoRoot) {
+  if (typeof process.getuid !== "function" || process.getuid() !== 0) return;
+
+  let owner;
+  try {
+    owner = statSync(repoRoot);
+  } catch {
+    return;
+  }
+  if (!owner.uid || owner.uid === 0) return;
+
+  const envPath = resolve(repoRoot, ".env");
+  if (existsSync(envPath)) {
+    updateEnvFileValue(envPath, "DUNE_HOST_UID", String(owner.uid));
+    updateEnvFileValue(envPath, "DUNE_HOST_GID", String(owner.gid));
+  }
+
+  for (const path of [
+    repoRoot,
+    envPath,
+    resolve(repoRoot, "runtime/generated"),
+    resolve(repoRoot, "runtime/generated/battlegroup.env"),
+    resolve(repoRoot, "runtime/generated/db-backup.env"),
+    resolve(repoRoot, "runtime/generated/director-character-transfer.ini"),
+    resolve(repoRoot, "runtime/generated/director-deepdesert-dual.ini"),
+    resolve(repoRoot, "runtime/generated/ip-change-restart.env"),
+    resolve(repoRoot, "runtime/generated/map-runtime-modes.json"),
+    resolve(repoRoot, "runtime/generated/memory-balancer.json"),
+    resolve(repoRoot, "runtime/generated/message-of-the-day.json"),
+    resolve(repoRoot, "runtime/generated/message-of-the-day-state.json"),
+    resolve(repoRoot, "runtime/generated/player-announcements.json"),
+    resolve(repoRoot, "runtime/generated/player-announcements-state.json"),
+    resolve(repoRoot, "runtime/generated/restart-schedule.env"),
+    resolve(repoRoot, "runtime/generated/shutdown-protection.env"),
+    resolve(repoRoot, "runtime/generated/sietch-config.json"),
+    resolve(repoRoot, "runtime/generated/update-auto.env"),
+    resolve(repoRoot, "runtime/generated/usersettings.json"),
+    resolve(repoRoot, "runtime/generated/gameplay-profile.ini"),
+    resolve(repoRoot, "runtime/generated/care-package.json"),
+    resolve(repoRoot, "runtime/generated/care-package-grants.jsonl"),
+    resolve(repoRoot, "runtime/generated/care-package-pending-returns.json"),
+    resolve(repoRoot, "runtime/addons"),
+    resolve(repoRoot, "runtime/addons/state.json"),
+    resolve(repoRoot, "runtime/secrets/funcom-token.txt")
+  ]) {
+    try {
+      if (existsSync(path)) chownSync(path, owner.uid, owner.gid);
+    } catch {
+      // Best effort. The console should still start even if a mounted path
+      // cannot be chowned by the current runtime.
+    }
+  }
+}
+
+function updateEnvFileValue(path, key, value) {
+  const current = existsSync(path) ? readFileSync(path, "utf8").split(/\r?\n/) : [];
+  let found = false;
+  const line = `${key}=${value}`;
+  const next = current.map((entry) => {
+    if (envLineKey(entry) !== key) return entry;
+    found = true;
+    return line;
+  });
+  if (!found) next.push(line);
+  writeFileSync(path, `${next.filter((entry, index) => entry !== "" || index < next.length - 1).join("\n")}\n`, { mode: 0o644 });
+  try { chmodSync(path, 0o644); } catch {}
+}
+
+function envLineKey(line) {
+  const text = String(line || "").trimStart();
+  if (!text || text.startsWith("#")) return "";
+  const index = text.indexOf("=");
+  return index > 0 ? text.slice(0, index).trim() : "";
+}
+
+function readConsoleVersion(repoRoot) {
+  try {
+    return readFileSync(resolve(repoRoot, "VERSION"), "utf8").trim() || "dev";
+  } catch {
+    return "dev";
+  }
 }
 
 function resolveAdminBindHost(value) {
@@ -90,6 +175,7 @@ function getOrCreateSecret(path, bytes) {
 export function publicConfig(config) {
   return {
     appName: config.appName,
+    version: config.version,
     repoRoot: config.repoRoot,
     host: config.host,
     port: config.port,

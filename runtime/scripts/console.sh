@@ -44,6 +44,44 @@ print_url() {
   echo "  http://$(detect_web_console_ip):$(web_console_port)"
 }
 
+persist_env_value() {
+  local key="$1"
+  local value="$2"
+  local env_file=".env"
+  local tmp_file
+
+  touch "$env_file"
+  tmp_file="$(mktemp)"
+  awk -v key="$key" -v value="$value" '
+    BEGIN { found = 0 }
+    $0 ~ "^" key "=" {
+      print key "=" value
+      found = 1
+      next
+    }
+    { print }
+    END {
+      if (!found) {
+        print key "=" value
+      }
+    }
+  ' "$env_file" >"$tmp_file"
+  mv "$tmp_file" "$env_file"
+}
+
+prepare_docker_socket_gid() {
+  if [ -z "${DOCKER_SOCKET_GID:-}" ] && [ -S /var/run/docker.sock ] && command -v stat >/dev/null 2>&1; then
+    DOCKER_SOCKET_GID="$(stat -c '%g' /var/run/docker.sock 2>/dev/null || true)"
+  fi
+  export DOCKER_SOCKET_GID="${DOCKER_SOCKET_GID:-0}"
+  persist_env_value DOCKER_SOCKET_GID "$DOCKER_SOCKET_GID"
+}
+
+prepare_host_user_ids() {
+  export DUNE_HOST_UID="${DUNE_HOST_UID:-$(id -u)}"
+  export DUNE_HOST_GID="${DUNE_HOST_GID:-$(id -g)}"
+}
+
 require_compose() {
   if [ ! -f "$WEB_COMPOSE" ]; then
     echo "Missing $WEB_COMPOSE. Run this from the repo root."
@@ -57,6 +95,8 @@ require_compose() {
 
 restart_console() {
   require_compose
+  prepare_docker_socket_gid
+  prepare_host_user_ids
   mkdir -p runtime/generated
   echo "Rebuilding Dune Docker Console..."
   COMPOSE_PROJECT_NAME="$PROJECT_NAME" DUNE_HOST_REPO_ROOT="$HOST_ROOT" docker compose -f "$WEB_COMPOSE" build "$WEB_SERVICE"
@@ -69,6 +109,8 @@ restart_console() {
 
 status_console() {
   require_compose
+  prepare_docker_socket_gid
+  prepare_host_user_ids
   docker ps -a --filter "name=^/${WEB_SERVICE}$" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
   print_url
 }

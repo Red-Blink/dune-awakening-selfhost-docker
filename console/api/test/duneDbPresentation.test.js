@@ -4,6 +4,7 @@ import {
   factionDisplayName,
   factionIdByName,
   factionTierBumps,
+  craftingRecipeCatalogRows,
   journeyDepth,
   journeyDisplayName,
   journeyParentId,
@@ -15,6 +16,7 @@ import {
   researchProductGroup,
   researchRecipeId,
   researchType,
+  schematicRecipeId,
   tagsForJourneyNodeSubtree,
   tutorialStatus,
   validateMapName,
@@ -59,6 +61,23 @@ test("category helpers classify common recipe and research identifiers", () => {
   assert.equal(researchRecipeId("RCP_Sandbike"), "Sandbike");
   assert.equal(researchCategory("BLD_Turbine"), "Construction");
   assert.equal(researchProductGroup("T5_DuraluminumThing"), "Duraluminum Products");
+});
+
+test("schematic catalog helpers map item schematics to crafting recipes", () => {
+  assert.equal(schematicRecipeId("HealthPackSchematic"), "HealthPackRecipe");
+  assert.equal(schematicRecipeId("Bloodsack_Unique_Durable_02_Schematic"), "Bloodsack_Unique_Durable_02_Recipe");
+  assert.equal(schematicRecipeId("Schematic_UniqueBattleRifle"), "UniqueBattleRifleRecipe");
+  assert.equal(schematicRecipeId("NPE_ScrapMetalKnife_Schematic"), "ScrapMetalKnifeRecipe");
+  assert.deepEqual(craftingRecipeCatalogRows([
+    { id: "HealthPackSchematic", name: "Healkit", category: "schematics" },
+    { id: "WaterCistern_Patent", name: "Water Cistern Patent", category: "buildings" }
+  ]), [{
+    recipeId: "HealthPackRecipe",
+    displayName: "Healkit",
+    category: "Essentials",
+    source: "Schematics",
+    qualityLevel: 0
+  }]);
 });
 
 test("validation helpers reject unsafe identifiers", () => {

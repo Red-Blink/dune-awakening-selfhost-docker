@@ -15,6 +15,7 @@ export async function preflight(config) {
   checks.push(diskCheck(config.repoRoot));
   checks.push(dockerCliCheck());
   checks.push(dockerComposeCheck());
+  checks.push(dockerSocketCheck());
   checks.push(dockerDaemonCheck());
   checks.push(fileCheck("Runtime directory", config.repoRoot));
   checks.push(fileCheck("docker-compose.yml", resolve(config.repoRoot, "docker-compose.yml")));
@@ -85,16 +86,78 @@ function dockerDaemonCheck() {
     const line = out.split(/\r?\n/).map((part) => part.trim()).find(Boolean) || "Docker daemon is reachable";
     return check("Docker daemon", "pass", line);
   } catch (error) {
+    const output = commandErrorOutput(error);
+    if (/permission denied/i.test(output) && /docker\.sock|docker daemon/i.test(output)) {
+      return check(
+        "Docker daemon",
+        "fail",
+        "Docker socket permission denied.",
+        [
+          "The Web UI can see Docker, but this container cannot access the Docker socket.",
+          dockerSocketDetail(),
+          "Set DOCKER_SOCKET_GID to the Docker socket group id, then restart the Web UI:",
+          "  DOCKER_SOCKET_GID=$(stat -c '%g' /var/run/docker.sock) dune console restart"
+        ].filter(Boolean).join("\n")
+      );
+    }
+    if (/cannot connect to the docker daemon|is the docker daemon running/i.test(output)) {
+      return check(
+        "Docker daemon",
+        "fail",
+        "Docker daemon is not running or cannot be reached.",
+        [
+          "Start Docker on the server, then restart the Web UI.",
+          "On Linux, the included installer normally starts Docker automatically.",
+          "If you use Docker Desktop, open Docker Desktop and wait until it says the engine is running."
+        ].join("\n")
+      );
+    }
     return check(
       "Docker daemon",
       "fail",
       "Docker is installed but is not running or cannot be reached.",
       [
         "Run the included installer again so it can start Docker and repair access where supported.",
-        "If you use Docker Desktop, open Docker Desktop and wait until it says the engine is running."
+        "If you use Docker Desktop, open Docker Desktop and wait until it says the engine is running.",
+        output
       ].join("\n")
     );
   }
+}
+
+function dockerSocketCheck() {
+  const socket = "/var/run/docker.sock";
+  if (!existsSync(socket)) {
+    return check(
+      "Docker socket",
+      "fail",
+      "Docker socket is not mounted.",
+      "The Web UI container needs /var/run/docker.sock mounted so it can manage local Docker services."
+    );
+  }
+  try {
+    const st = statSync(socket);
+    return check("Docker socket", st.isSocket() ? "pass" : "warn", dockerSocketDetail(st));
+  } catch (error) {
+    return check("Docker socket", "fail", "Could not inspect Docker socket.", String(error.message || error));
+  }
+}
+
+function dockerSocketDetail(existingStat = null) {
+  try {
+    const st = existingStat || statSync("/var/run/docker.sock");
+    return `Socket group id: ${st.gid}, mode: ${modeString(st.mode)}`;
+  } catch {
+    return "";
+  }
+}
+
+function commandErrorOutput(error) {
+  return String(error?.stderr || error?.stdout || error?.message || error || "").trim();
+}
+
+function modeString(mode) {
+  return `0${(mode & 0o777).toString(8)}`;
 }
 
 function fileCheck(name, path, optional = false) {

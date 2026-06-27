@@ -301,7 +301,7 @@ export function App() {
         setHomeTaskResult({ status: "stopped", title: "Server Stopped" });
         setHomeRunningAction("");
       } else if ((homeRunningAction === "start" || homeRunningAction === "restart") && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText)) {
-        setHomeTaskResult({ status: "succeeded", title: homeRunningAction === "start" ? "Server Started Successfully" : "Server Restarted Successfully" });
+        setHomeTaskResult({ status: "succeeded", title: homeRunningAction === "start" ? "Server Started Successfully" : "Battlegroup Restarted Successfully" });
         setHomeRunningAction("");
       }
     }
@@ -503,7 +503,11 @@ async function waitForTask(task: Task, setTask: (task: Task) => void) {
   setTask(current);
   for (let i = 0; i < 180 && !["succeeded", "failed", "cancelled"].includes(current.status); i += 1) {
     await new Promise((resolvePromise) => window.setTimeout(resolvePromise, 1000));
-    current = (await setupApi.task(current.id)).task;
+    try {
+      current = (await setupApi.task(current.id)).task;
+    } catch (error) {
+      throw normalizeTaskPollError(error);
+    }
     setTask(current);
   }
   return current;
@@ -513,7 +517,11 @@ async function waitForTaskSilently(task: Task) {
   let current = task;
   for (let i = 0; i < 180 && !["succeeded", "failed", "cancelled"].includes(current.status); i += 1) {
     await new Promise((resolvePromise) => window.setTimeout(resolvePromise, 1000));
-    current = (await setupApi.task(current.id)).task;
+    try {
+      current = (await setupApi.task(current.id)).task;
+    } catch (error) {
+      throw normalizeTaskPollError(error);
+    }
   }
   return current;
 }
@@ -523,10 +531,22 @@ async function waitForTaskWithUpdates(task: Task, onUpdate: (task: Task) => void
   onUpdate(current);
   for (let i = 0; i < 3600 && !isTerminalTask(current.status); i += 1) {
     await new Promise((resolvePromise) => window.setTimeout(resolvePromise, 1000));
-    current = (await setupApi.task(current.id)).task;
+    try {
+      current = (await setupApi.task(current.id)).task;
+    } catch (error) {
+      throw normalizeTaskPollError(error);
+    }
     onUpdate(current);
   }
   return current;
+}
+
+function normalizeTaskPollError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/session expired|console restarted|failed to fetch|networkerror|load failed/i.test(message)) {
+    return new Error("The console connection was interrupted while the operation was running. Refresh the page and check the latest status before trying again.");
+  }
+  return error instanceof Error ? error : new Error(message);
 }
 
 

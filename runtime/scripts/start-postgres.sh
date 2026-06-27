@@ -4,9 +4,9 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 [ -f .env ] && . ./.env
-[ -f runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
+[ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
 
-[ -f runtime/generated/image-tags.env ] && . runtime/generated/image-tags.env
+[ -r runtime/generated/image-tags.env ] && . runtime/generated/image-tags.env
 source runtime/scripts/host-paths.sh
 source runtime/scripts/image-tags.sh
 POSTGRES_IMAGE_TAG="$(resolve_postgres_image_tag)"

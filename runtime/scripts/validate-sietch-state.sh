@@ -9,7 +9,7 @@ ok() { printf 'OK   %s\n' "$*"; }
 fail() { printf 'FAIL %s\n' "$*" >&2; failures=$((failures + 1)); }
 warn() { printf 'WARN %s\n' "$*" >&2; }
 
-if bash -n runtime/scripts/sietches.sh runtime/scripts/publish-sietch-overrides.sh runtime/scripts/start-all.sh runtime/scripts/spawn-server.sh runtime/scripts/despawn-server.sh runtime/scripts/manager.sh runtime/scripts/doctor.sh runtime/scripts/dune; then
+if bash -n runtime/scripts/sietches.sh runtime/scripts/publish-sietch-overrides.sh runtime/scripts/publish-deepdesert-overrides.sh runtime/scripts/publish-network-server-state-overrides.sh runtime/scripts/start-all.sh runtime/scripts/spawn-server.sh runtime/scripts/despawn-server.sh runtime/scripts/manager.sh runtime/scripts/doctor.sh runtime/scripts/dune; then
   ok "shell syntax"
 else
   fail "shell syntax"

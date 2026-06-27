@@ -59,13 +59,13 @@ export function createAuth(config) {
   function requireAuth(req, res) {
     const session = readSession(req);
     if (!session) {
-      json(res, 401, { error: "Your console session expired or the console restarted. Refresh the page, then sign in again." });
+      json(res, 401, { error: "Your browser login session expired. Refresh the page, then sign in again." });
       return null;
     }
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method || "")) {
       const csrf = req.headers["x-csrf-token"];
       if (!config.authDisabled && csrf !== session.csrf) {
-        json(res, 403, { error: "CSRF token is missing or invalid" });
+        json(res, 403, { error: "Your browser login session expired. Refresh the page, then sign in again." });
         return null;
       }
     }

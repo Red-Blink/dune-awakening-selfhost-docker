@@ -241,6 +241,13 @@ persist_web_port() {
   fi
 }
 
+prepare_docker_socket_gid() {
+  if [ -z "${DOCKER_SOCKET_GID:-}" ] && [ -S /var/run/docker.sock ] && command -v stat >/dev/null 2>&1; then
+    DOCKER_SOCKET_GID="$(stat -c '%g' /var/run/docker.sock 2>/dev/null || true)"
+  fi
+  export DOCKER_SOCKET_GID="${DOCKER_SOCKET_GID:-0}"
+}
+
 choose_web_port() {
   local chosen prompt default_port
   default_port="${ADMIN_BIND_PORT:-$(existing_web_port)}"
@@ -308,8 +315,22 @@ start_console() {
   step "Starting the Web UI."
   export ADMIN_BIND_PORT="$WEB_PORT"
   export DUNE_HOST_REPO_ROOT="${DUNE_HOST_REPO_ROOT:-$(pwd -P)}"
+  export DUNE_HOST_UID="${DUNE_HOST_UID:-$(id -u)}"
+  export DUNE_HOST_GID="${DUNE_HOST_GID:-$(id -g)}"
   export COMPOSE_PROJECT_NAME="${DUNE_COMPOSE_PROJECT_NAME:-dune-awakening-selfhost-docker}"
-  "${DOCKER[@]}" compose -f "$WEB_COMPOSE" up -d --build "$WEB_SERVICE"
+  prepare_docker_socket_gid
+  if [ "${DOCKER[0]}" = "sudo" ]; then
+    need_sudo env \
+      "ADMIN_BIND_PORT=$ADMIN_BIND_PORT" \
+      "DUNE_HOST_REPO_ROOT=$DUNE_HOST_REPO_ROOT" \
+      "DUNE_HOST_UID=$DUNE_HOST_UID" \
+      "DUNE_HOST_GID=$DUNE_HOST_GID" \
+      "DOCKER_SOCKET_GID=$DOCKER_SOCKET_GID" \
+      "COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME" \
+      docker compose -f "$WEB_COMPOSE" up -d --build "$WEB_SERVICE"
+  else
+    "${DOCKER[@]}" compose -f "$WEB_COMPOSE" up -d --build "$WEB_SERVICE"
+  fi
 }
 
 read_admin_password() {

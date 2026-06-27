@@ -28,6 +28,7 @@ export const playersApi = {
   resetAllSpecializationKeystones: (playerId: string, confirmation: string) => post<{ supported: boolean; result?: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/specializations/keystones/reset-all`, { confirmation }),
   refillWater: (playerId: string, amount = 1000000) => post<{ task: Task }>(`/api/players/${encodeURIComponent(playerId)}/refill-water`, { amount }),
   kick: (playerId: string) => post<{ task: Task }>(`/api/players/${encodeURIComponent(playerId)}/kick`),
+  repairLoginQueue: (playerId: string, confirmation: string) => post<{ task: Task }>(`/api/players/${encodeURIComponent(playerId)}/repair-login-queue`, { confirmation }),
   teleport: (playerId: string, body: { x: number; y: number; z: number; yaw: number }) => post<{ task: Task }>(`/api/players/${encodeURIComponent(playerId)}/teleport`, body),
   spawnVehicle: (playerId: string, body: { vehicleId: string; template: string; offset: number }) => post<{ task: Task }>(`/api/players/${encodeURIComponent(playerId)}/spawn-vehicle`, body),
   cleanInventory: (playerId: string, confirmation: string) => post<{ task: Task }>(`/api/players/${encodeURIComponent(playerId)}/clean-inventory`, { confirmation }),

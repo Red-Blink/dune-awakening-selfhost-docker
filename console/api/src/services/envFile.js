@@ -4,10 +4,11 @@ import { resolve } from "node:path";
 export function updateEnvFileValue(repoRoot, key, value) {
   const envPath = resolve(repoRoot, ".env");
   const current = existsSync(envPath) ? readFileSync(envPath, "utf8").split(/\r?\n/) : [];
-  const line = `${key}=${quoteEnv(String(value))}`;
+  const normalizedKey = String(key || "").trim();
+  const line = `${normalizedKey}=${quoteEnv(String(value))}`;
   let found = false;
   const next = current.map((existing) => {
-    if (existing.match(new RegExp(`^${key}=`))) {
+    if (envLineKey(existing) === normalizedKey) {
       found = true;
       return line;
     }
@@ -20,5 +21,12 @@ export function updateEnvFileValue(repoRoot, key, value) {
 
 export function quoteEnv(value) {
   if (/^[A-Za-z0-9_.:-]+$/.test(value)) return value;
-  return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
+  return JSON.stringify(value);
+}
+
+function envLineKey(line) {
+  const text = String(line || "").trimStart();
+  if (!text || text.startsWith("#")) return "";
+  const index = text.indexOf("=");
+  return index > 0 ? text.slice(0, index).trim() : "";
 }

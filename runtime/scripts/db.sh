@@ -56,6 +56,43 @@ redact_fls() {
   fi
 }
 
+token_payload_value() {
+  local token="$1"
+  local key="$2"
+
+  TOKEN="$token" TOKEN_KEY="$key" python3 - <<'PY'
+import base64
+import json
+import os
+import sys
+
+token = os.environ.get("TOKEN", "").strip()
+key = os.environ.get("TOKEN_KEY", "").strip()
+parts = token.split(".")
+if len(parts) < 2 or not key:
+    sys.exit(1)
+
+payload = parts[1] + "=" * (-len(parts[1]) % 4)
+try:
+    data = json.loads(base64.urlsafe_b64decode(payload.encode()).decode())
+except Exception:
+    sys.exit(1)
+
+value = data.get(key) or data.get(key[:1].lower() + key[1:])
+if value is None:
+    sys.exit(1)
+print(value)
+PY
+}
+
+battlegroup_host_id() {
+  local battlegroup_id="$1"
+  case "$battlegroup_id" in
+    sh-*-*) printf '%s\n' "$battlegroup_id" | sed -E 's/^sh-([A-Za-z0-9]+)-.*$/\1/' ;;
+    *) return 1 ;;
+  esac
+}
+
 require_postgres() {
   if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dune-postgres; then
     echo "dune-postgres is not running."
@@ -754,7 +791,7 @@ adopt_backup_battlegroup_id() {
     printf 'ADOPTED_AT=%q\n' "$ts"
     printf 'BACKUP_FILE=%q\n' "$(basename "$backup_file")"
   } > "$BATTLEGROUP_RESTORE_FILE"
-  chmod 600 "$BATTLEGROUP_RESTORE_FILE" 2>/dev/null || true
+  chmod 664 "$BATTLEGROUP_RESTORE_FILE" 2>/dev/null || true
 
   server_title="$(config_value runtime/generated/battlegroup.env SERVER_TITLE || true)"
   server_region="$(config_value runtime/generated/battlegroup.env SERVER_REGION || true)"
@@ -768,7 +805,7 @@ adopt_backup_battlegroup_id() {
     [ -n "$server_ip" ] && printf 'SERVER_IP=%q\n' "$server_ip"
     [ -n "$server_ip_mode" ] && printf 'SERVER_IP_MODE=%q\n' "$server_ip_mode"
   } > runtime/generated/battlegroup.env
-  chmod 600 runtime/generated/battlegroup.env 2>/dev/null || true
+  chmod 664 runtime/generated/battlegroup.env 2>/dev/null || true
 
   echo "Adopt backup battlegroup: $current_id -> $backup_battlegroup_id"
   echo "Battlegroup rollback point saved: $BATTLEGROUP_RESTORE_FILE"
@@ -914,6 +951,32 @@ detect_funcom_token_battlegroup_mismatch() {
   local attempt
   local auth_pattern='ACCESS_DENIED|AccessDenied|access denied|Invalid Authorization to manage SelfHosted Battlegroup|invalid authorization|Unauthorized|HTTP[^[:cntrl:]]*(401|403)|status[^[:cntrl:]]*(401|403)|statusCode[^[:cntrl:]]*(401|403)|response[^[:cntrl:]]*(401|403)|code[^[:cntrl:]]*(401|403)'
   local funcom_context_pattern='Battlegroup|SelfHosted|Funcom|FuncomLiveServices'
+  local previous_battlegroup=""
+  local adopted_battlegroup=""
+  local token=""
+  local token_host=""
+  local adopted_host=""
+
+  previous_battlegroup="$(config_value "$BATTLEGROUP_RESTORE_FILE" PREVIOUS_BATTLEGROUP_ID 2>/dev/null || true)"
+  adopted_battlegroup="$(config_value "$BATTLEGROUP_RESTORE_FILE" ADOPTED_BATTLEGROUP_ID 2>/dev/null || true)"
+  if [ -n "$previous_battlegroup" ] && [ -n "$adopted_battlegroup" ] && [ "$previous_battlegroup" != "$adopted_battlegroup" ]; then
+    token="$(tr -d '\r\n' < runtime/secrets/funcom-token.txt 2>/dev/null || true)"
+    token_host="$(token_payload_value "$token" HostId 2>/dev/null || true)"
+    adopted_host="$(battlegroup_host_id "$adopted_battlegroup" 2>/dev/null || true)"
+
+    if [ -n "$token_host" ] && [ -n "$adopted_host" ] && [ "$(printf '%s' "$token_host" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$adopted_host" | tr '[:upper:]' '[:lower:]')" ]; then
+      echo "Attention Required: Funcom token mismatch detected."
+      echo "Current token HostId: $token_host"
+      echo "Restored Battlegroup ID: $adopted_battlegroup"
+      echo "Please update your Funcom token to the one used by the restored Battlegroup ID from Server Controls."
+      return 1
+    fi
+
+    echo "Notice: Restored backup adopted a different Battlegroup ID."
+    echo "Previous Docker Battlegroup ID: $previous_battlegroup"
+    echo "Restored Battlegroup ID: $adopted_battlegroup"
+    echo "Current token HostId matches the restored Battlegroup prefix. Continuing unless Funcom returns an authorization error."
+  fi
 
   for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
     logs="$(
@@ -1001,9 +1064,6 @@ import_db() {
 
   require_postgres
   identity_snapshot="$(capture_current_account_identities)"
-  if backup_is_external "$backup_file"; then
-    adopt_backup_battlegroup_id "$backup_file"
-  fi
 
   echo "WARNING: importing a database backup replaces current battlegroup database state."
   echo "A pre-import backup will be created first."
@@ -1018,6 +1078,10 @@ import_db() {
   fi
 
   DB_BACKUP_ORIGIN=restore-safety backup_db "$BACKUP_DIR_DEFAULT"
+  if backup_is_external "$backup_file"; then
+    adopt_backup_battlegroup_id "$backup_file"
+  fi
+
   stop_db_dependents
   recreate_dune_database
 

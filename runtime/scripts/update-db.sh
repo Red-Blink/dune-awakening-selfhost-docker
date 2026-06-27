@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
-[ -f runtime/generated/image-tags.env ] && . runtime/generated/image-tags.env
+[ -r runtime/generated/image-tags.env ] && . runtime/generated/image-tags.env
 source runtime/scripts/image-tags.sh
 WORLD_IMAGE_TAG="$(resolve_world_image_tag)"
 

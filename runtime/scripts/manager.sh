@@ -204,52 +204,6 @@ repair_runtime_files() {
   fi
 }
 
-choose_stack_release_to_install() {
-  local rows=() row tag published name
-  local labels=()
-  local tags=()
-  local choice
-
-  set +e
-  mapfile -t rows < <("$DUNE" self-update list 2>/dev/null)
-  local rc=$?
-  set -e
-
-  if [ "$rc" -ne 0 ] || [ "${#rows[@]}" -eq 0 ]; then
-    echo "Could not fetch stack releases from GitHub."
-    echo "Make sure the detected GitHub repo is correct and that published releases exist."
-    echo "If GitHub API rate limiting is the issue, set DUNE_SELF_UPDATE_TOKEN."
-    return 1
-  fi
-
-  for row in "${rows[@]}"; do
-    IFS=$'	' read -r tag published name <<< "$row"
-    [ -n "${tag:-}" ] || continue
-    tags+=("$tag")
-    if [ -n "${name:-}" ]; then
-      labels+=("${tag}  ${published:-unknown}  ${name}")
-    else
-      labels+=("${tag}  ${published:-unknown}")
-    fi
-  done
-
-  [ "${#tags[@]}" -gt 0 ] || {
-    echo "No published stack releases were returned."
-    return 1
-  }
-
-  labels+=("Back")
-  menu_or_back "Restore Stack Release" "${labels[@]}" || return 1
-  choice="$MENU_CHOICE"
-
-  if [ "$choice" -gt "${#tags[@]}" ]; then
-    return 1
-  fi
-
-  CHOSEN_STACK_RELEASE_TAG="${tags[$((choice - 1))]}"
-  return 0
-}
-
 read_choice() {
   local prompt="${1:-Select An Option: }"
   local choice
@@ -752,6 +706,7 @@ persist_runtime_identity_snapshot() {
     printf 'SERVER_REGION=%q\n' "${server_region:-Europe}"
     printf 'SERVER_IP=%q\n' "${server_ip:-auto}"
   } > runtime/generated/battlegroup.env
+  chmod 664 runtime/generated/battlegroup.env 2>/dev/null || true
 }
 
 show_config_summary() {
@@ -3986,7 +3941,6 @@ updates_menu() {
       "Runtime Files Status" \
       "Repair Runtime Files" \
       "Check Stack Update" \
-      "Restore Previous Stack" \
       "Check Game Server Update" \
       "Automatic Updates" \
       "Back" || return
@@ -4023,20 +3977,6 @@ updates_menu() {
         ;;
       5)
         echo
-        if choose_stack_release_to_install; then
-          echo
-          if confirm "Install stack release '$CHOSEN_STACK_RELEASE_TAG' now?"; then
-            run_cmd "$DUNE" self-update install "$CHOSEN_STACK_RELEASE_TAG"
-          else
-            echo "Cancelled."
-          fi
-        else
-          echo "Cancelled."
-        fi
-        pause
-        ;;
-      6)
-        echo
         set +e
         "$DUNE" update check
         rc=$?
@@ -4052,8 +3992,8 @@ updates_menu() {
         fi
         pause
         ;;
-      7) automatic_updates_menu ;;
-      8) return ;;
+      6) automatic_updates_menu ;;
+      7) return ;;
     esac
   done
 }

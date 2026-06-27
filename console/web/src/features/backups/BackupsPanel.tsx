@@ -189,7 +189,7 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
         await runBackupTask("deleteAll", backupsApi.deleteAll, "Backup Deleted", "Backup Delete Failed");
       })}>Delete All Backups</button></div></div>
       {backupRestoreTask ? <BackupResultCard result={backupRestoreTaskResult(backupRestoreTask)} /> : backupResult && <BackupResultCard result={backupResult} />}
-      {rows.length ? <DataTable rows={rows} columns={["backupName", "battlegroupId", "created", "type", "source"]} action={(row) => <div className="service-actions">
+      {rows.length ? <DataTable rows={rows} columns={["backupName", "battlegroupId", "created", "size", "type", "source"]} action={(row) => <div className="service-actions">
         <button className="icon-action restore-action" title="Restore" aria-label="Restore backup" disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); run(async () => {
           const sourceText = /^external$/i.test(String(row.source || "")) ? " External backups will be matched to the backup battlegroup automatically when needed." : "";
           if (!(await confirmAction(`The current battlegroup database will be replaced.${sourceText}`, {
@@ -271,7 +271,7 @@ function backupRestoreTaskResult(task: Task): BackupResult {
     };
   }
   if (task.status === "succeeded") {
-    return { status: "succeeded", title: "Restore Completed", message: "Database restore finished and the Dune stack restart completed.", details };
+    return { status: "succeeded", title: "Restore Completed", message: "Database restore finished and the Dune console restart completed.", details };
   }
   if (task.status === "failed") {
     return { status: "failed", title: "Backup Restore Failed", message: task.errorMessage || conciseTaskError(task), details };
@@ -281,7 +281,7 @@ function backupRestoreTaskResult(task: Task): BackupResult {
 
 function backupRestoreStageMessage(task: Task) {
   const lines = task.logLines.map((row) => row.line).join("\n");
-  if (/Starting Dune stack|Restarting Dune stack|Starting services/i.test(lines)) return "Restarting Dune services and waiting for the stack to come back up.";
+  if (/Starting Dune stack|Restarting Dune stack|Starting services/i.test(lines)) return "Restarting Dune services and waiting for the console to come back up.";
   if (/Database import finished/i.test(lines)) return "Database restore finished. Restarting services.";
   if (/Automatic account relink/i.test(lines)) return "Relinking restored characters to current Docker player identities.";
   if (/Adopt backup battlegroup:/i.test(lines)) return "Changing Docker to use the backup battlegroup ID.";
@@ -329,8 +329,16 @@ function parseBackupRows(text: string) {
     const createdSort = listTimestamp ? backupDisplayTimestampSort(created) : backupTimestampSort(timestamp);
     const type = friendlyBackupType(name, line);
     const source = /import/i.test(name) ? "External" : name.includes("__") ? name.split("__")[0].replace(/^dune-db-/, "") : "Local";
-    return { name, backupName: name, battlegroupId: "Unknown", created, createdSort, type, source };
+    const size = formatBackupListSize(line);
+    return { name, backupName: name, battlegroupId: "Unknown", created, createdSort, size, type, source };
   }).filter(Boolean).sort((a, b) => Number((b as Record<string, unknown>).createdSort || 0) - Number((a as Record<string, unknown>).createdSort || 0)) as Record<string, unknown>[];
+}
+
+function formatBackupListSize(line: string) {
+  const match = line.match(/\b(\d+(?:\.\d+)?)\s*(B|KB|KiB|MB|MiB|GB|GiB|TB|TiB)\b/i);
+  if (!match) return "Unknown";
+  const unit = match[2].replace(/iB$/i, "B").toUpperCase();
+  return `${match[1]} ${unit}`;
 }
 
 function formatBackupTimestamp(value: string) {

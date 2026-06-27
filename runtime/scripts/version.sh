@@ -76,8 +76,10 @@ PROJECT_VERSION="dev"
 GIT_BRANCH="unknown"
 GIT_COMMIT="unknown"
 GIT_STATE="unknown"
+GIT_METADATA_AVAILABLE=0
 
 if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  GIT_METADATA_AVAILABLE=1
   GIT_BRANCH="$(git branch --show-current 2>/dev/null || echo unknown)"
   [ -n "$GIT_BRANCH" ] || GIT_BRANCH="detached"
   GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
@@ -126,9 +128,14 @@ fi
 
 echo "=== Self-Host Stack Version ==="
 printf "%-18s %s\n" "Project version:" "$PROJECT_VERSION"
-printf "%-18s %s\n" "Git branch:" "$GIT_BRANCH"
-printf "%-18s %s\n" "Git commit:" "$GIT_COMMIT"
-printf "%-18s %s\n" "Working tree:" "$GIT_STATE"
+if [ "$GIT_METADATA_AVAILABLE" = "1" ]; then
+  printf "%-18s %s\n" "Install source:" "Git checkout"
+  printf "%-18s %s\n" "Git branch:" "$GIT_BRANCH"
+  printf "%-18s %s\n" "Git commit:" "$GIT_COMMIT"
+  printf "%-18s %s\n" "Working tree:" "$GIT_STATE"
+else
+  printf "%-18s %s\n" "Install source:" "release archive / non-git install"
+fi
 
 echo
 echo "=== Server config ==="

@@ -41,6 +41,18 @@ export function listCatalogItems(repoRoot, { q = "", limit = 500 } = {}) {
     .map((item) => normalizeItem(item, repoRoot));
 }
 
+export function itemRequiresDatabaseGrant(item = {}) {
+  const id = String(item.itemId || item.id || "").trim();
+  const category = String(item.category || "").toLowerCase();
+  const source = String(item.source || "").toLowerCase();
+  return category === "schematics" ||
+    source === "schematics" ||
+    category.includes("augment") ||
+    /^schematic(pattern|_)/i.test(id) ||
+    /_schematic$/i.test(id) ||
+    /schematic$/i.test(id);
+}
+
 function normalizeItem(item, repoRoot = "") {
   const id = String(item.id || "").trim();
   if (!/^[A-Za-z0-9_./:-]{1,240}$/.test(id)) throw new Error("Invalid resolved item id");

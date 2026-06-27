@@ -1,13 +1,14 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 
 export function enrichBackupRows(config, rows) {
   return rows.map((row) => {
     const metadata = readBackupMetadata(config, row.name);
+    const sizeBytes = readBackupSize(config, row.name);
     const origin = String(metadata.backup_origin || metadata.origin || "").trim().toLowerCase();
     const battlegroupId = String(metadata.imported_from_battlegroup_id || metadata.battlegroup_id || "").trim();
-    const enriched = { ...row, battlegroupId: battlegroupId || "Unknown" };
+    const enriched = { ...row, battlegroupId: battlegroupId || "Unknown", sizeBytes, size: formatBackupSize(sizeBytes) };
     if (/^(automatic|scheduled)$/.test(origin)) return { ...enriched, type: "Automatic Backup" };
     if (/^(restore-safety|restore_safety|restore safety)$/.test(origin)) return { ...enriched, type: "Restore Safety Backup" };
     if (/^(pre-update|pre_update|preupdate)$/.test(origin)) return { ...enriched, type: "Pre-update Backup" };
@@ -15,6 +16,29 @@ export function enrichBackupRows(config, rows) {
     if (/^(external|imported)$/.test(origin)) return { ...enriched, type: "Imported Backup", source: "External" };
     return enriched;
   });
+}
+
+export function readBackupSize(config, name) {
+  if (!/^[A-Za-z0-9_.-]+\.(backup|dump|sql)$/i.test(String(name || ""))) return 0;
+  try {
+    return statSync(resolve(config.repoRoot, "runtime/backups/db", name)).size;
+  } catch {
+    return 0;
+  }
+}
+
+export function formatBackupSize(bytes) {
+  const value = Number(bytes || 0);
+  if (!Number.isFinite(value) || value <= 0) return "Unknown";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let size = value;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  const precision = unitIndex === 0 ? 0 : size >= 10 ? 1 : 2;
+  return `${size.toFixed(precision).replace(/\.0+$|(\.\d*[1-9])0+$/, "$1")} ${units[unitIndex]}`;
 }
 
 export function readBackupMetadata(config, name) {

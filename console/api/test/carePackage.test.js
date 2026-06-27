@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { clearCarePackageHistory, enableCarePackage, grantEligibleCarePackages, grantCarePackage, runCarePackageAutoScan, saveCarePackageConfig, carePackageCapabilities, carePackageConfig, carePackageEligiblePlayers, carePackageHistory, validateCarePackageConfig } from "../src/carePackage.js";
@@ -105,7 +105,7 @@ test("care package eligibility skips missing action ids, offline players, and al
       { actor_id: 84, character_name: "New", action_player_id: "New#1", online_status: "Offline" }
     ]);
     assert.equal(result.rows.find((row) => row.character_name === "RedBlink").eligible, false);
-    assert.match(result.rows.find((row) => row.character_name === "RedBlink").reason, /Already granted/);
+    assert.match(result.rows.find((row) => row.character_name === "RedBlink").reason, /Already received first-online Care Package/);
     assert.equal(result.rows.find((row) => row.character_name === "NoId").eligible, false);
     assert.equal(result.rows.find((row) => row.character_name === "New").eligible, false);
     assert.match(result.rows.find((row) => row.character_name === "New").reason, /Not currently online/);
@@ -146,7 +146,7 @@ test("care package first-online grants are player-aware across actor and charact
     ]);
     assert.equal(result.rows.find((row) => row.character_name === "Existing").eligible, false);
     assert.equal(result.rows.find((row) => row.character_name === "New Character").eligible, false);
-    assert.match(result.rows.find((row) => row.character_name === "New Character").reason, /Already granted/);
+    assert.match(result.rows.find((row) => row.character_name === "New Character").reason, /Already received first-online Care Package/);
     await assert.rejects(() => grantCarePackage(config, "Account#1", { confirmation: "GRANT CARE PACKAGE", source: "auto", actorId: 101, characterName: "Existing" }), /already granted/);
     await assert.rejects(() => grantCarePackage(config, "Account#1", {
       confirmation: "GRANT CARE PACKAGE",
@@ -157,6 +157,111 @@ test("care package first-online grants are player-aware across actor and charact
       flsId: "fls-1",
       characterName: "New Character"
     }), /already granted/);
+  } finally {
+    rmSync(config.repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("care package first-online does not repeat after the package kit changes", async () => {
+  const config = tempConfig();
+  try {
+    saveCarePackageConfig(config, {
+      enabled: true,
+      activeKitId: "starter-kit",
+      autoGrantKitId: "starter-kit",
+      kits: [{ id: "starter-kit", name: "Starter Kit", xp: 10, items: [] }],
+      autoGrantRules: [{ id: "first-online-rule", enabled: true, kitId: "starter-kit", grantWhen: "first_online" }]
+    });
+    await runCarePackageAutoScan(config, [{
+      actor_id: 101,
+      account_id: "stable-account-1",
+      character_name: "Test1",
+      action_player_id: "Player#1",
+      funcom_id: "Player#1",
+      fls_id: "Player#1",
+      online_status: "Online"
+    }]);
+
+    saveCarePackageConfig(config, {
+      enabled: true,
+      activeKitId: "boots-kit",
+      autoGrantKitId: "boots-kit",
+      kits: [{ id: "boots-kit", name: "Boots Kit", xp: 25, items: [] }],
+      autoGrantRules: [{ id: "first-online-rule", enabled: true, kitId: "boots-kit", grantWhen: "first_online" }]
+    });
+    const repeat = await runCarePackageAutoScan(config, [{
+      actor_id: 202,
+      account_id: "stable-account-1",
+      character_name: "Test1",
+      action_player_id: "Player#1",
+      funcom_id: "Player#1",
+      fls_id: "Player#1",
+      online_status: "Online"
+    }]);
+
+    assert.equal(repeat.granted, 0);
+    assert.equal(repeat.skipped, 1);
+    assert.match(repeat.results[0].reason, /Already received first-online Care Package/);
+  } finally {
+    rmSync(config.repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("care package first-online does not repeat after many skipped scans", async () => {
+  const config = tempConfig();
+  try {
+    saveCarePackageConfig(config, {
+      enabled: true,
+      activeKitId: "starter-kit",
+      autoGrantKitId: "starter-kit",
+      kits: [{ id: "starter-kit", name: "Starter Kit", xp: 10, items: [] }],
+      autoGrantRules: [{ id: "first-online-rule", enabled: true, kitId: "starter-kit", grantWhen: "first_online" }]
+    });
+    await runCarePackageAutoScan(config, [{
+      actor_id: 101,
+      account_id: "stable-account-1",
+      character_name: "Test1",
+      action_player_id: "Player#1",
+      funcom_id: "Player#1",
+      fls_id: "Player#1",
+      online_status: "Online"
+    }]);
+
+    const grantsFile = resolve(config.generatedDir, "care-package-grants.jsonl");
+    for (let index = 0; index < 600; index += 1) {
+      appendFileSync(grantsFile, `${JSON.stringify({
+        id: `skipped-${index}`,
+        playerId: "Other#1",
+        action_player_id: "Other#1",
+        actor_id: "202",
+        account_id: "stable-account-2",
+        character_name: "Offline Player",
+        source: "auto",
+        version: "starter-kit",
+        kitId: "starter-kit",
+        kitName: "Starter Kit",
+        status: "skipped",
+        ok: true,
+        reason: "Not currently online",
+        startedAt: new Date(Date.now() + index).toISOString(),
+        finishedAt: new Date(Date.now() + index).toISOString(),
+        results: []
+      })}\n`);
+    }
+
+    const repeat = await runCarePackageAutoScan(config, [{
+      actor_id: 303,
+      account_id: "stable-account-1",
+      character_name: "Test1 Again",
+      action_player_id: "Player#1",
+      funcom_id: "Player#1",
+      fls_id: "Player#1",
+      online_status: "Online"
+    }]);
+
+    assert.equal(repeat.granted, 0);
+    assert.equal(repeat.skipped, 1);
+    assert.match(repeat.results[0].reason, /Already received first-online Care Package/);
   } finally {
     rmSync(config.repoRoot, { recursive: true, force: true });
   }
@@ -183,6 +288,29 @@ test("care package supports separate manual and auto-grant kit selection", async
     assert.equal(auto.granted, 1);
     assert.equal(auto.results[0].kitName, "Auto Kit");
     assert.equal(auto.results[0].version, "auto-kit");
+  } finally {
+    rmSync(config.repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("care package grants schematics through the database item path", async () => {
+  const config = tempConfig();
+  try {
+    writeCatalog(config);
+    saveCarePackageConfig(config, {
+      enabled: true,
+      activeKitId: "schematic-kit",
+      kits: [{ id: "schematic-kit", name: "Schematic Kit", xp: 0, items: [{ itemName: "Arhun K-28 Lasgun", quantity: 1, quality: 0 }] }]
+    });
+    const result = await grantCarePackage(config, "Player#1", {
+      confirmation: "GRANT CARE PACKAGE",
+      kitId: "schematic-kit",
+      actorId: 101,
+      characterName: "Test"
+    }, { db: {}, dbGiveItemToPlayer: async (_actorId, item) => ({ ok: true, inserted: { template_id: item.templateId, quality_level: item.quality } }) });
+    const itemGrant = result.results.find((row) => row.item?.itemId === "ChoamHeavyLasgunSchematic");
+    assert.equal(itemGrant.operation, "dbGiveItemToPlayer");
+    assert.equal(itemGrant.result.inserted.quality_level, 0);
   } finally {
     rmSync(config.repoRoot, { recursive: true, force: true });
   }
@@ -330,6 +458,32 @@ test("care package send message fails clearly without recipient identity", async
   }
 });
 
+test("care package persona setup falls back when account_id is not a conflict key", async () => {
+  const config = tempConfig();
+  try {
+    writeCatalog(config);
+    saveCarePackageConfig(config, {
+      enabled: true,
+      version: "care-package-v1",
+      xp: 0,
+      items: [{ itemName: "Plant Fiber", quantity: 10, durability: 1 }],
+      kits: [{ id: "care-package-v1", name: "Care Package", xp: 0, items: [{ itemName: "Plant Fiber", quantity: 10, durability: 1 }], sendMessage: "Welcome" }]
+    });
+    const db = fakePersonaDb({ failEncryptedPlayerStateConflict: true });
+    const result = await grantCarePackage(config, "12345", {
+      confirmation: "GRANT CARE PACKAGE",
+      characterName: "Player",
+      funcomId: "Player#1",
+      flsId: "ABCDEF1234567890"
+    }, { db });
+    assert.equal(result.status, "granted");
+    assert.ok(db.queries.some((query) => /update dune\."encrypted_player_state"/.test(query.text)));
+    assert.ok(db.queries.some((query) => /insert into dune\."encrypted_player_state".*where not exists/s.test(query.text)));
+  } finally {
+    rmSync(config.repoRoot, { recursive: true, force: true });
+  }
+});
+
 test("care package grant partial failures records partial_failed status and summary", async () => {
   const config = tempConfig();
   try {
@@ -399,7 +553,7 @@ test("care package auto scan does not repeat after package content was delivered
     }], "auto", { db: fakePersonaDb() });
     assert.equal(repeat.granted, 0);
     assert.equal(repeat.skipped, 1);
-    assert.match(repeat.results[0].reason, /Already granted Welcome Kit/);
+    assert.match(repeat.results[0].reason, /Already received first-online Care Package/);
   } finally {
     rmSync(config.repoRoot, { recursive: true, force: true });
   }
@@ -514,21 +668,25 @@ function writeCatalog(config) {
   mkdirSync(resolve(config.repoRoot, "runtime/data"), { recursive: true });
   writeFileSync(resolve(config.repoRoot, "runtime/data/admin-items.json"), JSON.stringify([
     { id: "PlantFiber_1", name: "Plant Fiber", category: "materials" },
-    { id: "CupWater_1", name: "Cup of Water", category: "consumables" }
+    { id: "CupWater_1", name: "Cup of Water", category: "consumables" },
+    { id: "ChoamHeavyLasgunSchematic", name: "Arhun K-28 Lasgun", category: "schematics", source: "Schematics" }
   ]));
 }
 
-function fakePersonaDb() {
+function fakePersonaDb(options = {}) {
   const columns = {
     accounts: ["id", "user", "funcom_id"],
     encrypted_accounts: ["id", "user", "encrypted_funcom_id", "takeoverable"],
-    player_state: ["account_id", "character_name"]
+    player_state: ["account_id", "character_name"],
+    encrypted_player_state: ["account_id", "encrypted_character_name", "online_status"]
   };
   const tableTypes = {
     accounts: "VIEW",
     encrypted_accounts: "BASE TABLE",
-    player_state: "VIEW"
+    player_state: "VIEW",
+    encrypted_player_state: "BASE TABLE"
   };
+  let failedEncryptedPlayerStateConflict = false;
   return {
     queries: [],
     async query(text, params = []) {
@@ -541,6 +699,15 @@ function fakePersonaDb() {
       }
       if (/from dune\.accounts/.test(text)) {
         return { rows: [{ hex_fls_id: "A5C0DE5E12A00001", funcom_id: "Server#0001" }] };
+      }
+      if (
+        options.failEncryptedPlayerStateConflict
+        && !failedEncryptedPlayerStateConflict
+        && /insert into dune\."encrypted_player_state"/.test(text)
+        && /on conflict \("account_id"\)/.test(text)
+      ) {
+        failedEncryptedPlayerStateConflict = true;
+        throw new Error("there is no unique or exclusion constraint matching the ON CONFLICT specification");
       }
       return { rows: [], rowCount: 1 };
     }

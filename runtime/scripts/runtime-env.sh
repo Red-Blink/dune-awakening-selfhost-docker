@@ -19,7 +19,7 @@ config_value() {
   local file="$1"
   local key="$2"
 
-  [ -f "$file" ] || return 1
+  [ -r "$file" ] || return 1
   awk -F= -v key="$key" '
     $1 == key {
       value = substr($0, length(key) + 2)
@@ -29,6 +29,21 @@ config_value() {
       exit
     }
   ' "$file"
+}
+
+normalize_generated_env_permissions() {
+  local file
+
+  for file in \
+    runtime/generated/battlegroup.env \
+    runtime/generated/battlegroup-restore-point.env \
+    runtime/generated/db-backup.env \
+    runtime/generated/ip-change-restart.env \
+    runtime/generated/restart-schedule.env \
+    runtime/generated/update-auto.env; do
+    [ -e "$file" ] || continue
+    chmod g+r,u+rw "$file" 2>/dev/null || true
+  done
 }
 
 container_exists_any_state() {
@@ -131,6 +146,11 @@ detect_public_ip() {
     for url in       "https://api.ipify.org"       "https://ipv4.icanhazip.com"       "https://ifconfig.me/ip"
     do
       ip="$(curl -fsS4 --max-time 8 "$url" 2>/dev/null | tr -d '[:space:]' || true)"
+      if is_ipv4 "$ip"; then
+        printf '%s' "$ip"
+        return 0
+      fi
+      ip="$(curl -fsS --max-time 8 "$url" 2>/dev/null | tr -d '[:space:]' || true)"
       if is_ipv4 "$ip"; then
         printf '%s' "$ip"
         return 0
@@ -286,7 +306,7 @@ resolve_server_ip_mode() {
 resolve_server_ip() {
   local mode configured detected
 
-  configured="$(first_known_value "${SERVER_IP:-}" "$(config_value .env SERVER_IP 2>/dev/null || true)" || true)"
+  configured="$(first_known_value "$(config_value .env SERVER_IP 2>/dev/null || true)" "${SERVER_IP:-}" || true)"
   if value_is_known "$configured" && [ "$configured" != "auto" ]; then
     printf '%s' "$configured"
     return 0
@@ -302,7 +322,7 @@ resolve_server_ip() {
       ;;
   esac
 
-  first_known_value     "$detected"     "${SERVER_IP:-}"     "$(config_value .env SERVER_IP 2>/dev/null || true)"     "$(container_env_value_any_state dune-director HOST_DATACENTER_IP_ADDRESS 2>/dev/null || true)"     "$(container_env_value_any_state dune-server-gateway HOST_DATACENTER_IP_ADDRESS 2>/dev/null || true)"     "$(detect_bind_ip 2>/dev/null || true)"     "auto"
+  first_known_value     "$detected"     "$(config_value .env SERVER_IP 2>/dev/null || true)"     "${SERVER_IP:-}"     "$(container_env_value_any_state dune-director HOST_DATACENTER_IP_ADDRESS 2>/dev/null || true)"     "$(container_env_value_any_state dune-server-gateway HOST_DATACENTER_IP_ADDRESS 2>/dev/null || true)"     "$(detect_bind_ip 2>/dev/null || true)"     "auto"
 }
 
 resolve_bind_ip() {
@@ -380,12 +400,15 @@ resolve_rmq_admin_host() {
 }
 
 game_external_address_override_env_args() {
-  local bind_ip advertised_ip
+  local mode bind_ip advertised_ip
 
+  [ "${DUNE_DISABLE_GAME_EXTERNAL_ADDRESS_OVERRIDE:-0}" = "1" ] && return 0
   [ "${DUNE_ALLOW_GAME_EXTERNAL_ADDRESS_OVERRIDE:-0}" = "1" ] || return 0
 
+  mode="$(resolve_server_ip_mode 2>/dev/null || true)"
   bind_ip="$(resolve_game_listen_ip)"
   advertised_ip="$(resolve_advertised_ip)"
+
   if [ "$bind_ip" != "$advertised_ip" ]; then
     echo "Skipping EXTERNAL_ADDRESS_OVERRIDE: bind IP $bind_ip differs from advertised IP $advertised_ip." >&2
     return 0
@@ -397,6 +420,13 @@ game_external_address_override_env_args() {
 usersettings_engine_value() {
   local key="$1"
   local fallback="$2"
+  local value
+
+  value="$(python3 runtime/scripts/usersettings.py engine-values 2>/dev/null | awk -F '\t' -v key="$key" '$1 == key { print $2; exit }' || true)"
+  if value_is_known "$value"; then
+    printf '%s' "$value"
+    return 0
+  fi
 
   python3 - "$key" "$fallback" <<'PY2'
 import json
