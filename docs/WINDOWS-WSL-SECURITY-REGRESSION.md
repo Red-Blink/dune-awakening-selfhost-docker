@@ -45,6 +45,7 @@ add('README adds Windows WSL option', 'Windows 11 Home / WSL2 / Ubuntu 26.04' in
 add('README links Windows quickstart', 'WINDOWS-WSL-QUICKSTART.md' in readme)
 add('README links Administrator PowerShell instructions', 'ADMIN-POWERSHELL.md' in readme)
 add('Quickstart contains latest-release bootstrap', 'dune-awakening-selfhost-docker/archive/refs/tags/' in quickstart and '.\\install.ps1' in quickstart)
+add('Quickstart explains Administrator PowerShell launch steps', 'Run as administrator' in quickstart and 'Administrator:' in quickstart)
 add('Quickstart warns not to nest powershell command wrapper', 'Do not wrap this command' in quickstart)
 add('Admin doc explains Run as administrator', 'Run as administrator' in admin and 'Administrator:' in admin)
 add('WSL guide warns not to expose Web UI publicly', 'Do not expose `8088`' in guide or 'Do not expose the Web UI' in guide)
