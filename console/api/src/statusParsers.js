@@ -59,6 +59,7 @@ export function parseFlsSummary(text) {
 export function parseDoctorWarnings(text, readinessText = "") {
   const readinessHealthy = /^READY:/m.test(readinessText);
   return text.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^WARN\s+/i.test(line)).filter((line) => {
+    if (/DeepDesert_1 is always-on/i.test(line)) return false;
     if (!readinessHealthy) return true;
     return !/Director heartbeat not seen in recent logs|Gateway DB monitoring not seen in recent logs/i.test(line);
   });

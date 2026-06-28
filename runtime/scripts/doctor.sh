@@ -18,6 +18,10 @@ warn_msg() {
   warn=1
 }
 
+info_msg() {
+  echo "INFO $*"
+}
+
 fail_msg() {
   echo "FAIL $*"
   fail=1
@@ -124,8 +128,7 @@ check_deepdesert_mode() {
   mode="$(runtime/scripts/map-modes.sh mode DeepDesert_1 2>/dev/null | awk 'NF { print $NF; exit }' || true)"
 
   if [ "$mode" = "always-on" ]; then
-    warn_msg "DeepDesert_1 is always-on; this can worsen vehicle timing on WSL2/dense bases"
-    echo "     Prefer dynamic unless you have enough dedicated host headroom."
+    info_msg "DeepDesert_1 is always-on; ensure the host has enough dedicated headroom for vehicle timing"
   elif [ -n "$mode" ]; then
     ok "DeepDesert_1 map mode: $mode"
   fi

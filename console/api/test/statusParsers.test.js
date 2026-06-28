@@ -234,6 +234,13 @@ WARN Gateway DB monitoring not seen in recent logs`;
   assert.equal(parseDoctorWarnings(doctor, "NOT READY: one or more required checks failed.").length, 2);
 });
 
+test("doctor parser treats DeepDesert always-on as informational", () => {
+  const doctor = `=== Host latency and vehicle timing ===
+WARN DeepDesert_1 is always-on; this can worsen vehicle timing on WSL2/dense bases
+WARN Host latency sysctls are not at the recommended values`;
+  assert.deepEqual(parseDoctorWarnings(doctor, healthyReady), ["WARN Host latency sysctls are not at the recommended values"]);
+});
+
 test("skill module parser attaches id and max level metadata to module rows", () => {
   const rows = parseSkillModules(`Bindu Dodge [BeneGesserit]
   id: Skills.Spice.BinduDodge

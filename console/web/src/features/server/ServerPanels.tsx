@@ -466,6 +466,8 @@ export function ServerPanel(props: {
   const [funcomToken, setFuncomToken] = useState("");
   const [serviceRestartResult, setServiceRestartResult] = useState<HomeTaskResult | null>(null);
   const [serviceRestartingService, setServiceRestartingService] = useState("");
+  const [doctorLoading, setDoctorLoading] = useState(!props.doctor);
+  const [doctorError, setDoctorError] = useState("");
   const controlActionRunId = useRef(0);
   const controlActionStartedAt = useRef(0);
   const controlActionReadyPolls = useRef(0);
@@ -498,6 +500,10 @@ export function ServerPanel(props: {
     setRunningAction(action);
   }
   async function loadControlStatus(includeDiagnostics = false): Promise<HomeLoadResult> {
+    if (includeDiagnostics) {
+      setDoctorLoading(true);
+      setDoctorError("");
+    }
     const requests = includeDiagnostics
       ? [serverApi.status(), serverApi.readiness(), serverApi.ports(), serverApi.doctor()] as const
       : [serverApi.status(), serverApi.readiness()] as const;
@@ -521,7 +527,13 @@ export function ServerPanel(props: {
       result.readinessError = nextReadiness.reason instanceof Error ? nextReadiness.reason.message : String(nextReadiness.reason);
     }
     if (nextPorts?.status === "fulfilled") props.setPorts(nextPorts.value.stdout);
-    if (nextDoctor?.status === "fulfilled") props.setDoctor(nextDoctor.value.stdout);
+    if (nextDoctor?.status === "fulfilled") {
+      props.setDoctor(nextDoctor.value.stdout || nextDoctor.value.stderr || "");
+      setDoctorLoading(false);
+    } else if (nextDoctor) {
+      setDoctorError(nextDoctor.reason instanceof Error ? nextDoctor.reason.message : String(nextDoctor.reason));
+      setDoctorLoading(false);
+    }
     if (!result.statusLoaded && result.statusError) props.onError(friendlyHomeStatusError(result.statusError));
     return result;
   }
@@ -796,7 +808,14 @@ export function ServerPanel(props: {
     const id = window.setInterval(async () => {
       if (!active) return;
       const result = await serverApi.doctor().catch(() => null);
-      if (active && result) props.setDoctor(result.stdout || result.stderr || "");
+      if (!active) return;
+      if (result) {
+        props.setDoctor(result.stdout || result.stderr || "");
+        setDoctorError("");
+      } else if (!props.doctor) {
+        setDoctorError("Doctor diagnostics could not be loaded.");
+      }
+      setDoctorLoading(false);
     }, 30000);
     return () => {
       active = false;
@@ -891,7 +910,7 @@ export function ServerPanel(props: {
           </span>}
         </div>
       </section>
-      <DoctorSummary text={props.doctor} readiness={props.readiness} />
+      <DoctorSummary text={props.doctor} readiness={props.readiness} loading={doctorLoading} error={doctorError} />
     </section>
   );
 }
@@ -1095,18 +1114,23 @@ function HomeHealthCards({ status, readiness, readinessWarning, loading, running
   </div>;
 }
 
-function DoctorSummary({ text, readiness }: { text: string; readiness: string }) {
+function DoctorSummary({ text, readiness, loading, error }: { text: string; readiness: string; loading: boolean; error: string }) {
   const readinessHealthy = /^READY:/m.test(readiness);
   const issues = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^WARN\s+/i.test(line)).filter((line) => {
     if (!readinessHealthy) return true;
-    return !/Director heartbeat not seen in recent logs|Gateway DB monitoring not seen in recent logs/i.test(line);
+    return !/Director heartbeat not seen in recent logs|Gateway DB monitoring not seen in recent logs|DeepDesert_1 is always-on/i.test(line);
   }).slice(0, 6);
+  const info = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^INFO\s+/i.test(line)).slice(0, 3);
   return <section className="action-section doctor-section">
     <div className="panel-title"><h4>Doctor Diagnostics</h4></div>
-    {text ? <p>{issues.length ? `${issues.length} diagnostic item${issues.length === 1 ? "" : "s"} need attention.` : "No obvious warning lines detected in the latest doctor output."}</p> : <p>Run Doctor to show diagnostics.</p>}
+    {loading ? <p className="loading-dots">Checking diagnostics</p> : error ? <p className="error">{error}</p> : text ? <p>{issues.length ? `${issues.length} diagnostic item${issues.length === 1 ? "" : "s"} need attention.` : "Doctor diagnostics look healthy."}</p> : <p>Doctor diagnostics have not loaded yet.</p>}
     {issues.length > 0 && <div className="check-grid">{issues.map((issue, index) => {
       const advice = doctorAdvice(issue);
       return <article className="check-card" key={`${issue}-${index}`}><div><strong>{advice.title}</strong><p>{advice.message}</p>{advice.nextStep && <span className="muted">{advice.nextStep}</span>}</div><StatusPill value="WARN" /></article>;
+    })}</div>}
+    {!issues.length && info.length > 0 && <div className="check-grid">{info.map((line, index) => {
+      const clean = friendlyIssueLine(line);
+      return <article className="check-card" key={`${line}-${index}`}><div><strong>Diagnostic Note</strong><p>{clean}</p></div><StatusPill value="INFO" /></article>;
     })}</div>}
   </section>;
 }
@@ -1129,6 +1153,12 @@ function doctorAdvice(issue: string) {
     title: "Advertised IP Warning",
     message: clean,
     nextStep: "Review Setup -> Server Identity and Network/Ports for Local vs Public mode.",
+    status: "WARN"
+  };
+  if (/Host latency sysctls are not at the recommended values/i.test(issue)) return {
+    title: "Host Network Tuning",
+    message: "The host UDP/network buffer sysctls are below the recommended values for smoother high-traffic game server networking.",
+    nextStep: "They are normally applied before game server startup. If this persists after a restart, run runtime/scripts/host-latency-tune.sh on the host and check whether the OS allows those sysctl values.",
     status: "WARN"
   };
   return {
