@@ -1122,6 +1122,7 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
             <section className="inline-edit-panel">
               <div className="panel-title"><h4>Edit {rowName}</h4></div>
               <KeyValueGrid items={[["Status", displayStatus], ["Mode", row.mode], ["Memory", row.memory], ["Dimensions", row.dimensions], ...(isSurvivalRow && primarySurvivalSietch ? [["Password", primarySurvivalSietch.passwordSet ? "Set" : "Not Set"] as [string, unknown]] : [])]} />
+              {isVehicleDeployMap(rowName) && <p className="muted">Vehicle-deploy Overland maps use Overmap Active instead of Always On by default to avoid vehicle ownership restore races during startup.</p>}
               <div className="action-line">
                 <label className="compact-select">Mode<select value={modeDraft} disabled={String(row.mode) === "Core Map"} onChange={(event) => setModeDraft(event.target.value)}><option value="dynamic">Dynamic</option><option value="always-on">Always On</option><option value="overmap-active">Overmap Active</option><option value="disabled">Disabled</option></select></label>
                 <label className="memory-number-field">Memory<input type="number" min="1" step="1" value={memory} onChange={(event) => setMemory(event.target.value)} placeholder="8" /></label>
@@ -1831,6 +1832,10 @@ function friendlyMapMode(value: string) {
   if (normalized === "disabled") return "Disabled";
   if (normalized === "core map" || normalized === "core") return "Core Map";
   return value ? titleCase(value) : "Not Available";
+}
+
+function isVehicleDeployMap(value: string) {
+  return /^CB_Overland_/i.test(String(value || "").trim());
 }
 
 function modeInputValue(value: string) {
