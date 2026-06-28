@@ -199,6 +199,27 @@ function Resolve-RepoUrl {
     return "https://github.com/Red-Blink/dune-awakening-selfhost-docker.git"
 }
 
+function Resolve-SourceArchiveUrl {
+    param([string]$ResolvedRepoUrl)
+
+    $repo = $ResolvedRepoUrl.Trim()
+    $owner = ""
+    $name = ""
+
+    if ($repo -match '^https://github\.com/([^/]+)/([^/?#]+?)(\.git)?/?$') {
+        $owner = $Matches[1]
+        $name = $Matches[2]
+    } elseif ($repo -match '^git@github\.com:([^/]+)/(.+?)(\.git)?$') {
+        $owner = $Matches[1]
+        $name = $Matches[2]
+    } else {
+        throw "Only GitHub repository URLs are supported by the Windows end-user installer. Use a URL like https://github.com/owner/repo.git."
+    }
+
+    $encodedRef = [System.Uri]::EscapeDataString($RepoRef)
+    return "https://api.github.com/repos/$owner/$name/tarball/$encodedRef"
+}
+
 function Install-DockerEngineInUbuntu {
     param([string]$LinuxUser)
 
@@ -214,7 +235,7 @@ function Install-DockerEngineInUbuntu {
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y ca-certificates curl gnupg lsb-release git nano iproute2 apt-transport-https
+apt-get install -y ca-certificates curl gnupg lsb-release nano iproute2 apt-transport-https tar gzip
 for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
   apt-get remove -y "$pkg" >/dev/null 2>&1 || true
 done
@@ -252,13 +273,12 @@ docker compose version >/dev/null
 function Install-RepositoryAndRunInstaller {
     param(
         [string]$LinuxUser,
-        [string]$ResolvedRepoUrl
+        [string]$SourceArchiveUrl
     )
 
-    Write-Step "Installing Dune Docker Console inside Ubuntu"
+    Write-Step "Installing Dune Docker Console source archive inside Ubuntu"
 
-    $safeRepoUrl = $ResolvedRepoUrl.Replace("'", "'\''")
-    $safeRepoRef = $RepoRef.Replace("'", "'\''")
+    $safeArchiveUrl = $SourceArchiveUrl.Replace("'", "'\''")
     $safeInstallDir = $InstallDir.Replace("'", "'\''")
     $safeAdminPort = [string]$AdminPort
     $startFlag = if ($NoStart) { "1" } else { "0" }
@@ -266,26 +286,54 @@ function Install-RepositoryAndRunInstaller {
     $script = @'
 set -euo pipefail
 cd "$HOME"
-if [ -d '__INSTALL_DIR__/.git' ]; then
-  echo "Repository already exists. Updating it."
-  git -C '__INSTALL_DIR__' fetch --all --tags
-  git -C '__INSTALL_DIR__' checkout '__REPO_REF__'
-  git -C '__INSTALL_DIR__' pull --ff-only || true
-else
-  git clone '__REPO_URL__' '__INSTALL_DIR__'
-  git -C '__INSTALL_DIR__' checkout '__REPO_REF__' || true
+archive_url='__SOURCE_ARCHIVE_URL__'
+install_dir="$HOME/__INSTALL_DIR__"
+
+case "$install_dir" in
+  "$HOME"/*) ;;
+  *) echo "Refusing to install outside HOME: $install_dir"; exit 1 ;;
+esac
+
+work_dir="$(mktemp -d)"
+trap 'rm -rf "$work_dir"' EXIT
+mkdir -p "$work_dir/source"
+
+echo "Downloading source archive."
+curl -fsSL "$archive_url" -o "$work_dir/source.tar.gz"
+tar -xzf "$work_dir/source.tar.gz" -C "$work_dir/source" --strip-components=1
+
+preserve_dir="$work_dir/preserve"
+mkdir -p "$preserve_dir"
+
+if [ -d "$install_dir/runtime" ]; then
+  mv "$install_dir/runtime" "$preserve_dir/runtime"
 fi
-cd '__INSTALL_DIR__'
+if [ -f "$install_dir/.env" ]; then
+  mv "$install_dir/.env" "$preserve_dir/.env"
+fi
+
+rm -rf "$install_dir"
+mkdir -p "$install_dir"
+cp -a "$work_dir/source/." "$install_dir/"
+
+if [ -d "$preserve_dir/runtime" ]; then
+  rm -rf "$install_dir/runtime"
+  mv "$preserve_dir/runtime" "$install_dir/runtime"
+fi
+if [ -f "$preserve_dir/.env" ]; then
+  mv "$preserve_dir/.env" "$install_dir/.env"
+fi
+
+cd "$install_dir"
 chmod +x install.sh
 if [ '__START_FLAG__' = '1' ]; then
-  echo "Repository is ready at $(pwd). -NoStart was used, so install.sh was not run."
+  echo "Source is ready at $(pwd). -NoStart was used, so install.sh was not run."
 else
   ADMIN_BIND_PORT='__ADMIN_PORT__' ./install.sh
 fi
 '@
 
-    $script = $script.Replace("__REPO_URL__", $safeRepoUrl)
-    $script = $script.Replace("__REPO_REF__", $safeRepoRef)
+    $script = $script.Replace("__SOURCE_ARCHIVE_URL__", $safeArchiveUrl)
     $script = $script.Replace("__INSTALL_DIR__", $safeInstallDir)
     $script = $script.Replace("__START_FLAG__", $startFlag)
     $script = $script.Replace("__ADMIN_PORT__", $safeAdminPort)
@@ -296,7 +344,7 @@ fi
 function Show-Finish {
     param(
         [string]$LinuxUser,
-        [string]$ResolvedRepoUrl
+        [string]$SourceArchiveUrl
     )
 
     Write-Host ""
@@ -316,7 +364,7 @@ function Show-Finish {
     Write-Host "Install details:"
     Write-Host "  WSL distro: $WslDistro"
     Write-Host "  Linux user: $LinuxUser"
-    Write-Host "  Repository: $ResolvedRepoUrl"
+    Write-Host "  Source archive: $SourceArchiveUrl"
     Write-Host "  Ubuntu path: ~/$InstallDir"
 }
 
@@ -334,10 +382,11 @@ try {
     Install-DockerEngineInUbuntu -LinuxUser $linuxUser
 
     $resolvedRepoUrl = Resolve-RepoUrl
-    Write-Step "Using repository $resolvedRepoUrl"
+    $sourceArchiveUrl = Resolve-SourceArchiveUrl -ResolvedRepoUrl $resolvedRepoUrl
+    Write-Step "Using source archive $sourceArchiveUrl"
 
-    Install-RepositoryAndRunInstaller -LinuxUser $linuxUser -ResolvedRepoUrl $resolvedRepoUrl
-    Show-Finish -LinuxUser $linuxUser -ResolvedRepoUrl $resolvedRepoUrl
+    Install-RepositoryAndRunInstaller -LinuxUser $linuxUser -SourceArchiveUrl $sourceArchiveUrl
+    Show-Finish -LinuxUser $linuxUser -SourceArchiveUrl $sourceArchiveUrl
 }
 catch {
     Write-Host ""
