@@ -30,6 +30,7 @@ install = Path('install.ps1').read_text(encoding='utf-8')
 readme = Path('README.md').read_text(encoding='utf-8')
 guide = Path('docs/WINDOWS-WSL-INSTALL.md').read_text(encoding='utf-8')
 quickstart = Path('docs/WINDOWS-WSL-QUICKSTART.md').read_text(encoding='utf-8')
+admin = Path('docs/ADMIN-POWERSHELL.md').read_text(encoding='utf-8')
 
 lower_install = install.lower()
 
@@ -41,8 +42,11 @@ add('install.ps1 does not embed Funcom token values', 'funcom-token' not in lowe
 add('install.ps1 removes only temporary helper scripts', 'Remove-Item -LiteralPath $scriptPath -Force' in install)
 add('README preserves Linux install.sh path', './install.sh' in readme and 'Copy and paste this on a fresh Linux server' in readme)
 add('README adds Windows WSL option', 'Windows 11 Home / WSL2 / Ubuntu 26.04' in readme)
-add('README adds Windows latest-release bootstrap', 'dune-awakening-selfhost-docker/archive/refs/tags/' in readme and '.\\install.ps1' in readme)
-add('Quickstart repeats latest-release bootstrap', 'dune-awakening-selfhost-docker/archive/refs/tags/' in quickstart and '.\\install.ps1' in quickstart)
+add('README links Windows quickstart', 'WINDOWS-WSL-QUICKSTART.md' in readme)
+add('README links Administrator PowerShell instructions', 'ADMIN-POWERSHELL.md' in readme)
+add('Quickstart contains latest-release bootstrap', 'dune-awakening-selfhost-docker/archive/refs/tags/' in quickstart and '.\\install.ps1' in quickstart)
+add('Quickstart warns not to nest powershell command wrapper', 'Do not wrap this command' in quickstart)
+add('Admin doc explains Run as administrator', 'Run as administrator' in admin and 'Administrator:' in admin)
 add('WSL guide warns not to expose Web UI publicly', 'Do not expose `8088`' in guide or 'Do not expose the Web UI' in guide)
 add('WSL guide tells users not to commit secrets', 'Do not commit `.env`' in guide and 'runtime/secrets' in guide)
 add('WSL guide documents Docker socket risk', '/var/run/docker.sock' in guide and 'privileged' in guide)
@@ -66,6 +70,7 @@ Expected result: all checks pass.
 - Confirm Linux users can still use the original README Linux installer.
 - Confirm Windows users can either use the latest-release bootstrap command or run the helper from a trusted local checkout.
 - Confirm the release bootstrap downloads a GitHub release archive and runs the checked-in script from that extracted archive.
+- Confirm Windows documentation tells users how to launch Administrator PowerShell.
 - Confirm the helper delegates to `install.sh` after preparing WSL and Docker.
 - Confirm the helper does not store Windows, Ubuntu, Funcom, or Web UI passwords.
 - Confirm public port guidance distinguishes game ports from the admin Web UI.
