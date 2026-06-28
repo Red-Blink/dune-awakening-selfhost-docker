@@ -9,7 +9,6 @@ SKILL_MODULES_FILE="runtime/data/admin-skill-modules.json"
 XP_EVENT_TAGS_FILE="runtime/data/admin-xp-event-tags.json"
 TOKEN_FILE="runtime/secrets/funcom-token.txt"
 COMMAND_TOKEN_FILE="runtime/secrets/command-auth-token.txt"
-BUILTIN_COMMAND_AUTH_TOKEN="Nu6VmPWUMvdPMeB7qErr"
 RMQ_CONTAINER="dune-rmq-game"
 POSTGRES_CONTAINER="dune-postgres"
 ADMIN_HISTORY_TSV="runtime/generated/admin-command-history.tsv"
@@ -149,8 +148,31 @@ command_auth_token() {
     fi
   fi
 
-  # Matches the working upstream manager's command-auth fallback.
-  printf '%s' "$BUILTIN_COMMAND_AUTH_TOKEN"
+  generate_command_auth_token
+}
+
+generate_command_auth_token() {
+  local token
+
+  mkdir -p "$(dirname "$COMMAND_TOKEN_FILE")"
+  if command -v openssl >/dev/null 2>&1; then
+    token="$(openssl rand -hex 32)"
+  elif command -v python3 >/dev/null 2>&1; then
+    token="$(python3 - <<'PY'
+import secrets
+print(secrets.token_hex(32))
+PY
+)"
+  else
+    echo "Missing openssl or python3; cannot generate $COMMAND_TOKEN_FILE" >&2
+    return 1
+  fi
+  (
+    umask 077
+    printf '%s\n' "$token" > "$COMMAND_TOKEN_FILE"
+  )
+  chmod 600 "$COMMAND_TOKEN_FILE" 2>/dev/null || true
+  printf '%s' "$token"
 }
 
 require_rmq_game_running() {
