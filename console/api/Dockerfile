@@ -46,5 +46,8 @@ COPY console/api/package-lock.json ./
 RUN npm ci --omit=dev
 COPY console/api/src ./src
 COPY --from=web-build /app/web/dist /app/web-dist
+RUN mkdir -p /repo \
+    && chown -R node:node /app /repo
+USER node
 WORKDIR /repo
 CMD ["node", "/app/src/server.js"]
