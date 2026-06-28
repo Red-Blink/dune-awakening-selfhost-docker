@@ -78,16 +78,25 @@ The installer downloads the latest release, prepares the server, starts the Web 
 
 ### Windows 11 Home / WSL2 / Ubuntu 26.04
 
-Windows users can install through WSL2 without replacing the Linux installer. The PowerShell helper prepares Windows/WSL, installs Ubuntu 26.04, installs Docker Engine inside Ubuntu, and then runs the existing `install.sh` inside Ubuntu.
+Windows users can install through WSL2 without replacing the Linux installer. Start with the Windows quick-start so WSL2 and Ubuntu 26.04 are installed, Ubuntu is launched once, and the Linux username/password are created before the Dune installer runs.
 
-Run the Windows quick install from an **Administrator PowerShell** window:
+Windows setup order:
+
+1. Confirm virtualization is enabled.
+2. Open PowerShell as Administrator.
+3. Install WSL2.
+4. Install Ubuntu 26.04.
+5. Launch Ubuntu once and create the Linux user.
+6. Run the Dune Windows / WSL installer.
+
+Documentation:
 
 - How to open Administrator PowerShell: [docs/ADMIN-POWERSHELL.md](docs/ADMIN-POWERSHELL.md)
-- Windows quick install command: [docs/WINDOWS-WSL-QUICKSTART.md](docs/WINDOWS-WSL-QUICKSTART.md)
+- Windows quick install, including WSL and Ubuntu setup: [docs/WINDOWS-WSL-QUICKSTART.md](docs/WINDOWS-WSL-QUICKSTART.md)
 - Full Windows guide: [docs/WINDOWS-WSL-INSTALL.md](docs/WINDOWS-WSL-INSTALL.md)
 - Maintainer security checks: [docs/WINDOWS-WSL-SECURITY-REGRESSION.md](docs/WINDOWS-WSL-SECURITY-REGRESSION.md)
 
-If you already cloned this repository locally, open Administrator PowerShell in the repo folder and run:
+If you already cloned this repository locally after completing WSL and Ubuntu first-run setup, open Administrator PowerShell in the repo folder and run:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass -Force
