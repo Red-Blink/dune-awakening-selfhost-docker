@@ -39,8 +39,8 @@ function Invoke-External {
     param(
         [Parameter(Mandatory = $true)]
         [string]$FilePath,
-        [Parameter(ValueFromRemainingArguments = $true)]
-        [string[]]$Arguments
+
+        [string[]]$Arguments = @()
     )
 
     & $FilePath @Arguments
@@ -55,7 +55,7 @@ function ConvertTo-WslPathLiteral {
     $resolved = [System.IO.Path]::GetFullPath($WindowsPath)
     if ($resolved -match '^([A-Za-z]):\\(.*)$') {
         $drive = $Matches[1].ToLowerInvariant()
-        $rest = $Matches[2].Replace('\\', '/')
+        $rest = $Matches[2] -replace '\\', '/'
         return "/mnt/$drive/$rest"
     }
 
@@ -78,11 +78,11 @@ function Invoke-WslScript {
 
     try {
         if ($Root) {
-            Invoke-External wsl.exe -d $WslDistro -u root -- bash $wslScriptPath
+            Invoke-External -FilePath "wsl.exe" -Arguments @("-d", $WslDistro, "-u", "root", "--", "bash", $wslScriptPath)
         } elseif (-not [string]::IsNullOrWhiteSpace($User)) {
-            Invoke-External wsl.exe -d $WslDistro -u $User -- bash $wslScriptPath
+            Invoke-External -FilePath "wsl.exe" -Arguments @("-d", $WslDistro, "-u", $User, "--", "bash", $wslScriptPath)
         } else {
-            Invoke-External wsl.exe -d $WslDistro -- bash $wslScriptPath
+            Invoke-External -FilePath "wsl.exe" -Arguments @("-d", $WslDistro, "--", "bash", $wslScriptPath)
         }
     }
     finally {
@@ -120,7 +120,7 @@ function Ensure-WslInstalled {
         if ($LASTEXITCODE -ne 0) {
             Write-Info "WSL is not fully installed. Starting Microsoft WSL installation."
             Write-Info "Windows may ask you to reboot. If it does, reboot and run this script again."
-            Invoke-External wsl.exe --install --no-distribution
+            Invoke-External -FilePath "wsl.exe" -Arguments @("--install", "--no-distribution")
         }
     }
 
@@ -220,7 +220,7 @@ function Install-DockerEngineInUbuntu {
 
     Write-Step "Installing Docker Engine inside Ubuntu"
 
-    $escapedUser = $LinuxUser.Replace("'", "'\\''")
+    $escapedUser = $LinuxUser.Replace("'", "'\''")
     $script = @"
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -267,9 +267,9 @@ function Install-RepositoryAndRunInstaller {
 
     Write-Step "Installing Dune Docker Console inside Ubuntu"
 
-    $safeRepoUrl = $ResolvedRepoUrl.Replace("'", "'\\''")
-    $safeRepoRef = $RepoRef.Replace("'", "'\\''")
-    $safeInstallDir = $InstallDir.Replace("'", "'\\''")
+    $safeRepoUrl = $ResolvedRepoUrl.Replace("'", "'\''")
+    $safeRepoRef = $RepoRef.Replace("'", "'\''")
+    $safeInstallDir = $InstallDir.Replace("'", "'\''")
     $safeAdminPort = [string]$AdminPort
     $startFlag = if ($NoStart) { "1" } else { "0" }
 
