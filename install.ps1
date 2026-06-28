@@ -49,19 +49,6 @@ function Invoke-External {
     }
 }
 
-function ConvertTo-WslPathLiteral {
-    param([Parameter(Mandatory = $true)][string]$WindowsPath)
-
-    $resolved = [System.IO.Path]::GetFullPath($WindowsPath)
-    if ($resolved -match '^([A-Za-z]):\\(.*)$') {
-        $drive = $Matches[1].ToLowerInvariant()
-        $rest = $Matches[2] -replace '\\', '/'
-        return "/mnt/$drive/$rest"
-    }
-
-    throw "Only local drive paths are supported for temporary WSL scripts. Unsupported path: $resolved"
-}
-
 function Invoke-WslScript {
     param(
         [Parameter(Mandatory = $true)]
@@ -70,23 +57,15 @@ function Invoke-WslScript {
         [switch]$Root
     )
 
-    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "dune-wsl-install"
-    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
-    $scriptPath = Join-Path $tempDir ("script-{0}.sh" -f ([guid]::NewGuid().ToString("N")))
-    Set-Content -LiteralPath $scriptPath -Value $ScriptText -Encoding ASCII -NoNewline
-    $wslScriptPath = ConvertTo-WslPathLiteral -WindowsPath $scriptPath
+    $scriptBase64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($ScriptText))
+    $bashCommand = "printf '%s' '$scriptBase64' | base64 -d | bash"
 
-    try {
-        if ($Root) {
-            Invoke-External -FilePath "wsl.exe" -Arguments @("-d", $WslDistro, "-u", "root", "--", "bash", $wslScriptPath)
-        } elseif (-not [string]::IsNullOrWhiteSpace($User)) {
-            Invoke-External -FilePath "wsl.exe" -Arguments @("-d", $WslDistro, "-u", $User, "--", "bash", $wslScriptPath)
-        } else {
-            Invoke-External -FilePath "wsl.exe" -Arguments @("-d", $WslDistro, "--", "bash", $wslScriptPath)
-        }
-    }
-    finally {
-        Remove-Item -LiteralPath $scriptPath -Force -ErrorAction SilentlyContinue
+    if ($Root) {
+        Invoke-External -FilePath "wsl.exe" -Arguments @("-d", $WslDistro, "-u", "root", "--", "bash", "-lc", $bashCommand)
+    } elseif (-not [string]::IsNullOrWhiteSpace($User)) {
+        Invoke-External -FilePath "wsl.exe" -Arguments @("-d", $WslDistro, "-u", $User, "--", "bash", "-lc", $bashCommand)
+    } else {
+        Invoke-External -FilePath "wsl.exe" -Arguments @("-d", $WslDistro, "--", "bash", "-lc", $bashCommand)
     }
 }
 
