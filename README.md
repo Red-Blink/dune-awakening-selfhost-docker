@@ -66,6 +66,8 @@ Keep database and internal admin ports private.
 
 ## Getting Started
 
+### Linux server
+
 Copy and paste this on a fresh Linux server:
 
 ```bash
@@ -73,6 +75,25 @@ bash -c 'set -euo pipefail; if ! command -v curl >/dev/null 2>&1; then sudo apt-
 ```
 
 The installer downloads the latest release, prepares the server, starts the Web UI, and tells you what address to open in your browser. If you are on the same network as the server, use the same-network address. If you are connecting over the internet, use the public address and allow TCP `8088` in your firewall.
+
+### Windows 11 Home / WSL2 / Ubuntu 26.04
+
+Windows users can install through WSL2 without replacing the Linux installer. The PowerShell helper prepares Windows/WSL, installs Ubuntu 26.04, installs Docker Engine inside Ubuntu, and then runs the existing `install.sh` inside Ubuntu.
+
+From a trusted local checkout of this repository, open **PowerShell as Administrator** and run:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass -Force
+.\install.ps1
+```
+
+Then open the Web UI from Windows:
+
+```text
+http://localhost:8088
+```
+
+Full Windows documentation is available in [docs/WINDOWS-WSL-INSTALL.md](docs/WINDOWS-WSL-INSTALL.md). Maintainer security checks for this path are in [docs/WINDOWS-WSL-SECURITY-REGRESSION.md](docs/WINDOWS-WSL-SECURITY-REGRESSION.md).
 
 ## Community Addons
 
