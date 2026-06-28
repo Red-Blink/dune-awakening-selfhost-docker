@@ -132,7 +132,26 @@ This command:
 3. Runs the downloaded `install.ps1`.
 4. The installer prepares WSL2, Ubuntu 26.04, Docker Engine inside Ubuntu, and delegates final server startup to the existing Linux `install.sh`.
 
-## 8. If `localhost:8088` does not open
+## 8. Get the Web UI admin password
+
+The Web UI admin password is stored in persistent Ubuntu host storage:
+
+```text
+~/dune-awakening-selfhost-docker/runtime/secrets/admin-web-password.txt
+```
+
+Docker image rebuilds, container recreates, and `docker compose down` do not delete this file. That is intentional so normal restarts do not rotate the admin password.
+
+To print the current password from PowerShell:
+
+```powershell
+Write-Host "Admin Web UI password:"
+wsl -d Ubuntu-26.04 -- bash -lc "cat ~/dune-awakening-selfhost-docker/runtime/secrets/admin-web-password.txt"
+```
+
+If you intentionally need to rotate the Web UI admin password, move aside only `admin-web-password.txt`, then recreate the Web UI container so a new file is generated. Do not remove the whole `runtime/secrets` directory, because it may contain other secrets, including the Funcom token.
+
+## 9. If `localhost:8088` does not open
 
 First verify the Web console is running inside Ubuntu:
 
