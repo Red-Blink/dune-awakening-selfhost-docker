@@ -158,6 +158,8 @@ The Web UI admin password is stored in persistent Ubuntu host storage:
 
 Docker image rebuilds, container recreates, and `docker compose down` do not delete this file. That is intentional so normal restarts do not rotate the admin password.
 
+The password printed by the installer is the current password in this file at install time. If you later change the Web UI password from the browser, the installer-printed password is no longer valid; the same file will contain the new current password.
+
 To print the current password from PowerShell:
 
 ```powershell
