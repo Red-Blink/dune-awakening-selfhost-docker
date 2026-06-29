@@ -94,6 +94,7 @@ Documentation:
 - How to open Administrator PowerShell: [docs/ADMIN-POWERSHELL.md](docs/ADMIN-POWERSHELL.md)
 - Windows quick install, including WSL and Ubuntu setup: [docs/WINDOWS-WSL-QUICKSTART.md](docs/WINDOWS-WSL-QUICKSTART.md)
 - Full Windows guide: [docs/WINDOWS-WSL-INSTALL.md](docs/WINDOWS-WSL-INSTALL.md)
+- WSL mirrored networking and Web UI Docker socket access: [docs/WINDOWS-WSL-NETWORKING-AND-DOCKER-SOCKET.md](docs/WINDOWS-WSL-NETWORKING-AND-DOCKER-SOCKET.md)
 - Maintainer security checks: [docs/WINDOWS-WSL-SECURITY-REGRESSION.md](docs/WINDOWS-WSL-SECURITY-REGRESSION.md)
 
 If you already cloned this repository locally after completing WSL and Ubuntu first-run setup, open Administrator PowerShell in the repo folder and run:
