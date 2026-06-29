@@ -8,7 +8,9 @@ services:
     image: redblink-dune-docker-console:dev
     container_name: redblink-dune-docker-console
     restart: unless-stopped
-    user: "${DUNE_HOST_UID:-0}:${DUNE_HOST_GID:-0}"
+    # The installer persists DUNE_HOST_UID/GID into .env so later manual
+    # compose runs keep write access to bind-mounted repo files such as .env.
+    user: "${DUNE_HOST_UID:-1000}:${DUNE_HOST_GID:-1000}"
     # Host networking lets the console reach RedBlink defaults such as
     # Postgres on 127.0.0.1:15432 and bind ADMIN_BIND_PORT directly.
     network_mode: host

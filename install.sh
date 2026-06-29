@@ -228,17 +228,36 @@ next_available_port() {
 
 existing_web_port() {
   if [ -f .env ]; then
-    awk -F= '/^ADMIN_BIND_PORT=/ {print $2; exit}' .env | sed 's/[[:space:]"'\'']//g'
+    awk -F= '/^ADMIN_BIND_PORT=/ {print $2; exit}' .env | sed 's/[[:space:]"'\''']//g'
+  fi
+}
+
+default_host_uid() {
+  printf '%s' "${SUDO_UID:-$(id -u)}"
+}
+
+default_host_gid() {
+  printf '%s' "${SUDO_GID:-$(id -g)}"
+}
+
+persist_env_value() {
+  local key="$1"
+  local value="$2"
+  local env_file="${3:-.env}"
+  local escaped_value
+
+  touch "$env_file"
+  escaped_value="$(printf '%s' "$value" | sed 's/[&|]/\\&/g')"
+
+  if grep -q "^${key}=" "$env_file"; then
+    sed -i "s|^${key}=.*|${key}=${escaped_value}|" "$env_file"
+  else
+    printf '%s=%s\n' "$key" "$value" >> "$env_file"
   fi
 }
 
 persist_web_port() {
-  local env_file=".env"
-  if [ -f "$env_file" ] && grep -q '^ADMIN_BIND_PORT=' "$env_file"; then
-    sed -i "s/^ADMIN_BIND_PORT=.*/ADMIN_BIND_PORT=$WEB_PORT/" "$env_file"
-  else
-    printf '\nADMIN_BIND_PORT=%s\n' "$WEB_PORT" >> "$env_file"
-  fi
+  persist_env_value "ADMIN_BIND_PORT" "$WEB_PORT"
 }
 
 prepare_docker_socket_gid() {
@@ -246,6 +265,13 @@ prepare_docker_socket_gid() {
     DOCKER_SOCKET_GID="$(stat -c '%g' /var/run/docker.sock 2>/dev/null || true)"
   fi
   export DOCKER_SOCKET_GID="${DOCKER_SOCKET_GID:-0}"
+}
+
+persist_console_runtime_env() {
+  persist_env_value "DUNE_HOST_REPO_ROOT" "$DUNE_HOST_REPO_ROOT"
+  persist_env_value "DUNE_HOST_UID" "$DUNE_HOST_UID"
+  persist_env_value "DUNE_HOST_GID" "$DUNE_HOST_GID"
+  persist_env_value "DOCKER_SOCKET_GID" "$DOCKER_SOCKET_GID"
 }
 
 choose_web_port() {
@@ -315,10 +341,11 @@ start_console() {
   step "Starting the Web UI."
   export ADMIN_BIND_PORT="$WEB_PORT"
   export DUNE_HOST_REPO_ROOT="${DUNE_HOST_REPO_ROOT:-$(pwd -P)}"
-  export DUNE_HOST_UID="${DUNE_HOST_UID:-$(id -u)}"
-  export DUNE_HOST_GID="${DUNE_HOST_GID:-$(id -g)}"
+  export DUNE_HOST_UID="${DUNE_HOST_UID:-$(default_host_uid)}"
+  export DUNE_HOST_GID="${DUNE_HOST_GID:-$(default_host_gid)}"
   export COMPOSE_PROJECT_NAME="${DUNE_COMPOSE_PROJECT_NAME:-dune-awakening-selfhost-docker}"
   prepare_docker_socket_gid
+  persist_console_runtime_env
   if [ "${DOCKER[0]}" = "sudo" ]; then
     need_sudo env \
       "ADMIN_BIND_PORT=$ADMIN_BIND_PORT" \
