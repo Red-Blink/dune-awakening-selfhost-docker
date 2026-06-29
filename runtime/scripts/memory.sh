@@ -413,6 +413,11 @@ for row in server_catalog:
 rows = []
 seen = set()
 global_default = env.get("DUNE_MEMORY_DEFAULT", "")
+map_default_overrides = {
+    "DLC_Story_LostHarvest_EcolabA": "2g default",
+    "DLC_Story_LostHarvest_EcolabB": "2g default",
+    "DLC_Story_LostHarvest_ForgottenLab": "2g default",
+}
 partition_rows = []
 for row in catalog:
     name = str(row.get("map", ""))
@@ -429,6 +434,8 @@ for row in catalog:
 
     if override:
         display = override
+    elif name in map_default_overrides:
+        display = map_default_overrides[name]
     elif catalog_memory:
         display = f"{catalog_memory} default"
     elif global_default:

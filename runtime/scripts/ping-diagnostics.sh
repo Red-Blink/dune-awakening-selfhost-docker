@@ -264,16 +264,8 @@ if docker_available; then
     multihome="$(container_arg_value "$container" -MultiHome= || true)"
     [ "$pod_ip" = "$bind_ip" ] && ok "$map container POD_IP=$pod_ip" || fail_msg "$map container POD_IP=$pod_ip expected $bind_ip"
     [ "$multihome" = "$bind_ip" ] && ok "$map container MultiHome=$multihome" || fail_msg "$map container MultiHome=$multihome expected $bind_ip"
-    if [ "$mode" = "public" ] && [ "$bind_ip" != "$server_ip" ]; then
-      if [ -n "$external_override" ]; then
-        fail_msg "$map container EXTERNAL_ADDRESS_OVERRIDE=$external_override on NAT host; game UDP must bind to $bind_ip, not $server_ip"
-      else
-        ok "$map container has no EXTERNAL_ADDRESS_OVERRIDE for NAT-safe bind"
-      fi
-    elif [ "$mode" = "public" ] && [ "${DUNE_ALLOW_GAME_EXTERNAL_ADDRESS_OVERRIDE:-0}" = "1" ]; then
+    if [ "$mode" = "public" ]; then
       [ "$external_override" = "$server_ip" ] && ok "$map container EXTERNAL_ADDRESS_OVERRIDE=$external_override" || fail_msg "$map container EXTERNAL_ADDRESS_OVERRIDE=${external_override:-<empty>} expected $server_ip"
-    elif [ "$mode" = "public" ]; then
-      [ -z "$external_override" ] && ok "$map container has no EXTERNAL_ADDRESS_OVERRIDE" || warn_msg "$map container EXTERNAL_ADDRESS_OVERRIDE=$external_override"
     elif [ -n "$external_override" ] && [ "$external_override" != "$server_ip" ]; then
       warn_msg "$map container EXTERNAL_ADDRESS_OVERRIDE=$external_override differs from advertised IP $server_ip."
     elif [ -n "$external_override" ]; then

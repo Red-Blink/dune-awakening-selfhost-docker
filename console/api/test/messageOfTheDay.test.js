@@ -75,6 +75,31 @@ test("message of the day sends once per online session", async () => {
   assert.equal(loginAgain.sent, 1);
 });
 
+test("message of the day treats changed login session as a new online session", async () => {
+  const cfg = config();
+  saveMessageOfTheDay(cfg, { enabled: true, title: "Daily", message: "Welcome back" });
+
+  const first = await runMessageOfTheDayScan(cfg, [onlinePlayer({ login_session: "2026-06-28 10:00:00+00" })], { mockMode: true, persona: { funcomId: "Server#0001", hexFlsId: "A5C0DE5E12A00001" } });
+  assert.equal(first.sent, 1);
+
+  const sameSession = await runMessageOfTheDayScan(cfg, [onlinePlayer({ login_session: "2026-06-28 10:00:00+00" })], { mockMode: true, persona: { funcomId: "Server#0001", hexFlsId: "A5C0DE5E12A00001" } });
+  assert.equal(sameSession.sent, 0);
+
+  const quickRelog = await runMessageOfTheDayScan(cfg, [onlinePlayer({ login_session: "2026-06-28 10:05:00+00" })], { mockMode: true, persona: { funcomId: "Server#0001", hexFlsId: "A5C0DE5E12A00001" } });
+  assert.equal(quickRelog.sent, 1);
+});
+
+test("message of the day does not resend on map or actor changes within the same login", async () => {
+  const cfg = config();
+  saveMessageOfTheDay(cfg, { enabled: true, title: "Daily", message: "Welcome back" });
+
+  const first = await runMessageOfTheDayScan(cfg, [onlinePlayer({ actor_id: 6, map: "Survival_1", login_session: "2026-06-28 10:00:00+00" })], { mockMode: true, persona: { funcomId: "Server#0001", hexFlsId: "A5C0DE5E12A00001" } });
+  assert.equal(first.sent, 1);
+
+  const mapTravel = await runMessageOfTheDayScan(cfg, [onlinePlayer({ actor_id: 99, map: "Overmap", login_session: "2026-06-28 10:00:00+00" })], { mockMode: true, persona: { funcomId: "Server#0001", hexFlsId: "A5C0DE5E12A00001" } });
+  assert.equal(mapTravel.sent, 0);
+});
+
 test("message of the day can prime currently online players after save", async () => {
   const cfg = config();
   saveMessageOfTheDay(cfg, { enabled: true, title: "Daily", message: "Welcome back" });

@@ -18,6 +18,10 @@ warn_msg() {
   warn=1
 }
 
+info_msg() {
+  echo "INFO $*"
+}
+
 fail_msg() {
   echo "FAIL $*"
   fail=1
@@ -60,6 +64,45 @@ check_udp() {
     ok "$label listening on UDP $port"
   else
     fail_msg "$label not listening on UDP $port"
+  fi
+}
+
+is_wsl_host() {
+  grep -qiE 'microsoft|wsl' /proc/sys/kernel/osrelease 2>/dev/null
+}
+
+check_game_container_pinning() {
+  local container
+  local cpuset
+  local found=0
+
+  command -v docker >/dev/null 2>&1 || return 0
+
+  while IFS= read -r container; do
+    [ -n "$container" ] || continue
+    [ "$container" = "dune-server-gateway" ] && continue
+    cpuset="$(docker inspect -f '{{.HostConfig.CpusetCpus}}' "$container" 2>/dev/null || true)"
+    if [ -n "$cpuset" ] && [ "$cpuset" != "<no value>" ]; then
+      warn_msg "Game container CPU pinning detected: $container cpuset=$cpuset"
+      found=1
+    fi
+  done < <(docker ps --format '{{.Names}}' 2>/dev/null | grep -E '^dune-server-' || true)
+
+  if [ "$found" -eq 0 ]; then
+    ok "No active game container CPU pinning detected"
+  fi
+}
+
+check_deepdesert_mode() {
+  local mode
+
+  [ -x runtime/scripts/map-modes.sh ] || return 0
+  mode="$(runtime/scripts/map-modes.sh mode DeepDesert_1 2>/dev/null | awk 'NF { print $NF; exit }' || true)"
+
+  if [ "$mode" = "always-on" ]; then
+    info_msg "DeepDesert_1 is always-on; ensure the host has enough dedicated headroom for vehicle timing"
+  elif [ -n "$mode" ]; then
+    ok "DeepDesert_1 map mode: $mode"
   fi
 }
 
@@ -144,6 +187,17 @@ check_udp "$client_port_base" "Overmap clients"
 check_udp "$((client_port_base + 1))" "Survival_1 clients"
 check_udp "$igw_port_base" "Survival_1 server-to-server"
 check_udp "$((igw_port_base + 1))" "Overmap server-to-server"
+
+echo
+echo "=== Host latency and vehicle timing ==="
+if is_wsl_host; then
+  warn_msg "WSL2 host detected"
+  echo "     Fast vehicle movement can be more sensitive to WSL2 scheduling/network jitter; a full Linux VM or native Linux is preferred for busy servers."
+else
+  ok "Host is not detected as WSL2"
+fi
+check_game_container_pinning
+check_deepdesert_mode
 
 echo
 echo "=== Steam server files ==="

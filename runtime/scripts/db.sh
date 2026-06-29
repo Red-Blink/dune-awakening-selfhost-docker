@@ -33,7 +33,7 @@ Usage:
   dune db transfer clear-pending
   dune db delete <backup-file-or-name>
   dune db delete --all
-  dune db auto enable <HH:MM> [retention-days]
+  dune db auto enable <HH:MM> [retention-days] [interval-hours]
   dune db auto disable
   dune db auto status
   dune db auto retention <days>
@@ -456,7 +456,8 @@ backup_db() {
     echo "battlegroup_id: $(config_value runtime/generated/battlegroup.env BATTLEGROUP_ID || echo unknown)"
   } > "$sidecar_file"
 
-  chmod 600 "$backup_file" "$sidecar_file"
+  chmod 600 "$backup_file"
+  chmod 644 "$sidecar_file"
 
   echo "Backup written:"
   echo "  $backup_file"
@@ -1500,7 +1501,7 @@ can_manage_host_systemd_with_docker() {
 load_auto_state() {
   DB_AUTO_BACKUP_ENABLED="${DB_AUTO_BACKUP_ENABLED:-0}"
   DB_AUTO_BACKUP_TIME="${DB_AUTO_BACKUP_TIME:-05:00}"
-  DB_AUTO_BACKUP_INTERVAL_HOURS="${DB_AUTO_BACKUP_INTERVAL_HOURS:-}"
+  DB_AUTO_BACKUP_INTERVAL_HOURS="${DB_AUTO_BACKUP_INTERVAL_HOURS:-24}"
   DB_AUTO_BACKUP_RETENTION_DAYS="${DB_AUTO_BACKUP_RETENTION_DAYS:-0}"
   DB_AUTO_BACKUP_DIR="${DB_AUTO_BACKUP_DIR:-$BACKUP_DIR_DEFAULT}"
 
@@ -1511,7 +1512,7 @@ load_auto_state() {
 
   DB_AUTO_BACKUP_ENABLED="${DB_AUTO_BACKUP_ENABLED:-0}"
   DB_AUTO_BACKUP_TIME="${DB_AUTO_BACKUP_TIME:-05:00}"
-  DB_AUTO_BACKUP_INTERVAL_HOURS="${DB_AUTO_BACKUP_INTERVAL_HOURS:-}"
+  DB_AUTO_BACKUP_INTERVAL_HOURS="${DB_AUTO_BACKUP_INTERVAL_HOURS:-24}"
   DB_AUTO_BACKUP_RETENTION_DAYS="${DB_AUTO_BACKUP_RETENTION_DAYS:-0}"
   DB_AUTO_BACKUP_DIR="${DB_AUTO_BACKUP_DIR:-$BACKUP_DIR_DEFAULT}"
 }
@@ -1520,6 +1521,7 @@ write_auto_state() {
   local enabled="$1"
   local backup_time="$2"
   local retention_days="${3:-0}"
+  local interval_hours="${4:-24}"
   local tmp_file
 
   mkdir -p runtime/generated
@@ -1527,7 +1529,7 @@ write_auto_state() {
   cat > "$tmp_file" <<EOF
 DB_AUTO_BACKUP_ENABLED=$enabled
 DB_AUTO_BACKUP_TIME=$backup_time
-DB_AUTO_BACKUP_INTERVAL_HOURS=
+DB_AUTO_BACKUP_INTERVAL_HOURS=$interval_hours
 DB_AUTO_BACKUP_RETENTION_DAYS=$retention_days
 DB_AUTO_BACKUP_DIR=$BACKUP_DIR_DEFAULT
 EOF
@@ -1540,10 +1542,16 @@ validate_backup_time() {
   printf '%s' "$backup_time" | grep -Eq '^([01][0-9]|2[0-3]):[0-5][0-9]$'
 }
 
+validate_interval_hours() {
+  local interval_hours="$1"
+  printf '%s' "$interval_hours" | grep -Eq '^[0-9]+$' && [ "$interval_hours" -ge 1 ] && [ "$interval_hours" -le 168 ]
+}
+
 write_auto_units_to() {
   local backup_time="$1"
   local systemd_dir="$2"
   local exec_root="$3"
+  local interval_hours="${4:-24}"
 
   mkdir -p "$systemd_dir"
   cat > "$systemd_dir/dune-awakening-db-backup.service" <<EOF
@@ -1567,6 +1575,13 @@ Description=Run Dune Awakening battlegroup database backup
 
 [Timer]
 OnCalendar=*-*-* ${backup_time}:00
+EOF
+  if [ "$interval_hours" != "24" ]; then
+    cat >> "$systemd_dir/dune-awakening-db-backup.timer" <<EOF
+OnUnitActiveSec=${interval_hours}h
+EOF
+  fi
+  cat >> "$systemd_dir/dune-awakening-db-backup.timer" <<EOF
 Persistent=true
 Unit=dune-awakening-db-backup.service
 
@@ -1577,12 +1592,14 @@ EOF
 
 install_auto_units_via_docker_host() {
   local backup_time="$1"
+  local interval_hours="${2:-24}"
   local image
   image="$(docker_helper_image)"
 
   can_manage_host_systemd_with_docker || return 1
   docker run --rm --privileged --pid=host --network=host \
     -e DB_AUTO_BACKUP_TIME="$backup_time" \
+    -e DB_AUTO_BACKUP_INTERVAL_HOURS="$interval_hours" \
     -e DUNE_HOST_REPO_ROOT="$HOST_ROOT_DIR" \
     -v /:/host \
     --entrypoint bash \
@@ -1610,6 +1627,13 @@ Description=Run Dune Awakening battlegroup database backup
 
 [Timer]
 OnCalendar=*-*-* ${DB_AUTO_BACKUP_TIME}:00
+EOF
+      if [ "${DB_AUTO_BACKUP_INTERVAL_HOURS}" != "24" ]; then
+        cat >> "$systemd_dir/dune-awakening-db-backup.timer" <<EOF
+OnUnitActiveSec=${DB_AUTO_BACKUP_INTERVAL_HOURS}h
+EOF
+      fi
+      cat >> "$systemd_dir/dune-awakening-db-backup.timer" <<EOF
 Persistent=true
 Unit=dune-awakening-db-backup.service
 
@@ -1660,6 +1684,7 @@ show_auto_timer_status_via_docker_host() {
 auto_backup_enable() {
   local backup_time="${1:-}"
   local retention_days="${2:-}"
+  local interval_hours="${3:-}"
 
   if [ -z "$backup_time" ]; then
     echo "Missing backup time."
@@ -1681,18 +1706,32 @@ auto_backup_enable() {
       echo "Invalid retention days: $retention_days"
       echo "Use a positive integer number of days, for example:"
       echo "  dune db auto enable 05:00 14"
+      echo "Use 0 to disable retention when setting an interval:"
+      echo "  dune db auto enable 05:00 0 12"
       exit 1
     fi
   else
     retention_days="${DB_AUTO_BACKUP_RETENTION_DAYS:-0}"
   fi
 
-  write_auto_state 1 "$backup_time" "$retention_days"
+  if [ -n "$interval_hours" ]; then
+    if ! validate_interval_hours "$interval_hours"; then
+      echo "Invalid interval hours: $interval_hours"
+      echo "Use a whole number from 1 to 168, for example:"
+      echo "  dune db auto enable 05:00 14 12"
+      exit 1
+    fi
+  else
+    interval_hours="${DB_AUTO_BACKUP_INTERVAL_HOURS:-24}"
+  fi
+
+  write_auto_state 1 "$backup_time" "$retention_days" "$interval_hours"
 
   if ! command -v systemctl >/dev/null 2>&1; then
-    if install_auto_units_via_docker_host "$backup_time"; then
+    if install_auto_units_via_docker_host "$backup_time" "$interval_hours"; then
       echo "Auto DB backups enabled."
       echo "Backup time: $backup_time"
+      echo "Interval: every $interval_hours hours"
       echo "Timer: dune-awakening-db-backup.timer"
       return 0
     fi
@@ -1702,26 +1741,28 @@ auto_backup_enable() {
   fi
 
   if ! can_manage_systemd_units; then
-    if install_auto_units_via_docker_host "$backup_time"; then
+    if install_auto_units_via_docker_host "$backup_time" "$interval_hours"; then
       echo "Auto DB backups enabled."
       echo "Backup time: $backup_time"
+      echo "Interval: every $interval_hours hours"
       echo "Timer: dune-awakening-db-backup.timer"
       return 0
     fi
     echo "Auto DB backup preference saved, but this user cannot install systemd units."
     echo "Saved: $AUTO_STATE_FILE"
     echo "To install the timer, run this command with sudo/root:"
-    echo "  runtime/scripts/dune db auto enable $backup_time${retention_days:+ $retention_days}"
+    echo "  runtime/scripts/dune db auto enable $backup_time $retention_days $interval_hours"
     return 0
   fi
 
-  write_auto_units_to "$backup_time" "/etc/systemd/system" "$ROOT_DIR"
+  write_auto_units_to "$backup_time" "/etc/systemd/system" "$ROOT_DIR" "$interval_hours"
 
   systemctl daemon-reload
   systemctl enable --now dune-awakening-db-backup.timer
 
   echo "Auto DB backups enabled."
   echo "Backup time: $backup_time"
+  echo "Interval: every $interval_hours hours"
   if [ "${retention_days:-0}" -gt 0 ] 2>/dev/null; then
     echo "Retention: keep backups from the last $retention_days days"
   else
@@ -1733,12 +1774,14 @@ auto_backup_enable() {
 auto_backup_disable() {
   local backup_time
   local retention_days
+  local interval_hours
 
   load_auto_state
   backup_time="${DB_AUTO_BACKUP_TIME:-05:00}"
   retention_days="${DB_AUTO_BACKUP_RETENTION_DAYS:-0}"
+  interval_hours="${DB_AUTO_BACKUP_INTERVAL_HOURS:-24}"
 
-  write_auto_state 0 "$backup_time" "$retention_days"
+  write_auto_state 0 "$backup_time" "$retention_days" "$interval_hours"
 
   if command -v systemctl >/dev/null 2>&1 && can_manage_systemd_units; then
     systemctl disable --now dune-awakening-db-backup.timer >/dev/null 2>&1 || true
@@ -1761,9 +1804,7 @@ auto_backup_status() {
     echo "Enabled:          false"
   fi
   echo "Backup time:      ${DB_AUTO_BACKUP_TIME:-05:00}"
-  if [ -n "${DB_AUTO_BACKUP_INTERVAL_HOURS:-}" ]; then
-    echo "Interval hours:   ${DB_AUTO_BACKUP_INTERVAL_HOURS}"
-  fi
+  echo "Interval hours:   ${DB_AUTO_BACKUP_INTERVAL_HOURS:-24}"
   if [ "${DB_AUTO_BACKUP_RETENTION_DAYS:-0}" -gt 0 ] 2>/dev/null; then
     echo "Retention:        ${DB_AUTO_BACKUP_RETENTION_DAYS} days"
   else
@@ -1807,7 +1848,7 @@ auto_backup_retention() {
       exit 2
       ;;
     off|OFF|0)
-      write_auto_state "${DB_AUTO_BACKUP_ENABLED:-0}" "${DB_AUTO_BACKUP_TIME:-05:00}" 0
+      write_auto_state "${DB_AUTO_BACKUP_ENABLED:-0}" "${DB_AUTO_BACKUP_TIME:-05:00}" 0 "${DB_AUTO_BACKUP_INTERVAL_HOURS:-24}"
       echo "Auto backup retention disabled. Old backups will not be deleted automatically."
       ;;
     *)
@@ -1816,7 +1857,7 @@ auto_backup_retention() {
         echo "Use a positive integer number of days, or: dune db auto retention off"
         exit 1
       fi
-      write_auto_state "${DB_AUTO_BACKUP_ENABLED:-0}" "${DB_AUTO_BACKUP_TIME:-05:00}" "$value"
+      write_auto_state "${DB_AUTO_BACKUP_ENABLED:-0}" "${DB_AUTO_BACKUP_TIME:-05:00}" "$value" "${DB_AUTO_BACKUP_INTERVAL_HOURS:-24}"
       echo "Auto backup retention set to $value days."
       ;;
   esac
@@ -1827,7 +1868,7 @@ handle_auto_backup() {
 
   case "$sub" in
     enable|on)
-      auto_backup_enable "${2:-}" "${3:-}"
+      auto_backup_enable "${2:-}" "${3:-}" "${4:-}"
       ;;
     disable|off)
       auto_backup_disable
@@ -1878,7 +1919,7 @@ case "$cmd" in
     delete_backup "${2:-}"
     ;;
   auto)
-    handle_auto_backup "${2:-status}" "${3:-}" "${4:-}"
+    handle_auto_backup "${2:-status}" "${3:-}" "${4:-}" "${5:-}"
     ;;
   help|--help|-h)
     usage

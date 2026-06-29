@@ -129,6 +129,7 @@ commit;
 " >/dev/null
 
 docker rm -f dune-server-survival-1 2>/dev/null || true
+ensure_host_latency_tuned
 
 docker run -d \
   --name dune-server-survival-1 \

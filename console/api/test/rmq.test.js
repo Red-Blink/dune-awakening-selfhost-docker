@@ -183,11 +183,12 @@ test("publishes map chat to chat.map routing key", async () => {
       dimension: 0,
       senderFuncomId: "Server#0001",
       senderHexFlsId: "A5C0DE5E12A00001",
+      amqpUserId: "254A06043E9F0B16",
       message: "Event starts soon"
     });
     assert.equal(result.amqp.exchange, "chat.map");
     assert.equal(result.amqp.routingKey, "HaggaBasin.0");
-    assert.equal(result.amqp.userId, "A5C0DE5E12A00001");
+    assert.equal(result.amqp.userId, "254A06043E9F0B16");
     assert.match(calls[0].args.join(" "), /rabbitmqctl eval/);
   } finally {
     globalThis.__testSpawn = originalSpawn;

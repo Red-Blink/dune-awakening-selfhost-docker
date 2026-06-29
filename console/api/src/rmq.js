@@ -66,10 +66,11 @@ export function buildShutdownBroadcastCommand({ shutdownType = "Restart", delayM
   };
 }
 
-export function buildCarePackageWhisperPayload({ recipientFuncomId, recipientCharacterName, senderFuncomId, message, now = new Date(), messageId } = {}) {
+export function buildCarePackageWhisperPayload({ recipientFuncomId, recipientCharacterName, senderFuncomId, senderDisplayName = "", message, now = new Date(), messageId } = {}) {
   const recipientId = validateWhisperIdentity(recipientFuncomId, "recipient Funcom ID");
   const recipientName = validateWhisperName(recipientCharacterName, "recipient character name");
   const senderId = validateWhisperIdentity(senderFuncomId, "sender Funcom ID");
+  const spoofedName = validateOptionalSpoofedName(senderDisplayName);
   const text = validateBroadcastMessage(message);
   const id = validateMessageId(messageId || randomUUID());
   const timestamp = new Date(now).toISOString();
@@ -77,10 +78,10 @@ export function buildCarePackageWhisperPayload({ recipientFuncomId, recipientCha
     m_Id: id,
     m_ChannelType: "ETextChatChannelType::Whispers",
     m_SubChannelId: recipientId,
-    m_bUseSpoofedUserName: false,
+    m_bUseSpoofedUserName: Boolean(spoofedName),
     m_SpoofedUserNameFrom: {
       m_Id: "",
-      m_DisplayName: ""
+      m_DisplayName: spoofedName
     },
     m_FuncomIdFrom: senderId,
     m_UserNameTo: recipientName,
@@ -105,19 +106,20 @@ export function buildCarePackageWhisperPayload({ recipientFuncomId, recipientCha
   };
 }
 
-export function buildMapChatPayload({ senderFuncomId, message, now = new Date(), messageId } = {}) {
+export function buildMapChatPayload({ senderFuncomId, senderDisplayName = "", message, now = new Date(), messageId } = {}) {
   const senderId = validateWhisperIdentity(senderFuncomId, "sender Funcom ID");
+  const spoofedName = validateOptionalSpoofedName(senderDisplayName);
   const text = validateBroadcastMessage(message);
   const id = validateMessageId(messageId || randomUUID());
   const timestamp = formatMapChatTimestamp(now);
   const inner = {
     m_Id: id,
     m_ChannelType: "Map",
-    m_bUseSpoofedUserName: false,
+    m_bUseSpoofedUserName: Boolean(spoofedName),
     m_SpoofedUserNameFrom: {
       m_TableId: "",
       m_Key: "",
-      m_UnlocalizedName: ""
+      m_UnlocalizedName: spoofedName
     },
     m_FuncomIdFrom: senderId,
     m_UserNameTo: "",
@@ -175,6 +177,7 @@ export async function publishCarePackageWhisper(config, fields) {
 
 export async function publishMapChat(config, fields) {
   const senderHexFlsId = validateHexFlsId(fields?.senderHexFlsId);
+  const amqpUserId = validateHexFlsId(fields?.amqpUserId || senderHexFlsId);
   const mapName = validateMapChatMap(fields?.mapName || fields?.region || "HaggaBasin");
   const dimension = validateInteger(fields?.dimension ?? 0, 0, 9999, "dimension");
   const directQueue = fields?.recipientQueue ? validateQueueName(fields.recipientQueue, "recipient queue") : "";
@@ -184,7 +187,7 @@ export async function publishMapChat(config, fields) {
   const payload = buildMapChatPayload(fields);
   const outerB64 = Buffer.from(JSON.stringify(payload.outer), "utf8").toString("base64");
   const routingB64 = Buffer.from(routingKey, "utf8").toString("base64");
-  const senderB64 = Buffer.from(senderHexFlsId, "utf8").toString("base64");
+  const senderB64 = Buffer.from(amqpUserId, "utf8").toString("base64");
   const exchangeB64 = Buffer.from(exchange, "utf8").toString("base64");
   const exchangeLabelB64 = Buffer.from(exchangeLabel, "utf8").toString("base64");
   const evalCode = `Outer = base64:decode(<<"${outerB64}">>), Routing = base64:decode(<<"${routingB64}">>), Sender = base64:decode(<<"${senderB64}">>), Exchange = base64:decode(<<"${exchangeB64}">>), ExchangeLabel = base64:decode(<<"${exchangeLabelB64}">>), XName = rabbit_misc:r(<<"/">>, exchange, Exchange), X = rabbit_exchange:lookup_or_die(XName), MsgId = list_to_binary("web-map-chat-" ++ integer_to_list(erlang:system_time(millisecond))), P = {list_to_atom("P_basic"), <<"Content">>, undefined, [], undefined, undefined, undefined, undefined, undefined, MsgId, undefined, <<"text_chat">>, Sender, <<"fls_backend">>, undefined}, Content = rabbit_basic:build_content(P, Outer), {ok, Msg} = rabbit_basic:message(XName, Routing, Content), Result = rabbit_queue_type:publish_at_most_once(X, Msg), io:format("publish=~p exchange=~s routing=~s type=text_chat user_id=~s app_id=fls_backend~n", [Result, ExchangeLabel, Routing, Sender]).`;
@@ -198,7 +201,7 @@ export async function publishMapChat(config, fields) {
       exchange: exchangeLabel,
       routingKey,
       type: "text_chat",
-      userId: senderHexFlsId,
+      userId: amqpUserId,
       senderHexFlsId,
       appId: "fls_backend"
     }
@@ -333,6 +336,13 @@ function validateMapChatMap(value) {
   const raw = String(value || "").trim();
   if (/^[A-Za-z0-9_]{1,80}$/.test(raw)) return raw;
   throw new Error("Map chat region must be a map key like HaggaBasin, Overmap, or DeepDesert");
+}
+
+function validateOptionalSpoofedName(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^[^\u0000-\u001f]{1,80}$/.test(raw)) return raw;
+  throw new Error("Spoofed sender name must be 1-80 printable characters");
 }
 
 function validateMessageId(value) {

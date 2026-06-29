@@ -29,6 +29,16 @@ test("memory balancer parses docker stats rows", () => {
   assert.equal(row.percent, 75);
 });
 
+test("memory balancer canonicalizes DeepDesert containers", () => {
+  const row = parseDockerStatsRow(JSON.stringify({
+    Name: "dune-server-deepdesert-1-8",
+    MemUsage: "3GiB / 16GiB",
+    MemPerc: "18.75%"
+  }));
+  assert.equal(row.container, "dune-server-deepdesert-1-8");
+  assert.equal(row.map, "DeepDesert_1");
+});
+
 test("memory balancer persists enabled state across restarts", async () => {
   const root = mkdtempSync(join(tmpdir(), "dune-memory-balancer-"));
   const generatedDir = join(root, "runtime/generated");

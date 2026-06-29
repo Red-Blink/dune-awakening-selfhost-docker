@@ -128,6 +128,7 @@ commit;
 " >/dev/null
 
 docker rm -f dune-server-overmap 2>/dev/null || true
+ensure_host_latency_tuned
 
 docker run -d \
   --name dune-server-overmap \

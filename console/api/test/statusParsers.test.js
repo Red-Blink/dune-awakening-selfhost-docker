@@ -234,6 +234,12 @@ WARN Gateway DB monitoring not seen in recent logs`;
   assert.equal(parseDoctorWarnings(doctor, "NOT READY: one or more required checks failed.").length, 2);
 });
 
+test("doctor parser treats DeepDesert always-on as informational", () => {
+  const doctor = `=== Host latency and vehicle timing ===
+WARN DeepDesert_1 is always-on; this can worsen vehicle timing on WSL2/dense bases`;
+  assert.deepEqual(parseDoctorWarnings(doctor, healthyReady), []);
+});
+
 test("skill module parser attaches id and max level metadata to module rows", () => {
   const rows = parseSkillModules(`Bindu Dodge [BeneGesserit]
   id: Skills.Spice.BinduDodge
@@ -259,6 +265,19 @@ test("memory status parser formats Gi defaults as friendly GB labels", () => {
   const rows = parseMemoryStatusRows(memoryStatusOutput);
   assert.deepEqual(rows.find((row) => row.map === "Survival_1"), { map: "Survival_1", memory: "12 GB (Default)" });
   assert.deepEqual(rows.find((row) => row.map === "CB_Dungeon_ThePit"), { map: "CB_Dungeon_ThePit", memory: "13 GB" });
+});
+
+test("memory status parser accepts long map names without fixed-width spacing", () => {
+  const rows = parseMemoryStatusRows(`=== Memory configuration ===
+Default memory: built-in per-map defaults, or server catalog for other dynamic maps
+
+MAP                          MEMORY
+DLC_Story_LostHarvest_EcolabA 6g
+DLC_Story_LostHarvest_EcolabB 2Gi default
+DLC_Story_LostHarvest_ForgottenLab 10g`);
+  assert.deepEqual(rows.find((row) => row.map === "DLC_Story_LostHarvest_EcolabA"), { map: "DLC_Story_LostHarvest_EcolabA", memory: "6 GB" });
+  assert.deepEqual(rows.find((row) => row.map === "DLC_Story_LostHarvest_EcolabB"), { map: "DLC_Story_LostHarvest_EcolabB", memory: "2 GB (Default)" });
+  assert.deepEqual(rows.find((row) => row.map === "DLC_Story_LostHarvest_ForgottenLab"), { map: "DLC_Story_LostHarvest_ForgottenLab", memory: "10 GB" });
 });
 
 test("server partition parser derives status from real ready/alive fields", () => {
@@ -304,6 +323,7 @@ test("auto backup status parser handles retention, timer, and permission failure
     stdout: `=== Automatic database backups ===
 Enabled:          true
 Backup time:      05:30
+Interval hours:   12
 Retention:        3 days
 Backup directory: runtime/backups/db
 
@@ -311,6 +331,7 @@ Systemd timer:   enabled`
   });
   assert.equal(status.enabled, true);
   assert.equal(status.backupTime, "05:30");
+  assert.equal(status.intervalHours, "12");
   assert.equal(status.retentionDays, "3");
   assert.equal(status.retentionLabel, "3 Days");
   assert.equal(status.timer, "enabled");

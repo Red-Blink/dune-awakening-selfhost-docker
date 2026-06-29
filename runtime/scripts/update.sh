@@ -25,6 +25,8 @@ AUTO_TIMER_NAME="dune-awakening-auto-update.timer"
 AUTO_SERVICE_FILE="/etc/systemd/system/$AUTO_SERVICE_NAME"
 AUTO_TIMER_FILE="/etc/systemd/system/$AUTO_TIMER_NAME"
 AUTO_DEFAULT_TIME="${DUNE_AUTO_UPDATE_TIME:-05:00}"
+AUTO_DEFAULT_INTERVAL_MINUTES="${DUNE_AUTO_UPDATE_INTERVAL_MINUTES:-60}"
+AUTO_PENDING_FILE="runtime/generated/update-auto-pending.env"
 
 container_running() {
   local name="$1"
@@ -57,15 +59,26 @@ trap cleanup_update_state EXIT
 
 write_auto_state() {
   local enabled="$1"
-  local time_value="$2"
-  local timer_installed="${3:-${DUNE_AUTO_UPDATE_TIMER_INSTALLED:-0}}"
+  local interval_minutes="$2"
+  local apply_enabled="${3:-${DUNE_AUTO_UPDATE_APPLY_ENABLED:-1}}"
+  local notify_enabled="${4:-${DUNE_AUTO_UPDATE_NOTIFY_ENABLED:-1}}"
+  local notify_minutes="${5:-${DUNE_AUTO_UPDATE_NOTIFY_MINUTES:-15}}"
+  local wait_empty="${6:-${DUNE_AUTO_UPDATE_WAIT_EMPTY:-0}}"
+  local max_wait_minutes="${7:-${DUNE_AUTO_UPDATE_MAX_WAIT_MINUTES:-360}}"
+  local timer_installed="${8:-${DUNE_AUTO_UPDATE_TIMER_INSTALLED:-0}}"
   local tmp
 
   mkdir -p runtime/generated
   tmp="${AUTO_STATE_FILE}.$$"
   cat > "$tmp" <<EOF
 DUNE_AUTO_UPDATE_ENABLED=$enabled
-DUNE_AUTO_UPDATE_TIME=$time_value
+DUNE_AUTO_UPDATE_TIME=${DUNE_AUTO_UPDATE_TIME:-$AUTO_DEFAULT_TIME}
+DUNE_AUTO_UPDATE_INTERVAL_MINUTES=$interval_minutes
+DUNE_AUTO_UPDATE_APPLY_ENABLED=$apply_enabled
+DUNE_AUTO_UPDATE_NOTIFY_ENABLED=$notify_enabled
+DUNE_AUTO_UPDATE_NOTIFY_MINUTES=$notify_minutes
+DUNE_AUTO_UPDATE_WAIT_EMPTY=$wait_empty
+DUNE_AUTO_UPDATE_MAX_WAIT_MINUTES=$max_wait_minutes
 DUNE_AUTO_UPDATE_TIMER_INSTALLED=$timer_installed
 EOF
   chmod 644 "$tmp" 2>/dev/null || true
@@ -75,10 +88,49 @@ EOF
 read_auto_state() {
   DUNE_AUTO_UPDATE_ENABLED=0
   DUNE_AUTO_UPDATE_TIME="$AUTO_DEFAULT_TIME"
+  DUNE_AUTO_UPDATE_INTERVAL_MINUTES="$AUTO_DEFAULT_INTERVAL_MINUTES"
+  DUNE_AUTO_UPDATE_APPLY_ENABLED=1
+  DUNE_AUTO_UPDATE_NOTIFY_ENABLED=1
+  DUNE_AUTO_UPDATE_NOTIFY_MINUTES=15
+  DUNE_AUTO_UPDATE_WAIT_EMPTY=0
+  DUNE_AUTO_UPDATE_MAX_WAIT_MINUTES=360
   DUNE_AUTO_UPDATE_TIMER_INSTALLED=""
   if [ -f "$AUTO_STATE_FILE" ]; then
     # shellcheck disable=SC1090
     . "$AUTO_STATE_FILE"
+  fi
+}
+
+require_auto_interval_minutes() {
+  local value="$1"
+  if ! printf '%s' "$value" | grep -Eq '^[0-9]+$' || [ "$value" -lt 5 ] || [ "$value" -gt 1440 ]; then
+    echo "Auto-update check interval must be between 5 and 1440 minutes."
+    exit 2
+  fi
+}
+
+require_bool_flag() {
+  local value="$1"
+  local label="$2"
+  if ! printf '%s' "$value" | grep -Eq '^(0|1)$'; then
+    echo "$label must be 0 or 1."
+    exit 2
+  fi
+}
+
+require_auto_notify_minutes() {
+  local value="$1"
+  if ! printf '%s' "$value" | grep -Eq '^[0-9]+$' || [ "$value" -lt 1 ] || [ "$value" -gt 1440 ]; then
+    echo "Auto-update notification time must be between 1 and 1440 minutes."
+    exit 2
+  fi
+}
+
+require_auto_max_wait_minutes() {
+  local value="$1"
+  if ! printf '%s' "$value" | grep -Eq '^[0-9]+$' || [ "$value" -lt 0 ] || [ "$value" -gt 10080 ]; then
+    echo "Auto-update max wait must be between 0 and 10080 minutes."
+    exit 2
   fi
 }
 
@@ -87,7 +139,7 @@ can_manage_systemd_units() {
 }
 
 write_auto_units_to() {
-  local time_value="$1"
+  local interval_minutes="$1"
   local systemd_dir="$2"
   local exec_root="$3"
 
@@ -101,7 +153,7 @@ After=network-online.target docker.service
 [Service]
 Type=oneshot
 WorkingDirectory=$exec_root
-ExecStart=$exec_root/runtime/scripts/dune update --yes
+ExecStart=$exec_root/runtime/scripts/update.sh auto run
 EOF
 
   cat > "$systemd_dir/$AUTO_TIMER_NAME" <<EOF
@@ -109,7 +161,9 @@ EOF
 Description=Run Dune Awakening self-host auto update
 
 [Timer]
-OnCalendar=*-*-* $time_value
+OnBootSec=5min
+OnUnitActiveSec=${interval_minutes}min
+AccuracySec=1min
 Persistent=true
 Unit=$AUTO_SERVICE_NAME
 
@@ -129,13 +183,13 @@ can_manage_host_systemd_with_docker() {
 }
 
 install_auto_units_via_docker_host() {
-  local time_value="$1"
+  local interval_minutes="$1"
   local image
   image="$(docker_helper_image)"
 
   can_manage_host_systemd_with_docker || return 1
   docker run --rm --privileged --pid=host --network=host \
-    -e DUNE_AUTO_UPDATE_TIME="$time_value" \
+    -e DUNE_AUTO_UPDATE_INTERVAL_MINUTES="$interval_minutes" \
     -e DUNE_HOST_REPO_ROOT="$HOST_ROOT_DIR" \
     -v /:/host \
     --entrypoint bash \
@@ -152,14 +206,16 @@ After=network-online.target docker.service
 [Service]
 Type=oneshot
 WorkingDirectory=${DUNE_HOST_REPO_ROOT}
-ExecStart=${DUNE_HOST_REPO_ROOT}/runtime/scripts/dune update --yes
+ExecStart=${DUNE_HOST_REPO_ROOT}/runtime/scripts/update.sh auto run
 EOF
       cat > "$systemd_dir/dune-awakening-auto-update.timer" <<EOF
 [Unit]
 Description=Run Dune Awakening self-host auto update
 
 [Timer]
-OnCalendar=*-*-* ${DUNE_AUTO_UPDATE_TIME}
+OnBootSec=5min
+OnUnitActiveSec=${DUNE_AUTO_UPDATE_INTERVAL_MINUTES}min
+AccuracySec=1min
 Persistent=true
 Unit=dune-awakening-auto-update.service
 
@@ -182,6 +238,7 @@ disable_auto_units_via_docker_host() {
     "$image" -lc '
       set -euo pipefail
       chroot /host /bin/systemctl disable --now dune-awakening-auto-update.timer >/dev/null 2>&1 || true
+      rm -f /host/etc/systemd/system/dune-awakening-auto-update.service /host/etc/systemd/system/dune-awakening-auto-update.timer
       chroot /host /bin/systemctl daemon-reload
     '
 }
@@ -212,53 +269,68 @@ show_auto_timer_status_via_docker() {
 
 handle_auto_update() {
   sub="${1:-status}"
-  time_value="${2:-$AUTO_DEFAULT_TIME}"
+  interval_minutes="${2:-$AUTO_DEFAULT_INTERVAL_MINUTES}"
+  apply_enabled="${3:-1}"
+  notify_enabled="${4:-1}"
+  notify_minutes="${5:-15}"
+  wait_empty="${6:-0}"
+  max_wait_minutes="${7:-360}"
 
   mkdir -p runtime/generated
 
   case "$sub" in
     enable|on)
+      if printf '%s' "$interval_minutes" | grep -Eq '^([01][0-9]|2[0-3]):[0-5][0-9]$'; then
+        interval_minutes="$AUTO_DEFAULT_INTERVAL_MINUTES"
+      fi
+      require_auto_interval_minutes "$interval_minutes"
+      require_bool_flag "$apply_enabled" "Apply update"
+      require_bool_flag "$notify_enabled" "Notify players"
+      require_auto_notify_minutes "$notify_minutes"
+      require_bool_flag "$wait_empty" "Wait until empty"
+      require_auto_max_wait_minutes "$max_wait_minutes"
+
       if ! command -v systemctl >/dev/null 2>&1; then
-        if install_auto_units_via_docker_host "$time_value"; then
-          write_auto_state 1 "$time_value" 1
+        if install_auto_units_via_docker_host "$interval_minutes"; then
+          write_auto_state 1 "$interval_minutes" "$apply_enabled" "$notify_enabled" "$notify_minutes" "$wait_empty" "$max_wait_minutes" 1
           echo "Auto updates enabled."
-          echo "Daily time: $time_value"
+          echo "Check interval: every $interval_minutes minutes"
           echo "Timer: $AUTO_TIMER_NAME"
           return 0
         else
-          write_auto_state 1 "$time_value" 0
+          write_auto_state 1 "$interval_minutes" "$apply_enabled" "$notify_enabled" "$notify_minutes" "$wait_empty" "$max_wait_minutes" 0
           echo "Auto-update preference saved, but systemctl was not found and the host timer could not be installed through Docker."
           echo "Saved: $AUTO_STATE_FILE"
           echo "To install the timer, run this command with sudo/root:"
-          echo "  runtime/scripts/update.sh auto enable $time_value"
+          echo "  runtime/scripts/update.sh auto enable $interval_minutes $apply_enabled $notify_enabled $notify_minutes $wait_empty $max_wait_minutes"
           return 1
         fi
       fi
 
       if ! can_manage_systemd_units; then
-        if install_auto_units_via_docker_host "$time_value"; then
-          write_auto_state 1 "$time_value" 1
+        if install_auto_units_via_docker_host "$interval_minutes"; then
+          write_auto_state 1 "$interval_minutes" "$apply_enabled" "$notify_enabled" "$notify_minutes" "$wait_empty" "$max_wait_minutes" 1
           echo "Auto updates enabled."
-          echo "Daily time: $time_value"
+          echo "Check interval: every $interval_minutes minutes"
           echo "Timer: $AUTO_TIMER_NAME"
           return 0
         else
-          write_auto_state 1 "$time_value" 0
+          write_auto_state 1 "$interval_minutes" "$apply_enabled" "$notify_enabled" "$notify_minutes" "$wait_empty" "$max_wait_minutes" 0
           echo "Auto-update preference saved, but this user cannot install systemd units."
           echo "Saved: $AUTO_STATE_FILE"
           echo "To install the timer, run this command with sudo/root:"
-          echo "  runtime/scripts/update.sh auto enable $time_value"
+          echo "  runtime/scripts/update.sh auto enable $interval_minutes $apply_enabled $notify_enabled $notify_minutes $wait_empty $max_wait_minutes"
           return 1
         fi
       fi
 
-      write_auto_units_to "$time_value" "/etc/systemd/system" "$HOST_ROOT_DIR"
+      write_auto_units_to "$interval_minutes" "/etc/systemd/system" "$HOST_ROOT_DIR"
       systemctl daemon-reload
       systemctl enable --now "$AUTO_TIMER_NAME"
-      write_auto_state 1 "$time_value" 1
+      write_auto_state 1 "$interval_minutes" "$apply_enabled" "$notify_enabled" "$notify_minutes" "$wait_empty" "$max_wait_minutes" 1
 
       echo "Auto updates enabled."
-      echo "Daily time: $time_value"
+      echo "Check interval: every $interval_minutes minutes"
       echo "Timer: $AUTO_TIMER_NAME"
       ;;
 
@@ -268,12 +340,12 @@ handle_auto_update() {
         systemctl disable --now "$AUTO_TIMER_NAME" >/dev/null 2>&1 || true
         rm -f "$AUTO_SERVICE_FILE" "$AUTO_TIMER_FILE"
         systemctl daemon-reload
-        write_auto_state 0 "${DUNE_AUTO_UPDATE_TIME:-$time_value}" 1
+        write_auto_state 0 "${DUNE_AUTO_UPDATE_INTERVAL_MINUTES:-$interval_minutes}" "${DUNE_AUTO_UPDATE_APPLY_ENABLED:-1}" "${DUNE_AUTO_UPDATE_NOTIFY_ENABLED:-1}" "${DUNE_AUTO_UPDATE_NOTIFY_MINUTES:-15}" "${DUNE_AUTO_UPDATE_WAIT_EMPTY:-0}" "${DUNE_AUTO_UPDATE_MAX_WAIT_MINUTES:-360}" 0
       elif can_manage_host_systemd_with_docker; then
         disable_auto_units_via_docker_host
-        write_auto_state 0 "${DUNE_AUTO_UPDATE_TIME:-$time_value}" 1
+        write_auto_state 0 "${DUNE_AUTO_UPDATE_INTERVAL_MINUTES:-$interval_minutes}" "${DUNE_AUTO_UPDATE_APPLY_ENABLED:-1}" "${DUNE_AUTO_UPDATE_NOTIFY_ENABLED:-1}" "${DUNE_AUTO_UPDATE_NOTIFY_MINUTES:-15}" "${DUNE_AUTO_UPDATE_WAIT_EMPTY:-0}" "${DUNE_AUTO_UPDATE_MAX_WAIT_MINUTES:-360}" 0
       elif [ "${DUNE_AUTO_UPDATE_TIMER_INSTALLED:-0}" != "1" ] && [ "${DUNE_AUTO_UPDATE_ENABLED:-0}" != "1" ]; then
-        write_auto_state 0 "${DUNE_AUTO_UPDATE_TIME:-$time_value}" 0
+        write_auto_state 0 "${DUNE_AUTO_UPDATE_INTERVAL_MINUTES:-$interval_minutes}" "${DUNE_AUTO_UPDATE_APPLY_ENABLED:-1}" "${DUNE_AUTO_UPDATE_NOTIFY_ENABLED:-1}" "${DUNE_AUTO_UPDATE_NOTIFY_MINUTES:-15}" "${DUNE_AUTO_UPDATE_WAIT_EMPTY:-0}" "${DUNE_AUTO_UPDATE_MAX_WAIT_MINUTES:-360}" 0
       else
         echo "Auto updates could not be disabled because the host timer cannot be managed from this environment."
         return 1
@@ -287,6 +359,18 @@ handle_auto_update() {
 
       echo "Auto updates enabled: $DUNE_AUTO_UPDATE_ENABLED"
       echo "Auto update time:      $DUNE_AUTO_UPDATE_TIME"
+      echo "Check interval minutes: ${DUNE_AUTO_UPDATE_INTERVAL_MINUTES:-$AUTO_DEFAULT_INTERVAL_MINUTES}"
+      echo "Apply updates:        ${DUNE_AUTO_UPDATE_APPLY_ENABLED:-1}"
+      echo "Notify players:       ${DUNE_AUTO_UPDATE_NOTIFY_ENABLED:-1}"
+      echo "Notify minutes:       ${DUNE_AUTO_UPDATE_NOTIFY_MINUTES:-15}"
+      echo "Wait until empty:     ${DUNE_AUTO_UPDATE_WAIT_EMPTY:-0}"
+      echo "Max wait minutes:     ${DUNE_AUTO_UPDATE_MAX_WAIT_MINUTES:-360}"
+      if [ -f "$AUTO_PENDING_FILE" ]; then
+        # shellcheck disable=SC1090
+        . "$AUTO_PENDING_FILE"
+        echo "Pending build:        ${DUNE_AUTO_UPDATE_PENDING_BUILD:-unknown}"
+        echo "Pending since:        ${DUNE_AUTO_UPDATE_PENDING_SINCE:-unknown}"
+      fi
 
       if [ "${DUNE_AUTO_UPDATE_TIMER_INSTALLED:-}" = "1" ]; then
         echo
@@ -314,20 +398,136 @@ handle_auto_update() {
       fi
       ;;
 
+    run)
+      run_auto_update_policy
+      ;;
+
     *)
       echo "Unknown auto-update command: $sub"
       echo "Usage:"
-      echo "  dune update auto enable"
-      echo "  dune update auto enable HH:MM"
+      echo "  dune update auto enable [interval-minutes] [apply 0|1] [notify 0|1] [notify-minutes] [wait-empty 0|1] [max-wait-minutes]"
       echo "  dune update auto disable"
       echo "  dune update auto status"
+      echo "  dune update auto run"
       return 2
       ;;
   esac
 }
 
+online_player_count() {
+  docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dune-postgres || {
+    echo 0
+    return 0
+  }
+
+  docker exec dune-postgres psql -U dune -d dune -Atc "
+    select greatest(
+      coalesce((select sum(coalesce(connected_players, 0)) from dune.farm_state where coalesce(alive, false)), 0),
+      coalesce((select count(*) from dune.player_state where coalesce(online_status::text, '') = 'Online'), 0)
+    );
+  " 2>/dev/null | tr -d '[:space:]' || echo 0
+}
+
+write_auto_pending() {
+  local build="$1"
+  local first_seen="$2"
+  local notified="$3"
+  local tmp
+
+  mkdir -p runtime/generated
+  tmp="${AUTO_PENDING_FILE}.$$"
+  cat >"$tmp" <<EOF
+DUNE_AUTO_UPDATE_PENDING_BUILD=$build
+DUNE_AUTO_UPDATE_PENDING_SINCE=$first_seen
+DUNE_AUTO_UPDATE_PENDING_NOTIFIED=$notified
+EOF
+  chmod 644 "$tmp" 2>/dev/null || true
+  mv -f "$tmp" "$AUTO_PENDING_FILE"
+}
+
+run_auto_update_policy() {
+  read_auto_state
+  [ "${DUNE_AUTO_UPDATE_ENABLED:-0}" = "1" ] || {
+    echo "Auto updates are disabled."
+    return 0
+  }
+
+  local check_log check_rc remote_build now first_seen notified players age_seconds max_wait_seconds
+  check_log="$(mktemp)"
+  set +e
+  "$0" check >"$check_log" 2>&1
+  check_rc=$?
+  set -e
+  cat "$check_log"
+
+  case "$check_rc" in
+    0)
+      rm -f "$AUTO_PENDING_FILE" "$check_log"
+      echo "No auto-update action needed."
+      return 0
+      ;;
+    100)
+      ;;
+    *)
+      rm -f "$check_log"
+      echo "Auto update check failed with exit code: $check_rc"
+      return "$check_rc"
+      ;;
+  esac
+
+  if [ "${DUNE_AUTO_UPDATE_APPLY_ENABLED:-1}" != "1" ]; then
+    rm -f "$check_log"
+    echo "Update is available, but automatic apply is disabled."
+    return 0
+  fi
+
+  remote_build="$(awk -F: '/Remote build:/ { gsub(/^[[:space:]]+/, "", $2); print $2; exit }' "$check_log")"
+  remote_build="${remote_build:-unknown}"
+  rm -f "$check_log"
+
+  now="$(date +%s)"
+  first_seen="$now"
+  notified=0
+  if [ -f "$AUTO_PENDING_FILE" ]; then
+    # shellcheck disable=SC1090
+    . "$AUTO_PENDING_FILE"
+    if [ "${DUNE_AUTO_UPDATE_PENDING_BUILD:-}" = "$remote_build" ]; then
+      first_seen="${DUNE_AUTO_UPDATE_PENDING_SINCE:-$now}"
+      notified="${DUNE_AUTO_UPDATE_PENDING_NOTIFIED:-0}"
+    fi
+  fi
+
+  if [ "${DUNE_AUTO_UPDATE_NOTIFY_ENABLED:-1}" = "1" ] && [ "$notified" != "1" ]; then
+    runtime/scripts/dune admin broadcast-restart-warning "${DUNE_AUTO_UPDATE_NOTIFY_MINUTES:-15}" || true
+    notified=1
+  fi
+  write_auto_pending "$remote_build" "$first_seen" "$notified"
+
+  if [ "${DUNE_AUTO_UPDATE_WAIT_EMPTY:-0}" = "1" ]; then
+    players="$(online_player_count)"
+    players="${players:-0}"
+    max_wait_seconds="$((${DUNE_AUTO_UPDATE_MAX_WAIT_MINUTES:-360} * 60))"
+    age_seconds="$((now - first_seen))"
+    if [ "$players" -gt 0 ] 2>/dev/null && { [ "$max_wait_seconds" -eq 0 ] || [ "$age_seconds" -lt "$max_wait_seconds" ]; }; then
+      echo "Update is pending, but $players player(s) are online. Waiting for the server to empty."
+      return 0
+    fi
+    if [ "$players" -gt 0 ] 2>/dev/null; then
+      echo "Max wait reached with $players player(s) online; applying update now."
+    else
+      echo "Server is empty; applying pending update."
+    fi
+  elif [ "${DUNE_AUTO_UPDATE_NOTIFY_ENABLED:-1}" = "1" ]; then
+    echo "Waiting ${DUNE_AUTO_UPDATE_NOTIFY_MINUTES:-15} minute(s) after player warning before applying update."
+    sleep "$((DUNE_AUTO_UPDATE_NOTIFY_MINUTES * 60))"
+  fi
+
+  "$0" --yes
+  rm -f "$AUTO_PENDING_FILE"
+}
+
 if [ "$cmd" = "auto" ]; then
-  handle_auto_update "${2:-status}" "${3:-$AUTO_DEFAULT_TIME}"
+  handle_auto_update "${2:-status}" "${3:-$AUTO_DEFAULT_INTERVAL_MINUTES}" "${4:-1}" "${5:-1}" "${6:-15}" "${7:-0}" "${8:-360}"
   exit $?
 fi
 

@@ -5,12 +5,13 @@ import { buildDuneArgs, runDune } from "./runner.js";
 import { itemRequiresDatabaseGrant, resolveCatalogItem } from "./adminCatalog.js";
 import { publishCarePackageWhisper } from "./rmq.js";
 import { giveItemToPlayer } from "./duneDb.js";
+import { liveItemGrantOk, liveItemGrantWarning } from "./grantResults.js";
 
 const DEFAULT_KIT_ID = "care-package-v1";
 const CARE_PACKAGE_SERVER_PERSONA = {
   accountId: "9000002",
-  funcomId: "Server#0001",
-  hexFlsId: "A5C0DE5E12A00001",
+  funcomId: "Server#4242",
+  hexFlsId: "5E121CE000000001",
   displayName: "Server",
   playerControllerId: "900000201",
   playerStateId: "900000202",
@@ -18,8 +19,8 @@ const CARE_PACKAGE_SERVER_PERSONA = {
 };
 export const MESSAGE_OF_THE_DAY_PERSONA = {
   accountId: "9000003",
-  funcomId: "MessageOfTheDay#0001",
-  hexFlsId: "A5C0DE5E12A00002",
+  funcomId: "MOTD#4242",
+  hexFlsId: "5E121CE000000002",
   displayName: "Message of the Day",
   playerControllerId: "900000301",
   playerStateId: "900000302",
@@ -265,17 +266,15 @@ export async function grantCarePackage(config, playerId, body = {}, context = {}
   const results = [];
   if (kit.sendMessage) {
     try {
-      const persona = await ensureCarePackageServerPersona(context.db);
       const recipient = resolveWelcomeWhisperRecipient(playerId, body);
+      const persona = context.db ? await ensureCarePackageServerPersona(context.db) : CARE_PACKAGE_SERVER_PERSONA;
       const result = config.mockMode
         ? { code: 0, stdout: "mock care package message whisper\n", stderr: "", payload: null }
         : await publishCarePackageWhisper(config, {
             recipientFuncomId: recipient.funcomId,
             recipientCharacterName: recipient.characterName,
-            recipientQueue: recipient.queue,
             senderFuncomId: persona.funcomId,
             senderHexFlsId: persona.hexFlsId,
-            amqpUserId: persona.hexFlsId,
             message: kit.sendMessage
           });
       results.push({
@@ -313,7 +312,19 @@ export async function grantCarePackage(config, playerId, body = {}, context = {}
       } else {
         const command = buildDuneArgs(operation, payload);
         const result = config.mockMode ? { code: 0, stdout: "mock package item grant\n", stderr: "" } : await runDune(config, command);
-        results.push({ ok: true, operation, item: payload, stdout: result.stdout, stderr: result.stderr, exitCode: result.code, warning: item.quality ? "Grade could not be persisted because the player actor ID was unavailable." : undefined });
+        const warnings = [
+          item.quality ? "Grade could not be persisted because the player actor ID was unavailable." : "",
+          liveItemGrantWarning(result)
+        ].filter(Boolean);
+        results.push({
+          ok: liveItemGrantOk(result),
+          operation,
+          item: payload,
+          stdout: result.stdout,
+          stderr: result.stderr,
+          exitCode: result.code,
+          warning: warnings.join(" ") || undefined
+        });
       }
     } catch (error) {
       results.push({ ok: false, item, error: error.message || String(error) });
@@ -718,8 +729,10 @@ async function ensureSyntheticWhisperPersona(db, persona, label) {
   if (encryptedColumns.has("id")) {
     const encryptedValues = [["id", persona.accountId]];
     if (encryptedColumns.has("user")) encryptedValues.push(["user", persona.hexFlsId]);
-    if (encryptedColumns.has("encrypted_funcom_id")) encryptedValues.push(["encrypted_funcom_id", Buffer.from(persona.funcomId, "utf8")]);
+    if (encryptedColumns.has("encrypted_funcom_id")) encryptedValues.push(["encrypted_funcom_id", { rawSql: "dune.encrypt_user_data($VALUE)", value: persona.funcomId }]);
     if (encryptedColumns.has("takeoverable")) encryptedValues.push(["takeoverable", false]);
+    if (encryptedColumns.has("platform_id")) encryptedValues.push(["platform_id", "redblink-console"]);
+    if (encryptedColumns.has("platform_name")) encryptedValues.push(["platform_name", "RedBlink Console"]);
     if (encryptedValues.length > 1) await upsertDuneRow(db, "encrypted_accounts", encryptedValues, "id");
   }
 
@@ -753,6 +766,12 @@ async function ensureSyntheticWhisperPersonaPlayerRows(db, persona) {
 
   const encryptedPlayerStateColumns = await tableColumns(db, "encrypted_player_state");
   if (encryptedPlayerStateColumns.has("account_id") && encryptedPlayerStateColumns.has("encrypted_character_name")) {
+    if (encryptedPlayerStateColumns.has("id")) {
+      await db.query(`
+        delete from dune."encrypted_player_state"
+        where "account_id" = $1
+          and "id" <> (select min("id") from dune."encrypted_player_state" where "account_id" = $1)`, [persona.accountId]);
+    }
     const playerStateValues = [
       ["account_id", persona.accountId],
       ["encrypted_character_name", { rawSql: "dune.encrypt_user_data($VALUE)" }]
@@ -761,10 +780,11 @@ async function ensureSyntheticWhisperPersonaPlayerRows(db, persona) {
     if (encryptedPlayerStateColumns.has("player_controller_id")) playerStateValues.push(["player_controller_id", persona.playerControllerId]);
     if (encryptedPlayerStateColumns.has("player_pawn_id")) playerStateValues.push(["player_pawn_id", persona.playerPawnId]);
     if (encryptedPlayerStateColumns.has("player_state_id")) playerStateValues.push(["player_state_id", persona.playerStateId]);
-    if (encryptedPlayerStateColumns.has("life_state")) playerStateValues.push(["life_state", { rawSql: "$VALUE::playerlifestate", value: "Alive" }]);
-    if (encryptedPlayerStateColumns.has("online_status")) playerStateValues.push(["online_status", { rawSql: "$VALUE::playerconnectionstatus", value: "Offline" }]);
+    if (encryptedPlayerStateColumns.has("life_state")) playerStateValues.push(["life_state", { rawSql: "$VALUE::dune.playerlifestate", value: "Alive" }]);
+    if (encryptedPlayerStateColumns.has("online_status")) playerStateValues.push(["online_status", { rawSql: "$VALUE::dune.playerconnectionstatus", value: "Offline" }]);
+    if (encryptedPlayerStateColumns.has("server_id")) playerStateValues.push(["server_id", { rawSql: "(select server_id from dune.encrypted_player_state where server_id is not null limit 1)" }]);
     if (encryptedPlayerStateColumns.has("previous_server_partition_id")) playerStateValues.push(["previous_server_partition_id", 1]);
-    if (encryptedPlayerStateColumns.has("is_coriolis_processed")) playerStateValues.push(["is_coriolis_processed", true]);
+    if (encryptedPlayerStateColumns.has("is_coriolis_processed")) playerStateValues.push(["is_coriolis_processed", false]);
     if (encryptedPlayerStateColumns.has("return_dimension_index")) playerStateValues.push(["return_dimension_index", 0]);
     if (encryptedPlayerStateColumns.has("home_dimension_index")) playerStateValues.push(["home_dimension_index", 0]);
     await upsertDuneRow(db, "encrypted_player_state", playerStateValues, "account_id", {
@@ -835,6 +855,7 @@ async function upsertDuneRow(db, table, entries, conflictColumn, rawSqlValues = 
   const values = [];
   const placeholders = entries.map(([name, value]) => {
     const parameterValue = Object.prototype.hasOwnProperty.call(rawSqlValues, name) ? rawSqlValues[name] : value?.value ?? value;
+    if (value && typeof value === "object" && value.rawSql && !value.rawSql.includes("$VALUE")) return value.rawSql;
     values.push(parameterValue);
     const placeholder = `$${values.length}`;
     if (value && typeof value === "object" && value.rawSql) return value.rawSql.replace("$VALUE", placeholder);

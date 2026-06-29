@@ -284,6 +284,7 @@ function mapFromContainerName(name) {
   if (name === "dune-server-survival-1") return "Survival_1";
   if (/^dune-server-survival-1-\d+$/.test(name)) return `Survival_1 partition ${name.split("-").pop()}`;
   if (name === "dune-server-overmap") return "Overmap";
+  if (/^dune-server-deepdesert-1(?:-\d+)?$/.test(name)) return "DeepDesert_1";
   return name.replace(/^dune-server-/, "");
 }
 

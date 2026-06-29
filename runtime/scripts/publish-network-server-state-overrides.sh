@@ -14,6 +14,8 @@ STOP_RESTORE_TIMEOUT_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_STOP_RESTORE_TIMEOUT
 PRIORITY_MAP_TIMEOUT_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_PRIORITY_MAP_TIMEOUT_SECONDS:-8}"
 BACKGROUND_MAP_TIMEOUT_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_BACKGROUND_MAP_TIMEOUT_SECONDS:-3}"
 PRIORITY_MAPS="${DUNE_NETWORK_STATE_OVERRIDE_PRIORITY_MAPS:-Survival_1 Overmap DeepDesert_1}"
+PUBLISH_ALL_ACTIVE_MAPS="${DUNE_NETWORK_STATE_OVERRIDE_ALL_ACTIVE_MAPS:-1}"
+PUBLISH_INTERVAL_SECONDS="${DUNE_NETWORK_STATE_OVERRIDE_INTERVAL_SECONDS:-5}"
 RMQ_USER=""
 RMQ_PASSWORD=""
 
@@ -180,6 +182,9 @@ priority_maps() {
       printf '%s\n' "$map_name"
     done
     configured_always_on_maps
+    if [ "$PUBLISH_ALL_ACTIVE_MAPS" = "1" ]; then
+      server_state_maps
+    fi
   } | sed '/^$/d' | awk '!seen[$0]++'
 }
 
@@ -208,6 +213,7 @@ ensure_route_for_map() {
 
   rmq_admin declare exchange name="$FILTER_EXCHANGE" type=direct durable=true >/dev/null
   rmq_admin declare queue name="$source_queue" durable=true >/dev/null
+  rmq_admin purge queue name="$source_queue" >/dev/null || true
   rmq_admin declare binding \
     source="$SOURCE_EXCHANGE" \
     destination="$source_queue" \
@@ -512,7 +518,7 @@ start_loop() {
       background_count="$(printf '%s\n' "$background_maps" | sed '/^$/d' | wc -l | tr -d '[:space:]')"
       [ "${background_count:-0}" -gt 0 ] || background_count=0
       [ "$background_index" -le "$background_count" ] || background_index=1
-      route_refresh_at=$(( $(date +%s) + 10 ))
+      route_refresh_at=$(( $(date +%s) + PUBLISH_INTERVAL_SECONDS ))
     fi
 
     kick_priority_maps_once >>"$LOG_FILE" 2>&1 || true
@@ -526,7 +532,7 @@ start_loop() {
       [ "$background_index" -le "$background_count" ] || background_index=1
     fi
 
-    sleep 10
+    sleep "$PUBLISH_INTERVAL_SECONDS"
   done
 }
 

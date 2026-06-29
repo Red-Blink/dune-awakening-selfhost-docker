@@ -28,6 +28,7 @@ import { updateEnvFileValue as updateEnvValue } from "./services/envFile.js";
 import { funcomAuthMismatchDetected, matchingFuncomAuthLines, saveFuncomTokenValue as writeFuncomToken, validDockerSince } from "./services/funcomAuth.js";
 import { readCharacterTransferSettings, saveCharacterTransferSettings } from "./services/characterTransferSettings.js";
 import { handleDiscordAdapterRoute, isDiscordAdapterRoute } from "./services/discordAdapter.js";
+import { liveItemGrantOk, liveItemGrantWarning } from "./grantResults.js";
 import { primeMessageOfTheDayOnlineState, readMessageOfTheDay, restoreMessageOfTheDay, runMessageOfTheDayScan, saveMessageOfTheDay } from "./services/messageOfTheDay.js";
 import { primePlayerAnnouncementOnlineState, readPlayerAnnouncements, restorePlayerAnnouncements, runPlayerAnnouncementScan, savePlayerAnnouncements } from "./services/playerAnnouncements.js";
 
@@ -45,6 +46,8 @@ let playerAnnouncementsAutoLastRun = 0;
 const journeyTagsData = loadJourneyTagsData();
 const memoryBalancer = createMemoryBalancer(config);
 const POSTGRES_UNAVAILABLE_MESSAGE = "Postgres is not running or is restarting. Wait for the database service to come back online, then refresh.";
+const DEFAULT_ALWAYS_ON_STARTUP_PARALLELISM = 1;
+const MAX_ALWAYS_ON_STARTUP_PARALLELISM = 16;
 
 process.on("unhandledRejection", (error) => {
   console.error(`Unhandled background rejection: ${redact(error?.message || error)}`);
@@ -449,6 +452,8 @@ async function handleApi(req, res) {
   if (path === "/api/map/overlays") return dbJson(res, () => duneDb.liveMapMarkers(db, url.searchParams.get("map") || ""));
   if (path === "/api/maps/mode" && req.method === "POST") return confirmedTask(req, res, "maps", "mapsSetMode", {}, "SET MAP MODE");
   if (path === "/api/maps/settings" && req.method === "POST") return mapSettingsRoute(req, res);
+  if (path === "/api/maps/runtime-settings" && req.method === "POST") return mapsRuntimeSettingsRoute(req, res);
+  if (path === "/api/maps/runtime-settings") return json(res, 200, readMapsRuntimeSettings());
   if (path === "/api/maps") return commandJson(res, "mapsList");
   if (path === "/api/maps/mode") return commandJson(res, "mapsMode", { map: url.searchParams.get("map") || "" });
   if (path === "/api/maps/reconcile" && req.method === "POST") return confirmedTask(req, res, "maps", "mapsReconcile", {}, "RECONCILE MAPS");
@@ -1544,7 +1549,16 @@ async function grantPlayerItem(playerId, item, target) {
   const command = buildDuneArgs(operation, payload);
   if (config.mockMode) return { ok: true, operation, command };
   const result = await runDune(config, command);
-  return { ok: true, operation, item: payload, stdout: result.stdout, stderr: result.stderr, exitCode: result.code };
+  const warning = liveItemGrantWarning(result);
+  return {
+    ok: liveItemGrantOk(result),
+    operation,
+    item: payload,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    exitCode: result.code,
+    warning: warning || undefined
+  };
 }
 
 function validateGrantGrade(value) {
@@ -1575,26 +1589,22 @@ async function mapChatRoute(req, res) {
   const mapName = body.mapName || body.region || "HaggaBasin";
   const dimension = body.dimension ?? 0;
   try {
-    const persona = await ensureCarePackageServerPersona(db);
     const recipients = config.mockMode ? [{ queue: "mock-player_queue" }] : await mapChatRecipients(mapName, dimension);
     if (!recipients.length) throw new Error("No online players are currently subscribed to that map.");
-    const results = [];
-    for (const recipient of recipients) {
-      results.push(config.mockMode
-        ? { code: 0, stdout: "mock map chat\n", stderr: "", args: [] }
-        : await publishMapChat(config, {
-            mapName,
-            dimension,
-            message,
-            senderFuncomId: persona.funcomId,
-            senderHexFlsId: persona.hexFlsId,
-            recipientQueue: recipient.queue
-          }));
-    }
+    const sender = config.mockMode ? { funcomId: "Server#4242", hexFlsId: "5E121CE000000001" } : await ensureCarePackageServerPersona(db);
+    const result = config.mockMode
+      ? { code: 0, stdout: "mock map chat\n", stderr: "", args: [] }
+      : await publishMapChat(config, {
+          mapName,
+          dimension,
+          message,
+          senderFuncomId: sender.funcomId,
+          senderHexFlsId: sender.hexFlsId
+        });
     const target = `${mapName}.${dimension}`;
     audit(config, req, "admin.map-chat", { supported: true, target, recipients: recipients.length });
-    recordAdminHistory(config, { command: "web-map-chat", target, friendly: "Map Chat", path: "rmq:chat.map/direct", result: "published", message });
-    return json(res, 200, { supported: true, ok: true, stdout: results.map((result) => result.stdout).join("\n"), stderr: results.map((result) => result.stderr).filter(Boolean).join("\n"), note: `Map chat message was sent to ${recipients.length} online player${recipients.length === 1 ? "" : "s"}.`, recipients: recipients.length });
+    recordAdminHistory(config, { command: "web-map-chat", target, friendly: "Map Chat", path: "rmq:chat.map", result: "published", message });
+    return json(res, 200, { supported: true, ok: true, stdout: result.stdout, stderr: result.stderr || "", note: `Map chat message was sent to ${recipients.length} online player${recipients.length === 1 ? "" : "s"}.`, recipients: recipients.length });
   } catch (error) {
     const reason = redact(String(error.message || error).replaceAll("Care Package message whisper", "Map chat"));
     audit(config, req, "admin.map-chat", { supported: false, error: reason });
@@ -1626,7 +1636,9 @@ async function mapChatRecipients(mapName, dimension) {
   const mapPlaceholders = maps.map((_, index) => `$${index + 1}`).join(",");
   const onlineCondition = playerStateColumns.has("online_status") ? "coalesce(ps.online_status::text, 'Offline') <> 'Offline'" : "true";
   const result = await db.query(`
-    select distinct concat(ac."user", '_queue') as queue
+    select distinct concat(ac."user", '_queue') as queue,
+           coalesce(ac."user", '') as fls_id,
+           coalesce(ac.funcom_id, '') as funcom_id
     from dune.player_state ps
     join dune.accounts ac on ac.${quoteIdentifier(accountIdentityColumn)} = ps.${quoteIdentifier(playerStateIdentityColumn)}
     join dune.world_partition wp on wp.server_id = ps.server_id
@@ -1635,7 +1647,11 @@ async function mapChatRecipients(mapName, dimension) {
       and wp.map in (${mapPlaceholders})
       and coalesce(wp.dimension_index, 0) = $${maps.length + 1}
     order by queue`, values);
-  return (result.rows || []).map((row) => ({ queue: String(row.queue || "").trim() })).filter((row) => row.queue);
+  return (result.rows || []).map((row) => ({
+    queue: String(row.queue || "").trim(),
+    flsId: String(row.fls_id || "").trim(),
+    funcomId: String(row.funcom_id || "").trim()
+  })).filter((row) => row.queue);
 }
 
 function mapChatServerMaps(mapName) {
@@ -1765,6 +1781,42 @@ function readSetupConfigValues() {
     }
   }
   return values;
+}
+
+function readEnvFileValue(key) {
+  const file = resolve(config.repoRoot, ".env");
+  if (!existsSync(file)) return "";
+  for (const rawLine of readFileSync(file, "utf8").split(/\r?\n/)) {
+    const parsed = parseEnvLine(rawLine);
+    if (parsed?.key === key) return parsed.value;
+  }
+  return "";
+}
+
+function readMapsRuntimeSettings() {
+  const raw = readEnvFileValue("DUNE_ALWAYS_ON_STARTUP_PARALLELISM") || process.env.DUNE_ALWAYS_ON_STARTUP_PARALLELISM || "";
+  const parsed = Number(raw);
+  const value = Number.isInteger(parsed) && parsed >= 1
+    ? Math.min(parsed, MAX_ALWAYS_ON_STARTUP_PARALLELISM)
+    : DEFAULT_ALWAYS_ON_STARTUP_PARALLELISM;
+  return {
+    alwaysOnStartupParallelism: value,
+    defaultAlwaysOnStartupParallelism: DEFAULT_ALWAYS_ON_STARTUP_PARALLELISM,
+    maxAlwaysOnStartupParallelism: MAX_ALWAYS_ON_STARTUP_PARALLELISM,
+    configured: Boolean(raw)
+  };
+}
+
+async function mapsRuntimeSettingsRoute(req, res) {
+  const body = await readJson(req);
+  const value = Number(body.alwaysOnStartupParallelism);
+  if (!Number.isInteger(value) || value < 1 || value > MAX_ALWAYS_ON_STARTUP_PARALLELISM) {
+    return json(res, 400, { error: `Always-on startup parallelism must be a whole number from 1 to ${MAX_ALWAYS_ON_STARTUP_PARALLELISM}.` });
+  }
+  updateEnvFileValue("DUNE_ALWAYS_ON_STARTUP_PARALLELISM", String(value));
+  process.env.DUNE_ALWAYS_ON_STARTUP_PARALLELISM = String(value);
+  audit(config, req, "maps.runtime-settings", { DUNE_ALWAYS_ON_STARTUP_PARALLELISM: value });
+  return json(res, 200, readMapsRuntimeSettings());
 }
 
 function parseEnvLine(line) {

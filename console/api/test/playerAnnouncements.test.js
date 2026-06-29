@@ -22,14 +22,15 @@ function config() {
   };
 }
 
-function player(name = "John", id = "ABCDEF1234567890") {
+function player(name = "John", id = "ABCDEF1234567890", overrides = {}) {
   return {
     actor_id: 6,
     action_player_id: id,
     fls_id: id,
     character_name: name,
     online_status: "Online",
-    map: "Survival_1"
+    map: "Survival_1",
+    ...overrides
   };
 }
 
@@ -76,6 +77,38 @@ test("player announcements publish join and leave events from online state chang
   const left = await runPlayerAnnouncementScan(cfg, [player("Jane", "1234567890ABCDEF")], { mockMode: true });
   assert.equal(left.left, 1);
   assert.equal(left.sent, 1);
+});
+
+test("player announcements treat changed login session as a fresh join", async () => {
+  const cfg = config();
+  savePlayerAnnouncements(cfg, { joinEnabled: true, joinMessage: "{playerName} joined", leaveEnabled: false, leaveMessage: "{playerName} left" });
+
+  const first = await runPlayerAnnouncementScan(cfg, [player("John", "ABCDEF1234567890", { login_session: "2026-06-28 10:00:00+00" })], { mockMode: true });
+  assert.equal(first.joined, 1);
+  assert.equal(first.sent, 1);
+
+  const sameSession = await runPlayerAnnouncementScan(cfg, [player("John", "ABCDEF1234567890", { login_session: "2026-06-28 10:00:00+00" })], { mockMode: true });
+  assert.equal(sameSession.joined, 0);
+  assert.equal(sameSession.sent, 0);
+
+  const quickRelog = await runPlayerAnnouncementScan(cfg, [player("John", "ABCDEF1234567890", { login_session: "2026-06-28 10:05:00+00" })], { mockMode: true });
+  assert.equal(quickRelog.joined, 1);
+  assert.equal(quickRelog.sent, 1);
+});
+
+test("player announcements do not join again on map or actor changes within the same login", async () => {
+  const cfg = config();
+  savePlayerAnnouncements(cfg, { joinEnabled: true, joinMessage: "{playerName} joined", leaveEnabled: true, leaveMessage: "{playerName} left" });
+
+  const first = await runPlayerAnnouncementScan(cfg, [player("John", "ABCDEF1234567890", { actor_id: 6, map: "Survival_1", login_session: "2026-06-28 10:00:00+00" })], { mockMode: true });
+  assert.equal(first.joined, 1);
+  assert.equal(first.left, 0);
+  assert.equal(first.sent, 1);
+
+  const mapTravel = await runPlayerAnnouncementScan(cfg, [player("John", "ABCDEF1234567890", { actor_id: 99, map: "Overmap", login_session: "2026-06-28 10:00:00+00" })], { mockMode: true });
+  assert.equal(mapTravel.joined, 0);
+  assert.equal(mapTravel.left, 0);
+  assert.equal(mapTravel.sent, 0);
 });
 
 test("player announcements report leave events even when nobody remains online", async () => {

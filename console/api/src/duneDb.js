@@ -832,7 +832,11 @@ export async function listPlayers(db, { online = false, q = "" } = {}) {
   if (!(await tableExists(db, "actors")) || !(await tableExists(db, "player_state"))) {
     return unsupported("players", ["dune.actors", "dune.player_state"]);
   }
+  const playerStateColumns = await columnsFor(db, "player_state");
   const lastSeenSelect = await playerLastSeenSelect(db);
+  const loginSessionSelect = playerStateColumns.has("last_login_time")
+    ? "coalesce(ps.last_login_time::text, '')"
+    : "''";
   const lastSeenWithOnlineFallback = `
     case
       when coalesce(ps.online_status::text, '') = 'Online'
@@ -869,6 +873,7 @@ export async function listPlayers(db, { online = false, q = "" } = {}) {
            a.class,
            coalesce(a.map, '') as map,
            coalesce(ps.online_status::text, 'Offline') as online_status,
+           ${loginSessionSelect} as login_session,
            ${lastSeenWithOnlineFallback} as last_seen
     from dune.actors a
     left join dune.player_state ps on ps.account_id = a.owner_account_id

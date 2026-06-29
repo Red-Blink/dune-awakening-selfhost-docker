@@ -5,6 +5,10 @@ cd "$(dirname "$0")/../.."
 ROOT_DIR="$(pwd)"
 HOST_ROOT_DIR="${DUNE_HOST_REPO_ROOT:-$ROOT_DIR}"
 
+[ -f .env ] && . ./.env
+[ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
+source runtime/scripts/runtime-env.sh
+
 STATE_FILE="runtime/generated/restart-schedule.env"
 SERVICE_NAME="dune-awakening-scheduled-restart.service"
 TIMER_NAME="dune-awakening-scheduled-restart.timer"
@@ -413,7 +417,15 @@ show_status() {
 }
 
 run_now() {
+  local public_ip_fallback
+
   echo "=== Scheduled battlegroup restart ==="
+  public_ip_fallback="$(scheduled_restart_public_ip_fallback 2>/dev/null || true)"
+  if [ -n "$public_ip_fallback" ]; then
+    export DUNE_SERVER_IP_FALLBACK="$public_ip_fallback"
+    echo "Public IP fallback: $public_ip_fallback"
+  fi
+
   echo "Stopping battlegroup..."
   runtime/scripts/stop-all.sh
   echo
@@ -426,6 +438,31 @@ notify_now() {
   require_notify_minutes "$notify_minutes"
   echo "=== Scheduled restart warning ==="
   runtime/scripts/dune admin broadcast-restart-warning "$notify_minutes"
+}
+
+scheduled_restart_public_ip_fallback() {
+  local mode ip
+
+  mode="$(resolve_server_ip_mode 2>/dev/null || true)"
+  [ "$mode" = "public" ] || return 0
+
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dune-postgres; then
+    ip="$(docker exec dune-postgres psql -U postgres -d dune -Atc "
+      select value
+      from dune.network_address_config
+      where key = 'game_addr_ip'
+      limit 1;
+    " 2>/dev/null | tr -d '[:space:]' || true)"
+    if is_ipv4 "$ip" && ! is_private_ipv4 "$ip"; then
+      printf '%s' "$ip"
+      return 0
+    fi
+  fi
+
+  ip="$(resolve_server_ip 2>/dev/null || true)"
+  if is_ipv4 "$ip" && ! is_private_ipv4 "$ip"; then
+    printf '%s' "$ip"
+  fi
 }
 
 cmd="${1:-status}"

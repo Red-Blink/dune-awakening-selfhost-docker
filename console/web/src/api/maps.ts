@@ -35,12 +35,21 @@ export type MemoryBalancerState = {
   updatedAt: string | null;
 };
 
+export type MapRuntimeSettings = {
+  alwaysOnStartupParallelism: number;
+  defaultAlwaysOnStartupParallelism: number;
+  maxAlwaysOnStartupParallelism: number;
+  configured: boolean;
+};
+
 export const mapsApi = {
   maps: () => api<{ stdout: string }>("/api/maps"),
   status: () => api<Record<string, { stdout?: string; stderr?: string; exitCode?: number }>>("/api/map/status"),
   mode: (map = "") => api<{ stdout: string }>(`/api/maps/mode${map ? `?map=${encodeURIComponent(map)}` : ""}`),
   setMode: (body: { map: string; mode: string; confirmation: string }) => post<{ task: Task }>("/api/maps/mode", body),
   saveMapSettings: (body: { map: string; partitionId?: string; mode?: string; memory?: string; modeChanged: boolean; memoryChanged: boolean; running: boolean; confirmation: string }) => post<{ task: Task }>("/api/maps/settings", body),
+  runtimeSettings: () => api<MapRuntimeSettings>("/api/maps/runtime-settings"),
+  saveRuntimeSettings: (body: { alwaysOnStartupParallelism: number }) => post<MapRuntimeSettings>("/api/maps/runtime-settings", body),
   reconcile: (confirmation: string) => post<{ task: Task }>("/api/maps/reconcile", { confirmation }),
   spawn: (target: string, confirmation: string) => post<{ task: Task }>("/api/maps/spawn", { target, confirmation }),
   despawn: (target: string, confirmation: string) => post<{ task: Task }>("/api/maps/despawn", { target, confirmation }),

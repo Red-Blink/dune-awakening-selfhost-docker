@@ -10,5 +10,5 @@ export const backupsApi = {
   downloadUrl: (backup: string) => `/api/backups/${encodeURIComponent(backup)}/download`,
   importExternal: (form: FormData) => api<{ ok: boolean; row?: Record<string, unknown>; rows?: Record<string, unknown>[] }>("/api/backups/import-external", { method: "POST", body: form }),
   autoStatus: () => api<{ stdout: string; stderr?: string; exitCode?: number; status?: Record<string, unknown> }>("/api/backups/auto"),
-  saveAuto: (body: { enabled: boolean; time: string; retentionDays: number }) => post<{ task: Task }>("/api/backups/auto", body)
+  saveAuto: (body: { enabled: boolean; time: string; retentionDays: number; intervalHours: number }) => post<{ task: Task }>("/api/backups/auto", body)
 };

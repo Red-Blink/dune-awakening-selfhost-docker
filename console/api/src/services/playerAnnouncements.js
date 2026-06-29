@@ -92,7 +92,7 @@ export async function runPlayerAnnouncementScan(config, players, context = {}) {
   const events = [];
   if (settings.joinEnabled) {
     for (const [key, player] of Object.entries(currentOnline)) {
-      if (!previousOnline[key]) events.push({ type: "join", player, message: renderPlayerMessage(settings.joinMessage, player) });
+      if (!previousOnline[key] || !sameSession(previousOnline[key], player)) events.push({ type: "join", player, message: renderPlayerMessage(settings.joinMessage, player) });
     }
   }
   if (settings.leaveEnabled) {
@@ -106,6 +106,7 @@ export async function runPlayerAnnouncementScan(config, players, context = {}) {
   let skippedNoRecipients = 0;
   const results = [];
   const onlineRecipients = Object.values(currentOnline).filter((player) => player.queue);
+  let persona = null;
   for (const event of events) {
     try {
       const recipients = eventRecipients(event, onlineRecipients);
@@ -118,20 +119,16 @@ export async function runPlayerAnnouncementScan(config, players, context = {}) {
         results.push({ ok: true, mock: true, type: event.type, player: event.player.characterName, recipients: recipients.length });
         sent += recipients.length;
       } else {
-        const persona = context.persona || await ensureCarePackageServerPersona(context.db);
-        const published = [];
-        for (const recipient of recipients) {
-          published.push(await publishMapChat(config, {
-            message: event.message,
-            senderFuncomId: persona.funcomId,
-            senderHexFlsId: persona.hexFlsId,
-            mapName: event.player.chatMapName,
-            dimension: event.player.dimension,
-            recipientQueue: recipient.queue
-          }));
-        }
-        sent += published.length;
-        results.push({ ok: true, type: event.type, player: event.player.characterName, recipients: published.length, stdout: published.map((result) => result.stdout).join("\n") });
+        persona ||= await ensureCarePackageServerPersona(context.db);
+        const result = await publishMapChat(config, {
+          message: event.message,
+          senderFuncomId: persona.funcomId,
+          senderHexFlsId: persona.hexFlsId,
+          mapName: event.player.chatMapName,
+          dimension: event.player.dimension
+        });
+        sent += recipients.length;
+        results.push({ ok: true, type: event.type, player: event.player.characterName, recipients: recipients.length, stdout: result.stdout });
       }
     } catch (error) {
       failed += 1;
@@ -192,23 +189,33 @@ function onlineMap(players = []) {
 }
 
 function normalizePlayer(player = {}) {
-  const key = String(player.action_player_id || player.actor_id || player.player_pawn_id || player.fls_id || player.flsId || player.funcom_id || player.funcomId || "").trim();
-  const characterName = String(player.character_name || player.characterName || player.funcom_id || player.funcomId || key).trim();
   const flsId = String(player.fls_id || player.flsId || "").trim();
+  const funcomId = String(player.funcom_id || player.funcomId || "").trim();
+  const key = String(player.action_player_id || flsId || funcomId || player.actor_id || player.player_pawn_id || "").trim();
+  const characterName = String(player.character_name || player.characterName || funcomId || key).trim();
   const onlineStatus = String(player.online_status || player.onlineStatus || "").trim().toLowerCase();
   const map = String(player.map || player.map_name || player.mapName || "").trim();
   const dimension = normalizeDimension(player.dimension_index ?? player.dimensionIndex ?? player.dimension);
+  const sessionKey = String(player.login_session || player.loginSession || player.last_login_time || player.lastLoginTime || "").trim();
   return {
     key,
     characterName,
     flsId,
+    funcomId,
     online: onlineStatus === "online",
     queue: flsId ? `${flsId}_queue` : "",
     map,
     mapName: friendlyMapName(map),
     chatMapName: chatMapName(map),
-    dimension
+    dimension,
+    sessionKey
   };
+}
+
+function sameSession(previous = {}, current = {}) {
+  const sessionKey = String(current.sessionKey || "").trim();
+  if (!sessionKey) return true;
+  return String(previous.sessionKey || "").trim() === sessionKey;
 }
 
 function renderPlayerMessage(template, player) {

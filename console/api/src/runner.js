@@ -107,13 +107,25 @@ export function buildDuneArgs(operation, payload = {}) {
       {
         const args = ["db", "auto", "enable", validateUpdateTime(payload.time || "05:00")];
         const retentionDays = validateInteger(payload.retentionDays ?? 0, 0, 3650);
-        if (retentionDays > 0) args.push(String(retentionDays));
+        const intervalHours = validateInteger(payload.intervalHours ?? 24, 1, 168);
+        if (retentionDays > 0 || intervalHours !== 24) args.push(String(retentionDays));
+        if (intervalHours !== 24) args.push(String(intervalHours));
         return args;
       }
     case "backupAutoRetention":
       return ["db", "auto", "retention", String(validateInteger(payload.retentionDays, 0, 3650))];
     case "updateAutoEnable":
-      return ["update", "auto", "enable", validateUpdateTime(payload.time || "05:00")];
+      return [
+        "update",
+        "auto",
+        "enable",
+        String(validateInteger(payload.intervalMinutes ?? 60, 5, 1440)),
+        payload.applyEnabled === false ? "0" : "1",
+        payload.notifyEnabled === false ? "0" : "1",
+        String(validateInteger(payload.notifyMinutes ?? 15, 1, 1440)),
+        payload.waitUntilEmpty ? "1" : "0",
+        String(validateInteger(payload.maxWaitMinutes ?? 360, 0, 10080))
+      ];
     case "databaseTables":
       return ["database", "tables", payload.schema || "dune"];
     case "databasePreview":

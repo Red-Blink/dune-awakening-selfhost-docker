@@ -47,6 +47,7 @@ mkdir -p runtime/server-gateway/config
 
 docker network create dune-net 2>/dev/null || true
 docker rm -f dune-server-gateway 2>/dev/null || true
+ensure_host_latency_tuned
 
 docker run -d \
   --name dune-server-gateway \

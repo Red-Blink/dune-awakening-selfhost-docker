@@ -322,7 +322,7 @@ resolve_server_ip() {
       ;;
   esac
 
-  first_known_value     "$detected"     "$(config_value .env SERVER_IP 2>/dev/null || true)"     "${SERVER_IP:-}"     "$(container_env_value_any_state dune-director HOST_DATACENTER_IP_ADDRESS 2>/dev/null || true)"     "$(container_env_value_any_state dune-server-gateway HOST_DATACENTER_IP_ADDRESS 2>/dev/null || true)"     "$(detect_bind_ip 2>/dev/null || true)"     "auto"
+  first_known_value     "$detected"     "$(config_value .env SERVER_IP 2>/dev/null || true)"     "${SERVER_IP:-}"     "${DUNE_SERVER_IP_FALLBACK:-}"     "$(container_env_value_any_state dune-director HOST_DATACENTER_IP_ADDRESS 2>/dev/null || true)"     "$(container_env_value_any_state dune-server-gateway HOST_DATACENTER_IP_ADDRESS 2>/dev/null || true)"     "$(detect_bind_ip 2>/dev/null || true)"     "auto"
 }
 
 resolve_bind_ip() {
@@ -399,21 +399,49 @@ resolve_rmq_admin_host() {
   resolve_rmq_game_host
 }
 
+ensure_host_latency_tuned() {
+  local stamp="runtime/generated/host-latency-tune.stamp"
+  local interval="${DUNE_HOST_LATENCY_TUNE_INTERVAL_SECONDS:-300}"
+  local now last elapsed
+
+  [ "${DUNE_HOST_LATENCY_TUNE:-1}" = "1" ] || return 0
+  [ -x runtime/scripts/host-latency-tune.sh ] || return 0
+  mkdir -p runtime/generated
+
+  now="$(date +%s)"
+  last="$(cat "$stamp" 2>/dev/null || true)"
+  if [ -n "$last" ] && [ "$last" -gt 0 ] 2>/dev/null; then
+    elapsed=$((now - last))
+    [ "$elapsed" -lt "$interval" ] && return 0
+  fi
+
+  if timeout --kill-after=2s "${DUNE_HOST_LATENCY_TUNE_TIMEOUT_SECONDS:-30}s" runtime/scripts/host-latency-tune.sh >/tmp/dune-host-latency-tune.log 2>&1; then
+    printf '%s\n' "$now" >"$stamp"
+  else
+    echo "WARN host latency tuning did not complete; continuing startup. See /tmp/dune-host-latency-tune.log" >&2
+  fi
+}
+
 game_external_address_override_env_args() {
   local mode bind_ip advertised_ip
 
   [ "${DUNE_DISABLE_GAME_EXTERNAL_ADDRESS_OVERRIDE:-0}" = "1" ] && return 0
-  [ "${DUNE_ALLOW_GAME_EXTERNAL_ADDRESS_OVERRIDE:-0}" = "1" ] || return 0
 
   mode="$(resolve_server_ip_mode 2>/dev/null || true)"
   bind_ip="$(resolve_game_listen_ip)"
   advertised_ip="$(resolve_advertised_ip)"
 
-  if [ "$bind_ip" != "$advertised_ip" ]; then
-    echo "Skipping EXTERNAL_ADDRESS_OVERRIDE: bind IP $bind_ip differs from advertised IP $advertised_ip." >&2
+  if [ "$mode" != "public" ] && [ "${DUNE_ALLOW_GAME_EXTERNAL_ADDRESS_OVERRIDE:-0}" != "1" ]; then
     return 0
   fi
 
+  if ! is_ipv4 "$advertised_ip" || [ "$advertised_ip" = "auto" ]; then
+    return 0
+  fi
+
+  # run-server.sh turns this into -ExternalAddress while preserving -MultiHome
+  # as the local bind IP. NAT/public hosts need both: bind locally, advertise
+  # publicly in server-state messages consumed by the in-game browser.
   printf '%s\n' -e "EXTERNAL_ADDRESS_OVERRIDE=$advertised_ip"
 }
 
@@ -467,6 +495,9 @@ default_memory_for_map() {
     survival|survival-1|survival_1) printf '%s' "16g" ;;
     overmap) printf '%s' "3g" ;;
     deepdesert|deepdesert-1|deepdesert_1) printf '%s' "16g" ;;
+    dlc_story_lostharvest_ecolaba|dlc-story-lostharvest-ecolaba) printf '%s' "2g" ;;
+    dlc_story_lostharvest_ecolabb|dlc-story-lostharvest-ecolabb) printf '%s' "2g" ;;
+    dlc_story_lostharvest_forgottenlab|dlc-story-lostharvest-forgottenlab) printf '%s' "2g" ;;
     *) printf '%s' "3g" ;;
   esac
 }

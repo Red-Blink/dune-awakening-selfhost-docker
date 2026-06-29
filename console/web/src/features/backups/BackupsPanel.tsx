@@ -40,6 +40,7 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
   const [autoBackup, setAutoBackup] = useState<{ stdout?: string; stderr?: string; exitCode?: number } | null>(null);
   const [autoEnabled, setAutoEnabled] = useState(false);
   const [autoTime, setAutoTime] = useState("05:00");
+  const [autoIntervalHours, setAutoIntervalHours] = useState("24");
   const [autoRetentionDays, setAutoRetentionDays] = useState("0");
   const [backupResult, setBackupResult] = useState<BackupResult | null>(null);
   const [autoResult, setAutoResult] = useState<BackupResult | null>(null);
@@ -68,6 +69,7 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
     const status = result.status || {};
     setAutoEnabled(Boolean(status.enabled));
     if (status.backupTime) setAutoTime(toHourMinuteTime(status.backupTime));
+    if (status.intervalHours) setAutoIntervalHours(String(status.intervalHours));
     if (status.retentionDays !== undefined) setAutoRetentionDays(String(status.retentionDays || "0"));
   }
   async function refresh() {
@@ -114,9 +116,15 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
       setAutoResult({ status: "failed", title: "Automatic Backup Settings Failed", message: "Daily backup time must be a valid 24-hour time, for example 05:00 or 23:30." });
       return;
     }
+    const intervalHours = Number(autoIntervalHours);
+    if (nextEnabled && (!Number.isInteger(intervalHours) || intervalHours < 1 || intervalHours > 168)) {
+      setAutoResult({ status: "failed", title: "Automatic Backup Settings Failed", message: "Backup interval must be a whole number from 1 to 168 hours." });
+      return;
+    }
     setAutoTime(sanitizedTime);
+    setAutoIntervalHours(String(intervalHours || 24));
     setAutoEnabled(nextEnabled);
-    const final = await runBackupTask("auto", () => backupsApi.saveAuto({ enabled: nextEnabled, time: sanitizedTime, retentionDays: Number(autoRetentionDays) }), "Automatic Backup Settings Saved", "Automatic Backup Settings Failed");
+    const final = await runBackupTask("auto", () => backupsApi.saveAuto({ enabled: nextEnabled, time: sanitizedTime, retentionDays: Number(autoRetentionDays), intervalHours: intervalHours || 24 }), "Automatic Backup Settings Saved", "Automatic Backup Settings Failed");
     if (final?.status !== "succeeded") {
       setAutoEnabled(!nextEnabled);
     }
@@ -210,7 +218,8 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
         <div className="panel-title"><h4>Automatic Backups</h4><label className={`switch-checkbox ${autoEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={Boolean(busyAction)} checked={autoEnabled} onChange={(event) => run(() => saveAutomaticBackups(event.target.checked))} /><span className="switch-label">Automatic Backups</span><strong className="switch-state">{autoEnabled ? "ON" : "OFF"}</strong></label></div>
         <KeyValueGrid items={[
           ["Current Status", commandStatusSummary(autoBackup).reason ? "Unavailable" : autoEnabled ? "Enabled" : "Disabled"],
-          ["Backup Time (Local Server Time)", toHourMinuteTime(autoStatus.backupTime || autoTime)],
+          ["First Backup Time (Local Server Time)", toHourMinuteTime(autoStatus.backupTime || autoTime)],
+          ["Interval", `Every ${autoStatus.intervalHours || autoIntervalHours || 24} hours`],
           ["Retention", autoStatus.retentionLabel || "No Retention Limit"],
           ["Timer", autoTimerLabel],
           ["Last Run", autoStatus.lastRun],
@@ -218,7 +227,9 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
         ]} />
         {commandStatusSummary(autoBackup).reason && <p className="danger-note">{commandStatusSummary(autoBackup).reason}</p>}
         <div className="action-line backup-auto-controls">
-          <label className="compact-select">Daily Backup Time<input type="time" step="60" pattern="[0-2][0-9]:[0-5][0-9]" value={autoTime} onChange={(event) => setAutoTime(sanitizeTimeInput(event.target.value))} placeholder="05:00" /></label>
+          <label className="compact-select">First Backup Time<input type="time" step="60" pattern="[0-2][0-9]:[0-5][0-9]" value={autoTime} onChange={(event) => setAutoTime(sanitizeTimeInput(event.target.value))} placeholder="05:00" /></label>
+          <label className="memory-number-field">Repeat Every<input type="number" min="1" max="168" step="1" value={autoIntervalHours} onChange={(event) => setAutoIntervalHours(event.target.value)} /></label>
+          <span className="unit-label">Hours</span>
           <label className="memory-number-field">Keep<input type="number" min="0" max="3650" step="1" value={autoRetentionDays} onChange={(event) => setAutoRetentionDays(event.target.value)} /></label>
           <span className="unit-label">Days</span>
           <button disabled={Boolean(busyAction)} onClick={() => run(() => saveAutomaticBackups())}>Save Settings</button>

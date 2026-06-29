@@ -3,8 +3,51 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
+set -a
+[ -f .env ] && . ./.env
+set +a
+
 STATE_FILE="${DUNE_MAP_MODES_FILE:-runtime/generated/map-runtime-modes.json}"
 GRACE_SECONDS="${DUNE_AUTOSCALER_DESPAWN_GRACE_SECONDS:-${DUNE_AUTOSCALER_IDLE_SECONDS:-300}}"
+RECONCILE_LOCK_FILE="${DUNE_ALWAYS_ON_RECONCILE_LOCK_FILE:-runtime/generated/map-modes-reconcile.lock}"
+RECONCILE_STATE_FILE="${DUNE_ALWAYS_ON_RECONCILE_STATE_FILE:-runtime/generated/map-modes-reconcile.tsv}"
+RECONCILE_STATE_LOCK_FILE="${DUNE_ALWAYS_ON_RECONCILE_STATE_LOCK_FILE:-runtime/generated/map-modes-reconcile-state.lock}"
+SPAWN_TIMEOUT_SECONDS="${DUNE_ALWAYS_ON_SPAWN_TIMEOUT_SECONDS:-240}"
+STARTUP_PRIORITY="${DUNE_ALWAYS_ON_STARTUP_PRIORITY:-SH_Arrakeen,SH_HarkoVillage,DeepDesert_1}"
+
+positive_int_or_default() {
+  local value="$1"
+  local fallback="$2"
+
+  if printf '%s' "$value" | grep -Eq '^[1-9][0-9]*$'; then
+    printf '%s\n' "$value"
+  else
+    printf '%s\n' "$fallback"
+  fi
+}
+
+nonnegative_int_or_default() {
+  local value="$1"
+  local fallback="$2"
+
+  if printf '%s' "$value" | grep -Eq '^[0-9]+$'; then
+    printf '%s\n' "$value"
+  else
+    printf '%s\n' "$fallback"
+  fi
+}
+
+STARTUP_PARALLELISM="$(positive_int_or_default "${DUNE_ALWAYS_ON_STARTUP_PARALLELISM:-1}" 1)"
+RECONCILE_PARALLELISM="$(positive_int_or_default "${DUNE_ALWAYS_ON_RECONCILE_PARALLELISM:-$STARTUP_PARALLELISM}" "$STARTUP_PARALLELISM")"
+MAX_SPAWNS_PER_RECONCILE="$(positive_int_or_default "${DUNE_ALWAYS_ON_RECONCILE_MAX_SPAWNS:-1}" 1)"
+MAX_WARMING_SERVERS="$(positive_int_or_default "${DUNE_ALWAYS_ON_RECONCILE_MAX_WARMING:-$STARTUP_PARALLELISM}" "$STARTUP_PARALLELISM")"
+if [ -n "${DUNE_ALWAYS_ON_RECONCILE_MIN_SPAWN_INTERVAL_SECONDS+x}" ]; then
+  MIN_SPAWN_INTERVAL_SECONDS="$(nonnegative_int_or_default "$DUNE_ALWAYS_ON_RECONCILE_MIN_SPAWN_INTERVAL_SECONDS" 30)"
+elif [ "$STARTUP_PARALLELISM" -gt 1 ]; then
+  MIN_SPAWN_INTERVAL_SECONDS=0
+else
+  MIN_SPAWN_INTERVAL_SECONDS=30
+fi
 
 usage() {
   cat <<'EOF'
@@ -19,6 +62,8 @@ Usage:
   dune maps reconcile
 
 Survival_1 and Overmap are protected always-on maps and are not configurable here.
+CB_Overland_* vehicle-deploy maps are redirected from always-on to overmap-active
+unless DUNE_ALLOW_VEHICLE_MAP_ALWAYS_ON=1 is set.
 EOF
 }
 
@@ -32,6 +77,13 @@ require_postgres() {
 protected_map() {
   case "$1" in
     Survival_1|Overmap|survival|survival-1|survival_1|overmap) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+vehicle_deploy_map() {
+  case "$1" in
+    CB_Overland_*) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -132,6 +184,12 @@ set_mode() {
     *) echo "Mode must be dynamic, always-on, overmap-active, or disabled."; exit 2 ;;
   esac
 
+  if [ "$mode" = "always-on" ] && vehicle_deploy_map "$canonical" && [ "${DUNE_ALLOW_VEHICLE_MAP_ALWAYS_ON:-0}" != "1" ]; then
+    echo "WARN $canonical is a vehicle-deploy map. Always-on can race vehicle ownership restore during map startup."
+    echo "WARN Using overmap-active instead. Set DUNE_ALLOW_VEHICLE_MAP_ALWAYS_ON=1 to force always-on."
+    mode="overmap-active"
+  fi
+
   ensure_state_file
   python3 - "$STATE_FILE" "$canonical" "$mode" <<'PY'
 import json
@@ -230,6 +288,82 @@ except Exception:
 PY
 }
 
+reconcile_state_get() {
+  local key="$1"
+  [ -f "$RECONCILE_STATE_FILE" ] || return 1
+  awk -F '\t' -v key="$key" '$1 == key { print $2; found=1; exit } END { if (!found) exit 1 }' "$RECONCILE_STATE_FILE"
+}
+
+reconcile_state_set() {
+  local key="$1"
+  local value="$2"
+  local dir tmp lock_fd
+
+  dir="$(dirname "$RECONCILE_STATE_FILE")"
+  mkdir -p "$dir"
+  exec {lock_fd}>"$RECONCILE_STATE_LOCK_FILE"
+  flock "$lock_fd"
+  tmp="$(mktemp "$dir/.reconcile-state.XXXXXX")"
+  if [ -f "$RECONCILE_STATE_FILE" ]; then
+    awk -F '\t' -v key="$key" '$1 != key { print }' "$RECONCILE_STATE_FILE" >"$tmp"
+  fi
+  printf '%s\t%s\n' "$key" "$value" >>"$tmp"
+  mv "$tmp" "$RECONCILE_STATE_FILE"
+  exec {lock_fd}>&-
+}
+
+recent_spawn_blocking() {
+  local now last elapsed
+
+  [ "${MIN_SPAWN_INTERVAL_SECONDS:-0}" -gt 0 ] 2>/dev/null || return 1
+  now="$(date +%s)"
+  last="$(reconcile_state_get last_spawn_at 2>/dev/null || true)"
+  [ -n "$last" ] || return 1
+  elapsed=$((now - last))
+  [ "$elapsed" -lt "$MIN_SPAWN_INTERVAL_SECONDS" ]
+}
+
+warming_always_on_count() {
+  docker exec dune-postgres psql -U postgres -d dune -At -c "
+    select count(*)
+    from dune.world_partition wp
+    left join dune.farm_state fs on fs.server_id = wp.server_id
+    where coalesce(wp.server_id, '') <> ''
+      and coalesce(fs.alive, false) = true
+      and coalesce(fs.ready, false) = false;
+  " 2>/dev/null | tr -d '[:space:]' || echo 0
+}
+
+run_spawn_server() {
+  local partition_id="$1"
+  shift || true
+
+  if [ "${SPAWN_TIMEOUT_SECONDS:-0}" -gt 0 ] 2>/dev/null; then
+    timeout --kill-after=10s "${SPAWN_TIMEOUT_SECONDS}s" runtime/scripts/spawn-server.sh "$partition_id" "$@"
+  else
+    runtime/scripts/spawn-server.sh "$partition_id" "$@"
+  fi
+}
+
+spawn_gate_allows() {
+  local map="$1"
+  local partition_id="$2"
+  local warming
+
+  if recent_spawn_blocking; then
+    echo "WAIT always-on map=$map partition=$partition_id spawn-throttle=${MIN_SPAWN_INTERVAL_SECONDS}s"
+    return 1
+  fi
+
+  warming="$(warming_always_on_count)"
+  if [ "${warming:-0}" -ge "${MAX_WARMING_SERVERS:-1}" ] 2>/dev/null; then
+    echo "WAIT always-on map=$map partition=$partition_id warming=${warming} max=${MAX_WARMING_SERVERS}"
+    return 1
+  fi
+
+  return 0
+}
+
 adopt_live_unassigned_server() {
   local map="$1"
   local partition_id="$2"
@@ -284,7 +418,7 @@ assigned_server_for_partition() {
 
 reconcile_map() {
   local map="$1"
-  local rows assigned running container age adopted
+  local rows assigned running container age adopted spawned=0
 
   require_postgres
   rows="$(docker exec dune-postgres psql -U postgres -d dune -At -F '|' -c "
@@ -321,12 +455,75 @@ reconcile_map() {
         continue
       fi
       echo "REPAIR always-on map=$map partition=$partition_id restarting unassigned container=$container"
-      runtime/scripts/spawn-server.sh "$partition_id" --force
+      spawn_gate_allows "$map" "$partition_id" || continue
+      if run_spawn_server "$partition_id" --force; then
+        reconcile_state_set last_spawn_at "$(date +%s)"
+        spawned=$((spawned + 1))
+      else
+        echo "WARN always-on map=$map partition=$partition_id spawn failed or timed out"
+      fi
+      [ "$spawned" -lt "$MAX_SPAWNS_PER_RECONCILE" ] || break
       continue
     fi
+    spawn_gate_allows "$map" "$partition_id" || continue
     echo "SPAWN always-on map=$map partition=$partition_id"
-    runtime/scripts/spawn-server.sh "$partition_id"
+    if run_spawn_server "$partition_id"; then
+      reconcile_state_set last_spawn_at "$(date +%s)"
+      spawned=$((spawned + 1))
+    else
+      echo "WARN always-on map=$map partition=$partition_id spawn failed or timed out"
+    fi
+    [ "$spawned" -lt "$MAX_SPAWNS_PER_RECONCILE" ] || break
   done <<< "$rows"
+}
+
+reconcile_job_pids=()
+
+wait_for_reconcile_slot() {
+  local first_pid
+
+  while [ "${#reconcile_job_pids[@]}" -ge "$RECONCILE_PARALLELISM" ]; do
+    first_pid="${reconcile_job_pids[0]}"
+    wait "$first_pid" || true
+    reconcile_job_pids=("${reconcile_job_pids[@]:1}")
+  done
+}
+
+wait_for_reconcile_jobs() {
+  local pid
+
+  for pid in "${reconcile_job_pids[@]}"; do
+    wait "$pid" || true
+  done
+  reconcile_job_pids=()
+}
+
+reconcile_maps() {
+  local map
+
+  if [ "$#" -eq 0 ]; then
+    return 0
+  fi
+
+  if [ "$RECONCILE_PARALLELISM" -le 1 ]; then
+    for map in "$@"; do
+      [ -n "$map" ] || continue
+      reconcile_map "$map"
+    done
+    return 0
+  fi
+
+  echo "Reconciling always-on maps with parallelism=${RECONCILE_PARALLELISM}, max-warming=${MAX_WARMING_SERVERS}, min-spawn-interval=${MIN_SPAWN_INTERVAL_SECONDS}s"
+  reconcile_job_pids=()
+  for map in "$@"; do
+    [ -n "$map" ] || continue
+    wait_for_reconcile_slot
+    (
+      reconcile_map "$map"
+    ) &
+    reconcile_job_pids+=("$!")
+  done
+  wait_for_reconcile_jobs
 }
 
 despawn_map() {
@@ -353,9 +550,15 @@ despawn_map() {
 }
 
 reconcile_all() {
+  local maps=() map
+
   require_postgres
   ensure_state_file
-  python3 - "$STATE_FILE" <<'PY' | while read -r map; do
+  while read -r map; do
+    [ -n "$map" ] || continue
+    protected_map "$map" && continue
+    maps+=("$map")
+  done < <(python3 - "$STATE_FILE" "$STARTUP_PRIORITY" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -364,14 +567,53 @@ try:
     data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 except Exception:
     data = {}
-for map_name, cfg in sorted(data.get("maps", {}).items()):
-    if cfg.get("mode") == "always-on":
-        print(map_name)
+priority = [item.strip() for item in sys.argv[2].split(",") if item.strip()]
+priority_index = {name: index for index, name in enumerate(priority)}
+always_on = [
+    map_name
+    for map_name, cfg in data.get("maps", {}).items()
+    if cfg.get("mode") == "always-on"
+]
+for map_name in sorted(always_on, key=lambda name: (priority_index.get(name, len(priority)), name)):
+    print(map_name)
 PY
+  )
+
+  reconcile_maps "${maps[@]}"
+}
+
+reconcile_selected() {
+  local maps=() map
+
+  if [ "$#" -eq 0 ]; then
+    reconcile_all
+    return
+  fi
+
+  require_postgres
+  ensure_state_file
+  for map in "$@"; do
     [ -n "$map" ] || continue
+    map="$(canonical_map "$map")"
     protected_map "$map" && continue
-    reconcile_map "$map"
+    if [ "$(mode_for_map "$map")" != "always-on" ]; then
+      echo "SKIP always-on reconcile map=$map mode=$(mode_for_map "$map")"
+      continue
+    fi
+    maps+=("$map")
   done
+
+  reconcile_maps "${maps[@]}"
+}
+
+with_reconcile_lock() {
+  mkdir -p "$(dirname "$RECONCILE_LOCK_FILE")"
+  exec 8>"$RECONCILE_LOCK_FILE"
+  if ! flock -n 8; then
+    echo "WAIT always-on reconcile already running"
+    return 0
+  fi
+  reconcile_selected "$@"
 }
 
 dynamic_grace_remaining() {
@@ -396,7 +638,7 @@ case "$cmd" in
     if [ $# -ne 3 ]; then usage; exit 2; fi
     set_mode "$2" "$3"
     ;;
-  reconcile) reconcile_all ;;
+  reconcile) shift || true; with_reconcile_lock "$@" ;;
   is-always-on)
     map="$(canonical_map "${2:-}")"
     [ "$(mode_for_map "$map")" = "always-on" ]

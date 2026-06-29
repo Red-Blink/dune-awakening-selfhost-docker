@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Grid2X2, List, Lock } from "lucide-react";
-import { mapsApi, type LiveMapMemoryRow, type MemoryBalancerState, type UserSettingField, type UserSettingsSchema } from "../../api/maps";
+import { mapsApi, type LiveMapMemoryRow, type MapRuntimeSettings, type MemoryBalancerState, type UserSettingField, type UserSettingsSchema } from "../../api/maps";
 import { setupApi, type Task } from "../../api/setup";
 import { SecretInput } from "../../components/SecretInput";
 import { KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/common/DisplayPrimitives";
@@ -222,6 +222,10 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
   const [memoryError, setMemoryError] = useState("");
   const [memoryBalancer, setMemoryBalancer] = useState<MemoryBalancerState | null>(null);
   const [memoryBalancerSaving, setMemoryBalancerSaving] = useState(false);
+  const [runtimeSettings, setRuntimeSettings] = useState<MapRuntimeSettings | null>(null);
+  const [startupParallelism, setStartupParallelism] = useState("1");
+  const [runtimeSettingsSaving, setRuntimeSettingsSaving] = useState(false);
+  const [runtimeSettingsResult, setRuntimeSettingsResult] = useState<HomeTaskResult | null>(null);
   const [sietchesText, setSietchesText] = useState("");
   const [sietchDimensionsText, setSietchDimensionsText] = useState("");
   const [sietchDimensionIdsText, setSietchDimensionIdsText] = useState("");
@@ -238,6 +242,7 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
   const [settingsTab, setSettingsTab] = useState<"engine" | "game">("engine");
   const [modifiersOpen, setModifiersOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [startupSettingsOpen, setStartupSettingsOpen] = useState(false);
   const [memory, setMemory] = useState("8");
   const [modeDraft, setModeDraft] = useState("dynamic");
   const [loading, setLoading] = useState(false);
@@ -478,6 +483,11 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
   async function loadMemoryBalancer() {
     setMemoryBalancer(await mapsApi.memoryBalancer());
   }
+  async function loadRuntimeSettings() {
+    const settings = await mapsApi.runtimeSettings();
+    setRuntimeSettings(settings);
+    setStartupParallelism(String(settings.alwaysOnStartupParallelism));
+  }
   async function toggleMemoryBalancer() {
     setMemoryBalancerSaving(true);
     try {
@@ -487,12 +497,33 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
       setMemoryBalancerSaving(false);
     }
   }
+  async function saveRuntimeSettings() {
+    const max = runtimeSettings?.maxAlwaysOnStartupParallelism || 16;
+    const value = Number(startupParallelism);
+    if (!Number.isInteger(value) || value < 1 || value > max) {
+      setRuntimeSettingsResult({ status: "failed", title: "Startup Setting Not Saved", message: `Use a whole number from 1 to ${max}.` });
+      return;
+    }
+    setRuntimeSettingsSaving(true);
+    setRuntimeSettingsResult(null);
+    try {
+      const next = await mapsApi.saveRuntimeSettings({ alwaysOnStartupParallelism: value });
+      setRuntimeSettings(next);
+      setStartupParallelism(String(next.alwaysOnStartupParallelism));
+      setRuntimeSettingsResult({ status: "succeeded", title: "Startup Setting Saved", message: "Applies to the next always-on reconcile." });
+    } catch (error) {
+      setRuntimeSettingsResult({ status: "failed", title: "Startup Setting Failed", message: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setRuntimeSettingsSaving(false);
+    }
+  }
   useEffect(() => {
     run(loadMaps);
     run(loadSchema);
     run(loadUserEngine);
     run(loadLiveMemory);
     run(loadMemoryBalancer);
+    run(loadRuntimeSettings);
     run(loadSietches);
   }, []);
   useEffect(() => {
@@ -553,6 +584,13 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
     return () => window.clearTimeout(id);
   }, [mapsResult, mapsResultScope]);
   useEffect(() => {
+    if (!runtimeSettingsResult || runtimeSettingsResult.status === "running") return;
+    const id = window.setTimeout(() => {
+      setRuntimeSettingsResult(null);
+    }, 5000);
+    return () => window.clearTimeout(id);
+  }, [runtimeSettingsResult]);
+  useEffect(() => {
     const id = window.setInterval(() => { void loadLiveMemory().catch(() => {}); }, 5000);
     return () => window.clearInterval(id);
   }, []);
@@ -583,10 +621,26 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
       document.removeEventListener("visibilitychange", refreshVisibleMaps);
     };
   }, []);
-  const mapRows = mergeMapAndMemoryRows(mapsText, memoryText, serversText);
+  const mapRows = mergeMapAndMemoryRows(mapsText, memoryText, serversText, readinessText);
   const serverPartitionRows = parseServerPartitionRows(serversText);
   const readinessStatusByPartitionId = parseReadinessPartitionStatuses(readinessText);
   const partitionStatusById = new globalThis.Map(serverPartitionRows.map((row) => [String(row.partitionId || ""), String(row.status || "")]));
+  const mapWarmupActive = mapRows.some((row) => {
+    const mode = String(row.mode || "").trim();
+    const status = String(row.status || "").trim();
+    return /^(Always On|Core Map)$/i.test(mode) && /^(Queued|Starting|Loading|Warming)$/i.test(status);
+  });
+  useEffect(() => {
+    if (!mapWarmupActive) return;
+    const refreshWarmup = () => {
+      if (document.visibilityState !== "visible") return;
+      void refreshMapRuntime().catch(() => {});
+      void loadLiveMemory().catch(() => {});
+    };
+    refreshWarmup();
+    const id = window.setInterval(refreshWarmup, 1500);
+    return () => window.clearInterval(id);
+  }, [mapWarmupActive]);
   const selectedMap = mapRows.find((row) => String(row.map) === selectedMapName) || null;
   const selectedName = String(selectedMap?.map || "");
   const userGameMap = mapRows.find((row) => String(row.map) === userGameMapName) || null;
@@ -1088,12 +1142,32 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
   }
   const modifiersAvailable = mapsLoaded;
   const advancedAvailable = mapsLoaded;
+  const runtimeParallelismValue = runtimeSettings?.alwaysOnStartupParallelism ?? 1;
+  const runtimeParallelismMax = runtimeSettings?.maxAlwaysOnStartupParallelism ?? 16;
+  const startupParallelismDirty = Number(startupParallelism) !== runtimeParallelismValue;
   return <section className="panel maps-panel">
     <div className="panel-title"><h2>Maps & Sietches</h2><div className="maps-title-actions">{memoryBalancer?.enabled && <span className={`maps-memory-balancer-status ${memoryBalancer.lastError ? "danger" : ""}`}>{memoryBalancer.lastError ? `Memory Balancer error: ${memoryBalancer.lastError}` : memoryBalancer.lastMessage || "Memory Balancer is monitoring running maps"}</span>}<button className={`switch-toggle maps-memory-balancer-toggle ${memoryBalancer?.enabled ? "enabled" : "disabled"}`} disabled={memoryBalancerSaving} onClick={() => run(toggleMemoryBalancer)}><span className="switch-label">Memory Balancer</span><strong className="switch-state">{memoryBalancer?.enabled ? "ON" : "OFF"}</strong></button><button disabled={loading} onClick={() => run(loadMaps)}>{loading ? "Refreshing..." : "Refresh Maps"}</button></div></div>
     {mapsResult && mapsResultScope === "maps" && !isDeepDesertDualResult(mapsResult) && !isForceDespawnResult(mapsResult) && !isMapSettingsResult(mapsResult) ? <div className="maps-result-slot"><HomeTaskResultCard result={mapsResult} /></div> : null}
     <section className="action-section">
       <h4>Maps Overview</h4>
       <MapModeGuide />
+      <div className={`playerAdmin_toggle maps-startup-toggle ${startupSettingsOpen ? "open" : ""}`}>
+        <button className="playerAdmin_toggleHeader" aria-label={startupSettingsOpen ? "Collapse Always-On Startup" : "Expand Always-On Startup"} onClick={() => setStartupSettingsOpen(!startupSettingsOpen)}>{startupSettingsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Always-On Startup</span></button>
+        {startupSettingsOpen && <div className="playerAdmin_toggleBody maps-startup-settings">
+        <div className="maps-startup-settings-copy">
+          <strong>Parallel Map Warmup</strong>
+          <p>Starts multiple always-on maps at once on stronger hosts. Higher values warm faster but spike CPU, RAM, and disk I/O.</p>
+        </div>
+        <div className="action-line maps-startup-settings-line">
+          <label className="memory-number-field">Parallel Starts<input type="number" min="1" max={runtimeParallelismMax} step="1" value={startupParallelism} onChange={(event) => setStartupParallelism(event.target.value)} /></label>
+          <button disabled={!startupParallelismDirty || runtimeSettingsSaving} onClick={() => run(saveRuntimeSettings)}>{runtimeSettingsSaving ? "Saving..." : "Save Setting"}</button>
+          {runtimeSettingsResult ? <span className={`inline-task-result map-action-result maps-startup-result result-${inlineTaskResultClass(runtimeSettingsResult)}`}>
+            <strong>{runtimeSettingsResult.title}</strong>
+            {runtimeSettingsResult.message && <span className="inline-task-message">{runtimeSettingsResult.message}</span>}
+          </span> : null}
+        </div>
+        </div>}
+      </div>
       {loading && !mapRows.length && <div className="empty"><span className="loading-dots">Loading Maps</span></div>}
       {!loading && loadError && !mapRows.length && <div className="result-panel"><strong>Map list could not be loaded.</strong><p>{loadError}</p><button onClick={() => run(loadMaps)}>Retry</button></div>}
       {mapRows.length ? <div className="table-wrap maps-overview-table-wrap"><table className="maps-overview-table"><thead><tr><th>Map</th><th>Status</th><th>Mode</th><th>Memory</th><th className="actions-column">Action</th></tr></thead><tbody>{mapRows.map((row) => {
@@ -1108,8 +1182,8 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
         const baseStatus = isDeepDesertRow && deepDesertDualConfiguring
           ? "Configuring"
           : isDeepDesertRow && primaryDeepDesertPartition ? partitionStatusById.get(String(primaryDeepDesertPartition.partitionId || "")) || String(primaryDeepDesertPartition.status || row.status || "Not Available")
-          : isSurvivalRow && primarySurvivalSietch ? partitionStatusById.get(primarySurvivalSietch.partitionId) || readinessStatusByPartitionId.get(primarySurvivalSietch.partitionId) || String(row.status || "Not Available") : String(row.status || "Not Available");
-        const displayStatus = statusWithLiveMemory(baseStatus, memoryRow, row.mode);
+          : isSurvivalRow && primarySurvivalSietch ? readinessStatusByPartitionId.get(primarySurvivalSietch.partitionId) || partitionStatusById.get(primarySurvivalSietch.partitionId) || String(row.status || "Not Available") : String(row.status || "Not Available");
+        const displayStatus = isSurvivalRow && /^Ready$/i.test(baseStatus) ? "Ready" : statusWithLiveMemory(baseStatus, memoryRow, row.mode);
         const canForceDespawn = isDeepDesertRow && deepDesertDualEnabled
           ? [displayStatus, ...dynamicDeepDesertRows.map((deepRow) => partitionStatusById.get(String(deepRow.partitionId || "")) || String(deepRow.status || ""))].some((status) => mapCanForceDespawn({ status }))
           : mapCanForceDespawn({ ...row, status: displayStatus });
@@ -1122,6 +1196,7 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
             <section className="inline-edit-panel">
               <div className="panel-title"><h4>Edit {rowName}</h4></div>
               <KeyValueGrid items={[["Status", displayStatus], ["Mode", row.mode], ["Memory", row.memory], ["Dimensions", row.dimensions], ...(isSurvivalRow && primarySurvivalSietch ? [["Password", primarySurvivalSietch.passwordSet ? "Set" : "Not Set"] as [string, unknown]] : [])]} />
+              {isVehicleDeployMap(rowName) && <p className="muted">Vehicle-deploy Overland maps use Overmap Active instead of Always On by default to avoid vehicle ownership restore races during startup.</p>}
               <div className="action-line">
                 <label className="compact-select">Mode<select value={modeDraft} disabled={String(row.mode) === "Core Map"} onChange={(event) => setModeDraft(event.target.value)}><option value="dynamic">Dynamic</option><option value="always-on">Always On</option><option value="overmap-active">Overmap Active</option><option value="disabled">Disabled</option></select></label>
                 <label className="memory-number-field">Memory<input type="number" min="1" step="1" value={memory} onChange={(event) => setMemory(event.target.value)} placeholder="8" /></label>
@@ -1359,6 +1434,7 @@ function mapRuntimeStatusDetail(value: string) {
   if (/^Ready$/i.test(value)) return "Travel-ready: the map has a server ID, endpoint, and farm readiness.";
   if (/^Loading$/i.test(value)) return "The container/server is up, but travel should wait until farm readiness is true.";
   if (/^Starting$/i.test(value)) return "A server is assigned, but it has not reported alive yet.";
+  if (/^Queued$/i.test(value)) return "This map is configured Always On and is waiting for the autoscaler to start it.";
   if (/^Not Running$/i.test(value)) return "No active server is assigned for this map.";
   if (/^Configuring$/i.test(value)) return "Map configuration is being updated.";
   return "Runtime state from map registration and readiness checks.";
@@ -1468,8 +1544,11 @@ function memoryForMap(rows: LiveMapMemoryRow[], map: string, row?: Record<string
 
 function statusWithLiveMemory(status: string, memoryRow: LiveMapMemoryRow | null, mode?: unknown) {
   const normalized = String(status || "Not Available");
+  if (/^Always On$/i.test(String(mode || "").trim()) && /^(Not Running|Not Available|Unallocated|Assigned|Idle|Starting|Queued)$/i.test(normalized)) {
+    return memoryRow ? "Loading" : "Queued";
+  }
   if (!memoryRow) return normalized;
-  if (/^(Not Running|Not Available|Unallocated|Assigned|Idle)$/i.test(normalized)) {
+  if (/^(Not Running|Not Available|Unallocated|Assigned|Idle|Starting)$/i.test(normalized)) {
     return "Loading";
   }
   return normalized;
@@ -1631,10 +1710,11 @@ function parseMapRows(text: string): Record<string, unknown>[] {
     const map = line.split(/\s+/)[0];
     const assigned = line.match(/\bAssigned:\s*(\d+)/i)?.[1] || "";
     const partitions = line.match(/\bPartitions:\s*(\d+)/i)?.[1] || "";
+    const mode = friendlyMapMode(line.match(/\bCurrent:\s*(dynamic|always-on|overmap-active|disabled)\b/i)?.[1] || line.match(/\b(dynamic|always-on|overmap-active|disabled)\b/i)?.[1] || "");
     return {
       map,
-      status: assigned && Number(assigned) > 0 ? "Starting" : "Not Running",
-      mode: friendlyMapMode(line.match(/\bCurrent:\s*(dynamic|always-on|overmap-active|disabled)\b/i)?.[1] || line.match(/\b(dynamic|always-on|overmap-active|disabled)\b/i)?.[1] || ""),
+      status: assigned && Number(assigned) > 0 ? "Starting" : /^Always On$/i.test(mode) ? "Queued" : "Not Running",
+      mode,
       partitions: partitions || "Unknown",
       assigned: assigned || "Unknown",
       memory: line.match(/\b\d+\s*[gGmM][bB]?\b/)?.[0] || "",
@@ -1652,10 +1732,25 @@ function parseMapRows(text: string): Record<string, unknown>[] {
 
 function parseMemoryRows(text: string): Record<string, unknown>[] {
   return stripAnsi(text).split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !/^===|^Default memory|^MAP\s+MEMORY/i.test(line)).map((line) => {
-    const match = line.match(/^(.+?)\s{2,}(.+)$/);
-    if (!match) return null;
-    return { map: match[1].trim(), memory: formatMemoryValue(match[2].trim()) };
+    const parsed = parseMemoryStatusLine(line);
+    if (!parsed) return null;
+    return { map: parsed.map, memory: formatMemoryValue(parsed.memory) };
   }).filter(Boolean) as Record<string, unknown>[];
+}
+
+function defaultMemoryFromStatus(text: string) {
+  const line = stripAnsi(text).split(/\r?\n/).find((candidate) => /^Default memory:/i.test(candidate.trim())) || "";
+  const value = line.replace(/^Default memory:\s*/i, "").trim();
+  if (!value || /built-in per-map defaults/i.test(value)) return "";
+  return formatMemoryValue(value);
+}
+
+function fallbackMemoryForMap(map: string, memoryText: string) {
+  const globalDefault = defaultMemoryFromStatus(memoryText);
+  if (globalDefault) return globalDefault;
+  if (map === "Survival_1" || map === "DeepDesert_1") return "16 GB (Default)";
+  if (map === "Overmap") return "3 GB (Default)";
+  return "3 GB (Default)";
 }
 
 function updateMemoryStatusText(text: string, updates: Array<{ map: string; partitionId?: string; memory: string }>) {
@@ -1667,9 +1762,9 @@ function updateMemoryStatusText(text: string, updates: Array<{ map: string; part
   const pending = new globalThis.Map(normalizedUpdates.map((update) => [update.key, update.memory]));
   const lines = String(text || "").split(/\r?\n/);
   const nextLines = lines.map((line) => {
-    const match = line.trim().match(/^(.+?)\s{2,}(.+)$/);
-    if (!match) return line;
-    const key = match[1].trim();
+    const parsed = parseMemoryStatusLine(line.trim());
+    if (!parsed) return line;
+    const key = parsed.map;
     const memory = pending.get(key);
     if (!memory) return line;
     pending.delete(key);
@@ -1680,6 +1775,12 @@ function updateMemoryStatusText(text: string, updates: Array<{ map: string; part
   const hasBody = nextLines.some((line) => line.trim());
   const base = hasBody ? nextLines : ["=== Memory configuration ===", "Default memory: built-in per-map defaults, or server catalog for other dynamic maps", "", "MAP                          MEMORY"];
   return [...base, ...insertLines].join("\n");
+}
+
+function parseMemoryStatusLine(line: string) {
+  const match = String(line || "").trim().match(/^(.+?)\s+((?:\d+(?:\.\d+)?)\s*(?:[KMGT](?:i?B?|B)?)(?:\s+\(?default\)?)?)$/i);
+  if (!match) return null;
+  return { map: match[1].trim(), memory: match[2].trim() };
 }
 
 function parseServerPartitionRows(text: string): Record<string, unknown>[] {
@@ -1718,6 +1819,14 @@ function parseReadinessPartitionStatuses(text: string) {
       else if (/^FAIL$/i.test(state)) statuses.set("1", "Not Running");
       continue;
     }
+    const baseOvermapMatch = line.match(/^(OK|WAIT|FAIL)\s+Overmap\s+(.+)$/i);
+    if (baseOvermapMatch) {
+      const [, state, detail] = baseOvermapMatch;
+      if (/^OK$/i.test(state) && /\bready\b/i.test(detail)) statuses.set("2", "Ready");
+      else if (/^WAIT$/i.test(state) && /\bwarming\b/i.test(detail)) statuses.set("2", "Loading");
+      else if (/^FAIL$/i.test(state)) statuses.set("2", "Not Running");
+      continue;
+    }
     const match = line.match(/^(OK|WAIT|FAIL)\s+dune-server-survival-1-(\d+)\s+(.+)$/i);
     if (!match) continue;
     const [, state, partitionId, detail] = match;
@@ -1728,24 +1837,30 @@ function parseReadinessPartitionStatuses(text: string) {
   return statuses;
 }
 
-function mergeMapAndMemoryRows(mapsText: string, memoryText: string, serversText = ""): Record<string, unknown>[] {
+function mergeMapAndMemoryRows(mapsText: string, memoryText: string, serversText = "", readinessText = ""): Record<string, unknown>[] {
   const rows = new globalThis.Map<string, Record<string, unknown>>();
   const serverRows = new globalThis.Map<string, Record<string, unknown>>();
+  const readinessStatuses = parseReadinessPartitionStatuses(readinessText);
   for (const row of parseServerPartitionRows(serversText)) {
     const map = String(row.map || "");
     if (!map) continue;
+    const partitionId = String(row.partitionId || "").trim();
+    const readinessStatus = partitionId ? readinessStatuses.get(partitionId) : "";
+    const coreReadinessAuthoritative = /^(Survival_1|Overmap)$/i.test(map);
+    const mergedStatus = readinessStatus && coreReadinessAuthoritative ? readinessStatus : readinessStatus ? strongestMapStatus(String(row.status || ""), readinessStatus) : "";
+    const rowWithReadiness = mergedStatus ? { ...row, status: mergedStatus } : row;
     const existing = serverRows.get(map);
     const existingDimension = Number(existing?.dimension ?? Number.POSITIVE_INFINITY);
-    const rowDimension = Number(row.dimension ?? Number.POSITIVE_INFINITY);
+    const rowDimension = Number(rowWithReadiness.dimension ?? Number.POSITIVE_INFINITY);
     const existingPartitionId = Number(existing?.partitionId ?? Number.POSITIVE_INFINITY);
-    const rowPartitionId = Number(row.partitionId ?? Number.POSITIVE_INFINITY);
+    const rowPartitionId = Number(rowWithReadiness.partitionId ?? Number.POSITIVE_INFINITY);
     const useRowAsBase = !existing || rowDimension < existingDimension || (rowDimension === existingDimension && rowPartitionId < existingPartitionId);
-    const base = useRowAsBase ? row : existing;
-    const status = map === "DeepDesert_1" ? String(base?.status || "") : strongestMapStatus(String(existing?.status || ""), String(row.status || ""));
+    const base = useRowAsBase ? rowWithReadiness : existing;
+    const status = map === "DeepDesert_1" ? String(base?.status || "") : strongestMapStatus(String(existing?.status || ""), String(rowWithReadiness.status || ""));
     serverRows.set(map, {
       ...base,
       status,
-      dimensions: existing?.dimensions ? `${String(existing.dimensions)}, ${String(row.label || row.partitionId)}` : String(row.label || row.partitionId || "")
+      dimensions: existing?.dimensions ? `${String(existing.dimensions)}, ${String(rowWithReadiness.label || rowWithReadiness.partitionId)}` : String(rowWithReadiness.label || rowWithReadiness.partitionId || "")
     });
   }
   for (const row of parseMemoryRows(memoryText)) {
@@ -1771,7 +1886,7 @@ function mergeMapAndMemoryRows(mapsText: string, memoryText: string, serversText
       ...row,
       status: server?.status || row.status || rows.get(map)?.status || "Not Available",
       mode: row.mode || rows.get(map)?.mode || "Not Available",
-      memory: row.memory ? formatMemoryValue(String(row.memory)) : rows.get(map)?.memory || "Not Available",
+      memory: row.memory ? formatMemoryValue(String(row.memory)) : rows.get(map)?.memory || fallbackMemoryForMap(map, memoryText),
       partitionId: row.partitionId || row.partition || server?.partitionId || rows.get(map)?.partitionId || "",
       dimensions: row.dimensions || server?.dimensions || rows.get(map)?.dimensions || "Not Available"
     });
@@ -1785,7 +1900,7 @@ function mapRuntimeStatus(row: { assignedServer?: unknown; ready?: unknown; aliv
   const alive = isTruthyDbValue(row.alive);
   if (ready && alive) return "Ready";
   if (alive) return "Loading";
-  if (assigned) return "Starting";
+  if (assigned) return "Loading";
   return "Not Running";
 }
 
@@ -1798,11 +1913,11 @@ function mapCanForceDespawn(row: Record<string, unknown>) {
 }
 
 function mapRuntimeNeedsLiveApply(status: unknown) {
-  return /^(Ready|Loading|Starting|Assigned|Warming|Running)$/i.test(String(status || "").trim());
+  return /^(Ready|Loading|Starting|Assigned|Warming|Running|Queued)$/i.test(String(status || "").trim());
 }
 
 function strongestMapStatus(a: string, b: string) {
-  const order = ["Not Available", "Not Running", "Starting", "Loading", "Warming", "Running", "Ready"];
+  const order = ["Not Available", "Not Running", "Queued", "Starting", "Loading", "Warming", "Running", "Ready"];
   return order.indexOf(b) > order.indexOf(a) ? b : a || b;
 }
 
@@ -1814,6 +1929,10 @@ function friendlyMapMode(value: string) {
   if (normalized === "disabled") return "Disabled";
   if (normalized === "core map" || normalized === "core") return "Core Map";
   return value ? titleCase(value) : "Not Available";
+}
+
+function isVehicleDeployMap(value: string) {
+  return /^CB_Overland_/i.test(String(value || "").trim());
 }
 
 function modeInputValue(value: string) {

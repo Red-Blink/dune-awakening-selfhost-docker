@@ -22,6 +22,10 @@ DYNAMIC_READY_HEAL_STALE_SECONDS="${DUNE_AUTOSCALER_DYNAMIC_READY_HEAL_STALE_SEC
 DIRECTOR_BROWSER_SCAN_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_BROWSER_SCAN_SECONDS:-30}"
 DYNAMIC_READY_HEAL_SCAN_SECONDS="${DUNE_AUTOSCALER_DYNAMIC_READY_HEAL_SCAN_SECONDS:-30}"
 CHAT_EXCHANGE_REPAIR_SECONDS="${DUNE_AUTOSCALER_CHAT_EXCHANGE_REPAIR_SECONDS:-15}"
+IGWO_UNAVAILABLE_SCAN_SECONDS="${DUNE_AUTOSCALER_IGWO_UNAVAILABLE_SCAN_SECONDS:-10}"
+IGWO_UNAVAILABLE_COOLDOWN_SECONDS="${DUNE_AUTOSCALER_IGWO_UNAVAILABLE_COOLDOWN_SECONDS:-60}"
+STALE_SERVER_STATE_SCAN_SECONDS="${DUNE_AUTOSCALER_STALE_SERVER_STATE_SCAN_SECONDS:-15}"
+STALE_SERVER_STATE_COOLDOWN_SECONDS="${DUNE_AUTOSCALER_STALE_SERVER_STATE_COOLDOWN_SECONDS:-45}"
 
 mkdir -p "$(dirname "$STATE_FILE")"
 touch "$STATE_FILE"
@@ -42,6 +46,8 @@ echo "Dynamic mode-change grace: ${DESPAWN_GRACE_SECONDS}s"
 echo "Travel grace: ${TRAVEL_GRACE_SECONDS}s"
 echo "Director browser heal scan: ${DIRECTOR_BROWSER_SCAN_SECONDS}s"
 echo "Dynamic ready heal scan: ${DYNAMIC_READY_HEAL_SCAN_SECONDS}s"
+echo "IGWO unavailable heal scan: ${IGWO_UNAVAILABLE_SCAN_SECONDS}s"
+echo "Stale server-state heal scan: ${STALE_SERVER_STATE_SCAN_SECONDS}s"
 echo "State file: ${STATE_FILE}"
 echo
 
@@ -63,23 +69,29 @@ hub_origin_id_for_map() {
   case "$1" in
     SH_Arrakeen) echo "SH_Arrakeen3" ;;
     SH_HarkoVillage) echo "SH_HarkoVillage4" ;;
+    Story_ProcesVerbal) echo "Story_ProcesVerbal9" ;;
     *) return 1 ;;
   esac
 }
 
 hub_server_id_for_origin_id() {
+  local map
+
   case "$1" in
-    SH_Arrakeen3) echo "mr2tVhMST9mp8k1NDnx49Q" ;;
-    SH_HarkoVillage4)
-      psql_value "
-        select coalesce(server_id, '')
-        from dune.farm_state
-        where map = 'SH_HarkoVillage'
-        limit 1;
-      "
-      ;;
+    SH_Arrakeen3) map="SH_Arrakeen" ;;
+    SH_HarkoVillage4) map="SH_HarkoVillage" ;;
+    Story_ProcesVerbal9) map="Story_ProcesVerbal" ;;
     *) return 1 ;;
   esac
+
+  psql_value "
+    select coalesce(server_id, '')
+    from dune.farm_state
+    where map = '$map'
+      and coalesce(server_id, '') <> ''
+    order by ready desc, alive desc
+    limit 1;
+  "
 }
 
 origin_server_id_for_origin_id() {
@@ -516,6 +528,7 @@ hub_container_for_map() {
   case "$1" in
     SH_Arrakeen) echo "dune-server-sh-arrakeen-3" ;;
     SH_HarkoVillage) echo "dune-server-sh-harkovillage-4" ;;
+    Story_ProcesVerbal) echo "dune-server-story-procesverbal-9" ;;
     *) return 1 ;;
   esac
 }
@@ -1058,9 +1071,23 @@ named_destination_target_map() {
     Travel_To_HaggaBasin_*|Travel_To_Hagga_Basin_*)
       echo "Survival_1"
       ;;
+    Story_ProcesVerbal_ApartmentMurder|Story_ProcesVerbal_BanquetMurder|Story_ProcesVerbal_BarMurder|Travel_To_Arrakeen|*_to_Arrakeen|*_To_Arrakeen)
+      echo "SH_Arrakeen"
+      ;;
     *)
       return 1
       ;;
+  esac
+}
+
+respawn_map_for_target_map() {
+  case "$1" in
+    Survival_1) echo "HaggaBasin" ;;
+    SH_Arrakeen) echo "Arrakeen" ;;
+    SH_HarkoVillage) echo "HarkoVillage" ;;
+    Overmap) echo "Overland" ;;
+    DeepDesert_1) echo "DeepDesert" ;;
+    *) echo "$1" ;;
   esac
 }
 
@@ -1142,6 +1169,12 @@ reconcile_always_on_maps() {
   runtime/scripts/map-modes.sh reconcile || true
 }
 
+reconcile_always_on_map() {
+  local map="$1"
+  [ -n "$map" ] || return 0
+  runtime/scripts/map-modes.sh reconcile "$map" || true
+}
+
 remember_server_id_map() {
   local map="$1"
   local server_id="$2"
@@ -1186,6 +1219,16 @@ partition_target_info() {
       coalesce(server_id, '')
     from dune.world_partition
     where partition_id = $partition_id
+    limit 1;
+  "
+}
+
+map_for_partition() {
+  local partition_id="$1"
+  psql_value "
+    select coalesce(map, '')
+    from dune.world_partition
+    where partition_id = ${partition_id}
     limit 1;
   "
 }
@@ -1434,7 +1477,7 @@ ensure_overmap_travel_maps_prewarmed() {
 scan_named_destination_failures() {
   local source_map container log_file handoff_rows
 
-  for source_map in SH_Arrakeen SH_HarkoVillage; do
+  for source_map in SH_Arrakeen SH_HarkoVillage Story_ProcesVerbal; do
     container="$(hub_container_for_map "$source_map" 2>/dev/null || true)"
     [ -n "$container" ] || continue
     docker ps --format '{{.Names}}' | grep -qx "$container" || continue
@@ -1448,7 +1491,7 @@ import re
 source_map = os.environ.get("SOURCE_MAP", "")
 log_file = os.environ.get("LOG_FILE", "")
 request_re = re.compile(r'FlowType:"Travel", Stage:"(?:Request|Update|Grant)", PlayerId:"([^"]+)", FlowId:"([A-F0-9]+)"')
-failure_re = re.compile(r'UpdateTravelDestination\((Travel_To_[A-Za-z0-9_]+)\) unable to find destination')
+failure_re = re.compile(r'UpdateTravelDestination\(([A-Za-z0-9_]+)\) unable to find destination')
 
 flows = {}
 
@@ -1482,7 +1525,7 @@ PY
       [ -n "${flow_id:-}" ] || continue
       hub_travel_seen "$flow_id" && continue
 
-      local target_map account_id destination_row target_partition_id target_dimension target_server_id current_map
+      local target_map account_id destination_row target_partition_id target_dimension target_server_id current_map target_respawn_map
       target_map="$(named_destination_target_map "$destination_name" 2>/dev/null || true)"
       [ -n "$target_map" ] || continue
 
@@ -1510,9 +1553,27 @@ PY
         order by wp.partition_id
         limit 1;
       ")"
+      if [ -z "$destination_row" ] && ! map_is_disabled "$target_map"; then
+        echo "SPAWN named-destination-target source=$source_map destination=$destination_name target=$target_map"
+        runtime/scripts/spawn-server.sh "$target_map" || true
+        destination_row="$(psql_value "
+          select
+            wp.partition_id || '|' ||
+            coalesce(wp.dimension_index::text, '0') || '|' ||
+            coalesce(wp.server_id, '')
+          from dune.world_partition wp
+          join dune.farm_state fs on fs.server_id = wp.server_id
+          where wp.map = '$target_map'
+            and fs.ready = true
+            and fs.alive = true
+          order by wp.partition_id
+          limit 1;
+        ")"
+      fi
       [ -n "$destination_row" ] || continue
       IFS='|' read -r target_partition_id target_dimension target_server_id <<< "$destination_row"
       [ -n "$target_server_id" ] || continue
+      target_respawn_map="$(respawn_map_for_target_map "$target_map")"
 
       psql_value "
         update dune.player_state
@@ -1570,17 +1631,18 @@ PY
           end if;
 
           if respawn_identity_column is not null and respawn_identity_id is not null then
-            execute format('delete from dune.player_respawn_locations where %I = \$1 and map = ''HaggaBasin''', respawn_identity_column)
+            execute format('delete from dune.player_respawn_locations where %I = \$1 and map = ''${target_respawn_map//\'/\'\'}''', respawn_identity_column)
             using respawn_identity_id;
           end if;
         end
         \$\$;
       " >/dev/null
 
+      timeout 20 runtime/scripts/publish-network-server-state-overrides.sh map "$target_map" >/dev/null 2>&1 || true
       replay_hagga_travel_handoff "$flow_id" "$source_map" "$destination_name"
 
       remember_hub_travel "$flow_id" "$account_id" "$source_map" "$target_map" "$(date +%s)"
-      echo "NAMED-TRAVEL account=$account_id flow=$flow_id destination=$destination_name from=$source_map to=$target_map current_map=$current_map server=$target_server_id cleaned_respawns=HaggaBasin"
+      echo "NAMED-TRAVEL account=$account_id flow=$flow_id destination=$destination_name from=$source_map to=$target_map current_map=$current_map server=$target_server_id cleaned_respawns=$target_respawn_map"
     done <<< "$handoff_rows"
   done
 }
@@ -1814,6 +1876,173 @@ for line in sys.stdin:
   done <<< "$demand_rows"
 }
 
+scan_igwo_unavailable_maps() {
+  local rows now map event_id last_seen
+
+  director_heal_due igwo_unavailable "$IGWO_UNAVAILABLE_SCAN_SECONDS" || return 0
+  now="$(date +%s)"
+
+  rows="$(
+    docker logs --since "$NAMED_DESTINATION_SINCE" dune-director 2>&1 | python3 -c '
+import hashlib
+import re
+import sys
+
+pattern = re.compile(r"Trying to change the number of instances for map ([A-Za-z0-9_]+) but IGWO is unavailable")
+seen = set()
+
+for line in sys.stdin:
+    match = pattern.search(line)
+    if not match:
+        continue
+    map_name = match.group(1)
+    event_id = hashlib.sha1(line.encode("utf-8", errors="replace")).hexdigest()
+    key = (map_name, event_id)
+    if key in seen:
+        continue
+    seen.add(key)
+    print(f"{event_id}|{map_name}")
+'
+  )"
+
+  while IFS='|' read -r event_id map; do
+    [ -n "${map:-}" ] || continue
+    demand_event_seen "igwo:${event_id}" && continue
+
+    last_seen="$(director_heal_get "igwo:${map}" 2>/dev/null || true)"
+    if [ -n "$last_seen" ] && [ $((now - last_seen)) -lt "$IGWO_UNAVAILABLE_COOLDOWN_SECONDS" ]; then
+      remember_demand_event "igwo:${event_id}" "$map" "$now"
+      continue
+    fi
+
+    if map_is_disabled "$map"; then
+      echo "SKIP igwo-unavailable map=$map mode=disabled"
+      remember_demand_event "igwo:${event_id}" "$map" "$now"
+      continue
+    fi
+
+    if map_is_always_on "$map"; then
+      echo "HEAL igwo-unavailable map=$map mode=always-on"
+      reconcile_always_on_map "$map"
+    else
+      echo "HEAL igwo-unavailable map=$map mode=dynamic-demand"
+      handle_demand "$map" 1 "igwo:${event_id}"
+    fi
+
+    publish_state_for_map "$map"
+    director_heal_set "igwo:${map}" "$now"
+    remember_demand_event "igwo:${event_id}" "$map" "$now"
+  done <<< "$rows"
+}
+
+publish_state_for_map() {
+  local map="$1"
+
+  [ -n "$map" ] || return 0
+  case "$map" in
+    Survival_1)
+      timeout 20 runtime/scripts/network-addresses.sh reconcile >/dev/null 2>&1 || true
+      timeout 20 runtime/scripts/publish-sietch-overrides.sh once >/dev/null 2>&1 || true
+      ;;
+    Overmap)
+      timeout 20 runtime/scripts/network-addresses.sh reconcile >/dev/null 2>&1 || true
+      timeout 20 runtime/scripts/publish-network-server-state-overrides.sh restart >/dev/null 2>&1 || true
+      timeout 20 runtime/scripts/publish-network-server-state-overrides.sh map "$map" >/dev/null 2>&1 || true
+      ;;
+    DeepDesert_1)
+      timeout 20 runtime/scripts/network-addresses.sh reconcile >/dev/null 2>&1 || true
+      timeout 20 runtime/scripts/publish-deepdesert-overrides.sh once >/dev/null 2>&1 || true
+      timeout 20 runtime/scripts/publish-network-server-state-overrides.sh restart >/dev/null 2>&1 || true
+      timeout 20 runtime/scripts/publish-network-server-state-overrides.sh map "$map" >/dev/null 2>&1 || true
+      ;;
+    *)
+      timeout 20 runtime/scripts/network-addresses.sh reconcile >/dev/null 2>&1 || true
+      timeout 20 runtime/scripts/publish-network-server-state-overrides.sh map "$map" >/dev/null 2>&1 || true
+      ;;
+  esac
+}
+
+scan_stale_server_state() {
+  local rows now event_id partition_id map last_seen
+
+  director_heal_due stale_server_state "$STALE_SERVER_STATE_SCAN_SECONDS" || return 0
+  now="$(date +%s)"
+
+  rows="$(
+    docker logs --since "$SINCE" dune-director 2>&1 | python3 -c '
+import hashlib
+import re
+import sys
+
+partition_pattern = re.compile(r"Failed to process travel queue for partition ([0-9]+)")
+stale_pattern = re.compile(r"The last server state.s reportTimestamp is older than 60 seconds!")
+pending_partition = None
+seen = set()
+
+for line in sys.stdin:
+    partition_match = partition_pattern.search(line)
+    if partition_match:
+        pending_partition = partition_match.group(1)
+        continue
+    if pending_partition and stale_pattern.search(line):
+        event_id = hashlib.sha1(f"{pending_partition}:{line}".encode("utf-8", errors="replace")).hexdigest()
+        key = (pending_partition, event_id)
+        if key not in seen:
+            seen.add(key)
+            print(f"{event_id}|{pending_partition}")
+        pending_partition = None
+'
+  )"
+
+  while IFS='|' read -r event_id partition_id; do
+    [ -n "${partition_id:-}" ] || continue
+    demand_event_seen "stale-state:${event_id}" && continue
+
+    last_seen="$(director_heal_get "stale-state:${partition_id}" 2>/dev/null || true)"
+    if [ -n "$last_seen" ] && [ $((now - last_seen)) -lt "$STALE_SERVER_STATE_COOLDOWN_SECONDS" ]; then
+      remember_demand_event "stale-state:${event_id}" "$partition_id" "$now"
+      continue
+    fi
+
+    map="$(map_for_partition "$partition_id" | tr -d '\r[:space:]')"
+    [ -n "$map" ] || continue
+    echo "HEAL stale-server-state partition=${partition_id} map=${map}"
+    publish_state_for_map "$map"
+    director_heal_set "stale-state:${partition_id}" "$now"
+    remember_demand_event "stale-state:${event_id}" "$map" "$now"
+  done <<< "$rows"
+}
+
+scan_unscoped_stale_server_state() {
+  local count now last_seen map
+
+  director_heal_due unscoped_stale_server_state "$STALE_SERVER_STATE_SCAN_SECONDS" || return 0
+  now="$(date +%s)"
+
+  count="$(
+    docker logs --since "$SINCE" dune-director 2>&1 | python3 -c '
+import re
+import sys
+
+stale_pattern = re.compile(r"The last server state.s reportTimestamp is older than 60 seconds!")
+print(sum(1 for line in sys.stdin if stale_pattern.search(line)))
+'
+  )"
+
+  [ "${count:-0}" -gt 0 ] || return 0
+
+  last_seen="$(director_heal_get unscoped_stale_state 2>/dev/null || true)"
+  if [ -n "$last_seen" ] && [ $((now - last_seen)) -lt "$STALE_SERVER_STATE_COOLDOWN_SECONDS" ]; then
+    return 0
+  fi
+
+  echo "HEAL unscoped-stale-server-state occurrences=${count} maps=Survival_1,Overmap,DeepDesert_1"
+  for map in Survival_1 Overmap DeepDesert_1; do
+    publish_state_for_map "$map"
+  done
+  director_heal_set unscoped_stale_state "$now"
+}
+
 director_live_server_rows() {
   docker exec dune-postgres psql -U postgres -d dune -At -F '|' -c "
     select map, server_id
@@ -1925,6 +2154,9 @@ while true; do
   scan_deepdesert_loading_responses
   ensure_overmap_travel_maps_prewarmed
   scan_travel_demand
+  scan_igwo_unavailable_maps
+  scan_stale_server_state
+  scan_unscoped_stale_server_state
   progress_deepdesert_travel_handoffs
   scan_proactive_hagga_handoffs
   scan_named_destination_failures

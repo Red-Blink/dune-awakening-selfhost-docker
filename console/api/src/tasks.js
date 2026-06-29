@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { runDune, buildDuneArgs } from "./runner.js";
+import { liveItemGrantWarning } from "./grantResults.js";
 
 export class TaskManager {
   constructor(config) {
@@ -67,6 +68,8 @@ export class TaskManager {
           timeoutMs: taskTimeoutMs(this.config, operation),
           onLine: (text, stream) => this.append(task, text, stream)
         });
+        const grantWarning = itemGrantTaskWarning(operation, result);
+        if (grantWarning) throw Object.assign(new Error(grantWarning), { code: 1, stdout: result.stdout, stderr: result.stderr });
         lastCode = result.code;
       }
       task.status = "succeeded";
@@ -135,6 +138,11 @@ export class TaskManager {
     const all = this.list();
     for (const task of all.slice(this.config.taskRetention)) this.tasks.delete(task.id);
   }
+}
+
+function itemGrantTaskWarning(operation, result) {
+  if (operation !== "adminGiveItem" && operation !== "adminGiveItemId") return "";
+  return liveItemGrantWarning(result);
 }
 
 export function buildSelfUpdateHelperDockerArgs({ helperName, hostRepoRoot, composeProjectName, helperImage, command }) {

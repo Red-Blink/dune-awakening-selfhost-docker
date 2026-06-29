@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { setupApi, type Task } from "../../api/setup";
 import { updatesApi } from "../../api/updates";
 import { KeyValueGrid, StatusPill } from "../../components/common/DisplayPrimitives";
@@ -28,9 +29,6 @@ type UpdatesPanelProps = {
   waitForTask: (task: Task) => Promise<Task>;
   parseKeyValueText: (text: string) => Record<string, string>;
   formatTimerStatus: (value: string) => string;
-  toHourMinuteTime: (value: unknown) => string;
-  sanitizeTimeInput: (value: string) => string;
-  isValidHourMinuteTime: (value: string) => boolean;
   commandStatusSummary: (result: { stdout?: string; stderr?: string; exitCode?: number } | null) => { status: string; reason: string };
   taskTechnicalDetails: (task: Task) => string;
   formatResultTitle: (value: unknown, pending?: boolean) => string;
@@ -42,9 +40,6 @@ export function UpdatesPanel({
   waitForTask,
   parseKeyValueText,
   formatTimerStatus,
-  toHourMinuteTime,
-  sanitizeTimeInput,
-  isValidHourMinuteTime,
   commandStatusSummary,
   taskTechnicalDetails,
   formatResultTitle,
@@ -56,9 +51,15 @@ export function UpdatesPanel({
   const [stackStatus, setStackStatus] = useState<Record<string, string>>(() => stackUpdateTask && !isTerminalTask(stackUpdateTask.status) ? { status: "Updating", current: "", latest: "", reason: "Console update is running." } : { status: "Not checked", current: "", latest: "", reason: "" });
   const [gameSteamcmdFixTask, setGameSteamcmdFixTask] = useState<Task | null>(null);
   const [autoGame, setAutoGame] = useState<{ stdout?: string; stderr?: string; exitCode?: number } | null>(null);
+  const [autoGameOpen, setAutoGameOpen] = useState(false);
   const [autoGameLoading, setAutoGameLoading] = useState(true);
   const [autoGameEnabled, setAutoGameEnabled] = useState(false);
-  const [autoGameTime, setAutoGameTime] = useState("05:00");
+  const [autoGameIntervalMinutes, setAutoGameIntervalMinutes] = useState("60");
+  const [autoGameApplyEnabled, setAutoGameApplyEnabled] = useState(true);
+  const [autoGameNotifyEnabled, setAutoGameNotifyEnabled] = useState(true);
+  const [autoGameNotifyMinutes, setAutoGameNotifyMinutes] = useState("15");
+  const [autoGameWaitUntilEmpty, setAutoGameWaitUntilEmpty] = useState(false);
+  const [autoGameMaxWaitMinutes, setAutoGameMaxWaitMinutes] = useState("360");
   const [autoGameResult, setAutoGameResult] = useState<HomeTaskResult | null>(null);
   const [stackUpdateNow, setStackUpdateNow] = useState(() => Date.now());
   const [stackUpdateExpectedVersion, setStackUpdateExpectedVersion] = useState(() => loadStackUpdateExpectedVersion());
@@ -136,24 +137,42 @@ export function UpdatesPanel({
       const preferenceEnabled = /^(1|true|enabled)$/i.test(values.auto_updates_enabled || values.enabled || "");
       const timerReady = /^(active|enabled)$/i.test(values.systemd_timer || "");
       setAutoGameEnabled(preferenceEnabled && timerReady);
-      if (values.auto_update_time) setAutoGameTime(toHourMinuteTime(values.auto_update_time));
+      if (values.check_interval_minutes) setAutoGameIntervalMinutes(values.check_interval_minutes);
+      if (values.apply_updates) setAutoGameApplyEnabled(/^(1|true|yes|enabled)$/i.test(values.apply_updates));
+      if (values.notify_players) setAutoGameNotifyEnabled(/^(1|true|yes|enabled)$/i.test(values.notify_players));
+      if (values.notify_minutes) setAutoGameNotifyMinutes(values.notify_minutes);
+      if (values.wait_until_empty) setAutoGameWaitUntilEmpty(/^(1|true|yes|enabled)$/i.test(values.wait_until_empty));
+      if (values.max_wait_minutes) setAutoGameMaxWaitMinutes(values.max_wait_minutes);
     } finally {
       setAutoGameLoading(false);
     }
   }
 
   async function saveAutoGame(nextEnabled = autoGameEnabled) {
-    const sanitizedTime = toHourMinuteTime(autoGameTime);
-    if (nextEnabled && !isValidHourMinuteTime(sanitizedTime)) {
-      setAutoGameResult({ status: "failed", title: "Auto Updates Save Failed", message: "Daily check time must be a valid 24-hour time, for example 05:00 or 23:30." });
+    const intervalMinutes = validateAutoGameInteger(autoGameIntervalMinutes, 5, 1440);
+    const notifyMinutes = validateAutoGameInteger(autoGameNotifyMinutes, 1, 1440);
+    const maxWaitMinutes = validateAutoGameInteger(autoGameMaxWaitMinutes, 0, 10080);
+    if (nextEnabled && (!intervalMinutes || !notifyMinutes || maxWaitMinutes === null)) {
+      setAutoGameResult({ status: "failed", title: "Auto Updates Save Failed", message: "Check interval, notice, and max wait values must be valid whole minutes." });
       return;
     }
-    setAutoGameTime(sanitizedTime);
+    setAutoGameIntervalMinutes(String(intervalMinutes || 60));
+    setAutoGameNotifyMinutes(String(notifyMinutes || 15));
+    setAutoGameMaxWaitMinutes(String(maxWaitMinutes ?? 360));
     setAutoGameResult({ status: "running", title: "Saving Auto Updates" });
     const requestedEnabled = nextEnabled;
     setAutoGameEnabled(requestedEnabled);
     try {
-      const final = await waitForTask((await updatesApi.saveAutoGame({ enabled: requestedEnabled, time: sanitizedTime, confirmation: "SAVE AUTO GAME UPDATES" })).task);
+      const final = await waitForTask((await updatesApi.saveAutoGame({
+        enabled: requestedEnabled,
+        intervalMinutes: intervalMinutes || 60,
+        applyEnabled: autoGameApplyEnabled,
+        notifyEnabled: autoGameNotifyEnabled,
+        notifyMinutes: notifyMinutes || 15,
+        waitUntilEmpty: autoGameWaitUntilEmpty,
+        maxWaitMinutes: maxWaitMinutes ?? 360,
+        confirmation: "SAVE AUTO GAME UPDATES"
+      })).task);
       const details = taskTechnicalDetails(final);
       const nextAutoGame = await updatesApi.autoGameStatus();
       setAutoGame(nextAutoGame);
@@ -330,24 +349,61 @@ export function UpdatesPanel({
         </div>
         {stackUpdateTask && <StackUpdateProgress task={stackUpdateTask} handoffPercent={stackUpdateHandoffPercent} refreshCountdown={stackUpdateRefreshCountdown} onRetry={applyStackUpdate} formatResultTitle={formatResultTitle} formatResultMessage={formatResultMessage} />}
       </section>
-      <section className="action-section">
-        <div className="panel-title"><h4>Automatic Game Updates</h4><label className={`switch-checkbox ${autoGameEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={autoGameLoading || autoGameSaving} checked={autoGameEnabled} onChange={(event) => saveAutoGame(event.target.checked)} /><span className="switch-label">Auto Updates</span><strong className="switch-state">{autoGameEnabled ? "ON" : "OFF"}</strong></label></div>
+      <div className={`playerAdmin_toggle auto-game-toggle ${autoGameOpen ? "open" : ""}`}>
+          <button className="playerAdmin_toggleHeader" aria-label={autoGameOpen ? "Collapse Automatic Game Updates" : "Expand Automatic Game Updates"} onClick={() => setAutoGameOpen(!autoGameOpen)}>{autoGameOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Automatic Game Updates</span></button>
+          {autoGameOpen && <div className="playerAdmin_toggleBody">
+        <div className="panel-title"><h4>Service Configuration</h4><label className={`switch-checkbox ${autoGameEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={autoGameLoading || autoGameSaving} checked={autoGameEnabled} onChange={(event) => saveAutoGame(event.target.checked)} /><span className="switch-label">Auto Updates</span><strong className="switch-state">{autoGameEnabled ? "ON" : "OFF"}</strong></label></div>
         <KeyValueGrid items={[
           ["Current Status", autoGameStatusLabel],
-          ["Check Time (Local Server Time)", toHourMinuteTime(autoGameValues.auto_update_time || autoGameTime)],
+          ["Check Interval", `Every ${autoGameValues.check_interval_minutes || autoGameIntervalMinutes} minutes`],
+          ["Apply Updates", enabledLabel(autoGameValues.apply_updates, autoGameApplyEnabled)],
+          ["Player Notice", enabledLabel(autoGameValues.notify_players, autoGameNotifyEnabled, `${autoGameValues.notify_minutes || autoGameNotifyMinutes} minutes`)],
+          ["Empty Server Policy", enabledLabel(autoGameValues.wait_until_empty, autoGameWaitUntilEmpty, `max ${autoGameValues.max_wait_minutes || autoGameMaxWaitMinutes} minutes`)],
           ["Timer", autoGameDisplayTimerLabel]
         ]} />
         {commandStatusSummary(autoGame).reason && <p className="danger-note">{commandStatusSummary(autoGame).reason}</p>}
+        <div className="auto-update-policy-grid">
+          <section className="auto-update-policy-group">
+            <h5>Schedule</h5>
+            <label className="auto-update-settings-row"><span>Check for updates every</span><span className="number-unit-field"><input type="number" min="5" max="1440" step="1" disabled={autoGameSaving} value={autoGameIntervalMinutes} onChange={(event) => setAutoGameIntervalMinutes(event.target.value)} /><em>min</em></span><span className="auto-update-settings-spacer" /></label>
+          </section>
+          <section className="auto-update-policy-group">
+            <h5>Update Action</h5>
+            <label className="auto-update-settings-row auto-update-settings-boolean-row"><span>Apply update when found</span><strong>{autoGameApplyEnabled ? "Enabled" : "Disabled"}</strong><input type="checkbox" disabled={autoGameSaving} checked={autoGameApplyEnabled} onChange={(event) => setAutoGameApplyEnabled(event.target.checked)} /></label>
+          </section>
+          <section className="auto-update-policy-group">
+            <h5>Player Notice</h5>
+            <label className="auto-update-settings-row auto-update-settings-boolean-row"><span>Warn players before restart</span><strong>{autoGameNotifyEnabled ? "Enabled" : "Disabled"}</strong><input type="checkbox" disabled={autoGameSaving} checked={autoGameNotifyEnabled} onChange={(event) => setAutoGameNotifyEnabled(event.target.checked)} /></label>
+            <label className={`auto-update-settings-row ${autoGameNotifyEnabled ? "" : "is-disabled"}`}><span>Warning time</span><span className="number-unit-field"><input type="number" min="1" max="1440" step="1" disabled={autoGameSaving || !autoGameNotifyEnabled} value={autoGameNotifyMinutes} onChange={(event) => setAutoGameNotifyMinutes(event.target.value)} /><em>min</em></span><span className="auto-update-settings-spacer" /></label>
+          </section>
+          <section className="auto-update-policy-group">
+            <h5>Empty Server Policy</h5>
+            <label className="auto-update-settings-row auto-update-settings-boolean-row"><span>Wait until server is empty</span><strong>{autoGameWaitUntilEmpty ? "Enabled" : "Disabled"}</strong><input type="checkbox" disabled={autoGameSaving} checked={autoGameWaitUntilEmpty} onChange={(event) => setAutoGameWaitUntilEmpty(event.target.checked)} /></label>
+            <label className={`auto-update-settings-row ${autoGameWaitUntilEmpty ? "" : "is-disabled"}`}><span>Maximum wait</span><span className="number-unit-field"><input type="number" min="0" max="10080" step="1" disabled={autoGameSaving || !autoGameWaitUntilEmpty} value={autoGameMaxWaitMinutes} onChange={(event) => setAutoGameMaxWaitMinutes(event.target.value)} /><em>min</em></span><span className="auto-update-settings-spacer" /></label>
+          </section>
+        </div>
+        <div className="auto-update-settings-divider" />
         <div className="action-line schedule-action-line auto-game-action-line">
-          <label className="compact-select">Daily Check Time<input type="time" step="60" pattern="[0-2][0-9]:[0-5][0-9]" disabled={autoGameSaving} value={autoGameTime} onChange={(event) => setAutoGameTime(sanitizeTimeInput(event.target.value))} placeholder="05:00" /></label>
           <button disabled={autoGameLoading || autoGameSaving} onClick={() => saveAutoGame()}>Save Auto Updates</button>
           {autoGameResult && <span className={`inline-task-result result-${autoGameResult.status === "succeeded" ? "ok" : autoGameResult.status === "failed" ? "fail" : "running"}`}>
             <strong className={autoGameResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(autoGameResult.title, autoGameResult.status === "running")}</strong>
           </span>}
         </div>
-      </section>
+          </div>}
+      </div>
     </div>
   </section>;
+}
+
+function validateAutoGameInteger(value: string, min: number, max: number) {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < min || n > max) return null;
+  return n;
+}
+
+function enabledLabel(rawValue: string | undefined, fallback: boolean, detail = "") {
+  const enabled = rawValue ? /^(1|true|yes|enabled)$/i.test(rawValue) : fallback;
+  return enabled ? detail ? `Enabled (${detail})` : "Enabled" : "Disabled";
 }
 
 function GameUpdateProgress({

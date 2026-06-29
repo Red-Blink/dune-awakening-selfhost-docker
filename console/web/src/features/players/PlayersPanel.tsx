@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { playersApi } from "../../api/players";
 import { DataTable } from "../../components/common/DataTable";
@@ -20,25 +20,48 @@ type PlayersPanelProps = {
   renderCharacterAdmin: (props: CharacterAdminRenderProps) => ReactNode;
 };
 
+const PLAYERS_AUTO_REFRESH_MS = 10_000;
+
 export function PlayersPanel({ onError, renderCharacterAdmin }: PlayersPanelProps) {
   const [q, setQ] = useState("");
   const [playerFilter, setPlayerFilter] = useState<"all" | "online" | "offline">("all");
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
   const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
+  const refreshInFlight = useRef(false);
+  const qRef = useRef(q);
+  const playerFilterRef = useRef(playerFilter);
 
-  async function load(filter = playerFilter) {
-    onError("");
+  useEffect(() => {
+    qRef.current = q;
+  }, [q]);
+
+  useEffect(() => {
+    playerFilterRef.current = playerFilter;
+  }, [playerFilter]);
+
+  const load = useCallback(async (filter = playerFilterRef.current, options: { silent?: boolean } = {}) => {
+    if (refreshInFlight.current) return;
+    refreshInFlight.current = true;
+    if (!options.silent) onError("");
     try {
-      const result = filter === "online" ? await playersApi.online() : await playersApi.list(q);
+      const result = filter === "online" ? await playersApi.online() : await playersApi.list(qRef.current);
       const nextRows = result.rows || [];
-      setRows(filter === "offline"
+      const visibleRows = filter === "offline"
         ? nextRows.filter((row) => String(row.online_status || "").toLowerCase() !== "online")
-        : nextRows);
+        : nextRows;
+      setRows(visibleRows);
+      setSelected((current) => {
+        if (!current) return current;
+        const currentId = String(current.actor_id || current.player_pawn_id || current.id || "");
+        return visibleRows.find((row) => String(row.actor_id || row.player_pawn_id || row.id || "") === currentId) || current;
+      });
     } catch (error) {
-      onError(error instanceof Error ? error.message : String(error));
+      if (!options.silent) onError(error instanceof Error ? error.message : String(error));
+    } finally {
+      refreshInFlight.current = false;
     }
-  }
+  }, [onError]);
 
   async function open(row: Record<string, unknown>) {
     const id = String(row.actor_id || row.player_pawn_id || row.id || "");
@@ -48,7 +71,25 @@ export function PlayersPanel({ onError, renderCharacterAdmin }: PlayersPanelProp
 
   useEffect(() => {
     void load("all");
-  }, []);
+  }, [load]);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "hidden") return;
+      void load(playerFilter, { silent: true });
+    };
+
+    const interval = window.setInterval(refresh, PLAYERS_AUTO_REFRESH_MS);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [load, playerFilter]);
 
   const dbPlayerId = selected ? String(selected.actor_id || selected.player_pawn_id || selected.id || "") : "";
   const actionPlayerId = selected ? String(selected.action_player_id || selected.funcom_id || selected.fls_id || selected.account_id || "") : "";

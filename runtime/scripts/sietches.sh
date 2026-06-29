@@ -559,7 +559,12 @@ for name in order:
 
     configured_memory = env.get(env_key(name))
     catalog_memory = server_by_map.get(name, {}).get("resources", {}).get("limits", {}).get("memory", "")
-    memory = configured_memory or catalog_memory or env.get("DUNE_MEMORY_DEFAULT") or "default"
+    map_default_overrides = {
+        "DLC_Story_LostHarvest_EcolabA": "2g",
+        "DLC_Story_LostHarvest_EcolabB": "2g",
+        "DLC_Story_LostHarvest_ForgottenLab": "2g",
+    }
+    memory = configured_memory or map_default_overrides.get(name) or catalog_memory or env.get("DUNE_MEMORY_DEFAULT") or "default"
     rows.append((name, str(max_dimensions), str(active_dimensions), memory, kind))
 
 if mode == "--names":
@@ -650,7 +655,12 @@ else:
     active = str(int(map_config.get("active_dimensions") or min(max_dimensions, len(rows))))
 
 catalog_memory = server_by_map.get(name, {}).get("resources", {}).get("limits", {}).get("memory", "")
-memory = env.get(env_key(name)) or catalog_memory or env.get("DUNE_MEMORY_DEFAULT") or "default"
+map_default_overrides = {
+    "DLC_Story_LostHarvest_EcolabA": "2g",
+    "DLC_Story_LostHarvest_EcolabB": "2g",
+    "DLC_Story_LostHarvest_ForgottenLab": "2g",
+}
+memory = env.get(env_key(name)) or map_default_overrides.get(name) or catalog_memory or env.get("DUNE_MEMORY_DEFAULT") or "default"
 
 partition_config = config.get("partitions", {})
 def default_display_name(row):

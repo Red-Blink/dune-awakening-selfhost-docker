@@ -13,6 +13,7 @@ import { conciseTaskError, funcomTokenMismatchDetected } from "../../lib/taskDis
 
 export type HomeLoadResult = { statusLoaded: boolean; readinessLoaded: boolean; statusError: string; readinessError: string; statusText: string; readinessText: string };
 export type HomeTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
+export type RestartLifecycleState = { stopObserved: boolean; startObserved: boolean };
 type ConfirmAction = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }) => Promise<boolean>;
 type ServerMode = "public" | "local";
 
@@ -37,7 +38,39 @@ function formatResultMessage(value: unknown) {
   return formatUiSentence(value, false);
 }
 
-export function HomePanel({ status, readiness, taskResult, setTaskResult, funcomTokenResult, setFuncomTokenResult, runningAction, setRunningAction, onLoad, confirmAction }: {
+export function stackActionPendingResult(action: "start" | "stop" | "restart", phase: "running" | "waiting" | "confirming" = "running"): HomeTaskResult {
+  if (action === "stop") return { status: "running", title: "Stopping", message: "Stopping battlegroup services." };
+  if (action === "start") {
+    if (phase === "confirming") return { status: "running", title: "Finalizing Startup", message: "Services reported ready once. Confirming they stay ready." };
+    if (phase === "waiting") return { status: "running", title: "Waiting for Server Readiness", message: "Start command finished. Waiting for services to become ready." };
+    return { status: "running", title: "Starting", message: "Starting battlegroup services." };
+  }
+  if (phase === "confirming") return { status: "running", title: "Finalizing Battlegroup Restart", message: "Services reported ready once. Confirming they stay ready." };
+  if (phase === "waiting") return { status: "running", title: "Waiting for Battlegroup Readiness", message: "Restart command finished. Waiting for services to become ready." };
+  return { status: "running", title: "Restarting Battlegroup", message: "Stopping services, then starting them again." };
+}
+
+export function createRestartLifecycleState(): RestartLifecycleState {
+  return { stopObserved: false, startObserved: false };
+}
+
+export function advanceRestartLifecycle(state: RestartLifecycleState, status: string, readiness: string): RestartLifecycleState {
+  const stopObserved = state.stopObserved || isHomeStopComplete(status, readiness) || hasRestartStopSignal(status, readiness);
+  const startObserved = state.startObserved || (stopObserved && hasRestartStartSignal(status, readiness));
+  return { stopObserved, startObserved };
+}
+
+function advanceRestartLifecycleFromTaskDetails(state: RestartLifecycleState, details: string): RestartLifecycleState {
+  const text = stripAnsi(details || "");
+  const stopObserved = state.stopObserved || /\b(stopping|stopped|stop-all|stop all|docker compose down)\b/i.test(text);
+  return { ...state, stopObserved };
+}
+
+export function isRestartLifecycleReady(action: "start" | "stop" | "restart" | "", state: RestartLifecycleState) {
+  return action !== "restart" || state.startObserved;
+}
+
+export function HomePanel({ status, readiness, taskResult, setTaskResult, funcomTokenResult, setFuncomTokenResult, runningAction, restartStartObserved, setRunningAction, onLoad, confirmAction }: {
   status: string;
   readiness: string;
   taskResult: HomeTaskResult | null;
@@ -45,6 +78,7 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   funcomTokenResult: HomeTaskResult | null;
   setFuncomTokenResult: Dispatch<SetStateAction<HomeTaskResult | null>>;
   runningAction: "start" | "stop" | "restart" | "";
+  restartStartObserved: boolean;
   setRunningAction: Dispatch<SetStateAction<"start" | "stop" | "restart" | "">>;
   onLoad: () => Promise<HomeLoadResult>;
   confirmAction: ConfirmAction;
@@ -57,11 +91,15 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   const [hasLoaded, setHasLoaded] = useState(Boolean(status || readiness));
   const homeActionRunId = useRef(0);
   const homeActionStartedAt = useRef(0);
+  const homeActionReadyPolls = useRef(0);
+  const homeRestartLifecycle = useRef<RestartLifecycleState>(createRestartLifecycleState());
   const refreshRunId = useRef(0);
   const activeHomeAction = useRef<"start" | "stop" | "restart" | "">(runningAction);
 
   function setHomeAction(action: "start" | "stop" | "restart" | "") {
     activeHomeAction.current = action;
+    homeActionReadyPolls.current = 0;
+    if (action === "restart" || !action) homeRestartLifecycle.current = createRestartLifecycleState();
     setRunningAction(action);
   }
 
@@ -87,17 +125,28 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
       if (!isActive() || refreshRunId.current !== runId) return;
       if (result.statusLoaded || result.readinessLoaded) {
         applyHomeLoadResult(result);
-        const loadedState = getHomeServerState(result.statusText || status, result.readinessText || readiness);
-        if ((runningAction === "start" || runningAction === "restart") && isHomeActionComplete(result.statusText || status, result.readinessText || readiness)) {
-          setTaskResult({ status: "succeeded", title: runningAction === "start" ? "Server Started Successfully" : "Battlegroup Restarted Successfully" });
-          setHomeAction("");
+        const statusText = result.statusText || status;
+        const readinessText = result.readinessText || readiness;
+        const loadedState = getHomeServerState(statusText, readinessText);
+        if (runningAction === "restart") homeRestartLifecycle.current = advanceRestartLifecycle(homeRestartLifecycle.current, statusText, readinessText);
+        const restartReady = isRestartLifecycleReady(runningAction, homeRestartLifecycle.current);
+        if (runningAction === "restart" && restartReady) {
+          if (isHomeActionComplete(statusText, readinessText)) setHomeAction("");
+        } else if (runningAction === "start" && isHomeActionComplete(statusText, readinessText)) {
+          homeActionReadyPolls.current += 1;
+          if (homeActionReadyPolls.current >= 2) {
+            setTaskResult({ status: "succeeded", title: "Server Started Successfully" });
+            setHomeAction("");
+          } else {
+            setTaskResult(stackActionPendingResult(runningAction, "confirming"));
+          }
         } else if (runningAction === "stop" && loadedState.stopped) {
           setTaskResult({ status: "stopped", title: "Server Stopped" });
           setHomeAction("");
+        } else if (runningAction === "start" || runningAction === "restart") {
+          homeActionReadyPolls.current = 0;
         }
-        if (taskResult?.status === "failed" && isHomeActionComplete(result.statusText || status, result.readinessText || readiness)) {
-          setTaskResult({ status: "succeeded", title: /restart/i.test(taskResult.title) ? "Battlegroup Restarted Successfully" : "Server Started Successfully" });
-        } else if (taskResult?.status === "failed" && loadedState.running) {
+        if (taskResult?.status === "failed" && (!/restart/i.test(taskResult.title) || restartReady) && isHomeActionComplete(statusText, readinessText)) {
           setTaskResult({ status: "succeeded", title: /restart/i.test(taskResult.title) ? "Battlegroup Restarted Successfully" : "Server Started Successfully" });
         } else if (taskResult?.status === "failed" && loadedState.stopped && /stop/i.test(taskResult.title)) {
           setTaskResult({ status: "stopped", title: "Server Stopped" });
@@ -125,14 +174,17 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
     }[action];
     setLocalError("");
     setHomeAction(action);
-    setTaskResult({ status: "running", title: copy.running });
+    setTaskResult(stackActionPendingResult(action));
     if (action === "restart") {
       const preLoad = await onLoad().catch(() => null);
       if (homeActionRunId.current !== actionRunId) return;
       if (preLoad) {
         applyHomeLoadResult(preLoad);
         const preState = getHomeServerState(preLoad.statusText || status, preLoad.readinessText || readiness);
-        if (preState.stopped) commandAction = "start";
+        if (preState.stopped) {
+          homeRestartLifecycle.current = { ...homeRestartLifecycle.current, stopObserved: true };
+          commandAction = "start";
+        }
       }
     }
     let keepPolling = false;
@@ -141,32 +193,41 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
       const final = await waitForTaskSilently(response.task);
       if (homeActionRunId.current !== actionRunId) return;
       const details = taskTechnicalDetails(final);
+      if (action === "restart") homeRestartLifecycle.current = advanceRestartLifecycleFromTaskDetails(homeRestartLifecycle.current, details);
       const postLoad = await onLoad().catch(() => null);
       if (homeActionRunId.current !== actionRunId) return;
       if (postLoad) applyHomeLoadResult(postLoad);
       const postState = getHomeServerState(postLoad?.statusText || status, postLoad?.readinessText || readiness);
       const postReady = isHomeActionComplete(postLoad?.statusText || status, postLoad?.readinessText || readiness);
+      if (action === "restart") {
+        homeRestartLifecycle.current = advanceRestartLifecycle(homeRestartLifecycle.current, postLoad?.statusText || status, postLoad?.readinessText || readiness);
+      }
+      const restartReady = isRestartLifecycleReady(action, homeRestartLifecycle.current);
       const elapsedMs = Date.now() - homeActionStartedAt.current;
       if (action === "stop" && isHomeStopComplete(postLoad?.statusText || status, postLoad?.readinessText || readiness)) {
         setTaskResult({ status: "stopped", title: copy.success, details });
-      } else if ((action === "start" || action === "restart") && elapsedMs >= 8000 && postReady) {
-        setTaskResult({ status: "succeeded", title: copy.success, details });
+      } else if (action === "restart" && restartReady) {
+        keepPolling = true;
+        if (isHomeActionComplete(postLoad?.statusText || status, postLoad?.readinessText || readiness)) setHomeAction("");
+      } else if (action === "start" && elapsedMs >= 8000 && postReady) {
+        keepPolling = true;
+        setTaskResult({ ...stackActionPendingResult(action, "confirming"), details });
       } else if (final.status !== "succeeded") {
         if ((action === "start" || action === "restart") && (postState.starting || postState.running)) {
           keepPolling = true;
-          setTaskResult({ status: "running", title: copy.running, details });
+          setTaskResult({ ...stackActionPendingResult(action), details });
         } else {
           setTaskResult({ status: "failed", title: copy.failure, details });
         }
       } else if (action === "stop") {
         keepPolling = true;
-        setTaskResult({ status: "running", title: copy.running, details });
+        setTaskResult({ ...stackActionPendingResult(action), details });
       } else if (action === "restart" && final.status === "succeeded") {
         keepPolling = true;
-        setTaskResult({ status: "running", title: copy.running, details });
+        setTaskResult({ ...stackActionPendingResult(action, "waiting"), details });
       } else if ((action === "start" || action === "restart") && (final.status === "succeeded" || postState.starting || postState.running)) {
         keepPolling = true;
-        setTaskResult({ status: "running", title: copy.running });
+        setTaskResult(final.status === "succeeded" ? stackActionPendingResult(action, "waiting") : stackActionPendingResult(action));
       } else {
         setTaskResult({ status: "failed", title: copy.failure, details });
       }
@@ -213,13 +274,31 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
       if (!active || !result) return;
       applyHomeLoadResult(result);
       const currentAction = activeHomeAction.current;
+      const statusText = result.statusText || status;
+      const readinessText = result.readinessText || readiness;
+      if (currentAction === "restart") homeRestartLifecycle.current = advanceRestartLifecycle(homeRestartLifecycle.current, statusText, readinessText);
+      const restartReady = isRestartLifecycleReady(currentAction, homeRestartLifecycle.current);
       const elapsedMs = Date.now() - homeActionStartedAt.current;
-      if (currentAction === "stop" && isHomeStopComplete(result.statusText || status, result.readinessText || readiness)) {
+      if (currentAction === "stop" && isHomeStopComplete(statusText, readinessText)) {
         setTaskResult({ status: "stopped", title: "Server Stopped" });
         setHomeAction("");
-      } else if ((currentAction === "start" || currentAction === "restart") && elapsedMs >= 8000 && isHomeActionComplete(result.statusText || status, result.readinessText || readiness)) {
-        setTaskResult({ status: "succeeded", title: currentAction === "start" ? "Server Started Successfully" : "Battlegroup Restarted Successfully" });
-        setHomeAction("");
+      } else if (currentAction === "restart" && restartReady) {
+        if (isHomeActionComplete(statusText, readinessText)) setHomeAction("");
+      } else if (currentAction === "start" && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText)) {
+        homeActionReadyPolls.current += 1;
+        if (homeActionReadyPolls.current >= 2) {
+          setTaskResult({ status: "succeeded", title: "Server Started Successfully" });
+          setHomeAction("");
+        } else {
+          setTaskResult(stackActionPendingResult(currentAction, "confirming"));
+        }
+      } else if (currentAction === "start" || currentAction === "restart") {
+        homeActionReadyPolls.current = 0;
+        setTaskResult((current) => {
+          if (current?.status !== "running") return current;
+          const phase = /^Waiting/i.test(current.title) ? "waiting" : "running";
+          return { ...current, ...stackActionPendingResult(currentAction, phase) };
+        });
       }
     }, 3000);
     return () => {
@@ -256,14 +335,17 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   }, [runningAction, status, readiness, onLoad]);
 
   useEffect(() => {
-    if (runningAction !== "start" && runningAction !== "restart") return;
-    if (!isHomeActionComplete(status, readiness)) return;
-    const minimumTransitionMs = runningAction === "restart" ? 8000 : 0;
-    const elapsedMs = Date.now() - homeActionStartedAt.current;
-    if (elapsedMs < minimumTransitionMs) return;
-    setTaskResult({ status: "succeeded", title: runningAction === "start" ? "Server Started Successfully" : "Battlegroup Restarted Successfully" });
-    setHomeAction("");
-  }, [runningAction, status, readiness, setRunningAction, setTaskResult]);
+    if (!isRestartSuccessAwaitingFreshStatus(taskResult, status, readiness)) return;
+    let active = true;
+    const id = window.setInterval(async () => {
+      const result = await onLoad().catch(() => null);
+      if (active && result) applyHomeLoadResult(result);
+    }, 1500);
+    return () => {
+      active = false;
+      window.clearInterval(id);
+    };
+  }, [taskResult?.status, taskResult?.title, status, readiness, onLoad]);
 
   useEffect(() => {
     if (!taskResult || taskResult.status === "running") return;
@@ -338,7 +420,7 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
         {localError && <p className="error">{localError}</p>}
       </article>
       <PerformanceCards performance={performance} error={performanceError} />
-      <HomeHealthCards status={status} readiness={readiness} readinessWarning={readinessWarning} loading={loading} runningAction={runningAction} taskResult={taskResult} funcomTokenResult={funcomTokenResult} />
+      <HomeHealthCards status={status} readiness={readiness} readinessWarning={readinessWarning} loading={loading} runningAction={runningAction} restartStartObserved={restartStartObserved} taskResult={taskResult} funcomTokenResult={funcomTokenResult} />
     </section>
   );
 }
@@ -425,6 +507,7 @@ export function ServerPanel(props: {
   funcomTokenResult: HomeTaskResult | null;
   setFuncomTokenResult: Dispatch<SetStateAction<HomeTaskResult | null>>;
   runningAction: "start" | "stop" | "restart" | "";
+  restartStartObserved: boolean;
   setRunningAction: Dispatch<SetStateAction<"start" | "stop" | "restart" | "">>;
   onError: (text: string) => void;
   onRedeploy: () => void;
@@ -444,8 +527,12 @@ export function ServerPanel(props: {
   const [funcomToken, setFuncomToken] = useState("");
   const [serviceRestartResult, setServiceRestartResult] = useState<HomeTaskResult | null>(null);
   const [serviceRestartingService, setServiceRestartingService] = useState("");
+  const [doctorLoading, setDoctorLoading] = useState(!props.doctor);
+  const [doctorError, setDoctorError] = useState("");
   const controlActionRunId = useRef(0);
   const controlActionStartedAt = useRef(0);
+  const controlActionReadyPolls = useRef(0);
+  const controlRestartLifecycle = useRef<RestartLifecycleState>(createRestartLifecycleState());
   const serviceRestartRunId = useRef(0);
   const { taskResult, setTaskResult, funcomTokenResult, setFuncomTokenResult, runningAction, setRunningAction, confirmAction } = props;
   const activeControlAction = useRef<"start" | "stop" | "restart" | "">(runningAction);
@@ -471,9 +558,15 @@ export function ServerPanel(props: {
   }
   function setControlAction(action: "start" | "stop" | "restart" | "") {
     activeControlAction.current = action;
+    controlActionReadyPolls.current = 0;
+    if (action === "restart" || !action) controlRestartLifecycle.current = createRestartLifecycleState();
     setRunningAction(action);
   }
   async function loadControlStatus(includeDiagnostics = false): Promise<HomeLoadResult> {
+    if (includeDiagnostics) {
+      setDoctorLoading(true);
+      setDoctorError("");
+    }
     const requests = includeDiagnostics
       ? [serverApi.status(), serverApi.readiness(), serverApi.ports(), serverApi.doctor()] as const
       : [serverApi.status(), serverApi.readiness()] as const;
@@ -497,7 +590,13 @@ export function ServerPanel(props: {
       result.readinessError = nextReadiness.reason instanceof Error ? nextReadiness.reason.message : String(nextReadiness.reason);
     }
     if (nextPorts?.status === "fulfilled") props.setPorts(nextPorts.value.stdout);
-    if (nextDoctor?.status === "fulfilled") props.setDoctor(nextDoctor.value.stdout);
+    if (nextDoctor?.status === "fulfilled") {
+      props.setDoctor(nextDoctor.value.stdout || nextDoctor.value.stderr || "");
+      setDoctorLoading(false);
+    } else if (nextDoctor) {
+      setDoctorError(nextDoctor.reason instanceof Error ? nextDoctor.reason.message : String(nextDoctor.reason));
+      setDoctorLoading(false);
+    }
     if (!result.statusLoaded && result.statusError) props.onError(friendlyHomeStatusError(result.statusError));
     return result;
   }
@@ -583,33 +682,40 @@ export function ServerPanel(props: {
     }[action];
     props.onError("");
     setControlAction(action);
-    setTaskResult({ status: "running", title: copy.running });
+    setTaskResult(stackActionPendingResult(action));
     let keepPolling = false;
     try {
       const response = action === "start" ? await serverApi.start() : action === "stop" ? await serverApi.stop() : await serverApi.restart();
       const final = await waitForTaskSilently(response.task);
       if (controlActionRunId.current !== actionRunId) return;
       const details = taskTechnicalDetails(final);
+      if (action === "restart") controlRestartLifecycle.current = advanceRestartLifecycleFromTaskDetails(controlRestartLifecycle.current, details);
       const postLoad = await loadControlStatus(false).catch(() => null);
       if (controlActionRunId.current !== actionRunId) return;
       const statusText = postLoad?.statusText || props.status;
       const readinessText = postLoad?.readinessText || props.readiness;
+      if (action === "restart") controlRestartLifecycle.current = advanceRestartLifecycle(controlRestartLifecycle.current, statusText, readinessText);
+      const restartReady = isRestartLifecycleReady(action, controlRestartLifecycle.current);
       const elapsedMs = Date.now() - controlActionStartedAt.current;
       if (action === "stop" && isHomeStopComplete(statusText, readinessText)) {
         setTaskResult({ status: "stopped", title: copy.success, details });
-      } else if ((action === "start" || action === "restart") && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText)) {
-        setTaskResult({ status: "succeeded", title: copy.success, details });
+      } else if (action === "restart" && restartReady) {
+        keepPolling = true;
+        if (isHomeActionComplete(statusText, readinessText)) setControlAction("");
+      } else if (action === "start" && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText)) {
+        keepPolling = true;
+        setTaskResult({ ...stackActionPendingResult(action, "confirming"), details });
       } else if (final.status !== "succeeded") {
         const postState = getHomeServerState(statusText, readinessText);
         if ((action === "start" || action === "restart") && (postState.starting || postState.running)) {
           keepPolling = true;
-          setTaskResult({ status: "running", title: copy.running, details });
+          setTaskResult({ ...stackActionPendingResult(action), details });
         } else {
           setTaskResult({ status: "failed", title: copy.failure, details });
         }
       } else {
         keepPolling = true;
-        setTaskResult({ status: "running", title: copy.running, details });
+        setTaskResult({ ...stackActionPendingResult(action, "waiting"), details });
       }
     } catch (error) {
       if (controlActionRunId.current !== actionRunId) return;
@@ -697,6 +803,7 @@ export function ServerPanel(props: {
     if (runningAction && controlActionStartedAt.current === 0) controlActionStartedAt.current = Date.now();
     if (!runningAction) controlActionStartedAt.current = 0;
   }, [runningAction]);
+
   useEffect(() => {
     const title = findLineValue(props.status, ["title", "server title", "SERVER_TITLE"]);
     if (!title || titleSaving) return;
@@ -718,17 +825,28 @@ export function ServerPanel(props: {
       const currentAction = activeControlAction.current;
       const statusText = result.statusText || props.status;
       const readinessText = result.readinessText || props.readiness;
+      if (currentAction === "restart") controlRestartLifecycle.current = advanceRestartLifecycle(controlRestartLifecycle.current, statusText, readinessText);
+      const restartReady = isRestartLifecycleReady(currentAction, controlRestartLifecycle.current);
       const elapsedMs = Date.now() - controlActionStartedAt.current;
       if (currentAction === "stop" && isHomeStopComplete(statusText, readinessText)) {
         setTaskResult({ status: "stopped", title: "Server Stopped" });
         setControlAction("");
-      } else if ((currentAction === "start" || currentAction === "restart") && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText)) {
-        setTaskResult({ status: "succeeded", title: currentAction === "start" ? "Server Started Successfully" : "Battlegroup Restarted Successfully" });
-        setControlAction("");
+      } else if (currentAction === "restart" && restartReady) {
+        if (isHomeActionComplete(statusText, readinessText)) setControlAction("");
+      } else if (currentAction === "start" && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText)) {
+        controlActionReadyPolls.current += 1;
+        if (controlActionReadyPolls.current >= 2) {
+          setTaskResult({ status: "succeeded", title: "Server Started Successfully" });
+          setControlAction("");
+        } else {
+          setTaskResult(stackActionPendingResult(currentAction, "confirming"));
+        }
       } else {
+        if (currentAction === "start" || currentAction === "restart") controlActionReadyPolls.current = 0;
         setTaskResult((current) => {
           if (current?.status !== "running") return current;
-          return { ...current, title: currentAction === "start" ? "Starting" : currentAction === "stop" ? "Stopping" : "Restarting Battlegroup" };
+          const phase = /^Waiting/i.test(current.title) ? "waiting" : "running";
+          return { ...current, ...stackActionPendingResult(currentAction || "restart", phase) };
         });
       }
     }, 3000);
@@ -759,12 +877,31 @@ export function ServerPanel(props: {
       window.clearInterval(id);
     };
   }, [runningAction, props.status, props.readiness]);
+
+  useEffect(() => {
+    if (!isRestartSuccessAwaitingFreshStatus(taskResult, props.status, props.readiness)) return;
+    let active = true;
+    const id = window.setInterval(async () => {
+      if (active) await loadControlStatus(true).catch(() => null);
+    }, 1500);
+    return () => {
+      active = false;
+      window.clearInterval(id);
+    };
+  }, [taskResult?.status, taskResult?.title, props.status, props.readiness]);
   useEffect(() => {
     let active = true;
     const id = window.setInterval(async () => {
       if (!active) return;
       const result = await serverApi.doctor().catch(() => null);
-      if (active && result) props.setDoctor(result.stdout || result.stderr || "");
+      if (!active) return;
+      if (result) {
+        props.setDoctor(result.stdout || result.stderr || "");
+        setDoctorError("");
+      } else if (!props.doctor) {
+        setDoctorError("Doctor diagnostics could not be loaded.");
+      }
+      setDoctorLoading(false);
     }, 30000);
     return () => {
       active = false;
@@ -859,7 +996,7 @@ export function ServerPanel(props: {
           </span>}
         </div>
       </section>
-      <DoctorSummary text={props.doctor} readiness={props.readiness} />
+      <DoctorSummary text={props.doctor} readiness={props.readiness} loading={doctorLoading} error={doctorError} />
     </section>
   );
 }
@@ -1036,9 +1173,9 @@ function isValidHourMinuteTime(value: string) {
 
 
 
-function HomeHealthCards({ status, readiness, readinessWarning, loading, runningAction, taskResult, funcomTokenResult }: { status: string; readiness: string; readinessWarning: string; loading: boolean; runningAction: "start" | "stop" | "restart" | ""; taskResult: HomeTaskResult | null; funcomTokenResult: HomeTaskResult | null }) {
+function HomeHealthCards({ status, readiness, readinessWarning, loading, runningAction, restartStartObserved, taskResult, funcomTokenResult }: { status: string; readiness: string; readinessWarning: string; loading: boolean; runningAction: "start" | "stop" | "restart" | ""; restartStartObserved: boolean; taskResult: HomeTaskResult | null; funcomTokenResult: HomeTaskResult | null }) {
   const funcomTokenCheckRunning = funcomTokenResult?.status === "running";
-  const summary = summarizeHomeStatus(status, readiness, readinessWarning, loading, runningAction, taskResult, !funcomTokenCheckRunning && (isFuncomTokenAuthFailure(funcomTokenResult) || hasPersistedFuncomTokenAuthFailure()));
+  const summary = summarizeHomeStatus(status, readiness, readinessWarning, loading, runningAction, taskResult, restartStartObserved, !funcomTokenCheckRunning && (isFuncomTokenAuthFailure(funcomTokenResult) || hasPersistedFuncomTokenAuthFailure()));
   return <div className="home-health wide">
     <section className="dashboard-band">
       <h3>Server Identity</h3>
@@ -1063,18 +1200,23 @@ function HomeHealthCards({ status, readiness, readinessWarning, loading, running
   </div>;
 }
 
-function DoctorSummary({ text, readiness }: { text: string; readiness: string }) {
+function DoctorSummary({ text, readiness, loading, error }: { text: string; readiness: string; loading: boolean; error: string }) {
   const readinessHealthy = /^READY:/m.test(readiness);
   const issues = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^WARN\s+/i.test(line)).filter((line) => {
     if (!readinessHealthy) return true;
-    return !/Director heartbeat not seen in recent logs|Gateway DB monitoring not seen in recent logs/i.test(line);
+    return !/Director heartbeat not seen in recent logs|Gateway DB monitoring not seen in recent logs|DeepDesert_1 is always-on/i.test(line);
   }).slice(0, 6);
+  const info = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^INFO\s+/i.test(line)).slice(0, 3);
   return <section className="action-section doctor-section">
     <div className="panel-title"><h4>Doctor Diagnostics</h4></div>
-    {text ? <p>{issues.length ? `${issues.length} diagnostic item${issues.length === 1 ? "" : "s"} need attention.` : "No obvious warning lines detected in the latest doctor output."}</p> : <p>Run Doctor to show diagnostics.</p>}
+    {loading ? <p className="loading-dots">Checking diagnostics</p> : error ? <p className="error">{error}</p> : text ? <p>{issues.length ? `${issues.length} diagnostic item${issues.length === 1 ? "" : "s"} need attention.` : "Doctor diagnostics look healthy."}</p> : <p>Doctor diagnostics have not loaded yet.</p>}
     {issues.length > 0 && <div className="check-grid">{issues.map((issue, index) => {
       const advice = doctorAdvice(issue);
       return <article className="check-card" key={`${issue}-${index}`}><div><strong>{advice.title}</strong><p>{advice.message}</p>{advice.nextStep && <span className="muted">{advice.nextStep}</span>}</div><StatusPill value="WARN" /></article>;
+    })}</div>}
+    {!issues.length && info.length > 0 && <div className="check-grid">{info.map((line, index) => {
+      const clean = friendlyIssueLine(line);
+      return <article className="check-card" key={`${line}-${index}`}><div><strong>Diagnostic Note</strong><p>{clean}</p></div><StatusPill value="INFO" /></article>;
     })}</div>}
   </section>;
 }
@@ -1140,12 +1282,13 @@ function firstArray(...values: unknown[]) {
   return values.find((value) => Array.isArray(value)) as unknown[] | undefined;
 }
 
-function summarizeHomeStatus(status: string, readiness: string, readinessWarning: string, loading: boolean, runningAction: "start" | "stop" | "restart" | "" = "", taskResult: HomeTaskResult | null = null, funcomTokenAuthFailure = false) {
+function summarizeHomeStatus(status: string, readiness: string, readinessWarning: string, loading: boolean, runningAction: "start" | "stop" | "restart" | "" = "", taskResult: HomeTaskResult | null = null, restartStarted = false, funcomTokenAuthFailure = false) {
   void readinessWarning;
   const serverState = getHomeServerState(status, readiness);
   const bootStarting = isHomeBootStarting(status, readiness);
   const actionFailed = taskResult?.status === "failed" && !serverState.running;
   const actionStopped = taskResult?.status === "stopped";
+  const restartSuccessAwaitingFreshStatus = isRestartSuccessAwaitingFreshStatus(taskResult, status, readiness);
   const rawOverall = findLineValue(status, ["overall"]);
   const readinessReady = /^READY:/m.test(readiness);
   const liveOverall = readinessReady ? "OK" : friendlyHomeOverall(rawOverall || (readiness ? "Readiness checked" : readinessWarning ? "Status loaded, readiness warning" : status ? "Status loaded" : loading ? "Checking" : "Unknown"));
@@ -1157,12 +1300,19 @@ function summarizeHomeStatus(status: string, readiness: string, readinessWarning
   const rawFls = preferKnownHomeHealth(summarizeFls(status), summarizeReadinessFls(readiness));
   const readyOverride = readinessReady ? { label: "OK", status: "Ready", detail: "" } : null;
   const coreReadyWithReview = !runningAction && isHomeCoreReadyWithReview(status, readiness, rawContainers, rawListeners, rawDatabase, rawGames, rawRabbit, rawFls);
-  const isStarting = runningAction === "start" || runningAction === "restart" || (bootStarting && !coreReadyWithReview);
-  const transitionOverall = runningAction === "restart" ? "Restarting Battlegroup" : runningAction === "stop" ? "Stopping" : isStarting ? "Starting" : "";
+  const isStarting = runningAction === "start" || runningAction === "restart" || restartSuccessAwaitingFreshStatus || (bootStarting && !coreReadyWithReview);
+  const restartSuccessObserved = taskResult?.status === "succeeded" && /restart/i.test(taskResult.title || "");
+  const restartStartObserved = restartStarted || restartSuccessAwaitingFreshStatus || restartSuccessObserved;
+  const transitionOverall = runningAction === "restart"
+    ? restartStartObserved ? "Starting" : "Restarting Battlegroup"
+    : runningAction === "stop" ? "Stopping" : isStarting ? "Starting" : "";
   const warmingOverall = /^Warming$/i.test(rawGames.label) ? "Warming" : "";
   const overall = readinessReady && !runningAction ? "OK" : isStarting ? transitionOverall : runningAction ? transitionOverall : serverState.stopped || actionStopped ? "Stopped" : coreReadyWithReview ? "Needs Review" : warmingOverall || liveOverall;
-  const attentionHealth = !isStarting && (serverState.stopped || actionStopped || actionFailed) ? attentionHomeHealthCards() : null;
-  const transitionAction: "start" | "stop" | "restart" | "" = runningAction || (bootStarting && !coreReadyWithReview ? "start" : "");
+  const attentionHealth = !isStarting && !restartSuccessAwaitingFreshStatus && (serverState.stopped || actionStopped || actionFailed) ? attentionHomeHealthCards() : null;
+  const transitionAction: "start" | "stop" | "restart" | "" = restartStartObserved
+    ? "start"
+    : runningAction === "restart" ? ""
+      : runningAction || (restartSuccessAwaitingFreshStatus || (bootStarting && !coreReadyWithReview) ? "start" : "");
   const containers = readyOverride || transitionHomeHealthCard(rawContainers, transitionAction) || attentionHealth?.containers || rawContainers;
   const listeners = readyOverride || transitionHomeHealthCard(rawListeners, transitionAction) || attentionHealth?.listeners || rawListeners;
   const database = readyOverride || transitionHomeHealthCard(rawDatabase, transitionAction) || attentionHealth?.database || rawDatabase;
@@ -1228,6 +1378,14 @@ function isHomeCoreReadyWithReview(
 
 function isReadyHomeCard(item: { label: string; status: string; detail: string }) {
   return /^OK$/i.test(item.label) && /^Ready$/i.test(item.status);
+}
+
+function isRestartSuccessAwaitingFreshStatus(taskResult: HomeTaskResult | null, status: string, readiness: string): boolean {
+  return taskResult?.status === "succeeded" &&
+    /restart/i.test(taskResult.title || "") &&
+    getHomeServerState(status, readiness).stopped &&
+    !isHomeStartComplete(status, readiness) &&
+    !isHomeReadinessOperational(readiness);
 }
 
 
@@ -1338,6 +1496,44 @@ export function isHomeStopComplete(status: string, readiness: string) {
   return readinessContainersStopped || (allListenersMissing && gameServersStopped);
 }
 
+function hasRestartStopSignal(status: string, readiness: string) {
+  const text = `${status}\n${readiness}`;
+  const requiredContainers = [
+    "dune-postgres",
+    "dune-rmq-admin",
+    "dune-rmq-game",
+    "dune-text-router",
+    "dune-director",
+    "dune-server-gateway",
+    "dune-server-survival-1",
+    "dune-server-overmap"
+  ];
+  const containerLines = sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
+  return requiredContainers.some((name) =>
+    containerLines.some((line) => new RegExp(`^${name}\\s+\\b(missing|stopped|exited|dead|not running)\\b`, "i").test(line)) ||
+    new RegExp(`\\bFAIL\\s+container\\s+${name}\\b`, "i").test(text)
+  );
+}
+
+function hasRestartStartSignal(status: string, readiness: string) {
+  const text = `${status}\n${readiness}`;
+  const requiredContainers = [
+    "dune-postgres",
+    "dune-rmq-admin",
+    "dune-rmq-game",
+    "dune-text-router",
+    "dune-director",
+    "dune-server-gateway",
+    "dune-server-survival-1",
+    "dune-server-overmap"
+  ];
+  const containerLines = sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
+  return requiredContainers.some((name) =>
+    containerLines.some((line) => new RegExp(`^${name}\\s+.*\\bUp\\b`, "i").test(line)) ||
+    new RegExp(`\\bOK\\s+container\\s+${name}\\b`, "i").test(text)
+  );
+}
+
 function isHomeStartComplete(status: string, readiness: string) {
   const serverState = getHomeServerState(status, readiness);
   if (serverState.stopped) return false;
@@ -1388,9 +1584,7 @@ function transitionHomeHealthCard(item: { label: string; status: string; detail:
   if (runningAction !== "start" && runningAction !== "restart") return null;
   if (/^OK$/i.test(item.label) && /^Ready$/i.test(item.status)) return item;
   if (/^Warming$/i.test(item.label)) return item;
-  const label = runningAction === "restart" ? "Restarting Battlegroup" : "Getting Ready";
-  const status = runningAction === "restart" ? "WARN" : "Starting";
-  return { label, status, detail: "" };
+  return { label: "Getting Ready", status: "Starting", detail: "" };
 }
 
 function preferKnownHomeHealth(primary: { label: string; status: string; detail: string }, fallback: { label: string; status: string; detail: string }) {
@@ -1456,10 +1650,9 @@ function isHomeBootStarting(status: string, readiness: string) {
 }
 
 function homeOverallBadge(value: string) {
-  if (/^restarting$/i.test(value)) return "WARN";
-  if (/^stopping$/i.test(value)) return "WARN";
+  const normalized = String(value || "").trim().toLowerCase();
+  if (/\b(restarting|restart|stopping|starting)\b/.test(normalized)) return "WARN";
   if (/^stopped$/i.test(value)) return "WARN";
-  if (/^starting$/i.test(value)) return "Starting";
   if (/^issue(?: detected)?$/i.test(value)) return "WARN";
   if (/warming/i.test(value)) return "Info";
   if (/stopped|not running|offline/i.test(value)) return "WARN";

@@ -429,12 +429,15 @@ test("care package send message is sent as a grant action", async () => {
     const result = await grantCarePackage(config, "RedBlink#75570", {
       confirmation: "GRANT CARE PACKAGE",
       characterName: "RedBlink",
-      funcomId: "RedBlink#75570"
+      funcomId: "RedBlink#75570",
+      flsId: "ABCDEF1234567890"
     }, { db });
     assert.equal(result.status, "granted");
-    assert.equal(result.results.find((row) => row.operation === "carePackageWelcomeWhisper")?.ok, true);
+    const whisper = result.results.find((row) => row.operation === "carePackageWelcomeWhisper");
+    assert.equal(whisper?.ok, true);
+    assert.equal(whisper?.senderName, "Server");
     assert.match(result.summary, /2 succeeded, 0 failed/);
-    assert.ok(db.queries.some((query) => /insert into dune\."encrypted_accounts"/.test(query.text)));
+    assert.equal(db.queries.some((query) => /insert into dune\."encrypted_accounts"/.test(query.text)), true);
   } finally {
     rmSync(config.repoRoot, { recursive: true, force: true });
   }
@@ -458,7 +461,7 @@ test("care package send message fails clearly without recipient identity", async
   }
 });
 
-test("care package persona setup falls back when account_id is not a conflict key", async () => {
+test("care package send message seeds the synthetic sender persona safely", async () => {
   const config = tempConfig();
   try {
     writeCatalog(config);
@@ -477,8 +480,8 @@ test("care package persona setup falls back when account_id is not a conflict ke
       flsId: "ABCDEF1234567890"
     }, { db });
     assert.equal(result.status, "granted");
-    assert.ok(db.queries.some((query) => /update dune\."encrypted_player_state"/.test(query.text)));
-    assert.ok(db.queries.some((query) => /insert into dune\."encrypted_player_state".*where not exists/s.test(query.text)));
+    assert.equal(db.queries.some((query) => /update dune\."encrypted_player_state"/.test(query.text)), true);
+    assert.equal(db.queries.some((query) => /insert into dune\."encrypted_player_state".*where not exists/s.test(query.text)), true);
   } finally {
     rmSync(config.repoRoot, { recursive: true, force: true });
   }
