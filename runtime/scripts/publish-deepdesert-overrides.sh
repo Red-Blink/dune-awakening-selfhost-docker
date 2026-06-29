@@ -267,11 +267,16 @@ start_loop() {
   write_live_pidfile
   trap 'rm -f "$PID_FILE"' EXIT
   local route_refresh_at=0
+  local rows payload
   ensure_route
   while true; do
     if [ "$(date +%s)" -ge "$route_refresh_at" ]; then
       ensure_route >>"$LOG_FILE" 2>&1 || true
-      publish_snapshot_once >>"$LOG_FILE" 2>&1 || true
+      rows="$(publish_snapshot_once 2>>"$LOG_FILE" || true)"
+      while IFS= read -r payload; do
+        [ -n "$payload" ] || continue
+        publish_payload "$payload" >>"$LOG_FILE" 2>&1 || true
+      done <<< "$rows"
       route_refresh_at=$(( $(date +%s) + 10 ))
     fi
     sleep 1
