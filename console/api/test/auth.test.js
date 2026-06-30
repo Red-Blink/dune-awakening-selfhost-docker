@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createAuth, clearSessionCookie, setSessionCookie, json } from "../src/auth.js";
+import { EMBEDDABLE_CONTENT_SECURITY_POLICY, createAuth, clearSessionCookie, setSessionCookie, json, withSecurityHeaders } from "../src/auth.js";
 
 test("auth creates readable signed sessions", () => {
   const auth = createAuth({ sessionSecret: "secret", adminPassword: "admin", authDisabled: false });
@@ -44,10 +44,23 @@ test("session cookies can opt into Secure for production/container deployments",
 test("json responses include defensive browser headers", () => {
   const res = fakeResponse();
   json(res, 200, { ok: true });
+  assert.match(res.headers["content-security-policy"], /default-src 'self'/);
+  assert.match(res.headers["content-security-policy"], /frame-ancestors 'none'/);
+  assert.equal(res.headers["strict-transport-security"], "max-age=31536000");
   assert.equal(res.headers["x-content-type-options"], "nosniff");
   assert.equal(res.headers["x-frame-options"], "DENY");
   assert.equal(res.headers["referrer-policy"], "no-referrer");
   assert.match(res.headers["permissions-policy"], /camera=\(\)/);
+});
+
+test("security headers allow explicit same-origin addon frame overrides", () => {
+  const headers = withSecurityHeaders({
+    "content-security-policy": EMBEDDABLE_CONTENT_SECURITY_POLICY,
+    "x-frame-options": "SAMEORIGIN"
+  });
+  assert.match(headers["content-security-policy"], /frame-ancestors 'self'/);
+  assert.equal(headers["x-frame-options"], "SAMEORIGIN");
+  assert.equal(headers["strict-transport-security"], "max-age=31536000");
 });
 
 function fakeResponse() {
