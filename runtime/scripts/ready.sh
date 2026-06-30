@@ -363,7 +363,7 @@ echo "=== Listener checks ==="
 check_tcp 15432 "Postgres localhost" "dune-postgres"
 check_tcp 32573 "RabbitMQ admin localhost" "dune-rmq-admin"
 check_tcp 31982 "RabbitMQ game public" "dune-rmq-game"
-check_tcp 31983 "RabbitMQ game HTTP public" "dune-rmq-game"
+check_tcp 31983 "RabbitMQ game HTTP local" "dune-rmq-game"
 check_tcp 5059  "TextRouter localhost" "dune-text-router"
 check_tcp 11717 "Director localhost" "dune-director"
 
