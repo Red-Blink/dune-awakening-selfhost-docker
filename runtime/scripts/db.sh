@@ -434,7 +434,7 @@ backup_db() {
   artifact_id="dune-db-$scope"
   backup_file="$out_dir/$artifact_id-$ts.backup"
   sidecar_file="$backup_file.yaml"
-  tmp_file="/tmp/$artifact_id-$ts.backup"
+  tmp_file="$(docker exec dune-postgres mktemp "/tmp/${artifact_id}.XXXXXX.backup")"
 
   echo "Creating database backup..."
   docker exec dune-postgres pg_dump -U postgres -d dune -Fc -f "$tmp_file"
@@ -1087,7 +1087,7 @@ import_db() {
   recreate_dune_database
 
   ext="${backup_file##*.}"
-  tmp_file="/tmp/dune-db-import-$(date +%Y%m%d-%H%M%S).$ext"
+  tmp_file="$(docker exec dune-postgres mktemp "/tmp/dune-db-import.XXXXXX.$ext")"
   docker cp "$backup_file" "dune-postgres:$tmp_file"
 
   echo "Restoring database..."

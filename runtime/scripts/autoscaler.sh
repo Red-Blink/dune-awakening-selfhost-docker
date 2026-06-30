@@ -1068,7 +1068,10 @@ progress_deepdesert_travel_handoffs() {
       continue
     fi
 
-    TARGET_JSON="$target_json" FLOW_ID="$flow_id" PLAYER_ID="$player_id" ORIGIN_ID="$origin_id" REQUEST_TOKEN="$request_token" python3 - <<'PY' > /tmp/deepdesert-progress.json
+    local progress_json
+    progress_json="$(mktemp "${TMPDIR:-/tmp}/dune-deepdesert-progress.XXXXXX")"
+
+    TARGET_JSON="$target_json" FLOW_ID="$flow_id" PLAYER_ID="$player_id" ORIGIN_ID="$origin_id" REQUEST_TOKEN="$request_token" python3 - <<'PY' > "$progress_json"
 import json
 import os
 from datetime import datetime, timedelta, timezone
@@ -1125,10 +1128,11 @@ sys.exit(0 if target["ready"] else 1)
 PY
     then
       local grant_json
-      grant_json="$(python3 - <<'PY'
+      grant_json="$(PROGRESS_JSON="$progress_json" python3 - <<'PY'
 import json
+import os
 from pathlib import Path
-print(json.dumps(json.loads(Path("/tmp/deepdesert-progress.json").read_text())["grant"], separators=(",", ":"), ensure_ascii=False))
+print(json.dumps(json.loads(Path(os.environ["PROGRESS_JSON"]).read_text())["grant"], separators=(",", ":"), ensure_ascii=False))
 PY
 )"
       prepare_deepdesert_travel_actors "$player_id" "$(TARGET_JSON="$target_json" python3 - <<'PY'
@@ -1143,10 +1147,11 @@ PY
     else
       if [ $((now - last_refresh)) -ge 15 ]; then
         local response_json
-        response_json="$(python3 - <<'PY'
+        response_json="$(PROGRESS_JSON="$progress_json" python3 - <<'PY'
 import json
+import os
 from pathlib import Path
-print(json.dumps(json.loads(Path("/tmp/deepdesert-progress.json").read_text())["response"], separators=(",", ":"), ensure_ascii=False))
+print(json.dumps(json.loads(Path(os.environ["PROGRESS_JSON"]).read_text())["response"], separators=(",", ":"), ensure_ascii=False))
 PY
 )"
         publish_rmq_json "heartbeats" "$origin_server_id" "$response_json" "travel-response-dd-${flow_id}" || true
@@ -1154,6 +1159,7 @@ PY
         echo "DEEPDESERT-QUEUE flow=$flow_id origin=$origin_id server=$origin_server_id state=loading-refresh"
       fi
     fi
+    rm -f "$progress_json"
   done < "$DEEPDESERT_TRAVEL_FILE"
 }
 

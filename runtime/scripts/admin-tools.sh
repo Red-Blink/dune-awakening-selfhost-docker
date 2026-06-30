@@ -98,6 +98,7 @@ if error:
 with open(path, "a", encoding="utf-8") as f:
     f.write(json.dumps(row, separators=(",", ":")) + "\n")
 PY
+  chmod 600 "$ADMIN_HISTORY_TSV" "$ADMIN_AUDIT_JSONL" 2>/dev/null || true
 }
 
 audit_admin_command() {

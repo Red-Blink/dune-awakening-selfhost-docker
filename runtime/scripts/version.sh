@@ -55,7 +55,8 @@ first_known_value() {
 
 steam_build_id() {
   local app_id="$1"
-  local manifest="/tmp/dune-appmanifest-${app_id}.acf"
+  local manifest
+  manifest="$(mktemp "${TMPDIR:-/tmp}/dune-appmanifest-${app_id}.XXXXXX")"
 
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dune-orchestrator; then
     docker compose exec -T orchestrator sh -lc "cat /srv/dune/server/steamapps/appmanifest_${app_id}.acf 2>/dev/null" > "$manifest" 2>/dev/null || true
@@ -67,6 +68,7 @@ steam_build_id() {
     rm -f "$manifest"
   fi
 
+  rm -f "$manifest"
   echo "unknown"
 }
 

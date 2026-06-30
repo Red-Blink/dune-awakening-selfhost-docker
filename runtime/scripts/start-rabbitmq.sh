@@ -67,7 +67,8 @@ if [ ! -f runtime/rabbitmq-game/certs/key.pem ]; then
 fi
 
 chmod 755 runtime/rabbitmq-game runtime/rabbitmq-game/certs runtime/rabbitmq-game/config
-chmod 644 runtime/rabbitmq-game/certs/*.pem
+chmod 600 runtime/rabbitmq-game/certs/key.pem
+chmod 644 runtime/rabbitmq-game/certs/cert.pem runtime/rabbitmq-game/certs/cacert.pem
 cat > runtime/rabbitmq-admin/config/enabled_plugins <<'EOF'
 [rabbitmq_management,rabbitmq_prometheus,rabbitmq_auth_backend_http,rabbitmq_auth_backend_cache].
 EOF

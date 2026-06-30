@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, chmodSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { redact, redactValue } from "./redact.js";
 
@@ -13,6 +13,7 @@ export function audit(config, req, action, detail = {}) {
     detail: redactValue(detail)
   };
   appendFileSync(config.auditLog, `${JSON.stringify(row)}\n`, { mode: 0o600 });
+  secureAuditFile(config.auditLog);
 }
 
 export function recordAdminHistory(config, { command, target = "-", friendly = "", path = "web", result = "ok", message = "" }) {
@@ -27,9 +28,19 @@ export function recordAdminHistory(config, { command, target = "-", friendly = "
     safeColumn(result),
     safeMessage ? JSON.stringify({ messagePreview: safeMessage }) : "{}"
   ];
-  appendFileSync(join(config.generatedDir, "admin-command-history.tsv"), `${columns.join("\t")}\n`, { mode: 0o600 });
+  const historyFile = join(config.generatedDir, "admin-command-history.tsv");
+  appendFileSync(historyFile, `${columns.join("\t")}\n`, { mode: 0o600 });
+  secureAuditFile(historyFile);
 }
 
 function safeColumn(value) {
   return redact(String(value || "-")).replace(/[\r\n\t]/g, " ").slice(0, 160);
+}
+
+function secureAuditFile(path) {
+  try {
+    chmodSync(path, 0o600);
+  } catch {
+    // Best effort on non-POSIX development hosts.
+  }
 }

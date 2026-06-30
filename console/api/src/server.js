@@ -609,12 +609,16 @@ async function clearAdminHistoryRoute(req, res) {
   if (body.scope === "admin-tools") {
     const current = existsSync(historyFile) ? readFileSync(historyFile, "utf8") : "";
     const next = current.split(/\r?\n/).filter((line) => line && !isAdminToolsHistoryLine(line)).join("\n");
-    writeFileSync(historyFile, next ? `${next}\n` : "");
+    writeFileSync(historyFile, next ? `${next}\n` : "", { mode: 0o600 });
+    chmodSync(historyFile, 0o600);
     audit(config, req, "admin.history.clear", { ok: true, scope: "admin-tools" });
     return json(res, 200, { ok: true });
   }
-  writeFileSync(historyFile, "");
-  writeFileSync(join(historyDir, "admin-command-audit.jsonl"), "");
+  const auditFile = join(historyDir, "admin-command-audit.jsonl");
+  writeFileSync(historyFile, "", { mode: 0o600 });
+  writeFileSync(auditFile, "", { mode: 0o600 });
+  chmodSync(historyFile, 0o600);
+  chmodSync(auditFile, 0o600);
   audit(config, req, "admin.history.clear", { ok: true, scope: "all" });
   return json(res, 200, { ok: true });
 }

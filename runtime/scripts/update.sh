@@ -588,7 +588,8 @@ STEAMCMD_SH=/srv/dune/steam/steamcmd.sh
 STEAMCMD_BIN=/srv/dune/steam/linux32/steamcmd
 INSTALL_DIR=/srv/dune/server
 APP_ID="${APP_ID:-4754530}"
-APPINFO="/tmp/dune-appinfo-${APP_ID}.txt"
+APPINFO="$(mktemp "${TMPDIR:-/tmp}/dune-appinfo-${APP_ID}.XXXXXX")"
+trap '\''rm -f "$APPINFO"'\'' EXIT
 MANIFEST="${INSTALL_DIR}/steamapps/appmanifest_${APP_ID}.acf"
 
 if [ -x "$STEAMCMD_SH" ]; then
