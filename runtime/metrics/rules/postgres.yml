@@ -1,0 +1,67 @@
+groups:
+  - name: dune-postgres
+    rules:
+      - alert: DunePostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: postgres-exporter
+        annotations:
+          summary: Dune Postgres is down
+          description: postgres_exporter reports pg_up == 0.
+
+      - alert: DunePostgresExporterScrapeError
+        expr: pg_exporter_last_scrape_error == 1
+        for: 5m
+        labels:
+          severity: warning
+          service: postgres-exporter
+        annotations:
+          summary: Dune Postgres exporter scrape error
+          description: postgres_exporter has reported scrape errors for 5 minutes.
+
+      - alert: DunePostgresHighConnections
+        expr: 100 * (sum(pg_stat_activity_count) / sum(pg_settings_max_connections)) > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: postgres-exporter
+        annotations:
+          summary: Dune Postgres connection usage is high
+          description: Postgres active connections are above 80% of max connections.
+
+      - alert: DunePostgresCriticalConnections
+        expr: 100 * (sum(pg_stat_activity_count) / sum(pg_settings_max_connections)) > 95
+        for: 2m
+        labels:
+          severity: critical
+          service: postgres-exporter
+        annotations:
+          summary: Dune Postgres connection usage is critical
+          description: Postgres active connections are above 95% of max connections.
+
+      - alert: DunePostgresDeadlocks
+        expr: increase(pg_stat_database_deadlocks{datname="dune"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: postgres-exporter
+        annotations:
+          summary: Dune Postgres deadlocks detected
+          description: The Dune database deadlock counter increased in the last 5 minutes.
+
+      - alert: DunePostgresLowCacheHitRatio
+        expr: |
+          100 * (
+            pg_stat_database_blks_hit{datname="dune"}
+            /
+            (pg_stat_database_blks_hit{datname="dune"} + pg_stat_database_blks_read{datname="dune"})
+          ) < 95
+        for: 15m
+        labels:
+          severity: warning
+          service: postgres-exporter
+        annotations:
+          summary: Dune Postgres cache hit ratio is low
+          description: The Dune database cache hit ratio has been below 95% for 15 minutes.
