@@ -8,9 +8,11 @@ cd "$(dirname "$0")/../.."
 
 [ -r runtime/generated/image-tags.env ] && . runtime/generated/image-tags.env
 source runtime/scripts/host-paths.sh
+source runtime/scripts/runtime-env.sh
 source runtime/scripts/image-tags.sh
 POSTGRES_IMAGE_TAG="$(resolve_postgres_image_tag)"
 IMAGE="registry.funcom.com/funcom/self-hosting/igw-postgres:${POSTGRES_IMAGE_TAG}"
+POSTGRES_PORT="$(resolve_postgres_port)"
 
 mkdir -p runtime/postgres/initdb
 
@@ -43,7 +45,7 @@ docker run -d \
   --name dune-postgres \
   --network dune-net \
   --restart unless-stopped \
-  -p 127.0.0.1:15432:5432 \
+  -p "127.0.0.1:${POSTGRES_PORT}:5432" \
   -e POSTGRES_USER=postgres \
   -e POSTGRES_PASSWORD=postgres \
   -e POSTGRES_DB=dune \

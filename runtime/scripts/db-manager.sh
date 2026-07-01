@@ -3,10 +3,15 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
+[ -f .env ] && . ./.env
+[ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
+source runtime/scripts/runtime-env.sh
+
 PG_CONTAINER="${DUNE_PG_CONTAINER:-dune-postgres}"
 PG_USER="${DUNE_DB_USER:-dune}"
 PG_PASSWORD="${DUNE_DB_PASSWORD:-dune}"
 PG_DB="${DUNE_DB_NAME:-}"
+PG_PORT="${DUNE_DB_PORT:-$(resolve_postgres_port)}"
 EXPORT_DIR="runtime/generated/db-exports"
 
 usage() {
@@ -43,7 +48,7 @@ detect_db() {
     done
   else
     for db in dune postgres; do
-      if PGPASSWORD="$PG_PASSWORD" psql -h 127.0.0.1 -p 15432 -U "$PG_USER" -d "$db" -Atc "select 1;" >/dev/null 2>&1; then
+      if PGPASSWORD="$PG_PASSWORD" psql -h 127.0.0.1 -p "$PG_PORT" -U "$PG_USER" -d "$db" -Atc "select 1;" >/dev/null 2>&1; then
         printf '%s' "$db"
         return 0
       fi
@@ -58,7 +63,7 @@ psql_run() {
   if has_container; then
     docker exec -e PGPASSWORD="$PG_PASSWORD" "$PG_CONTAINER" psql -U "$PG_USER" -d "$db" "$@"
   else
-    PGPASSWORD="$PG_PASSWORD" psql -h 127.0.0.1 -p 15432 -U "$PG_USER" -d "$db" "$@"
+    PGPASSWORD="$PG_PASSWORD" psql -h 127.0.0.1 -p "$PG_PORT" -U "$PG_USER" -d "$db" "$@"
   fi
 }
 
@@ -70,7 +75,7 @@ pg_dump_backup() {
   if has_container; then
     docker exec -e PGPASSWORD="$PG_PASSWORD" "$PG_CONTAINER" pg_dump -U "$PG_USER" -d "$db" -Fc > "$out"
   else
-    PGPASSWORD="$PG_PASSWORD" pg_dump -h 127.0.0.1 -p 15432 -U "$PG_USER" -d "$db" -Fc > "$out"
+    PGPASSWORD="$PG_PASSWORD" pg_dump -h 127.0.0.1 -p "$PG_PORT" -U "$PG_USER" -d "$db" -Fc > "$out"
   fi
   echo "$out"
 }

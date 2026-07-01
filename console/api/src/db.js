@@ -9,7 +9,7 @@ export function discoverDbConfig(env = process.env) {
   }
   return {
     host: env.DUNE_DB_HOST || env.PGHOST || "127.0.0.1",
-    port: Number(env.DUNE_DB_PORT || env.PGPORT || 15432),
+    port: Number(env.DUNE_DB_PORT || env.PGPORT || env.POSTGRES_PORT || 15432),
     database: env.DUNE_DB_NAME || env.PGDATABASE || "dune",
     user: env.DUNE_DB_USER || env.PGUSER || "dune",
     password: env.DUNE_DB_PASSWORD || env.PGPASSWORD || "dune",

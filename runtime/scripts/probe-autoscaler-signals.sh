@@ -3,6 +3,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
+[ -f .env ] && . ./.env
+[ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
+source runtime/scripts/runtime-env.sh
+
+DIRECTOR_PORT="$(resolve_director_port)"
+
 echo "=== Director HTTP quick probe ==="
 for path in \
   / \
@@ -22,8 +28,8 @@ for path in \
   /queues
 do
   echo
-  echo "--- GET http://127.0.0.1:11717$path ---"
-  curl -fsS --max-time 3 "http://127.0.0.1:11717$path" 2>&1 | head -60 || true
+  echo "--- GET http://127.0.0.1:${DIRECTOR_PORT}${path} ---"
+  curl -fsS --max-time 3 "http://127.0.0.1:${DIRECTOR_PORT}${path}" 2>&1 | head -60 || true
 done
 
 echo

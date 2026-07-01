@@ -31,6 +31,27 @@ config_value() {
   ' "$file"
 }
 
+port_env_value() {
+  local key="$1"
+  local default_value="$2"
+  local value="${!key:-$default_value}"
+
+  if printf '%s' "$value" | grep -Eq '^[0-9]+$' && [ "$value" -ge 1 ] && [ "$value" -le 65535 ]; then
+    printf '%s' "$value"
+    return 0
+  fi
+
+  printf '%s\n' "Invalid $key=$value; expected TCP/UDP port 1-65535." >&2
+  return 1
+}
+
+resolve_postgres_port() { port_env_value POSTGRES_PORT 15432; }
+resolve_rmq_admin_port() { port_env_value RMQ_ADMIN_PORT 32573; }
+resolve_rmq_game_port() { port_env_value RMQ_GAME_PORT 31982; }
+resolve_rmq_game_http_port() { port_env_value RMQ_GAME_HTTP_PORT 31983; }
+resolve_text_router_port() { port_env_value TEXT_ROUTER_PORT 5059; }
+resolve_director_port() { port_env_value DIRECTOR_PORT 11717; }
+
 normalize_generated_env_permissions() {
   local file
 

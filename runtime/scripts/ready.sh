@@ -5,6 +5,13 @@ cd "$(dirname "$0")/../.."
 
 source runtime/scripts/runtime-env.sh
 
+postgres_port="$(resolve_postgres_port)"
+rmq_admin_port="$(resolve_rmq_admin_port)"
+rmq_game_port="$(resolve_rmq_game_port)"
+rmq_game_http_port="$(resolve_rmq_game_http_port)"
+text_router_port="$(resolve_text_router_port)"
+director_port="$(resolve_director_port)"
+
 fail=0
 wait=0
 docker_timeout_seconds="${DUNE_READY_DOCKER_TIMEOUT_SECONDS:-12}"
@@ -360,12 +367,12 @@ done
 
 echo
 echo "=== Listener checks ==="
-check_tcp 15432 "Postgres localhost" "dune-postgres"
-check_tcp 32573 "RabbitMQ admin localhost" "dune-rmq-admin"
-check_tcp 31982 "RabbitMQ game public" "dune-rmq-game"
-check_tcp 31983 "RabbitMQ game HTTP public" "dune-rmq-game"
-check_tcp 5059  "TextRouter localhost" "dune-text-router"
-check_tcp 11717 "Director localhost" "dune-director"
+check_tcp "$postgres_port" "Postgres localhost" "dune-postgres"
+check_tcp "$rmq_admin_port" "RabbitMQ admin localhost" "dune-rmq-admin"
+check_tcp "$rmq_game_port" "RabbitMQ game public" "dune-rmq-game"
+check_tcp "$rmq_game_http_port" "RabbitMQ game HTTP public" "dune-rmq-game"
+check_tcp "$text_router_port" "TextRouter localhost" "dune-text-router"
+check_tcp "$director_port" "Director localhost" "dune-director"
 
 client_port_base="$(resolve_client_port_base)"
 igw_port_base="$(resolve_igw_port_base)"

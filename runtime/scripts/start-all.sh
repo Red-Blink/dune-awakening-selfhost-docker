@@ -178,7 +178,13 @@ docker ps --filter "name=dune-" --format "table {{.Names}}\t{{.Status}}\t{{.Port
 
 echo
 echo "=== Required TCP listeners ==="
-ss -lntp | grep -E ':(15432|31982|31983|32573|5059|11717)' || true
+postgres_port="$(resolve_postgres_port)"
+rmq_admin_port="$(resolve_rmq_admin_port)"
+rmq_game_port="$(resolve_rmq_game_port)"
+rmq_game_http_port="$(resolve_rmq_game_http_port)"
+text_router_port="$(resolve_text_router_port)"
+director_port="$(resolve_director_port)"
+ss -lntp | grep -E ":(${postgres_port}|${rmq_game_port}|${rmq_game_http_port}|${rmq_admin_port}|${text_router_port}|${director_port})" || true
 
 client_port_base="$(resolve_client_port_base)"
 igw_port_base="$(resolve_igw_port_base)"

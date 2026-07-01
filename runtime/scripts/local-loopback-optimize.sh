@@ -14,6 +14,8 @@ SERVER_IP="$(resolve_server_ip)"
 BIND_IP="$(resolve_bind_ip)"
 CLIENT_PORT_BASE="$(resolve_client_port_base)"
 IGW_PORT_BASE="$(resolve_igw_port_base)"
+RMQ_GAME_PORT="$(resolve_rmq_game_port)"
+RMQ_GAME_HTTP_PORT="$(resolve_rmq_game_http_port)"
 CLIENT_PORT_END="$((CLIENT_PORT_BASE + 33))"
 IGW_PORT_END="$((IGW_PORT_BASE + 33))"
 
@@ -49,8 +51,8 @@ ensure_chain() {
 install_rules() {
   iptables_cmd -t nat -A "$CHAIN_NAME" -p udp --dport "${CLIENT_PORT_BASE}:${CLIENT_PORT_END}" -j DNAT --to-destination "$BIND_IP"
   iptables_cmd -t nat -A "$CHAIN_NAME" -p udp --dport "${IGW_PORT_BASE}:${IGW_PORT_END}" -j DNAT --to-destination "$BIND_IP"
-  iptables_cmd -t nat -A "$CHAIN_NAME" -p tcp --dport 31982 -j DNAT --to-destination "$BIND_IP"
-  iptables_cmd -t nat -A "$CHAIN_NAME" -p tcp --dport 31983 -j DNAT --to-destination "$BIND_IP"
+  iptables_cmd -t nat -A "$CHAIN_NAME" -p tcp --dport "$RMQ_GAME_PORT" -j DNAT --to-destination "$BIND_IP"
+  iptables_cmd -t nat -A "$CHAIN_NAME" -p tcp --dport "$RMQ_GAME_HTTP_PORT" -j DNAT --to-destination "$BIND_IP"
 }
 
 main() {

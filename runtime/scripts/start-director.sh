@@ -12,6 +12,7 @@ source runtime/scripts/runtime-env.sh
 source runtime/scripts/image-tags.sh
 WORLD_IMAGE_TAG="$(resolve_world_image_tag)"
 IMAGE="registry.funcom.com/funcom/self-hosting/seabass-server-bg-director:${WORLD_IMAGE_TAG}"
+DIRECTOR_PORT="$(resolve_director_port)"
 
 TOKEN_FILE="runtime/secrets/funcom-token.txt"
 RMQ_SECRET_FILE="runtime/secrets/rmq-http-token-auth-secret.txt"
@@ -269,7 +270,7 @@ docker run -d \
   --name dune-director \
   --network dune-net \
   --restart unless-stopped \
-  -p 127.0.0.1:11717:11717/tcp \
+  -p "127.0.0.1:${DIRECTOR_PORT}:11717/tcp" \
   -v "$(host_path "$PWD/runtime/director/config/director_config.ini"):/Tools/Battlegroups/Director/BattlegroupDirector/director_config.ini:ro" \
   -v "$(host_path "$PWD/runtime/generated/director-bundle"):/opt/dune-director-bundle" \
   -v "$(host_path "$FAKE_K8S_SERVICEACCOUNT_DIR"):/run/secrets/kubernetes.io/serviceaccount:ro" \

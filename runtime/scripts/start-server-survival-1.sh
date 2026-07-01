@@ -31,6 +31,10 @@ SERVER_IP="$(resolve_server_ip)"
 BATTLEGROUP_ID="$(resolve_battlegroup_id)"
 CLIENT_PORT_BASE="$(resolve_client_port_base)"
 IGW_PORT_BASE="$(resolve_igw_port_base)"
+POSTGRES_PORT="$(resolve_postgres_port)"
+RMQ_ADMIN_PORT="$(resolve_rmq_admin_port)"
+RMQ_GAME_PORT="$(resolve_rmq_game_port)"
+DIRECTOR_PORT="$(resolve_director_port)"
 GAME_PORT="$((CLIENT_PORT_BASE + 1))"
 IGW_PORT="$IGW_PORT_BASE"
 PARTITION_ID="${DUNE_SURVIVAL_PARTITION_ID:-1}"
@@ -243,17 +247,17 @@ docker run -d \
   "ServerName=$BATTLEGROUP_ID" \
   "-MultiHome=$MULTIHOME_IP" \
   -DatabaseName=dune \
-  -DatabaseHost=127.0.0.1:15432 \
+  "-DatabaseHost=127.0.0.1:${POSTGRES_PORT}" \
   -DatabaseUser=dune \
   -DatabasePassword=dune \
   "-PartitionIndex=$PARTITION_ID" \
   "-ini:engine:[URL]:Port=$GAME_PORT" \
   "-ini:engine:[URL]:IGWPort=$IGW_PORT" \
-  -battlegroup-director-url=127.0.0.1:11717 \
+  "-battlegroup-director-url=127.0.0.1:${DIRECTOR_PORT}" \
   "--RMQGameHostname=$RMQ_GAME_HOST" \
-  --RMQGamePort=31982 \
+  "--RMQGamePort=${RMQ_GAME_PORT}" \
   "--RMQAdminHostname=$RMQ_ADMIN_HOST" \
-  --RMQAdminPort=32573 \
+  "--RMQAdminPort=${RMQ_ADMIN_PORT}" \
   "${SIETCH_RUNTIME_ARGS[@]}" \
   "${LOG_RUNTIME_ARGS[@]}"
 

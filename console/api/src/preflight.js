@@ -4,9 +4,8 @@ import { execFileSync } from "node:child_process";
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 
-const ports = [15432, 31982, 31983, 32573, 5059, 7777, 7778, 7888, 7889, 11717];
-
 export async function preflight(config) {
+  const ports = configuredPorts();
   const checks = [];
   checks.push(check("Operating system", "info", `${platform()} ${release()}`));
   checks.push(check("Architecture", arch() === "x64" ? "pass" : "warn", arch()));
@@ -26,6 +25,28 @@ export async function preflight(config) {
   checks.push(fileCheck("Backup directory", resolve(config.repoRoot, "runtime/backups/db"), true));
   checks.push(...await Promise.all(ports.map(portCheck)));
   return { checks, summary: summarize(checks) };
+}
+
+function configuredPorts(env = process.env) {
+  const clientBase = portValue(env.CLIENT_PORT_BASE, 7777);
+  const igwBase = portValue(env.IGW_PORT_BASE, 7888);
+  return [
+    portValue(env.POSTGRES_PORT || env.DUNE_DB_PORT || env.PGPORT, 15432),
+    portValue(env.RMQ_GAME_PORT, 31982),
+    portValue(env.RMQ_GAME_HTTP_PORT, 31983),
+    portValue(env.RMQ_ADMIN_PORT, 32573),
+    portValue(env.TEXT_ROUTER_PORT, 5059),
+    clientBase,
+    clientBase + 1,
+    igwBase,
+    igwBase + 1,
+    portValue(env.DIRECTOR_PORT, 11717)
+  ];
+}
+
+function portValue(value, fallback) {
+  const parsed = Number(value || fallback);
+  return Number.isInteger(parsed) && parsed > 0 && parsed <= 65535 ? parsed : fallback;
 }
 
 function check(name, status, message, detail = "") {

@@ -10,8 +10,8 @@ services:
     restart: unless-stopped
     init: true
     user: "${DUNE_HOST_UID:-0}:${DUNE_HOST_GID:-0}"
-    # Host networking lets the console reach RedBlink defaults such as
-    # Postgres on 127.0.0.1:15432 and bind ADMIN_BIND_PORT directly.
+    # Host networking lets the console reach local Dune services and bind
+    # ADMIN_BIND_PORT directly.
     network_mode: host
     group_add:
       - "${DOCKER_SOCKET_GID:-0}"
@@ -22,7 +22,7 @@ services:
       # Make RedBlink dune scripts target the main Dune stack, not this web-only compose project.
       COMPOSE_PROJECT_NAME: "${DUNE_COMPOSE_PROJECT_NAME:-dune-awakening-selfhost-docker}"
       ADMIN_BIND_HOST: "${ADMIN_BIND_HOST:-0.0.0.0}"
-      ADMIN_BIND_PORT: "${ADMIN_BIND_PORT:-8088}"
+      ADMIN_BIND_PORT: "${ADMIN_WEB_PORT:-${ADMIN_BIND_PORT:-8088}}"
       ADMIN_AUTH_DISABLED: "${ADMIN_AUTH_DISABLED:-0}"
       ADMIN_SECURE_COOKIES: "${ADMIN_SECURE_COOKIES:-0}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
@@ -35,6 +35,14 @@ services:
       ADMIN_DATABASE_URL: "${ADMIN_DATABASE_URL:-}"
       DUNE_DB_HOST: "${DUNE_DB_HOST:-}"
       DUNE_DB_PORT: "${DUNE_DB_PORT:-}"
+      POSTGRES_PORT: "${POSTGRES_PORT:-}"
+      RMQ_ADMIN_PORT: "${RMQ_ADMIN_PORT:-}"
+      RMQ_GAME_PORT: "${RMQ_GAME_PORT:-}"
+      RMQ_GAME_HTTP_PORT: "${RMQ_GAME_HTTP_PORT:-}"
+      TEXT_ROUTER_PORT: "${TEXT_ROUTER_PORT:-}"
+      DIRECTOR_PORT: "${DIRECTOR_PORT:-}"
+      CLIENT_PORT_BASE: "${CLIENT_PORT_BASE:-}"
+      IGW_PORT_BASE: "${IGW_PORT_BASE:-}"
       DUNE_DB_NAME: "${DUNE_DB_NAME:-}"
       DUNE_DB_USER: "${DUNE_DB_USER:-}"
       DUNE_DB_PASSWORD: "${DUNE_DB_PASSWORD:-}"

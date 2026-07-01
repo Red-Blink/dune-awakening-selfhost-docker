@@ -32,9 +32,9 @@ detect_web_console_ip() {
 }
 
 web_console_port() {
-  local port="${ADMIN_BIND_PORT:-}"
+  local port="${ADMIN_WEB_PORT:-${ADMIN_BIND_PORT:-}}"
   if [ -z "$port" ] && [ -f .env ]; then
-    port="$(awk -F= '/^ADMIN_BIND_PORT=/ {print $2; exit}' .env | tr -d '[:space:]"'\''' || true)"
+    port="$(awk -F= '/^(ADMIN_BIND_PORT|ADMIN_WEB_PORT)=/ {print $2; exit}' .env | tr -d '[:space:]"'\''' || true)"
   fi
   printf '%s' "${port:-8088}"
 }
@@ -97,6 +97,7 @@ restart_console() {
   require_compose
   prepare_docker_socket_gid
   prepare_host_user_ids
+  export ADMIN_BIND_PORT="${ADMIN_WEB_PORT:-${ADMIN_BIND_PORT:-}}"
   mkdir -p runtime/generated
   echo "Rebuilding Dune Docker Console..."
   COMPOSE_PROJECT_NAME="$PROJECT_NAME" DUNE_HOST_REPO_ROOT="$HOST_ROOT" docker compose -f "$WEB_COMPOSE" build "$WEB_SERVICE"
@@ -111,6 +112,7 @@ status_console() {
   require_compose
   prepare_docker_socket_gid
   prepare_host_user_ids
+  export ADMIN_BIND_PORT="${ADMIN_WEB_PORT:-${ADMIN_BIND_PORT:-}}"
   docker ps -a --filter "name=^/${WEB_SERVICE}$" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
   print_url
 }

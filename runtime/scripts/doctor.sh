@@ -175,12 +175,18 @@ done
 
 echo
 echo "=== Ports ==="
-check_tcp 15432 "Postgres"
-check_tcp 32573 "RabbitMQ admin"
-check_tcp 31982 "RabbitMQ game"
-check_tcp 31983 "RabbitMQ game HTTP"
-check_tcp 5059 "TextRouter"
-check_tcp 11717 "Director"
+postgres_port="$(resolve_postgres_port)"
+rmq_admin_port="$(resolve_rmq_admin_port)"
+rmq_game_port="$(resolve_rmq_game_port)"
+rmq_game_http_port="$(resolve_rmq_game_http_port)"
+text_router_port="$(resolve_text_router_port)"
+director_port="$(resolve_director_port)"
+check_tcp "$postgres_port" "Postgres"
+check_tcp "$rmq_admin_port" "RabbitMQ admin"
+check_tcp "$rmq_game_port" "RabbitMQ game"
+check_tcp "$rmq_game_http_port" "RabbitMQ game HTTP"
+check_tcp "$text_router_port" "TextRouter"
+check_tcp "$director_port" "Director"
 client_port_base="$(resolve_client_port_base)"
 igw_port_base="$(resolve_igw_port_base)"
 check_udp "$client_port_base" "Overmap clients"
@@ -291,7 +297,7 @@ fi
 case "$mode" in
   public)
     ok "Hosting mode: public"
-    echo "     Make sure your firewall/router allows TCP 31982, TCP 31983, and the configured UDP game ranges."
+    echo "     Make sure your firewall/router allows TCP ${rmq_game_port}, TCP ${rmq_game_http_port}, and the configured UDP game ranges."
     ;;
   local)
     ok "Hosting mode: local/LAN"

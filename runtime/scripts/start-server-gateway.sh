@@ -41,6 +41,8 @@ SERVER_REGION="$(resolve_server_region)"
 SERVER_IP="$(resolve_server_ip)"
 BATTLEGROUP_ID="$(resolve_battlegroup_id)"
 DUNE_DB_PASSWORD="${DUNE_DB_PASSWORD:-dune}"
+RMQ_GAME_PORT="$(resolve_rmq_game_port)"
+RMQ_GAME_HTTP_PORT="$(resolve_rmq_game_http_port)"
 
 
 mkdir -p runtime/server-gateway/config
@@ -77,8 +79,8 @@ docker run -d \
   -m service \
   -c ./service/configs/service.conf \
   --RMQGameHostname="$SERVER_IP" \
-  --RMQGamePort=31982 \
-  --RMQGameHttpPort=31983
+  "--RMQGamePort=${RMQ_GAME_PORT}" \
+  "--RMQGameHttpPort=${RMQ_GAME_HTTP_PORT}"
 
 sleep 12
 

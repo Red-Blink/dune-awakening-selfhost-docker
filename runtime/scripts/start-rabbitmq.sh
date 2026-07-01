@@ -8,9 +8,13 @@ cd "$(dirname "$0")/../.."
 
 [ -r runtime/generated/image-tags.env ] && . runtime/generated/image-tags.env
 source runtime/scripts/host-paths.sh
+source runtime/scripts/runtime-env.sh
 source runtime/scripts/image-tags.sh
 WORLD_IMAGE_TAG="$(resolve_world_image_tag)"
 IMAGE="registry.funcom.com/funcom/self-hosting/seabass-server-rabbitmq:${WORLD_IMAGE_TAG}"
+RMQ_ADMIN_PORT="$(resolve_rmq_admin_port)"
+RMQ_GAME_PORT="$(resolve_rmq_game_port)"
+RMQ_GAME_HTTP_PORT="$(resolve_rmq_game_http_port)"
 
 mkdir -p runtime/rabbitmq-admin/config
 mkdir -p runtime/rabbitmq-game/config
@@ -88,7 +92,7 @@ docker run -d \
   --name dune-rmq-admin \
   --network dune-net \
   --restart unless-stopped \
-  -p 127.0.0.1:32573:5672 \
+  -p "127.0.0.1:${RMQ_ADMIN_PORT}:5672" \
   -v "$(host_path "$PWD/runtime/rabbitmq-admin/config/rabbitmq.conf"):/etc/rabbitmq/rabbitmq.conf:ro" \
   -v "$(host_path "$PWD/runtime/rabbitmq-admin/config/enabled_plugins"):/etc/rabbitmq/enabled_plugins:ro" \
   "$IMAGE"
@@ -97,9 +101,9 @@ docker run -d \
   --name dune-rmq-game \
   --network dune-net \
   --restart unless-stopped \
-  -p 31982:5672/tcp \
+  -p "${RMQ_GAME_PORT}:5672/tcp" \
   -p 127.0.0.1:15672:15672/tcp \
-  -p 31983:15672/tcp \
+  -p "${RMQ_GAME_HTTP_PORT}:15672/tcp" \
   -v "$(host_path "$PWD/runtime/rabbitmq-game/config/rabbitmq.conf"):/etc/rabbitmq/rabbitmq.conf:ro" \
   -v "$(host_path "$PWD/runtime/rabbitmq-game/config/enabled_plugins"):/etc/rabbitmq/enabled_plugins:ro" \
   -v "$(host_path "$PWD/runtime/rabbitmq-game/certs/cacert.pem"):/etc/rabbitmq/cacert.pem:ro" \

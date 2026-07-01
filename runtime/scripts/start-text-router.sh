@@ -12,6 +12,7 @@ source runtime/scripts/runtime-env.sh
 source runtime/scripts/image-tags.sh
 WORLD_IMAGE_TAG="$(resolve_world_image_tag)"
 IMAGE="registry.funcom.com/funcom/self-hosting/seabass-server-text-router:${WORLD_IMAGE_TAG}"
+TEXT_ROUTER_PORT="$(resolve_text_router_port)"
 
 TOKEN_FILE="runtime/secrets/funcom-token.txt"
 RMQ_SECRET_FILE="runtime/secrets/rmq-http-token-auth-secret.txt"
@@ -81,7 +82,7 @@ docker run -d \
   --name dune-text-router \
   --network dune-net \
   --restart unless-stopped \
-  -p 127.0.0.1:5059:5059/tcp \
+  -p "127.0.0.1:${TEXT_ROUTER_PORT}:5059/tcp" \
   -v "$(host_path "$FAKE_K8S_SERVICEACCOUNT_DIR"):/run/secrets/kubernetes.io/serviceaccount:ro" \
   -e "KUBERNETES_SERVICE_HOST=igwo.local" \
   -e "KUBERNETES_SERVICE_PORT=6443" \
