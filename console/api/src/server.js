@@ -346,6 +346,11 @@ async function handleApi(req, res) {
   if (path === "/api/admin/character-transfer-settings") return characterTransferSettingsRoute(req, res);
   if (path === "/api/admin/message-of-the-day") return messageOfTheDayRoute(req, res);
   if (path === "/api/admin/player-announcements") return playerAnnouncementsRoute(req, res);
+  if (path === "/api/admin/landsraad") return landsraadRoute(req, res, "overview");
+  if (path === "/api/admin/landsraad/task-goal") return landsraadRoute(req, res, "task-goal");
+  if (path === "/api/admin/landsraad/term-task-goals") return landsraadRoute(req, res, "term-task-goals");
+  if (path === "/api/admin/landsraad/reward-tier") return landsraadRoute(req, res, "reward-tier");
+  if (path === "/api/admin/landsraad/player-contribution") return landsraadRoute(req, res, "player-contribution");
   if (path === "/api/admin/broadcast" && req.method === "POST") return broadcastRoute(req, res);
   if (path === "/api/admin/map-chat" && req.method === "POST") return mapChatRoute(req, res);
   if (path === "/api/admin/broadcast-shutdown" && req.method === "POST") return shutdownBroadcastRoute(req, res);
@@ -470,6 +475,7 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/maps\/spicefields\/[^/]+$/) && req.method === "PATCH") return mapsSpicefieldUpdateRoute(req, res, path);
   if (path === "/api/maps/spicefields") return dbJson(res, () => duneDb.listSpicefieldTypes(db));
   if (path === "/api/maps/user-settings/schema") return userSettingsSchemaRoute(res);
+  if (path === "/api/maps/user-settings/values") return userSettingsValuesRoute(res, url);
   if (path === "/api/maps/user-settings/raw" && req.method === "POST") return userSettingsRawWriteRoute(req, res);
   if (path === "/api/maps/user-settings/raw") return userSettingsRawRoute(res, url);
   if (path === "/api/maps/user-settings/save" && req.method === "POST") return userSettingsSaveRoute(req, res);
@@ -1095,6 +1101,26 @@ async function playerAnnouncementsRoute(req, res) {
   }
 }
 
+async function landsraadRoute(req, res, action) {
+  if (req.method === "GET" && action === "overview") return dbJson(res, () => duneDb.landsraadOverview(db));
+  if (req.method !== "POST") return json(res, 405, { error: "Method not allowed" });
+  const body = await readJson(req);
+  try {
+    let result;
+    if (action === "task-goal") result = await duneDb.updateLandsraadTaskGoal(db, body.taskId, body.goalAmount);
+    else if (action === "term-task-goals") result = await duneDb.updateLandsraadTermTaskGoals(db, body.termId, body.goalAmount);
+    else if (action === "reward-tier") result = await duneDb.updateLandsraadRewardTier(db, body);
+    else if (action === "player-contribution") result = await duneDb.setLandsraadPlayerContribution(db, body);
+    else return json(res, 404, { error: "Not found" });
+    audit(config, req, `admin.landsraad.${action}`, { ...body, ok: true });
+    return json(res, 200, result);
+  } catch (error) {
+    audit(config, req, `admin.landsraad.${action}`, { ...body, ok: false, error: redact(error.message || error) });
+    const payload = apiErrorPayload(error, error.unsupported ? 501 : 400);
+    return json(res, payload.status, { supported: false, ...payload.body });
+  }
+}
+
 async function confirmedTask(req, res, type, operation, payload, phrase) {
   const body = await readJson(req);
   if (phrase && body.confirmation !== phrase) {
@@ -1161,6 +1187,25 @@ async function userSettingsRawRoute(res, url) {
   try {
     const result = await runDune(config, buildDuneArgs(operation, { map, partitionId }), { timeoutMs: 8000, redactOutput: false });
     return json(res, 200, { content: result.stdout || "" });
+  } catch (error) {
+    return json(res, 500, { error: redact(error.message || error) });
+  }
+}
+
+async function userSettingsValuesRoute(res, url) {
+  const scope = String(url.searchParams.get("scope") || "global");
+  const map = url.searchParams.get("map") || "Survival_1";
+  const partitionId = url.searchParams.get("partitionId") || "";
+  const operation = scope === "engine"
+    ? "userSettingsEngineValues"
+    : scope === "partition"
+      ? "userSettingsPartitionValues"
+      : scope === "map"
+        ? "userSettingsMapValues"
+        : "userSettingsGlobalValues";
+  try {
+    const result = await runDune(config, buildDuneArgs(operation, { map, partitionId }), { timeoutMs: 8000 });
+    return json(res, 200, { stdout: result.stdout || "" });
   } catch (error) {
     return json(res, 500, { error: redact(error.message || error) });
   }

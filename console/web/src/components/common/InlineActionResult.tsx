@@ -7,7 +7,7 @@ export type InlineActionResultState = {
   pending?: boolean;
 };
 
-export function InlineActionResult({ result, resultKey }: { result: InlineActionResultState | null; resultKey: string }) {
+export function InlineActionResult({ result, resultKey, format = true }: { result: InlineActionResultState | null; resultKey: string; format?: boolean }) {
   if (!result || result.key !== resultKey) return null;
-  return <span className="inline-action-result-wrap"><span className={`inline-action-result ${result.tone} ${result.pending ? "pending" : ""}`}>{formatUiSentence(result.text, Boolean(result.pending))}</span></span>;
+  return <span className="inline-action-result-wrap"><span className={`inline-action-result ${result.tone} ${result.pending ? "pending" : ""}`}>{format ? formatUiSentence(result.text, Boolean(result.pending)) : result.text}</span></span>;
 }

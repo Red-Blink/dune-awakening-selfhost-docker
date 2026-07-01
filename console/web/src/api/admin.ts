@@ -48,6 +48,44 @@ export type PlayerAnnouncementSettings = {
   leaveMessage: string;
 };
 
+export type LandsraadTerm = {
+  term_id: number | string;
+  start_time?: string;
+  end_time?: string;
+  test_term?: boolean;
+  reigning_faction?: string;
+  active_decree?: string;
+  elected_decree?: string;
+  winning_faction?: string;
+};
+
+export type LandsraadTask = {
+  task_id: string;
+  board_index: number;
+  house_name: string;
+  display_name: string;
+  goal_amount: number;
+  faction_progress: number;
+  completed: boolean;
+  winning_faction?: string;
+  sysselraad?: boolean;
+};
+
+export type LandsraadReward = {
+  task_id: string;
+  threshold: number;
+  template_id: string;
+  amount: number;
+};
+
+export type LandsraadOverview = {
+  capabilities: Record<string, boolean>;
+  term: LandsraadTerm | null;
+  decrees: Record<string, unknown>[];
+  tasks: LandsraadTask[];
+  rewards: LandsraadReward[];
+};
+
 export const adminApi = {
   itemCatalog: (q = "", limit = 10000) => api<{ rows: ItemCatalogEntry[] }>(`/api/admin/items/catalog?q=${encodeURIComponent(q)}&limit=${encodeURIComponent(String(limit))}`),
   itemSearch: (q: string) => api<{ stdout: string }>(`/api/admin/items/search?q=${encodeURIComponent(q)}`),
@@ -66,6 +104,11 @@ export const adminApi = {
   playerAnnouncements: () => api<{ settings: PlayerAnnouncementSettings; defaults: PlayerAnnouncementSettings }>("/api/admin/player-announcements"),
   savePlayerAnnouncements: (settings: PlayerAnnouncementSettings) => post<{ ok: boolean; settings: PlayerAnnouncementSettings; defaults: PlayerAnnouncementSettings }>("/api/admin/player-announcements", { settings }),
   restorePlayerAnnouncements: () => post<{ ok: boolean; settings: PlayerAnnouncementSettings; defaults: PlayerAnnouncementSettings }>("/api/admin/player-announcements", { restoreDefaults: true }),
+  landsraad: () => api<LandsraadOverview>("/api/admin/landsraad"),
+  setLandsraadTaskGoal: (taskId: string | number, goalAmount: number) => post<{ ok: boolean }>("/api/admin/landsraad/task-goal", { taskId, goalAmount }),
+  setLandsraadTermTaskGoals: (termId: string | number, goalAmount: number) => post<{ ok: boolean; updatedRows: number }>("/api/admin/landsraad/term-task-goals", { termId, goalAmount }),
+  setLandsraadRewardTier: (body: { taskId: string | number; threshold: number; newThreshold: number; templateId: string; amount: number }) => post<{ ok: boolean }>("/api/admin/landsraad/reward-tier", body),
+  setLandsraadPlayerContribution: (body: { playerId: string | number; taskId: string | number; amount: number }) => post<{ ok: boolean; message?: string }>("/api/admin/landsraad/player-contribution", body),
   kickAllOnline: (confirmation: string) => post<{ task: Task }>("/api/players/kick-all-online", { confirmation }),
   broadcast: (title: string, body: string, durationSec: number) => post<{ supported: boolean; reason?: string; ok?: boolean; stdout?: string; stderr?: string; note?: string }>("/api/admin/broadcast", { title, body, durationSec }),
   mapChat: (mapName: string, dimension: number, body: string) => post<{ supported: boolean; reason?: string; ok?: boolean; stdout?: string; stderr?: string; note?: string }>("/api/admin/map-chat", { mapName, dimension, body })

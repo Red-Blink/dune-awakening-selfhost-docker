@@ -1,5 +1,5 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { Archive, Database, FileText, Gift, Heart, Home, Map as MapIcon, MessageCircle, PackagePlus, RefreshCw, Server, Settings, Sparkles, Users } from "lucide-react";
+import { Archive, Database, FileText, Gift, Heart, Home, Landmark, Map as MapIcon, MessageCircle, PackagePlus, RefreshCw, Server, Settings, Sparkles, Users } from "lucide-react";
 import { api, post, setCsrfToken } from "./api/client";
 import { serverApi } from "./api/server";
 import { updatesApi } from "./api/updates";
@@ -30,7 +30,7 @@ import {
 import { parseUpdateTask, stackVersionButtonLabel, stackVersionButtonTitle } from "./features/updates/updateUtils";
 import { formatUiSentence, stripAnsi, summarizeCommandText, titleCase } from "./lib/display";
 
-type Tab = "Home" | "Server Control" | "Services" | "Players" | "Admin Tools" | "Live Map" | "Maps" | "Care Package" | "Addons" | "Database" | "Storage" | "Backups" | "Logs" | "Updates" | "Settings";
+type Tab = "Home" | "Server Control" | "Services" | "Players" | "Landsraad" | "Admin Tools" | "Live Map" | "Maps" | "Care Package" | "Addons" | "Database" | "Storage" | "Backups" | "Logs" | "Updates" | "Settings";
 type SetupState = { files: Record<string, boolean>; config: Record<string, unknown> };
 let openConfirmDialog: ((request: ConfirmDialogRequest) => void) | null = null;
 
@@ -41,6 +41,7 @@ const CarePackagePanel = lazy(() => import("./features/carePackage/CarePackagePa
 const DatabasePanel = lazy(() => import("./features/database/DatabasePanel").then((module) => ({ default: module.DatabasePanel })));
 const LogsPanel = lazy(() => import("./features/logs/LogsPanel").then((module) => ({ default: module.LogsPanel })));
 const LiveMapPanel = lazy(() => import("./features/liveMap/LiveMapPanel").then((module) => ({ default: module.LiveMapPanel })));
+const LandsraadPanel = lazy(() => import("./features/adminTools/LandsraadAdminSection").then((module) => ({ default: module.LandsraadPanel })));
 const MapsPanel = lazy(() => import("./features/maps/MapsPanel").then((module) => ({ default: module.MapsPanel })));
 const CharacterAdminUI = lazy(() => import("./features/players/CharacterAdminUI").then((module) => ({ default: module.CharacterAdminUI })));
 const PlayersPanel = lazy(() => import("./features/players/PlayersPanel").then((module) => ({ default: module.PlayersPanel })));
@@ -106,6 +107,7 @@ const navGroups: { title: string; items: { tab: Tab; icon: React.ReactNode }[] }
       { tab: "Maps", icon: <MapIcon size={18} /> },
       { tab: "Players", icon: <Users size={18} /> },
       { tab: "Live Map", icon: <MapIcon size={18} /> },
+      { tab: "Landsraad", icon: <Landmark size={18} /> },
       { tab: "Admin Tools", icon: <PackagePlus size={18} /> },
       { tab: "Care Package", icon: <Gift size={18} /> }
     ]
@@ -500,6 +502,7 @@ export function App() {
         }} />}
         {!redeploySetupOpen && tab === "Services" && <LazyTabBoundary label="Loading Services"><ServicesPanel services={services} setServices={setServices} setTask={setTask} openLogs={(service) => { setRedeploySetupOpen(false); setSelectedLogService(service); setTab("Logs"); }} onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Players" && <LazyTabBoundary label="Loading Players"><PlayersPanel onError={setError} renderCharacterAdmin={(props) => <LazyTabBoundary label="Loading Player Details"><CharacterAdminUI {...props} onError={setError} confirmAction={confirmDialog} waitForTask={waitForTaskSilently} formatMutationResult={formatMutationResult} /></LazyTabBoundary>} /></LazyTabBoundary>}
+        {!redeploySetupOpen && tab === "Landsraad" && <LazyTabBoundary label="Loading Landsraad"><LandsraadPanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Admin Tools" && <LazyTabBoundary label="Loading Admin Tools"><AdminToolsPanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Live Map" && <LazyTabBoundary label="Loading Live Map"><LiveMapPanel onError={setError} confirmAction={confirmDialog} waitForTask={waitForTaskSilently} taskTechnicalDetails={taskTechnicalDetails} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Maps" && <LazyTabBoundary label="Loading Maps"><MapsPanel onError={setError} confirmAction={confirmDialog} confirmSettingsRestart={confirmSettingsRestart} waitForTaskWithUpdates={waitForTaskWithUpdates} taskTechnicalDetails={taskTechnicalDetails} /></LazyTabBoundary>}

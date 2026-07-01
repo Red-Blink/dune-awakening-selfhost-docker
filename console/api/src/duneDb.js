@@ -208,6 +208,216 @@ export async function updateSpicefieldType(db, typeId, values = {}) {
   return { ok: true, updatedRows: result.rowCount || 0, row: result.rows[0] };
 }
 
+export async function landsraadOverview(db) {
+  if (!(await tableExists(db, "landsraad_decree_term")) || !(await tableExists(db, "landsraad_tasks"))) {
+    return unsupported("landsraad", ["dune.landsraad_decree_term", "dune.landsraad_tasks"]);
+  }
+
+  const hasDecrees = await tableExists(db, "landsraad_decrees");
+  const hasRewards = await tableExists(db, "landsraad_task_rewards");
+  const hasFactionContributions = await tableExists(db, "landsraad_task_faction_contributions");
+  const termColumns = await columnsFor(db, "landsraad_decree_term");
+  const taskColumns = await columnsFor(db, "landsraad_tasks");
+  const termResult = await db.query(`
+    select t.term_id,
+           ${termColumns.has("start_time") ? "t.start_time::text" : "''"} as start_time,
+           ${termColumns.has("end_time") ? "t.end_time::text" : "''"} as end_time,
+           ${termColumns.has("test_term") ? "coalesce(t.test_term, false)" : "false"} as test_term,
+           ${termColumns.has("reigning_faction_id") ? "coalesce(rf.name, '')" : "''"} as reigning_faction,
+           ${termColumns.has("active_decree_id") ? "coalesce(ad.decree_name, '')" : "''"} as active_decree,
+           ${termColumns.has("elected_decree_id") ? "coalesce(ed.decree_name, '')" : "''"} as elected_decree,
+           ${termColumns.has("winning_faction_id") ? "coalesce(wf.name, '')" : "''"} as winning_faction
+    from dune.landsraad_decree_term t
+    ${termColumns.has("reigning_faction_id") ? "left join dune.factions rf on rf.id = t.reigning_faction_id" : ""}
+    ${termColumns.has("active_decree_id") ? "left join dune.landsraad_decrees ad on ad.id = t.active_decree_id" : ""}
+    ${termColumns.has("elected_decree_id") ? "left join dune.landsraad_decrees ed on ed.id = t.elected_decree_id" : ""}
+    ${termColumns.has("winning_faction_id") ? "left join dune.factions wf on wf.id = t.winning_faction_id" : ""}
+    order by t.term_id desc
+    limit 1`);
+  const term = termResult.rows[0] || null;
+
+  const decrees = hasDecrees ? (await db.query(`
+    select id,
+           decree_name as name,
+           coalesce(weight, 0) as weight,
+           coalesce(disabled, false) as disabled
+    from dune.landsraad_decrees
+    order by id`)).rows : [];
+
+  let tasks = [];
+  let rewards = [];
+  if (term) {
+    const taskSelects = [
+      "t.id::text as task_id",
+      taskColumns.has("board_index") ? "coalesce(t.board_index, 0) as board_index" : "0 as board_index",
+      taskColumns.has("house_name") ? "coalesce(t.house_name, '') as house_name" : "'' as house_name",
+      taskColumns.has("house_name") ? "regexp_replace(coalesce(t.house_name, ''), '^DA_House', '') as display_name" : "'' as display_name",
+      taskColumns.has("goal_amount") ? "coalesce(t.goal_amount, 0)::int as goal_amount" : "0 as goal_amount",
+      taskColumns.has("completed") ? "coalesce(t.completed, false) as completed" : "false as completed",
+      taskColumns.has("winning_faction_id") ? "coalesce(wf.name, '') as winning_faction" : "'' as winning_faction",
+      taskColumns.has("sysselraad") ? "coalesce(t.sysselraad, false) as sysselraad" : "false as sysselraad",
+      hasFactionContributions ? "coalesce(sum(fc.amount), 0)::real as faction_progress" : "0::real as faction_progress"
+    ];
+    const joins = [
+      taskColumns.has("winning_faction_id") ? "left join dune.factions wf on wf.id = t.winning_faction_id" : "",
+      hasFactionContributions ? "left join dune.landsraad_task_faction_contributions fc on fc.task_id = t.id" : ""
+    ].filter(Boolean).join("\n");
+    const groupBy = hasFactionContributions
+      ? `group by ${taskSelects
+        .filter((select) => !select.includes("sum("))
+        .map((select) => select.split(/\s+as\s+/i)[0])
+        .join(", ")}`
+      : "";
+    tasks = (await db.query(`
+      select ${taskSelects.join(",\n             ")}
+      from dune.landsraad_tasks t
+      ${joins}
+      where t.term_id = $1
+      ${groupBy}
+      order by ${taskColumns.has("board_index") ? "coalesce(t.board_index, 0)" : "t.id::text"}, t.id::text`, [term.term_id])).rows;
+
+    if (hasRewards) {
+      rewards = (await db.query(`
+        select r.task_id::text as task_id,
+               r.threshold::int as threshold,
+               coalesce(r.template_id, '') as template_id,
+               coalesce(r.amount, 0)::int as amount
+        from dune.landsraad_task_rewards r
+        join dune.landsraad_tasks t on t.id = r.task_id
+        where t.term_id = $1
+        order by ${taskColumns.has("board_index") ? "coalesce(t.board_index, 0)" : "t.id"}, r.task_id, r.threshold`, [term.term_id])).rows;
+    }
+  }
+
+  return {
+    capabilities: {
+      landsraad: true,
+      decrees: hasDecrees,
+      rewards: hasRewards,
+      factionContributions: hasFactionContributions,
+      playerContributions: await tableExists(db, "landsraad_task_player_contributions"),
+      guildContributions: await tableExists(db, "landsraad_task_guild_contributions")
+    },
+    term,
+    decrees,
+    tasks,
+    rewards
+  };
+}
+
+export async function updateLandsraadTaskGoal(db, taskId, goalAmount) {
+  await requireCapability(await tableExists(db, "landsraad_tasks"), "Landsraad task goals require dune.landsraad_tasks.");
+  const id = intParam(taskId, "task id", 1);
+  const goal = intParam(goalAmount, "goal amount", 0, 2147483647);
+  const result = await db.query(`
+    update dune.landsraad_tasks
+       set goal_amount = $1
+     where id = $2
+     returning id::text as task_id, goal_amount::int`, [goal, id]);
+  if (!result.rowCount) {
+    const error = new Error(`Landsraad task ${id} was not found.`);
+    error.statusCode = 404;
+    throw error;
+  }
+  return { ok: true, updatedRows: result.rowCount || 0, row: result.rows[0] };
+}
+
+export async function updateLandsraadTermTaskGoals(db, termId, goalAmount) {
+  await requireCapability(await tableExists(db, "landsraad_tasks"), "Landsraad task goals require dune.landsraad_tasks.");
+  const id = intParam(termId, "term id", 1);
+  const goal = intParam(goalAmount, "goal amount", 0, 2147483647);
+  const result = await db.query(`
+    update dune.landsraad_tasks
+       set goal_amount = $1
+     where term_id = $2`, [goal, id]);
+  return { ok: true, updatedRows: result.rowCount || 0, termId: id, goalAmount: goal };
+}
+
+export async function updateLandsraadRewardTier(db, values = {}) {
+  await requireCapability(await tableExists(db, "landsraad_task_rewards"), "Landsraad rewards require dune.landsraad_task_rewards.");
+  const { taskId, threshold, newThreshold, templateId, amount } = values;
+  const safeTaskId = intParam(taskId, "task id", 1);
+  const oldThreshold = intParam(threshold, "reward threshold", 0, 2147483647);
+  const nextThreshold = Object.prototype.hasOwnProperty.call(values, "newThreshold")
+    ? intParam(newThreshold, "new reward threshold", 0, 2147483647)
+    : oldThreshold;
+  const nextTemplateId = String(templateId ?? "").trim();
+  const nextAmount = intParam(amount, "reward amount", 0, 2147483647);
+  if (!nextTemplateId || nextTemplateId.length > 256) {
+    const error = new Error("Reward template id is required and must be shorter than 257 characters.");
+    error.statusCode = 400;
+    throw error;
+  }
+  const result = await db.query(`
+    update dune.landsraad_task_rewards
+       set threshold = $1,
+           template_id = $2,
+           amount = $3
+     where task_id = $4
+       and threshold = $5
+     returning task_id::text as task_id,
+               threshold::int as threshold,
+               template_id,
+               amount::int`, [nextThreshold, nextTemplateId, nextAmount, safeTaskId, oldThreshold]);
+  if (!result.rowCount) {
+    const error = new Error(`Landsraad reward tier ${oldThreshold} for task ${safeTaskId} was not found.`);
+    error.statusCode = 404;
+    throw error;
+  }
+  return { ok: true, updatedRows: result.rowCount || 0, row: result.rows[0] };
+}
+
+export async function setLandsraadPlayerContribution(db, { playerId, taskId, amount } = {}) {
+  await requireCapability(await tableExists(db, "landsraad_task_player_contributions"), "Landsraad player contributions require dune.landsraad_task_player_contributions.");
+  await requireCapability(await tableExists(db, "landsraad_task_faction_contributions"), "Landsraad faction contribution totals require dune.landsraad_task_faction_contributions.");
+  const safeTaskId = intParam(taskId, "task id", 1);
+  const safeAmount = numberParam(amount, "contribution amount", 0, 1_000_000_000);
+  return db.transaction(async (tx) => {
+    const player = await resolvePlayerMutationTarget(tx, playerId);
+    const factionResult = await tx.query(`
+      select faction_id
+      from dune.player_faction
+      where actor_id = $1
+      order by faction_id
+      limit 1`, [player.controllerId]);
+    const factionId = factionResult.rows[0]?.faction_id;
+    if (factionId === undefined || factionId === null) {
+      const error = new Error("Player has no faction assignment, so Landsraad contribution totals cannot be calculated.");
+      error.statusCode = 400;
+      throw error;
+    }
+    await tx.query("delete from dune.landsraad_task_player_contributions where player_id = $1 and task_id = $2", [player.controllerId, safeTaskId]);
+    await tx.query(`
+      insert into dune.landsraad_task_player_contributions (player_id, faction_id, task_id, amount)
+      values ($1, $2, $3, $4)`, [player.controllerId, factionId, safeTaskId, safeAmount]);
+    await tx.query("delete from dune.landsraad_task_faction_contributions where task_id = $1", [safeTaskId]);
+    await tx.query(`
+      insert into dune.landsraad_task_faction_contributions (faction_id, task_id, amount)
+      select faction_id, task_id, floor(sum(amount))::int
+      from dune.landsraad_task_player_contributions
+      where task_id = $1
+      group by faction_id, task_id`, [safeTaskId]);
+    if (await tableExists(tx, "landsraad_task_guild_contributions") && await tableExists(tx, "guild_members")) {
+      await tx.query("delete from dune.landsraad_task_guild_contributions where task_id = $1", [safeTaskId]);
+      await tx.query(`
+        insert into dune.landsraad_task_guild_contributions (guild_id, faction_id, task_id, amount)
+        select gm.guild_id, pc.faction_id, pc.task_id, floor(sum(pc.amount))::int
+        from dune.landsraad_task_player_contributions pc
+        join dune.guild_members gm on gm.player_id = pc.player_id
+        where pc.task_id = $1
+        group by gm.guild_id, pc.faction_id, pc.task_id`, [safeTaskId]);
+    }
+    return {
+      ok: true,
+      player,
+      taskId: safeTaskId,
+      factionId,
+      amount: safeAmount,
+      message: "Landsraad contribution updated and totals recalculated."
+    };
+  });
+}
+
 async function rowReference(db, schema, table, rowId) {
   const raw = String(rowId || "").trim();
   if (/^\(\d+,\d+\)$/.test(raw)) return { type: "ctid", params: [raw] };

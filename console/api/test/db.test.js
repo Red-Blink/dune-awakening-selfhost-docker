@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
-import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, completeJourneyNode, completeTutorial, deleteInventoryItem, giveItemToPlayer, giveItemToStorage, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerJourney, playerPosition, playerResearchItems, resetJourneyNode, resetTutorial, runSql, tablePreview, unlockCraftingRecipe, unlockResearchItem, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
+import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, completeJourneyNode, completeTutorial, deleteInventoryItem, giveItemToPlayer, giveItemToStorage, landsraadOverview, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerJourney, playerPosition, playerResearchItems, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, unlockCraftingRecipe, unlockResearchItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
   assert.deepEqual(discoverDbConfig({}), {
@@ -203,6 +203,78 @@ test("spicefield controls update only editable tuning columns", async () => {
   assert.doesNotMatch(updateCall.text, /current_globally_active\s*=/);
   assert.deepEqual(updateCall.values, [2, 3, false, 1.5, 25]);
   await assert.rejects(() => updateSpicefieldType(db, 25, { max_globally_active: -1 }), /Invalid max active/);
+});
+
+test("landsraad overview reads current term tasks and rewards", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) {
+        const table = values[1];
+        const columns = table === "landsraad_decree_term"
+          ? ["term_id", "start_time", "end_time", "test_term", "active_decree_id", "elected_decree_id", "winning_faction_id"]
+          : ["id", "term_id", "board_index", "house_name", "goal_amount", "completed", "winning_faction_id", "sysselraad"];
+        return { rows: columns.map((column_name) => ({ column_name })) };
+      }
+      if (text.includes("from dune.landsraad_decree_term")) return { rows: [{ term_id: 7, active_decree: "Active", elected_decree: "Elected" }] };
+      if (text.includes("from dune.landsraad_decrees")) return { rows: [{ id: 1, name: "Active", weight: 1, disabled: false }] };
+      if (text.includes("from dune.landsraad_tasks t") && text.includes("group by")) {
+        return { rows: [{ task_id: "42", board_index: 1, display_name: "Alexin", goal_amount: 1000, faction_progress: 250, completed: false }] };
+      }
+      if (text.includes("from dune.landsraad_task_rewards")) {
+        return { rows: [{ task_id: "42", threshold: 500, template_id: "Reward", amount: 1 }] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await landsraadOverview(db);
+  assert.equal(result.capabilities.landsraad, true);
+  assert.equal(result.term.term_id, 7);
+  assert.equal(result.tasks[0].task_id, "42");
+  assert.equal(result.rewards[0].threshold, 500);
+  assert.ok(calls.some((call) => String(call.text).includes("where t.term_id = $1") && call.values[0] === 7));
+  const taskQuery = calls.find((call) => String(call.text).includes("from dune.landsraad_tasks t") && String(call.text).includes("group by"));
+  assert.ok(taskQuery);
+  assert.match(taskQuery.text, /order by coalesce\(t\.board_index, 0\), t\.id::text/);
+});
+
+test("landsraad goal and reward mutations validate and target explicit rows", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("update dune.landsraad_tasks") && text.includes("where id = $2")) return { rows: [{ task_id: "42", goal_amount: 7500 }], rowCount: 1 };
+      if (text.includes("update dune.landsraad_tasks") && text.includes("where term_id = $2")) return { rows: [], rowCount: 4 };
+      if (text.includes("update dune.landsraad_task_rewards")) return { rows: [{ task_id: "42", threshold: 2000, template_id: "Template", amount: 3 }], rowCount: 1 };
+      return { rows: [] };
+    }
+  };
+  await updateLandsraadTaskGoal(db, 42, 7500);
+  await updateLandsraadTermTaskGoals(db, 7, 8000);
+  await updateLandsraadRewardTier(db, { taskId: 42, threshold: 1000, newThreshold: 2000, templateId: "Template", amount: 3 });
+  assert.ok(calls.some((call) => String(call.text).includes("where id = $2") && call.values.join(",") === "7500,42"));
+  assert.ok(calls.some((call) => String(call.text).includes("where term_id = $2") && call.values.join(",") === "8000,7"));
+  assert.ok(calls.some((call) => String(call.text).includes("threshold = $5") && call.values.join(",") === "2000,Template,3,42,1000"));
+  await assert.rejects(() => updateLandsraadRewardTier(db, { taskId: 42, threshold: 1000, newThreshold: 1000, templateId: "", amount: 1 }), /Reward template id/);
+});
+
+test("landsraad player contribution recalculates faction and guild totals in one transaction", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    playerRows: [{ actor_id: 123, account_id: 44, controller_id: 55, player_state_id: 5, online_status: "Offline" }]
+  });
+  const result = await setLandsraadPlayerContribution(db, { playerId: 123, taskId: 42, amount: 99 });
+  assert.equal(result.player.controllerId, 55);
+  assert.equal(result.taskId, 42);
+  assert.ok(calls.some((call) => call.text === "begin"));
+  assert.ok(calls.some((call) => String(call.text).includes("delete from dune.landsraad_task_player_contributions") && call.values[0] === 55 && call.values[1] === 42));
+  assert.ok(calls.some((call) => String(call.text).includes("insert into dune.landsraad_task_player_contributions") && call.values[0] === 55 && call.values[2] === 42 && call.values[3] === 99));
+  assert.ok(calls.some((call) => String(call.text).includes("insert into dune.landsraad_task_faction_contributions")));
+  assert.ok(calls.some((call) => String(call.text).includes("insert into dune.landsraad_task_guild_contributions")));
+  assert.ok(calls.some((call) => call.text === "commit"));
 });
 
 test("database table list returns exact row counts", async () => {
@@ -995,6 +1067,7 @@ function fakeMutationDb(calls, fixtures = {}) {
       if (text.includes("delete from dune.tutorial_per_player")) return { rows: [], rowCount: fixtures.tutorialDeleteRows ?? 0 };
       if (text.includes("dune.update_player_tags")) return { rows: [{ ok: true }] };
       if (text.includes("from dune.actors a")) return { rows: fixtures.playerRows || [{ actor_id: 123, account_id: 44, controller_id: 55, player_state_id: 5, online_status: "Offline" }] };
+      if (/from\s+dune\.player_faction\b/.test(text)) return { rows: fixtures.playerFactionRows || [{ faction_id: 1 }] };
       if (text.includes("dune.get_solaris_id")) return { rows: [{ currency_id: 0 }] };
       if (text.includes("adjust_player_virtual_currency_balance")) return { rows: [{ ok: true }] };
       if (text.includes("player_virtual_currency_balances")) return { rows: fixtures.balanceRows || [] };
