@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
-import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, completeJourneyNode, completeTutorial, deleteInventoryItem, giveItemToPlayer, giveItemToStorage, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerJourney, playerPosition, playerResearchItems, resetJourneyNode, resetTutorial, runSql, tablePreview, unlockCraftingRecipe, unlockResearchItem, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
+import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, addonOpsHealthSummary, completeJourneyNode, completeTutorial, deleteInventoryItem, giveItemToPlayer, giveItemToStorage, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerJourney, playerPosition, playerResearchItems, resetJourneyNode, resetTutorial, runSql, tablePreview, unlockCraftingRecipe, unlockResearchItem, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
   assert.deepEqual(discoverDbConfig({}), {
@@ -1024,3 +1024,130 @@ function fakeMutationDb(calls, fixtures = {}) {
   };
   return db;
 }
+test("addon OPS health summary returns aggregate counts only", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      const sql = String(text);
+      calls.push({ text: sql, values });
+
+      if (sql.includes("to_regclass")) {
+        return { rows: [{ exists: ["dune.farm_state", "dune.player_state"].includes(values[0]) }] };
+      }
+
+      if (sql.includes("information_schema.columns")) {
+        const table = values[1];
+        const names = table === "farm_state"
+          ? ["is_ready", "is_alive", "incoming_connections", "outgoing_connections"]
+          : table === "player_state"
+            ? ["online_status", "life_state", "character_state"]
+            : [];
+        return { rows: names.map((column_name) => ({ column_name })) };
+      }
+
+      if (sql.includes("from dune.farm_state") && sql.includes("count(*)::int as total")) {
+        return { rows: [{ total: 2 }] };
+      }
+
+      if (sql.includes("from dune.\"farm_state\"") && sql.includes('"is_ready"')) {
+        return { rows: [{ count: 1 }] };
+      }
+
+      if (sql.includes("from dune.\"farm_state\"") && sql.includes('"is_alive"')) {
+        return { rows: [{ count: 2 }] };
+      }
+
+      if (sql.includes("from dune.\"farm_state\"") && sql.includes('"incoming_connections"')) {
+        return { rows: [{ total: "3" }] };
+      }
+
+      if (sql.includes("from dune.\"farm_state\"") && sql.includes('"outgoing_connections"')) {
+        return { rows: [{ total: "4" }] };
+      }
+
+      if (sql.includes("from dune.player_state") && sql.includes("count(*)::int as total")) {
+        return { rows: [{ total: 3 }] };
+      }
+
+      if (sql.includes("from dune.\"player_state\"") && sql.includes('"online_status"')) {
+        return { rows: [{ key: "Offline", count: 1 }, { key: "Online", count: 2 }] };
+      }
+
+      if (sql.includes("from dune.\"player_state\"") && sql.includes('"life_state"')) {
+        return { rows: [{ key: "Alive", count: 2 }, { key: "Dead", count: 1 }] };
+      }
+
+      if (sql.includes("from dune.\"player_state\"") && sql.includes('"character_state"')) {
+        return { rows: [{ key: "Created", count: 3 }] };
+      }
+
+      throw new Error(`Unexpected query: ${sql}`);
+    }
+  };
+
+  const result = await addonOpsHealthSummary(db);
+
+  assert.equal(result.supported, true);
+  assert.equal(result.capabilities.opsHealth, true);
+  assert.equal(result.capabilities.farmState, true);
+  assert.equal(result.capabilities.playerState, true);
+  assert.equal(result.capabilities.farmVariables, false);
+  assert.equal(result.capabilities.encryptedPlayerState, false);
+
+  assert.equal(result.server.farms.total, 2);
+  assert.equal(result.server.farms.ready, 1);
+  assert.equal(result.server.farms.alive, 2);
+  assert.equal(result.server.connections.incoming, 3);
+  assert.equal(result.server.connections.outgoing, 4);
+
+  assert.equal(result.players.total, 3);
+  assert.equal(result.players.connected, 2);
+  assert.deepEqual(result.players.onlineStatus, { Offline: 1, Online: 2 });
+  assert.deepEqual(result.players.lifeState, { Alive: 2, Dead: 1 });
+  assert.deepEqual(result.players.characterState, { Created: 3 });
+
+  assert.equal(Object.prototype.hasOwnProperty.call(result.players, "rows"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(result.server, "rows"), false);
+  assert.doesNotMatch(JSON.stringify(result), /player_controller_id|account_id|character_name|funcom_id|fls_id|actor_id/i);
+
+  assert.ok(calls.some((call) => call.text.includes("from dune.farm_state")));
+  assert.ok(calls.some((call) => call.text.includes("from dune.player_state")));
+});
+
+test("addon OPS health summary skips optional player aggregates when columns are absent", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      const sql = String(text);
+      calls.push({ text: sql, values });
+
+      if (sql.includes("to_regclass")) {
+        return { rows: [{ exists: values[0] === "dune.player_state" }] };
+      }
+
+      if (sql.includes("information_schema.columns")) {
+        return { rows: [] };
+      }
+
+      if (sql.includes("from dune.player_state") && sql.includes("count(*)::int as total")) {
+        return { rows: [{ total: 5 }] };
+      }
+
+      throw new Error(`Unexpected query: ${sql}`);
+    }
+  };
+
+  const result = await addonOpsHealthSummary(db);
+
+  assert.equal(result.capabilities.farmState, false);
+  assert.equal(result.capabilities.playerState, true);
+  assert.equal(result.players.total, 5);
+  assert.equal(result.players.connected, 0);
+  assert.deepEqual(result.players.onlineStatus, {});
+  assert.deepEqual(result.players.lifeState, {});
+  assert.deepEqual(result.players.characterState, {});
+
+  assert.equal(calls.some((call) => call.text.includes("online_status")), false);
+  assert.equal(calls.some((call) => call.text.includes("life_state")), false);
+  assert.equal(calls.some((call) => call.text.includes("character_state")), false);
+});
