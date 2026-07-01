@@ -70,6 +70,24 @@ export async function readRawBody(req, maxBytes) {
   return Buffer.concat(chunks);
 }
 
+export function createConnectionLimiter(maxConnections) {
+  const limit = Math.max(1, Number(maxConnections) || 1);
+  let active = 0;
+
+  function enter() {
+    if (active >= limit) return null;
+    active += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      active = Math.max(0, active - 1);
+    };
+  }
+
+  return { enter, activeCount: () => active, limit: () => limit };
+}
+
 export function safeStaticTarget(staticDir, requestPath) {
   const dist = resolve(staticDir);
   const normalizedPath = requestPath === "/" ? "/index.html" : requestPath;

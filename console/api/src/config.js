@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { networkInterfaces } from "node:os";
 
 export const APP_NAME = "Dune Docker Console";
+const DEFAULT_MAX_UPLOAD_BYTES = 128 * 1024 * 1024;
 
 export function loadConfig() {
   const repoRoot = resolve(process.env.DUNE_DOCKER_DIR || process.env.RUNTIME_DIR || process.cwd());
@@ -37,7 +38,8 @@ export function loadConfig() {
     spicefieldOverridesFile: resolve(generatedDir, "spicefield-overrides.json"),
     taskRetention: Number(process.env.ADMIN_TASK_RETENTION || 200),
     maxJsonBytes: Number(process.env.ADMIN_MAX_JSON_BYTES || 2 * 1024 * 1024),
-    maxUploadBytes: Number(process.env.ADMIN_MAX_UPLOAD_BYTES || 1024 * 1024 * 1024),
+    maxUploadBytes: Number(process.env.ADMIN_MAX_UPLOAD_BYTES || DEFAULT_MAX_UPLOAD_BYTES),
+    maxSseConnections: Number(process.env.ADMIN_MAX_SSE_CONNECTIONS || 20),
     commandTimeoutMs: Number(process.env.ADMIN_COMMAND_TIMEOUT_MS || 120000),
     staticDir: process.env.ADMIN_STATIC_DIR || resolve(repoRoot, "console/web/dist")
   };
