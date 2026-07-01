@@ -1550,7 +1550,7 @@ edit_userengine_menu() {
           "global_xp_multiplier|Global XP Multiplier|float" \
           "global_fame_multiplier|Global Fame Multiplier|float" \
           "global_progression_speed_multiplier|Global Progression Speed Multiplier|float" \
-          "guild_creation_cost|Guild Creation Cost|int" \
+          "guild_settings_creation_cost|Guild Creation Cost|int" \
           "sell_order_price_percentage_fee|Sell Order Price Percentage Fee|float" \
           "spice_tax_amount|Spice Tax Amount|float" \
           "spice_tax_interval|Spice Tax Interval|int"
@@ -1582,8 +1582,9 @@ edit_userengine_menu() {
         edit_userengine_category_menu "UserEngine World / Guilds / Vehicles" \
           "cycle_duration_in_days|Cycle Duration In Days|int" \
           "db_wipe_enabled|DB Wipe Enabled|bool" \
-          "max_guild_members_allowed|Max Guild Members Allowed|int" \
-          "max_guilds_allowed|Max Guilds Allowed|int" \
+          "guild_settings_max_guild_members_allowed|Max Guild Members Allowed|int" \
+          "guild_settings_max_guilds_allowed|Max Guilds Allowed|int" \
+          "guild_settings_max_pending_invites|Max Pending Guild Invites|int" \
           "max_permissions_per_actor|Max Permissions Per Actor|int" \
           "vehicle_quicksand_damage|Vehicle Quicksand Damage|float"
         ;;
@@ -1657,7 +1658,7 @@ edit_usergame_menu() {
           "global_xp_multiplier|Global XP Multiplier|float" \
           "global_fame_multiplier|Global Fame Multiplier|float" \
           "global_progression_speed_multiplier|Global Progression Speed Multiplier|float" \
-          "guild_creation_cost|Guild Creation Cost|int" \
+          "guild_settings_creation_cost|Guild Creation Cost|int" \
           "sell_order_price_percentage_fee|Sell Order Price Percentage Fee|float" \
           "spice_tax_amount|Spice Tax Amount|float" \
           "spice_tax_interval|Spice Tax Interval|int"
@@ -1689,8 +1690,9 @@ edit_usergame_menu() {
         edit_usergame_category_menu "$map" "$partition_id" "UserGame World / Guilds / Vehicles: $title_suffix" \
           "cycle_duration_in_days|Cycle Duration In Days|int" \
           "db_wipe_enabled|DB Wipe Enabled|bool" \
-          "max_guild_members_allowed|Max Guild Members Allowed|int" \
-          "max_guilds_allowed|Max Guilds Allowed|int" \
+          "guild_settings_max_guild_members_allowed|Max Guild Members Allowed|int" \
+          "guild_settings_max_guilds_allowed|Max Guilds Allowed|int" \
+          "guild_settings_max_pending_invites|Max Pending Guild Invites|int" \
           "max_permissions_per_actor|Max Permissions Per Actor|int" \
           "vehicle_quicksand_damage|Vehicle Quicksand Damage|float"
         ;;

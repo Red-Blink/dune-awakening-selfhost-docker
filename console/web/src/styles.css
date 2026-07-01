@@ -251,6 +251,7 @@ h1, h2, h3, h4, h5 { color: var(--title); line-height: 1.2; letter-spacing: 0; }
   padding: 10px 12px;
 }
 .sidebar-nav-count { margin-left: auto; min-width: 24px; padding: 2px 7px; border: 1px solid #4d4032; border-radius: 999px; background: #171a1d; color: #ffd08a; font-size: 12px; font-weight: 800; text-align: center; }
+.sidebar-nav-count-online { border-color: #3d8b62; background: rgba(24, 101, 84, .18); color: #8fffd2; box-shadow: 0 0 0 1px rgba(143, 255, 210, .08); }
 .sidebar-addon-children { display: grid; gap: 6px; padding-left: 16px; }
 .sidebar-addon-children button {
   min-height: 34px;

@@ -259,6 +259,11 @@ PARTITION_ENGINE_FIELDS = {
 PROTECTED_ENGINE_FIELDS = {"server_display_name", "server_login_password"}
 RESET_PRESERVED_ENGINE_FIELDS = {"port", "igw_port", "server_display_name", "server_login_password"}
 PROFILE_HEADER_ORDER = {"Engine": 0, "Global": 1, "Map": 2, "Partition": 3}
+LEGACY_GUILD_FIELD_ALIASES = {
+    "guild_creation_cost": "guild_settings_creation_cost",
+    "max_guilds_allowed": "guild_settings_max_guilds_allowed",
+    "max_guild_members_allowed": "guild_settings_max_guild_members_allowed",
+}
 
 
 def field_spec(field_id: str):
@@ -525,6 +530,34 @@ def profile_remove_key(profile: dict, scope: str, section: str, key: str, map_na
     block["lines"] = out
 
 
+def mirror_legacy_guild_profile_field(profile: dict, scope: str, map_name: str, partition_id: str, field_id: str, value: str) -> None:
+    canonical_field = LEGACY_GUILD_FIELD_ALIASES.get(field_id)
+    if not canonical_field:
+        return
+    spec = MAP_FIELDS.get(canonical_field)
+    if not spec or not spec[0] or not spec[1]:
+        return
+    if scope == "global":
+        profile_set_key(profile, "global", spec[0], spec[1], value)
+    elif scope == "map":
+        profile_set_key(profile, "map", spec[0], spec[1], value, map_name=map_name)
+    elif scope == "partition":
+        profile_set_key(profile, "partition", spec[0], spec[1], value, canonical_map(map_name or "Survival_1"), str(partition_id or ""))
+
+
+def sync_legacy_guild_values(values: dict[str, str]) -> dict[str, str]:
+    for legacy_field, canonical_field in LEGACY_GUILD_FIELD_ALIASES.items():
+        legacy_default = str(MAP_FIELDS[legacy_field][2])
+        canonical_default = str(MAP_FIELDS[canonical_field][2])
+        legacy_value = str(values.get(legacy_field, legacy_default))
+        canonical_value = str(values.get(canonical_field, canonical_default))
+        if legacy_value != legacy_default and canonical_value == canonical_default:
+            values[canonical_field] = legacy_value
+        elif canonical_value != canonical_default and legacy_value == legacy_default:
+            values[legacy_field] = canonical_value
+    return values
+
+
 def seed_profile_from_legacy_config() -> dict:
     profile = empty_profile()
     profile["preamble"] = [
@@ -786,6 +819,7 @@ def set_profile_field(profile: dict, scope: str, map_name: str, partition_id: st
         spec = MAP_FIELDS[field_id]
         if spec[0] and spec[1]:
             profile_set_key(profile, "global", spec[0], spec[1], value)
+            mirror_legacy_guild_profile_field(profile, "global", "", "", field_id, value)
         return
 
     if scope == "map":
@@ -794,6 +828,7 @@ def set_profile_field(profile: dict, scope: str, map_name: str, partition_id: st
         spec = MAP_FIELDS[field_id]
         if spec[0] and spec[1]:
             profile_set_key(profile, "map", spec[0], spec[1], value, map_name=map_name)
+            mirror_legacy_guild_profile_field(profile, "map", map_name, "", field_id, value)
         return
 
     if scope == "partition":
@@ -824,6 +859,7 @@ def set_profile_field(profile: dict, scope: str, map_name: str, partition_id: st
         spec = MAP_FIELDS.get(field_id)
         if spec and spec[0] and spec[1]:
             profile_set_key(profile, "partition", spec[0], spec[1], value, target_map, target_partition)
+            mirror_legacy_guild_profile_field(profile, "partition", target_map, target_partition, field_id, value)
         return
 
     raise SystemExit("Unknown settings scope.")
@@ -856,7 +892,7 @@ def profile_map_values(profile: dict, map_name: str) -> dict[str, str]:
         map_value = profile_get_key(profile, "map", section, ini_key, target_map)
         if map_value is not None:
             values[key] = map_value
-    return values
+    return sync_legacy_guild_values(values)
 
 
 def profile_global_values(profile: dict) -> dict[str, str]:
@@ -868,7 +904,7 @@ def profile_global_values(profile: dict) -> dict[str, str]:
         global_value = profile_get_key(profile, "global", section, ini_key)
         if global_value is not None:
             values[key] = global_value
-    return values
+    return sync_legacy_guild_values(values)
 
 
 def profile_partition_values(profile: dict, map_name: str, partition_id: str) -> dict[str, str]:
@@ -889,7 +925,7 @@ def profile_partition_values(profile: dict, map_name: str, partition_id: str) ->
     values["partition_pve_enabled"] = "True" if profile_array_contains(
         profile, "partition", "/Script/DuneSandbox.PvpPveSettings", "m_PveEnabledPartitions", target_partition, target_map, target_partition
     ) else values.get("partition_pve_enabled", "False")
-    return values
+    return sync_legacy_guild_values(values)
 
 
 def profile_section_lines(profile: dict, scope: str, section: str, map_name: str = "", partition_id: str = "") -> list[str]:
@@ -1494,6 +1530,7 @@ def profile_selftest() -> int:
     text = """; keep me
 [Global:/Script/DuneSandbox.DuneGameMode]
 m_GlobalXPMultiplier=1.0
+m_MaxGuildMembersAllowed=5
 UnknownGlobal=abc
 
 [Map:Survival_1:/Script/DuneSandbox.DuneGameMode]
@@ -1523,6 +1560,8 @@ Dune.GlobalVehicleMiningOutputMultiplier=10
         raise SystemExit("Compiled runtime INI contains scoped profile headers.")
     if "+m_PvpEnabledPartitions=3" not in compiled_game:
         raise SystemExit("Partition PvP array line was not compiled.")
+    if "[/Script/DuneSandbox.GuildSettings]" not in compiled_game or "m_MaxGuildMembersAllowed=5" not in compiled_game:
+        raise SystemExit("Legacy guild member limit was not mirrored to GuildSettings.")
     if "UnknownGlobal=abc" not in compiled_game or "CustomPartitionKey=True" not in compiled_game:
         raise SystemExit("Compiled UserGame dropped unknown profile lines.")
     if "UnknownEngine=xyz" not in compiled_engine:

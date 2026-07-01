@@ -4,6 +4,7 @@ import { api, post, setCsrfToken } from "./api/client";
 import { serverApi } from "./api/server";
 import { updatesApi } from "./api/updates";
 import { addonsApi } from "./api/addons";
+import { playersApi } from "./api/players";
 import { setupApi, type Task } from "./api/setup";
 import { SetupWizard } from "./components/SetupWizard";
 import { TaskProgress } from "./components/TaskProgress";
@@ -149,6 +150,7 @@ export function App() {
   const [pinnedAddons, setPinnedAddons] = useState<PinnedAddon[]>(() => loadPinnedAddons());
   const [selectedPinnedAddonId, setSelectedPinnedAddonId] = useState("");
   const [addonCount, setAddonCount] = useState(0);
+  const [onlinePlayerCount, setOnlinePlayerCount] = useState(0);
   const [status, setStatus] = useState("");
   const [readiness, setReadiness] = useState("");
   const [ports, setPorts] = useState("");
@@ -201,6 +203,7 @@ export function App() {
       setSetupState(null);
       setSetupStateLoaded(false);
       setAddonCount(0);
+      setOnlinePlayerCount(0);
       return;
     }
     let cancelled = false;
@@ -228,6 +231,25 @@ export function App() {
         if (!cancelled) setAddonCount(0);
       });
     return () => { cancelled = true; };
+  }, [auth]);
+
+  useEffect(() => {
+    if (!auth) return;
+    let cancelled = false;
+    async function refreshOnlinePlayers() {
+      try {
+        const result = await playersApi.online();
+        if (!cancelled) setOnlinePlayerCount((result.rows || []).length);
+      } catch {
+        if (!cancelled) setOnlinePlayerCount(0);
+      }
+    }
+    void refreshOnlinePlayers();
+    const id = window.setInterval(refreshOnlinePlayers, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
   }, [auth]);
 
   useEffect(() => {
@@ -456,7 +478,7 @@ export function App() {
                     setRedeploySetupOpen(false);
                     setSelectedPinnedAddonId("");
                     setTab(item.tab);
-                  }}>{item.icon}<span>{item.tab}</span>{item.tab === "Addons" && addonCount > 0 && <span className="sidebar-nav-count">{addonCount}</span>}</button>
+                  }}>{item.icon}<span>{item.tab}</span>{item.tab === "Players" && onlinePlayerCount > 0 && <span className="sidebar-nav-count sidebar-nav-count-online">{onlinePlayerCount}</span>}{item.tab === "Addons" && addonCount > 0 && <span className="sidebar-nav-count">{addonCount}</span>}</button>
                   {item.tab === "Addons" && pinnedAddons.length > 0 && <div className="sidebar-addon-children">
                     {pinnedAddons.map((addon) => (
                       <button key={addon.id} className={tab === "Addons" && selectedPinnedAddonId === addon.id ? "active" : ""} onClick={() => {
