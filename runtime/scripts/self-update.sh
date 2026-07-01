@@ -425,6 +425,7 @@ backup_local_state() {
     runtime/generated/restart-schedule.env \
     runtime/generated/shutdown-protection.env \
     runtime/generated/sietch-config.json \
+    runtime/generated/spicefield-overrides.json \
     runtime/generated/update-auto.env \
     runtime/generated/usersettings.json \
     runtime/generated/gameplay-profile.ini \
@@ -556,6 +557,7 @@ restore_local_state_after_install() {
   restore_local_state_file_if_needed "$backup_dir" runtime/generated/restart-schedule.env
   restore_local_state_file_if_needed "$backup_dir" runtime/generated/shutdown-protection.env
   restore_local_state_file_if_needed "$backup_dir" runtime/generated/sietch-config.json
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/spicefield-overrides.json
   restore_local_state_file_if_needed "$backup_dir" runtime/generated/update-auto.env
   restore_local_state_file_if_needed "$backup_dir" runtime/generated/usersettings.json
   restore_local_state_file_if_needed "$backup_dir" runtime/generated/gameplay-profile.ini
@@ -698,6 +700,7 @@ restore_local_state_ownership() {
     runtime/generated/restart-schedule.env \
     runtime/generated/shutdown-protection.env \
     runtime/generated/sietch-config.json \
+    runtime/generated/spicefield-overrides.json \
     runtime/generated/update-auto.env \
     runtime/generated/usersettings.json \
     runtime/generated/gameplay-profile.ini \

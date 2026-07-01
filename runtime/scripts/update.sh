@@ -892,6 +892,10 @@ fi
 echo "=== Run database update/migration ==="
 runtime/scripts/update-db.sh
 
+echo
+echo "=== Reapply persisted Spice Field overrides ==="
+runtime/scripts/spicefield-overrides.sh apply
+
 if [ "$cmd" = "install" ]; then
   echo
   echo "=== Apply canonical world partitions ==="
