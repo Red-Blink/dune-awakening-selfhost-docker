@@ -1006,6 +1006,114 @@ export async function addonLeadershipPlayers(db) {
   };
 }
 
+export async function addonOpsHealthSummary(db) {
+  const generatedAt = new Date().toISOString();
+  const capabilities = {
+    opsHealth: true,
+    farmState: await tableExists(db, "farm_state").catch(() => false),
+    farmVariables: await tableExists(db, "farm_variables").catch(() => false),
+    playerState: await tableExists(db, "player_state").catch(() => false),
+    encryptedPlayerState: await tableExists(db, "encrypted_player_state").catch(() => false)
+  };
+
+  const result = {
+    generatedAt,
+    supported: true,
+    capabilities,
+    server: {
+      farms: { total: 0, ready: 0, alive: 0 },
+      connections: { incoming: 0, outgoing: 0 }
+    },
+    players: {
+      total: 0,
+      connected: 0,
+      onlineStatus: {},
+      lifeState: {},
+      characterState: {}
+    }
+  };
+
+  if (capabilities.farmState) {
+    const farmColumns = await columnsFor(db, "farm_state").catch(() => new Set());
+    const farmRows = await db.query(`
+      select count(*)::int as total
+      from dune.farm_state`);
+    result.server.farms.total = Number(farmRows.rows[0]?.total || 0);
+
+    const readyColumn = firstExistingColumn(farmColumns, ["ready", "is_ready", "server_ready", "b_is_ready"]);
+    if (readyColumn) {
+      result.server.farms.ready = await countTruthyColumn(db, "farm_state", readyColumn);
+    }
+
+    const aliveColumn = firstExistingColumn(farmColumns, ["alive", "is_alive", "server_alive", "b_is_alive"]);
+    if (aliveColumn) {
+      result.server.farms.alive = await countTruthyColumn(db, "farm_state", aliveColumn);
+    }
+
+    const incomingColumn = firstExistingColumn(farmColumns, ["incoming_connections", "num_incoming_connections", "incoming_server_connections"]);
+    if (incomingColumn) {
+      result.server.connections.incoming = await sumNumericColumn(db, "farm_state", incomingColumn);
+    }
+
+    const outgoingColumn = firstExistingColumn(farmColumns, ["outgoing_connections", "num_outgoing_connections", "outgoing_server_connections"]);
+    if (outgoingColumn) {
+      result.server.connections.outgoing = await sumNumericColumn(db, "farm_state", outgoingColumn);
+    }
+  }
+
+  if (capabilities.playerState) {
+    const playerColumns = await columnsFor(db, "player_state").catch(() => new Set());
+
+    const totalRows = await db.query(`
+      select count(*)::int as total
+      from dune.player_state`);
+    result.players.total = Number(totalRows.rows[0]?.total || 0);
+
+    if (playerColumns.has("online_status")) {
+      result.players.onlineStatus = await countByTextColumn(db, "player_state", "online_status");
+      result.players.connected = Object.entries(result.players.onlineStatus)
+        .filter(([key]) => key.toLowerCase() === "online" || key.toLowerCase() === "connected")
+        .reduce((sum, [, count]) => sum + Number(count || 0), 0);
+    }
+
+    if (playerColumns.has("life_state")) {
+      result.players.lifeState = await countByTextColumn(db, "player_state", "life_state");
+    }
+
+    if (playerColumns.has("character_state")) {
+      result.players.characterState = await countByTextColumn(db, "player_state", "character_state");
+    }
+  }
+
+  return result;
+}
+
+async function countByTextColumn(db, table, column) {
+  const result = await db.query(`
+    select coalesce(${quoteIdentifier(column)}::text, 'Unknown') as key,
+           count(*)::int as count
+    from dune.${quoteIdentifier(table)}
+    group by coalesce(${quoteIdentifier(column)}::text, 'Unknown')
+    order by key`);
+  return Object.fromEntries(result.rows.map((row) => [String(row.key || "Unknown"), Number(row.count || 0)]));
+}
+
+async function countTruthyColumn(db, table, column) {
+  const result = await db.query(`
+    select count(*)::int as count
+    from dune.${quoteIdentifier(table)}
+    where lower(coalesce(${quoteIdentifier(column)}::text, '')) in ('true', 't', '1', 'yes', 'ready', 'alive')`);
+  return Number(result.rows[0]?.count || 0);
+}
+
+async function sumNumericColumn(db, table, column) {
+  const result = await db.query(`
+    select coalesce(sum(nullif(${quoteIdentifier(column)}::text, '')::numeric), 0)::bigint as total
+    from dune.${quoteIdentifier(table)}
+    where nullif(${quoteIdentifier(column)}::text, '') ~ '^-?[0-9]+(\\.[0-9]+)?$'`);
+  return Number(result.rows[0]?.total || 0);
+}
+
 async function leadershipLevels(db) {
   const levels = new Map();
   if (await tableExists(db, "player_state") && await tableExists(db, "actor_fgl_entities") && await tableExists(db, "fgl_entities")) {

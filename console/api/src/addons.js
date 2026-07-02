@@ -17,6 +17,7 @@ const ALLOWED_ADDON_PERMISSIONS = new Set([
   "database:write",
   "server:status",
   "server:restart",
+  "ops:read",
   "files:addon-data",
   "broadcast:send"
 ]);
