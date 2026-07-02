@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 const sessions = new Map();
 
@@ -50,9 +51,19 @@ export function createAuth(config) {
     return session;
   }
 
+  function currentAdminPassword() {
+    if (config.adminPasswordEnvManaged) return config.adminPassword;
+    if (!config.adminPasswordFile) return config.adminPassword;
+    try {
+      return readFileSync(config.adminPasswordFile, "utf8").trim() || config.adminPassword;
+    } catch {
+      return config.adminPassword;
+    }
+  }
+
   function passwordMatches(value) {
     const left = Buffer.from(String(value || ""));
-    const right = Buffer.from(config.adminPassword);
+    const right = Buffer.from(currentAdminPassword());
     return left.length === right.length && timingSafeEqual(left, right);
   }
 

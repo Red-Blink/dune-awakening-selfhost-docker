@@ -66,6 +66,8 @@ Keep database and internal admin ports private.
 
 ## Getting Started
 
+### Linux server
+
 Copy and paste this on a fresh Linux server:
 
 ```bash
@@ -73,6 +75,40 @@ bash -c 'set -euo pipefail; if ! command -v curl >/dev/null 2>&1; then sudo apt-
 ```
 
 The installer downloads the latest release, prepares the server, starts the Web UI, and tells you what address to open in your browser. If you are on the same network as the server, use the same-network address. If you are connecting over the internet, use the public address and allow TCP `8088` in your firewall.
+
+### Windows 11 Home / WSL2 / Ubuntu 26.04
+
+Windows users can install through WSL2 without replacing the Linux installer. Start with the Windows quick-start so WSL2 and Ubuntu 26.04 are installed, Ubuntu is launched once, and the Linux username/password are created before the Dune installer runs.
+
+Windows setup order:
+
+1. Confirm virtualization is enabled.
+2. Open PowerShell as Administrator.
+3. Install WSL2.
+4. Install Ubuntu 26.04.
+5. Launch Ubuntu once and create the Linux user.
+6. Run the Dune Windows / WSL installer.
+
+Documentation:
+
+- How to open Administrator PowerShell: [docs/ADMIN-POWERSHELL.md](docs/ADMIN-POWERSHELL.md)
+- Windows quick install, including WSL and Ubuntu setup: [docs/WINDOWS-WSL-QUICKSTART.md](docs/WINDOWS-WSL-QUICKSTART.md)
+- Full Windows guide: [docs/WINDOWS-WSL-INSTALL.md](docs/WINDOWS-WSL-INSTALL.md)
+- WSL mirrored networking and Web UI Docker socket access: [docs/WINDOWS-WSL-NETWORKING-AND-DOCKER-SOCKET.md](docs/WINDOWS-WSL-NETWORKING-AND-DOCKER-SOCKET.md)
+- Maintainer security checks: [docs/WINDOWS-WSL-SECURITY-REGRESSION.md](docs/WINDOWS-WSL-SECURITY-REGRESSION.md)
+
+If you already cloned this repository locally after completing WSL and Ubuntu first-run setup, open Administrator PowerShell in the repo folder and run:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass -Force
+.\install.ps1
+```
+
+Then open the Web UI from Windows:
+
+```text
+http://localhost:8088
+```
 
 ## Community Addons
 

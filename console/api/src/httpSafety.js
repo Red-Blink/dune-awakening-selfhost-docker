@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 
 export async function readJsonBody(req, maxBytes) {
   const chunks = [];
@@ -75,6 +75,7 @@ export function safeStaticTarget(staticDir, requestPath) {
   const normalizedPath = requestPath === "/" ? "/index.html" : requestPath;
   const file = resolve(dist, `.${normalizedPath}`);
   const fallback = resolve(dist, "index.html");
-  const safeFile = file.startsWith(`${dist}/`) ? file : fallback;
+  const relativePath = relative(dist, file);
+  const safeFile = relativePath && !relativePath.startsWith("..") && !isAbsolute(relativePath) ? file : fallback;
   return existsSync(safeFile) ? safeFile : fallback;
 }
