@@ -36,6 +36,17 @@ function isTerminalTask(status: string) {
   return ["succeeded", "failed", "cancelled"].includes(status);
 }
 
+type SortState = { column: string; direction: "asc" | "desc" };
+
+function useSortableRows<T extends Record<string, unknown>>(rows: T[]) {
+  const [sort, setSort] = useState<SortState | null>(null);
+  const sortedRows = sort ? [...rows].sort((a, b) => compareTableValues(a[sort.column], b[sort.column], sort.direction)) : rows;
+  function onSort(column: string) {
+    setSort((current) => (current?.column === column ? { column, direction: current.direction === "asc" ? "desc" : "asc" } : { column, direction: "asc" }));
+  }
+  return { sortedRows, sortColumn: sort?.column, sortDirection: sort?.direction, onSort, reset: () => setSort(null) };
+}
+
 function loadDatabasePasswordState(): DatabasePasswordState {
   if (typeof window === "undefined") return { result: null };
   try {
@@ -168,6 +179,8 @@ export function DatabasePanel() {
     setColumns([]);
     setCount("");
     setPreviewError("");
+    columnsSort.reset();
+    previewSort.reset();
     await refreshTablePreview(table);
     window.setTimeout(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }
@@ -289,6 +302,11 @@ export function DatabasePanel() {
   const filteredTables = tableSearchTerm
     ? tables.filter((table) => `${String(table.schema || "")}.${String(table.name || "")}`.toLowerCase().includes(tableSearchTerm))
     : tables;
+  const tablesSort = useSortableRows(filteredTables);
+  const columnsSort = useSortableRows(columns);
+  const previewSort = useSortableRows(previewRows);
+  const searchSort = useSortableRows(searchRows);
+  const querySort = useSortableRows(queryRows);
   return <section className="panel">
     <h2>Database Browser</h2>
     <p className="database-browser-note">
@@ -326,7 +344,7 @@ export function DatabasePanel() {
       {tableSearch && <button onClick={() => setTableSearch("")}>Clear</button>}
     </div>
     {filteredTables.length
-      ? <DataTable rows={filteredTables} columns={["schema", "name", "row_count"]} onRowClick={(row) => open(String(row.name))} />
+      ? <DataTable rows={tablesSort.sortedRows} columns={["schema", "name", "row_count"]} onRowClick={(row) => open(String(row.name))} sortColumn={tablesSort.sortColumn} sortDirection={tablesSort.sortDirection} onSort={tablesSort.onSort} />
       : <div className="empty database-empty">No matching tables found.</div>}
     <h3 ref={previewRef}>{selected ? `${schema}.${selected} (${count} rows)` : "Table Preview"}</h3>
     {!selected && <div className="empty database-empty">No table selected. Select a table to preview and edit rows.</div>}
@@ -339,9 +357,9 @@ export function DatabasePanel() {
       </p>}
       <details className="technical-details">
         <summary>Columns</summary>
-        <DataTable rows={columns} />
+        <DataTable rows={columnsSort.sortedRows} sortColumn={columnsSort.sortColumn} sortDirection={columnsSort.sortDirection} onSort={columnsSort.onSort} />
       </details>
-      {!previewLoading && !previewError && (previewRows.length ? <DataTable rows={previewRows} columns={previewColumns} action={(row) => <button onClick={(event) => { event.stopPropagation(); startEdit(row); }}>Edit</button>} actionClassName="backup-table-actions" tableClassName="backup-table" /> : <div className="empty database-empty">This table has no rows to preview.</div>)}
+      {!previewLoading && !previewError && (previewRows.length ? <DataTable rows={previewSort.sortedRows} columns={previewColumns} action={(row) => <button onClick={(event) => { event.stopPropagation(); startEdit(row); }}>Edit</button>} actionClassName="backup-table-actions" tableClassName="backup-table" sortColumn={previewSort.sortColumn} sortDirection={previewSort.sortDirection} onSort={previewSort.onSort} /> : <div className="empty database-empty">This table has no rows to preview.</div>)}
       {!editRow && editResult && <section className={`result-panel ${editResult.status === "running" ? "" : "transient-result"} ${editResult.status === "succeeded" ? "result-ok" : editResult.status === "failed" ? "result-fail" : "result-running"}`}>
         <div className="panel-title"><strong>{formatResultTitle(editResult.title, editResult.status === "running")}</strong><StatusPill value={editResult.status === "succeeded" ? "Saved" : editResult.status === "failed" ? "Failed" : "Saving"} /></div>
         {editResult.message && <p>{formatResultMessage(editResult.message)}</p>}
@@ -363,7 +381,7 @@ export function DatabasePanel() {
     </section>}
     <h3>Search Tables and Columns</h3>
     <div className="action-row"><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tables or columns" /><button onClick={searchColumns}>Search</button></div>
-    {searchRan && (searchRows.length ? <DataTable rows={searchRows} /> : <div className="empty database-empty">No matching tables or columns found.</div>)}
+    {searchRan && (searchRows.length ? <DataTable rows={searchSort.sortedRows} sortColumn={searchSort.sortColumn} sortDirection={searchSort.sortDirection} onSort={searchSort.onSort} /> : <div className="empty database-empty">No matching tables or columns found.</div>)}
     <div className={`playerAdmin_toggle database-advanced-section ${advancedSqlOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={advancedSqlOpen ? "Collapse Advanced SQL Console" : "Expand Advanced SQL Console"} onClick={() => setAdvancedSqlOpen(!advancedSqlOpen)}>{advancedSqlOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Advanced SQL Console</span></button>
       {advancedSqlOpen && <div className="playerAdmin_toggleBody">
@@ -371,11 +389,19 @@ export function DatabasePanel() {
         <div className="action-row"><button onClick={runQuery}>Run Query</button><button onClick={exportQueryJson}>Export Query JSON</button></div>
         {queryRan && queryError && <div className="empty database-empty danger-note">{formatResultMessage(`Query failed: ${queryError}`)}</div>}
         {queryRan && !queryError && queryResult && (queryRows.length
-          ? <DataTable rows={queryRows} columns={queryColumns} />
+          ? <DataTable rows={querySort.sortedRows} columns={queryColumns} sortColumn={querySort.sortColumn} sortDirection={querySort.sortDirection} onSort={querySort.onSort} />
           : <div className="result-panel transient-result result-ok database-query-result">Query completed. Rows affected: {queryAffectedRows}.</div>)}
       </div>}
     </div>
   </section>;
+}
+
+function compareTableValues(a: unknown, b: unknown, direction: "asc" | "desc") {
+  const aNum = Number(a);
+  const bNum = Number(b);
+  const bothNumeric = a !== null && a !== undefined && a !== "" && b !== null && b !== undefined && b !== "" && !Number.isNaN(aNum) && !Number.isNaN(bNum);
+  const result = bothNumeric ? aNum - bNum : String(a ?? "").localeCompare(String(b ?? ""), undefined, { sensitivity: "base" });
+  return direction === "asc" ? result : -result;
 }
 
 function databasePreviewColumns(preview: { columns?: { name: string }[] } | null) {

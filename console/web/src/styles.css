@@ -1046,6 +1046,9 @@ body.debug .technical-details { display: block; }
 table { width: max-content; min-width: 100%; border-collapse: collapse; }
 th, td { border-bottom: 1px solid #302b25; padding: 9px 10px; text-align: left; vertical-align: middle; max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 th { color: #ffd08a; background: #171a1d; position: sticky; top: 0; z-index: 1; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: #ffe0a8; }
+.sort-indicator { color: #cbbd9f; }
 tr.clickable { cursor: pointer; }
 tr.clickable:hover { background: rgba(198, 139, 74, .12); }
 .actions-column { text-align: center; }
