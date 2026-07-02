@@ -50,6 +50,8 @@ install_basic_tools() {
     need_sudo zypper --non-interactive install ca-certificates curl
   elif command -v pacman >/dev/null 2>&1; then
     need_sudo pacman -Sy --noconfirm ca-certificates curl
+  elif command -v apk >/dev/null 2>&1; then
+    need_sudo apk add --no-cache ca-certificates curl
   fi
 }
 
@@ -58,7 +60,7 @@ install_docker() {
     return
   fi
 
-  step "Docker is missing. Installing Docker now."
+  step "Docker is missing. Installing Pre-requisites for Docker now."
   install_basic_tools
 
   if ! command -v curl >/dev/null 2>&1; then
@@ -67,7 +69,38 @@ install_docker() {
     exit 1
   fi
 
-  curl -fsSL https://get.docker.com | need_sudo sh
+  step "Installing Docker now."
+ 
+  if ! error=$(curl -fsSL https://get.docker.com | need_sudo sh 2>&1); then
+  echo "$error" >&2
+    if echo "$error" | grep -qi "alpine"; then
+      step "Official Docker does not support Alpine Linux. Installing Docker from the Alpine community repository instead."
+      install_docker_alpine
+    else
+      echo "$error" >&2
+      exit 1
+    fi
+  fi
+}
+
+install_docker_alpine() {
+  local repos_file="/etc/apk/repositories"
+
+  # Ensure the community repository line of the package manager is not commented out as this is needed to install Docker Package.
+  if grep -qE '^#.*community$' "$repos_file"; then
+    echo "The Alpine community repository is currently disabled in $repos_file."
+    echo "Docker is not listed in the default Alpine repository, so this installer needs to enable the community repository to install Docker."
+    printf "Allow this installer to enable it? [y/N] " #Force the user to confirm enabling the community repository so they are aware we are making a change to the default settings.
+    read -r response
+    if echo "$response" | grep -qi "^y"; then
+      need_sudo sed -i 's|^#\(.*community\)$|\1|' "$repos_file"
+    else
+      echo "Cannot install Docker without the community repository. Aborting."
+      exit 1
+    fi
+  fi
+
+  need_sudo apk add --no-cache docker
 }
 
 select_docker_command() {
@@ -118,21 +151,45 @@ start_docker() {
   exit 1
 }
 
+set_docker_group_access() {
+  local target_user="$1"
+
+  if ! getent group docker &>/dev/null; then
+    echo "Docker group does not exist yet — Is Docker installed?"
+    return
+  fi
+
+  if command -v usermod &>/dev/null; then
+    need_sudo usermod -aG docker "$target_user"
+  elif command -v addgroup &>/dev/null; then
+    need_sudo addgroup "$target_user" docker
+  else
+    echo "Cannot add user $target_user to the docker group automatically."
+    echo "Please manually add your user to the docker group and log out and back in."
+  fi
+}
+
 ensure_docker_group_access() {
   local target_user
   target_user="${SUDO_USER:-${USER:-}}"
+  step "Checking if User: $target_user is in the docker group."
   if [ -z "$target_user" ] || [ "$target_user" = "root" ]; then
     return
   fi
   if ! getent group docker >/dev/null 2>&1; then
+    echo "Docker group does not exist yet — Is Docker installed?"
     return
   fi
   if id -nG "$target_user" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
+    echo "User $target_user is already in the docker group."
     return
   fi
 
-  step "Allowing your user to run Docker commands later."
-  need_sudo usermod -aG docker "$target_user" || true
+  echo "$target_user is not in the docker group."
+  # TODO: (Remove once verify) Origional - need_sudo usermod -aG docker "$target_user" || true
+  set_docker_group_access "$target_user"
+  echo "User $target_user has been added to the docker group. Log out and back in for this change to take effect."
+
   DOCKER_GROUP_UPDATED=1
 }
 
@@ -150,6 +207,8 @@ ensure_compose() {
     need_sudo dnf install -y docker-compose-plugin
   elif command -v yum >/dev/null 2>&1; then
     need_sudo yum install -y docker-compose-plugin
+  elif command -v apk >/dev/null 2>&1; then
+    need_sudo apk add --no-cache docker-compose
   else
     echo "Docker Compose is missing and this operating system is not supported for automatic Compose installation."
     echo "Install the Docker Compose v2 plugin or use Docker Desktop, then run this installer again."
