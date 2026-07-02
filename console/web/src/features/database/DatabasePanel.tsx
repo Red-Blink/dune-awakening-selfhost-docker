@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { databaseApi } from "../../api/database";
+import { databaseApi, type ColumnFilterTerm, type ColumnFilterTree } from "../../api/database";
 import { setupApi, type Task } from "../../api/setup";
 import { SecretInput } from "../../components/SecretInput";
 import { DataTable } from "../../components/common/DataTable";
@@ -93,18 +93,16 @@ function splitTopLevelKeyword(term: string, keyword: string): string[] {
   return parts.filter((part) => part.length > 0);
 }
 
-function rowMatchesColumnQuery(row: Record<string, unknown>, previewColumns: string[], query: string): boolean {
-  const orGroups = splitTopLevelKeyword(query, "or");
-  return orGroups.some((group) => {
+function buildColumnFilterTree(query: string): ColumnFilterTree | null {
+  const trimmed = query.trim();
+  if (!trimmed) return null;
+  const orGroups = splitTopLevelKeyword(trimmed, "or");
+  return orGroups.map((group) => {
     const andTerms = splitTopLevelKeyword(group, "and");
-    return andTerms.every((rawTerm) => {
+    return andTerms.map((rawTerm): ColumnFilterTerm => {
       const filter = parseColumnEqualityFilter(rawTerm);
-      if (filter) {
-        const matchedColumn = previewColumns.find((column) => column.toLowerCase() === filter.column.toLowerCase());
-        return matchedColumn ? String(row[matchedColumn] ?? "").toLowerCase() === filter.value.toLowerCase() : false;
-      }
-      const needle = stripOuterQuotes(rawTerm).toLowerCase();
-      return previewColumns.some((column) => String(row[column] ?? "").toLowerCase().includes(needle));
+      if (filter) return { type: "column", column: filter.column, value: filter.value };
+      return { type: "text", value: stripOuterQuotes(rawTerm) };
     });
   });
 }
@@ -166,6 +164,7 @@ export function DatabasePanel() {
   const [preview, setPreview] = useState<{ columns?: { name: string }[]; rows?: Record<string, unknown>[] } | null>(null);
   const [columns, setColumns] = useState<Record<string, unknown>[]>([]);
   const [count, setCount] = useState("");
+  const [tableTotalCount, setTableTotalCount] = useState("");
   const [previewPage, setPreviewPage] = useState(0);
   const [previewPageSize, setPreviewPageSize] = useState(DATABASE_PREVIEW_DEFAULT_PAGE_SIZE);
   const [previewError, setPreviewError] = useState("");
@@ -183,6 +182,7 @@ export function DatabasePanel() {
   const [databasePasswordState, setDatabasePasswordState] = useState<DatabasePasswordState>(() => loadDatabasePasswordState());
   const [tableSearch, setTableSearch] = useState("");
   const [columnSearch, setColumnSearch] = useState("");
+  const [previewFilter, setPreviewFilter] = useState<ColumnFilterTree | null>(null);
   const [search, setSearch] = useState("");
   const [searchRows, setSearchRows] = useState<Record<string, unknown>[]>([]);
   const [searchRan, setSearchRan] = useState(false);
@@ -243,27 +243,30 @@ export function DatabasePanel() {
     setPreview(null);
     setColumns([]);
     setCount("");
+    setTableTotalCount("");
     setPreviewPage(0);
     setPreviewError("");
     columnsSort.reset();
     previewSort.reset();
-setColumnSearch("");
-await refreshTablePreview(table, 0, previewPageSize);
+    setColumnSearch("");
+    setPreviewFilter(null);
+    void databaseApi.count(schema, table).then((result) => setTableTotalCount(String(result.count))).catch(() => undefined);
+    await refreshTablePreview(table, 0, previewPageSize, null);
     window.setTimeout(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }
-  async function refreshTablePreview(table: string, page = previewPage, pageSize = previewPageSize) {
+  async function refreshTablePreview(table: string, page = previewPage, pageSize = previewPageSize, filter = previewFilter) {
     setPreviewLoading(true);
     setPreviewError("");
     try {
       const [nextColumns, nextCount] = await Promise.all([
         databaseApi.columns(schema, table),
-        databaseApi.count(schema, table)
+        databaseApi.count(schema, table, filter)
       ]);
       const rowCount = Math.max(0, Number(nextCount.count) || 0);
       const safePageSize = normalizeDatabasePreviewPageSize(pageSize);
       const totalPages = Math.max(1, Math.ceil(rowCount / safePageSize));
       const safePage = Math.max(0, Math.min(page, totalPages - 1));
-      const nextPreview = rowCount > 0 ? await databaseApi.preview(schema, table, safePageSize, safePage * safePageSize) : { columns: [], rows: [] };
+      const nextPreview = rowCount > 0 ? await databaseApi.preview(schema, table, safePageSize, safePage * safePageSize, filter) : { columns: [], rows: [] };
       setPreview(nextPreview);
       setColumns(nextColumns);
       setCount(String(nextCount.count));
@@ -288,6 +291,22 @@ await refreshTablePreview(table, 0, previewPageSize);
     setPreviewPage(0);
     previewSort.reset();
     if (selected) await refreshTablePreview(selected, 0, nextPageSize);
+  }
+  async function runColumnSearch() {
+    if (!selected || previewLoading) return;
+    const nextFilter = buildColumnFilterTree(columnSearch);
+    setPreviewFilter(nextFilter);
+    setPreviewPage(0);
+    previewSort.reset();
+    await refreshTablePreview(selected, 0, previewPageSize, nextFilter);
+  }
+  async function clearColumnSearch() {
+    setColumnSearch("");
+    if (!previewFilter) return;
+    setPreviewFilter(null);
+    setPreviewPage(0);
+    previewSort.reset();
+    if (selected) await refreshTablePreview(selected, 0, previewPageSize, null);
   }
   async function loadDatabaseStatus() {
     setDatabaseStatusLoading(true);
@@ -393,13 +412,9 @@ await refreshTablePreview(table, 0, previewPageSize);
   const filteredColumnsMeta = columnSearchTerm
     ? columns.filter((column) => String(column.name || "").toLowerCase().includes(columnSearchTerm))
     : columns;
-  const columnSearchQuery = columnSearch.trim();
-  const filteredPreviewRows = columnSearchQuery
-    ? previewRows.filter((row) => rowMatchesColumnQuery(row, previewColumns, columnSearchQuery))
-    : previewRows;
   const tablesSort = useSortableRows(filteredTables);
   const columnsSort = useSortableRows(filteredColumnsMeta);
-  const previewSort = useSortableRows(filteredPreviewRows);
+  const previewSort = useSortableRows(previewRows);
   const searchSort = useSortableRows(searchRows);
   const querySort = useSortableRows(queryRows);
   return <section className="panel">
@@ -441,19 +456,19 @@ await refreshTablePreview(table, 0, previewPageSize);
     {filteredTables.length
       ? <DataTable rows={tablesSort.sortedRows} columns={["schema", "name", "row_count"]} onRowClick={(row) => open(String(row.name))} sortColumn={tablesSort.sortColumn} sortDirection={tablesSort.sortDirection} onSort={tablesSort.onSort} />
       : <div className="empty database-empty">No matching tables found.</div>}
-    <h3 ref={previewRef}>{selected ? `${schema}.${selected} (${count} rows)` : "Table Preview"}</h3>
+    <h3 ref={previewRef}>{selected ? `${schema}.${selected} (${tableTotalCount} rows)` : "Table Preview"}</h3>
     {!selected && <div className="empty database-empty">No table selected. Select a table to preview and edit rows.</div>}
     {selected && <section className="database-table-panel">
       {previewLoading && <div className="empty database-empty">Loading table page...</div>}
       {previewError && <div className="empty database-empty danger-note">Preview failed: {formatResultMessage(previewError)}</div>}
 {!previewLoading && !previewError && <div className="action-row database-table-search-row">
-  <input value={columnSearch} onChange={(event) => setColumnSearch(event.target.value)} placeholder="Search columns, or column='value' and/or ..." />
-  {columnSearch && <button onClick={() => setColumnSearch("")}>Clear</button>}
+  <input value={columnSearch} onChange={(event) => setColumnSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void runColumnSearch(); }} placeholder="Search columns, or column='value' and/or ..." />
+  <button disabled={previewLoading} onClick={() => void runColumnSearch()}>Search</button>
+  {columnSearch && <button onClick={() => void clearColumnSearch()}>Clear</button>}
 </div>}
 {!previewLoading && !previewError && <div className="database-preview-toolbar">
   <p className="muted database-preview-count">
     Showing {previewStartRow.toLocaleString()}-{previewEndRow.toLocaleString()} of {previewRowCount.toLocaleString()} rows.
-    {previewIsTruncated ? ` Full preview is capped at ${DATABASE_PREVIEW_MAX_ROWS.toLocaleString()} rows to keep the browser responsive.` : ""}
   </p>
   <div className="database-pagination-controls">
     <label className="compact-select">Rows<select value={String(previewPageSize)} onChange={(event) => { void changePreviewPageSize(event.target.value); }}>
@@ -466,16 +481,13 @@ await refreshTablePreview(table, 0, previewPageSize);
     <button disabled={!previewHasNextPage || previewLoading} onClick={() => void goToPreviewPage(previewTotalPages - 1)}>Last</button>
   </div>
 </div>}
-      </div>}
       <details className="technical-details">
         <summary>Columns</summary>
         <DataTable rows={columnsSort.sortedRows} emptyMessage={columnSearchTerm ? "No matching columns found." : "No columns found."} sortColumn={columnsSort.sortColumn} sortDirection={columnsSort.sortDirection} onSort={columnsSort.onSort} />
       </details>
       {!previewLoading && !previewError && (previewRows.length
-        ? (previewSort.sortedRows.length
-            ? <DataTable rows={previewSort.sortedRows} columns={previewColumns} action={(row) => <button onClick={(event) => { event.stopPropagation(); startEdit(row); }}>Edit</button>} actionClassName="backup-table-actions" tableClassName="backup-table" sortColumn={previewSort.sortColumn} sortDirection={previewSort.sortDirection} onSort={previewSort.onSort} />
-            : <div className="empty database-empty">No matching rows found.</div>)
-        : <div className="empty database-empty">This table has no rows to preview.</div>)}
+        ? <DataTable rows={previewSort.sortedRows} columns={previewColumns} action={(row) => <button onClick={(event) => { event.stopPropagation(); startEdit(row); }}>Edit</button>} actionClassName="backup-table-actions" tableClassName="backup-table" sortColumn={previewSort.sortColumn} sortDirection={previewSort.sortDirection} onSort={previewSort.onSort} />
+        : <div className="empty database-empty">{previewFilter ? "No matching rows found." : "This table has no rows to preview."}</div>)}
       {!editRow && editResult && <section className={`result-panel ${editResult.status === "running" ? "" : "transient-result"} ${editResult.status === "succeeded" ? "result-ok" : editResult.status === "failed" ? "result-fail" : "result-running"}`}>
         <div className="panel-title"><strong>{formatResultTitle(editResult.title, editResult.status === "running")}</strong><StatusPill value={editResult.status === "succeeded" ? "Saved" : editResult.status === "failed" ? "Failed" : "Saving"} /></div>
         {editResult.message && <p>{formatResultMessage(editResult.message)}</p>}
