@@ -174,18 +174,21 @@ NumExtraServers=0
 PlayerHardCap=1
 ShouldUpdatePlayerCountOnFls=false
 AllowGroupTravel=false
+KeepPartiesTogether=false
 NumExtraServers=0
 
 [Story_Faction_Outpost_Hark]
 PlayerHardCap=1
 ShouldUpdatePlayerCountOnFls=false
 AllowGroupTravel=false
+KeepPartiesTogether=false
 NumExtraServers=0
 
 [Story_HeighlinerDungeon]
 PlayerHardCap=1
 ShouldUpdatePlayerCountOnFls=false
 AllowGroupTravel=false
+KeepPartiesTogether=false
 NumExtraServers=0
 EOF
 
