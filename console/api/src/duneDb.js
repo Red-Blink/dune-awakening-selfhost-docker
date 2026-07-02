@@ -99,13 +99,62 @@ async function tablePrimaryKeyColumns(db, schema, table) {
   return result.rows.map((row) => row.name).filter(Boolean);
 }
 
-export async function tableCount(db, schema, table) {
+const MAX_FILTER_TERMS = 20;
+
+function validateFilterTree(tree) {
+  if (tree === null || tree === undefined) return null;
+  if (!Array.isArray(tree) || !tree.length) throw new Error("Invalid filter");
+  let totalTerms = 0;
+  for (const group of tree) {
+    if (!Array.isArray(group) || !group.length) throw new Error("Invalid filter");
+    for (const term of group) {
+      if (!term || (term.type !== "text" && term.type !== "column")) throw new Error("Invalid filter");
+      if (term.type === "column" && !String(term.column || "")) throw new Error("Invalid filter");
+      if (typeof term.value !== "string") throw new Error("Invalid filter");
+      totalTerms += 1;
+    }
+  }
+  if (totalTerms > MAX_FILTER_TERMS) throw new Error("Too many filter conditions");
+  return tree;
+}
+
+function escapeLikeValue(value) {
+  return String(value).replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+async function buildFilterWhereClause(db, schema, table, filterTree) {
+  const validated = validateFilterTree(filterTree);
+  if (!validated) return { sql: "", params: [] };
+  const columnNames = (await tableColumns(db, schema, table)).map((column) => column.name);
+  const params = [];
+  const orGroups = validated.map((group) => {
+    const andTerms = group.map((term) => {
+      if (term.type === "column") {
+        const matched = columnNames.find((name) => name.toLowerCase() === String(term.column).toLowerCase());
+        if (!matched) return "false";
+        params.push(term.value);
+        return `lower(${quoteIdentifier(matched)}::text) = lower($${params.length})`;
+      }
+      const likeValue = `%${escapeLikeValue(term.value)}%`;
+      const conditions = columnNames.map((name) => {
+        params.push(likeValue);
+        return `${quoteIdentifier(name)}::text ILIKE $${params.length}`;
+      });
+      return conditions.length ? `(${conditions.join(" or ")})` : "false";
+    });
+    return `(${andTerms.join(" and ")})`;
+  });
+  return { sql: ` where ${orGroups.join(" or ")}`, params };
+}
+
+export async function tableCount(db, schema, table, filterTree = null) {
   const safe = quoteQualified(schema, table);
-  const result = await db.query(`select count(*)::bigint as count from ${safe}`);
+  const { sql: whereSql, params } = await buildFilterWhereClause(db, schema, table, filterTree);
+  const result = await db.query(`select count(*)::bigint as count from ${safe}${whereSql}`, params);
   return { schema, table, count: result.rows[0]?.count ?? "0" };
 }
 
-export async function tablePreview(db, schema, table, limit = 50, offset = 0) {
+export async function tablePreview(db, schema, table, limit = 50, offset = 0, filterTree = null) {
   const safe = quoteQualified(schema, table);
   const maxLimit = intParam(limit, "limit", 1, MAX_TABLE_PREVIEW_ROWS);
   const safeOffset = intParam(offset, "offset", 0);
@@ -116,7 +165,8 @@ export async function tablePreview(db, schema, table, limit = 50, offset = 0) {
   const orderSql = primaryKeys.length
     ? ` order by ${primaryKeys.map((key) => quoteIdentifier(key)).join(", ")}`
     : " order by ctid";
-  const result = await db.query(`select ${rowIdSql} as __rowid, * from ${safe}${orderSql} limit $1 offset $2`, [maxLimit, safeOffset]);
+  const { sql: whereSql, params: whereParams } = await buildFilterWhereClause(db, schema, table, filterTree);
+  const result = await db.query(`select ${rowIdSql} as __rowid, * from ${safe}${whereSql}${orderSql} limit $${whereParams.length + 1} offset $${whereParams.length + 2}`, [...whereParams, maxLimit, safeOffset]);
   return { schema, table, limit: maxLimit, offset: safeOffset, ...rowsResult(result) };
 }
 
