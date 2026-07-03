@@ -62,8 +62,7 @@ Usage:
   dune maps reconcile
 
 Survival_1 and Overmap are protected always-on maps and are not configurable here.
-CB_Overland_* vehicle-deploy maps are redirected from always-on to overmap-active
-unless DUNE_ALLOW_VEHICLE_MAP_ALWAYS_ON=1 is set.
+Use overmap-active explicitly for maps that should only run while Overmap has demand.
 EOF
 }
 
@@ -77,13 +76,6 @@ require_postgres() {
 protected_map() {
   case "$1" in
     Survival_1|Overmap|survival|survival-1|survival_1|overmap) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
-vehicle_deploy_map() {
-  case "$1" in
-    CB_Overland_*) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -183,12 +175,6 @@ set_mode() {
     dynamic|always-on|overmap-active|disabled) ;;
     *) echo "Mode must be dynamic, always-on, overmap-active, or disabled."; exit 2 ;;
   esac
-
-  if [ "$mode" = "always-on" ] && vehicle_deploy_map "$canonical" && [ "${DUNE_ALLOW_VEHICLE_MAP_ALWAYS_ON:-0}" != "1" ]; then
-    echo "WARN $canonical is a vehicle-deploy map. Always-on can race vehicle ownership restore during map startup."
-    echo "WARN Using overmap-active instead. Set DUNE_ALLOW_VEHICLE_MAP_ALWAYS_ON=1 to force always-on."
-    mode="overmap-active"
-  fi
 
   ensure_state_file
   python3 - "$STATE_FILE" "$canonical" "$mode" <<'PY'
