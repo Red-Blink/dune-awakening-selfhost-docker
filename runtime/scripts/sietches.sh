@@ -503,7 +503,7 @@ mode = sys.argv[4]
 
 db_partitions = os.environ.get("SIETCH_DB_PARTITIONS_JSON")
 partitions = json.loads(db_partitions) if db_partitions else json.loads(partition_path.read_text())
-servers = json.loads(server_path.read_text()) if server_path.exists() else []
+servers = json.loads(server_path.read_text()) if server_path.exists() and server_path.stat().st_size > 0 else []
 config = json.loads(config_path.read_text()) if config_path.exists() else {"maps": {}, "partitions": {}}
 
 env = {}
@@ -604,7 +604,7 @@ target = sys.argv[4].lower()
 
 db_partitions = os.environ.get("SIETCH_DB_PARTITIONS_JSON")
 partitions = json.loads(db_partitions) if db_partitions else json.loads(partition_path.read_text())
-servers = json.loads(server_path.read_text()) if server_path.exists() else []
+servers = json.loads(server_path.read_text()) if server_path.exists() and server_path.stat().st_size > 0 else []
 config = json.loads(config_path.read_text()) if config_path.exists() else {"maps": {}, "partitions": {}}
 
 env = {}
@@ -725,7 +725,7 @@ active_only = sys.argv[6] == "1"
 
 db_partitions = os.environ.get("SIETCH_DB_PARTITIONS_JSON")
 partitions = json.loads(db_partitions) if db_partitions else json.loads(partition_path.read_text())
-servers = json.loads(server_path.read_text()) if server_path.exists() else []
+servers = json.loads(server_path.read_text()) if server_path.exists() and server_path.stat().st_size > 0 else []
 config = json.loads(config_path.read_text()) if config_path.exists() else {"maps": {}, "partitions": {}}
 
 rows = [row for row in partitions if str(row.get("map", "")).lower() == target]
@@ -812,7 +812,7 @@ value = int(sys.argv[6])
 
 db_partitions = os.environ.get("SIETCH_DB_PARTITIONS_JSON")
 partitions = json.loads(db_partitions) if db_partitions else json.loads(partition_path.read_text())
-servers = json.loads(server_path.read_text()) if server_path.exists() else []
+servers = json.loads(server_path.read_text()) if server_path.exists() and server_path.stat().st_size > 0 else []
 config = json.loads(config_path.read_text()) if config_path.exists() else {"maps": {}, "partitions": {}}
 maps = {}
 for row in partitions:
