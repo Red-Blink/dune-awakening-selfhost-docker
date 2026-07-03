@@ -839,6 +839,7 @@ main { padding: 22px; min-width: 0; }
 .technical-details, .task-technical-details { display: none; margin-top: 12px; min-width: 0; max-width: 100%; }
 .task-technical-details { display: block; }
 body.debug .technical-details { display: block; }
+.update-log-details { margin-top: 6px; }
 .technical-details summary, .task-technical-details summary {
   cursor: pointer;
   color: #ffd08a;

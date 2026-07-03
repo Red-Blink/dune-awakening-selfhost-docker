@@ -419,6 +419,7 @@ function GameUpdateProgress({
   const repairRunning = Boolean(repairTask && !isTerminalTask(repairTask.status));
   const repairSucceeded = repairTask?.status === "succeeded";
   const repairable = task.status === "failed" && isSteamcmdManifestFailure(task);
+  const updateLog = task.logLines.slice(-160).map((line) => line.line).join("\n").trim();
   return <div className={`result-panel game-update-progress result-${task.status === "succeeded" ? "ok" : task.status === "failed" ? "fail" : "running"}`} aria-live="polite">
     <div className="panel-title">
       <h4 className={running ? "loading-dots" : ""}>{formatResultTitle(progress.title, running)}</h4>
@@ -437,6 +438,10 @@ function GameUpdateProgress({
       {repairable && <button disabled={repairRunning} onClick={onFixSteamcmd}>Fix SteamCMD</button>}
       <button disabled={repairRunning} onClick={onRetry}>Retry Game Update</button>
     </div>}
+    <details className="task-technical-details update-log-details">
+      <summary>Update Log</summary>
+      <pre className="log-box">{updateLog || "Waiting for game update output..."}</pre>
+    </details>
   </div>;
 }
 
