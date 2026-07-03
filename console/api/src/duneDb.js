@@ -2541,6 +2541,72 @@ export async function repairGear(db, id) {
   });
 }
 
+export async function repairVehicleDecay(db, id, { thresholdPercent = 50 } = {}) {
+  await requireCapability(await supportsRepairVehicleDecay(db), "Repair vehicle decay requires dune.vehicle_modules.stats, dune.vehicle_modules.vehicle_id, and dune.actors.owner_account_id.");
+  const threshold = Number(thresholdPercent);
+  if (!Number.isFinite(threshold) || threshold < 1 || threshold > 100) throw new Error("Vehicle repair threshold must be between 1 and 100 percent");
+  const thresholdRatio = threshold / 100;
+  return db.transaction(async (tx) => {
+    const player = await resolvePlayerMutationTarget(tx, id);
+    if (String(player.onlineStatus).toLowerCase() === "online") throw new Error("Repair vehicle decay requires the player to be offline so live state cannot overwrite the DB change");
+    const scanned = await tx.query(`
+      select count(*)::int as scanned,
+             count(distinct vm.vehicle_id)::int as vehicles
+      from dune.vehicle_modules vm
+      join dune.actors a on a.id = vm.vehicle_id
+      where a.owner_account_id = $1
+        and vm.stats is not null
+        and jsonb_typeof(vm.stats->'FVehicleModuleDurabilityStats') = 'array'
+        and jsonb_array_length(vm.stats->'FVehicleModuleDurabilityStats') >= 2
+        and (vm.stats->'FVehicleModuleDurabilityStats'->1) ? 'MaxDurability'
+        and (vm.stats->'FVehicleModuleDurabilityStats'->1) ? 'DecayedMaxDurability'`, [player.accountId]);
+    const repaired = await tx.query(`
+      with eligible as (
+        select vm.id,
+               vm.vehicle_id,
+               (durability->>'MaxDurability')::numeric as max_durability
+        from dune.vehicle_modules vm
+        join dune.actors a on a.id = vm.vehicle_id
+        cross join lateral (
+          select vm.stats->'FVehicleModuleDurabilityStats'->1 as durability
+        ) d
+        where a.owner_account_id = $1
+          and vm.stats is not null
+          and jsonb_typeof(vm.stats->'FVehicleModuleDurabilityStats') = 'array'
+          and jsonb_array_length(vm.stats->'FVehicleModuleDurabilityStats') >= 2
+          and durability ? 'MaxDurability'
+          and durability ? 'DecayedMaxDurability'
+          and (durability->>'MaxDurability') ~ '^-?[0-9]+(\\.[0-9]+)?$'
+          and (durability->>'DecayedMaxDurability') ~ '^-?[0-9]+(\\.[0-9]+)?$'
+          and (durability->>'MaxDurability')::numeric > 0
+          and (durability->>'DecayedMaxDurability')::numeric < ((durability->>'MaxDurability')::numeric * $2)
+      )
+      update dune.vehicle_modules vm
+      set stats = jsonb_set(
+        jsonb_set(
+          vm.stats,
+          '{FVehicleModuleDurabilityStats,1,CurrentDurability}',
+          to_jsonb(eligible.max_durability)
+        ),
+        '{FVehicleModuleDurabilityStats,1,DecayedMaxDurability}',
+        to_jsonb(eligible.max_durability)
+      )
+      from eligible
+      where vm.id = eligible.id
+      returning vm.id, vm.vehicle_id`, [player.accountId, thresholdRatio]);
+    const repairedVehicles = new Set(repaired.rows.map((row) => String(row.vehicle_id))).size;
+    return {
+      ok: true,
+      player,
+      thresholdPercent: threshold,
+      scanned: Number(scanned.rows[0]?.scanned || 0),
+      vehicles: Number(scanned.rows[0]?.vehicles || 0),
+      repaired: repaired.rows.length,
+      repairedVehicles
+    };
+  });
+}
+
 export async function refuelVehicle(db, id, { vehicleId }) {
   await requireCapability(await supportsRefuelVehicle(db), "Refuel vehicle requires dune.actors.owner_account_id, class, and properties JSON.");
   const safeVehicleId = intParam(vehicleId, "vehicle id", 1);
@@ -2578,6 +2644,7 @@ async function playerCapabilities(db) {
     researchItems: await supportsResearchItems(db),
     inventoryDelete: await supportsInventoryDelete(db),
     repairGear: await supportsRepairGear(db),
+    repairVehicleDecay: await supportsRepairVehicleDecay(db),
     refuelVehicle: await supportsRefuelVehicle(db),
     progression: false,
     events: false,
@@ -2795,6 +2862,14 @@ async function supportsRepairGear(db) {
   const inventoryColumns = await columnsFor(db, "inventories");
   const itemColumns = await columnsFor(db, "items");
   return inventoryColumns.has("inventory_type") && itemColumns.has("stats");
+}
+
+async function supportsRepairVehicleDecay(db) {
+  if (!(await tableExists(db, "vehicle_modules")) || !(await tableExists(db, "actors"))) return false;
+  const moduleColumns = await columnsFor(db, "vehicle_modules");
+  const actorColumns = await columnsFor(db, "actors");
+  return ["id", "vehicle_id", "stats"].every((column) => moduleColumns.has(column)) &&
+    ["id", "owner_account_id"].every((column) => actorColumns.has(column));
 }
 
 async function supportsRefuelVehicle(db) {

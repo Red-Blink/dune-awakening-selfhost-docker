@@ -74,6 +74,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
   const [playerAdmin_vehicleId, playerAdmin_setVehicleId] = useState("");
   const [playerAdmin_vehicleTemplate, playerAdmin_setVehicleTemplate] = useState("");
   const [playerAdmin_vehicleCatalog, playerAdmin_setVehicleCatalog] = useState<Record<string, string[]>>({});
+  const [playerAdmin_vehicleDecayThreshold, playerAdmin_setVehicleDecayThreshold] = useState("50");
   const playerAdmin_resultTimer = useRef<number | null>(null);
   const playerAdmin_factionIds: Record<string, number> = { Atreides: 1, Harkonnen: 2, Smuggler: 4 };
   const playerAdmin_craftingCategories = ["Essentials", "Water Discipline", "Combat", "Construction", "Exploration", "Vehicles"];
@@ -677,7 +678,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
       </table>
     </div>
   );
-  const playerAdmin_actionRow = (playerAdmin_key: string, playerAdmin_label: string, playerAdmin_input: React.ReactNode, playerAdmin_buttonLabel: string, playerAdmin_onClick: () => void, playerAdmin_disabled = false, playerAdmin_note = "") => (
+  const playerAdmin_actionRow = (playerAdmin_key: string, playerAdmin_label: React.ReactNode, playerAdmin_input: React.ReactNode, playerAdmin_buttonLabel: string, playerAdmin_onClick: () => void, playerAdmin_disabled = false, playerAdmin_note = "") => (
     <div className="playerAdmin_actionGroup">
       <div className="playerAdmin_actionRow">
         <span className="playerAdmin_actionLabel">{playerAdmin_label}{playerAdmin_note && <em>{playerAdmin_note}</em>}</span>
@@ -1069,7 +1070,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
         </div>
       )}
       {playerAdmin_activeTab === "Journey" && <div className="playerAdmin_content"><section className="playerAdmin_box"><h4>Journey Browser</h4><div className="playerAdmin_boxHeaderLine playerAdmin_journeyHeaderLine"><p>A relog is required to see the change.</p><div className="playerAdmin_journeyHeaderTools"><input className="playerAdmin_journeyFilterInput" value={playerAdmin_journeyFilter} onChange={(event) => playerAdmin_setJourneyFilter(event.target.value)} placeholder="Filter by name, ID, status, or dependency" aria-label="Filter Journey Browser" />{playerAdmin_journeyFilter && <button type="button" onClick={() => playerAdmin_setJourneyFilter("")}>Clear</button>}<span className="playerAdmin_note">{playerAdmin_journeyFilterTerms.length ? `${playerAdmin_filteredJourneyEntryCount} of ${playerAdmin_journeyEntryCount}` : playerAdmin_journeyEntryCount} Journey Entr{(playerAdmin_journeyFilterTerms.length ? playerAdmin_filteredJourneyEntryCount : playerAdmin_journeyEntryCount) === 1 ? "y" : "ies"} Detected</span></div></div>{playerAdmin_journeyError && <p className="playerAdmin_note danger">{playerAdmin_journeyError}</p>}{playerAdmin_toggleBox("journey_story", `Story (${playerAdmin_filteredJourneyRows.story.length}${playerAdmin_journeyFilterTerms.length ? `/${playerAdmin_journeyRows.story.length}` : ""})`, playerAdmin_journeyTable(playerAdmin_filteredJourneyRows.story, playerAdmin_journeyFilterTerms.length ? "No story entries match this filter." : "No story entries were found."))}{playerAdmin_toggleBox("journey_contract", `Contracts (${playerAdmin_filteredJourneyRows.contract.length}${playerAdmin_journeyFilterTerms.length ? `/${playerAdmin_journeyRows.contract.length}` : ""})`, playerAdmin_journeyTable(playerAdmin_filteredJourneyRows.contract, playerAdmin_journeyFilterTerms.length ? "No contract entries match this filter." : "No contract entries were found."))}{playerAdmin_toggleBox("journey_codex", `Codex (${playerAdmin_filteredJourneyRows.codex.length}${playerAdmin_journeyFilterTerms.length ? `/${playerAdmin_journeyRows.codex.length}` : ""})`, playerAdmin_journeyTable(playerAdmin_filteredJourneyRows.codex, playerAdmin_journeyFilterTerms.length ? "No codex entries match this filter." : "No codex entries were found."))}{playerAdmin_toggleBox("journey_tutorial", `Tutorial (${playerAdmin_filteredJourneyRows.tutorial.length}${playerAdmin_journeyFilterTerms.length ? `/${playerAdmin_journeyRows.tutorial.length}` : ""})`, playerAdmin_journeyTable(playerAdmin_filteredJourneyRows.tutorial, playerAdmin_journeyFilterTerms.length ? "No tutorial entries match this filter." : "No tutorial entries were found."))}</section></div>}
-      {playerAdmin_activeTab === "Admin" && <div className="playerAdmin_content"><section className="playerAdmin_box"><h4>Player Admin Actions</h4><p>Use this area for player maintenance and high-impact admin actions. Some actions require the player to be online, while database repairs require the player to be offline.</p><div className="playerAdmin_section"><h5>Repair</h5><div className="playerAdmin_quickButtonRow"><button disabled={!dbPlayerId || playerAdmin_isOnline || playerAdmin_actionResult?.pending} onClick={async () => {
+      {playerAdmin_activeTab === "Admin" && <div className="playerAdmin_content"><section className="playerAdmin_box"><h4>Player Admin Actions</h4><p>Use this area for player maintenance and high-impact admin actions. Some actions require the player to be online, while database repairs require the player to be offline.</p><div className="playerAdmin_section playerAdmin_repairSection"><h5>Repair</h5><div className="playerAdmin_repairRow"><span className="playerAdmin_repairLabel"><span>Repair Gear</span><em>{playerAdmin_isOnline ? "The player must be offline." : "Equipped and carried gear durability. Relog required."}</em></span><button disabled={!dbPlayerId || playerAdmin_isOnline || playerAdmin_actionResult?.pending} onClick={async () => {
         if (!(await confirmAction(`Repair gear for ${playerName}? The player must be offline and should relog after this.`))) return;
         void playerAdmin_runAction("repairGear", `Repairing ${playerName}'s gear`, async () => {
           const response = await playersApi.repairGear(dbPlayerId, "REPAIR GEAR");
@@ -1082,7 +1083,31 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
               : `No gear needed repair (${scanned} item${scanned === 1 ? "" : "s"} scanned).`
           };
         }, `${playerName}'s gear was repaired. Relog required.`, { actionType: "Repair Gear", target: playerName, amount: "1" });
-      }}>Repair Gear</button><div className="playerAdmin_quickButtonResult">{playerAdmin_actionResultOrNote("repairGear", playerAdmin_isOnline ? "The player must be offline." : "Repairs equipped and carried gear durability. Relog required.")}</div></div></div><div className="playerAdmin_section"><h5>Danger Zone</h5><div className="playerAdmin_buttonRow"><button className="danger" disabled={!actionPlayerId || playerAdmin_actionResult?.pending} onClick={async () => {
+      }}>Repair Gear</button><InlineActionResult result={playerAdmin_actionResult} resultKey="repairGear" /></div><div className="playerAdmin_repairRow"><span className="playerAdmin_repairLabel"><span>Repair Vehicle Red Bar</span><label className="playerAdmin_vehicleDecayField"><span>Threshold</span><input value={playerAdmin_vehicleDecayThreshold} onChange={(event) => playerAdmin_setVehicleDecayThreshold(event.target.value)} inputMode="numeric" aria-label="Vehicle red-bar repair threshold percent" /><span>%</span></label><em>{playerAdmin_isOnline ? "The player must be offline." : "Owned vehicle modules below the threshold. Relog required."}</em></span><button disabled={!dbPlayerId || playerAdmin_isOnline || playerAdmin_actionResult?.pending} onClick={async () => {
+        const threshold = Number(playerAdmin_vehicleDecayThreshold);
+        if (!Number.isFinite(threshold) || threshold < 1 || threshold > 100) {
+          playerAdmin_showResult("repairVehicleDecay", "Use a threshold from 1 to 100.", "danger");
+          return;
+        }
+        if (!(await confirmAction(`Repair vehicle red-bar decay below ${threshold}% for ${playerName}? The player must be offline and should relog after this.`, {
+          title: "Repair Vehicle Decay",
+          confirmLabel: "Repair Vehicles",
+          details: [{ label: "Threshold", value: `${threshold}%`, tone: "accent" }]
+        }))) return;
+        void playerAdmin_runAction("repairVehicleDecay", `Repairing ${playerName}'s vehicle decay`, async () => {
+          const response = await playersApi.repairVehicleDecay(dbPlayerId, { thresholdPercent: threshold, confirmation: "REPAIR VEHICLE DECAY" });
+          const result = response.result || {};
+          const repaired = Number(result.repaired || 0);
+          const scanned = Number(result.scanned || 0);
+          const vehicles = Number(result.vehicles || 0);
+          const repairedVehicles = Number(result.repairedVehicles || 0);
+          return {
+            message: repaired > 0
+              ? `Repaired ${repaired} vehicle module${repaired === 1 ? "" : "s"} across ${repairedVehicles} vehicle${repairedVehicles === 1 ? "" : "s"}. Relog required.`
+              : `No vehicle modules were below ${threshold}% red-bar threshold (${scanned} module${scanned === 1 ? "" : "s"} across ${vehicles} vehicle${vehicles === 1 ? "" : "s"} scanned).`
+          };
+        }, `${playerName}'s vehicle decay was repaired. Relog required.`, { actionType: "Repair Vehicle Decay", target: playerName, amount: `${threshold}%` });
+      }}>Repair Vehicles</button><InlineActionResult result={playerAdmin_actionResult} resultKey="repairVehicleDecay" /></div></div><div className="playerAdmin_section playerAdmin_dangerSection"><h5>Danger Zone</h5><div className="playerAdmin_buttonRow"><button className="danger" disabled={!actionPlayerId || playerAdmin_actionResult?.pending} onClick={async () => {
         if (!(await confirmAction(`Repair ${playerName}'s login queue? Use this only when the player is stuck on connection errors and is not actually in-game.`, {
           title: "Repair Login Queue",
           confirmLabel: "Repair Queue",

@@ -915,8 +915,11 @@ body.debug .technical-details { display: block; }
 .playerAdmin_box, .playerAdmin_toggle { border: 1px solid #302b25; background: #14171a; border-radius: 8px; padding: 14px; display: grid; gap: 12px; }
 .playerAdmin_box h4, .playerAdmin_section h5 { margin: 0; color: #ffd08a; font-size: 16px; line-height: 1.25; }
 .playerAdmin_section { display: grid; gap: 10px; }
+.playerAdmin_dangerSection { border-top: 1px solid rgba(214, 185, 140, .14); padding-top: 12px; }
 .playerAdmin_quickButtonRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .playerAdmin_quickButtonRow button { width: auto; }
+.playerAdmin_vehicleDecayField { display: inline-flex; align-items: center; gap: 8px; color: #cbbd9f; max-width: 180px; font-size: 12px; font-weight: 500; }
+.playerAdmin_vehicleDecayField input { width: 74px; max-width: 74px; }
 .playerAdmin_quickButtonResult { min-width: min(260px, 100%); display: inline-flex; align-items: center; min-height: 40px; }
 .playerAdmin_quickButtonResult .inline-action-result.note { font-style: italic; }
 .playerAdmin_actionGroup { display: grid; gap: 4px; }
@@ -927,6 +930,13 @@ body.debug .technical-details { display: block; }
 .playerAdmin_boxHeaderLine .playerAdmin_filterRow { margin-left: auto; }
 .playerAdmin_box .playerAdmin_section > .playerAdmin_actionGroup .playerAdmin_actionRow { display: grid; grid-template-columns: 210px minmax(220px, 360px) auto minmax(220px, 1fr); align-items: center; }
 .playerAdmin_actionRow .playerAdmin_actionLabel { min-width: 180px; color: #e9dcc8; font-weight: 700; display: grid; gap: 3px; }
+.playerAdmin_repairRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.playerAdmin_repairRow + .playerAdmin_repairRow { border-top: 1px solid rgba(214, 185, 140, .14); padding-top: 12px; }
+.playerAdmin_repairRow button { width: auto; flex: 0 0 auto; }
+.playerAdmin_repairLabel { flex: 0 0 190px; min-width: 190px; color: #e9dcc8; font-weight: 700; display: grid; gap: 5px; }
+.playerAdmin_repairLabel > span:first-child { white-space: nowrap; }
+.playerAdmin_repairLabel em { color: #cbbd9f; font-size: 12px; font-style: italic; font-weight: 500; line-height: 1.25; }
+.playerAdmin_repairRow .inline-action-result-wrap { flex: 1 1 260px; min-width: 240px; }
 .playerAdmin_actionLabel em { color: #cbbd9f; font-size: 12px; font-style: italic; font-weight: 500; line-height: 1.25; }
 .playerAdmin_actionRow input, .playerAdmin_actionRow select, .playerAdmin_filterRow input, .playerAdmin_filterRow select { max-width: 220px; }
 .playerAdmin_actionRow .playerAdmin_fieldSlot { min-height: 1px; }

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
-import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, completeJourneyNode, completeTutorial, deleteInventoryItem, giveItemToPlayer, giveItemToStorage, landsraadOverview, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerJourney, playerPosition, playerResearchItems, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, unlockCraftingRecipe, unlockResearchItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
+import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, completeJourneyNode, completeTutorial, deleteInventoryItem, giveItemToPlayer, giveItemToStorage, landsraadOverview, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerJourney, playerPosition, playerResearchItems, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, unlockCraftingRecipe, unlockResearchItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
   assert.deepEqual(discoverDbConfig({}), {
@@ -679,6 +679,26 @@ test("player give-item persists selected item grade", async () => {
   });
 });
 
+test("vehicle decay repair is scoped to the selected player's owned vehicles", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    vehicleModuleScanRows: [{ scanned: 3, vehicles: 2 }],
+    repairedVehicleModuleRows: [{ id: 10, vehicle_id: 900 }, { id: 11, vehicle_id: 900 }, { id: 12, vehicle_id: 901 }]
+  });
+  const result = await repairVehicleDecay(db, 123, { thresholdPercent: 50 });
+  assert.equal(result.scanned, 3);
+  assert.equal(result.vehicles, 2);
+  assert.equal(result.repaired, 3);
+  assert.equal(result.repairedVehicles, 2);
+  const update = calls.find((call) => call.text.includes("update dune.vehicle_modules vm"));
+  assert.ok(update);
+  assert.match(update.text, /join dune\.actors a on a\.id = vm\.vehicle_id/);
+  assert.match(update.text, /a\.owner_account_id = \$1/);
+  assert.match(update.text, /DecayedMaxDurability/);
+  assert.match(update.text, /CurrentDurability/);
+  assert.deepEqual(update.values, [44, 0.5]);
+});
+
 test("storage give-item reports unsupported capability when schema functions are absent", async () => {
   const db = {
     query: async (text) => text.includes("to_regclass") ? { rows: [{ exists: false }] } : { rows: [] },
@@ -1065,6 +1085,8 @@ function fakeMutationDb(calls, fixtures = {}) {
           ? ["id", "actor_id", "max_item_count", "max_item_volume", "inventory_type"]
           : table === "actors"
             ? ["id", "class", "owner_account_id", "properties"]
+            : table === "vehicle_modules"
+              ? ["id", "vehicle_id", "template_id", "stats"]
             : table === "journey_story_node"
               ? [fixtures.journeyIdentityColumn || "account_id", "story_node_id", "has_pending_reward", "complete_condition_state", "reveal_condition_state", "fail_condition_state", "metadata_state", "reset_group"]
               : table === "player_tags"
@@ -1108,6 +1130,8 @@ function fakeMutationDb(calls, fixtures = {}) {
       if (text.includes("delete from dune.items where id = $1")) return { rows: [], rowCount: 1 };
       if (text.includes("dune.delete_item")) return { rows: [{ ok: true }] };
       if (text.includes("from dune.inventories") && text.includes("where actor_id")) return { rows: fixtures.storageRows || [] };
+      if (text.includes("from dune.vehicle_modules vm") && text.includes("count(*)::int as scanned")) return { rows: fixtures.vehicleModuleScanRows || [{ scanned: 0, vehicles: 0 }] };
+      if (text.includes("update dune.vehicle_modules vm")) return { rows: fixtures.repairedVehicleModuleRows || [] };
       if (text.includes("count(*)::int")) return { rows: fixtures.countRows || [{ count: 0 }] };
       if (text.includes("max(position_index)")) return { rows: [{ position_index: 2 }] };
       if (text.includes("insert into dune.items")) return { rows: fixtures.insertedRows || [] };
