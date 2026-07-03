@@ -3015,3 +3015,105 @@ function unsupported(feature, requiredTables) {
     reason: `Unsupported by detected schema. Missing required table(s): ${requiredTables.join(", ")}`
   };
 }
+
+function emptyAddonOpsHealthPlayers() {
+  return {
+    total: 0,
+    onlineStatus: {},
+    lifeState: {},
+    characterState: {},
+    combinations: []
+  };
+}
+
+function emptyAddonOpsHealthFarms() {
+  return {
+    total: 0,
+    ready: 0,
+    alive: 0,
+    connectedPlayers: 0,
+    incomingS2SConnections: 0,
+    outgoingS2SConnections: 0
+  };
+}
+
+function addCount(target, key, count) {
+  target[String(key || "Unknown")] = (target[String(key || "Unknown")] || 0) + count;
+}
+
+export async function addonOpsHealthPlayers(db) {
+  if (!(await tableExists(db, "player_state"))) return emptyAddonOpsHealthPlayers();
+
+  const columns = await columnsFor(db, "player_state");
+  const required = ["online_status", "life_state", "character_state"];
+  if (!required.every((column) => columns.has(column))) return emptyAddonOpsHealthPlayers();
+
+  const result = await db.query(`
+    select coalesce(online_status::text, 'Unknown') as online_status,
+           coalesce(life_state::text, 'Unknown') as life_state,
+           coalesce(character_state::text, 'Unknown') as character_state,
+           count(*)::int as players
+    from dune.player_state
+    group by 1, 2, 3
+    order by 1, 2, 3`);
+
+  const out = emptyAddonOpsHealthPlayers();
+  for (const row of result.rows || []) {
+    const players = Number(row.players || 0);
+    const onlineStatus = String(row.online_status || "Unknown");
+    const lifeState = String(row.life_state || "Unknown");
+    const characterState = String(row.character_state || "Unknown");
+
+    out.total += players;
+    addCount(out.onlineStatus, onlineStatus, players);
+    addCount(out.lifeState, lifeState, players);
+    addCount(out.characterState, characterState, players);
+    out.combinations.push({ onlineStatus, lifeState, characterState, players });
+  }
+
+  return out;
+}
+
+export async function addonOpsHealthFarms(db) {
+  if (!(await tableExists(db, "farm_state"))) return emptyAddonOpsHealthFarms();
+
+  const columns = await columnsFor(db, "farm_state");
+  const boolCount = (column) => columns.has(column)
+    ? `sum(case when coalesce(${quoteIdentifier(column)}, false) then 1 else 0 end)::int`
+    : "0::int";
+  const intSum = (column) => columns.has(column)
+    ? `coalesce(sum(coalesce(${quoteIdentifier(column)}, 0)), 0)::int`
+    : "0::int";
+
+  const result = await db.query(`
+    select count(*)::int as total,
+           ${boolCount("ready")} as ready,
+           ${boolCount("alive")} as alive,
+           ${intSum("connected_players")} as connected_players,
+           ${intSum("incoming_s2s_connections")} as incoming_s2s_connections,
+           ${intSum("outgoing_s2s_connections")} as outgoing_s2s_connections
+    from dune.farm_state`);
+
+  const row = result.rows?.[0] || {};
+  return {
+    total: Number(row.total || 0),
+    ready: Number(row.ready || 0),
+    alive: Number(row.alive || 0),
+    connectedPlayers: Number(row.connected_players || 0),
+    incomingS2SConnections: Number(row.incoming_s2s_connections || 0),
+    outgoingS2SConnections: Number(row.outgoing_s2s_connections || 0)
+  };
+}
+
+export async function addonOpsHealthSummaryV2(db) {
+  const [players, farms] = await Promise.all([
+    addonOpsHealthPlayers(db),
+    addonOpsHealthFarms(db)
+  ]);
+
+  return { players, farms };
+}
+
+export async function addonOpsHealthSummary(db) {
+  return addonOpsHealthSummaryV2(db);
+}

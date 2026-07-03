@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
-import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, completeJourneyNode, completeTutorial, deleteInventoryItem, giveItemToPlayer, giveItemToStorage, landsraadOverview, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerJourney, playerPosition, playerResearchItems, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, unlockCraftingRecipe, unlockResearchItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
+import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, completeJourneyNode, completeTutorial, deleteInventoryItem, giveItemToPlayer, giveItemToStorage, landsraadOverview, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerJourney, playerPosition, playerResearchItems, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, unlockCraftingRecipe, unlockResearchItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
   assert.deepEqual(discoverDbConfig({}), {
@@ -1071,6 +1071,161 @@ test("tutorial complete and reset use player controller tutorial records", async
   const reset = await resetTutorial(resetDb, 123, { tutorialId: 7 });
   assert.equal(reset.deletedRows, 1);
   assert.ok(resetCalls.some((call) => call.text.includes("delete from dune.tutorial_per_player") && call.values[0] === 55 && call.values[1] === 7));
+});
+
+
+test("OPS health players returns aggregate counts only", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) {
+        return { rows: ["online_status", "life_state", "character_state"].map((column_name) => ({ column_name })) };
+      }
+      if (text.includes("from dune.player_state") && text.includes("group by 1, 2, 3")) {
+        return { rows: [
+          { online_status: "Online", life_state: "Alive", character_state: "Active", players: 2 },
+          { online_status: "Offline", life_state: "Alive", character_state: "Active", players: 1 }
+        ] };
+      }
+      return { rows: [] };
+    }
+  };
+
+  const result = await addonOpsHealthPlayers(db);
+  assert.deepEqual(result, {
+    total: 3,
+    onlineStatus: { Online: 2, Offline: 1 },
+    lifeState: { Alive: 3 },
+    characterState: { Active: 3 },
+    combinations: [
+      { onlineStatus: "Online", lifeState: "Alive", characterState: "Active", players: 2 },
+      { onlineStatus: "Offline", lifeState: "Alive", characterState: "Active", players: 1 }
+    ]
+  });
+  assert.equal(Object.hasOwn(result, "rows"), false);
+  assert.ok(calls.some((call) => String(call.text).includes("count(*)::int as players")));
+});
+
+test("OPS health players falls back to empty aggregate shape when source is missing", async () => {
+  const db = {
+    query: async () => ({ rows: [{ exists: false }] })
+  };
+
+  assert.deepEqual(await addonOpsHealthPlayers(db), {
+    total: 0,
+    onlineStatus: {},
+    lifeState: {},
+    characterState: {},
+    combinations: []
+  });
+});
+
+test("OPS health farms returns aggregate counters only", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) {
+        return { rows: [
+          "ready",
+          "alive",
+          "connected_players",
+          "incoming_s2s_connections",
+          "outgoing_s2s_connections"
+        ].map((column_name) => ({ column_name })) };
+      }
+      if (text.includes("from dune.farm_state")) {
+        return { rows: [{
+          total: 2,
+          ready: 2,
+          alive: 1,
+          connected_players: 7,
+          incoming_s2s_connections: 3,
+          outgoing_s2s_connections: 4
+        }] };
+      }
+      return { rows: [] };
+    }
+  };
+
+  assert.deepEqual(await addonOpsHealthFarms(db), {
+    total: 2,
+    ready: 2,
+    alive: 1,
+    connectedPlayers: 7,
+    incomingS2SConnections: 3,
+    outgoingS2SConnections: 4
+  });
+  assert.ok(calls.some((call) => String(call.text).includes("count(*)::int as total")));
+});
+
+test("OPS health farms falls back to empty aggregate shape when source is missing", async () => {
+  const db = {
+    query: async () => ({ rows: [{ exists: false }] })
+  };
+
+  assert.deepEqual(await addonOpsHealthFarms(db), {
+    total: 0,
+    ready: 0,
+    alive: 0,
+    connectedPlayers: 0,
+    incomingS2SConnections: 0,
+    outgoingS2SConnections: 0
+  });
+});
+
+
+test("OPS health summary compatibility action matches summary v2 shape", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) {
+        const table = values[1];
+        const columns = table === "player_state"
+          ? ["online_status", "life_state", "character_state"]
+          : ["ready", "alive", "connected_players", "incoming_s2s_connections", "outgoing_s2s_connections"];
+        return { rows: columns.map((column_name) => ({ column_name })) };
+      }
+      if (text.includes("from dune.player_state")) {
+        return { rows: [{ online_status: "Online", life_state: "Alive", character_state: "Active", players: 1 }] };
+      }
+      if (text.includes("from dune.farm_state")) {
+        return { rows: [{ total: 1, ready: 1, alive: 1, connected_players: 1, incoming_s2s_connections: 1, outgoing_s2s_connections: 1 }] };
+      }
+      return { rows: [] };
+    }
+  };
+
+  assert.deepEqual(await addonOpsHealthSummary(db), await addonOpsHealthSummaryV2(db));
+});
+
+test("OPS health summary v2 combines player and farm aggregate health", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) {
+        const table = values[1];
+        const columns = table === "player_state"
+          ? ["online_status", "life_state", "character_state"]
+          : ["ready", "alive", "connected_players", "incoming_s2s_connections", "outgoing_s2s_connections"];
+        return { rows: columns.map((column_name) => ({ column_name })) };
+      }
+      if (text.includes("from dune.player_state")) {
+        return { rows: [{ online_status: "Online", life_state: "Alive", character_state: "Active", players: 1 }] };
+      }
+      if (text.includes("from dune.farm_state")) {
+        return { rows: [{ total: 1, ready: 1, alive: 1, connected_players: 1, incoming_s2s_connections: 1, outgoing_s2s_connections: 1 }] };
+      }
+      return { rows: [] };
+    }
+  };
+
+  const result = await addonOpsHealthSummaryV2(db);
+  assert.equal(result.players.total, 1);
+  assert.equal(result.farms.total, 1);
 });
 
 function fakeMutationDb(calls, fixtures = {}) {
