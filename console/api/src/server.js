@@ -1006,13 +1006,23 @@ async function exportJson(res, filename, fn) {
   }
 }
 
+function parseDatabaseFilterParam(url) {
+  const raw = url.searchParams.get("filter");
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error("Invalid filter parameter");
+  }
+}
+
 function databaseTableRoute(req, res, path, action, url) {
   const parts = path.split("/");
   const schema = decodeURIComponent(parts[4]);
   const table = decodeURIComponent(parts[5]);
   if (action === "columns") return dbJson(res, () => duneDb.tableColumns(db, schema, table));
-  if (action === "count") return dbJson(res, () => duneDb.tableCount(db, schema, table));
-  return dbJson(res, () => duneDb.tablePreview(db, schema, table, url.searchParams.get("limit") || 50, url.searchParams.get("offset") || 0));
+  if (action === "count") return dbJson(res, () => duneDb.tableCount(db, schema, table, parseDatabaseFilterParam(url)));
+  return dbJson(res, () => duneDb.tablePreview(db, schema, table, url.searchParams.get("limit") || 50, url.searchParams.get("offset") || 0, parseDatabaseFilterParam(url)));
 }
 
 function dbPlayerRoute(res, path, fn) {
