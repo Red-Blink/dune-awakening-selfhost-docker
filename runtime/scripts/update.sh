@@ -774,6 +774,10 @@ if [ "$cmd" != "install" ]; then
 fi
 
 echo
+echo "=== Pause autoscaler before update ==="
+runtime/scripts/autoscaler-control.sh stop || true
+
+echo
 echo "=== Stop game servers before update ==="
 runtime/scripts/recycle-world-game-servers.sh stop-all
 
