@@ -467,9 +467,19 @@ for line in endpoint_rows_raw.splitlines():
     partition_id, game_addr, game_port = line.split("\t", 2)
     endpoint_by_partition[partition_id] = (game_addr, game_port)
 
+latest_by_partition = {}
 for message in messages:
     payload = json.loads(message["payload"])
     partition_id = str(payload.get("partitionId"))
+    if not partition_id or partition_id == "None":
+        continue
+    current = latest_by_partition.get(partition_id)
+    if current is None or int(payload.get("reportTimestamp", 0) or 0) >= int(current.get("reportTimestamp", 0) or 0):
+        latest_by_partition[partition_id] = payload
+
+base_timestamp = int(time.time())
+for offset, partition_id in enumerate(sorted(latest_by_partition, key=lambda value: (0, int(value)) if value.isdigit() else (1, value))):
+    payload = latest_by_partition[partition_id]
     if partition_id == "1" and survival_log_ready:
         payload["ready"] = True
     cfg = partition_cfg.get(partition_id, {})
@@ -493,7 +503,7 @@ for message in messages:
     combat = gameplay.setdefault("CombatSettings", {})
     if combat.get("shouldForceEnablePvpOnAllPartitions") in ("", None):
         combat["shouldForceEnablePvpOnAllPartitions"] = False
-    payload["reportTimestamp"] = int(time.time())
+    payload["reportTimestamp"] = max(base_timestamp + offset, int(payload.get("reportTimestamp", 0) or 0) + 1)
     print(json.dumps(payload, separators=(",", ":")))
 PY
 }
