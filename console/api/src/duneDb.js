@@ -3117,3 +3117,530 @@ export async function addonOpsHealthSummaryV2(db) {
 export async function addonOpsHealthSummary(db) {
   return addonOpsHealthSummaryV2(db);
 }
+
+// v0.4.0 Player Activity Foundation
+function emptyAddonActivity() {
+  return {
+    totalPlayers: 0,
+    onlinePlayers: 0,
+    offlinePlayers: 0,
+    activeLast1h: 0,
+    activeLast24h: 0,
+    activeLast7d: 0,
+    sessionCount: 0,
+    returningPlayers: 0,
+    newPlayers: 0,
+    guildActivity: [],
+    factionActivity: [],
+    mapActivity: [],
+    inactivePlayers: 0
+  };
+}
+
+export async function addonOpsActivitySummary(db) {
+  if (!(await tableExists(db, "player_state"))) return emptyAddonActivity();
+
+  const psColumns = await columnsFor(db, "player_state");
+  const hasOnlineStatus = psColumns.has("online_status");
+  const hasLastSeen = psColumns.has("last_seen_time") || psColumns.has("last_seen") || psColumns.has("last_login_time");
+  const lastSeenCol = hasLastSeen
+    ? firstExistingColumn(psColumns, ["last_seen_time", "last_seen", "last_login_time"])
+    : "";
+
+  const onlineCount = hasOnlineStatus
+    ? await db.query(`select count(*)::int as c from dune.player_state where online_status::text = 'Online'`)
+    : { rows: [{ c: 0 }] };
+
+  const totalResult = await db.query("select count(*)::int as c from dune.player_state");
+
+  let active1h = 0, active24h = 0, active7d = 0;
+  if (lastSeenCol) {
+    const active = await db.query(`
+      select
+        count(*) filter (where ${quoteIdentifier(lastSeenCol)} >= (current_timestamp at time zone 'UTC') - interval '1 hour')::int as active_1h,
+        count(*) filter (where ${quoteIdentifier(lastSeenCol)} >= (current_timestamp at time zone 'UTC') - interval '24 hours')::int as active_24h,
+        count(*) filter (where ${quoteIdentifier(lastSeenCol)} >= (current_timestamp at time zone 'UTC') - interval '7 days')::int as active_7d
+      from dune.player_state`);
+    active1h = Number(active.rows[0]?.active_1h || 0);
+    active24h = Number(active.rows[0]?.active_24h || 0);
+    active7d = Number(active.rows[0]?.active_7d || 0);
+  }
+
+  let guildActivity = [];
+  if (await tableExists(db, "guild_members") && await tableExists(db, "guilds")) {
+    const guildResult = await db.query(`
+      select coalesce(g.name, g.guild_name, 'Unknown') as guild_name,
+             count(gm.*)::int as members,
+             count(*) filter (where ps.online_status::text = 'Online')::int as online
+      from dune.guild_members gm
+      join dune.guilds g on g.id = gm.guild_id or g.guild_id = gm.guild_id
+      left join dune.player_state ps on ps.account_id = gm.player_id or ps.player_controller_id = gm.player_id
+      group by g.name, g.guild_name
+      order by members desc
+      limit 20`);
+    guildActivity = guildResult.rows.map((r) => ({
+      guild: String(r.guild_name || "Unknown"),
+      members: Number(r.members || 0),
+      online: Number(r.online || 0)
+    }));
+  }
+
+  let factionActivity = [];
+  if (await tableExists(db, "player_faction") && await tableExists(db, "factions")) {
+    const factionResult = await db.query(`
+      select coalesce(f.name, 'Unknown') as faction_name,
+             count(pf.*)::int as members,
+             count(*) filter (where ps.online_status::text = 'Online')::int as online
+      from dune.player_faction pf
+      left join dune.factions f on f.id = pf.faction_id
+      left join dune.player_state ps on ps.player_pawn_id = pf.actor_id or ps.player_controller_id = pf.actor_id
+      group by f.name
+      order by members desc`);
+    factionActivity = factionResult.rows.map((r) => ({
+      faction: String(r.faction_name || "Unknown"),
+      members: Number(r.members || 0),
+      online: Number(r.online || 0)
+    }));
+  }
+
+  let mapActivity = [];
+  if (await tableExists(db, "actors")) {
+    const mapResult = await db.query(`
+      select coalesce(nullif(a.map, ''), 'Unknown') as map_name,
+             count(*)::int as actors,
+             count(*) filter (where ps.online_status::text = 'Online')::int as online
+      from dune.actors a
+      left join dune.player_state ps on ps.player_pawn_id = a.id
+      where a.class ilike '%PlayerCharacter%'
+      group by a.map
+      order by actors desc
+      limit 20`);
+    mapActivity = mapResult.rows.map((r) => ({
+      map: String(r.map_name || "Unknown"),
+      actors: Number(r.actors || 0),
+      online: Number(r.online || 0)
+    }));
+  }
+
+  const totalOnline = Number(onlineCount.rows[0]?.c || 0);
+  const totalPlayers = Number(totalResult.rows[0]?.c || 0);
+  const inactivePlayers = totalPlayers - active7d;
+
+  return {
+    totalPlayers,
+    onlinePlayers: totalOnline,
+    offlinePlayers: totalPlayers - totalOnline,
+    activeLast1h: active1h,
+    activeLast24h: active24h,
+    activeLast7d: active7d,
+    sessionCount: 0,
+    returningPlayers: 0,
+    newPlayers: 0,
+    guildActivity,
+    factionActivity,
+    mapActivity,
+    inactivePlayers: inactivePlayers > 0 ? inactivePlayers : 0
+  };
+}
+
+// v0.5.0 Combat and Death Analytics
+function emptyAddonCombat() {
+  return {
+    totalDeaths: 0,
+    pvpDeaths: 0,
+    pveDeaths: 0,
+    deathsByCause: [],
+    deathsByMap: [],
+    topHostileNpcs: [],
+    kdRatio: 0
+  };
+}
+
+export async function addonOpsCombatDeaths(db) {
+  if (!(await tableExists(db, "game_events"))) return emptyAddonCombat();
+
+  const geColumns = await columnsFor(db, "game_events");
+  if (!geColumns.has("event_type") || !geColumns.has("custom_data")) return emptyAddonCombat();
+
+  const deathEvents = await db.query(`
+    select event_type::text,
+           coalesce(map, 'Unknown') as map,
+           coalesce(custom_data->>'cause', custom_data->>'damage_type', custom_data->>'killer_type', 'Unknown') as cause,
+           coalesce(custom_data->>'killer_name', custom_data->>'attacker_name', 'Unknown') as killer_name,
+           count(*)::int as events
+    from dune.game_events
+    where event_type ilike '%death%' or event_type ilike '%kill%' or custom_data ? 'cause_of_death'
+    group by 1, 2, 3, 4
+    order by events desc
+    limit 50`);
+
+  let totalDeaths = 0;
+  let pvpDeaths = 0;
+  let pveDeaths = 0;
+  const causeMap = new Map();
+  const mapMap = new Map();
+  const npcMap = new Map();
+
+  for (const row of deathEvents.rows || []) {
+    const count = Number(row.events || 0);
+    const cause = String(row.cause || "Unknown");
+    const map = String(row.map || "Unknown");
+    const killer = String(row.killer_name || "");
+
+    totalDeaths += count;
+    const isPvP = /player/i.test(killer) || /pvp/i.test(cause);
+    const isPvE = /npc|creature|environment|fall|drown|fire/i.test(cause) || !isPvP;
+
+    if (isPvP) pvpDeaths += count;
+    if (isPvE) pveDeaths += count;
+
+    causeMap.set(cause, (causeMap.get(cause) || 0) + count);
+    mapMap.set(map, (mapMap.get(map) || 0) + count);
+    if (killer && !/player|unknown/i.test(killer)) {
+      npcMap.set(killer, (npcMap.get(killer) || 0) + count);
+    }
+  }
+
+  return {
+    totalDeaths,
+    pvpDeaths,
+    pveDeaths,
+    deathsByCause: [...causeMap.entries()].map(([cause, count]) => ({ cause, count })).sort((a, b) => b.count - a.count).slice(0, 20),
+    deathsByMap: [...mapMap.entries()].map(([map, count]) => ({ map, count })).sort((a, b) => b.count - a.count),
+    topHostileNpcs: [...npcMap.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 20),
+    kdRatio: totalDeaths > 0 ? parseFloat((pvpDeaths / Math.max(totalDeaths, 1)).toFixed(2)) : 0
+  };
+}
+
+// v0.6.0 Resource and Gathering Analytics
+function emptyAddonResources() {
+  return {
+    totalFields: 0,
+    totalValueRemaining: 0,
+    resourcesByType: [],
+    resourcesByMap: [],
+    gatheringSpikes: []
+  };
+}
+
+export async function addonOpsResourcesSummary(db) {
+  if (!(await tableExists(db, "resourcefield_state"))) return emptyAddonResources();
+
+  const rfColumns = await columnsFor(db, "resourcefield_state");
+  const valueCol = firstExistingColumn(rfColumns, ["value_remaining", "value"]);
+  const kindCol = firstExistingColumn(rfColumns, ["field_kind_id", "field_type", "resource_type"]);
+
+  const total = await db.query(`
+    select count(*)::int as total_fields,
+           ${valueCol ? `coalesce(sum(${quoteIdentifier(valueCol)}), 0)::bigint` : "0::bigint"} as total_value
+    from dune.resourcefield_state`);
+
+  let byType = [];
+  if (kindCol) {
+    const typeResult = await db.query(`
+      select ${quoteIdentifier(kindCol)}::text as resource_type,
+             count(*)::int as fields,
+             ${valueCol ? `coalesce(sum(${quoteIdentifier(valueCol)}), 0)::bigint` : "0::bigint"} as total_value
+      from dune.resourcefield_state
+      group by ${quoteIdentifier(kindCol)}
+      order by fields desc
+      limit 30`);
+    byType = typeResult.rows.map((r) => ({
+      type: String(r.resource_type || "Unknown"),
+      fields: Number(r.fields || 0),
+      totalValue: Number(r.total_value || 0)
+    }));
+  }
+
+  let byMap = [];
+  if (rfColumns.has("map")) {
+    const mapResult = await db.query(`
+      select coalesce(map, 'Unknown') as map_name,
+             count(*)::int as fields,
+             ${valueCol ? `coalesce(sum(${quoteIdentifier(valueCol)}), 0)::bigint` : "0::bigint"} as total_value
+      from dune.resourcefield_state
+      group by map
+      order by fields desc`);
+    byMap = mapResult.rows.map((r) => ({
+      map: String(r.map_name || "Unknown"),
+      fields: Number(r.fields || 0),
+      totalValue: Number(r.total_value || 0)
+    }));
+  }
+
+  return {
+    totalFields: Number(total.rows[0]?.total_fields || 0),
+    totalValueRemaining: Number(total.rows[0]?.total_value || 0),
+    resourcesByType: byType,
+    resourcesByMap: byMap,
+    gatheringSpikes: []
+  };
+}
+
+// v0.7.0 Economy and Trade Analytics
+function emptyAddonEconomy() {
+  return {
+    totalCurrencyHolders: 0,
+    totalSupply: 0,
+    currencies: [],
+    activeOrders: 0,
+    fulfilledOrders: 0,
+    topTradedItems: [],
+    totalTaxFees: 0
+  };
+}
+
+export async function addonOpsEconomySummary(db) {
+  if (!(await tableExists(db, "player_virtual_currency_balances"))) return emptyAddonEconomy();
+
+  const currencyResult = await db.query(`
+    select currency_id::text,
+           count(*)::int as holders,
+           coalesce(sum(balance), 0)::bigint as total_supply,
+           coalesce(avg(balance), 0)::bigint as average_balance,
+           coalesce(min(balance), 0)::bigint as min_balance,
+           coalesce(max(balance), 0)::bigint as max_balance
+    from dune.player_virtual_currency_balances
+    group by currency_id
+    order by total_supply desc`);
+
+  let activeOrders = 0;
+  let fulfilledOrders = 0;
+  let topTradedItems = [];
+  let totalTaxFees = 0;
+
+  if (await tableExists(db, "dune_exchange_orders")) {
+    const orderResult = await db.query("select count(*)::int as c from dune.dune_exchange_orders");
+    activeOrders = Number(orderResult.rows[0]?.c || 0);
+
+    const items = await db.query(`
+      select template_id::text,
+             count(*)::int as orders,
+             coalesce(avg(item_price), 0)::bigint as avg_price,
+             coalesce(min(item_price), 0)::bigint as min_price,
+             coalesce(max(item_price), 0)::bigint as max_price
+      from dune.dune_exchange_orders
+      group by template_id
+      order by orders desc
+      limit 20`);
+    topTradedItems = items.rows.map((r) => ({
+      templateId: String(r.template_id || ""),
+      orders: Number(r.orders || 0),
+      avgPrice: Number(r.avg_price || 0),
+      minPrice: Number(r.min_price || 0),
+      maxPrice: Number(r.max_price || 0)
+    }));
+  }
+
+  if (await tableExists(db, "dune_exchange_fulfilled_orders")) {
+    const fulfilled = await db.query("select count(*)::int as c from dune.dune_exchange_fulfilled_orders");
+    fulfilledOrders = Number(fulfilled.rows[0]?.c || 0);
+
+    const fees = await db.query(`
+      select coalesce(sum(fee_amount), 0)::bigint as total_fees
+      from dune.dune_exchange_fulfilled_orders`);
+    totalTaxFees = Number(fees.rows[0]?.total_fees || 0);
+  }
+
+  return {
+    totalCurrencyHolders: currencyResult.rows.reduce((s, r) => s + Number(r.holders || 0), 0),
+    totalSupply: currencyResult.rows.reduce((s, r) => s + Number(r.total_supply || 0), 0),
+    currencies: currencyResult.rows.map((r) => ({
+      currencyId: String(r.currency_id || ""),
+      holders: Number(r.holders || 0),
+      totalSupply: Number(r.total_supply || 0),
+      averageBalance: Number(r.average_balance || 0),
+      minBalance: Number(r.min_balance || 0),
+      maxBalance: Number(r.max_balance || 0)
+    })),
+    activeOrders,
+    fulfilledOrders,
+    topTradedItems,
+    totalTaxFees
+  };
+}
+
+// v0.8.0 Inventory, Crafting, and Storage Analytics
+function emptyAddonInventory() {
+  return {
+    totalItems: 0,
+    totalInventories: 0,
+    itemsByTemplate: [],
+    totalCrafted: 0,
+    storageUsage: []
+  };
+}
+
+export async function addonOpsInventorySummary(db) {
+  if (!(await tableExists(db, "items"))) return emptyAddonInventory();
+
+  const itemResult = await db.query("select count(*)::int as c from dune.items");
+  const totalItems = Number(itemResult.rows[0]?.c || 0);
+
+  let inventories = 0;
+  if (await tableExists(db, "inventories")) {
+    const invResult = await db.query("select count(*)::int as c from dune.inventories");
+    inventories = Number(invResult.rows[0]?.c || 0);
+  }
+
+  const byTemplate = await db.query(`
+    select template_id::text,
+           count(*)::int as count,
+           coalesce(sum(stack_size), 0)::bigint as total_stack
+    from dune.items
+    group by template_id
+    order by count desc
+    limit 30`);
+  const itemsByTemplate = byTemplate.rows.map((r) => ({
+    templateId: String(r.template_id || ""),
+    count: Number(r.count || 0),
+    totalStack: Number(r.total_stack || 0)
+  }));
+
+  let totalCrafted = 0;
+  let storageUsage = [];
+
+  if (await tableExists(db, "item_operations_staging_table")) {
+    const craftResult = await db.query(`
+      select count(*)::int as c
+      from dune.item_operations_staging_table
+      where function_name ilike '%craft%' or function_name ilike '%create%'`);
+    totalCrafted = Number(craftResult.rows[0]?.c || 0);
+  }
+
+  if (await tableExists(db, "inventories") && await tableExists(db, "items")) {
+    const storageResult = await db.query(`
+      select inv.id::text as inventory_id,
+             count(i.*)::int as item_count,
+             coalesce(sum(i.stack_size), 0)::bigint as total_stack
+      from dune.inventories inv
+      left join dune.items i on i.inventory_id = inv.id
+      group by inv.id
+      order by item_count desc
+      limit 20`);
+    storageUsage = storageResult.rows.map((r) => ({
+      inventoryId: String(r.inventory_id || ""),
+      itemCount: Number(r.item_count || 0),
+      totalStack: Number(r.total_stack || 0)
+    }));
+  }
+
+  return {
+    totalItems,
+    totalInventories: inventories,
+    itemsByTemplate,
+    totalCrafted,
+    storageUsage
+  };
+}
+
+// v0.9.0 Location, Territory, and Base Activity
+function emptyAddonLocation() {
+  return {
+    activeMaps: [],
+    totalMarkers: 0,
+    markersByMap: [],
+    playerDensity: [],
+    territoryPressure: []
+  };
+}
+
+export async function addonOpsLocationActivity(db) {
+  if (!(await tableExists(db, "actors"))) return emptyAddonLocation();
+
+  let activeMaps = [];
+  if (await tableExists(db, "player_state")) {
+    const mapResult = await db.query(`
+      select coalesce(nullif(a.map, ''), 'Unknown') as map_name,
+             count(distinct a.id)::int as players,
+             count(*) filter (where ps.online_status::text = 'Online')::int as online
+      from dune.actors a
+      left join dune.player_state ps on ps.player_pawn_id = a.id
+      where a.class ilike '%PlayerCharacter%'
+      group by a.map
+      order by players desc`);
+    activeMaps = mapResult.rows.map((r) => ({
+      map: String(r.map_name || "Unknown"),
+      players: Number(r.players || 0),
+      online: Number(r.online || 0)
+    }));
+  }
+
+  let totalMarkers = 0;
+  let markersByMap = [];
+  if (await tableExists(db, "markers")) {
+    const markerResult = await db.query("select count(*)::int as c from dune.markers");
+    totalMarkers = Number(markerResult.rows[0]?.c || 0);
+
+    const markers = await db.query(`
+      select coalesce(map_name_id::text, 'Unknown') as map_name,
+             count(*)::int as markers
+      from dune.markers
+      group by map_name_id
+      order by markers desc`);
+    markersByMap = markers.rows.map((r) => ({
+      map: String(r.map_name || "Unknown"),
+      markers: Number(r.markers || 0)
+    }));
+  }
+
+  return {
+    activeMaps,
+    totalMarkers,
+    markersByMap,
+    playerDensity: activeMaps,
+    territoryPressure: []
+  };
+}
+
+// v1.0.0 SOC/OPS Operations Center
+function emptyAddonSoc() {
+  return {
+    platformHealth: "Unknown",
+    bridgeRequests: 0,
+    bridgeErrors: 0,
+    bridgeSuccessRate: 0,
+    dataFreshness: "",
+    timestamp: ""
+  };
+}
+
+export async function addonOpsSocSummary(db) {
+  const healthPlayers = await addonOpsHealthPlayers(db);
+  const healthFarms = await addonOpsHealthFarms(db);
+  const activity = await addonOpsActivitySummary(db);
+  const economy = await addonOpsEconomySummary(db);
+  const combat = await addonOpsCombatDeaths(db);
+  const resources = await addonOpsResourcesSummary(db);
+  const inventory = await addonOpsInventorySummary(db);
+  const location = await addonOpsLocationActivity(db);
+
+  const totalPlayers = healthPlayers.total;
+  const onlinePlayers = healthPlayers.onlineStatus.Online || 0;
+  const totalFarms = healthFarms.total;
+
+  const platformHealth = totalFarms > 0 && onlinePlayers > 0
+    ? "Healthy"
+    : totalFarms === 0
+      ? "Degraded - No farm servers"
+      : "Degraded";
+
+  return {
+    platformHealth,
+    bridgeRequests: 0,
+    bridgeErrors: 0,
+    bridgeSuccessRate: 100,
+    dataFreshness: new Date().toISOString(),
+    timestamp: new Date().toISOString(),
+    health: {
+      players: healthPlayers,
+      farms: healthFarms
+    },
+    activity,
+    economy,
+    combat,
+    resources,
+    inventory,
+    location
+  };
+}
