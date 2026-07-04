@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
-      - uses: actions/setup-node@60edb5dd545a775178f52524783378180a3fb4bc
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
       - name: Run console API tests
@@ -37,5 +37,9 @@ jobs:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
         with:
           fetch-depth: 0
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/Red-Blink/dune-awakening-selfhost-docker.git
+      - name: Fetch upstream
+        run: git fetch upstream main
       - name: Run security PR checks
         run: bash tests/security-pr-checks.sh
