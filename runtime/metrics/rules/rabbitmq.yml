@@ -1,0 +1,64 @@
+groups:
+  - name: dune-rabbitmq
+    rules:
+      - alert: DuneRabbitMQDown
+        expr: rabbitmq_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: rabbitmq
+        annotations:
+          summary: Dune RabbitMQ broker is down
+          description: RabbitMQ Prometheus metrics report rabbitmq_up == 0.
+
+      - alert: DuneRabbitMQHighMemory
+        expr: 100 * (rabbitmq_process_resident_memory_bytes / rabbitmq_resident_memory_limit_bytes) > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: rabbitmq
+        annotations:
+          summary: Dune RabbitMQ memory usage is high
+          description: RabbitMQ resident memory is above 80% of its limit.
+
+      - alert: DuneRabbitMQHighFileDescriptors
+        expr: 100 * (rabbitmq_process_open_fds / rabbitmq_process_max_fds) > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: rabbitmq
+        annotations:
+          summary: Dune RabbitMQ file descriptor usage is high
+          description: RabbitMQ open file descriptors are above 80% of max file descriptors.
+
+      - alert: DuneRabbitMQQueueBacklog
+        expr: rabbitmq_queue_messages_ready > 1000
+        for: 10m
+        labels:
+          severity: warning
+          service: rabbitmq
+        annotations:
+          summary: Dune RabbitMQ queue backlog detected
+          description: RabbitMQ ready queue messages have been above 1000 for 10 minutes.
+
+      - alert: DuneRabbitMQUnackedBacklog
+        expr: rabbitmq_queue_messages_unacked > 1000
+        for: 10m
+        labels:
+          severity: warning
+          service: rabbitmq
+        annotations:
+          summary: Dune RabbitMQ unacked backlog detected
+          description: RabbitMQ unacked messages have been above 1000 for 10 minutes.
+
+      - alert: DuneRabbitMQUnroutableMessages
+        expr: |
+          rate(rabbitmq_global_messages_unroutable_dropped_total[5m]) > 0
+          or rate(rabbitmq_global_messages_unroutable_returned_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: rabbitmq
+        annotations:
+          summary: Dune RabbitMQ unroutable messages detected
+          description: RabbitMQ unroutable dropped or returned message counters are increasing.

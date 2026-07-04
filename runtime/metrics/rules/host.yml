@@ -1,0 +1,62 @@
+groups:
+  - name: dune-host
+    rules:
+      - alert: DuneHostHighCpu
+        expr: 100 * (1 - avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 85
+        for: 10m
+        labels:
+          severity: warning
+          service: node-exporter
+        annotations:
+          summary: Dune host CPU usage is high
+          description: Host CPU usage has been above 85% for 10 minutes.
+
+      - alert: DuneHostHighMemory
+        expr: 100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 90
+        for: 10m
+        labels:
+          severity: warning
+          service: node-exporter
+        annotations:
+          summary: Dune host memory usage is high
+          description: Host memory usage has been above 90% for 10 minutes.
+
+      - alert: DuneHostLowAvailableMemory
+        expr: node_memory_MemAvailable_bytes < 2147483648
+        for: 5m
+        labels:
+          severity: critical
+          service: node-exporter
+        annotations:
+          summary: Dune host available memory is critically low
+          description: Host available memory has been below 2 GiB for 5 minutes.
+
+      - alert: DuneHostHighFilesystemUsage
+        expr: 100 * (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) > 85
+        for: 15m
+        labels:
+          severity: warning
+          service: node-exporter
+        annotations:
+          summary: Dune host filesystem usage is high
+          description: A host filesystem has been above 85% usage for 15 minutes.
+
+      - alert: DuneHostCriticalFilesystemUsage
+        expr: 100 * (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) > 95
+        for: 5m
+        labels:
+          severity: critical
+          service: node-exporter
+        annotations:
+          summary: Dune host filesystem usage is critical
+          description: A host filesystem has been above 95% usage for 5 minutes.
+
+      - alert: DuneHostFilesystemReadonly
+        expr: node_filesystem_readonly{fstype!~"tmpfs|overlay"} == 1
+        for: 1m
+        labels:
+          severity: critical
+          service: node-exporter
+        annotations:
+          summary: Dune host filesystem is read-only
+          description: A host filesystem is reporting read-only state.

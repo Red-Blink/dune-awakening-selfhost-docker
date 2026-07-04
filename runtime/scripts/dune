@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC1091
+# .env is runtime/operator-local and may not exist during static analysis.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
@@ -111,6 +113,14 @@ command_can_sudo_reexec_safely() {
   case "$cmd" in
     status|ps|servers|ports|ping|ping-diagnostics|ready|logs|doctor)
       return 0
+      ;;
+    metrics)
+      case "$target" in
+        ""|status|ps|logs|config|help|--help|-h)
+          return 0
+          ;;
+      esac
+      return 1
       ;;
     *)
       return 1
@@ -335,6 +345,11 @@ EOF
     runtime/scripts/console.sh "$@"
     ;;
 
+  metrics)
+    shift || true
+    bash runtime/scripts/metrics-stack.sh "$@"
+    ;;
+
   update)
     shift || true
     set -a
@@ -432,6 +447,7 @@ Usage:
   dune logs <service> [--raw]
   dune restart <service>
   dune console restart
+  dune metrics [start|stop|restart|status|logs|config|pull]
   dune update [check|auto enable|auto disable|auto status|--yes]
   dune self-update [check|list|install [latest|<tag>]]
   dune restart-schedule [enable <HH:MM> [notify-minutes]|disable|status]

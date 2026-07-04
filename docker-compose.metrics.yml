@@ -1,0 +1,80 @@
+services:
+  dune-prometheus:
+    image: ${METRICS_PROMETHEUS_IMAGE:-prom/prometheus:latest}
+    container_name: dune-prometheus
+    restart: unless-stopped
+    networks:
+      - dune-net
+    ports:
+      - "127.0.0.1:${METRICS_PROMETHEUS_PORT:-9090}:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${METRICS_RETENTION_TIME:-7d}
+      - --storage.tsdb.retention.size=${METRICS_RETENTION_SIZE:-2GB}
+      - --web.console.libraries=/usr/share/prometheus/console_libraries
+      - --web.console.templates=/usr/share/prometheus/consoles
+      - --web.enable-lifecycle
+    volumes:
+      - ./runtime/metrics/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./runtime/metrics/rules:/etc/prometheus/rules:ro
+      - dune-prometheus-data:/prometheus
+    security_opt:
+      - no-new-privileges:true
+
+  dune-node-exporter:
+    image: ${METRICS_NODE_EXPORTER_IMAGE:-quay.io/prometheus/node-exporter:latest}
+    container_name: dune-node-exporter
+    restart: unless-stopped
+    networks:
+      - dune-net
+    command:
+      - --path.rootfs=/host
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/docker/netns|var/lib/docker/.+)($$|/)
+      - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|overlay|proc|pstore|rpc_pipefs|securityfs|sysfs|tracefs)$$
+    pid: host
+    volumes:
+      # Avoid :rslave by default because WSL/Docker Desktop root mounts may not be shared/slave mounts.
+      - /:/host:ro
+    security_opt:
+      - no-new-privileges:true
+
+  dune-cadvisor:
+    image: ${METRICS_CADVISOR_IMAGE:-gcr.io/cadvisor/cadvisor:latest}
+    container_name: dune-cadvisor
+    restart: unless-stopped
+    networks:
+      - dune-net
+    privileged: true
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=10s
+      - --store_container_labels=false
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+
+  dune-postgres-exporter:
+    image: ${METRICS_POSTGRES_EXPORTER_IMAGE:-quay.io/prometheuscommunity/postgres-exporter:latest}
+    container_name: dune-postgres-exporter
+    restart: unless-stopped
+    networks:
+      - dune-net
+    environment:
+      DATA_SOURCE_URI: dune-postgres:5432/dune?sslmode=disable
+      DATA_SOURCE_USER: ${DUNE_DB_USER:-dune}
+      DATA_SOURCE_PASS: ${DUNE_DB_PASSWORD:-dune}
+      PG_EXPORTER_DISABLE_DEFAULT_METRICS: "false"
+      PG_EXPORTER_DISABLE_SETTINGS_METRICS: "false"
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  dune-net:
+    external: true
+
+volumes:
+  dune-prometheus-data:

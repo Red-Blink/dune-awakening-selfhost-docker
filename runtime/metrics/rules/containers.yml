@@ -1,0 +1,49 @@
+groups:
+  - name: dune-containers
+    rules:
+      - alert: DuneContainerMissing
+        expr: absent(container_last_seen{name=~"dune-.*|redblink-dune-docker-console"})
+        for: 2m
+        labels:
+          severity: warning
+          service: cadvisor
+        annotations:
+          summary: Dune container metrics are missing
+          description: cAdvisor is not reporting expected Dune container metrics.
+
+      - alert: DuneContainerHighMemory
+        expr: |
+          (
+            container_memory_working_set_bytes{name=~"dune-.*|redblink-dune-docker-console"}
+            / container_spec_memory_limit_bytes{name=~"dune-.*|redblink-dune-docker-console"}
+          ) * 100 > 90
+          and container_spec_memory_limit_bytes{name=~"dune-.*|redblink-dune-docker-console"} > 0
+        for: 10m
+        labels:
+          severity: warning
+          service: cadvisor
+        annotations:
+          summary: Dune container memory usage is high
+          description: A Dune container is using more than 90% of its memory limit for 10 minutes.
+
+      - alert: DuneContainerMemoryFailures
+        expr: increase(container_memory_failcnt{name=~"dune-.*|redblink-dune-docker-console"}[10m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: cadvisor
+        annotations:
+          summary: Dune container memory allocation failures detected
+          description: A Dune container memory fail counter increased in the last 10 minutes.
+
+      - alert: DuneContainerNetworkErrors
+        expr: |
+          rate(container_network_receive_errors_total{name=~"dune-.*|redblink-dune-docker-console"}[5m]) > 0
+          or rate(container_network_transmit_errors_total{name=~"dune-.*|redblink-dune-docker-console"}[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+          service: cadvisor
+        annotations:
+          summary: Dune container network errors detected
+          description: A Dune container is reporting network receive or transmit errors.
