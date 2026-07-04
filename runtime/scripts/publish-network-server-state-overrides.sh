@@ -111,11 +111,15 @@ prepare_runtime_generated_files() {
 }
 
 ensure_text_router_log() {
-  local container_log
+  local tail_lines
   mkdir -p runtime/text-router
-  container_log="$(docker exec dune-text-router sh -lc 'find /Tools/Battlegroups/TextRouter/TextRouter/logs -maxdepth 1 -type f -name "director*.log" | sort | tail -n 1' 2>/dev/null | tr -d '\r')"
-  [ -n "$container_log" ] || return 1
-  docker cp "dune-text-router:${container_log}" "$TEXT_ROUTER_LOG" >/dev/null
+  tail_lines="${DUNE_TEXT_ROUTER_LOG_TAIL_LINES:-4000}"
+  case "$tail_lines" in ''|*[!0-9]*) tail_lines=4000 ;; esac
+  docker exec dune-text-router sh -lc '
+    log="$(find /Tools/Battlegroups/TextRouter/TextRouter/logs -maxdepth 1 -type f -name "director*.log" | sort | tail -n 1)"
+    [ -n "$log" ] || exit 1
+    tail -n "$1" "$log"
+  ' sh "$tail_lines" > "$TEXT_ROUTER_LOG"
 }
 
 load_rmq_admin_creds() {
