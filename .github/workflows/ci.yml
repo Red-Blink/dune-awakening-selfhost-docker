@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a
         with:
           node-version: "22"
           cache: npm
@@ -48,3 +48,34 @@ jobs:
         run: git fetch upstream main
       - name: Run security PR checks
         run: bash tests/security-pr-checks.sh
+
+  api-dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: console/api/package-lock.json
+      - name: npm audit
+        run: npm audit --audit-level=high
+        working-directory: console/api
+
+  api-security-dast:
+    runs-on: ubuntu-latest
+    needs: [api-tests]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - name: Start Console
+        run: |
+          docker compose -f docker-compose.web.yml up -d --wait
+          sleep 10
+      - name: Run API security test
+        run: bash tests/api-security-test.sh
+        env:
+          ADMIN_AUTH_DISABLED: "1"
+      - name: Cleanup
+        if: always()
+        run: docker compose -f docker-compose.web.yml down

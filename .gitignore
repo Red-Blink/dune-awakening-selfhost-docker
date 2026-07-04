@@ -28,3 +28,4 @@ console/web/dist/
 # Python/cache
 __pycache__/
 *.pyc
+.security-reports/

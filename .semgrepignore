@@ -1,0 +1,12 @@
+# Pre-existing upstream code — do not scan for new findings in these paths.
+orchestrator/
+console/web/
+console/api/Dockerfile
+runtime/scripts/bootstrap-runtime-secrets.sh
+runtime/scripts/start-rabbitmq.sh
+
+# Generated/CI artifacts
+.security-reports/
+
+# Test fixtures containing synthetic JWT tokens and test secrets
+console/api/test/runner.test.js

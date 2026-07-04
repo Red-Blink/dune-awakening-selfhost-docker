@@ -83,4 +83,3 @@ Unit coverage added:
 - Add persisted counters if operators need protection across process restarts.
 - Add explicit proxy trust configuration before using forwarded headers as rate-limit identity.
 - Consider password policy improvements separately.
-
