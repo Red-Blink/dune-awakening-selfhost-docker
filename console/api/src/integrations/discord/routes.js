@@ -1,13 +1,13 @@
 import { timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { discordAdapterEnabled, discordAdapterErrorResponse, discordAdapterHealth, discordAdapterReadiness, discordAdapterServices, discordAdapterStatus, DISCORD_ADAPTER_ROUTES } from "./adapter.js";
+import { discordAdapterEnabled, discordAdapterErrorResponse, discordAdapterHealth, discordAdapterPopulation, discordAdapterReadiness, discordAdapterServices, discordAdapterStatus, DISCORD_ADAPTER_ROUTES } from "./adapter.js";
 import { policyError } from "./policy.js";
 
 export function isDiscordAdapterRoute(path) {
   return Object.values(DISCORD_ADAPTER_ROUTES).includes(path);
 }
 
-export async function handleDiscordAdapterRoute({ req, res, path, config, readJson, json, statusProvider, readinessProvider, servicesProvider }) {
+export async function handleDiscordAdapterRoute({ req, res, path, config, readJson, json, statusProvider, readinessProvider, servicesProvider, populationProvider }) {
   try {
     if (!discordAdapterEnabled(config)) throw policyError("adapter_disabled", "Discord adapter is disabled.", 404);
     requireDiscordBotToken(req, config);
@@ -41,6 +41,15 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
         config,
         actorPayload: body.actor,
         servicesProvider
+      }));
+    }
+
+    if (path === DISCORD_ADAPTER_ROUTES.POPULATION && req.method === "POST") {
+      const body = await readJson(req);
+      return json(res, 200, await discordAdapterPopulation({
+        config,
+        actorPayload: body.actor,
+        populationProvider
       }));
     }
 

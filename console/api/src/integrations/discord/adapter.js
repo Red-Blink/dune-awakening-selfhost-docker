@@ -18,7 +18,8 @@ export const DISCORD_LIVE_ADAPTER_ROUTES = Object.freeze([
   DISCORD_ADAPTER_ROUTES.HEALTH,
   DISCORD_ADAPTER_ROUTES.STATUS,
   DISCORD_ADAPTER_ROUTES.READINESS,
-  DISCORD_ADAPTER_ROUTES.SERVICES
+  DISCORD_ADAPTER_ROUTES.SERVICES,
+  DISCORD_ADAPTER_ROUTES.POPULATION
 ]);
 
 export const DISCORD_PLANNED_ADAPTER_ROUTES = Object.freeze(
@@ -119,6 +120,17 @@ export async function discordAdapterServices({ config, actorPayload, servicesPro
     capability: DISCORD_CAPABILITIES.SERVICES_READ,
     action: "discord.services",
     targetType: "services"
+  });
+}
+
+export async function discordAdapterPopulation({ config, actorPayload, populationProvider }) {
+  return discordAdapterReadOnlyOperation({
+    config,
+    actorPayload,
+    provider: populationProvider,
+    capability: DISCORD_CAPABILITIES.POPULATION_READ,
+    action: "discord.population",
+    targetType: "population"
   });
 }
 
