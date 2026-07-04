@@ -1,0 +1,7 @@
+# False positives: documentation examples using fake Discord IDs.
+# The hardcoded command-auth token is a real finding and has been removed.
+
+docs/discord-control-bot/README.md:discord-client-id:85
+docs/discord-control-bot/README.md:discord-client-id:86
+docs/discord-control-bot/README.md:discord-client-id:88
+docs/discord-control-bot/README.md:discord-client-id:90

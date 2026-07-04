@@ -27,7 +27,7 @@ with generated secrets.
 
 **FINDING-CORE-1: Hardcoded fallback command-auth token (HIGH)**
 - Files: `console/api/src/rmq.js:7`, `runtime/scripts/admin-tools.sh:12`
-- Token: `Nu6VmPWUMvdPMeB7qErr`
+- Token: `[REDACTED-HARDCODED-TOKEN]`
 - Recommendation: Remove the fallback. Make `DUNE_COMMAND_AUTH_TOKEN` required
   or generate a unique token at first boot in the generated/secrets volume.
 
