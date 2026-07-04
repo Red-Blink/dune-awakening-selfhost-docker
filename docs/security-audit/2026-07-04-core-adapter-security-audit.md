@@ -48,3 +48,16 @@ Scanner outputs are in `.security-audit/` on this branch:
 
 See the comprehensive audit in the Discord bot repo:
 `docs/security-audit/2026-07-04-comprehensive-security-audit.md`
+
+## Remediation Status
+
+- **FINDING-CORE-1:** Implemented on `security/core-remove-hardcoded-command-token`.
+  `BUILTIN_COMMAND_AUTH_TOKEN` removed; token now required via env or secrets file.
+  Gitleaks clean; `console/api` tests pass (220/220).
+- **FINDING-CORE-7:** `.gitleaksignore` added for README example IDs.
+
+## Next Steps
+
+1. Merge `security/core-remove-hardcoded-command-token` into `release/discord-adapter-readonly`.
+2. Address Dockerfile root-user, HEALTHCHECK, and apt-recommends findings.
+3. Open upstream tracking issue for the hardcoded token.
