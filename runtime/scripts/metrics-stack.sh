@@ -390,6 +390,10 @@ Usage:
 
 The metrics stack is opt-in and independent from the game stack.
 Prometheus binds to 127.0.0.1:${prometheus_port} by default.
+Security note: node-exporter reads host metrics and cAdvisor runs privileged with
+read-only host/Docker mounts so it can report container metrics.
+Default metrics images are version-pinned; override METRICS_*_IMAGE only when
+you intentionally want different exporter builds.
 Metrics compose project: ${metrics_project_name}
 EOF
     ;;

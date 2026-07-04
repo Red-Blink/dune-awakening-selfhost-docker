@@ -57,6 +57,17 @@ ${DUNE_COMPOSE_PROJECT_NAME:-dune-awakening-selfhost-docker}-metrics
 
 This prevents metrics compose operations from warning that the main game/web containers are orphaned.
 
+Metrics images are pinned by default for reproducible installs:
+
+```text
+METRICS_PROMETHEUS_IMAGE=quay.io/prometheus/prometheus:v3.5.0
+METRICS_NODE_EXPORTER_IMAGE=quay.io/prometheus/node-exporter:v1.9.1
+METRICS_CADVISOR_IMAGE=gcr.io/cadvisor/cadvisor:v0.52.1
+METRICS_POSTGRES_EXPORTER_IMAGE=quay.io/prometheuscommunity/postgres-exporter:v0.17.1
+```
+
+Operators can still override those image names in `.env` when they intentionally want a newer exporter build or a local mirror.
+
 ## Metrics Stack Components
 
 ```text
@@ -102,8 +113,8 @@ Security posture for R1:
 
 - Metrics stack remains opt-in.
 - Prometheus binds to `127.0.0.1` by default.
-- node_exporter is not public.
-- cAdvisor is not public.
+- node_exporter is not public, but it mounts the host root read-only and uses host PID visibility to collect host metrics.
+- cAdvisor is not public, but it runs privileged with read-only host/Docker mounts to collect container metrics.
 - postgres_exporter is not public.
 - RabbitMQ metrics are scraped on the internal Docker network.
 - No passwords or tokens are committed.

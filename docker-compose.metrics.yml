@@ -1,6 +1,6 @@
 services:
   dune-prometheus:
-    image: ${METRICS_PROMETHEUS_IMAGE:-prom/prometheus:latest}
+    image: ${METRICS_PROMETHEUS_IMAGE:-quay.io/prometheus/prometheus:v3.5.0}
     container_name: dune-prometheus
     restart: unless-stopped
     networks:
@@ -23,7 +23,7 @@ services:
       - no-new-privileges:true
 
   dune-node-exporter:
-    image: ${METRICS_NODE_EXPORTER_IMAGE:-quay.io/prometheus/node-exporter:latest}
+    image: ${METRICS_NODE_EXPORTER_IMAGE:-quay.io/prometheus/node-exporter:v1.9.1}
     container_name: dune-node-exporter
     restart: unless-stopped
     networks:
@@ -40,7 +40,7 @@ services:
       - no-new-privileges:true
 
   dune-cadvisor:
-    image: ${METRICS_CADVISOR_IMAGE:-gcr.io/cadvisor/cadvisor:latest}
+    image: ${METRICS_CADVISOR_IMAGE:-gcr.io/cadvisor/cadvisor:v0.52.1}
     container_name: dune-cadvisor
     restart: unless-stopped
     networks:
@@ -58,7 +58,7 @@ services:
       - /dev/disk:/dev/disk:ro
 
   dune-postgres-exporter:
-    image: ${METRICS_POSTGRES_EXPORTER_IMAGE:-quay.io/prometheuscommunity/postgres-exporter:latest}
+    image: ${METRICS_POSTGRES_EXPORTER_IMAGE:-quay.io/prometheuscommunity/postgres-exporter:v0.17.1}
     container_name: dune-postgres-exporter
     restart: unless-stopped
     networks:
