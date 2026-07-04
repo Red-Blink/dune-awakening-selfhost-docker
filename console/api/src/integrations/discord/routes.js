@@ -1,6 +1,10 @@
 import { timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { discordAdapterEnabled, discordAdapterErrorResponse, discordAdapterHealth, discordAdapterPopulation, discordAdapterReadiness, discordAdapterServices, discordAdapterStatus, DISCORD_ADAPTER_ROUTES } from "./adapter.js";
+import {
+  discordAdapterEnabled, discordAdapterErrorResponse, discordAdapterHealth,
+  discordAdapterPopulation, discordAdapterReadiness, discordAdapterServices,
+  discordAdapterStatus, DISCORD_ADAPTER_ROUTES, DISCORD_PLANNED_ADAPTER_ROUTES
+} from "./adapter.js";
 import { policyError } from "./policy.js";
 
 export function isDiscordAdapterRoute(path) {
@@ -51,6 +55,53 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
         actorPayload: body.actor,
         populationProvider
       }));
+    }
+
+    // OPS observability routes (planned — bridge integration pending)
+    const OPS_PATHS = [
+      DISCORD_ADAPTER_ROUTES.OPS_ACTIVITY,
+      DISCORD_ADAPTER_ROUTES.OPS_COMBAT,
+      DISCORD_ADAPTER_ROUTES.OPS_RESOURCES,
+      DISCORD_ADAPTER_ROUTES.OPS_ECONOMY,
+      DISCORD_ADAPTER_ROUTES.OPS_INVENTORY,
+      DISCORD_ADAPTER_ROUTES.OPS_LOCATION,
+      DISCORD_ADAPTER_ROUTES.OPS_SOC,
+      DISCORD_ADAPTER_ROUTES.OPS_PROMETHEUS,
+      DISCORD_ADAPTER_ROUTES.OPS_DASHBOARD
+    ];
+
+    if (OPS_PATHS.includes(path) && req.method === "POST") {
+      const body = await readJson(req);
+      return json(res, 200, {
+        ok: true,
+        status: "planned",
+        route: path,
+        message: "OPS observability route is planned. Bridge integration pending. See yacketrj/dune-ops-observability-addon.",
+        actor: body.actor ? { userId: body.actor.userId } : null
+      });
+    }
+
+    // Broadcast route
+    if (path === DISCORD_ADAPTER_ROUTES.BROADCAST && req.method === "POST") {
+      const body = await readJson(req);
+      return json(res, 200, {
+        ok: true,
+        status: "planned",
+        route: path,
+        message: "Broadcast route is planned. Requires game server RabbitMQ integration."
+      });
+    }
+
+    // Announcements route
+    if (path === DISCORD_ADAPTER_ROUTES.ANNOUNCEMENTS && req.method === "POST") {
+      const body = await readJson(req);
+      return json(res, 200, {
+        ok: true,
+        status: "planned",
+        route: path,
+        announcements: [],
+        message: "Announcements route is planned. Requires game server event bridge."
+      });
     }
 
     throw policyError("not_found", "Discord adapter route not found.", 404);

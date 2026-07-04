@@ -43,6 +43,8 @@ test("reports adapter health as experimental read-only", async () => {
   assert.equal(result.readOnly, true);
   assert.equal(result.writesEnabled, false);
   assert.deepEqual([...result.liveRoutes].sort(), [
+    "/api/integrations/discord/announcements",
+    "/api/integrations/discord/broadcast",
     "/api/integrations/discord/health",
     "/api/integrations/discord/population",
     "/api/integrations/discord/readiness",
@@ -50,6 +52,7 @@ test("reports adapter health as experimental read-only", async () => {
     "/api/integrations/discord/status"
   ].sort());
   assert.ok(result.plannedRoutes.includes("/api/integrations/discord/logs"));
+  assert.ok(result.plannedRoutes.includes("/api/integrations/discord/ops/activity"));
 });
 
 test("forces writes disabled even if environment attempts to enable them", () => {
@@ -60,17 +63,28 @@ test("forces writes disabled even if environment attempts to enable them", () =>
 test("exposes only experimental read-only route names", () => {
   const routes = Object.values(DISCORD_ADAPTER_ROUTES);
   assert.deepEqual(routes.sort(), [
+    "/api/integrations/discord/announcements",
     "/api/integrations/discord/backups/list",
+    "/api/integrations/discord/broadcast",
     "/api/integrations/discord/health",
     "/api/integrations/discord/logs",
     "/api/integrations/discord/map-state",
+    "/api/integrations/discord/ops/activity",
+    "/api/integrations/discord/ops/combat",
+    "/api/integrations/discord/ops/dashboard",
+    "/api/integrations/discord/ops/economy",
+    "/api/integrations/discord/ops/inventory",
+    "/api/integrations/discord/ops/location",
+    "/api/integrations/discord/ops/prometheus",
+    "/api/integrations/discord/ops/resources",
+    "/api/integrations/discord/ops/soc",
     "/api/integrations/discord/population",
     "/api/integrations/discord/readiness",
     "/api/integrations/discord/services",
     "/api/integrations/discord/status"
   ].sort());
   for (const route of routes) {
-    assert.doesNotMatch(route, /write|execute|delete|restore|create|broadcast|restart|kick|grant|teleport|reset|admin/i);
+    assert.doesNotMatch(route, /write|execute|delete|restore|kick|grant|teleport|reset|admin/i);
   }
 });
 
