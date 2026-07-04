@@ -76,6 +76,7 @@ MULTIHOME_IP="$(resolve_bind_ip)"
 RMQ_GAME_HOST="$(resolve_rmq_game_host)"
 RMQ_ADMIN_HOST="$(resolve_rmq_admin_host)"
 mapfile -t GAME_EXTERNAL_ADDRESS_ENV < <(game_external_address_override_env_args)
+validate_game_external_address_override_env_args "${GAME_EXTERNAL_ADDRESS_ENV[@]}"
 PORT_RESERVATION_FILE="runtime/generated/spawn-port-reservations.tsv"
 PORT_LOCK_FILE="runtime/generated/spawn-port-reservations.lock"
 SPAWN_SUCCESS=0

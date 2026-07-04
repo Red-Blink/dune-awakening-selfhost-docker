@@ -444,12 +444,11 @@ ensure_host_latency_tuned() {
 }
 
 game_external_address_override_env_args() {
-  local mode bind_ip advertised_ip
+  local mode advertised_ip
 
   [ "${DUNE_DISABLE_GAME_EXTERNAL_ADDRESS_OVERRIDE:-0}" = "1" ] && return 0
 
   mode="$(resolve_server_ip_mode 2>/dev/null || true)"
-  bind_ip="$(resolve_game_listen_ip)"
   advertised_ip="$(resolve_advertised_ip)"
 
   if [ "$mode" != "public" ] && [ "${DUNE_ALLOW_GAME_EXTERNAL_ADDRESS_OVERRIDE:-0}" != "1" ]; then
@@ -464,6 +463,36 @@ game_external_address_override_env_args() {
   # as the local bind IP. NAT/public hosts need both: bind locally, advertise
   # publicly in server-state messages consumed by the in-game browser.
   printf '%s\n' -e "EXTERNAL_ADDRESS_OVERRIDE=$advertised_ip"
+}
+
+validate_game_external_address_override_env_args() {
+  local mode advertised_ip arg found=0
+
+  [ "${DUNE_DISABLE_GAME_EXTERNAL_ADDRESS_OVERRIDE:-0}" = "1" ] && return 0
+
+  mode="$(resolve_server_ip_mode 2>/dev/null || true)"
+  [ "$mode" = "public" ] || return 0
+
+  advertised_ip="$(resolve_advertised_ip)"
+  if ! is_ipv4 "$advertised_ip" || [ "$advertised_ip" = "auto" ]; then
+    echo "Public mode requires a valid SERVER_IP before starting game containers." >&2
+    echo "Set SERVER_IP to your public IPv4, or switch SERVER_IP_MODE=local for LAN-only hosting." >&2
+    return 1
+  fi
+
+  for arg in "$@"; do
+    if [ "$arg" = "EXTERNAL_ADDRESS_OVERRIDE=$advertised_ip" ]; then
+      found=1
+      break
+    fi
+  done
+
+  if [ "$found" != "1" ]; then
+    echo "Public mode would start a game container without EXTERNAL_ADDRESS_OVERRIDE=$advertised_ip." >&2
+    echo "Refusing to start because clients may receive private LAN addresses for map travel." >&2
+    echo "Unset DUNE_DISABLE_GAME_EXTERNAL_ADDRESS_OVERRIDE or fix SERVER_IP/SERVER_IP_MODE, then retry." >&2
+    return 1
+  fi
 }
 
 usersettings_engine_value() {
