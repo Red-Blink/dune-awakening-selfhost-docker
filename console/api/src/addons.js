@@ -13,6 +13,7 @@ const ADDON_LIFECYCLE_STATES = new Set(["active", "deprecated", "unsupported", "
 const INSTALL_BLOCKED_LIFECYCLES = new Set(["unsupported", "removed", "blocked"]);
 const ALLOWED_ADDON_PERMISSIONS = new Set([
   "players:read",
+  "ops:read",
   "database:read",
   "database:write",
   "server:status",
