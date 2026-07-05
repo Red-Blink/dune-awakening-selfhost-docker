@@ -12,6 +12,10 @@ export function isDiscordAdapterRoute(path) {
 }
 
 export async function handleDiscordAdapterRoute({ req, res, path, config, readJson, json, statusProvider, readinessProvider, servicesProvider, populationProvider }) {
+  const safeStatusProvider = typeof statusProvider === "function" ? statusProvider : async () => ({});
+  const safeReadinessProvider = typeof readinessProvider === "function" ? readinessProvider : async () => ({ ready: true });
+  const safeServicesProvider = typeof servicesProvider === "function" ? servicesProvider : async () => ({ services: [] });
+  const safePopulationProvider = typeof populationProvider === "function" ? populationProvider : async () => ({ onlinePlayers: 0 });
   try {
     if (!discordAdapterEnabled(config)) throw policyError("adapter_disabled", "Discord adapter is disabled.", 404);
     requireDiscordBotToken(req, config);
@@ -26,7 +30,7 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
         config,
         actorPayload: body.actor,
         diagnostic: Boolean(body.diagnostic),
-        statusProvider
+        statusProvider: safeStatusProvider
       }));
     }
 
@@ -35,7 +39,7 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
       return json(res, 200, await discordAdapterReadiness({
         config,
         actorPayload: body.actor,
-        readinessProvider
+        readinessProvider: safeReadinessProvider
       }));
     }
 
@@ -44,7 +48,7 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
       return json(res, 200, await discordAdapterServices({
         config,
         actorPayload: body.actor,
-        servicesProvider
+        servicesProvider: safeServicesProvider
       }));
     }
 
@@ -53,7 +57,7 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
       return json(res, 200, await discordAdapterPopulation({
         config,
         actorPayload: body.actor,
-        populationProvider
+        populationProvider: safePopulationProvider
       }));
     }
 
