@@ -76,7 +76,7 @@ python -u /root/PSQL/updatedb.py \
   --ignore-backup-failure \
   --unattended \
   > /tmp/dune-db-update.log 2>&1
-' 
+'
 
 start_ts="$(date +%s)"
 last_logs=""

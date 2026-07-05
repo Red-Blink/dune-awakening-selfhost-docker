@@ -47,6 +47,7 @@ export function createAuth(config) {
       sessions.delete(id);
       return null;
     }
+    session.expiresAt = Date.now() + 12 * 60 * 60 * 1000;
     return session;
   }
 

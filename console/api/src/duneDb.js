@@ -1356,6 +1356,97 @@ async function leadershipGuilds(db) {
   return guilds;
 }
 
+const NEUTRAL_GUILD_FACTION_ID = 3;
+
+function guildFactionDisplayName(row) {
+  const factionId = row.guild_faction;
+  if (!factionId || Number(factionId) === NEUTRAL_GUILD_FACTION_ID) return "Neutral";
+  return row.guild_faction_name || `Faction ${factionId}`;
+}
+
+export async function listGuilds(db, { q = "" } = {}) {
+  if (!(await tableExists(db, "guilds"))) return unsupported("guilds", ["dune.guilds"]);
+  const guildColumns = await columnsFor(db, "guilds");
+  const guildIdColumn = firstExistingColumn(guildColumns, ["guild_id", "id"]);
+  const guildNameColumn = firstExistingColumn(guildColumns, ["guild_name", "name", "display_name"]);
+  if (!guildIdColumn || !guildNameColumn) return unsupported("guilds", ["dune.guilds"]);
+  const guildFactionColumn = firstExistingColumn(guildColumns, ["guild_faction", "faction_id", "faction"]);
+  const guildDescriptionColumn = firstExistingColumn(guildColumns, ["guild_description", "description"]);
+  const hasMembers = await tableExists(db, "guild_members");
+  let memberGuildColumn = "";
+  if (hasMembers) {
+    const memberColumns = await columnsFor(db, "guild_members");
+    memberGuildColumn = firstExistingColumn(memberColumns, ["guild_id", "id"]);
+  }
+  const hasFactions = guildFactionColumn && await tableExists(db, "factions");
+
+  const values = [];
+  let where = "1=1";
+  if (q) {
+    values.push(`%${q}%`);
+    where += ` and g.${quoteIdentifier(guildNameColumn)} ilike $${values.length}`;
+  }
+
+  const memberCountSelect = hasMembers && memberGuildColumn
+    ? `(select count(*) from dune.guild_members gm where gm.${quoteIdentifier(memberGuildColumn)} = g.${quoteIdentifier(guildIdColumn)})`
+    : "0";
+
+  const result = await db.query(`
+    select g.${quoteIdentifier(guildIdColumn)}::text as guild_id,
+           coalesce(g.${quoteIdentifier(guildNameColumn)}, '') as guild_name,
+           ${guildFactionColumn ? `coalesce(g.${quoteIdentifier(guildFactionColumn)}::text, '')` : "''"} as guild_faction,
+           ${hasFactions ? "coalesce(f.name, '')" : "''"} as guild_faction_name,
+           ${guildDescriptionColumn ? `coalesce(g.${quoteIdentifier(guildDescriptionColumn)}, '')` : "''"} as guild_description,
+           ${memberCountSelect}::int as member_count
+    from dune.guilds g
+    ${hasFactions ? `left join dune.factions f on f.id = g.${quoteIdentifier(guildFactionColumn)}` : ""}
+    where ${where}
+    order by lower(coalesce(g.${quoteIdentifier(guildNameColumn)}, '')), g.${quoteIdentifier(guildIdColumn)}
+    limit 500`, values);
+
+  const rows = result.rows.map((row) => ({ ...row, guild_faction: guildFactionDisplayName(row) }));
+  return { capabilities: { guilds: true, guildMembers: hasMembers }, rows };
+}
+
+export async function guildMembers(db, guildId) {
+  const id = intParam(guildId, "guild id", 1);
+  if (!(await tableExists(db, "guild_members")) || !(await tableExists(db, "guilds"))) {
+    return unsupported("guildMembers", ["dune.guild_members", "dune.guilds"]);
+  }
+  const memberColumns = await columnsFor(db, "guild_members");
+  const guildColumns = await columnsFor(db, "guilds");
+  const memberGuildColumn = firstExistingColumn(memberColumns, ["guild_id", "id"]);
+  const memberPlayerColumn = firstExistingColumn(memberColumns, ["player_id", "player_controller_id", "actor_id", "account_id", "player_pawn_id"]);
+  const memberRoleColumn = firstExistingColumn(memberColumns, ["role_id", "role"]);
+  const guildIdColumn = firstExistingColumn(guildColumns, ["guild_id", "id"]);
+  if (!memberGuildColumn || !memberPlayerColumn || !guildIdColumn) {
+    return unsupported("guildMembers", ["dune.guild_members", "dune.guilds"]);
+  }
+
+  const hasPlayerState = await tableExists(db, "player_state");
+  const hasActors = await tableExists(db, "actors");
+  const memberPlayerRef = `gm.${quoteIdentifier(memberPlayerColumn)}`;
+  const joins = [];
+  if (hasPlayerState) joins.push(`left join dune.player_state ps_by_controller on ps_by_controller.player_controller_id = ${memberPlayerRef}`);
+  if (hasActors) joins.push(`left join dune.actors a_by_actor_id on a_by_actor_id.id = ${memberPlayerRef}`);
+  if (hasPlayerState) joins.push(`left join dune.player_state ps_by_account on ps_by_account.account_id = coalesce(${hasActors ? "a_by_actor_id.owner_account_id" : "null"}, ${memberPlayerRef})`);
+  const characterNameSelect = hasPlayerState
+    ? "coalesce(ps_by_controller.character_name, ps_by_account.character_name, '')"
+    : "''";
+
+  const result = await db.query(`
+    select ${memberPlayerRef}::text as player_id,
+           ${memberRoleColumn ? `gm.${quoteIdentifier(memberRoleColumn)}::text` : "''"} as role_id,
+           ${characterNameSelect} as character_name
+    from dune.guild_members gm
+    join dune.guilds g on g.${quoteIdentifier(guildIdColumn)} = gm.${quoteIdentifier(memberGuildColumn)}
+    ${joins.join("\n    ")}
+    where gm.${quoteIdentifier(memberGuildColumn)} = $1
+    order by ${memberRoleColumn ? `gm.${quoteIdentifier(memberRoleColumn)} asc, ` : ""}lower(${characterNameSelect})`, [id]);
+
+  return { capabilities: { guildMembers: true }, rows: result.rows };
+}
+
 function firstExistingColumn(columns, names) {
   return names.find((name) => columns.has(name)) || "";
 }

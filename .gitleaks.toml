@@ -1,0 +1,10 @@
+# Gitleaks configuration for dune-awakening-selfhost-docker
+# The built-in fallback token is intentionally hardcoded
+# to match the game server's expected default.
+# See: console/api/src/rmq.js BUILTIN_COMMAND_AUTH_TOKEN
+
+[allowlist]
+  description = "Known command-auth fallback shared by game server"
+  regexes = [
+    "Nu6VmPWUMvdPMeB7qErr"
+  ]

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
-import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, completeJourneyNode, completeTutorial, deleteInventoryItem, giveItemToPlayer, giveItemToStorage, landsraadOverview, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerJourney, playerPosition, playerResearchItems, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, unlockCraftingRecipe, unlockResearchItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
+import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, completeJourneyNode, completeTutorial, deleteInventoryItem, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerJourney, playerPosition, playerResearchItems, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, unlockCraftingRecipe, unlockResearchItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
   assert.deepEqual(discoverDbConfig({}), {
@@ -554,6 +554,224 @@ test("addon leadership players include level and faction summaries", async () =>
     ["Test Two", 7, "Harkonnen"]
   ]);
   assert.deepEqual(result.rows.map((row) => row.guild), ["Water Sellers", "Spice Guild"]);
+});
+
+test("list guilds returns capability response when dune.guilds is missing", async () => {
+  const db = {
+    query: async () => ({ rows: [{ exists: false }] })
+  };
+  const result = await listGuilds(db, {});
+  assert.equal(result.capabilities.guilds, false);
+  assert.match(result.reason, /dune\.guilds/);
+});
+
+test("list guilds returns rows with description and member count", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: ["dune.guilds", "dune.guild_members"].includes(name) }] };
+      }
+      if (text.includes("information_schema.columns")) {
+        const table = String(values[1] || "");
+        if (table === "guilds") return { rows: ["guild_id", "guild_name", "guild_faction", "guild_description"].map((column_name) => ({ column_name })) };
+        if (table === "guild_members") return { rows: ["player_id", "guild_id", "role_id"].map((column_name) => ({ column_name })) };
+        return { rows: [] };
+      }
+      return { rows: [
+        { guild_id: "1", guild_name: "Water Sellers", guild_faction: "1", guild_faction_name: "", guild_description: "Trade guild", member_count: 4 }
+      ] };
+    }
+  };
+  const result = await listGuilds(db, {});
+  assert.equal(result.capabilities.guilds, true);
+  assert.equal(result.capabilities.guildMembers, true);
+  assert.equal(result.rows.length, 1);
+  assert.equal(result.rows[0].guild_name, "Water Sellers");
+  assert.equal(result.rows[0].guild_description, "Trade guild");
+  assert.equal(result.rows[0].member_count, 4);
+});
+
+test("list guilds resolves faction id to a name when dune.factions has a match", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: ["dune.guilds", "dune.guild_members", "dune.factions"].includes(name) }] };
+      }
+      if (text.includes("information_schema.columns")) {
+        const table = String(values[1] || "");
+        if (table === "guilds") return { rows: ["guild_id", "guild_name", "guild_faction"].map((column_name) => ({ column_name })) };
+        if (table === "guild_members") return { rows: ["player_id", "guild_id"].map((column_name) => ({ column_name })) };
+        return { rows: [] };
+      }
+      return { rows: [
+        { guild_id: "1", guild_name: "House Guard", guild_faction: "1", guild_faction_name: "Atreides", guild_description: "", member_count: 2 }
+      ] };
+    }
+  };
+  const result = await listGuilds(db, {});
+  assert.equal(result.rows[0].guild_faction, "Atreides");
+});
+
+test("list guilds treats faction id 3 as Neutral even when dune.factions is present", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: ["dune.guilds", "dune.guild_members", "dune.factions"].includes(name) }] };
+      }
+      if (text.includes("information_schema.columns")) {
+        const table = String(values[1] || "");
+        if (table === "guilds") return { rows: ["guild_id", "guild_name", "guild_faction"].map((column_name) => ({ column_name })) };
+        if (table === "guild_members") return { rows: ["player_id", "guild_id"].map((column_name) => ({ column_name })) };
+        return { rows: [] };
+      }
+      return { rows: [
+        { guild_id: "2", guild_name: "Unaligned Traders", guild_faction: "3", guild_faction_name: "", guild_description: "", member_count: 1 }
+      ] };
+    }
+  };
+  const result = await listGuilds(db, {});
+  assert.equal(result.rows[0].guild_faction, "Neutral");
+});
+
+test("list guilds falls back to a numeric faction label when dune.factions has no matching row", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: ["dune.guilds", "dune.guild_members", "dune.factions"].includes(name) }] };
+      }
+      if (text.includes("information_schema.columns")) {
+        const table = String(values[1] || "");
+        if (table === "guilds") return { rows: ["guild_id", "guild_name", "guild_faction"].map((column_name) => ({ column_name })) };
+        if (table === "guild_members") return { rows: ["player_id", "guild_id"].map((column_name) => ({ column_name })) };
+        return { rows: [] };
+      }
+      return { rows: [
+        { guild_id: "3", guild_name: "Unknown Alliance", guild_faction: "9", guild_faction_name: "", guild_description: "", member_count: 0 }
+      ] };
+    }
+  };
+  const result = await listGuilds(db, {});
+  assert.equal(result.rows[0].guild_faction, "Faction 9");
+});
+
+test("list guilds filters by name when a search query is given", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: ["dune.guilds", "dune.guild_members"].includes(name) }] };
+      }
+      if (text.includes("information_schema.columns")) {
+        const table = String(values[1] || "");
+        if (table === "guilds") return { rows: ["guild_id", "guild_name"].map((column_name) => ({ column_name })) };
+        if (table === "guild_members") return { rows: ["player_id", "guild_id"].map((column_name) => ({ column_name })) };
+        return { rows: [] };
+      }
+      return { rows: [] };
+    }
+  };
+  await listGuilds(db, { q: "Water" });
+  const guildQuery = calls.find((call) => call.text.includes("from dune.guilds g"));
+  assert.ok(guildQuery);
+  assert.match(guildQuery.text, /ilike \$1/);
+  assert.deepEqual(guildQuery.values, ["%Water%"]);
+});
+
+test("guild members returns capability response when required tables are missing", async () => {
+  const db = {
+    query: async () => ({ rows: [{ exists: false }] })
+  };
+  const result = await guildMembers(db, 1);
+  assert.equal(result.capabilities.guildMembers, false);
+  assert.match(result.reason, /dune\.guild_members/);
+});
+
+test("guild members returns member rows with player id, role, and character name", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: ["dune.guild_members", "dune.guilds", "dune.player_state"].includes(name) }] };
+      }
+      if (text.includes("information_schema.columns")) {
+        const table = String(values[1] || "");
+        if (table === "guild_members") return { rows: ["player_id", "guild_id", "role_id"].map((column_name) => ({ column_name })) };
+        if (table === "guilds") return { rows: ["guild_id", "guild_name"].map((column_name) => ({ column_name })) };
+        return { rows: [] };
+      }
+      if (text.includes("from dune.guild_members gm")) {
+        return { rows: [
+          { player_id: "301", role_id: "100", character_name: "Leader One" },
+          { player_id: "302", role_id: "1", character_name: "Member Two" }
+        ] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await guildMembers(db, 1);
+  assert.equal(result.capabilities.guildMembers, true);
+  assert.deepEqual(result.rows, [
+    { player_id: "301", role_id: "100", character_name: "Leader One" },
+    { player_id: "302", role_id: "1", character_name: "Member Two" }
+  ]);
+});
+
+test("guild members joins player_controller_id, actor id, and owning account as a defensive identity fallback", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: ["dune.guild_members", "dune.guilds", "dune.player_state", "dune.actors"].includes(name) }] };
+      }
+      if (text.includes("information_schema.columns")) {
+        const table = String(values[1] || "");
+        if (table === "guild_members") return { rows: ["player_id", "guild_id", "role_id"].map((column_name) => ({ column_name })) };
+        if (table === "guilds") return { rows: ["guild_id", "guild_name"].map((column_name) => ({ column_name })) };
+        return { rows: [] };
+      }
+      return { rows: [] };
+    }
+  };
+  await guildMembers(db, 1);
+  const memberQuery = calls.find((call) => call.text.includes("from dune.guild_members gm"));
+  assert.ok(memberQuery);
+  assert.match(memberQuery.text, /left join dune\.player_state ps_by_controller on ps_by_controller\.player_controller_id = gm\."player_id"/);
+  assert.match(memberQuery.text, /left join dune\.actors a_by_actor_id on a_by_actor_id\.id = gm\."player_id"/);
+  assert.match(memberQuery.text, /left join dune\.player_state ps_by_account on ps_by_account\.account_id = coalesce\(a_by_actor_id\.owner_account_id, gm\."player_id"\)/);
+  assert.match(memberQuery.text, /coalesce\(ps_by_controller\.character_name, ps_by_account\.character_name, ''\)/);
+});
+
+test("guild members falls back to a direct account-id join when dune.actors is unavailable", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: ["dune.guild_members", "dune.guilds", "dune.player_state"].includes(name) }] };
+      }
+      if (text.includes("information_schema.columns")) {
+        const table = String(values[1] || "");
+        if (table === "guild_members") return { rows: ["player_id", "guild_id", "role_id"].map((column_name) => ({ column_name })) };
+        if (table === "guilds") return { rows: ["guild_id", "guild_name"].map((column_name) => ({ column_name })) };
+        return { rows: [] };
+      }
+      return { rows: [] };
+    }
+  };
+  await guildMembers(db, 1);
+  const memberQuery = calls.find((call) => call.text.includes("from dune.guild_members gm"));
+  assert.ok(memberQuery);
+  assert.doesNotMatch(memberQuery.text, /dune\.actors/);
+  assert.match(memberQuery.text, /left join dune\.player_state ps_by_account on ps_by_account\.account_id = coalesce\(null, gm\."player_id"\)/);
 });
 
 test("addon leadership players derive character level from level component XP", async () => {

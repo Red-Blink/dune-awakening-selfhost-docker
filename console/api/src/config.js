@@ -39,8 +39,18 @@ export function loadConfig() {
     maxJsonBytes: Number(process.env.ADMIN_MAX_JSON_BYTES || 2 * 1024 * 1024),
     maxUploadBytes: Number(process.env.ADMIN_MAX_UPLOAD_BYTES || 1024 * 1024 * 1024),
     commandTimeoutMs: Number(process.env.ADMIN_COMMAND_TIMEOUT_MS || 120000),
-    staticDir: process.env.ADMIN_STATIC_DIR || resolve(repoRoot, "console/web/dist")
+    staticDir: process.env.ADMIN_STATIC_DIR || resolve(repoRoot, "console/web/dist"),
+    allowedIps: parseAllowedIps(process.env.ADMIN_ALLOWED_IPS)
   };
+}
+
+export function parseAllowedIps(value) {
+  if (!value) return [];
+  return String(value)
+    .split(",")
+    .map((ip) => ip.trim())
+    .filter((ip) => ip.length > 0)
+    .map((ip) => ip.replace(/^::ffff:/, ""));
 }
 
 function repairRootOwnedHostState(repoRoot) {

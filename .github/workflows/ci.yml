@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "integration/**"
+      - "release/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: console/api/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: console/api
+      - name: Run console API tests
+        run: node --test test/*.test.js
+        working-directory: console/api
+
+  metrics-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - name: Run metrics stack unit tests
+        run: bash tests/metrics-stack-unit.sh
+
+  security-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+        with:
+          fetch-depth: 0
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/Red-Blink/dune-awakening-selfhost-docker.git
+      - name: Fetch upstream
+        run: git fetch upstream main
+      - name: Run security PR checks
+        run: bash tests/security-pr-checks.sh
+
+  api-dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: console/api/package-lock.json
+      - name: npm audit
+        run: npm audit --audit-level=high
+        working-directory: console/api

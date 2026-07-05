@@ -3,9 +3,10 @@ import { createServer as createNetServer } from "node:net";
 import { spawn } from "node:child_process";
 import { existsSync, writeFileSync, chmodSync, mkdirSync, createReadStream, readFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { loadConfig, publicConfig } from "./config.js";
+import { loadConfig, publicConfig, parseAllowedIps } from "./config.js";
 import { createAuth, setSessionCookie, clearSessionCookie, json, withSecurityHeaders } from "./auth.js";
 import { createLoginRateLimiter } from "./rateLimit.js";
+import { createBridgeRateLimiter } from "./bridgeRateLimit.js";
 import { TaskManager, publicTask } from "./tasks.js";
 import { preflight } from "./preflight.js";
 import { buildDuneArgs, isDynamicServerService, isReadOnlySql, parseVehicleList, runDockerLogs, runDune, validateServiceName } from "./runner.js";
@@ -36,6 +37,7 @@ import { persistSpicefieldOverride } from "./services/spicefieldOverrides.js";
 const config = loadConfig();
 const auth = createAuth(config);
 const loginRateLimiter = createLoginRateLimiter();
+const bridgeRateLimiter = createBridgeRateLimiter();
 const tasks = new TaskManager(config);
 let db = createDb(config);
 let carePackageAutoRunning = false;
@@ -59,6 +61,14 @@ process.on("unhandledRejection", (error) => {
 });
 
 createServer(async (req, res) => {
+  if (config.allowedIps.length) {
+    const remoteIp = (req.socket.remoteAddress || "").replace(/^::ffff:/, "");
+    if (!config.allowedIps.includes(remoteIp)) {
+      res.writeHead(403, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "Access denied: IP not in ADMIN_ALLOWED_IPS" }));
+      return;
+    }
+  }
   try {
     if (req.url?.startsWith("/api/")) {
       await handleApi(req, res);
@@ -71,6 +81,10 @@ createServer(async (req, res) => {
   }
 }).listen(config.port, config.host, () => {
   console.log(`${config.appName} API listening on http://${config.host}:${config.port}`);
+  if (config.host === "0.0.0.0") {
+    console.warn("Warning: ADMIN_BIND_HOST is 0.0.0.0 — the Web Console is reachable on all network interfaces.");
+    console.warn("Set ADMIN_BIND_HOST to a specific LAN IP and/or set ADMIN_ALLOWED_IPS to restrict access.");
+  }
   if (!config.authDisabled) {
     console.log("Initial admin password is stored in runtime/secrets/admin-web-password.txt");
   }
@@ -340,6 +354,8 @@ async function handleApi(req, res) {
   if (path === "/api/players") return dbJson(res, () => duneDb.listPlayers(db, { q: url.searchParams.get("q") || "" }));
   if (path === "/api/players/online") return dbJson(res, () => duneDb.listPlayers(db, { online: true }));
   if (path === "/api/players/search") return dbJson(res, () => duneDb.listPlayers(db, { q: url.searchParams.get("q") || "" }));
+  if (path === "/api/guilds") return dbJson(res, () => duneDb.listGuilds(db, { q: url.searchParams.get("q") || "" }));
+  if (path.match(/^\/api\/guilds\/[^/]+\/members$/)) return dbJson(res, () => duneDb.guildMembers(db, decodeURIComponent(path.split("/")[3])));
   if (path === "/api/admin/items/catalog") return json(res, 200, { rows: listCatalogItems(config.repoRoot, { q: url.searchParams.get("q") || "", limit: url.searchParams.get("limit") || 500 }) });
   if (path === "/api/admin/items/search") return commandJson(res, "adminItemSearch", { q: url.searchParams.get("q") || "" });
   if (path === "/api/admin/items") return commandJson(res, url.searchParams.get("category") ? "adminItemListCategory" : "adminItemList", { category: url.searchParams.get("category") || "" });
@@ -506,6 +522,13 @@ async function handleApi(req, res) {
 
 async function addonBridgeRoute(req, res, path) {
   const id = decodeURIComponent(path.split("/").at(-2));
+  const clientIp = (req.socket.remoteAddress || "unknown").replace(/^::ffff:/, "");
+  const key = `${id}:${clientIp}`;
+  const limit = bridgeRateLimiter.check(key);
+  if (!limit.allowed) {
+    return json(res, 429, { error: `Bridge rate limit exceeded. Try again in ${limit.retryAfterSeconds}s.` });
+  }
+  bridgeRateLimiter.record(key);
   const body = await readJson(req);
   const action = String(body.action || "").trim();
   if (action === "leadership.players.list") {
