@@ -237,7 +237,6 @@ MAP_FIELDS = {
     "guild_settings_max_guilds_allowed": ("/Script/DuneSandbox.GuildSettings", "m_MaxGuildsAllowed", "3"),
     "guild_settings_max_guild_members_allowed": ("/Script/DuneSandbox.GuildSettings", "m_MaxGuildMembersAllowed", "32"),
     "guild_settings_max_pending_invites": ("/Script/DuneSandbox.GuildSettings", "m_MaxPendingGuildInvitesAllowed", "10"),
-    "augment_minimum_item_quality": ("/Script/DuneSandbox.AugmentSettings", "m_MinimumAugmentableItemQuality", "0"),
     "augment_jackpot_roll_percentage": ("/Script/DuneSandbox.AugmentSettings", "m_JackpotRollPercentage", "0.950000"),
     "augment_max_ranged_weapon_augments": ("/Script/DuneSandbox.AugmentSettings", "m_MaxRangedWeaponAugments", "3"),
     "augment_max_melee_weapon_augments": ("/Script/DuneSandbox.AugmentSettings", "m_MaxMeleeWeaponAugments", "3"),
