@@ -85,9 +85,10 @@ export function PlayerDetailTab({
 
   function startEditItem(row: Record<string, unknown>) {
     setEditRow(row);
+    const hasCurrentAtLoad = row.current_durability != null;
     setEditValues(Object.fromEntries(EDITABLE_INVENTORY_COLUMNS.map((column) => {
-      const isDurability = column === "current_durability" || column === "max_durability";
-      if (isDurability && row[column] == null) return [column, ""];
+      if (column === "max_durability" && row.max_durability == null) return [column, hasCurrentAtLoad ? "100" : ""];
+      if (column === "current_durability" && row.current_durability == null) return [column, ""];
       return [column, serializeEditableDbValue(row[column])];
     })));
   }
@@ -97,8 +98,8 @@ export function PlayerDetailTab({
     const itemId = String(editRow.id || "");
     const templateId = String(editRow.template_id || "Unknown item");
 
-    const hasMax = editRow.max_durability != null;
     const hasCurrent = editRow.current_durability != null;
+    const hasMax = editRow.max_durability != null || hasCurrent;
     const maxDurability = hasMax ? Number(editValues.max_durability) : undefined;
     if (hasMax && (!Number.isFinite(maxDurability) || maxDurability! < 0 || maxDurability! > 100)) {
       setMessage("Max Durability must be a number between 0 and 100.");
@@ -147,17 +148,17 @@ export function PlayerDetailTab({
   }
 
   function renderEditPanel(row: Record<string, unknown>) {
+    const hasCurrentAtLoad = row.current_durability != null;
+    const hasMaxAtLoad = row.max_durability != null || hasCurrentAtLoad;
     return <div className="result-panel database-edit-panel">
       <div className="panel-title"><strong>Edit Inventory Item</strong></div>
       <p className="playerAdmin_note">Item ID: {String(row.id)} · {String(row.template_id)}</p>
       <div className="database-edit-grid">
         {EDITABLE_INVENTORY_COLUMNS.map((column) => {
+          const isDisabled = column === "current_durability" ? !hasCurrentAtLoad : column === "max_durability" ? !hasMaxAtLoad : false;
           const isDurability = column === "current_durability" || column === "max_durability";
-          const isNullDurability = isDurability && row[column] == null;
           return <label key={column}>{friendlyColumnName(column)}
-            {isDurability
-              ? <input type="number" step="any" min={0} max={column === "max_durability" ? 100 : undefined} value={editValues[column] || ""} disabled={isNullDurability} placeholder={isNullDurability ? "N/A" : undefined} onChange={(event) => setEditValues({ ...editValues, [column]: event.target.value })} />
-              : <textarea rows={2} value={editValues[column] || ""} onChange={(event) => setEditValues({ ...editValues, [column]: event.target.value })} />}
+            <input type="number" step="any" min={isDurability ? 0 : undefined} max={column === "max_durability" ? 100 : undefined} value={editValues[column] || ""} disabled={isDisabled} placeholder={isDisabled ? "N/A" : undefined} onChange={(event) => setEditValues({ ...editValues, [column]: event.target.value })} />
           </label>;
         })}
       </div>

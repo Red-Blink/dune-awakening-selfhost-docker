@@ -1528,8 +1528,8 @@ export async function playerInventory(db, id) {
            i.inventory_id,
            coalesce((i.stats->'FItemStackAndDurabilityStats'->1->>'CurrentDurability'), null) as current_durability,
            coalesce(
-             (i.stats->'FItemStackAndDurabilityStats'->1->>'MaxDurability'),
-             (i.stats->'FItemStackAndDurabilityStats'->1->>'DecayedMaxDurability'),
+             nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'MaxDurability')::numeric, 0),
+             nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'DecayedMaxDurability')::numeric, 0),
              null
            ) as max_durability,
            i.stats

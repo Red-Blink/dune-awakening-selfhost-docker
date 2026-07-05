@@ -915,14 +915,14 @@ test("live map services returns capability response when world partitions are mi
   assert.match(result.reason, /dune\.world_partition/);
 });
 
-test("player inventory selects DecayedMaxDurability as a max_durability fallback", async () => {
+test("player inventory selects DecayedMaxDurability as a max_durability fallback and hides a stored zero", async () => {
   const calls = [];
   const db = fakeMutationDb(calls);
   await playerInventory(db, 123);
   const select = calls.find((call) => call.text.includes("order by i.template_id"));
   assert.ok(select);
-  assert.match(select.text, /MaxDurability/);
-  assert.match(select.text, /DecayedMaxDurability/);
+  assert.match(select.text, /nullif\(\(i\.stats->'FItemStackAndDurabilityStats'->1->>'MaxDurability'\)::numeric, 0\)/);
+  assert.match(select.text, /nullif\(\(i\.stats->'FItemStackAndDurabilityStats'->1->>'DecayedMaxDurability'\)::numeric, 0\)/);
 });
 
 test("inventory delete verifies ownership before calling dune.delete_item", async () => {
