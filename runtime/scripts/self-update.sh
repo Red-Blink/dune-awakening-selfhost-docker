@@ -6,9 +6,43 @@ ROOT_DIR="$(pwd)"
 
 CURRENT_VERSION="dev"
 [ -f VERSION ] && CURRENT_VERSION="$(tr -d '[:space:]' < VERSION)"
+DEFAULT_SELF_UPDATE_REPO="Red-Blink/dune-awakening-selfhost-docker"
+
+normalize_github_remote_repo() {
+  local remote="$1"
+
+  case "$remote" in
+    https://github.com/*)
+      remote="${remote#https://github.com/}"
+      ;;
+    git@github.com:*)
+      remote="${remote#git@github.com:}"
+      ;;
+    ssh://git@github.com/*)
+      remote="${remote#ssh://git@github.com/}"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  remote="${remote%.git}"
+  remote="${remote%/}"
+  [ -n "$remote" ] || return 1
+  printf '%s\n' "$remote"
+}
+
+github_repo_from_git_remote() {
+  local remote_name="$1"
+  local remote
+
+  remote="$(git remote get-url "$remote_name" 2>/dev/null || true)"
+  [ -n "$remote" ] || return 1
+  normalize_github_remote_repo "$remote"
+}
 
 detect_github_repo() {
-  local remote
+  local remote_name repo
 
   if [ -n "${DUNE_SELF_UPDATE_REPO:-}" ]; then
     printf '%s\n' "$DUNE_SELF_UPDATE_REPO"
@@ -16,27 +50,49 @@ detect_github_repo() {
   fi
 
   if command -v git >/dev/null 2>&1; then
-    remote="$(git remote get-url origin 2>/dev/null || true)"
-    case "$remote" in
-      https://github.com/*)
-        remote="${remote#https://github.com/}"
-        remote="${remote%.git}"
-        printf '%s\n' "$remote"
+    for remote_name in upstream origin; do
+      repo="$(github_repo_from_git_remote "$remote_name" 2>/dev/null || true)"
+      if [ "$repo" = "$DEFAULT_SELF_UPDATE_REPO" ]; then
+        printf '%s\n' "$repo"
         return 0
-        ;;
-      git@github.com:*)
-        remote="${remote#git@github.com:}"
-        remote="${remote%.git}"
-        printf '%s\n' "$remote"
-        return 0
-        ;;
-    esac
+      fi
+    done
+
+    repo="$(github_repo_from_git_remote upstream 2>/dev/null || true)"
+    if [ -n "$repo" ]; then
+      printf '%s\n' "$repo"
+      return 0
+    fi
+
+    repo="$(github_repo_from_git_remote origin 2>/dev/null || true)"
+    if [ -n "$repo" ]; then
+      printf '%s\n' "$repo"
+      return 0
+    fi
   fi
 
-  printf '%s\n' "Red-Blink/dune-awakening-selfhost-docker"
+  printf '%s\n' "$DEFAULT_SELF_UPDATE_REPO"
+}
+
+detect_github_fetch_remote() {
+  local repo="$1"
+  local remote_name remote_repo
+
+  if command -v git >/dev/null 2>&1; then
+    for remote_name in upstream origin; do
+      remote_repo="$(github_repo_from_git_remote "$remote_name" 2>/dev/null || true)"
+      if [ "$remote_repo" = "$repo" ]; then
+        printf '%s\n' "$remote_name"
+        return 0
+      fi
+    done
+  fi
+
+  printf '%s\n' "https://github.com/${repo}.git"
 }
 
 GITHUB_REPO="$(detect_github_repo)"
+GITHUB_FETCH_REMOTE="$(detect_github_fetch_remote "$GITHUB_REPO")"
 GITHUB_API_BASE="${DUNE_SELF_UPDATE_API_BASE:-https://api.github.com}"
 GITHUB_TOKEN="${DUNE_SELF_UPDATE_TOKEN:-}"
 LATEST_TAG_CACHE_FILE="runtime/generated/self-update-latest-tag.txt"
@@ -846,12 +902,12 @@ install_release_tag_with_git() {
     exit 2
   }
 
-  remote="$(git remote get-url origin 2>/dev/null || true)"
+  remote="$GITHUB_FETCH_REMOTE"
   echo "Updating stack Git checkout from:"
   echo "  $remote"
   echo "Fetching release tag: $tag"
-  git fetch --force --tags origin
-  git fetch --force origin "refs/tags/${tag}:refs/tags/${tag}" >/dev/null 2>&1 || true
+  git fetch --force --tags "$remote"
+  git fetch --force "$remote" "refs/tags/${tag}:refs/tags/${tag}" >/dev/null 2>&1 || true
 
   target="$(git rev-parse -q --verify "refs/tags/${tag}^{commit}" 2>/dev/null || true)"
   if [ -z "$target" ]; then
@@ -945,13 +1001,13 @@ case "$cmd" in
     ;;
 
   check|status)
-    echo "Current stack version: $CURRENT_VERSION"
     set +e
     latest="$(latest_release_tag)"
     rc=$?
     set -e
 
     if [ "$rc" -ne 0 ] || [ -z "${latest:-}" ]; then
+      echo "Current stack version: $CURRENT_VERSION"
       echo "Latest release:        unknown"
       echo "GitHub repo:           $GITHUB_REPO"
       echo
