@@ -29,6 +29,7 @@ import {
 
 const MAX_INTEL_POINTS = 2779;
 const MAX_TABLE_PREVIEW_ROWS = 10000;
+const INVENTORY_EDITABLE_COLUMNS = new Set(["stack_size", "quality_level", "position_index", "current_durability", "max_durability"]);
 let craftingRecipeCatalogCache = null;
 
 export class UnsupportedCapabilityError extends Error {
@@ -2543,8 +2544,7 @@ export async function deleteInventoryItem(db, playerId, itemId) {
 export async function updateInventoryItem(db, playerId, itemId, values) {
   await requireCapability(await supportsInventoryEdit(db), "Inventory edit requires dune.items and dune.inventories.");
   const safeItemId = intParam(itemId, "item id", 1);
-  const nextValues = { ...values };
-  delete nextValues.template_id;
+  const nextValues = Object.fromEntries(Object.entries(values || {}).filter(([key]) => INVENTORY_EDITABLE_COLUMNS.has(key)));
   return db.transaction(async (tx) => {
     const player = await resolvePlayerMutationTarget(tx, playerId);
     const owned = await tx.query(`

@@ -992,6 +992,31 @@ test("inventory update strips template_id even if explicitly submitted", async (
   assert.doesNotMatch(updateCall.text, /"template_id"/);
 });
 
+test("inventory update whitelists editable columns and rejects id, inventory_id, template_id, and raw stats", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.actors a")) return { rows: [{ actor_id: 123, account_id: 44, controller_id: 55, player_state_id: 5, online_status: "Offline" }] };
+      if (text.includes("where i.id = $1 and inv.actor_id = $2")) return { rows: [{ id: 99, stats: { FCustomizationStats: [[], {}], FItemStackAndDurabilityStats: [[], {}] } }] };
+      if (text.includes("pg_index")) return { rows: [{ name: "id" }] };
+      if (text.includes("information_schema.columns")) return { rows: [{ name: "id" }, { name: "inventory_id" }, { name: "template_id" }, { name: "stats" }, { name: "quality_level" }] };
+      return { rows: [], rowCount: 1 };
+    },
+    transaction: async (fn) => fn(db)
+  };
+  await updateInventoryItem(db, 123, 99, { id: 99, inventory_id: 7, template_id: "Hacked_Item", stats: { FCustomizationStats: [[], { color: "hacked" }] }, quality_level: "5" });
+  const updateCall = calls.find((call) => String(call.text).startsWith("update"));
+  assert.ok(updateCall);
+  const setClause = updateCall.text.split(" where ")[0];
+  assert.match(setClause, /"quality_level"/);
+  assert.doesNotMatch(setClause, /"id"\s*=/);
+  assert.doesNotMatch(setClause, /"inventory_id"/);
+  assert.doesNotMatch(setClause, /"template_id"/);
+  assert.doesNotMatch(setClause, /"stats"/);
+});
+
 test("inventory update rejects max_durability outside the 0-100 range", async () => {
   const calls = [];
   const db = fakeMutationDb(calls, {

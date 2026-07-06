@@ -6,7 +6,7 @@ import { TechnicalDetails } from "../../components/common/DisplayPrimitives";
 import { formatUiSentence, friendlyColumnName } from "../../lib/display";
 import { serializeEditableDbValue, parseEditableDbValue } from "../../lib/dbValues";
 
-const EDITABLE_INVENTORY_COLUMNS = ["stack_size", "quality_level", "position_index", "inventory_id", "current_durability", "max_durability"];
+const EDITABLE_INVENTORY_COLUMNS = ["stack_size", "quality_level", "position_index", "current_durability", "max_durability"];
 
 type ConfirmAction = (
   message: string,
