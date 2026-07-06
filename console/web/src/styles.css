@@ -1441,8 +1441,8 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 .landsraad-persistent-status .inline-action-result { display: inline-flex; align-items: center; min-height: 24px; line-height: 1.2; white-space: nowrap; }
 .landsraad-persistent-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; min-width: min(100%, 460px); }
 .landsraad-persistent-controls label { display: inline-flex; flex-direction: row; gap: 8px; align-items: center; min-width: 0; color: #ceb894; font-size: 1rem; font-weight: 400; }
-.landsraad-persistent-controls select { width: 150px; height: 38px; font-size: 1rem; }
-.landsraad-persistent-controls button { height: 38px; }
+.landsraad-persistent-controls select { flex: 0 1 180px; height: auto; }
+.landsraad-persistent-controls button { height: auto; }
 .landsraad-section-divider { margin-top: 2px; }
 .landsraad-task-table th, .landsraad-task-table td,
 .landsraad-reward-table th, .landsraad-reward-table td { vertical-align: middle; }
