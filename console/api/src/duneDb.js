@@ -3595,3 +3595,88 @@ export async function addonOpsCombatDeaths(db) {
 function emptyCombatDeaths() {
   return { totalDeaths: 0, pvpDeaths: 0, pveDeaths: 0, deathsByCause: [], deathsByMap: [], topHostileNpcs: [], kdRatio: null };
 }
+
+export async function addonOpsEconomySummary(db) {
+  let totalCurrencyHolders = 0;
+  let totalSupply = 0;
+  let currencyBreakdown = [];
+
+  try {
+    const currencyExists = await tableExists(db, "player_virtual_currency_balances");
+    if (currencyExists) {
+      const result = await db.query(`
+        select count(distinct player_controller_id)::int as holders,
+               coalesce(sum(balance), 0)::bigint as total_supply
+        from dune.player_virtual_currency_balances`);
+      const r = result.rows?.[0] || {};
+      totalCurrencyHolders = Number(r.holders || 0);
+      totalSupply = Number(r.total_supply || 0);
+
+      const breakdown = await db.query(`
+        select currency_id::text as currency_id,
+               count(distinct player_controller_id)::int as holders,
+               coalesce(sum(balance), 0)::bigint as supply,
+               coalesce(round(avg(balance)), 0)::bigint as avg_balance,
+               coalesce(min(balance), 0)::bigint as min_balance,
+               coalesce(max(balance), 0)::bigint as max_balance
+        from dune.player_virtual_currency_balances
+        group by currency_id
+        order by supply desc`);
+      currencyBreakdown = breakdown.rows || [];
+    }
+  } catch { }
+
+  let activeOrders = 0;
+  let fulfilledOrders = 0;
+  let topTradedItems = [];
+
+  try {
+    const ordersExist = await tableExists(db, "dune_exchange_orders");
+    const fulfilledExist = await tableExists(db, "dune_exchange_fulfilled_orders");
+    if (ordersExist) {
+      const ordersResult = await db.query(`select count(*)::int as count from dune.dune_exchange_orders`);
+      activeOrders = Number(ordersResult.rows?.[0]?.count || 0);
+
+      const topResult = await db.query(`
+        select coalesce(template_id, 'Unknown') as template_id,
+               count(*)::int as orders,
+               coalesce(round(avg(item_price)), 0)::bigint as avg_price,
+               coalesce(min(item_price), 0)::bigint as min_price,
+               coalesce(max(item_price), 0)::bigint as max_price
+        from dune.dune_exchange_orders
+        group by template_id
+        order by orders desc
+        limit 20`);
+      topTradedItems = topResult.rows || [];
+    }
+    if (fulfilledExist) {
+      const fulfilledResult = await db.query(`select count(*)::int as count from dune.dune_exchange_fulfilled_orders`);
+      fulfilledOrders = Number(fulfilledResult.rows?.[0]?.count || 0);
+    }
+  } catch { }
+
+  let taxCollected = 0;
+  try {
+    const taxExists = await tableExists(db, "tax_invoice");
+    if (taxExists) {
+      const taxResult = await db.query(`
+        select coalesce(sum(amount), 0)::bigint as total
+        from dune.tax_invoice`);
+      taxCollected = Number(taxResult.rows?.[0]?.total || 0);
+    }
+  } catch { }
+
+  return {
+    totalCurrencyHolders,
+    totalSupply,
+    activeOrders,
+    fulfilledOrders,
+    taxCollected,
+    currencyBreakdown,
+    topTradedItems
+  };
+}
+
+function emptyEconomySummary() {
+  return { totalCurrencyHolders: 0, totalSupply: 0, activeOrders: 0, fulfilledOrders: 0, taxCollected: 0, currencyBreakdown: [], topTradedItems: [] };
+}
