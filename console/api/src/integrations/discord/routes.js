@@ -14,7 +14,7 @@ async function defaultPopulationProvider(config) {
     const status = await discordStatusProvider(config);
     const population = status?.population;
     if (population !== undefined) return parsePopulationValue(population);
-    
+
     // Fallback: scan raw status for population-like fields
     if (status && typeof status === "object") {
       for (const [key, val] of Object.entries(status)) {
