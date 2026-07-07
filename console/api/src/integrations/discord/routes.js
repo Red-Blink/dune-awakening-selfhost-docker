@@ -6,16 +6,54 @@ import {
   discordAdapterStatus, DISCORD_ADAPTER_ROUTES, DISCORD_PLANNED_ADAPTER_ROUTES
 } from "./adapter.js";
 import { policyError } from "./policy.js";
+import { discordStatusProvider } from "./statusProvider.js";
+import { discordReadinessProvider, discordServicesProvider } from "./readOnlyProviders.js";
+
+async function defaultPopulationProvider(config) {
+  try {
+    const status = await discordStatusProvider(config);
+    const population = status?.population;
+    if (population !== undefined) return parsePopulationValue(population);
+
+    // Fallback: scan raw status for population-like fields
+    if (status && typeof status === "object") {
+      for (const [key, val] of Object.entries(status)) {
+        if (/pop/i.test(key) && typeof val === "string") {
+          return parsePopulationValue(val);
+        }
+        if (typeof val === "object" && val !== null) {
+          for (const [k2, v2] of Object.entries(val)) {
+            if (/pop/i.test(k2) && typeof v2 === "string") {
+              return parsePopulationValue(v2);
+            }
+          }
+        }
+      }
+    }
+    return { onlinePlayers: "unknown", totalPlayers: "unknown", aggregate: true, detailsSuppressed: true };
+  } catch {
+    return { onlinePlayers: "unknown", totalPlayers: "unknown", aggregate: true, detailsSuppressed: true };
+  }
+}
+
+function parsePopulationValue(value = "") {
+  const text = String(value).trim();
+  const match = text.match(/(\d+)\s*\/?\s*(\d+)/);
+  if (match) return { onlinePlayers: Number(match[1]), totalPlayers: match[2] ? Number(match[2]) : 0, aggregate: true, detailsSuppressed: true };
+  const num = Number(text);
+  if (Number.isFinite(num)) return { onlinePlayers: num, totalPlayers: 0, aggregate: true, detailsSuppressed: true };
+  return { onlinePlayers: "unknown", totalPlayers: "unknown", aggregate: true, detailsSuppressed: true };
+}
 
 export function isDiscordAdapterRoute(path) {
   return Object.values(DISCORD_ADAPTER_ROUTES).includes(path);
 }
 
 export async function handleDiscordAdapterRoute({ req, res, path, config, readJson, json, statusProvider, readinessProvider, servicesProvider, populationProvider }) {
-  const safeStatusProvider = typeof statusProvider === "function" ? statusProvider : async () => ({});
-  const safeReadinessProvider = typeof readinessProvider === "function" ? readinessProvider : async () => ({ ready: true });
-  const safeServicesProvider = typeof servicesProvider === "function" ? servicesProvider : async () => ({ services: [] });
-  const safePopulationProvider = typeof populationProvider === "function" ? populationProvider : async () => ({ onlinePlayers: 0 });
+  const safeStatusProvider = typeof statusProvider === "function" ? statusProvider : () => discordStatusProvider(config);
+  const safeReadinessProvider = typeof readinessProvider === "function" ? readinessProvider : () => discordReadinessProvider(config);
+  const safeServicesProvider = typeof servicesProvider === "function" ? servicesProvider : () => discordServicesProvider(config);
+  const safePopulationProvider = typeof populationProvider === "function" ? populationProvider : () => defaultPopulationProvider(config);
   try {
     if (!discordAdapterEnabled(config)) throw policyError("adapter_disabled", "Discord adapter is disabled.", 404);
     requireDiscordBotToken(req, config);

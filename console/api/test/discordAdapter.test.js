@@ -189,3 +189,82 @@ test("formats safe adapter errors", () => {
   assert.equal(response.body.code, "bad_request");
   assert.doesNotMatch(response.body.error, /127\.0\.0\.1/);
 });
+
+// Server route integration test — exercises handleDiscordAdapterRoute through a live HTTP server
+import { createServer } from "node:http";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { handleDiscordAdapterRoute } from "../src/integrations/discord/routes.js";
+
+test("adapter routes respond through mounted HTTP server path", async () => {
+  const tokenFile = "/tmp/discord-adapter-test-token.txt";
+  writeFileSync(tokenFile, "server-test-token");
+  const testConfig = { discordBotApiTokenFile: tokenFile, discordAdapterEnabled: true, auditLog: "/tmp/discord-adapter-test-audit.jsonl", generatedDir: "/tmp/discord-adapter-test-generated" };
+
+  // Mock providers so routes return 200 without requiring a running Dune server
+  const mockStatus = async () => ({ ok: true, summary: { overall: "OK", region: "us", mode: "pve", population: "8/128" } });
+  const mockReadiness = async () => ({ ready: true, overall: "READY", issues: [] });
+  const mockServices = async () => ({ overall: "OK", services: [{ name: "Database", status: "up" }] });
+  const mockPopulation = async () => ({ onlinePlayers: 8, totalPlayers: 128, aggregate: true, detailsSuppressed: true });
+
+  try {
+    await new Promise((resolve, reject) => {
+      const server = createServer(async (req, res) => {
+        const url = new URL(req.url || "/", "http://local");
+        const path = url.pathname;
+        const readJson = async () => {
+          const chunks = [];
+          for await (const chunk of req) chunks.push(chunk);
+          return Buffer.concat(chunks).length ? JSON.parse(Buffer.concat(chunks).toString()) : {};
+        };
+        const json = (r, code, body) => { r.writeHead(code, { "content-type": "application/json" }); r.end(JSON.stringify(body)); };
+        await handleDiscordAdapterRoute({
+          req, res, path, config: testConfig, readJson, json,
+          statusProvider: mockStatus,
+          readinessProvider: mockReadiness,
+          servicesProvider: mockServices,
+          populationProvider: mockPopulation
+        });
+      });
+      const auth = { authorization: "Bearer server-test-token" };
+
+      server.listen(async () => {
+        try {
+          const base = `http://127.0.0.1:${server.address().port}`;
+
+          // Health
+          const health = await (await fetch(`${base}/api/integrations/discord/health`, { headers: auth })).json();
+          assert.equal(health.ok, true);
+          assert.equal(health.enabled, true);
+
+          // Status
+          const status = await (await fetch(`${base}/api/integrations/discord/status`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ actor: actor(["role-observer"]) }) })).json();
+          assert.equal(status.ok, true);
+
+          // Readiness
+          const readiness = await (await fetch(`${base}/api/integrations/discord/readiness`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ actor: actor(["role-observer"]) }) })).json();
+          assert.equal(readiness.ok, true);
+
+          // Services
+          const services = await (await fetch(`${base}/api/integrations/discord/services`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ actor: actor(["role-observer"]) }) })).json();
+          assert.equal(services.ok, true);
+          assert.ok(Array.isArray(services.result.services));
+
+          // Population
+          const pop = await (await fetch(`${base}/api/integrations/discord/population`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ actor: actor(["role-moderator"]) }) })).json();
+          assert.equal(pop.ok, true);
+
+          // Auth: 401 without token
+          assert.equal((await fetch(`${base}/api/integrations/discord/health`)).status, 401);
+
+          // Auth: 404 unknown route
+          assert.equal((await fetch(`${base}/api/integrations/discord/nonexistent`, { headers: auth })).status, 404);
+
+          server.close();
+          resolve();
+        } catch (e) { server.close(); reject(e); }
+      });
+    });
+  } finally {
+    try { unlinkSync(tokenFile); } catch {}
+  }
+});
