@@ -8,6 +8,11 @@ import {
 import { policyError } from "./policy.js";
 import { discordStatusProvider } from "./statusProvider.js";
 import { discordReadinessProvider, discordServicesProvider } from "./readOnlyProviders.js";
+import {
+  opsActivityProvider, opsCombatProvider, opsResourcesProvider,
+  opsEconomyProvider, opsInventoryProvider, opsLocationProvider,
+  opsSocProvider, opsPrometheusProvider, opsDashboardProvider
+} from "./opsProvider.js";
 
 async function defaultPopulationProvider(config) {
   try {
@@ -99,7 +104,7 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
       }));
     }
 
-    // OPS observability routes (planned — bridge integration pending)
+    // OPS observability routes — wired to provider stubs
     const OPS_PATHS = [
       DISCORD_ADAPTER_ROUTES.OPS_ACTIVITY,
       DISCORD_ADAPTER_ROUTES.OPS_COMBAT,
@@ -112,15 +117,25 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
       DISCORD_ADAPTER_ROUTES.OPS_DASHBOARD
     ];
 
+    const OPS_PROVIDERS = {
+      [DISCORD_ADAPTER_ROUTES.OPS_ACTIVITY]: opsActivityProvider,
+      [DISCORD_ADAPTER_ROUTES.OPS_COMBAT]: opsCombatProvider,
+      [DISCORD_ADAPTER_ROUTES.OPS_RESOURCES]: opsResourcesProvider,
+      [DISCORD_ADAPTER_ROUTES.OPS_ECONOMY]: opsEconomyProvider,
+      [DISCORD_ADAPTER_ROUTES.OPS_INVENTORY]: opsInventoryProvider,
+      [DISCORD_ADAPTER_ROUTES.OPS_LOCATION]: opsLocationProvider,
+      [DISCORD_ADAPTER_ROUTES.OPS_SOC]: opsSocProvider,
+      [DISCORD_ADAPTER_ROUTES.OPS_PROMETHEUS]: opsPrometheusProvider,
+      [DISCORD_ADAPTER_ROUTES.OPS_DASHBOARD]: opsDashboardProvider,
+    };
+
     if (OPS_PATHS.includes(path) && req.method === "POST") {
       const body = await readJson(req);
-      return json(res, 200, {
-        ok: true,
-        status: "planned",
-        route: path,
-        message: "OPS observability route is planned. Bridge integration pending. See yacketrj/dune-ops-observability-addon.",
-        actor: body.actor ? { userId: body.actor.userId } : null
-      });
+      const provider = OPS_PROVIDERS[path];
+      if (provider) {
+        return json(res, 200, await provider(config));
+      }
+      return json(res, 200, { ok: false, error: `OPS provider not found for: ${path}` });
     }
 
     // Broadcast route
