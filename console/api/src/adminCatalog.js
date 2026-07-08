@@ -48,6 +48,7 @@ export function itemRequiresDatabaseGrant(item = {}) {
   return category === "schematics" ||
     source === "schematics" ||
     category.includes("augment") ||
+    source.includes("augment") ||
     /^schematic(pattern|_)/i.test(id) ||
     /_schematic$/i.test(id) ||
     /schematic$/i.test(id);
