@@ -33,6 +33,7 @@ import { liveItemGrantOk, liveItemGrantWarning } from "./grantResults.js";
 import { primeMessageOfTheDayOnlineState, readMessageOfTheDay, restoreMessageOfTheDay, runMessageOfTheDayScan, saveMessageOfTheDay } from "./services/messageOfTheDay.js";
 import { primePlayerAnnouncementOnlineState, readPlayerAnnouncements, restorePlayerAnnouncements, runPlayerAnnouncementScan, savePlayerAnnouncements } from "./services/playerAnnouncements.js";
 import { persistSpicefieldOverride } from "./services/spicefieldOverrides.js";
+import { exportBlueprint, importBlueprint, listBlueprints } from "./blueprints.js";
 
 const config = loadConfig();
 const auth = createAuth(config);
@@ -459,6 +460,9 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/storage\/[^/]+\/items$/)) return dbJson(res, () => duneDb.storageItems(db, decodeURIComponent(path.split("/")[3])));
   if (path.match(/^\/api\/storage\/[^/]+\/give-item$/) && req.method === "POST") return storageGiveItemRoute(req, res, path);
   if (path.match(/^\/api\/storage\/[^/]+\/export$/)) return exportJson(res, `storage-${decodeURIComponent(path.split("/")[3])}.json`, () => duneDb.storageItems(db, decodeURIComponent(path.split("/")[3])));
+  if (path === "/api/blueprints" && req.method === "GET") return dbJson(res, () => listBlueprints(db));
+  if (path.match(/^\/api\/blueprints\/([^/]+)\/export$/) && req.method === "GET") return blueprintExportRoute(req, res, path);
+  if (path === "/api/blueprints/import" && req.method === "POST") return blueprintImportRoute(req, res);
   if (path === "/api/care-package/capabilities") return json(res, 200, carePackageCapabilities());
   if (path === "/api/care-package/config" && req.method === "POST") return carePackageConfigRoute(req, res);
   if (path === "/api/care-package/config") return json(res, 200, carePackageConfig(config));
@@ -1575,6 +1579,58 @@ async function storageGiveItemRoute(req, res, path) {
     const resolved = resolveCatalogItem(config.repoRoot, body);
     return duneDb.giveItemToStorage(db, storageId, { ...body, templateId: resolved.itemId });
   }, { storageId });
+}
+
+async function blueprintExportRoute(req, res, path) {
+  const idPart = decodeURIComponent(path.split("/")[3]);
+  const blueprintId = Number(idPart);
+  if (!Number.isFinite(blueprintId) || blueprintId < 1) return json(res, 400, { error: "Invalid blueprint ID" });
+  try {
+    const data = await exportBlueprint(db, blueprintId);
+    const filename = data.name ? `${sanitizeBlueprintFilename(data.name)}.json` : `blueprint_${blueprintId}.json`;
+    res.writeHead(200, {
+      "content-type": "application/json; charset=utf-8",
+      "content-disposition": `attachment; filename="${filename}"`
+    });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    const status = error.unsupported ? 501 : 500;
+    return json(res, status, { ok: false, error: redact(error.message || error) });
+  }
+}
+
+async function blueprintImportRoute(req, res) {
+  if (!config.mockMode) {
+    return json(res, 501, { error: "Blueprint import is not available in mockMode=false. Import writes directly to the game database and requires a fully connected server." });
+  }
+  try {
+    const { fields, files } = await readMultipartForm(req, 32 << 20);
+    const playerIdStr = fields.player_id;
+    const playerPawnId = Number(playerIdStr);
+    if (!Number.isFinite(playerPawnId) || playerPawnId < 1) return json(res, 400, { error: "Invalid player_id" });
+    const fileEntry = Array.isArray(files.file) ? files.file[0] : files.file;
+    if (!fileEntry) return json(res, 400, { error: "Blueprint file required" });
+    const fileContent = typeof fileEntry === "string" ? fileEntry : fileEntry.toString("utf-8");
+    let blueprintFile;
+    try {
+      blueprintFile = JSON.parse(fileContent);
+    } catch {
+      return json(res, 400, { error: "Invalid blueprint JSON" });
+    }
+    if (!blueprintFile.instances?.length && !blueprintFile.placeables?.length) {
+      return json(res, 400, { error: "Blueprint has no instances or placeables" });
+    }
+    const result = await importBlueprint(db, playerPawnId, blueprintFile);
+    audit(config, req, "blueprints.import", { playerPawnId, result });
+    return json(res, 200, result);
+  } catch (error) {
+    if (error.unsupported) return json(res, 501, { supported: false, error: redact(error.message || error) });
+    return json(res, 500, { ok: false, error: redact(error.message || error) });
+  }
+}
+
+function sanitizeBlueprintFilename(s) {
+  return String(s).replace(/[\x00-\x1f\x7f<>:"/\\|?*]/g, "_").trim() || "blueprint";
 }
 
 async function directDbMutation(req, res, action, phrase, fn, meta = {}) {
