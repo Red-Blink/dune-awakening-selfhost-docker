@@ -1,18 +1,17 @@
 // Broadcast Provider — sends in-game messages via dune CLI.
-// Wraps dune admin broadcast-restart-warning for now; extendable
-// to full message broadcast when game server integration supports it.
+// Uses dune admin broadcast for in-game server messages.
+// Gate: requires DUNE_DISCORD_WRITES_ENABLED and admin capability.
 
 import { buildDuneArgs, runDune } from "../../runner.js";
 import { sanitizeDiscordValue } from "./sanitize.js";
 
 export async function broadcastProvider(config, { message } = {}) {
-  if (!message) {
+  if (!message || !String(message).trim()) {
     return { ok: false, error: "Broadcast message is required." };
   }
 
   try {
-    // Use the admin-broadcast operation
-    const args = ["admin", "broadcast-restart-warning", String(message).slice(0, 100)];
+    const args = ["admin", "broadcast", String(message).slice(0, 200)];
     const result = await runDune(config, args, {
       timeoutMs: 30000,
       allowedExitCodes: [0]
