@@ -29,3 +29,6 @@ console/web/dist/
 __pycache__/
 *.pyc
 .security-reports/
+
+# Added by ggshield
+.cache_ggshield

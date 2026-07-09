@@ -54,7 +54,7 @@ function blueprintItemStatsJSON(blueprintId, name) {
 }
 
 export async function blueprintCapabilities(db) {
-  const tables = ["building_blueprints", "building_blueprint_instances", "building_blueprint_placeables", "items", "inventories"];
+  const tables = ["building_blueprints", "building_blueprint_instances", "building_blueprint_placeables", "building_blueprint_pentashields", "items", "inventories"];
   const allExist = await Promise.all(tables.map((t) => tableExistsGeneric(db, t)));
   return allExist.every(Boolean);
 }

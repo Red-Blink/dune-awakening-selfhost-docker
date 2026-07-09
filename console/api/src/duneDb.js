@@ -3364,16 +3364,14 @@ export async function discordPlayerLinksTableCreate(db) {
 
 export async function resolvePlayerByName(db, characterName) {
   const result = await db.query(`
-    select player_controller_id,
-           account_id,
+    select player_controller_id::text as player_controller_id,
            character_name,
-           player_pawn_id,
-           online_status
+           player_pawn_id::text as player_pawn_id,
+           coalesce(online_status::text, 'Offline') as online_status
     from dune.player_state
     where lower(character_name) = lower($1)
-    order by player_controller_id
-    limit 1`, [String(characterName).trim()]);
-  return result.rows[0] || null;
+    order by player_controller_id`, [String(characterName).trim()]);
+  return result.rows;
 }
 
 export async function getLinkedPlayer(db, discordUserId) {
