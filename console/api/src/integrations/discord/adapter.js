@@ -22,7 +22,16 @@ export const DISCORD_ADAPTER_ROUTES = Object.freeze({
   OPS_LOCATION: "/api/integrations/discord/ops/location",
   OPS_SOC: "/api/integrations/discord/ops/soc",
   OPS_PROMETHEUS: "/api/integrations/discord/ops/prometheus",
-  OPS_DASHBOARD: "/api/integrations/discord/ops/dashboard"
+  OPS_DASHBOARD: "/api/integrations/discord/ops/dashboard",
+  PLAYERS_LINK: "/api/integrations/discord/players/link",
+  PLAYERS_UNLINK: "/api/integrations/discord/players/unlink",
+  PLAYERS_ME: "/api/integrations/discord/players/me",
+  PLAYERS_INVENTORY: "/api/integrations/discord/players/inventory",
+  PLAYERS_STORAGE: "/api/integrations/discord/players/storage",
+  PLAYERS_FIND: "/api/integrations/discord/players/find",
+  PLAYERS_INVENTORY_SEARCH: "/api/integrations/discord/players/inventory/search",
+  GUILD_STORAGE: "/api/integrations/discord/guild/storage",
+  GUILD_FIND: "/api/integrations/discord/guild/find"
 });
 
 export const DISCORD_LIVE_ADAPTER_ROUTES = Object.freeze([
@@ -32,7 +41,16 @@ export const DISCORD_LIVE_ADAPTER_ROUTES = Object.freeze([
   DISCORD_ADAPTER_ROUTES.SERVICES,
   DISCORD_ADAPTER_ROUTES.POPULATION,
   DISCORD_ADAPTER_ROUTES.BROADCAST,
-  DISCORD_ADAPTER_ROUTES.ANNOUNCEMENTS
+  DISCORD_ADAPTER_ROUTES.ANNOUNCEMENTS,
+  DISCORD_ADAPTER_ROUTES.PLAYERS_LINK,
+  DISCORD_ADAPTER_ROUTES.PLAYERS_UNLINK,
+  DISCORD_ADAPTER_ROUTES.PLAYERS_ME,
+  DISCORD_ADAPTER_ROUTES.PLAYERS_INVENTORY,
+  DISCORD_ADAPTER_ROUTES.PLAYERS_STORAGE,
+  DISCORD_ADAPTER_ROUTES.PLAYERS_FIND,
+  DISCORD_ADAPTER_ROUTES.PLAYERS_INVENTORY_SEARCH,
+  DISCORD_ADAPTER_ROUTES.GUILD_STORAGE,
+  DISCORD_ADAPTER_ROUTES.GUILD_FIND
 ]);
 
 export const DISCORD_PLANNED_ADAPTER_ROUTES = Object.freeze(

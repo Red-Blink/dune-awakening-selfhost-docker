@@ -255,7 +255,7 @@ async function handleApi(req, res) {
     return json(res, 200, { ok: true });
   }
   if (isDiscordAdapterRoute(path)) {
-    return handleDiscordAdapterRoute({ req, res, path, config, readJson, json });
+    return handleDiscordAdapterRoute({ req, res, path, config, readJson, json, db });
   }
 
   const session = auth.requireAuth(req, res);

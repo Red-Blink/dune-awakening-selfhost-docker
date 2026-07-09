@@ -7,7 +7,10 @@ export const DISCORD_CAPABILITIES = Object.freeze({
   POPULATION_READ: "population:read",
   LOGS_READ: "logs:read",
   MAPS_READ: "maps:read",
-  BACKUPS_READ: "backups:read"
+  BACKUPS_READ: "backups:read",
+  INVENTORY_READ: "inventory:read",
+  STORAGE_READ: "storage:read",
+  GUILD_READ: "guild:read"
 });
 
 export const EXPERIMENTAL_READ_ONLY_CAPABILITIES = Object.freeze(new Set(Object.values(DISCORD_CAPABILITIES)));
@@ -25,7 +28,9 @@ const CAPABILITY_BY_TIER = Object.freeze({
     DISCORD_CAPABILITIES.SERVICES_READ,
     DISCORD_CAPABILITIES.POPULATION_READ,
     DISCORD_CAPABILITIES.MAPS_READ,
-    DISCORD_CAPABILITIES.BACKUPS_READ
+    DISCORD_CAPABILITIES.BACKUPS_READ,
+    DISCORD_CAPABILITIES.INVENTORY_READ,
+    DISCORD_CAPABILITIES.GUILD_READ
   ]),
   admin: new Set(Object.values(DISCORD_CAPABILITIES)),
   owner: new Set(Object.values(DISCORD_CAPABILITIES))

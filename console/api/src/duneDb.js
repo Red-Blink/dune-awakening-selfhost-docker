@@ -3352,3 +3352,203 @@ export async function addonOpsHealthSummaryV2(db) {
 export async function addonOpsHealthSummary(db) {
   return addonOpsHealthSummaryV2(db);
 }
+
+export async function discordPlayerLinksTableCreate(db) {
+  await db.query(`
+    create table if not exists dune.discord_player_links (
+      discord_user_id text primary key,
+      player_controller_id bigint not null,
+      linked_at timestamp with time zone default now()
+    )`);
+}
+
+export async function resolvePlayerByName(db, characterName) {
+  const result = await db.query(`
+    select player_controller_id,
+           account_id,
+           character_name,
+           player_pawn_id,
+           online_status
+    from dune.player_state
+    where lower(character_name) = lower($1)
+    order by player_controller_id
+    limit 1`, [String(characterName).trim()]);
+  return result.rows[0] || null;
+}
+
+export async function getLinkedPlayer(db, discordUserId) {
+  await discordPlayerLinksTableCreate(db);
+  const result = await db.query(`
+    select dpl.discord_user_id,
+           dpl.player_controller_id::text as controller_id,
+           coalesce(ps.character_name, '') as character_name,
+           coalesce(ps.player_pawn_id, 0) as player_pawn_id,
+           coalesce(ps.online_status::text, 'Offline') as online_status
+    from dune.discord_player_links dpl
+    join dune.player_state ps on ps.player_controller_id = dpl.player_controller_id
+    where dpl.discord_user_id = $1
+    limit 1`, [String(discordUserId)]);
+  return result.rows[0] || null;
+}
+
+export async function discordPlayerLink(db, discordUserId, playerControllerId) {
+  await discordPlayerLinksTableCreate(db);
+  await db.query("delete from dune.discord_player_links where player_controller_id = $1", [playerControllerId]);
+  await db.query(`
+    insert into dune.discord_player_links (discord_user_id, player_controller_id)
+    values ($1, $2)
+    on conflict (discord_user_id) do update
+      set player_controller_id = excluded.player_controller_id,
+          linked_at = now()`, [String(discordUserId), playerControllerId]);
+  return await getLinkedPlayer(db, discordUserId);
+}
+
+export async function discordPlayerUnlink(db, discordUserId) {
+  await discordPlayerLinksTableCreate(db);
+  const player = await getLinkedPlayer(db, discordUserId);
+  await db.query("delete from dune.discord_player_links where discord_user_id = $1", [String(discordUserId)]);
+  return Boolean(player);
+}
+
+export async function playerOwnedStorageQuery(db, playerControllerId) {
+  const result = await db.query(`
+    select p.id,
+           coalesce(max(case when pa.actor_name not like '##%' and pa.actor_name <> 'None' then pa.actor_name end), p.building_type) as name,
+           p.building_type as class,
+           coalesce(a.map, '') as map,
+           count(i.id)::int as item_count
+    from dune.placeables p
+    left join dune.actors a on a.id = p.id
+    left join dune.inventories inv on inv.actor_id = p.id
+    left join dune.items i on i.inventory_id = inv.id
+    left join dune.actor_fgl_entities afe on afe.entity_id = p.owner_entity_id
+    left join dune.permission_actor_rank par on par.actor_id = afe.actor_id
+    left join dune.permission_actor pa on pa.actor_id = par.permission_actor_id
+    where par.player_id = $1
+      and par.rank = 1
+      and p.is_hologram = false
+      and p.owner_entity_id is not null
+      and p.owner_entity_id != 0
+    group by p.id, p.building_type, a.map
+    order by p.id`, [playerControllerId]);
+  return { rows: result.rows };
+}
+
+export async function guildStorageQuery(db, playerControllerId) {
+  const result = await db.query(`
+    select p.id,
+           coalesce(max(case when pa.actor_name not like '##%' and pa.actor_name <> 'None' then pa.actor_name end), p.building_type) as name,
+           p.building_type as class,
+           coalesce(a.map, '') as map,
+           count(i.id)::int as item_count
+    from dune.placeables p
+    left join dune.actors a on a.id = p.id
+    left join dune.inventories inv on inv.actor_id = p.id
+    left join dune.items i on i.inventory_id = inv.id
+    left join dune.actor_fgl_entities afe on afe.entity_id = p.owner_entity_id
+    left join dune.permission_actor_rank par on par.actor_id = afe.actor_id
+    left join dune.guild_members gm on gm.player_id = par.player_id
+    left join dune.guild_members self_gm on self_gm.player_id = $1
+    left join dune.permission_actor pa on pa.actor_id = par.permission_actor_id
+    where gm.guild_id = self_gm.guild_id
+      and p.is_hologram = false
+      and p.owner_entity_id is not null
+      and p.owner_entity_id != 0
+    group by p.id, p.building_type, a.map
+    order by p.id`, [playerControllerId]);
+  return { rows: result.rows };
+}
+
+export async function searchItemsInContainers(db, { playerControllerId, query, scope = "owned" }) {
+  const searchTerm = `%${String(query).trim()}%`;
+
+  if (scope === "owned") {
+    const result = await db.query(`
+      select i.id,
+             i.template_id,
+             i.stack_size,
+             i.quality_level,
+             i.inventory_id,
+             inv.actor_id as container_id,
+             coalesce(
+               nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'CurrentDurability'), null),
+               null
+             ) as current_durability,
+             coalesce(
+               nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'MaxDurability')::numeric, 0),
+               nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'DecayedMaxDurability')::numeric, 0),
+               null
+             ) as max_durability
+      from dune.items i
+      join dune.inventories inv on i.inventory_id = inv.id
+      join dune.placeables p on p.id = inv.actor_id
+      left join dune.actor_fgl_entities afe on afe.entity_id = p.owner_entity_id
+      left join dune.permission_actor_rank par on par.actor_id = afe.actor_id
+      where par.player_id = $1
+        and par.rank = 1
+        and i.template_id ilike $2
+      order by i.template_id
+      limit 200`, [playerControllerId, searchTerm]);
+    return { rows: result.rows };
+  }
+
+  if (scope === "guild") {
+    const result = await db.query(`
+      select distinct i.id,
+             i.template_id,
+             i.stack_size,
+             i.quality_level,
+             i.inventory_id,
+             inv.actor_id as container_id,
+             coalesce(
+               nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'CurrentDurability'), null),
+               null
+             ) as current_durability,
+             coalesce(
+               nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'MaxDurability')::numeric, 0),
+               nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'DecayedMaxDurability')::numeric, 0),
+               null
+             ) as max_durability
+      from dune.items i
+      join dune.inventories inv on i.inventory_id = inv.id
+      join dune.placeables p on p.id = inv.actor_id
+      left join dune.actor_fgl_entities afe on afe.entity_id = p.owner_entity_id
+      left join dune.permission_actor_rank par on par.actor_id = afe.actor_id
+      left join dune.guild_members gm on gm.player_id = par.player_id
+      left join dune.guild_members self_gm on self_gm.player_id = $1
+      where gm.guild_id = self_gm.guild_id
+        and i.template_id ilike $2
+      order by i.template_id
+      limit 200`, [playerControllerId, searchTerm]);
+    return { rows: result.rows };
+  }
+
+  throw new Error(`Unsupported search scope: ${scope}. Use "owned" or "guild".`);
+}
+
+export async function searchItemsInPlayerInventory(db, playerPawnId, query) {
+  const searchTerm = `%${String(query).trim()}%`;
+  const result = await db.query(`
+    select i.id,
+           i.template_id,
+           i.stack_size,
+           i.quality_level,
+           i.position_index,
+           i.inventory_id,
+           coalesce(
+             nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'CurrentDurability'), null),
+             null
+           ) as current_durability,
+           coalesce(
+             nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'MaxDurability')::numeric, 0),
+             nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'DecayedMaxDurability')::numeric, 0),
+             null
+           ) as max_durability
+    from dune.items i
+    join dune.inventories inv on i.inventory_id = inv.id
+    where inv.actor_id = $1
+      and i.template_id ilike $2
+    order by i.template_id
+    limit 200`, [intParam(playerPawnId, "player pawn id", 1), searchTerm]);
+  return { rows: result.rows };
+}
