@@ -43,11 +43,12 @@ export function groupByContainer(items, containerField = "container_id") {
   return Array.from(map.values());
 }
 
-export async function playerInventoryProvider(db, playerPawnId) {
+export async function playerInventoryProvider(db, { playerPawnId, characterName } = {}) {
   const result = await playerInventory(db, playerPawnId);
   const rows = result.rows || [];
   return {
     ok: true,
+    characterName: characterName || `Player ${playerPawnId}`,
     capabilities: result.capabilities || {},
     grouped: groupByMap(rows),
     rows,

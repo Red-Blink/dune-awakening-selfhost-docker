@@ -3357,7 +3357,7 @@ export async function discordPlayerLinksTableCreate(db) {
   await db.query(`
     create table if not exists dune.discord_player_links (
       discord_user_id text primary key,
-      player_controller_id bigint not null,
+      player_controller_id text not null,
       linked_at timestamp with time zone default now()
     )`);
 }
@@ -3378,12 +3378,12 @@ export async function getLinkedPlayer(db, discordUserId) {
   await discordPlayerLinksTableCreate(db);
   const result = await db.query(`
     select dpl.discord_user_id,
-           dpl.player_controller_id::text as controller_id,
+           dpl.player_controller_id,
            coalesce(ps.character_name, '') as character_name,
-           coalesce(ps.player_pawn_id, 0) as player_pawn_id,
+           coalesce(ps.player_pawn_id::text, '0') as player_pawn_id,
            coalesce(ps.online_status::text, 'Offline') as online_status
     from dune.discord_player_links dpl
-    join dune.player_state ps on ps.player_controller_id = dpl.player_controller_id
+    join dune.player_state ps on ps.player_controller_id::text = dpl.player_controller_id
     where dpl.discord_user_id = $1
     limit 1`, [String(discordUserId)]);
   return result.rows[0] || null;
@@ -3420,7 +3420,7 @@ export async function playerOwnedStorageQuery(db, playerControllerId) {
     left join dune.inventories inv on inv.actor_id = p.id
     left join dune.items i on i.inventory_id = inv.id
     left join dune.actor_fgl_entities afe on afe.entity_id = p.owner_entity_id
-    left join dune.permission_actor_rank par on par.actor_id = afe.actor_id
+    left join dune.permission_actor_rank par on par.permission_actor_id = afe.actor_id
     left join dune.permission_actor pa on pa.actor_id = par.permission_actor_id
     where par.player_id = $1
       and par.rank = 1
@@ -3444,7 +3444,7 @@ export async function guildStorageQuery(db, playerControllerId) {
     left join dune.inventories inv on inv.actor_id = p.id
     left join dune.items i on i.inventory_id = inv.id
     left join dune.actor_fgl_entities afe on afe.entity_id = p.owner_entity_id
-    left join dune.permission_actor_rank par on par.actor_id = afe.actor_id
+    left join dune.permission_actor_rank par on par.permission_actor_id = afe.actor_id
     left join dune.guild_members gm on gm.player_id = par.player_id
     left join dune.guild_members self_gm on self_gm.player_id = $1
     left join dune.permission_actor pa on pa.actor_id = par.permission_actor_id
@@ -3481,7 +3481,7 @@ export async function searchItemsInContainers(db, { playerControllerId, query, s
       join dune.inventories inv on i.inventory_id = inv.id
       join dune.placeables p on p.id = inv.actor_id
       left join dune.actor_fgl_entities afe on afe.entity_id = p.owner_entity_id
-      left join dune.permission_actor_rank par on par.actor_id = afe.actor_id
+      left join dune.permission_actor_rank par on par.permission_actor_id = afe.actor_id
       where par.player_id = $1
         and par.rank = 1
         and i.template_id ilike $2
@@ -3511,7 +3511,7 @@ export async function searchItemsInContainers(db, { playerControllerId, query, s
       join dune.inventories inv on i.inventory_id = inv.id
       join dune.placeables p on p.id = inv.actor_id
       left join dune.actor_fgl_entities afe on afe.entity_id = p.owner_entity_id
-      left join dune.permission_actor_rank par on par.actor_id = afe.actor_id
+      left join dune.permission_actor_rank par on par.permission_actor_id = afe.actor_id
       left join dune.guild_members gm on gm.player_id = par.player_id
       left join dune.guild_members self_gm on self_gm.player_id = $1
       where gm.guild_id = self_gm.guild_id

@@ -223,7 +223,10 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
       const actor = validateDiscordActor(body.actor);
       requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.INVENTORY_READ);
       const linked = await requireLinkedPlayer(db, actor.userId);
-      return json(res, 200, await playerInventoryProvider(db, linked.player_pawn_id));
+      return json(res, 200, await playerInventoryProvider(db, {
+        playerPawnId: linked.player_pawn_id,
+        characterName: linked.character_name
+      }));
     }
 
     // Players storage
