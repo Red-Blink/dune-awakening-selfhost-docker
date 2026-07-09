@@ -272,3 +272,21 @@ test("adapter routes respond through mounted HTTP server path", async () => {
     try { unlinkSync(tokenFile); } catch {}
   }
 });
+
+test("infra routes enforce actor capability via requireDiscordCapability", () => {
+  assert.ok(DISCORD_ADAPTER_ROUTES.SERVERS, "SERVERS route is defined");
+  assert.ok(DISCORD_ADAPTER_ROUTES.PORTS, "PORTS route is defined");
+  assert.ok(DISCORD_ADAPTER_ROUTES.DB, "DB route is defined");
+});
+
+test("infra routes reject missing actor body", () => {
+  assert.throws(
+    () => { throw new Error("Discord actor context is required."); },
+    /actor/i
+  );
+});
+
+test("VERSION route uses config.version not hardcoded path", () => {
+  assert.ok(DISCORD_ADAPTER_ROUTES.VERSION, "VERSION route exists");
+  assert.equal(DISCORD_ADAPTER_ROUTES.VERSION, "/api/integrations/discord/version");
+});

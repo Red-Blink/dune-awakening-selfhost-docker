@@ -3,9 +3,10 @@ import { readFileSync } from "node:fs";
 import {
   discordAdapterEnabled, discordAdapterErrorResponse, discordAdapterHealth,
   discordAdapterPopulation, discordAdapterReadiness, discordAdapterServices,
-  discordAdapterStatus, DISCORD_ADAPTER_ROUTES, DISCORD_PLANNED_ADAPTER_ROUTES
+  discordAdapterStatus, DISCORD_ADAPTER_ROUTES, DISCORD_PLANNED_ADAPTER_ROUTES,
+  validateDiscordActor, discordRoleMappingFromEnv
 } from "./adapter.js";
-import { policyError } from "./policy.js";
+import { policyError, requireDiscordCapability, DISCORD_CAPABILITIES } from "./policy.js";
 import { discordStatusProvider } from "./statusProvider.js";
 import { discordReadinessProvider, discordServicesProvider } from "./readOnlyProviders.js";
 import {
@@ -18,14 +19,17 @@ import { buildDuneArgs, runDune } from "../../runner.js";
 // Secure infra operation whitelist — maps route keys to known-safe dune operations.
 // Never passes user input directly to the dune CLI.
 const INFRA_OPERATIONS = Object.freeze({
-  SERVERS: { operation: "servers", timeoutMs: 15000, capability: "services:read" },
-  PORTS: { operation: "ports", timeoutMs: 15000, capability: "services:read" },
-  DB: { operation: "dbStatus", timeoutMs: 15000, capability: "services:read" },
+  SERVERS: { operation: "servers", timeoutMs: 15000, capability: DISCORD_CAPABILITIES.SERVICES_READ },
+  PORTS: { operation: "ports", timeoutMs: 15000, capability: DISCORD_CAPABILITIES.SERVICES_READ },
+  DB: { operation: "dbStatus", timeoutMs: 15000, capability: DISCORD_CAPABILITIES.SERVICES_READ },
 });
 
-async function handleSecureInfraRoute({ key, config, json, res }) {
+async function handleSecureInfraRoute({ key, config, json, res, actor }) {
   const op = INFRA_OPERATIONS[key];
   if (!op) throw policyError("not_found", "Unsupported infrastructure operation.", 404);
+
+  const mapping = discordRoleMappingFromEnv();
+  requireDiscordCapability(actor, mapping, op.capability);
 
   const result = await runDune(config, buildDuneArgs(op.operation), {
     timeoutMs: op.timeoutMs,
@@ -196,22 +200,26 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
       });
     }
 
-    // Secure infra routes — read-only, whitelisted operations only
+    // Secure infra routes — read-only, whitelisted operations only.
+    // Actor identity and capability are enforced before any dune CLI call.
     if (path === DISCORD_ADAPTER_ROUTES.SERVERS && req.method === "POST") {
       const body = await readJson(req);
-      return handleSecureInfraRoute({ key: "SERVERS", config, json, res });
+      const actor = validateDiscordActor(body.actor);
+      return handleSecureInfraRoute({ key: "SERVERS", config, json, res, actor });
     }
     if (path === DISCORD_ADAPTER_ROUTES.PORTS && req.method === "POST") {
       const body = await readJson(req);
-      return handleSecureInfraRoute({ key: "PORTS", config, json, res });
+      const actor = validateDiscordActor(body.actor);
+      return handleSecureInfraRoute({ key: "PORTS", config, json, res, actor });
     }
     if (path === DISCORD_ADAPTER_ROUTES.DB && req.method === "POST") {
       const body = await readJson(req);
-      return handleSecureInfraRoute({ key: "DB", config, json, res });
+      const actor = validateDiscordActor(body.actor);
+      return handleSecureInfraRoute({ key: "DB", config, json, res, actor });
     }
 
     if (path === DISCORD_ADAPTER_ROUTES.VERSION && req.method === "GET") {
-      return json(res, 200, { ok: true, version: readFileSync("/repo/VERSION", "utf8").trim() });
+      return json(res, 200, { ok: true, version: config.version || "dev" });
     }
 
     throw policyError("not_found", "Discord adapter route not found.", 404);
