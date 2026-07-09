@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Circle, X } from "lucide-react";
 import { playersApi } from "../../api/players";
+import { adminApi } from "../../api/admin";
 import { DataTable, useSortableRows } from "../../components/common/DataTable";
 import { TechnicalDetails } from "../../components/common/DisplayPrimitives";
 import { formatUiSentence, friendlyColumnName } from "../../lib/display";
@@ -45,6 +46,20 @@ export function PlayerDetailTab({
   const [editRow, setEditRow] = useState<Record<string, unknown> | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [editSaving, setEditSaving] = useState(false);
+  const [augmentTargetRow, setAugmentTargetRow] = useState<Record<string, unknown> | null>(null);
+  const [augmentSelected, setAugmentSelected] = useState<string[]>([]);
+  const [augmentCatalog, setAugmentCatalog] = useState<{ id: string; name: string }[]>([]);
+  const [augmentApplying, setAugmentApplying] = useState(false);
+
+  useEffect(() => {
+    adminApi.itemCatalog("", 10000).then((result) => {
+      const augs = (result.rows || []).filter((item) =>
+        (item.category || "").toLowerCase().includes("augment") ||
+        (item.source || "").toLowerCase() === "augments"
+      ).map((item) => ({ id: item.itemId || item.id, name: item.name }));
+      setAugmentCatalog(augs);
+    }).catch(() => setAugmentCatalog([]));
+  }, []);
 
   useEffect(() => {
     if (!message) return undefined;
@@ -147,6 +162,40 @@ export function PlayerDetailTab({
     }
   }
 
+  async function applyAugments() {
+    if (!augmentTargetRow || augmentSelected.length === 0) return;
+    const itemId = String(augmentTargetRow.id || "");
+    const templateId = String(augmentTargetRow.template_id || "Unknown item");
+    if (!(await confirmAction(`Apply ${augmentSelected.length} augment(s) to this item?`, {
+      title: "Apply Augments",
+      confirmLabel: "Apply",
+      details: [
+        { label: "Item ID", value: itemId, tone: "accent" },
+        { label: "Template", value: templateId, tone: "accent" },
+        { label: "Augments", value: augmentSelected.map((augId) => { const found = augmentCatalog.find((a) => a.id === augId); return found ? found.name : augId; }).join(", "), tone: "success" }
+      ]
+    }))) return;
+
+    setAugmentApplying(true);
+    try {
+      const response = await playersApi.augmentInventoryItem(playerId, itemId, augmentSelected, "APPLY AUGMENTS");
+      setMessage(formatMutationResult(response));
+      setMessageDetails(JSON.stringify(response, null, 2));
+      onActionLog?.("Apply Augments", templateId, String(augmentSelected.length), "Succeeded");
+      setAugmentTargetRow(null);
+      setAugmentSelected([]);
+      onReload();
+    } catch (error) {
+      const text = error instanceof Error ? error.message : String(error);
+      setMessage(text);
+      setMessageDetails("");
+      onActionLog?.("Apply Augments", templateId, String(augmentSelected.length), `Failed: ${text}`);
+      onError(text);
+    } finally {
+      setAugmentApplying(false);
+    }
+  }
+
   function renderEditPanel(row: Record<string, unknown>) {
     const hasCurrentAtLoad = row.current_durability != null;
     const hasMaxAtLoad = row.max_durability != null || hasCurrentAtLoad;
@@ -180,6 +229,7 @@ export function PlayerDetailTab({
       actionClassName="actions-column"
       action={(row) => <span className="icon-toggle-group">
         <button className="icon-toggle-button success" title="Edit item" aria-label="Edit item" onClick={(event) => { event.stopPropagation(); startEditItem(row); }}><Circle size={16} /></button>
+        <button className="icon-toggle-button accent" title="Apply Augments" aria-label="Apply Augments" onClick={(event) => { event.stopPropagation(); setAugmentTargetRow(row); setAugmentSelected([]); }}>+A</button>
         <button className="icon-toggle-button danger" title="Delete item" aria-label="Delete item" onClick={(event) => { event.stopPropagation(); void deleteItem(row); }}><X size={16} /></button>
       </span>}
       sortColumn={inventorySort.sortColumn}
@@ -187,8 +237,23 @@ export function PlayerDetailTab({
       onSort={inventorySort.onSort}
       resizableColumns
       rowKey={(row) => String(row.id)}
-      isRowExpanded={(row) => editRow !== null && String(row.id) === String(editRow.id)}
-      renderExpandedRow={(row) => renderEditPanel(row)}
+      isRowExpanded={(row) => (editRow !== null && String(row.id) === String(editRow.id)) || (augmentTargetRow !== null && String(row.id) === String(augmentTargetRow.id))}
+      renderExpandedRow={(row) => augmentTargetRow !== null && String(row.id) === String(augmentTargetRow.id) ? (
+        <div className="result-panel database-edit-panel">
+          <div className="panel-title"><strong>Apply Augments</strong></div>
+          <p className="playerAdmin_note">Item ID: {String(row.id)} · {String(row.template_id)}</p>
+          {augmentCatalog.length === 0 ? <p>Loading augment catalog...</p> : <>
+            <select className="augment-picker" multiple value={augmentSelected} size={Math.min(augmentCatalog.length, 12)} onChange={(event) => { const selected = Array.from(event.target.selectedOptions, (opt) => opt.value); setAugmentSelected(selected); }} style={{ width: "100%", maxHeight: 240 }}>
+              {augmentCatalog.map((aug) => <option key={aug.id} value={aug.id}>{aug.id} — {aug.name}</option>)}
+            </select>
+            <p className="playerAdmin_note" style={{ marginTop: 8 }}>Selected {augmentSelected.length} of {augmentCatalog.length} augment(s). Use Ctrl+Click to select multiple.</p>
+          </>}
+          <div className="action-line">
+            <button disabled={augmentSelected.length === 0 || augmentApplying} onClick={() => void applyAugments()}>{augmentApplying ? "Applying..." : `Apply ${augmentSelected.length} Augment(s)`}</button>
+            <button onClick={() => { setAugmentTargetRow(null); setAugmentSelected([]); }}>Cancel</button>
+          </div>
+        </div>
+      ) : renderEditPanel(row)}
     />
   </div>;
 }
