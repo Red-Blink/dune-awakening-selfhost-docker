@@ -196,7 +196,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
       setCarePackageTab("configure");
       setEditingPackageIndex(null);
       setSelectedPackageItem(null);
-      setPackageDraft({ itemName: "", itemId: "", quantity: "1", grade: "0" });
+      setPackageDraft({ itemName: "", itemId: "", quantity: "1", grade: "0", augments: [] });
     });
   }
   async function deleteActiveKit() {

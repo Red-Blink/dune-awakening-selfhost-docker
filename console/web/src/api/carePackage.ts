@@ -18,7 +18,7 @@ export type CarePackageConfig = {
 export type CarePackageEntry = {
   id: string;
   name: string;
-  items: { itemName?: string; itemId?: string; quantity: number; durability?: number; quality?: number; grade?: number }[];
+  items: { itemName?: string; itemId?: string; quantity: number; durability?: number; quality?: number; grade?: number; augments?: string[] }[];
   xp: number;
   sendMessage?: string;
 };
