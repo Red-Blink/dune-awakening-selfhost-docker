@@ -140,6 +140,17 @@ test("blueprint capabilities detects missing tables", async () => {
   assert.equal(cap, false);
 });
 
+test("blueprint capabilities requires pentashield table", async () => {
+  const db = {
+    query: async (text, vals) => {
+      if (String(vals[0]).includes("building_blueprint_pentashields")) return { rows: [{ exists: false }] };
+      return { rows: [{ exists: true }] };
+    }
+  };
+  const cap = await blueprintCapabilities(db);
+  assert.equal(cap, false);
+});
+
 test("blueprint capabilities returns true when all tables present", async () => {
   const db = { query: async () => ({ rows: [{ exists: true }] }) };
   const cap = await blueprintCapabilities(db);

@@ -23,11 +23,12 @@ type JourneyRow = { id: string; name: string; rawName: string; category: string;
 
 type ConfirmAction = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
 
-function playerAdmin_itemUsesDatabaseGrant(item: { itemId?: string; id?: string; category?: string; source?: string; quality?: unknown; grade?: unknown; durability?: unknown }) {
+function playerAdmin_itemUsesDatabaseGrant(item: { itemId?: string; id?: string; category?: string; source?: string; quality?: unknown; grade?: unknown; durability?: unknown; augments?: string[] }) {
   const id = String(item.itemId || item.id || "").trim();
   const category = String(item.category || "").toLowerCase();
   const source = String(item.source || "").toLowerCase();
   return itemGrade(item) > 0 ||
+    Boolean(item.augments?.length) ||
     category === "schematics" ||
     source === "schematics" ||
     category.includes("augment") ||
@@ -146,7 +147,8 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     category: playerAdmin_selectedItem.category,
     source: playerAdmin_selectedItem.source,
     quantity: Number(playerAdmin_quantity) || 1,
-    quality: normalizeItemGrade(playerAdmin_grade)
+    quality: normalizeItemGrade(playerAdmin_grade),
+    augments: playerAdmin_selectedAugments.length > 0 ? [...playerAdmin_selectedAugments] : undefined
   }] : [];
   const playerAdmin_hasGrantItems = playerAdmin_selectedGrantItems.length > 0;
   const playerAdmin_allGrantItemsUseDb = playerAdmin_hasGrantItems && playerAdmin_selectedGrantItems.every(playerAdmin_itemUsesDatabaseGrant);
