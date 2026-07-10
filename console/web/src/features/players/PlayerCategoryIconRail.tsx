@@ -9,6 +9,7 @@ const PLAYER_ADMIN_ICON_RAIL_LABELS = [
   "Exploration",
   "Vehicles",
   "Augmentations",
+  "Augments",
   "Uniques",
   "Trooper",
   "Swordmaster",
@@ -23,6 +24,7 @@ function duneCategoryAssetKey(label: string) {
   const normalized = label.trim().toLowerCase();
   if (!normalized || normalized === "all categories") return "all_categories";
   if (normalized === "specializations") return "all_categories";
+  if (normalized === "augments") return "augmentations";
   return normalized.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 }
 

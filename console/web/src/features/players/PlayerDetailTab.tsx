@@ -4,7 +4,8 @@ import { playersApi } from "../../api/players";
 import { adminApi } from "../../api/admin";
 import { DataTable, useSortableRows } from "../../components/common/DataTable";
 import { TechnicalDetails } from "../../components/common/DisplayPrimitives";
-import { formatUiSentence, friendlyColumnName } from "../../lib/display";
+import { augmentLimit, AugmentPicker, friendlyCatalogName } from "../../components/common/ItemCatalog";
+import { formatUiSentence, formatCell, friendlyColumnName } from "../../lib/display";
 import { serializeEditableDbValue, parseEditableDbValue } from "../../lib/dbValues";
 
 const EDITABLE_INVENTORY_COLUMNS = ["stack_size", "quality_level", "position_index", "current_durability", "max_durability"];
@@ -54,8 +55,7 @@ export function PlayerDetailTab({
   useEffect(() => {
     adminApi.itemCatalog("", 10000).then((result) => {
       const augs = (result.rows || []).filter((item) =>
-        (item.category || "").toLowerCase().includes("augment") ||
-        (item.source || "").toLowerCase() === "augments"
+        /T\d+_Augment/i.test(item.id || "") && ((item.category || "").toLowerCase() || "").includes("schematics")
       ).map((item) => ({ id: item.itemId || item.id, name: item.name }));
       setAugmentCatalog(augs);
     }).catch(() => setAugmentCatalog([]));
@@ -227,6 +227,7 @@ export function PlayerDetailTab({
       rows={inventorySort.sortedRows}
       emptyMessage={emptyMessage}
       actionClassName="actions-column"
+      renderCell={(row, col) => col === "template_id" ? friendlyCatalogName(String(row.template_id || "")) : formatCell(row[col])}
       action={(row) => <span className="icon-toggle-group">
         <button className="icon-toggle-button success" title="Edit item" aria-label="Edit item" onClick={(event) => { event.stopPropagation(); startEditItem(row); }}><Circle size={16} /></button>
         <button className="icon-toggle-button accent" title="Apply Augments" aria-label="Apply Augments" onClick={(event) => { event.stopPropagation(); setAugmentTargetRow(row); setAugmentSelected([]); }}>+A</button>
@@ -246,12 +247,12 @@ export function PlayerDetailTab({
             const itemTemplate = String(row.template_id || "");
             const all = augmentCatalog;
             const name = itemTemplate.toLowerCase();
-            if (/_schematic$/i.test(name)) return <p>Schematics cannot be augmented.</p>;
+            if (/_schematic$/i.test(name) || /_augment_/i.test(name)) return <p>Schematics and augment items cannot be augmented.</p>;
             const isWeapon = /lasgun|spitdart|jabal|disruptor|smg|karpov|rifle|drillshot|shotgun|grda|scattergun|vulcan|lmg|pyrocket|fireball|flamethrower|rocket|missile|pistol|snubnose|rafiq|maula|melee|sword|blade|knife|fremen/i.test(name);
             const isArmor = /chest|armor|guard|garment|helmet|boots|gloves|suit/i.test(name);
             const isMelee = /melee|sword|blade|knife|fremen/i.test(name);
             const rangedGeneric = new Set(["Damage","Acuracy","Shielddamage","Range","Recoil","ReloadSpeed","Rateoffire","Magazinecapacity","Headshotdamage"]); const commonGeneric = new Set(["DeathDurability","Ch5"]);
-            const wp = (id: string) => { const m = id.match(/^T6_Augment_(.+?)\d+$/); return m ? m[1] : ""; };
+            const wp = (id: string) => { const trimmed = id.replace(/_Schematic$/i, ""); const m = trimmed.match(/^T\d+_Augment_(.+?)\d+$/); return m ? m[1] : ""; };
             const weaponMap: [RegExp, Set<string>][] = [
               [/lasgun/i, new Set(["Lasgun"])], [/spitdart|jabal/i, new Set(["Spitdartrifle","SpitdartRifle"])],
               [/disruptor| smg/i, new Set(["smg","Smg"])], [/karpov|battle.?rifle/i, new Set(["BR"])],
@@ -271,11 +272,9 @@ export function PlayerDetailTab({
               }
               return true;
             });
-            return filtered.length === 0 ? <p>No matching augments for this item type.</p> : <>
-            <select className="augment-picker" multiple value={augmentSelected} size={Math.min(filtered.length, 12)} onChange={(event) => { const selected = Array.from(event.target.selectedOptions, (opt) => opt.value).slice(0, /chest|armor|guard|garment/i.test(String(row.template_id)) ? 2 : 3); setAugmentSelected(selected); }} style={{ width: "100%", maxHeight: 280, fontSize: "12px" }}>
-              {filtered.map((aug) => <option key={aug.id} value={aug.id}>{aug.id} — {aug.name}</option>)}
-            </select>
-            <p className="playerAdmin_note" style={{ marginTop: 8 }}>Selected {augmentSelected.length} of {filtered.length} augment(s). Use Ctrl+Click to select multiple.</p>
+            return augmentLimit(String(row.template_id)) === 0 ? <p>Augments only available for weapons and armor.</p> : filtered.length === 0 ? <p>No matching augments for this item type.</p> : <>
+            <label>Augments ({augmentSelected.length}/{augmentLimit(String(row.template_id))})</label>
+            <AugmentPicker augments={filtered} selected={augmentSelected} onChange={setAugmentSelected} limit={augmentLimit(String(row.template_id))} />
           </>;
           })()}
           <div className="action-line">

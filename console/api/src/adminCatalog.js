@@ -1,11 +1,35 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+let _catalogCache = null;
+let _catalogRepoRoot = null;
+
+function loadCatalog(repoRoot) {
+  if (_catalogCache && _catalogRepoRoot === repoRoot) return _catalogCache;
+  _catalogCache = JSON.parse(readFileSync(resolve(repoRoot, "runtime/data/admin-items.json"), "utf8"));
+  _catalogRepoRoot = repoRoot;
+  return _catalogCache;
+}
+
+const _imageCache = new Map();
+
+function itemImagePath(repoRoot, id) {
+  if (!repoRoot) return "/images/items/image-unavailable.png";
+  const filename = `${id}.png`;
+  const relativePath = `images/items/${filename}`;
+  const cacheKey = `${repoRoot}::${id}`;
+  if (_imageCache.has(cacheKey)) return _imageCache.get(cacheKey);
+  const absolutePath = resolve(repoRoot, "console/web/public", relativePath);
+  const result = existsSync(absolutePath) ? `/${relativePath}` : "/images/items/image-unavailable.png";
+  _imageCache.set(cacheKey, result);
+  return result;
+}
+
 export function resolveCatalogItem(repoRoot, { itemName = "", itemId = "" } = {}) {
   const value = String(itemId || itemName || "").trim();
   if (!value || value.length > 240 || /[\r\n]/.test(value)) throw new Error("Item name or id is required");
 
-  const items = JSON.parse(readFileSync(resolve(repoRoot, "runtime/data/admin-items.json"), "utf8"));
+  const items = loadCatalog(repoRoot);
   const mode = itemId ? "id" : "name";
   if (mode === "id") {
     const exact = items.find((item) => String(item.id || "") === value);
@@ -27,7 +51,7 @@ export function resolveCatalogItem(repoRoot, { itemName = "", itemId = "" } = {}
 }
 
 export function listCatalogItems(repoRoot, { q = "", limit = 500 } = {}) {
-  const items = JSON.parse(readFileSync(resolve(repoRoot, "runtime/data/admin-items.json"), "utf8"));
+  const items = loadCatalog(repoRoot);
   const term = String(q || "").trim().toLowerCase();
   const max = Math.max(1, Math.min(Number(limit) || 500, 10000));
   return items
@@ -66,12 +90,4 @@ function normalizeItem(item, repoRoot = "") {
     source: String(item.source || "manual"),
     image
   };
-}
-
-function itemImagePath(repoRoot, id) {
-  if (!repoRoot) return "/images/items/image-unavailable.png";
-  const filename = `${id}.png`;
-  const relativePath = `images/items/${filename}`;
-  const absolutePath = resolve(repoRoot, "console/web/public", relativePath);
-  return existsSync(absolutePath) ? `/${relativePath}` : "/images/items/image-unavailable.png";
 }

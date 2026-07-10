@@ -20,6 +20,7 @@ import {
   type CatalogItem
 } from "../../components/common/ItemCatalog";
 import { formatUiSentence } from "../../lib/display";
+import { augmentLimit, AugmentPicker } from "../../components/common/ItemCatalog";
 import { titleCaseWords } from "../players/playerAdminUtils";
 
 type HomeTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
@@ -76,8 +77,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
   useEffect(() => {
     adminApi.itemCatalog("", 10000).then((result) => {
       const augs = (result.rows || []).filter((item) =>
-        (item.category || "").toLowerCase().includes("augment") ||
-        (item.source || "").toLowerCase() === "augments"
+        /T\d+_Augment/i.test(item.id || "") && ((item.category || "").toLowerCase() || "").includes("schematics")
       ).map((item) => ({ id: item.itemId || item.id, name: item.name }));
       setAugmentCatalog(augs);
     }).catch(() => setAugmentCatalog([]));
@@ -85,13 +85,17 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
   function carePkgFilterAugments(itemName: string, itemId: string, itemCategory: string, all: { id: string; name: string }[]) {
     const name = (itemId + " " + itemName).toLowerCase();
     const cat = (itemCategory || "").toLowerCase();
-    if (cat === "schematics" || /_schematic$/i.test(name)) return [];
+    if (cat === "schematics" || /_schematic$/i.test(name) || /_augment_/i.test(name)) return [];
     if ((!name || all.length === 0) && cat !== "weapons" && cat !== "clothing") return all;
     const isArmor = /chest|armor|guard|garment|helmet|boots|gloves|suit/i.test(name) || cat === "clothing";
     const isMelee = /melee|sword|blade|knife|fremen/i.test(name);
     const isWeapon = cat === "weapons" || isMelee || /lasgun|spitdart|jabal|disruptor|smg|karpov|rifle|drillshot|shotgun|grda|scattergun|vulcan|lmg|pyrocket|fireball|flamethrower|rocket|missile|pistol|snubnose|rafiq|maula/i.test(name);
     const rangedGeneric = new Set(["Damage","Acuracy","Shielddamage","Range","Recoil","ReloadSpeed","Rateoffire","Magazinecapacity","Headshotdamage"]); const commonGeneric = new Set(["DeathDurability","Ch5"]);
-    const wp = (id: string) => { const m = id.match(/^T6_Augment_(.+?)\d+$/); return m ? m[1] : ""; };
+    const wp = (id: string) => {
+        const trimmed = id.replace(/_Schematic$/i, "");
+        const m = trimmed.match(/^T\d+_Augment_(.+?)\d+$/);
+        return m ? m[1] : "";
+      };
     const weaponMap: [RegExp, Set<string>][] = [
       [/lasgun/i, new Set(["Lasgun"])], [/spitdart|jabal/i, new Set(["Spitdartrifle","SpitdartRifle"])],
       [/disruptor| smg/i, new Set(["smg","Smg"])], [/karpov|battle.?rifle/i, new Set(["BR"])],
@@ -402,7 +406,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
               <label>Grade<ItemGradeSelect value={packageDraft.grade} onChange={(grade) => setPackageDraft({ ...packageDraft, grade })} /></label>
               {(() => {
                 const filteredAugs = carePkgFilterAugments(packageDraft.itemName, packageDraft.itemId, selectedPackageItem?.category || "", augmentCatalog);
-                return filteredAugs.length === 0 ? null : <label>Augments<select className="augment-picker" multiple value={packageDraft.augments} onChange={(event) => { const selected = Array.from(event.target.selectedOptions, (opt) => opt.value).slice(0, /chest|armor|guard|garment/i.test(packageDraft.itemName) ? 2 : 3); setPackageDraft({ ...packageDraft, augments: selected }); }} style={{ minWidth: 320, maxWidth: 420, height: 60 }}>{filteredAugs.map((aug) => <option key={aug.id} value={aug.id}>{aug.name}</option>)}</select></label>;
+                return filteredAugs.length === 0 ? (augmentLimit(packageDraft.itemName, selectedPackageItem?.category) === 0 ? <label><span className="playerAdmin_note">Augments only available for weapons and armor</span></label> : null) : augmentLimit(packageDraft.itemName, selectedPackageItem?.category) === 0 ? <label><span className="playerAdmin_note">Augments only available for weapons and armor</span></label> : <label>Augments ({packageDraft.augments.length}/{augmentLimit(packageDraft.itemName, selectedPackageItem?.category)})<AugmentPicker augments={filteredAugs} selected={packageDraft.augments} onChange={(selected) => setPackageDraft({ ...packageDraft, augments: selected })} limit={augmentLimit(packageDraft.itemName, selectedPackageItem?.category)} /></label>;
               })()}
               <button disabled={!selectedPackageItem} onClick={addPackageItem}>Add Item</button>
             </div>
@@ -411,7 +415,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
         </div>
         {activeKit.items?.length ? <div className="table-wrap package-items-table"><table><thead><tr><th>Preview</th><th>Item Name</th><th>Item ID</th><th>Quantity</th><th>Grade</th><th>Augments</th><th>Actions</th></tr></thead><tbody>{activeKit.items.map((item, index) => {
           const editing = editingPackageIndex === index;
-          return <tr key={`${item.itemName || item.itemId}-${index}`}><td><PackageItemPreview item={item} /></td><td>{catalogItemName(item)}</td><td>{catalogItemId(item)}</td><td>{editing ? <input className="package-item-quantity-input" type="number" min="1" value={packageEditDraft.quantity} onChange={(event) => setPackageEditDraft({ ...packageEditDraft, quantity: event.target.value })} /> : item.quantity}</td><td>{editing ? <ItemGradeSelect value={packageEditDraft.grade} onChange={(grade) => setPackageEditDraft({ ...packageEditDraft, grade })} /> : itemGrade(item)}</td><td style={{ fontSize: "11px", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis" }}>{editing ? (() => { const filteredAugs = carePkgFilterAugments(item.itemName || "", item.itemId || "", "", augmentCatalog); return filteredAugs.length === 0 ? <span>No matching augments</span> : <select className="augment-picker" multiple value={packageEditDraft.augments} onChange={(event) => { const selected = Array.from(event.target.selectedOptions, (opt) => opt.value); setPackageEditDraft({ ...packageEditDraft, augments: selected }); }} style={{ minWidth: 260, height: 50 }}>{filteredAugs.map((aug) => <option key={aug.id} value={aug.id}>{aug.name}</option>)}</select>; })() : (item.augments && item.augments.length > 0) ? item.augments.map((augId: string) => { const found = augmentCatalog.find((a) => a.id === augId); return found ? found.name : augId; }).join(", ") : "—"}</td><td className="package-actions-cell"><div className="service-actions">{editing ? <><button onClick={() => savePackageItemEdit(index)}>Save</button><button onClick={() => setEditingPackageIndex(null)}>Cancel</button></> : <button onClick={() => editPackageItem(index)}>Edit</button>}<button className="danger" onClick={() => {
+          return <tr key={`${item.itemName || item.itemId}-${index}`}><td><PackageItemPreview item={item} /></td><td>{catalogItemName(item)}</td><td>{catalogItemId(item)}</td><td>{editing ? <input className="package-item-quantity-input" type="number" min="1" value={packageEditDraft.quantity} onChange={(event) => setPackageEditDraft({ ...packageEditDraft, quantity: event.target.value })} /> : item.quantity}</td><td>{editing ? <ItemGradeSelect value={packageEditDraft.grade} onChange={(grade) => setPackageEditDraft({ ...packageEditDraft, grade })} /> : itemGrade(item)}</td><td style={{ fontSize: "11px", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis" }}>{editing ? (() => { const filteredAugs = carePkgFilterAugments(item.itemName || "", item.itemId || "", "", augmentCatalog); return augmentLimit(item.itemName || "") === 0 ? <span>Augments not applicable</span> : filteredAugs.length === 0 ? <span>No matching augments</span> : <AugmentPicker augments={filteredAugs} selected={packageEditDraft.augments} onChange={(selected) => setPackageEditDraft({ ...packageEditDraft, augments: selected })} limit={3} />; })() : (item.augments && item.augments.length > 0) ? item.augments.map((augId: string) => { const found = augmentCatalog.find((a) => a.id === augId); return found ? found.name : augId; }).join(", ") : "—"}</td><td className="package-actions-cell"><div className="service-actions">{editing ? <><button onClick={() => savePackageItemEdit(index)}>Save</button><button onClick={() => setEditingPackageIndex(null)}>Cancel</button></> : <button onClick={() => editPackageItem(index)}>Edit</button>}<button className="danger" onClick={() => {
           const nextItems = activeKit.items.filter((_, itemIndex) => itemIndex !== index);
           updateActiveKit({ items: nextItems });
           setItemsText(nextItems.map(packageItemTextLine).join("\n"));

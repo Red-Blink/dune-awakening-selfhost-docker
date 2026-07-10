@@ -146,6 +146,19 @@ test("blueprint capabilities returns true when all tables present", async () => 
   assert.equal(cap, true);
 });
 
+test("blueprint capabilities returns false when pentashields table is missing", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, vals) => {
+      calls.push({ text, vals });
+      if (String(vals[0]).includes("building_blueprint_pentashields")) return { rows: [{ exists: false }] };
+      return { rows: [{ exists: true }] };
+    }
+  };
+  const cap = await blueprintCapabilities(db);
+  assert.equal(cap, false);
+});
+
 test("import blueprint creates item with Blueprint_CopyDevice template", async () => {
   const { db } = fakeBlueprintDb([]);
   const result = await importBlueprint(db, 123, { name: "My Base", instances: [SAMPLE_INSTANCE] });

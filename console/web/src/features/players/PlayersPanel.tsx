@@ -22,6 +22,13 @@ type PlayersPanelProps = {
 
 const PLAYERS_AUTO_REFRESH_MS = 10_000;
 
+function factionClass(faction: string): string {
+  const name = faction.toLowerCase();
+  if (name === "atreides") return "atreides";
+  if (name === "harkonnen") return "harkonnen";
+  return "";
+}
+
 export function PlayersPanel({ onError, renderCharacterAdmin }: PlayersPanelProps) {
   const [q, setQ] = useState("");
   const [playerFilter, setPlayerFilter] = useState<"all" | "online" | "offline">("all");
@@ -105,7 +112,8 @@ export function PlayersPanel({ onError, renderCharacterAdmin }: PlayersPanelProp
     <section className="panel">
       <div className="panel-title"><h2>Players</h2><div className="action-row players-filter-row"><label className="inline-filter-label players-filter-label">Filter <select className="players-filter-select" value={playerFilter} onChange={(event) => { const nextFilter = event.target.value as "all" | "online" | "offline"; setPlayerFilter(nextFilter); void load(nextFilter); }}><option value="all">All Players</option><option value="online">Online</option><option value="offline">Offline</option></select></label><button onClick={() => void load(playerFilter)}>Refresh</button></div></div>
       <div className="action-row"><input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search character, FLS ID, account id, or actor id" /><button onClick={() => void load(playerFilter)}>Search</button></div>
-      <DataTable rows={playersSort.sortedRows} columns={["actor_id", "character_name", "account_id", "last_seen", "online_status", "map", "fls_id"]} tableClassName="players-table" onRowClick={open} emptyMessage={playersEmptyMessage} sortColumn={playersSort.sortColumn} sortDirection={playersSort.sortDirection} onSort={playersSort.onSort} resizableColumns rowKey={(row) => String(row.actor_id)} renderCell={(row, col) => {
+      <DataTable rows={playersSort.sortedRows} columns={["actor_id", "character_name", "faction", "account_id", "last_seen", "online_status", "map", "fls_id"]} tableClassName="players-table" onRowClick={open} emptyMessage={playersEmptyMessage} sortColumn={playersSort.sortColumn} sortDirection={playersSort.sortDirection} onSort={playersSort.onSort} resizableColumns       rowKey={(row) => String(row.actor_id)} rowAttrs={(row): Record<string, string> => { const f = factionClass(String(row.faction || "")); return f ? { "data-faction": f } : {}; }} renderCell={(row, col) => {
+        if (col === "faction") return <span className={`faction-name ${factionClass(String(row.faction || ""))}`}>{String(row.faction || "—")}</span>;
         if (col === "online_status") return <PlayerStatusCell value={row[col]} />;
         if (col === "last_seen") return formatLastOnline(row);
         return formatCell(row[col]);
