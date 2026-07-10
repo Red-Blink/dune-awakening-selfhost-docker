@@ -37,7 +37,5 @@ RUN chmod +x /usr/local/bin/dune
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-USER dune
-
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["dune", "daemon"]
