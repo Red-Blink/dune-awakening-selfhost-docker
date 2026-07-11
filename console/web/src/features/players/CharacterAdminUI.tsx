@@ -176,6 +176,28 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
       playerAdmin_showResult("placeableGrant", "Resource grants require the player to be online.", "danger");
       return;
     }
+
+    // Check inventory capacity
+    const slotsNeeded = resourceTypes;
+    const volumeNeeded = totalPlaceableVolume(resources);
+    const invRows = playerAdmin_inventoryAllRows || [];
+    const slotsUsed = invRows.length;
+    const volumeUsed = invRows.reduce((sum: number, row: any) => sum + (Number(row.volume_override) || 0.1), 0);
+    const invData = playerAdmin_inventoryData as any;
+    const maxSlots = invData?.maxSlots || invData?.max_item_count || 50;
+    const maxVolume = invData?.maxVolume || invData?.max_item_volume || 200;
+    const slotsFree = maxSlots - slotsUsed;
+    const volumeFree = maxVolume - volumeUsed;
+    
+    if (slotsNeeded > slotsFree) {
+      playerAdmin_showResult("placeableGrant", `Not enough inventory slots. Need ${slotsNeeded}, have ${slotsFree} free (${slotsUsed}/${maxSlots} used).`, "danger");
+      return;
+    }
+    if (volumeNeeded > volumeFree) {
+      playerAdmin_showResult("placeableGrant", `Not enough inventory volume. Need ~${volumeNeeded.toFixed(1)}V, have ${volumeFree.toFixed(1)}V free (${volumeUsed.toFixed(1)}/${maxVolume}V used).`, "danger");
+      return;
+    }
+    
     playerAdmin_showResult("placeableGrant", `Giving ${resourceTypes} resource types...`, "neutral", true);
     try {
       let granted = 0, failed = 0;
