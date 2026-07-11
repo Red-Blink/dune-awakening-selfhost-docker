@@ -2614,31 +2614,7 @@ function validateAugmentIds(augments) {
   return ids;
 }
 
-function augmentRollCount(augmentId) {
-  const id = String(augmentId || "").replace(/_Schematic$/i, "");
-  const m = id.match(/^T\d+_Augment_(.+?)(\d+|Off)$/);
-  const type = m ? m[1].replace(/^Ch5_/, "").toLowerCase() : "";
-  const num = m?.[2] || "";
-  const key = num ? type + num : type;
-  // Roll counts from https://dune.gaming.tools per augment
-  const KNOWN: Record<string, number> = {
-    "melee8": 3,             // Blade Optimizer: Damage, Atk Stam, Block Stam
-    "melee4": 2,             // Aggressive Grip Adjuster
-    "melee1": 2,             // Blade Sharpener (assumed 2)
-    "melee6": 1,             // Blade Blood Grooves  
-    "ch5melee1": 2,         // Heavy Metal Blade Coating
-    "spitdartrifle7": 8,     // Unique: 5 fixed + 3 random
-    "spitdartrifle5": 2,
-    "spitdartrifle2": 1,
-    "spitdartrifle1": 2,
-    "damage1": 1,            // Heavy Caliber Upgrade
-    "damage2": 1,            // House Heavy Caliber Upgrade
-    "deathdurabilityoff": 1, // Protective Coating
-  };
-  if (KNOWN[key]) return KNOWN[key];
-  if (type === "melee" || type.startsWith("ch5melee")) return 2;
-  return 1;
-}
+function buildItemStats({ augments = [], durability = {} } = {}) {
   const augmentIds = augments.map((id) => String(id).replace(/_Schematic$/i, ""));
   const durabilityObj = durability.max !== undefined
     ? { CurrentDurability: Number(durability.current ?? durability.max), DecayedMaxDurability: Number(durability.max) }
@@ -2648,20 +2624,14 @@ function augmentRollCount(augmentId) {
       [],
       augmentIds.length > 0 ? {
         AppliedAugments: augmentIds.map((id) => ({ Name: id })),
-        AppliedAugmentRollData: augmentIds.map((id) => {
-          const cleaned = String(id).replace(/_Schematic$/i, "");
-          const m = cleaned.match(/^T\d+_Augment_(.+?)(\d+|Off)$/);
-          const type = m ? m[1].replace(/^Ch5_/, "").toLowerCase() : "";
-          // Melee augments have 2 rolls, generic/armor have 1, weapon-specific vary
-          const count = type === "melee" ? 2 : type.startsWith("armor") ? 1 : 1;
-          return { StatRolls: Array(count).fill(1.0), AppliedEffectIndices: [] };
-        }),
+        AppliedAugmentRollData: augmentIds.map(() => ({ StatRolls: [1.0], AppliedEffectIndices: [] })),
         AppliedAugmentQualities: augmentIds.map(() => 5)
       } : {}
     ],
     FCustomizationStats: [[], {}],
     FItemStackAndDurabilityStats: [[], durabilityObj]
-  };}
+  };
+}
 
 function isTemplateAugmentable(templateId) {
   const name = String(templateId || "");
@@ -2690,6 +2660,8 @@ export async function augmentInventoryItem(db, playerId, itemId, { augments = []
       where i.id = $1 and inv.actor_id = $2
       for update`, [safeItemId, player.actorId]);
     if (!owned.rows[0]) throw new Error("Inventory item was not found in the selected player's directly-owned inventory");
+    const templateId = String(owned.rows[0].template_id || "");
+    if (!isTemplateAugmentable(templateId)) throw new Error("Augments can only be applied to weapons and armor. This item type is not augmentable.");
     const existing = owned.rows[0].stats || {};
     const augData = existing.FAugmentedItemStats || [[], {}];
     const currentAugments = augData[1]?.AppliedAugments || [];
@@ -2699,13 +2671,7 @@ export async function augmentInventoryItem(db, playerId, itemId, { augments = []
     const currentRolls = augData[1]?.AppliedAugmentRollData || [];
     const allAugments = [...currentAugments, ...newAugs];
     const allQualities = [...currentQualities, ...newAugs.map(() => 5)];
-    const allRolls = [...currentRolls, ...newAugs.map((aug) => {
-          const cleaned = String(aug.Name).replace(/_Schematic$/i, "");
-          const m = cleaned.match(/^T\d+_Augment_(.+?)(\d+|Off)$/);
-          const type = m ? m[1].replace(/^Ch5_/, "").toLowerCase() : "";
-          const count = type === "melee" ? 2 : type.startsWith("armor") ? 1 : 1;
-          return { StatRolls: Array(count).fill(1.0), AppliedEffectIndices: [] };
-        })];
+    const allRolls = [...currentRolls, ...newAugs.map(() => ({ StatRolls: [1.0], AppliedEffectIndices: [] }))];
     const mergedNames = allAugments.map((a) => a.Name);
     const nextStats = {
       ...existing,
@@ -2716,7 +2682,7 @@ export async function augmentInventoryItem(db, playerId, itemId, { augments = []
       }]
     };
     await tx.query("update dune.items set stats = $1::jsonb where id = $2", [JSON.stringify(nextStats), safeItemId]);
-    return { ok: true, itemId: safeItemId, templateId: owned.rows[0].template_id, augments: mergedNames, previous: currentNames };
+    return { ok: true, itemId: safeItemId, templateId: owned.rows[0].template_id, augments: mergedNames, previous: currentNames }; 
   });
 }
 
