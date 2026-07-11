@@ -125,8 +125,8 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     const isWeapon = cat === "weapons" || isMelee || /lasgun|LongRifle|LogRifle|spitdart|jabal|disruptor|Smg|karpov|BR|HarkAr|drillshot|Shotgun|grda|Scattergun|vulcan|LMG|AtreLMG|pyrocket|Fireballer|Flamethrower|rocket|missile|pistol|snubnose|rafiq|maula|HeavyPistol|RocketLauncher|UniqueAr|ChoamLg|ChoamSda|UniqueSda|UniqueFlameThrower|UniqueScattergun/i.test(name);
     playerAdmin_setFilteredAugments(all.filter((aug) => {
       const p = wp(aug.id);
-      if (isArmor) return p.startsWith("armor");
-      if (isMelee) return p === "melee" || commonGeneric.has(p);
+      if (isArmor || cat === "clothing") return p.startsWith("armor") || commonGeneric.has(p);
+      if (cat === "weapons") return true;
       if (isWeapon) {
         if (rangedGeneric.has(p) || commonGeneric.has(p)) return true;
         for (const [rx, set] of weaponMap) { if (rx.test(name) && set.has(p)) return true; }

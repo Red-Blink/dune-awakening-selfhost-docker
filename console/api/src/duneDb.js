@@ -2624,7 +2624,14 @@ function buildItemStats({ augments = [], durability = {} } = {}) {
       [],
       augmentIds.length > 0 ? {
         AppliedAugments: augmentIds.map((id) => ({ Name: id })),
-        AppliedAugmentRollData: augmentIds.map(() => ({ StatRolls: [1.0], AppliedEffectIndices: [] })),
+        AppliedAugmentRollData: augmentIds.map((id) => {
+          const cleaned = String(id).replace(/_Schematic$/i, "");
+          const m = cleaned.match(/^T\d+_Augment_(.+?)(\d+|Off)$/);
+          const type = m ? m[1].replace(/^Ch5_/, "").toLowerCase() : "";
+          // Melee augments have 2 rolls, generic/armor have 1, weapon-specific vary
+          const count = type === "melee" ? 2 : type.startsWith("armor") ? 1 : 1;
+          return { StatRolls: Array(count).fill(1.0), AppliedEffectIndices: [] };
+        }),
         AppliedAugmentQualities: augmentIds.map(() => 5)
       } : {}
     ],
@@ -2668,7 +2675,13 @@ export async function augmentInventoryItem(db, playerId, itemId, { augments = []
     const currentRolls = augData[1]?.AppliedAugmentRollData || [];
     const allAugments = [...currentAugments, ...newAugs];
     const allQualities = [...currentQualities, ...newAugs.map(() => 5)];
-    const allRolls = [...currentRolls, ...newAugs.map(() => ({ StatRolls: [1.0], AppliedEffectIndices: [] }))];
+    const allRolls = [...currentRolls, ...newAugs.map((aug) => {
+          const cleaned = String(aug.Name).replace(/_Schematic$/i, "");
+          const m = cleaned.match(/^T\d+_Augment_(.+?)(\d+|Off)$/);
+          const type = m ? m[1].replace(/^Ch5_/, "").toLowerCase() : "";
+          const count = type === "melee" ? 2 : type.startsWith("armor") ? 1 : 1;
+          return { StatRolls: Array(count).fill(1.0), AppliedEffectIndices: [] };
+        })];
     const mergedNames = allAugments.map((a) => a.Name);
     const nextStats = {
       ...existing,
