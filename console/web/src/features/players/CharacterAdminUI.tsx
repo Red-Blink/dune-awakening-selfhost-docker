@@ -1309,7 +1309,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
             options={["Utilities","Fabricators","Refineries","Storage"]}
             value={playerAdmin_placeableCategory}
             onChange={playerAdmin_setPlaceableCategory}
-            allLabel="All"
+            allLabel="All Categories"
           />
           {playerAdmin_filteredPlaceableItems.length > 0 && <div style={{ marginTop: 10 }}>
             <span className="playerAdmin_note">{playerAdmin_filteredPlaceableItems.length} placeable(s)</span>
