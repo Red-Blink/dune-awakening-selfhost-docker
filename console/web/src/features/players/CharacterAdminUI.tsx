@@ -111,15 +111,15 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
       return;
     }
     const isArmor = /chest|armor|guard|garment|helmet|boots|gloves|suit/i.test(name) || cat === "clothing";
-    const rangedGeneric = new Set(["Damage","Acuracy","Shielddamage","Range","Recoil","ReloadSpeed","Rateoffire","Magazinecapacity","Headshotdamage"]); const commonGeneric = new Set(["deathdurability","ch5"]);
+    const rangedGeneric = new Set(["damage","acuracy","shielddamage","range","recoil","reloadspeed","rateoffire","magazinecapacity","headshotdamage"]); const commonGeneric = new Set(["deathdurability","ch5"]);
     const wp = (id: string) => { const trimmed = id.replace(/_Schematic$/i, ""); const m = trimmed.match(/^T\d+_Augment_(.+?)(\d+|Off)$/); return m ? m[1].replace(/^Ch5_/, "").toLowerCase() : ""; };
     const weaponMap: [RegExp, Set<string>][] = [
-      [/lasgun|ChoamLg/i, new Set(["Lasgun"])], [/spitdart|jabal|LongRifle|LogRifle|SmugDmr|Rifle_Long/i, new Set(["Spitdartrifle","SpitdartRifle"])],
-      [/disruptor| smg|SMG|AtreSmg|UniqueSmg/i, new Set(["smg","Smg"])], [/karpov|battle.?rifle|\bBR\b|HarkAr|UniqueAr|AtreBR/i, new Set(["BR"])],
-      [/drillshot|shotgun|Shotgun/i, new Set(["Shotgun"])], [/grda|scattergun|Scattergun|UniqueScattergun/i, new Set(["Scattergun"])],
-      [/vulcan|lmg|LMG|AtreLMG/i, new Set(["Lmg"])], [/pyrocket|fireball|Fireballer/i, new Set(["Fireballer"])],
-      [/flamethrower|Flamethrower|UniqueFlameThrower/i, new Set(["Flamethrower"])], [/rocket|missile|RocketLauncher/i, new Set(["RocketLauncher"])],
-      [/maula|pistol|snubnose|rafiq|HeavyPistol|ChoamSda|UniqueSda/i, new Set(["HeavyPistol","MaulaPistol"])],
+      [/lasgun|ChoamLg/i, new Set(["lasgun"])], [/spitdart|jabal|LongRifle|LogRifle|SmugDmr|Rifle_Long/i, new Set(["spitdartrifle","spitdartrifle"])],
+      [/disruptor| smg|SMG|AtreSmg|UniqueSmg/i, new Set(["smg","smg"])], [/karpov|battle.?rifle|\bBR\b|HarkAr|UniqueAr|AtreBR/i, new Set(["br"])],
+      [/drillshot|shotgun|Shotgun/i, new Set(["shotgun"])], [/grda|scattergun|Scattergun|UniqueScattergun/i, new Set(["scattergun"])],
+      [/vulcan|lmg|LMG|AtreLMG/i, new Set(["lmg"])], [/pyrocket|fireball|Fireballer/i, new Set(["fireballer"])],
+      [/flamethrower|Flamethrower|UniqueFlameThrower/i, new Set(["flamethrower"])], [/rocket|missile|RocketLauncher/i, new Set(["rocketlauncher"])],
+      [/maula|pistol|snubnose|rafiq|HeavyPistol|ChoamSda|UniqueSda/i, new Set(["heavypistol","maulapistol"])],
     ];
     const isMelee = /melee|sword|blade|knife|fremen|Dirk|Rapier|Kindjal|Minotaur|Sword|DualBlades|CHOAMSword|Crysknife|DewReaper|Ghola|ScrapMetalKnife|UniqueSword|UniqueDirk|UniqueRapier/i.test(name);
     const isWeapon = cat === "weapons" || isMelee || /lasgun|LongRifle|LogRifle|spitdart|jabal|disruptor|Smg|karpov|BR|HarkAr|drillshot|Shotgun|grda|Scattergun|vulcan|LMG|AtreLMG|pyrocket|Fireballer|Flamethrower|rocket|missile|pistol|snubnose|rafiq|maula|HeavyPistol|RocketLauncher|UniqueAr|ChoamLg|ChoamSda|UniqueSda|UniqueFlameThrower|UniqueScattergun/i.test(name);
