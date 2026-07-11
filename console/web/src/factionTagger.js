@@ -14,13 +14,14 @@
   }
 
   function scan() {
-    // Only scan data-display elements — skip item catalogs, forms, inputs
-    document.querySelectorAll(".guilds-table td, .guilds-table th, .players-table td, .players-table th, .metric-card, .card .section-heading h2, .card .section-heading h3, .panel-title h2").forEach(tag);
-    document.querySelectorAll("tr").forEach(function(row) {
-      if (row.hasAttribute("data-tagged-faction") || row.hasAttribute("data-tagged-spice")) return;
-      if (row.closest("table") && (row.closest(".guilds-table") || row.closest(".players-table"))) {
-        tag(row);
-      }
+    // Only tag leaf elements by their OWN text content — never tag containers
+    document.querySelectorAll(".guilds-table td, .guilds-table th, .players-table td, .players-table th, .panel-title h2, .section-heading h2, .section-heading h3").forEach(tag);
+    // Tag metric-card strong elements only if the card contains faction text
+    document.querySelectorAll(".metric-card").forEach(function(card) {
+      if (card.hasAttribute("data-tagged-faction") || card.hasAttribute("data-tagged-spice")) return;
+      var t = (card.textContent || "").slice(0, 100).toLowerCase();
+      if (/atreides/i.test(t)) card.setAttribute("data-tagged-faction", "atreides");
+      else if (/harkonnen/i.test(t)) card.setAttribute("data-tagged-faction", "harkonnen");
     });
   }
 
