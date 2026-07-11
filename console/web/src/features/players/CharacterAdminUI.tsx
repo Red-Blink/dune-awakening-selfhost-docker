@@ -126,7 +126,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     playerAdmin_setFilteredAugments(all.filter((aug) => {
       const p = wp(aug.id);
       if (isArmor || cat === "clothing") return p.startsWith("armor") || commonGeneric.has(p);
-      if (cat === "weapons") return true;
+      if (cat === "weapons") return !isMelee || p === "melee" || p.startsWith("armor") || rangedGeneric.has(p) || commonGeneric.has(p);
       if (isWeapon) {
         if (rangedGeneric.has(p) || commonGeneric.has(p)) return true;
         for (const [rx, set] of weaponMap) { if (rx.test(name) && set.has(p)) return true; }
