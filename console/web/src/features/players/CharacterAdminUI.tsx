@@ -111,8 +111,8 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
       return;
     }
     const isArmor = /chest|armor|guard|garment|helmet|boots|gloves|suit/i.test(name) || cat === "clothing";
-    const rangedGeneric = new Set(["Damage","Acuracy","Shielddamage","Range","Recoil","ReloadSpeed","Rateoffire","Magazinecapacity","Headshotdamage"]); const commonGeneric = new Set(["DeathDurability","Ch5"]);
-    const wp = (id: string) => { const trimmed = id.replace(/_Schematic$/i, ""); const m = trimmed.match(/^T\d+_Augment_(.+?)\d+$/); return m ? m[1].replace(/^Ch5_/, "") : ""; };
+    const rangedGeneric = new Set(["damage","acuracy","shielddamage","range","recoil","reloadspeed","rateoffire","magazinecapacity","headshotdamage"]); const commonGeneric = new Set(["deathdurability","ch5"]);
+    const wp = (id: string) => { const trimmed = id.replace(/_Schematic$/i, ""); const m = trimmed.match(/^T\d+_Augment_(.+?)(\d+|Off)$/); return m ? m[1].replace(/^Ch5_/, "").toLowerCase() : ""; };
     const weaponMap: [RegExp, Set<string>][] = [
       [/lasgun|ChoamLg/i, new Set(["Lasgun"])], [/spitdart|jabal|LongRifle|LogRifle|SmugDmr|Rifle_Long/i, new Set(["Spitdartrifle","SpitdartRifle"])],
       [/disruptor| smg|SMG|AtreSmg|UniqueSmg/i, new Set(["smg","Smg"])], [/karpov|battle.?rifle|\bBR\b|HarkAr|UniqueAr|AtreBR/i, new Set(["BR"])],
@@ -125,8 +125,8 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     const isWeapon = cat === "weapons" || isMelee || /lasgun|LongRifle|LogRifle|spitdart|jabal|disruptor|Smg|karpov|BR|HarkAr|drillshot|Shotgun|grda|Scattergun|vulcan|LMG|AtreLMG|pyrocket|Fireballer|Flamethrower|rocket|missile|pistol|snubnose|rafiq|maula|HeavyPistol|RocketLauncher|UniqueAr|ChoamLg|ChoamSda|UniqueSda|UniqueFlameThrower|UniqueScattergun/i.test(name);
     playerAdmin_setFilteredAugments(all.filter((aug) => {
       const p = wp(aug.id);
-      if (isArmor) return /^Armor/i.test(p);
-      if (isMelee) return p === "Melee" || commonGeneric.has(p);
+      if (isArmor) return p.startsWith("armor") || commonGeneric.has(p);
+      if (cat === "weapons") return p === "melee" || p.startsWith("armor") || rangedGeneric.has(p) || commonGeneric.has(p);
       if (isWeapon) {
         if (rangedGeneric.has(p) || commonGeneric.has(p)) return true;
         for (const [rx, set] of weaponMap) { if (rx.test(name) && set.has(p)) return true; }
