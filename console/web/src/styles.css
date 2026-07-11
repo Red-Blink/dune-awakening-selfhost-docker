@@ -1877,15 +1877,13 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 [data-tagged-faction="atreides"],
 [data-tagged-faction="atreides"] td,
 [data-tagged-faction="atreides"] th,
-[data-tagged-faction="atreides"] span,
-[data-tagged-faction="atreides"] strong { color: #4ade80; }
+[data-tagged-faction="atreides"] span { color: #4ade80; }
 
 /* Harkonnen (Red) */
 [data-tagged-faction="harkonnen"],
 [data-tagged-faction="harkonnen"] td,
 [data-tagged-faction="harkonnen"] th,
-[data-tagged-faction="harkonnen"] span,
-[data-tagged-faction="harkonnen"] strong { color: #f87171; }
+[data-tagged-faction="harkonnen"] span { color: #f87171; }
 
 /* ── Augment Picker (chip-based) ── */
 .augment-chip {
@@ -1914,4 +1912,3 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 [data-tagged-spice] td,
 [data-tagged-spice] th,
 [data-tagged-spice] span,
-[data-tagged-spice] strong { color: #c4b5fd; }
