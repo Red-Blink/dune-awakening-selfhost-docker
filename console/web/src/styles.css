@@ -1910,3 +1910,4 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 [data-tagged-spice] th { color: #c4b5fd; }
 .catalog-item-option strong { color: #fff1d4; }
 .catalog-item-option small { color: #ad9f89; }
+.addon-name strong, .addon-entry strong { color: inherit; }
