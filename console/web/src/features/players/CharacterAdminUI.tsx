@@ -1309,7 +1309,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
             options={["Utilities","Fabricators","Refineries","Storage"]}
             value={playerAdmin_placeableCategory}
             onChange={playerAdmin_setPlaceableCategory}
-            allLabel="All Categories"
+            allLabel="All"
           />
           {playerAdmin_filteredPlaceableItems.length > 0 && <div style={{ marginTop: 10 }}>
             <span className="playerAdmin_note">{playerAdmin_filteredPlaceableItems.length} placeable(s)</span>
@@ -1368,7 +1368,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
               options={playerAdmin_craftingCategories}
               value={playerAdmin_craftingCategory}
               onChange={playerAdmin_setCraftingCategory}
-              allLabel="All Categories"
+              allLabel="All"
             />
             {playerAdmin_craftingError ? <p className="playerAdmin_note danger">{playerAdmin_craftingError}</p> : playerAdmin_craftingTable}
           </section>
@@ -1401,7 +1401,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
                 playerAdmin_setResearchCategory(nextCategory);
                 playerAdmin_setProductGroup("");
               }}
-              allLabel="All Categories"
+              allLabel="All"
             />
             {playerAdmin_researchError ? <p className="playerAdmin_note danger">{playerAdmin_researchError}</p> : playerAdmin_researchTable}
           </section>
