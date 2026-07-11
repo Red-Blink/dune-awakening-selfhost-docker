@@ -623,11 +623,9 @@ const deathPoller = { enabled: false, init() {}, tick() {} };
 
 2. **Live Augment Grant** — Currently requires relog. Could explore game console commands that support augment application to live players.
 
-3. **Augment Compatibility Data** — Hardcoded regexes could be replaced with a data-driven compatibility map sourced from game files or community databases.
+3. **Augment Compatibility Database** — Replace hardcoded regexes with a data-driven compatibility map. Each weapon family maps to specific augment types. Source from `dune.gaming.tools` or game files.
 
-4. **Augment Preview** — Show tooltip preview of what stats each augment will add before applying.
-
-5. **Building Material Requirements** — Currently uses hardcoded estimates in `placeableResources.ts`. A scraper script from `dune.gaming.tools` could provide accurate, up-to-date resource data.
+4. **Augment Stat Preview** — Show tooltip preview of what stats each augment will add (e.g., "Damage +48% to +70%, Volume +50%") before applying, using scraped data from gaming.tools.
 
 ---
 
