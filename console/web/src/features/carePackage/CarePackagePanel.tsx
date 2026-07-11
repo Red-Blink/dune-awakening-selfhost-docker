@@ -89,30 +89,9 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
     const cat = (itemCategory || "").toLowerCase();
     if (cat === "schematics" || /_schematic$/i.test(name)) return [];
     if ((!name || all.length === 0) && cat !== "weapons" && cat !== "clothing") return all;
-    const isArmor = /chest|armor|guard|garment|helmet|boots|gloves|suit/i.test(name) || cat === "clothing";
-    const isMelee = /melee|sword|blade|knife|fremen/i.test(name);
-    const isWeapon = cat === "weapons" || isMelee || /lasgun|spitdart|jabal|disruptor|smg|karpov|rifle|drillshot|shotgun|grda|scattergun|vulcan|lmg|pyrocket|fireball|flamethrower|rocket|missile|pistol|snubnose|rafiq|maula/i.test(name);
-    const rangedGeneric = new Set(["damage","acuracy","shielddamage","range","recoil","reloadspeed","rateoffire","magazinecapacity","headshotdamage"]); const commonGeneric = new Set(["deathdurability","ch5"]);
-    const wp = (id: string) => { const trimmed = id.replace(/_Schematic$/i, ""); const m = trimmed.match(/^T\d+_Augment_(.+?)(\d+|Off)$/); return m ? m[1].replace(/^Ch5_/, "").toLowerCase() : ""; };
-    const weaponMap: [RegExp, Set<string>][] = [
-      [/lasgun/i, new Set(["lasgun"])], [/spitdart|jabal/i, new Set(["spitdartrifle","spitdartrifle"])],
-      [/disruptor| smg/i, new Set(["smg","smg"])], [/karpov|battle.?rifle/i, new Set(["br"])],
-      [/drillshot|shotgun/i, new Set(["shotgun"])], [/grda|scattergun/i, new Set(["scattergun"])],
-      [/vulcan|lmg/i, new Set(["lmg"])], [/pyrocket|fireball/i, new Set(["fireballer"])],
-      [/flamethrower/i, new Set(["flamethrower"])], [/rocket|missile/i, new Set(["rocketlauncher"])],
-      [/maula|pistol|snubnose|rafiq/i, new Set(["heavypistol","maulapistol"])],
-    ];
-    return all.filter((aug) => {
-      const p = wp(aug.id);
-      if (isArmor) return p.startsWith("armor");
-      if (isMelee) return p === "melee" || commonGeneric.has(p);
-      if (isWeapon) {
-        if (rangedGeneric.has(p) || commonGeneric.has(p)) return true;
-        for (const [rx, set] of weaponMap) { if (rx.test(name) && set.has(p)) return true; }
-        return false;
-      }
-      return true;
-    });
+    const limit = augmentLimit(itemName, cat, itemId);
+    if (limit === 0) return [];
+    return all.sort((a: any, b: any) => a.name.localeCompare(b.name));
   }
   async function run(action: () => Promise<unknown>) {
     onError("");
