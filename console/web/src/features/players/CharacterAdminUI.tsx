@@ -146,7 +146,8 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     category: playerAdmin_selectedItem.category,
     source: playerAdmin_selectedItem.source,
     quantity: Number(playerAdmin_quantity) || 1,
-    quality: normalizeItemGrade(playerAdmin_grade)
+    quality: normalizeItemGrade(playerAdmin_grade),
+      augments: playerAdmin_selectedAugments.length > 0 ? [...playerAdmin_selectedAugments] : undefined
   }] : [];
   const playerAdmin_hasGrantItems = playerAdmin_selectedGrantItems.length > 0;
   const playerAdmin_allGrantItemsUseDb = playerAdmin_hasGrantItems && playerAdmin_selectedGrantItems.every(playerAdmin_itemUsesDatabaseGrant);
