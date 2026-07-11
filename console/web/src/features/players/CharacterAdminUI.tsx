@@ -126,14 +126,13 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     playerAdmin_setFilteredAugments(all.filter((aug) => {
       const p = wp(aug.id);
       if (isArmor) return p.startsWith("armor") || commonGeneric.has(p);
-      if (cat === "weapons") return p === "melee" || p.startsWith("armor") || rangedGeneric.has(p) || commonGeneric.has(p);
       if (isWeapon) {
         if (rangedGeneric.has(p) || commonGeneric.has(p)) return true;
         for (const [rx, set] of weaponMap) { if (rx.test(name) && set.has(p)) return true; }
         return false;
       }
       return true;
-    }));
+    })).sort((a, b) => a.name.localeCompare(b.name));
   }, [playerAdmin_itemName, playerAdmin_itemId, playerAdmin_selectedItem?.category, playerAdmin_augmentCatalog]);
   const playerAdmin_factionIds: Record<string, number> = { Atreides: 1, Harkonnen: 2, Smuggler: 4 };
   const playerAdmin_craftingCategories = ["Essentials", "Water Discipline", "Combat", "Construction", "Exploration", "Vehicles"];
