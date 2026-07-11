@@ -1908,7 +1908,6 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 .augment-option:last-child { border-radius: 0 0 4px 4px; }
 
 /* Spice (Violet) */
-[data-tagged-spice],
 [data-tagged-spice] td,
 [data-tagged-spice] th,
-[data-tagged-spice] span,
+[data-tagged-spice] span { color: #c4b5fd; }
