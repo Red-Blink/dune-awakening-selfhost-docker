@@ -383,7 +383,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
               <label>Grade<ItemGradeSelect value={packageDraft.grade} onChange={(grade) => setPackageDraft({ ...packageDraft, grade })} /></label>
               {(() => {
                 const filteredAugs = carePkgFilterAugments(packageDraft.itemName, packageDraft.itemId, selectedPackageItem?.category || "", augmentCatalog);
-                return filteredAugs.length === 0 ? null : <label>Augments ({packageDraft.augments.length}/{augmentLimit(packageDraft.itemName, selectedPackageItem?.category)})<AugmentPicker augments={[...filteredAugs].sort((a: any, b: any) => a.name.localeCompare(b.name))} selected={packageDraft.augments} onChange={(selected) => setPackageDraft({ ...packageDraft, augments: selected })} limit={augmentLimit(packageDraft.itemName, selectedPackageItem?.category)} /></label>;
+                return filteredAugs.length === 0 ? null : <label>Augments ({packageDraft.augments.length}/{augmentLimit(packageDraft.itemName, selectedPackageItem?.category, packageDraft.itemId)})<AugmentPicker augments={[...filteredAugs].sort((a: any, b: any) => a.name.localeCompare(b.name))} selected={packageDraft.augments} onChange={(selected) => setPackageDraft({ ...packageDraft, augments: selected })} limit={augmentLimit(packageDraft.itemName, selectedPackageItem?.category, packageDraft.itemId)} /></label>;
               })()}
               <button disabled={!selectedPackageItem} onClick={addPackageItem}>Add Item</button>
             </div>
