@@ -608,8 +608,8 @@ main { padding: 22px; min-width: 0; }
 .addon-status-toggle { min-width: 124px; }
 .addon-catalog-cell { display: flex; justify-content: center; }
 .addon-pin-column { text-align: center; }
-.addon-source-link { color: var(--accent); font-weight: 800; text-decoration: none; }
-.addon-source-link:hover { color: #f1c96f; text-decoration: underline; }
+.addon-source-link { color: #f1c96f; font-weight: 800; text-decoration: none; }
+.addon-source-link:hover { color: #ffd08a; text-decoration: underline; }
 .addon-permissions-list { display: flex; flex-wrap: wrap; gap: 6px; max-width: 240px; }
 .addon-permission-chip { border: 1px solid #3a3127; border-radius: 999px; color: #cbbda8; background: rgba(255,255,255,.03); padding: 3px 8px; font-size: 12px; white-space: nowrap; text-transform: capitalize; }
 .addon-permission-chip.approved { border-color: rgba(61,139,98,.55); color: var(--success-text); background: rgba(61,139,98,.14); }
