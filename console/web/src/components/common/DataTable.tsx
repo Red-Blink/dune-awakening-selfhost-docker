@@ -91,6 +91,7 @@ type DataTableProps = {
   isRowExpanded?: (row: Record<string, unknown>) => boolean;
   renderExpandedRow?: (row: Record<string, unknown>) => ReactNode;
   rowKey?: (row: Record<string, unknown>) => string | number;
+  rowAttrs?: (row: Record<string, unknown>) => Record<string, string>;
 };
 
 export function DataTable({
@@ -111,7 +112,8 @@ export function DataTable({
   resizableColumns = false,
   isRowExpanded,
   renderExpandedRow,
-  rowKey
+  rowKey,
+  rowAttrs
 }: DataTableProps) {
   const resize = useResizableColumns(resizableColumns);
 
@@ -119,5 +121,5 @@ export function DataTable({
   if (!rows.length) return <div className="empty">{emptyMessage}</div>;
   const colStyle = (col: string) => resizableColumns ? resize.columnStyle(col) : undefined;
   const totalColumns = cols.length + (action ? 1 : 0) + (secondaryAction ? 1 : 0);
-  return <div className="table-wrap"><table className={tableClassName}><thead><tr>{cols.map((col) => <th key={col} className={onSort ? "sortable" : ""} style={colStyle(col)} onClick={onSort ? () => onSort(col) : undefined}>{friendlyColumnName(col)}{onSort && sortColumn === col && <span className="sort-indicator">{sortDirection === "desc" ? " ↓" : " ↑"}</span>}{resizableColumns && resize.resizeHandle(col)}</th>)}{action && <th className={actionClassName}>Actions</th>}{secondaryAction && <th className={secondaryActionClassName}>{secondaryActionLabel}</th>}</tr></thead><tbody>{rows.map((row, index) => <Fragment key={rowKey ? rowKey(row) : index}><tr onClick={() => onRowClick?.(row)} className={onRowClick ? "clickable" : ""}>{cols.map((col) => <td key={col} style={colStyle(col)}>{renderCell ? renderCell(row, col) : formatCell(row[col])}</td>)}{action && <td className={actionClassName}>{action(row)}</td>}{secondaryAction && <td className={secondaryActionClassName}>{secondaryAction(row)}</td>}</tr>{isRowExpanded?.(row) && renderExpandedRow && <tr className="expanded-row"><td colSpan={totalColumns} className="expanded-row-cell">{renderExpandedRow(row)}</td></tr>}</Fragment>)}</tbody></table></div>;
+  return <div className="table-wrap"><table className={tableClassName}><thead><tr>{cols.map((col) => <th key={col} className={onSort ? "sortable" : ""} style={colStyle(col)} onClick={onSort ? () => onSort(col) : undefined}>{friendlyColumnName(col)}{onSort && sortColumn === col && <span className="sort-indicator">{sortDirection === "desc" ? " ↓" : " ↑"}</span>}{resizableColumns && resize.resizeHandle(col)}</th>)}{action && <th className={actionClassName}>Actions</th>}{secondaryAction && <th className={secondaryActionClassName}>{secondaryActionLabel}</th>}</tr></thead><tbody>{rows.map((row, index) => <Fragment key={rowKey ? rowKey(row) : index}><tr onClick={() => onRowClick?.(row)} className={onRowClick ? "clickable" : ""} {...(rowAttrs ? rowAttrs(row) : {})}>{cols.map((col) => <td key={col} style={colStyle(col)}>{renderCell ? renderCell(row, col) : formatCell(row[col])}</td>)}{action && <td className={actionClassName}>{action(row)}</td>}{secondaryAction && <td className={secondaryActionClassName}>{secondaryAction(row)}</td>}</tr>{isRowExpanded?.(row) && renderExpandedRow && <tr className="expanded-row"><td colSpan={totalColumns} className="expanded-row-cell">{renderExpandedRow(row)}</td></tr>}</Fragment>)}</tbody></table></div>;
 }
