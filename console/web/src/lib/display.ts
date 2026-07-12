@@ -76,6 +76,7 @@ export function friendlyColumnName(value: string) {
     maxLevel: "Max Level",
     itemName: "Item Name",
     itemId: "Item ID",
+    stack_size: "Quantity",
     quantity: "Quantity",
     durability: "Durability",
     created: "Created",
@@ -92,6 +93,7 @@ export function friendlyColumnName(value: string) {
     recipeName: "Recipe",
     researchName: "Research",
     recipeId: "Recipe ID",
+    quality_level: "Grade",
     qualityLevel: "Grade",
     itemKey: "Item Key",
     productGroup: "Product Group"

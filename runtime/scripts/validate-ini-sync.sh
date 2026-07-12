@@ -38,12 +38,12 @@ EngineCustomKey=KeepMeToo
 ; engine custom comment
 EOF
 
-DUNE_USERSETTINGS_GAME_ROOT="$ROOT_DIR" DUNE_USERSETTINGS_CONFIG="$CONFIG" python3 "$USERSETTINGS" engine-set storm_duration 777 >/dev/null
-if ! DUNE_USERSETTINGS_GAME_ROOT="$ROOT_DIR" DUNE_USERSETTINGS_CONFIG="$CONFIG" python3 "$USERSETTINGS" engine-values | grep -q $'storm_duration\t777'; then
+DUNE_USERSETTINGS_GAME_ROOT="$ROOT_DIR" DUNE_USERSETTINGS_CONFIG="$CONFIG" python3 "$USERSETTINGS" engine-set mining_output_multiplier 7.77 >/dev/null
+if ! DUNE_USERSETTINGS_GAME_ROOT="$ROOT_DIR" DUNE_USERSETTINGS_CONFIG="$CONFIG" python3 "$USERSETTINGS" engine-values | grep -q $'mining_output_multiplier\t7.77'; then
   echo "UserEngine live value was not reflected." >&2
   exit 1
 fi
-DUNE_USERSETTINGS_GAME_ROOT="$ROOT_DIR" DUNE_USERSETTINGS_CONFIG="$CONFIG" python3 "$USERSETTINGS" engine-set storm_warning_duration 88 >/dev/null
+DUNE_USERSETTINGS_GAME_ROOT="$ROOT_DIR" DUNE_USERSETTINGS_CONFIG="$CONFIG" python3 "$USERSETTINGS" engine-set vehicle_mining_output_multiplier 8.88 >/dev/null
 grep -q 'EngineCustomKey=KeepMeToo' "$ENGINE" || { echo "UserEngine unknown key was not preserved." >&2; exit 1; }
 grep -q '; engine custom comment' "$ENGINE" || { echo "UserEngine comment was not preserved." >&2; exit 1; }
 

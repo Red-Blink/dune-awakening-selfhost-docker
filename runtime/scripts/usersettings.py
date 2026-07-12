@@ -95,6 +95,7 @@ MAP_FIELDS = {
     "max_landclaim_segments": ("/Script/DuneSandbox.BuildingSettings", "m_MaxNumLandclaimSegments", "6"),
     "building_blueprint_max_extensions": ("/Script/DuneSandbox.BuildingSettings", "m_BuildingBlueprintMaxExtensions", "4"),
     "base_backup_max_extensions": ("/Script/DuneSandbox.BuildingSettings", "m_BaseBackupMaxExtensions", "8"),
+    "base_backup_tool_time_restriction_seconds": ("/Script/DuneSandbox.BuildingSettings", "m_BaseBackupToolTimeRestrictionInSeconds", "60"),
     "building_restriction_limits_enabled": ("/Script/DuneSandbox.BuildingSettings", "m_bBuildingRestrictionLimitsEnabled", "True"),
     "mitigate_all_sandstorm_damage": ("/Script/DuneSandbox.BuildingSettings", "m_bMitigateAllSandstormDamage", "False"),
     "fallback_default_building_health": ("/Script/DuneSandbox.BuildingSettings", "m_FallbackDefaultBuildingHealth", "2500.000000"),
@@ -1312,6 +1313,56 @@ def compiled_usergame_ini(profile: dict, map_name: str, partition_id: str | None
     ])
 
 
+def client_game_ini(profile: dict, map_name: str, partition_id: str | None = None) -> str:
+    target_map = canonical_map(map_name) if str(map_name or "").strip() else ""
+    target_partition = str(partition_id or "")
+    section_lines: dict[str, list[str]] = {}
+    replace_indexes: dict[tuple[str, str, str], int] = {}
+
+    def block_applies(block: dict) -> bool:
+        scope = block.get("scope")
+        if scope == "Global":
+            return True
+        if scope == "Map":
+            return bool(target_map) and block.get("map") == target_map
+        if scope == "Partition":
+            return bool(target_map and target_partition) and block.get("map") == target_map and str(block.get("partition", "")) == target_partition
+        return False
+
+    for block in sorted_profile_sections(profile.get("sections", [])):
+        if not block_applies(block):
+            continue
+        section = str(block.get("ini_section", ""))
+        if not section:
+            continue
+        entries = section_lines.setdefault(section, [])
+        for raw in block.get("lines", []):
+            parsed = split_ini_assignment(raw)
+            if not parsed:
+                entries.append(raw)
+                continue
+            prefix, key, _ = parsed
+            if key.startswith("Bgd."):
+                continue
+            if prefix:
+                entries.append(raw)
+                continue
+            replacement_key = (section, prefix, key)
+            previous_index = replace_indexes.get(replacement_key)
+            if previous_index is None:
+                replace_indexes[replacement_key] = len(entries)
+                entries.append(raw)
+            else:
+                entries[previous_index] = raw
+
+    target_label = "global UserGame" if not target_map else target_map if not target_partition else f"{target_map} partition {target_partition}"
+    return render_ini_sections(section_lines, [
+        "; Game.ini for the Dune: Awakening client.",
+        f"; Generated from Docker UserGame.ini values for {target_label}.",
+        "; Copy these sections into Saved/Config/WindowsClient/Game.ini while the game is closed.",
+    ])
+
+
 def write_compiled_userengine(path: Path, profile: dict, map_name: str = "", partition_id: str | None = None) -> None:
     atomic_write_text(path, compiled_userengine_ini(profile, map_name, partition_id))
 
@@ -1565,11 +1616,28 @@ Dune.GlobalVehicleMiningOutputMultiplier=10
         raise SystemExit("Compiled UserGame dropped unknown profile lines.")
     if "UnknownEngine=xyz" not in compiled_engine:
         raise SystemExit("Compiled UserEngine dropped unknown profile lines.")
+    client_game = client_game_ini(reparsed, "Survival_1", "3")
+    if "[Global:" in client_game or "[Map:" in client_game or "[Partition:" in client_game:
+        raise SystemExit("Client Game.ini export contains scoped Docker profile headers.")
+    if "m_GlobalXPMultiplier=2.0" not in client_game or "UnknownGlobal=abc" not in client_game or "CustomPartitionKey=True" not in client_game:
+        raise SystemExit("Client Game.ini export dropped applicable saved UserGame values.")
+    if "m_MaxNumLandclaimSegments=" in client_game:
+        raise SystemExit("Client Game.ini export included unsaved UserGame defaults.")
+    profile_set_key(reparsed, "global", "ConsoleVariables", "Bgd.ServerDisplayName", quote_ini_string("Do Not Export"))
+    profile_set_key(reparsed, "global", "ConsoleVariables", "Bgd.ServerLoginPassword", quote_ini_string("Do Not Export"))
+    bgd_filtered_client_game = client_game_ini(reparsed, "Survival_1", "3")
+    if "Bgd.ServerDisplayName=" in bgd_filtered_client_game or "Bgd.ServerLoginPassword=" in bgd_filtered_client_game:
+        raise SystemExit("Client Game.ini export included BGD identity values.")
     if profile_engine_values(reparsed)["vehicle_mining_output_multiplier"] != "10":
         raise SystemExit("Plain UserEngine raw section did not feed interactive engine values.")
     profile_set_key(reparsed, "global", "/Script/DuneSandbox.DuneGameMode", "m_GlobalFameMultiplier", "3.0")
     if "UnknownGlobal=abc" not in serialize_profile(reparsed):
         raise SystemExit("Interactive profile update dropped unknown keys.")
+    profile_set_key(reparsed, "global", "/Script/DuneSandbox.BuildingSettings", "m_BaseBackupToolTimeRestrictionInSeconds", "60")
+    if profile_map_values(reparsed, "Survival_1")["base_backup_tool_time_restriction_seconds"] != "60":
+        raise SystemExit("Base backup tool time restriction did not feed interactive map values.")
+    if "m_BaseBackupToolTimeRestrictionInSeconds=60" not in compiled_usergame_ini(reparsed, "Survival_1", "3"):
+        raise SystemExit("Base backup tool time restriction did not compile from interactive profile update.")
     if infer_runtime_target(Path("/tmp/runtime/game/survival-1-34/Saved")) != ("Survival_1", "34"):
         raise SystemExit("Dynamic Survival runtime folder was not inferred.")
     if infer_runtime_target(Path("/tmp/runtime/game/deepdesert-1-58/Saved")) != ("DeepDesert_1", "58"):
@@ -1678,6 +1746,15 @@ def main(argv: list[str]) -> int:
         return profile_write_encoded(argv[2])
     if command == "profile-game-raw":
         sys.stdout.write(profile_game_text())
+        return 0
+    if command == "client-game-ini" and len(argv) == 2:
+        sys.stdout.write(client_game_ini(read_profile(), ""))
+        return 0
+    if command == "client-game-ini" and len(argv) == 3:
+        sys.stdout.write(client_game_ini(read_profile(), argv[2]))
+        return 0
+    if command == "client-game-ini" and len(argv) == 4:
+        sys.stdout.write(client_game_ini(read_profile(), argv[2], argv[3]))
         return 0
     if command == "profile-game-write-b64" and len(argv) == 3:
         return profile_game_write_encoded(argv[2])

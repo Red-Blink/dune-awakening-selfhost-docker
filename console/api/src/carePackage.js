@@ -35,18 +35,18 @@ const DEFAULT_KIT = {
 };
 
 const DEFAULT_CONFIG = {
-  enabled: true,
-  version: DEFAULT_KIT_ID,
-  activeKitId: DEFAULT_KIT_ID,
-  autoGrantKitId: DEFAULT_KIT_ID,
-  kits: [DEFAULT_KIT],
+  enabled: false,
+  version: "",
+  activeKitId: "",
+  autoGrantKitId: "",
+  kits: [],
   items: [],
   xp: 0,
   allowRepeatGrants: false,
   autoGrantEnabled: false,
   autoGrantIntervalSeconds: 60,
   grantWhen: "first_online",
-  autoGrantRules: [{ id: "auto-rule-1", enabled: false, kitId: DEFAULT_KIT_ID, grantWhen: "first_online", lastSeenDays: 30 }]
+  autoGrantRules: []
 };
 const firstOnlineClaimLocks = new Map();
 
@@ -332,7 +332,6 @@ export async function grantCarePackage(config, playerId, body = {}, context = {}
     try {
       const resolved = resolveCatalogItem(config.repoRoot, item.itemId ? { itemId: item.itemId } : { itemName: item.itemName });
       const operation = item.itemId ? "adminGiveItemId" : "adminGiveItem";
-      const augments = Array.isArray(item.augments) ? item.augments.filter(Boolean).slice(0, 20) : [];
       const payload = {
         playerId,
         itemId: resolved.itemId,
@@ -340,19 +339,26 @@ export async function grantCarePackage(config, playerId, body = {}, context = {}
         quantity: item.quantity,
         quality: item.quality,
         durability: 1,
-        augments
+        augments: [],
+        augmentQuality: 1
       };
-      const needsDatabaseGrant = Number(item.quality || 0) > 0 || itemRequiresDatabaseGrant(resolved) || augments.length > 0;
+      const needsDatabaseGrant = itemRequiresDatabaseGrant(resolved);
       if (needsDatabaseGrant && context.db && body.actorId) {
         const result = config.mockMode
           ? { ok: true, inserted: { template_id: resolved.itemId, stack_size: item.quantity, quality_level: item.quality } }
-          : await (context.dbGiveItemToPlayer || ((actorId, itemPayload) => giveItemToPlayer(context.db, actorId, itemPayload)))(body.actorId, { templateId: resolved.itemId, quantity: item.quantity, quality: item.quality, augments });
-        results.push({ ok: true, operation: "dbGiveItemToPlayer", item: payload, result });
+          : await (context.dbGiveItemToPlayer || ((actorId, itemPayload) => giveItemToPlayer(context.db, actorId, itemPayload)))(body.actorId, {
+              templateId: resolved.itemId,
+              quantity: item.quantity,
+              quality: item.quality,
+              augments: [],
+              augmentQuality: payload.augmentQuality,
+              allowOnlinePreAugmented: source === "manual"
+            });
+        results.push({ ok: true, operation: "dbGiveItemToPlayer", item: payload, result, warning: result?.requiresRelog ? "Relog required before the item appears correctly." : undefined });
       } else {
         const command = buildDuneArgs(operation, payload);
         const result = config.mockMode ? { code: 0, stdout: "mock package item grant\n", stderr: "" } : await runDune(config, command);
         const warnings = [
-          item.quality ? "Grade could not be persisted because the player actor ID was unavailable." : "",
           liveItemGrantWarning(result)
         ].filter(Boolean);
         results.push({
@@ -726,10 +732,14 @@ function summarizeActionResults(results) {
     .filter((result) => !result.ok)
     .map((result) => `${describeAction(result)} failed: ${result.error || "unknown error"}`)
     .slice(0, 3);
+  const warnings = results
+    .filter((result) => result.ok && result.warning)
+    .map((result) => `${describeAction(result)}: ${result.warning}`)
+    .slice(0, 3);
   return {
     ok: failureCount === 0,
     status,
-    summary: `${successCount} succeeded, ${failureCount} failed${failed.length ? `; ${failed.join("; ")}` : ""}`
+    summary: `${successCount} succeeded, ${failureCount} failed${failed.length ? `; ${failed.join("; ")}` : ""}${warnings.length ? `; ${warnings.join("; ")}` : ""}`
   };
 }
 
@@ -746,15 +756,20 @@ function selectedKit(config, kitId, grantWhen = config.grantWhen, lastSeenDays =
 }
 
 function validateCarePackages(body = {}) {
+  const hasLegacyPackage = !Array.isArray(body.kits) && (
+    (Array.isArray(body.items) && body.items.length > 0) ||
+    (Object.prototype.hasOwnProperty.call(body, "xp") && Number(body.xp) !== 0) ||
+    Boolean(validateSendMessage(body.sendMessage || ""))
+  );
   const rawKits = Array.isArray(body.kits)
     ? body.kits
-    : [{
+    : hasLegacyPackage ? [{
         id: /^[A-Za-z0-9_.:-]{1,80}$/.test(String(body.version || "")) ? body.version : DEFAULT_KIT_ID,
         name: body.name || "Care Package",
         items: body.items,
         xp: body.xp,
         sendMessage: body.sendMessage
-      }];
+      }] : [];
   if (rawKits.length > 12) throw new Error("Care Package supports at most 12 packages");
   const used = new Set();
   return rawKits.map((kit, index) => {
@@ -784,7 +799,7 @@ function validateAutoGrantRules(body, kits, fallbackKitId, fallbackGrantWhen) {
   if (!kits.length) return [];
   const rawRules = Array.isArray(body.autoGrantRules)
     ? body.autoGrantRules
-    : [{ id: "auto-rule-1", enabled: false, kitId: body.autoGrantKitId || fallbackKitId, grantWhen: body.grantWhen || fallbackGrantWhen, lastSeenDays: body.lastSeenDays || 30 }];
+    : [];
   if (rawRules.length > 24) throw new Error("Care Package supports at most 24 auto-grant rules");
   const used = new Set();
   return rawRules.map((rule, index) => {
@@ -793,7 +808,7 @@ function validateAutoGrantRules(body, kits, fallbackKitId, fallbackGrantWhen) {
     used.add(id);
     return {
       id,
-      enabled: rule.enabled !== false,
+      enabled: rule.enabled === true,
       kitId: validKitId(rule.kitId, kits) || fallbackKitId,
       grantWhen: validateGrantWhen(rule.grantWhen || fallbackGrantWhen),
       lastSeenDays: validateInteger(rule.lastSeenDays ?? 30, "lastSeenDays", 1, 3650)
@@ -829,23 +844,15 @@ function validateCarePackageItem(item = {}) {
   if (!itemName && !itemId) throw new Error("Care Package item requires itemName or itemId");
   if (itemName && (itemName.length > 240 || /[\r\n]/.test(itemName))) throw new Error("Invalid Care Package item name");
   if (itemId && !/^[A-Za-z0-9_./:-]{1,240}$/.test(itemId)) throw new Error("Invalid Care Package item id");
-  const augments = Array.isArray(item.augments)
-    ? item.augments.filter((id) => String(id || "").trim() && /^[A-Za-z0-9_./:-]{1,240}$/.test(String(id || "").trim())).slice(0, 20)
-    : [];
-  return {
+  const normalized = {
     itemName,
     itemId,
     quantity: validateInteger(item.quantity ?? 1, "quantity", 1, 1000000),
-    quality: validateItemQuality(item.quality ?? item.grade ?? item.durability ?? 0),
+    quality: 0,
     durability: 1,
-    augments
+    augments: []
   };
-}
-
-function validateItemQuality(value) {
-  const number = Number(value);
-  if (!Number.isFinite(number)) return 0;
-  return Math.max(0, Math.min(5, Math.trunc(number)));
+  return normalized;
 }
 
 function validateSendMessage(value) {

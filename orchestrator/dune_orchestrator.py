@@ -146,7 +146,7 @@ def check_free_space():
         for path, free_gb in too_low:
             print(f"[dune]   {path}: {free_gb:.1f} GiB free, needs at least {MIN_FREE_GB} GiB", flush=True)
         print("", flush=True)
-        print("[dune] Free disk space or move Docker's data-root to a larger disk, then retry:", flush=True)
+        print("[dune] Free up disk space or move Docker's data-root to a larger disk, then retry:", flush=True)
         print("[dune]   runtime/scripts/update.sh install", flush=True)
         print("[dune] Advanced override if you know there is enough external Docker storage:", flush=True)
         print("[dune]   DUNE_MIN_FREE_GB=10 runtime/scripts/update.sh install", flush=True)

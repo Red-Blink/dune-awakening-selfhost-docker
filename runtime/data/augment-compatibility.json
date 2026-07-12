@@ -1,0 +1,3991 @@
+{
+  "source": "https://www.method.gg/dune-awakening/augmentations-database",
+  "generatedFrom": "Method augmentation compatibility and effect data, July 2026",
+  "matchRule": "An augment is compatible when any item tag starts with any augment tag.",
+  "augments": {
+    "T6_Augment_Acuracy1": {
+      "name": "Precision Barrel Adjuster",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/precision-barrel-adjuster",
+      "gradeEffects": {
+        "1": [
+          "Accuracy +2% - +5%"
+        ],
+        "2": [
+          "Accuracy +6% - +10%"
+        ],
+        "3": [
+          "Accuracy +11% - +15%"
+        ],
+        "4": [
+          "Accuracy +16% - +20%"
+        ],
+        "5": [
+          "Accuracy +21% - +25%"
+        ]
+      },
+      "effectSummary": "Accuracy +21% - +25%"
+    },
+    "T6_Augment_Armor1": {
+      "name": "Concussive Dampening",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Clothes.Utility",
+        "Items.Clothes.Stillsuit",
+        "Items.Clothes.ScoutArmor",
+        "Items.Clothes.HeavyArmor"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/concussive-dampening",
+      "gradeEffects": {
+        "1": [
+          "Concussive Mitigation +1.75% - +2.25%",
+          "Energy Mitigation -1%"
+        ],
+        "2": [
+          "Concussive Mitigation +2.5% - +3.1%",
+          "Energy Mitigation -1%"
+        ],
+        "3": [
+          "Concussive Mitigation +3.25% - +4%",
+          "Energy Mitigation -1%"
+        ]
+      },
+      "effectSummary": "Concussive Mitigation +3.25% - +4%; Energy Mitigation -1%"
+    },
+    "T6_Augment_Armor10": {
+      "name": "Energy Resistant Weave",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Clothes.Utility",
+        "Items.Clothes.Stillsuit",
+        "Items.Clothes.ScoutArmor",
+        "Items.Clothes.HeavyArmor"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/energy-resistant-weave",
+      "gradeEffects": {
+        "1": [
+          "Energy Mitigation +2.2% - +3.11%",
+          "Poison Mitigation -1%"
+        ],
+        "2": [
+          "Energy Mitigation +3.25% - +4.25%",
+          "Poison Mitigation -1%"
+        ],
+        "3": [
+          "Energy Mitigation +4.3% - +5.5%",
+          "Poison Mitigation -1%"
+        ]
+      },
+      "effectSummary": "Energy Mitigation +4.3% - +5.5%; Poison Mitigation -1%"
+    },
+    "T6_Augment_Armor11": {
+      "name": "Detoxifying Fabrics",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Clothes.Utility",
+        "Items.Clothes.Stillsuit",
+        "Items.Clothes.ScoutArmor",
+        "Items.Clothes.HeavyArmor"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/detoxifying-fabrics",
+      "gradeEffects": {
+        "1": [
+          "Poison Mitigation +1.75% - +2.25%",
+          "Energy Mitigation -1%"
+        ],
+        "2": [
+          "Poison Mitigation +2.5% - +3.1%",
+          "Energy Mitigation -1%"
+        ],
+        "3": [
+          "Poison Mitigation +3.25% - +4%",
+          "Energy Mitigation -1%"
+        ]
+      },
+      "effectSummary": "Poison Mitigation +3.25% - +4%; Energy Mitigation -1%"
+    },
+    "T6_Augment_Armor12": {
+      "name": "Dart-proof Latticing",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Clothes.Utility",
+        "Items.Clothes.Stillsuit",
+        "Items.Clothes.ScoutArmor",
+        "Items.Clothes.HeavyArmor"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/dart-proof-latticing",
+      "gradeEffects": {
+        "1": [
+          "Dart Mitigation +2.2% - +3%",
+          "Volume (Weight) +50%"
+        ],
+        "2": [
+          "Dart Mitigation +3.25% - +4.2%",
+          "Volume (Weight) +50%"
+        ],
+        "3": [
+          "Dart Mitigation +4.25% - +5.5%",
+          "Volume (Weight) +50%"
+        ]
+      },
+      "effectSummary": "Dart Mitigation +4.25% - +5.5%; Volume (Weight) +50%"
+    },
+    "T6_Augment_Armor13": {
+      "name": "Flame-resistant Fabrics",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Clothes.Utility",
+        "Items.Clothes.Stillsuit",
+        "Items.Clothes.ScoutArmor",
+        "Items.Clothes.HeavyArmor"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/flame-resistant-fabrics",
+      "gradeEffects": {
+        "1": [
+          "Fire Mitigation +1% - +1.38%",
+          "Poison Mitigation -1%"
+        ],
+        "2": [
+          "Fire Mitigation +1.5% - +2%",
+          "Poison Mitigation -1%"
+        ],
+        "3": [
+          "Fire Mitigation +2.25% - +3%",
+          "Poison Mitigation -1%"
+        ]
+      },
+      "effectSummary": "Fire Mitigation +2.25% - +3%; Poison Mitigation -1%"
+    },
+    "T6_Augment_Armor14": {
+      "name": "Blade-warding Weave",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Clothes.Utility",
+        "Items.Clothes.Stillsuit",
+        "Items.Clothes.ScoutArmor",
+        "Items.Clothes.HeavyArmor"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/blade-warding-weave",
+      "gradeEffects": {
+        "1": [
+          "Blade Mitigation +1.75% - +2.25%",
+          "Dart Mitigation -1%"
+        ],
+        "2": [
+          "Blade Mitigation +2.5% - +3.1%",
+          "Dart Mitigation -1%"
+        ],
+        "3": [
+          "Blade Mitigation +3.25% - +4%",
+          "Dart Mitigation -1%"
+        ]
+      },
+      "effectSummary": "Blade Mitigation +3.25% - +4%; Dart Mitigation -1%"
+    },
+    "T6_Augment_Armor16": {
+      "name": "Radiation Absorbing Fabrics",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Clothes.Stillsuit",
+        "Items.Clothes.ScoutArmor",
+        "Items.Clothes.HeavyArmor"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/radiation-absorbing-fabrics",
+      "gradeEffects": {
+        "1": [
+          "Fire Mitigation +0.6% - +0.88%",
+          "Radiation Mitigation +2% - +2.9%",
+          "Blade Mitigation -1%",
+          "Dart Mitigation -1%"
+        ],
+        "2": [
+          "Fire Mitigation +1% - +1.38%",
+          "Radiation Mitigation +3% - +3.9%",
+          "Blade Mitigation -1%",
+          "Dart Mitigation -1%"
+        ],
+        "3": [
+          "Fire Mitigation +1.5% - +2%",
+          "Radiation Mitigation +4% - +4.9%",
+          "Blade Mitigation -1%",
+          "Dart Mitigation -1%"
+        ],
+        "4": [
+          "Fire Mitigation +2.25% - +3%",
+          "Radiation Mitigation +5% - +6%",
+          "Blade Mitigation -1%",
+          "Dart Mitigation -1%"
+        ]
+      },
+      "effectSummary": "Fire Mitigation +2.25% - +3%; Radiation Mitigation +5% - +6%; Blade Mitigation -1%; Dart Mitigation -1%"
+    },
+    "T6_Augment_Armor17": {
+      "name": "Radiation Shielded Latticing",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Clothes.Stillsuit",
+        "Items.Clothes.ScoutArmor",
+        "Items.Clothes.HeavyArmor"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/radiation-shielded-latticing",
+      "gradeEffects": {
+        "1": [
+          "Radiation Mitigation +3% - +3.9%",
+          "Volume (Weight) +50%"
+        ],
+        "2": [
+          "Radiation Mitigation +4% - +4.9%",
+          "Volume (Weight) +50%"
+        ],
+        "3": [
+          "Radiation Mitigation +5% - +6%",
+          "Volume (Weight) +50%"
+        ]
+      },
+      "effectSummary": "Radiation Mitigation +5% - +6%; Volume (Weight) +50%"
+    },
+    "T6_Augment_Armor2": {
+      "name": "Concussive Redirection",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Clothes.Utility",
+        "Items.Clothes.Stillsuit",
+        "Items.Clothes.ScoutArmor",
+        "Items.Clothes.HeavyArmor"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/concussive-redirection",
+      "gradeEffects": {
+        "1": [
+          "Concussive Mitigation +1.75% - +2.25%",
+          "Dart Mitigation -1%"
+        ],
+        "2": [
+          "Concussive Mitigation +2.5% - +3.1%",
+          "Dart Mitigation -1%"
+        ],
+        "3": [
+          "Concussive Mitigation +3.25% - +4%",
+          "Dart Mitigation -1%"
+        ]
+      },
+      "effectSummary": "Concussive Mitigation +3.25% - +4%; Dart Mitigation -1%"
+    },
+    "T6_Augment_Armor3": {
+      "name": "Woven Reinforcement",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Clothes.Utility",
+        "Items.Clothes.Stillsuit",
+        "Items.Clothes.ScoutArmor",
+        "Items.Clothes.HeavyArmor"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/woven-reinforcement",
+      "gradeEffects": {
+        "1": [
+          "Blade Mitigation +1.75% - +2.25%",
+          "Fire Mitigation -0.5%",
+          "Poison Mitigation -0.5%"
+        ],
+        "2": [
+          "Blade Mitigation +2.5% - +3.1%",
+          "Fire Mitigation -0.5%",
+          "Poison Mitigation -0.5%"
+        ],
+        "3": [
+          "Blade Mitigation +3.25% - +4%",
+          "Fire Mitigation -0.5%",
+          "Poison Mitigation -0.5%"
+        ]
+      },
+      "effectSummary": "Blade Mitigation +3.25% - +4%; Fire Mitigation -0.5%; Poison Mitigation -0.5%"
+    },
+    "T6_Augment_Armor4": {
+      "name": "Penetrative Reinforcement",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Clothes.Utility",
+        "Items.Clothes.Stillsuit",
+        "Items.Clothes.ScoutArmor",
+        "Items.Clothes.HeavyArmor"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/penetrative-reinforcement",
+      "gradeEffects": {
+        "1": [
+          "Dart Mitigation +1.25% - +2%",
+          "Blade Mitigation -1%"
+        ],
+        "2": [
+          "Dart Mitigation +2.2% - +3%",
+          "Blade Mitigation -1%"
+        ],
+        "3": [
+          "Dart Mitigation +3.25% - +4.2%",
+          "Blade Mitigation -1%"
+        ],
+        "4": [
+          "Dart Mitigation +4.25% - +5.5%",
+          "Blade Mitigation -1%"
+        ]
+      },
+      "effectSummary": "Dart Mitigation +4.25% - +5.5%; Blade Mitigation -1%"
+    },
+    "T6_Augment_Armor5": {
+      "name": "Energy Dispersing Padding",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Clothes.Utility",
+        "Items.Clothes.Stillsuit",
+        "Items.Clothes.ScoutArmor",
+        "Items.Clothes.HeavyArmor"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/energy-dispersing-padding",
+      "gradeEffects": {
+        "1": [
+          "Energy Mitigation +1.3% - +2.02%",
+          "Concussive Mitigation -1%"
+        ],
+        "2": [
+          "Energy Mitigation +2.2% - +3.11%",
+          "Concussive Mitigation -1%"
+        ],
+        "3": [
+          "Energy Mitigation +3.25% - +4.25%",
+          "Concussive Mitigation -1%"
+        ],
+        "4": [
+          "Energy Mitigation +4.3% - +5.5%",
+          "Concussive Mitigation -1%"
+        ]
+      },
+      "effectSummary": "Energy Mitigation +4.3% - +5.5%; Concussive Mitigation -1%"
+    },
+    "T6_Augment_Armor6": {
+      "name": "Garment Reinforcement",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Clothes.Utility",
+        "Items.Clothes.Stillsuit",
+        "Items.Clothes.ScoutArmor",
+        "Items.Clothes.HeavyArmor"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/garment-reinforcement",
+      "gradeEffects": {
+        "1": [
+          "Armor +2% - +4%"
+        ],
+        "2": [
+          "Armor +5% - +8%"
+        ],
+        "3": [
+          "Armor +9% - +12%"
+        ],
+        "4": [
+          "Armor +13% - +16%"
+        ],
+        "5": [
+          "Armor +17% - +20%"
+        ]
+      },
+      "effectSummary": "Armor +17% - +20%"
+    },
+    "T6_Augment_Armor8": {
+      "name": "Desert-tested Weave",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Clothes.Utility",
+        "Items.Clothes.Stillsuit",
+        "Items.Clothes.ScoutArmor",
+        "Items.Clothes.HeavyArmor"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/desert-tested-weave",
+      "gradeEffects": {
+        "1": [
+          "Heat Protection +30% - +40%",
+          "Volume (Weight) +50%"
+        ],
+        "2": [
+          "Heat Protection +50% - +60%",
+          "Volume (Weight) +50%"
+        ],
+        "3": [
+          "Heat Protection +70% - +80%",
+          "Volume (Weight) +50%"
+        ],
+        "4": [
+          "Heat Protection +90% - +100%",
+          "Volume (Weight) +50%"
+        ]
+      },
+      "effectSummary": "Heat Protection +90% - +100%; Volume (Weight) +50%"
+    },
+    "T6_Augment_Armor9": {
+      "name": "Curative-infused Padding",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Clothes.Utility",
+        "Items.Clothes.Stillsuit",
+        "Items.Clothes.ScoutArmor",
+        "Items.Clothes.HeavyArmor"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/curative-infused-padding",
+      "gradeEffects": {
+        "1": [
+          "Poison Mitigation +1% - +1.5%",
+          "Fire Mitigation -1%"
+        ],
+        "2": [
+          "Poison Mitigation +1.75% - +2.25%",
+          "Fire Mitigation -1%"
+        ],
+        "3": [
+          "Poison Mitigation +2.5% - +3.1%",
+          "Fire Mitigation -1%"
+        ],
+        "4": [
+          "Poison Mitigation +3.25% - +4%",
+          "Fire Mitigation -1%"
+        ]
+      },
+      "effectSummary": "Poison Mitigation +3.25% - +4%; Fire Mitigation -1%"
+    },
+    "T6_Augment_BR1": {
+      "name": "Karpov 38 Pressurizer",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/karpov-38-pressurizer",
+      "gradeEffects": {
+        "1": [
+          "Accuracy +16% - +20%",
+          "Ranged Damage +28% - +44%",
+          "Shield Damage +10% - +14%",
+          "Rate of Fire -20%"
+        ],
+        "2": [
+          "Accuracy +21% - +25%",
+          "Ranged Damage +48% - +70%",
+          "Shield Damage +15% - +20%",
+          "Rate of Fire -20%"
+        ]
+      },
+      "effectSummary": "Accuracy +21% - +25%; Ranged Damage +48% - +70%; Shield Damage +15% - +20%; Rate of Fire -20%"
+    },
+    "T6_Augment_BR2": {
+      "name": "Karpov 38 Dart Sprayer",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/karpov-38-dart-sprayer",
+      "gradeEffects": {
+        "1": [
+          "Rate of Fire +7% - +11%",
+          "Ranged Damage -5%"
+        ],
+        "2": [
+          "Rate of Fire +12% - +18%",
+          "Ranged Damage -5%"
+        ],
+        "3": [
+          "Rate of Fire +20% - +26%",
+          "Ranged Damage -5%"
+        ],
+        "4": [
+          "Rate of Fire +27% - +34%",
+          "Ranged Damage -5%"
+        ]
+      },
+      "effectSummary": "Rate of Fire +27% - +34%; Ranged Damage -5%"
+    },
+    "T6_Augment_BR3": {
+      "name": "Karpov 38 Heavy Kit",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/karpov-38-heavy-kit",
+      "gradeEffects": {
+        "1": [
+          "Ranged Damage +9% - +15%",
+          "Volume Reduction -35% - -40%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "2": [
+          "Ranged Damage +18% - +26%",
+          "Volume Reduction -45% - -50%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "3": [
+          "Ranged Damage +28% - +44%",
+          "Volume Reduction -55% - -60%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "4": [
+          "Ranged Damage +48% - +70%",
+          "Volume Reduction -65% - -70%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ]
+      },
+      "effectSummary": "Ranged Damage +48% - +70%; Volume Reduction -65% - -70%; Clip Size -25%; Power Consumption Per Shot +30%"
+    },
+    "T6_Augment_BR4": {
+      "name": "Karpov 38 Focuser",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/karpov-38-focuser",
+      "gradeEffects": {
+        "1": [
+          "Accuracy +6% - +10%",
+          "Recoil Reduction -11% - -20%",
+          "Reload Speed -4%",
+          "Ranged Damage -5%"
+        ],
+        "2": [
+          "Accuracy +11% - +15%",
+          "Recoil Reduction -22% - -30%",
+          "Reload Speed -6%",
+          "Ranged Damage -5%"
+        ],
+        "3": [
+          "Accuracy +16% - +20%",
+          "Recoil Reduction -33% - -40%",
+          "Reload Speed -8%",
+          "Ranged Damage -5%"
+        ],
+        "4": [
+          "Accuracy +21% - +25%",
+          "Recoil Reduction -44% - -50%",
+          "Reload Speed -10%",
+          "Ranged Damage -5%"
+        ]
+      },
+      "effectSummary": "Accuracy +21% - +25%; Recoil Reduction -44% - -50%; Reload Speed -10%; Ranged Damage -5%"
+    },
+    "T6_Augment_BR8": {
+      "name": "Karpov 38 Precision Kit",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/karpov-38-precision-kit",
+      "gradeEffects": {
+        "1": [
+          "Clip Size +40% - +60%",
+          "Headshot Damage +10% - +16%",
+          "Power Consumption Per Shot -15% - -25%",
+          "Accuracy -10%",
+          "Volume (Weight) +50%"
+        ],
+        "2": [
+          "Clip Size +60% - +80%",
+          "Headshot Damage +20% - +31%",
+          "Power Consumption Per Shot -20% - -30%",
+          "Accuracy -10%",
+          "Volume (Weight) +50%"
+        ],
+        "3": [
+          "Clip Size +80% - +100%",
+          "Headshot Damage +34% - +50%",
+          "Power Consumption Per Shot -25% - -35%",
+          "Accuracy -10%",
+          "Volume (Weight) +50%"
+        ]
+      },
+      "effectSummary": "Clip Size +80% - +100%; Headshot Damage +34% - +50%; Power Consumption Per Shot -25% - -35%; Accuracy -10%; Volume (Weight) +50%"
+    },
+    "T6_Augment_Ch5_BR1": {
+      "name": "Karpov 38 Sniper Barrel",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/karpov-38-sniper-barrel",
+      "gradeEffects": {
+        "1": [
+          "Accuracy +11% - +15%",
+          "Effective Range +11% - +15%",
+          "Reload Speed +10%"
+        ],
+        "2": [
+          "Accuracy +16% - +20%",
+          "Effective Range +17% - +20%",
+          "Reload Speed +10%"
+        ],
+        "3": [
+          "Accuracy +21% - +25%",
+          "Effective Range +22% - +25%",
+          "Reload Speed +10%"
+        ]
+      },
+      "effectSummary": "Accuracy +21% - +25%; Effective Range +22% - +25%; Reload Speed +10%"
+    },
+    "T6_Augment_Ch5_Fireballer1": {
+      "name": "Pyrocket Decimator",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Fireballer"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/pyrocket-decimator",
+      "gradeEffects": {
+        "1": [
+          "Shield Damage +12% - +18%",
+          "Accuracy -10%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "2": [
+          "Shield Damage +20% - +28%",
+          "Accuracy -10%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "3": [
+          "Shield Damage +30% - +40%",
+          "Accuracy -10%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ]
+      },
+      "effectSummary": "Shield Damage +30% - +40%; Accuracy -10%; Clip Size -25%; Power Consumption Per Shot +30%"
+    },
+    "T6_Augment_Ch5_Flamethrower1": {
+      "name": "Flamethrower Decimator",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Flamethrower"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/flamethrower-decimator",
+      "gradeEffects": {
+        "1": [
+          "Shield Damage +12% - +18%",
+          "Rate of Fire -10%"
+        ],
+        "2": [
+          "Shield Damage +20% - +28%",
+          "Rate of Fire -10%"
+        ],
+        "3": [
+          "Shield Damage +30% - +40%",
+          "Rate of Fire -10%"
+        ]
+      },
+      "effectSummary": "Shield Damage +30% - +40%; Rate of Fire -10%"
+    },
+    "T6_Augment_Ch5_Heavypistol1": {
+      "name": "Rafiq Snubnose Marksman",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Pistol"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/rafiq-snubnose-marksman",
+      "gradeEffects": {
+        "1": [
+          "Effective Range +22% - +30%",
+          "Recoil Reduction -22% - -30%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "2": [
+          "Effective Range +34% - +40%",
+          "Recoil Reduction -33% - -40%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "3": [
+          "Effective Range +44% - +50%",
+          "Recoil Reduction -44% - -50%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ]
+      },
+      "effectSummary": "Effective Range +44% - +50%; Recoil Reduction -44% - -50%; Clip Size -25%; Power Consumption Per Shot +30%"
+    },
+    "T6_Augment_Ch5_Lasgun1": {
+      "name": "Lasgun Concentrator",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Lasgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/lasgun-concentrator",
+      "gradeEffects": {
+        "1": [
+          "Accuracy -18% - -30%",
+          "Ranged Damage +18% - +26%",
+          "Power Consumption Per Shot +30%",
+          "Rate of Fire -10%"
+        ],
+        "2": [
+          "Accuracy -24% - -40%",
+          "Ranged Damage +28% - +44%",
+          "Power Consumption Per Shot +30%",
+          "Rate of Fire -10%"
+        ],
+        "3": [
+          "Accuracy -30% - -50%",
+          "Ranged Damage +48% - +70%",
+          "Power Consumption Per Shot +30%",
+          "Rate of Fire -10%"
+        ]
+      },
+      "effectSummary": "Accuracy -30% - -50%; Ranged Damage +48% - +70%; Power Consumption Per Shot +30%; Rate of Fire -10%"
+    },
+    "T6_Augment_Ch5_LMG1": {
+      "name": "VULCAN GAU-92 Accelerator",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.LMG"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/vulcan-gau-92-accelerator",
+      "gradeEffects": {
+        "1": [
+          "Accuracy +11% - +15%",
+          "Recoil Reduction -22% - -30%",
+          "Reload Speed -6%",
+          "Shield Damage -5%"
+        ],
+        "2": [
+          "Accuracy +16% - +20%",
+          "Recoil Reduction -33% - -40%",
+          "Reload Speed -8%",
+          "Shield Damage -5%"
+        ],
+        "3": [
+          "Accuracy +21% - +25%",
+          "Recoil Reduction -44% - -50%",
+          "Reload Speed -10%",
+          "Shield Damage -5%"
+        ]
+      },
+      "effectSummary": "Accuracy +21% - +25%; Recoil Reduction -44% - -50%; Reload Speed -10%; Shield Damage -5%"
+    },
+    "T6_Augment_Ch5_Maulapistol1": {
+      "name": "Maula Pistol Antipersonnel Rounds",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Pistol"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/maula-pistol-antipersonnel-rounds",
+      "gradeEffects": {
+        "1": [
+          "Headshot Damage +10% - +16%",
+          "Ranged Damage +18% - +26%",
+          "Effective Range -10%",
+          "Recoil +5%",
+          "Shield Damage -5%"
+        ],
+        "2": [
+          "Headshot Damage +20% - +31%",
+          "Ranged Damage +28% - +44%",
+          "Effective Range -10%",
+          "Recoil +5%",
+          "Shield Damage -5%"
+        ],
+        "3": [
+          "Headshot Damage +34% - +50%",
+          "Ranged Damage +48% - +70%",
+          "Effective Range -10%",
+          "Recoil +5%",
+          "Shield Damage -5%"
+        ]
+      },
+      "effectSummary": "Headshot Damage +34% - +50%; Ranged Damage +48% - +70%; Effective Range -10%; Recoil +5%; Shield Damage -5%"
+    },
+    "T6_Augment_Ch5_Melee1": {
+      "name": "Heavy Metal Blade Coating",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.MeleeWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/heavy-metal-blade-coating",
+      "gradeEffects": {
+        "1": [
+          "Blade Damage +28% - +44%",
+          "Volume (Weight) +50%"
+        ],
+        "2": [
+          "Blade Damage +48% - +70%",
+          "Volume (Weight) +50%"
+        ]
+      },
+      "effectSummary": "Blade Damage +48% - +70%; Volume (Weight) +50%"
+    },
+    "T6_Augment_Ch5_Melee3": {
+      "name": "Blade Blood Grooves",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.MeleeWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/blade-blood-grooves",
+      "gradeEffects": {
+        "1": [
+          "Attack Stamina Cost -3% - -5%",
+          "Volume Reduction -25% - -30%",
+          "Blade Damage -10%"
+        ],
+        "2": [
+          "Attack Stamina Cost -7% - -9%",
+          "Volume Reduction -35% - -40%",
+          "Blade Damage -10%"
+        ],
+        "3": [
+          "Attack Stamina Cost -11% - -13%",
+          "Volume Reduction -45% - -50%",
+          "Blade Damage -10%"
+        ],
+        "4": [
+          "Attack Stamina Cost -15% - -17%",
+          "Volume Reduction -55% - -60%",
+          "Blade Damage -10%"
+        ],
+        "5": [
+          "Attack Stamina Cost -18% - -20%",
+          "Volume Reduction -65% - -70%",
+          "Blade Damage -10%"
+        ]
+      },
+      "effectSummary": "Attack Stamina Cost -18% - -20%; Volume Reduction -65% - -70%; Blade Damage -10%"
+    },
+    "T6_Augment_Ch5_RocketLauncher1": {
+      "name": "Missile Launcher Obliterator",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.RocketLauncher"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/missile-launcher-obliterator",
+      "gradeEffects": {
+        "1": [
+          "Recoil Reduction -22% - -30%",
+          "Shield Damage +6% - +9%",
+          "Accuracy -10%"
+        ],
+        "2": [
+          "Recoil Reduction -33% - -40%",
+          "Shield Damage +10% - +14%",
+          "Accuracy -10%"
+        ],
+        "3": [
+          "Recoil Reduction -44% - -50%",
+          "Shield Damage +15% - +20%",
+          "Accuracy -10%"
+        ]
+      },
+      "effectSummary": "Recoil Reduction -44% - -50%; Shield Damage +15% - +20%; Accuracy -10%"
+    },
+    "T6_Augment_Ch5_Scattergun1": {
+      "name": "Scattergun Rampage-Enhancement",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Shotgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/scattergun-rampage-enhancement",
+      "gradeEffects": {
+        "1": [
+          "Clip Size +40% - +60%",
+          "Power Consumption Per Shot -15% - -25%",
+          "Ranged Damage +18% - +26%",
+          "Headshot Damage -15%"
+        ],
+        "2": [
+          "Clip Size +60% - +80%",
+          "Power Consumption Per Shot -20% - -30%",
+          "Ranged Damage +28% - +44%",
+          "Headshot Damage -15%"
+        ],
+        "3": [
+          "Clip Size +80% - +100%",
+          "Power Consumption Per Shot -25% - -35%",
+          "Ranged Damage +48% - +70%",
+          "Headshot Damage -15%"
+        ]
+      },
+      "effectSummary": "Clip Size +80% - +100%; Power Consumption Per Shot -25% - -35%; Ranged Damage +48% - +70%; Headshot Damage -15%"
+    },
+    "T6_Augment_Ch5_Shotgun1": {
+      "name": "Drillshot FK7 Spray-and-Pray",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Shotgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/drillshot-fk7-spray-and-pray",
+      "gradeEffects": {
+        "1": [
+          "Rate of Fire +12% - +18%",
+          "Reload Speed -6%",
+          "Clip Size -25%",
+          "Effective Range -10%",
+          "Power Consumption Per Shot +30%",
+          "Recoil +5%"
+        ],
+        "2": [
+          "Rate of Fire +20% - +26%",
+          "Reload Speed -8%",
+          "Clip Size -25%",
+          "Effective Range -10%",
+          "Power Consumption Per Shot +30%",
+          "Recoil +5%"
+        ],
+        "3": [
+          "Rate of Fire +27% - +34%",
+          "Reload Speed -10%",
+          "Clip Size -25%",
+          "Effective Range -10%",
+          "Power Consumption Per Shot +30%",
+          "Recoil +5%"
+        ]
+      },
+      "effectSummary": "Rate of Fire +27% - +34%; Reload Speed -10%; Clip Size -25%; Effective Range -10%; Power Consumption Per Shot +30%; Recoil +5%"
+    },
+    "T6_Augment_Ch5_SMG1": {
+      "name": "Disruptor M11 Personnel-Buster",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.SMG"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/disruptor-m11-personnel-buster",
+      "gradeEffects": {
+        "1": [
+          "Headshot Damage +10% - +16%",
+          "Rate of Fire +12% - +18%",
+          "Effective Range -10%",
+          "Recoil +5%",
+          "Shield Damage -5%"
+        ],
+        "2": [
+          "Headshot Damage +20% - +31%",
+          "Rate of Fire +20% - +26%",
+          "Effective Range -10%",
+          "Recoil +5%",
+          "Shield Damage -5%"
+        ],
+        "3": [
+          "Headshot Damage +34% - +50%",
+          "Rate of Fire +27% - +34%",
+          "Effective Range -10%",
+          "Recoil +5%",
+          "Shield Damage -5%"
+        ]
+      },
+      "effectSummary": "Headshot Damage +34% - +50%; Rate of Fire +27% - +34%; Effective Range -10%; Recoil +5%; Shield Damage -5%"
+    },
+    "T6_Augment_Ch5_Spitdart1": {
+      "name": "JABAL Spitdart Ranger",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Rifle.SpitDart"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/jabal-spitdart-ranger",
+      "gradeEffects": {
+        "1": [
+          "Recoil Reduction -22% - -30%",
+          "Reload Speed -6%",
+          "Rate of Fire -10%"
+        ],
+        "2": [
+          "Recoil Reduction -33% - -40%",
+          "Reload Speed -8%",
+          "Rate of Fire -10%"
+        ],
+        "3": [
+          "Recoil Reduction -44% - -50%",
+          "Reload Speed -10%",
+          "Rate of Fire -10%"
+        ]
+      },
+      "effectSummary": "Recoil Reduction -44% - -50%; Reload Speed -10%; Rate of Fire -10%"
+    },
+    "T6_Augment_Damage1": {
+      "name": "Heavy Caliber Upgrade",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/heavy-caliber-upgrade",
+      "gradeEffects": {
+        "1": [
+          "Ranged Damage +2% - +8%"
+        ],
+        "2": [
+          "Ranged Damage +9% - +15%"
+        ],
+        "3": [
+          "Ranged Damage +18% - +26%"
+        ],
+        "4": [
+          "Ranged Damage +28% - +44%"
+        ],
+        "5": [
+          "Ranged Damage +48% - +70%"
+        ]
+      },
+      "effectSummary": "Ranged Damage +48% - +70%"
+    },
+    "T6_Augment_Damage2": {
+      "name": "House Heavy Caliber Upgrade",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/house-heavy-caliber-upgrade",
+      "gradeEffects": {
+        "1": [
+          "Ranged Damage +8% - +10%"
+        ],
+        "2": [
+          "Ranged Damage +9% - +15%"
+        ],
+        "3": [
+          "Ranged Damage +18% - +26%"
+        ],
+        "4": [
+          "Ranged Damage +28% - +44%"
+        ],
+        "5": [
+          "Ranged Damage +48% - +70%"
+        ]
+      },
+      "effectSummary": "Ranged Damage +48% - +70%"
+    },
+    "T6_Augment_DeathDurabilityOff": {
+      "name": "Protective Coating",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Clothes.Utility",
+        "Items.Clothes.Stillsuit",
+        "Items.Clothes.ScoutArmor",
+        "Items.Clothes.HeavyArmor",
+        "Items.Holsters.RangedWeapons",
+        "Items.Holsters.MeleeWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/protective-coating",
+      "gradeEffects": {
+        "1": [
+          "Durability Loss on Defeat 0%"
+        ]
+      },
+      "effectSummary": "Durability Loss on Defeat 0%"
+    },
+    "T6_Augment_Fireballer1": {
+      "name": "Pyrocket Supercharger",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Fireballer"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/pyrocket-supercharger",
+      "gradeEffects": {
+        "1": [
+          "Ranged Damage +18% - +26%",
+          "Rate of Fire +12% - +18%",
+          "Reload Speed +20%",
+          "Volume (Weight) +50%"
+        ],
+        "2": [
+          "Ranged Damage +28% - +44%",
+          "Rate of Fire +20% - +26%",
+          "Reload Speed +20%",
+          "Volume (Weight) +50%"
+        ],
+        "3": [
+          "Ranged Damage +48% - +70%",
+          "Rate of Fire +27% - +34%",
+          "Reload Speed +20%",
+          "Volume (Weight) +50%"
+        ]
+      },
+      "effectSummary": "Ranged Damage +48% - +70%; Rate of Fire +27% - +34%; Reload Speed +20%; Volume (Weight) +50%"
+    },
+    "T6_Augment_Fireballer2": {
+      "name": "Pyrocket Quickloader",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Fireballer"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/pyrocket-quickloader",
+      "gradeEffects": {
+        "1": [
+          "Clip Size +11% - +20%",
+          "Power Consumption Per Shot -6% - -10%",
+          "Reload Speed -4%",
+          "Volume Reduction -35% - -40%",
+          "Accuracy -10%",
+          "Shield Damage -5%"
+        ],
+        "2": [
+          "Clip Size +22% - +30%",
+          "Power Consumption Per Shot -11% - -15%",
+          "Reload Speed -6%",
+          "Volume Reduction -45% - -50%",
+          "Accuracy -10%",
+          "Shield Damage -5%"
+        ],
+        "3": [
+          "Clip Size +33% - +40%",
+          "Power Consumption Per Shot -16% - -20%",
+          "Reload Speed -8%",
+          "Volume Reduction -55% - -60%",
+          "Accuracy -10%",
+          "Shield Damage -5%"
+        ],
+        "4": [
+          "Clip Size +44% - +50%",
+          "Power Consumption Per Shot -21% - -25%",
+          "Reload Speed -10%",
+          "Volume Reduction -65% - -70%",
+          "Accuracy -10%",
+          "Shield Damage -5%"
+        ]
+      },
+      "effectSummary": "Clip Size +44% - +50%; Power Consumption Per Shot -21% - -25%; Reload Speed -10%; Volume Reduction -65% - -70%; Accuracy -10%; Shield Damage -5%"
+    },
+    "T6_Augment_Flamethrower1": {
+      "name": "Flamethrower Amplifier",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Flamethrower"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/flamethrower-amplifier",
+      "gradeEffects": {
+        "1": [
+          "Ranged Damage +28% - +44%",
+          "Recoil Reduction -33% - -40%",
+          "Volume (Weight) +50%"
+        ],
+        "2": [
+          "Ranged Damage +48% - +70%",
+          "Recoil Reduction -44% - -50%",
+          "Volume (Weight) +50%"
+        ]
+      },
+      "effectSummary": "Ranged Damage +48% - +70%; Recoil Reduction -44% - -50%; Volume (Weight) +50%"
+    },
+    "T6_Augment_Flamethrower2": {
+      "name": "Flamethrower Superheater",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Flamethrower"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/flamethrower-superheater",
+      "gradeEffects": {
+        "1": [
+          "Fire DoT Damage +300%",
+          "Rate of Fire +27% - +34%",
+          "Effective Range -10%"
+        ]
+      },
+      "effectSummary": "Fire DoT Damage +300%; Rate of Fire +27% - +34%; Effective Range -10%"
+    },
+    "T6_Augment_Flamethrower3": {
+      "name": "Flamethrower Nozzle Extension",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Flamethrower"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/flamethrower-nozzle-extension",
+      "gradeEffects": {
+        "1": [
+          "Clip Size +22% - +30%",
+          "Effective Range +11% - +15%",
+          "Power Consumption Per Shot -11% - -15%",
+          "Recoil +5%",
+          "Volume (Weight) +50%"
+        ],
+        "2": [
+          "Clip Size +33% - +40%",
+          "Effective Range +17% - +20%",
+          "Power Consumption Per Shot -16% - -20%",
+          "Recoil +5%",
+          "Volume (Weight) +50%"
+        ],
+        "3": [
+          "Clip Size +44% - +50%",
+          "Effective Range +22% - +25%",
+          "Power Consumption Per Shot -21% - -25%",
+          "Recoil +5%",
+          "Volume (Weight) +50%"
+        ]
+      },
+      "effectSummary": "Clip Size +44% - +50%; Effective Range +22% - +25%; Power Consumption Per Shot -21% - -25%; Recoil +5%; Volume (Weight) +50%"
+    },
+    "T6_Augment_Flamethrower4": {
+      "name": "Flamethrower Quickloader",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Flamethrower"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/flamethrower-quickloader",
+      "gradeEffects": {
+        "1": [
+          "Recoil Reduction -11% - -20%",
+          "Reload Speed -4%",
+          "Volume Reduction -35% - -40%",
+          "Ranged Damage -5%"
+        ],
+        "2": [
+          "Recoil Reduction -22% - -30%",
+          "Reload Speed -6%",
+          "Volume Reduction -45% - -50%",
+          "Ranged Damage -5%"
+        ],
+        "3": [
+          "Recoil Reduction -33% - -40%",
+          "Reload Speed -8%",
+          "Volume Reduction -55% - -60%",
+          "Ranged Damage -5%"
+        ],
+        "4": [
+          "Recoil Reduction -44% - -50%",
+          "Reload Speed -10%",
+          "Volume Reduction -65% - -70%",
+          "Ranged Damage -5%"
+        ]
+      },
+      "effectSummary": "Recoil Reduction -44% - -50%; Reload Speed -10%; Volume Reduction -65% - -70%; Ranged Damage -5%"
+    },
+    "T6_Augment_Headshotdamage1": {
+      "name": "Tactical Enhancer",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/tactical-enhancer",
+      "gradeEffects": {
+        "1": [
+          "Headshot Damage +3% - +5%"
+        ],
+        "2": [
+          "Headshot Damage +6% - +10%"
+        ],
+        "3": [
+          "Headshot Damage +10% - +16%"
+        ],
+        "4": [
+          "Headshot Damage +20% - +31%"
+        ],
+        "5": [
+          "Headshot Damage +34% - +50%"
+        ]
+      },
+      "effectSummary": "Headshot Damage +34% - +50%"
+    },
+    "T6_Augment_HeavyPistol1": {
+      "name": "Rafiq Snubnose Heavy Kit",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Pistol"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/rafiq-snubnose-heavy-kit",
+      "gradeEffects": {
+        "1": [
+          "Headshot Damage +20% - +31%",
+          "Ranged Damage +28% - +44%",
+          "Rate of Fire -20%"
+        ],
+        "2": [
+          "Headshot Damage +34% - +50%",
+          "Ranged Damage +48% - +70%",
+          "Rate of Fire -20%"
+        ]
+      },
+      "effectSummary": "Headshot Damage +34% - +50%; Ranged Damage +48% - +70%; Rate of Fire -20%"
+    },
+    "T6_Augment_HeavyPistol2": {
+      "name": "Rafiq Snubnose Disruptive Coating",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Pistol"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/rafiq-snubnose-disruptive-coating",
+      "gradeEffects": {
+        "1": [
+          "Ranged Damage +18% - +26%",
+          "Shield Damage +6% - +9%",
+          "Volume Reduction -45% - -50%",
+          "Clip Size -50%",
+          "Power Consumption Per Shot +60%",
+          "Reload Speed +10%"
+        ],
+        "2": [
+          "Ranged Damage +28% - +44%",
+          "Shield Damage +10% - +14%",
+          "Volume Reduction -55% - -60%",
+          "Clip Size -50%",
+          "Power Consumption Per Shot +60%",
+          "Reload Speed +10%"
+        ],
+        "3": [
+          "Ranged Damage +48% - +70%",
+          "Shield Damage +15% - +20%",
+          "Volume Reduction -65% - -70%",
+          "Clip Size -50%",
+          "Power Consumption Per Shot +60%",
+          "Reload Speed +10%"
+        ]
+      },
+      "effectSummary": "Ranged Damage +48% - +70%; Shield Damage +15% - +20%; Volume Reduction -65% - -70%; Clip Size -50%; Power Consumption Per Shot +60%; Reload Speed +10%"
+    },
+    "T6_Augment_HeavyPistol3": {
+      "name": "Rafiq Snubnose Quickdraw Assembly",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Pistol"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/rafiq-snubnose-quickdraw-assembly",
+      "gradeEffects": {
+        "1": [
+          "Accuracy +11% - +15%",
+          "Recoil Reduction -22% - -30%",
+          "Reload Speed -6%",
+          "Ranged Damage -5%"
+        ],
+        "2": [
+          "Accuracy +16% - +20%",
+          "Recoil Reduction -33% - -40%",
+          "Reload Speed -8%",
+          "Ranged Damage -5%"
+        ],
+        "3": [
+          "Accuracy +21% - +25%",
+          "Recoil Reduction -44% - -50%",
+          "Reload Speed -10%",
+          "Ranged Damage -5%"
+        ]
+      },
+      "effectSummary": "Accuracy +21% - +25%; Recoil Reduction -44% - -50%; Reload Speed -10%; Ranged Damage -5%"
+    },
+    "T6_Augment_HeavyPistol4": {
+      "name": "Rafiq Snubnose Expander",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Pistol"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/rafiq-snubnose-expander",
+      "gradeEffects": {
+        "1": [
+          "Clip Size +22% - +40%",
+          "Power Consumption Per Shot -12% - -20%",
+          "Recoil +5%",
+          "Volume (Weight) +50%"
+        ],
+        "2": [
+          "Clip Size +44% - +60%",
+          "Power Consumption Per Shot -22% - -30%",
+          "Recoil +5%",
+          "Volume (Weight) +50%"
+        ],
+        "3": [
+          "Clip Size +66% - +80%",
+          "Power Consumption Per Shot -32% - -40%",
+          "Recoil +5%",
+          "Volume (Weight) +50%"
+        ],
+        "4": [
+          "Clip Size +88% - +100%",
+          "Power Consumption Per Shot -42% - -50%",
+          "Recoil +5%",
+          "Volume (Weight) +50%"
+        ]
+      },
+      "effectSummary": "Clip Size +88% - +100%; Power Consumption Per Shot -42% - -50%; Recoil +5%; Volume (Weight) +50%"
+    },
+    "T6_Augment_HeavyPistol5": {
+      "name": "Rafiq Snubnose Sprayer",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Pistol"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/rafiq-snubnose-sprayer",
+      "gradeEffects": {
+        "1": [
+          "Rate of Fire +7% - +11%",
+          "Shield Damage -5%"
+        ],
+        "2": [
+          "Rate of Fire +12% - +18%",
+          "Shield Damage -5%"
+        ],
+        "3": [
+          "Rate of Fire +20% - +26%",
+          "Shield Damage -5%"
+        ],
+        "4": [
+          "Rate of Fire +27% - +34%",
+          "Shield Damage -5%"
+        ]
+      },
+      "effectSummary": "Rate of Fire +27% - +34%; Shield Damage -5%"
+    },
+    "T6_Augment_Lasgun1": {
+      "name": "Lasgun Focuser",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Lasgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/lasgun-focuser",
+      "gradeEffects": {
+        "1": [
+          "Ranged Damage +9% - +15%",
+          "Volume Reduction -35% - -40%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%",
+          "Recoil +5%"
+        ],
+        "2": [
+          "Ranged Damage +18% - +26%",
+          "Volume Reduction -45% - -50%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%",
+          "Recoil +5%"
+        ],
+        "3": [
+          "Ranged Damage +28% - +44%",
+          "Volume Reduction -55% - -60%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%",
+          "Recoil +5%"
+        ],
+        "4": [
+          "Ranged Damage +48% - +70%",
+          "Volume Reduction -65% - -70%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%",
+          "Recoil +5%"
+        ]
+      },
+      "effectSummary": "Ranged Damage +48% - +70%; Volume Reduction -65% - -70%; Clip Size -25%; Power Consumption Per Shot +30%; Recoil +5%"
+    },
+    "T6_Augment_Lasgun2": {
+      "name": "Lasgun Extender",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Lasgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/lasgun-extender",
+      "gradeEffects": {
+        "1": [
+          "Accuracy +6% - +10%",
+          "Effective Range +12% - +20%",
+          "Volume Reduction -35% - -40%",
+          "Ranged Damage -5%"
+        ],
+        "2": [
+          "Accuracy +11% - +15%",
+          "Effective Range +22% - +30%",
+          "Volume Reduction -45% - -50%",
+          "Ranged Damage -5%"
+        ],
+        "3": [
+          "Accuracy +16% - +20%",
+          "Effective Range +34% - +40%",
+          "Volume Reduction -55% - -60%",
+          "Ranged Damage -5%"
+        ],
+        "4": [
+          "Accuracy +21% - +25%",
+          "Effective Range +44% - +50%",
+          "Volume Reduction -65% - -70%",
+          "Ranged Damage -5%"
+        ]
+      },
+      "effectSummary": "Accuracy +21% - +25%; Effective Range +44% - +50%; Volume Reduction -65% - -70%; Ranged Damage -5%"
+    },
+    "T6_Augment_Lasgun3": {
+      "name": "Lasgun Harmonizer",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Lasgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/lasgun-harmonizer",
+      "gradeEffects": {
+        "1": [
+          "Clip Size +33% - +40%",
+          "Power Consumption Per Shot -16% - -20%",
+          "Rate of Fire +20% - +26%",
+          "Recoil Reduction -33% - -40%",
+          "Effective Range -10%",
+          "Ranged Damage -5%",
+          "Volume (Weight) +50%"
+        ],
+        "2": [
+          "Clip Size +44% - +50%",
+          "Power Consumption Per Shot -21% - -25%",
+          "Rate of Fire +27% - +34%",
+          "Recoil Reduction -44% - -50%",
+          "Effective Range -10%",
+          "Ranged Damage -5%",
+          "Volume (Weight) +50%"
+        ]
+      },
+      "effectSummary": "Clip Size +44% - +50%; Power Consumption Per Shot -21% - -25%; Rate of Fire +27% - +34%; Recoil Reduction -44% - -50%; Effective Range -10%; Ranged Damage -5%; Volume (Weight) +50%"
+    },
+    "T6_Augment_Lasgun4": {
+      "name": "Lasgun Amplifier",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Lasgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/lasgun-amplifier",
+      "gradeEffects": {
+        "1": [
+          "Ranged Damage +18% - +26%",
+          "Volume Reduction -45% - -50%",
+          "Effective Range -10%",
+          "Recoil +5%"
+        ],
+        "2": [
+          "Ranged Damage +28% - +44%",
+          "Volume Reduction -55% - -60%",
+          "Effective Range -10%",
+          "Recoil +5%"
+        ],
+        "3": [
+          "Ranged Damage +48% - +70%",
+          "Volume Reduction -65% - -70%",
+          "Effective Range -10%",
+          "Recoil +5%"
+        ]
+      },
+      "effectSummary": "Ranged Damage +48% - +70%; Volume Reduction -65% - -70%; Effective Range -10%; Recoil +5%"
+    },
+    "T6_Augment_Lmg1": {
+      "name": "VULCAN GAU-92 Expander",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.LMG"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/vulcan-gau-92-expander",
+      "gradeEffects": {
+        "1": [
+          "Clip Size +25% - +75%",
+          "Power Consumption Per Shot -20% - -30%",
+          "Reload Speed -4%",
+          "Accuracy -10%",
+          "Ranged Damage -5%",
+          "Volume (Weight) +50%"
+        ],
+        "2": [
+          "Clip Size +62.5% - +112.5%",
+          "Power Consumption Per Shot -30% - -40%",
+          "Reload Speed -6%",
+          "Accuracy -10%",
+          "Ranged Damage -5%",
+          "Volume (Weight) +50%"
+        ],
+        "3": [
+          "Clip Size +100% - +150%",
+          "Power Consumption Per Shot -40% - -50%",
+          "Reload Speed -8%",
+          "Accuracy -10%",
+          "Ranged Damage -5%",
+          "Volume (Weight) +50%"
+        ],
+        "4": [
+          "Clip Size +150% - +200%",
+          "Power Consumption Per Shot -50% - -60%",
+          "Reload Speed -10%",
+          "Accuracy -10%",
+          "Ranged Damage -5%",
+          "Volume (Weight) +50%"
+        ]
+      },
+      "effectSummary": "Clip Size +150% - +200%; Power Consumption Per Shot -50% - -60%; Reload Speed -10%; Accuracy -10%; Ranged Damage -5%; Volume (Weight) +50%"
+    },
+    "T6_Augment_Lmg4": {
+      "name": "VULCAN GAU-92 Focuser",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.LMG"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/vulcan-gau-92-focuser",
+      "gradeEffects": {
+        "1": [
+          "Accuracy +6% - +10%",
+          "Effective Range +6% - +10%",
+          "Recoil Reduction -11% - -20%",
+          "Rate of Fire -10%"
+        ],
+        "2": [
+          "Accuracy +11% - +15%",
+          "Effective Range +11% - +15%",
+          "Recoil Reduction -22% - -30%",
+          "Rate of Fire -10%"
+        ],
+        "3": [
+          "Accuracy +16% - +20%",
+          "Effective Range +17% - +20%",
+          "Recoil Reduction -33% - -40%",
+          "Rate of Fire -10%"
+        ],
+        "4": [
+          "Accuracy +21% - +25%",
+          "Effective Range +22% - +25%",
+          "Recoil Reduction -44% - -50%",
+          "Rate of Fire -10%"
+        ]
+      },
+      "effectSummary": "Accuracy +21% - +25%; Effective Range +22% - +25%; Recoil Reduction -44% - -50%; Rate of Fire -10%"
+    },
+    "T6_Augment_Lmg5": {
+      "name": "VULCAN GAU-92 Disruptive Coating",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.LMG"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/vulcan-gau-92-disruptive-coating",
+      "gradeEffects": {
+        "1": [
+          "Ranged Damage +18% - +26%",
+          "Shield Damage +12% - +18%",
+          "Accuracy -10%",
+          "Recoil +5%",
+          "Reload Speed +10%"
+        ],
+        "2": [
+          "Ranged Damage +28% - +44%",
+          "Shield Damage +20% - +28%",
+          "Accuracy -10%",
+          "Recoil +5%",
+          "Reload Speed +10%"
+        ],
+        "3": [
+          "Ranged Damage +48% - +70%",
+          "Shield Damage +30% - +40%",
+          "Accuracy -10%",
+          "Recoil +5%",
+          "Reload Speed +10%"
+        ]
+      },
+      "effectSummary": "Ranged Damage +48% - +70%; Shield Damage +30% - +40%; Accuracy -10%; Recoil +5%; Reload Speed +10%"
+    },
+    "T6_Augment_Lmg6": {
+      "name": "VULCAN GAU-92 Sprayer",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.LMG"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/vulcan-gau-92-sprayer",
+      "gradeEffects": {
+        "1": [
+          "Rate of Fire +20% - +26%",
+          "Accuracy -10%",
+          "Effective Range -10%"
+        ],
+        "2": [
+          "Rate of Fire +27% - +34%",
+          "Accuracy -10%",
+          "Effective Range -10%"
+        ]
+      },
+      "effectSummary": "Rate of Fire +27% - +34%; Accuracy -10%; Effective Range -10%"
+    },
+    "T6_Augment_Magazinecapacity1": {
+      "name": "Capacity Expander",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/capacity-expander",
+      "gradeEffects": {
+        "1": [
+          "Clip Size +4% - +10%",
+          "Power Consumption Per Shot -2.5% - -5%",
+          "Volume (Weight) +50%"
+        ],
+        "2": [
+          "Clip Size +11% - +20%",
+          "Power Consumption Per Shot -6% - -10%",
+          "Volume (Weight) +50%"
+        ],
+        "3": [
+          "Clip Size +22% - +30%",
+          "Power Consumption Per Shot -11% - -15%",
+          "Volume (Weight) +50%"
+        ],
+        "4": [
+          "Clip Size +33% - +40%",
+          "Power Consumption Per Shot -16% - -20%",
+          "Volume (Weight) +50%"
+        ],
+        "5": [
+          "Clip Size +44% - +50%",
+          "Power Consumption Per Shot -21% - -25%",
+          "Volume (Weight) +50%"
+        ]
+      },
+      "effectSummary": "Clip Size +44% - +50%; Power Consumption Per Shot -21% - -25%; Volume (Weight) +50%"
+    },
+    "T6_Augment_MaulaPistol1": {
+      "name": "Maula Pistol Sprayer",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Pistol"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/maula-pistol-sprayer",
+      "gradeEffects": {
+        "1": [
+          "Rate of Fire +7% - +11%",
+          "Headshot Damage -15%"
+        ],
+        "2": [
+          "Rate of Fire +12% - +18%",
+          "Headshot Damage -15%"
+        ],
+        "3": [
+          "Rate of Fire +20% - +26%",
+          "Headshot Damage -15%"
+        ],
+        "4": [
+          "Rate of Fire +27% - +34%",
+          "Headshot Damage -15%"
+        ]
+      },
+      "effectSummary": "Rate of Fire +27% - +34%; Headshot Damage -15%"
+    },
+    "T6_Augment_MaulaPistol2": {
+      "name": "Maula Pistol Disruptive Coating",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Pistol"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/maula-pistol-disruptive-coating",
+      "gradeEffects": {
+        "1": [
+          "Ranged Damage +28% - +44%",
+          "Shield Damage +10% - +14%",
+          "Volume Reduction -55% - -60%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "2": [
+          "Ranged Damage +48% - +70%",
+          "Shield Damage +15% - +20%",
+          "Volume Reduction -65% - -70%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ]
+      },
+      "effectSummary": "Ranged Damage +48% - +70%; Shield Damage +15% - +20%; Volume Reduction -65% - -70%; Clip Size -25%; Power Consumption Per Shot +30%"
+    },
+    "T6_Augment_MaulaPistol3": {
+      "name": "Maula Pistol Expander",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Pistol"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/maula-pistol-expander",
+      "gradeEffects": {
+        "1": [
+          "Clip Size +30% - +45%",
+          "Power Consumption Per Shot -15% - -20%",
+          "Rate of Fire +12% - +18%",
+          "Accuracy -10%",
+          "Ranged Damage -5%"
+        ],
+        "2": [
+          "Clip Size +45% - +60%",
+          "Power Consumption Per Shot -20% - -25%",
+          "Rate of Fire +20% - +26%",
+          "Accuracy -10%",
+          "Ranged Damage -5%"
+        ],
+        "3": [
+          "Clip Size +60% - +75%",
+          "Power Consumption Per Shot -25% - -30%",
+          "Rate of Fire +27% - +34%",
+          "Accuracy -10%",
+          "Ranged Damage -5%"
+        ]
+      },
+      "effectSummary": "Clip Size +60% - +75%; Power Consumption Per Shot -25% - -30%; Rate of Fire +27% - +34%; Accuracy -10%; Ranged Damage -5%"
+    },
+    "T6_Augment_MaulaPistol4": {
+      "name": "Maula Pistol Barrel Extender",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Pistol"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/maula-pistol-barrel-extender",
+      "gradeEffects": {
+        "1": [
+          "Accuracy +11% - +15%",
+          "Effective Range +11% - +15%",
+          "Reload Speed -6%",
+          "Rate of Fire -10%"
+        ],
+        "2": [
+          "Accuracy +16% - +20%",
+          "Effective Range +17% - +20%",
+          "Reload Speed -8%",
+          "Rate of Fire -10%"
+        ],
+        "3": [
+          "Accuracy +21% - +25%",
+          "Effective Range +22% - +25%",
+          "Reload Speed -10%",
+          "Rate of Fire -10%"
+        ]
+      },
+      "effectSummary": "Accuracy +21% - +25%; Effective Range +22% - +25%; Reload Speed -10%; Rate of Fire -10%"
+    },
+    "T6_Augment_MaulaPistol5": {
+      "name": "Maula Pistol Tactical Enhancer",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Pistol"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/maula-pistol-tactical-enhancer",
+      "gradeEffects": {
+        "1": [
+          "Accuracy +6% - +10%",
+          "Headshot Damage +6% - +10%",
+          "Recoil Reduction -11% - -20%",
+          "Volume Reduction -35% - -40%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%",
+          "Rate of Fire -10%"
+        ],
+        "2": [
+          "Accuracy +11% - +15%",
+          "Headshot Damage +10% - +16%",
+          "Recoil Reduction -22% - -30%",
+          "Volume Reduction -45% - -50%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%",
+          "Rate of Fire -10%"
+        ],
+        "3": [
+          "Accuracy +16% - +20%",
+          "Headshot Damage +20% - +31%",
+          "Recoil Reduction -33% - -40%",
+          "Volume Reduction -55% - -60%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%",
+          "Rate of Fire -10%"
+        ],
+        "4": [
+          "Accuracy +21% - +25%",
+          "Headshot Damage +34% - +50%",
+          "Recoil Reduction -44% - -50%",
+          "Volume Reduction -65% - -70%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%",
+          "Rate of Fire -10%"
+        ]
+      },
+      "effectSummary": "Accuracy +21% - +25%; Headshot Damage +34% - +50%; Recoil Reduction -44% - -50%; Volume Reduction -65% - -70%; Clip Size -25%; Power Consumption Per Shot +30%; Rate of Fire -10%"
+    },
+    "T6_Augment_Melee1": {
+      "name": "Blade Sharpener",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.MeleeWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/blade-sharpener",
+      "gradeEffects": {
+        "1": [
+          "Blade Damage +2% - +8%"
+        ],
+        "2": [
+          "Blade Damage +7% - +15%"
+        ],
+        "3": [
+          "Blade Damage +14% - +26%"
+        ],
+        "4": [
+          "Blade Damage +28% - +44%"
+        ],
+        "5": [
+          "Blade Damage +48% - +70%"
+        ]
+      },
+      "effectSummary": "Blade Damage +48% - +70%"
+    },
+    "T6_Augment_Melee2": {
+      "name": "Blade Grip Adjuster",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.MeleeWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/blade-grip-adjuster",
+      "gradeEffects": {
+        "1": [
+          "Attack Stamina Cost -3% - -5%"
+        ],
+        "2": [
+          "Attack Stamina Cost -7% - -9%"
+        ],
+        "3": [
+          "Attack Stamina Cost -11% - -13%"
+        ],
+        "4": [
+          "Attack Stamina Cost -15% - -17%"
+        ],
+        "5": [
+          "Attack Stamina Cost -18% - -20%"
+        ]
+      },
+      "effectSummary": "Attack Stamina Cost -18% - -20%"
+    },
+    "T6_Augment_Melee3": {
+      "name": "Blade Flexi-Coating",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.MeleeWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/blade-flexi-coating",
+      "gradeEffects": {
+        "1": [
+          "Block Stamina Cost -3% - -5%"
+        ],
+        "2": [
+          "Block Stamina Cost -7% - -9%"
+        ],
+        "3": [
+          "Block Stamina Cost -11% - -13%"
+        ],
+        "4": [
+          "Block Stamina Cost -15% - -17%"
+        ],
+        "5": [
+          "Block Stamina Cost -18% - -20%"
+        ]
+      },
+      "effectSummary": "Block Stamina Cost -18% - -20%"
+    },
+    "T6_Augment_Melee4": {
+      "name": "Aggressive Grip Adjuster",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.MeleeWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/aggressive-grip-adjuster",
+      "gradeEffects": {
+        "1": [
+          "Attack Stamina Cost -7% - -9%",
+          "Block Stamina Cost +10%"
+        ],
+        "2": [
+          "Attack Stamina Cost -11% - -13%",
+          "Block Stamina Cost +10%"
+        ],
+        "3": [
+          "Attack Stamina Cost -15% - -17%",
+          "Block Stamina Cost +10%"
+        ],
+        "4": [
+          "Attack Stamina Cost -18% - -20%",
+          "Block Stamina Cost +10%"
+        ]
+      },
+      "effectSummary": "Attack Stamina Cost -18% - -20%; Block Stamina Cost +10%"
+    },
+    "T6_Augment_Melee5": {
+      "name": "Lightweight Adjuster",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.MeleeWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/lightweight-adjuster",
+      "gradeEffects": {
+        "1": [
+          "Attack Stamina Cost -11% - -13%",
+          "Volume Reduction -45% - -50%",
+          "Blade Damage -5%"
+        ],
+        "2": [
+          "Attack Stamina Cost -15% - -17%",
+          "Volume Reduction -55% - -60%",
+          "Blade Damage -5%"
+        ],
+        "3": [
+          "Attack Stamina Cost -18% - -20%",
+          "Volume Reduction -65% - -70%",
+          "Blade Damage -5%"
+        ]
+      },
+      "effectSummary": "Attack Stamina Cost -18% - -20%; Volume Reduction -65% - -70%; Blade Damage -5%"
+    },
+    "T6_Augment_Melee6": {
+      "name": "Heavy Blade Adjuster",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.MeleeWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/heavy-blade-adjuster",
+      "gradeEffects": {
+        "1": [
+          "Blade Damage +7% - +15%",
+          "Block Stamina Cost +10%"
+        ],
+        "2": [
+          "Blade Damage +14% - +26%",
+          "Block Stamina Cost +10%"
+        ],
+        "3": [
+          "Blade Damage +28% - +44%",
+          "Block Stamina Cost +10%"
+        ],
+        "4": [
+          "Blade Damage +48% - +70%",
+          "Block Stamina Cost +10%"
+        ]
+      },
+      "effectSummary": "Blade Damage +48% - +70%; Block Stamina Cost +10%"
+    },
+    "T6_Augment_Melee7": {
+      "name": "Defensive Grip Adjuster",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.MeleeWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/defensive-grip-adjuster",
+      "gradeEffects": {
+        "1": [
+          "Block Stamina Cost -7% - -9%",
+          "Attack Stamina Cost +10%"
+        ],
+        "2": [
+          "Block Stamina Cost -11% - -13%",
+          "Attack Stamina Cost +10%"
+        ],
+        "3": [
+          "Block Stamina Cost -15% - -17%",
+          "Attack Stamina Cost +10%"
+        ],
+        "4": [
+          "Block Stamina Cost -18% - -20%",
+          "Attack Stamina Cost +10%"
+        ]
+      },
+      "effectSummary": "Block Stamina Cost -18% - -20%; Attack Stamina Cost +10%"
+    },
+    "T6_Augment_Melee8": {
+      "name": "Blade Optimizer",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.MeleeWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/blade-optimizer",
+      "gradeEffects": {
+        "1": [
+          "Attack Stamina Cost -11% - -13%",
+          "Block Stamina Cost -11% - -13%",
+          "Blade Damage -7%"
+        ],
+        "2": [
+          "Attack Stamina Cost -15% - -17%",
+          "Block Stamina Cost -15% - -17%",
+          "Blade Damage -7%"
+        ],
+        "3": [
+          "Attack Stamina Cost -18% - -20%",
+          "Block Stamina Cost -18% - -20%",
+          "Blade Damage -7%"
+        ]
+      },
+      "effectSummary": "Attack Stamina Cost -18% - -20%; Block Stamina Cost -18% - -20%; Blade Damage -7%"
+    },
+    "T6_Augment_Melee9": {
+      "name": "Edge Optimizer",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.MeleeWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/edge-optimizer",
+      "gradeEffects": {
+        "1": [
+          "Blade Damage +7% - +15%",
+          "Attack Stamina Cost +10%"
+        ],
+        "2": [
+          "Blade Damage +14% - +26%",
+          "Attack Stamina Cost +10%"
+        ],
+        "3": [
+          "Blade Damage +28% - +44%",
+          "Attack Stamina Cost +10%"
+        ],
+        "4": [
+          "Blade Damage +48% - +70%",
+          "Attack Stamina Cost +10%"
+        ]
+      },
+      "effectSummary": "Blade Damage +48% - +70%; Attack Stamina Cost +10%"
+    },
+    "T6_Augment_Range1": {
+      "name": "Barrel Extender",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/barrel-extender",
+      "gradeEffects": {
+        "1": [
+          "Effective Range +2% - +5%"
+        ],
+        "2": [
+          "Effective Range +6% - +10%"
+        ],
+        "3": [
+          "Effective Range +11% - +15%"
+        ],
+        "4": [
+          "Effective Range +17% - +20%"
+        ],
+        "5": [
+          "Effective Range +22% - +25%"
+        ]
+      },
+      "effectSummary": "Effective Range +22% - +25%"
+    },
+    "T6_Augment_Rateoffire1": {
+      "name": "Quick-release Trigger",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/quick-release-trigger",
+      "gradeEffects": {
+        "1": [
+          "Rate of Fire +3% - +6%"
+        ],
+        "2": [
+          "Rate of Fire +7% - +11%"
+        ],
+        "3": [
+          "Rate of Fire +12% - +18%"
+        ],
+        "4": [
+          "Rate of Fire +20% - +26%"
+        ],
+        "5": [
+          "Rate of Fire +27% - +34%"
+        ]
+      },
+      "effectSummary": "Rate of Fire +27% - +34%"
+    },
+    "T6_Augment_Recoil1": {
+      "name": "Recoil Adjuster",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/recoil-adjuster",
+      "gradeEffects": {
+        "1": [
+          "Recoil Reduction -5% - -10%"
+        ],
+        "2": [
+          "Recoil Reduction -11% - -20%"
+        ],
+        "3": [
+          "Recoil Reduction -22% - -30%"
+        ],
+        "4": [
+          "Recoil Reduction -33% - -40%"
+        ],
+        "5": [
+          "Recoil Reduction -44% - -50%"
+        ]
+      },
+      "effectSummary": "Recoil Reduction -44% - -50%"
+    },
+    "T6_Augment_ReloadSpeed1": {
+      "name": "Quickloader",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/quickloader",
+      "gradeEffects": {
+        "1": [
+          "Reload Speed -2%"
+        ],
+        "2": [
+          "Reload Speed -4%"
+        ],
+        "3": [
+          "Reload Speed -6%"
+        ],
+        "4": [
+          "Reload Speed -8%"
+        ],
+        "5": [
+          "Reload Speed -10%"
+        ]
+      },
+      "effectSummary": "Reload Speed -10%"
+    },
+    "T6_Augment_RocketLauncher1": {
+      "name": "Missile Launcher Fragmenter",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.RocketLauncher"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/missile-launcher-fragmenter",
+      "gradeEffects": {
+        "1": [
+          "Reload Speed -4%",
+          "Splash Radius +11% - +20%",
+          "Shield Damage -5%"
+        ],
+        "2": [
+          "Reload Speed -6%",
+          "Splash Radius +22% - +30%",
+          "Shield Damage -5%"
+        ],
+        "3": [
+          "Reload Speed -8%",
+          "Splash Radius +33% - +40%",
+          "Shield Damage -5%"
+        ],
+        "4": [
+          "Reload Speed -10%",
+          "Splash Radius +44% - +50%",
+          "Shield Damage -5%"
+        ]
+      },
+      "effectSummary": "Reload Speed -10%; Splash Radius +44% - +50%; Shield Damage -5%"
+    },
+    "T6_Augment_RocketLauncher2": {
+      "name": "Missile Launcher Disruptive Coating",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.RocketLauncher"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/missile-launcher-disruptive-coating",
+      "gradeEffects": {
+        "1": [
+          "Shield Damage +6% - +9%",
+          "Reload Speed +10%"
+        ],
+        "2": [
+          "Shield Damage +10% - +14%",
+          "Reload Speed +10%"
+        ],
+        "3": [
+          "Shield Damage +15% - +20%",
+          "Reload Speed +10%"
+        ]
+      },
+      "effectSummary": "Shield Damage +15% - +20%; Reload Speed +10%"
+    },
+    "T6_Augment_RocketLauncher3": {
+      "name": "Missile Launcher Quickloader",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.RocketLauncher"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/missile-launcher-quickloader",
+      "gradeEffects": {
+        "1": [
+          "Accuracy +6% - +10%",
+          "Recoil Reduction -11% - -20%",
+          "Reload Speed -4%",
+          "Ranged Damage -5%"
+        ],
+        "2": [
+          "Accuracy +11% - +15%",
+          "Recoil Reduction -22% - -30%",
+          "Reload Speed -6%",
+          "Ranged Damage -5%"
+        ],
+        "3": [
+          "Accuracy +16% - +20%",
+          "Recoil Reduction -33% - -40%",
+          "Reload Speed -8%",
+          "Ranged Damage -5%"
+        ],
+        "4": [
+          "Accuracy +21% - +25%",
+          "Recoil Reduction -44% - -50%",
+          "Reload Speed -10%",
+          "Ranged Damage -5%"
+        ]
+      },
+      "effectSummary": "Accuracy +21% - +25%; Recoil Reduction -44% - -50%; Reload Speed -10%; Ranged Damage -5%"
+    },
+    "T6_Augment_RocketLauncher4": {
+      "name": "Missile Launcher Heavy Payload",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.RocketLauncher"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/missile-launcher-heavy-payload",
+      "gradeEffects": {
+        "1": [
+          "Ranged Damage +18% - +26%",
+          "Shield Damage -5%",
+          "Splash Radius -15%"
+        ],
+        "2": [
+          "Ranged Damage +28% - +44%",
+          "Shield Damage -5%",
+          "Splash Radius -15%"
+        ],
+        "3": [
+          "Ranged Damage +48% - +70%",
+          "Shield Damage -5%",
+          "Splash Radius -15%"
+        ]
+      },
+      "effectSummary": "Ranged Damage +48% - +70%; Shield Damage -5%; Splash Radius -15%"
+    },
+    "T6_Augment_Scattergun2": {
+      "name": "GRDA 44 Tactical Amplifier",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Shotgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/grda-44-tactical-amplifier",
+      "gradeEffects": {
+        "1": [
+          "Headshot Damage +6% - +10%",
+          "Rate of Fire -10%"
+        ],
+        "2": [
+          "Headshot Damage +10% - +16%",
+          "Rate of Fire -10%"
+        ],
+        "3": [
+          "Headshot Damage +20% - +31%",
+          "Rate of Fire -10%"
+        ],
+        "4": [
+          "Headshot Damage +34% - +50%",
+          "Rate of Fire -10%"
+        ]
+      },
+      "effectSummary": "Headshot Damage +34% - +50%; Rate of Fire -10%"
+    },
+    "T6_Augment_Scattergun4": {
+      "name": "GRDA 44 Expander",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Shotgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/grda-44-expander",
+      "gradeEffects": {
+        "1": [
+          "Clip Size +55% - +75%",
+          "Effective Range +6% - +10%",
+          "Power Consumption Per Shot -10% - -15%",
+          "Pellet Spread +15%",
+          "Ranged Damage -5%"
+        ],
+        "2": [
+          "Clip Size +80% - +100%",
+          "Effective Range +11% - +15%",
+          "Power Consumption Per Shot -15% - -20%",
+          "Pellet Spread +15%",
+          "Ranged Damage -5%"
+        ],
+        "3": [
+          "Clip Size +105% - +125%",
+          "Effective Range +17% - +20%",
+          "Power Consumption Per Shot -20% - -25%",
+          "Pellet Spread +15%",
+          "Ranged Damage -5%"
+        ],
+        "4": [
+          "Clip Size +130% - +150%",
+          "Effective Range +22% - +25%",
+          "Power Consumption Per Shot -25% - -30%",
+          "Pellet Spread +15%",
+          "Ranged Damage -5%"
+        ]
+      },
+      "effectSummary": "Clip Size +130% - +150%; Effective Range +22% - +25%; Power Consumption Per Shot -25% - -30%; Pellet Spread +15%; Ranged Damage -5%"
+    },
+    "T6_Augment_Scattergun5": {
+      "name": "GRDA 44 Amplifier",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Shotgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/grda-44-amplifier",
+      "gradeEffects": {
+        "1": [
+          "Pellet Spread -16% - -20%",
+          "Ranged Damage +28% - +44%",
+          "Effective Range -10%"
+        ],
+        "2": [
+          "Pellet Spread -21% - -25%",
+          "Ranged Damage +48% - +70%",
+          "Effective Range -10%"
+        ]
+      },
+      "effectSummary": "Pellet Spread -21% - -25%; Ranged Damage +48% - +70%; Effective Range -10%"
+    },
+    "T6_Augment_Scattergun6": {
+      "name": "GRDA 44 Optimizer",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Shotgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/grda-44-optimizer",
+      "gradeEffects": {
+        "1": [
+          "Pellet Spread -11% - -15%",
+          "Ranged Damage +18% - +26%",
+          "Volume Reduction -45% - -50%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "2": [
+          "Pellet Spread -16% - -20%",
+          "Ranged Damage +28% - +44%",
+          "Volume Reduction -55% - -60%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "3": [
+          "Pellet Spread -21% - -25%",
+          "Ranged Damage +48% - +70%",
+          "Volume Reduction -65% - -70%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ]
+      },
+      "effectSummary": "Pellet Spread -21% - -25%; Ranged Damage +48% - +70%; Volume Reduction -65% - -70%; Clip Size -25%; Power Consumption Per Shot +30%"
+    },
+    "T6_Augment_Scattergun7": {
+      "name": "GRDA 44 Sprayer",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Shotgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/grda-44-sprayer",
+      "gradeEffects": {
+        "1": [
+          "Rate of Fire +7% - +11%",
+          "Accuracy -10%",
+          "Pellet Spread +15%",
+          "Recoil +5%"
+        ],
+        "2": [
+          "Rate of Fire +12% - +18%",
+          "Accuracy -10%",
+          "Pellet Spread +15%",
+          "Recoil +5%"
+        ],
+        "3": [
+          "Rate of Fire +20% - +26%",
+          "Accuracy -10%",
+          "Pellet Spread +15%",
+          "Recoil +5%"
+        ],
+        "4": [
+          "Rate of Fire +27% - +34%",
+          "Accuracy -10%",
+          "Pellet Spread +15%",
+          "Recoil +5%"
+        ]
+      },
+      "effectSummary": "Rate of Fire +27% - +34%; Accuracy -10%; Pellet Spread +15%; Recoil +5%"
+    },
+    "T6_Augment_Scattergun8": {
+      "name": "GRDA 44 Micro-Rigidity Coating",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Shotgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/grda-44-micro-rigidity-coating",
+      "gradeEffects": {
+        "1": [
+          "Accuracy +11% - +15%",
+          "Effective Range +11% - +15%",
+          "Recoil Reduction -22% - -30%",
+          "Volume Reduction -45% - -50%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "2": [
+          "Accuracy +16% - +20%",
+          "Effective Range +17% - +20%",
+          "Recoil Reduction -33% - -40%",
+          "Volume Reduction -55% - -60%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "3": [
+          "Accuracy +21% - +25%",
+          "Effective Range +22% - +25%",
+          "Recoil Reduction -44% - -50%",
+          "Volume Reduction -65% - -70%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ]
+      },
+      "effectSummary": "Accuracy +21% - +25%; Effective Range +22% - +25%; Recoil Reduction -44% - -50%; Volume Reduction -65% - -70%; Clip Size -25%; Power Consumption Per Shot +30%"
+    },
+    "T6_Augment_Shielddamage1": {
+      "name": "Disruptive Coating",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/disruptive-coating",
+      "gradeEffects": {
+        "1": [
+          "Shield Damage +3% - +5%"
+        ],
+        "2": [
+          "Shield Damage +6% - +9%"
+        ],
+        "3": [
+          "Shield Damage +10% - +14%"
+        ],
+        "4": [
+          "Shield Damage +15% - +20%"
+        ]
+      },
+      "effectSummary": "Shield Damage +15% - +20%"
+    },
+    "T6_Augment_Shotgun1": {
+      "name": "Drillshot FK7 Tactical Adjuster",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Shotgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/drillshot-fk7-tactical-adjuster",
+      "gradeEffects": {
+        "1": [
+          "Accuracy +11% - +15%",
+          "Effective Range +11% - +15%",
+          "Headshot Damage +10% - +16%",
+          "Rate of Fire -10%"
+        ],
+        "2": [
+          "Accuracy +16% - +20%",
+          "Effective Range +17% - +20%",
+          "Headshot Damage +20% - +31%",
+          "Rate of Fire -10%"
+        ],
+        "3": [
+          "Accuracy +21% - +25%",
+          "Effective Range +22% - +25%",
+          "Headshot Damage +34% - +50%",
+          "Rate of Fire -10%"
+        ]
+      },
+      "effectSummary": "Accuracy +21% - +25%; Effective Range +22% - +25%; Headshot Damage +34% - +50%; Rate of Fire -10%"
+    },
+    "T6_Augment_Shotgun2": {
+      "name": "Drillshot FK7 Amplifier",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Shotgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/drillshot-fk7-amplifier",
+      "gradeEffects": {
+        "1": [
+          "Ranged Damage +9% - +15%",
+          "Volume Reduction -35% - -40%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "2": [
+          "Ranged Damage +18% - +26%",
+          "Volume Reduction -45% - -50%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "3": [
+          "Ranged Damage +28% - +44%",
+          "Volume Reduction -55% - -60%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "4": [
+          "Ranged Damage +48% - +70%",
+          "Volume Reduction -65% - -70%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ]
+      },
+      "effectSummary": "Ranged Damage +48% - +70%; Volume Reduction -65% - -70%; Clip Size -25%; Power Consumption Per Shot +30%"
+    },
+    "T6_Augment_Shotgun3": {
+      "name": "Drillshot FK7 Optimizer",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Shotgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/drillshot-fk7-optimizer",
+      "gradeEffects": {
+        "1": [
+          "Ranged Damage +28% - +44%",
+          "Recoil Reduction -33% - -40%",
+          "Accuracy -10%"
+        ],
+        "2": [
+          "Ranged Damage +48% - +70%",
+          "Recoil Reduction -44% - -50%",
+          "Accuracy -10%"
+        ]
+      },
+      "effectSummary": "Ranged Damage +48% - +70%; Recoil Reduction -44% - -50%; Accuracy -10%"
+    },
+    "T6_Augment_Shotgun4": {
+      "name": "Drillshot FK7 Sprayer",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Shotgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/drillshot-fk7-sprayer",
+      "gradeEffects": {
+        "1": [
+          "Clip Size +55% - +75%",
+          "Power Consumption Per Shot -10% - -15%",
+          "Rate of Fire +7% - +11%",
+          "Ranged Damage -5%",
+          "Recoil +5%",
+          "Volume (Weight) +50%"
+        ],
+        "2": [
+          "Clip Size +80% - +100%",
+          "Power Consumption Per Shot -15% - -20%",
+          "Rate of Fire +12% - +18%",
+          "Ranged Damage -5%",
+          "Recoil +5%",
+          "Volume (Weight) +50%"
+        ],
+        "3": [
+          "Clip Size +105% - +125%",
+          "Power Consumption Per Shot -20% - -25%",
+          "Rate of Fire +20% - +26%",
+          "Ranged Damage -5%",
+          "Recoil +5%",
+          "Volume (Weight) +50%"
+        ],
+        "4": [
+          "Clip Size +130% - +150%",
+          "Power Consumption Per Shot -25% - -30%",
+          "Rate of Fire +27% - +34%",
+          "Ranged Damage -5%",
+          "Recoil +5%",
+          "Volume (Weight) +50%"
+        ]
+      },
+      "effectSummary": "Clip Size +130% - +150%; Power Consumption Per Shot -25% - -30%; Rate of Fire +27% - +34%; Ranged Damage -5%; Recoil +5%; Volume (Weight) +50%"
+    },
+    "T6_Augment_Shotgun5": {
+      "name": "Drillshot FK7 Quickloader",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Heavy.Shotgun"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/drillshot-fk7-quickloader",
+      "gradeEffects": {
+        "1": [
+          "Headshot Damage +10% - +16%",
+          "Reload Speed -6%",
+          "Volume Reduction -45% - -50%",
+          "Accuracy -10%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%",
+          "Recoil +5%"
+        ],
+        "2": [
+          "Headshot Damage +20% - +31%",
+          "Reload Speed -8%",
+          "Volume Reduction -55% - -60%",
+          "Accuracy -10%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%",
+          "Recoil +5%"
+        ],
+        "3": [
+          "Headshot Damage +34% - +50%",
+          "Reload Speed -10%",
+          "Volume Reduction -65% - -70%",
+          "Accuracy -10%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%",
+          "Recoil +5%"
+        ]
+      },
+      "effectSummary": "Headshot Damage +34% - +50%; Reload Speed -10%; Volume Reduction -65% - -70%; Accuracy -10%; Clip Size -25%; Power Consumption Per Shot +30%; Recoil +5%"
+    },
+    "T6_Augment_smg1": {
+      "name": "Disruptor M11 Precision Tuning",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.SMG"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/disruptor-m11-precision-tuning",
+      "gradeEffects": {
+        "1": [
+          "Accuracy +11% - +15%",
+          "Clip Size +40% - +60%",
+          "Power Consumption Per Shot -15% - -25%",
+          "Recoil Reduction -22% - -30%",
+          "Ranged Damage -5%"
+        ],
+        "2": [
+          "Accuracy +16% - +20%",
+          "Clip Size +60% - +80%",
+          "Power Consumption Per Shot -20% - -30%",
+          "Recoil Reduction -33% - -40%",
+          "Ranged Damage -5%"
+        ],
+        "3": [
+          "Accuracy +21% - +25%",
+          "Clip Size +80% - +100%",
+          "Power Consumption Per Shot -25% - -35%",
+          "Recoil Reduction -44% - -50%",
+          "Ranged Damage -5%"
+        ]
+      },
+      "effectSummary": "Accuracy +21% - +25%; Clip Size +80% - +100%; Power Consumption Per Shot -25% - -35%; Recoil Reduction -44% - -50%; Ranged Damage -5%"
+    },
+    "T6_Augment_smg2": {
+      "name": "Disruptor M11 Quickloader",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.SMG"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/disruptor-m11-quickloader",
+      "gradeEffects": {
+        "1": [
+          "Rate of Fire +12% - +18%",
+          "Reload Speed -6%",
+          "Accuracy -10%",
+          "Ranged Damage -2.5%",
+          "Volume (Weight) +50%"
+        ],
+        "2": [
+          "Rate of Fire +20% - +26%",
+          "Reload Speed -8%",
+          "Accuracy -10%",
+          "Ranged Damage -2.5%",
+          "Volume (Weight) +50%"
+        ],
+        "3": [
+          "Rate of Fire +27% - +34%",
+          "Reload Speed -10%",
+          "Accuracy -10%",
+          "Ranged Damage -2.5%",
+          "Volume (Weight) +50%"
+        ]
+      },
+      "effectSummary": "Rate of Fire +27% - +34%; Reload Speed -10%; Accuracy -10%; Ranged Damage -2.5%; Volume (Weight) +50%"
+    },
+    "T6_Augment_smg3": {
+      "name": "Disruptor M11 Shield Breaker",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.SMG"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/disruptor-m11-shield-breaker",
+      "gradeEffects": {
+        "1": [
+          "Effective Range +6% - +10%",
+          "Shield Damage +3% - +5%",
+          "Rate of Fire -10%"
+        ],
+        "2": [
+          "Effective Range +11% - +15%",
+          "Shield Damage +6% - +9%",
+          "Rate of Fire -10%"
+        ],
+        "3": [
+          "Effective Range +17% - +20%",
+          "Shield Damage +10% - +14%",
+          "Rate of Fire -10%"
+        ],
+        "4": [
+          "Effective Range +22% - +25%",
+          "Shield Damage +15% - +20%",
+          "Rate of Fire -10%"
+        ]
+      },
+      "effectSummary": "Effective Range +22% - +25%; Shield Damage +15% - +20%; Rate of Fire -10%"
+    },
+    "T6_Augment_smg4": {
+      "name": "Disruptor M11 Sprayer",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.SMG"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/disruptor-m11-sprayer",
+      "gradeEffects": {
+        "1": [
+          "Clip Size +125% - +175%",
+          "Power Consumption Per Shot -50% - -60%",
+          "Rate of Fire +20% - +26%",
+          "Reload Speed +20%",
+          "Volume (Weight) +50%"
+        ],
+        "2": [
+          "Clip Size +150% - +200%",
+          "Power Consumption Per Shot -60% - -70%",
+          "Rate of Fire +27% - +34%",
+          "Reload Speed +20%",
+          "Volume (Weight) +50%"
+        ]
+      },
+      "effectSummary": "Clip Size +150% - +200%; Power Consumption Per Shot -60% - -70%; Rate of Fire +27% - +34%; Reload Speed +20%; Volume (Weight) +50%"
+    },
+    "T6_Augment_Smg5": {
+      "name": "Disruptor M11 Amplifier",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.SMG"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/disruptor-m11-amplifier",
+      "gradeEffects": {
+        "1": [
+          "Ranged Damage +9% - +15%",
+          "Rate of Fire -10%"
+        ],
+        "2": [
+          "Ranged Damage +18% - +26%",
+          "Rate of Fire -10%"
+        ],
+        "3": [
+          "Ranged Damage +28% - +44%",
+          "Rate of Fire -10%"
+        ],
+        "4": [
+          "Ranged Damage +48% - +70%",
+          "Rate of Fire -10%"
+        ]
+      },
+      "effectSummary": "Ranged Damage +48% - +70%; Rate of Fire -10%"
+    },
+    "T6_Augment_smg7": {
+      "name": "Disruptor M11 Heavy Kit",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.SMG"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/disruptor-m11-heavy-kit",
+      "gradeEffects": {
+        "1": [
+          "Ranged Damage +9% - +15%",
+          "Volume Reduction -35% - -40%",
+          "Accuracy -10%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "2": [
+          "Ranged Damage +18% - +26%",
+          "Volume Reduction -45% - -50%",
+          "Accuracy -10%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "3": [
+          "Ranged Damage +28% - +44%",
+          "Volume Reduction -55% - -60%",
+          "Accuracy -10%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "4": [
+          "Ranged Damage +48% - +70%",
+          "Volume Reduction -65% - -70%",
+          "Accuracy -10%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ]
+      },
+      "effectSummary": "Ranged Damage +48% - +70%; Volume Reduction -65% - -70%; Accuracy -10%; Clip Size -25%; Power Consumption Per Shot +30%"
+    },
+    "T6_Augment_Spitdartrifle2": {
+      "name": "JABAL Spitdart Tactical Enhancer",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Rifle.SpitDart"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/jabal-spitdart-tactical-enhancer",
+      "gradeEffects": {
+        "1": [
+          "Headshot Damage +10% - +16%",
+          "Recoil +5%"
+        ],
+        "2": [
+          "Headshot Damage +20% - +31%",
+          "Recoil +5%"
+        ],
+        "3": [
+          "Headshot Damage +34% - +50%",
+          "Recoil +5%"
+        ]
+      },
+      "effectSummary": "Headshot Damage +34% - +50%; Recoil +5%"
+    },
+    "T6_Augment_Spitdartrifle3": {
+      "name": "JABAL Spitdart Range Adjuster",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Rifle.SpitDart"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/jabal-spitdart-range-adjuster",
+      "gradeEffects": {
+        "1": [
+          "Accuracy +6% - +10%",
+          "Effective Range +6% - +10%",
+          "Reload Speed +10%"
+        ],
+        "2": [
+          "Accuracy +11% - +15%",
+          "Effective Range +11% - +15%",
+          "Reload Speed +10%"
+        ],
+        "3": [
+          "Accuracy +16% - +20%",
+          "Effective Range +17% - +20%",
+          "Reload Speed +10%"
+        ],
+        "4": [
+          "Accuracy +21% - +25%",
+          "Effective Range +22% - +25%",
+          "Reload Speed +10%"
+        ]
+      },
+      "effectSummary": "Accuracy +21% - +25%; Effective Range +22% - +25%; Reload Speed +10%"
+    },
+    "T6_Augment_SpitdartRifle5": {
+      "name": "JABAL Spitdart Amplifier",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Rifle.SpitDart"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/jabal-spitdart-amplifier",
+      "gradeEffects": {
+        "1": [
+          "Ranged Damage +18% - +26%",
+          "Recoil +5%"
+        ],
+        "2": [
+          "Ranged Damage +28% - +44%",
+          "Recoil +5%"
+        ],
+        "3": [
+          "Ranged Damage +48% - +70%",
+          "Recoil +5%"
+        ]
+      },
+      "effectSummary": "Ranged Damage +48% - +70%; Recoil +5%"
+    },
+    "T6_Augment_SpitdartRifle6": {
+      "name": "JABAL Spitdart Disruptive Coating",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Rifle.SpitDart"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/jabal-spitdart-disruptive-coating",
+      "gradeEffects": {
+        "1": [
+          "Shield Damage +3% - +5%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "2": [
+          "Shield Damage +6% - +9%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "3": [
+          "Shield Damage +10% - +14%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ],
+        "4": [
+          "Shield Damage +15% - +20%",
+          "Clip Size -25%",
+          "Power Consumption Per Shot +30%"
+        ]
+      },
+      "effectSummary": "Shield Damage +15% - +20%; Clip Size -25%; Power Consumption Per Shot +30%"
+    },
+    "T6_Augment_SpitdartRifle7": {
+      "name": "JABAL Spitdart Expander",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Rifle.SpitDart"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/jabal-spitdart-expander",
+      "gradeEffects": {
+        "1": [
+          "Clip Size +137.5% - +180%",
+          "Power Consumption Per Shot -50% - -60%",
+          "Rate of Fire +7% - +11%",
+          "Accuracy -10%",
+          "Effective Range -10%",
+          "Ranged Damage -5%",
+          "Volume (Weight) +50%"
+        ],
+        "2": [
+          "Clip Size +175% - +220%",
+          "Power Consumption Per Shot -55% - -65%",
+          "Rate of Fire +12% - +18%",
+          "Accuracy -10%",
+          "Effective Range -10%",
+          "Ranged Damage -5%",
+          "Volume (Weight) +50%"
+        ],
+        "3": [
+          "Clip Size +212.5% - +260%",
+          "Power Consumption Per Shot -60% - -70%",
+          "Rate of Fire +20% - +26%",
+          "Accuracy -10%",
+          "Effective Range -10%",
+          "Ranged Damage -5%",
+          "Volume (Weight) +50%"
+        ],
+        "4": [
+          "Clip Size +250% - +300%",
+          "Power Consumption Per Shot -65% - -75%",
+          "Rate of Fire +27% - +34%",
+          "Accuracy -10%",
+          "Effective Range -10%",
+          "Ranged Damage -5%",
+          "Volume (Weight) +50%"
+        ]
+      },
+      "effectSummary": "Clip Size +250% - +300%; Power Consumption Per Shot -65% - -75%; Rate of Fire +27% - +34%; Accuracy -10%; Effective Range -10%; Ranged Damage -5%; Volume (Weight) +50%"
+    },
+    "T6_Augment_SpitdartRifle8": {
+      "name": "JABAL Spitdart Toxicity Amplifier",
+      "category": "weapons",
+      "source": "Augments",
+      "tags": [
+        "Items.Holsters.RangedWeapons.Light.Rifle.SpitDart"
+      ],
+      "methodUrl": "https://www.method.gg/dune-awakening/database/augmentations/jabal-spitdart-toxicity-amplifier",
+      "gradeEffects": {
+        "1": [
+          "Poison Damage +100%",
+          "Shield Damage -5%"
+        ],
+        "2": [
+          "Poison Damage +200%",
+          "Shield Damage -5%"
+        ]
+      },
+      "effectSummary": "Poison Damage +200%; Shield Damage -5%"
+    }
+  },
+  "methodItems": {
+    "A Dart for Every Man": [
+      "Items.Holsters.RangedWeapons.Light.SMG"
+    ],
+    "Ambition": [
+      "Items.Holsters.RangedWeapons.Heavy.Shotgun"
+    ],
+    "Bashar's Command": [
+      "Items.Holsters.RangedWeapons.Heavy.LMG"
+    ],
+    "Black Market K-28 Lasgun": [
+      "Items.Holsters.RangedWeapons.Heavy.Lasgun"
+    ],
+    "Blind Fury": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.SpitDart"
+    ],
+    "Branding Blade": [
+      "Items.Holsters.MeleeWeapons.Sword.Sword"
+    ],
+    "Bulwark Boots": [
+      "Items.Clothes.HeavyArmor.Feet"
+    ],
+    "Bulwark Chest": [
+      "Items.Clothes.HeavyArmor.Torso"
+    ],
+    "Bulwark Gloves": [
+      "Items.Clothes.HeavyArmor.Hands"
+    ],
+    "Bulwark Helmet": [
+      "Items.Clothes.HeavyArmor.Head"
+    ],
+    "Bulwark Leggings": [
+      "Items.Clothes.HeavyArmor.Legs"
+    ],
+    "Burning Blades": [
+      "Items.Holsters.MeleeWeapons.Knife.DualDaggers",
+      "Items.ExcludeFromLootSystem",
+      "Items.ExcludeFromPlayerBuyingFromVendor"
+    ],
+    "Cauterizer": [
+      "Items.Holsters.MeleeWeapons.Knife.Dirk"
+    ],
+    "Circuit Gauntlets": [
+      "Items.Clothes.HeavyArmor.Hands"
+    ],
+    "Combat Exoskeleton Chestpiece": [
+      "Items.Clothes.HeavyArmor.Torso"
+    ],
+    "Crew Chief's Stillsuit Garment": [],
+    "Desert Garb": [
+      "Items.Clothes.ScoutArmor.Torso"
+    ],
+    "Dunewatcher": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.SpitDart"
+    ],
+    "Eel's Tooth": [
+      "Items.Holsters.MeleeWeapons.Knife.Dirk"
+    ],
+    "Executor's Boots": [
+      "Items.Clothes.HeavyArmor.Feet"
+    ],
+    "Executor's Chestpiece": [
+      "Items.Clothes.HeavyArmor.Torso"
+    ],
+    "Executor's Gauntlets": [
+      "Items.Clothes.HeavyArmor.Hands"
+    ],
+    "Executor's Helmet": [
+      "Items.Clothes.HeavyArmor.Head"
+    ],
+    "Executor's Pants": [
+      "Items.Clothes.HeavyArmor.Legs"
+    ],
+    "Experimental Lightning Gun": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+    ],
+    "Feyd's Drinker": [
+      "Items.Holsters.MeleeWeapons.Knife.Kindjal"
+    ],
+    "Glasser": [
+      "Items.Holsters.RangedWeapons.Heavy.Flamethrower"
+    ],
+    "Halleck's Pick": [
+      "Items.Holsters.MeleeWeapons.Sword.Rapier"
+    ],
+    "Hell-Fury Pistol": [
+      "Items.Holsters.RangedWeapons.Heavy.Pistol"
+    ],
+    "Hook-claw Gloves": [
+      "Items.Clothes.ScoutArmor.Hands"
+    ],
+    "Idaho's Charge": [
+      "Items.Clothes.ScoutArmor.Torso"
+    ],
+    "Imperial Stillsuit Boots": [
+      "Items.Clothes.Stillsuit.Feet"
+    ],
+    "Imperial Stillsuit Garment": [
+      "Items.Clothes.Stillsuit.Torso"
+    ],
+    "Imperial Stillsuit Gloves": [
+      "Items.Clothes.Stillsuit.Hands"
+    ],
+    "Imperial Stillsuit Mask": [
+      "Items.Clothes.Stillsuit.Head"
+    ],
+    "Indara's Lullaby": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+    ],
+    "Ix-core Leggings": [
+      "Items.Clothes.ScoutArmor.Legs"
+    ],
+    "Leech's Maw": [
+      "Items.Holsters.MeleeWeapons.Knife.DualDaggers"
+    ],
+    "Pardot's Hood": [
+      "Items.Clothes.Stillsuit.Head",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Penetrator": [
+      "Items.Holsters.RangedWeapons.Heavy.Shotgun"
+    ],
+    "Perforator": [
+      "Items.Holsters.RangedWeapons.Light.Shotgun"
+    ],
+    "Phantom Whisper Chestpiece": [
+      "Items.Clothes.ScoutArmor.Torso"
+    ],
+    "Phantom Whisper Helm": [
+      "Items.Clothes.ScoutArmor.Head"
+    ],
+    "Pincushion Boots": [
+      "Items.Clothes.ScoutArmor.Feet"
+    ],
+    "Pincushion Chestpiece": [
+      "Items.Clothes.ScoutArmor.Torso"
+    ],
+    "Pincushion Gauntlets": [
+      "Items.Clothes.ScoutArmor.Hands"
+    ],
+    "Pincushion Helmet": [
+      "Items.Clothes.ScoutArmor.Head"
+    ],
+    "Pincushion Pants": [
+      "Items.Clothes.ScoutArmor.Legs"
+    ],
+    "Plasma Cannon": [
+      "Items.Holsters.RangedWeapons.Heavy.LMG"
+    ],
+    "Plastanium Pyrocket": [
+      "Items.Holsters.RangedWeapons.Heavy.Fireballer",
+      "Items.ExcludeFromLootSystem",
+      "Items.ExcludeFromPlayerBuyingFromVendor"
+    ],
+    "Power Harness": [
+      "Items.Clothes.HeavyArmor.Torso"
+    ],
+    "Prescient Edge": [
+      "Items.Holsters.MeleeWeapons.Sword.Rapier"
+    ],
+    "Regis Burst Drillshot": [
+      "Items.Holsters.RangedWeapons.Heavy.Shotgun"
+    ],
+    "Regis Disruptor Pistol": [
+      "Items.Holsters.RangedWeapons.Heavy.Pistol"
+    ],
+    "Regis Tripleshot Repeating Rifle": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.SpitDart"
+    ],
+    "Replica Pulse-knife": [
+      "Items.Holsters.MeleeWeapons.Knife.Kindjal"
+    ],
+    "Replica Pulse-sword": [
+      "Items.Holsters.MeleeWeapons.Sword.Sword"
+    ],
+    "Salusan Vengeance": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+    ],
+    "Sardaukar Intimidator": [
+      "Items.Holsters.RangedWeapons.Light.SMG"
+    ],
+    "Seethe": [
+      "Items.Holsters.RangedWeapons.Heavy.Pistol"
+    ],
+    "Serpent's Fang": [
+      "Items.Holsters.MeleeWeapons.Knife.Kindjal"
+    ],
+    "Shaddam's Bladder": [
+      "Items.Clothes.Stillsuit.Torso",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Shellburster": [
+      "Items.Holsters.RangedWeapons.Light.Shotgun"
+    ],
+    "Shishakli's Bite": [
+      "Items.Holsters.RangedWeapons.Light.Pistol"
+    ],
+    "Spike Hilt Sword": [
+      "Items.Holsters.MeleeWeapons.Sword.Sword",
+      "Items.ExcludeFromLootSystem",
+      "Items.ExcludeFromPlayerBuyingFromVendor"
+    ],
+    "Spitting Cobra": [
+      "Items.Holsters.RangedWeapons.Light.SMG"
+    ],
+    "Static Needle": [
+      "Items.Holsters.MeleeWeapons.Sword.Rapier"
+    ],
+    "Tabr Softstep Boots": [
+      "Items.Clothes.ScoutArmor.Feet"
+    ],
+    "Tactical Radiation Suit": [
+      "Items.Clothes.Utility"
+    ],
+    "The Ancient Way": [
+      "Items.Holsters.RangedWeapons.Heavy.RocketLauncher"
+    ],
+    "The Angry Adder": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+    ],
+    "The Forge Boots": [
+      "Items.Clothes.ScoutArmor.Feet"
+    ],
+    "The Forge Chestpiece": [
+      "Items.Clothes.ScoutArmor.Torso"
+    ],
+    "The Forge Gloves": [
+      "Items.Clothes.ScoutArmor.Hands"
+    ],
+    "The Forge Helmet": [
+      "Items.Clothes.ScoutArmor.Head"
+    ],
+    "The Forge Pants": [
+      "Items.Clothes.ScoutArmor.Legs"
+    ],
+    "The Hateful Barker": [
+      "Items.Holsters.RangedWeapons.Heavy.LMG"
+    ],
+    "Vaporizer": [
+      "Items.Holsters.RangedWeapons.Heavy.Flamethrower"
+    ],
+    "Villari's Stillsuit Boots": [
+      "Items.Clothes.Stillsuit.Feet",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Villari's Stillsuit Garment": [
+      "Items.Clothes.Stillsuit.Torso",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Villari's Stillsuit Gloves": [
+      "Items.Clothes.Stillsuit.Hands",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Villari's Stillsuit Mask": [
+      "Items.Clothes.Stillsuit.Head",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Way of the Misr": [
+      "Items.Holsters.RangedWeapons.Light.Pistol"
+    ],
+    "Wayfinder Helm": [
+      "Items.Clothes.ScoutArmor.Head"
+    ],
+    "Yueh's Reaper Gloves": [
+      "Items.Clothes.ScoutArmor.Hands"
+    ]
+  },
+  "itemAliases": {
+    "Assassin_Light06_Unique_Helmet": [
+      "Items.Clothes.ScoutArmor.Head"
+    ],
+    "Assassin_Light06_Unique_Helmet_Schematic": [
+      "Items.Clothes.ScoutArmor.Head"
+    ],
+    "Assassin_Light06_Unique_Top": [
+      "Items.Clothes.ScoutArmor.Torso"
+    ],
+    "Assassin_Light06_Unique_Top_Schematic": [
+      "Items.Clothes.ScoutArmor.Torso"
+    ],
+    "B1C4_Unique_Dirk2": [
+      "Items.Holsters.MeleeWeapons.Knife.Dirk"
+    ],
+    "B1C4_Unique_Dirk2_Schematic": [
+      "Items.Holsters.MeleeWeapons.Knife.Dirk"
+    ],
+    "B1C4_Unique_DualBlades1": [
+      "Items.Holsters.MeleeWeapons.Knife.DualDaggers"
+    ],
+    "B1C4_Unique_DualBlades1_Schematic": [
+      "Items.Holsters.MeleeWeapons.Knife.DualDaggers"
+    ],
+    "B1C4_Unique_HarkAr2": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+    ],
+    "B1C4_Unique_HarkAr2_Schematic": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+    ],
+    "B1C4_Unique_HeavyPistol2": [
+      "Items.Holsters.RangedWeapons.Heavy.Pistol"
+    ],
+    "B1C4_Unique_HeavyPistol2_Schematic": [
+      "Items.Holsters.RangedWeapons.Heavy.Pistol"
+    ],
+    "B1C4_Unique_Kindjal2": [
+      "Items.Holsters.MeleeWeapons.Knife.Kindjal"
+    ],
+    "B1C4_Unique_Kindjal2_Schematic": [
+      "Items.Holsters.MeleeWeapons.Knife.Kindjal"
+    ],
+    "B1C4_Unique_LMG2": [
+      "Items.Holsters.RangedWeapons.Heavy.LMG"
+    ],
+    "B1C4_Unique_LMG2_Schematic": [
+      "Items.Holsters.RangedWeapons.Heavy.LMG"
+    ],
+    "B1C4_Unique_Rapier2": [
+      "Items.Holsters.MeleeWeapons.Sword.Rapier"
+    ],
+    "B1C4_Unique_Rapier2_Schematic": [
+      "Items.Holsters.MeleeWeapons.Sword.Rapier"
+    ],
+    "B1C4_Unique_SMG2": [
+      "Items.Holsters.RangedWeapons.Light.SMG"
+    ],
+    "B1C4_Unique_SMG2_Schematic": [
+      "Items.Holsters.RangedWeapons.Light.SMG"
+    ],
+    "B1C4_Unique_SmugDmr1": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.SpitDart"
+    ],
+    "B1C4_Unique_SmugDmr1_Schematic": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.SpitDart"
+    ],
+    "B1C4_Unique_Sword2": [
+      "Items.Holsters.MeleeWeapons.Sword.Sword"
+    ],
+    "B1C4_Unique_Sword2_Schematic": [
+      "Items.Holsters.MeleeWeapons.Sword.Sword"
+    ],
+    "ChoamLg2": [
+      "Items.Holsters.RangedWeapons.Heavy.Lasgun"
+    ],
+    "Combat_Hark_MedUnique02_Boots": [
+      "Items.Clothes.ScoutArmor.Feet"
+    ],
+    "Combat_Hark_MedUnique02_Boots_Schematic": [
+      "Items.Clothes.ScoutArmor.Feet"
+    ],
+    "Combat_Hark_MedUnique02_Bottom": [
+      "Items.Clothes.ScoutArmor.Legs"
+    ],
+    "Combat_Hark_MedUnique02_Bottom_Schematic": [
+      "Items.Clothes.ScoutArmor.Legs"
+    ],
+    "Combat_Hark_MedUnique02_Gloves": [
+      "Items.Clothes.ScoutArmor.Hands"
+    ],
+    "Combat_Hark_MedUnique02_Gloves_Schematic": [
+      "Items.Clothes.ScoutArmor.Hands"
+    ],
+    "Combat_Hark_MedUnique02_Helmet": [
+      "Items.Clothes.ScoutArmor.Head"
+    ],
+    "Combat_Hark_MedUnique02_Helmet_Schematic": [
+      "Items.Clothes.ScoutArmor.Head"
+    ],
+    "Combat_Hark_MedUnique02_Top": [
+      "Items.Clothes.ScoutArmor.Torso"
+    ],
+    "Combat_Hark_MedUnique02_Top_Schematic": [
+      "Items.Clothes.ScoutArmor.Torso"
+    ],
+    "Combat_Heavy_Unique_PowerEfficient_Gloves_06": [
+      "Items.Clothes.HeavyArmor.Hands"
+    ],
+    "Combat_Heavy_Unique_PowerEfficient_Gloves_06_Schematic": [
+      "Items.Clothes.HeavyArmor.Hands"
+    ],
+    "Combat_Heavy_Unique_PowerIncrease_Top_06": [
+      "Items.Clothes.HeavyArmor.Torso"
+    ],
+    "Combat_Heavy_Unique_PowerIncrease_Top_06_Schematic": [
+      "Items.Clothes.HeavyArmor.Torso"
+    ],
+    "Combat_Heavy_Unique_Reinforced_Boots_06": [
+      "Items.Clothes.HeavyArmor.Feet"
+    ],
+    "Combat_Heavy_Unique_Reinforced_Boots_06_Schematic": [
+      "Items.Clothes.HeavyArmor.Feet"
+    ],
+    "Combat_Heavy_Unique_Reinforced_Bottom_06": [
+      "Items.Clothes.HeavyArmor.Legs"
+    ],
+    "Combat_Heavy_Unique_Reinforced_Bottom_06_Schematic": [
+      "Items.Clothes.HeavyArmor.Legs"
+    ],
+    "Combat_Heavy_Unique_Reinforced_Gloves_06": [
+      "Items.Clothes.HeavyArmor.Hands"
+    ],
+    "Combat_Heavy_Unique_Reinforced_Gloves_06_Schematic": [
+      "Items.Clothes.HeavyArmor.Hands"
+    ],
+    "Combat_Heavy_Unique_Reinforced_Helmet_06": [
+      "Items.Clothes.HeavyArmor.Head"
+    ],
+    "Combat_Heavy_Unique_Reinforced_Helmet_06_Schematic": [
+      "Items.Clothes.HeavyArmor.Head"
+    ],
+    "Combat_Heavy_Unique_Reinforced_Top_06": [
+      "Items.Clothes.HeavyArmor.Torso"
+    ],
+    "Combat_Heavy_Unique_Reinforced_Top_06_Schematic": [
+      "Items.Clothes.HeavyArmor.Torso"
+    ],
+    "Combat_Light_Unique_BiomeHeat_Top_06": [
+      "Items.Clothes.ScoutArmor.Torso"
+    ],
+    "Combat_Light_Unique_BiomeHeat_Top_06_Schematic": [
+      "Items.Clothes.ScoutArmor.Torso"
+    ],
+    "Combat_Light_Unique_Climbing_Gloves_06": [
+      "Items.Clothes.ScoutArmor.Hands"
+    ],
+    "Combat_Light_Unique_Climbing_Gloves_06_Schematic": [
+      "Items.Clothes.ScoutArmor.Hands"
+    ],
+    "Combat_Light_Unique_DewReap_Gloves_06": [
+      "Items.Clothes.ScoutArmor.Hands"
+    ],
+    "Combat_Light_Unique_DewReap_Gloves_06_Schematic": [
+      "Items.Clothes.ScoutArmor.Hands"
+    ],
+    "Combat_Light_Unique_ReduceSuspensor_Top_06": [
+      "Items.Clothes.ScoutArmor.Torso"
+    ],
+    "Combat_Light_Unique_ReduceSuspensor_Top_06_Schematic": [
+      "Items.Clothes.ScoutArmor.Torso"
+    ],
+    "Combat_Light_Unique_Scanning_Helmet_05": [
+      "Items.Clothes.ScoutArmor.Head"
+    ],
+    "Combat_Light_Unique_Scanning_Helmet_05_Schematic": [
+      "Items.Clothes.ScoutArmor.Head"
+    ],
+    "Combat_Light_Unique_Scanning_Helmet_06": [
+      "Items.Clothes.ScoutArmor.Head"
+    ],
+    "Combat_Light_Unique_Scanning_Helmet_06_Schematic": [
+      "Items.Clothes.ScoutArmor.Head"
+    ],
+    "Combat_Light_Unique_Stamina_Bottom_06": [
+      "Items.Clothes.ScoutArmor.Legs"
+    ],
+    "Combat_Light_Unique_Stamina_Bottom_06_Schematic": [
+      "Items.Clothes.ScoutArmor.Legs"
+    ],
+    "Combat_Light_Unique_WormThreat_Boots_06": [
+      "Items.Clothes.ScoutArmor.Feet"
+    ],
+    "Combat_Light_Unique_WormThreat_Boots_06_Schematic": [
+      "Items.Clothes.ScoutArmor.Feet"
+    ],
+    "Combat_Neut_AtreidesDeserterUnique05_Boots": [
+      "Items.Clothes.HeavyArmor.Feet"
+    ],
+    "Combat_Neut_AtreidesDeserterUnique05_Boots_Schematic": [
+      "Items.Clothes.HeavyArmor.Feet"
+    ],
+    "Combat_Neut_AtreidesDeserterUnique05_Bottom": [
+      "Items.Clothes.HeavyArmor.Legs"
+    ],
+    "Combat_Neut_AtreidesDeserterUnique05_Bottom_Schematic": [
+      "Items.Clothes.HeavyArmor.Legs"
+    ],
+    "Combat_Neut_AtreidesDeserterUnique05_Gloves": [
+      "Items.Clothes.HeavyArmor.Hands"
+    ],
+    "Combat_Neut_AtreidesDeserterUnique05_Gloves_Schematic": [
+      "Items.Clothes.HeavyArmor.Hands"
+    ],
+    "Combat_Neut_AtreidesDeserterUnique05_Helmet": [
+      "Items.Clothes.HeavyArmor.Head"
+    ],
+    "Combat_Neut_AtreidesDeserterUnique05_Helmet_Schematic": [
+      "Items.Clothes.HeavyArmor.Head"
+    ],
+    "Combat_Neut_AtreidesDeserterUnique05_Top": [
+      "Items.Clothes.HeavyArmor.Torso"
+    ],
+    "Combat_Neut_AtreidesDeserterUnique05_Top_Schematic": [
+      "Items.Clothes.HeavyArmor.Torso"
+    ],
+    "Combat_Neut_SmugglerDeserterUnique06_Boots": [
+      "Items.Clothes.ScoutArmor.Feet"
+    ],
+    "Combat_Neut_SmugglerDeserterUnique06_Boots_Schematic": [
+      "Items.Clothes.ScoutArmor.Feet"
+    ],
+    "Combat_Neut_SmugglerDeserterUnique06_Bottom": [
+      "Items.Clothes.ScoutArmor.Legs"
+    ],
+    "Combat_Neut_SmugglerDeserterUnique06_Bottom_Schematic": [
+      "Items.Clothes.ScoutArmor.Legs"
+    ],
+    "Combat_Neut_SmugglerDeserterUnique06_Gloves": [
+      "Items.Clothes.ScoutArmor.Hands"
+    ],
+    "Combat_Neut_SmugglerDeserterUnique06_Gloves_Schematic": [
+      "Items.Clothes.ScoutArmor.Hands"
+    ],
+    "Combat_Neut_SmugglerDeserterUnique06_Helmet": [
+      "Items.Clothes.ScoutArmor.Head"
+    ],
+    "Combat_Neut_SmugglerDeserterUnique06_Helmet_Schematic": [
+      "Items.Clothes.ScoutArmor.Head"
+    ],
+    "Combat_Neut_SmugglerDeserterUnique06_Top": [
+      "Items.Clothes.ScoutArmor.Torso"
+    ],
+    "Combat_Neut_SmugglerDeserterUnique06_Top_Schematic": [
+      "Items.Clothes.ScoutArmor.Torso"
+    ],
+    "Exoskeleton_Heavy06_Unique_Top": [
+      "Items.Clothes.HeavyArmor.Torso"
+    ],
+    "Exoskeleton_Heavy06_Unique_Top_Schematic": [
+      "Items.Clothes.HeavyArmor.Torso"
+    ],
+    "Fireballer_3": [
+      "Items.Holsters.RangedWeapons.Heavy.Fireballer",
+      "Items.ExcludeFromLootSystem",
+      "Items.ExcludeFromPlayerBuyingFromVendor"
+    ],
+    "Fireballer_3_Schematic": [
+      "Items.Holsters.RangedWeapons.Heavy.Fireballer",
+      "Items.ExcludeFromLootSystem",
+      "Items.ExcludeFromPlayerBuyingFromVendor"
+    ],
+    "Flamethrower_Prototype_2": [
+      "Items.Holsters.RangedWeapons.Heavy.Flamethrower"
+    ],
+    "HeavyPistol_Unique_Bleed_06": [
+      "Items.Holsters.RangedWeapons.Heavy.Pistol"
+    ],
+    "HeavyPistol_Unique_Bleed_06_Schematic": [
+      "Items.Holsters.RangedWeapons.Heavy.Pistol"
+    ],
+    "HeavyPistol_Unique_Headshot_06": [
+      "Items.Holsters.RangedWeapons.Heavy.Pistol"
+    ],
+    "HeavyPistol_Unique_Headshot_06_Schematic": [
+      "Items.Holsters.RangedWeapons.Heavy.Pistol"
+    ],
+    "Kindjal_Unique_Blood_06": [
+      "Items.Holsters.MeleeWeapons.Knife.Kindjal"
+    ],
+    "Kindjal_Unique_Blood_06_Schematic": [
+      "Items.Holsters.MeleeWeapons.Knife.Kindjal"
+    ],
+    "Kindjal_Unique_Stamina_06": [
+      "Items.Holsters.MeleeWeapons.Knife.Kindjal"
+    ],
+    "Kindjal_Unique_Stamina_06_Schematic": [
+      "Items.Holsters.MeleeWeapons.Knife.Kindjal"
+    ],
+    "LMG_Unique_Power_06": [
+      "Items.Holsters.RangedWeapons.Heavy.LMG"
+    ],
+    "LMG_Unique_Power_06_Schematic": [
+      "Items.Holsters.RangedWeapons.Heavy.LMG"
+    ],
+    "LMG_Unique_RapidFire_06": [
+      "Items.Holsters.RangedWeapons.Heavy.LMG"
+    ],
+    "LMG_Unique_RapidFire_06_Schematic": [
+      "Items.Holsters.RangedWeapons.Heavy.LMG"
+    ],
+    "LongRifle_Unique_LargeMag_06": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.SpitDart"
+    ],
+    "LongRifle_Unique_LargeMag_06_Schematic": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.SpitDart"
+    ],
+    "LongRifle_Unique_Poison_06": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.SpitDart"
+    ],
+    "LongRifle_Unique_Poison_06_Schematic": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.SpitDart"
+    ],
+    "Radiation_Suit_T6_Unique_Armored": [
+      "Items.Clothes.Utility"
+    ],
+    "Radiation_Suit_T6_Unique_Armored_Schematic": [
+      "Items.Clothes.Utility"
+    ],
+    "RocketLauncher_Unique_Homing_06": [
+      "Items.Holsters.RangedWeapons.Heavy.RocketLauncher"
+    ],
+    "RocketLauncher_Unique_Homing_06_Schematic": [
+      "Items.Holsters.RangedWeapons.Heavy.RocketLauncher"
+    ],
+    "Shotgun_Unique_Blood_06": [
+      "Items.Holsters.RangedWeapons.Heavy.Shotgun"
+    ],
+    "Shotgun_Unique_Blood_06_Schematic": [
+      "Items.Holsters.RangedWeapons.Heavy.Shotgun"
+    ],
+    "Shotgun_Unique_Explosive_06": [
+      "Items.Holsters.RangedWeapons.Heavy.Shotgun"
+    ],
+    "Shotgun_Unique_Explosive_06_Schematic": [
+      "Items.Holsters.RangedWeapons.Heavy.Shotgun"
+    ],
+    "Shotgun_Unique_LargeMag_06": [
+      "Items.Holsters.RangedWeapons.Heavy.Shotgun"
+    ],
+    "Shotgun_Unique_LargeMag_06_Schematic": [
+      "Items.Holsters.RangedWeapons.Heavy.Shotgun"
+    ],
+    "SMG_Unique_LargeMag_06": [
+      "Items.Holsters.RangedWeapons.Light.SMG"
+    ],
+    "SMG_Unique_LargeMag_06_Schematic": [
+      "Items.Holsters.RangedWeapons.Light.SMG"
+    ],
+    "Stillsuit_Choam_Unique_Dashed06_Top": [],
+    "Stillsuit_Choam_Unique_Dashed06_Top_Schematic": [],
+    "Stillsuit_Unique_Armored_06_Boots": [
+      "Items.Clothes.Stillsuit.Feet"
+    ],
+    "Stillsuit_Unique_Armored_06_Boots_Schematic": [
+      "Items.Clothes.Stillsuit.Feet"
+    ],
+    "Stillsuit_Unique_Armored_06_Gloves": [
+      "Items.Clothes.Stillsuit.Hands"
+    ],
+    "Stillsuit_Unique_Armored_06_Gloves_Schematic": [
+      "Items.Clothes.Stillsuit.Hands"
+    ],
+    "Stillsuit_Unique_Armored_06_Mask": [
+      "Items.Clothes.Stillsuit.Head"
+    ],
+    "Stillsuit_Unique_Armored_06_Mask_Schematic": [
+      "Items.Clothes.Stillsuit.Head"
+    ],
+    "Stillsuit_Unique_Armored_06_Top": [
+      "Items.Clothes.Stillsuit.Torso"
+    ],
+    "Stillsuit_Unique_Armored_06_Top_Schematic": [
+      "Items.Clothes.Stillsuit.Torso"
+    ],
+    "Stillsuit_Unique_Efficient_06_Boots": [
+      "Items.Clothes.Stillsuit.Feet",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Stillsuit_Unique_Efficient_06_Boots_Schematic": [
+      "Items.Clothes.Stillsuit.Feet",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Stillsuit_Unique_Efficient_06_Gloves": [
+      "Items.Clothes.Stillsuit.Hands",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Stillsuit_Unique_Efficient_06_Gloves_Schematic": [
+      "Items.Clothes.Stillsuit.Hands",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Stillsuit_Unique_Efficient_06_Mask": [
+      "Items.Clothes.Stillsuit.Head",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Stillsuit_Unique_Efficient_06_Mask_Schematic": [
+      "Items.Clothes.Stillsuit.Head",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Stillsuit_Unique_Efficient_06_Top": [
+      "Items.Clothes.Stillsuit.Torso",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Stillsuit_Unique_Efficient_06_Top_Schematic": [
+      "Items.Clothes.Stillsuit.Torso",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Stillsuit_Unique_HeatMitigation_06_Mask": [
+      "Items.Clothes.Stillsuit.Head",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Stillsuit_Unique_HeatMitigation_06_Mask_Schematic": [
+      "Items.Clothes.Stillsuit.Head",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Stillsuit_Unique_HighCapacity_06_Top": [
+      "Items.Clothes.Stillsuit.Torso",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "Stillsuit_Unique_HighCapacity_06_Top_Schematic": [
+      "Items.Clothes.Stillsuit.Torso",
+      "Items.ExcludeFromLootSystem"
+    ],
+    "T6_ChoamLg2_Schematic": [
+      "Items.Holsters.RangedWeapons.Heavy.Lasgun"
+    ],
+    "T6_UniqueFlamethrower_Prototype_2_Schematic": [
+      "Items.Holsters.RangedWeapons.Heavy.Flamethrower"
+    ],
+    "Unique_Sword_BleedyBlocky_6": [
+      "Items.Holsters.MeleeWeapons.Sword.Sword",
+      "Items.ExcludeFromLootSystem",
+      "Items.ExcludeFromPlayerBuyingFromVendor"
+    ],
+    "Unique_Sword_BleedyBlocky_6_Schematic": [
+      "Items.Holsters.MeleeWeapons.Sword.Sword",
+      "Items.ExcludeFromLootSystem",
+      "Items.ExcludeFromPlayerBuyingFromVendor"
+    ],
+    "UniqueAr_Burst_06": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+    ],
+    "UniqueAr_Burst_06_Schematic": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+    ],
+    "UniqueAr4": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+    ],
+    "UniqueAr4_Schematic": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+    ],
+    "UniqueAr6_Electric": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+    ],
+    "UniqueAr6_Electric_Schematic": [
+      "Items.Holsters.RangedWeapons.Light.Rifle.BattleRifle"
+    ],
+    "UniqueDirk_04": [
+      "Items.Holsters.MeleeWeapons.Knife.Dirk"
+    ],
+    "UniqueDirk_04_Schematic": [
+      "Items.Holsters.MeleeWeapons.Knife.Dirk"
+    ],
+    "UniqueDualBlades_6": [
+      "Items.Holsters.MeleeWeapons.Knife.DualDaggers",
+      "Items.ExcludeFromLootSystem",
+      "Items.ExcludeFromPlayerBuyingFromVendor"
+    ],
+    "UniqueDualBlades_6_Schematic": [
+      "Items.Holsters.MeleeWeapons.Knife.DualDaggers",
+      "Items.ExcludeFromLootSystem",
+      "Items.ExcludeFromPlayerBuyingFromVendor"
+    ],
+    "UniqueFlameThrower_02": [
+      "Items.Holsters.RangedWeapons.Heavy.Flamethrower"
+    ],
+    "UniqueFlameThrower_02_Schematic": [
+      "Items.Holsters.RangedWeapons.Heavy.Flamethrower"
+    ],
+    "UniqueRapier_03": [
+      "Items.Holsters.MeleeWeapons.Sword.Rapier"
+    ],
+    "UniqueRapier_03_Schematic": [
+      "Items.Holsters.MeleeWeapons.Sword.Rapier"
+    ],
+    "UniqueRapier_Power_06": [
+      "Items.Holsters.MeleeWeapons.Sword.Rapier"
+    ],
+    "UniqueRapier_Power_06_Schematic": [
+      "Items.Holsters.MeleeWeapons.Sword.Rapier"
+    ],
+    "UniqueScattergun_Fire_06": [
+      "Items.Holsters.RangedWeapons.Light.Shotgun"
+    ],
+    "UniqueScattergun_Fire_06_Schematic": [
+      "Items.Holsters.RangedWeapons.Light.Shotgun"
+    ],
+    "UniqueScattergun5": [
+      "Items.Holsters.RangedWeapons.Light.Shotgun"
+    ],
+    "UniqueScattergun5_Schematic": [
+      "Items.Holsters.RangedWeapons.Light.Shotgun"
+    ],
+    "UniqueSda_Doubleshot_06": [
+      "Items.Holsters.RangedWeapons.Light.Pistol"
+    ],
+    "UniqueSda_Doubleshot_06_Schematic": [
+      "Items.Holsters.RangedWeapons.Light.Pistol"
+    ],
+    "UniqueSda6": [
+      "Items.Holsters.RangedWeapons.Light.Pistol"
+    ],
+    "UniqueSda6_Schematic": [
+      "Items.Holsters.RangedWeapons.Light.Pistol"
+    ],
+    "UniqueSmg3": [
+      "Items.Holsters.RangedWeapons.Light.SMG"
+    ],
+    "UniqueSmg3_Schematic": [
+      "Items.Holsters.RangedWeapons.Light.SMG"
+    ],
+    "UniqueSword_05": [
+      "Items.Holsters.MeleeWeapons.Sword.Sword"
+    ],
+    "UniqueSword_05_Schematic": [
+      "Items.Holsters.MeleeWeapons.Sword.Sword"
+    ]
+  }
+}

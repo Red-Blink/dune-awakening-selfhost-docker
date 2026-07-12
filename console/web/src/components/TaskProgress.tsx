@@ -34,6 +34,8 @@ export function TaskProgress({ task, onDismiss }: { task: Task | null; onDismiss
   }, [liveTask?.id, liveTask?.status]);
 
   if (!liveTask) return null;
+  const message = taskMessage(liveTask);
+  const error = taskErrorMessage(liveTask, message);
   return (
     <section className="panel">
       <div className="panel-title">
@@ -43,10 +45,10 @@ export function TaskProgress({ task, onDismiss }: { task: Task | null; onDismiss
           {terminalStatuses.has(liveTask.status) && <button onClick={onDismiss}>Dismiss</button>}
         </div>
       </div>
-      <p>{formatUiSentence(taskMessage(liveTask))}</p>
+      <p>{formatUiSentence(message)}</p>
       {liveTask.operation === "init" && !terminalStatuses.has(liveTask.status) && <p className="task-elapsed">This can take a while on a fresh server. Elapsed time: <strong>{formatElapsed(now - new Date(liveTask.startedAt).getTime())}</strong></p>}
       {liveTask.operation === "init" && <ProgressBar progress={initTaskProgress(liveTask)} />}
-      {liveTask.errorMessage && <p className="error">{formatUiSentence(liveTask.errorMessage)}</p>}
+      {error && <p className="error">{formatUiSentence(error)}</p>}
       <details className={liveTask.operation === "init" ? "task-technical-details" : "technical-details"}>
         <summary>{liveTask.operation === "init" ? "Deployment Log" : "Technical details"}</summary>
         <pre className="log-box">{liveTask.logLines.slice(-120).map((line) => line.line).join("\n")}</pre>
@@ -88,6 +90,7 @@ function formatUiSentence(value: unknown, pending = false) {
 function taskTitle(task: Task) {
   if (task.operation === "init") {
     if (task.status === "succeeded") return "Deployment Complete";
+    if (task.status === "failed" && diskSpaceFailure(task)) return "Not Enough Disk Space";
     if (task.status === "failed") return "Deployment Failed";
     return "Deploying Dune Server";
   }
@@ -125,7 +128,7 @@ function backupRestoreHasCompletedImport(task: Task) {
 
 function initTaskMessage(task: Task) {
   if (task.status === "succeeded") return "Deployment finished. The game services are starting and may need several minutes before they are ready.";
-  if (task.status === "failed") return task.errorMessage || "Deployment failed. Open technical details to see the last server output.";
+  if (task.status === "failed") return diskSpaceFailure(task) || task.errorMessage || "Deployment failed. Open the deployment log to see the last server output.";
   const lines = task.logLines.map((row) => row.line).join("\n");
   if (/Starting orchestrator container/i.test(lines)) return "Starting the deployment container.";
   if (/Downloading\/loading assets and running database setup\/update/i.test(lines)) return "Downloading server assets, loading Funcom images, and preparing the database.";
@@ -152,4 +155,31 @@ function initTaskProgress(task: Task) {
   if (/Preparing fresh runtime state|Backing up existing local config|Resetting Postgres volume/i.test(lines)) return { percent: 18, label: "Preparing the server workspace." };
   if (/Using saved Web UI setup values|Generating battlegroup ID/i.test(lines)) return { percent: 10, label: "Reading setup details." };
   return { percent: task.status === "queued" ? 3 : 6, label: "Starting deployment." };
+}
+
+function taskErrorMessage(task: Task, visibleMessage: string) {
+  if (!task.errorMessage) return "";
+  const error = task.errorMessage.trim();
+  if (!error) return "";
+  if (task.operation === "init" && diskSpaceFailure(task)) return "";
+  if (sameSentence(error, visibleMessage)) return "";
+  return error;
+}
+
+function sameSentence(a: string, b: string) {
+  return normalizeSentence(a) === normalizeSentence(b);
+}
+
+function normalizeSentence(value: string) {
+  return String(value || "").replace(/\s+/g, " ").replace(/[.!?]+$/g, "").trim().toLowerCase();
+}
+
+function diskSpaceFailure(task: Task) {
+  const text = [task.errorMessage || "", ...task.logLines.map((row) => row.line)].join("\n");
+  if (!/Free disk space is below the configured safety minimum|Not enough free disk space/i.test(text)) return "";
+  const detail = text.match(/\[dune\]\s+([^:\n]+):\s+([0-9.]+)\s+GiB free,\s+needs at least\s+([0-9.]+)\s+GiB/i);
+  if (detail) {
+    return `There is not enough free disk space. ${detail[1].trim()} has ${detail[2]} GiB free, but deployment requires at least ${detail[3]} GiB. Free up disk space or move Docker's data-root to a larger disk, then retry.`;
+  }
+  return "There is not enough free disk space for a safe Dune server deployment. Free up disk space or move Docker's data-root to a larger disk, then retry.";
 }

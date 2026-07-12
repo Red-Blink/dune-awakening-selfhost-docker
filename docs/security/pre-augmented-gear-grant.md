@@ -21,20 +21,27 @@ Per game mechanics:
 
 **Approach A: Grant gear with augments pre-installed**
 - Extends `giveItemToPlayer()` and `giveItemToStorage()` to accept an `augments` array
-- Augments are written into the `FCustomizationStats` field of the `dune.items.stats` JSONB column
+- Augments are written into the game's `FAugmentedItemStats` field of the `dune.items.stats` JSONB column
+- Applied augments require the rolled payload from a real standalone augment item's `FAugmentItemStats`; if that source row is missing, the console rejects the request instead of creating gear that the game renders with empty augment slots
 - Example stats payload:
   ```json
   {
-    "FCustomizationStats": [["T6_Augment_Melee1", "T6_Augment_Damage1"], {}],
+    "FCustomizationStats": [[], {}],
+    "FAugmentedItemStats": [[], {
+      "AppliedAugments": [{"Name": "T6_Augment_Melee1"}, {"Name": "T6_Augment_Damage1"}],
+      "AppliedAugmentQualities": [1, 1],
+      "AppliedAugmentRollData": [{"StatRolls": [0.01], "AppliedEffectIndices": []}, {"StatRolls": [0.02], "AppliedEffectIndices": []}]
+    }],
     "FItemStackAndDurabilityStats": [[], {"CurrentDurability": 100, "MaxDurability": 100, "DecayedMaxDurability": 100, "DecayedDurability": 100}]
   }
   ```
 - Durability values are now initialized to 100 by default on DB-granted player items
 - All pre-augmented grants force the database path (cannot go through RabbitMQ live grant)
+- Player inventory augment grants require the player to be offline so live server state cannot overwrite the database edit
 
 **Approach B: Apply augments to an existing inventory item**
 - New `augmentInventoryItem()` function in `duneDb.js`
-- Merges augment IDs into an existing item's `FCustomizationStats`, preserving existing durability and augment data
+- Replaces the existing item's `FAugmentedItemStats`, preserving existing durability and non-augment customization data
 - Deduplicates augment IDs automatically
 - New API route: `POST /api/players/:id/augment-item`
 
@@ -43,6 +50,7 @@ Per game mechanics:
 ### Core Library
 - `console/api/src/duneDb.js`
   - Added `validateAugmentIds()`, `buildItemStats()` helpers
+- Added lookup of augment item `FAugmentItemStats` so gear receives real `AppliedAugmentRollData`; requests now fail clearly when the required rolled augment payload is not present in the database
   - Added `augmentInventoryItem()` — applies augments to existing DB items
   - Extended `giveItemToPlayer()` — accepts `augments: []`, populates durability stats
   - Extended `giveItemToStorage()` — accepts `augments: []`
@@ -115,9 +123,9 @@ Response:
 ## Testing
 
 - `console/api/test/db.test.js`: 7 new tests covering:
-  - Player give-item with augments populates FCustomizationStats
+  - Player give-item with augments populates FAugmentedItemStats
   - Player give-item with augments forces DB path on grade 0 items
-  - Storage give-item with augments populates FCustomizationStats
+  - Storage give-item with augments populates FAugmentedItemStats
   - Augment inventory item applies augment IDs to existing item
   - Augment inventory item merges with existing augments
   - Augment inventory item deduplicates augment IDs
@@ -129,5 +137,6 @@ Response:
 
 ## Limitations
 
-- The CLI tools (`admin-tools.sh`) use RabbitMQ for live grants, which does not support `FCustomizationStats`. Pre-augmented gear grants must go through the web API or direct database operations.
-- This feature populates the database representation of augment slots. The game client's behavior when receiving items with pre-populated `FCustomizationStats` has not been tested live — players may need to relog or refresh inventory for the augment state to sync.
+- The CLI tools (`admin-tools.sh`) use RabbitMQ for live grants, which does not support pre-populated `FAugmentedItemStats`. Pre-augmented gear grants must go through the web API or direct database operations.
+- Player inventory augment edits are database mutations. The target player must be offline and should log in after the edit for the game server to load the updated item stats.
+- Real standalone augment rows are required because they contain the game's own rolled `FAugmentItemStats` payload. If a payload is missing, the console stops the grant/apply operation and tells the user which augment rows need real rolled stats.

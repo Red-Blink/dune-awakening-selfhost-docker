@@ -6,7 +6,7 @@ export type CarePackageConfig = {
   activeKitId: string;
   autoGrantKitId: string;
   kits: CarePackageEntry[];
-  items: { itemName?: string; itemId?: string; quantity: number; durability?: number; quality?: number; grade?: number; image?: string; augments?: string[] }[];
+  items: { itemName?: string; itemId?: string; quantity: number; durability?: number; quality?: number; grade?: number; image?: string; category?: string; source?: string; augments?: string[]; augmentQuality?: number }[];
   xp: number;
   allowRepeatGrants: boolean;
   autoGrantEnabled: boolean;
@@ -18,7 +18,7 @@ export type CarePackageConfig = {
 export type CarePackageEntry = {
   id: string;
   name: string;
-  items: { itemName?: string; itemId?: string; quantity: number; durability?: number; quality?: number; grade?: number; augments?: string[] }[];
+  items: { itemName?: string; itemId?: string; quantity: number; durability?: number; quality?: number; grade?: number; image?: string; category?: string; source?: string; augments?: string[]; augmentQuality?: number }[];
   xp: number;
   sendMessage?: string;
 };

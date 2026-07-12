@@ -28,6 +28,7 @@ const regions = ["Europe", "North America", "South America", "Asia", "Oceania", 
 type SetupConfig = { SERVER_TITLE: string; SERVER_REGION: string; SERVER_IP: string; SERVER_IP_MODE: string; SERVER_PROVIDER: string; STEAM_APP_ID: string };
 const terminalStatuses = new Set(["succeeded", "failed", "cancelled"]);
 const completionRedirectSeconds = 10;
+const deploymentSuccessHoldMs = 3000;
 const defaultSetupConfig: SetupConfig = { SERVER_TITLE: "My Dune Server", SERVER_REGION: "Europe", SERVER_IP: "auto", SERVER_IP_MODE: "public", SERVER_PROVIDER: "dune-docker", STEAM_APP_ID: "4754530" };
 
 export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy", onSetupComplete }: { initialStep?: number; jumpNonce?: number; mode?: "first-run" | "redeploy"; onSetupComplete?: () => void }) {
@@ -121,6 +122,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
       setTask(current);
     }
     if (current.status === "succeeded") {
+      await new Promise((resolve) => window.setTimeout(resolve, deploymentSuccessHoldMs));
       const finishStep = stepIndex("finish");
       setMaxUnlockedStep((value) => Math.max(value, finishStep));
       setStep(finishStep);

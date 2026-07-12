@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Grid2X2, List, Lock } from "lucide-react";
+import { ChevronDown, ChevronUp, Download, Grid2X2, List, Lock } from "lucide-react";
 import { mapsApi, type LiveMapMemoryRow, type MapRuntimeSettings, type MemoryBalancerState, type SpicefieldTypeRow, type UserSettingField, type UserSettingsSchema } from "../../api/maps";
 import { setupApi, type Task } from "../../api/setup";
 import { SecretInput } from "../../components/SecretInput";
@@ -1193,6 +1193,12 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
     const name = kind === "engine" ? "UserEngine.ini" : "UserGame.ini";
     downloadText(name, text);
   }
+  async function downloadClientGameIni() {
+    const map = !userGameName || isUserGameGlobal ? undefined : userGameName;
+    const partitionId = !userGameName || isUserGameGlobal ? undefined : effectiveUserGamePartitionId;
+    const result = await mapsApi.rawUserSettings("client-game", map, partitionId);
+    downloadText("Game.ini", result.content || "");
+  }
   async function toggleAdvanced() {
     if (!mapsLoaded) return;
     if (advancedOpen) {
@@ -1372,10 +1378,13 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
     <div className={`playerAdmin_toggle maps-modifiers-toggle ${modifiersOpen && modifiersAvailable ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" disabled={!modifiersAvailable} aria-label={modifiersOpen && modifiersAvailable ? "Collapse Interactive Modifiers" : "Expand Interactive Modifiers"} onClick={toggleModifiers}>{modifiersOpen && modifiersAvailable ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Interactive Modifiers</span></button>
       {modifiersOpen && modifiersAvailable && <div className="playerAdmin_toggleBody">
-      <div className="settings-tabs" role="tablist" aria-label="Interactive modifier editor">
-        <button className={settingsTab === "engine" ? "active" : ""} role="tab" aria-selected={settingsTab === "engine"} onClick={() => setSettingsTab("engine")}>UserEngine</button>
-        <button className={settingsTab === "game" ? "active" : ""} role="tab" aria-selected={settingsTab === "game"} onClick={() => setSettingsTab("game")}>UserGame</button>
-        <button className={settingsTab === "spicefields" ? "active" : ""} role="tab" aria-selected={settingsTab === "spicefields"} onClick={() => { setSettingsTab("spicefields"); void loadSpicefields({ preserveDrafts: true }).catch(() => undefined); }}>Spice Fields</button>
+      <div className="settings-tabs-row">
+        <div className="settings-tabs" role="tablist" aria-label="Interactive modifier editor">
+          <button className={settingsTab === "engine" ? "active" : ""} role="tab" aria-selected={settingsTab === "engine"} onClick={() => setSettingsTab("engine")}>UserEngine</button>
+          <button className={settingsTab === "game" ? "active" : ""} role="tab" aria-selected={settingsTab === "game"} onClick={() => setSettingsTab("game")}>UserGame</button>
+          <button className={settingsTab === "spicefields" ? "active" : ""} role="tab" aria-selected={settingsTab === "spicefields"} onClick={() => { setSettingsTab("spicefields"); void loadSpicefields({ preserveDrafts: true }).catch(() => undefined); }}>Spice Fields</button>
+        </div>
+        <button className="settings-download-button" type="button" title={userGameName && !isUserGameGlobal ? "Download client Game.ini for the selected UserGame target" : "Download client Game.ini for global UserGame values"} onClick={() => run(downloadClientGameIni)}><Download size={16} /> Game.ini</button>
       </div>
       {settingsTab === "engine" ? <>
         <SettingsEditor fields={engineFields} values={engineDraft} onChange={(id, value) => setEngineDraft({ ...engineDraft, [id]: value })} />

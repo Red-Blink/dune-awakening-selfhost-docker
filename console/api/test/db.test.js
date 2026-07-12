@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
-import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, augmentInventoryItem, changeDunePassword, completeJourneyNode, completeTutorial, deleteInventoryItem, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerInventory, playerJourney, playerPosition, playerProfile, playerResearchItems, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
+import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, augmentInventoryItem, augmentNewestPlayerItem, changeDunePassword, completeJourneyNode, completeTutorial, deleteInventoryItem, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerInventory, playerJourney, playerPosition, playerProfile, playerResearchItems, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
   assert.deepEqual(discoverDbConfig({}), {
@@ -948,6 +948,30 @@ test("player inventory selects DecayedMaxDurability as a max_durability fallback
   assert.match(select.text, /nullif\(\(i\.stats->'FItemStackAndDurabilityStats'->1->>'DecayedMaxDurability'\)::numeric, 0\)/);
 });
 
+test("player inventory enriches rows with catalog category and source for augment eligibility", async () => {
+  const db = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.items i")) return { rows: [{
+        id: 501,
+        template_id: "SmugDmr5",
+        stack_size: 1,
+        quality_level: 5,
+        position_index: 0,
+        inventory_id: 7,
+        current_durability: "100",
+        max_durability: "100",
+        stats: {}
+      }] };
+      return { rows: [] };
+    }
+  };
+  const result = await playerInventory(db, 123);
+  assert.equal(result.rows[0].template_id, "SmugDmr5");
+  assert.equal(result.rows[0].category, "weapons");
+  assert.equal(result.rows[0].source, "Weapons");
+});
+
 test("inventory delete verifies ownership before calling dune.delete_item", async () => {
   const calls = [];
   const db = fakeMutationDb(calls, {
@@ -1134,29 +1158,166 @@ test("player give-item persists selected item grade", async () => {
   assert.equal(stats.FItemStackAndDurabilityStats[1].MaxDurability, 100);
 });
 
-test("player give-item with augments populates FCustomizationStats", async () => {
+test("player give-item bumps standalone augment grade zero to grade one", async () => {
   const calls = [];
   const db = fakeMutationDb(calls, {
     storageRows: [{ id: 7, actor_id: 123, max_item_count: 30, max_item_volume: 0 }],
     countRows: [{ count: 1 }],
-    insertedRows: [{ id: 502, template_id: "UniqueSword", stack_size: 1, quality_level: 0, position_index: 3, inventory_id: 7 }]
+    insertedRows: [{ id: 501, template_id: "T6_Augment_Melee4", stack_size: 1, quality_level: 1, position_index: 2, inventory_id: 7 }]
   });
-  const result = await giveItemToPlayer(db, 123, { templateId: "UniqueSword", quantity: 1, quality: 0, augments: ["T6_Augment_Melee1", "T6_Augment_Melee4"] });
+  await giveItemToPlayer(db, 123, { templateId: "T6_Augment_Melee4", quantity: 1, quality: 0 });
+  const insert = calls.find((call) => call.text.includes("insert into dune.items"));
+  assert.ok(insert);
+  assert.deepEqual(insert.values.slice(0, 5), [7, "T6_Augment_Melee4", 1, 1, 2]);
+});
+
+test("player give-item keeps normal weapon grade zero", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    storageRows: [{ id: 7, actor_id: 123, max_item_count: 30, max_item_volume: 0 }],
+    countRows: [{ count: 1 }],
+    insertedRows: [{ id: 501, template_id: "SMG_Unique_LargeMag_06", stack_size: 1, quality_level: 0, position_index: 2, inventory_id: 7 }]
+  });
+  await giveItemToPlayer(db, 123, { templateId: "SMG_Unique_LargeMag_06", quantity: 1, quality: 0 });
+  const insert = calls.find((call) => call.text.includes("insert into dune.items"));
+  assert.ok(insert);
+  assert.deepEqual(insert.values.slice(0, 5), [7, "SMG_Unique_LargeMag_06", 1, 0, 2]);
+});
+
+test("player give-item with augments populates FAugmentedItemStats", async () => {
+  const calls = [];
+  const augmentRollRows = [
+    { template_id: "T6_Augment_Melee1", stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } },
+    { template_id: "T6_Augment_Melee4", stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } }
+  ];
+  const db = fakeMutationDb(calls, {
+    augmentRollRows,
+    storageRows: [{ id: 7, actor_id: 123, max_item_count: 30, max_item_volume: 0 }],
+    countRows: [{ count: 1 }],
+    insertedRows: [{ id: 502, template_id: "UniqueSword_05", stack_size: 1, quality_level: 0, position_index: 3, inventory_id: 7 }]
+  });
+  const result = await giveItemToPlayer(db, 123, { templateId: "UniqueSword_05", quantity: 1, quality: 0, augments: ["T6_Augment_Melee1", "T6_Augment_Melee4"] });
   assert.deepEqual(result.augments, ["T6_Augment_Melee1", "T6_Augment_Melee4"]);
   const insert = calls.find((call) => call.text.includes("insert into dune.items"));
   assert.ok(insert);
   const stats = JSON.parse(insert.values[5]);
-  assert.deepEqual(stats.FCustomizationStats, [["T6_Augment_Melee1", "T6_Augment_Melee4"], {}]);
+  assert.deepEqual(stats.FCustomizationStats, [[], {}]);
+  assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugments, [{ Name: "T6_Augment_Melee1" }, { Name: "T6_Augment_Melee4" }]);
+  assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugmentQualities, [1, 1]);
+  assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugmentRollData, [{ StatRolls: [1], AppliedEffectIndices: [] }, { StatRolls: [1], AppliedEffectIndices: [] }]);
+});
+
+test("player give-item with augments writes normal acquisition metadata when supported", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    augmentRollRows: [{ template_id: "T6_Augment_Melee1", stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } }],
+    itemColumns: ["inventory_id", "template_id", "stack_size", "quality_level", "position_index", "stats", "is_new", "acquisition_time"],
+    storageRows: [{ id: 7, actor_id: 123, max_item_count: 30, max_item_volume: 0 }],
+    countRows: [{ count: 1 }],
+    insertedRows: [{ id: 502, template_id: "UniqueSword_05", stack_size: 1, quality_level: 0, position_index: 3, inventory_id: 7 }]
+  });
+  await giveItemToPlayer(db, 123, { templateId: "UniqueSword_05", quantity: 1, quality: 0, augments: ["T6_Augment_Melee1"] });
+  const insert = calls.find((call) => call.text.includes("insert into dune.items"));
+  assert.ok(insert);
+  assert.match(insert.text, /is_new/);
+  assert.match(insert.text, /acquisition_time/);
+  assert.equal(insert.values[6], false);
+  assert.ok(Number(insert.values[7]) > 0);
+});
+
+test("player give-item with grade zero augments requires offline", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    playerRows: [{ actor_id: 123, account_id: 44, controller_id: 55, player_state_id: 5, online_status: "Online" }],
+    augmentRollRows: [{ template_id: "T6_Augment_Melee1", stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } }],
+    storageRows: [{ id: 7, actor_id: 123, max_item_count: 30, max_item_volume: 0 }],
+    countRows: [{ count: 1 }]
+  });
+  await assert.rejects(
+    () => giveItemToPlayer(db, 123, { templateId: "UniqueSword_05", quantity: 1, quality: 0, augments: ["T6_Augment_Melee1"] }),
+    /Pre-augmented item grants require the player to be offline/
+  );
+  assert.equal(calls.some((call) => call.text.includes("insert into dune.items")), false);
+});
+
+test("player give-item with grade zero item and higher augment grade requires offline", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    playerRows: [{ actor_id: 123, account_id: 44, controller_id: 55, player_state_id: 5, online_status: "Online" }],
+    augmentRollRows: [{ template_id: "T6_Augment_Melee1", stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } }],
+    storageRows: [{ id: 7, actor_id: 123, max_item_count: 30, max_item_volume: 0 }],
+    countRows: [{ count: 1 }]
+  });
+  await assert.rejects(
+    () => giveItemToPlayer(db, 123, { templateId: "UniqueSword_05", quantity: 1, quality: 0, augments: ["T6_Augment_Melee1"], augmentQuality: 2 }),
+    /Pre-augmented item grants require the player to be offline/
+  );
+  assert.equal(calls.some((call) => call.text.includes("insert into dune.items")), false);
+});
+
+test("player give-item writes selected augment grade into applied augment qualities", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    augmentRollRows: [{ template_id: "T6_Augment_Melee1", quality_level: 1, stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } }],
+    storageRows: [{ id: 7, actor_id: 123, max_item_count: 30, max_item_volume: 0 }],
+    countRows: [{ count: 1 }],
+    insertedRows: [{ id: 502, template_id: "UniqueSword_05", stack_size: 1, quality_level: 0, position_index: 3, inventory_id: 7 }]
+  });
+  await giveItemToPlayer(db, 123, { templateId: "UniqueSword_05", quantity: 1, quality: 0, augments: ["T6_Augment_Melee1"], augmentQuality: 4 });
+  const insert = calls.find((call) => call.text.includes("insert into dune.items"));
+  assert.ok(insert);
+  const stats = JSON.parse(insert.values[5]);
+  assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugmentQualities, [4]);
+});
+
+test("player give-item generates perfect augment roll when no rolled source row exists", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    augmentRollRows: [],
+    storageRows: [{ id: 7, actor_id: 123, max_item_count: 30, max_item_volume: 0 }],
+    countRows: [{ count: 1 }],
+    insertedRows: [{ id: 505, template_id: "UniqueScattergun5", stack_size: 1, quality_level: 5, position_index: 4, inventory_id: 7 }]
+  });
+  await giveItemToPlayer(db, 123, { templateId: "UniqueScattergun5", quantity: 1, quality: 5, augments: ["T6_Augment_Scattergun5"] });
+  const insert = calls.find((call) => call.text.includes("insert into dune.items"));
+  assert.ok(insert);
+  const stats = JSON.parse(insert.values[5]);
+  assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugmentRollData, [{ StatRolls: [1], AppliedEffectIndices: [] }]);
+});
+
+test("player give-item can source augment roll data from existing augmented gear", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    augmentRollRows: [],
+    augmentedItemRows: [{
+      stats: {
+        FAugmentedItemStats: [[], {
+          AppliedAugments: [{ Name: "T6_Augment_ReloadSpeed1" }],
+          AppliedAugmentQualities: [1],
+          AppliedAugmentRollData: [{ StatRolls: [0.0], AppliedEffectIndices: [] }]
+        }]
+      }
+    }],
+    storageRows: [{ id: 7, actor_id: 123, max_item_count: 30, max_item_volume: 0 }],
+    countRows: [{ count: 1 }],
+    insertedRows: [{ id: 506, template_id: "UniqueScattergun5", stack_size: 1, quality_level: 0, position_index: 4, inventory_id: 7 }]
+  });
+  await giveItemToPlayer(db, 123, { templateId: "UniqueScattergun5", quantity: 1, quality: 0, augments: ["T6_Augment_ReloadSpeed1"] });
+  const insert = calls.find((call) => call.text.includes("insert into dune.items"));
+  assert.ok(insert);
+  const stats = JSON.parse(insert.values[5]);
+  assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugmentRollData, [{ StatRolls: [1], AppliedEffectIndices: [] }]);
 });
 
 test("player give-item with augments forces DB path with durability on grade 0 items", async () => {
   const calls = [];
   const db = fakeMutationDb(calls, {
+    augmentRollRows: [{ template_id: "T6_Augment_Melee1", stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } }],
     storageRows: [{ id: 7, actor_id: 123, max_item_count: 30, max_item_volume: 0 }],
     countRows: [{ count: 1 }],
-    insertedRows: [{ id: 503, template_id: "UniqueSword", stack_size: 1, quality_level: 0, position_index: 4, inventory_id: 7 }]
+    insertedRows: [{ id: 503, template_id: "UniqueSword_05", stack_size: 1, quality_level: 0, position_index: 4, inventory_id: 7 }]
   });
-  const result = await giveItemToPlayer(db, 123, { templateId: "UniqueSword", quantity: 1, quality: 0, augments: ["T6_Augment_Melee1"] });
+  const result = await giveItemToPlayer(db, 123, { templateId: "UniqueSword_05", quantity: 1, quality: 0, augments: ["T6_Augment_Melee1"] });
   assert.equal(result.inserted.quality_level, 0);
   const insert = calls.find((call) => call.text.includes("insert into dune.items"));
   assert.ok(insert);
@@ -1164,51 +1325,229 @@ test("player give-item with augments forces DB path with durability on grade 0 i
   assert.ok(stats.FItemStackAndDurabilityStats[1].CurrentDurability > 0);
 });
 
-test("storage give-item with augments populates FCustomizationStats", async () => {
+test("live grant augment patch excludes existing item IDs instead of relying on monotonic item IDs", async () => {
   const calls = [];
   const db = fakeMutationDb(calls, {
+    augmentRollRows: [{ template_id: "T6_Augment_Acuracy1", quality_level: 1, stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } }],
+    newItemRows: [{ id: 27082752, stats: {}, template_id: "SMG_Unique_LargeMag_06" }]
+  });
+  const result = await augmentNewestPlayerItem(db, 123, "SMG_Unique_LargeMag_06", {
+    existingItemIds: [27339050],
+    augments: ["T6_Augment_Acuracy1"],
+    augmentQuality: 1
+  });
+  assert.equal(result.itemId, 27082752);
+  const select = calls.find((call) => call.text.includes("not (i.id = any($3::bigint[]))"));
+  assert.ok(select);
+  assert.deepEqual(select.values.slice(0, 3), [123, "SMG_Unique_LargeMag_06", [27339050]]);
+  const update = calls.find((call) => call.text.includes("update dune.items set stats"));
+  assert.ok(update);
+  assert.equal(update.values.at(-1), 27082752);
+  const stats = JSON.parse(update.values[0]);
+  assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugments, [{ Name: "T6_Augment_Acuracy1" }]);
+});
+
+test("storage give-item with augments populates FAugmentedItemStats", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    augmentRollRows: [{ template_id: "T6_Augment_Melee1", stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } }],
     storageRows: [{ id: 7, actor_id: 222, max_item_count: 30, max_item_volume: 0 }],
     countRows: [{ count: 1 }],
-    insertedRows: [{ id: 504, template_id: "UniqueSword", stack_size: 1, quality_level: 0, position_index: 5, inventory_id: 7 }]
+    insertedRows: [{ id: 504, template_id: "UniqueSword_05", stack_size: 1, quality_level: 0, position_index: 5, inventory_id: 7 }]
   });
-  const result = await giveItemToStorage(db, 222, { templateId: "UniqueSword", quantity: 1, quality: 0, augments: ["T6_Augment_Melee1"] });
+  const result = await giveItemToStorage(db, 222, { templateId: "UniqueSword_05", quantity: 1, quality: 0, augments: ["T6_Augment_Melee1"] });
   assert.deepEqual(result.augments, ["T6_Augment_Melee1"]);
   const insert = calls.find((call) => call.text.includes("insert into dune.items"));
   assert.ok(insert);
   const stats = JSON.parse(insert.values[5]);
-  assert.deepEqual(stats.FCustomizationStats, [["T6_Augment_Melee1"], {}]);
+  assert.deepEqual(stats.FCustomizationStats, [[], {}]);
+  assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugments, [{ Name: "T6_Augment_Melee1" }]);
+  assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugmentQualities, [1]);
+  assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugmentRollData, [{ StatRolls: [1], AppliedEffectIndices: [] }]);
+  assert.equal(stats.FItemStackAndDurabilityStats[1].CurrentDurability, 100);
 });
 
-test("augment inventory item applies augment IDs to existing item FCustomizationStats", async () => {
+test("augment inventory item applies augment IDs to existing item FAugmentedItemStats", async () => {
   const calls = [];
   const existingStats = { FCustomizationStats: [[], {}], FItemStackAndDurabilityStats: [[], { CurrentDurability: 80 }] };
   const db = fakeMutationDb(calls, {
-    itemRows: [{ id: 501, stats: existingStats, template_id: "UniqueSword" }]
+    augmentRollRows: [
+      { template_id: "T6_Augment_Melee1", stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } },
+      { template_id: "T6_Augment_Melee4", stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } }
+    ],
+    itemRows: [{ id: 501, stats: existingStats, template_id: "UniqueSword_05" }]
   });
   const result = await augmentInventoryItem(db, 123, 501, { augments: ["T6_Augment_Melee1", "T6_Augment_Melee4"] });
   assert.deepEqual(result.augments, ["T6_Augment_Melee1", "T6_Augment_Melee4"]);
   const update = calls.find((call) => call.text.includes("update dune.items set stats"));
   assert.ok(update);
   const stats = JSON.parse(update.values[0]);
-  assert.deepEqual(stats.FCustomizationStats, [["T6_Augment_Melee1", "T6_Augment_Melee4"], {}]);
+  assert.deepEqual(stats.FCustomizationStats, [[], {}]);
+  assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugments, [{ Name: "T6_Augment_Melee1" }, { Name: "T6_Augment_Melee4" }]);
+  assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugmentQualities, [1, 1]);
+  assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugmentRollData, [{ StatRolls: [1], AppliedEffectIndices: [] }, { StatRolls: [1], AppliedEffectIndices: [] }]);
   assert.equal(stats.FItemStackAndDurabilityStats[1].CurrentDurability, 80);
 });
 
-test("augment inventory item merges with existing augments", async () => {
+test("augment inventory item applies selected augment grade", async () => {
   const calls = [];
-  const existingStats = { FCustomizationStats: [["T6_Augment_Damage1"], {}], FItemStackAndDurabilityStats: [[], {}] };
   const db = fakeMutationDb(calls, {
-    itemRows: [{ id: 501, stats: existingStats, template_id: "UniqueSword" }]
+    augmentRollRows: [
+      { template_id: "T6_Augment_Melee1", quality_level: 1, stats: { FAugmentItemStats: [[], { StatRolls: [0.4], AppliedEffectIndices: [] }] } }
+    ],
+    itemRows: [{ id: 501, stats: { FCustomizationStats: [[], {}], FItemStackAndDurabilityStats: [[], {}] }, template_id: "UniqueSword_05" }]
   });
-  const result = await augmentInventoryItem(db, 123, 501, { augments: ["T6_Augment_Melee1", "T6_Augment_Damage1"] });
-  assert.deepEqual(result.augments, ["T6_Augment_Damage1", "T6_Augment_Melee1"]);
+  const result = await augmentInventoryItem(db, 123, 501, { augments: ["T6_Augment_Melee1"], augmentQuality: 5 });
+  assert.equal(result.augmentQuality, 5);
+  const update = calls.find((call) => call.text.includes("update dune.items set stats"));
+  assert.ok(update);
+  const stats = JSON.parse(update.values[0]);
+  assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugmentQualities, [5]);
+});
+
+test("augment inventory item normalizes generated item metadata when supported", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    augmentRollRows: [{ template_id: "T6_Augment_Melee1", stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } }],
+    itemColumns: ["inventory_id", "template_id", "stack_size", "quality_level", "position_index", "stats", "is_new", "acquisition_time"],
+    itemRows: [{ id: 501, stats: { FCustomizationStats: [[], {}], FItemStackAndDurabilityStats: [[], {}] }, template_id: "UniqueSword_05", is_new: true, acquisition_time: 0 }]
+  });
+  await augmentInventoryItem(db, 123, 501, { augments: ["T6_Augment_Melee1"] });
+  const update = calls.find((call) => call.text.includes("update dune.items set stats"));
+  assert.ok(update);
+  assert.match(update.text, /is_new =/);
+  assert.match(update.text, /acquisition_time =/);
+  assert.equal(update.values[1], false);
+  assert.ok(Number(update.values[2]) > 0);
+});
+
+test("augment inventory item repairs empty ranged weapon stats while applying augments", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    augmentRollRows: [
+      { template_id: "T6_Augment_Acuracy1", stats: { FAugmentItemStats: [[], { StatRolls: [0.2], AppliedEffectIndices: [] }] } },
+      { template_id: "T6_Augment_Damage1", stats: { FAugmentItemStats: [[], { StatRolls: [0.3], AppliedEffectIndices: [] }] } },
+      { template_id: "T6_Augment_DeathDurabilityOff", stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } }
+    ],
+    itemRows: [{
+      id: 501,
+      stats: { FCustomizationStats: [[], {}], FItemStackAndDurabilityStats: [[], {}] },
+      template_id: "UniqueScattergun5"
+    }]
+  });
+  await augmentInventoryItem(db, 123, 501, { augments: ["T6_Augment_Acuracy1", "T6_Augment_Damage1", "T6_Augment_DeathDurabilityOff"] });
+  const update = calls.find((call) => call.text.includes("update dune.items set stats"));
+  assert.ok(update);
+  const stats = JSON.parse(update.values[0]);
+  assert.deepEqual(stats.FWeaponItemStats, [[], { CurrentAmmo: 0 }]);
+  assert.equal(stats.FItemStackAndDurabilityStats[1].CurrentDurability, 100);
+  assert.equal(stats.FItemStackAndDurabilityStats[1].MaxDurability, 100);
+  assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugments, [
+    { Name: "T6_Augment_Acuracy1" },
+    { Name: "T6_Augment_Damage1" },
+    { Name: "T6_Augment_DeathDurabilityOff" }
+  ]);
+});
+
+test("augment inventory item replaces existing augments", async () => {
+  const calls = [];
+  const existingStats = { FCustomizationStats: [[], {}], FAugmentedItemStats: [[], { AppliedAugments: ["T6_Augment_Damage1"], AppliedAugmentQualities: [1], AppliedAugmentRollData: [{ StatRolls: [] }] }], FItemStackAndDurabilityStats: [[], {}] };
+  const db = fakeMutationDb(calls, {
+    augmentRollRows: [
+      { template_id: "T6_Augment_Melee1", stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } },
+      { template_id: "T6_Augment_Melee4", stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } }
+    ],
+    itemRows: [{ id: 501, stats: existingStats, template_id: "UniqueSword_05" }]
+  });
+  const result = await augmentInventoryItem(db, 123, 501, { augments: ["T6_Augment_Melee1", "T6_Augment_Melee4"] });
+  assert.deepEqual(result.previous, ["T6_Augment_Damage1"]);
+  assert.deepEqual(result.augments, ["T6_Augment_Melee1", "T6_Augment_Melee4"]);
+});
+
+test("augment inventory item rejects augments that do not match the item family", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    itemRows: [{ id: 501, stats: { FCustomizationStats: [[], {}], FItemStackAndDurabilityStats: [[], {}] }, template_id: "UniqueScattergun5" }]
+  });
+  await assert.rejects(
+    () => augmentInventoryItem(db, 123, 501, { augments: ["T6_Augment_Armor6"] }),
+    /Select augment\(s\) that match this weapon/
+  );
+});
+
+test("augment inventory item allows Method-compatible light shotgun augments", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    augmentRollRows: [
+      { template_id: "T6_Augment_Scattergun5", stats: { FAugmentItemStats: [[], { StatRolls: [0.25], AppliedEffectIndices: [] }] } },
+      { template_id: "T6_Augment_Damage1", stats: { FAugmentItemStats: [[], { StatRolls: [0.13], AppliedEffectIndices: [] }] } }
+    ],
+    itemRows: [{ id: 501, stats: { FCustomizationStats: [[], {}], FItemStackAndDurabilityStats: [[], {}] }, template_id: "UniqueScattergun5" }]
+  });
+  const result = await augmentInventoryItem(db, 123, 501, { augments: ["T6_Augment_Scattergun5", "T6_Augment_Damage1"] });
+  assert.deepEqual(result.augments, ["T6_Augment_Scattergun5", "T6_Augment_Damage1"]);
+});
+
+test("augment inventory item enforces Method weapon subfamilies", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    itemRows: [{ id: 501, stats: { FCustomizationStats: [[], {}], FItemStackAndDurabilityStats: [[], {}] }, template_id: "SmugDmr5" }]
+  });
+  await assert.rejects(
+    () => augmentInventoryItem(db, 123, 501, { augments: ["T6_Augment_Scattergun5"] }),
+    /Select augment\(s\) that match this weapon/
+  );
+});
+
+test("augment inventory item rejects unsupported JABAL Spitdart items", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    itemRows: [{ id: 501, stats: { FCustomizationStats: [[], {}], FItemStackAndDurabilityStats: [[], {}] }, template_id: "SmugDmr5" }]
+  });
+  await assert.rejects(
+    () => augmentInventoryItem(db, 123, 501, { augments: ["T6_Augment_SpitdartRifle5", "T6_Augment_Damage1"] }),
+    /Select augment\(s\) that match this weapon/
+  );
+});
+
+test("augment inventory item allows catalog-compatible Spitdart augments", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    augmentRollRows: [
+      { template_id: "T6_Augment_SpitdartRifle5", stats: { FAugmentItemStats: [[], { StatRolls: [0.33], AppliedEffectIndices: [] }] } },
+      { template_id: "T6_Augment_Damage1", stats: { FAugmentItemStats: [[], { StatRolls: [0.13], AppliedEffectIndices: [] }] } }
+    ],
+    itemRows: [{ id: 501, stats: { FCustomizationStats: [[], {}], FItemStackAndDurabilityStats: [[], {}] }, template_id: "B1C4_Unique_SmugDmr1" }]
+  });
+  const result = await augmentInventoryItem(db, 123, 501, { augments: ["T6_Augment_SpitdartRifle5", "T6_Augment_Damage1"] });
+  assert.deepEqual(result.augments, ["T6_Augment_SpitdartRifle5", "T6_Augment_Damage1"]);
+});
+
+test("augment inventory item allows clothing augments but rejects weapon augments on clothing", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    augmentRollRows: [
+      { template_id: "T6_Augment_Armor6", stats: { FAugmentItemStats: [[], { StatRolls: [0.06], AppliedEffectIndices: [] }] } }
+    ],
+    itemRows: [{ id: 501, stats: { FCustomizationStats: [[], {}], FItemStackAndDurabilityStats: [[], {}] }, template_id: "Combat_Hark_MedUnique02_Gloves" }]
+  });
+  const result = await augmentInventoryItem(db, 123, 501, { augments: ["T6_Augment_Armor6"] });
+  assert.deepEqual(result.augments, ["T6_Augment_Armor6"]);
+  await assert.rejects(
+    () => augmentInventoryItem(db, 123, 501, { augments: ["T6_Augment_Damage1"] }),
+    /Select augment\(s\) that match this clothing/
+  );
 });
 
 test("augment inventory item deduplicates augment IDs", async () => {
   const calls = [];
-  const existingStats = { FCustomizationStats: [["T6_Augment_Melee1"], {}], FItemStackAndDurabilityStats: [[], {}] };
+  const existingStats = { FCustomizationStats: [[], {}], FAugmentedItemStats: [[], { AppliedAugments: ["T6_Augment_Melee1"], AppliedAugmentQualities: [1], AppliedAugmentRollData: [{ StatRolls: [] }] }], FItemStackAndDurabilityStats: [[], {}] };
   const db = fakeMutationDb(calls, {
-    itemRows: [{ id: 501, stats: existingStats, template_id: "UniqueSword" }]
+    augmentRollRows: [
+      { template_id: "T6_Augment_Melee1", stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } },
+      { template_id: "T6_Augment_Melee4", stats: { FAugmentItemStats: [[], { StatRolls: [1], AppliedEffectIndices: [] }] } }
+    ],
+    itemRows: [{ id: 501, stats: existingStats, template_id: "UniqueSword_05" }]
   });
   const result = await augmentInventoryItem(db, 123, 501, { augments: ["T6_Augment_Melee1", "T6_Augment_Melee4", "T6_Augment_Melee1"] });
   assert.deepEqual(result.augments, ["T6_Augment_Melee1", "T6_Augment_Melee4"]);
@@ -1217,7 +1556,7 @@ test("augment inventory item deduplicates augment IDs", async () => {
 test("augment inventory item requires valid augment IDs", async () => {
   const calls = [];
   const db = fakeMutationDb(calls, {
-    itemRows: [{ id: 501, stats: { FCustomizationStats: [[], {}] }, template_id: "UniqueSword" }]
+    itemRows: [{ id: 501, stats: { FCustomizationStats: [[], {}] }, template_id: "UniqueSword_05" }]
   });
   await assert.rejects(() => augmentInventoryItem(db, 123, 501, { augments: [] }), /At least one augment ID is required/);
   await assert.rejects(() => augmentInventoryItem(db, 123, 501, { augments: ["bad;id"] }), /Invalid item template/);
@@ -1825,7 +2164,7 @@ function fakeMutationDb(calls, fixtures = {}) {
               ? [fixtures.journeyIdentityColumn || "account_id", "story_node_id", "has_pending_reward", "complete_condition_state", "reveal_condition_state", "fail_condition_state", "metadata_state", "reset_group"]
               : table === "player_tags"
                 ? [fixtures.journeyIdentityColumn || "account_id", "tag"]
-                : ["inventory_id", "template_id", "stack_size", "quality_level", "position_index", "stats"];
+                : fixtures.itemColumns || ["inventory_id", "template_id", "stack_size", "quality_level", "position_index", "stats"];
         return { rows: names.map((column_name) => ({ column_name })) };
       }
       if (text.includes("TechKnowledgePlayerComponent") && text.includes("all_research")) return { rows: fixtures.researchListRows || [] };
@@ -1848,6 +2187,8 @@ function fakeMutationDb(calls, fixtures = {}) {
       if (text.includes("delete from dune.tutorial_per_player")) return { rows: [], rowCount: fixtures.tutorialDeleteRows ?? 0 };
       if (text.includes("dune.update_player_tags")) return { rows: [{ ok: true }] };
       if (text.includes("from dune.actors a")) return { rows: fixtures.playerRows || [{ actor_id: 123, account_id: 44, controller_id: 55, player_state_id: 5, online_status: "Offline" }] };
+      if (text.includes("stats ? 'FAugmentItemStats'")) return { rows: fixtures.augmentRollRows || [] };
+      if (text.includes("stats ? 'FAugmentedItemStats'")) return { rows: fixtures.augmentedItemRows || [] };
       if (/from\s+dune\.player_faction\b/.test(text)) return { rows: fixtures.playerFactionRows || [{ faction_id: 1 }] };
       if (text.includes("dune.get_solaris_id")) return { rows: [{ currency_id: 0 }] };
       if (text.includes("adjust_player_virtual_currency_balance")) return { rows: [{ ok: true }] };
@@ -1858,6 +2199,7 @@ function fakeMutationDb(calls, fixtures = {}) {
       if (text.includes("jsonb_set") && text.includes("FactionPlayerComponent")) return { rows: [] };
       if (text.includes("m_TechKnowledgePoints") && text.includes("select")) return { rows: fixtures.intelRows || [] };
       if (text.includes("m_TechKnowledgePoints") && text.includes("update")) return { rows: [{ ok: true }] };
+      if (text.includes("not (i.id = any($3::bigint[]))")) return { rows: fixtures.newItemRows || [] };
       if (text.includes("from dune.items i") && text.includes("where i.id = $1")) return { rows: fixtures.itemRows || [] };
       if (text.includes("not exists(select 1 from dune.items where id = $1")) return { rows: [{ deleted: true }] };
       if (text.includes("exists(select 1 from dune.items where id = $1")) return { rows: [{ exists: Boolean(fixtures.itemStillExists) }] };

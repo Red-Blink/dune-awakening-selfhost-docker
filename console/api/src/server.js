@@ -446,7 +446,7 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/players\/[^/]+\/repair-gear$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.repair-gear", "REPAIR GEAR", (playerId) => duneDb.repairGear(db, playerId));
   if (path.match(/^\/api\/players\/[^/]+\/repair-vehicle-decay$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.repair-vehicle-decay", "REPAIR VEHICLE DECAY", (playerId, body) => duneDb.repairVehicleDecay(db, playerId, body));
   if (path.match(/^\/api\/players\/[^/]+\/refuel-vehicle$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.refuel-vehicle", "REFUEL VEHICLE", (playerId, body) => duneDb.refuelVehicle(db, playerId, body));
-  if (path.match(/^\/api\/players\/[^/]+\/augment-item$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.augment-item", "APPLY AUGMENTS", (playerId, body) => duneDb.augmentInventoryItem(db, playerId, body.itemId, { augments: body.augments }));
+  if (path.match(/^\/api\/players\/[^/]+\/augment-item$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.augment-item", "APPLY AUGMENTS", (playerId, body) => duneDb.augmentInventoryItem(db, playerId, body.itemId, { augments: body.augments, augmentQuality: body.augmentQuality }));
   if (path.match(/^\/api\/players\/[^/]+\/inventory\/[^/]+$/) && req.method === "DELETE") return inventoryDeleteRoute(req, res, path);
   if (path.match(/^\/api\/players\/[^/]+\/inventory\/[^/]+$/) && req.method === "PATCH") return inventoryUpdateRoute(req, res, path);
   if (path.match(/^\/api\/players\/[^/]+\/crafting-recipes$/)) return dbPlayerRoute(res, path, duneDb.playerCraftingRecipes);
@@ -1275,9 +1275,15 @@ async function userSettingsSchemaRoute(res) {
 
 async function userSettingsRawRoute(res, url) {
   const kind = String(url.searchParams.get("kind") || "engine");
-  const map = url.searchParams.get("map") || "Survival_1";
+  const map = kind === "client-game" ? (url.searchParams.get("map") || "") : (url.searchParams.get("map") || "Survival_1");
   const partitionId = url.searchParams.get("partitionId") || "";
-  const operation = kind === "profile" ? "userSettingsProfileRaw" : kind === "engine" ? "userSettingsRawEngine" : "userSettingsRawGame";
+  const operation = kind === "profile"
+    ? "userSettingsProfileRaw"
+    : kind === "client-game"
+      ? "userSettingsClientGameIni"
+      : kind === "engine"
+        ? "userSettingsRawEngine"
+        : "userSettingsRawGame";
   try {
     const result = await runDune(config, buildDuneArgs(operation, { map, partitionId }), { timeoutMs: 8000, redactOutput: false });
     return json(res, 200, { content: result.stdout || "" });
@@ -1723,8 +1729,8 @@ async function giveSingleItemRoute(req, res, path, operation) {
     }
   }
   const item = operation === "adminGiveItemId"
-    ? { itemId: body.itemId, quantity: body.quantity, quality: body.quality, grade: body.grade, durability: body.durability, augments: body.augments }
-    : { itemName: body.itemName, quantity: body.quantity, quality: body.quality, grade: body.grade, durability: body.durability, augments: body.augments };
+    ? { itemId: body.itemId, quantity: body.quantity, quality: body.quality, grade: body.grade, durability: body.durability, augments: body.augments, augmentQuality: body.augmentQuality }
+    : { itemName: body.itemName, quantity: body.quantity, quality: body.quality, grade: body.grade, durability: body.durability, augments: body.augments, augmentQuality: body.augmentQuality };
   try {
     const target = await resolvePlayerGrantTarget(playerId);
     const result = await grantPlayerItem(playerId, item, target);
@@ -1741,6 +1747,7 @@ async function grantPlayerItem(playerId, item, target) {
   const operation = resolved.itemId ? "adminGiveItemId" : "adminGiveItem";
   const hasExplicitGrade = item.quality !== undefined || item.grade !== undefined;
   const selectedGrade = hasExplicitGrade ? validateGrantGrade(item.quality ?? item.grade) : undefined;
+  const selectedAugmentGrade = item.augmentQuality === undefined ? 1 : validateAugmentGrantGrade(item.augmentQuality);
   const usesDatabaseGrant = (selectedGrade !== undefined && selectedGrade > 0) || itemRequiresDatabaseGrant(resolved) || (item.augments && item.augments.length > 0);
   const databaseGrade = hasExplicitGrade ? selectedGrade : 0;
   const payload = {
@@ -1750,10 +1757,15 @@ async function grantPlayerItem(playerId, item, target) {
     quantity: item.quantity ?? 1,
     quality: hasExplicitGrade ? selectedGrade : undefined,
     durability: 1,
-    augments: item.augments || []
+    augments: item.augments || [],
+    augmentQuality: selectedAugmentGrade
   };
+  const liveAugmentRefreshWarning = "Augments were written to the database. If the player was online, the weapon may need a relog before the augment slots appear in-game.";
   if (usesDatabaseGrant) {
     if (!config.mockMode && !target.actorId) throw new Error("A database actor ID is required to grant graded items, schematics, and augments");
+    if (!config.mockMode && payload.augments.length > 0 && target.online) {
+      throw new Error("Pre-augmented item grants require the player to be offline. Grade 0 items with no augments can be granted while the player is online. Item Grades 1-5 or Augment Grades 1-5 require the player to be offline.");
+    }
     const result = config.mockMode
       ? { ok: true, inserted: { template_id: resolved.itemId || payload.itemName, stack_size: payload.quantity, quality_level: databaseGrade } }
       : await duneDb.giveItemToPlayer(db, target.actorId, {
@@ -1761,9 +1773,16 @@ async function grantPlayerItem(playerId, item, target) {
           itemName: payload.itemName,
           quantity: payload.quantity,
           quality: databaseGrade,
-          augments: payload.augments
+          augments: payload.augments,
+          augmentQuality: payload.augmentQuality
         });
-    return { ok: true, operation: "dbGiveItemToPlayer", item: { ...payload, quality: databaseGrade }, result };
+    return {
+      ok: true,
+      operation: "dbGiveItemToPlayer",
+      item: { ...payload, quality: databaseGrade },
+      result,
+      warning: target.online && payload.augments.length > 0 ? liveAugmentRefreshWarning : undefined
+    };
   }
   const command = buildDuneArgs(operation, payload);
   if (config.mockMode) return { ok: true, operation, command };
@@ -1780,9 +1799,33 @@ async function grantPlayerItem(playerId, item, target) {
   };
 }
 
+async function augmentNewestPlayerItemWithRetry(actorId, templateId, options) {
+  let lastError = null;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    try {
+      const result = await duneDb.augmentNewestPlayerItem(db, actorId, templateId, options);
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 650));
+      const state = await duneDb.playerItemAugmentState(db, actorId, result.itemId, options.augments || []);
+      if (state.ok) return { ...result, verified: true };
+      lastError = new Error(`${templateId} augment patch was overwritten or incomplete; retrying`);
+    } catch (error) {
+      lastError = error;
+      if (!/new inventory row was not found/i.test(String(error?.message || error))) throw error;
+    }
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 500));
+  }
+  throw lastError;
+}
+
 function validateGrantGrade(value) {
   const n = Number(value);
   if (!Number.isFinite(n) || Math.trunc(n) !== n || n < 0 || n > 5) throw new Error("Expected item grade 0-5");
+  return n;
+}
+
+function validateAugmentGrantGrade(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || Math.trunc(n) !== n || n < 1 || n > 5) throw new Error("Expected augment grade 1-5");
   return n;
 }
 

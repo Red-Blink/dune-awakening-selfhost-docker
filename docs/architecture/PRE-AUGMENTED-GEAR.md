@@ -1,8 +1,8 @@
 # Pre-Augmented Gear Implementation Guide
 
-**Author:** DarkDante  
-**Date:** July 2026  
-**Status:** Implemented & Tested  
+**Author:** DarkDante
+**Date:** July 2026
+**Status:** Implemented & Tested
 **Branches:** `feature/pre-augmented-gear` (server), `feature/rbac` (integration), `feature/ui-enhancements` (frontend)
 
 ---
@@ -657,21 +657,21 @@ BEGIN
   IF aug_data IS NULL OR aug_data->'AppliedAugmentRollData' IS NULL THEN
     RETURN NEW;
   END IF;
-  
+
   rolls := aug_data->'AppliedAugmentRollData';
-  
+
   FOR i IN 0..jsonb_array_length(rolls)-1 LOOP
     roll_item := rolls->i;
     roll_item := jsonb_set(roll_item, '{StatRolls}', '[1.0]'::jsonb);
     new_rolls := new_rolls || roll_item;
   END LOOP;
-  
+
   NEW.stats := jsonb_set(
     jsonb_set(NEW.stats, '{FAugmentedItemStats,1,AppliedAugmentRollData}', new_rolls),
     '{FAugmentedItemStats,1,AppliedAugmentQualities}',
     (SELECT jsonb_agg(5) FROM jsonb_array_elements(aug_data->'AppliedAugmentQualities'))
   );
-  
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

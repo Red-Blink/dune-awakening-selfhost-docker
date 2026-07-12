@@ -5,7 +5,7 @@ export const playersApi = {
   list: (q = "") => api<{ rows: Record<string, unknown>[]; capabilities: Record<string, unknown> }>(`/api/players${q ? `?q=${encodeURIComponent(q)}` : ""}`),
   online: () => api<{ rows: Record<string, unknown>[]; capabilities: Record<string, unknown> }>("/api/players/online"),
   profile: (playerId: string) => api<Record<string, unknown>>(`/api/players/${encodeURIComponent(playerId)}`),
-  inventory: (playerId: string) => api<{ rows: Record<string, unknown>[]; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/inventory`),
+  inventory: (playerId: string) => api<{ rows: Record<string, unknown>[]; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/inventory`, { cache: "no-store" }),
   currency: (playerId: string) => api<{ rows: Record<string, unknown>[]; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/currency`),
   factions: (playerId: string) => api<{ rows: Record<string, unknown>[]; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/factions`),
   specs: (playerId: string) => api<{ rows: Record<string, unknown>[]; skillModules?: Record<string, unknown>[]; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/specs`),
@@ -14,10 +14,10 @@ export const playersApi = {
   events: (playerId: string) => api<Record<string, unknown>>(`/api/players/${encodeURIComponent(playerId)}/events`),
   stats: (playerId: string) => api<Record<string, unknown>>(`/api/players/${encodeURIComponent(playerId)}/stats`),
   history: (playerId: string) => api<Record<string, unknown>>(`/api/players/${encodeURIComponent(playerId)}/history`),
-  giveItem: (playerId: string, body: { itemName: string; quantity: number; durability?: number; quality?: number; grade?: number; augments?: string[] }) => post<{ task: Task }>(`/api/players/${encodeURIComponent(playerId)}/give-item`, body),
-  giveItems: (playerId: string, items: { itemName?: string; itemId?: string; quantity: number; durability?: number; quality?: number; grade?: number; augments?: string[] }[], options: { historyScope?: string; historyFriendly?: string } = {}) => post<{ ok: boolean; results: Record<string, unknown>[] }>(`/api/players/${encodeURIComponent(playerId)}/give-items`, { items, ...options }),
+  giveItem: (playerId: string, body: { itemName: string; quantity: number; durability?: number; quality?: number; grade?: number; augments?: string[]; augmentQuality?: number }) => post<{ task: Task }>(`/api/players/${encodeURIComponent(playerId)}/give-item`, body),
+  giveItems: (playerId: string, items: { itemName?: string; itemId?: string; quantity: number; durability?: number; quality?: number; grade?: number; augments?: string[]; augmentQuality?: number }[], options: { historyScope?: string; historyFriendly?: string } = {}) => post<{ ok: boolean; results: Record<string, unknown>[] }>(`/api/players/${encodeURIComponent(playerId)}/give-items`, { items, ...options }),
   giveTemplate: (playerId: string, template = "scout-ornithopter-mk6") => post<{ task: Task }>(`/api/players/${encodeURIComponent(playerId)}/give-items`, { template }),
-  giveItemId: (playerId: string, body: { itemId: string; quantity: number; durability?: number; quality?: number; grade?: number; augments?: string[] }) => post<{ task: Task }>(`/api/players/${encodeURIComponent(playerId)}/give-item-id`, body),
+  giveItemId: (playerId: string, body: { itemId: string; quantity: number; durability?: number; quality?: number; grade?: number; augments?: string[]; augmentQuality?: number }) => post<{ task: Task }>(`/api/players/${encodeURIComponent(playerId)}/give-item-id`, body),
   addXp: (playerId: string, amount: number) => post<{ task: Task }>(`/api/players/${encodeURIComponent(playerId)}/add-xp`, { amount }),
   setSkillPoints: (playerId: string, points: number) => post<{ task: Task }>(`/api/players/${encodeURIComponent(playerId)}/set-skill-points`, { points }),
   setSkillModule: (playerId: string, body: { module: string; level: number }) => post<{ task: Task }>(`/api/players/${encodeURIComponent(playerId)}/set-skill-module`, body),
@@ -50,5 +50,5 @@ export const playersApi = {
   refuelVehicle: (playerId: string, body: { vehicleId: string; confirmation: string }) => post<{ supported: boolean; result?: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/refuel-vehicle`, body),
   deleteInventoryItem: (playerId: string, itemId: string, confirmation: string) => api<{ supported: boolean; result?: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/inventory/${encodeURIComponent(itemId)}`, { method: "DELETE", body: JSON.stringify({ confirmation }) }),
   updateInventoryItem: (playerId: string, itemId: string, values: Record<string, unknown>, confirmation: string) => api<{ supported: boolean; result?: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/inventory/${encodeURIComponent(itemId)}`, { method: "PATCH", body: JSON.stringify({ confirmation, values }) }),
-  augmentInventoryItem: (playerId: string, itemId: string, augments: string[], confirmation: string) => post<{ supported: boolean; result?: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/augment-item`, { itemId, augments, confirmation })
+  augmentInventoryItem: (playerId: string, itemId: string, augments: string[], augmentQuality: number, confirmation: string) => post<{ supported: boolean; result?: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/augment-item`, { itemId, augments, augmentQuality, confirmation })
 };

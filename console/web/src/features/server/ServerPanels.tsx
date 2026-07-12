@@ -135,21 +135,21 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
         } else if (runningAction === "start" && isHomeActionComplete(statusText, readinessText)) {
           homeActionReadyPolls.current += 1;
           if (homeActionReadyPolls.current >= 2) {
-            setTaskResult({ status: "succeeded", title: "Server Started Successfully" });
+            setTaskResult({ status: "succeeded", title: "Battlegroup Started Successfully" });
             setHomeAction("");
           } else {
             setTaskResult(stackActionPendingResult(runningAction, "confirming"));
           }
         } else if (runningAction === "stop" && loadedState.stopped) {
-          setTaskResult({ status: "stopped", title: "Server Stopped" });
+          setTaskResult({ status: "stopped", title: "Battlegroup Stopped" });
           setHomeAction("");
         } else if (runningAction === "start" || runningAction === "restart") {
           homeActionReadyPolls.current = 0;
         }
         if (taskResult?.status === "failed" && (!/restart/i.test(taskResult.title) || restartReady) && isHomeActionComplete(statusText, readinessText)) {
-          setTaskResult({ status: "succeeded", title: /restart/i.test(taskResult.title) ? "Battlegroup Restarted Successfully" : "Server Started Successfully" });
+          setTaskResult({ status: "succeeded", title: /restart/i.test(taskResult.title) ? "Battlegroup Restarted Successfully" : "Battlegroup Started Successfully" });
         } else if (taskResult?.status === "failed" && loadedState.stopped && /stop/i.test(taskResult.title)) {
-          setTaskResult({ status: "stopped", title: "Server Stopped" });
+          setTaskResult({ status: "stopped", title: "Battlegroup Stopped" });
         }
       } else {
         setLocalError(friendlyHomeStatusError(result.statusError || result.readinessError || "Server status and readiness checks failed."));
@@ -162,14 +162,14 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   }
 
   async function runServerAction(action: "start" | "stop" | "restart") {
-    if (action === "stop" && !(await confirmAction("Stop the Dune server console?"))) return;
+    if (action === "stop" && !(await confirmAction("Stop the battlegroup?"))) return;
     if (action === "restart" && !(await confirmAction("Restart the battlegroup?"))) return;
     const actionRunId = ++homeActionRunId.current;
     homeActionStartedAt.current = Date.now();
     let commandAction = action;
     const copy = {
-      start: { running: "Starting", success: "Server Started Successfully", failure: "Start Failed" },
-      stop: { running: "Stopping", success: "Server Stopped", failure: "Server stop failed." },
+      start: { running: "Starting", success: "Battlegroup Started Successfully", failure: "Battlegroup Start Failed" },
+      stop: { running: "Stopping", success: "Battlegroup Stopped", failure: "Battlegroup stop failed." },
       restart: { running: "Restarting Battlegroup", success: "Battlegroup Restarted Successfully", failure: "Battlegroup Restart Failed" }
     }[action];
     setLocalError("");
@@ -280,14 +280,14 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
       const restartReady = isRestartLifecycleReady(currentAction, homeRestartLifecycle.current);
       const elapsedMs = Date.now() - homeActionStartedAt.current;
       if (currentAction === "stop" && isHomeStopComplete(statusText, readinessText)) {
-        setTaskResult({ status: "stopped", title: "Server Stopped" });
+        setTaskResult({ status: "stopped", title: "Battlegroup Stopped" });
         setHomeAction("");
       } else if (currentAction === "restart" && restartReady) {
         if (isHomeActionComplete(statusText, readinessText)) setHomeAction("");
       } else if (currentAction === "start" && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText)) {
         homeActionReadyPolls.current += 1;
         if (homeActionReadyPolls.current >= 2) {
-          setTaskResult({ status: "succeeded", title: "Server Started Successfully" });
+          setTaskResult({ status: "succeeded", title: "Battlegroup Started Successfully" });
           setHomeAction("");
         } else {
           setTaskResult(stackActionPendingResult(currentAction, "confirming"));
@@ -412,7 +412,7 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
         <p>Use this dashboard for setup, service health, logs, backups, updates, and player admin actions.</p>
         <div className="action-row">
           <button className={loading ? "refresh-status-button refreshing" : "refresh-status-button"} disabled={refreshDisabled} onClick={() => refresh()}>{loading ? <span className="loading-dots">Refreshing</span> : "Refresh Status"}</button>
-          <button disabled={startDisabled} title={controlsState.running ? "Server is already running." : ""} onClick={() => runServerAction("start")}><Play size={16} /> Start</button>
+          <button disabled={startDisabled} title={controlsState.running ? "Battlegroup is already running." : ""} onClick={() => runServerAction("start")}><Play size={16} /> Start</button>
           <button disabled={stopDisabled} onClick={() => runServerAction("stop")}>Stop</button>
           <button disabled={restartDisabled} onClick={() => runServerAction("restart")}>Restart Battlegroup</button>
         </div>
@@ -685,15 +685,15 @@ export function ServerPanel(props: {
     if (statusResult.status === "rejected") throw statusResult.reason;
   }
   async function runServerAction(action: "start" | "stop" | "restart") {
-    if (action === "stop" && !(await confirmAction("Stop the Dune server console?"))) return;
+    if (action === "stop" && !(await confirmAction("Stop the battlegroup?"))) return;
     if (action === "restart" && !(await confirmAction("Restart the battlegroup?"))) return;
     serviceRestartRunId.current += 1;
     setServiceRestartingService("");
     const actionRunId = ++controlActionRunId.current;
     controlActionStartedAt.current = Date.now();
     const copy = {
-      start: { running: "Starting", success: "Server Started Successfully", failure: "Start Failed" },
-      stop: { running: "Stopping", success: "Server Stopped", failure: "Server stop failed." },
+      start: { running: "Starting", success: "Battlegroup Started Successfully", failure: "Battlegroup Start Failed" },
+      stop: { running: "Stopping", success: "Battlegroup Stopped", failure: "Battlegroup stop failed." },
       restart: { running: "Restarting Battlegroup", success: "Battlegroup Restarted Successfully", failure: "Battlegroup Restart Failed" }
     }[action];
     props.onError("");
@@ -845,14 +845,14 @@ export function ServerPanel(props: {
       const restartReady = isRestartLifecycleReady(currentAction, controlRestartLifecycle.current);
       const elapsedMs = Date.now() - controlActionStartedAt.current;
       if (currentAction === "stop" && isHomeStopComplete(statusText, readinessText)) {
-        setTaskResult({ status: "stopped", title: "Server Stopped" });
+        setTaskResult({ status: "stopped", title: "Battlegroup Stopped" });
         setControlAction("");
       } else if (currentAction === "restart" && restartReady) {
         if (isHomeActionComplete(statusText, readinessText)) setControlAction("");
       } else if (currentAction === "start" && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText)) {
         controlActionReadyPolls.current += 1;
         if (controlActionReadyPolls.current >= 2) {
-          setTaskResult({ status: "succeeded", title: "Server Started Successfully" });
+          setTaskResult({ status: "succeeded", title: "Battlegroup Started Successfully" });
           setControlAction("");
         } else {
           setTaskResult(stackActionPendingResult(currentAction, "confirming"));

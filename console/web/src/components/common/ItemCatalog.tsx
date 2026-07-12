@@ -160,11 +160,26 @@ export function augmentLimit(itemName: string, category?: string, itemId?: strin
 
 export function packageItemTextLine(item: { itemName?: string; itemId?: string; quantity?: unknown; quality?: unknown; grade?: unknown; durability?: unknown }) {
   return `${item.itemId || item.itemName || ""},${Number(item.quantity) || 1},${itemGrade(item)}`;
+export function catalogItemMinimumGrade(item?: { itemId?: string; id?: string; source?: string; category?: string } | null) {
+  const id = String(item?.itemId || item?.id || "");
+  const source = String(item?.source || "").toLowerCase();
+  const category = String(item?.category || "").toLowerCase();
+  return source.includes("augment") || category.includes("augment") || /^T\d+_Augment_/i.test(id) ? 1 : 0;
 }
 
-export function ItemGradeSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return <select className="package-item-durability-input" value={String(normalizeItemGrade(value))} onChange={(event) => onChange(event.target.value)}>
-    {[0, 1, 2, 3, 4, 5].map((grade) => <option key={grade} value={grade}>{grade}</option>)}
+export function packageItemTextLine(item: { itemName?: string; itemId?: string; quantity?: unknown; quality?: unknown; grade?: unknown; durability?: unknown; augments?: string[]; augmentQuality?: unknown }) {
+  const augments = Array.isArray(item.augments) && item.augments.length ? item.augments.join("|") : "";
+  const augmentQuality = augments ? Math.max(1, Math.min(5, normalizeItemGrade(item.augmentQuality ?? 1) || 1)) : "";
+  return `${item.itemId || item.itemName || ""},${Number(item.quantity) || 1},${itemGrade(item)},${augments},${augmentQuality}`;
+}
+
+export function ItemGradeSelect({ value, onChange, minGrade = 0, disabled = false, emptyWhenDisabled = false }: { value: string; onChange: (value: string) => void; minGrade?: number; disabled?: boolean; emptyWhenDisabled?: boolean }) {
+  const min = Math.max(0, Math.min(5, Math.trunc(Number(minGrade) || 0)));
+  const selected = Math.max(min, normalizeItemGrade(value));
+  const selectedValue = disabled && emptyWhenDisabled ? "" : String(selected);
+  return <select className="package-item-durability-input" value={selectedValue} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
+    {emptyWhenDisabled && <option value=""></option>}
+    {[0, 1, 2, 3, 4, 5].filter((grade) => grade >= min).map((grade) => <option key={grade} value={grade}>{grade}</option>)}
   </select>;
 }
 

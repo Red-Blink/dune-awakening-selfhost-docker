@@ -353,7 +353,7 @@ export function App() {
       }
       const restartReady = isRestartLifecycleReady(homeRunningAction, stackRestartLifecycle.current);
       if (homeRunningAction === "stop" && isHomeStopComplete(statusText, readinessText)) {
-        setHomeTaskResult({ status: "stopped", title: "Server Stopped" });
+        setHomeTaskResult({ status: "stopped", title: "Battlegroup Stopped" });
         setHomeRunningAction("");
       } else if (homeRunningAction === "restart" && restartReady) {
         setHomeRestartStarted(true);
@@ -365,7 +365,7 @@ export function App() {
       } else if (homeRunningAction === "start" && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText)) {
         stackActionReadyPolls.current += 1;
         if (stackActionReadyPolls.current >= 2) {
-          setHomeTaskResult({ status: "succeeded", title: "Server Started Successfully" });
+          setHomeTaskResult({ status: "succeeded", title: "Battlegroup Started Successfully" });
           setHomeRunningAction("");
         } else {
           setHomeTaskResult(stackActionPendingResult(homeRunningAction, "confirming"));

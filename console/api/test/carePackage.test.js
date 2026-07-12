@@ -5,12 +5,18 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { clearCarePackageHistory, enableCarePackage, grantEligibleCarePackages, grantCarePackage, runCarePackageAutoScan, saveCarePackageConfig, carePackageCapabilities, carePackageConfig, carePackageEligiblePlayers, carePackageHistory, validateCarePackageConfig } from "../src/carePackage.js";
 
-test("care package is enabled by default and reports manual capability", () => {
+test("care package starts empty, disabled, and reports manual capability", () => {
   const config = tempConfig();
   try {
-    assert.equal(carePackageConfig(config).enabled, true);
-    assert.equal(carePackageConfig(config).autoGrantEnabled, false);
-    assert.equal(carePackageConfig(config).autoGrantRules[0].enabled, false);
+    const initial = carePackageConfig(config);
+    assert.equal(initial.enabled, false);
+    assert.equal(initial.activeKitId, "");
+    assert.equal(initial.autoGrantKitId, "");
+    assert.deepEqual(initial.kits, []);
+    assert.deepEqual(initial.items, []);
+    assert.equal(initial.xp, 0);
+    assert.equal(initial.autoGrantEnabled, false);
+    assert.deepEqual(initial.autoGrantRules, []);
     const caps = carePackageCapabilities();
     assert.equal(caps.manualGrant, true);
     assert.equal(caps.bulkGrant, true);
@@ -26,12 +32,12 @@ test("care package config validation rejects unsafe items and bounds", () => {
     version: "care-package-v1",
     items: [{ itemName: "Water", quantity: 2, durability: 1 }],
     xp: 100
-  }).items[0], { itemName: "Water", itemId: "", quantity: 2, quality: 1, durability: 1, augments: [] });
+  }).items[0], { itemName: "Water", itemId: "", quantity: 2, quality: 0, durability: 1, augments: [] });
   assert.deepEqual(validateCarePackageConfig({
-    items: [{ itemName: "Water", quantity: 2, grade: 5, durability: 0 }]
-  }).items[0], { itemName: "Water", itemId: "", quantity: 2, quality: 5, durability: 1, augments: [] });
+    items: [{ itemName: "Water", quantity: 2, grade: 5, durability: 0, augments: ["T6_Augment_Damage1"], augmentQuality: 5 }]
+  }).items[0], { itemName: "Water", itemId: "", quantity: 2, quality: 0, durability: 1, augments: [] });
   assert.equal(validateCarePackageConfig({ autoGrantEnabled: true, autoGrantIntervalSeconds: 60, grantWhen: "first_online" }).grantWhen, "first_online");
-  assert.equal(validateCarePackageConfig({ version: "bad version with spaces" }).version, "care-package-v1");
+  assert.equal(validateCarePackageConfig({ version: "bad version with spaces" }).version, "");
   assert.throws(() => validateCarePackageConfig({ items: [{ itemName: "Bad\nName" }] }), /Invalid Care Package item name/);
   assert.throws(() => validateCarePackageConfig({ xp: -1 }), /xp/);
   assert.throws(() => validateCarePackageConfig({ autoGrantIntervalSeconds: 59 }), /autoGrantIntervalSeconds/);
@@ -325,7 +331,7 @@ test("care package first-online manual and auto overlap is blocked by pre-delive
         id: "starter-kit",
         name: "Starter Kit",
         xp: 0,
-        items: [{ itemName: "Plant Fiber", quantity: 1, quality: 1 }]
+        items: [{ itemName: "Arhun K-28 Lasgun", quantity: 1 }]
       }],
       autoGrantRules: [{ id: "first-online-rule", enabled: true, kitId: "starter-kit", grantWhen: "first_online" }]
     });
@@ -398,7 +404,7 @@ test("care package first-online auto claim blocks overlapping manual starter del
         id: "starter-kit",
         name: "Starter Kit",
         xp: 0,
-        items: [{ itemName: "Plant Fiber", quantity: 1, quality: 1 }]
+        items: [{ itemName: "Arhun K-28 Lasgun", quantity: 1 }]
       }],
       autoGrantRules: [{ id: "first-online-rule", enabled: true, kitId: "starter-kit", grantWhen: "first_online" }]
     });
@@ -596,6 +602,57 @@ test("care package grant all successes records granted status and summary", asyn
     assert.equal(result.status, "granted");
     assert.equal(result.ok, true);
     assert.match(result.summary, /2 succeeded, 0 failed/);
+  } finally {
+    rmSync(config.repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("care package strips legacy grades and augments from package items", async () => {
+  const config = tempConfig();
+  config.mockMode = true;
+  try {
+    writeCatalog(config);
+    const saved = saveCarePackageConfig(config, {
+      enabled: true,
+      activeKitId: "welcome-kit",
+      kits: [{
+        id: "welcome-kit",
+        name: "Welcome",
+        xp: 0,
+        sendMessage: "",
+        items: [{
+          itemId: "SMG_Unique_LargeMag_06",
+          itemName: "A Dart for Every Man",
+          quantity: 1,
+          quality: 5,
+          augments: ["T6_Augment_Acuracy1"],
+          augmentQuality: 5
+        }]
+      }]
+    });
+    assert.equal(saved.kits[0].items[0].quality, 0);
+    assert.deepEqual(saved.kits[0].items[0].augments, []);
+    assert.equal("augmentQuality" in saved.kits[0].items[0], false);
+
+    const result = await grantCarePackage(config, "Dagnir#1", {
+      confirmation: "GRANT CARE PACKAGE",
+      source: "manual",
+      kitId: "welcome-kit",
+      actorId: 42,
+      characterName: "Dagnir",
+      onlineStatus: "Online"
+    }, {
+      db: {},
+      dbGiveItemToPlayer: async () => {
+        throw new Error("care package should not use the database path for stripped grade or augment input");
+      }
+    });
+    assert.equal(result.status, "granted");
+    const itemGrant = result.results.find((entry) => entry.operation === "adminGiveItemId");
+    assert.ok(itemGrant);
+    assert.equal(itemGrant.item.quality, 0);
+    assert.deepEqual(itemGrant.item.augments, []);
+    assert.doesNotMatch(result.summary, /Relog required/);
   } finally {
     rmSync(config.repoRoot, { recursive: true, force: true });
   }
@@ -858,6 +915,7 @@ function writeCatalog(config) {
   writeFileSync(resolve(config.repoRoot, "runtime/data/admin-items.json"), JSON.stringify([
     { id: "PlantFiber_1", name: "Plant Fiber", category: "materials" },
     { id: "CupWater_1", name: "Cup of Water", category: "consumables" },
+    { id: "SMG_Unique_LargeMag_06", name: "A Dart for Every Man", category: "weapons" },
     { id: "ChoamHeavyLasgunSchematic", name: "Arhun K-28 Lasgun", category: "schematics", source: "Schematics" }
   ]));
 }

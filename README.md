@@ -30,6 +30,10 @@ Join our fast growing Discord: [Dune: Awakening Docker](https://discord.gg/9pQqy
 - Database browser plus database backup, restore, import, and maintenance tools
 - And much more!
 
+## Screenshots
+
+See the [Screenshots Gallery](docs/screenshots.md).
+
 ## Requirements
 
 You do not need to be a Linux expert. Start with a fresh server and the installer will check the basics for you.
