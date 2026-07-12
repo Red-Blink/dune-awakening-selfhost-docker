@@ -8,12 +8,6 @@ import { DataTable } from "../../components/common/DataTable";
 import { TechnicalDetails } from "../../components/common/DisplayPrimitives";
 import {
   ItemCatalogSelector,
-  ItemGradeSelect,
-  AugmentPicker,
-  augmentLimit,
-  isWeapon,
-  isArmor,
-  isMelee,
   PackageItemPreview,
   catalogItemId,
   catalogItemName,
@@ -73,37 +67,6 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
   const [output, setOutput] = useState("");
   const [technicalOutput, setTechnicalOutput] = useState("");
   const [outputScope, setOutputScope] = useState<"config" | "grant" | "auto" | "history" | "">("");
-  useEffect(() => {
-    adminApi.itemCatalog("", 10000).then((result) => {
-      const augs = (result.rows || []).filter((item) =>
-        /T\d+_Augment/i.test(item.id || "") && ((item.category || "").toLowerCase() || "").includes("schematics") ||
-        false
-      ).map((item) => ({ id: item.itemId || item.id, name: item.name }));
-      setAugmentCatalog(augs);
-    }).catch(() => setAugmentCatalog([]));
-  }, []);
-  function carePkgFilterAugments(itemName: string, itemId: string, itemCategory: string, all: { id: string; name: string }[]) {
-    const name = (itemId + " " + itemName).toLowerCase();
-    const cat = (itemCategory || "").toLowerCase();
-    if (cat === "schematics" || /_schematic$/i.test(name)) return [];
-    if ((!name || all.length === 0) && cat !== "weapons" && cat !== "clothing") return all;
-    const limit = augmentLimit(itemName, cat, itemId);
-    if (limit === 0) return [];
-    const combined = (itemId + " " + itemName).toLowerCase();
-    const isGear = isArmor(combined) || cat === "clothing";
-    const isMeleeW = isMelee(combined);
-    const isRanged = isWeapon(combined) || cat === "weapons";
-    const rangedGeneric = new Set(["damage","acuracy","shielddamage","range","recoil","reloadspeed","rateoffire","magazinecapacity","headshotdamage"]);
-    const commonGeneric = new Set(["deathdurability","ch5"]);
-    const wp = (id: string) => { const trimmed = id.replace(/_Schematic$/i, ""); const m = trimmed.match(/^T\d+_Augment_(.+?)(\d+|Off)$/); return m ? m[1].replace(/^Ch5_/, "").toLowerCase() : ""; };
-    return all.filter((aug) => {
-      const p = wp(aug.id);
-      if (isGear) return p.startsWith("armor") || commonGeneric.has(p);
-      if (isMeleeW) return p === "melee" || commonGeneric.has(p);
-      if (isRanged) return rangedGeneric.has(p) || commonGeneric.has(p) || p === "melee";
-      return true;
-    }).sort((a: any, b: any) => a.name.localeCompare(b.name));
-  }
   async function run(action: () => Promise<unknown>) {
     onError("");
     setOutput("");
@@ -390,14 +353,6 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
           <button className="playerAdmin_toggleHeader" aria-label={packageItemsOpen ? "Collapse Select Items" : "Expand Select Items"} onClick={() => setPackageItemsOpen(!packageItemsOpen)}>{packageItemsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Select Items</span></button>
           {packageItemsOpen && <div className="playerAdmin_toggleBody"><div className="playerAdmin_section">
             <ItemCatalogSelector selected={selectedPackageItem} onSelect={choosePackageItem} />
-            <div className="action-line">
-              <label>Quantity<input type="number" min="1" value={packageDraft.quantity} onChange={(event) => setPackageDraft({ ...packageDraft, quantity: event.target.value })} /></label>
-              <label>Grade<ItemGradeSelect value={packageDraft.grade} onChange={(grade) => setPackageDraft({ ...packageDraft, grade })} /></label>
-              {(() => {
-                const filteredAugs = carePkgFilterAugments(packageDraft.itemName, packageDraft.itemId, selectedPackageItem?.category || "", augmentCatalog);
-                return filteredAugs.length === 0 ? null : <label>Augments ({packageDraft.augments.length}/{augmentLimit(packageDraft.itemName, selectedPackageItem?.category, packageDraft.itemId)})<AugmentPicker augments={[...filteredAugs].sort((a: any, b: any) => a.name.localeCompare(b.name))} selected={packageDraft.augments} onChange={(selected) => setPackageDraft({ ...packageDraft, augments: selected })} limit={augmentLimit(packageDraft.itemName, selectedPackageItem?.category, packageDraft.itemId)} /></label>;
-              })()}
-              <button disabled={!selectedPackageItem} onClick={addPackageItem}>Add Item</button>
             <div className="playerAdmin_itemActionStack">
               <div className="playerAdmin_itemInputLine">
                 <span className="playerAdmin_actionLabel playerAdmin_itemSelectedLabel">Selected Item</span>

@@ -1790,21 +1790,3 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 @media (max-width: 720px) {
   .playerAdmin_actionNote { padding-left: 0; }
 }
-
-/* Augment Picker */
-.augment-chip {
-  display: inline-flex; align-items: center; gap: 3px;
-  padding: 3px 8px; background: rgba(124, 58, 237, .15); border: 1px solid var(--spice, #7c3aed);
-  border-radius: 12px; font-size: 12px; color: var(--spice-text, #c4b5fd); cursor: pointer;
-}
-.augment-chip:hover { background: rgba(124, 58, 237, .25); }
-.augment-chip-x { font-size: 14px; opacity: .7; margin-left: 2px; }
-.augment-chip-x:hover { opacity: 1; color: #f87171; }
-.augment-list {
-  border: 1px solid #374151; border-radius: 8px; background: #1a1d24;
-  padding: 4px 0;
-}
-.augment-option {
-  padding: 6px 12px; font-size: 13px; color: #d1d5db; cursor: pointer;
-}
-.augment-option:hover { background: rgba(124, 58, 237, .15); color: #c4b5fd; }

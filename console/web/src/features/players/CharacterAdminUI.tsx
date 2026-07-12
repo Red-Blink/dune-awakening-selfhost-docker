@@ -5,7 +5,6 @@ import { playersApi } from "../../api/players";
 import type { Task } from "../../api/setup";
 import { compareTableValues, DataTable, useResizableColumns, useSortableRows, useSortState } from "../../components/common/DataTable";
 import { InlineActionResult } from "../../components/common/InlineActionResult";
-import { ItemCatalogSelector, ItemGradeSelect, MAX_ARMOR_AUGMENTS, PackageItemPreview, AugmentPicker, augmentLimit, catalogItemId, catalogItemName, grantItemDurability, itemGrade, normalizeItemGrade, type CatalogItem } from "../../components/common/ItemCatalog";
 import { AugmentDropdown } from "../../components/common/AugmentDropdown";
 import { ItemCatalogSelector, ItemGradeSelect, PackageItemPreview, catalogItemId, catalogItemMinimumGrade, catalogItemName, grantItemDurability, itemGrade, normalizeItemGrade, type CatalogItem } from "../../components/common/ItemCatalog";
 import { firstDefined, formatCell } from "../../lib/display";
@@ -116,43 +115,6 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
   const [playerAdmin_vehicleDecayThreshold, playerAdmin_setVehicleDecayThreshold] = useState("50");
   const playerAdmin_resultTimer = useRef<number | null>(null);
   useEffect(() => {
-    const name = (playerAdmin_itemId + " " + playerAdmin_itemName).toLowerCase();
-    const cat = (playerAdmin_selectedItem?.category || "").toLowerCase();
-    const src = (playerAdmin_selectedItem?.source || "").toLowerCase();
-    const all = playerAdmin_augmentCatalog;
-    if (cat === "schematics" || src === "schematics" || /_schematic$/i.test(name)) {
-      playerAdmin_setFilteredAugments([]);
-      return;
-    }
-    if ((!name || all.length === 0) && cat !== "weapons" && cat !== "clothing") {
-      playerAdmin_setFilteredAugments(all);
-      return;
-    }
-    const isArmor = /chest|armor|guard|garment|helmet|boots|gloves|suit/i.test(name) || cat === "clothing";
-    const rangedGeneric = new Set(["damage","acuracy","shielddamage","range","recoil","reloadspeed","rateoffire","magazinecapacity","headshotdamage"]); const commonGeneric = new Set(["deathdurability","ch5"]);
-    const wp = (id: string) => { const trimmed = id.replace(/_Schematic$/i, ""); const m = trimmed.match(/^T\d+_Augment_(.+?)(\d+|Off)$/); return m ? m[1].replace(/^Ch5_/, "").toLowerCase() : ""; };
-    const weaponMap: [RegExp, Set<string>][] = [
-      [/lasgun|ChoamLg/i, new Set(["lasgun"])], [/spitdart|jabal|LongRifle|LogRifle|SmugDmr|Rifle_Long/i, new Set(["spitdartrifle","spitdartrifle"])],
-      [/disruptor| smg|SMG|AtreSmg|UniqueSmg/i, new Set(["smg","smg"])], [/karpov|battle.?rifle|\bBR\b|HarkAr|UniqueAr|AtreBR/i, new Set(["br"])],
-      [/drillshot|shotgun|Shotgun/i, new Set(["shotgun"])], [/grda|scattergun|Scattergun|UniqueScattergun/i, new Set(["scattergun"])],
-      [/vulcan|lmg|LMG|AtreLMG/i, new Set(["lmg"])], [/pyrocket|fireball|Fireballer/i, new Set(["fireballer"])],
-      [/flamethrower|Flamethrower|UniqueFlameThrower/i, new Set(["flamethrower"])], [/rocket|missile|RocketLauncher/i, new Set(["rocketlauncher"])],
-      [/maula|pistol|snubnose|rafiq|HeavyPistol|ChoamSda|UniqueSda/i, new Set(["heavypistol","maulapistol"])],
-    ];
-    const isMelee = /melee|sword|blade|knife|fremen|Dirk|Rapier|Kindjal|Minotaur|Sword|DualBlades|CHOAMSword|Crysknife|DewReaper|Ghola|ScrapMetalKnife|UniqueSword|UniqueDirk|UniqueRapier/i.test(name);
-    const isWeapon = cat === "weapons" || isMelee || /lasgun|LongRifle|LogRifle|spitdart|jabal|disruptor|Smg|karpov|BR|HarkAr|drillshot|Shotgun|grda|Scattergun|vulcan|LMG|AtreLMG|pyrocket|Fireballer|Flamethrower|rocket|missile|pistol|snubnose|rafiq|maula|HeavyPistol|RocketLauncher|UniqueAr|ChoamLg|ChoamSda|UniqueSda|UniqueFlameThrower|UniqueScattergun/i.test(name);
-    playerAdmin_setFilteredAugments(all.filter((aug) => {
-      const p = wp(aug.id);
-      if (isArmor || cat === "clothing") return p.startsWith("armor") || commonGeneric.has(p);
-      if (cat === "weapons") { if (isMelee) return p === "melee" || commonGeneric.has(p); if (rangedGeneric.has(p) || commonGeneric.has(p)) return true; for (const [rx, set] of weaponMap) { if (rx.test(name) && set.has(p)) return true; } return false; }
-      if (isWeapon) {
-        if (rangedGeneric.has(p) || commonGeneric.has(p)) return true;
-        for (const [rx, set] of weaponMap) { if (rx.test(name) && set.has(p)) return true; }
-        return false;
-      }
-      return true;
-    }).sort((a: any, b: any) => a.name.localeCompare(b.name)));
-  }, [playerAdmin_itemName, playerAdmin_itemId, playerAdmin_selectedItem?.category, playerAdmin_augmentCatalog]);
     playerAdmin_setFilteredAugments(filterAugmentsForItem({
       itemId: playerAdmin_itemId,
       name: playerAdmin_itemName,
@@ -172,8 +134,6 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     category: playerAdmin_selectedItem.category,
     source: playerAdmin_selectedItem.source,
     quantity: Number(playerAdmin_quantity) || 1,
-    quality: normalizeItemGrade(playerAdmin_grade),
-      augments: playerAdmin_selectedAugments.length > 0 ? [...playerAdmin_selectedAugments] : undefined
     quality: playerAdmin_effectiveGrade(playerAdmin_grade, playerAdmin_selectedItem),
     augments: playerAdmin_allowedSelectedAugments.length > 0 ? [...playerAdmin_allowedSelectedAugments] : undefined,
     augmentQuality: playerAdmin_allowedSelectedAugments.length > 0 ? playerAdmin_augmentGrade(playerAdmin_augmentGradeValue) : undefined
@@ -205,8 +165,8 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
   useEffect(() => {
     adminApi.itemCatalog("", 10000).then((result) => {
       const augs = (result.rows || []).filter((item) =>
-        /T\d+_Augment/i.test(item.id || "") && ((item.category || "").toLowerCase() || "").includes("schematics") ||
-        false
+        (item.category || "").toLowerCase().includes("augment") ||
+        (item.source || "").toLowerCase() === "augments"
       ).map((item) => ({ id: item.itemId || item.id, name: item.name }));
       playerAdmin_setAugmentCatalog(augs);
     }).catch(() => playerAdmin_setAugmentCatalog([]));
@@ -1168,8 +1128,6 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
           {playerAdmin_actionRow("intel", "Give Intel", <input type="number" min="1" value={playerAdmin_intelAmount} onChange={(event) => playerAdmin_setIntelAmount(event.target.value)} />, "Give", () => playerAdmin_runAction("intel", `Giving ${Number(playerAdmin_intelAmount) || 0} Intel to ${playerName}`, () => playersApi.addIntel(dbPlayerId, { amount: Number(playerAdmin_intelAmount) || 0, confirmation: "ADD INTEL" }), `${playerName}'s Intel was updated and will load on next join.`, { actionType: "Give Intel", target: playerName, amount: String(Number(playerAdmin_intelAmount) || 0) }), !dbPlayerId || playerAdmin_isOnline, playerAdmin_isOnline ? "The player must be offline." : "The player must be offline for this database edit.")}
           {playerAdmin_actionRow("faction", "Give Faction Reputation", <><select value={playerAdmin_factionName} onChange={(event) => playerAdmin_setFactionName(event.target.value)}><option>Atreides</option><option>Harkonnen</option><option>Smuggler</option></select><input type="number" min="1" max="12474" value={playerAdmin_factionAmount} onChange={(event) => playerAdmin_setFactionAmount(event.target.value)} /></>, "Give", () => playerAdmin_runAction("faction", `Giving ${Number(playerAdmin_factionAmount) || 0} ${playerAdmin_factionName} reputation to ${playerName}`, () => playersApi.addFactionReputation(dbPlayerId, { factionId: playerAdmin_factionIds[playerAdmin_factionName] || 1, amount: Number(playerAdmin_factionAmount) || 0, confirmation: "ADD FACTION REPUTATION" }), `${playerName}'s faction reputation was updated. Relog required.`, { actionType: "Give Faction Reputation", target: playerAdmin_factionName, amount: String(Number(playerAdmin_factionAmount) || 0) }), !dbPlayerId, "A relog is required to see the change.")}
         </div>)}
-         <div className={`playerAdmin_toggle ${playerAdmin_openToggles.give_items ? "open" : ""}`}><button className="playerAdmin_toggleHeader" onClick={() => playerAdmin_toggle("give_items")}>{playerAdmin_openToggles.give_items ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Give Items</span></button>{playerAdmin_openToggles.give_items && <div className="playerAdmin_toggleBody"><div className="playerAdmin_section"><p className="action-help-note">The player must be online for instant normal item grants. Schematics, augments, and Grades 1-5 are saved to the player inventory and may require a relog before they appear correctly.</p><ItemCatalogSelector selected={playerAdmin_selectedItem} onSelect={playerAdmin_chooseItem} /><div className="playerAdmin_itemActionStack"><div className="playerAdmin_itemInputLine"><span className="playerAdmin_actionLabel playerAdmin_itemSelectedLabel">Selected Item</span><label className="playerAdmin_itemNumberField">Quantity<input className="package-item-quantity-input" type="number" min="1" value={playerAdmin_quantity} onChange={(event) => playerAdmin_setQuantity(event.target.value)} /></label><label className="playerAdmin_itemNumberField">Grade<ItemGradeSelect value={playerAdmin_grade} onChange={playerAdmin_setGrade} /></label>{augmentLimit(playerAdmin_itemName, playerAdmin_selectedItem?.category, playerAdmin_itemId) > 0 && <label className="playerAdmin_itemNumberField">Augments ({playerAdmin_selectedAugments.length}/{augmentLimit(playerAdmin_itemName, playerAdmin_selectedItem?.category, playerAdmin_itemId)})<AugmentPicker augments={playerAdmin_filteredAugments} selected={playerAdmin_selectedAugments} onChange={playerAdmin_setSelectedAugments} limit={augmentLimit(playerAdmin_itemName, playerAdmin_selectedItem?.category, playerAdmin_itemId)} /></label>}<div className="playerAdmin_actionRow playerAdmin_itemActionRow"><button disabled={!playerAdmin_canGiveSelectedItems || playerAdmin_actionResult?.pending} onClick={() => void playerAdmin_giveMultipleItems()}>{playerAdmin_multiList.length ? "Give Package" : "Give Item"}</button><button disabled={!playerAdmin_selectedItem} onClick={playerAdmin_addSelectedItem}>Add Item</button><InlineActionResult result={playerAdmin_actionResult} resultKey="giveMultiple" /></div></div></div>
-          {playerAdmin_multiList.length ? <div className="table-wrap package-items-table playerAdmin_itemsTable"><table><thead><tr><th>Preview</th><th>Item Name</th><th>Item ID</th><th>Quantity</th><th>Grade</th><th>Augments</th><th>Actions</th></tr></thead><tbody>{playerAdmin_multiList.map((item, index) => {
          <div className={`playerAdmin_toggle ${playerAdmin_openToggles.give_items ? "open" : ""}`}><button className="playerAdmin_toggleHeader" onClick={() => playerAdmin_toggle("give_items")}>{playerAdmin_openToggles.give_items ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Give Items</span></button>{playerAdmin_openToggles.give_items && <div className="playerAdmin_toggleBody"><div className="playerAdmin_section"><ItemCatalogSelector selected={playerAdmin_selectedItem} onSelect={playerAdmin_chooseItem} /><div className="playerAdmin_itemActionStack"><div className="playerAdmin_itemInputLine"><span className="playerAdmin_actionLabel playerAdmin_itemSelectedLabel">Selected Item</span><label className="playerAdmin_itemNumberField">Quantity<input className="package-item-quantity-input" type="number" min="1" value={playerAdmin_quantity} onChange={(event) => playerAdmin_setQuantity(event.target.value)} /></label><label className="playerAdmin_itemNumberField">Grade<ItemGradeSelect value={playerAdmin_grade} minGrade={catalogItemMinimumGrade(playerAdmin_selectedItem)} onChange={playerAdmin_setGrade} /></label>{playerAdmin_filteredAugments.length > 0 && <><div className="playerAdmin_itemNumberField"><span>Augments</span><AugmentDropdown options={playerAdmin_displayAugments} value={playerAdmin_selectedAugments} maxSelected={playerAdmin_augmentLimit(playerAdmin_itemName, playerAdmin_itemId, playerAdmin_selectedItem?.category, playerAdmin_selectedItem?.source)} onChange={(selected) => playerAdmin_setSelectedAugments(selected.slice(0, playerAdmin_augmentLimit(playerAdmin_itemName, playerAdmin_itemId, playerAdmin_selectedItem?.category, playerAdmin_selectedItem?.source)))} /></div><label className="playerAdmin_itemNumberField">Aug. Grade<ItemGradeSelect value={playerAdmin_augmentGradeValue} minGrade={1} disabled={playerAdmin_selectedAugments.length === 0} emptyWhenDisabled onChange={playerAdmin_setAugmentGradeValue} /></label></>}<div className="playerAdmin_actionRow playerAdmin_itemActionRow"><button disabled={!playerAdmin_canGiveSelectedItems || playerAdmin_actionResult?.pending} onClick={() => void playerAdmin_giveMultipleItems()}>{playerAdmin_multiList.length ? "Give Package" : "Give Item"}</button><button disabled={!playerAdmin_selectedItem} onClick={playerAdmin_addSelectedItem}>Add Item</button><InlineActionResult result={playerAdmin_actionResult} resultKey="giveMultiple" /></div></div><p className="action-help-note">Grade 0 items with no augments can be granted while the player is online. Item Grades 1-5 or Augment Grades 1-5 require the player to be offline.</p></div>
           {playerAdmin_multiList.length ? <div className="table-wrap package-items-table playerAdmin_itemsTable"><table><thead><tr><th>Preview</th><th>Item Name</th><th>Item ID</th><th>Quantity</th><th>Grade</th><th>Augments</th><th>Aug. Grade</th><th>Actions</th></tr></thead><tbody>{playerAdmin_multiList.map((item, index) => {
             const editing = playerAdmin_itemEditIndex === index;
