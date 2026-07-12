@@ -1282,6 +1282,21 @@ test("player give-item generates perfect augment roll when no rolled source row 
   const insert = calls.find((call) => call.text.includes("insert into dune.items"));
   assert.ok(insert);
   const stats = JSON.parse(insert.values[5]);
+  assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugmentRollData, [{ StatRolls: [1, 1, 1], AppliedEffectIndices: [] }]);
+});
+
+test("player give-item uses real augment roll length before catalog fallback", async () => {
+  const calls = [];
+  const db = fakeMutationDb(calls, {
+    augmentRollRows: [{ template_id: "T6_Augment_Scattergun5", stats: { FAugmentItemStats: [[], { StatRolls: [0.25], AppliedEffectIndices: [] }] } }],
+    storageRows: [{ id: 7, actor_id: 123, max_item_count: 30, max_item_volume: 0 }],
+    countRows: [{ count: 1 }],
+    insertedRows: [{ id: 505, template_id: "UniqueScattergun5", stack_size: 1, quality_level: 5, position_index: 4, inventory_id: 7 }]
+  });
+  await giveItemToPlayer(db, 123, { templateId: "UniqueScattergun5", quantity: 1, quality: 5, augments: ["T6_Augment_Scattergun5"] });
+  const insert = calls.find((call) => call.text.includes("insert into dune.items"));
+  assert.ok(insert);
+  const stats = JSON.parse(insert.values[5]);
   assert.deepEqual(stats.FAugmentedItemStats[1].AppliedAugmentRollData, [{ StatRolls: [1], AppliedEffectIndices: [] }]);
 });
 

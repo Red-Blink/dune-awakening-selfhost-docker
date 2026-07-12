@@ -2682,8 +2682,24 @@ function augmentRollPayloadFromStats(stats) {
   return perfectAugmentRollPayload(payload);
 }
 
-function perfectAugmentRollPayload(payload = {}) {
-  const rollCount = Array.isArray(payload.StatRolls) && payload.StatRolls.length > 0 ? payload.StatRolls.length : 1;
+function augmentRollCount(augmentId = "") {
+  const entry = augmentCompatibilityCatalog().augments[String(augmentId || "")];
+  const explicit = Number(entry?.rollCount ?? entry?.statRollCount);
+  if (Number.isFinite(explicit) && explicit > 0) return Math.trunc(explicit);
+  const gradeEffects = entry?.gradeEffects && typeof entry.gradeEffects === "object" ? Object.values(entry.gradeEffects) : [];
+  const effectCounts = gradeEffects
+    .filter(Array.isArray)
+    .map((effects) => effects.length)
+    .filter((count) => count > 0);
+  if (effectCounts.length > 0) return Math.max(...effectCounts);
+  if (typeof entry?.effectSummary === "string" && entry.effectSummary.trim()) {
+    return Math.max(1, entry.effectSummary.split(";").map((part) => part.trim()).filter(Boolean).length);
+  }
+  return 1;
+}
+
+function perfectAugmentRollPayload(payload = {}, augmentId = "") {
+  const rollCount = Array.isArray(payload.StatRolls) && payload.StatRolls.length > 0 ? payload.StatRolls.length : augmentRollCount(augmentId);
   return {
     StatRolls: Array.from({ length: rollCount }, () => 1),
     AppliedEffectIndices: Array.isArray(payload.AppliedEffectIndices) ? payload.AppliedEffectIndices : []
@@ -2850,7 +2866,7 @@ async function loadAugmentRollPayloads(tx, augmentIds = [], qualityOverride = nu
       for (let index = 0; index < applied.length; index += 1) {
         const appliedId = typeof applied[index] === "string" ? applied[index] : applied[index]?.Name;
         if (!uniqueIds.includes(appliedId)) continue;
-        const rollPayload = perfectAugmentRollPayload(rollData[index] || {});
+        const rollPayload = perfectAugmentRollPayload(rollData[index] || {}, appliedId);
         const score = augmentRollScore(row.template_id, sourceTemplateId, rollPayload);
         if (!payloads.has(appliedId) || score > (scoredPayloads.get(appliedId) ?? -1)) {
           payloads.set(appliedId, { quality: overrideQuality ?? Number(qualities[index] ?? 1), rollData: rollPayload });
@@ -2860,7 +2876,7 @@ async function loadAugmentRollPayloads(tx, augmentIds = [], qualityOverride = nu
     }
   }
   for (const id of uniqueIds) {
-    if (!payloads.has(id)) payloads.set(id, { quality: overrideQuality ?? 1, rollData: perfectAugmentRollPayload() });
+    if (!payloads.has(id)) payloads.set(id, { quality: overrideQuality ?? 1, rollData: perfectAugmentRollPayload({}, id) });
   }
   return payloads;
 }
