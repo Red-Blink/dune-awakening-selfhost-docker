@@ -4,8 +4,6 @@ import { playersApi } from "../../api/players";
 import { adminApi } from "../../api/admin";
 import { DataTable, useSortableRows } from "../../components/common/DataTable";
 import { TechnicalDetails } from "../../components/common/DisplayPrimitives";
-import { augmentLimit, AugmentPicker, friendlyCatalogName } from "../../components/common/ItemCatalog";
-import { formatUiSentence, formatCell, friendlyColumnName } from "../../lib/display";
 import { AugmentDropdown } from "../../components/common/AugmentDropdown";
 import { ItemGradeSelect } from "../../components/common/ItemCatalog";
 import { formatUiSentence, friendlyColumnName } from "../../lib/display";
@@ -121,7 +119,8 @@ export function PlayerDetailTab({
   useEffect(() => {
     adminApi.itemCatalog("", 10000).then((result) => {
       const augs = (result.rows || []).filter((item) =>
-        /T\d+_Augment/i.test(item.id || "") && ((item.category || "").toLowerCase() || "").includes("schematics")
+        (item.category || "").toLowerCase().includes("augment") ||
+        (item.source || "").toLowerCase() === "augments"
       ).map((item) => ({ id: item.itemId || item.id, name: item.name }));
       setAugmentCatalog(augs);
     }).catch(() => setAugmentCatalog([]));
@@ -371,12 +370,6 @@ export function PlayerDetailTab({
       renderCell={renderInventoryCell}
       tableClassName="player-inventory-table"
       actionClassName="actions-column"
-      renderCell={(row, col) => col === "template_id" ? friendlyCatalogName(String(row.template_id || "")) : formatCell(row[col])}
-      action={(row) => <span className="icon-toggle-group">
-        <button className="icon-toggle-button success" title="Edit item" aria-label="Edit item" onClick={(event) => { event.stopPropagation(); startEditItem(row); }}><Circle size={16} /></button>
-        <button className="icon-toggle-button accent" title="Apply Augments" aria-label="Apply Augments" onClick={(event) => { event.stopPropagation(); setAugmentTargetRow(row); setAugmentSelected([]); }}>+A</button>
-        <button className="icon-toggle-button danger" title="Delete item" aria-label="Delete item" onClick={(event) => { event.stopPropagation(); void deleteItem(row); }}><X size={16} /></button>
-      </span>}
       action={(row) => {
         const canUseAugments = inventoryItemCanUseAugments(row);
         return <span className="icon-toggle-group">
@@ -398,35 +391,6 @@ export function PlayerDetailTab({
           {(() => {
             const itemTemplate = String(row.template_id || "");
             const all = augmentCatalog;
-            const name = itemTemplate.toLowerCase();
-            if (/_schematic$/i.test(name) || /_augment_/i.test(name)) return <p>Schematics and augment items cannot be augmented.</p>;
-            const isWeapon = /lasgun|spitdart|jabal|disruptor|smg|karpov|rifle|drillshot|shotgun|grda|scattergun|vulcan|lmg|pyrocket|fireball|flamethrower|rocket|missile|pistol|snubnose|rafiq|maula|melee|sword|blade|knife|fremen/i.test(name);
-            const isArmor = /chest|armor|guard|garment|helmet|boots|gloves|suit/i.test(name);
-            const isMelee = /melee|sword|blade|knife|fremen/i.test(name);
-            const rangedGeneric = new Set(["Damage","Acuracy","Shielddamage","Range","Recoil","ReloadSpeed","Rateoffire","Magazinecapacity","Headshotdamage"]); const commonGeneric = new Set(["DeathDurability","Ch5"]);
-            const wp = (id: string) => { const trimmed = id.replace(/_Schematic$/i, ""); const m = trimmed.match(/^T\d+_Augment_(.+?)\d+$/); return m ? m[1] : ""; };
-            const weaponMap: [RegExp, Set<string>][] = [
-              [/lasgun/i, new Set(["Lasgun"])], [/spitdart|jabal/i, new Set(["Spitdartrifle","SpitdartRifle"])],
-              [/disruptor| smg/i, new Set(["smg","Smg"])], [/karpov|battle.?rifle/i, new Set(["BR"])],
-              [/drillshot|shotgun/i, new Set(["Shotgun"])], [/grda|scattergun/i, new Set(["Scattergun"])],
-              [/vulcan|lmg/i, new Set(["Lmg"])], [/pyrocket|fireball/i, new Set(["Fireballer"])],
-              [/flamethrower/i, new Set(["Flamethrower"])], [/rocket|missile/i, new Set(["RocketLauncher"])],
-              [/maula|pistol|snubnose|rafiq/i, new Set(["HeavyPistol","MaulaPistol"])],
-            ];
-            const filtered = all.filter((aug) => {
-              const p = wp(aug.id);
-              if (isArmor) return /^Armor/i.test(p);
-              if (isMelee) return p === "Melee" || commonGeneric.has(p);
-              if (isWeapon) {
-                if (rangedGeneric.has(p) || commonGeneric.has(p)) return true;
-                for (const [rx, set] of weaponMap) { if (rx.test(name) && set.has(p)) return true; }
-                return false;
-              }
-              return true;
-            });
-            return augmentLimit(String(row.template_id)) === 0 ? <p>Augments only available for weapons and armor.</p> : filtered.length === 0 ? <p>No matching augments for this item type.</p> : <>
-            <label>Augments ({augmentSelected.length}/{augmentLimit(String(row.template_id))})</label>
-            <AugmentPicker augments={filtered} selected={augmentSelected} onChange={setAugmentSelected} limit={augmentLimit(String(row.template_id))} />
             if (/_schematic$/i.test(itemTemplate)) return <p>Schematics cannot be augmented.</p>;
             const itemMeta = {
               templateId: itemTemplate,

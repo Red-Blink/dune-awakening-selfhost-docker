@@ -45,6 +45,7 @@ test("json responses include defensive browser headers", () => {
   const res = fakeResponse();
   json(res, 200, { ok: true });
   assert.equal(res.headers["x-content-type-options"], "nosniff");
+  assert.equal(res.headers["x-frame-options"], "DENY");
   assert.equal(res.headers["referrer-policy"], "no-referrer");
   assert.match(res.headers["permissions-policy"], /camera=\(\)/);
 });

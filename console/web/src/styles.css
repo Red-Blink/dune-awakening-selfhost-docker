@@ -1,145 +1,36 @@
-/* ── Default Theme (Violet — Raw Spice) ── */
 :root {
   color-scheme: dark;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --bg: #0a0614;
-  --panel: #150f22;
-  --panel-soft: #110d1c;
-  --panel-muted: #0d0a17;
-  --border: #2a1a4a;
-  --border-strong: #3a2a6a;
-  --text: #e0dde8;
-  --text-strong: #e0d6ff;
-  --muted: #8a7aba;
-  --muted-warm: #9a8aca;
-  --title: #c4b5fd;
-  --accent: #7c3aed;
-  --accent-strong: #8b5cf6;
-  --accent-bg: rgba(124, 58, 237, .15);
-  --accent-glow: rgba(124, 58, 237, .22);
-  --success: #1e7a4a;
+  --bg: #0d0f12;
+  --panel: #171a1d;
+  --panel-soft: #14171a;
+  --panel-muted: #101316;
+  --border: #302b25;
+  --border-strong: #4d4032;
+  --text: #f3efe7;
+  --text-strong: #fff1d4;
+  --muted: #ad9f89;
+  --muted-warm: #ceb894;
+  --title: #ffd08a;
+  --accent: #c68b4a;
+  --accent-strong: #d49a5c;
+  --success: #3d8b62;
   --success-text: #9be6bd;
   --danger: #a74949;
   --danger-strong: #8d3434;
   --danger-text: #ffb4a8;
-  --warning: #8b7a2e;
-  --faction-color: #7c3aed;
-  --faction-name: "Unchosen";
-  --spice: #7c3aed;
-  --spice-text: #c4b5fd;
-  --spice-glow: #a78bfa;
-  --spice-bg: rgba(124, 58, 237, .12);
-  background: var(--bg);
-  color: var(--text);
-}
-
-/* ── Atreides Theme (Green & Gold) ──
-   Nobility, Honor, Nature. "the green and black Atreides banner" */
-:root[data-faction="atreides"] {
-  --bg: #060e06;
-  --panel: #0d1a0d;
-  --panel-soft: #0a160a;
-  --panel-muted: #081208;
-  --border: #1a3a1a;
-  --border-strong: #2a5a2a;
-  --text: #d8e8d8;
-  --text-strong: #ccffcc;
-  --muted: #7a9a7a;
-  --muted-warm: #8aaa8a;
-  --title: #f59e0b;
-  --accent: #16a34a;
-  --accent-strong: #22c55e;
-  --accent-bg: rgba(22, 163, 74, .15);
-  --accent-glow: rgba(22, 163, 74, .22);
-  --success: #1e7a4a;
-  --success-text: #9be6bd;
-  --danger: #a74949;
-  --danger-strong: #8d3434;
-  --danger-text: #ffb4a8;
-  --warning: #f59e0b;
-  --faction-color: #16a34a;
-  --faction-name: "Atreides";
-  --spice: #166534;
-  --spice-text: #86efac;
-  --spice-glow: #22c55e;
-  --spice-bg: rgba(22, 163, 74, .12);
-  background: radial-gradient(circle at top left, rgba(22, 163, 74, .10), transparent 38%), var(--bg);
-}
-
-/* ── Harkonnen Theme (Red & Black) ──
-   Ruthlessness, Ambition, Power. Fresh spice color. */
-:root[data-faction="harkonnen"] {
-  --bg: #0c0808;
-  --panel: #1a1010;
-  --panel-soft: #160e0e;
-  --panel-muted: #120b0b;
-  --border: #3d1a1a;
-  --border-strong: #5c2828;
-  --text: #e8dfdf;
-  --text-strong: #fee2e2;
-  --muted: #b09a9a;
-  --muted-warm: #cc9e9e;
-  --title: #fca5a5;
-  --accent: #ef4444;
-  --accent-strong: #f87171;
-  --accent-bg: rgba(239, 68, 68, .15);
-  --accent-glow: rgba(239, 68, 68, .22);
-  --success: #2d7a52;
-  --success-text: #9be6bd;
-  --danger: #dc2626;
-  --danger-strong: #b91c1c;
-  --danger-text: #fecaca;
-  --warning: #9e7a2a;
-  --faction-color: #ef4444;
-  --faction-name: "Harkonnen";
-  --spice: #7c3aed;
-  --spice-text: #c4b5fd;
-  --spice-glow: #f59e0b;
-  --spice-bg: rgba(124, 58, 237, .12);
-  background: radial-gradient(circle at top left, rgba(239, 68, 68, .12), transparent 38%), var(--bg);
-}
-
-/* ── Fremen Theme (Spice Blue) ──
-   Desert culture, spice melange, blue-within-blue eyes. */
-:root[data-faction="fremen"] {
-  --bg: #070c14;
-  --panel: #0f1a2e;
-  --panel-soft: #0c1626;
-  --panel-muted: #091320;
-  --border: #1a3050;
-  --border-strong: #2a4a7a;
-  --text: #e0e8f0;
-  --text-strong: #d6e4ff;
-  --muted: #7a9aba;
-  --muted-warm: #8aaaca;
-  --title: #93c5fd;
-  --accent: #2563eb;
-  --accent-strong: #3b82f6;
-  --accent-bg: rgba(37, 99, 235, .15);
-  --accent-glow: rgba(37, 99, 235, .22);
-  --success: #1e7a4a;
-  --success-text: #9be6bd;
-  --danger: #a74949;
-  --danger-strong: #8d3434;
-  --danger-text: #ffb4a8;
-  --warning: #8b7a2e;
-  --faction-color: #2563eb;
-  --faction-name: "Fremen";
-  --spice: #2563eb;
-  --spice-text: #93c5fd;
-  --spice-glow: #f59e0b;
-  --spice-bg: rgba(37, 99, 235, .12);
+  --warning: #a97932;
   background: var(--bg);
   color: var(--text);
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; }
+body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top left, rgba(170, 111, 45, .18), transparent 38%), var(--bg); }
 button, input, select, textarea { font: inherit; }
 button, .button-link {
   border: 1px solid var(--border-strong);
-  background: var(--panel-soft);
-  color: var(--text-strong);
+  background: #25201b;
+  color: #f7e7c7;
   padding: 10px 14px;
   border-radius: 6px;
   cursor: pointer;
@@ -149,8 +40,8 @@ button, .button-link {
   justify-content: center;
   gap: 8px;
 }
-button:hover, .button-link:hover { border-color: var(--accent-strong); }
-button.active { background: var(--accent-bg); border-color: var(--accent-strong); color: var(--accent-strong); }
+button:hover, .button-link:hover { border-color: var(--accent); }
+button.active { background: #9b5f2a; border-color: var(--accent-strong); }
 button.danger { border-color: var(--danger-strong); color: #ffc9c9; }
 button.success { border-color: var(--success); color: #d8f0c8; }
 button.success:hover { border-color: #63b57f; }
@@ -608,8 +499,8 @@ main { padding: 22px; min-width: 0; }
 .addon-status-toggle { min-width: 124px; }
 .addon-catalog-cell { display: flex; justify-content: center; }
 .addon-pin-column { text-align: center; }
-.addon-source-link { color: #f1c96f; font-weight: 800; text-decoration: none; }
-.addon-source-link:hover { color: #ffd08a; text-decoration: underline; }
+.addon-source-link { color: var(--accent); font-weight: 800; text-decoration: none; }
+.addon-source-link:hover { color: #f1c96f; text-decoration: underline; }
 .addon-permissions-list { display: flex; flex-wrap: wrap; gap: 6px; max-width: 240px; }
 .addon-permission-chip { border: 1px solid #3a3127; border-radius: 999px; color: #cbbda8; background: rgba(255,255,255,.03); padding: 3px 8px; font-size: 12px; white-space: nowrap; text-transform: capitalize; }
 .addon-permission-chip.approved { border-color: rgba(61,139,98,.55); color: var(--success-text); background: rgba(61,139,98,.14); }
@@ -709,7 +600,7 @@ main { padding: 22px; min-width: 0; }
 .actions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: end; }
 .actions-grid label.compact-field { width: 140px; }
 .actions-grid > button { justify-self: start; }
-.catalog-selector { display: grid; gap: 10px; width: 100%; max-width: none; overflow-x: auto; }
+.catalog-selector { display: grid; gap: 10px; width: 100%; max-width: none; }
 .catalog-filter-row { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 10px; align-items: end; }
 .catalog-filter-row .catalog-category-select { min-width: 0; width: 100%; }
 .catalog-search-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
@@ -718,8 +609,8 @@ main { padding: 22px; min-width: 0; }
 .catalog-view-toggle button.active { border-color: #c68b4a; background: #2a2118; color: #ffd08a; }
 .catalog-filter-input { width: 100%; min-height: 42px; }
 .catalog-selector .key-value-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
-.catalog-item-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; max-height: min(64vh, 520px); overflow: auto; border: 1px solid #302b25; border-radius: 8px; padding: 10px; background: #101316; }
-.catalog-item-picker.list-view { display: block; overflow-x: auto; }
+.catalog-item-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; max-height: 520px; overflow: auto; border: 1px solid #302b25; border-radius: 8px; padding: 10px; background: #101316; }
+.catalog-item-picker.list-view { display: block; }
 .catalog-item-option { min-height: 92px; padding: 10px; justify-content: flex-start; text-align: left; background: #171a1d; }
 .catalog-item-option span { min-width: 0; display: grid; gap: 3px; }
 .catalog-item-option strong, .catalog-item-option small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1517,17 +1408,6 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
 .package-items-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; }
 .package-items-toggle-panel.open .package-items-toggle-row { border-bottom: 1px solid #302b25; }
 .package-items-toggle-row h4 { margin: 0; }
-.package-items-picker-panel { display: grid; gap: 10px; padding: 12px; }
-.package-items-table table { table-layout: auto; width: max-content; min-width: 100%; }
-.package-items-table th:nth-child(1), .package-items-table td:nth-child(1) { width: 92px; text-align: center; }
-.package-items-table th:nth-child(2), .package-items-table td:nth-child(2) { min-width: 200px; white-space: nowrap; }
-.package-items-table th:nth-child(3), .package-items-table td:nth-child(3) { min-width: 160px; }
-.package-items-table th:nth-child(4), .package-items-table td:nth-child(4) { width: 90px; }
-.package-items-table th:nth-child(5), .package-items-table td:nth-child(5) { width: 90px; }
-.package-items-table th:nth-child(6), .package-items-table td:nth-child(6) { min-width: 180px; }
-.package-items-table tbody tr { height: 58px; }
-.package-items-table td { height: 58px; }
-.package-items-table button { padding: 6px 10px; }
 .package-items-table table { table-layout: fixed; width: 100%; min-width: 860px; }
 .table-wrap.package-items-table { overflow-x: auto; max-height: none; }
 .package-items-table th:nth-child(1), .package-items-table td:nth-child(1) { width: 96px; text-align: center; }
@@ -1910,206 +1790,3 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 @media (max-width: 720px) {
   .playerAdmin_actionNote { padding-left: 0; }
 }
-
-/* ── Discord OAuth2 Login ── */
-.oauth-discord-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  padding: 12px 16px;
-  margin: 8px 0;
-  background: #5865F2;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-size: 15px;
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.oauth-discord-button:hover { background: #4752C4; color: #fff; }
-
-.login-separator {
-  display: flex;
-  align-items: center;
-  margin: 16px 0;
-  color: var(--adm-subtle-text);
-  font-size: 12px;
-}
-.login-separator::before, .login-separator::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--adm-border);
-}
-.login-separator span { padding: 0 10px; }
-
-/* ── User Profile (topbar) ── */
-.user-profile {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 12px 4px 4px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.04);
-}
-.user-avatar {
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  object-fit: cover;
-}
-.user-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--adm-text);
-}
-.user-role {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.user-role-owner    { background: #f59e0b; color: #1a0a00; }
-.user-role-admin    { background: #ef4444; color: #fff; }
-.user-role-moderator { background: #3b82f6; color: #fff; }
-.user-role-observer  { background: #64748b; color: #fff; }
-.user-role-public    { background: #334155; color: #94a3b8; }
-
-.profile-logout-button {
-  background: none;
-  border: 1px solid var(--adm-border);
-  color: var(--adm-subtle-text);
-  padding: 3px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 11px;
-  transition: all 0.15s;
-}
-.profile-logout-button:hover {
-  background: rgba(239,68,68,0.15);
-  border-color: #ef4444;
-  color: #ef4444;
-}
-
-/* ── Role-Blocked Banner ── */
-.rbac-public-banner {
-  background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(139,92,246,0.1));
-  border: 1px solid rgba(59,130,246,0.3);
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  color: var(--adm-text);
-}
-.rbac-public-banner strong { color: #3b82f6; }
-
-/* ── Faction Selector ── */
-.faction-selector {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  margin: 12px 0;
-}
-.faction-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 500;
-  border: 2px solid var(--border);
-  background: var(--panel-muted);
-  color: var(--muted);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.faction-chip.active {
-  color: var(--text-strong);
-  background: var(--panel-soft);
-}
-.faction-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-/* ── Guild Faction Badges ── */
-.guild-faction-badge {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-.guild-faction-badge.guild-atreides {
-  background: rgba(22, 163, 74, .15);
-  color: #4ade80;
-  border: 1px solid rgba(22, 163, 74, .3);
-}
-.guild-faction-badge.guild-harkonnen {
-  background: rgba(239, 68, 68, .15);
-  color: #f87171;
-  border: 1px solid rgba(239, 68, 68, .3);
-}
-.guild-faction-badge.guild-fremen {
-  background: rgba(37, 99, 235, .15);
-  color: #60a5fa;
-  border: 1px solid rgba(37, 99, 235, .3);
-}
-
-/* ══════════════════════════════════════════════════════════════
-   AUTOMATIC FACTION COLORING SYSTEM
-   faction-tagger.js tags elements → CSS colors them
-   Uses data-tagged-* to avoid conflict with :root theme data-faction
-   ══════════════════════════════════════════════════════════════ */
-
-/* Atreides (Green) */
-[data-tagged-faction="atreides"],
-[data-tagged-faction="atreides"] td,
-[data-tagged-faction="atreides"] th { color: #4ade80; }
-
-/* Harkonnen (Red) */
-[data-tagged-faction="harkonnen"],
-[data-tagged-faction="harkonnen"] td,
-[data-tagged-faction="harkonnen"] th { color: #f87171; }
-
-/* ── Augment Picker (chip-based) ── */
-.augment-chip {
-  display: inline-flex; align-items: center; gap: 3px;
-  padding: 3px 8px; background: rgba(124, 58, 237, .15); border: 1px solid var(--spice);
-  border-radius: 12px; font-size: 12px; color: var(--spice-text); cursor: pointer;
-  transition: background .15s;
-}
-.augment-chip:hover { background: rgba(124, 58, 237, .25); }
-.augment-chip-x { font-size: 14px; line-height: 1; opacity: .7; margin-left: 2px; }
-.augment-chip-x:hover { opacity: 1; color: #f87171; }
-.augment-list {
-  border: 1px solid #374151; border-radius: 8px; background: #1a1d24;
-  padding: 4px 0;
-}
-.augment-option {
-  padding: 6px 12px; font-size: 13px; color: #d1d5db; cursor: pointer;
-  transition: background .1s, color .1s;
-}
-.augment-option:hover { background: rgba(124, 58, 237, .15); color: #c4b5fd; }
-.augment-option:first-child { border-radius: 4px 4px 0 0; }
-.augment-option:last-child { border-radius: 0 0 4px 4px; }
-
-/* Spice (Violet) */
-[data-tagged-spice] td,
-[data-tagged-spice] th { color: #c4b5fd; }
-.catalog-item-option strong { color: #fff1d4; }
-.catalog-item-option small { color: #ad9f89; }
-.addon-name strong, .addon-entry strong { color: inherit; }

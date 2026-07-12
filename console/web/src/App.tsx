@@ -1,5 +1,5 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { Archive, Database, FileText, Gift, Heart, Home, Landmark, Layers, Map as MapIcon, MessageCircle, PackagePlus, RefreshCw, Server, Settings, Shield, Sparkles, Users } from "lucide-react";
+import { Archive, Database, FileText, Gift, Heart, Home, Landmark, Map as MapIcon, MessageCircle, PackagePlus, RefreshCw, Server, Settings, Shield, Sparkles, Users } from "lucide-react";
 import { api, post, setCsrfToken } from "./api/client";
 import { serverApi } from "./api/server";
 import { updatesApi } from "./api/updates";
@@ -31,14 +31,13 @@ import {
 import { parseUpdateTask, stackVersionButtonLabel, stackVersionButtonTitle } from "./features/updates/updateUtils";
 import { formatUiSentence, stripAnsi, summarizeCommandText, titleCase } from "./lib/display";
 
-type Tab = "Home" | "Server Control" | "Services" | "Players" | "Guilds" | "Landsraad" | "Admin Tools" | "Live Map" | "Maps" | "Care Package" | "Blueprints" | "Addons" | "Database" | "Storage" | "Backups" | "Logs" | "Updates" | "Settings";
+type Tab = "Home" | "Server Control" | "Services" | "Players" | "Guilds" | "Landsraad" | "Admin Tools" | "Live Map" | "Maps" | "Care Package" | "Addons" | "Database" | "Storage" | "Backups" | "Logs" | "Updates" | "Settings";
 type SetupState = { files: Record<string, boolean>; config: Record<string, unknown> };
 let openConfirmDialog: ((request: ConfirmDialogRequest) => void) | null = null;
 
 const AddonsPanel = lazy(() => import("./features/addons/AddonsPanel").then((module) => ({ default: module.AddonsPanel })));
 const AdminToolsPanel = lazy(() => import("./features/adminTools/AdminToolsPanel").then((module) => ({ default: module.AdminToolsPanel })));
 const BackupsPanel = lazy(() => import("./features/backups/BackupsPanel").then((module) => ({ default: module.BackupsPanel })));
-const BlueprintsPanel = lazy(() => import("./features/blueprints/BlueprintsPanel").then((module) => ({ default: module.BlueprintsPanel })));
 const CarePackagePanel = lazy(() => import("./features/carePackage/CarePackagePanel").then((module) => ({ default: module.CarePackagePanel })));
 const DatabasePanel = lazy(() => import("./features/database/DatabasePanel").then((module) => ({ default: module.DatabasePanel })));
 const GuildsPanel = lazy(() => import("./features/guilds/GuildsPanel").then((module) => ({ default: module.GuildsPanel })));
@@ -113,8 +112,7 @@ const navGroups: { title: string; items: { tab: Tab; icon: React.ReactNode }[] }
       { tab: "Live Map", icon: <MapIcon size={18} /> },
       { tab: "Landsraad", icon: <Landmark size={18} /> },
       { tab: "Admin Tools", icon: <PackagePlus size={18} /> },
-      { tab: "Care Package", icon: <Gift size={18} /> },
-      { tab: "Blueprints", icon: <Layers size={18} /> }
+      { tab: "Care Package", icon: <Gift size={18} /> }
     ]
   },
   {
@@ -162,9 +160,6 @@ function LazyTabBoundary({ children, label = "Loading Section" }: { children: Re
 export function App() {
   const [auth, setAuth] = useState(false);
   const [password, setPassword] = useState("");
-  const [oauthConfigured, setOauthConfigured] = useState(false);
-  const [faction, setFaction] = useState<string>(() => localStorage.getItem("dune-faction") || "fremen");
-  const [userProfile, setUserProfile] = useState<{ name: string; avatar: string | null; source: string; role: string } | null>(null);
   const [tab, setTab] = useState<Tab>("Home");
   const [pinnedAddons, setPinnedAddons] = useState<PinnedAddon[]>(() => loadPinnedAddons());
   const [selectedPinnedAddonId, setSelectedPinnedAddonId] = useState("");
@@ -207,15 +202,9 @@ export function App() {
   }, [pinnedAddons]);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-faction", faction);
-  }, [faction]);
-
-  useEffect(() => {
-    api<{ authenticated: boolean; csrfToken: string | null; config?: { discordOAuthConfigured?: boolean }; user?: { name: string; avatar: string | null; source: string; role: string } }>("/api/auth/state").then((state) => {
+    api<{ authenticated: boolean; csrfToken: string | null }>("/api/auth/state").then((state) => {
       setAuth(state.authenticated);
       setCsrfToken(state.csrfToken);
-      if (state.config?.discordOAuthConfigured) setOauthConfigured(true);
-      if (state.user) setUserProfile(state.user);
     }).catch(() => undefined);
   }, []);
 
@@ -291,10 +280,9 @@ export function App() {
   }
 
   async function login() {
-    const result = await post<{ authenticated: boolean; csrfToken: string; user?: { name: string; avatar: string | null; source: string; role: string } }>("/api/auth/login", { password });
+    const result = await post<{ authenticated: boolean; csrfToken: string }>("/api/auth/login", { password });
     setCsrfToken(result.csrfToken);
     setAuth(result.authenticated);
-    if (result.user) setUserProfile(result.user);
   }
 
   async function logoutAfterPasswordChange() {
@@ -306,14 +294,6 @@ export function App() {
     setCsrfToken(null);
     setAuth(false);
     setPassword("");
-    setTab("Home");
-  }
-
-  async function logout() {
-    try { await post("/api/auth/logout"); } catch {}
-    setCsrfToken(null);
-    setAuth(false);
-    setUserProfile(null);
     setTab("Home");
   }
 
@@ -438,27 +418,6 @@ export function App() {
         <form className="login-panel" onSubmit={(event) => { event.preventDefault(); void safe(login); }}>
           <h1>Dune Docker Console</h1>
           <p>Spice Clearance Required</p>
-          <div className="faction-selector">
-            {[
-              { id: "atreides", name: "Atreides", color: "#16a34a" },
-              { id: "harkonnen", name: "Harkonnen", color: "#ef4444" },
-              { id: "fremen", name: "Fremen", color: "#2563eb" }
-            ].map((f) => (
-              <button type="button" key={f.id}
-                className={`faction-chip ${faction === f.id ? "active" : ""}`}
-                style={{ borderColor: faction === f.id ? f.color : "var(--border)" }}
-                onClick={() => { setFaction(f.id); localStorage.setItem("dune-faction", f.id); }}>
-                <span className="faction-dot" style={{ background: f.color }} />
-                {f.name}
-              </button>
-            ))}
-          </div>
-          {oauthConfigured && (
-            <a href="/api/auth/discord" className="oauth-discord-button">
-              <DiscordLogo size={20} /> Login with Discord
-            </a>
-          )}
-          <div className="login-separator"><span>or use password</span></div>
           <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Admin Password" />
           <button type="submit">Sign In</button>
           {error && <p className="error">{error}</p>}
@@ -492,13 +451,7 @@ export function App() {
               <span>Finish the first-time setup to unlock the console.</span>
             </div>
           </header>
-        {error && <div className="error-banner">{error}</div>}
-        {userProfile?.role === "public" && (
-          <div className="rbac-public-banner">
-            <Shield size={18} />
-            <span>Your Discord account has <strong>limited access</strong>. Contact your server admin to be added to observer, moderator, or admin roles.</span>
-          </div>
-        )}
+          {error && <div className="error-banner">{error}</div>}
           <SetupWizard
             initialStep={setupJump.step}
             jumpNonce={setupJump.nonce}
@@ -570,15 +523,7 @@ export function App() {
             <strong>{visibleTitle}</strong>
             <span>{visibleSubtitle}</span>
           </div>
-          <div className="topbar-links" aria-label="User actions">
-            {userProfile && (
-              <div className="user-profile">
-                {userProfile.avatar && <img className="user-avatar" src={userProfile.avatar} alt="" width={24} height={24} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />}
-                <span className="user-name">{userProfile.name}</span>
-                <span className={`user-role user-role-${userProfile.role}`}>{userProfile.role}</span>
-                <button className="profile-logout-button" onClick={() => { void safe(logout); }} title="Sign out">Sign out</button>
-              </div>
-            )}
+          <div className="topbar-links" aria-label="Community links">
             <a className="community-button discord" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer" title="Join Discord"><span>Join Discord</span><DiscordLogo size={19} /></a>
             <a className="community-button support" href={REDBLINK_KOFI_URL} target="_blank" rel="noreferrer" title="Support Project"><span>Support Project</span><KofiLogo size={19} /></a>
           </div>
@@ -599,7 +544,6 @@ export function App() {
         {!redeploySetupOpen && tab === "Live Map" && <LazyTabBoundary label="Loading Live Map"><LiveMapPanel onError={setError} confirmAction={confirmDialog} waitForTask={waitForTaskSilently} taskTechnicalDetails={taskTechnicalDetails} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Maps" && <LazyTabBoundary label="Loading Maps"><MapsPanel onError={setError} confirmAction={confirmDialog} confirmSettingsRestart={confirmSettingsRestart} waitForTaskWithUpdates={waitForTaskWithUpdates} taskTechnicalDetails={taskTechnicalDetails} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Care Package" && <LazyTabBoundary label="Loading Care Package"><CarePackagePanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Blueprints" && <LazyTabBoundary label="Loading Blueprints"><BlueprintsPanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Addons" && <LazyTabBoundary label="Loading Addons"><AddonsPanel pinnedAddons={pinnedAddons} setPinnedAddons={setPinnedAddons} selectedAddonId={selectedPinnedAddonId} clearSelectedAddon={() => setSelectedPinnedAddonId("")} setAddonCount={setAddonCount} confirmAction={confirmDialog} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Database" && <LazyTabBoundary label="Loading Database"><DatabasePanel /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Storage" && <LazyTabBoundary label="Loading Storage"><StoragePanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} /></LazyTabBoundary>}
