@@ -1748,8 +1748,8 @@ async function grantPlayerItem(playerId, item, target) {
   const hasExplicitGrade = item.quality !== undefined || item.grade !== undefined;
   const selectedGrade = hasExplicitGrade ? validateGrantGrade(item.quality ?? item.grade) : undefined;
   const selectedAugmentGrade = item.augmentQuality === undefined ? 1 : validateAugmentGrantGrade(item.augmentQuality);
-  const usesDatabaseGrant = (selectedGrade !== undefined && selectedGrade > 0) || itemRequiresDatabaseGrant(resolved) || (item.augments && item.augments.length > 0);
-  const databaseGrade = hasExplicitGrade ? selectedGrade : 0;
+  const usesDatabaseGrant = itemRequiresDatabaseGrant(resolved) || (item.augments && item.augments.length > 0);
+  const databaseGrade = hasExplicitGrade ? selectedGrade : (usesDatabaseGrant ? 1 : 0);
   const payload = {
     playerId: target.actionId || playerId,
     itemId: resolved.itemId,
@@ -1764,7 +1764,7 @@ async function grantPlayerItem(playerId, item, target) {
   if (usesDatabaseGrant) {
     if (!config.mockMode && !target.actorId) throw new Error("A database actor ID is required to grant graded items, schematics, and augments");
     if (!config.mockMode && payload.augments.length > 0 && target.online) {
-      throw new Error("Pre-augmented item grants require the player to be offline. Grade 0 items with no augments can be granted while the player is online. Item Grades 1-5 or Augment Grades 1-5 require the player to be offline.");
+      throw new Error("Augmented item grants require the player to be offline. Grade 0-5 items without augments can be granted while the player is online.");
     }
     const result = config.mockMode
       ? { ok: true, inserted: { template_id: resolved.itemId || payload.itemName, stack_size: payload.quantity, quality_level: databaseGrade } }
