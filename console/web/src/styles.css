@@ -1417,6 +1417,23 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
 .package-items-table th:nth-child(5), .package-items-table td:nth-child(5) { width: 260px; min-width: 260px; }
 .package-items-table tbody tr { min-height: 58px; }
 .package-items-table td { min-height: 58px; }
+.playerAdmin_itemsTable.package-items-table table { min-width: 980px; }
+.playerAdmin_itemsTable.package-items-table th:nth-child(1),
+.playerAdmin_itemsTable.package-items-table td:nth-child(1) { width: 82px; }
+.playerAdmin_itemsTable.package-items-table th:nth-child(2),
+.playerAdmin_itemsTable.package-items-table td:nth-child(2) { width: 18%; }
+.playerAdmin_itemsTable.package-items-table th:nth-child(3),
+.playerAdmin_itemsTable.package-items-table td:nth-child(3) { width: 18%; }
+.playerAdmin_itemsTable.package-items-table th:nth-child(4),
+.playerAdmin_itemsTable.package-items-table td:nth-child(4),
+.playerAdmin_itemsTable.package-items-table th:nth-child(5),
+.playerAdmin_itemsTable.package-items-table td:nth-child(5) { width: 104px; min-width: 104px; max-width: 104px; text-align: center; }
+.playerAdmin_itemsTable.package-items-table th:nth-child(6),
+.playerAdmin_itemsTable.package-items-table td:nth-child(6) { width: 240px; min-width: 240px; max-width: 240px; }
+.playerAdmin_itemsTable.package-items-table th:nth-child(7),
+.playerAdmin_itemsTable.package-items-table td:nth-child(7) { width: 118px; min-width: 118px; max-width: 118px; text-align: center; }
+.playerAdmin_itemsTable.package-items-table th:nth-child(8),
+.playerAdmin_itemsTable.package-items-table td:nth-child(8) { width: 220px; min-width: 220px; max-width: 220px; }
 .package-augment-summary {
   display: -webkit-box;
   -webkit-line-clamp: 3;

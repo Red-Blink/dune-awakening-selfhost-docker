@@ -7,10 +7,17 @@ export const DISCORD_CAPABILITIES = Object.freeze({
   POPULATION_READ: "population:read",
   LOGS_READ: "logs:read",
   MAPS_READ: "maps:read",
-  BACKUPS_READ: "backups:read"
+  BACKUPS_READ: "backups:read",
+  BROADCAST_SEND: "broadcast:send"
 });
 
-export const EXPERIMENTAL_READ_ONLY_CAPABILITIES = Object.freeze(new Set(Object.values(DISCORD_CAPABILITIES)));
+export const EXPERIMENTAL_READ_ONLY_CAPABILITIES = Object.freeze(
+  new Set(Object.values(DISCORD_CAPABILITIES).filter((c) => c !== DISCORD_CAPABILITIES.BROADCAST_SEND))
+);
+
+export const DISCORD_WRITE_CAPABILITIES = Object.freeze(
+  new Set([DISCORD_CAPABILITIES.BROADCAST_SEND])
+);
 
 const CAPABILITY_BY_TIER = Object.freeze({
   public: new Set([DISCORD_CAPABILITIES.STATUS_READ]),
@@ -79,6 +86,7 @@ export function requireDiscordCapability(actor, mapping, capability) {
 
 export function requireExperimentalReadOnlyCapability(capability) {
   const normalizedCapability = requiredString(capability, "capability");
+  if (DISCORD_WRITE_CAPABILITIES.has(normalizedCapability)) return; // checked separately via write enablement
   if (!EXPERIMENTAL_READ_ONLY_CAPABILITIES.has(normalizedCapability)) {
     throw policyError("not_read_only", `Capability is not allowed in experimental read-only mode: ${normalizedCapability}`, 403);
   }
