@@ -14,6 +14,10 @@ export const DISCORD_ADAPTER_ROUTES = Object.freeze({
   BACKUPS_LIST: "/api/integrations/discord/backups/list",
   BROADCAST: "/api/integrations/discord/broadcast",
   ANNOUNCEMENTS: "/api/integrations/discord/announcements",
+  VERSION: "/api/integrations/discord/version",
+  SERVERS: "/api/integrations/discord/servers",
+  PORTS: "/api/integrations/discord/ports",
+  DB: "/api/integrations/discord/db",
   OPS_ACTIVITY: "/api/integrations/discord/ops/activity",
   OPS_COMBAT: "/api/integrations/discord/ops/combat",
   OPS_RESOURCES: "/api/integrations/discord/ops/resources",
@@ -32,7 +36,11 @@ export const DISCORD_LIVE_ADAPTER_ROUTES = Object.freeze([
   DISCORD_ADAPTER_ROUTES.SERVICES,
   DISCORD_ADAPTER_ROUTES.POPULATION,
   DISCORD_ADAPTER_ROUTES.BROADCAST,
-  DISCORD_ADAPTER_ROUTES.ANNOUNCEMENTS
+  DISCORD_ADAPTER_ROUTES.ANNOUNCEMENTS,
+  DISCORD_ADAPTER_ROUTES.VERSION,
+  DISCORD_ADAPTER_ROUTES.SERVERS,
+  DISCORD_ADAPTER_ROUTES.PORTS,
+  DISCORD_ADAPTER_ROUTES.DB
 ]);
 
 export const DISCORD_PLANNED_ADAPTER_ROUTES = Object.freeze(
