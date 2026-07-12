@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   discordAdapterEnabled, discordAdapterErrorResponse, discordAdapterHealth,
   discordAdapterPopulation, discordAdapterReadiness, discordAdapterServices,
-  discordAdapterStatus, DISCORD_ADAPTER_ROUTES, DISCORD_PLANNED_ADAPTER_ROUTES,
+  discordAdapterStatus, discordWritesEnabled, DISCORD_ADAPTER_ROUTES, DISCORD_PLANNED_ADAPTER_ROUTES,
   validateDiscordActor, discordRoleMappingFromEnv
 } from "./adapter.js";
 import { policyError, requireDiscordCapability, DISCORD_CAPABILITIES } from "./policy.js";
@@ -14,6 +14,7 @@ import {
   opsEconomyProvider, opsInventoryProvider, opsLocationProvider,
   opsSocProvider, opsPrometheusProvider, opsDashboardProvider
 } from "./opsProvider.js";
+import { broadcastProvider } from "./broadcastProvider.js";
 import { buildDuneArgs, runDune } from "../../runner.js";
 
 // Secure infra operation whitelist — maps route keys to known-safe dune operations.
@@ -167,15 +168,15 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
       return json(res, 200, { ok: false, error: `OPS provider not found for: ${path}` });
     }
 
-    // Broadcast route
+    // Broadcast route — gated behind write enablement, actor identity, and admin/owner capability.
     if (path === DISCORD_ADAPTER_ROUTES.BROADCAST && req.method === "POST") {
+      if (!discordWritesEnabled(config)) throw policyError("writes_disabled", "Write operations are not enabled.", 403);
       const body = await readJson(req);
-      return json(res, 200, {
-        ok: true,
-        status: "planned",
-        route: path,
-        message: "Broadcast route is planned. Requires game server RabbitMQ integration."
-      });
+      const actor = validateDiscordActor(body.actor);
+      const mapping = discordRoleMappingFromEnv();
+      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.BROADCAST_SEND);
+      const result = await broadcastProvider(config, { message: body.message });
+      return json(res, 200, result);
     }
 
     // Announcements route
