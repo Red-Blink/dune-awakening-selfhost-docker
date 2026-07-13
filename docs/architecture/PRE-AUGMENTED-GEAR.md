@@ -18,8 +18,8 @@ Both write to `dune.items.stats` under `FAugmentedItemStats`. The player must be
 - **Weapons**: up to 3 augments (Crafting keystones 44-49)
 - **Clothing/armor**: up to 2 augments (Crafting keystones 42-43)
 
-The code internally caps at 20 augments per call as a defensive bound, but the
-effective limit is enforced by the keystone check.
+Both flows auto-purchase missing Crafting specialization keystones via
+`ensureAugmentSlotKeystones()`.
 
 ---
 
@@ -31,8 +31,8 @@ effective limit is enforced by the keystone check.
     [],
     {
       "AppliedAugments": [
-        { "Name": "Augment_Damage1" },
-        { "Name": "Augment_Melee1" }
+        { "Name": "T6_Augment_Damage1" },
+        { "Name": "T6_Augment_Melee1" }
       ],
       "AppliedAugmentQualities": [5, 3],
       "AppliedAugmentRollData": [
@@ -44,7 +44,8 @@ effective limit is enforced by the keystone check.
 }
 ```
 
-- **AppliedAugments** — array of `{ "Name": "<templateId>" }` objects
+- **AppliedAugments** — array of `{ "Name": "<templateId>" }` objects. IDs use the
+  `T6_Augment_` prefix (e.g., `T6_Augment_Damage1`, `T6_Augment_Armor1`)
 - **AppliedAugmentQualities** — parallel array of quality levels (same index)
 - **AppliedAugmentRollData** — parallel array of `{ StatRolls, AppliedEffectIndices }` objects
 
@@ -53,7 +54,7 @@ Complete stats JSON:
 {
   "FCustomizationStats": [[], {}],
   "FAugmentedItemStats": [[], {
-    "AppliedAugments": [{ "Name": "Augment_Damage1" }],
+    "AppliedAugments": [{ "Name": "T6_Augment_Damage1" }],
     "AppliedAugmentQualities": [5],
     "AppliedAugmentRollData": [{ "StatRolls": [1.0], "AppliedEffectIndices": [] }]
   }],
@@ -73,33 +74,34 @@ Complete stats JSON:
 
 ```
 POST /api/players/:id/augment-item
-Body: { itemId: 123, augments: ["Augment_Damage1"], augmentQuality: 5 }
+Body: { itemId: 123, augments: ["T6_Augment_Damage1"], augmentQuality: 5 }
 ```
-
-**Requires player offline.** Rejects online players.
 
 **Flow:**
 1. Validates augment IDs, quality level
 2. `requireOfflinePlayer()` — rejects online players
 3. Locks item row `for update`, validates ownership
 4. Extracts existing augments, deduplicates (internal cap: 20)
-5. `validateAugmentsForTemplate()` — tag-based compatibility check
-6. `ensureAugmentSlotKeystones()` — auto-purchases Crafting spec keystones (also inserts baseline Crafting track XP)
-7. `loadAugmentRollPayloads()` — inherits best roll data from existing matching items in inventory
+5. `validateAugmentsForTemplate()` — tag-based compatibility
+6. `ensureAugmentSlotKeystones()` — auto-purchases Crafting spec keystones
+7. `loadAugmentRollPayloads()` — inherits roll data from existing items
 8. `buildAugmentedItemStats()` — generates `FAugmentedItemStats`
 9. Updates `dune.items.stats`, resets `is_new` flag
-
-**Returns:** `{ ok, itemId, templateId, augments, augmentQuality, previous, slotUnlocks }`
 
 ### Pre-augmented grant
 
 ```
 POST /api/players/:id/give-item
-Body: { templateId: "AtreLMG5", quality: 5, augments: ["Augment_Lmg1"], augmentQuality: 1 }
+Body: { templateId: "AtreLMG5", quality: 5, augments: ["T6_Augment_Lmg1"], augmentQuality: 1 }
 ```
 
-**Requires player offline for database path.** Uses default roll values (`{ StatRolls: [1.0], AppliedEffectIndices: [] }`).
-Does NOT auto-purchase specialization keystones (unlike the apply flow).
+**Flow:**
+1. `itemRequiresDatabaseGrant()` — true when augments present
+2. Creates new item via `giveItemToPlayer()`
+3. `ensureAugmentSlotKeystones()` — auto-purchases Crafting spec keystones
+4. `loadAugmentRollPayloads()` — loads roll data from existing items, falls back to `perfectAugmentRollPayload()`
+5. `buildItemStats()` — generates full stats JSON including `FAugmentedItemStats`
+6. Writes to `dune.items` directly (offline path)
 
 ---
 
@@ -107,8 +109,7 @@ Does NOT auto-purchase specialization keystones (unlike the apply flow).
 
 ### `buildAugmentedItemStats(augmentIds, rollPayloads)`
 
-Generates `FAugmentedItemStats` with parallel arrays. Each `rollPayloads` entry is a
-`{ StatRolls, AppliedEffectIndices }` object from `perfectAugmentRollPayload()`:
+Generates `FAugmentedItemStats` with parallel arrays:
 ```js
 return [[], {
   AppliedAugments: augmentIds.map(id => ({ Name: id })),
@@ -119,71 +120,84 @@ return [[], {
 
 ### `augmentRollCount(augmentId)`
 
-Returns the roll count for an augment by reading from `augmentCompatibilityCatalog()`.
-Checks `rollCount`, `statRollCount`, `gradeEffects`, and `effectSummary` fields in order.
-Returns `1` if no data is available.
+Returns roll count from `augmentCompatibilityCatalog()` using `rollCount`,
+`statRollCount`, `gradeEffects`, and `effectSummary` fields. Returns `1`
+if no data available. Not hardcoded.
 
 ### `perfectAugmentRollPayload(payload, augmentId)`
 
-Generates a `{ StatRolls, AppliedEffectIndices }` object with all `StatRolls` set to `1`
-(perfect roll). Uses `augmentRollCount()` to determine array size.
+Generates `{ StatRolls, AppliedEffectIndices }` with all `StatRolls` set
+to `1.0` (perfect rolls). Used as fallback when no existing roll data found.
 
-### `loadAugmentRollPayloads(tx, augmentIds, qualityOverride, { sourceTemplateId, excludeItemId })`
+### `loadAugmentRollPayloads(tx, augmentIds, qualityOverride, opts)`
 
-Searches existing inventory items for matching augments and inherits their roll data.
-Preference: standalone augment items first, then items with same source template,
-then any item with that augment applied. Falls back to `perfectAugmentRollPayload()`.
-
-### `augmentSlotKeystoneIdsForTemplate(templateId)`
-
-Returns Crafting specialization keystone IDs needed for augment slots:
-- **Clothing**: `[42, 43]` — 2 slots max
-- **Melee weapons**: `[44, 45, 46]` — 3 slots max
-- **Ranged weapons**: `[47, 48, 49]` — 3 slots max
-- **Dual-type**: all 6 keystones
+Searches existing inventory items for matching augments and inherits their
+`StatRolls`/`AppliedEffectIndices`. Prefers standalone augment items, then
+items with matching source template, then any item with the augment applied.
+Falls back to `perfectAugmentRollPayload()` if nothing found.
 
 ### `ensureAugmentSlotKeystones(tx, player, templateId, augmentIds)`
 
-Auto-purchases missing Crafting specialization keystones. Also inserts baseline
-Crafting track XP in `specialization_tracks` if needed. Used only in the apply flow.
+Auto-purchases missing Crafting specialization keystones via
+`purchased_specialization_keystones`. Also inserts baseline Crafting track
+XP in `specialization_tracks` if needed. Called by BOTH apply and grant flows.
+
+### `augmentSlotKeystoneIdsForTemplate(templateId)`
+
+Returns keystone IDs for augment slots:
+- **Clothing**: `[42, 43]` — 2 slots
+- **Melee weapons**: `[44, 45, 46]` — 3 slots
+- **Ranged weapons**: `[47, 48, 49]` — 3 slots
+- **Dual-type**: all 6
+
+### `augmentTagsMatch(itemTags, augmentTags)`
+
+Returns `true` if ANY augment tag matches ANY item tag (using `.some()`).
+Not an "ALL must match" constraint — single match is sufficient.
 
 ### `augmentAllowedForTemplate(templateId, augmentId)`
 
-Tag-based compatibility check. Compares augment tags from `runtime/data/augment-compatibility.json`
-against item type tags inferred from the template ID.
+Checks if an augment's tags have at least one matching item tag.
+Loads tag data from `runtime/data/augment-compatibility.json`.
 
 ---
 
 ## 5. Augment Compatibility (Tag-Based)
 
-Loaded from `runtime/data/augment-compatibility.json`:
+Loaded from `runtime/data/augment-compatibility.json`. Actual augment IDs use
+the `T6_Augment_` prefix:
 ```json
 {
   "augments": {
-    "Augment_Damage1": { "tags": ["RangedWeapons", "MeleeWeapons"] },
-    "Augment_Armor1":  { "tags": ["Clothing"] }
+    "T6_Augment_Damage1": { "tags": ["RangedWeapons", "MeleeWeapons"] },
+    "T6_Augment_Armor1":  { "tags": ["Clothing"] }
   }
 }
 ```
 
 Item tags inferred via `inferredAugmentItemTags()`:
-- **MeleeWeapons** — knife, sword, axe, mace, hammer, spear, kindjal, etc.
-- **RangedWeapons** — pistol, rifle, shotgun, bow, crossbow, sniper, etc.
+- **MeleeWeapons** — knife, sword, axe, mace, hammer, spear, kindjal
+- **RangedWeapons** — pistol, rifle, shotgun, bow, crossbow, sniper
 - **Clothing** — armor, stillsuit, combat gear
 
-An augment is compatible only if ALL its tags match the item's tags.
+Matching: `augmentTagsMatch()` uses `.some()` — ANY matching tag pair is
+sufficient. Augment `tags: ["RangedWeapons"]` matches an item with
+`["RangedWeapons", "MeleeWeapons"]` because at least one tag overlaps.
 
 ---
 
-## 6. Flow Differences
+## 6. Flow Comparison
 
 | | Apply to existing | Pre-augmented grant |
 |---|-------------------|---------------------|
 | Endpoint | `POST /augment-item` | `POST /give-item` |
-| Player state | **Offline required** | **Offline required** (DB path) |
-| Roll data | Inherited from inventory | Default perfect rolls |
-| Keystones | Auto-purchased | Not purchased |
+| Player state | Offline required | Offline required (DB path) |
+| Keystones | Auto-purchased | Auto-purchased |
+| Roll data | Inherited from inventory | Inherited from inventory, falls back to perfect |
 | Item | Existing (must own) | New item created |
+| Stats built via | `buildAugmentedItemStats()` | `buildItemStats()` |
+
+Both flows call `ensureAugmentSlotKeystones()` and `loadAugmentRollPayloads()`.
 
 ---
 
@@ -197,8 +211,8 @@ An augment is compatible only if ALL its tags match the item's tags.
 | **Clothing** | Up to 2 augments (Crafting keystones 42-43) |
 | **Internal cap** | 20 augments per call (`.slice(0, 20)`) |
 | **Ownership** | Item must be in player's directly-owned inventory |
-| **Compatibility** | Tag-based from `augment-compatibility.json` |
-| **Roll count** | Dynamic — read from compatibility catalog |
+| **Compatibility** | ANY matching tag (`.some()`) from `augment-compatibility.json` |
+| **Roll count** | Dynamic from compatibility catalog, not hardcoded |
 
 ---
 
@@ -207,7 +221,6 @@ An augment is compatible only if ALL its tags match the item's tags.
 | File | Purpose |
 |------|---------|
 | `console/api/src/duneDb.js` | All augment functions |
-| `runtime/data/augment-compatibility.json` | Augment-to-tag mapping |
-| `console/web/src/lib/augmentEligibility.ts` | Frontend compatibility |
-| `console/web/src/components/common/AugmentDropdown.tsx` | Augment picker UI |
+| `runtime/data/augment-compatibility.json` | Augment-to-tag mapping (T6_Augment_ prefix) |
+| `console/web/src/lib/augmentEligibility.ts` | Frontend compatibility matching |
 | `console/api/test/pre-augmented-gear-regression.test.js` | Regression tests |
