@@ -11,6 +11,16 @@ if [ "$(id -u)" = "0" ]; then
     exec "$@"
   fi
 
+  # Upgrade path: repair root-owned directories from previous installs.
+  # Without this, old root-owned /repo breaks non-root console.
+  for dir in /repo /app; do
+    if [ -d "$dir" ] && [ "$(stat -c '%U' "$dir" 2>/dev/null || echo 'root')" = "root" ]; then
+      echo "[entrypoint] Repairing root-owned $dir → ${target_uid}:${target_gid}"
+      chown -R "${target_uid}:${target_gid}" "$dir" 2>/dev/null || \
+        echo "[entrypoint] WARNING: could not chown $dir (may be read-only mount)"
+    fi
+  done
+
   # Ensure group exists for target GID
   if ! getent group "$target_gid" >/dev/null 2>&1; then
     groupadd -g "$target_gid" dune 2>/dev/null || true

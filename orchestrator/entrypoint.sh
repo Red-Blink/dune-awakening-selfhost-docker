@@ -3,12 +3,15 @@ set -e
 
 echo "[entrypoint] Running as root — repairing permissions on mounted runtime directories"
 
-# Repair ownership on volumes that may be root-owned from previous installs
+# Upgrade path: repair root-owned volumes from previous installs.
+# This allows existing root-owned deployments to migrate to non-root.
 for dir in /srv/dune/server /srv/dune/steam /srv/dune/generated /srv/dune/cache /home/dune/.steam; do
   mkdir -p "$dir"
-  if [ "$(stat -c '%U' "$dir" 2>/dev/null || echo '')" != "dune" ]; then
-    echo "[entrypoint] chown dune:dune $dir"
-    chown -R dune:dune "$dir" 2>/dev/null || echo "[entrypoint] WARNING: could not chown $dir"
+  current_owner="$(stat -c '%U' "$dir" 2>/dev/null || echo 'root')"
+  if [ "$current_owner" != "dune" ]; then
+    echo "[entrypoint] Repairing $dir: $current_owner → dune:dune"
+    chown -R dune:dune "$dir" 2>/dev/null || \
+      echo "[entrypoint] WARNING: could not chown $dir (may be read-only mount)"
   fi
 done
 

@@ -49,9 +49,7 @@ COPY console/api/src ./src
 COPY --from=web-build /app/web/dist /app/web-dist
 COPY console/api/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
-RUN mkdir -p /repo \
-    && chown -R node:node /app /repo
-USER node
+RUN mkdir -p /repo
 WORKDIR /repo
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["node", "/app/src/server.js"]
