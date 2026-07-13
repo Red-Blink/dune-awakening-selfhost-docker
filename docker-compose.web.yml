@@ -16,6 +16,8 @@ services:
     group_add:
       - "${DOCKER_SOCKET_GID:-0}"
     environment:
+      DUNE_HOST_UID: "${DUNE_HOST_UID:-0}"
+      DUNE_HOST_GID: "${DUNE_HOST_GID:-0}"
       DUNE_DOCKER_DIR: /repo
       DUNE_CONTAINER_REPO_ROOT: /repo
       DUNE_HOST_REPO_ROOT: "${DUNE_HOST_REPO_ROOT:-${PWD}}"
