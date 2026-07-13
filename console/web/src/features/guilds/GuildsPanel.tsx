@@ -86,7 +86,7 @@ export function GuildsPanel({ onError }: GuildsPanelProps) {
   return (
     <section className="panel">
       <div className="panel-title"><h2>Guilds</h2><div className="action-row"><button onClick={() => void load()}>Refresh</button></div></div>
-      <div className="action-row"><input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search guild name" /><button onClick={() => void load()}>Search</button></div>
+      <div className="action-row guilds-search-row"><input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search guild name" /><button onClick={() => void load()}>Search</button></div>
       <DataTable rows={rows} columns={["guild_name", "guild_faction", "member_count", "guild_description"]} tableClassName="guilds-table" onRowClick={openGuild} emptyMessage="No guilds have been found yet." />
       {selectedGuild && (
         <div className="guild-members-panel">
