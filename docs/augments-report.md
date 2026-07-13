@@ -1,7 +1,7 @@
 # Pre-Augmented Gear — Feature Specification & Test Report
 
-> **Branch**: `pr/augments` | **PR**: Pending  
-> **Status**: Code merged upstream (#73), documentation PR  
+> **Branch**: `pr/augments` | **PR**: Pending
+> **Status**: Code merged upstream (#73), documentation PR
 > **Tests**: 76 regression tests pass | **Documentation**: 730-line architecture guide
 
 ---
