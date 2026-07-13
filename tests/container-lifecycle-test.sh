@@ -123,7 +123,7 @@ done
 # ── Test 10: Orchestrator Dockerfile builds ──
 echo ""
 echo "10. Orchestrator Dockerfile builds"
-if docker build --quiet -f "$REPO_ROOT/orchestrator/Dockerfile" -t "dune-orch-test:lifecycle" "$REPO_ROOT" 2>&1 > /dev/null; then
+if docker build --quiet -f "$REPO_ROOT/orchestrator/Dockerfile" -t "dune-orch-test:lifecycle" "$REPO_ROOT/orchestrator" 2>&1 > /dev/null; then
   pass "orchestrator Dockerfile builds"
 else
   fail "orchestrator Dockerfile build failed"
