@@ -285,16 +285,95 @@ Writing to `player_faction_reputation` may:
 
 ---
 
-## 9. Next Steps
+## 9. Implementation Plan
 
-1. **Phase 1**: Read-only specialization viewer in Player tab
-2. **Phase 1b**: XP progress bar using the known XP curve
-3. **Phase 2**: Test XP grant on a sacrificial offline player account
-   - Write `xp_amount = 1000` and `level = lookupLevel(1000)`
-   - Log player in, observe if game engine overwrites or accepts
-4. **Phase 3**: If Phase 2 succeeds, test trait grant
-5. **Spice grant**: Already available via Give Item — no code needed
+### Phase 1: Read-Only View + Fast Track (Safe, High Value)
+
+**Decision**: Combine approach 1 (error + guidance) and 3 (resource grants).
+NO DB writes to journey/faction tables. NO P34 risk.
+
+#### 1a: Read-Only View
+```
+GET /api/players/:id/specializations
+```
+Returns:
+- Track levels and XP per track (from `specialization_tracks`)
+- Purchased traits (from `purchased_specialization_keystones` + `keystones_map`)
+- Faction and reputation (from `player_faction` + `player_faction_reputation`)
+- Journey unlocks completed (from `journey_story_node`, filtered to spec-relevant nodes)
+- Landsraad mission progress (from `landsraad_task_progress`)
+- XP progress bar with next-level target
+
+#### 1b: Prerequisite Check
+```
+GET /api/players/:id/specializations/readiness
+```
+Returns which of the 11 steps are complete/incomplete:
+```json
+{
+  "ready": false,
+  "steps": [
+    { "name": "Faction Level 5", "done": true },
+    { "name": "House Operator title", "done": true },
+    { "name": "Faction-aligned Guild", "done": false },
+    { "name": "Art of Making Friends", "done": false },
+    ...
+  ],
+  "missing": ["Faction-aligned Guild", "Art of Making Friends"]
+}
+```
+
+#### 1c: Fast Track Resource Grant
+```
+POST /api/players/:id/specializations/fast-track
+```
+For each incomplete prerequisite, looks up the required items and grants them
+via the existing Give Item system. Example:
+- "Need Faction Level 5" → grant faction contract items (from `admin-items.json`)
+- "Need Art of Making Friends" → grant quest-required items
+- "Need Spice to buy traits" → grant Spice Melange stacks
+
+Returns:
+```json
+{
+  "granted": [
+    { "step": "Faction Level 5", "items": ["T6_FactionContract_Atreides x10"] },
+    { "step": "Traits", "items": ["SpiceMelange x750"] }
+  ],
+  "stillNeeds": ["Faction-aligned Guild"]
+}
+```
+
+#### 1d: UI — Specializations Sub-Tab
+- New sub-tab in `CharacterAdminUI` (between Blueprints and Admin)
+- Readiness panel showing 11-step checklist with checkmarks/crosses
+- "Fast Track" button that grants resources for incomplete steps
+- Track viewer showing XP bars, trait trees, and spice costs
+
+### Phase 2: XP Grant (HIGH RISK — needs testing)
+
+Only after we test on a sacrificial player account:
+1. Write `xp_amount` + computed `level` to `specialization_tracks`
+2. Log player in, observe game engine behavior
+3. If engine accepts, build the admin UI for XP grant
+4. If engine reverts/crashes, abandon this path
+
+### Phase 3: Trait Purchase (HIGH RISK — needs testing)
+
+Same as Phase 2: test on sacrificial account first.
+
+### Phase 3b: Trait Unlock via Spice Grant (SAFE)
+
+Instead of writing to `purchased_specialization_keystones`, grant Spice Melange
+to the player's inventory and let them buy traits through the in-game UI.
+This is the safe path — no DB writes to specialization tables needed.
 
 ---
 
-*Sources: method.gg specialization guide, dune.* DB inspection, DefaultGame.ini*
+## 10. Next Steps
+
+1. Build `GET /api/players/:id/specializations/readiness` — prerequisite check
+2. Identify required items per prerequisite step (from `admin-items.json` + game data)
+3. Build `POST /api/players/:id/specializations/fast-track` — resource grants
+4. Build Specializations sub-tab in CharacterAdminUI
+5. Test end-to-end: fast-track a fresh player, have them complete the journey naturally
