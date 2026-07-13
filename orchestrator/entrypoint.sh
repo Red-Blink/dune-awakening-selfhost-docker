@@ -33,4 +33,15 @@ if getent group docker >/dev/null 2>&1; then
 fi
 
 echo "[entrypoint] Dropping privileges to dune user"
-exec su - dune -c "exec $*"
+
+# Argument-preserving privilege drop (not su -c — that loses boundaries)
+if command -v runuser >/dev/null 2>&1; then
+  exec runuser -u dune -- "$@"
+fi
+if command -v gosu >/dev/null 2>&1; then
+  exec gosu dune "$@"
+fi
+if command -v setpriv >/dev/null 2>&1; then
+  exec setpriv --reuid=dune --regid=dune --inh-caps=-all -- "$@"
+fi
+exec su -s /bin/bash dune -c 'exec "$@"' -- "$@"
