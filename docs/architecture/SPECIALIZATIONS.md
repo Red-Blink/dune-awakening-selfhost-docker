@@ -113,7 +113,7 @@ ReducedScannedTime24 → 35 → 48 → 63 → 81
 
 ---
 
-## 3. The Unlock Chain (10 Steps to Access)
+## 3. The Unlock Chain (11 Steps to Access)
 
 Specializations are NOT available to new players. The full unlock chain:
 
@@ -131,13 +131,19 @@ Specializations are NOT available to new players. The full unlock chain:
     └── Piter de Vries (Harko Village) for Harkonnen
 7.  Receive "House Operator" title (dialog-triggered, not a DB flag)
 8.  Join a Faction-aligned Guild
-9.  Gain Landsraad Mission access (L key, 35 missions/week cap)
-10. Landsraad Missions award specialization XP (5/day, 625 XP/day max)
+9.  Complete faction journey: "The Art of Making Friends" (or equivalent)
+    └── This journey node appears AFTER faction level 5 + House Operator title
+    └── Tracked in dune.journey_story_node (complete_condition_state = true)
+    └── WITHOUT this, the specialization system is NOT accessible
+10. Gain Landsraad Mission access (L key, 35 missions/week cap)
+11. Landsraad Missions award specialization XP (5/day, 625 XP/day max)
 ```
 
-**Key insight**: Steps 1-8 cannot be bypassed with DB writes. They involve
-NPC interactions, quest flags, dialog triggers, and guild membership — all
-game-engine authoritative.
+**Key insight**: "The Art of Making Friends" (or faction-equivalent journey) is
+the gatekeeper between faction allegiance and the specialization system. Even
+if we write to `specialization_tracks`, the game engine validates journey
+state on login. If this journey node is incomplete, specializations will not
+activate and our writes may be silently reverted or crash.
 
 ---
 
