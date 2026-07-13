@@ -943,9 +943,12 @@ body.debug .technical-details { display: block; }
   min-width: 144px;
   padding-right: 38px;
 }
-.players-table th:nth-child(5),
-.players-table td:nth-child(5) { text-align: center; }
-.players-table td:nth-child(5) .player-status-cell { justify-content: center; }
+.players-search-row, .guilds-search-row { flex-wrap: nowrap; }
+.players-search-row input, .guilds-search-row input { width: auto; min-width: 0; flex: 1 1 auto; }
+.players-search-row button, .guilds-search-row button { width: auto; flex: 0 0 auto; }
+.players-table th:nth-child(4),
+.players-table td:nth-child(4) { text-align: center; }
+.players-table td:nth-child(4) .player-status-cell { justify-content: center; }
 .player-status-cell { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; }
 .player-status-cell.online { color: var(--success-text); }
 .player-status-cell.offline { color: var(--danger-text); }
@@ -964,8 +967,9 @@ body.debug .technical-details { display: block; }
 .playerAdmin_summaryActions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px solid rgba(214, 185, 140, .14); padding-top: 12px; }
 .playerAdmin_summaryActions button { width: auto; }
 .playerAdmin_summaryActions .playerAdmin_actionNote { flex: 1 0 100%; padding-left: 0; }
-.playerAdmin_tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; overflow-x: auto; }
-.playerAdmin_tabs button { width: 100%; min-height: 58px; border-radius: 6px; border-color: #3b3329; background: #171a1d; color: #e9dcc8; font-size: 15px; font-weight: 700; white-space: nowrap; }
+.playerAdmin_tabs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; overflow-x: auto; }
+.playerAdmin_tabs button { width: 100%; min-height: 54px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 6px; border-color: #3b3329; background: #171a1d; color: #e9dcc8; font-size: 14px; font-weight: 700; white-space: nowrap; }
+.playerAdmin_tabs button svg { flex: 0 0 auto; }
 .playerAdmin_tabs button.active { border-color: #c68b4a; background: rgba(198, 139, 74, .16); color: #ffd08a; }
 .playerAdmin_content { display: grid; gap: 12px; }
 .playerAdmin_box, .playerAdmin_toggle { border: 1px solid #302b25; background: #14171a; border-radius: 8px; padding: 14px; display: grid; gap: 12px; }
@@ -1133,6 +1137,45 @@ body.debug .technical-details { display: block; }
 .playerAdmin_journeyName { min-width: 220px; }
 .playerAdmin_itemsTable { margin-top: 2px; }
 .playerAdmin_empty { padding: 10px 2px; color: #d9c8aa; }
+.blueprints-panel { display: grid; gap: 12px; min-width: 0; }
+.blueprints-panel .home-task-result { margin: 0; }
+.blueprint-import-row { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; }
+.blueprint-import-row > button { width: auto; min-height: 40px; }
+.blueprint-file-field { display: grid; gap: 5px; flex: 1 1 360px; max-width: 560px; min-width: min(100%, 260px); color: var(--muted-warm); font-size: 15px; line-height: 1.35; cursor: pointer; }
+.blueprint-file-field > input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.blueprint-file-control { min-height: 40px; display: flex; align-items: center; gap: 9px; min-width: 0; padding: 8px 11px; border: 1px solid var(--border-strong); border-radius: 6px; background: #17191b; color: #e8dcc4; }
+.blueprint-file-field:hover .blueprint-file-control { border-color: var(--accent); background: #1f2021; }
+.blueprint-file-control span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.blueprint-help-note { max-width: none; }
+.blueprint-list-toolbar { min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.blueprint-list-toolbar-bottom { justify-content: flex-end; border-top: 1px solid rgba(214, 185, 140, .14); padding-top: 12px; }
+.blueprint-list-toolbar .service-actions { margin-left: auto; }
+.blueprint-list-toolbar-bottom .blueprint-select-all { margin-left: auto; }
+.blueprint-list-toolbar-bottom .service-actions { margin-left: 0; }
+.blueprint-select-all, .blueprint-row-select { display: inline-flex; align-items: center; gap: 8px; color: #e9dcc8; cursor: pointer; }
+.blueprint-select-all input, .blueprint-row-select input { width: 17px; height: 17px; min-height: 0; margin: 0; accent-color: var(--accent); }
+.blueprint-row-select { width: 28px; height: 38px; justify-content: center; border: 0; background: transparent; }
+.blueprint-import-progress { display: grid; gap: 8px; border-color: var(--warning); }
+.blueprint-import-progress p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.blueprint-progress-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--title); }
+.blueprint-progress-heading span { color: var(--muted-warm); font-size: 13px; }
+.blueprint-progress-track { height: 9px; overflow: hidden; border: 1px solid var(--border); border-radius: 999px; background: #0c0e10; }
+.blueprint-progress-track span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .3s ease; }
+.blueprints-table { width: 100%; table-layout: fixed; }
+.blueprints-table th:nth-child(1), .blueprints-table td:nth-child(1) { width: 72px; text-align: center; }
+.blueprints-table th:nth-child(2), .blueprints-table td:nth-child(2) { width: auto; }
+.blueprints-table th:nth-child(3), .blueprints-table td:nth-child(3),
+.blueprints-table th:nth-child(4), .blueprints-table td:nth-child(4) { width: 110px; text-align: center; }
+.blueprints-table th:nth-child(5), .blueprints-table td:nth-child(5) { width: 130px; text-align: center; }
+.blueprints-table th:last-child, .blueprints-table td:last-child { width: 154px; text-align: center; overflow: visible; }
+.blueprint-name { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-strong); font-weight: 700; }
+.blueprint-actions-column .icon-toggle-group { justify-content: center; }
+@media (max-width: 760px) {
+  .blueprint-file-field { flex-basis: 100%; max-width: none; }
+  .blueprint-list-toolbar, .blueprint-list-toolbar .service-actions { align-items: stretch; }
+  .blueprint-list-toolbar .service-actions { width: 100%; margin-left: 0; justify-content: flex-start; }
+  .blueprints-table { min-width: 720px; }
+}
 .gauge { display: grid; gap: 4px; background: #171a1d; border: 1px solid #302b25; border-radius: 8px; padding: 12px; }
 .service-table { display: grid; gap: 10px; margin-top: 14px; }
 .service-actions, .service-card .service-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
@@ -1218,7 +1261,7 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
   .home-backdrop { inset: 0; }
   .grid, .two-col { grid-template-columns: 1fr; }
   .health-grid, .health-grid-compact { grid-template-columns: 1fr; }
-  .playerAdmin_tabs { grid-template-columns: repeat(6, minmax(116px, 1fr)); }
+  .playerAdmin_tabs { grid-template-columns: repeat(7, minmax(112px, 1fr)); }
   .live-map-layout { grid-template-columns: 1fr; }
   .live-map-frame { height: 62vh; min-height: 420px; }
   .live-map-stats { grid-template-columns: 1fr; }
