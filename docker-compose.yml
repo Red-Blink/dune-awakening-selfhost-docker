@@ -23,7 +23,7 @@ services:
       - dune-steam:/srv/dune/steam
       - dune-cache:/srv/dune/cache
       - dune-generated:/srv/dune/generated
-      - ./work:/work
+      - dune-work:/work
     stdin_open: true
     tty: true
     command: ["dune", "daemon"]
@@ -33,3 +33,4 @@ volumes:
   dune-steam:
   dune-cache:
   dune-generated:
+  dune-work:

@@ -14,6 +14,9 @@ if [ -f .env ]; then
 fi
 set +a
 
+runtime/scripts/repair-host-runtime-permissions.sh
+export DUNE_RUNTIME_PERMISSIONS_REPAIRED=1
+
 run_timed_step() {
   local label="$1"
   shift

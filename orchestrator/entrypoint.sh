@@ -1,17 +1,37 @@
 #!/bin/bash
 set -e
 
-echo "[entrypoint] Running as root — repairing permissions on mounted runtime directories"
+echo "[entrypoint] Running as root - preparing mounted runtime directories"
 
 # Upgrade path: repair root-owned volumes from previous installs.
 # This allows existing root-owned deployments to migrate to non-root.
-for dir in /srv/dune/server /srv/dune/steam /srv/dune/generated /srv/dune/cache /home/dune/.steam; do
+WRITABLE_DIRS=(
+  /srv/dune/server
+  /srv/dune/steam
+  /srv/dune/generated
+  /srv/dune/cache
+  /home/dune/.steam
+  /work
+)
+
+for dir in "${WRITABLE_DIRS[@]}"; do
   mkdir -p "$dir"
-  current_owner="$(stat -c '%U' "$dir" 2>/dev/null || echo 'root')"
-  if [ "$current_owner" != "dune" ]; then
-    echo "[entrypoint] Repairing $dir: $current_owner → dune:dune"
-    chown -R dune:dune "$dir" 2>/dev/null || \
-      echo "[entrypoint] WARNING: could not chown $dir (may be read-only mount)"
+  current_owner="$(stat -c '%u:%g' "$dir" 2>/dev/null || echo 'unknown')"
+  if [ "$current_owner" != "$(id -u dune):$(id -g dune)" ]; then
+    echo "[entrypoint] Repairing $dir ownership ($current_owner -> dune:dune)"
+    if ! chown -R dune:dune "$dir"; then
+      echo "[entrypoint] ERROR: could not repair ownership for $dir" >&2
+      exit 1
+    fi
+  fi
+done
+
+for dir in "${WRITABLE_DIRS[@]}"; do
+  marker="$dir/.dune-write-test"
+  if ! runuser -u dune -- sh -c 'touch "$1" && rm -f "$1"' sh "$marker"; then
+    echo "[entrypoint] ERROR: $dir is not writable by the dune runtime user." >&2
+    echo "[entrypoint] Check the volume mount and host filesystem permissions, then recreate the orchestrator." >&2
+    exit 1
   fi
 done
 

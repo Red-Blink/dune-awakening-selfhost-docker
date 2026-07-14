@@ -11,7 +11,10 @@ fail() { echo -e "  \033[0;31m✗ $*\033[0m"; FAIL=$((FAIL + 1)); }
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 IMAGE_NAME="dune-console-test:lifecycle"
 TEST_DIR=$(mktemp -d)
-trap "rm -rf $TEST_DIR" EXIT
+cleanup() {
+  sudo rm -rf "$TEST_DIR" 2>/dev/null || rm -rf "$TEST_DIR" 2>/dev/null || true
+}
+trap cleanup EXIT
 
 echo "============================================="
 echo "  Container Lifecycle Tests"
@@ -138,6 +141,96 @@ if docker build --quiet -t "dune-orch-test:lifecycle" "$REPO_ROOT/orchestrator" 
   pass "orchestrator Dockerfile builds"
 else
   fail "orchestrator Dockerfile build failed"
+fi
+
+# ── Test 12: Orchestrator repairs all writable upgrade mounts ──
+echo ""
+echo "12. Orchestrator repairs root-owned writable mounts"
+ORCH_TEST_ROOT="$TEST_DIR/orchestrator-upgrade"
+mkdir -p "$ORCH_TEST_ROOT"/{server,steam,generated,cache,home-steam,work}
+printf 'old catalog\n' > "$ORCH_TEST_ROOT/work/server-catalog.json"
+sudo chown -R root:root "$ORCH_TEST_ROOT" 2>/dev/null || true
+sudo chmod -R u+rwX,go-rwx "$ORCH_TEST_ROOT" 2>/dev/null || true
+
+OUTPUT=$(docker run --rm \
+  -v "$ORCH_TEST_ROOT/server:/srv/dune/server" \
+  -v "$ORCH_TEST_ROOT/steam:/srv/dune/steam" \
+  -v "$ORCH_TEST_ROOT/generated:/srv/dune/generated" \
+  -v "$ORCH_TEST_ROOT/cache:/srv/dune/cache" \
+  -v "$ORCH_TEST_ROOT/home-steam:/home/dune/.steam" \
+  -v "$ORCH_TEST_ROOT/work:/work" \
+  "dune-orch-test:lifecycle" \
+  sh -lc 'test "$(id -u)" != 0; printf "new catalog\n" > /work/server-catalog.json; touch /srv/dune/server/test /srv/dune/steam/test /srv/dune/generated/test /srv/dune/cache/test /home/dune/.steam/test; echo OK' 2>&1) || true
+if echo "$OUTPUT" | grep -q "OK"; then
+  pass "orchestrator migrates existing writable mounts before dropping privileges"
+else
+  fail "orchestrator could not migrate writable mounts"
+  echo "    output: $OUTPUT"
+fi
+
+# ── Test 13: Main compose uses managed scratch storage ──
+echo ""
+echo "13. Orchestrator scratch storage is Docker-managed"
+COMPOSE_CONFIG=$(docker compose -f "$REPO_ROOT/docker-compose.yml" config 2>&1) || true
+if echo "$COMPOSE_CONFIG" | grep -q 'source: dune-work' \
+  && echo "$COMPOSE_CONFIG" | grep -q 'target: /work' \
+  && ! echo "$COMPOSE_CONFIG" | grep -q "$REPO_ROOT/work"; then
+  pass "/work uses the managed dune-work volume"
+else
+  fail "/work must not use a host bind mount"
+fi
+
+# ── Test 14: Shell entrypoints keep executable modes ──
+echo ""
+echo "14. Shell entrypoints are executable"
+NON_EXECUTABLE=$(find "$REPO_ROOT/runtime/scripts" -maxdepth 1 -type f -name '*.sh' ! -perm -111 -print)
+for f in "$REPO_ROOT/console/api/entrypoint.sh" "$REPO_ROOT/orchestrator/entrypoint.sh"; do
+  if [ ! -x "$f" ]; then
+    NON_EXECUTABLE="${NON_EXECUTABLE}${NON_EXECUTABLE:+$'\n'}$f"
+  fi
+done
+if [ -z "$NON_EXECUTABLE" ]; then
+  pass "runtime scripts and container entrypoints are executable"
+else
+  fail "shell entrypoints missing executable mode"
+  echo "$NON_EXECUTABLE" | sed 's/^/    /'
+fi
+
+# ── Test 15: Root-owned host runtime state is migrated ──
+echo ""
+echo "15. Host runtime state ownership migration"
+HOST_RUNTIME_ROOT="$TEST_DIR/host-runtime"
+mkdir -p "$HOST_RUNTIME_ROOT/runtime"/{generated,logs,backups,secrets,addons,text-router}
+mkdir -p "$HOST_RUNTIME_ROOT/runtime/game/test-map/Saved/UserSettings"
+printf 'old state\n' > "$HOST_RUNTIME_ROOT/runtime/generated/autoscaler-idle.tsv"
+printf 'old setting\n' > "$HOST_RUNTIME_ROOT/runtime/game/test-map/Saved/UserSettings/UserGame.ini"
+sudo chown -R root:root "$HOST_RUNTIME_ROOT/runtime" 2>/dev/null || true
+sudo chmod -R u+rwX,go-rwx "$HOST_RUNTIME_ROOT/runtime" 2>/dev/null || true
+
+OUTPUT=$(DUNE_RUNTIME_REPO_ROOT="$HOST_RUNTIME_ROOT" \
+  DUNE_RUNTIME_HOST_REPO_ROOT="$HOST_RUNTIME_ROOT" \
+  DUNE_RUNTIME_PERMISSION_HELPER_IMAGE="dune-orch-test:lifecycle" \
+  DUNE_HOST_UID="$(id -u)" \
+  DUNE_HOST_GID="$(id -g)" \
+  "$REPO_ROOT/runtime/scripts/repair-host-runtime-permissions.sh" 2>&1) || true
+if [ -w "$HOST_RUNTIME_ROOT/runtime/generated/autoscaler-idle.tsv" ] \
+  && printf 'new state\n' > "$HOST_RUNTIME_ROOT/runtime/generated/autoscaler-idle.tsv" \
+  && printf 'router state\n' > "$HOST_RUNTIME_ROOT/runtime/text-router/state.json" \
+  && printf 'new setting\n' > "$HOST_RUNTIME_ROOT/runtime/game/test-map/Saved/UserSettings/UserGame.ini"; then
+  pass "root-owned autoscaler, TextRouter, and map settings state is migrated"
+else
+  fail "host runtime permission migration failed"
+  echo "    output: $OUTPUT"
+fi
+
+# ── Test 16: Startup paths invoke host runtime migration ──
+echo ""
+echo "16. Startup paths invoke host runtime migration"
+if grep -q 'repair-host-runtime-permissions.sh' "$REPO_ROOT/runtime/scripts/start-all.sh" \
+  && grep -q 'repair-host-runtime-permissions.sh' "$REPO_ROOT/runtime/scripts/start-autoscaler.sh"; then
+  pass "full and standalone autoscaler startup both repair legacy ownership"
+else
+  fail "startup paths must invoke host runtime permission migration"
 fi
 
 # ── Cleanup ──

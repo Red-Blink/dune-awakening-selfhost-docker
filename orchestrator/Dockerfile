@@ -28,7 +28,8 @@ RUN useradd -m -s /bin/bash dune \
     /srv/dune/steam \
     /srv/dune/generated \
     /srv/dune/cache \
- && chown -R dune:dune /home/dune /srv/dune \
+    /work \
+ && chown -R dune:dune /home/dune /srv/dune /work \
  && usermod -aG docker dune
 
 COPY dune_orchestrator.py /usr/local/bin/dune

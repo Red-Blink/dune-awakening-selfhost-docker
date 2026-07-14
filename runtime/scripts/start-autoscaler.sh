@@ -8,9 +8,18 @@ source runtime/scripts/host-paths.sh
 
 CONTAINER_NAME="dune-autoscaler"
 IMAGE="dune-orchestrator:dev"
-HOST_UID="${DUNE_HOST_UID:-$(id -u)}"
-HOST_GID="${DUNE_HOST_GID:-$(id -g)}"
+REPO_UID="$(stat -c '%u' .)"
+REPO_GID="$(stat -c '%g' .)"
+HOST_UID="${DUNE_HOST_UID:-$REPO_UID}"
+HOST_GID="${DUNE_HOST_GID:-$REPO_GID}"
 DOCKER_SOCK_GID="${DOCKER_SOCKET_GID:-}"
+
+if [ "$HOST_UID" = "0" ] && [ "$REPO_UID" != "0" ]; then
+  HOST_UID="$REPO_UID"
+fi
+if [ "$HOST_GID" = "0" ] && [ "$REPO_GID" != "0" ]; then
+  HOST_GID="$REPO_GID"
+fi
 
 if [ -z "$DOCKER_SOCK_GID" ] && [ -S /var/run/docker.sock ]; then
   DOCKER_SOCK_GID="$(stat -c '%g' /var/run/docker.sock 2>/dev/null || true)"
@@ -42,6 +51,13 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   echo "Start or build the orchestrator first:"
   echo "  docker compose up -d --build orchestrator"
   exit 1
+fi
+
+if [ "${DUNE_RUNTIME_PERMISSIONS_REPAIRED:-0}" != "1" ]; then
+  DUNE_HOST_UID="$HOST_UID" \
+    DUNE_HOST_GID="$HOST_GID" \
+    DUNE_RUNTIME_PERMISSION_HELPER_IMAGE="$IMAGE" \
+    runtime/scripts/repair-host-runtime-permissions.sh
 fi
 
 echo "Starting autoscaler container..."
