@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
 cd "$(dirname "$0")"
 
@@ -7,7 +7,8 @@ APP_NAME="Dune Docker Console"
 WEB_COMPOSE="docker-compose.web.yml"
 WEB_SERVICE="redblink-dune-docker-console"
 WEB_PORT="${ADMIN_BIND_PORT:-8088}"
-DOCKER=(docker)
+DOCKER_CMD="docker"
+DOCKER_NEEDS_SUDO=0
 DOCKER_GROUP_UPDATED=0
 
 say() {
@@ -41,17 +42,17 @@ has_systemd() {
 install_basic_tools() {
   if command -v apt-get >/dev/null 2>&1; then
     need_sudo apt-get update
-    need_sudo apt-get install -y ca-certificates curl
+    need_sudo apt-get install -y ca-certificates curl bash
   elif command -v dnf >/dev/null 2>&1; then
-    need_sudo dnf install -y ca-certificates curl
+    need_sudo dnf install -y ca-certificates curl bash
   elif command -v yum >/dev/null 2>&1; then
-    need_sudo yum install -y ca-certificates curl
+    need_sudo yum install -y ca-certificates curl bash
   elif command -v zypper >/dev/null 2>&1; then
-    need_sudo zypper --non-interactive install ca-certificates curl
+    need_sudo zypper --non-interactive install ca-certificates curl bash
   elif command -v pacman >/dev/null 2>&1; then
-    need_sudo pacman -Sy --noconfirm ca-certificates curl
+    need_sudo pacman -Sy --noconfirm ca-certificates curl bash
   elif command -v apk >/dev/null 2>&1; then
-    need_sudo apk add --no-cache ca-certificates curl
+    need_sudo apk add --no-cache ca-certificates curl bash
   fi
 }
 
@@ -70,14 +71,21 @@ install_docker() {
   fi
 
   step "Installing Docker now."
- 
-  if ! error=$(curl -fsSL https://get.docker.com | need_sudo sh 2>&1); then
-  echo "$error" >&2
+
+  get_docker_script="${TMPDIR:-/tmp}/dune-get-docker-$$.sh"
+  trap 'rm -f "$get_docker_script"' 0
+
+  if ! curl -fsSL https://get.docker.com -o "$get_docker_script"; then
+    echo "Could not download the Docker install script from get.docker.com." >&2
+    exit 1
+  fi
+
+  if ! error=$(need_sudo sh "$get_docker_script" 2>&1); then
+    echo "$error" >&2
     if echo "$error" | grep -qi "alpine"; then
       step "Official Docker does not support Alpine Linux. Installing Docker from the Alpine community repository instead."
       install_docker_alpine
     else
-      echo "$error" >&2
       exit 1
     fi
   fi
@@ -105,15 +113,18 @@ install_docker_alpine() {
 
 select_docker_command() {
   if docker info >/dev/null 2>&1; then
-    DOCKER=(docker)
+    DOCKER_CMD="docker"
+    DOCKER_NEEDS_SUDO=0
     return 0
   fi
   if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
-    DOCKER=(sudo docker)
+    DOCKER_CMD="sudo docker"
+    DOCKER_NEEDS_SUDO=1
     return 0
   fi
   if [ "$(id -u)" -eq 0 ] && docker info >/dev/null 2>&1; then
-    DOCKER=(docker)
+    DOCKER_CMD="docker"
+    DOCKER_NEEDS_SUDO=0
     return 0
   fi
   return 1
@@ -154,14 +165,14 @@ start_docker() {
 set_docker_group_access() {
   local target_user="$1"
 
-  if ! getent group docker &>/dev/null; then
+  if ! getent group docker >/dev/null 2>&1; then
     echo "Docker group does not exist yet — Is Docker installed?"
     return
   fi
 
-  if command -v usermod &>/dev/null; then
+  if command -v usermod >/dev/null 2>&1; then
     need_sudo usermod -aG docker "$target_user"
-  elif command -v addgroup &>/dev/null; then
+  elif command -v addgroup >/dev/null 2>&1; then
     need_sudo addgroup "$target_user" docker
   else
     echo "Cannot add user $target_user to the docker group automatically."
@@ -194,7 +205,7 @@ ensure_docker_group_access() {
 }
 
 ensure_compose() {
-  if "${DOCKER[@]}" compose version >/dev/null 2>&1; then
+  if $DOCKER_CMD compose version >/dev/null 2>&1; then
     return
   fi
 
@@ -215,7 +226,7 @@ ensure_compose() {
     exit 1
   fi
 
-  if ! "${DOCKER[@]}" compose version >/dev/null 2>&1; then
+  if ! $DOCKER_CMD compose version >/dev/null 2>&1; then
     echo "Docker Compose is still not available after installation."
     echo "Restart your shell or Docker Desktop, then run this installer again."
     exit 1
@@ -441,7 +452,7 @@ start_console() {
   prepare_docker_socket_gid
   persist_console_runtime_env
   migrate_existing_ownership
-  if [ "${DOCKER[0]}" = "sudo" ]; then
+  if [ "$DOCKER_NEEDS_SUDO" = "1" ]; then
     need_sudo env \
       "ADMIN_BIND_PORT=$ADMIN_BIND_PORT" \
       "DUNE_HOST_REPO_ROOT=$DUNE_HOST_REPO_ROOT" \
@@ -451,14 +462,14 @@ start_console() {
       "COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME" \
       docker compose -f "$WEB_COMPOSE" up -d --build "$WEB_SERVICE"
   else
-    "${DOCKER[@]}" compose -f "$WEB_COMPOSE" up -d --build "$WEB_SERVICE"
+    $DOCKER_CMD compose -f "$WEB_COMPOSE" up -d --build "$WEB_SERVICE"
   fi
 }
 
 read_admin_password() {
   local password_file="$1"
-  local attempt
-  for attempt in $(seq 1 20); do
+  local attempt=1
+  while [ "$attempt" -le 20 ]; do
     if [ -r "$password_file" ] && [ -s "$password_file" ]; then
       tr -d '\r\n' < "$password_file"
       return
@@ -468,6 +479,7 @@ read_admin_password() {
       return
     fi
     sleep 1
+    attempt=$((attempt + 1))
   done
 }
 
