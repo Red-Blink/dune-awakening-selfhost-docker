@@ -1,6 +1,6 @@
 # Specializations — Deep Analysis & Pre-Requisites
 
-> **Branch**: `feature/specializations`  
+> **Branch**: `feature/specializations`
 > **Status**: ANALYSIS — updated with method.gg data | **Last Updated**: 2026-07-13
 
 ## Executive Summary
