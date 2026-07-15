@@ -39,6 +39,10 @@ has_systemd() {
   command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]
 }
 
+has_openrc() {
+  command -v rc-update >/dev/null 2>&1 && command -v rc-service >/dev/null 2>&1
+}
+
 install_basic_tools() {
   if command -v apt-get >/dev/null 2>&1; then
     need_sudo apt-get update
@@ -139,6 +143,9 @@ start_docker() {
 
   if has_systemd; then
     need_sudo systemctl enable --now docker || true
+  elif has_openrc; then
+    need_sudo rc-update add docker default || true
+    need_sudo rc-service docker start || true
   elif command -v service >/dev/null 2>&1; then
     need_sudo service docker start || true
   fi
