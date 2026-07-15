@@ -16,6 +16,7 @@ const ALLOWED_ADDON_PERMISSIONS = new Set([
   "ops:read",
   "database:read",
   "database:write",
+  "admin:grant-items",
   "server:status",
   "server:restart",
   "files:addon-data",

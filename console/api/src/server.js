@@ -36,6 +36,7 @@ import { primePlayerAnnouncementOnlineState, readPlayerAnnouncements, restorePla
 import { persistSpicefieldOverride } from "./services/spicefieldOverrides.js";
 import { exportBlueprint, importBlueprint, listBlueprints, deleteBlueprint } from "./blueprints.js";
 import { createZipArchive } from "./services/zipArchive.js";
+import { grantAddonItem } from "./addonItemGrants.js";
 
 const config = loadConfig();
 const auth = createAuth(config);
@@ -589,6 +590,29 @@ async function addonBridgeRoute(req, res, path) {
     const result = await duneDb.addonOpsEconomySummary(db);
     audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: true });
     return json(res, 200, { ok: true, result });
+  }
+  if (action === "admin.items.grant") {
+    const addon = assertInstalledAddonPermission(config, id, "admin:grant-items");
+    if (!applyMutationRateLimit(req, res, `addon:${id}:admin.items.grant`)) return;
+    try {
+      const result = await grantAddonItem(config, addon.id, body);
+      audit(config, req, "addons.bridge", {
+        id: addon.id,
+        action,
+        permission: addon.permission,
+        requestId: result.requestId,
+        playerId: result.playerId,
+        itemId: result.itemId,
+        quantity: result.quantity,
+        quality: result.quality,
+        duplicate: result.duplicate,
+        ok: true
+      });
+      return json(res, 200, { ok: true, result });
+    } catch (error) {
+      audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, requestId: String(body.requestId || ""), ok: false, error: redact(error.message || error) });
+      return json(res, 400, { ok: false, error: redact(error.message || error) });
+    }
   }
   if (action === "database.query" || action === "database.execute") {
     const query = String(body.query || "");

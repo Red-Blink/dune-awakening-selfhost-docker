@@ -149,6 +149,7 @@ test("normalizes addon provenance fields", () => {
 test("normalizes addon permission arrays and structured permissions", () => {
   assert.deepEqual(normalizeAddonPermissions(["players:read", "players:read"]), ["players:read"]);
   assert.deepEqual(normalizeAddonPermissions({ database: ["read", "write"], server: ["status"] }), ["database:read", "database:write", "server:status"]);
+  assert.deepEqual(normalizeAddonPermissions({ admin: ["grant-items"] }), ["admin:grant-items"]);
   assert.throws(() => normalizeAddonPermissions(["database:drop"]), /not supported/);
   assert.throws(() => normalizeAddonPermissions({ database: "read" }), /must be an array/);
 });
