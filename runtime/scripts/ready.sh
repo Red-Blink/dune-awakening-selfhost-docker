@@ -3,6 +3,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
+set -a
+[ -f .env ] && . ./.env
+[ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
+set +a
 source runtime/scripts/runtime-env.sh
 
 postgres_port="$(resolve_postgres_port)"

@@ -36,6 +36,13 @@ jobs:
       - name: Run metrics stack unit tests
         run: bash tests/metrics-stack-unit.sh
 
+  runtime-script-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - name: Test readiness with configured service ports
+        run: bash tests/ready-configured-ports-test.sh
+
   container-lifecycle:
     runs-on: ubuntu-latest
     steps:

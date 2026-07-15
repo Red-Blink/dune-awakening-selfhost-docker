@@ -278,7 +278,7 @@ else
 fi
 
 director_logs="$(docker logs --since 15m dune-director 2>&1 || true)"
-if grep -q 'Battlegroups_SendBattlegroupHeartbeat.*Request successful' <<< "$director_logs"; then
+if grep -Eq 'Battlegroups_SendBattlegroupHeartbeat.*Request successful|RMQ connection successful.*Initiating heartbeat|Population declaration: .*"IsLocked":false' <<< "$director_logs"; then
   ok "Director heartbeat to Funcom/FLS"
 else
   warn_msg "Director heartbeat not seen in recent logs"
