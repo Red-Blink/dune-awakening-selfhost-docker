@@ -8,6 +8,7 @@ import { KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/com
 import { formatUiSentence } from "../../lib/display";
 import { conciseTaskError } from "../../lib/taskDisplay";
 import { serializeEditableDbValue, parseEditableDbValue } from "../../lib/dbValues";
+import { DatabaseSchemaBrowser } from "./DatabaseSchemaBrowser";
 
 type HomeTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
 type DatabasePasswordState = { taskId?: string; result: HomeTaskResult | null };
@@ -176,12 +177,14 @@ export function DatabasePanel() {
   const [search, setSearch] = useState("");
   const [searchRows, setSearchRows] = useState<Record<string, unknown>[]>([]);
   const [searchRan, setSearchRan] = useState(false);
+  const [schemaBrowserOpen, setSchemaBrowserOpen] = useState(false);
   const [advancedSqlOpen, setAdvancedSqlOpen] = useState(false);
   const [editRow, setEditRow] = useState<Record<string, unknown> | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [editResult, setEditResult] = useState<HomeTaskResult | null>(null);
   const previewRef = useRef<HTMLHeadingElement | null>(null);
   const editRef = useRef<HTMLElement | null>(null);
+  const sqlEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const databasePasswordResult = databasePasswordState.result;
   async function loadTables() { setTables(await databaseApi.tables(schema)); }
   useEffect(() => {
@@ -380,6 +383,15 @@ export function DatabasePanel() {
     setSearchRan(true);
     setSearchRows(await databaseApi.search(search));
   }
+  function createSqlQuery(query: string) {
+    setSql(query);
+    setAdvancedSqlOpen(true);
+    window.requestAnimationFrame(() => {
+      sqlEditorRef.current?.focus();
+      const cursor = query.length;
+      sqlEditorRef.current?.setSelectionRange(cursor, cursor);
+    });
+  }
   const databaseServer = databaseStatus?.server as Record<string, unknown> | undefined;
   const databaseConfig = databaseStatus?.config as Record<string, unknown> | undefined;
   const showDefaultDatabasePasswordNote = !databaseStatus || databaseStatus.usesDefaultPassword !== false;
@@ -500,10 +512,16 @@ export function DatabasePanel() {
     <h3>Search Tables and Columns</h3>
     <div className="action-row"><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tables or columns" /><button onClick={searchColumns}>Search</button></div>
     {searchRan && (searchRows.length ? <DataTable rows={searchSort.sortedRows} sortColumn={searchSort.sortColumn} sortDirection={searchSort.sortDirection} onSort={searchSort.onSort} /> : <div className="empty database-empty">No matching tables or columns found.</div>)}
+    <div className={`playerAdmin_toggle database-schema-section ${schemaBrowserOpen ? "open" : ""}`}>
+      <button className="playerAdmin_toggleHeader" aria-label={schemaBrowserOpen ? "Collapse Table Schemas" : "Expand Table Schemas"} onClick={() => setSchemaBrowserOpen(!schemaBrowserOpen)}>{schemaBrowserOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Table Schemas</span></button>
+      {schemaBrowserOpen && <div className="playerAdmin_toggleBody">
+        <DatabaseSchemaBrowser schema={schema} tables={tables} onCreateQuery={createSqlQuery} />
+      </div>}
+    </div>
     <div className={`playerAdmin_toggle database-advanced-section ${advancedSqlOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={advancedSqlOpen ? "Collapse Advanced SQL Console" : "Expand Advanced SQL Console"} onClick={() => setAdvancedSqlOpen(!advancedSqlOpen)}>{advancedSqlOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Advanced SQL Console</span></button>
       {advancedSqlOpen && <div className="playerAdmin_toggleBody">
-        <textarea value={sql} onChange={(event) => setSql(event.target.value)} rows={5} />
+        <textarea ref={sqlEditorRef} value={sql} onChange={(event) => setSql(event.target.value)} rows={5} />
         <div className="action-row"><button onClick={runQuery}>Run Query</button><button onClick={exportQueryJson}>Export Query JSON</button></div>
         {queryRan && queryError && <div className="empty database-empty danger-note">{formatResultMessage(`Query failed: ${queryError}`)}</div>}
         {queryRan && !queryError && queryResult && (queryRows.length
