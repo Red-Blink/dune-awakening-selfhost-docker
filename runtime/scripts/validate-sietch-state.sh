@@ -15,10 +15,11 @@ else
   fail "shell syntax"
 fi
 
-if grep -q 'docs/' README.md; then
-  fail "README still links to docs/"
+if grep -qF '[Screenshots Gallery](docs/screenshots.md)' README.md \
+  && [ -f docs/screenshots.md ]; then
+  ok "README Screenshots Gallery link resolves"
 else
-  ok "README has no docs/ dependency"
+  fail "README Screenshots Gallery link is missing or broken"
 fi
 
 if grep -q '"isStartingMap": True' runtime/scripts/publish-sietch-overrides.sh \

@@ -990,6 +990,69 @@ select count(*) from ranked where ord <= ${target} and server_id <> '';
   return 1
 }
 
+survival_port_bases() {
+  (
+    # shellcheck disable=SC1091
+    [ -f .env ] && . ./.env
+    # shellcheck disable=SC1091
+    [ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
+    # shellcheck disable=SC1091
+    source runtime/scripts/runtime-env.sh
+    printf '%s\t%s\n' "$(resolve_client_port_base)" "$(resolve_igw_port_base)"
+  )
+}
+
+relocate_survival_port_conflicts() {
+  local target="${1:-1}"
+  local client_base igw_base first_client last_client first_igw last_igw
+  local conflicts partition_id map game_port igw_port connected_players
+
+  [ "$target" -gt 1 ] 2>/dev/null || return 0
+  IFS=$'\t' read -r client_base igw_base < <(survival_port_bases)
+  validate_positive_integer "$client_base" || return 1
+  validate_positive_integer "$igw_base" || return 1
+
+  first_client=$((client_base + 2))
+  last_client=$((client_base + target))
+  first_igw=$((igw_base + 2))
+  last_igw=$((igw_base + target))
+
+  conflicts="$(docker exec dune-postgres psql -U postgres -d dune -At -F $'\t' -c "
+select
+  wp.partition_id,
+  wp.map,
+  coalesce(fs.game_port, 0),
+  coalesce(fs.igw_port, 0),
+  coalesce(fs.connected_players, 0)
+from dune.world_partition wp
+join dune.farm_state fs on fs.server_id = wp.server_id
+where lower(wp.map) <> lower('Survival_1')
+  and coalesce(fs.alive, false) = true
+  and (
+    fs.game_port between ${first_client} and ${last_client}
+    or fs.igw_port between ${first_igw} and ${last_igw}
+  )
+order by wp.partition_id;
+" 2>/dev/null || true)"
+
+  [ -n "$conflicts" ] || return 0
+
+  while IFS=$'\t' read -r partition_id map game_port igw_port connected_players; do
+    if [ "${connected_players:-0}" -gt 0 ] 2>/dev/null; then
+      echo "Cannot reserve Sietch ports ${game_port}/${igw_port} while $map partition $partition_id has connected players." >&2
+      echo "Wait for that map to empty, then retry the Sietch change." >&2
+      return 1
+    fi
+  done <<< "$conflicts"
+
+  while IFS=$'\t' read -r partition_id map game_port igw_port connected_players; do
+    [ -n "${partition_id:-}" ] || continue
+    echo "Relocating $map partition $partition_id from newly reserved Sietch ports ${game_port}/${igw_port}..."
+    runtime/scripts/despawn-server.sh "$partition_id" --force
+    runtime/scripts/spawn-server.sh "$partition_id"
+  done <<< "$conflicts"
+}
+
 sync_survival_usersettings_state() {
   python3 - <<'PY'
 import json
@@ -1290,6 +1353,9 @@ PY
     ensure_map_partitions "$map" "$target"
     if [ "${ENSURE_MAP_PARTITIONS_CHANGED:-0}" -eq 1 ]; then
       topology_changed=1
+    fi
+    if [ "$map" = "Survival_1" ]; then
+      relocate_survival_port_conflicts "$target"
     fi
   fi
 

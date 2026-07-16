@@ -56,6 +56,8 @@ test("long-running server tasks get an extended timeout", () => {
   assert.equal(taskTimeoutMs(config, "restartAll"), 30 * 60 * 1000);
   assert.equal(taskTimeoutMs(config, "storageCleanupImages"), 30 * 60 * 1000);
   assert.equal(taskTimeoutMs(config, "storageCleanupBuildCache"), 30 * 60 * 1000);
+  assert.equal(taskTimeoutMs(config, "sietchesSetActive"), 30 * 60 * 1000);
+  assert.equal(taskTimeoutMs(config, "sietchesReconcile"), 30 * 60 * 1000);
 });
 
 test("web self-update helper mounts the host repo path", () => {
