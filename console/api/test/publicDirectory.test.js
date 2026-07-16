@@ -20,7 +20,8 @@ import {
   normalizeDiscordInvite,
   readConfiguredCapacity,
   readDirectorySettings,
-  readGameBuild
+  readGameBuild,
+  reconcilePublicProbe
 } from "../src/services/publicDirectory.js";
 
 test("heartbeat includes an empty Discord invite so stale directory links are removed", () => {
@@ -161,12 +162,41 @@ test("directory snapshot uses compact database aggregates and local metadata", a
   }
 });
 
-test("battlegroup running state distinguishes stopped stacks from partial stacks", () => {
-  assert.equal(isBattlegroupRunning(() => ["dune-server-survival-1"]), true);
-  assert.equal(isBattlegroupRunning(() => ["dune-postgres", "redblink-dune-docker-console"]), false);
-  assert.equal(isBattlegroupRunning(() => {
+test("battlegroup running state distinguishes stopped stacks from partial stacks", async () => {
+  assert.equal(await isBattlegroupRunning(() => ["dune-server-survival-1"]), true);
+  assert.equal(await isBattlegroupRunning(() => ["dune-postgres", "redblink-dune-docker-console"]), false);
+  assert.equal(await isBattlegroupRunning(() => {
     throw new Error("docker unavailable");
   }), false);
+});
+
+test("probe reconciliation yields while its Docker command is running", async () => {
+  const files = fixture();
+  let releaseCommand;
+  let commandFinished = false;
+  const commandGate = new Promise((resolve) => { releaseCommand = resolve; });
+  try {
+    const reconciliation = reconcilePublicProbe(files.repoRoot, {
+      enabled: true,
+      signalingUrl: "https://dunedocker.app/api/v1/probes",
+      serverId: "11111111-1111-4111-8111-111111111111",
+      secret: "abcdefghijklmnopqrstuvwxyzABCDEFG123456"
+    }, async () => {
+      await commandGate;
+      commandFinished = true;
+      return "";
+    });
+
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(commandFinished, false);
+    assert.equal(readFileSync(join(files.generatedDir, "public-probe.env"), "utf8").includes("DUNE_PUBLIC_PROBE_ENABLED=true"), true);
+
+    releaseCommand();
+    await reconciliation;
+    assert.equal(commandFinished, true);
+  } finally {
+    files.cleanup();
+  }
 });
 
 test("reporter sends a fresh offline heartbeat when the battlegroup is stopped", async () => {

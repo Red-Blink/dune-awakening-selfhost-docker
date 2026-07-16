@@ -50,3 +50,10 @@ test("public probe lifecycle script is executable and supports clean shutdown", 
   assert.match(script, /outbound-only WebRTC compatibility mode/);
   assert.match(script, /DUNE_PUBLIC_PROBE_FORCE_BRIDGE=true compose up -d/);
 });
+
+test("public probe lifecycle does not block the Console event loop", () => {
+  const source = readFileSync(resolve(repoRoot, "console/api/src/services/publicDirectory.js"), "utf8");
+  assert.doesNotMatch(source, /execFileSync/);
+  assert.match(source, /await runCommand\(script, \["reconcile"\]/);
+  assert.match(source, /await execFileOutput\("docker"/);
+});

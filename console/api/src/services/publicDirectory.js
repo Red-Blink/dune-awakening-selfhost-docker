@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import * as duneDb from "../duneDb.js";
 
 const DEFAULT_BASE_URL = "https://dunedocker.app/api/v1/servers";
@@ -372,9 +372,9 @@ export function normalizeDiscordInvite(value) {
   }
 }
 
-export function isBattlegroupRunning(getRunningContainers = runningContainerNames) {
+export async function isBattlegroupRunning(getRunningContainers = runningContainerNames) {
   try {
-    const running = new Set(getRunningContainers());
+    const running = new Set(await getRunningContainers());
     return [...BATTLEGROUP_CORE_CONTAINERS].some((name) => running.has(name));
   } catch {
     return false;
@@ -392,8 +392,8 @@ export function getOrCreateIdentity(path) {
   return identity;
 }
 
-function runningContainerNames() {
-  const output = execFileSync("docker", ["ps", "--format", "{{.Names}}"], {
+async function runningContainerNames() {
+  const output = await execFileOutput("docker", ["ps", "--format", "{{.Names}}"], {
     encoding: "utf8",
     timeout: 5000,
     stdio: ["ignore", "pipe", "ignore"]
@@ -550,10 +550,10 @@ function normalizeSignalingUrl(value) {
   }
 }
 
-function reconcilePublicProbe(repoRoot, probe) {
+export async function reconcilePublicProbe(repoRoot, probe, runCommand = execFileOutput) {
   const script = resolve(repoRoot, "runtime", "scripts", "public-probe.sh");
   if (!probe?.enabled) {
-    execFileSync(script, ["stop"], {
+    await runCommand(script, ["stop"], {
       cwd: repoRoot,
       encoding: "utf8",
       timeout: 120000,
@@ -574,11 +574,23 @@ function reconcilePublicProbe(repoRoot, probe) {
     serverId: probe.serverId,
     secret: probe.secret
   });
-  execFileSync(script, ["reconcile"], {
+  await runCommand(script, ["reconcile"], {
     cwd: repoRoot,
     encoding: "utf8",
     timeout: 120000,
     stdio: ["ignore", "pipe", "pipe"]
+  });
+}
+
+function execFileOutput(file, args, options) {
+  return new Promise((resolvePromise, rejectPromise) => {
+    execFile(file, args, { ...options, maxBuffer: 4 * 1024 * 1024 }, (error, stdout) => {
+      if (error) {
+        rejectPromise(error);
+        return;
+      }
+      resolvePromise(stdout || "");
+    });
   });
 }
 
