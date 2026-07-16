@@ -26,6 +26,8 @@ const simpleOperations = {
   ports: ["ports"],
   doctor: ["doctor"],
   networkBindFix: ["network", "fix"],
+  storageCleanupImages: ["storage", "cleanup"],
+  storageCleanupBuildCache: ["storage", "cleanup", "--build-cache"],
   start: ["start"],
   stop: ["stop"],
   updateCheck: ["update", "check"],

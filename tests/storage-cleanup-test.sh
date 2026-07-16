@@ -41,7 +41,7 @@ IMAGES
     ;;
   "image rm sha256:old-world") exit 0 ;;
   "image rm sha256:old-console") exit 0 ;;
-  "builder prune --force --filter until=168h") exit 0 ;;
+  "builder prune --force --all") exit 0 ;;
   *) echo "Unexpected fake Docker call: $*" >&2; exit 1 ;;
 esac
 EOF
@@ -73,7 +73,7 @@ if grep -Eq 'image rm sha256:(current-world|used-old|foreign)' "$FAKE_DOCKER_LOG
 fi
 
 cache_output="$(runtime/scripts/storage.sh cleanup --dry-run --build-cache)"
-grep -q 'WOULD RUN docker builder prune --force --filter until=168h' <<<"$cache_output"
+grep -q 'WOULD RUN docker builder prune --force --all' <<<"$cache_output"
 if grep -q '^builder prune ' "$FAKE_DOCKER_LOG"; then
   echo "Dry-run unexpectedly pruned build cache." >&2
   exit 1

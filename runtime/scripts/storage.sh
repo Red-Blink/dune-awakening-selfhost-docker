@@ -12,9 +12,9 @@ Usage:
 The default cleanup removes only obsolete Funcom/Dune game images. It never
 removes containers, volumes, databases, game files, or backups.
 
---build-cache also removes Docker build cache older than seven days. Docker's
-default builder is shared, so this option can affect build cache from other
-projects on the same host.
+--build-cache also removes unused Docker build cache. Docker protects cache
+used by active builds, but the default builder is shared, so this option can
+affect build cache from other projects on the same host.
 EOF
 }
 
@@ -138,12 +138,12 @@ cleanup_storage() {
 
   if [ "$build_cache" = "1" ]; then
     echo
-    echo "=== Docker build cache older than seven days ==="
+    echo "=== Unused Docker build cache ==="
     if [ "$dry_run" = "1" ]; then
-      echo "WOULD RUN docker builder prune --force --filter until=168h"
+      echo "WOULD RUN docker builder prune --force --all"
     else
       echo "This builder may be shared with other projects on this Docker host."
-      docker builder prune --force --filter until=168h
+      docker builder prune --force --all
     fi
   fi
 }

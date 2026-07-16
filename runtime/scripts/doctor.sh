@@ -54,22 +54,22 @@ docker_size_bytes() {
 }
 
 check_docker_storage() {
-  local rows image_reclaim="0B" cache_reclaim="0B" image_bytes=0 cache_bytes=0
+  local rows obsolete_output obsolete_count=0 cache_reclaim="0B" cache_bytes=0
   rows="$(docker system df --format '{{.Type}}|{{.Reclaimable}}' 2>/dev/null || true)"
   [ -n "$rows" ] || { warn_msg "Docker storage usage could not be inspected"; return; }
 
-  image_reclaim="$(awk -F'|' '$1 == "Images" { print $2; exit }' <<<"$rows")"
+  obsolete_output="$(runtime/scripts/storage.sh cleanup --dry-run 2>/dev/null || true)"
+  obsolete_count="$(grep -c '^WOULD REMOVE ' <<<"$obsolete_output" || true)"
   cache_reclaim="$(awk -F'|' '$1 == "Build Cache" { print $2; exit }' <<<"$rows")"
-  image_bytes="$(docker_size_bytes <<<"${image_reclaim:-0B}")"
   cache_bytes="$(docker_size_bytes <<<"${cache_reclaim:-0B}")"
-  image_bytes="${image_bytes:-0}"
+  obsolete_count="${obsolete_count:-0}"
   cache_bytes="${cache_bytes:-0}"
 
-  if [ "$image_bytes" -ge 10000000000 ]; then
-    warn_msg "Docker has ${image_reclaim} of reclaimable images"
+  if [ "$obsolete_count" -gt 0 ]; then
+    warn_msg "Docker has ${obsolete_count} obsolete project-owned image(s) that can be cleaned"
     echo "     Preview project-owned cleanup: dune storage cleanup --dry-run"
   else
-    ok "Reclaimable Docker images: ${image_reclaim:-0B}"
+    ok "No obsolete project-owned Docker images found"
   fi
   if [ "$cache_bytes" -ge 10000000000 ]; then
     warn_msg "Docker has ${cache_reclaim} of reclaimable build cache"
