@@ -6,6 +6,14 @@ import { KeyValueGrid, StatusPill } from "../../components/common/DisplayPrimiti
 import { firstDefined, formatUiSentence, friendlyColumnName } from "../../lib/display";
 
 type SettingsTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
+type PublicDirectorySettings = {
+  available?: boolean;
+  enabled?: boolean;
+  mode?: string;
+  state?: string;
+  lastSuccessAt?: string | null;
+  error?: string | null;
+};
 
 type SettingsPanelProps = {
   onPasswordChanged: () => Promise<void>;
@@ -20,6 +28,8 @@ export function SettingsPanel({ onPasswordChanged }: SettingsPanelProps) {
   const [webPortResult, setWebPortResult] = useState<SettingsTaskResult | null>(null);
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [webPortSaving, setWebPortSaving] = useState(false);
+  const [serverListingSaving, setServerListingSaving] = useState(false);
+  const [serverListingError, setServerListingError] = useState("");
   const [loginPasswordOpen, setLoginPasswordOpen] = useState(false);
   const [webPortOpen, setWebPortOpen] = useState(false);
   const [webPort, setWebPort] = useState("");
@@ -114,11 +124,39 @@ export function SettingsPanel({ onPasswordChanged }: SettingsPanelProps) {
       setWebPortSaving(false);
     }
   }
+  async function changeServerListing(enabled: boolean) {
+    setServerListingSaving(true);
+    setServerListingError("");
+    try {
+      const result = await post<{ ok: boolean; publicDirectory: PublicDirectorySettings }>("/api/settings/public-directory", { enabled });
+      setSettings((current) => current ? { ...current, publicDirectory: result.publicDirectory } : current);
+    } catch (error) {
+      setServerListingError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setServerListingSaving(false);
+    }
+  }
   const config = (settings?.config as Record<string, unknown> | undefined) || {};
+  const publicDirectory = (settings?.publicDirectory as PublicDirectorySettings | undefined) || {};
+  const serverListingVisible = settings !== null && publicDirectory.available === true;
+  const serverListingEnabled = publicDirectory.enabled === true;
   const passwordEnvManaged = Boolean(config.adminPasswordEnvManaged);
   const currentPort = String(config.port || "8088");
   return <section className="panel">
-    <div className="panel-title"><h2>Settings</h2><button onClick={refresh}>Refresh</button></div>
+    <div className="panel-title"><h2>Settings</h2><div className="action-row settings-title-actions">
+      {serverListingVisible && <label className={`switch-checkbox settings-server-listing-toggle ${serverListingEnabled ? "enabled" : "disabled"}`}>
+        <input
+          type="checkbox"
+          disabled={serverListingSaving}
+          checked={serverListingEnabled}
+          onChange={(event) => { void changeServerListing(event.target.checked); }}
+        />
+        <span className="switch-label">Server Listing:</span>
+        <strong className="switch-state">{serverListingSaving ? "Saving" : serverListingEnabled ? "Enabled" : "Disabled"}</strong>
+      </label>}
+      <button onClick={refresh}>Refresh</button>
+    </div></div>
+    {serverListingError && <p className="error settings-server-listing-error">{serverListingError}</p>}
     <div className="settings-section-stack">
       <RuntimeSettingsSummary settings={settings} />
       <div className={`playerAdmin_toggle settings-web-port-toggle ${webPortOpen ? "open" : ""}`}>

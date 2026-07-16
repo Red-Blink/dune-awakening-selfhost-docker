@@ -110,6 +110,9 @@ button.refresh-status-button.refreshing:disabled {
 .switch-toggle.disabled, .switch-checkbox.disabled { border-color: var(--danger); color: var(--danger-text); }
 .switch-toggle:hover, .switch-checkbox:hover { border-color: var(--accent); }
 .switch-checkbox:has(input:disabled) { opacity: .45; cursor: not-allowed; }
+.settings-title-actions { justify-content: flex-end; }
+.settings-server-listing-toggle .switch-state { min-width: 72px; }
+.settings-server-listing-error { margin: 0 0 12px; text-align: right; }
 input, select, textarea {
   width: 100%;
   border: 1px solid var(--border-strong);
@@ -373,35 +376,45 @@ main { padding: 22px; min-width: 0; }
   font-weight: 800;
   line-height: 1;
   text-decoration: none;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, .28);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, .28), 0 0 18px rgba(198, 139, 74, .2);
-  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+  text-shadow: 0 1px 2px rgba(31, 7, 34, .68);
+  background: radial-gradient(
+    circle at 0 0,
+    #d89bdc 0%,
+    #ce82d3 36%,
+    #c167c8 60%,
+    #a943b0 82%,
+    #8f2e95 100%
+  );
+  border-color: #bd5bc4;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .3), 0 0 22px rgba(189, 91, 196, .28);
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease;
 }
 .community-button:hover {
   transform: translateY(-1px);
-  border-color: rgba(255, 241, 212, .78);
+  border-color: #ce70d3;
+  background: radial-gradient(
+    circle at 0 0,
+    #e0aae3 0%,
+    #d68edb 36%,
+    #ca72d0 60%,
+    #b74dbd 82%,
+    #9c35a2 100%
+  );
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .34), 0 0 30px rgba(189, 91, 196, .42);
 }
-.community-button.discord {
-  background: linear-gradient(135deg, #bd7cc6 0%, #96559e 48%, #5e3465 100%);
-  border-color: rgba(150, 85, 158, .72);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, .3), 0 0 22px rgba(150, 85, 158, .28);
-}
-.community-button.discord:hover { box-shadow: 0 12px 32px rgba(0, 0, 0, .34), 0 0 30px rgba(150, 85, 158, .42); }
 .community-button.support {
-  background: linear-gradient(135deg, #d291db 0%, #96559e 48%, #63356a 100%);
-  color: #fff;
-  border-color: rgba(150, 85, 158, .72);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, .3), 0 0 22px rgba(150, 85, 158, .24);
   isolation: isolate;
 }
-.community-button.support:hover { box-shadow: 0 12px 32px rgba(0, 0, 0, .34), 0 0 30px rgba(150, 85, 158, .38); }
 .community-button svg {
   flex: 0 0 auto;
   color: currentColor;
+  filter: drop-shadow(0 1px 1px rgba(31, 7, 34, .58));
 }
 .community-button span,
 .community-button svg {
-  color: #f3efe7;
+  position: relative;
+  z-index: 1;
+  color: #fff;
 }
 .community-button.support::before,
 .community-button.support::after {
@@ -436,19 +449,37 @@ main { padding: 22px; min-width: 0; }
   50% { opacity: .86; }
   100% { transform: translate3d(3px, -5px, 0) scale(1.08); opacity: .58; }
 }
+@media (max-width: 760px) {
+  .topbar { flex-wrap: wrap; align-items: flex-start; }
+  .topbar-links { width: 100%; gap: 10px; }
+  .community-button { flex: 1 1 0; }
+}
+@media (max-width: 560px) {
+  .topbar-links { display: grid !important; grid-template-columns: 1fr; }
+  .community-button { width: 100%; }
+}
 .app-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  justify-items: center;
   gap: 8px;
   margin-top: 24px;
   padding: 18px 0 4px;
   color: #cbbda8;
   font-size: 13px;
+  text-align: center;
 }
-.app-footer svg { color: #e96d8f; }
+.app-footer-credit,
+.app-footer-directory {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: 100%;
+}
+.app-footer-credit > svg { flex: 0 0 auto; color: #e96d8f; }
 .app-footer a { color: #9ddcff; font-weight: 800; text-decoration: none; }
 .app-footer a:hover { text-decoration: underline; }
+.app-footer-directory svg { flex: 0 0 auto; color: currentColor; }
 
 .login-screen { position: relative; display: grid; min-height: 100vh; place-items: center; overflow: hidden; background: url("/assets/dune/login_background.png") center / cover no-repeat fixed; }
 .login-screen::before { content: ""; position: absolute; inset: 0; background: rgba(0, 0, 0, .72); }

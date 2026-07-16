@@ -37,6 +37,7 @@ import { persistSpicefieldOverride } from "./services/spicefieldOverrides.js";
 import { exportBlueprint, importBlueprint, listBlueprints, deleteBlueprint } from "./blueprints.js";
 import { createZipArchive } from "./services/zipArchive.js";
 import { grantAddonItem } from "./addonItemGrants.js";
+import { createPublicDirectoryReporter, readDirectorySettings } from "./services/publicDirectory.js";
 
 const config = loadConfig();
 const auth = createAuth(config);
@@ -45,6 +46,7 @@ const mutationRateLimiter = createMutationRateLimiter();
 const bridgeRateLimiter = createBridgeRateLimiter();
 const tasks = new TaskManager(config);
 let db = createDb(config);
+const publicDirectory = createPublicDirectoryReporter(config, { getDb: () => db });
 let carePackageAutoRunning = false;
 let carePackageAutoLastRun = 0;
 let carePackageAutoNextAllowedRun = 0;
@@ -95,6 +97,7 @@ createServer(async (req, res) => {
     console.log("Initial admin password is stored in runtime/secrets/admin-web-password.txt");
   }
   scheduleBootAutoStart();
+  publicDirectory.start();
 });
 
 setInterval(() => {
@@ -278,6 +281,7 @@ async function handleApi(req, res) {
   if (path === "/api/setup/save-token" && req.method === "POST") return saveToken(req, res);
   if (path === "/api/setup/init" && req.method === "POST") return task(req, res, "setup", "init", {});
   if (path === "/api/setup/tasks") return json(res, 200, { tasks: tasks.list().map(publicTask) });
+  if (path === "/api/public-directory/status") return json(res, 200, publicDirectory.publicState());
   if (path.startsWith("/api/setup/tasks/")) return taskRoute(req, res, path);
 
   if (path === "/api/server/status") return commandJson(res, "status");
@@ -534,6 +538,7 @@ async function handleApi(req, res) {
   if (path === "/api/sietches/update" && req.method === "POST") return sietchesUpdateRoute(req, res);
   if (path === "/api/deepdesert") return commandJson(res, "deepdesertStatus");
   if (path === "/api/deepdesert/update" && req.method === "POST") return deepDesertUpdateRoute(req, res);
+  if (path === "/api/settings/public-directory" && req.method === "POST") return publicDirectorySettingsRoute(req, res);
   if (path === "/api/settings" && req.method === "POST") return writeConfig(req, res);
   if (path === "/api/settings") return json(res, 200, await setupState());
 
@@ -2091,6 +2096,7 @@ async function setupState() {
   return {
     config: publicConfig(config),
     serverConfig: readSetupConfigValues(),
+    publicDirectory: publicDirectorySettings(),
     files: {
       env,
       token,
@@ -2099,6 +2105,19 @@ async function setupState() {
       initialized,
       duneScript: existsSync(config.duneScript)
     }
+  };
+}
+
+function publicDirectorySettings() {
+  const settings = readDirectorySettings(config.repoRoot);
+  const reporter = publicDirectory.publicState();
+  return {
+    available: settings.mode === "public",
+    enabled: settings.mode === "public" && settings.enabled,
+    mode: settings.mode,
+    state: reporter.state || (settings.mode === "public" ? "pending" : "local-only"),
+    lastSuccessAt: reporter.lastSuccessAt || null,
+    error: reporter.error || null
   };
 }
 
@@ -2276,6 +2295,21 @@ async function writeConfig(req, res) {
   }
   audit(config, req, "setup.write-config", { keys: Object.keys(body).filter((key) => allowed.includes(key)) });
   return json(res, 200, { ok: true });
+}
+
+async function publicDirectorySettingsRoute(req, res) {
+  const body = await readJson(req);
+  if (typeof body.enabled !== "boolean") {
+    return json(res, 400, { error: "Server listing enabled must be true or false." });
+  }
+  const current = readDirectorySettings(config.repoRoot);
+  if (current.mode !== "public") {
+    return json(res, 409, { error: "Server listing is available only when the server is running in public mode." });
+  }
+  updateEnvFileValue("DUNE_PUBLIC_DIRECTORY_ENABLED", body.enabled ? "true" : "false");
+  audit(config, req, "settings.public-directory", { enabled: body.enabled });
+  await publicDirectory.tick();
+  return json(res, 200, { ok: true, publicDirectory: publicDirectorySettings() });
 }
 
 async function saveToken(req, res) {

@@ -478,6 +478,7 @@ backup_local_state() {
     runtime/generated/message-of-the-day-state.json \
     runtime/generated/player-announcements.json \
     runtime/generated/player-announcements-state.json \
+    runtime/generated/public-directory-status.json \
     runtime/generated/restart-schedule.env \
     runtime/generated/shutdown-protection.env \
     runtime/generated/sietch-config.json \
@@ -489,7 +490,8 @@ backup_local_state() {
     runtime/generated/care-package-grants.jsonl \
     runtime/generated/care-package-pending-returns.json \
     runtime/addons/state.json \
-    runtime/secrets/funcom-token.txt
+    runtime/secrets/funcom-token.txt \
+    runtime/secrets/public-directory.json
   do
     [ -e "$path" ] || continue
     printf '%s\n' "$path" >> "$manifest"
@@ -610,6 +612,7 @@ restore_local_state_after_install() {
   restore_local_state_file_if_needed "$backup_dir" runtime/generated/message-of-the-day-state.json
   restore_local_state_file_if_needed "$backup_dir" runtime/generated/player-announcements.json
   restore_local_state_file_if_needed "$backup_dir" runtime/generated/player-announcements-state.json
+  restore_local_state_file_if_needed "$backup_dir" runtime/generated/public-directory-status.json
   restore_local_state_file_if_needed "$backup_dir" runtime/generated/restart-schedule.env
   restore_local_state_file_if_needed "$backup_dir" runtime/generated/shutdown-protection.env
   restore_local_state_file_if_needed "$backup_dir" runtime/generated/sietch-config.json
@@ -622,6 +625,7 @@ restore_local_state_after_install() {
   restore_local_state_file_if_needed "$backup_dir" runtime/generated/care-package-pending-returns.json
   restore_local_state_file_if_needed "$backup_dir" runtime/addons/state.json
   restore_local_state_file_if_needed "$backup_dir" runtime/secrets/funcom-token.txt
+  restore_local_state_file_if_needed "$backup_dir" runtime/secrets/public-directory.json
   merge_env_keys_from_backup "$backup_dir" .env
   merge_env_keys_from_backup "$backup_dir" runtime/generated/battlegroup.env
 }
@@ -753,6 +757,7 @@ restore_local_state_ownership() {
     runtime/generated/message-of-the-day-state.json \
     runtime/generated/player-announcements.json \
     runtime/generated/player-announcements-state.json \
+    runtime/generated/public-directory-status.json \
     runtime/generated/restart-schedule.env \
     runtime/generated/shutdown-protection.env \
     runtime/generated/sietch-config.json \
@@ -768,6 +773,7 @@ restore_local_state_ownership() {
     runtime/addons/installed \
     runtime/addons/staging \
     runtime/addons/state.json \
+    runtime/secrets/public-directory.json \
     runtime/secrets/funcom-token.txt \
     2>/dev/null || true
 }
