@@ -2,17 +2,17 @@
 
 ![Dune Awakening Self-Host Docker cover](assets/cover.png)
 
-![Docker](https://img.shields.io/badge/Docker-Ready-brightgreen) ![Linux](https://img.shields.io/badge/Linux-Supported-brightgreen) ![WSL2](https://img.shields.io/badge/WSL2-Supported-brightgreen) ![Self--Hosted](https://img.shields.io/badge/Self--Hosted-Yes-brightgreen) ![Status](https://img.shields.io/badge/Status-Experimental-orange) ![License](https://img.shields.io/badge/License-MIT-brightgreen)
+![Docker](https://img.shields.io/badge/Docker-Ready-brightgreen) ![Linux](https://img.shields.io/badge/Linux-Supported-brightgreen) ![WSL2](https://img.shields.io/badge/WSL2-Supported-brightgreen) ![Self--Hosted](https://img.shields.io/badge/Self--Hosted-Yes-brightgreen) ![Status](https://img.shields.io/badge/Status-Experimental-orange) ![License](https://img.shields.io/badge/License-MIT-brightgreen) [![DuneDocker.app](https://img.shields.io/badge/Website-DuneDocker.app-f47fff)](https://dunedocker.app/)
 
 Dune Docker Console is a Docker-based self-hosting package for Dune: Awakening with a built-in browser admin panel. Install it on a fresh server, open the Web UI, finish setup in the wizard, and manage players, maps, backups, updates, live tools, and server operations without living in the terminal.
 
 This project is unofficial. It is not affiliated with, endorsed by, sponsored by, or supported by Funcom.
 
-## Community & Support
+## Project Links
 
-Need help, want to follow updates, or want to discuss features, addons, and self-hosting?
-
-Join our fast growing Discord: [Dune: Awakening Docker](https://discord.gg/9pQqytu6BU)
+- [Official Website](https://dunedocker.app/) - Project information, installation guidance, FAQ, and the public server directory
+- [Discord Community](https://discord.gg/9pQqytu6BU) - Support, updates, addons, and community discussion
+- [Support the Project](https://ko-fi.com/redblink) - Help support development, testing, and project infrastructure
 
 ## Features
 
@@ -28,6 +28,8 @@ Join our fast growing Discord: [Dune: Awakening Docker](https://discord.gg/9pQqy
 - Memory controls, including per-map memory settings and the Memory Balancer
 - Autoscaler controls for starting, stopping, and reconciling dynamic map servers
 - Database browser plus database backup, restore, import, and maintenance tools
+- Item granting and inventory editing with compatible augments, augment grades, and effect previews
+- Blueprint management for importing, exporting, archiving, and deleting player building blueprints
 - And much more!
 
 ## Screenshots
@@ -78,6 +80,12 @@ bash -c 'set -euo pipefail; if ! command -v curl >/dev/null 2>&1; then sudo apt-
 
 The installer downloads the latest release, prepares the server, starts the Web UI, and tells you what address to open in your browser. If you are on the same network as the server, use the same-network address. If you are connecting over the internet, use the public address and allow TCP `8088` in your firewall.
 
+## Public Server Directory
+
+[dunedocker.app](https://dunedocker.app/) provides a live directory of public servers running Dune Docker Console, including server status, players, region, Sietches, personalized latency, and optional community Discord links.
+
+Public server owners can manage their listing and Discord invite from the console Settings page. Local and LAN-only servers are not listed.
+
 ## Community Addons
 
 Dune Docker Console includes a Community Addons area for extra tools built by the community. Server owners can discover, install, enable, and remove addons from the Web UI without replacing the main console.
@@ -102,8 +110,14 @@ The template gives addon developers a ready-to-use structure, examples, validati
 
 ## Credits
 
-Dune Docker Console is created and maintained by RedBlink. You are welcome to use, fork, modify, and build on this project. If you share or redistribute it, please credit RedBlink as the original developer.
+Dune Docker Console is led and actively maintained by RedBlink, with fixes, testing, ideas, and contributions from the wider community.
+
+You are welcome to use, fork, modify, share, and redistribute this project. When doing so, please credit RedBlink as the original developer.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+**Free and open source under the MIT License.**
+
+You can use, fork, modify, share, and redistribute Dune Docker Console in personal or commercial projects, subject to the license terms.
+
+Read the full [MIT License](LICENSE).
