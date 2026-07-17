@@ -864,7 +864,7 @@ test("list bases filters by name or owner name via a having clause", async () =>
   await listBases(db, { q: "Sietch" });
   const baseQuery = calls.find((call) => call.text.includes("from dune.buildings b"));
   assert.ok(baseQuery);
-  assert.match(baseQuery.text, /having coalesce\(pa\.actor_name, ''\) ilike \$1 or coalesce\(max\(ps\.character_name\), ''\) ilike \$1/);
+  assert.match(baseQuery.text, /having coalesce\(pa\.actor_name, ''\) ilike \$1 or coalesce\(owner\.character_name, ''\) ilike \$1/);
   assert.deepEqual(baseQuery.values, ["%Sietch%"]);
 });
 

@@ -2109,13 +2109,13 @@ export async function listBases(db, { q = "" } = {}) {
   let having = "";
   if (q) {
     values.push(`%${q}%`);
-    having = `having coalesce(pa.actor_name, '') ilike $${values.length} or coalesce(max(ps.character_name), '') ilike $${values.length}`;
+    having = `having coalesce(pa.actor_name, '') ilike $${values.length} or coalesce(owner.character_name, '') ilike $${values.length}`;
   }
   try {
     const result = await db.query(`
       select b.id::text as base_id,
              coalesce(pa.actor_name, 'Base ' || b.id::text) as name,
-             coalesce(max(ps.character_name), '') as owner_name,
+             coalesce(owner.character_name, '') as owner_name,
              coalesce(a.map, '') as map,
              ((a.transform).location).x as x,
              ((a.transform).location).y as y,
@@ -2127,12 +2127,18 @@ export async function listBases(db, { q = "" } = {}) {
       join dune.actor_fgl_entities afe on afe.entity_id = bi.owner_entity_id
       join dune.actors a on a.id = afe.actor_id
       left join dune.permission_actor pa on pa.actor_id = a.id
-      left join dune.permission_actor_rank par on par.permission_actor_id = a.id
-      left join dune.actors player_a on player_a.id = par.player_id
-      left join dune.player_state ps on ps.account_id = player_a.owner_account_id
+      left join lateral (
+        select ps.character_name
+        from dune.permission_actor_rank par
+        join dune.actors player_a on player_a.id = par.player_id
+        join dune.player_state ps on ps.account_id = player_a.owner_account_id
+        where par.permission_actor_id = a.id
+        order by par.rank asc, ps.character_name asc
+        limit 1
+      ) owner on true
       left join dune.placeables p on p.owner_entity_id = bi.owner_entity_id
       where a.transform is not null
-      group by b.id, pa.actor_name, a.map, a.transform
+      group by b.id, pa.actor_name, owner.character_name, a.map, a.transform
       ${having}
       order by lower(coalesce(pa.actor_name, '')), b.id
       limit 500`, values);
@@ -2165,7 +2171,7 @@ export async function exportBase(db, id) {
   const baseRow = await db.query(`
     select b.id::text as base_id,
            coalesce(pa.actor_name, 'Base ' || b.id::text) as name,
-           coalesce(max(ps.character_name), '') as owner_name,
+           coalesce(owner.character_name, '') as owner_name,
            coalesce(a.map, '') as map,
            ((a.transform).location).x as x,
            ((a.transform).location).y as y,
@@ -2175,11 +2181,17 @@ export async function exportBase(db, id) {
     join dune.actor_fgl_entities afe on afe.entity_id = bi.owner_entity_id
     join dune.actors a on a.id = afe.actor_id
     left join dune.permission_actor pa on pa.actor_id = a.id
-    left join dune.permission_actor_rank par on par.permission_actor_id = a.id
-    left join dune.actors player_a on player_a.id = par.player_id
-    left join dune.player_state ps on ps.account_id = player_a.owner_account_id
+    left join lateral (
+      select ps.character_name
+      from dune.permission_actor_rank par
+      join dune.actors player_a on player_a.id = par.player_id
+      join dune.player_state ps on ps.account_id = player_a.owner_account_id
+      where par.permission_actor_id = a.id
+      order by par.rank asc, ps.character_name asc
+      limit 1
+    ) owner on true
     where b.id = $1
-    group by b.id, pa.actor_name, a.map, a.transform`, [baseId]);
+    group by b.id, pa.actor_name, owner.character_name, a.map, a.transform`, [baseId]);
   if (!baseRow.rows.length) throw new UnsupportedCapabilityError(`Base ${baseId} was not found.`);
   const base = baseRow.rows[0];
   const anchor = { x: Number(base.x), y: Number(base.y), z: Number(base.z) };
