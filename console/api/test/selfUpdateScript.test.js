@@ -78,9 +78,15 @@ test("archive self-update replaces project files and preserves local state", asy
   const extractResult = spawnSync("tar", ["-xzf", archive, "-C", stagingDir]);
   assert.equal(extractResult.status, 0, extractResult.stderr?.toString());
   cpSync(join(stagingDir, "candidate"), installDir, { recursive: true });
+  copyFileSync(
+    join(repoRoot, "runtime", "scripts", "self-update.sh"),
+    join(installDir, "runtime", "scripts", "self-update.sh")
+  );
+  chmodSync(join(installDir, "runtime", "scripts", "self-update.sh"), 0o700);
 
   writeFileSync(join(installDir, "VERSION"), "v0.0.1\n");
   writeFileSync(join(installDir, "README.md"), "stale project file\n");
+  writeFileSync(join(installDir, "newer-release-only.txt"), "must be removed\n");
   writeFileSync(join(installDir, ".env"), "SERVER_TITLE=Preserved Server\nADMIN_BIND_PORT=9090\n");
   mkdirSync(join(installDir, "runtime", "generated"), { recursive: true });
   mkdirSync(join(installDir, "runtime", "secrets"), { recursive: true });
@@ -89,6 +95,8 @@ test("archive self-update replaces project files and preserves local state", asy
   writeFileSync(join(installDir, "runtime", "generated", "public-probe.env"), "DUNE_PUBLIC_PROBE_ENABLED=true\nDUNE_PUBLIC_PROBE_ADDRESS=203.0.113.42\nDUNE_PUBLIC_PROBE_ENDPOINT=https://203.0.113.42\n");
   writeFileSync(join(installDir, "runtime", "secrets", "funcom-token.txt"), "test-token\n");
   writeFileSync(join(installDir, "runtime", "secrets", "public-directory.json"), "{\"serverId\":\"11111111-1111-4111-8111-111111111111\",\"secret\":\"abcdefghijklmnopqrstuvwxyz123456\"}\n");
+  mkdirSync(join(installDir, "runtime", "addons", "installed", "example"), { recursive: true });
+  writeFileSync(join(installDir, "runtime", "addons", "installed", "example", "state.txt"), "preserved addon\n");
 
   writeFileSync(join(fakeBin, "docker"), `#!/usr/bin/env bash
 set -e
@@ -139,6 +147,7 @@ exit 0
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.equal(readFileSync(join(installDir, "VERSION"), "utf8").trim(), version);
     assert.notEqual(readFileSync(join(installDir, "README.md"), "utf8"), "stale project file\n");
+    assert.equal(existsSync(join(installDir, "newer-release-only.txt")), false);
     const updatedEnv = readFileSync(join(installDir, ".env"), "utf8");
     assert.ok(updatedEnv.includes("SERVER_TITLE=Preserved Server\n"));
     assert.ok(updatedEnv.includes("ADMIN_BIND_PORT=9090\n"));
@@ -147,6 +156,7 @@ exit 0
     assert.equal(readFileSync(join(installDir, "runtime", "generated", "public-probe.env"), "utf8"), "DUNE_PUBLIC_PROBE_ENABLED=true\nDUNE_PUBLIC_PROBE_ADDRESS=203.0.113.42\nDUNE_PUBLIC_PROBE_ENDPOINT=https://203.0.113.42\n");
     assert.equal(readFileSync(join(installDir, "runtime", "secrets", "funcom-token.txt"), "utf8"), "test-token\n");
     assert.equal(readFileSync(join(installDir, "runtime", "secrets", "public-directory.json"), "utf8"), "{\"serverId\":\"11111111-1111-4111-8111-111111111111\",\"secret\":\"abcdefghijklmnopqrstuvwxyz123456\"}\n");
+    assert.equal(readFileSync(join(installDir, "runtime", "addons", "installed", "example", "state.txt"), "utf8"), "preserved addon\n");
     assert(existsSync(join(installDir, "runtime", "backups", "self-update")));
     assert(readdirSync(join(installDir, "runtime", "backups", "self-update")).length > 0);
     assert.ok(result.stdout.includes(`Installed stack version: ${version}`));

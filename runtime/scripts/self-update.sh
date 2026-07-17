@@ -448,7 +448,9 @@ backup_current_stack() {
     --exclude='./runtime/generated' \
     --exclude='./runtime/secrets' \
     --exclude='./runtime/backups' \
+    --exclude='./runtime/addons' \
     --exclude='./runtime/game' \
+    --exclude='./runtime/logs' \
     --exclude='./runtime/text-router' \
     --exclude='./work' \
     .
@@ -459,6 +461,37 @@ backup_current_stack() {
   } > "$backup_dir/meta.env"
 
   backup_local_state "$backup_dir"
+}
+
+remove_backed_up_project_files() {
+  local backup_dir="$1"
+  local manifest path relative target unsafe_path
+
+  [ -s "$backup_dir/project-files.tgz" ] || return 0
+  unsafe_path=""
+  manifest="$(mktemp)"
+  tar -tzf "$backup_dir/project-files.tgz" > "$manifest"
+
+  while IFS= read -r path; do
+    relative="${path#./}"
+    [ -n "$relative" ] || continue
+    case "/$relative/" in
+      *"/../"*|*"/./"*)
+        unsafe_path="$path"
+        break
+        ;;
+    esac
+    target="$ROOT_DIR/$relative"
+    if [ -f "$target" ] || [ -L "$target" ]; then
+      rm -f "$target"
+    fi
+  done < "$manifest"
+
+  rm -f "$manifest"
+  if [ -n "$unsafe_path" ]; then
+    echo "Refusing unsafe path from project backup: $unsafe_path"
+    return 1
+  fi
 }
 
 backup_local_state() {
@@ -968,6 +1001,8 @@ install_release_tag_from_archive() {
 
   echo "Installing stack release into:"
   echo "  $ROOT_DIR"
+  echo "Removing project-managed files from the current release..."
+  remove_backed_up_project_files "$backup_dir"
   (
     cd "$src"
     tar --exclude='.git' -cf - .
