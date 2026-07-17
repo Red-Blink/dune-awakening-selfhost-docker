@@ -491,6 +491,8 @@ main { padding: 22px; min-width: 0; }
 .login-screen::before { content: ""; position: absolute; inset: 0; background: rgba(0, 0, 0, .72); }
 .login-panel, .panel, .hero-panel { background: rgba(23, 24, 26, .92); border: 1px solid #312a22; border-radius: 8px; padding: 20px; box-shadow: 0 16px 60px rgba(0,0,0,.35); }
 .login-panel { position: relative; z-index: 1; width: min(440px, calc(100vw - 32px)); display: grid; gap: 14px; background: rgba(17, 19, 22, .84); backdrop-filter: blur(8px); text-align: center; }
+.login-logo { display: block; width: clamp(100px, 24vw, 136px); height: auto; margin: 0 auto; object-fit: contain; }
+.login-panel > button[type="submit"] { width: 160px; justify-self: center; }
 .loading-panel { display: flex; align-items: center; gap: 16px; }
 .spinner { width: 28px; height: 28px; border: 3px solid #4d4032; border-top-color: #ffd08a; border-radius: 50%; animation: spin 1s linear infinite; flex: 0 0 auto; }
 @keyframes spin { to { transform: rotate(360deg); } }
