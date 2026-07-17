@@ -1153,13 +1153,13 @@ body.debug .technical-details { display: block; }
 .playerAdmin_quickRewardsSection .playerAdmin_fieldGroup { grid-column: 2; }
 .playerAdmin_quickRewardsSection .playerAdmin_actionGroup button { grid-column: 3; }
 .playerAdmin_quickRewardsSection .inline-action-result-wrap { grid-column: 4; }
-.playerAdmin_repairRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.playerAdmin_repairRow { display: grid; grid-template-columns: minmax(190px, 220px) max-content minmax(0, 1fr); align-items: center; gap: 10px; }
 .playerAdmin_repairRow + .playerAdmin_repairRow { border-top: 1px solid rgba(214, 185, 140, .14); padding-top: 12px; }
-.playerAdmin_repairRow button { width: auto; flex: 0 0 auto; }
-.playerAdmin_repairLabel { flex: 0 0 190px; min-width: 190px; color: #e9dcc8; font-weight: 700; display: grid; gap: 5px; }
+.playerAdmin_repairRow button { width: auto; }
+.playerAdmin_repairLabel { min-width: 0; color: #e9dcc8; font-weight: 700; display: grid; gap: 5px; }
 .playerAdmin_repairLabel > span:first-child { white-space: nowrap; }
 .playerAdmin_repairLabel em { color: #cbbd9f; font-size: 12px; font-style: italic; font-weight: 500; line-height: 1.25; }
-.playerAdmin_repairRow .inline-action-result-wrap { flex: 1 1 260px; min-width: 240px; }
+.playerAdmin_repairRow .inline-action-result-wrap { align-self: center; min-width: 0; }
 .playerAdmin_actionLabel em { color: #cbbd9f; font-size: 12px; font-style: italic; font-weight: 500; line-height: 1.25; }
 .playerAdmin_actionRow input, .playerAdmin_actionRow select, .playerAdmin_filterRow input, .playerAdmin_filterRow select { max-width: 220px; }
 .playerAdmin_actionRow .playerAdmin_fieldSlot { min-height: 1px; }
@@ -1993,4 +1993,7 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 }
 @media (max-width: 720px) {
   .playerAdmin_actionNote { padding-left: 0; }
+  .playerAdmin_repairRow { grid-template-columns: 1fr; align-items: start; }
+  .playerAdmin_repairRow button { justify-self: start; }
+  .playerAdmin_repairRow .inline-action-result-wrap { width: 100%; min-height: 24px; }
 }
