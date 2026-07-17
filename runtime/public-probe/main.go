@@ -22,7 +22,8 @@ import (
 const (
 	maxResponseBytes = 128 * 1024
 	maxMessageBytes  = 256
-	sessionLifetime  = 45 * time.Second
+	maxSessions      = 4
+	sessionLifetime  = 20 * time.Second
 )
 
 type config struct {
@@ -51,6 +52,7 @@ type agent struct {
 	config config
 	client *http.Client
 	wg     sync.WaitGroup
+	slots  chan struct{}
 }
 
 func main() {
@@ -73,6 +75,7 @@ func main() {
 				IdleConnTimeout:     90 * time.Second,
 			},
 		},
+		slots: make(chan struct{}, maxSessions),
 	}
 	log.Printf("WebRTC probe agent starting for server %s", cfg.serverID)
 	a.run(ctx)
@@ -97,8 +100,14 @@ func loadConfig() (config, error) {
 func (a *agent) run(ctx context.Context) {
 	backoff := time.Second
 	for ctx.Err() == nil {
+		select {
+		case a.slots <- struct{}{}:
+		case <-ctx.Done():
+			return
+		}
 		job, err := a.nextJob(ctx)
 		if err != nil {
+			<-a.slots
 			if ctx.Err() != nil {
 				break
 			}
@@ -113,11 +122,13 @@ func (a *agent) run(ctx context.Context) {
 		}
 		backoff = time.Second
 		if job == nil {
+			<-a.slots
 			continue
 		}
 		a.wg.Add(1)
 		go func() {
 			defer a.wg.Done()
+			defer func() { <-a.slots }()
 			if err := a.handleJob(ctx, *job); err != nil {
 				log.Printf("probe session %s failed: %v", job.SessionID, err)
 			}

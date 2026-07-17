@@ -11,6 +11,9 @@ test("public probe implements a bounded WebRTC data-channel echo", () => {
   assert.match(source, /github\.com\/pion\/webrtc\/v4/);
   assert.match(source, /maxMessageBytes\s+=\s+256/);
   assert.match(source, /messages >= 20/);
+  assert.match(source, /maxSessions\s+=\s+4/);
+  assert.match(source, /sessionLifetime\s+=\s+20 \* time\.Second/);
+  assert.match(source, /slots:\s+make\(chan struct\{\}, maxSessions\)/);
   assert.match(source, /DUNE_PUBLIC_PROBE_SIGNAL_URL/);
   assert.match(source, /https:\/\/dunedocker\.app\//);
 });
@@ -23,6 +26,9 @@ test("public probe does not publish ports and runs with restricted privileges", 
   assert.match(compose, /no-new-privileges:true/);
   assert.match(compose, /cap_drop:\s*\n\s+- ALL/);
   assert.match(compose, /DUNE_PUBLIC_PROBE_SECRET/);
+  assert.match(compose, /cpus: "0\.50"/);
+  assert.match(compose, /mem_limit: 128m/);
+  assert.match(compose, /pids_limit: 64/);
   assert.doesNotMatch(compose, /NET_BIND_SERVICE/);
   assert.match(hostCompose, /network_mode: host/);
   assert.doesNotMatch(hostCompose, /^\s+ports:/m);

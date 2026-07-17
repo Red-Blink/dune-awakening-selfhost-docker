@@ -18,6 +18,9 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cpus: "0.50"
+    mem_limit: 128m
+    pids_limit: 64
     logging:
       driver: json-file
       options:
