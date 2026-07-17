@@ -103,6 +103,16 @@ export function BasesPanel({ onError }: BasesPanelProps) {
     }
   }
 
+  if (loading) {
+    return <section className="panel">
+      <div className="panel-title"><h2>Bases</h2></div>
+      <div className="loading-panel">
+        <span className="spinner" aria-hidden="true" />
+        <strong className="loading-dots">Loading Bases</strong>
+      </div>
+    </section>;
+  }
+
   const totalBases = rows.length;
   const totalPieces = rows.reduce((sum, row) => sum + Number(row.piece_count || 0), 0);
   const totalPlaceables = rows.reduce((sum, row) => sum + Number(row.placeable_count || 0), 0);
@@ -131,7 +141,7 @@ export function BasesPanel({ onError }: BasesPanelProps) {
         sortDirection={sort.sortDirection}
         onSort={sort.onSort}
         rowKey={(row) => String(row.base_id)}
-        emptyMessage={loading ? "Loading bases..." : "No bases have been found yet."}
+        emptyMessage="No bases have been found yet."
       />
     </section>
   );
