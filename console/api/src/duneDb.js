@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   craftingRecipeCatalogRows,
+  compareJourneyCatalogOrder,
   factionDisplayName,
   factionIdByName,
   factionTierBumps,
@@ -2446,6 +2447,7 @@ export async function playerJourney(db, id, journeyTagsData = {}) {
   const journeyIdentityId = playerJourneyIdentity(player, schema.journeyIdColumn);
   const tagIdentityId = playerJourneyIdentity(player, schema.tagIdColumn);
   const tagMap = journeyTagsData?.journey_node_tags || {};
+  const journeyAliases = journeyTagsData?.journey_aliases || {};
   const contractTags = journeyTagsData?.contract_tags || {};
   const contractAliases = journeyTagsData?.contract_aliases || {};
   const taggedNodeIds = Object.keys(tagMap).sort((a, b) => a.localeCompare(b));
@@ -2456,7 +2458,9 @@ export async function playerJourney(db, id, journeyTagsData = {}) {
     group by story_node_id
     order by story_node_id`);
   const discoveredNodeIds = discovered.rows.map((row) => String(row.story_node_id || "")).filter(Boolean);
-  const knownNodeIds = [...new Set([...taggedNodeIds, ...discoveredNodeIds])].sort((a, b) => a.localeCompare(b));
+  const catalogNodeIds = Object.keys(journeyAliases);
+  const knownNodeIds = [...new Set([...catalogNodeIds, ...taggedNodeIds, ...discoveredNodeIds])]
+    .sort((a, b) => compareJourneyCatalogOrder(a, b, journeyTagsData));
   const contractNodeIds = Object.values(contractAliases).filter(Boolean).sort((a, b) => String(a).localeCompare(String(b)));
   const codex = await db.query(`
     select story_node_id
@@ -2486,14 +2490,14 @@ export async function playerJourney(db, id, journeyTagsData = {}) {
     left join dune.tutorial_per_player tp on tp.tutorial_id = t.id and tp.player_id = $1
     order by t.name`, [player.controllerId]);
 
-  const storyRows = knownNodeIds.filter((nodeId) => journeyGroup(nodeId) === "story").map((nodeId) => journeyNodeRow(nodeId, "Story", state, tagMap, knownNodeIds));
-  const journeyContractRows = knownNodeIds.filter((nodeId) => journeyGroup(nodeId) === "contract").map((nodeId) => journeyNodeRow(nodeId, "Contract", state, tagMap, knownNodeIds));
+  const storyRows = knownNodeIds.filter((nodeId) => journeyGroup(nodeId) === "story").map((nodeId) => journeyNodeRow(nodeId, "Story", state, tagMap, knownNodeIds, journeyAliases));
+  const journeyContractRows = knownNodeIds.filter((nodeId) => journeyGroup(nodeId) === "contract").map((nodeId) => journeyNodeRow(nodeId, "Contract", state, tagMap, knownNodeIds, journeyAliases));
   const contractRows = [
     ...journeyContractRows,
     ...contractNodeIds.map((nodeId) => contractNodeRow(String(nodeId), contractTags, contractAliases, tagState))
   ].sort((a, b) => a.rawName.localeCompare(b.rawName));
   const codexIds = codex.rows.map((row) => row.story_node_id).filter(Boolean);
-  const codexRows = codexIds.map((nodeId) => journeyNodeRow(nodeId, "Codex", state, {}, codexIds));
+  const codexRows = codexIds.map((nodeId) => journeyNodeRow(nodeId, "Codex", state, {}, codexIds, journeyAliases));
   const tutorial = tutorialRows.rows.map((row) => ({
     id: String(row.id),
     name: journeyDisplayName(row.name),
@@ -3436,11 +3440,11 @@ function journeyGroup(nodeId) {
   return "story";
 }
 
-function journeyNodeRow(nodeId, category, state, tagMap, allNodeIds) {
+function journeyNodeRow(nodeId, category, state, tagMap, allNodeIds, journeyAliases = {}) {
   const nodeState = state.get(nodeId) || {};
   return {
     id: nodeId,
-    name: journeyDisplayName(nodeId),
+    name: journeyDisplayName(nodeId, journeyAliases),
     rawName: nodeId,
     category,
     depth: journeyDepth(nodeId, allNodeIds),

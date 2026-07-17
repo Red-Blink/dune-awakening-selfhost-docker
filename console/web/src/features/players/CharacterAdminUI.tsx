@@ -1051,7 +1051,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
             const hasChildren = Boolean(childrenByParent.get(rowKey)?.length);
             const expanded = playerAdmin_journeyFilterTerms.length ? hasChildren : Boolean(playerAdmin_expandedJourney[`${row.category}:${rowKey}`]);
             return <tr key={`${row.category}-${row.id}`}>
-              <td className="playerAdmin_journeyName" style={{ ...resize.columnStyle("name"), paddingLeft: `${10 + row.depth * 18}px` }}>{hasChildren ? <button className="playerAdmin_expanderButton" type="button" onClick={() => playerAdmin_toggleJourney(`${row.category}:${rowKey}`)}>{expanded ? "-" : "+"}</button> : <span className="playerAdmin_expanderSpacer" />}{row.name}</td>
+              <td className="playerAdmin_journeyName" style={{ ...resize.columnStyle("name"), paddingLeft: `${10 + row.depth * 18}px` }}>{hasChildren ? <button className="playerAdmin_expanderButton" type="button" onClick={() => playerAdmin_toggleJourney(`${row.category}:${rowKey}`)}>{expanded ? "-" : "+"}</button> : <span className="playerAdmin_expanderSpacer" />}<span title={row.name}>{row.name}</span></td>
               <td style={resize.columnStyle("category")}>{row.category}</td>
               <td className="playerAdmin_shortCode" style={resize.columnStyle("id")}><code title={row.rawName || row.id} style={resize.columnStyle("id") ? { maxWidth: "100%" } : undefined}>{row.rawName || row.id}</code></td>
               <td className="playerAdmin_shortCode" style={resize.columnStyle("dependency")}>{row.dependency ? <code title={row.dependency} style={resize.columnStyle("dependency") ? { maxWidth: "100%" } : undefined}>{row.dependency}</code> : "Unknown"}</td>

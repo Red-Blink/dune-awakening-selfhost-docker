@@ -5,6 +5,7 @@ import {
   factionIdByName,
   factionTierBumps,
   craftingRecipeCatalogRows,
+  compareJourneyCatalogOrder,
   journeyDepth,
   journeyCompletionNodeIds,
   journeyDisplayName,
@@ -38,6 +39,9 @@ test("display helpers normalize game identifiers", () => {
   assert.equal(factionDisplayName({ faction_name: "Atreides", faction_id: 1 }), "Atreides");
   assert.equal(factionDisplayName({ faction_name: "", faction_id: 9 }), "Faction 9");
   assert.equal(journeyDisplayName("DA_ChapterOne.Step2"), "Step 2");
+  assert.equal(journeyDisplayName("DA_MQ_NPEAutocompleted", {
+    DA_MQ_NPEAutocompleted: "The Fall of the Proteus"
+  }), "The Fall of the Proteus");
   assert.equal(recipeDisplayName("Buggy_TreadWheel_Recipe"), "Buggy Tread Wheel");
   assert.equal(researchDisplayName("RCP_SandbikeEnginePatent"), "Sandbike Engine");
 });
@@ -59,6 +63,19 @@ test("journey tree helpers resolve parents, depth, and subtree tags", () => {
       Other: ["Tag.D"]
     }
   }), ["Root.Branch", "Root.Branch.Leaf", "Root.Branch.Leaf.Child"]);
+});
+
+test("journey catalog ordering follows explicit sibling sequences", () => {
+  const parent = "DA_SQ_VermiliusGap.Relocate.RelocateOutsideHBS";
+  const drive = `${parent}.Drive north to the Vermilius Gap`;
+  const research = `${parent}.ResearchAdvTotem`;
+  const construct = `${parent}.ConstructAdvTotem`;
+  const destroy = `${parent}.DestroyYourBase`;
+  const data = { journey_children: { [parent]: [drive, research, construct, destroy] } };
+  assert.deepEqual(
+    [construct, destroy, drive, research].sort((a, b) => compareJourneyCatalogOrder(a, b, data)),
+    [drive, research, construct, destroy]
+  );
 });
 
 test("category helpers classify common recipe and research identifiers", () => {

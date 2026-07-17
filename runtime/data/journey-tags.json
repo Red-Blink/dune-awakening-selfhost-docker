@@ -1,4 +1,2642 @@
 {
+  "journey_aliases": {
+    "DA_DLC_LostHarvest": "Lost Harvest",
+    "DA_DLC_LostHarvest.StrandedDuneMen": "The Fall of the Mithra",
+    "DA_DLC_LostHarvest.StrandedDuneMen.InvestigateDistressCall": "Investigate the distress call",
+    "DA_DLC_LostHarvest.StrandedDuneMen.InvestigateDistressCall.Listen ToTheCall": "Listen to the distress call",
+    "DA_DLC_LostHarvest.StrandedDuneMen.InvestigateDistressCall.ReachTheCrashSite": "Reach the crash site northwest of Griffin's Reach Tradepost",
+    "DA_DLC_LostHarvest.StrandedDuneMen.InvestigateDistressCall.FindSurvivors": "Locate survivors",
+    "DA_DLC_LostHarvest.StrandedDuneMen.AssistTheOfficers": "Assist the Dune Men Officers",
+    "DA_DLC_LostHarvest.StrandedDuneMen.AssistTheOfficers.CompleteQuartermastersContract": "Complete Contracts for Quartermaster Hix",
+    "DA_DLC_LostHarvest.StrandedDuneMen.AssistTheOfficers.CompleteCommsContract": "Complete Contracts for Lieutenant Drangh",
+    "DA_DLC_LostHarvest.StrandedDuneMen.AssistTheOfficers.CompleteHansoQuest": "Complete Contracts for Chief Hanso",
+    "DA_DLC_LostHarvest.StrandedDuneMen.ReturnToHanso": "Return to Chief Hanso",
+    "DA_DLC_LostHarvest.StrandedDuneMen.ReturnToHanso.ReturnToBoss": "Speak with Chief Hanso",
+    "DA_DLC_LostHarvest.ScaveningForALead": "Villari's Prize",
+    "DA_DLC_LostHarvest.ScaveningForALead.AssistKief1": "Assist Keif Villari",
+    "DA_DLC_LostHarvest.ScaveningForALead.AssistKief1.CompleteScavengingContract": "Complete Keif Villari's Contract",
+    "DA_DLC_LostHarvest.DiggingDeeper": "Digging Deeper",
+    "DA_DLC_LostHarvest.DiggingDeeper.AssistKief2": "Complete Keif Villari's covert mission",
+    "DA_DLC_LostHarvest.DiggingDeeper.AssistKief2.CompleteDiggingContract": "Complete the \"Digging Deeper\" Contract",
+    "DA_DLC_LostHarvest.DiggingDeeper.AssistKief2.ReachLabExit": "Return to the surface",
+    "DA_DLC_LostHarvest.DiggingDeeper.AssistKief2.ReturnToHarko": "Bring the package to the contact in Harko Village",
+    "DA_DLC_LostHarvest.DiggingDeeper.AssistKief2.LeaveHarkoAndWait": "Return to the Hagga Basin and await word from Elara Tuek",
+    "DA_DLC_LostHarvest.HuntingTheSpheres": "Secrets of the Past",
+    "DA_DLC_LostHarvest.HuntingTheSpheres.ReturnTheSpheres": "Unlocking the Secrets",
+    "DA_DLC_LostHarvest.HuntingTheSpheres.ReturnTheSpheres.CompleteEcolabA": "Complete the \"Secrets of the Past\" Contract and report to Elara Tuek",
+    "DA_DLC_LostHarvest.HuntingTheSpheres.ReturnTheSpheres.CompleteEcolabB": "Complete the \"Once Upon a Time\" Contract and report to Elara Tuek",
+    "DA_FQ_ClimbTheRanks": "The War of Assassins",
+    "DA_FQ_ClimbTheRanks.JoinAHouse": "Join a House",
+    "DA_FQ_ClimbTheRanks.JoinAHouse.StrikeADeal": "Strike a deal with a recruiter",
+    "DA_FQ_ClimbTheRanks.JoinAHouse.StrikeADeal.TalkToARecruiter": "Talk to a recruiter for House Atreides or House Harkonnen at the Anvil Tradepost",
+    "DA_FQ_ClimbTheRanks.JoinAHouse.StrikeADeal.GetSpyMission": "Get a Contract from one of the recruiters at the Anvil Tradepost",
+    "DA_FQ_ClimbTheRanks.JoinAHouse.StrikeADeal.FindTheSpy": "Complete Contract \"The Missing Spy\" for House Atreides or House Harkonnen",
+    "DA_FQ_ClimbTheRanks.JoinAHouse.ProveYourself": "Prove yourself to at least one of the recruiters",
+    "DA_FQ_ClimbTheRanks.JoinAHouse.ProveYourself.Rank1Contracts": "Complete Contracts for your sponsor",
+    "DA_FQ_ClimbTheRanks.JoinAHouse.ProveYourself.ChooseASide": "Choose a side",
+    "DA_FQ_ClimbTheRanks.ATestOfLoyalty": "A Test of Loyalty",
+    "DA_FQ_ClimbTheRanks.ATestOfLoyalty.GetMaximToBackOff": "Neutralize Lb. Kazmir",
+    "DA_FQ_ClimbTheRanks.ATestOfLoyalty.GetMaximToBackOff.FindSemuta": "Complete Contract \"Test of Loyalty\"",
+    "DA_FQ_ClimbTheRanks.ATestOfTreachery": "A Test of Treachery",
+    "DA_FQ_ClimbTheRanks.ATestOfTreachery.GetAntonToBackOff": "Blackmail Lt. Tolliver",
+    "DA_FQ_ClimbTheRanks.ATestOfTreachery.GetAntonToBackOff.FindCounterfeitEvidence": "Complete Contract \"Test of Treachery\"",
+    "DA_FQ_ClimbTheRanks.ClimbTheRanksR2": "Climb the ranks",
+    "DA_FQ_ClimbTheRanks.ClimbTheRanksR2.ContributeToWarEffort_Atreides": "Contribute to the war effort",
+    "DA_FQ_ClimbTheRanks.ClimbTheRanksR2.ContributeToWarEffort_Atreides.CompleteContractsR2": "Complete Contracts for your sponsor",
+    "DA_FQ_ClimbTheRanks.InvestigateKytheria_Atreides": "The Kytheria Wreck",
+    "DA_FQ_ClimbTheRanks.InvestigateKytheria_Atreides.InvestigateWreck_Atreides": "Investigate the Wreck of the Kytheria",
+    "DA_FQ_ClimbTheRanks.InvestigateKytheria_Atreides.InvestigateWreck_Atreides.Complete \"Track Down Skorda\" Contract": "Complete Contract \"Track Down Skorda\"",
+    "DA_FQ_ClimbTheRanks.InvestigateKytheria_Atreides.InvestigateWreck_Atreides.MeetAndreaGanan": "Deliver your report to Andrea Ganan at Helius Gate",
+    "DA_FQ_ClimbTheRanks.InvestigateKytheria_Harkonnen": "The Kytheria Wreck",
+    "DA_FQ_ClimbTheRanks.InvestigateKytheria_Harkonnen.InvestigateWreck_Harkonnen": "Investigate the Wreck of the Kytheria",
+    "DA_FQ_ClimbTheRanks.InvestigateKytheria_Harkonnen.InvestigateWreck_Harkonnen.Complete \"Track Down Skorda\" Contract": "Complete Contract \"Track Down Skorda\"",
+    "DA_FQ_ClimbTheRanks.InvestigateKytheria_Harkonnen.InvestigateWreck_Harkonnen.MeetSimoneVonKonig": "Report to Simone Von Konig at Riftwatch",
+    "DA_FQ_ClimbTheRanks.GatheringIntelligence": "Deadly Intelligence",
+    "DA_FQ_ClimbTheRanks.GatheringIntelligence.TrackDownContainer": "Track down the content of the mysterious container",
+    "DA_FQ_ClimbTheRanks.GatheringIntelligence.TrackDownContainer.InvestigateSandflies": "Complete contract \"Investigate the Sandflies\"",
+    "DA_FQ_ClimbTheRanks.GatheringIntelligence.TrackDownContainer.TrackDownPilot": "Complete contract \"Interrogate Tripp Yates\"",
+    "DA_FQ_ClimbTheRanks.GatheringIntelligence.TrackDownContainer.TrackDownRedScorpion": "Complete contract \"The Trail of the Red Scorpion\"",
+    "DA_FQ_ClimbTheRanks.GatheringIntelligence.TrackDownContainer.FindCanister": "Complete contract \"Secrets of the Stone Sentinel\"",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides": "Poisoned Spice",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PutFindingsToTest": "Put your findings to the test",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PutFindingsToTest.SpeakWithGanan": "Talk to Andrea Ganan",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PutFindingsToTest.MeetThufir": "Talk to Thufir Hawat in Arrakeen",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PutFindingsToTest.ReturnToGanan": "Accept Andrea Ganan's next assignment",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PunishTraitor": "Punish the traitor",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PunishTraitor.FindBusinessman": "Talk to Ambrose Lucifera in Arrakeen",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PunishTraitor.ChoosePoisonOrSpare": "Decide what to do with the poisoned bottle",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PunishTraitor.CompleteWarProfiteerContract": "Complete Contract \"The War Profiteer\"",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PunishTraitor.TalkToThufirAgain": "Accept Thufir Hawat's next assignment",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen": "Poisoned Spice",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.LeverageYourFindings": "Leverage your findings",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.LeverageYourFindings.SpeakWithVonKonig": "Talk to Simone Von Konig",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.LeverageYourFindings.MeetPiter": "Talk to Piter de Vries in Harko Village",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.LeverageYourFindings.ReturnToVonKonig": "Accept Simone von Konig's next assignment",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.LeverageYourFindings.DeliverResults": "Complete Contract \"HARKONNEN: VON KONIG: A Secret Delivery\"",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.TakeALeap": "Take a Leap",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.TakeALeap.PoisonOrWarnPiter": "Poison Piter de Vries or betray Simone Von Konig",
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.TakeALeap.TalkToPiterAgain": "Accept Piter de Vries' next assignment",
+    "DA_FQ_ClimbTheRanks.HuntingSkorda": "Hunting Skorda",
+    "DA_FQ_ClimbTheRanks.HuntingSkorda.FindSkorda": "Find Skorda",
+    "DA_FQ_ClimbTheRanks.HuntingSkorda.FindSkorda.SkordaInArrakeen": "Complete Contract \"A New Cultist\"",
+    "DA_FQ_ClimbTheRanks.HuntingSkorda.FindSkorda.SkordaInMysaTarrill": "Complete Contract \"The Hunt for Skorda\"",
+    "DA_FQ_ClimbTheRanks.HuntingSkorda.FindSkorda.SkordaInOodham": "Complete Contract \"Skorda's Last Stand\"",
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides": "The Doomed Delphis",
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides.DeviseAPlan_Atreides": "Devise a plan",
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides.DeviseAPlan_Atreides.TellThufirAboutDelphis": "Accept Thufir Hawat's next assignment",
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides.SecureLastContainer_Atreides": "Secure the last container of bad spice",
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides.SecureLastContainer_Atreides.RecoverSheolContainer_Atreides": "Complete Contract \"The Tainted Spice\"",
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides.PledgeAllegiance_Atreides": "Pledge allegiance to your House",
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides.PledgeAllegiance_Atreides.PledgeAllegiance_Atreides_Sub": "Talk to Thufir to meet Duke Leto",
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen": "Euporia Fallen",
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen.DeviseAPlan_Harkonnen": "Devise a plan",
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen.DeviseAPlan_Harkonnen.TellPiterAboutEuporia": "Accept Piter de Vries' next assignment",
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen.SecureLastContainer_Harkonnen": "Secure the last container of bad spice",
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen.SecureLastContainer_Harkonnen.RecoverSheolContainer_Harkonnen": "Complete Contract \"The Tainted Spice\"",
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen.PledgeAllegiance_Harkonnen": "Pledge allegiance to your House",
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen.PledgeAllegiance_Harkonnen.PledgeAllegiance_Harkonnen_Sub": "Talk to Piter to meet Beast Rabban",
+    "DA_FQ_ClimbTheRanks.TransitionToCh3_Hark": "Called to Duty",
+    "DA_FQ_ClimbTheRanks.TransitionToCh3_Hark.TheCall": "Go to a safe location",
+    "DA_FQ_ClimbTheRanks.TransitionToCh3_Hark.TheCall.AnswerTheCall": "Travel to your base or a settlement",
+    "DA_FQ_ClimbTheRanks.TransitionToCh3_Atre": "Called to Duty",
+    "DA_FQ_ClimbTheRanks.TransitionToCh3_Atre.TheCall": "Go to a safe location",
+    "DA_FQ_ClimbTheRanks.TransitionToCh3_Atre.TheCall.AnswerTheCall": "Travel to your base or a settlement",
+    "DA_FQ_ClimbTheRanks.Rank5To20": "The Art of Making Friends",
+    "DA_FQ_ClimbTheRanks.Rank5To20.MeetSponsor": "Take your next assignment",
+    "DA_FQ_ClimbTheRanks.Rank5To20.MeetSponsor.TalkToSponsor": "Talk to the head of your House",
+    "DA_FQ_ClimbTheRanks.Rank5To20.StartLandsraadOnboarding": "Prepare to participate in the Landsraad",
+    "DA_FQ_ClimbTheRanks.Rank5To20.StartLandsraadOnboarding.ReportToMasterOfAssassins": "Report to your handler",
+    "DA_FQ_ClimbTheRanks.Rank5To20.CompleteLandsraadMission": "Complete a Landsraad mission",
+    "DA_FQ_ClimbTheRanks.Rank5To20.CompleteLandsraadMission.CompleteOnboardingJourney1": "Complete the Journey \"Of Politics and Recollection\"",
+    "DA_FQ_ClimbTheRanks.Rank5To20.CraftAugmentation": "Craft an augmentation",
+    "DA_FQ_ClimbTheRanks.Rank5To20.CraftAugmentation.CompleteOnboardingJourney2": "Complete the Journey \"Mnemonic Devices\"",
+    "DA_FQ_ClimbTheRanks.Rank5To20.ReachRank20": "Improve your relations with the Houses of the Landsraad",
+    "DA_FQ_ClimbTheRanks.Rank5To20.ReachRank20.GrindRanks": "Complete Landsraad Missions to reach rank 19",
+    "DA_FQ_ClimbTheRanks.Rank20_Mission_Harkonnen": "Revenge Most Toxic",
+    "DA_FQ_ClimbTheRanks.Rank20_Mission_Harkonnen.Ch3Mission": "Take your next assignment",
+    "DA_FQ_ClimbTheRanks.Rank20_Mission_Harkonnen.Ch3Mission.GetCallForMission": "Travel to your base or a settlement",
+    "DA_FQ_ClimbTheRanks.Rank20_Mission_Harkonnen.Ch3Mission.GetMission": "Talk to Beast Rabban in Harko Village",
+    "DA_FQ_ClimbTheRanks.Rank20_Mission_Harkonnen.Ch3Mission.CompleteMission": "Complete the contract: \"Rabban's Revenge\"",
+    "DA_FQ_ClimbTheRanks.Rank20_Mission_Atreides": "Honorable Death",
+    "DA_FQ_ClimbTheRanks.Rank20_Mission_Atreides.Ch3Mission": "Take your next assignment",
+    "DA_FQ_ClimbTheRanks.Rank20_Mission_Atreides.Ch3Mission.GetCallForMission": "Travel to your base or a settlement",
+    "DA_FQ_ClimbTheRanks.Rank20_Mission_Atreides.Ch3Mission.GetMission": "Talk to Duke Leto Atreides in Arrakeen",
+    "DA_FQ_ClimbTheRanks.Rank20_Mission_Atreides.Ch3Mission.CompleteMission": "Complete the contract: \"The Last Beacon\"",
+    "DA_FQ_ClimbTheRanks.BetrayTheAtreides": "Betray the Atreides",
+    "DA_FQ_ClimbTheRanks.BetrayTheAtreides.Complete The Betrayal": "Finish the job",
+    "DA_FQ_ClimbTheRanks.BetrayTheAtreides.Complete The Betrayal.Complete The Contract": "Complete the contract to defect to House Harkonnen",
+    "DA_FQ_ClimbTheRanks.BetrayTheHarkonnen": "Betray the Harkonnen",
+    "DA_FQ_ClimbTheRanks.BetrayTheHarkonnen.Complete The Betrayal": "Finish the job",
+    "DA_FQ_ClimbTheRanks.BetrayTheHarkonnen.Complete The Betrayal.Complete The Contract": "Complete the contract to defect to House Atreides",
+    "DA_MQ_ANewBeginning": "A New Beginning",
+    "DA_MQ_ANewBeginning.Basic Loadout": "Getting Equipped",
+    "DA_MQ_ANewBeginning.Basic Loadout.Makeshift clothing": "Get your first set of armor",
+    "DA_MQ_ANewBeginning.Basic Loadout.Makeshift clothing.Harvest 19 Plant fiber": "Harvest Plant fiber (15)",
+    "DA_MQ_ANewBeginning.Basic Loadout.Makeshift clothing.Unlock makeshift clothing in the tech menu": "Research Makeshift Clothing in the Research Menu",
+    "DA_MQ_ANewBeginning.Basic Loadout.Makeshift clothing.Craft a full set of makeshift clothing": "Craft a full set of Makeshift Clothing",
+    "DA_MQ_ANewBeginning.Basic Loadout.Makeshift clothing.Equip makeshift clothing": "Equip a full set of Makeshift Clothing",
+    "DA_MQ_ANewBeginning.Basic Loadout.Maula pistol": "Get your first ranged weapon",
+    "DA_MQ_ANewBeginning.Basic Loadout.Maula pistol.Harvest 65 Salvage Metal": "Salvage metal using a Cutteray (65)",
+    "DA_MQ_ANewBeginning.Basic Loadout.Maula pistol.ResearchMaula": "Research the Maula Pistol Kit",
+    "DA_MQ_ANewBeginning.Basic Loadout.Maula pistol.Unlock and craft an Improvised Maula Pistol": "Craft an Improvised Maula Pistol",
+    "DA_MQ_ANewBeginning.Basic Loadout.Maula pistol.Craft 90 darts": "Craft Light Darts (90)",
+    "DA_MQ_ANewBeginning.First Skirmish": "The Attitude of the Knife",
+    "DA_MQ_ANewBeginning.First Skirmish.Respawn Beacon": "Secure a safe Respawn Point",
+    "DA_MQ_ANewBeginning.First Skirmish.Respawn Beacon.ResearchRespawn": "Research the Respawn Beacon",
+    "DA_MQ_ANewBeginning.First Skirmish.Respawn Beacon.Unlock and craft a Respawn Beacon": "Craft a Respawn Beacon",
+    "DA_MQ_ANewBeginning.First Skirmish.Respawn Beacon.Place down the Respawn Beacon": "Place a Respawn Beacon",
+    "DA_MQ_ANewBeginning.First Skirmish.Locate Scavengers": "Recon the area for a Scavenger Camp",
+    "DA_MQ_ANewBeginning.First Skirmish.Locate Scavengers.ResearchBinoculars": "Research the Binoculars",
+    "DA_MQ_ANewBeginning.First Skirmish.Locate Scavengers.Unlock and craft Binoculars": "Craft Binoculars",
+    "DA_MQ_ANewBeginning.First Skirmish.Locate Scavengers.Use the binoculars to scout for an enemy camp": "Scout for a scavenger camp using binoculars",
+    "DA_MQ_ANewBeginning.First Skirmish.Fight the Scavengers": "Kills and Skills",
+    "DA_MQ_ANewBeginning.First Skirmish.Fight the Scavengers.Go to the enemy camp": "Go to the scavenger camp",
+    "DA_MQ_ANewBeginning.First Skirmish.Fight the Scavengers.Use your ability": "Use your Ability",
+    "DA_MQ_ANewBeginning.First Skirmish.Fight the Scavengers.Kill the Scavengers": "Kill the Scavengers",
+    "DA_MQ_ANewBeginning.First Skirmish.Unlock more skills": "Honing Your Potential",
+    "DA_MQ_ANewBeginning.First Skirmish.Unlock more skills.Spend skill points to learn a new skill": "Open the Skills menu",
+    "DA_MQ_ANewBeginning.First Skirmish.Unlock more skills.Equip second ability": "Learn a new Ability from the Skills menu",
+    "DA_MQ_ANewBeginning.Building Basics": "Shelter and Shields",
+    "DA_MQ_ANewBeginning.Building Basics.Gather resources": "Salvage, Mine, Harvest",
+    "DA_MQ_ANewBeginning.Building Basics.Gather resources.Harvest 150 Granite Stone": "Mine Granite Stone (150)",
+    "DA_MQ_ANewBeginning.Building Basics.Gather resources.Harvest 125 Salvage Metal": "Salvage Metal (125)",
+    "DA_MQ_ANewBeginning.Building Basics.Gather resources.Harvest 48 Fuel": "Salvage Fuel Cells (24)",
+    "DA_MQ_ANewBeginning.Building Basics.Craft Building equipment": "Appetite for Construction",
+    "DA_MQ_ANewBeginning.Building Basics.Craft Building equipment.ResearchConstructionTool": "Research the Basic Construction Kit",
+    "DA_MQ_ANewBeginning.Building Basics.Craft Building equipment.Unlock and craft a construction tool": "Craft a Construction Tool",
+    "DA_MQ_ANewBeginning.Building Basics.Craft Building equipment.Equip the construction tool": "Equip a Construction Tool",
+    "DA_MQ_ANewBeginning.Building Basics.Craft Building equipment.Place down a Subfief Console": "Construct or Interact with a Sub-Fief Console",
+    "DA_MQ_ANewBeginning.Building Basics.Foundation": "Foundation",
+    "DA_MQ_ANewBeginning.Building Basics.Foundation.Place down 4 foundations": "Construct foundations (4)",
+    "DA_MQ_ANewBeginning.Building Basics.Walls": "Walls",
+    "DA_MQ_ANewBeginning.Building Basics.Walls.Place down 7 walls": "Construct walls (7)",
+    "DA_MQ_ANewBeginning.Building Basics.Walls.Place down a door": "Construct a door",
+    "DA_MQ_ANewBeginning.Building Basics.Roof": "Roof",
+    "DA_MQ_ANewBeginning.Building Basics.Roof.Place down 4 roof pieces": "Construct a roof (4)",
+    "DA_MQ_ANewBeginning.Building Basics.Roof.MoveTotem": "Move your Sub-fief Console to a sheltered location with the Construction Tool",
+    "DA_MQ_ANewBeginning.Building Basics.Power your base": "Desert Power",
+    "DA_MQ_ANewBeginning.Building Basics.Power your base.Place a Small Storage Container": "Construct or interact with a Small Storage Container",
+    "DA_MQ_ANewBeginning.Building Basics.Power your base.Place a Fuel Powered Generator": "Construct or interact with a Fuel-Powered Generator",
+    "DA_MQ_ANewBeginning.Building Basics.Power your base.Add fuel to generator and power the shield": "Deposit Fuel Cells in the Generator to power the base shield",
+    "DA_MQ_ANewBeginning.Blood to Water": "Water from Blood",
+    "DA_MQ_ANewBeginning.Blood to Water.Craft equipment": "Specialized Equipment",
+    "DA_MQ_ANewBeginning.Blood to Water.Craft equipment.Harvest 110 Salvage Metal": "Salvage Metal (110)",
+    "DA_MQ_ANewBeginning.Blood to Water.Craft equipment.Harvest 25 Plant Fiber": "Harvest Plant Fiber (25)",
+    "DA_MQ_ANewBeginning.Blood to Water.Craft equipment.ResearchBloodExtractor": "Research the Basic Exsanguination Kit",
+    "DA_MQ_ANewBeginning.Blood to Water.Craft equipment.Unlock and craft a Blood Extractor": "Craft a Blood Extractor",
+    "DA_MQ_ANewBeginning.Blood to Water.Craft equipment.Craft a Blood Sack": "Craft a Small Blood Sack",
+    "DA_MQ_ANewBeginning.Blood to Water.Kill Scavengers": "Blood on the Sand",
+    "DA_MQ_ANewBeginning.Blood to Water.Kill Scavengers.Locate an enemy camp": "Locate and kill Scavengers",
+    "DA_MQ_ANewBeginning.Blood to Water.Kill Scavengers.Harvest 3000ml blood using the Blood Extractor": "Extract 1000ml blood from corpses using an Improvised Blood Extractor",
+    "DA_MQ_ANewBeginning.Blood to Water.Make water from blood": "Purification",
+    "DA_MQ_ANewBeginning.Blood to Water.Make water from blood.ResearchBloodPurifier": "Research the Blood Purifier",
+    "DA_MQ_ANewBeginning.Blood to Water.Make water from blood.Return to your base and place down a Blood Purifier": "Construct or interact with a Blood Purifier in your base",
+    "DA_MQ_ANewBeginning.Blood to Water.Make water from blood.Deposit blood into the blood purifier": "Deposit blood into the blood purifier",
+    "DA_MQ_ANewBeginning.Aql No 1": "Echoes of the Past",
+    "DA_MQ_ANewBeginning.Aql No 1.CompleteAQLTrials": "Trial of Aql",
+    "DA_MQ_ANewBeginning.Aql No 1.CompleteAQLTrials.CompleteFirstTrial": "Complete the First Trial of Aql in Hagga Basin South",
+    "DA_MQ_ANewBeginning.Aql No 1.Get resource from a moisture sealed cave": "Gather Fremen Components from moisture-sealed caves",
+    "DA_MQ_ANewBeginning.Aql No 1.Get resource from a moisture sealed cave.Locate a moisture sealed cave": "Locate a moisture-sealed cave",
+    "DA_MQ_ANewBeginning.Aql No 1.Get resource from a moisture sealed cave.Gather 6 Micro-Sandwich Fabric": "Gather Micro-Sandwich Fabric (6)",
+    "DA_MQ_ANewBeginning.Aql No 1.Get resource from a moisture sealed cave.Gather 1 EMF Generator": "Gather an EMF Generator",
+    "DA_MQ_ANewBeginning.Aql No 1.Harvest resources to craft a Stillsuit": "Harvest Materials for a Stillsuit",
+    "DA_MQ_ANewBeginning.Aql No 1.Harvest resources to craft a Stillsuit.Harvest 165 Salvage Metal": "Salvage Metal (165)",
+    "DA_MQ_ANewBeginning.Aql No 1.Harvest resources to craft a Stillsuit.Harvest 17 Plant Fiber": "Harvest Plant Fiber (17)",
+    "DA_MQ_ANewBeginning.Aql No 1.Harvest resources to craft a Stillsuit.Harvest 12 Copper Ore": "Mine Copper Ore (12)",
+    "DA_MQ_ANewBeginning.Aql No 1.Craft the Stillsuit": "Constructing a Fabricator for a Stillsuit",
+    "DA_MQ_ANewBeginning.Aql No 1.Craft the Stillsuit.Return to your base and drink water": "Return to your base and drink water from the Blood Purifier",
+    "DA_MQ_ANewBeginning.Aql No 1.Craft the Stillsuit.ResearchFabricator": "Research the Fabricator",
+    "DA_MQ_ANewBeginning.Aql No 1.Craft the Stillsuit.Unlock and place a Fabricator": "Construct or interact with a Fabricator",
+    "DA_MQ_ANewBeginning.Aql No 1.FabricateStillsuit": "Fabricating a Stillsuit",
+    "DA_MQ_ANewBeginning.Aql No 1.FabricateStillsuit.Craft a complete Stillsuit": "Fabricate a complete Scavenger Stillsuit",
+    "DA_MQ_ANewBeginning.Aql No 1.FabricateStillsuit.Equip the Stillsuit": "Equip the Scavenger Stillsuit",
+    "DA_MQ_ANewBeginning.Reach Civilization": "A Touch of Civilization",
+    "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear": "Lessons in Cartography",
+    "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear.ResearchOreRefinery": "Research the Small Ore Refinery",
+    "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear.Unlock and place down Ore Refinery": "Construct or interact with a Small Ore Refinery",
+    "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear.Refine Copper Ore": "Refine Copper Ore (12)",
+    "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear.ResearchSurveyingKit": "Research the Surveying Kit",
+    "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear.Unlock and craft a Survey probe launcher": "Fabricate a Survey Probe Launcher",
+    "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear.Craft a Survey probe": "Fabricate a Survey Probe",
+    "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear.Find the Survey location and fire a Survey Probe": "Climb to high ground and fire a Survey Probe",
+    "DA_MQ_ANewBeginning.Reach Civilization.Tradepost": "A Rendezvous with Zantara",
+    "DA_MQ_ANewBeginning.Reach Civilization.Tradepost.Travel to the Tradepost": "Travel to Griffin's Reach Tradepost",
+    "DA_MQ_ANewBeginning.Reach Civilization.Tradepost.PickupContract": "Pick up the first Contract in the SCRAP METTLE chain from the Contract Board",
+    "DA_MQ_ANewBeginning.Reach Civilization.Tradepost.DeliverContract": "Deliver required Copper Ore to Contract Board and then Contact Issuer",
+    "DA_MQ_ANewBeginning.Reach Civilization.Tradepost.Buy a unique Literjon schematic from the vendor": "Buy a unique Hajra Literjon schematic from the merchant",
+    "DA_MQ_ANewBeginning.Reach Civilization.PickupNextContract": "A Contract Awaits",
+    "DA_MQ_ANewBeginning.Reach Civilization.PickupNextContract.WreckingCrew": "Pick up Contract \"SCRAP METTLE: Wrecking Crew\" from Contract Board",
+    "DA_MQ_ANewBeginning.Dangerous Mission": "The Wreck of the Alcyon",
+    "DA_MQ_ANewBeginning.Dangerous Mission.Shipwreck": "The Right of Salvage",
+    "DA_MQ_ANewBeginning.Dangerous Mission.Shipwreck.Travel to a Shipwreck": "Travel to the shipwreck",
+    "DA_MQ_ANewBeginning.Dangerous Mission.Shipwreck.Gather 10 Plasteel Microflora Fiber": "Gather Plasteel Microflora Fiber (10)",
+    "DA_MQ_ANewBeginning.Dangerous Mission.Shipwreck.Gather 2 Mechanical parts": "Gather Mechanical parts (2)",
+    "DA_MQ_ANewBeginning.Dangerous Mission.Harvest Resources": "Harvest materials to upgrade your Armor and Weapons",
+    "DA_MQ_ANewBeginning.Dangerous Mission.Harvest Resources.Harvest 160 Copper Ore": "Mine Copper Ore (160)",
+    "DA_MQ_ANewBeginning.Dangerous Mission.Harvest Resources.Harvest 25 Plant Fiber Shipwreck": "Harvest Plant Fiber (25)",
+    "DA_MQ_ANewBeginning.Dangerous Mission.Craft better gear": "Military Grade",
+    "DA_MQ_ANewBeginning.Dangerous Mission.Craft better gear.ResearchScavGear": "Research Scavenger Rags, Karpov 38 and Kindjal",
+    "DA_MQ_ANewBeginning.Dangerous Mission.Craft better gear.Unlock and craft a full set of Scavengers Armor": "Fabricate a full set of Scavenger Rags",
+    "DA_MQ_ANewBeginning.Dangerous Mission.Craft better gear.Unlock and craft a Assault Rifle": "Fabricate a Karpov 38",
+    "DA_MQ_ANewBeginning.Dangerous Mission.Craft better gear.Unlock and craft a Kindjal": "Fabricate a Kindjal",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2": "Across the Gap",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Imperial Testing Station": "His Imperial Majesty's Desert Botanical Testing Station",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Imperial Testing Station.Travel to a Imperial Testing Station": "Travel to Imperial Testing Station No. 2",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Imperial Testing Station.Gather 6 Particle Capacitator": "Gather Particle Capacitators (6)",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Imperial Testing Station.Gather 13 Advanced Servok": "Gather Advanced Servoks (13)",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Craft a Sandbike": "Fabricate a Sandbike",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Craft a Sandbike.ResearchSandbike": "Research the Sandbike Mk1 Assembly",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Craft a Sandbike.Unlock and craft 1 Power Supply Unit": "Fabricate a Sandbike PSU Mk1",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Craft a Sandbike.Craft 3 Treads": "Fabricate a Sandbike Tread Mk1 (3)",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Craft a Sandbike.Craft 1 Engine": "Fabricate a Sandbike Engine Mk1",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Craft a Sandbike.Craft 1 Chassis": "Fabricate a Sandbike Chassis Mk1",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Craft a Sandbike.Craft 1 Hull": "Fabricate a Sandbike Hull Mk1",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Refine Vehicle Fuel": "Refining Vehicle Fuel",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Refine Vehicle Fuel.ResearchChemicalRefinery": "Research the Small Chemical Refinery",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Refine Vehicle Fuel.Unlock and place down a Small Chemical Refinery": "Construct or interact with a Small Chemical Refinery",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Refine Vehicle Fuel.Refine Fuel": "Refine a Small or Medium Sized Vehicle Fuel Cell",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Build a Sandbike": "Assemble a Sandbike",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Build a Sandbike.Craft a Welding Torch": "Fabricate a Welding Torch Mk1",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Build a Sandbike.Put all parts together using the Welding Torch": "Assemble the Sandbike using a Welding Torch Mk1",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Build a Sandbike.Fuel the bike": "Refuel the Sandbike",
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Build a Sandbike.Drive the bike": "Drive the Sandbike",
+    "DA_MQ_AssassinsHandbook": "The Assassin's Handbook",
+    "DA_MQ_AssassinsHandbook.Intro": "Black Market Tech",
+    "DA_MQ_AssassinsHandbook.Intro.FindGreatHouseRepresentatives": "Search for a Black Market Trader",
+    "DA_MQ_AssassinsHandbook.Intro.FindGreatHouseRepresentatives.EnterHarkoVillage": "Enter Harko Village",
+    "DA_MQ_AssassinsHandbook.Intro.FindGreatHouseRepresentatives.MeetAtPlaza": "Search Harko Village for a Black Market Trader",
+    "DA_MQ_AssassinsHandbook.Intro.MeettheInformant": "Meet the Informant",
+    "DA_MQ_AssassinsHandbook.Intro.MeettheInformant.TalkToTheSpider": "Find Fenring's contact",
+    "DA_MQ_AssassinsHandbook.Intro.MeettheInformant.AcceptTheFirstKill": "Accept one of the assassinations offered by Elara Tuek",
+    "DA_MQ_AssassinsHandbook.TheParanoid": "The Paranoid",
+    "DA_MQ_AssassinsHandbook.TheParanoid.FindThePriestessSubleaders": "Find the Chosen of the Maas Kharet",
+    "DA_MQ_AssassinsHandbook.TheParanoid.FindThePriestessSubleaders.KillSubleader1": "Kill the Chosen of the Fire and claim the pentashield code",
+    "DA_MQ_AssassinsHandbook.TheParanoid.FindThePriestessSubleaders.KillSubleader2": "Kill the Chosen of the Body and claim the pentashield code",
+    "DA_MQ_AssassinsHandbook.TheParanoid.FindThePriestessSubleaders.KillSubleader3": "Kill the Chosen of the Tooth and claim the pentashield code",
+    "DA_MQ_AssassinsHandbook.TheParanoid.FindThePriestessSubleaders.KillSubleader4": "Kill the Chosen of the Breath and claim the pentashield code",
+    "DA_MQ_AssassinsHandbook.TheParanoid.FindTheParanoidsPrayerRoom": "Find the Place of Contemplation",
+    "DA_MQ_AssassinsHandbook.TheParanoid.FindTheParanoidsPrayerRoom.EnterTheRoom": "Enter the contemplation chamber",
+    "DA_MQ_AssassinsHandbook.TheParanoid.FindTheParanoidsPrayerRoom.UseShieldDissembler": "Use the Shield Dissembler on the last pentashield",
+    "DA_MQ_AssassinsHandbook.TheParanoid.FindTheParanoidsPrayerRoom.KillTheParanoid": "Kill The Paranoid",
+    "DA_MQ_AssassinsHandbook.TheParanoid.FindTheParanoidsPrayerRoom.ExitParanoidRoom": "Exit the Place of Contemplation",
+    "DA_MQ_AssassinsHandbook.TheGlutton": "The Glutton",
+    "DA_MQ_AssassinsHandbook.TheGlutton.LearnAboutYourTarget": "Learn about your target",
+    "DA_MQ_AssassinsHandbook.TheGlutton.LearnAboutYourTarget.FindTheHostageInTheSlaversBase": "Search for Petyr at the Khidr's Shadow slaver base",
+    "DA_MQ_AssassinsHandbook.TheGlutton.FindThGluttonsDiningRoom": "Enter the Glutton's dining room",
+    "DA_MQ_AssassinsHandbook.TheGlutton.FindThGluttonsDiningRoom.EnterTheGluttonsDiningRoom": "Enter the Glutton's dining room",
+    "DA_MQ_AssassinsHandbook.TheGlutton.FindThGluttonsDiningRoom.KillTheGlutton": "Poison the Glutton's food with chaumas",
+    "DA_MQ_AssassinsHandbook.TheGlutton.FindThGluttonsDiningRoom.ExitGluttonRoom": "Exit the Glutton's dining room",
+    "DA_MQ_AssassinsHandbook.SecondTarget": "The Next Target",
+    "DA_MQ_AssassinsHandbook.SecondTarget.ReturnToTheSpider1": "Return to Elara Tuek",
+    "DA_MQ_AssassinsHandbook.SecondTarget.ReturnToTheSpider1.TalkToTheSpider2": "Talk to Elara Tuek in Harko Village",
+    "DA_MQ_AssassinsHandbook.SecondTarget.ReturnToTheSpider1.AcceptTheSecondKill": "Accept the second name",
+    "DA_MQ_AssassinsHandbook.FurtherInstructions": "Further Instructions",
+    "DA_MQ_AssassinsHandbook.FurtherInstructions.ReturnToTheSpider2": "Return to Elara Tuek",
+    "DA_MQ_AssassinsHandbook.FurtherInstructions.ReturnToTheSpider2.TalkToTheSpider5": "Talk to Elara Tuek about your next target",
+    "DA_MQ_AssassinsHandbook.FurtherInstructions.ReturnToTheSpider2.ReturnToHBSAndWait": "Return to Hagga Basin and wait for further instructions",
+    "DA_MQ_AssassinsHandbook.FurtherInstructions.ReturnToTheSpider2.CallFromAriste": "Receive transmission",
+    "DA_MQ_AssassinsHandbook.ASignFromAbove": "A Sign from Above",
+    "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite": "Investigate the Wreck of the Hephaestus",
+    "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.ReachtheWreckofHephaestus": "Reach the Wreck of the Hephaestus",
+    "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.EnterFirstCargoBay": "Find a way into the cargo bay",
+    "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.SurviveSuboidAssault": "Survive the suboid assault until the nobleman powers up the cargo bay",
+    "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.FindContainersCargoBay": "Find the Container Cargo Bay",
+    "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.FindTheContainer": "Find the container used to smuggle in the noble",
+    "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.DescribeWhatYouSee": "Describe the contents of the container",
+    "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.ReachTheBridge": "Find your way to the bridge section",
+    "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.SwitchOffTheEmergencyOverride": "Switch off the Emergency Override",
+    "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.RemoveTheFuseCapacitor": "Remove the Fuse Capacitor",
+    "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.RestartTheNacelles": "Restart the Power Nacelles",
+    "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.SwitchOnTheLights": "Turn the auxiliary power on to support the noble",
+    "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.FindTheDecoder": "Search for an Ixian Decoder in the bridge",
+    "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.CompletetheWreckofHephaestus": "Escape the Wreck of the Hephaestus",
+    "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.ReachSafety": "Reach your base or a city",
+    "DA_MQ_AssassinsHandbook.ANewTarget": "New Targets",
+    "DA_MQ_AssassinsHandbook.ANewTarget.MeetTheContact2": "Meet the contact",
+    "DA_MQ_AssassinsHandbook.ANewTarget.MeetTheContact2.ReceiveSpiderCall": "Receive Transmission",
+    "DA_MQ_AssassinsHandbook.ANewTarget.MeetTheContact2.TalkToTheSpider2": "Talk to Elara Tuek",
+    "DA_MQ_AssassinsHandbook.ANewTarget.MeetTheContact2.AcceptTheWaterFatKill": "Accept the Water Fat assassination",
+    "DA_MQ_AssassinsHandbook.TheWaterFat": "The Water Fat",
+    "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask": "Eliminate the Water Fat",
+    "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask.ReachTheWaterFatManor": "Reach the Water Shipper's Mansion",
+    "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask.FindWayInsideManor": "Find a way inside the mansion",
+    "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask.FindTheOffice": "Find the Water Shipper's water storage",
+    "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask.DoNotGetDetected": "Reach the target without being seen",
+    "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask.CompleteTheAssasination": "Poison the water cistern",
+    "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask.Escape": "Escape the manor using an Ornithopter",
+    "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask.ReachSafeArea": "Reach your base or a city",
+    "DA_MQ_AssassinsHandbook.LastTarget": "Last Target",
+    "DA_MQ_AssassinsHandbook.LastTarget.MeetTheContact": "Meet Elara Tuek",
+    "DA_MQ_AssassinsHandbook.LastTarget.MeetTheContact.TalkToTheSpider3": "Talk to Elara Tuek",
+    "DA_MQ_AssassinsHandbook.LastTarget.MeetTheContact.AcceptTheJackalKill": "Report to Elara Tuek",
+    "DA_MQ_AssassinsHandbook.TheJackal": "The Jackal",
+    "DA_MQ_AssassinsHandbook.TheJackal.TheJackal": "Eliminate the Jackal",
+    "DA_MQ_AssassinsHandbook.TheJackal.TheJackal.ReachTheJackalAlley": "Reach the Jackal's alley",
+    "DA_MQ_AssassinsHandbook.TheJackal.TheJackal.FindWhatHeknows": "Find out how to talk to the Jackal",
+    "DA_MQ_AssassinsHandbook.TheJackal.TheJackal.CompleteTheAssassination": "Kill the Jackal",
+    "DA_MQ_AssassinsHandbook.TheJackal.TheJackal.ExitJackalAlley": "Exit the Jackal's alley",
+    "DA_MQ_AssassinsHandbook.MeetingAriste": "A rendezvous with Ari",
+    "DA_MQ_AssassinsHandbook.MeetingAriste.MeetingInArrakeen": "Meeting in Arrakeen",
+    "DA_MQ_AssassinsHandbook.MeetingAriste.MeetingInArrakeen.ReachTheBarInArrakeen": "Meet Ari on the second floor of the Salusan Bull in Arrakeen",
+    "DA_MQ_AssassinsHandbook.SearchingForAnswers": "Searching for Answers",
+    "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage": "Find the location of the co-ordinates from the decrypted message",
+    "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage.TalkToZantara": "Talk to Zantara in Harko Village",
+    "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage.ReachTheLabUnderOldCarthag": "Reach the Lab under Old Carthag",
+    "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage.FindWayInsideLab": "Find a way inside the base",
+    "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage.ExploreTheFacility": "Learn more about the purpose of this facility",
+    "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage.ReuniteWithZantara": "Find your way to Zantara deeper in the facility",
+    "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage.ExploreFurther": "Find answers",
+    "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage.CompleteTheLab": "Escape the Tleilaxu facility",
+    "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage.ReachSafeLocation": "Reach your base or a city",
+    "DA_MQ_AssassinsHandbook.Epilogue": "Epilogue",
+    "DA_MQ_AssassinsHandbook.Epilogue.InvestigationOutcome": "An End to Many Things",
+    "DA_MQ_AssassinsHandbook.Epilogue.InvestigationOutcome.WatingForAriste2": "Wait to hear from Ariste",
+    "DA_MQ_FindTheFremen": "Find the Fremen",
+    "DA_MQ_FindTheFremen.FirstTest": "The First Trial of Aql",
+    "DA_MQ_FindTheFremen.FirstTest.FirstQuestion": "The First Question",
+    "DA_MQ_FindTheFremen.FirstTest.FirstQuestion.FindtheCaveentrance": "Follow your inner sight to the first trial",
+    "DA_MQ_FindTheFremen.FirstTest.FirstQuestion.FindAltarCave": "Enter the ancient cave",
+    "DA_MQ_FindTheFremen.FirstTest.FirstQuestion.CompleteFirstTest": "Interact with the altar then complete the first trial",
+    "DA_MQ_FindTheFremen.SecondTest": "The Second Trial of Aql",
+    "DA_MQ_FindTheFremen.SecondTest.SecondQuestion": "The Second Question",
+    "DA_MQ_FindTheFremen.SecondTest.SecondQuestion.FindAltarCave2": "Locate the second trial",
+    "DA_MQ_FindTheFremen.SecondTest.SecondQuestion.CompleteSecondTest": "Interact with the altar then complete the second trial",
+    "DA_MQ_FindTheFremen.ThirdTest": "The Third Trial of Aql",
+    "DA_MQ_FindTheFremen.ThirdTest.ThirdQuestion": "The Third Question",
+    "DA_MQ_FindTheFremen.ThirdTest.ThirdQuestion.FindAltarCave3": "Locate the third trial",
+    "DA_MQ_FindTheFremen.ThirdTest.ThirdQuestion.CompleteThirdTest": "Listen to the shigawire recording at the destroyed altar",
+    "DA_MQ_FindTheFremen.FourthTest": "The Fourth Trial of Aql",
+    "DA_MQ_FindTheFremen.FourthTest.FourthQuestion": "The Fourth Question",
+    "DA_MQ_FindTheFremen.FourthTest.FourthQuestion.FindAltarCave4": "Locate the fourth trial",
+    "DA_MQ_FindTheFremen.FourthTest.FourthQuestion.CompleteFourthTest": "Interact with the altar then complete the fourth trial",
+    "DA_MQ_FindTheFremen.FifthTest": "The Fifth Trial of Aql",
+    "DA_MQ_FindTheFremen.FifthTest.FifthQuestion": "The Fifth Question",
+    "DA_MQ_FindTheFremen.FifthTest.FifthQuestion.FindAltarCave5": "Locate the fifth trial",
+    "DA_MQ_FindTheFremen.FifthTest.FifthQuestion.CompleteFifthTest": "Interact with the altar then complete the fifth trial",
+    "DA_MQ_FindTheFremen.SixthTest": "The Sixth Trial of Aql",
+    "DA_MQ_FindTheFremen.SixthTest.SixthQuestion": "The Sixth Question",
+    "DA_MQ_FindTheFremen.SixthTest.SixthQuestion.FindAltarCave6": "Locate the sixth trial",
+    "DA_MQ_FindTheFremen.SixthTest.SixthQuestion.CompleteSixthTest": "Listen to the shigawire recording at the destroyed altar",
+    "DA_MQ_FindTheFremen.SeventhTest": "The Seventh Trial of Aql",
+    "DA_MQ_FindTheFremen.SeventhTest.SeventhQuestion": "The Seventh Question",
+    "DA_MQ_FindTheFremen.SeventhTest.SeventhQuestion.FindAltarCave7": "Locate the seventh trial",
+    "DA_MQ_FindTheFremen.SeventhTest.SeventhQuestion.CompleteSeventhTest": "Interact with the altar then complete the seventh trial",
+    "DA_MQ_FindTheFremen.TheSietch": "The Footsteps of the Fremen",
+    "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent": "A Final Test",
+    "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.SietchLocation": "Find the cave",
+    "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.UnlockDoor": "Discover what lies within",
+    "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.ExploreTheSietch": "Explore the sietch with Ari",
+    "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.SolveScripturesPuzzle": "Complete the ecology lesson",
+    "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.ExploreFurther": "Continue exploring the abandoned sietch",
+    "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.SolveTheDeathstillPuzzle": "Realign the mechanism and activate the ancient deathstill",
+    "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.EnterTheConsoleRoom": "Enter the secret chamber",
+    "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.FindTheSafe": "Find the safe mentioned in the projection",
+    "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.ExitConsoleRoom": "Find a way out of the secret chamber",
+    "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.KillTheBoss": "Survive the Assault",
+    "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.EscapeTheSietch": "Find your way out",
+    "DA_MQ_FindTheFremen.Epilogue": "Epilogue",
+    "DA_MQ_FindTheFremen.Epilogue.WaitingForAriste": "Wait for contact",
+    "DA_MQ_FindTheFremen.Epilogue.WaitingForAriste.WaitForTheCall": "Wait for Ari to find information about decoding the Minimic film",
+    "DA_MQ_NPEAutocompleted": "The Fall of the Proteus",
+    "DA_MQ_NPEAutocompleted.Escape": "The Fall of the Proteus",
+    "DA_MQ_NPEAutocompleted.Escape.TalkToZantara": "Talk to Zantara",
+    "DA_MQ_NPEAutocompleted.Escape.EscapeTheEnclosure": "Escape the Enclosure",
+    "DA_MQ_TheGreatConvention": "The Great Convention — Part I",
+    "DA_MQ_TheGreatConvention.NoctuasCall": "The Call",
+    "DA_MQ_TheGreatConvention.NoctuasCall.UnexpectedVisitor": "An unexpected visitor",
+    "DA_MQ_TheGreatConvention.NoctuasCall.UnexpectedVisitor.ListenToNoctua": "Look for a sign in a Hagga Basin settlement",
+    "DA_MQ_TheGreatConvention.CalledToACount": "Called To A Count",
+    "DA_MQ_TheGreatConvention.CalledToACount.MeetElaraInHarko": "Meet Elara Tuek in Harko Village",
+    "DA_MQ_TheGreatConvention.CalledToACount.MeetElaraInHarko.TravelToHarkoVillage": "Travel to Harko Village",
+    "DA_MQ_TheGreatConvention.CalledToACount.MeetElaraInHarko.SpeakToElara": "Talk to Elara Tuek at Hannivar’s",
+    "DA_MQ_TheGreatConvention.CalledToACount.DiscussionWithFenring": "Discussion with the Count",
+    "DA_MQ_TheGreatConvention.CalledToACount.DiscussionWithFenring.TalkToCountFenring": "Talk to Count Fenring",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar": "Proces-Verbal",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.MeetChiefInvestigator": "Meet the Chief Investigator",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.MeetChiefInvestigator.TravelToArrakeenBarMurder": "Travel to Arrakeen",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.MeetChiefInvestigator.SpeakToChiefInvestigator": "Talk to the Chief Investigator at the Imperial Consulate",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.MeetChiefInvestigator.GainEntranceToPrivateRoom": "Locate Osten Laithe in the Upper Salusan Bull",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.LocateOsten": "Locate Osten Laithe",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.LocateOsten.FirstMurderEnterScene": "Gain access to the private room",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.LocateOsten.FirstMurderSearchForClues": "Scan the room for clues",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.LocateOsten.FirstMurderTalkToWitnesses": "Interrogate witnesses in the Upper Salusan Bull",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.ProveFoulPlay": "Convince Hester Klimt that Osten Laithe was murdered",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.ProveFoulPlay.FirstMurderProveFoulPlay": "Find a way to prove foul play",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.ProveFoulPlay.FirstMurderGetSnooper": "Acquire a poison snooper through Alastair Chim or Tidjii O'Garee",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.ProveFoulPlay.FirstMurderPoisonProof": "Investigate the private room using the poison snooper",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.InvestigateMurder": "Investigate Osten Laithe's murder",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.InvestigateMurder.FirstMurderTalkToApprentice": "Interrogate witnesses again in the Upper Salusan Bull",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.InvestigateMurder.FirstMurderDiscussFindings": "Discuss your findings with Sub-Prefect Tors",
+    "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop": "Touch Of Evil",
+    "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop.VisitWorkshop": "Investigate Osten Laithe's Workshop",
+    "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop.VisitWorkshop.LocateEngineersWorkshop": "Locate the Sandflies base",
+    "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop.VisitWorkshop.FindTheEngineersOffice": "Locate Osten's workshop inside the base",
+    "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop.VisitWorkshop.CollectDocuments": "Scan Osten's workshop for clues",
+    "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop.DiscussFindings": "Return to Tors in Arrakeen",
+    "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop.DiscussFindings.SpeakWithTors": "Discuss your findings with Tors",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment": "From The Ashes",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.TheSecondVictim": "Locate Phaedra Vye",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.TheSecondVictim.SecondMurderEnterScene": "Enter Phaedra's apartment",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.TheSecondVictim.SecondMurderSearchForClues": "Search the apartment for clues on Phaedra's whereabouts",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.TheSecondVictim.SecondMurderSpeakToTors": "Discuss your findings with Tors",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.DeepDesertBase": "Go to the location in the Deep Desert",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.DeepDesertBase.LocateTheBase": "Find the entrance to the location mentioned in the note",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.DeepDesertBase.SearchTheValet": "Search the valet's body",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.DeepDesertBase.FindLootRoom": "Go deeper into the cave",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.DeepDesertBase.SearchForMoreClues": "Search the cave for clues",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.DeepDesertBase.ReportToTors": "Return to Tors in Arrakeen",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.SecondInvestigateApartment": "Scan Phaedra's apartment for clues on her whereabouts",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.SecondInvestigateApartment.DecipherCrypticNote": "Decipher the valet's note",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.SecondInvestigateApartment.SearchTheHiddenRoom": "Search the secret room for clues",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.SecondMurderDiscussFindings": "Talk to Tidjii O'Garee",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.SecondMurderDiscussFindings.SecondMurderSpeakWithBlackMarketTrader": "Ask Tidjii O'Garee what she knows",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet": "The Janusian Faithful",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.TheBanquet": "Follow the trail of the assassin",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.TheBanquet.EnterScene": "Enter the banquet",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.FirstVictim": "Investigate the banquet",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.FirstVictim.TalkToNoble": "Talk to the dying noble",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.FirstVictim.ReportToDhood": "Report back to Dhood Shazz",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.FirstVictim.SearchForClues": "Identify Ansel Virro among the dead nobles and report to Dhood",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.SecondVictim": "Investigate the banquet further",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.SecondVictim.TalkToButler": "Talk to the butler at the banquet",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.SecondVictim.SearchForClues2": "Identify Agade Yimari among the dead nobles and report to Dhood",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.Ambrose": "Talk to Ambrose Lucifera",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.Ambrose.SpeakToAmbrose": "Interrogate Ambrose Lucifera at the banquet",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.ThirdVictim": "Identify the remaining victims",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.ThirdVictim.TalkToButler2": "Talk to the butler about Ambrose's note",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.ThirdVictim.SearchForClues3": "Identify Roella Ramsby among the dead nobles and report to Dhood",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.ThirdVictim.DiscussFindingsTors": "Talk to Tors",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.TrailTors": "Catch the assassin",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.TrailTors.FollowTors": "Follow Tors",
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.TrailTors.ReturnToElara": "Return to Elara Tuek",
+    "DA_MQ_TheGreatConvention.TheBloodline": "The Bloodline",
+    "DA_MQ_TheGreatConvention.TheBloodline.MeetAriste": "Meet Ariste",
+    "DA_MQ_TheGreatConvention.TheBloodline.MeetAriste.SpeakToAristeAtSalusanBull": "Talk to Ariste at the Salusan Bull",
+    "DA_MQ_TheGreatConvention.TheBloodline.Invitation": "Make your way to the Archives under the Palace",
+    "DA_MQ_TheGreatConvention.TheBloodline.Invitation.ShowTokenToGuard": "Present Ariste’s token at the Western Palace Barricade",
+    "DA_MQ_TheGreatConvention.TheBloodline.Invitation.FollowArristeInside": "Follow Ariste to the Archives",
+    "DA_MQ_TheGreatConvention.TheBloodline.UpperArchives": "Sneak through the Upper Archives",
+    "DA_MQ_TheGreatConvention.TheBloodline.UpperArchives.ExploreArchives": "Find young Ariste's first etching",
+    "DA_MQ_TheGreatConvention.TheBloodline.UpperArchives.ExploreArchives2": "Find young Ariste's second etching",
+    "DA_MQ_TheGreatConvention.TheBloodline.UpperArchives.ExploreArchives3": "Find young Ariste's third etching",
+    "DA_MQ_TheGreatConvention.TheBloodline.UpperArchives.DistractGuards": "Distract the guards and progress through the Archives",
+    "DA_MQ_TheGreatConvention.TheBloodline.UpperArchives.ExploreArchives4": "Find young Ariste's fourth etching",
+    "DA_MQ_TheGreatConvention.TheBloodline.LowerArchives": "Meet with Ariste in the Lower Archives",
+    "DA_MQ_TheGreatConvention.TheBloodline.LowerArchives.ExploreLowerArchives": "Look for hidden notes in the Lower Archives",
+    "DA_MQ_TheGreatConvention.TheBloodline.LowerArchives.PassBeneGesseritTest": "Pass the Bene Gesserit test",
+    "DA_MQ_TheGreatConvention.TheBloodline.DeepArchives": "Find out about your origins",
+    "DA_MQ_TheGreatConvention.TheBloodline.DeepArchives.ExploreDeepArchives": "Enter the breeding matrix",
+    "DA_MQ_TheGreatConvention.TheBloodline.DeepArchives.ProvideBloodSample": "Provide a blood sample",
+    "DA_MQ_TheGreatConvention.TheBloodline.DeepArchives.LeaveThePalace": "Leave the Arrakeen Palace",
+    "DA_MQ_TheGreatConvention.NoctuasReturn": "Noctua's Return",
+    "DA_MQ_TheGreatConvention.NoctuasReturn.FromBeyond": "The return",
+    "DA_MQ_TheGreatConvention.NoctuasReturn.FromBeyond.AMessageFromNoctua": "Look for Noctua in a Hagga Basin settlement",
+    "DA_MQ_TheGreatConventionPt2": "The Great Convention — Part II",
+    "DA_MQ_TheGreatConventionPt2.CallToArms": "Call to Arms",
+    "DA_MQ_TheGreatConventionPt2.CallToArms.TheAftermath": "Talk to Elara",
+    "DA_MQ_TheGreatConventionPt2.CallToArms.TheAftermath.Transmission": "Travel to any safe settlement and wait for Elara's call",
+    "DA_MQ_TheGreatConventionPt2.CallToArms.TheAftermath.MeetElara": "Talk to Elara in Harko Village",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1": "The Art of Kanly",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1.The Arena": "Enter the arena",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1.The Arena.FindElarasContact": "Talk to Elara's contact near the North Terminus exit in Harko Village",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1.The Arena.EnterTheArenaLobby": "Enter the arena lobby",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1.Tier1": "Sign up as a fighter in the arena",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1.Tier1.TalkToArenaMasterTier1": "Ask Maksim Dubrov about participating in the arena fights",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1.Tier1.Tier1Fight1": "Complete your first fight against scavengers",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1.Tier1.Tier1Fight2": "Defeat Brute the Scrapper",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2": "Secrets of the Exile",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1Intro": "Move on to tier two",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1Intro.Task1TalkToArenaMaster": "Talk to Maksim Dubrov in the arena lobby",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1FindContact": "Find Maksim Dubrov's contact",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1FindContact.Task1GoToContactLocation": "Travel to the Sheol",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1FindContact.Task1InvestigateContact": "Search the area for clues about the radiation core",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore": "Obtain the radiation core",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore.Task1GoToShipwreck": "Look for the core near the Wreck of the Ourea",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore.Task1LocateRadiationCore": "Locate the radiation core",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore.Task1AttemptToPickupRadiationCore": "Secure the radiation core",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore.Task1FollowPowerCable": "Find the radiation core's control room",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore.Task1CloseRadiationCore": "Use the control console to close the radiation core container",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore.Task1PickupRadiationCore": "Pick up the radiation core",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore.Task1DeliverRadiationCore": "Return to Maksim Dubrov in the arena lobby",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Tier2": "Complete the second tier",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Tier2.Tier2Fight1": "Defeat the Kirab encounter",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Tier2.Tier2Fight2": "Defeat Aren the Exile",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3": "Breaking the Chains",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2Intro": "Move on to tier three",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2Intro.TalkToMasterTask2": "Talk to Maksim Dubrov in the arena lobby",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2FindLocation": "Secure the elacca shipment",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2FindLocation.Task2GoToSmallShipwreck": "Travel to the shipment's last reported location in the Deep Desert",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2FindLocation.Task2ScanArea": "Scan and examine the area for traces of the shipment",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2ObtainElaccaShipment": "Search Testing Station No. 217 for the elacca shipment",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2ObtainElaccaShipment.Task2GoToEcolab": "Follow the footprints",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2ObtainElaccaShipment.Task2FindElaccaDocument": "Search the testing station for traces of the shipment",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2ObtainElaccaShipment.Task2GetElaccaShipment": "Secure the crates of elacca",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2ObtainElaccaShipment.Task2ExitEcolab": "Leave the testing station",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2ObtainElaccaShipment.Task2DeliverElaccaShipment": "Return to Maksim Dubrov in the arena lobby",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Tier3": "Complete the third tier",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Tier3.Tier3Fight1": "Defeat the elacca drugged fighters",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Tier3.Tier3Fight2": "Defeat the slavers",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Tier3.Tier3Fight3": "Defeat the Master of Chains",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4": "Extinguishing the Flames",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3Intro": "Move on to tier four",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3Intro.Task3TalkToArenaMaster": "Talk to Maksim Dubrov in the arena lobby",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid": "Capture a suboid for Maksim Dubrov",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3GoToWoH": "Travel to the Wreck of Hephaestus",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3InvestigateSuboidCorpse": "Investigate the suboid corpse",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3ReachCargoDeck": "Reach the cargo deck",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3ClearFirstBloodDoor": "Search the first hangar",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3ClearSecondBloodDoor": "Search the second hangar",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3EnterFinalRoom": "Search the aft section",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3FindSuboid": "Find a suboid",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3TurnOnPower": "Turn on the floodlight to knock out the suboid",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3ObtainSuboid": "Capture the suboid",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3FindExit": "Find a way out of the wreck",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3BringSuboid": "Deliver the suboid",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3BringSuboid.Task3DeliverSuboid": "Return to Maksim Dubrov in the arena lobby",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Tier4": "Complete the fourth tier",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Tier4.Tier4Fight1": "Defeat the Sandflies",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Tier4.Tier4Fight2": "Defeat the second group of Sandflies",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Tier4.Tier4Fight3": "Defeat the suboids",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Tier4.Tier4Fight4": "Defeat Thrax the Flamer",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5": "A Deadly Poison",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4Intro": "Move on to tier five",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4Intro.Task4TalkToArenaMaster": "Talk to Maksim Dubrov in the arena lobby",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola": "Capture an abomination for Maksim Dubrov",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4GoToOldCarthag": "Travel to the ruins of Old Carthag",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4ClearFirstArea": "Search the upper rooms",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4ClearSecondBloodDoor": "Search the processing room",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4SearchFirstIncubatorRoom": "Search the incubator rooms",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4FirstIncubatorRoomTurnPowerOn": "Find a way to open the pods",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4TriggerFinalAmbush": "Continue your search",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4DefeatFinalAmbush": "Survive the ambush",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4SearchSecondIncubator": "Search the next incubator rooms",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4SecondIncubatorRoomTurnPowerOn": "Open the pods",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4ObtainGhola": "Capture the unconscious abomination",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4FindWayOutOfLab": "Find a way out of the lab",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4FindExit": "Return to your ornithopter and leave the ruins of Old Carthag",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4BringGhola": "Deliver the abomination",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4BringGhola.Task4DeliverGhola": "Return to Maksim Dubrov in the arena lobby",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Tier5": "Complete the fifth tier",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Tier5.Tier5Fight1": "Defeat the Maas Kharet cultists",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Tier5.Tier5Fight2": "Defeat the abominations",
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Tier5.Tier5Fight3": "Defeat Sinnu the Poisoner",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw": "Outside the Law",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.ForbiddenKnowledge": "Meet the Free Traders",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.ForbiddenKnowledge.MeetElara2": "Report back to Elara in Harko Village",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.ForbiddenKnowledge.GoToFallenLight": "Travel to Fallen Light",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon": "Escape the Free Trader gauntlet",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon.MoveDeeper0": "Explore the gauntlet with Feyd-Rautha",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon.EscapeArena1": "Survive the kirab assault",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon.MoveDeeper1": "Continue through the gauntlet and meet up with Feyd",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon.EscapeArena2": "Survive the Sandflies assault",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon.MoverDeeper2": "Continue through the gauntlet",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon.EscapeArena3": "Survive the Maas Kharet assault",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon.MoveDeeper3": "Continue through the gauntlet",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.Minotaur": "Defeat the gauntlet champion",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.Minotaur.DefeatMinotaur": "Kill the Minotaur",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.Minotaur.CatchFacerdancer": "Catch the Face Dancer",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.Debrief": "Report back",
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.Debrief.ElaraDebrief": "Report back to Elara in Harko Village",
+    "DA_MQ_TheGreatConventionPt2.NoctuasMessage": "Call of the Night",
+    "DA_MQ_TheGreatConventionPt2.NoctuasMessage.NoctuaReturns": "Find Noctua",
+    "DA_MQ_TheGreatConventionPt2.NoctuasMessage.NoctuaReturns.ReceiveMessage": "Travel to a tradepost in the Hagga Basin",
+    "DA_SQ_DeepDesert": "Deep Desert",
+    "DA_SQ_DeepDesert.DDLocations": "Charting the Depths",
+    "DA_SQ_DeepDesert.DDLocations.DDSurvey": "Surveying the Deep Desert",
+    "DA_SQ_DeepDesert.DDLocations.DDSurvey.DDEcolab": "Locate an Imperial Testing Station",
+    "DA_SQ_DeepDesert.DDLocations.DDSurvey.DDShipwreck": "Locate a Shipwreck",
+    "DA_SQ_DeepDesert.DDVehicles": "Operational Readiness",
+    "DA_SQ_DeepDesert.DDVehicles.DDSandcrawler": "Sandcrawler Mk6",
+    "DA_SQ_DeepDesert.DDVehicles.DDSandcrawler.ResearchSandcrawler": "Research the Sandcrawler Mk6 Assembly",
+    "DA_SQ_DeepDesert.DDVehicles.DDSandcrawler.SandcrawlerConstruct": "Construct a Sandcrawler Mk6",
+    "DA_SQ_DeepDesert.DDVehicles.DDSandcrawler.ConstructVacuum": "Construct a Sandcrawler Vacuum Mk6",
+    "DA_SQ_DeepDesert.DDVehicles.DDSandcrawler.ConstructCentrifuge": "Construct a Sandcrawler Centrifuge Mk6",
+    "DA_SQ_DeepDesert.DDVehicles.DDSandcrawler.FuelSandcrawler": "Fuel a Sandcrawler",
+    "DA_SQ_DeepDesert.DDVehicles.DDSandcrawler.SandcrawlerSpice": "Harvest Spice using a Sandcrawler",
+    "DA_SQ_DeepDesert.DDVehicles.DDTransportOrni": "Carrier Ornithopter Mk6",
+    "DA_SQ_DeepDesert.DDVehicles.DDTransportOrni.ResearchTransportOrni": "Research the Carrier Ornithopter Mk6 Assembly",
+    "DA_SQ_DeepDesert.DDVehicles.DDTransportOrni.ConstructOrni": "Construct a Carrier Ornithopter Mk6",
+    "DA_SQ_DeepDesert.DDVehicles.DDTransportOrni.FuelOrni": "Fuel a Carrier Ornithopter",
+    "DA_SQ_DeepDesert.DDVehicles.DDTransportOrni.TransportVehicle": "Transport a Vehicle with an Ornithopter",
+    "DA_SQ_DeepDesert.DDBase": "Logistical Issues",
+    "DA_SQ_DeepDesert.DDBase.ConstructBase": "Construct a temporary base",
+    "DA_SQ_DeepDesert.DDBase.ConstructBase.Foundation": "Construct at least 4 foundations",
+    "DA_SQ_DeepDesert.DDBase.ConstructBase.Walls": "Construct at least 7 walls and a door",
+    "DA_SQ_DeepDesert.DDBase.ConstructBase.Roof": "Construct at least 4 roof pieces",
+    "DA_SQ_DeepDesert.DDRocket": "Smoke Trail",
+    "DA_SQ_DeepDesert.DDRocket.RocketLauncher": "Regis Missile Launcher",
+    "DA_SQ_DeepDesert.DDRocket.RocketLauncher.Research": "Research the Regis Missile Launcher",
+    "DA_SQ_DeepDesert.DDRocket.RocketLauncher.Fabricate": "Fabricate a Regis Missile Launcher",
+    "DA_SQ_DeepDesert.DDRocket.RocketLauncher.Ammo": "Fabricate Missiles (20)",
+    "DA_SQ_DeepDesert.DDRocket.RocketLauncher.Kill": "Kill enemies with a Regis Missile Launcher (15)",
+    "DA_SQ_DeepDesert.DDHarvesting": "There Is Never Enough",
+    "DA_SQ_DeepDesert.DDHarvesting.SpiceHarvesting": "Large Scale Spice Harvesting",
+    "DA_SQ_DeepDesert.DDHarvesting.SpiceHarvesting.SandcrawlerDelivery": "Bring a Sandcrawler to a large Spice Field",
+    "DA_SQ_DeepDesert.DDHarvesting.SpiceHarvesting.SandcrawlerHarvest": "Harvest Spice from a large Spice Field with a Sandcrawler",
+    "DA_SQ_DeepDesert.DDHarvesting.SpiceHarvesting.SpiceThumper": "Use a Thumper to distract a worm away from the Sandcrawler",
+    "DA_SQ_JabalEifrit": "Jabal Eifrit & Hagga Rift",
+    "DA_SQ_JabalEifrit.SpecializedFabricators": "Specialized Fabrication",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.SurvivalFabricator": "Survival Fabricator",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.SurvivalFabricator.ResearchSurvival": "Research the Survival Fabricator",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.SurvivalFabricator.ResearchConstructSurvivalFabricator": "Construct or interact with a Survival Fabricator",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.SurvivalFabricator.ResearchAdvancedShield": "Research the Holtzman Shield Mk3",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.SurvivalFabricator.CraftAdvancedShield": "Fabricate a Holtzman Shield Mk3",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.VehicleFabricator": "Vehicle Fabricator",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.VehicleFabricator.ResearchVehicle": "Research the Vehicles Fabricator",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.VehicleFabricator.ResearchConstructVehicleFabricator": "Construct or interact with a Vehicles Fabricator",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.VehicleFabricator.ResearchSandbikeBoost": "Research the Sandbike Booster Mk3",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.VehicleFabricator.CraftSandbikeBoost": "Fabricate a Sandbike Booster Mk3",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.WeaponFabricator": "Weapons Fabricator",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.WeaponFabricator.ResearchWeapons": "Research the Weapons Fabricator",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.WeaponFabricator.ResearchConstructWeaponsFabricator": "Construct or interact with a Weapons Fabricator",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.WeaponFabricator.ResearchArtisanKindjal": "Research the Artisan Kindjal",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.WeaponFabricator.CraftArtisanKindjal": "Fabricate an Artisan Kindjal",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.WearableFabricator": "Garment Fabricator",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.WearableFabricator.ResearchGarment": "Research the Garment Fabricator",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.WearableFabricator.ResearchConstructWearableFabricator": "Construct or interact with a Garment Fabricator",
+    "DA_SQ_JabalEifrit.SpecializedFabricators.WearableFabricator.CraftSteelStillsuit": "Fabricate a Slaver Stillsuit",
+    "DA_SQ_JabalEifrit.BuildBuggy": "A Bigger Haul",
+    "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy": "Research and fabricate a Four Man Groundcar (aka Buggy)",
+    "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy.ResearchBuggy": "Research the Buggy Mk3 Assembly",
+    "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy.CraftChassis": "Fabricate a Buggy Chassis Mk3",
+    "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy.CraftHullFront": "Fabricate a Buggy Hull Mk3",
+    "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy.CraftEngine": "Fabricate a Buggy Engine Mk3",
+    "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy.CraftPSU": "Fabricate a Buggy PSU Mk3",
+    "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy.CraftTreads": "Fabricate Buggy Tread Mk3 (4)",
+    "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy.CraftRear Hull": "Fabricate a Buggy Rear Mk3",
+    "DA_SQ_JabalEifrit.BuildBuggy.Assemble": "Welding it together",
+    "DA_SQ_JabalEifrit.BuildBuggy.Assemble.AssembleBuggy": "Assemble the Buggy Mk3 using a Welding Torch",
+    "DA_SQ_JabalEifrit.BuildBuggy.Assemble.EnterBuggy": "Enter the Buggy Mk3",
+    "DA_SQ_JabalEifrit.WeaponsofWarII": "Weapons of War II",
+    "DA_SQ_JabalEifrit.WeaponsofWarII.SpitdartRifle": "Long range killer",
+    "DA_SQ_JabalEifrit.WeaponsofWarII.SpitdartRifle.ResearchSpitdart": "Research the Artisan JABAL Spitdart",
+    "DA_SQ_JabalEifrit.WeaponsofWarII.SpitdartRifle.CraftSpitdart": "Fabricate an Artisan JABAL Spitdart",
+    "DA_SQ_JabalEifrit.WeaponsofWarII.SpitdartRifle.KillSpitdart": "Kill enemies with an Artisan JABAL Spitdart (15)",
+    "DA_SQ_JabalEifrit.WeaponsofWarII.Dirk": "Close quarters wetwork",
+    "DA_SQ_JabalEifrit.WeaponsofWarII.Dirk.ResearchDirk": "Research the Artisan Dirk",
+    "DA_SQ_JabalEifrit.WeaponsofWarII.Dirk.CraftDirk": "Fabricate an Artisan Dirk",
+    "DA_SQ_JabalEifrit.WeaponsofWarII.Dirk.KillDirk": "Kill enemies with an Artisan Dirk (15)",
+    "DA_SQ_JabalEifrit.WeaponsofWarII.SnubnosePistol": "High powered pain",
+    "DA_SQ_JabalEifrit.WeaponsofWarII.SnubnosePistol.ResearchSnubnosePistol": "Research the Artisan Rafiq Snubnose",
+    "DA_SQ_JabalEifrit.WeaponsofWarII.SnubnosePistol.CraftSnubnosePistol": "Fabricate an Artisan Rafiq Snubnose",
+    "DA_SQ_JabalEifrit.WeaponsofWarII.SnubnosePistol.KillSnubnosePistol": "Kill enemies with an Artisan Rafiq Snubnose (15)",
+    "DA_SQ_JabalEifrit.WeaponsofWarII.SteelArmor": "Slaver Scout Armor",
+    "DA_SQ_JabalEifrit.WeaponsofWarII.SteelArmor.ResearchSteelArmor": "Research Slaver Scout Armor",
+    "DA_SQ_JabalEifrit.WeaponsofWarII.SteelArmor.CraftSteelArmor": "Fabricate a full set of Slaver Scout Armor",
+    "DA_SQ_JabalEifrit.WeaponsofWarII.SteelArmor.EquipSteelArmor": "Equip the Slaver Scout Armor",
+    "DA_SQ_JabalEifrit.ExploreJabal": "The Jabal Spires",
+    "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalWest": "Explore Jabal Eifrit Al-janub",
+    "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalWest.SurveyJabalWest": "Survey Jabal Eifrit Al-janub",
+    "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalWest.JabalWestTestingStation": "Travel to Imperial Testing Station No. 76",
+    "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalWest.JabalWestOutpost": "Travel to Khidr’s Shadow outpost",
+    "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalWest.JabalWestHandofKhidir": "Climb the Hand of Khidr",
+    "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalEast": "Explore Jabal Eifrit Al-sharq",
+    "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalEast.SurveyJabalEast": "Survey Jabal Eifrit Al-sharq",
+    "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalEast.JabalEastShipwreck": "Travel to the Wreck of the Tisiphone",
+    "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalEast.JabalEastEcolab": "Travel to Imperial Testing Station No. 63",
+    "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalNorth": "Explore Jabal Eifrit Al-gharb",
+    "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalNorth.SurveyJabalNorth": "Survey Jabal Eifrit Al-gharb",
+    "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalNorth.JabalNorthEcolab": "Travel to the Pinnacle Tradepost",
+    "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalNorth.JabalNorthOutpost": "Travel to Eastern Jumble Outpost",
+    "DA_SQ_JabalEifrit.ExploreHaggaRift": "Depths of the Rift",
+    "DA_SQ_JabalEifrit.ExploreHaggaRift.ExploreTheRift": "Explore the Rift",
+    "DA_SQ_JabalEifrit.ExploreHaggaRift.ExploreTheRift.SurveyHaggaRift": "Survey Hagga Rift",
+    "DA_SQ_JabalEifrit.ExploreHaggaRift.ExploreTheRift.RiftShipwreck": "Travel to the Wreck of the Kytheria",
+    "DA_SQ_JabalEifrit.ExploreHaggaRift.ExploreTheRift.RiftEcolab": "Travel to Imperial Testing Station No. 29",
+    "DA_SQ_JabalEifrit.ExploreHaggaRift.ExploreTheRift.RiftSpiral": "Travel to the Spiral Outpost",
+    "DA_SQ_JabalEifrit.Thumper": "Calling the Worm",
+    "DA_SQ_JabalEifrit.Thumper.UnlockandCraftThumper": "Vibrations on the Sand",
+    "DA_SQ_JabalEifrit.Thumper.UnlockandCraftThumper.CraftThumper": "Fabricate a Thumper",
+    "DA_SQ_JabalEifrit.Thumper.UseThumper": "Call a sandworm",
+    "DA_SQ_JabalEifrit.Thumper.UseThumper.EquipThumper": "Equip the Thumper",
+    "DA_SQ_JabalEifrit.Thumper.UseThumper.PlaceThumper": "Place a Thumper on open sand to attract a worm",
+    "DA_SQ_JabalEifrit.PortableLight": "A Light in the Darkness",
+    "DA_SQ_JabalEifrit.PortableLight.UnlockandCraftPortableLight": "Illuminating the path",
+    "DA_SQ_JabalEifrit.PortableLight.UnlockandCraftPortableLight.ResearchPortableLight": "Research the Personal Light",
+    "DA_SQ_JabalEifrit.PortableLight.UnlockandCraftPortableLight.CraftPortableLight": "Fabricate a Personal Light",
+    "DA_SQ_JabalEifrit.PortableLight.UnlockandCraftPortableLight.EquipPortableLight": "Equip the Personal Light",
+    "DA_SQ_JabalEifrit.PortableLight.UnlockandCraftPortableLight.TraveltoHaggaRift": "Travel into the Hagga Rift and use the Personal Light",
+    "DA_SQ_JabalEifrit.UsingStilltent": "Stormproof",
+    "DA_SQ_JabalEifrit.UsingStilltent.Stilltent": "Stilltent",
+    "DA_SQ_JabalEifrit.UsingStilltent.Stilltent.CraftStilltent": "Fabricate a Stilltent",
+    "DA_SQ_JabalEifrit.UsingStilltent.Stilltent.PlaceStilltent": "Place the Stilltent",
+    "DA_SQ_JabalEifrit.UsingStilltent.Stilltent.EnterStilltent": "Enter the Stilltent",
+    "DA_SQ_JabalEifrit.Deathstill": "Life from Death",
+    "DA_SQ_JabalEifrit.Deathstill.ResearchConstructDeathstill": "Construct a Deathstill",
+    "DA_SQ_JabalEifrit.Deathstill.ResearchConstructDeathstill.ConstructDeathstill": "Construct or interact with a Fremen Deathstill",
+    "DA_SQ_JabalEifrit.Deathstill.ResearchConstructDeathstill.ResearchWaterCistern": "Research the Medium Water Cistern",
+    "DA_SQ_JabalEifrit.Deathstill.ResearchConstructDeathstill.ConstructWaterCistern": "Construct or interact with a Medium Water Cistern",
+    "DA_SQ_JabalEifrit.Deathstill.KillandPickupEnemy": "Drain the Enemy",
+    "DA_SQ_JabalEifrit.Deathstill.KillandPickupEnemy.KillEnemy": "Locate and kill an enemy",
+    "DA_SQ_JabalEifrit.Deathstill.KillandPickupEnemy.PickupCorpse": "Pick up the corpse",
+    "DA_SQ_JabalEifrit.Deathstill.KillandPickupEnemy.DepositCorpse": "Return to your base and place the corpse in a Deathstill",
+    "DA_SQ_Oodham": "Shield Wall & O'odham",
+    "DA_SQ_Oodham.RadiationSuit": "Radiation Mitigation",
+    "DA_SQ_Oodham.RadiationSuit.RadiationResearchCraft": "Radiation Suit Mk4",
+    "DA_SQ_Oodham.RadiationSuit.RadiationResearchCraft.RadiationResearch": "Research the Radiation Suit Mk4",
+    "DA_SQ_Oodham.RadiationSuit.RadiationResearchCraft.RadiationCraft": "Fabricate a Radiation Suit Mk4",
+    "DA_SQ_Oodham.RadiationSuit.RadiationResearchCraft.EquipRadiation": "Equip a Radiation Suit Mk4",
+    "DA_SQ_Oodham.OodhamKill": "Weapons of War III",
+    "DA_SQ_Oodham.OodhamKill.ElephantGun": "House Drillshot FK7",
+    "DA_SQ_Oodham.OodhamKill.ElephantGun.ResearchElephantGun": "Research the Drillshot FK7",
+    "DA_SQ_Oodham.OodhamKill.ElephantGun.CraftElephantGun": "Fabricate a Drillshot FK7",
+    "DA_SQ_Oodham.OodhamKill.ElephantGun.KillElephantGun": "Kill enemies with a Drillshot FK7 (15)",
+    "DA_SQ_Oodham.OodhamKill.LMG": "House Vulcan GAU-92",
+    "DA_SQ_Oodham.OodhamKill.LMG.ResearchLMG": "Research the Vulcan GAU-92",
+    "DA_SQ_Oodham.OodhamKill.LMG.CraftLMG": "Fabricate a Vulcan GAU-92",
+    "DA_SQ_Oodham.OodhamKill.LMG.KillLMG": "Kill enemies with a Vulcan GAU-92 (15)",
+    "DA_SQ_Oodham.OodhamKill.Rapier": "House Rapier",
+    "DA_SQ_Oodham.OodhamKill.Rapier.ResearchRapier": "Research Rapier",
+    "DA_SQ_Oodham.OodhamKill.Rapier.CraftRapier": "Fabricate a Rapier",
+    "DA_SQ_Oodham.OodhamKill.Rapier.KillRapier": "Kill enemies with a Rapier (15)",
+    "DA_SQ_Oodham.OodhamKill.AlumiteArmor": "Duneman Heavy Armor",
+    "DA_SQ_Oodham.OodhamKill.AlumiteArmor.ResearchAlumiteArmor": "Research Duneman Heavy Armor",
+    "DA_SQ_Oodham.OodhamKill.AlumiteArmor.CraftAlumiteArmor": "Fabricate a full set of Duneman Heavy Armor",
+    "DA_SQ_Oodham.OodhamKill.AlumiteArmor.EquipAlumiteArmor": "Equip Duneman Heavy Armor",
+    "DA_SQ_Oodham.SpiceMask": "The Spice Must Flow",
+    "DA_SQ_Oodham.SpiceMask.UnlockSpiceMask": "Spice Mask",
+    "DA_SQ_Oodham.SpiceMask.UnlockSpiceMask.ResearchSpiceMask": "Research the Spice Mask",
+    "DA_SQ_Oodham.SpiceMask.UnlockSpiceMask.CraftSpiceMask": "Fabricate a Spice Mask",
+    "DA_SQ_Oodham.SpiceMask.UnlockSpiceMask.EquipSpiceMask": "Equip a Spice Mask",
+    "DA_SQ_Oodham.SpiceMask.SpiceHarvest": "Harvest Spice",
+    "DA_SQ_Oodham.SpiceMask.SpiceHarvest.SpiceMaskHarvest": "Harvest Spice with a Static Compactor while wearing a Spice Mask",
+    "DA_SQ_Oodham.Ornithopter": "Airborne!",
+    "DA_SQ_Oodham.Ornithopter.UnlockOrni": "Scout Ornithopter Mk4",
+    "DA_SQ_Oodham.Ornithopter.UnlockOrni.ResearchOrni": "Research the Scout Ornithopter Mk4",
+    "DA_SQ_Oodham.Ornithopter.CraftOrni": "Fabricate a Scout Ornithopter Mk4",
+    "DA_SQ_Oodham.Ornithopter.CraftOrni.CraftBodyHull": "Fabricate an Ornithopter Body Hull Mk4",
+    "DA_SQ_Oodham.Ornithopter.CraftOrni.CraftChassis": "Fabricate an Ornithopter Chassis Mk4",
+    "DA_SQ_Oodham.Ornithopter.CraftOrni.CraftCockpit": "Fabricate an Ornithopter Cockpit Mk4",
+    "DA_SQ_Oodham.Ornithopter.CraftOrni.CraftEngine": "Fabricate an Ornithopter Engine Mk4",
+    "DA_SQ_Oodham.Ornithopter.CraftOrni.CraftGenerator": "Fabricate an Ornithopter Generator Mk4",
+    "DA_SQ_Oodham.Ornithopter.CraftOrni.CraftWings": "Fabricate Ornithopter Wing Mk4 (4)",
+    "DA_SQ_Oodham.Ornithopter.ConstructOrni": "First flight",
+    "DA_SQ_Oodham.Ornithopter.ConstructOrni.BuildOrni": "Assemble the Scout Ornithopter Mk4",
+    "DA_SQ_Oodham.Ornithopter.ConstructOrni.EnterOrni": "Pilot the Scout Ornithopter Mk4",
+    "DA_SQ_Oodham.Exploration": "The Wall and the Valley",
+    "DA_SQ_Oodham.Exploration.ShieldWallEast": "Eastern Shield Wall",
+    "DA_SQ_Oodham.Exploration.ShieldWallEast.SurveyShieldWallEast": "Survey the Eastern Shield Wall",
+    "DA_SQ_Oodham.Exploration.ShieldWallEast.RedScorpion": "Travel to Imperial Testing Station No. 142",
+    "DA_SQ_Oodham.Exploration.ShieldWallEast.StoneSentinel": "Travel to the Stone Sentinel",
+    "DA_SQ_Oodham.Exploration.ShieldWallWest": "Western Shield Wall",
+    "DA_SQ_Oodham.Exploration.ShieldWallWest.SurveyShieldWallWest": "Survey the Western Shield Wall",
+    "DA_SQ_Oodham.Exploration.ShieldWallWest.Refinery": "Travel to Imperial Testing Station No. 60",
+    "DA_SQ_Oodham.Exploration.ShieldWallWest.Shipwreck": "Travel to the Wreck of the Alecto",
+    "DA_SQ_Oodham.Exploration.Oodham": "The O'odham",
+    "DA_SQ_Oodham.Exploration.Oodham.SurveyOodham": "Survey the O'odham",
+    "DA_SQ_Oodham.Exploration.Oodham.WaterTrap": "Travel to Imperial Testing Station No. 163",
+    "DA_SQ_Oodham.Exploration.MysaTarill": "Mysa Tarill",
+    "DA_SQ_Oodham.Exploration.MysaTarill.SurveyMysaTarill": "Survey Mysa Tarill",
+    "DA_SQ_Oodham.Exploration.MysaTarill.Crossroads": "Travel to the Crossroads Tradepost",
+    "DA_SQ_OverlandMap": "Greater Arrakis",
+    "DA_SQ_OverlandMap.AtreLandsraadMission": "Of Politics and Recollection",
+    "DA_SQ_OverlandMap.AtreLandsraadMission.AtreMission": "Start mnemonic recollection",
+    "DA_SQ_OverlandMap.AtreLandsraadMission.AtreMission.AtreAccept": "Accept a Landsraad mission from the Landsraad > Missions menu",
+    "DA_SQ_OverlandMap.AtreLandsraadMission.AtreMission.AtreComplete": "Complete a Landsraad mission",
+    "DA_SQ_OverlandMap.AtreLandsraadMission.AtreMission.AtreClaimReward": "Claim your reward from the Landsraad > Missions menu",
+    "DA_SQ_OverlandMap.AtreLandsraadMission.AtreMission.AtreKeyStone": "Acquire the \"Ranged Augmentation Limit\" Trait from the Skills > Specialization menu",
+    "DA_SQ_OverlandMap.AtreLandsraadMission.AtreMission.AtreReturn": "Talk to Thufir Hawat",
+    "DA_SQ_OverlandMap.HarkLandsraadMission": "Of Politics and Recollection",
+    "DA_SQ_OverlandMap.HarkLandsraadMission.HarkMission": "Start mnemonic recollection",
+    "DA_SQ_OverlandMap.HarkLandsraadMission.HarkMission.HarkAccept": "Accept a Landsraad mission from the Landsraad > Missions menu",
+    "DA_SQ_OverlandMap.HarkLandsraadMission.HarkMission.HarkComplete": "Complete a Landsraad mission",
+    "DA_SQ_OverlandMap.HarkLandsraadMission.HarkMission.HarkClaimReward": "Claim your reward from the Landsraad > Missions menu",
+    "DA_SQ_OverlandMap.HarkLandsraadMission.HarkMission.HarkKeyStone": "Acquire the \"Ranged Augmentation Limit\" Trait from the Skills > Specialization menu",
+    "DA_SQ_OverlandMap.HarkLandsraadMission.HarkMission.HarkReturn": "Talk to Piter de Vries",
+    "DA_SQ_OverlandMap.AtreAugmentation": "Mnemonic Devices",
+    "DA_SQ_OverlandMap.AtreAugmentation.AtreVendor": "Acquire a Regis component",
+    "DA_SQ_OverlandMap.AtreAugmentation.AtreVendor.AtreBuyItem": "Purchase an Offworld Regis Compound from the Landsraad crafting vendor",
+    "DA_SQ_OverlandMap.AtreAugmentation.AtreVendor.AtreFabriate": "Fabricate a Regis Component in the Advanced Survival Fabricator",
+    "DA_SQ_OverlandMap.AtreAugmentation.AtreAugmentStation": "Craft a weapon augmentation",
+    "DA_SQ_OverlandMap.AtreAugmentation.AtreAugmentStation.AtreFabricateAugment": "Fabricate an augmentation for a ranged weapon in the Advanced Weapons Fabricator",
+    "DA_SQ_OverlandMap.AtreAugmentation.AtreAugmentStation.AtreResearch": "Research the Augmentation Station",
+    "DA_SQ_OverlandMap.AtreAugmentation.AtreAugmentStation.AtreConstructStation": "Construct or interact with an Augmentation Station",
+    "DA_SQ_OverlandMap.AtreAugmentation.AtreAugmentStation.AtreApplyAugment": "Upgrade an item with an augmentation",
+    "DA_SQ_OverlandMap.HarkAugmentation": "Mnemonic Devices",
+    "DA_SQ_OverlandMap.HarkAugmentation.HarkVendor": "Acquire a Regis component",
+    "DA_SQ_OverlandMap.HarkAugmentation.HarkVendor.HarkBuyItem": "Purchase an Offworld Regis Compound from the Landsraad crafting vendor",
+    "DA_SQ_OverlandMap.HarkAugmentation.HarkVendor.HarkFabriate": "Fabricate a Regis Component in the Advanced Survival Fabricator",
+    "DA_SQ_OverlandMap.HarkAugmentation.HarkAugmentStation": "Craft a weapon augmentation",
+    "DA_SQ_OverlandMap.HarkAugmentation.HarkAugmentStation.HarkFabricateAugment": "Fabricate an augmentation for a ranged weapon in the Advanced Weapons Fabricator",
+    "DA_SQ_OverlandMap.HarkAugmentation.HarkAugmentStation.HarkResearch": "Research the Augmentation Station",
+    "DA_SQ_OverlandMap.HarkAugmentation.HarkAugmentStation.HarkConstructStation": "Construct or interact with an Augmentation Station",
+    "DA_SQ_OverlandMap.HarkAugmentation.HarkAugmentStation.HarkApplyAugment": "Upgrade an item with an augmentation",
+    "DA_SQ_OverlandMap.Dungeon": "Raider of the Broken Lands",
+    "DA_SQ_OverlandMap.Dungeon.DungeonMaster": "Find more augmentation schematics",
+    "DA_SQ_OverlandMap.Dungeon.DungeonMaster.TraveltoDungeon": "Attune to any dungeon after entering it from the Overland map",
+    "DA_SQ_OverlandMap.Dungeon.DungeonMaster.KillDungeonBoss": "Defeat the last challenger of the dungeon",
+    "DA_SQ_OverlandMap.Dungeon.DungeonMaster.LootAugmentSchematics": "Acquire an augmentation schematic from a dungeon",
+    "DA_SQ_OverlandMap.Dungeon.DungeonMaster.RecycleAugmentSchematic": "Recycle an augmentation schematic",
+    "DA_SQ_OverlandMap.ScalingUp": "Exponential Growth",
+    "DA_SQ_OverlandMap.ScalingUp.DifficultyScaling": "Proving your strength",
+    "DA_SQ_OverlandMap.ScalingUp.DifficultyScaling.CompleteFirst": "Enter and complete any dungeon on the overland map at difficulty 20 or higher",
+    "DA_SQ_OverlandMap.ScalingUp.DifficultyScaling.CompleteSecond": "Enter and complete any dungeon on the overland map at difficulty 30 or higher",
+    "DA_SQ_OverlandMap.14Update": "Terminal Profits",
+    "DA_SQ_OverlandMap.14Update.CompleteWindPass": "Investigate Wind Pass",
+    "DA_SQ_OverlandMap.14Update.CompleteWindPass.1": "Complete any Landsraad missions in Wind Pass",
+    "DA_SQ_OverlandMap.14Update.2": "Investigate the Old Quarry",
+    "DA_SQ_OverlandMap.14Update.2.1": "Defeat the last challenger of the Old Quarry",
+    "DA_SQ_OverlandMap.14Update.2.2": "Complete the Old Quarry on difficulty 15 or higher",
+    "DA_SQ_Sheol": "The Sheol",
+    "DA_SQ_Sheol.ExploreSheol": "The Graveyard",
+    "DA_SQ_Sheol.ExploreSheol.SurveyandPOI": "Discover the Sheol",
+    "DA_SQ_Sheol.ExploreSheol.SurveyandPOI.SurveySheol": "Survey the Sheol",
+    "DA_SQ_Sheol.ExploreSheol.SurveyandPOI.HarkoBase": "Travel to the Harkonnen base in the Northern Sheol",
+    "DA_SQ_Sheol.ExploreSheol.SurveyandPOI.TravelShipwreck": "Travel to the Wreck of the Ourea",
+    "DA_SQ_Sheol.IodinePill": "Mitigation Iteration",
+    "DA_SQ_Sheol.IodinePill.UnlockandusePill": "Iodine Pill",
+    "DA_SQ_Sheol.IodinePill.UnlockandusePill.ResearchPill": "Research the Iodine Pill",
+    "DA_SQ_Sheol.IodinePill.UnlockandusePill.CraftPill": "Fabricate an Iodine Pill",
+    "DA_SQ_Sheol.IodinePill.UnlockandusePill.ConsumePill": "Consume an Iodine Pill",
+    "DA_SQ_Taxation": "Miscellaneous",
+    "DA_SQ_Taxation.Taxi": "A Wider World",
+    "DA_SQ_Taxation.Taxi.TravelCity": "Reach a settlement",
+    "DA_SQ_Taxation.Taxi.TravelCity.Tradepost": "Travel to a Tradepost",
+    "DA_SQ_Taxation.Taxi.TravelCity.TalkPilot": "Talk to the ornithopter pilot",
+    "DA_SQ_Taxation.Taxi.TravelCity.Travel": "Reach a settlement",
+    "DA_SQ_Taxation.VehicleBackup": "A Backup Plan",
+    "DA_SQ_Taxation.VehicleBackup.BasicInventory": "Sandbike Inventory Mk1",
+    "DA_SQ_Taxation.VehicleBackup.BasicInventory.Research": "Research the Sandbike Inventory Mk1",
+    "DA_SQ_Taxation.VehicleBackup.BasicInventory.Fabricate": "Fabricate a Sandbike Inventory Mk1",
+    "DA_SQ_Taxation.VehicleBackup.BasicInventory.Construct": "Add a Sandbike Inventory Mk1 to your Sandbike",
+    "DA_SQ_Taxation.VehicleBackup.BackupTool": "Vehicle Backup Tool",
+    "DA_SQ_Taxation.VehicleBackup.BackupTool.ResearchBackup": "Research the Vehicle Backup Tool",
+    "DA_SQ_Taxation.VehicleBackup.BackupTool.FabricateBackup": "Fabricate a Vehicle Backup Tool",
+    "DA_SQ_Taxation.VehicleBackup.BackupTool.BackupVehicle": "Store a vehicle using a Backup Tool",
+    "DA_SQ_Taxation.MovingBase": "Location, location, location",
+    "DA_SQ_Taxation.MovingBase.CopyDevice": "Solido Replicator",
+    "DA_SQ_Taxation.MovingBase.CopyDevice.ResearchCopyDevice": "Research the Solido Replicator",
+    "DA_SQ_Taxation.MovingBase.CopyDevice.FabricateCopyDevice": "Fabricate a Solido Replicator",
+    "DA_SQ_Taxation.MovingBase.CopyDevice.CopyYourBase": "Copy a base using a Solido Replicator",
+    "DA_SQ_Taxation.UseExchange": "Banking Solaris",
+    "DA_SQ_Taxation.UseExchange.Exchange": "A solari saved is a solari not dropped on death...",
+    "DA_SQ_Taxation.UseExchange.Exchange.Solaris": "Collect solaris and put them in your backpack (200)",
+    "DA_SQ_Taxation.UseExchange.Exchange.TravelCity": "Travel to Harko Village or Arrakeen",
+    "DA_SQ_Taxation.UseExchange.Exchange.DepositSolaris": "Locate a banker and deposit solaris (200)",
+    "DA_SQ_Taxation.SandwormRecovery": "The Song of Shai-Hulud",
+    "DA_SQ_Taxation.SandwormRecovery.MysteriousSinging": "Find the source of the Mysterious Singing",
+    "DA_SQ_VermiliusGap": "Vermillius Gap",
+    "DA_SQ_VermiliusGap.Relocate": "Moving On",
+    "DA_SQ_VermiliusGap.Relocate.RelocateOutsideHBS": "Move your base to a new area",
+    "DA_SQ_VermiliusGap.Relocate.RelocateOutsideHBS.Drive north to the Vermilius Gap": "Drive north to the Vermillius Gap",
+    "DA_SQ_VermiliusGap.Relocate.RelocateOutsideHBS.ResearchAdvTotem": "Research the Advanced Construction Kit",
+    "DA_SQ_VermiliusGap.Relocate.RelocateOutsideHBS.ConstructAdvTotem": "Construct or interact with an Advanced Sub-Fief Console",
+    "DA_SQ_VermiliusGap.Relocate.RelocateOutsideHBS.DestroyYourBase": "Open the map and abandon your base(s) in Hagga Basin South",
+    "DA_SQ_VermiliusGap.Shields": "Preparing for life in Vermillius",
+    "DA_SQ_VermiliusGap.Shields.MiningToolUpgrade": "Upgrading the Mining Tool",
+    "DA_SQ_VermiliusGap.Shields.MiningToolUpgrade.ResearchCopperCutteray": "Research the Cutteray Mk1",
+    "DA_SQ_VermiliusGap.Shields.MiningToolUpgrade.FabricateCopperCutteray": "Fabricate a Cutteray Mk1",
+    "DA_SQ_VermiliusGap.Shields.MiningToolUpgrade.RefineIronIngots": "Refine Iron Ore",
+    "DA_SQ_VermiliusGap.Shields.BasicShield": "Holtzman Shield",
+    "DA_SQ_VermiliusGap.Shields.BasicShield.ShieldResearch": "Research a Holtzman Shield Mk2",
+    "DA_SQ_VermiliusGap.Shields.BasicShield.ShieldCraft": "Fabricate a Holtzman Shield Mk2",
+    "DA_SQ_VermiliusGap.Shields.BasicShield.ShieldEquip": "Equip a Holtzman Shield Mk2",
+    "DA_SQ_VermiliusGap.Shields.BasicShield.ShieldActivate": "Activate the Holtzman Shield Mk2",
+    "DA_SQ_VermiliusGap.StylesofSand": "Styles of Sand",
+    "DA_SQ_VermiliusGap.StylesofSand.FlourSand": "Sand to Silicone",
+    "DA_SQ_VermiliusGap.StylesofSand.FlourSand.ResearchScanner": "Research the Handheld Resource Scanner",
+    "DA_SQ_VermiliusGap.StylesofSand.FlourSand.UnlockScanner": "Fabricate a Handheld Resource Scanner",
+    "DA_SQ_VermiliusGap.StylesofSand.FlourSand.FlourSandLocate": "Locate a Flour Sand Field using a Scanner",
+    "DA_SQ_VermiliusGap.StylesofSand.FlourSand.FlourSandHarvest": "Gather Flour Sand (20)",
+    "DA_SQ_VermiliusGap.StylesofSand.FlourSand.RefineFlourSand": "Refine Silicone Blocks",
+    "DA_SQ_VermiliusGap.DewReaper": "Reap and Stow",
+    "DA_SQ_VermiliusGap.DewReaper.CraftDewReaper": "Tools and Containers",
+    "DA_SQ_VermiliusGap.DewReaper.CraftDewReaper.ResearchDewReaper": "Research the Dew Reaper Mk2",
+    "DA_SQ_VermiliusGap.DewReaper.CraftDewReaper.ResearchLiterjon": "Research the Literjon",
+    "DA_SQ_VermiliusGap.DewReaper.CraftDewReaper.FabricateDewReaper": "Fabricate a Dew Reaper Mk2",
+    "DA_SQ_VermiliusGap.DewReaper.CraftDewReaper.FabricateLiterjon": "Fabricate a Literjon",
+    "DA_SQ_VermiliusGap.DewReaper.HarvestandStore": "The Tears of Arrakis",
+    "DA_SQ_VermiliusGap.DewReaper.HarvestandStore.ReaoDew": "Reap dew from fields of flowers during the night and fill your Literjon",
+    "DA_SQ_VermiliusGap.DewReaper.HarvestandStore.ResearchCistern": "Research the Water Cistern",
+    "DA_SQ_VermiliusGap.DewReaper.HarvestandStore.ReseachandConstructCistern": "Construct or interact with a Water Cistern",
+    "DA_SQ_VermiliusGap.DewReaper.HarvestandStore.DepositWater": "Deposit water in a Water Cistern",
+    "DA_SQ_VermiliusGap.Weapons": "Weapons of War",
+    "DA_SQ_VermiliusGap.Weapons.Sword": "An Unremarkable Blade",
+    "DA_SQ_VermiliusGap.Weapons.Sword.SwordResearch": "Research a Standard Sword",
+    "DA_SQ_VermiliusGap.Weapons.Sword.SwordCraft": "Fabricate a Standard Sword",
+    "DA_SQ_VermiliusGap.Weapons.Sword.SwordKill": "Kill enemies with a Standard Sword (15)",
+    "DA_SQ_VermiliusGap.Weapons.Scattergun": "Spreading Aim",
+    "DA_SQ_VermiliusGap.Weapons.Scattergun.ScattergunResearch": "Research a Standard GRDA 44",
+    "DA_SQ_VermiliusGap.Weapons.Scattergun.ScattergunCraft": "Fabricate a Standard GRDA 44",
+    "DA_SQ_VermiliusGap.Weapons.Scattergun.ScattergunKill": "Kill enemies with a Standard GRDA 44  (15)",
+    "DA_SQ_VermiliusGap.Weapons.SMG": "Ready to Burst",
+    "DA_SQ_VermiliusGap.Weapons.SMG.SMGResearch": "Research a Standard Disruptor M11",
+    "DA_SQ_VermiliusGap.Weapons.SMG.SMGCraft": "Fabricate a Standard Disruptor M11",
+    "DA_SQ_VermiliusGap.Weapons.SMG.SMGKill": "Kill enemies with a Standard Disruptor M11 (15)",
+    "DA_SQ_VermiliusGap.Weapons.Armor": "The Iron Wall",
+    "DA_SQ_VermiliusGap.Weapons.Armor.ArmorResearch": "Research Kirab Heavy Armor",
+    "DA_SQ_VermiliusGap.Weapons.Armor.ArmorCraft": "Fabricate Kirab Heavy Armor",
+    "DA_SQ_VermiliusGap.Weapons.Armor.ArmorEquip": "Equip Kirab Heavy Armor",
+    "DA_SQ_VermiliusGap.SurveyVermillius": "Touring the Gap",
+    "DA_SQ_VermiliusGap.SurveyVermillius.ExploreEast": "Explore the Eastern Vermillius Gap",
+    "DA_SQ_VermiliusGap.SurveyVermillius.ExploreEast.SurveyEast": "Survey the Eastern Vermillius Gap",
+    "DA_SQ_VermiliusGap.SurveyVermillius.ExploreEast.EastTestingStation": "Travel to Imperial Testing Station No. 10",
+    "DA_SQ_VermiliusGap.SurveyVermillius.ExploreEast.EastOutpost": "Travel to the Southeast Ironworks",
+    "DA_SQ_VermiliusGap.SurveyVermillius.ExploreEast.EastTradepost": "Travel to the Anvil Tradepost",
+    "DA_SQ_VermiliusGap.SurveyVermillius.ExploreWest": "Explore the Western Vermillius Gap",
+    "DA_SQ_VermiliusGap.SurveyVermillius.ExploreWest.SurveyWest": "Survey the Western Vermillius Gap",
+    "DA_SQ_VermiliusGap.SurveyVermillius.ExploreWest.WestShipwreck": "Travel to The Wreck of the Pallas",
+    "DA_SQ_VermiliusGap.SurveyVermillius.ExploreWest.WestOutpost": "Travel to Flatrock Outpost",
+    "DA_SQ_VermiliusGap.SurveyVermillius.ExploreWest.WestEcolab": "Travel to Imperial Testing Station No. 197",
+    "DA_SQ_VermiliusGap.VermilliusContracts": "The Vermillius Contract",
+    "DA_SQ_VermiliusGap.VermilliusContracts.TravelContract": "Travel to the Anvil Tradepost and pick up Contracts",
+    "DA_SQ_VermiliusGap.VermilliusContracts.TravelContract.TravelAnvilStation": "Travel to the Anvil Tradepost",
+    "DA_SQ_VermiliusGap.VermilliusContracts.TravelContract.PickupContracts": "Interact with the Contract Board",
+    "DA_SQ_VermiliusGap.VermilliusContracts.CompleteContracts": "Complete Contracts",
+    "DA_SQ_VermiliusGap.VermilliusContracts.CompleteContracts.ThievesContacts": "Complete Contract \"PAYBACK: Stealing from Thieves\"",
+    "DA_SQ_VermiliusGap.VermilliusContracts.CompleteContracts.SpiceContract": "Complete Contract \"MONSTER SLAYING: Put Out the Eyes\"",
+    "DA_SQ_VermiliusGap.Maintenance": "Maintenance",
+    "DA_SQ_VermiliusGap.Maintenance.maintainSandbike": "Repairing Vehicles",
+    "DA_SQ_VermiliusGap.Maintenance.maintainSandbike.ObtainWeldingTorch": "Fabricate a Welding Torch Mk1",
+    "DA_SQ_VermiliusGap.Maintenance.maintainSandbike.Weldingwire": "Fabricate Welding Wire",
+    "DA_SQ_VermiliusGap.Maintenance.maintainSandbike.RepairSandbike": "Use the Welding Torch Mk1 to repair a vehicle",
+    "DA_SQ_VermiliusGap.Maintenance.Recycleandrepair": "Repair items",
+    "DA_SQ_VermiliusGap.Maintenance.Recycleandrepair.ResearchRepair": "Research the Repair Station",
+    "DA_SQ_VermiliusGap.Maintenance.Recycleandrepair.Repair": "Construct or interact with a Repair Station",
+    "DA_SQ_VermiliusGap.Maintenance.Recycleandrepair.RepairItems": "Repair an item in the Repair Station",
+    "DA_SQ_VermiliusGap.Maintenance.RecycleItems": "Recycle items",
+    "DA_SQ_VermiliusGap.Maintenance.RecycleItems.ResearchRecycle": "Research the Recycler",
+    "DA_SQ_VermiliusGap.Maintenance.RecycleItems.Recycle": "Construct or interact with a Recycler",
+    "DA_SQ_VermiliusGap.Maintenance.RecycleItems.UseRecycle": "Recycle items using a Recycler (10)",
+    "DA_SQ_VermiliusGap.InteriorDecoration": "Interior Decoration",
+    "DA_SQ_VermiliusGap.InteriorDecoration.PurchaseFurniture": "Purchase Furniture",
+    "DA_SQ_VermiliusGap.InteriorDecoration.PurchaseFurniture.TraveltoAnvileTradepost": "Travel to the Anvil Tradepost",
+    "DA_SQ_VermiliusGap.InteriorDecoration.PurchaseFurniture.BuyFurniture": "Purchase a CHOAM Furniture set from the merchant",
+    "DA_SQ_VermiliusGap.InteriorDecoration.PurchaseFurniture.ConstructFurniture": "Construct a Decoration from a CHOAM Furniture set",
+    "DA_SQ_VermiliusGap.Treasure": "Buried Treasure",
+    "DA_SQ_VermiliusGap.Treasure.GearingUp": "Preparations",
+    "DA_SQ_VermiliusGap.Treasure.GearingUp.UnlockScanner": "Research the Handheld Resource Scanner",
+    "DA_SQ_VermiliusGap.Treasure.GearingUp.CraftScanner": "Fabricate a Handheld Resource Scanner",
+    "DA_SQ_VermiliusGap.Treasure.GearingUp.CraftCompactor": "Fabricate a Static Compactor",
+    "DA_SQ_VermiliusGap.Treasure.LocateUnbury": "Locate and unbury a treasure",
+    "DA_SQ_VermiliusGap.Treasure.LocateUnbury.LocateTreasure": "Use the Handheld Scanner to locate a treasure on open sand",
+    "DA_SQ_VermiliusGap.Treasure.LocateUnbury.UnburyTreasure": "Unbury a treasure on open sand using a Static Compactor"
+  },
+  "journey_children": {
+    "": [
+      "DA_MQ_ANewBeginning",
+      "DA_SQ_DeepDesert",
+      "DA_MQ_FindTheFremen",
+      "DA_SQ_OverlandMap",
+      "DA_SQ_JabalEifrit",
+      "DA_DLC_LostHarvest",
+      "DA_SQ_Taxation",
+      "DA_SQ_Oodham",
+      "DA_MQ_AssassinsHandbook",
+      "DA_MQ_NPEAutocompleted",
+      "DA_MQ_TheGreatConvention",
+      "DA_MQ_TheGreatConventionPt2",
+      "DA_SQ_Sheol",
+      "DA_FQ_ClimbTheRanks",
+      "DA_SQ_VermiliusGap"
+    ],
+    "DA_DLC_LostHarvest.StrandedDuneMen.InvestigateDistressCall": [
+      "DA_DLC_LostHarvest.StrandedDuneMen.InvestigateDistressCall.Listen ToTheCall",
+      "DA_DLC_LostHarvest.StrandedDuneMen.InvestigateDistressCall.ReachTheCrashSite",
+      "DA_DLC_LostHarvest.StrandedDuneMen.InvestigateDistressCall.FindSurvivors"
+    ],
+    "DA_DLC_LostHarvest.StrandedDuneMen.AssistTheOfficers": [
+      "DA_DLC_LostHarvest.StrandedDuneMen.AssistTheOfficers.CompleteQuartermastersContract",
+      "DA_DLC_LostHarvest.StrandedDuneMen.AssistTheOfficers.CompleteCommsContract",
+      "DA_DLC_LostHarvest.StrandedDuneMen.AssistTheOfficers.CompleteHansoQuest"
+    ],
+    "DA_DLC_LostHarvest.StrandedDuneMen.ReturnToHanso": [
+      "DA_DLC_LostHarvest.StrandedDuneMen.ReturnToHanso.ReturnToBoss"
+    ],
+    "DA_DLC_LostHarvest.StrandedDuneMen": [
+      "DA_DLC_LostHarvest.StrandedDuneMen.InvestigateDistressCall",
+      "DA_DLC_LostHarvest.StrandedDuneMen.AssistTheOfficers",
+      "DA_DLC_LostHarvest.StrandedDuneMen.ReturnToHanso"
+    ],
+    "DA_DLC_LostHarvest.ScaveningForALead.AssistKief1": [
+      "DA_DLC_LostHarvest.ScaveningForALead.AssistKief1.CompleteScavengingContract"
+    ],
+    "DA_DLC_LostHarvest.ScaveningForALead": [
+      "DA_DLC_LostHarvest.ScaveningForALead.AssistKief1"
+    ],
+    "DA_DLC_LostHarvest.DiggingDeeper.AssistKief2": [
+      "DA_DLC_LostHarvest.DiggingDeeper.AssistKief2.CompleteDiggingContract",
+      "DA_DLC_LostHarvest.DiggingDeeper.AssistKief2.ReachLabExit",
+      "DA_DLC_LostHarvest.DiggingDeeper.AssistKief2.ReturnToHarko",
+      "DA_DLC_LostHarvest.DiggingDeeper.AssistKief2.LeaveHarkoAndWait"
+    ],
+    "DA_DLC_LostHarvest.DiggingDeeper": [
+      "DA_DLC_LostHarvest.DiggingDeeper.AssistKief2"
+    ],
+    "DA_DLC_LostHarvest.HuntingTheSpheres.ReturnTheSpheres": [
+      "DA_DLC_LostHarvest.HuntingTheSpheres.ReturnTheSpheres.CompleteEcolabA",
+      "DA_DLC_LostHarvest.HuntingTheSpheres.ReturnTheSpheres.CompleteEcolabB"
+    ],
+    "DA_DLC_LostHarvest.HuntingTheSpheres": [
+      "DA_DLC_LostHarvest.HuntingTheSpheres.ReturnTheSpheres"
+    ],
+    "DA_DLC_LostHarvest": [
+      "DA_DLC_LostHarvest.StrandedDuneMen",
+      "DA_DLC_LostHarvest.ScaveningForALead",
+      "DA_DLC_LostHarvest.DiggingDeeper",
+      "DA_DLC_LostHarvest.HuntingTheSpheres"
+    ],
+    "DA_FQ_ClimbTheRanks.JoinAHouse.StrikeADeal": [
+      "DA_FQ_ClimbTheRanks.JoinAHouse.StrikeADeal.TalkToARecruiter",
+      "DA_FQ_ClimbTheRanks.JoinAHouse.StrikeADeal.GetSpyMission",
+      "DA_FQ_ClimbTheRanks.JoinAHouse.StrikeADeal.FindTheSpy"
+    ],
+    "DA_FQ_ClimbTheRanks.JoinAHouse.ProveYourself": [
+      "DA_FQ_ClimbTheRanks.JoinAHouse.ProveYourself.Rank1Contracts",
+      "DA_FQ_ClimbTheRanks.JoinAHouse.ProveYourself.ChooseASide"
+    ],
+    "DA_FQ_ClimbTheRanks.JoinAHouse": [
+      "DA_FQ_ClimbTheRanks.JoinAHouse.StrikeADeal",
+      "DA_FQ_ClimbTheRanks.JoinAHouse.ProveYourself"
+    ],
+    "DA_FQ_ClimbTheRanks.ATestOfLoyalty.GetMaximToBackOff": [
+      "DA_FQ_ClimbTheRanks.ATestOfLoyalty.GetMaximToBackOff.FindSemuta"
+    ],
+    "DA_FQ_ClimbTheRanks.ATestOfLoyalty": [
+      "DA_FQ_ClimbTheRanks.ATestOfLoyalty.GetMaximToBackOff"
+    ],
+    "DA_FQ_ClimbTheRanks.ATestOfTreachery.GetAntonToBackOff": [
+      "DA_FQ_ClimbTheRanks.ATestOfTreachery.GetAntonToBackOff.FindCounterfeitEvidence"
+    ],
+    "DA_FQ_ClimbTheRanks.ATestOfTreachery": [
+      "DA_FQ_ClimbTheRanks.ATestOfTreachery.GetAntonToBackOff"
+    ],
+    "DA_FQ_ClimbTheRanks.ClimbTheRanksR2.ContributeToWarEffort_Atreides": [
+      "DA_FQ_ClimbTheRanks.ClimbTheRanksR2.ContributeToWarEffort_Atreides.CompleteContractsR2"
+    ],
+    "DA_FQ_ClimbTheRanks.ClimbTheRanksR2": [
+      "DA_FQ_ClimbTheRanks.ClimbTheRanksR2.ContributeToWarEffort_Atreides"
+    ],
+    "DA_FQ_ClimbTheRanks.InvestigateKytheria_Atreides.InvestigateWreck_Atreides": [
+      "DA_FQ_ClimbTheRanks.InvestigateKytheria_Atreides.InvestigateWreck_Atreides.Complete \"Track Down Skorda\" Contract",
+      "DA_FQ_ClimbTheRanks.InvestigateKytheria_Atreides.InvestigateWreck_Atreides.MeetAndreaGanan"
+    ],
+    "DA_FQ_ClimbTheRanks.InvestigateKytheria_Atreides": [
+      "DA_FQ_ClimbTheRanks.InvestigateKytheria_Atreides.InvestigateWreck_Atreides"
+    ],
+    "DA_FQ_ClimbTheRanks.InvestigateKytheria_Harkonnen.InvestigateWreck_Harkonnen": [
+      "DA_FQ_ClimbTheRanks.InvestigateKytheria_Harkonnen.InvestigateWreck_Harkonnen.Complete \"Track Down Skorda\" Contract",
+      "DA_FQ_ClimbTheRanks.InvestigateKytheria_Harkonnen.InvestigateWreck_Harkonnen.MeetSimoneVonKonig"
+    ],
+    "DA_FQ_ClimbTheRanks.InvestigateKytheria_Harkonnen": [
+      "DA_FQ_ClimbTheRanks.InvestigateKytheria_Harkonnen.InvestigateWreck_Harkonnen"
+    ],
+    "DA_FQ_ClimbTheRanks.GatheringIntelligence.TrackDownContainer": [
+      "DA_FQ_ClimbTheRanks.GatheringIntelligence.TrackDownContainer.InvestigateSandflies",
+      "DA_FQ_ClimbTheRanks.GatheringIntelligence.TrackDownContainer.TrackDownPilot",
+      "DA_FQ_ClimbTheRanks.GatheringIntelligence.TrackDownContainer.TrackDownRedScorpion",
+      "DA_FQ_ClimbTheRanks.GatheringIntelligence.TrackDownContainer.FindCanister"
+    ],
+    "DA_FQ_ClimbTheRanks.GatheringIntelligence": [
+      "DA_FQ_ClimbTheRanks.GatheringIntelligence.TrackDownContainer"
+    ],
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PutFindingsToTest": [
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PutFindingsToTest.SpeakWithGanan",
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PutFindingsToTest.MeetThufir",
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PutFindingsToTest.ReturnToGanan"
+    ],
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PunishTraitor": [
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PunishTraitor.FindBusinessman",
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PunishTraitor.ChoosePoisonOrSpare",
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PunishTraitor.CompleteWarProfiteerContract",
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PunishTraitor.TalkToThufirAgain"
+    ],
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides": [
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PutFindingsToTest",
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides.PunishTraitor"
+    ],
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.LeverageYourFindings": [
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.LeverageYourFindings.SpeakWithVonKonig",
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.LeverageYourFindings.MeetPiter",
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.LeverageYourFindings.ReturnToVonKonig",
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.LeverageYourFindings.DeliverResults"
+    ],
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.TakeALeap": [
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.TakeALeap.PoisonOrWarnPiter",
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.TakeALeap.TalkToPiterAgain"
+    ],
+    "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen": [
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.LeverageYourFindings",
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen.TakeALeap"
+    ],
+    "DA_FQ_ClimbTheRanks.HuntingSkorda.FindSkorda": [
+      "DA_FQ_ClimbTheRanks.HuntingSkorda.FindSkorda.SkordaInArrakeen",
+      "DA_FQ_ClimbTheRanks.HuntingSkorda.FindSkorda.SkordaInMysaTarrill",
+      "DA_FQ_ClimbTheRanks.HuntingSkorda.FindSkorda.SkordaInOodham"
+    ],
+    "DA_FQ_ClimbTheRanks.HuntingSkorda": [
+      "DA_FQ_ClimbTheRanks.HuntingSkorda.FindSkorda"
+    ],
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides.DeviseAPlan_Atreides": [
+      "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides.DeviseAPlan_Atreides.TellThufirAboutDelphis"
+    ],
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides.SecureLastContainer_Atreides": [
+      "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides.SecureLastContainer_Atreides.RecoverSheolContainer_Atreides"
+    ],
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides.PledgeAllegiance_Atreides": [
+      "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides.PledgeAllegiance_Atreides.PledgeAllegiance_Atreides_Sub"
+    ],
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides": [
+      "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides.DeviseAPlan_Atreides",
+      "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides.SecureLastContainer_Atreides",
+      "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides.PledgeAllegiance_Atreides"
+    ],
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen.DeviseAPlan_Harkonnen": [
+      "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen.DeviseAPlan_Harkonnen.TellPiterAboutEuporia"
+    ],
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen.SecureLastContainer_Harkonnen": [
+      "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen.SecureLastContainer_Harkonnen.RecoverSheolContainer_Harkonnen"
+    ],
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen.PledgeAllegiance_Harkonnen": [
+      "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen.PledgeAllegiance_Harkonnen.PledgeAllegiance_Harkonnen_Sub"
+    ],
+    "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen": [
+      "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen.DeviseAPlan_Harkonnen",
+      "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen.SecureLastContainer_Harkonnen",
+      "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen.PledgeAllegiance_Harkonnen"
+    ],
+    "DA_FQ_ClimbTheRanks.TransitionToCh3_Hark.TheCall": [
+      "DA_FQ_ClimbTheRanks.TransitionToCh3_Hark.TheCall.AnswerTheCall"
+    ],
+    "DA_FQ_ClimbTheRanks.TransitionToCh3_Hark": [
+      "DA_FQ_ClimbTheRanks.TransitionToCh3_Hark.TheCall"
+    ],
+    "DA_FQ_ClimbTheRanks.TransitionToCh3_Atre.TheCall": [
+      "DA_FQ_ClimbTheRanks.TransitionToCh3_Atre.TheCall.AnswerTheCall"
+    ],
+    "DA_FQ_ClimbTheRanks.TransitionToCh3_Atre": [
+      "DA_FQ_ClimbTheRanks.TransitionToCh3_Atre.TheCall"
+    ],
+    "DA_FQ_ClimbTheRanks.Rank5To20.MeetSponsor": [
+      "DA_FQ_ClimbTheRanks.Rank5To20.MeetSponsor.TalkToSponsor"
+    ],
+    "DA_FQ_ClimbTheRanks.Rank5To20.StartLandsraadOnboarding": [
+      "DA_FQ_ClimbTheRanks.Rank5To20.StartLandsraadOnboarding.ReportToMasterOfAssassins"
+    ],
+    "DA_FQ_ClimbTheRanks.Rank5To20.CompleteLandsraadMission": [
+      "DA_FQ_ClimbTheRanks.Rank5To20.CompleteLandsraadMission.CompleteOnboardingJourney1"
+    ],
+    "DA_FQ_ClimbTheRanks.Rank5To20.CraftAugmentation": [
+      "DA_FQ_ClimbTheRanks.Rank5To20.CraftAugmentation.CompleteOnboardingJourney2"
+    ],
+    "DA_FQ_ClimbTheRanks.Rank5To20.ReachRank20": [
+      "DA_FQ_ClimbTheRanks.Rank5To20.ReachRank20.GrindRanks"
+    ],
+    "DA_FQ_ClimbTheRanks.Rank5To20": [
+      "DA_FQ_ClimbTheRanks.Rank5To20.MeetSponsor",
+      "DA_FQ_ClimbTheRanks.Rank5To20.StartLandsraadOnboarding",
+      "DA_FQ_ClimbTheRanks.Rank5To20.CompleteLandsraadMission",
+      "DA_FQ_ClimbTheRanks.Rank5To20.CraftAugmentation",
+      "DA_FQ_ClimbTheRanks.Rank5To20.ReachRank20"
+    ],
+    "DA_FQ_ClimbTheRanks.Rank20_Mission_Harkonnen.Ch3Mission": [
+      "DA_FQ_ClimbTheRanks.Rank20_Mission_Harkonnen.Ch3Mission.GetCallForMission",
+      "DA_FQ_ClimbTheRanks.Rank20_Mission_Harkonnen.Ch3Mission.GetMission",
+      "DA_FQ_ClimbTheRanks.Rank20_Mission_Harkonnen.Ch3Mission.CompleteMission"
+    ],
+    "DA_FQ_ClimbTheRanks.Rank20_Mission_Harkonnen": [
+      "DA_FQ_ClimbTheRanks.Rank20_Mission_Harkonnen.Ch3Mission"
+    ],
+    "DA_FQ_ClimbTheRanks.Rank20_Mission_Atreides.Ch3Mission": [
+      "DA_FQ_ClimbTheRanks.Rank20_Mission_Atreides.Ch3Mission.GetCallForMission",
+      "DA_FQ_ClimbTheRanks.Rank20_Mission_Atreides.Ch3Mission.GetMission",
+      "DA_FQ_ClimbTheRanks.Rank20_Mission_Atreides.Ch3Mission.CompleteMission"
+    ],
+    "DA_FQ_ClimbTheRanks.Rank20_Mission_Atreides": [
+      "DA_FQ_ClimbTheRanks.Rank20_Mission_Atreides.Ch3Mission"
+    ],
+    "DA_FQ_ClimbTheRanks.BetrayTheAtreides.Complete The Betrayal": [
+      "DA_FQ_ClimbTheRanks.BetrayTheAtreides.Complete The Betrayal.Complete The Contract"
+    ],
+    "DA_FQ_ClimbTheRanks.BetrayTheAtreides": [
+      "DA_FQ_ClimbTheRanks.BetrayTheAtreides.Complete The Betrayal"
+    ],
+    "DA_FQ_ClimbTheRanks.BetrayTheHarkonnen.Complete The Betrayal": [
+      "DA_FQ_ClimbTheRanks.BetrayTheHarkonnen.Complete The Betrayal.Complete The Contract"
+    ],
+    "DA_FQ_ClimbTheRanks.BetrayTheHarkonnen": [
+      "DA_FQ_ClimbTheRanks.BetrayTheHarkonnen.Complete The Betrayal"
+    ],
+    "DA_FQ_ClimbTheRanks": [
+      "DA_FQ_ClimbTheRanks.JoinAHouse",
+      "DA_FQ_ClimbTheRanks.ATestOfLoyalty",
+      "DA_FQ_ClimbTheRanks.ATestOfTreachery",
+      "DA_FQ_ClimbTheRanks.ClimbTheRanksR2",
+      "DA_FQ_ClimbTheRanks.InvestigateKytheria_Atreides",
+      "DA_FQ_ClimbTheRanks.InvestigateKytheria_Harkonnen",
+      "DA_FQ_ClimbTheRanks.GatheringIntelligence",
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Atreides",
+      "DA_FQ_ClimbTheRanks.PoisonedSpice_Harkonnen",
+      "DA_FQ_ClimbTheRanks.HuntingSkorda",
+      "DA_FQ_ClimbTheRanks.InvestigateDelphis_Atreides",
+      "DA_FQ_ClimbTheRanks.InvestigateDelphis_Harkonnen",
+      "DA_FQ_ClimbTheRanks.TransitionToCh3_Hark",
+      "DA_FQ_ClimbTheRanks.TransitionToCh3_Atre",
+      "DA_FQ_ClimbTheRanks.Rank5To20",
+      "DA_FQ_ClimbTheRanks.Rank20_Mission_Harkonnen",
+      "DA_FQ_ClimbTheRanks.Rank20_Mission_Atreides",
+      "DA_FQ_ClimbTheRanks.BetrayTheAtreides",
+      "DA_FQ_ClimbTheRanks.BetrayTheHarkonnen"
+    ],
+    "DA_MQ_ANewBeginning.Basic Loadout.Makeshift clothing": [
+      "DA_MQ_ANewBeginning.Basic Loadout.Makeshift clothing.Harvest 19 Plant fiber",
+      "DA_MQ_ANewBeginning.Basic Loadout.Makeshift clothing.Unlock makeshift clothing in the tech menu",
+      "DA_MQ_ANewBeginning.Basic Loadout.Makeshift clothing.Craft a full set of makeshift clothing",
+      "DA_MQ_ANewBeginning.Basic Loadout.Makeshift clothing.Equip makeshift clothing"
+    ],
+    "DA_MQ_ANewBeginning.Basic Loadout.Maula pistol": [
+      "DA_MQ_ANewBeginning.Basic Loadout.Maula pistol.Harvest 65 Salvage Metal",
+      "DA_MQ_ANewBeginning.Basic Loadout.Maula pistol.ResearchMaula",
+      "DA_MQ_ANewBeginning.Basic Loadout.Maula pistol.Unlock and craft an Improvised Maula Pistol",
+      "DA_MQ_ANewBeginning.Basic Loadout.Maula pistol.Craft 90 darts"
+    ],
+    "DA_MQ_ANewBeginning.Basic Loadout": [
+      "DA_MQ_ANewBeginning.Basic Loadout.Makeshift clothing",
+      "DA_MQ_ANewBeginning.Basic Loadout.Maula pistol"
+    ],
+    "DA_MQ_ANewBeginning.First Skirmish.Respawn Beacon": [
+      "DA_MQ_ANewBeginning.First Skirmish.Respawn Beacon.ResearchRespawn",
+      "DA_MQ_ANewBeginning.First Skirmish.Respawn Beacon.Unlock and craft a Respawn Beacon",
+      "DA_MQ_ANewBeginning.First Skirmish.Respawn Beacon.Place down the Respawn Beacon"
+    ],
+    "DA_MQ_ANewBeginning.First Skirmish.Locate Scavengers": [
+      "DA_MQ_ANewBeginning.First Skirmish.Locate Scavengers.ResearchBinoculars",
+      "DA_MQ_ANewBeginning.First Skirmish.Locate Scavengers.Unlock and craft Binoculars",
+      "DA_MQ_ANewBeginning.First Skirmish.Locate Scavengers.Use the binoculars to scout for an enemy camp"
+    ],
+    "DA_MQ_ANewBeginning.First Skirmish.Fight the Scavengers": [
+      "DA_MQ_ANewBeginning.First Skirmish.Fight the Scavengers.Go to the enemy camp",
+      "DA_MQ_ANewBeginning.First Skirmish.Fight the Scavengers.Use your ability",
+      "DA_MQ_ANewBeginning.First Skirmish.Fight the Scavengers.Kill the Scavengers"
+    ],
+    "DA_MQ_ANewBeginning.First Skirmish.Unlock more skills": [
+      "DA_MQ_ANewBeginning.First Skirmish.Unlock more skills.Spend skill points to learn a new skill",
+      "DA_MQ_ANewBeginning.First Skirmish.Unlock more skills.Equip second ability"
+    ],
+    "DA_MQ_ANewBeginning.First Skirmish": [
+      "DA_MQ_ANewBeginning.First Skirmish.Respawn Beacon",
+      "DA_MQ_ANewBeginning.First Skirmish.Locate Scavengers",
+      "DA_MQ_ANewBeginning.First Skirmish.Fight the Scavengers",
+      "DA_MQ_ANewBeginning.First Skirmish.Unlock more skills"
+    ],
+    "DA_MQ_ANewBeginning.Building Basics.Gather resources": [
+      "DA_MQ_ANewBeginning.Building Basics.Gather resources.Harvest 150 Granite Stone",
+      "DA_MQ_ANewBeginning.Building Basics.Gather resources.Harvest 125 Salvage Metal",
+      "DA_MQ_ANewBeginning.Building Basics.Gather resources.Harvest 48 Fuel"
+    ],
+    "DA_MQ_ANewBeginning.Building Basics.Craft Building equipment": [
+      "DA_MQ_ANewBeginning.Building Basics.Craft Building equipment.ResearchConstructionTool",
+      "DA_MQ_ANewBeginning.Building Basics.Craft Building equipment.Unlock and craft a construction tool",
+      "DA_MQ_ANewBeginning.Building Basics.Craft Building equipment.Equip the construction tool",
+      "DA_MQ_ANewBeginning.Building Basics.Craft Building equipment.Place down a Subfief Console"
+    ],
+    "DA_MQ_ANewBeginning.Building Basics.Foundation": [
+      "DA_MQ_ANewBeginning.Building Basics.Foundation.Place down 4 foundations"
+    ],
+    "DA_MQ_ANewBeginning.Building Basics.Walls": [
+      "DA_MQ_ANewBeginning.Building Basics.Walls.Place down 7 walls",
+      "DA_MQ_ANewBeginning.Building Basics.Walls.Place down a door"
+    ],
+    "DA_MQ_ANewBeginning.Building Basics.Roof": [
+      "DA_MQ_ANewBeginning.Building Basics.Roof.Place down 4 roof pieces",
+      "DA_MQ_ANewBeginning.Building Basics.Roof.MoveTotem"
+    ],
+    "DA_MQ_ANewBeginning.Building Basics.Power your base": [
+      "DA_MQ_ANewBeginning.Building Basics.Power your base.Place a Small Storage Container",
+      "DA_MQ_ANewBeginning.Building Basics.Power your base.Place a Fuel Powered Generator",
+      "DA_MQ_ANewBeginning.Building Basics.Power your base.Add fuel to generator and power the shield"
+    ],
+    "DA_MQ_ANewBeginning.Building Basics": [
+      "DA_MQ_ANewBeginning.Building Basics.Gather resources",
+      "DA_MQ_ANewBeginning.Building Basics.Craft Building equipment",
+      "DA_MQ_ANewBeginning.Building Basics.Foundation",
+      "DA_MQ_ANewBeginning.Building Basics.Walls",
+      "DA_MQ_ANewBeginning.Building Basics.Roof",
+      "DA_MQ_ANewBeginning.Building Basics.Power your base"
+    ],
+    "DA_MQ_ANewBeginning.Blood to Water.Craft equipment": [
+      "DA_MQ_ANewBeginning.Blood to Water.Craft equipment.Harvest 110 Salvage Metal",
+      "DA_MQ_ANewBeginning.Blood to Water.Craft equipment.Harvest 25 Plant Fiber",
+      "DA_MQ_ANewBeginning.Blood to Water.Craft equipment.ResearchBloodExtractor",
+      "DA_MQ_ANewBeginning.Blood to Water.Craft equipment.Unlock and craft a Blood Extractor",
+      "DA_MQ_ANewBeginning.Blood to Water.Craft equipment.Craft a Blood Sack"
+    ],
+    "DA_MQ_ANewBeginning.Blood to Water.Kill Scavengers": [
+      "DA_MQ_ANewBeginning.Blood to Water.Kill Scavengers.Locate an enemy camp",
+      "DA_MQ_ANewBeginning.Blood to Water.Kill Scavengers.Harvest 3000ml blood using the Blood Extractor"
+    ],
+    "DA_MQ_ANewBeginning.Blood to Water.Make water from blood": [
+      "DA_MQ_ANewBeginning.Blood to Water.Make water from blood.ResearchBloodPurifier",
+      "DA_MQ_ANewBeginning.Blood to Water.Make water from blood.Return to your base and place down a Blood Purifier",
+      "DA_MQ_ANewBeginning.Blood to Water.Make water from blood.Deposit blood into the blood purifier"
+    ],
+    "DA_MQ_ANewBeginning.Blood to Water": [
+      "DA_MQ_ANewBeginning.Blood to Water.Craft equipment",
+      "DA_MQ_ANewBeginning.Blood to Water.Kill Scavengers",
+      "DA_MQ_ANewBeginning.Blood to Water.Make water from blood"
+    ],
+    "DA_MQ_ANewBeginning.Aql No 1.CompleteAQLTrials": [
+      "DA_MQ_ANewBeginning.Aql No 1.CompleteAQLTrials.CompleteFirstTrial"
+    ],
+    "DA_MQ_ANewBeginning.Aql No 1.Get resource from a moisture sealed cave": [
+      "DA_MQ_ANewBeginning.Aql No 1.Get resource from a moisture sealed cave.Locate a moisture sealed cave",
+      "DA_MQ_ANewBeginning.Aql No 1.Get resource from a moisture sealed cave.Gather 6 Micro-Sandwich Fabric",
+      "DA_MQ_ANewBeginning.Aql No 1.Get resource from a moisture sealed cave.Gather 1 EMF Generator"
+    ],
+    "DA_MQ_ANewBeginning.Aql No 1.Harvest resources to craft a Stillsuit": [
+      "DA_MQ_ANewBeginning.Aql No 1.Harvest resources to craft a Stillsuit.Harvest 165 Salvage Metal",
+      "DA_MQ_ANewBeginning.Aql No 1.Harvest resources to craft a Stillsuit.Harvest 17 Plant Fiber",
+      "DA_MQ_ANewBeginning.Aql No 1.Harvest resources to craft a Stillsuit.Harvest 12 Copper Ore"
+    ],
+    "DA_MQ_ANewBeginning.Aql No 1.Craft the Stillsuit": [
+      "DA_MQ_ANewBeginning.Aql No 1.Craft the Stillsuit.Return to your base and drink water",
+      "DA_MQ_ANewBeginning.Aql No 1.Craft the Stillsuit.ResearchFabricator",
+      "DA_MQ_ANewBeginning.Aql No 1.Craft the Stillsuit.Unlock and place a Fabricator"
+    ],
+    "DA_MQ_ANewBeginning.Aql No 1.FabricateStillsuit": [
+      "DA_MQ_ANewBeginning.Aql No 1.FabricateStillsuit.Craft a complete Stillsuit",
+      "DA_MQ_ANewBeginning.Aql No 1.FabricateStillsuit.Equip the Stillsuit"
+    ],
+    "DA_MQ_ANewBeginning.Aql No 1": [
+      "DA_MQ_ANewBeginning.Aql No 1.CompleteAQLTrials",
+      "DA_MQ_ANewBeginning.Aql No 1.Get resource from a moisture sealed cave",
+      "DA_MQ_ANewBeginning.Aql No 1.Harvest resources to craft a Stillsuit",
+      "DA_MQ_ANewBeginning.Aql No 1.Craft the Stillsuit",
+      "DA_MQ_ANewBeginning.Aql No 1.FabricateStillsuit"
+    ],
+    "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear": [
+      "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear.ResearchOreRefinery",
+      "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear.Unlock and place down Ore Refinery",
+      "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear.Refine Copper Ore",
+      "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear.ResearchSurveyingKit",
+      "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear.Unlock and craft a Survey probe launcher",
+      "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear.Craft a Survey probe",
+      "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear.Find the Survey location and fire a Survey Probe"
+    ],
+    "DA_MQ_ANewBeginning.Reach Civilization.Tradepost": [
+      "DA_MQ_ANewBeginning.Reach Civilization.Tradepost.Travel to the Tradepost",
+      "DA_MQ_ANewBeginning.Reach Civilization.Tradepost.PickupContract",
+      "DA_MQ_ANewBeginning.Reach Civilization.Tradepost.DeliverContract",
+      "DA_MQ_ANewBeginning.Reach Civilization.Tradepost.Buy a unique Literjon schematic from the vendor"
+    ],
+    "DA_MQ_ANewBeginning.Reach Civilization.PickupNextContract": [
+      "DA_MQ_ANewBeginning.Reach Civilization.PickupNextContract.WreckingCrew"
+    ],
+    "DA_MQ_ANewBeginning.Reach Civilization": [
+      "DA_MQ_ANewBeginning.Reach Civilization.Craft Surveying gear",
+      "DA_MQ_ANewBeginning.Reach Civilization.Tradepost",
+      "DA_MQ_ANewBeginning.Reach Civilization.PickupNextContract"
+    ],
+    "DA_MQ_ANewBeginning.Dangerous Mission.Shipwreck": [
+      "DA_MQ_ANewBeginning.Dangerous Mission.Shipwreck.Travel to a Shipwreck",
+      "DA_MQ_ANewBeginning.Dangerous Mission.Shipwreck.Gather 10 Plasteel Microflora Fiber",
+      "DA_MQ_ANewBeginning.Dangerous Mission.Shipwreck.Gather 2 Mechanical parts"
+    ],
+    "DA_MQ_ANewBeginning.Dangerous Mission.Harvest Resources": [
+      "DA_MQ_ANewBeginning.Dangerous Mission.Harvest Resources.Harvest 160 Copper Ore",
+      "DA_MQ_ANewBeginning.Dangerous Mission.Harvest Resources.Harvest 25 Plant Fiber Shipwreck"
+    ],
+    "DA_MQ_ANewBeginning.Dangerous Mission.Craft better gear": [
+      "DA_MQ_ANewBeginning.Dangerous Mission.Craft better gear.ResearchScavGear",
+      "DA_MQ_ANewBeginning.Dangerous Mission.Craft better gear.Unlock and craft a full set of Scavengers Armor",
+      "DA_MQ_ANewBeginning.Dangerous Mission.Craft better gear.Unlock and craft a Assault Rifle",
+      "DA_MQ_ANewBeginning.Dangerous Mission.Craft better gear.Unlock and craft a Kindjal"
+    ],
+    "DA_MQ_ANewBeginning.Dangerous Mission": [
+      "DA_MQ_ANewBeginning.Dangerous Mission.Shipwreck",
+      "DA_MQ_ANewBeginning.Dangerous Mission.Harvest Resources",
+      "DA_MQ_ANewBeginning.Dangerous Mission.Craft better gear"
+    ],
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Imperial Testing Station": [
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Imperial Testing Station.Travel to a Imperial Testing Station",
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Imperial Testing Station.Gather 6 Particle Capacitator",
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Imperial Testing Station.Gather 13 Advanced Servok"
+    ],
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Craft a Sandbike": [
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Craft a Sandbike.ResearchSandbike",
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Craft a Sandbike.Unlock and craft 1 Power Supply Unit",
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Craft a Sandbike.Craft 3 Treads",
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Craft a Sandbike.Craft 1 Engine",
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Craft a Sandbike.Craft 1 Chassis",
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Craft a Sandbike.Craft 1 Hull"
+    ],
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Refine Vehicle Fuel": [
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Refine Vehicle Fuel.ResearchChemicalRefinery",
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Refine Vehicle Fuel.Unlock and place down a Small Chemical Refinery",
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Refine Vehicle Fuel.Refine Fuel"
+    ],
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2.Build a Sandbike": [
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Build a Sandbike.Craft a Welding Torch",
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Build a Sandbike.Put all parts together using the Welding Torch",
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Build a Sandbike.Fuel the bike",
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Build a Sandbike.Drive the bike"
+    ],
+    "DA_MQ_ANewBeginning.Dangerous Mission No 2": [
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Imperial Testing Station",
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Craft a Sandbike",
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Refine Vehicle Fuel",
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2.Build a Sandbike"
+    ],
+    "DA_MQ_ANewBeginning": [
+      "DA_MQ_ANewBeginning.Basic Loadout",
+      "DA_MQ_ANewBeginning.First Skirmish",
+      "DA_MQ_ANewBeginning.Building Basics",
+      "DA_MQ_ANewBeginning.Blood to Water",
+      "DA_MQ_ANewBeginning.Aql No 1",
+      "DA_MQ_ANewBeginning.Reach Civilization",
+      "DA_MQ_ANewBeginning.Dangerous Mission",
+      "DA_MQ_ANewBeginning.Dangerous Mission No 2"
+    ],
+    "DA_MQ_AssassinsHandbook.Intro.FindGreatHouseRepresentatives": [
+      "DA_MQ_AssassinsHandbook.Intro.FindGreatHouseRepresentatives.EnterHarkoVillage",
+      "DA_MQ_AssassinsHandbook.Intro.FindGreatHouseRepresentatives.MeetAtPlaza"
+    ],
+    "DA_MQ_AssassinsHandbook.Intro.MeettheInformant": [
+      "DA_MQ_AssassinsHandbook.Intro.MeettheInformant.TalkToTheSpider",
+      "DA_MQ_AssassinsHandbook.Intro.MeettheInformant.AcceptTheFirstKill"
+    ],
+    "DA_MQ_AssassinsHandbook.Intro": [
+      "DA_MQ_AssassinsHandbook.Intro.FindGreatHouseRepresentatives",
+      "DA_MQ_AssassinsHandbook.Intro.MeettheInformant"
+    ],
+    "DA_MQ_AssassinsHandbook.TheParanoid.FindThePriestessSubleaders": [
+      "DA_MQ_AssassinsHandbook.TheParanoid.FindThePriestessSubleaders.KillSubleader1",
+      "DA_MQ_AssassinsHandbook.TheParanoid.FindThePriestessSubleaders.KillSubleader2",
+      "DA_MQ_AssassinsHandbook.TheParanoid.FindThePriestessSubleaders.KillSubleader3",
+      "DA_MQ_AssassinsHandbook.TheParanoid.FindThePriestessSubleaders.KillSubleader4"
+    ],
+    "DA_MQ_AssassinsHandbook.TheParanoid.FindTheParanoidsPrayerRoom": [
+      "DA_MQ_AssassinsHandbook.TheParanoid.FindTheParanoidsPrayerRoom.EnterTheRoom",
+      "DA_MQ_AssassinsHandbook.TheParanoid.FindTheParanoidsPrayerRoom.UseShieldDissembler",
+      "DA_MQ_AssassinsHandbook.TheParanoid.FindTheParanoidsPrayerRoom.KillTheParanoid",
+      "DA_MQ_AssassinsHandbook.TheParanoid.FindTheParanoidsPrayerRoom.ExitParanoidRoom"
+    ],
+    "DA_MQ_AssassinsHandbook.TheParanoid": [
+      "DA_MQ_AssassinsHandbook.TheParanoid.FindThePriestessSubleaders",
+      "DA_MQ_AssassinsHandbook.TheParanoid.FindTheParanoidsPrayerRoom"
+    ],
+    "DA_MQ_AssassinsHandbook.TheGlutton.LearnAboutYourTarget": [
+      "DA_MQ_AssassinsHandbook.TheGlutton.LearnAboutYourTarget.FindTheHostageInTheSlaversBase"
+    ],
+    "DA_MQ_AssassinsHandbook.TheGlutton.FindThGluttonsDiningRoom": [
+      "DA_MQ_AssassinsHandbook.TheGlutton.FindThGluttonsDiningRoom.EnterTheGluttonsDiningRoom",
+      "DA_MQ_AssassinsHandbook.TheGlutton.FindThGluttonsDiningRoom.KillTheGlutton",
+      "DA_MQ_AssassinsHandbook.TheGlutton.FindThGluttonsDiningRoom.ExitGluttonRoom"
+    ],
+    "DA_MQ_AssassinsHandbook.TheGlutton": [
+      "DA_MQ_AssassinsHandbook.TheGlutton.LearnAboutYourTarget",
+      "DA_MQ_AssassinsHandbook.TheGlutton.FindThGluttonsDiningRoom"
+    ],
+    "DA_MQ_AssassinsHandbook.SecondTarget.ReturnToTheSpider1": [
+      "DA_MQ_AssassinsHandbook.SecondTarget.ReturnToTheSpider1.TalkToTheSpider2",
+      "DA_MQ_AssassinsHandbook.SecondTarget.ReturnToTheSpider1.AcceptTheSecondKill"
+    ],
+    "DA_MQ_AssassinsHandbook.SecondTarget": [
+      "DA_MQ_AssassinsHandbook.SecondTarget.ReturnToTheSpider1"
+    ],
+    "DA_MQ_AssassinsHandbook.FurtherInstructions.ReturnToTheSpider2": [
+      "DA_MQ_AssassinsHandbook.FurtherInstructions.ReturnToTheSpider2.TalkToTheSpider5",
+      "DA_MQ_AssassinsHandbook.FurtherInstructions.ReturnToTheSpider2.ReturnToHBSAndWait",
+      "DA_MQ_AssassinsHandbook.FurtherInstructions.ReturnToTheSpider2.CallFromAriste"
+    ],
+    "DA_MQ_AssassinsHandbook.FurtherInstructions": [
+      "DA_MQ_AssassinsHandbook.FurtherInstructions.ReturnToTheSpider2"
+    ],
+    "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite": [
+      "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.ReachtheWreckofHephaestus",
+      "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.EnterFirstCargoBay",
+      "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.SurviveSuboidAssault",
+      "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.FindContainersCargoBay",
+      "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.FindTheContainer",
+      "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.DescribeWhatYouSee",
+      "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.ReachTheBridge",
+      "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.SwitchOffTheEmergencyOverride",
+      "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.RemoveTheFuseCapacitor",
+      "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.RestartTheNacelles",
+      "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.SwitchOnTheLights",
+      "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.FindTheDecoder",
+      "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.CompletetheWreckofHephaestus",
+      "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite.ReachSafety"
+    ],
+    "DA_MQ_AssassinsHandbook.ASignFromAbove": [
+      "DA_MQ_AssassinsHandbook.ASignFromAbove.InvestigateTheMeteorCrashSite"
+    ],
+    "DA_MQ_AssassinsHandbook.ANewTarget.MeetTheContact2": [
+      "DA_MQ_AssassinsHandbook.ANewTarget.MeetTheContact2.ReceiveSpiderCall",
+      "DA_MQ_AssassinsHandbook.ANewTarget.MeetTheContact2.TalkToTheSpider2",
+      "DA_MQ_AssassinsHandbook.ANewTarget.MeetTheContact2.AcceptTheWaterFatKill"
+    ],
+    "DA_MQ_AssassinsHandbook.ANewTarget": [
+      "DA_MQ_AssassinsHandbook.ANewTarget.MeetTheContact2"
+    ],
+    "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask": [
+      "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask.ReachTheWaterFatManor",
+      "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask.FindWayInsideManor",
+      "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask.FindTheOffice",
+      "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask.DoNotGetDetected",
+      "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask.CompleteTheAssasination",
+      "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask.Escape",
+      "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask.ReachSafeArea"
+    ],
+    "DA_MQ_AssassinsHandbook.TheWaterFat": [
+      "DA_MQ_AssassinsHandbook.TheWaterFat.TheWaterFatTask"
+    ],
+    "DA_MQ_AssassinsHandbook.LastTarget.MeetTheContact": [
+      "DA_MQ_AssassinsHandbook.LastTarget.MeetTheContact.TalkToTheSpider3",
+      "DA_MQ_AssassinsHandbook.LastTarget.MeetTheContact.AcceptTheJackalKill"
+    ],
+    "DA_MQ_AssassinsHandbook.LastTarget": [
+      "DA_MQ_AssassinsHandbook.LastTarget.MeetTheContact"
+    ],
+    "DA_MQ_AssassinsHandbook.TheJackal.TheJackal": [
+      "DA_MQ_AssassinsHandbook.TheJackal.TheJackal.ReachTheJackalAlley",
+      "DA_MQ_AssassinsHandbook.TheJackal.TheJackal.FindWhatHeknows",
+      "DA_MQ_AssassinsHandbook.TheJackal.TheJackal.CompleteTheAssassination",
+      "DA_MQ_AssassinsHandbook.TheJackal.TheJackal.ExitJackalAlley"
+    ],
+    "DA_MQ_AssassinsHandbook.TheJackal": [
+      "DA_MQ_AssassinsHandbook.TheJackal.TheJackal"
+    ],
+    "DA_MQ_AssassinsHandbook.MeetingAriste.MeetingInArrakeen": [
+      "DA_MQ_AssassinsHandbook.MeetingAriste.MeetingInArrakeen.ReachTheBarInArrakeen"
+    ],
+    "DA_MQ_AssassinsHandbook.MeetingAriste": [
+      "DA_MQ_AssassinsHandbook.MeetingAriste.MeetingInArrakeen"
+    ],
+    "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage": [
+      "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage.TalkToZantara",
+      "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage.ReachTheLabUnderOldCarthag",
+      "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage.FindWayInsideLab",
+      "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage.ExploreTheFacility",
+      "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage.ReuniteWithZantara",
+      "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage.ExploreFurther",
+      "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage.CompleteTheLab",
+      "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage.ReachSafeLocation"
+    ],
+    "DA_MQ_AssassinsHandbook.SearchingForAnswers": [
+      "DA_MQ_AssassinsHandbook.SearchingForAnswers.FindTheSourceOfTheDecryptedMessage"
+    ],
+    "DA_MQ_AssassinsHandbook.Epilogue.InvestigationOutcome": [
+      "DA_MQ_AssassinsHandbook.Epilogue.InvestigationOutcome.WatingForAriste2"
+    ],
+    "DA_MQ_AssassinsHandbook.Epilogue": [
+      "DA_MQ_AssassinsHandbook.Epilogue.InvestigationOutcome"
+    ],
+    "DA_MQ_AssassinsHandbook": [
+      "DA_MQ_AssassinsHandbook.Intro",
+      "DA_MQ_AssassinsHandbook.TheParanoid",
+      "DA_MQ_AssassinsHandbook.TheGlutton",
+      "DA_MQ_AssassinsHandbook.SecondTarget",
+      "DA_MQ_AssassinsHandbook.FurtherInstructions",
+      "DA_MQ_AssassinsHandbook.ASignFromAbove",
+      "DA_MQ_AssassinsHandbook.ANewTarget",
+      "DA_MQ_AssassinsHandbook.TheWaterFat",
+      "DA_MQ_AssassinsHandbook.LastTarget",
+      "DA_MQ_AssassinsHandbook.TheJackal",
+      "DA_MQ_AssassinsHandbook.MeetingAriste",
+      "DA_MQ_AssassinsHandbook.SearchingForAnswers",
+      "DA_MQ_AssassinsHandbook.Epilogue"
+    ],
+    "DA_MQ_FindTheFremen.FirstTest.FirstQuestion": [
+      "DA_MQ_FindTheFremen.FirstTest.FirstQuestion.FindtheCaveentrance",
+      "DA_MQ_FindTheFremen.FirstTest.FirstQuestion.FindAltarCave",
+      "DA_MQ_FindTheFremen.FirstTest.FirstQuestion.CompleteFirstTest"
+    ],
+    "DA_MQ_FindTheFremen.FirstTest": [
+      "DA_MQ_FindTheFremen.FirstTest.FirstQuestion"
+    ],
+    "DA_MQ_FindTheFremen.SecondTest.SecondQuestion": [
+      "DA_MQ_FindTheFremen.SecondTest.SecondQuestion.FindAltarCave2",
+      "DA_MQ_FindTheFremen.SecondTest.SecondQuestion.CompleteSecondTest"
+    ],
+    "DA_MQ_FindTheFremen.SecondTest": [
+      "DA_MQ_FindTheFremen.SecondTest.SecondQuestion"
+    ],
+    "DA_MQ_FindTheFremen.ThirdTest.ThirdQuestion": [
+      "DA_MQ_FindTheFremen.ThirdTest.ThirdQuestion.FindAltarCave3",
+      "DA_MQ_FindTheFremen.ThirdTest.ThirdQuestion.CompleteThirdTest"
+    ],
+    "DA_MQ_FindTheFremen.ThirdTest": [
+      "DA_MQ_FindTheFremen.ThirdTest.ThirdQuestion"
+    ],
+    "DA_MQ_FindTheFremen.FourthTest.FourthQuestion": [
+      "DA_MQ_FindTheFremen.FourthTest.FourthQuestion.FindAltarCave4",
+      "DA_MQ_FindTheFremen.FourthTest.FourthQuestion.CompleteFourthTest"
+    ],
+    "DA_MQ_FindTheFremen.FourthTest": [
+      "DA_MQ_FindTheFremen.FourthTest.FourthQuestion"
+    ],
+    "DA_MQ_FindTheFremen.FifthTest.FifthQuestion": [
+      "DA_MQ_FindTheFremen.FifthTest.FifthQuestion.FindAltarCave5",
+      "DA_MQ_FindTheFremen.FifthTest.FifthQuestion.CompleteFifthTest"
+    ],
+    "DA_MQ_FindTheFremen.FifthTest": [
+      "DA_MQ_FindTheFremen.FifthTest.FifthQuestion"
+    ],
+    "DA_MQ_FindTheFremen.SixthTest.SixthQuestion": [
+      "DA_MQ_FindTheFremen.SixthTest.SixthQuestion.FindAltarCave6",
+      "DA_MQ_FindTheFremen.SixthTest.SixthQuestion.CompleteSixthTest"
+    ],
+    "DA_MQ_FindTheFremen.SixthTest": [
+      "DA_MQ_FindTheFremen.SixthTest.SixthQuestion"
+    ],
+    "DA_MQ_FindTheFremen.SeventhTest.SeventhQuestion": [
+      "DA_MQ_FindTheFremen.SeventhTest.SeventhQuestion.FindAltarCave7",
+      "DA_MQ_FindTheFremen.SeventhTest.SeventhQuestion.CompleteSeventhTest"
+    ],
+    "DA_MQ_FindTheFremen.SeventhTest": [
+      "DA_MQ_FindTheFremen.SeventhTest.SeventhQuestion"
+    ],
+    "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent": [
+      "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.SietchLocation",
+      "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.UnlockDoor",
+      "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.ExploreTheSietch",
+      "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.SolveScripturesPuzzle",
+      "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.ExploreFurther",
+      "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.SolveTheDeathstillPuzzle",
+      "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.EnterTheConsoleRoom",
+      "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.FindTheSafe",
+      "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.ExitConsoleRoom",
+      "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.KillTheBoss",
+      "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.EscapeTheSietch"
+    ],
+    "DA_MQ_FindTheFremen.TheSietch": [
+      "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent"
+    ],
+    "DA_MQ_FindTheFremen.Epilogue.WaitingForAriste": [
+      "DA_MQ_FindTheFremen.Epilogue.WaitingForAriste.WaitForTheCall"
+    ],
+    "DA_MQ_FindTheFremen.Epilogue": [
+      "DA_MQ_FindTheFremen.Epilogue.WaitingForAriste"
+    ],
+    "DA_MQ_FindTheFremen": [
+      "DA_MQ_FindTheFremen.FirstTest",
+      "DA_MQ_FindTheFremen.SecondTest",
+      "DA_MQ_FindTheFremen.ThirdTest",
+      "DA_MQ_FindTheFremen.FourthTest",
+      "DA_MQ_FindTheFremen.FifthTest",
+      "DA_MQ_FindTheFremen.SixthTest",
+      "DA_MQ_FindTheFremen.SeventhTest",
+      "DA_MQ_FindTheFremen.TheSietch",
+      "DA_MQ_FindTheFremen.Epilogue"
+    ],
+    "DA_MQ_NPEAutocompleted.Escape": [
+      "DA_MQ_NPEAutocompleted.Escape.TalkToZantara",
+      "DA_MQ_NPEAutocompleted.Escape.EscapeTheEnclosure"
+    ],
+    "DA_MQ_NPEAutocompleted": [
+      "DA_MQ_NPEAutocompleted.Escape"
+    ],
+    "DA_MQ_TheGreatConvention.NoctuasCall.UnexpectedVisitor": [
+      "DA_MQ_TheGreatConvention.NoctuasCall.UnexpectedVisitor.ListenToNoctua"
+    ],
+    "DA_MQ_TheGreatConvention.NoctuasCall": [
+      "DA_MQ_TheGreatConvention.NoctuasCall.UnexpectedVisitor"
+    ],
+    "DA_MQ_TheGreatConvention.CalledToACount.MeetElaraInHarko": [
+      "DA_MQ_TheGreatConvention.CalledToACount.MeetElaraInHarko.TravelToHarkoVillage",
+      "DA_MQ_TheGreatConvention.CalledToACount.MeetElaraInHarko.SpeakToElara"
+    ],
+    "DA_MQ_TheGreatConvention.CalledToACount.DiscussionWithFenring": [
+      "DA_MQ_TheGreatConvention.CalledToACount.DiscussionWithFenring.TalkToCountFenring"
+    ],
+    "DA_MQ_TheGreatConvention.CalledToACount": [
+      "DA_MQ_TheGreatConvention.CalledToACount.MeetElaraInHarko",
+      "DA_MQ_TheGreatConvention.CalledToACount.DiscussionWithFenring"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.MeetChiefInvestigator": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.MeetChiefInvestigator.TravelToArrakeenBarMurder",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.MeetChiefInvestigator.SpeakToChiefInvestigator",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.MeetChiefInvestigator.GainEntranceToPrivateRoom"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.LocateOsten": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.LocateOsten.FirstMurderEnterScene",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.LocateOsten.FirstMurderSearchForClues",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.LocateOsten.FirstMurderTalkToWitnesses"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.ProveFoulPlay": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.ProveFoulPlay.FirstMurderProveFoulPlay",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.ProveFoulPlay.FirstMurderGetSnooper",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.ProveFoulPlay.FirstMurderPoisonProof"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.InvestigateMurder": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.InvestigateMurder.FirstMurderTalkToApprentice",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.InvestigateMurder.FirstMurderDiscussFindings"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBar": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.MeetChiefInvestigator",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.LocateOsten",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.ProveFoulPlay",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBar.InvestigateMurder"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop.VisitWorkshop": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop.VisitWorkshop.LocateEngineersWorkshop",
+      "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop.VisitWorkshop.FindTheEngineersOffice",
+      "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop.VisitWorkshop.CollectDocuments"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop.DiscussFindings": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop.DiscussFindings.SpeakWithTors"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop.VisitWorkshop",
+      "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop.DiscussFindings"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.TheSecondVictim": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.TheSecondVictim.SecondMurderEnterScene",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.TheSecondVictim.SecondMurderSearchForClues",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.TheSecondVictim.SecondMurderSpeakToTors"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.DeepDesertBase": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.DeepDesertBase.LocateTheBase",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.DeepDesertBase.SearchTheValet",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.DeepDesertBase.FindLootRoom",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.DeepDesertBase.SearchForMoreClues",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.DeepDesertBase.ReportToTors"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.SecondInvestigateApartment": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.SecondInvestigateApartment.DecipherCrypticNote",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.SecondInvestigateApartment.SearchTheHiddenRoom"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.SecondMurderDiscussFindings": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.SecondMurderDiscussFindings.SecondMurderSpeakWithBlackMarketTrader"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.TheSecondVictim",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.DeepDesertBase",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.SecondInvestigateApartment",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment.SecondMurderDiscussFindings"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.TheBanquet": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.TheBanquet.EnterScene"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.FirstVictim": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.FirstVictim.TalkToNoble",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.FirstVictim.ReportToDhood",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.FirstVictim.SearchForClues"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.SecondVictim": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.SecondVictim.TalkToButler",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.SecondVictim.SearchForClues2"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.Ambrose": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.Ambrose.SpeakToAmbrose"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.ThirdVictim": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.ThirdVictim.TalkToButler2",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.ThirdVictim.SearchForClues3",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.ThirdVictim.DiscussFindingsTors"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.TrailTors": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.TrailTors.FollowTors",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.TrailTors.ReturnToElara"
+    ],
+    "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet": [
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.TheBanquet",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.FirstVictim",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.SecondVictim",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.Ambrose",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.ThirdVictim",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet.TrailTors"
+    ],
+    "DA_MQ_TheGreatConvention.TheBloodline.MeetAriste": [
+      "DA_MQ_TheGreatConvention.TheBloodline.MeetAriste.SpeakToAristeAtSalusanBull"
+    ],
+    "DA_MQ_TheGreatConvention.TheBloodline.Invitation": [
+      "DA_MQ_TheGreatConvention.TheBloodline.Invitation.ShowTokenToGuard",
+      "DA_MQ_TheGreatConvention.TheBloodline.Invitation.FollowArristeInside"
+    ],
+    "DA_MQ_TheGreatConvention.TheBloodline.UpperArchives": [
+      "DA_MQ_TheGreatConvention.TheBloodline.UpperArchives.ExploreArchives",
+      "DA_MQ_TheGreatConvention.TheBloodline.UpperArchives.ExploreArchives2",
+      "DA_MQ_TheGreatConvention.TheBloodline.UpperArchives.ExploreArchives3",
+      "DA_MQ_TheGreatConvention.TheBloodline.UpperArchives.DistractGuards",
+      "DA_MQ_TheGreatConvention.TheBloodline.UpperArchives.ExploreArchives4"
+    ],
+    "DA_MQ_TheGreatConvention.TheBloodline.LowerArchives": [
+      "DA_MQ_TheGreatConvention.TheBloodline.LowerArchives.ExploreLowerArchives",
+      "DA_MQ_TheGreatConvention.TheBloodline.LowerArchives.PassBeneGesseritTest"
+    ],
+    "DA_MQ_TheGreatConvention.TheBloodline.DeepArchives": [
+      "DA_MQ_TheGreatConvention.TheBloodline.DeepArchives.ExploreDeepArchives",
+      "DA_MQ_TheGreatConvention.TheBloodline.DeepArchives.ProvideBloodSample",
+      "DA_MQ_TheGreatConvention.TheBloodline.DeepArchives.LeaveThePalace"
+    ],
+    "DA_MQ_TheGreatConvention.TheBloodline": [
+      "DA_MQ_TheGreatConvention.TheBloodline.MeetAriste",
+      "DA_MQ_TheGreatConvention.TheBloodline.Invitation",
+      "DA_MQ_TheGreatConvention.TheBloodline.UpperArchives",
+      "DA_MQ_TheGreatConvention.TheBloodline.LowerArchives",
+      "DA_MQ_TheGreatConvention.TheBloodline.DeepArchives"
+    ],
+    "DA_MQ_TheGreatConvention.NoctuasReturn.FromBeyond": [
+      "DA_MQ_TheGreatConvention.NoctuasReturn.FromBeyond.AMessageFromNoctua"
+    ],
+    "DA_MQ_TheGreatConvention.NoctuasReturn": [
+      "DA_MQ_TheGreatConvention.NoctuasReturn.FromBeyond"
+    ],
+    "DA_MQ_TheGreatConvention": [
+      "DA_MQ_TheGreatConvention.NoctuasCall",
+      "DA_MQ_TheGreatConvention.CalledToACount",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBar",
+      "DA_MQ_TheGreatConvention.ProcesVerbalEngineersWorkshop",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheApartment",
+      "DA_MQ_TheGreatConvention.ProcesVerbalTheBanquet",
+      "DA_MQ_TheGreatConvention.TheBloodline",
+      "DA_MQ_TheGreatConvention.NoctuasReturn"
+    ],
+    "DA_MQ_TheGreatConventionPt2.CallToArms.TheAftermath": [
+      "DA_MQ_TheGreatConventionPt2.CallToArms.TheAftermath.Transmission",
+      "DA_MQ_TheGreatConventionPt2.CallToArms.TheAftermath.MeetElara"
+    ],
+    "DA_MQ_TheGreatConventionPt2.CallToArms": [
+      "DA_MQ_TheGreatConventionPt2.CallToArms.TheAftermath"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1.The Arena": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1.The Arena.FindElarasContact",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1.The Arena.EnterTheArenaLobby"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1.Tier1": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1.Tier1.TalkToArenaMasterTier1",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1.Tier1.Tier1Fight1",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1.Tier1.Tier1Fight2"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1.The Arena",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1.Tier1"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1Intro": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1Intro.Task1TalkToArenaMaster"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1FindContact": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1FindContact.Task1GoToContactLocation",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1FindContact.Task1InvestigateContact"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore.Task1GoToShipwreck",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore.Task1LocateRadiationCore",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore.Task1AttemptToPickupRadiationCore",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore.Task1FollowPowerCable",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore.Task1CloseRadiationCore",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore.Task1PickupRadiationCore",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore.Task1DeliverRadiationCore"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Tier2": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Tier2.Tier2Fight1",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Tier2.Tier2Fight2"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1Intro",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1FindContact",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Task1ObtainRadiationCore",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2.Tier2"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2Intro": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2Intro.TalkToMasterTask2"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2FindLocation": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2FindLocation.Task2GoToSmallShipwreck",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2FindLocation.Task2ScanArea"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2ObtainElaccaShipment": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2ObtainElaccaShipment.Task2GoToEcolab",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2ObtainElaccaShipment.Task2FindElaccaDocument",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2ObtainElaccaShipment.Task2GetElaccaShipment",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2ObtainElaccaShipment.Task2ExitEcolab",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2ObtainElaccaShipment.Task2DeliverElaccaShipment"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Tier3": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Tier3.Tier3Fight1",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Tier3.Tier3Fight2",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Tier3.Tier3Fight3"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2Intro",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2FindLocation",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Task2ObtainElaccaShipment",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3.Tier3"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3Intro": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3Intro.Task3TalkToArenaMaster"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3GoToWoH",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3InvestigateSuboidCorpse",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3ReachCargoDeck",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3ClearFirstBloodDoor",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3ClearSecondBloodDoor",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3EnterFinalRoom",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3FindSuboid",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3TurnOnPower",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3ObtainSuboid",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid.Task3FindExit"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3BringSuboid": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3BringSuboid.Task3DeliverSuboid"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Tier4": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Tier4.Tier4Fight1",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Tier4.Tier4Fight2",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Tier4.Tier4Fight3",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Tier4.Tier4Fight4"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3Intro",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3CaptureASuboid",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Task3BringSuboid",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4.Tier4"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4Intro": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4Intro.Task4TalkToArenaMaster"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4GoToOldCarthag",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4ClearFirstArea",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4ClearSecondBloodDoor",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4SearchFirstIncubatorRoom",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4FirstIncubatorRoomTurnPowerOn",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4TriggerFinalAmbush",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4DefeatFinalAmbush",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4SearchSecondIncubator",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4SecondIncubatorRoomTurnPowerOn",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4ObtainGhola",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4FindWayOutOfLab",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola.Task4FindExit"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4BringGhola": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4BringGhola.Task4DeliverGhola"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Tier5": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Tier5.Tier5Fight1",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Tier5.Tier5Fight2",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Tier5.Tier5Fight3"
+    ],
+    "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5": [
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4Intro",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4CaptureAGhola",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Task4BringGhola",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5.Tier5"
+    ],
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.ForbiddenKnowledge": [
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.ForbiddenKnowledge.MeetElara2",
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.ForbiddenKnowledge.GoToFallenLight"
+    ],
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon": [
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon.MoveDeeper0",
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon.EscapeArena1",
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon.MoveDeeper1",
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon.EscapeArena2",
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon.MoverDeeper2",
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon.EscapeArena3",
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon.MoveDeeper3"
+    ],
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.Minotaur": [
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.Minotaur.DefeatMinotaur",
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.Minotaur.CatchFacerdancer"
+    ],
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.Debrief": [
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.Debrief.ElaraDebrief"
+    ],
+    "DA_MQ_TheGreatConventionPt2.OutsideTheLaw": [
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.ForbiddenKnowledge",
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.HighlignerDungeon",
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.Minotaur",
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw.Debrief"
+    ],
+    "DA_MQ_TheGreatConventionPt2.NoctuasMessage.NoctuaReturns": [
+      "DA_MQ_TheGreatConventionPt2.NoctuasMessage.NoctuaReturns.ReceiveMessage"
+    ],
+    "DA_MQ_TheGreatConventionPt2.NoctuasMessage": [
+      "DA_MQ_TheGreatConventionPt2.NoctuasMessage.NoctuaReturns"
+    ],
+    "DA_MQ_TheGreatConventionPt2": [
+      "DA_MQ_TheGreatConventionPt2.CallToArms",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly1",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly2",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly3",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly4",
+      "DA_MQ_TheGreatConventionPt2.TheArtOfKanly5",
+      "DA_MQ_TheGreatConventionPt2.OutsideTheLaw",
+      "DA_MQ_TheGreatConventionPt2.NoctuasMessage"
+    ],
+    "DA_SQ_DeepDesert.DDLocations.DDSurvey": [
+      "DA_SQ_DeepDesert.DDLocations.DDSurvey.DDEcolab",
+      "DA_SQ_DeepDesert.DDLocations.DDSurvey.DDShipwreck"
+    ],
+    "DA_SQ_DeepDesert.DDLocations": [
+      "DA_SQ_DeepDesert.DDLocations.DDSurvey"
+    ],
+    "DA_SQ_DeepDesert.DDVehicles.DDSandcrawler": [
+      "DA_SQ_DeepDesert.DDVehicles.DDSandcrawler.ResearchSandcrawler",
+      "DA_SQ_DeepDesert.DDVehicles.DDSandcrawler.SandcrawlerConstruct",
+      "DA_SQ_DeepDesert.DDVehicles.DDSandcrawler.ConstructVacuum",
+      "DA_SQ_DeepDesert.DDVehicles.DDSandcrawler.ConstructCentrifuge",
+      "DA_SQ_DeepDesert.DDVehicles.DDSandcrawler.FuelSandcrawler",
+      "DA_SQ_DeepDesert.DDVehicles.DDSandcrawler.SandcrawlerSpice"
+    ],
+    "DA_SQ_DeepDesert.DDVehicles.DDTransportOrni": [
+      "DA_SQ_DeepDesert.DDVehicles.DDTransportOrni.ResearchTransportOrni",
+      "DA_SQ_DeepDesert.DDVehicles.DDTransportOrni.ConstructOrni",
+      "DA_SQ_DeepDesert.DDVehicles.DDTransportOrni.FuelOrni",
+      "DA_SQ_DeepDesert.DDVehicles.DDTransportOrni.TransportVehicle"
+    ],
+    "DA_SQ_DeepDesert.DDVehicles": [
+      "DA_SQ_DeepDesert.DDVehicles.DDSandcrawler",
+      "DA_SQ_DeepDesert.DDVehicles.DDTransportOrni"
+    ],
+    "DA_SQ_DeepDesert.DDBase.ConstructBase": [
+      "DA_SQ_DeepDesert.DDBase.ConstructBase.Foundation",
+      "DA_SQ_DeepDesert.DDBase.ConstructBase.Walls",
+      "DA_SQ_DeepDesert.DDBase.ConstructBase.Roof"
+    ],
+    "DA_SQ_DeepDesert.DDBase": [
+      "DA_SQ_DeepDesert.DDBase.ConstructBase"
+    ],
+    "DA_SQ_DeepDesert.DDRocket.RocketLauncher": [
+      "DA_SQ_DeepDesert.DDRocket.RocketLauncher.Research",
+      "DA_SQ_DeepDesert.DDRocket.RocketLauncher.Fabricate",
+      "DA_SQ_DeepDesert.DDRocket.RocketLauncher.Ammo",
+      "DA_SQ_DeepDesert.DDRocket.RocketLauncher.Kill"
+    ],
+    "DA_SQ_DeepDesert.DDRocket": [
+      "DA_SQ_DeepDesert.DDRocket.RocketLauncher"
+    ],
+    "DA_SQ_DeepDesert.DDHarvesting.SpiceHarvesting": [
+      "DA_SQ_DeepDesert.DDHarvesting.SpiceHarvesting.SandcrawlerDelivery",
+      "DA_SQ_DeepDesert.DDHarvesting.SpiceHarvesting.SandcrawlerHarvest",
+      "DA_SQ_DeepDesert.DDHarvesting.SpiceHarvesting.SpiceThumper"
+    ],
+    "DA_SQ_DeepDesert.DDHarvesting": [
+      "DA_SQ_DeepDesert.DDHarvesting.SpiceHarvesting"
+    ],
+    "DA_SQ_DeepDesert": [
+      "DA_SQ_DeepDesert.DDLocations",
+      "DA_SQ_DeepDesert.DDVehicles",
+      "DA_SQ_DeepDesert.DDBase",
+      "DA_SQ_DeepDesert.DDRocket",
+      "DA_SQ_DeepDesert.DDHarvesting"
+    ],
+    "DA_SQ_JabalEifrit.SpecializedFabricators.SurvivalFabricator": [
+      "DA_SQ_JabalEifrit.SpecializedFabricators.SurvivalFabricator.ResearchSurvival",
+      "DA_SQ_JabalEifrit.SpecializedFabricators.SurvivalFabricator.ResearchConstructSurvivalFabricator",
+      "DA_SQ_JabalEifrit.SpecializedFabricators.SurvivalFabricator.ResearchAdvancedShield",
+      "DA_SQ_JabalEifrit.SpecializedFabricators.SurvivalFabricator.CraftAdvancedShield"
+    ],
+    "DA_SQ_JabalEifrit.SpecializedFabricators.VehicleFabricator": [
+      "DA_SQ_JabalEifrit.SpecializedFabricators.VehicleFabricator.ResearchVehicle",
+      "DA_SQ_JabalEifrit.SpecializedFabricators.VehicleFabricator.ResearchConstructVehicleFabricator",
+      "DA_SQ_JabalEifrit.SpecializedFabricators.VehicleFabricator.ResearchSandbikeBoost",
+      "DA_SQ_JabalEifrit.SpecializedFabricators.VehicleFabricator.CraftSandbikeBoost"
+    ],
+    "DA_SQ_JabalEifrit.SpecializedFabricators.WeaponFabricator": [
+      "DA_SQ_JabalEifrit.SpecializedFabricators.WeaponFabricator.ResearchWeapons",
+      "DA_SQ_JabalEifrit.SpecializedFabricators.WeaponFabricator.ResearchConstructWeaponsFabricator",
+      "DA_SQ_JabalEifrit.SpecializedFabricators.WeaponFabricator.ResearchArtisanKindjal",
+      "DA_SQ_JabalEifrit.SpecializedFabricators.WeaponFabricator.CraftArtisanKindjal"
+    ],
+    "DA_SQ_JabalEifrit.SpecializedFabricators.WearableFabricator": [
+      "DA_SQ_JabalEifrit.SpecializedFabricators.WearableFabricator.ResearchGarment",
+      "DA_SQ_JabalEifrit.SpecializedFabricators.WearableFabricator.ResearchConstructWearableFabricator",
+      "DA_SQ_JabalEifrit.SpecializedFabricators.WearableFabricator.CraftSteelStillsuit"
+    ],
+    "DA_SQ_JabalEifrit.SpecializedFabricators": [
+      "DA_SQ_JabalEifrit.SpecializedFabricators.SurvivalFabricator",
+      "DA_SQ_JabalEifrit.SpecializedFabricators.VehicleFabricator",
+      "DA_SQ_JabalEifrit.SpecializedFabricators.WeaponFabricator",
+      "DA_SQ_JabalEifrit.SpecializedFabricators.WearableFabricator"
+    ],
+    "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy": [
+      "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy.ResearchBuggy",
+      "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy.CraftChassis",
+      "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy.CraftHullFront",
+      "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy.CraftEngine",
+      "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy.CraftPSU",
+      "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy.CraftTreads",
+      "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy.CraftRear Hull"
+    ],
+    "DA_SQ_JabalEifrit.BuildBuggy.Assemble": [
+      "DA_SQ_JabalEifrit.BuildBuggy.Assemble.AssembleBuggy",
+      "DA_SQ_JabalEifrit.BuildBuggy.Assemble.EnterBuggy"
+    ],
+    "DA_SQ_JabalEifrit.BuildBuggy": [
+      "DA_SQ_JabalEifrit.BuildBuggy.CraftBuggy",
+      "DA_SQ_JabalEifrit.BuildBuggy.Assemble"
+    ],
+    "DA_SQ_JabalEifrit.WeaponsofWarII.SpitdartRifle": [
+      "DA_SQ_JabalEifrit.WeaponsofWarII.SpitdartRifle.ResearchSpitdart",
+      "DA_SQ_JabalEifrit.WeaponsofWarII.SpitdartRifle.CraftSpitdart",
+      "DA_SQ_JabalEifrit.WeaponsofWarII.SpitdartRifle.KillSpitdart"
+    ],
+    "DA_SQ_JabalEifrit.WeaponsofWarII.Dirk": [
+      "DA_SQ_JabalEifrit.WeaponsofWarII.Dirk.ResearchDirk",
+      "DA_SQ_JabalEifrit.WeaponsofWarII.Dirk.CraftDirk",
+      "DA_SQ_JabalEifrit.WeaponsofWarII.Dirk.KillDirk"
+    ],
+    "DA_SQ_JabalEifrit.WeaponsofWarII.SnubnosePistol": [
+      "DA_SQ_JabalEifrit.WeaponsofWarII.SnubnosePistol.ResearchSnubnosePistol",
+      "DA_SQ_JabalEifrit.WeaponsofWarII.SnubnosePistol.CraftSnubnosePistol",
+      "DA_SQ_JabalEifrit.WeaponsofWarII.SnubnosePistol.KillSnubnosePistol"
+    ],
+    "DA_SQ_JabalEifrit.WeaponsofWarII.SteelArmor": [
+      "DA_SQ_JabalEifrit.WeaponsofWarII.SteelArmor.ResearchSteelArmor",
+      "DA_SQ_JabalEifrit.WeaponsofWarII.SteelArmor.CraftSteelArmor",
+      "DA_SQ_JabalEifrit.WeaponsofWarII.SteelArmor.EquipSteelArmor"
+    ],
+    "DA_SQ_JabalEifrit.WeaponsofWarII": [
+      "DA_SQ_JabalEifrit.WeaponsofWarII.SpitdartRifle",
+      "DA_SQ_JabalEifrit.WeaponsofWarII.Dirk",
+      "DA_SQ_JabalEifrit.WeaponsofWarII.SnubnosePistol",
+      "DA_SQ_JabalEifrit.WeaponsofWarII.SteelArmor"
+    ],
+    "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalWest": [
+      "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalWest.SurveyJabalWest",
+      "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalWest.JabalWestTestingStation",
+      "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalWest.JabalWestOutpost",
+      "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalWest.JabalWestHandofKhidir"
+    ],
+    "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalEast": [
+      "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalEast.SurveyJabalEast",
+      "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalEast.JabalEastShipwreck",
+      "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalEast.JabalEastEcolab"
+    ],
+    "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalNorth": [
+      "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalNorth.SurveyJabalNorth",
+      "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalNorth.JabalNorthEcolab",
+      "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalNorth.JabalNorthOutpost"
+    ],
+    "DA_SQ_JabalEifrit.ExploreJabal": [
+      "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalWest",
+      "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalEast",
+      "DA_SQ_JabalEifrit.ExploreJabal.ExploreJabalNorth"
+    ],
+    "DA_SQ_JabalEifrit.ExploreHaggaRift.ExploreTheRift": [
+      "DA_SQ_JabalEifrit.ExploreHaggaRift.ExploreTheRift.SurveyHaggaRift",
+      "DA_SQ_JabalEifrit.ExploreHaggaRift.ExploreTheRift.RiftShipwreck",
+      "DA_SQ_JabalEifrit.ExploreHaggaRift.ExploreTheRift.RiftEcolab",
+      "DA_SQ_JabalEifrit.ExploreHaggaRift.ExploreTheRift.RiftSpiral"
+    ],
+    "DA_SQ_JabalEifrit.ExploreHaggaRift": [
+      "DA_SQ_JabalEifrit.ExploreHaggaRift.ExploreTheRift"
+    ],
+    "DA_SQ_JabalEifrit.Thumper.UnlockandCraftThumper": [
+      "DA_SQ_JabalEifrit.Thumper.UnlockandCraftThumper.CraftThumper"
+    ],
+    "DA_SQ_JabalEifrit.Thumper.UseThumper": [
+      "DA_SQ_JabalEifrit.Thumper.UseThumper.EquipThumper",
+      "DA_SQ_JabalEifrit.Thumper.UseThumper.PlaceThumper"
+    ],
+    "DA_SQ_JabalEifrit.Thumper": [
+      "DA_SQ_JabalEifrit.Thumper.UnlockandCraftThumper",
+      "DA_SQ_JabalEifrit.Thumper.UseThumper"
+    ],
+    "DA_SQ_JabalEifrit.PortableLight.UnlockandCraftPortableLight": [
+      "DA_SQ_JabalEifrit.PortableLight.UnlockandCraftPortableLight.ResearchPortableLight",
+      "DA_SQ_JabalEifrit.PortableLight.UnlockandCraftPortableLight.CraftPortableLight",
+      "DA_SQ_JabalEifrit.PortableLight.UnlockandCraftPortableLight.EquipPortableLight",
+      "DA_SQ_JabalEifrit.PortableLight.UnlockandCraftPortableLight.TraveltoHaggaRift"
+    ],
+    "DA_SQ_JabalEifrit.PortableLight": [
+      "DA_SQ_JabalEifrit.PortableLight.UnlockandCraftPortableLight"
+    ],
+    "DA_SQ_JabalEifrit.UsingStilltent.Stilltent": [
+      "DA_SQ_JabalEifrit.UsingStilltent.Stilltent.CraftStilltent",
+      "DA_SQ_JabalEifrit.UsingStilltent.Stilltent.PlaceStilltent",
+      "DA_SQ_JabalEifrit.UsingStilltent.Stilltent.EnterStilltent"
+    ],
+    "DA_SQ_JabalEifrit.UsingStilltent": [
+      "DA_SQ_JabalEifrit.UsingStilltent.Stilltent"
+    ],
+    "DA_SQ_JabalEifrit.Deathstill.ResearchConstructDeathstill": [
+      "DA_SQ_JabalEifrit.Deathstill.ResearchConstructDeathstill.ConstructDeathstill",
+      "DA_SQ_JabalEifrit.Deathstill.ResearchConstructDeathstill.ResearchWaterCistern",
+      "DA_SQ_JabalEifrit.Deathstill.ResearchConstructDeathstill.ConstructWaterCistern"
+    ],
+    "DA_SQ_JabalEifrit.Deathstill.KillandPickupEnemy": [
+      "DA_SQ_JabalEifrit.Deathstill.KillandPickupEnemy.KillEnemy",
+      "DA_SQ_JabalEifrit.Deathstill.KillandPickupEnemy.PickupCorpse",
+      "DA_SQ_JabalEifrit.Deathstill.KillandPickupEnemy.DepositCorpse"
+    ],
+    "DA_SQ_JabalEifrit.Deathstill": [
+      "DA_SQ_JabalEifrit.Deathstill.ResearchConstructDeathstill",
+      "DA_SQ_JabalEifrit.Deathstill.KillandPickupEnemy"
+    ],
+    "DA_SQ_JabalEifrit": [
+      "DA_SQ_JabalEifrit.SpecializedFabricators",
+      "DA_SQ_JabalEifrit.BuildBuggy",
+      "DA_SQ_JabalEifrit.WeaponsofWarII",
+      "DA_SQ_JabalEifrit.ExploreJabal",
+      "DA_SQ_JabalEifrit.ExploreHaggaRift",
+      "DA_SQ_JabalEifrit.Thumper",
+      "DA_SQ_JabalEifrit.PortableLight",
+      "DA_SQ_JabalEifrit.UsingStilltent",
+      "DA_SQ_JabalEifrit.Deathstill"
+    ],
+    "DA_SQ_Oodham.RadiationSuit.RadiationResearchCraft": [
+      "DA_SQ_Oodham.RadiationSuit.RadiationResearchCraft.RadiationResearch",
+      "DA_SQ_Oodham.RadiationSuit.RadiationResearchCraft.RadiationCraft",
+      "DA_SQ_Oodham.RadiationSuit.RadiationResearchCraft.EquipRadiation"
+    ],
+    "DA_SQ_Oodham.RadiationSuit": [
+      "DA_SQ_Oodham.RadiationSuit.RadiationResearchCraft"
+    ],
+    "DA_SQ_Oodham.OodhamKill.ElephantGun": [
+      "DA_SQ_Oodham.OodhamKill.ElephantGun.ResearchElephantGun",
+      "DA_SQ_Oodham.OodhamKill.ElephantGun.CraftElephantGun",
+      "DA_SQ_Oodham.OodhamKill.ElephantGun.KillElephantGun"
+    ],
+    "DA_SQ_Oodham.OodhamKill.LMG": [
+      "DA_SQ_Oodham.OodhamKill.LMG.ResearchLMG",
+      "DA_SQ_Oodham.OodhamKill.LMG.CraftLMG",
+      "DA_SQ_Oodham.OodhamKill.LMG.KillLMG"
+    ],
+    "DA_SQ_Oodham.OodhamKill.Rapier": [
+      "DA_SQ_Oodham.OodhamKill.Rapier.ResearchRapier",
+      "DA_SQ_Oodham.OodhamKill.Rapier.CraftRapier",
+      "DA_SQ_Oodham.OodhamKill.Rapier.KillRapier"
+    ],
+    "DA_SQ_Oodham.OodhamKill.AlumiteArmor": [
+      "DA_SQ_Oodham.OodhamKill.AlumiteArmor.ResearchAlumiteArmor",
+      "DA_SQ_Oodham.OodhamKill.AlumiteArmor.CraftAlumiteArmor",
+      "DA_SQ_Oodham.OodhamKill.AlumiteArmor.EquipAlumiteArmor"
+    ],
+    "DA_SQ_Oodham.OodhamKill": [
+      "DA_SQ_Oodham.OodhamKill.ElephantGun",
+      "DA_SQ_Oodham.OodhamKill.LMG",
+      "DA_SQ_Oodham.OodhamKill.Rapier",
+      "DA_SQ_Oodham.OodhamKill.AlumiteArmor"
+    ],
+    "DA_SQ_Oodham.SpiceMask.UnlockSpiceMask": [
+      "DA_SQ_Oodham.SpiceMask.UnlockSpiceMask.ResearchSpiceMask",
+      "DA_SQ_Oodham.SpiceMask.UnlockSpiceMask.CraftSpiceMask",
+      "DA_SQ_Oodham.SpiceMask.UnlockSpiceMask.EquipSpiceMask"
+    ],
+    "DA_SQ_Oodham.SpiceMask.SpiceHarvest": [
+      "DA_SQ_Oodham.SpiceMask.SpiceHarvest.SpiceMaskHarvest"
+    ],
+    "DA_SQ_Oodham.SpiceMask": [
+      "DA_SQ_Oodham.SpiceMask.UnlockSpiceMask",
+      "DA_SQ_Oodham.SpiceMask.SpiceHarvest"
+    ],
+    "DA_SQ_Oodham.Ornithopter.UnlockOrni": [
+      "DA_SQ_Oodham.Ornithopter.UnlockOrni.ResearchOrni"
+    ],
+    "DA_SQ_Oodham.Ornithopter.CraftOrni": [
+      "DA_SQ_Oodham.Ornithopter.CraftOrni.CraftBodyHull",
+      "DA_SQ_Oodham.Ornithopter.CraftOrni.CraftChassis",
+      "DA_SQ_Oodham.Ornithopter.CraftOrni.CraftCockpit",
+      "DA_SQ_Oodham.Ornithopter.CraftOrni.CraftEngine",
+      "DA_SQ_Oodham.Ornithopter.CraftOrni.CraftGenerator",
+      "DA_SQ_Oodham.Ornithopter.CraftOrni.CraftWings"
+    ],
+    "DA_SQ_Oodham.Ornithopter.ConstructOrni": [
+      "DA_SQ_Oodham.Ornithopter.ConstructOrni.BuildOrni",
+      "DA_SQ_Oodham.Ornithopter.ConstructOrni.EnterOrni"
+    ],
+    "DA_SQ_Oodham.Ornithopter": [
+      "DA_SQ_Oodham.Ornithopter.UnlockOrni",
+      "DA_SQ_Oodham.Ornithopter.CraftOrni",
+      "DA_SQ_Oodham.Ornithopter.ConstructOrni"
+    ],
+    "DA_SQ_Oodham.Exploration.ShieldWallEast": [
+      "DA_SQ_Oodham.Exploration.ShieldWallEast.SurveyShieldWallEast",
+      "DA_SQ_Oodham.Exploration.ShieldWallEast.RedScorpion",
+      "DA_SQ_Oodham.Exploration.ShieldWallEast.StoneSentinel"
+    ],
+    "DA_SQ_Oodham.Exploration.ShieldWallWest": [
+      "DA_SQ_Oodham.Exploration.ShieldWallWest.SurveyShieldWallWest",
+      "DA_SQ_Oodham.Exploration.ShieldWallWest.Refinery",
+      "DA_SQ_Oodham.Exploration.ShieldWallWest.Shipwreck"
+    ],
+    "DA_SQ_Oodham.Exploration.Oodham": [
+      "DA_SQ_Oodham.Exploration.Oodham.SurveyOodham",
+      "DA_SQ_Oodham.Exploration.Oodham.WaterTrap"
+    ],
+    "DA_SQ_Oodham.Exploration.MysaTarill": [
+      "DA_SQ_Oodham.Exploration.MysaTarill.SurveyMysaTarill",
+      "DA_SQ_Oodham.Exploration.MysaTarill.Crossroads"
+    ],
+    "DA_SQ_Oodham.Exploration": [
+      "DA_SQ_Oodham.Exploration.ShieldWallEast",
+      "DA_SQ_Oodham.Exploration.ShieldWallWest",
+      "DA_SQ_Oodham.Exploration.Oodham",
+      "DA_SQ_Oodham.Exploration.MysaTarill"
+    ],
+    "DA_SQ_Oodham": [
+      "DA_SQ_Oodham.RadiationSuit",
+      "DA_SQ_Oodham.OodhamKill",
+      "DA_SQ_Oodham.SpiceMask",
+      "DA_SQ_Oodham.Ornithopter",
+      "DA_SQ_Oodham.Exploration"
+    ],
+    "DA_SQ_OverlandMap.AtreLandsraadMission.AtreMission": [
+      "DA_SQ_OverlandMap.AtreLandsraadMission.AtreMission.AtreAccept",
+      "DA_SQ_OverlandMap.AtreLandsraadMission.AtreMission.AtreComplete",
+      "DA_SQ_OverlandMap.AtreLandsraadMission.AtreMission.AtreClaimReward",
+      "DA_SQ_OverlandMap.AtreLandsraadMission.AtreMission.AtreKeyStone",
+      "DA_SQ_OverlandMap.AtreLandsraadMission.AtreMission.AtreReturn"
+    ],
+    "DA_SQ_OverlandMap.AtreLandsraadMission": [
+      "DA_SQ_OverlandMap.AtreLandsraadMission.AtreMission"
+    ],
+    "DA_SQ_OverlandMap.HarkLandsraadMission.HarkMission": [
+      "DA_SQ_OverlandMap.HarkLandsraadMission.HarkMission.HarkAccept",
+      "DA_SQ_OverlandMap.HarkLandsraadMission.HarkMission.HarkComplete",
+      "DA_SQ_OverlandMap.HarkLandsraadMission.HarkMission.HarkClaimReward",
+      "DA_SQ_OverlandMap.HarkLandsraadMission.HarkMission.HarkKeyStone",
+      "DA_SQ_OverlandMap.HarkLandsraadMission.HarkMission.HarkReturn"
+    ],
+    "DA_SQ_OverlandMap.HarkLandsraadMission": [
+      "DA_SQ_OverlandMap.HarkLandsraadMission.HarkMission"
+    ],
+    "DA_SQ_OverlandMap.AtreAugmentation.AtreVendor": [
+      "DA_SQ_OverlandMap.AtreAugmentation.AtreVendor.AtreBuyItem",
+      "DA_SQ_OverlandMap.AtreAugmentation.AtreVendor.AtreFabriate"
+    ],
+    "DA_SQ_OverlandMap.AtreAugmentation.AtreAugmentStation": [
+      "DA_SQ_OverlandMap.AtreAugmentation.AtreAugmentStation.AtreFabricateAugment",
+      "DA_SQ_OverlandMap.AtreAugmentation.AtreAugmentStation.AtreResearch",
+      "DA_SQ_OverlandMap.AtreAugmentation.AtreAugmentStation.AtreConstructStation",
+      "DA_SQ_OverlandMap.AtreAugmentation.AtreAugmentStation.AtreApplyAugment"
+    ],
+    "DA_SQ_OverlandMap.AtreAugmentation": [
+      "DA_SQ_OverlandMap.AtreAugmentation.AtreVendor",
+      "DA_SQ_OverlandMap.AtreAugmentation.AtreAugmentStation"
+    ],
+    "DA_SQ_OverlandMap.HarkAugmentation.HarkVendor": [
+      "DA_SQ_OverlandMap.HarkAugmentation.HarkVendor.HarkBuyItem",
+      "DA_SQ_OverlandMap.HarkAugmentation.HarkVendor.HarkFabriate"
+    ],
+    "DA_SQ_OverlandMap.HarkAugmentation.HarkAugmentStation": [
+      "DA_SQ_OverlandMap.HarkAugmentation.HarkAugmentStation.HarkFabricateAugment",
+      "DA_SQ_OverlandMap.HarkAugmentation.HarkAugmentStation.HarkResearch",
+      "DA_SQ_OverlandMap.HarkAugmentation.HarkAugmentStation.HarkConstructStation",
+      "DA_SQ_OverlandMap.HarkAugmentation.HarkAugmentStation.HarkApplyAugment"
+    ],
+    "DA_SQ_OverlandMap.HarkAugmentation": [
+      "DA_SQ_OverlandMap.HarkAugmentation.HarkVendor",
+      "DA_SQ_OverlandMap.HarkAugmentation.HarkAugmentStation"
+    ],
+    "DA_SQ_OverlandMap.Dungeon.DungeonMaster": [
+      "DA_SQ_OverlandMap.Dungeon.DungeonMaster.TraveltoDungeon",
+      "DA_SQ_OverlandMap.Dungeon.DungeonMaster.KillDungeonBoss",
+      "DA_SQ_OverlandMap.Dungeon.DungeonMaster.LootAugmentSchematics",
+      "DA_SQ_OverlandMap.Dungeon.DungeonMaster.RecycleAugmentSchematic"
+    ],
+    "DA_SQ_OverlandMap.Dungeon": [
+      "DA_SQ_OverlandMap.Dungeon.DungeonMaster"
+    ],
+    "DA_SQ_OverlandMap.ScalingUp.DifficultyScaling": [
+      "DA_SQ_OverlandMap.ScalingUp.DifficultyScaling.CompleteFirst",
+      "DA_SQ_OverlandMap.ScalingUp.DifficultyScaling.CompleteSecond"
+    ],
+    "DA_SQ_OverlandMap.ScalingUp": [
+      "DA_SQ_OverlandMap.ScalingUp.DifficultyScaling"
+    ],
+    "DA_SQ_OverlandMap.14Update.CompleteWindPass": [
+      "DA_SQ_OverlandMap.14Update.CompleteWindPass.1"
+    ],
+    "DA_SQ_OverlandMap.14Update.2": [
+      "DA_SQ_OverlandMap.14Update.2.1",
+      "DA_SQ_OverlandMap.14Update.2.2"
+    ],
+    "DA_SQ_OverlandMap.14Update": [
+      "DA_SQ_OverlandMap.14Update.CompleteWindPass",
+      "DA_SQ_OverlandMap.14Update.2"
+    ],
+    "DA_SQ_OverlandMap": [
+      "DA_SQ_OverlandMap.AtreLandsraadMission",
+      "DA_SQ_OverlandMap.HarkLandsraadMission",
+      "DA_SQ_OverlandMap.AtreAugmentation",
+      "DA_SQ_OverlandMap.HarkAugmentation",
+      "DA_SQ_OverlandMap.Dungeon",
+      "DA_SQ_OverlandMap.ScalingUp",
+      "DA_SQ_OverlandMap.14Update"
+    ],
+    "DA_SQ_Sheol.ExploreSheol.SurveyandPOI": [
+      "DA_SQ_Sheol.ExploreSheol.SurveyandPOI.SurveySheol",
+      "DA_SQ_Sheol.ExploreSheol.SurveyandPOI.HarkoBase",
+      "DA_SQ_Sheol.ExploreSheol.SurveyandPOI.TravelShipwreck"
+    ],
+    "DA_SQ_Sheol.ExploreSheol": [
+      "DA_SQ_Sheol.ExploreSheol.SurveyandPOI"
+    ],
+    "DA_SQ_Sheol.IodinePill.UnlockandusePill": [
+      "DA_SQ_Sheol.IodinePill.UnlockandusePill.ResearchPill",
+      "DA_SQ_Sheol.IodinePill.UnlockandusePill.CraftPill",
+      "DA_SQ_Sheol.IodinePill.UnlockandusePill.ConsumePill"
+    ],
+    "DA_SQ_Sheol.IodinePill": [
+      "DA_SQ_Sheol.IodinePill.UnlockandusePill"
+    ],
+    "DA_SQ_Sheol": [
+      "DA_SQ_Sheol.ExploreSheol",
+      "DA_SQ_Sheol.IodinePill"
+    ],
+    "DA_SQ_Taxation.Taxi.TravelCity": [
+      "DA_SQ_Taxation.Taxi.TravelCity.Tradepost",
+      "DA_SQ_Taxation.Taxi.TravelCity.TalkPilot",
+      "DA_SQ_Taxation.Taxi.TravelCity.Travel"
+    ],
+    "DA_SQ_Taxation.Taxi": [
+      "DA_SQ_Taxation.Taxi.TravelCity"
+    ],
+    "DA_SQ_Taxation.VehicleBackup.BasicInventory": [
+      "DA_SQ_Taxation.VehicleBackup.BasicInventory.Research",
+      "DA_SQ_Taxation.VehicleBackup.BasicInventory.Fabricate",
+      "DA_SQ_Taxation.VehicleBackup.BasicInventory.Construct"
+    ],
+    "DA_SQ_Taxation.VehicleBackup.BackupTool": [
+      "DA_SQ_Taxation.VehicleBackup.BackupTool.ResearchBackup",
+      "DA_SQ_Taxation.VehicleBackup.BackupTool.FabricateBackup",
+      "DA_SQ_Taxation.VehicleBackup.BackupTool.BackupVehicle"
+    ],
+    "DA_SQ_Taxation.VehicleBackup": [
+      "DA_SQ_Taxation.VehicleBackup.BasicInventory",
+      "DA_SQ_Taxation.VehicleBackup.BackupTool"
+    ],
+    "DA_SQ_Taxation.MovingBase.CopyDevice": [
+      "DA_SQ_Taxation.MovingBase.CopyDevice.ResearchCopyDevice",
+      "DA_SQ_Taxation.MovingBase.CopyDevice.FabricateCopyDevice",
+      "DA_SQ_Taxation.MovingBase.CopyDevice.CopyYourBase"
+    ],
+    "DA_SQ_Taxation.MovingBase": [
+      "DA_SQ_Taxation.MovingBase.CopyDevice"
+    ],
+    "DA_SQ_Taxation.UseExchange.Exchange": [
+      "DA_SQ_Taxation.UseExchange.Exchange.Solaris",
+      "DA_SQ_Taxation.UseExchange.Exchange.TravelCity",
+      "DA_SQ_Taxation.UseExchange.Exchange.DepositSolaris"
+    ],
+    "DA_SQ_Taxation.UseExchange": [
+      "DA_SQ_Taxation.UseExchange.Exchange"
+    ],
+    "DA_SQ_Taxation.SandwormRecovery": [
+      "DA_SQ_Taxation.SandwormRecovery.MysteriousSinging"
+    ],
+    "DA_SQ_Taxation": [
+      "DA_SQ_Taxation.Taxi",
+      "DA_SQ_Taxation.VehicleBackup",
+      "DA_SQ_Taxation.MovingBase",
+      "DA_SQ_Taxation.UseExchange",
+      "DA_SQ_Taxation.SandwormRecovery"
+    ],
+    "DA_SQ_VermiliusGap.Relocate.RelocateOutsideHBS": [
+      "DA_SQ_VermiliusGap.Relocate.RelocateOutsideHBS.Drive north to the Vermilius Gap",
+      "DA_SQ_VermiliusGap.Relocate.RelocateOutsideHBS.ResearchAdvTotem",
+      "DA_SQ_VermiliusGap.Relocate.RelocateOutsideHBS.ConstructAdvTotem",
+      "DA_SQ_VermiliusGap.Relocate.RelocateOutsideHBS.DestroyYourBase"
+    ],
+    "DA_SQ_VermiliusGap.Relocate": [
+      "DA_SQ_VermiliusGap.Relocate.RelocateOutsideHBS"
+    ],
+    "DA_SQ_VermiliusGap.Shields.MiningToolUpgrade": [
+      "DA_SQ_VermiliusGap.Shields.MiningToolUpgrade.ResearchCopperCutteray",
+      "DA_SQ_VermiliusGap.Shields.MiningToolUpgrade.FabricateCopperCutteray",
+      "DA_SQ_VermiliusGap.Shields.MiningToolUpgrade.RefineIronIngots"
+    ],
+    "DA_SQ_VermiliusGap.Shields.BasicShield": [
+      "DA_SQ_VermiliusGap.Shields.BasicShield.ShieldResearch",
+      "DA_SQ_VermiliusGap.Shields.BasicShield.ShieldCraft",
+      "DA_SQ_VermiliusGap.Shields.BasicShield.ShieldEquip",
+      "DA_SQ_VermiliusGap.Shields.BasicShield.ShieldActivate"
+    ],
+    "DA_SQ_VermiliusGap.Shields": [
+      "DA_SQ_VermiliusGap.Shields.MiningToolUpgrade",
+      "DA_SQ_VermiliusGap.Shields.BasicShield"
+    ],
+    "DA_SQ_VermiliusGap.StylesofSand.FlourSand": [
+      "DA_SQ_VermiliusGap.StylesofSand.FlourSand.ResearchScanner",
+      "DA_SQ_VermiliusGap.StylesofSand.FlourSand.UnlockScanner",
+      "DA_SQ_VermiliusGap.StylesofSand.FlourSand.FlourSandLocate",
+      "DA_SQ_VermiliusGap.StylesofSand.FlourSand.FlourSandHarvest",
+      "DA_SQ_VermiliusGap.StylesofSand.FlourSand.RefineFlourSand"
+    ],
+    "DA_SQ_VermiliusGap.StylesofSand": [
+      "DA_SQ_VermiliusGap.StylesofSand.FlourSand"
+    ],
+    "DA_SQ_VermiliusGap.DewReaper.CraftDewReaper": [
+      "DA_SQ_VermiliusGap.DewReaper.CraftDewReaper.ResearchDewReaper",
+      "DA_SQ_VermiliusGap.DewReaper.CraftDewReaper.ResearchLiterjon",
+      "DA_SQ_VermiliusGap.DewReaper.CraftDewReaper.FabricateDewReaper",
+      "DA_SQ_VermiliusGap.DewReaper.CraftDewReaper.FabricateLiterjon"
+    ],
+    "DA_SQ_VermiliusGap.DewReaper.HarvestandStore": [
+      "DA_SQ_VermiliusGap.DewReaper.HarvestandStore.ReaoDew",
+      "DA_SQ_VermiliusGap.DewReaper.HarvestandStore.ResearchCistern",
+      "DA_SQ_VermiliusGap.DewReaper.HarvestandStore.ReseachandConstructCistern",
+      "DA_SQ_VermiliusGap.DewReaper.HarvestandStore.DepositWater"
+    ],
+    "DA_SQ_VermiliusGap.DewReaper": [
+      "DA_SQ_VermiliusGap.DewReaper.CraftDewReaper",
+      "DA_SQ_VermiliusGap.DewReaper.HarvestandStore"
+    ],
+    "DA_SQ_VermiliusGap.Weapons.Sword": [
+      "DA_SQ_VermiliusGap.Weapons.Sword.SwordResearch",
+      "DA_SQ_VermiliusGap.Weapons.Sword.SwordCraft",
+      "DA_SQ_VermiliusGap.Weapons.Sword.SwordKill"
+    ],
+    "DA_SQ_VermiliusGap.Weapons.Scattergun": [
+      "DA_SQ_VermiliusGap.Weapons.Scattergun.ScattergunResearch",
+      "DA_SQ_VermiliusGap.Weapons.Scattergun.ScattergunCraft",
+      "DA_SQ_VermiliusGap.Weapons.Scattergun.ScattergunKill"
+    ],
+    "DA_SQ_VermiliusGap.Weapons.SMG": [
+      "DA_SQ_VermiliusGap.Weapons.SMG.SMGResearch",
+      "DA_SQ_VermiliusGap.Weapons.SMG.SMGCraft",
+      "DA_SQ_VermiliusGap.Weapons.SMG.SMGKill"
+    ],
+    "DA_SQ_VermiliusGap.Weapons.Armor": [
+      "DA_SQ_VermiliusGap.Weapons.Armor.ArmorResearch",
+      "DA_SQ_VermiliusGap.Weapons.Armor.ArmorCraft",
+      "DA_SQ_VermiliusGap.Weapons.Armor.ArmorEquip"
+    ],
+    "DA_SQ_VermiliusGap.Weapons": [
+      "DA_SQ_VermiliusGap.Weapons.Sword",
+      "DA_SQ_VermiliusGap.Weapons.Scattergun",
+      "DA_SQ_VermiliusGap.Weapons.SMG",
+      "DA_SQ_VermiliusGap.Weapons.Armor"
+    ],
+    "DA_SQ_VermiliusGap.SurveyVermillius.ExploreEast": [
+      "DA_SQ_VermiliusGap.SurveyVermillius.ExploreEast.SurveyEast",
+      "DA_SQ_VermiliusGap.SurveyVermillius.ExploreEast.EastTestingStation",
+      "DA_SQ_VermiliusGap.SurveyVermillius.ExploreEast.EastOutpost",
+      "DA_SQ_VermiliusGap.SurveyVermillius.ExploreEast.EastTradepost"
+    ],
+    "DA_SQ_VermiliusGap.SurveyVermillius.ExploreWest": [
+      "DA_SQ_VermiliusGap.SurveyVermillius.ExploreWest.SurveyWest",
+      "DA_SQ_VermiliusGap.SurveyVermillius.ExploreWest.WestShipwreck",
+      "DA_SQ_VermiliusGap.SurveyVermillius.ExploreWest.WestOutpost",
+      "DA_SQ_VermiliusGap.SurveyVermillius.ExploreWest.WestEcolab"
+    ],
+    "DA_SQ_VermiliusGap.SurveyVermillius": [
+      "DA_SQ_VermiliusGap.SurveyVermillius.ExploreEast",
+      "DA_SQ_VermiliusGap.SurveyVermillius.ExploreWest"
+    ],
+    "DA_SQ_VermiliusGap.VermilliusContracts.TravelContract": [
+      "DA_SQ_VermiliusGap.VermilliusContracts.TravelContract.TravelAnvilStation",
+      "DA_SQ_VermiliusGap.VermilliusContracts.TravelContract.PickupContracts"
+    ],
+    "DA_SQ_VermiliusGap.VermilliusContracts.CompleteContracts": [
+      "DA_SQ_VermiliusGap.VermilliusContracts.CompleteContracts.ThievesContacts",
+      "DA_SQ_VermiliusGap.VermilliusContracts.CompleteContracts.SpiceContract"
+    ],
+    "DA_SQ_VermiliusGap.VermilliusContracts": [
+      "DA_SQ_VermiliusGap.VermilliusContracts.TravelContract",
+      "DA_SQ_VermiliusGap.VermilliusContracts.CompleteContracts"
+    ],
+    "DA_SQ_VermiliusGap.Maintenance.maintainSandbike": [
+      "DA_SQ_VermiliusGap.Maintenance.maintainSandbike.ObtainWeldingTorch",
+      "DA_SQ_VermiliusGap.Maintenance.maintainSandbike.Weldingwire",
+      "DA_SQ_VermiliusGap.Maintenance.maintainSandbike.RepairSandbike"
+    ],
+    "DA_SQ_VermiliusGap.Maintenance.Recycleandrepair": [
+      "DA_SQ_VermiliusGap.Maintenance.Recycleandrepair.ResearchRepair",
+      "DA_SQ_VermiliusGap.Maintenance.Recycleandrepair.Repair",
+      "DA_SQ_VermiliusGap.Maintenance.Recycleandrepair.RepairItems"
+    ],
+    "DA_SQ_VermiliusGap.Maintenance.RecycleItems": [
+      "DA_SQ_VermiliusGap.Maintenance.RecycleItems.ResearchRecycle",
+      "DA_SQ_VermiliusGap.Maintenance.RecycleItems.Recycle",
+      "DA_SQ_VermiliusGap.Maintenance.RecycleItems.UseRecycle"
+    ],
+    "DA_SQ_VermiliusGap.Maintenance": [
+      "DA_SQ_VermiliusGap.Maintenance.maintainSandbike",
+      "DA_SQ_VermiliusGap.Maintenance.Recycleandrepair",
+      "DA_SQ_VermiliusGap.Maintenance.RecycleItems"
+    ],
+    "DA_SQ_VermiliusGap.InteriorDecoration.PurchaseFurniture": [
+      "DA_SQ_VermiliusGap.InteriorDecoration.PurchaseFurniture.TraveltoAnvileTradepost",
+      "DA_SQ_VermiliusGap.InteriorDecoration.PurchaseFurniture.BuyFurniture",
+      "DA_SQ_VermiliusGap.InteriorDecoration.PurchaseFurniture.ConstructFurniture"
+    ],
+    "DA_SQ_VermiliusGap.InteriorDecoration": [
+      "DA_SQ_VermiliusGap.InteriorDecoration.PurchaseFurniture"
+    ],
+    "DA_SQ_VermiliusGap.Treasure.GearingUp": [
+      "DA_SQ_VermiliusGap.Treasure.GearingUp.UnlockScanner",
+      "DA_SQ_VermiliusGap.Treasure.GearingUp.CraftScanner",
+      "DA_SQ_VermiliusGap.Treasure.GearingUp.CraftCompactor"
+    ],
+    "DA_SQ_VermiliusGap.Treasure.LocateUnbury": [
+      "DA_SQ_VermiliusGap.Treasure.LocateUnbury.LocateTreasure",
+      "DA_SQ_VermiliusGap.Treasure.LocateUnbury.UnburyTreasure"
+    ],
+    "DA_SQ_VermiliusGap.Treasure": [
+      "DA_SQ_VermiliusGap.Treasure.GearingUp",
+      "DA_SQ_VermiliusGap.Treasure.LocateUnbury"
+    ],
+    "DA_SQ_VermiliusGap": [
+      "DA_SQ_VermiliusGap.Relocate",
+      "DA_SQ_VermiliusGap.Shields",
+      "DA_SQ_VermiliusGap.StylesofSand",
+      "DA_SQ_VermiliusGap.DewReaper",
+      "DA_SQ_VermiliusGap.Weapons",
+      "DA_SQ_VermiliusGap.SurveyVermillius",
+      "DA_SQ_VermiliusGap.VermilliusContracts",
+      "DA_SQ_VermiliusGap.Maintenance",
+      "DA_SQ_VermiliusGap.InteriorDecoration",
+      "DA_SQ_VermiliusGap.Treasure"
+    ]
+  },
   "journey_node_tags": {
     "DA_DLC_LostHarvest.DiggingDeeper.AssistKief2.LeaveHarkoAndWait": [
       "Contract.Target.Interaction.MTX.Ch1.Journey4.ElaraCalled"
@@ -212,6 +2850,13 @@
     ],
     "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.EscapeTheSietch": [
       "Journey.TheSietch.Progression.Completed"
+    ],
+    "DA_MQ_FindTheFremen.TheSietch.SietchLocationParent.SietchInteractions": [
+      "Journey.TheSietch.Interactions.Lesson1Completed",
+      "Journey.TheSietch.Interactions.Lesson2Completed",
+      "Journey.TheSietch.Interactions.Lesson3Completed",
+      "Journey.TheSietch.Interactions.DeathStillInteracted",
+      "Journey.TheSietch.Interactions.SafeInteracted"
     ],
     "DA_MQ_TheGreatConvention.CalledToACount.DiscussionWithFenring.TalkToCountFenring": [
       "Journey.Chapter2.CalledToACount.Completed"

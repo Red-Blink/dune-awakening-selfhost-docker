@@ -60,7 +60,9 @@ export function journeyDepth(nodeId, allNodeIds) {
   return depth;
 }
 
-export function journeyDisplayName(value) {
+export function journeyDisplayName(value, aliases = {}) {
+  const alias = String(aliases?.[String(value || "")] || "").trim();
+  if (alias) return alias;
   const raw = String(value || "").split(".").pop() || String(value || "");
   return raw
     .replace(/^(DA_|CT_|LDR_|FQ_|Dunipedia_)/, "")
@@ -69,6 +71,33 @@ export function journeyDisplayName(value) {
     .replace(/([0-9])([A-Z])/g, "$1 $2")
     .replace(/\s+/g, " ")
     .trim() || String(value || "");
+}
+
+export function compareJourneyCatalogOrder(left, right, journeyData = {}) {
+  const a = String(left || "");
+  const b = String(right || "");
+  if (a === b) return 0;
+  const aParts = a.split(".");
+  const bParts = b.split(".");
+  const sharedLength = Math.min(aParts.length, bParts.length);
+  let shared = 0;
+  while (shared < sharedLength && aParts[shared] === bParts[shared]) shared += 1;
+  if (shared === sharedLength) return aParts.length - bParts.length;
+
+  const parentId = aParts.slice(0, shared).join(".");
+  const siblings = Array.isArray(journeyData?.journey_children?.[parentId])
+    ? journeyData.journey_children[parentId]
+    : [];
+  const aId = aParts.slice(0, shared + 1).join(".");
+  const bId = bParts.slice(0, shared + 1).join(".");
+  const aIndex = siblings.indexOf(aId);
+  const bIndex = siblings.indexOf(bId);
+  if (aIndex >= 0 || bIndex >= 0) {
+    if (aIndex < 0) return 1;
+    if (bIndex < 0) return -1;
+    if (aIndex !== bIndex) return aIndex - bIndex;
+  }
+  return aId.localeCompare(bId);
 }
 
 export function tutorialStatus(value) {

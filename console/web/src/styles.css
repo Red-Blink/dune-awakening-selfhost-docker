@@ -1210,6 +1210,10 @@ body.debug .technical-details { display: block; }
 .playerAdmin_actionRow .playerAdmin_fieldGroup .playerAdmin_skillPointsInput { width: 96px; max-width: 96px; flex: 0 0 96px; }
 .playerAdmin_journeyTable th:nth-child(3), .playerAdmin_journeyTable td:nth-child(3),
 .playerAdmin_journeyTable th:nth-child(4), .playerAdmin_journeyTable td:nth-child(4) { width: 150px; max-width: 150px; }
+.playerAdmin_journeyTable th:first-child, .playerAdmin_journeyTable td:first-child { width: 340px; min-width: 340px; }
+.playerAdmin_journeyTable th:nth-last-child(2), .playerAdmin_journeyTable td:nth-last-child(2) { width: 190px; min-width: 190px; max-width: 220px; }
+.playerAdmin_journeyTable .playerAdmin_resultCell { min-width: 190px; max-width: 220px; }
+.playerAdmin_journeyTable .playerAdmin_resultCell .inline-action-result { font-size: 12px; line-height: 1.3; }
 .playerAdmin_journeyTable th:nth-child(6), .playerAdmin_journeyTable td:nth-child(6) { text-align: center; }
 .playerAdmin_journeyTable th:last-child, .playerAdmin_journeyTable td:last-child { text-align: center; }
 .playerAdmin_journeyTable .playerAdmin_actionCell { justify-content: center; }
@@ -1278,7 +1282,7 @@ body.debug .technical-details { display: block; }
 .playerAdmin_rankBars button:disabled { opacity: .45; cursor: not-allowed; }
 .playerAdmin_saveBar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px solid #302b25; padding-top: 12px; }
 .playerAdmin_saveBar button { width: auto; }
-.playerAdmin_journeyName { min-width: 220px; }
+.playerAdmin_journeyName { min-width: 340px; }
 .playerAdmin_itemsTable { margin-top: 2px; }
 .playerAdmin_empty { padding: 10px 2px; color: #d9c8aa; }
 .blueprints-panel { display: grid; gap: 12px; min-width: 0; }

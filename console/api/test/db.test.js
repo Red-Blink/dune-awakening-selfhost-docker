@@ -1807,9 +1807,18 @@ test("journey listing groups story contract codex and tutorial rows with player 
     ],
     tutorialRows: [{ id: 7, name: "AttackTutorial", tutorial_state: 2 }]
   });
-  const result = await playerJourney(db, 123, { journey_node_tags: { "DA_Story.Root": ["Story.Tag"], "DA_Story.Root.Child": ["Story.Child"], "DA_CT_Arrakeen.Contract": ["Contract.Tag"] } });
-  assert.equal(result.rows.story.length, 2);
-  assert.equal(result.rows.story[1].parentId, "DA_Story.Root");
+  const result = await playerJourney(db, 123, {
+    journey_aliases: {
+      "DA_Story.Root": "Official Journey Name",
+      "DA_Story.Root.CatalogOnly": "Catalog-only Objective"
+    },
+    journey_node_tags: { "DA_Story.Root": ["Story.Tag"], "DA_Story.Root.Child": ["Story.Child"], "DA_CT_Arrakeen.Contract": ["Contract.Tag"] }
+  });
+  assert.equal(result.rows.story.length, 3);
+  assert.equal(result.rows.story[0].name, "Official Journey Name");
+  assert.equal(result.rows.story[0].rawName, "DA_Story.Root");
+  assert.equal(result.rows.story.find((row) => row.rawName === "DA_Story.Root.CatalogOnly").name, "Catalog-only Objective");
+  assert.ok(result.rows.story.slice(1).every((row) => row.parentId === "DA_Story.Root"));
   assert.equal(result.rows.contract[0].status, "Complete");
   assert.equal(result.rows.codex[0].category, "Codex");
   assert.equal(result.rows.tutorial[0].status, "Complete");
