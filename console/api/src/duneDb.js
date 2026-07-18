@@ -4020,8 +4020,8 @@ export async function addonOpsActivitySummary(db) {
 function emptyActivitySummary() {
   return {
     totalPlayers: 0, onlinePlayers: 0,
-    activeLast1h: null, activeLast24h: null, activeLast7d: null,
-    inactivePlayers: null, returningPlayers: null, newPlayers: null,
+    activeLast1h: 0, activeLast24h: 0, activeLast7d: 0,
+    inactivePlayers: 0, returningPlayers: 0, newPlayers: 0,
     playersDead: 0,
     guildActivity: [], factionActivity: [], mapActivity: []
   };
