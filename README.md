@@ -1,4 +1,4 @@
-# Dune Docker Console
+# Dune: Awakening Docker - Self-Hosted Server Console
 
 ![Dune Awakening Self-Host Docker cover](assets/cover.png)
 
