@@ -45,11 +45,24 @@ test("reports adapter health as experimental read-only", async () => {
   assert.deepEqual([...result.liveRoutes].sort(), [
     "/api/integrations/discord/announcements",
     "/api/integrations/discord/broadcast",
+    "/api/integrations/discord/db",
+    "/api/integrations/discord/guilds/find",
+    "/api/integrations/discord/guilds/storage",
     "/api/integrations/discord/health",
+    "/api/integrations/discord/players/find",
+    "/api/integrations/discord/players/inventory",
+    "/api/integrations/discord/players/inventory-search",
+    "/api/integrations/discord/players/link",
+    "/api/integrations/discord/players/me",
+    "/api/integrations/discord/players/storage",
+    "/api/integrations/discord/players/unlink",
     "/api/integrations/discord/population",
+    "/api/integrations/discord/ports",
     "/api/integrations/discord/readiness",
+    "/api/integrations/discord/servers",
     "/api/integrations/discord/services",
-    "/api/integrations/discord/status"
+    "/api/integrations/discord/status",
+    "/api/integrations/discord/version"
   ].sort());
   assert.ok(result.plannedRoutes.includes("/api/integrations/discord/logs"));
   assert.ok(result.plannedRoutes.includes("/api/integrations/discord/ops/activity"));
@@ -66,9 +79,13 @@ test("exposes only experimental read-only route names", () => {
     "/api/integrations/discord/announcements",
     "/api/integrations/discord/backups/list",
     "/api/integrations/discord/broadcast",
+    "/api/integrations/discord/db",
+    "/api/integrations/discord/guilds/find",
+    "/api/integrations/discord/guilds/storage",
     "/api/integrations/discord/health",
     "/api/integrations/discord/logs",
     "/api/integrations/discord/map-state",
+    "/api/integrations/discord/maintenance",
     "/api/integrations/discord/ops/activity",
     "/api/integrations/discord/ops/combat",
     "/api/integrations/discord/ops/dashboard",
@@ -78,10 +95,20 @@ test("exposes only experimental read-only route names", () => {
     "/api/integrations/discord/ops/prometheus",
     "/api/integrations/discord/ops/resources",
     "/api/integrations/discord/ops/soc",
+    "/api/integrations/discord/players/find",
+    "/api/integrations/discord/players/inventory",
+    "/api/integrations/discord/players/inventory-search",
+    "/api/integrations/discord/players/link",
+    "/api/integrations/discord/players/me",
+    "/api/integrations/discord/players/storage",
+    "/api/integrations/discord/players/unlink",
     "/api/integrations/discord/population",
+    "/api/integrations/discord/ports",
     "/api/integrations/discord/readiness",
+    "/api/integrations/discord/servers",
     "/api/integrations/discord/services",
-    "/api/integrations/discord/status"
+    "/api/integrations/discord/status",
+    "/api/integrations/discord/version"
   ].sort());
   for (const route of routes) {
     assert.doesNotMatch(route, /write|execute|delete|restore|kick|grant|teleport|reset|admin/i);

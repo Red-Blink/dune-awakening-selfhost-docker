@@ -299,6 +299,63 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
       }));
     }
 
+    // Logs route — read-only, returns recent log entries
+    if (path === DISCORD_ADAPTER_ROUTES.LOGS && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      const mapping = discordRoleMappingFromEnv();
+      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.LOGS_READ);
+
+      const result = await runDune(config, buildDuneArgs("logs"), {
+        timeoutMs: 15000,
+        allowedExitCodes: [0]
+      });
+
+      return json(res, 200, {
+        ok: true,
+        route: path,
+        logs: (result.stdout || "").slice(0, 4000).split("\n").slice(-50)
+      });
+    }
+
+    // Map state route — read-only, returns map runtime state
+    if (path === DISCORD_ADAPTER_ROUTES.MAP_STATE && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      const mapping = discordRoleMappingFromEnv();
+      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.STATUS_READ);
+
+      const result = await runDune(config, buildDuneArgs("maps"), {
+        timeoutMs: 15000,
+        allowedExitCodes: [0]
+      });
+
+      return json(res, 200, {
+        ok: true,
+        route: path,
+        mapState: (result.stdout || "").slice(0, 4000)
+      });
+    }
+
+    // Maintenance route — read-only, returns maintenance window metadata
+    if (path === DISCORD_ADAPTER_ROUTES.MAINTENANCE && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      const mapping = discordRoleMappingFromEnv();
+      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.STATUS_READ);
+
+      const result = await runDune(config, buildDuneArgs("maintenance"), {
+        timeoutMs: 15000,
+        allowedExitCodes: [0]
+      });
+
+      return json(res, 200, {
+        ok: true,
+        route: path,
+        maintenance: (result.stdout || "").slice(0, 4000)
+      });
+    }
+
     throw policyError("not_found", "Discord adapter route not found.", 404);
   } catch (error) {
     const response = discordAdapterErrorResponse(error);

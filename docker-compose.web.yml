@@ -8,6 +8,11 @@ services:
     image: redblink-dune-docker-console:dev
     container_name: redblink-dune-docker-console
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "${DUNE_DOCKER_LOG_MAX_SIZE:-50m}"
+        max-file: "${DUNE_DOCKER_LOG_MAX_FILES:-3}"
     init: true
     user: "${DUNE_HOST_UID:-0}:${DUNE_HOST_GID:-0}"
     # Host networking lets the console reach local Dune services and bind
@@ -16,6 +21,8 @@ services:
     group_add:
       - "${DOCKER_SOCKET_GID:-0}"
     environment:
+      DUNE_HOST_UID: "${DUNE_HOST_UID:-0}"
+      DUNE_HOST_GID: "${DUNE_HOST_GID:-0}"
       DUNE_DOCKER_DIR: /repo
       DUNE_CONTAINER_REPO_ROOT: /repo
       DUNE_HOST_REPO_ROOT: "${DUNE_HOST_REPO_ROOT:-${PWD}}"
@@ -47,6 +54,14 @@ services:
       DUNE_DB_USER: "${DUNE_DB_USER:-}"
       DUNE_DB_PASSWORD: "${DUNE_DB_PASSWORD:-}"
       DUNE_COMMAND_AUTH_TOKEN: "${DUNE_COMMAND_AUTH_TOKEN:-}"
+      DUNE_DISCORD_ADAPTER_ENABLED: "${DUNE_DISCORD_ADAPTER_ENABLED:-false}"
+      DUNE_DISCORD_ADAPTER_TOKEN: "${DUNE_DISCORD_ADAPTER_TOKEN:-}"
+      DUNE_BOT_API_TOKEN_FILE: "${DUNE_BOT_API_TOKEN_FILE:-}"
+      DISCORD_OBSERVER_ROLE_IDS: "${DISCORD_OBSERVER_ROLE_IDS:-}"
+      DISCORD_MODERATOR_ROLE_IDS: "${DISCORD_MODERATOR_ROLE_IDS:-}"
+      DISCORD_ADMIN_ROLE_IDS: "${DISCORD_ADMIN_ROLE_IDS:-}"
+      DISCORD_OWNER_ROLE_IDS: "${DISCORD_OWNER_ROLE_IDS:-}"
+      DUNE_PUBLIC_DIRECTORY_URL: "${DUNE_PUBLIC_DIRECTORY_URL:-}"
     volumes:
       - "${DUNE_HOST_REPO_ROOT:-.}:/repo"
       - /etc/localtime:/etc/localtime:ro

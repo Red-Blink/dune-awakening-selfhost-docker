@@ -11,6 +11,7 @@ export const DISCORD_ADAPTER_ROUTES = Object.freeze({
   POPULATION: "/api/integrations/discord/population",
   LOGS: "/api/integrations/discord/logs",
   MAP_STATE: "/api/integrations/discord/map-state",
+  MAINTENANCE: "/api/integrations/discord/maintenance",
   BACKUPS_LIST: "/api/integrations/discord/backups/list",
   BROADCAST: "/api/integrations/discord/broadcast",
   ANNOUNCEMENTS: "/api/integrations/discord/announcements",
