@@ -46,18 +46,29 @@ has_openrc() {
 install_basic_tools() {
   if command -v apt-get >/dev/null 2>&1; then
     need_sudo apt-get update
-    need_sudo apt-get install -y ca-certificates curl bash
+    need_sudo apt-get install -y ca-certificates curl bash tar openssl python3
   elif command -v dnf >/dev/null 2>&1; then
-    need_sudo dnf install -y ca-certificates curl bash
+    need_sudo dnf install -y ca-certificates curl bash tar openssl python3
   elif command -v yum >/dev/null 2>&1; then
-    need_sudo yum install -y ca-certificates curl bash
+    need_sudo yum install -y ca-certificates curl bash tar openssl python3
   elif command -v zypper >/dev/null 2>&1; then
-    need_sudo zypper --non-interactive install ca-certificates curl bash
+    need_sudo zypper --non-interactive install ca-certificates curl bash tar openssl python3
   elif command -v pacman >/dev/null 2>&1; then
-    need_sudo pacman -Sy --noconfirm ca-certificates curl bash
+    need_sudo pacman -Sy --noconfirm ca-certificates curl bash tar openssl python
   elif command -v apk >/dev/null 2>&1; then
-    need_sudo apk add --no-cache ca-certificates curl bash
+    need_sudo apk add --no-cache ca-certificates curl bash tar openssl python3
   fi
+}
+
+ensure_basic_tools() {
+  if command -v curl >/dev/null 2>&1 \
+    && command -v bash >/dev/null 2>&1 \
+    && command -v tar >/dev/null 2>&1 \
+    && command -v openssl >/dev/null 2>&1 \
+    && { command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; }; then
+    return
+  fi
+  install_basic_tools
 }
 
 install_docker() {
@@ -66,7 +77,6 @@ install_docker() {
   fi
 
   step "Docker is missing. Installing Pre-requisites for Docker now."
-  install_basic_tools
 
   if ! command -v curl >/dev/null 2>&1; then
     echo "Docker is missing and curl is not available, so the installer cannot continue automatically."
@@ -204,7 +214,6 @@ ensure_docker_group_access() {
   fi
 
   echo "$target_user is not in the docker group."
-  # TODO: (Remove once verify) Origional - need_sudo usermod -aG docker "$target_user" || true
   set_docker_group_access "$target_user"
   echo "User $target_user has been added to the docker group. Log out and back in for this change to take effect."
 
@@ -534,6 +543,7 @@ if ! is_linux; then
   exit 1
 fi
 
+ensure_basic_tools
 install_docker
 start_docker
 ensure_docker_group_access
