@@ -879,15 +879,18 @@ test("export base returns instances and placeables in blueprint-importable relat
   const anchor = { x: -165708.2808275, y: -220414.81625525, z: 23473.653477859374 };
   const pieceTransform = [-167075.33, -217459.17, 22768.473, 0, 0, 0.81915206, 0.57357645];
   const placeablePos = { x: -168670.68727685622, y: -218687.5419278533, z: 23154.388368606567, qz: 0.17364818, qw: 0.9848077 };
+  const ownerEntityId = "918273645";
+  const calls = [];
   const db = {
     query: async (text, values = []) => {
+      calls.push({ text, values });
       if (text.includes("to_regclass")) {
         const name = String(values[0] || "");
         return { rows: [{ exists: [...BASE_REQUIRED_TABLES, "dune.placeables"].includes(name) }] };
       }
       if (text.includes("from dune.buildings b")) {
         return { rows: [
-          { base_id: "1006", name: "Sietch One", owner_name: "Leader One", map: "HaggaBasin", x: String(anchor.x), y: String(anchor.y), z: String(anchor.z) }
+          { base_id: "1006", name: "Sietch One", owner_name: "Leader One", map: "HaggaBasin", x: String(anchor.x), y: String(anchor.y), z: String(anchor.z), owner_entity_id: ownerEntityId }
         ] };
       }
       if (text.includes("select instance_id, building_type, transform")) {
@@ -900,6 +903,8 @@ test("export base returns instances and placeables in blueprint-importable relat
     }
   };
   const result = await exportBase(db, 1006);
+  const placeableQuery = calls.find((call) => call.text.includes("select p.id as placeable_id"));
+  assert.deepEqual(placeableQuery.values, [ownerEntityId]);
   assert.equal(result.base_id, "1006");
   assert.equal(result.name, "Sietch One");
   assert.equal(result.owner_name, "Leader One");

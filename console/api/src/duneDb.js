@@ -2175,7 +2175,8 @@ export async function exportBase(db, id) {
            coalesce(a.map, '') as map,
            ((a.transform).location).x as x,
            ((a.transform).location).y as y,
-           ((a.transform).location).z as z
+           ((a.transform).location).z as z,
+           max(bi.owner_entity_id) as owner_entity_id
     from dune.buildings b
     join dune.building_instances bi on bi.building_id = b.id
     join dune.actor_fgl_entities afe on afe.entity_id = bi.owner_entity_id
@@ -2229,9 +2230,9 @@ export async function exportBase(db, id) {
                ((a.transform).rotation).w as qw
         from dune.placeables p
         join dune.actors a on a.id = p.id
-        where p.owner_entity_id = (select bi.owner_entity_id from dune.building_instances bi where bi.building_id = $1 limit 1)
+        where p.owner_entity_id = $1
           and a.transform is not null
-        order by p.id`, [baseId])
+        order by p.id`, [base.owner_entity_id])
     : { rows: [] };
   const placeables = placeableRows.rows.map((row) => ({
     placeable_id: row.placeable_id,
