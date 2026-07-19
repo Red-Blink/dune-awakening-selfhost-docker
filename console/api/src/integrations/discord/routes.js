@@ -16,6 +16,7 @@ import {
 } from "./opsProvider.js";
 import {
   linkPlayerProvider,
+  verifyPlayerLinkProvider,
   unlinkProvider,
   whoamiProvider,
   requireLinkedPlayer
@@ -191,9 +192,20 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
       const body = await readJson(req);
       const actor = validateDiscordActor(body.actor);
       requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.INVENTORY_READ);
-      return json(res, 200, await linkPlayerProvider(db, {
+      return json(res, 200, await linkPlayerProvider(db, config, {
         discordUserId: actor.userId,
         characterName: body.characterName
+      }));
+    }
+
+    // Players link verify
+    if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_LINK_VERIFY && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.INVENTORY_READ);
+      return json(res, 200, await verifyPlayerLinkProvider(db, {
+        discordUserId: actor.userId,
+        code: body.code
       }));
     }
 

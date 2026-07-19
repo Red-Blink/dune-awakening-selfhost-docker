@@ -4400,3 +4400,47 @@ export async function searchItemsInPlayerInventory(db, playerPawnId, query) {
     limit 200`, [intParam(playerPawnId, "player pawn id", 1), searchTerm]);
   return { rows: result.rows };
 }
+
+export async function discordPendingLinksTableCreate(db) {
+  await db.query(`
+    create table if not exists dune.discord_pending_links (
+      code text primary key,
+      discord_user_id text not null,
+      player_controller_id text not null,
+      character_name text not null,
+      funcom_id text,
+      fls_id text,
+      created_at timestamp with time zone default now(),
+      expires_at timestamp with time zone not null
+    )`);
+}
+
+export async function createPendingLink(db, discordUserId, playerControllerId, characterName, funcomId, flsId, code, expiresAt) {
+  await discordPendingLinksTableCreate(db);
+  await db.query(`
+    insert into dune.discord_pending_links (code, discord_user_id, player_controller_id, character_name, funcom_id, fls_id, expires_at)
+    values ($1, $2, $3, $4, $5, $6, $7)
+    on conflict (code) do update
+      set discord_user_id = excluded.discord_user_id,
+          player_controller_id = excluded.player_controller_id,
+          character_name = excluded.character_name,
+          funcom_id = excluded.funcom_id,
+          fls_id = excluded.fls_id,
+          expires_at = excluded.expires_at,
+          created_at = now()`, [code, discordUserId, playerControllerId, characterName, funcomId || "", flsId || "", expiresAt]);
+}
+
+export async function consumePendingLink(db, code) {
+  await discordPendingLinksTableCreate(db);
+  const result = await db.query(`
+    delete from dune.discord_pending_links
+    where code = $1 and expires_at > now()
+    returning discord_user_id, player_controller_id, character_name`, [code]);
+  return result.rows[0] || null;
+}
+
+export async function cleanupExpiredPendingLinks(db) {
+  await discordPendingLinksTableCreate(db);
+  const result = await db.query("delete from dune.discord_pending_links where expires_at <= now()");
+  return result.rowCount;
+}
