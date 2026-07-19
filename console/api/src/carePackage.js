@@ -2,7 +2,7 @@ import { appendFileSync, chmodSync, closeSync, existsSync, fstatSync, mkdirSync,
 import { dirname, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { buildDuneArgs, runDune } from "./runner.js";
-import { itemRequiresDatabaseGrant, resolveCatalogItem } from "./adminCatalog.js";
+import { itemIsSchematic, itemRequiresDatabaseGrant, resolveCatalogItem } from "./adminCatalog.js";
 import { publishCarePackageWhisper } from "./rmq.js";
 import { giveItemToPlayer } from "./duneDb.js";
 import { liveItemGrantOk, liveItemGrantWarning } from "./grantResults.js";
@@ -399,7 +399,12 @@ export async function grantCarePackage(config, playerId, body = {}, context = {}
         augments: [],
         augmentQuality: 1
       };
-      const needsDatabaseGrant = itemRequiresDatabaseGrant(resolved);
+      const schematic = itemIsSchematic(resolved);
+      const online = String(body.onlineStatus || body.online_status || "").toLowerCase() === "online";
+      if (schematic && !config.mockMode && !online) {
+        throw new Error("Physical schematic grants require the player to be online so delivery can be verified by the game server.");
+      }
+      const needsDatabaseGrant = itemRequiresDatabaseGrant(resolved) && !schematic;
       if (needsDatabaseGrant && context.db && body.actorId) {
         const result = config.mockMode
           ? { ok: true, inserted: { template_id: resolved.itemId, stack_size: item.quantity, quality_level: item.quality } }

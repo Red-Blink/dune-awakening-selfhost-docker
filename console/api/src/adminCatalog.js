@@ -16,9 +16,7 @@ export function resolveCatalogItem(repoRoot, { itemName = "", itemId = "" } = {}
   const exactNames = items.filter((item) => String(item.name || "").toLowerCase() === folded);
   if (exactNames.length === 1) return normalizeItem(exactNames[0], repoRoot);
   if (exactNames.length > 1) {
-    const nonSchematics = exactNames.filter((item) => String(item.category || "").toLowerCase() !== "schematics");
-    if (nonSchematics.length === 1) return normalizeItem(nonSchematics[0], repoRoot);
-    throw new Error(`Ambiguous item name: ${value}`);
+    throw new Error(`Ambiguous item name: ${value}. Select the item by its exact catalog ID.`);
   }
 
   const exactId = items.find((item) => String(item.id || "") === value);
@@ -49,6 +47,17 @@ export function itemRequiresDatabaseGrant(item = {}) {
     source === "schematics" ||
     category.includes("augment") ||
     source.includes("augment") ||
+    /^schematic(pattern|_)/i.test(id) ||
+    /_schematic$/i.test(id) ||
+    /schematic$/i.test(id);
+}
+
+export function itemIsSchematic(item = {}) {
+  const id = String(item.itemId || item.id || "").trim();
+  const category = String(item.category || "").toLowerCase();
+  const source = String(item.source || "").toLowerCase();
+  return category === "schematics" ||
+    source === "schematics" ||
     /^schematic(pattern|_)/i.test(id) ||
     /_schematic$/i.test(id) ||
     /schematic$/i.test(id);
