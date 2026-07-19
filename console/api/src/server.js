@@ -40,6 +40,7 @@ import { exportBlueprint, importBlueprint, listBlueprints, deleteBlueprint } fro
 import { createZipArchive } from "./services/zipArchive.js";
 import { grantAddonItem } from "./addonItemGrants.js";
 import { createPublicDirectoryReporter, normalizeDiscordInvite, readDirectorySettings } from "./services/publicDirectory.js";
+import { choamTerminalOverview, installChoamTerminals, removeChoamTerminals } from "./services/choamTerminals.js";
 
 const config = loadConfig();
 const auth = createAuth(config);
@@ -541,6 +542,9 @@ async function handleApi(req, res) {
   if (path === "/api/maps/memory") return commandJson(res, "memoryStatus");
   if (path.match(/^\/api\/maps\/spicefields\/[^/]+$/) && req.method === "PATCH") return mapsSpicefieldUpdateRoute(req, res, path);
   if (path === "/api/maps/spicefields") return dbJson(res, () => duneDb.listSpicefieldTypes(db));
+  if (path === "/api/maps/choam-terminals" && req.method === "POST") return mapsChoamTerminalInstallRoute(req, res);
+  if (path === "/api/maps/choam-terminals" && req.method === "DELETE") return mapsChoamTerminalRemoveRoute(req, res);
+  if (path === "/api/maps/choam-terminals") return dbJson(res, () => choamTerminalOverview(db));
   if (path === "/api/maps/user-settings/schema") return userSettingsSchemaRoute(res);
   if (path === "/api/maps/user-settings/values") return userSettingsValuesRoute(res, url);
   if (path === "/api/maps/user-settings/raw" && req.method === "POST") return userSettingsRawWriteRoute(req, res);
@@ -869,6 +873,20 @@ async function mapsSpicefieldUpdateRoute(req, res, path) {
     if (result.row) result.persistence = persistSpicefieldOverride(config, result.row);
     return result;
   });
+}
+
+async function mapsChoamTerminalInstallRoute(req, res) {
+  const body = await readJson(req);
+  if (!applyMutationRateLimit(req, res, "maps.choam-terminals.install")) return;
+  audit(config, req, "maps.choam-terminals.install", { tradeCenterKey: body.tradeCenterKey });
+  return dbJson(res, () => installChoamTerminals(db, body));
+}
+
+async function mapsChoamTerminalRemoveRoute(req, res) {
+  const body = await readJson(req);
+  if (!applyMutationRateLimit(req, res, "maps.choam-terminals.remove")) return;
+  audit(config, req, "maps.choam-terminals.remove", { tradeCenterKey: body.tradeCenterKey });
+  return dbJson(res, () => removeChoamTerminals(db, body));
 }
 
 async function safeCommand(operation, payload = {}) {

@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Download, Grid2X2, List, Lock } from "lucide-react";
-import { mapsApi, type LiveMapMemoryRow, type MapRuntimeSettings, type MemoryBalancerState, type SpicefieldTypeRow, type UserSettingField, type UserSettingsSchema } from "../../api/maps";
+import { mapsApi, type ChoamTerminalOverview, type ChoamTradeCenter, type LiveMapMemoryRow, type MapRuntimeSettings, type MemoryBalancerState, type SpicefieldTypeRow, type UserSettingField, type UserSettingsSchema } from "../../api/maps";
 import { setupApi, type Task } from "../../api/setup";
 import { SecretInput } from "../../components/SecretInput";
 import { KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/common/DisplayPrimitives";
@@ -245,12 +245,15 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
   const [selectedGameCategory, setSelectedGameCategory] = useState("");
   const [modifierFilter, setModifierFilter] = useState("");
   const [modifierViewMode, setModifierViewMode] = useState<"grid" | "list">("grid");
-  const [settingsTab, setSettingsTab] = useState<"engine" | "game" | "spicefields">("engine");
+  const [settingsTab, setSettingsTab] = useState<"engine" | "game" | "spicefields" | "choam">("engine");
   const [spicefieldRows, setSpicefieldRows] = useState<SpicefieldTypeRow[]>([]);
   const [spicefieldDrafts, setSpicefieldDrafts] = useState<Record<string, SpicefieldDraft>>({});
   const [spicefieldResult, setSpicefieldResult] = useState<HomeTaskResult | null>(null);
   const [spicefieldSavingId, setSpicefieldSavingId] = useState("");
   const [spicefieldFilter, setSpicefieldFilter] = useState("");
+  const [choamOverview, setChoamOverview] = useState<ChoamTerminalOverview | null>(null);
+  const [choamSavingKey, setChoamSavingKey] = useState("");
+  const [choamResult, setChoamResult] = useState<HomeTaskResult | null>(null);
   const [modifiersOpen, setModifiersOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [startupSettingsOpen, setStartupSettingsOpen] = useState(false);
@@ -560,6 +563,55 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
       setSpicefieldResult({ status: "failed", title: "Spice Fields Unavailable", message: result.reason });
     }
   }
+  async function loadChoamTerminals() {
+    const overview = await mapsApi.choamTerminals();
+    setChoamOverview(overview);
+    if (!overview.supported) setChoamResult({ status: "failed", title: "CHOAM Terminals Unavailable", message: overview.reason || "This database schema does not support CHOAM terminal placement." });
+  }
+  async function installChoamCenter(center: ChoamTradeCenter) {
+    const sietchCount = choamOverview?.sietches.length || 0;
+    if (!(await confirmAction(`Install a CHOAM Exchange terminal at ${center.name}?`, {
+      title: `Install at ${center.name}`,
+      confirmLabel: "Install Terminals",
+      details: [["Installation Scope", `All ${sietchCount} active Sietches`], ["Reload Required", "Restart Battlegroup"]].map(([label, value]) => ({ label, value }))
+    }))) return;
+    setChoamSavingKey(center.key);
+    setChoamResult({ status: "running", title: `Installing ${center.name} Terminals...` });
+    try {
+      const result = await mapsApi.installChoamTerminals(center.key);
+      await loadChoamTerminals();
+      const created = result.created.length;
+      setChoamResult({
+        status: "succeeded",
+        title: created ? "CHOAM Terminals Installed" : "CHOAM Terminals Already Installed",
+        message: created ? `${created} terminal${created === 1 ? "" : "s"} added. Restart the battlegroup to load them in-game.` : "Every active sietch already has this trade-center terminal."
+      });
+    } catch (error) {
+      setChoamResult({ status: "failed", title: "CHOAM Terminal Installation Failed", message: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setChoamSavingKey("");
+    }
+  }
+  async function removeChoamCenter(center: ChoamTradeCenter) {
+    const installed = choamOverview?.placements.filter((entry) => entry.trade_center_key === center.key && entry.actor_present).length || 0;
+    if (!(await confirmAction(`Remove the console-managed CHOAM Exchange terminals from ${center.name}?`, {
+      title: `Remove from ${center.name}`,
+      confirmLabel: "Remove Terminals",
+      danger: true,
+      details: [["Tracked Terminals", String(installed)], ["Reload Required", "Restart Battlegroup"]].map(([label, value]) => ({ label, value, tone: label === "Tracked Terminals" ? "danger" as const : undefined }))
+    }))) return;
+    setChoamSavingKey(center.key);
+    setChoamResult({ status: "running", title: `Removing ${center.name} Terminals...` });
+    try {
+      const result = await mapsApi.removeChoamTerminals(center.key);
+      await loadChoamTerminals();
+      setChoamResult({ status: "succeeded", title: "CHOAM Terminals Removed", message: result.removed ? `${result.removed} terminal${result.removed === 1 ? "" : "s"} removed. Restart the battlegroup to unload them in-game.` : "No console-managed terminals were installed at this trade center." });
+    } catch (error) {
+      setChoamResult({ status: "failed", title: "CHOAM Terminal Removal Failed", message: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setChoamSavingKey("");
+    }
+  }
   async function saveSpicefield(row: SpicefieldTypeRow) {
     const id = String(row.spicefield_type_id);
     const draft = spicefieldDrafts[id] || spicefieldDraftFromRow(row);
@@ -699,6 +751,11 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
     return () => window.clearTimeout(id);
   }, [spicefieldResult]);
   useEffect(() => {
+    if (!choamResult || choamResult.status === "running") return;
+    const id = window.setTimeout(() => setChoamResult(null), 7000);
+    return () => window.clearTimeout(id);
+  }, [choamResult]);
+  useEffect(() => {
     const refreshLiveMemory = () => {
       if (document.visibilityState !== "visible") return;
       void loadLiveMemory().catch(() => {});
@@ -716,6 +773,12 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
   useEffect(() => {
     if (!modifiersOpen || settingsTab !== "spicefields") return undefined;
     const id = window.setInterval(() => { void loadSpicefields({ preserveDrafts: true }).catch(() => {}); }, 5000);
+    return () => window.clearInterval(id);
+  }, [modifiersOpen, settingsTab]);
+  useEffect(() => {
+    if (!modifiersOpen || settingsTab !== "choam") return undefined;
+    void loadChoamTerminals().catch(() => undefined);
+    const id = window.setInterval(() => { void loadChoamTerminals().catch(() => {}); }, 10000);
     return () => window.clearInterval(id);
   }, [modifiersOpen, settingsTab]);
   useEffect(() => {
@@ -1437,8 +1500,9 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
           <button className={settingsTab === "engine" ? "active" : ""} role="tab" aria-selected={settingsTab === "engine"} onClick={() => setSettingsTab("engine")}>UserEngine</button>
           <button className={settingsTab === "game" ? "active" : ""} role="tab" aria-selected={settingsTab === "game"} onClick={() => setSettingsTab("game")}>UserGame</button>
           <button className={settingsTab === "spicefields" ? "active" : ""} role="tab" aria-selected={settingsTab === "spicefields"} onClick={() => { setSettingsTab("spicefields"); void loadSpicefields({ preserveDrafts: true }).catch(() => undefined); }}>Spice Fields</button>
+          <button className={settingsTab === "choam" ? "active" : ""} role="tab" aria-selected={settingsTab === "choam"} onClick={() => { setSettingsTab("choam"); void loadChoamTerminals().catch(() => undefined); }}>CHOAM Terminals</button>
         </div>
-        <button className="settings-download-button" type="button" title={userGameName && !isUserGameGlobal ? "Download client Game.ini for the selected UserGame target" : "Download client Game.ini for global UserGame values"} onClick={() => run(downloadClientGameIni)}><Download size={16} /> Game.ini</button>
+        {(settingsTab === "engine" || settingsTab === "game") && <button className="settings-download-button" type="button" title={userGameName && !isUserGameGlobal ? "Download client Game.ini for the selected UserGame target" : "Download client Game.ini for global UserGame values"} onClick={() => run(downloadClientGameIni)}><Download size={16} /> Game.ini</button>}
       </div>
       {settingsTab === "engine" ? <>
         <SettingsEditor fields={engineFields} values={engineDraft} onChange={(id, value) => setEngineDraft({ ...engineDraft, [id]: value })} />
@@ -1457,7 +1521,7 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
         </div>
         {userGameName && <SettingsCardGrid fields={filteredGameFields} values={gameDraft} onChange={(id, value) => setGameDraft({ ...gameDraft, [id]: value })} viewMode={modifierViewMode} emptyMessage={modifierFilter.trim() ? "No modifiers match your filter." : "Select a modifier category."} />}
         <div className="action-row"><button disabled={!gameDirty.length || !userGameName} onClick={() => run(saveGame)}>Save</button><button disabled={!gameDirty.length} onClick={() => setGameDraft(gameValues)}>Discard Changes</button></div>
-      </> : <>
+      </> : settingsTab === "spicefields" ? <>
         <SpicefieldsEditor
           rows={filteredSpicefieldRows}
           allRows={spicefieldRows}
@@ -1470,6 +1534,14 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
           onDraftChange={(id, draft) => setSpicefieldDrafts({ ...spicefieldDrafts, [id]: draft })}
           onDiscard={(row) => setSpicefieldDrafts({ ...spicefieldDrafts, [String(row.spicefield_type_id)]: spicefieldDraftFromRow(row) })}
           onSave={(row) => run(() => saveSpicefield(row))}
+        />
+      </> : <>
+        <ChoamTerminalsEditor
+          overview={choamOverview}
+          savingKey={choamSavingKey}
+          result={choamResult}
+          onInstall={(center) => run(() => installChoamCenter(center))}
+          onRemove={(center) => run(() => removeChoamCenter(center))}
         />
       </>}</div>}
     </div>
@@ -1543,6 +1615,53 @@ function SpicefieldsEditor({
           <td><select value={draft.spawningActive ? "true" : "false"} onChange={(event) => onDraftChange(id, { ...draft, spawningActive: event.target.value === "true" })}><option value="true">Enabled</option><option value="false">Disabled</option></select></td>
           <td><input type="number" min="0" step="any" value={draft.spawnWeight} onChange={(event) => onDraftChange(id, { ...draft, spawnWeight: event.target.value })} /></td>
           <td><div className="action-row spicefield-row-actions"><button disabled={!dirty || saving} onClick={() => onSave(row)}>{saving ? "Saving..." : "Save"}</button><button disabled={!dirty || saving} onClick={() => onDiscard(row)}>Discard</button></div></td>
+        </tr>;
+      })}</tbody>
+    </table></div> : null}
+  </section>;
+}
+
+function ChoamTerminalsEditor({
+  overview,
+  savingKey,
+  result,
+  onInstall,
+  onRemove
+}: {
+  overview: ChoamTerminalOverview | null;
+  savingKey: string;
+  result: HomeTaskResult | null;
+  onInstall: (center: ChoamTradeCenter) => void;
+  onRemove: (center: ChoamTradeCenter) => void;
+}) {
+  const activeSietches = overview?.sietches.length || 0;
+  return <section className="choam-terminals-editor">
+    <div className="choam-terminals-toolbar">
+      <p>Restart the battlegroup after installing or removing terminals for the changes to appear in-game.</p>
+    </div>
+    {result && <div className="maps-result-slot"><HomeTaskResultCard result={result} /></div>}
+    {!overview ? <div className="empty">CHOAM terminal state is loading.</div> : null}
+    {overview && !overview.supported ? <div className="empty">{overview.reason || "CHOAM terminal placement is unavailable."}</div> : null}
+    {overview?.supported ? <div className="settings-list-wrap choam-terminals-table-wrap"><table className="settings-list-table choam-terminals-table">
+      <thead><tr><th>Trade Center</th><th>Coverage</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>{overview.tradeCenters.map((center) => {
+        const placements = overview.placements.filter((entry) => entry.trade_center_key === center.key && entry.actor_present);
+        const installed = placements.length;
+        const complete = activeSietches > 0 && installed >= activeSietches;
+        const saving = savingKey === center.key;
+        return <tr key={center.key}>
+          <td><strong>{center.name}</strong></td>
+          <td className="choam-terminal-coverage">{installed} / {activeSietches} Sietches</td>
+          <td className="choam-terminal-status">
+            <span className={`badge ${complete ? "badge-pass" : installed ? "badge-warn" : "badge-info"}`}>
+              {complete ? "Installed" : installed ? "Partial" : "Not Installed"}
+            </span>
+          </td>
+          <td className="choam-terminal-actions-cell"><div className="action-row choam-terminal-actions">
+            {installed
+              ? <button className="danger" disabled={saving} onClick={() => onRemove(center)}>{saving ? "Working..." : "Remove"}</button>
+              : <button disabled={saving} onClick={() => onInstall(center)}>{saving ? "Working..." : "Install"}</button>}
+          </div></td>
         </tr>;
       })}</tbody>
     </table></div> : null}

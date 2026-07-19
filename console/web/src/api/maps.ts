@@ -55,6 +55,26 @@ export type SpicefieldTypeRow = {
   global_spawn_weight: number | null;
 };
 
+export type ChoamTradeCenter = { key: string; name: string };
+export type ChoamSietch = { partition_id: string; dimension_index: number; label: string };
+export type ChoamTerminalPlacement = {
+  trade_center_key: string;
+  trade_center_name: string;
+  dimension_index: number;
+  partition_id: string;
+  actor_id: string;
+  source_player_id: string;
+  created_at: string;
+  actor_present: boolean;
+};
+export type ChoamTerminalOverview = {
+  supported: boolean;
+  reason?: string;
+  tradeCenters: ChoamTradeCenter[];
+  sietches: ChoamSietch[];
+  placements: ChoamTerminalPlacement[];
+};
+
 export const mapsApi = {
   maps: () => api<{ stdout: string }>("/api/maps"),
   status: () => api<Record<string, { stdout?: string; stderr?: string; exitCode?: number }>>("/api/map/status"),
@@ -77,6 +97,11 @@ export const mapsApi = {
   spicefields: () => api<{ capabilities?: Record<string, boolean>; rows: SpicefieldTypeRow[]; reason?: string }>("/api/maps/spicefields"),
   updateSpicefield: (typeId: number | string, body: { max_globally_active: number; max_globally_primed: number; is_spawning_active: boolean; global_spawn_weight: number }) =>
     api<{ ok: boolean; updatedRows: number; row: SpicefieldTypeRow }>(`/api/maps/spicefields/${encodeURIComponent(String(typeId))}`, { method: "PATCH", body: JSON.stringify(body) }),
+  choamTerminals: () => api<ChoamTerminalOverview>("/api/maps/choam-terminals"),
+  installChoamTerminals: (tradeCenterKey: string) =>
+    post<{ ok: boolean; created: { dimensionIndex: number; partitionId: string; actorId: string; label: string }[]; unchanged: number; restartRequired: boolean }>("/api/maps/choam-terminals", { tradeCenterKey }),
+  removeChoamTerminals: (tradeCenterKey: string) =>
+    api<{ ok: boolean; removed: number; restartRequired: boolean }>("/api/maps/choam-terminals", { method: "DELETE", body: JSON.stringify({ tradeCenterKey }) }),
   userEngine: () => api<{ stdout: string; stderr?: string; exitCode?: number }>("/api/maps/userengine"),
   userGame: (map: string, partitionId?: string) => api<{ stdout: string; stderr?: string; exitCode?: number }>(`/api/maps/usergame?map=${encodeURIComponent(map)}${partitionId ? `&partitionId=${encodeURIComponent(partitionId)}` : ""}`),
   userSettingsSchema: () => api<UserSettingsSchema>("/api/maps/user-settings/schema"),
