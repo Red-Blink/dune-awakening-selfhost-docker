@@ -331,7 +331,7 @@ test("care package first-online manual and auto overlap is blocked by pre-delive
         id: "starter-kit",
         name: "Starter Kit",
         xp: 0,
-        items: [{ itemName: "Arhun K-28 Lasgun", quantity: 1 }]
+        items: [{ itemName: "Armor Piercing Augment", quantity: 1 }]
       }],
       autoGrantRules: [{ id: "first-online-rule", enabled: true, kitId: "starter-kit", grantWhen: "first_online" }]
     });
@@ -404,7 +404,7 @@ test("care package first-online auto claim blocks overlapping manual starter del
         id: "starter-kit",
         name: "Starter Kit",
         xp: 0,
-        items: [{ itemName: "Arhun K-28 Lasgun", quantity: 1 }]
+        items: [{ itemName: "Armor Piercing Augment", quantity: 1 }]
       }],
       autoGrantRules: [{ id: "first-online-rule", enabled: true, kitId: "starter-kit", grantWhen: "first_online" }]
     });
@@ -485,24 +485,49 @@ test("care package supports separate manual and auto-grant kit selection", async
   }
 });
 
-test("care package grants schematics through the database item path", async () => {
+test("care package grants physical schematics through the verified live path", async () => {
   const config = tempConfig();
   try {
     writeCatalog(config);
     saveCarePackageConfig(config, {
       enabled: true,
       activeKitId: "schematic-kit",
-      kits: [{ id: "schematic-kit", name: "Schematic Kit", xp: 0, items: [{ itemName: "Arhun K-28 Lasgun", quantity: 1, quality: 0 }] }]
+      kits: [{ id: "schematic-kit", name: "Schematic Kit", xp: 0, items: [{ itemId: "ChoamHeavyLasgunSchematic", itemName: "Arhun K-28 Lasgun", quantity: 1, quality: 0 }] }]
     });
     const result = await grantCarePackage(config, "Player#1", {
       confirmation: "GRANT CARE PACKAGE",
       kitId: "schematic-kit",
       actorId: 101,
-      characterName: "Test"
-    }, { db: {}, dbGiveItemToPlayer: async (_actorId, item) => ({ ok: true, inserted: { template_id: item.templateId, quality_level: item.quality } }) });
+      characterName: "Test",
+      onlineStatus: "Online"
+    });
     const itemGrant = result.results.find((row) => row.item?.itemId === "ChoamHeavyLasgunSchematic");
-    assert.equal(itemGrant.operation, "dbGiveItemToPlayer");
-    assert.equal(itemGrant.result.inserted.quality_level, 0);
+    assert.equal(itemGrant.operation, "adminGiveItemId");
+    assert.match(itemGrant.stdout, /mock package item grant/);
+  } finally {
+    rmSync(config.repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("care package rejects unverifiable offline physical schematic grants", async () => {
+  const config = tempConfig();
+  config.mockMode = false;
+  try {
+    writeCatalog(config);
+    saveCarePackageConfig(config, {
+      enabled: true,
+      activeKitId: "schematic-kit",
+      kits: [{ id: "schematic-kit", name: "Schematic Kit", xp: 0, items: [{ itemId: "ChoamHeavyLasgunSchematic", itemName: "Arhun K-28 Lasgun", quantity: 1 }] }]
+    });
+    const result = await grantCarePackage(config, "Player#1", {
+      confirmation: "GRANT CARE PACKAGE",
+      kitId: "schematic-kit",
+      actorId: 101,
+      characterName: "Test",
+      onlineStatus: "Offline"
+    }, { db: {} });
+    assert.equal(result.status, "failed");
+    assert.match(result.results[0].error, /require the player to be online/);
   } finally {
     rmSync(config.repoRoot, { recursive: true, force: true });
   }
@@ -938,6 +963,7 @@ function writeCatalog(config) {
   writeFileSync(resolve(config.repoRoot, "runtime/data/admin-items.json"), JSON.stringify([
     { id: "PlantFiber_1", name: "Plant Fiber", category: "materials" },
     { id: "CupWater_1", name: "Cup of Water", category: "consumables" },
+    { id: "ArmorPiercingAugment", name: "Armor Piercing Augment", category: "augments", source: "Items" },
     { id: "SMG_Unique_LargeMag_06", name: "A Dart for Every Man", category: "weapons" },
     { id: "ChoamHeavyLasgunSchematic", name: "Arhun K-28 Lasgun", category: "schematics", source: "Schematics" }
   ]));

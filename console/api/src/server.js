@@ -14,7 +14,7 @@ import { createDb, quoteIdentifier } from "./db.js";
 import * as duneDb from "./duneDb.js";
 import { audit, recordAdminHistory } from "./audit.js";
 import { redact } from "./redact.js";
-import { itemRequiresDatabaseGrant, listCatalogItems, resolveCatalogItem } from "./adminCatalog.js";
+import { itemIsSchematic, itemRequiresDatabaseGrant, listCatalogItems, resolveCatalogItem } from "./adminCatalog.js";
 import { buildBroadcastCommand, buildShutdownBroadcastCommand, publishMapChat, publishServerCommand } from "./rmq.js";
 import { clearCarePackageHistory, enableCarePackage, ensureCarePackageServerPersona, grantEligibleCarePackages, grantCarePackage, retryCarePackageGrant, runCarePackageAutoScan, saveCarePackageConfig, carePackageCapabilities, carePackageConfig, carePackageEligiblePlayers, carePackageHistory } from "./carePackage.js";
 import { readJsonBody, readMultipartForm } from "./httpSafety.js";
@@ -1858,12 +1858,13 @@ async function giveSingleItemRoute(req, res, path, operation) {
 }
 
 async function grantPlayerItem(playerId, item, target) {
-  const resolved = item.itemId ? { itemId: item.itemId } : resolveCatalogItem(config.repoRoot, item);
+  const resolved = item.itemId ? resolveCatalogItem(config.repoRoot, { itemId: item.itemId }) : resolveCatalogItem(config.repoRoot, item);
   const operation = resolved.itemId ? "adminGiveItemId" : "adminGiveItem";
   const hasExplicitGrade = item.quality !== undefined || item.grade !== undefined;
   const selectedGrade = hasExplicitGrade ? validateGrantGrade(item.quality ?? item.grade) : undefined;
   const selectedAugmentGrade = item.augmentQuality === undefined ? 1 : validateAugmentGrantGrade(item.augmentQuality);
-  const usesDatabaseGrant = !target.online || (selectedGrade !== undefined && selectedGrade > 0) || itemRequiresDatabaseGrant(resolved) || (item.augments && item.augments.length > 0);
+  const schematic = itemIsSchematic(resolved);
+  const usesDatabaseGrant = !schematic && (!target.online || (selectedGrade !== undefined && selectedGrade > 0) || itemRequiresDatabaseGrant(resolved) || (item.augments && item.augments.length > 0));
   const databaseGrade = hasExplicitGrade ? selectedGrade : 0;
   const payload = {
     playerId: target.actionId || playerId,
@@ -1876,6 +1877,9 @@ async function grantPlayerItem(playerId, item, target) {
     augmentQuality: selectedAugmentGrade
   };
   const liveAugmentRefreshWarning = "Augments were written to the database. If the player was online, the weapon may need a relog before the augment slots appear in-game.";
+  if (schematic && !config.mockMode && !target.online) {
+    throw new Error("Physical schematic grants require the player to be online so delivery can be verified by the game server.");
+  }
   if (usesDatabaseGrant) {
     if (!config.mockMode && !target.actorId) throw new Error("A database actor ID is required to grant graded items, schematics, and augments");
     if (!config.mockMode && payload.augments.length > 0 && target.online) {
