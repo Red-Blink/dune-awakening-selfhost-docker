@@ -26,7 +26,7 @@ function serviceError(message, statusCode = 400) {
 function centerForKey(value) {
   const key = String(value || "").trim().toLowerCase();
   const center = CHOAM_TRADE_CENTERS.find((entry) => entry.key === key);
-  if (!center) throw serviceError("Choose a valid Hagga Basin trade center.");
+  if (!center) throw serviceError("Choose a valid Hagga Basin trade post.");
   return center;
 }
 
