@@ -206,7 +206,7 @@ test("probe reconciliation yields while its Docker command is running", async ()
       enabled: true,
       signalingUrl: "https://dunedocker.app/api/v1/probes",
       serverId: "11111111-1111-4111-8111-111111111111",
-      secret: "abcdefghijklmnopqrstuvwxyzABCDEFG123456"
+      secret: "test-secret-placeholder-not-a-real-key"
     }, async () => {
       await commandGate;
       commandFinished = true;

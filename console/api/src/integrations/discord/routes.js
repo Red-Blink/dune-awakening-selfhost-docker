@@ -14,29 +14,38 @@ import {
   opsEconomyProvider, opsInventoryProvider, opsLocationProvider,
   opsSocProvider, opsPrometheusProvider, opsDashboardProvider
 } from "./opsProvider.js";
+import {
+  linkPlayerProvider,
+  verifyPlayerLinkProvider,
+  unlinkProvider,
+  whoamiProvider,
+  requireLinkedPlayer
+} from "./linkProvider.js";
+import {
+  playerInventoryProvider,
+  playerStorageProvider,
+  itemSearchProvider,
+  inventorySearchProvider
+} from "./inventoryProvider.js";
 import { broadcastProvider } from "./broadcastProvider.js";
 import { buildDuneArgs, runDune } from "../../runner.js";
+import { initializeDiscordAdapterSchema } from "./schema.js";
 
-// Secure infra operation whitelist — maps route keys to known-safe dune operations.
-// Never passes user input directly to the dune CLI.
 const INFRA_OPERATIONS = Object.freeze({
   SERVERS: { operation: "servers", timeoutMs: 15000, capability: DISCORD_CAPABILITIES.SERVICES_READ },
   PORTS: { operation: "ports", timeoutMs: 15000, capability: DISCORD_CAPABILITIES.SERVICES_READ },
-  DB: { operation: "dbStatus", timeoutMs: 15000, capability: DISCORD_CAPABILITIES.SERVICES_READ },
+  DB: { operation: "dbStatus", timeoutMs: 15000, capability: DISCORD_CAPABILITIES.SERVICES_READ }
 });
 
 async function handleSecureInfraRoute({ key, config, json, res, actor }) {
   const op = INFRA_OPERATIONS[key];
   if (!op) throw policyError("not_found", "Unsupported infrastructure operation.", 404);
-
   const mapping = discordRoleMappingFromEnv();
   requireDiscordCapability(actor, mapping, op.capability);
-
   const result = await runDune(config, buildDuneArgs(op.operation), {
     timeoutMs: op.timeoutMs,
     allowedExitCodes: [0]
   });
-
   return json(res, 200, {
     ok: true,
     operation: op.operation,
@@ -84,7 +93,7 @@ export function isDiscordAdapterRoute(path) {
   return Object.values(DISCORD_ADAPTER_ROUTES).includes(path);
 }
 
-export async function handleDiscordAdapterRoute({ req, res, path, config, readJson, json, statusProvider, readinessProvider, servicesProvider, populationProvider }) {
+export async function handleDiscordAdapterRoute({ req, res, path, config, readJson, json, db, statusProvider, readinessProvider, servicesProvider, populationProvider }) {
   const safeStatusProvider = typeof statusProvider === "function" ? statusProvider : () => discordStatusProvider(config);
   const safeReadinessProvider = typeof readinessProvider === "function" ? readinessProvider : () => discordReadinessProvider(config);
   const safeServicesProvider = typeof servicesProvider === "function" ? servicesProvider : () => discordServicesProvider(config);
@@ -92,6 +101,11 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
   try {
     if (!discordAdapterEnabled(config)) throw policyError("adapter_disabled", "Discord adapter is disabled.", 404);
     requireDiscordBotToken(req, config);
+
+    if (path.startsWith("/api/integrations/discord/players/") || path.startsWith("/api/integrations/discord/guilds/")) {
+      if (!db) throw policyError("database_unavailable", "Discord player data is unavailable.", 503);
+      await initializeDiscordAdapterSchema(db);
+    }
 
     if (path === DISCORD_ADAPTER_ROUTES.HEALTH && req.method === "GET") {
       return json(res, 200, await discordAdapterHealth(config));
@@ -201,22 +215,146 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
       });
     }
 
-    // Secure infra routes — read-only, whitelisted operations only.
-    // Actor identity and capability are enforced before any dune CLI call.
+    const mapping = discordRoleMappingFromEnv();
+
+    // Players link
+    if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_LINK && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.PLAYER_LINK_WRITE);
+      return json(res, 200, await linkPlayerProvider(db, config, {
+        discordUserId: actor.userId,
+        characterName: body.characterName
+      }));
+    }
+
+    // Players link verify
+    if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_LINK_VERIFY && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.PLAYER_LINK_WRITE);
+      return json(res, 200, await verifyPlayerLinkProvider(db, {
+        discordUserId: actor.userId,
+        code: body.code
+      }));
+    }
+
+    // Players unlink
+    if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_UNLINK && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.PLAYER_LINK_WRITE);
+      return json(res, 200, await unlinkProvider(db, {
+        discordUserId: actor.userId
+      }));
+    }
+
+    // Players me
+    if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_ME && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.INVENTORY_READ);
+      return json(res, 200, await whoamiProvider(db, {
+        discordUserId: actor.userId
+      }));
+    }
+
+    // Players inventory
+    if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_INVENTORY && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.INVENTORY_READ);
+      const linked = await requireLinkedPlayer(db, actor.userId);
+      return json(res, 200, await playerInventoryProvider(db, {
+        playerPawnId: linked.player_pawn_id,
+        characterName: linked.character_name
+      }));
+    }
+
+    // Players storage
+    if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_STORAGE && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.STORAGE_READ);
+      const linked = await requireLinkedPlayer(db, actor.userId);
+      const scope = body.scope || "owned";
+      if (scope !== "owned" && scope !== "guild") {
+        throw policyError("invalid_scope", 'Storage scope must be "owned" or "guild".');
+      }
+      return json(res, 200, await playerStorageProvider(db, {
+        playerControllerId: linked.player_controller_id,
+        scope
+      }));
+    }
+
+    // Players find (item search in containers)
+    if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_FIND && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.INVENTORY_READ);
+      const linked = await requireLinkedPlayer(db, actor.userId);
+      const scope = body.scope || "owned";
+      if (scope !== "owned" && scope !== "guild") {
+        throw policyError("invalid_scope", 'Search scope must be "owned" or "guild".');
+      }
+      return json(res, 200, await itemSearchProvider(db, {
+        playerControllerId: linked.player_controller_id,
+        query: body.query,
+        scope
+      }));
+    }
+
+    // Players inventory search
+    if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_INVENTORY_SEARCH && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.INVENTORY_READ);
+      const linked = await requireLinkedPlayer(db, actor.userId);
+      return json(res, 200, await inventorySearchProvider(db, {
+        playerPawnId: linked.player_pawn_id,
+        query: body.query
+      }));
+    }
+
+    // Guild storage
+    if (path === DISCORD_ADAPTER_ROUTES.GUILD_STORAGE && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.GUILD_READ);
+      const linked = await requireLinkedPlayer(db, actor.userId);
+      return json(res, 200, await playerStorageProvider(db, {
+        playerControllerId: linked.player_controller_id,
+        scope: "guild"
+      }));
+    }
+
+    // Guild find (item search in guild containers)
+    if (path === DISCORD_ADAPTER_ROUTES.GUILD_FIND && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.GUILD_READ);
+      const linked = await requireLinkedPlayer(db, actor.userId);
+      return json(res, 200, await itemSearchProvider(db, {
+        playerControllerId: linked.player_controller_id,
+        query: body.query,
+        scope: "guild"
+      }));
+    }
+
     if (path === DISCORD_ADAPTER_ROUTES.SERVERS && req.method === "POST") {
       const body = await readJson(req);
       const actor = validateDiscordActor(body.actor);
-      return await handleSecureInfraRoute({ key: "SERVERS", config, json, res, actor });
+      return handleSecureInfraRoute({ key: "SERVERS", config, json, res, actor });
     }
     if (path === DISCORD_ADAPTER_ROUTES.PORTS && req.method === "POST") {
       const body = await readJson(req);
       const actor = validateDiscordActor(body.actor);
-      return await handleSecureInfraRoute({ key: "PORTS", config, json, res, actor });
+      return handleSecureInfraRoute({ key: "PORTS", config, json, res, actor });
     }
     if (path === DISCORD_ADAPTER_ROUTES.DB && req.method === "POST") {
       const body = await readJson(req);
       const actor = validateDiscordActor(body.actor);
-      return await handleSecureInfraRoute({ key: "DB", config, json, res, actor });
+      return handleSecureInfraRoute({ key: "DB", config, json, res, actor });
     }
 
     if (path === DISCORD_ADAPTER_ROUTES.VERSION && req.method === "GET") {
@@ -240,7 +378,9 @@ export function requireDiscordBotToken(req, config) {
 }
 
 export function readDiscordBotApiToken(config) {
-  const tokenFile = process.env.DUNE_BOT_API_TOKEN_FILE || config?.discordBotApiTokenFile || "";
+  const directToken = process.env.DUNE_DISCORD_ADAPTER_TOKEN || config?.discordAdapterToken || "";
+  if (directToken) return String(directToken).trim();
+  const tokenFile = process.env.DUNE_DISCORD_ADAPTER_TOKEN_FILE || process.env.DUNE_BOT_API_TOKEN_FILE || config?.discordAdapterTokenFile || config?.discordBotApiTokenFile || "";
   if (!tokenFile) return "";
   try {
     return readFileSync(tokenFile, "utf8").trim();

@@ -30,6 +30,8 @@ import { updateEnvFileValue as updateEnvValue } from "./services/envFile.js";
 import { funcomAuthMismatchDetected, matchingFuncomAuthLines, saveFuncomTokenValue as writeFuncomToken, validDockerSince } from "./services/funcomAuth.js";
 import { readCharacterTransferSettings, saveCharacterTransferSettings } from "./services/characterTransferSettings.js";
 import { handleDiscordAdapterRoute, isDiscordAdapterRoute } from "./integrations/discord/routes.js";
+import { discordAdapterEnabled } from "./integrations/discord/adapter.js";
+import { initializeDiscordAdapterSchema } from "./integrations/discord/schema.js";
 import { liveItemGrantOk, liveItemGrantWarning } from "./grantResults.js";
 import { primeMessageOfTheDayOnlineState, readMessageOfTheDay, restoreMessageOfTheDay, runMessageOfTheDayScan, saveMessageOfTheDay } from "./services/messageOfTheDay.js";
 import { primePlayerAnnouncementOnlineState, readPlayerAnnouncements, restorePlayerAnnouncements, runPlayerAnnouncementScan, savePlayerAnnouncements } from "./services/playerAnnouncements.js";
@@ -98,6 +100,11 @@ createServer(async (req, res) => {
   }
   scheduleBootAutoStart();
   publicDirectory.start();
+  if (discordAdapterEnabled(config)) {
+    initializeDiscordAdapterSchema(db).catch((error) => {
+      console.warn(`Discord adapter schema initialization failed: ${redact(error?.message || error)}`);
+    });
+  }
 });
 
 setInterval(() => {
@@ -268,7 +275,7 @@ async function handleApi(req, res) {
     return json(res, 200, { ok: true });
   }
   if (isDiscordAdapterRoute(path)) {
-    return handleDiscordAdapterRoute({ req, res, path, config, readJson, json });
+    return handleDiscordAdapterRoute({ req, res, path, config, readJson, json, db });
   }
 
   const session = auth.requireAuth(req, res);

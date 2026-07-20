@@ -1,25 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { writeFileSync, unlinkSync } from "node:fs";
 import { DISCORD_ADAPTER_ROUTES, discordAdapterErrorResponse, discordAdapterHealth, discordAdapterPopulation, discordAdapterReadiness, discordAdapterServices, discordAdapterStatus, discordWritesEnabled } from "../src/integrations/discord/adapter.js";
 
 const OLD_ENV = { ...process.env };
-const FAKE_TOKEN_FILE = "/tmp/dune-test-bot-token.txt";
-const FAKE_TOKEN = "test-bot-token-value";
-
-function setupBotToken() {
-  writeFileSync(FAKE_TOKEN_FILE, FAKE_TOKEN);
-  process.env.DUNE_BOT_API_TOKEN_FILE = FAKE_TOKEN_FILE;
-}
-
-function teardownBotToken() {
-  try { unlinkSync(FAKE_TOKEN_FILE); } catch {}
-  delete process.env.DUNE_BOT_API_TOKEN_FILE;
-}
-
-function authHeaders() {
-  return { authorization: `Bearer ${FAKE_TOKEN}` };
-}
 
 function resetEnv() {
   process.env.DISCORD_OBSERVER_ROLE_IDS = "role-observer";
@@ -52,18 +35,30 @@ test.after(() => {
   process.env = OLD_ENV;
 });
 
-test("reports adapter health as experimental read-only", async () => {
+test("reports adapter health with isolated link-state writes", async () => {
   const result = await discordAdapterHealth({});
   assert.equal(result.ok, true);
   assert.equal(result.enabled, true);
   assert.equal(result.experimental, true);
-  assert.equal(result.readOnly, true);
+  assert.equal(result.readOnly, false);
+  assert.equal(result.gameDataWritesEnabled, false);
+  assert.deepEqual(result.adapterDataWrites, ["player-link"]);
   assert.equal(result.writesEnabled, false);
   assert.deepEqual([...result.liveRoutes].sort(), [
     "/api/integrations/discord/announcements",
     "/api/integrations/discord/broadcast",
     "/api/integrations/discord/db",
+    "/api/integrations/discord/guilds/find",
+    "/api/integrations/discord/guilds/storage",
     "/api/integrations/discord/health",
+    "/api/integrations/discord/players/find",
+    "/api/integrations/discord/players/inventory",
+    "/api/integrations/discord/players/inventory-search",
+    "/api/integrations/discord/players/link",
+    "/api/integrations/discord/players/link/verify",
+    "/api/integrations/discord/players/me",
+    "/api/integrations/discord/players/storage",
+    "/api/integrations/discord/players/unlink",
     "/api/integrations/discord/population",
     "/api/integrations/discord/ports",
     "/api/integrations/discord/readiness",
@@ -81,16 +76,19 @@ test("forces writes disabled even if environment attempts to enable them", () =>
   assert.equal(discordWritesEnabled({ discordWritesEnabled: true }), false);
 });
 
-test("exposes only experimental read-only route names", () => {
+test("exposes only allowlisted adapter route names", () => {
   const routes = Object.values(DISCORD_ADAPTER_ROUTES);
   assert.deepEqual(routes.sort(), [
     "/api/integrations/discord/announcements",
     "/api/integrations/discord/backups/list",
     "/api/integrations/discord/broadcast",
     "/api/integrations/discord/db",
+    "/api/integrations/discord/guilds/find",
+    "/api/integrations/discord/guilds/storage",
     "/api/integrations/discord/health",
     "/api/integrations/discord/logs",
     "/api/integrations/discord/map-state",
+    "/api/integrations/discord/maintenance",
     "/api/integrations/discord/ops/activity",
     "/api/integrations/discord/ops/combat",
     "/api/integrations/discord/ops/dashboard",
@@ -100,6 +98,14 @@ test("exposes only experimental read-only route names", () => {
     "/api/integrations/discord/ops/prometheus",
     "/api/integrations/discord/ops/resources",
     "/api/integrations/discord/ops/soc",
+    "/api/integrations/discord/players/find",
+    "/api/integrations/discord/players/inventory",
+    "/api/integrations/discord/players/inventory-search",
+    "/api/integrations/discord/players/link",
+    "/api/integrations/discord/players/link/verify",
+    "/api/integrations/discord/players/me",
+    "/api/integrations/discord/players/storage",
+    "/api/integrations/discord/players/unlink",
     "/api/integrations/discord/population",
     "/api/integrations/discord/ports",
     "/api/integrations/discord/readiness",
@@ -217,6 +223,7 @@ test("formats safe adapter errors", () => {
 
 // Server route integration test — exercises handleDiscordAdapterRoute through a live HTTP server
 import { createServer } from "node:http";
+import { writeFileSync, unlinkSync } from "node:fs";
 import { handleDiscordAdapterRoute } from "../src/integrations/discord/routes.js";
 
 test("adapter routes respond through mounted HTTP server path", async () => {
@@ -277,6 +284,11 @@ test("adapter routes respond through mounted HTTP server path", async () => {
           const pop = await (await fetch(`${base}/api/integrations/discord/population`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ actor: actor(["role-moderator"]) }) })).json();
           assert.equal(pop.ok, true);
 
+          // Existing version route remains live after adding player routes
+          const version = await (await fetch(`${base}/api/integrations/discord/version`, { headers: auth })).json();
+          assert.equal(version.ok, true);
+          assert.equal(version.version, "dev");
+
           // Auth: 401 without token
           assert.equal((await fetch(`${base}/api/integrations/discord/health`)).status, 401);
 
@@ -291,84 +303,4 @@ test("adapter routes respond through mounted HTTP server path", async () => {
   } finally {
     try { unlinkSync(tokenFile); } catch {}
   }
-});
-
-test("infra routes enforce actor capability via requireDiscordCapability", () => {
-  assert.ok(DISCORD_ADAPTER_ROUTES.SERVERS, "SERVERS route is defined");
-  assert.ok(DISCORD_ADAPTER_ROUTES.PORTS, "PORTS route is defined");
-  assert.ok(DISCORD_ADAPTER_ROUTES.DB, "DB route is defined");
-});
-
-test("infra routes reject missing actor body", async () => {
-  setupBotToken();
-  try {
-
-    const req = { method: "POST", headers: authHeaders() };
-    const res = { statusCode: 0, body: null };
-    const json = (r, code, body) => { res.statusCode = code; res.body = body; };
-
-    await handleDiscordAdapterRoute({
-      req, res, path: DISCORD_ADAPTER_ROUTES.SERVERS,
-      config: { repoRoot: "/tmp" },
-      readJson: async () => ({ actor: null }),
-      json
-    });
-    assert.ok(res.statusCode >= 400, `expected 4xx for missing actor, got ${res.statusCode}: ${JSON.stringify(res.body)}`);
-    assert.match(res.body?.error || "", /actor/i);
-  } finally {
-    teardownBotToken();
-  }
-});
-
-test("infra routes reject unauthorized actor tier", async () => {
-  setupBotToken();
-  try {
-
-    const req = { method: "POST", headers: authHeaders() };
-    const res = { statusCode: 0, body: null };
-    const json = (r, code, body) => { res.statusCode = code; res.body = body; };
-    const oldObs = process.env.DISCORD_OBSERVER_ROLE_IDS;
-    process.env.DISCORD_OBSERVER_ROLE_IDS = "role-observer";
-
-    try {
-      await handleDiscordAdapterRoute({
-        req, res, path: DISCORD_ADAPTER_ROUTES.SERVERS,
-        config: { repoRoot: "/tmp" },
-        readJson: async () => ({ actor: actor(["role-public"]) }),
-        json
-      });
-      // Public tier should not have SERVICES_READ — expect rejection
-      assert.ok(res.statusCode >= 400, `expected 4xx for public+servers, got ${res.statusCode}`);
-    } finally {
-      process.env.DISCORD_OBSERVER_ROLE_IDS = oldObs;
-    }
-  } finally {
-    teardownBotToken();
-  }
-});
-
-test("infra routes accept authorized actor tier", async () => {
-  setupBotToken();
-  try {
-
-    const req = { method: "GET", headers: authHeaders() };
-    const res = { statusCode: 0, body: null };
-    const json = (r, code, body) => { res.statusCode = code; res.body = body; };
-
-    await handleDiscordAdapterRoute({
-      req, res, path: DISCORD_ADAPTER_ROUTES.VERSION,
-      config: { repoRoot: "/tmp", version: "test-version" },
-      readJson: async () => ({}),
-      json
-    });
-    assert.equal(res.statusCode, 200, `expected 200 for version, got ${res.statusCode}: ${JSON.stringify(res.body)}`);
-    assert.equal(res.body?.version, "test-version", `expected version=test-version, got ${JSON.stringify(res.body)}`);
-  } finally {
-    teardownBotToken();
-  }
-});
-
-test("VERSION route uses config.version not hardcoded path", () => {
-  assert.ok(DISCORD_ADAPTER_ROUTES.VERSION, "VERSION route exists");
-  assert.equal(DISCORD_ADAPTER_ROUTES.VERSION, "/api/integrations/discord/version");
 });

@@ -8,15 +8,20 @@ export const DISCORD_CAPABILITIES = Object.freeze({
   LOGS_READ: "logs:read",
   MAPS_READ: "maps:read",
   BACKUPS_READ: "backups:read",
+  INVENTORY_READ: "inventory:read",
+  STORAGE_READ: "storage:read",
+  GUILD_READ: "guild:read",
+  PLAYER_LINK_WRITE: "player-link:write",
   BROADCAST_SEND: "broadcast:send"
 });
 
-export const EXPERIMENTAL_READ_ONLY_CAPABILITIES = Object.freeze(
-  new Set(Object.values(DISCORD_CAPABILITIES).filter((c) => c !== DISCORD_CAPABILITIES.BROADCAST_SEND))
-);
+export const DISCORD_WRITE_CAPABILITIES = Object.freeze(new Set([
+  DISCORD_CAPABILITIES.PLAYER_LINK_WRITE,
+  DISCORD_CAPABILITIES.BROADCAST_SEND
+]));
 
-export const DISCORD_WRITE_CAPABILITIES = Object.freeze(
-  new Set([DISCORD_CAPABILITIES.BROADCAST_SEND])
+export const EXPERIMENTAL_READ_ONLY_CAPABILITIES = Object.freeze(
+  new Set(Object.values(DISCORD_CAPABILITIES).filter((capability) => !DISCORD_WRITE_CAPABILITIES.has(capability)))
 );
 
 const CAPABILITY_BY_TIER = Object.freeze({
@@ -32,7 +37,11 @@ const CAPABILITY_BY_TIER = Object.freeze({
     DISCORD_CAPABILITIES.SERVICES_READ,
     DISCORD_CAPABILITIES.POPULATION_READ,
     DISCORD_CAPABILITIES.MAPS_READ,
-    DISCORD_CAPABILITIES.BACKUPS_READ
+    DISCORD_CAPABILITIES.BACKUPS_READ,
+    DISCORD_CAPABILITIES.INVENTORY_READ,
+    DISCORD_CAPABILITIES.STORAGE_READ,
+    DISCORD_CAPABILITIES.PLAYER_LINK_WRITE,
+    DISCORD_CAPABILITIES.GUILD_READ
   ]),
   admin: new Set(Object.values(DISCORD_CAPABILITIES)),
   owner: new Set(Object.values(DISCORD_CAPABILITIES))
@@ -86,7 +95,7 @@ export function requireDiscordCapability(actor, mapping, capability) {
 
 export function requireExperimentalReadOnlyCapability(capability) {
   const normalizedCapability = requiredString(capability, "capability");
-  if (DISCORD_WRITE_CAPABILITIES.has(normalizedCapability)) return; // checked separately via write enablement
+  if (DISCORD_WRITE_CAPABILITIES.has(normalizedCapability)) return;
   if (!EXPERIMENTAL_READ_ONLY_CAPABILITIES.has(normalizedCapability)) {
     throw policyError("not_read_only", `Capability is not allowed in experimental read-only mode: ${normalizedCapability}`, 403);
   }
