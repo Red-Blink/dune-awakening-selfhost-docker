@@ -379,7 +379,11 @@ async function handleApi(req, res) {
   if (path === "/api/players/search") return dbJson(res, () => duneDb.listPlayers(db, { q: url.searchParams.get("q") || "" }));
   if (path === "/api/guilds") return dbJson(res, () => duneDb.listGuilds(db, { q: url.searchParams.get("q") || "" }));
   if (path.match(/^\/api\/guilds\/[^/]+\/members$/)) return dbJson(res, () => duneDb.guildMembers(db, decodeURIComponent(path.split("/")[3])));
-  if (path === "/api/bases") return dbJson(res, () => duneDb.listBases(db, { q: url.searchParams.get("q") || "" }));
+  if (path === "/api/bases") return dbJson(res, () => duneDb.listBases(db, {
+    q: url.searchParams.get("q") || "",
+    page: url.searchParams.get("page") || 0,
+    pageSize: url.searchParams.get("pageSize") || 50
+  }));
   if (path.match(/^\/api\/bases\/[^/]+\/export$/) && req.method === "GET") return baseExportRoute(req, res, path);
   if (path === "/api/admin/items/catalog") return json(res, 200, { rows: listCatalogItems(config.repoRoot, { q: url.searchParams.get("q") || "", limit: url.searchParams.get("limit") || 500 }) });
   if (path === "/api/admin/items/search") return commandJson(res, "adminItemSearch", { q: url.searchParams.get("q") || "" });

@@ -2110,61 +2110,105 @@ function permissionRankLabel(rank) {
   return PERMISSION_RANK_LABELS[rank] || `Rank ${rank}`;
 }
 
-export async function listBases(db, { q = "" } = {}) {
+export async function listBases(db, { q = "", page = 0, pageSize = 50 } = {}) {
   const requiredTables = ["buildings", "building_instances", "actor_fgl_entities", "actors"];
   for (const table of requiredTables) {
-    if (!(await tableExists(db, table))) return unsupported("bases", requiredTables.map((t) => `dune.${t}`));
+    if (!(await tableExists(db, table))) {
+      return { ...unsupported("bases", requiredTables.map((t) => `dune.${t}`)), totalCount: 0, totalBases: 0, totalPieces: 0, totalPlaceables: 0 };
+    }
   }
+  const safePageSize = intParam(pageSize, "pageSize", 1, 200);
+  const safePage = intParam(page, "page", 0);
+  const offset = safePage * safePageSize;
+
   const values = [];
   let having = "";
   if (q) {
     values.push(`%${q}%`);
     having = `having coalesce(pa.actor_name, '') ilike $${values.length} or coalesce(owner.character_name, '') ilike $${values.length}`;
   }
+  values.push(safePageSize, offset);
+  const limitParamIndex = values.length - 1;
+  const offsetParamIndex = values.length;
+
   try {
     const result = await db.query(`
-      select b.id::text as base_id,
-             coalesce(pa.actor_name, 'Base ' || b.id::text) as name,
-             coalesce(owner.character_name, '') as owner_name,
-             coalesce(a.map, '') as map,
-             ((a.transform).location).x as x,
-             ((a.transform).location).y as y,
-             ((a.transform).location).z as z,
+      with matched as (
+        select b.id,
+               a.id as actor_id,
+               pa.actor_name as raw_name,
+               coalesce(pa.actor_name, 'Base ' || b.id::text) as name,
+               coalesce(owner.character_name, '') as owner_name,
+               coalesce(a.map, '') as map,
+               a.transform
+        from dune.buildings b
+        join dune.building_instances bi on bi.building_id = b.id
+        join dune.actor_fgl_entities afe on afe.entity_id = bi.owner_entity_id
+        join dune.actors a on a.id = afe.actor_id
+        left join dune.permission_actor pa on pa.actor_id = a.id
+        left join lateral (
+          select ps.character_name
+          from dune.permission_actor_rank par
+          join dune.actors player_a on player_a.id = par.player_id
+          join dune.player_state ps on ps.account_id = player_a.owner_account_id
+          where par.permission_actor_id = a.id
+          order by par.rank asc, ps.character_name asc
+          limit 1
+        ) owner on true
+        where a.transform is not null
+        group by b.id, a.id, pa.actor_name, owner.character_name, a.map, a.transform
+        ${having}
+      ),
+      paged as (
+        select *, count(*) over() as total_count
+        from matched
+        order by lower(coalesce(raw_name, '')), id
+        limit $${limitParamIndex} offset $${offsetParamIndex}
+      )
+      select p.id::text as base_id,
+             p.name,
+             p.owner_name,
+             p.map,
+             ((p.transform).location).x as x,
+             ((p.transform).location).y as y,
+             ((p.transform).location).z as z,
+             p.total_count,
              count(distinct bi.ctid)::int as piece_count,
-             count(distinct p.id)::int as placeable_count,
+             count(distinct pl.id)::int as placeable_count,
              coalesce(shared.entries, '[]'::jsonb) as shared_with
-      from dune.buildings b
-      join dune.building_instances bi on bi.building_id = b.id
-      join dune.actor_fgl_entities afe on afe.entity_id = bi.owner_entity_id
-      join dune.actors a on a.id = afe.actor_id
-      left join dune.permission_actor pa on pa.actor_id = a.id
-      left join lateral (
-        select ps.character_name
-        from dune.permission_actor_rank par
-        join dune.actors player_a on player_a.id = par.player_id
-        join dune.player_state ps on ps.account_id = player_a.owner_account_id
-        where par.permission_actor_id = a.id
-        order by par.rank asc, ps.character_name asc
-        limit 1
-      ) owner on true
+      from paged p
+      join dune.building_instances bi on bi.building_id = p.id
+      left join dune.placeables pl on pl.owner_entity_id = bi.owner_entity_id
       left join lateral (
         select jsonb_agg(jsonb_build_object('name', ps.character_name, 'rank', par.rank) order by par.rank asc, ps.character_name asc) as entries
         from dune.permission_actor_rank par
         join dune.actors player_a on player_a.id = par.player_id
         join dune.player_state ps on ps.account_id = player_a.owner_account_id
-        where par.permission_actor_id = a.id
+        where par.permission_actor_id = p.actor_id
           and par.rank <> 1
-          and ps.character_name is distinct from owner.character_name
+          and ps.character_name is distinct from p.owner_name
       ) shared on true
-      left join dune.placeables p on p.owner_entity_id = bi.owner_entity_id
-      where a.transform is not null
-      group by b.id, pa.actor_name, owner.character_name, a.map, a.transform, shared.entries
-      ${having}
-      order by lower(coalesce(pa.actor_name, '')), b.id
-      limit 500`, values);
+      group by p.id, p.name, p.owner_name, p.map, p.transform, p.total_count, shared.entries
+      order by lower(coalesce(p.name, '')), p.id`, values);
+
+    const totalsResult = await db.query(`
+      select count(distinct b.id)::int as total_bases,
+             count(distinct bi.ctid)::int as total_pieces,
+             count(distinct pl.id)::int as total_placeables
+      from dune.buildings b
+      join dune.building_instances bi on bi.building_id = b.id
+      join dune.actor_fgl_entities afe on afe.entity_id = bi.owner_entity_id
+      join dune.actors a on a.id = afe.actor_id
+      left join dune.placeables pl on pl.owner_entity_id = bi.owner_entity_id
+      where a.transform is not null`);
+
     return {
       capabilities: { bases: true },
-      rows: result.rows.map((row) => ({
+      totalCount: result.rows[0] ? Number(result.rows[0].total_count) : 0,
+      totalBases: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_bases) : 0,
+      totalPieces: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_pieces) : 0,
+      totalPlaceables: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_placeables) : 0,
+      rows: result.rows.map(({ total_count, ...row }) => ({
         ...row,
         x: Number(row.x),
         y: Number(row.y),
@@ -2179,7 +2223,7 @@ export async function listBases(db, { q = "" } = {}) {
       }))
     };
   } catch (error) {
-    return { capabilities: { bases: false }, rows: [], reason: `Base list query is unsupported by this schema: ${error.message}` };
+    return { capabilities: { bases: false }, rows: [], totalCount: 0, totalBases: 0, totalPieces: 0, totalPlaceables: 0, reason: `Base list query is unsupported by this schema: ${error.message}` };
   }
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, Unlock } from "lucide-react";
 import { basesApi } from "../../api/bases";
 import { apiDownload } from "../../api/client";
@@ -27,10 +27,26 @@ type BaseRow = Record<string, unknown> & {
 const BASES_AUTO_REFRESH_MS = 15 * 60_000; // 15 minutes — listBases is expensive
 const BASES_AUTO_REFRESH_RETRY_MS = 60_000; // backoff if a due refresh hasn't landed yet (in-flight/failed)
 const BASES_RELATIVE_TIME_TICK_MS = 30_000; // UI-only re-render cadence for "time ago" text — never fetches
+const BASES_PAGE_SIZES = [25, 50, 100, 200] as const;
+const BASES_DEFAULT_PAGE_SIZE = 50;
 
-type BasesCache = { rows: BaseRow[]; q: string; lastFetchedAt: number };
+type BasesCache = {
+  q: string;
+  page: number;
+  pageSize: number;
+  rows: BaseRow[];
+  totalCount: number;
+  totalBases: number;
+  totalPieces: number;
+  totalPlaceables: number;
+  lastFetchedAt: number;
+};
 
 let basesCache: BasesCache | null = null;
+
+function sameView(cache: BasesCache | null, q: string, page: number, pageSize: number) {
+  return !!cache && cache.q === q && cache.page === page && cache.pageSize === pageSize;
+}
 
 function errorText(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -52,13 +68,6 @@ function formatRelativeTime(fromMs: number, nowMs: number): string {
   return `${diffHr} hour${diffHr === 1 ? "" : "s"} ago`;
 }
 
-function matchesQuery(row: BaseRow, query: string) {
-  const needle = query.trim().toLowerCase();
-  if (!needle) return true;
-  return String(row.name ?? "").toLowerCase().includes(needle)
-    || String(row.owner_name ?? "").toLowerCase().includes(needle);
-}
-
 function renderBaseCell(row: Record<string, unknown>, column: string) {
   if (column !== "shared_with") {
     const value = row[column];
@@ -78,64 +87,102 @@ function renderBaseCell(row: Record<string, unknown>, column: string) {
 
 export function BasesPanel({ onError }: BasesPanelProps) {
   const [q, setQ] = useState(() => basesCache?.q ?? "");
+  const [submittedQ, setSubmittedQ] = useState(() => basesCache?.q ?? "");
+  const [page, setPage] = useState(() => basesCache?.page ?? 0);
+  const [pageSize, setPageSize] = useState<number>(() => basesCache?.pageSize ?? BASES_DEFAULT_PAGE_SIZE);
   const [rows, setRows] = useState<BaseRow[]>(() => basesCache?.rows ?? []);
+  const [totalCount, setTotalCount] = useState(() => basesCache?.totalCount ?? 0);
+  const [totalBases, setTotalBases] = useState(() => basesCache?.totalBases ?? 0);
+  const [totalPieces, setTotalPieces] = useState(() => basesCache?.totalPieces ?? 0);
+  const [totalPlaceables, setTotalPlaceables] = useState(() => basesCache?.totalPlaceables ?? 0);
   const [loading, setLoading] = useState(() => basesCache === null);
   const [now, setNow] = useState(() => Date.now());
   const [exportingId, setExportingId] = useState("");
-  const refreshInFlight = useRef(false);
-  const filteredRows = useMemo(() => rows.filter((row) => matchesQuery(row, q)), [rows, q]);
-  const sort = useSortableRows(filteredRows);
+  const requestIdRef = useRef(0);
+  const skipNextSearchReset = useRef(true);
+  const sort = useSortableRows(rows);
 
   useEffect(() => {
-    if (basesCache) basesCache.q = q;
-  }, [q]);
+    if (skipNextSearchReset.current) {
+      skipNextSearchReset.current = false;
+      return;
+    }
+    setPage(0);
+  }, [submittedQ]);
 
-  const load = useCallback(async (options: { silent?: boolean } = {}) => {
-    if (refreshInFlight.current) return;
-    refreshInFlight.current = true;
+  function submitSearch() {
+    setSubmittedQ(q);
+  }
+
+  const load = useCallback(async (params: { q: string; page: number; pageSize: number }, options: { silent?: boolean } = {}) => {
+    const requestId = ++requestIdRef.current;
     if (!options.silent) onError("");
     try {
-      const result = await basesApi.list();
+      const result = await basesApi.list(params);
+      if (requestIdRef.current !== requestId) return;
       const nextRows = (result.rows || []).map(withCoordinates);
       setRows(nextRows);
-      basesCache = { ...basesCache, rows: nextRows, q: basesCache?.q ?? "", lastFetchedAt: Date.now() };
+      setTotalCount(result.totalCount || 0);
+      setTotalBases(result.totalBases || 0);
+      setTotalPieces(result.totalPieces || 0);
+      setTotalPlaceables(result.totalPlaceables || 0);
+      basesCache = {
+        q: params.q,
+        page: params.page,
+        pageSize: params.pageSize,
+        rows: nextRows,
+        totalCount: result.totalCount || 0,
+        totalBases: result.totalBases || 0,
+        totalPieces: result.totalPieces || 0,
+        totalPlaceables: result.totalPlaceables || 0,
+        lastFetchedAt: Date.now()
+      };
     } catch (error) {
-      if (!options.silent) onError(errorText(error));
+      if (requestIdRef.current === requestId && !options.silent) onError(errorText(error));
     } finally {
-      setLoading(false);
-      refreshInFlight.current = false;
+      if (requestIdRef.current === requestId) setLoading(false);
     }
   }, [onError]);
 
   useEffect(() => {
     let cancelled = false;
     let timeoutId: number | undefined;
+    const params = { q: submittedQ, page, pageSize };
+    const cacheHit = sameView(basesCache, submittedQ, page, pageSize) ? basesCache : null;
+    const isStale = () => !cacheHit || Date.now() - cacheHit.lastFetchedAt >= BASES_AUTO_REFRESH_MS;
 
-    const isStale = () => Date.now() - (basesCache?.lastFetchedAt ?? 0) >= BASES_AUTO_REFRESH_MS;
+    if (cacheHit) {
+      setRows(cacheHit.rows);
+      setTotalCount(cacheHit.totalCount);
+      setTotalBases(cacheHit.totalBases);
+      setTotalPieces(cacheHit.totalPieces);
+      setTotalPlaceables(cacheHit.totalPlaceables);
+      setLoading(false);
+    }
 
-    const refreshIfStale = async () => {
-      if (document.visibilityState === "hidden" || !isStale()) return;
-      await load({ silent: true });
-    };
-
-    const scheduleNext = () => {
+    const scheduleNext = (fromTime: number) => {
       if (cancelled) return;
       window.clearTimeout(timeoutId);
-      const last = basesCache?.lastFetchedAt ?? Date.now();
-      const dueIn = last + BASES_AUTO_REFRESH_MS - Date.now();
+      const dueIn = fromTime + BASES_AUTO_REFRESH_MS - Date.now();
       const delay = dueIn > 0 ? dueIn : BASES_AUTO_REFRESH_RETRY_MS;
-      timeoutId = window.setTimeout(() => { void runAndReschedule(refreshIfStale); }, delay);
+      timeoutId = window.setTimeout(() => { void tick(); }, delay);
     };
 
-    const runAndReschedule = async (fn: () => Promise<void>) => {
-      await fn();
-      if (!cancelled) scheduleNext();
+    const tick = async () => {
+      if (document.visibilityState !== "hidden") await load(params, { silent: true });
+      if (!cancelled) scheduleNext(basesCache?.lastFetchedAt ?? Date.now());
     };
 
-    void runAndReschedule(basesCache === null ? () => load() : refreshIfStale);
+    if (!cacheHit || isStale()) {
+      void load(params).then(() => { if (!cancelled) scheduleNext(Date.now()); });
+    } else {
+      scheduleNext(cacheHit.lastFetchedAt);
+    }
 
     const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") void runAndReschedule(refreshIfStale);
+      if (document.visibilityState === "visible" && isStale()) {
+        void load(params, { silent: true }).then(() => { if (!cancelled) scheduleNext(Date.now()); });
+      }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
 
@@ -144,7 +191,7 @@ export function BasesPanel({ onError }: BasesPanelProps) {
       window.clearTimeout(timeoutId);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [load]);
+  }, [submittedQ, page, pageSize, load]);
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), BASES_RELATIVE_TIME_TICK_MS);
@@ -180,12 +227,17 @@ export function BasesPanel({ onError }: BasesPanelProps) {
     </section>;
   }
 
-  const totalBases = rows.length;
-  const totalPieces = rows.reduce((sum, row) => sum + Number(row.piece_count || 0), 0);
-  const totalPlaceables = rows.reduce((sum, row) => sum + Number(row.placeable_count || 0), 0);
   const lastFetchedAt = basesCache?.lastFetchedAt ?? null;
-  const filteredCount = filteredRows.length;
-  const rangeStart = filteredCount === 0 ? 0 : 1;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const rangeStart = totalCount === 0 ? 0 : page * pageSize + 1;
+  const rangeEnd = totalCount === 0 ? 0 : rangeStart + rows.length - 1;
+  const hasPreviousPage = page > 0;
+  const hasNextPage = page + 1 < totalPages;
+
+  function changePageSize(nextSize: number) {
+    setPageSize(nextSize);
+    setPage(0);
+  }
 
   return (
     <section className="panel">
@@ -195,16 +247,41 @@ export function BasesPanel({ onError }: BasesPanelProps) {
           {lastFetchedAt !== null && (
             <span className="muted">Refreshed {formatRelativeTime(lastFetchedAt, now)}</span>
           )}
-          <button onClick={() => void load()}>Refresh</button>
+          <button onClick={() => void load({ q: submittedQ, page, pageSize })}>Refresh</button>
         </div>
       </div>
       <p className="action-help-note">
         Total Bases: {totalBases.toLocaleString()} · Total Building Pieces: {totalPieces.toLocaleString()} · Total Placeables: {totalPlaceables.toLocaleString()}
       </p>
-      <div className="action-row bases-search-row"><input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search base or owner name" /></div>
-      <p className="action-help-note bases-row-count">
-        Showing {rangeStart}-{filteredCount} of {totalBases} rows.
-      </p>
+      <div className="action-row bases-search-row">
+        <input
+          value={q}
+          onChange={(event) => setQ(event.target.value)}
+          onKeyDown={(event) => { if (event.key === "Enter") submitSearch(); }}
+          placeholder="Search base or owner name"
+        />
+      </div>
+      <div className="panel-title bases-row-count">
+        <div className="action-row">
+          <button onClick={submitSearch}>Search</button>
+          <p className="action-help-note">
+            Showing {rangeStart}-{rangeEnd} of {totalCount} rows.
+          </p>
+        </div>
+        <div className="database-pagination-controls">
+          <label className="compact-select">
+            Rows
+            <select value={String(pageSize)} onChange={(event) => changePageSize(Number(event.target.value))}>
+              {BASES_PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+            </select>
+          </label>
+          <button disabled={!hasPreviousPage} onClick={() => setPage(0)}>First</button>
+          <button disabled={!hasPreviousPage} onClick={() => setPage(page - 1)}>Previous</button>
+          <span className="muted database-page-indicator">Page {page + 1} of {totalPages}</span>
+          <button disabled={!hasNextPage} onClick={() => setPage(page + 1)}>Next</button>
+          <button disabled={!hasNextPage} onClick={() => setPage(totalPages - 1)}>Last</button>
+        </div>
+      </div>
       <DataTable
         rows={sort.sortedRows}
         columns={["base_id", "name", "owner_name", "shared_with", "map", "coordinates", "piece_count", "placeable_count"]}
