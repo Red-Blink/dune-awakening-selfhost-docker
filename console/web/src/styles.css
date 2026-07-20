@@ -1678,6 +1678,25 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.bases-shared-list {
+  display: grid;
+  gap: 2px;
+  max-height: 4.2em;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  white-space: normal;
+  font-size: 11px;
+  line-height: 1.25;
+}
+.bases-shared-list span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bases-shared-list em {
+  color: #ad9f89;
+  font-style: normal;
+}
 .inventory-augment-input-line {
   align-items: end;
   flex-wrap: nowrap;
