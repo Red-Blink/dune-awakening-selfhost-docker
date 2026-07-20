@@ -2109,6 +2109,287 @@ export async function unsupportedPlayerFeature(db, id, feature) {
   return { capabilities: { [feature]: false }, rows: [], reason: `${feature} schema has not been detected in this database yet` };
 }
 
+const PERMISSION_RANK_LABELS = {
+  1: "Owner",
+  2: "Co-Owner",
+  3: "Associate"
+};
+
+function permissionRankLabel(rank) {
+  return PERMISSION_RANK_LABELS[rank] || `Rank ${rank}`;
+}
+
+const BASE_SORT_COLUMNS = {
+  base_id: { order: ["id"] },
+  name: { order: ["lower(coalesce(raw_name, ''))"] },
+  owner_name: { order: ["lower(coalesce(owner_name, ''))"], owner: true },
+  shared_with: { order: ["shared_count"], shared: true },
+  map: { order: ["lower(coalesce(map, ''))"] },
+  coordinates: { order: ["x", "y", "z"] },
+  piece_count: { order: ["piece_count"], pieces: true },
+  placeable_count: { order: ["placeable_count"], placeables: true }
+};
+
+export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColumn = "name", sortDirection = "asc" } = {}) {
+  const requiredTables = ["buildings", "building_instances", "actor_fgl_entities", "actors"];
+  for (const table of requiredTables) {
+    if (!(await tableExists(db, table))) {
+      return { ...unsupported("bases", requiredTables.map((t) => `dune.${t}`)), totalCount: 0, totalBases: 0, totalPieces: 0, totalPlaceables: 0 };
+    }
+  }
+  const safePageSize = intParam(pageSize, "pageSize", 1, 200);
+  const safePage = intParam(page, "page", 0);
+  const offset = safePage * safePageSize;
+  const safeSortColumn = Object.hasOwn(BASE_SORT_COLUMNS, sortColumn) ? sortColumn : "name";
+  const safeSortDirection = String(sortDirection).toLowerCase() === "desc" ? "desc" : "asc";
+  const sortSpec = BASE_SORT_COLUMNS[safeSortColumn];
+
+  // Owner resolution (lowest-rank permission holder) is a per-base correlated LATERAL —
+  // expensive at scale. When searching, the `having` clause needs it to filter on, so it
+  // must run inside `matched` (before pagination) for every candidate base. When not
+  // searching, defer it to the final SELECT so it only runs for the page being displayed.
+  const searching = Boolean(q);
+  const resolveOwnerBeforePaging = searching || sortSpec.owner;
+  const values = [];
+  let having = "";
+  if (searching) {
+    values.push(`%${q}%`);
+    having = `having coalesce(pa.actor_name, '') ilike $${values.length} or coalesce(owner.character_name, '') ilike $${values.length}`;
+  }
+  values.push(safePageSize, offset);
+  const limitParamIndex = values.length - 1;
+  const offsetParamIndex = values.length;
+
+  const matchedOwnerSelect = resolveOwnerBeforePaging ? "coalesce(owner.character_name, '') as owner_name,\n               " : "";
+  const matchedOwnerJoin = resolveOwnerBeforePaging ? `
+        left join lateral (
+          select ps.character_name
+          from dune.permission_actor_rank par
+          join dune.actors player_a on player_a.id = par.player_id
+          join dune.player_state ps on ps.account_id = player_a.owner_account_id
+          where par.permission_actor_id = a.id
+          order by par.rank asc, ps.character_name asc
+          limit 1
+        ) owner on true` : "";
+  const matchedGroupByOwner = resolveOwnerBeforePaging ? "owner.character_name, " : "";
+
+  const finalOwnerSelect = resolveOwnerBeforePaging ? "p.owner_name," : "coalesce(owner.character_name, '') as owner_name,";
+  const finalOwnerJoin = resolveOwnerBeforePaging ? "" : `
+      left join lateral (
+        select ps.character_name
+        from dune.permission_actor_rank par
+        join dune.actors player_a on player_a.id = par.player_id
+        join dune.player_state ps on ps.account_id = player_a.owner_account_id
+        where par.permission_actor_id = p.actor_id
+        order by par.rank asc, ps.character_name asc
+        limit 1
+      ) owner on true`;
+  const sharedOwnerRef = resolveOwnerBeforePaging ? "p.owner_name" : "coalesce(owner.character_name, '')";
+  const matchedSortSelect = [
+    "((a.transform).location).x as x",
+    "((a.transform).location).y as y",
+    "((a.transform).location).z as z",
+    sortSpec.pieces ? "(select count(*) from dune.building_instances count_bi where count_bi.building_id = b.id)::int as piece_count" : "",
+    sortSpec.placeables ? "(select count(*) from dune.placeables count_pl where count_pl.owner_entity_id in (select distinct bi2.owner_entity_id from dune.building_instances bi2 where bi2.building_id = b.id))::int as placeable_count" : "",
+    sortSpec.shared ? "(select count(*) from dune.permission_actor_rank count_par where count_par.permission_actor_id = a.id and count_par.rank <> 1)::int as shared_count" : ""
+  ].filter(Boolean).join(",\n               ");
+  const pagedOrder = [...sortSpec.order, ...(sortSpec.order.includes("id") ? [] : ["id"])].map((column) => `${column} ${safeSortDirection}`).join(", ");
+  const finalPieceCount = sortSpec.pieces ? "p.piece_count" : "(select count(*) from dune.building_instances bi where bi.building_id = p.id)::int";
+  const finalPlaceableCount = sortSpec.placeables ? "p.placeable_count" : "(select count(*) from dune.placeables pl where pl.owner_entity_id = p.owner_entity_id)::int";
+
+  try {
+    const result = await db.query(`
+      with matched as (
+        select b.id,
+               a.id as actor_id,
+               max(bi.owner_entity_id) as owner_entity_id,
+               pa.actor_name as raw_name,
+               coalesce(pa.actor_name, 'Base ' || b.id::text) as name,
+               ${matchedOwnerSelect}coalesce(a.map, '') as map,
+               a.transform,
+               ${matchedSortSelect}
+        from dune.buildings b
+        join dune.building_instances bi on bi.building_id = b.id
+        join dune.actor_fgl_entities afe on afe.entity_id = bi.owner_entity_id
+        join dune.actors a on a.id = afe.actor_id
+        left join dune.permission_actor pa on pa.actor_id = a.id
+        ${matchedOwnerJoin}
+        where a.transform is not null
+        group by b.id, a.id, pa.actor_name, ${matchedGroupByOwner}a.map, a.transform
+        ${having}
+      ),
+      paged as (
+        select *,
+               count(*) over() as total_count,
+               row_number() over (order by ${pagedOrder}) as sort_position
+        from matched
+        order by ${pagedOrder}
+        limit $${limitParamIndex} offset $${offsetParamIndex}
+      )
+      select p.id::text as base_id,
+             p.name,
+             ${finalOwnerSelect}
+             p.map,
+             p.x,
+             p.y,
+             p.z,
+             p.total_count,
+             ${finalPieceCount} as piece_count,
+             ${finalPlaceableCount} as placeable_count,
+             coalesce(shared.entries, '[]'::jsonb) as shared_with
+      from paged p
+      ${finalOwnerJoin}
+      left join lateral (
+        select jsonb_agg(jsonb_build_object('name', ps.character_name, 'rank', par.rank) order by par.rank asc, ps.character_name asc) as entries
+        from dune.permission_actor_rank par
+        join dune.actors player_a on player_a.id = par.player_id
+        join dune.player_state ps on ps.account_id = player_a.owner_account_id
+        where par.permission_actor_id = p.actor_id
+          and par.rank <> 1
+          and ps.character_name is distinct from ${sharedOwnerRef}
+      ) shared on true
+      order by p.sort_position`, values);
+
+    const totalsResult = await db.query(`
+      with valid_bases as (
+        select distinct b.id as building_id, afe.entity_id as owner_entity_id
+        from dune.buildings b
+        join dune.building_instances bi on bi.building_id = b.id
+        join dune.actor_fgl_entities afe on afe.entity_id = bi.owner_entity_id
+        join dune.actors a on a.id = afe.actor_id
+        where a.transform is not null
+      )
+      select (select count(*) from valid_bases)::int as total_bases,
+             (select count(*) from dune.building_instances bi join valid_bases vb on vb.building_id = bi.building_id)::int as total_pieces,
+             (select count(distinct pl.id) from dune.placeables pl join valid_bases vb on vb.owner_entity_id = pl.owner_entity_id)::int as total_placeables`);
+
+    return {
+      capabilities: { bases: true },
+      totalCount: result.rows[0] ? Number(result.rows[0].total_count) : 0,
+      totalBases: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_bases) : 0,
+      totalPieces: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_pieces) : 0,
+      totalPlaceables: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_placeables) : 0,
+      rows: result.rows.map(({ total_count, sort_position, ...row }) => ({
+        ...row,
+        x: Number(row.x),
+        y: Number(row.y),
+        z: Number(row.z),
+        piece_count: Number(row.piece_count),
+        placeable_count: Number(row.placeable_count),
+        shared_with: (Array.isArray(row.shared_with) ? row.shared_with : []).map((entry) => ({
+          name: entry.name,
+          rank: entry.rank,
+          label: permissionRankLabel(entry.rank)
+        }))
+      }))
+    };
+  } catch (error) {
+    return { capabilities: { bases: false }, rows: [], totalCount: 0, totalBases: 0, totalPieces: 0, totalPlaceables: 0, reason: `Base list query is unsupported by this schema: ${error.message}` };
+  }
+}
+
+function quaternionYawDegrees(qz, qw) {
+  return (2 * Math.atan2(Number(qz) || 0, Number(qw) || 0)) * (180 / Math.PI);
+}
+
+export async function exportBaseAsBlueprint(db, id) {
+  const baseId = intParam(id, "base id", 1);
+  const requiredTables = ["buildings", "building_instances", "actor_fgl_entities", "actors"];
+  for (const table of requiredTables) {
+    await requireCapability(await tableExists(db, table), `Base export requires dune.${requiredTables.join(", dune.")}.`);
+  }
+  const baseRow = await db.query(`
+    select b.id::text as base_id,
+           coalesce(pa.actor_name, 'Base ' || b.id::text) as name,
+           coalesce(owner.character_name, '') as owner_name,
+           coalesce(a.map, '') as map,
+           ((a.transform).location).x as x,
+           ((a.transform).location).y as y,
+           ((a.transform).location).z as z,
+           max(bi.owner_entity_id) as owner_entity_id
+    from dune.buildings b
+    join dune.building_instances bi on bi.building_id = b.id
+    join dune.actor_fgl_entities afe on afe.entity_id = bi.owner_entity_id
+    join dune.actors a on a.id = afe.actor_id
+    left join dune.permission_actor pa on pa.actor_id = a.id
+    left join lateral (
+      select ps.character_name
+      from dune.permission_actor_rank par
+      join dune.actors player_a on player_a.id = par.player_id
+      join dune.player_state ps on ps.account_id = player_a.owner_account_id
+      where par.permission_actor_id = a.id
+      order by par.rank asc, ps.character_name asc
+      limit 1
+    ) owner on true
+    where b.id = $1
+    group by b.id, pa.actor_name, owner.character_name, a.map, a.transform`, [baseId]);
+  if (!baseRow.rows.length) throw new UnsupportedCapabilityError(`Base ${baseId} was not found.`);
+  const base = baseRow.rows[0];
+  const anchor = { x: Number(base.x), y: Number(base.y), z: Number(base.z) };
+
+  // Blueprint import (blueprints.js) expects positions relative to a capture origin and a single
+  // yaw-degree rotation for instances, not the live tables' absolute world coords + quaternion.
+  // The anchor point is arbitrary (the base's own actor position) but consistent, so the exported
+  // pieces stay correctly positioned relative to each other when re-placed anywhere in-game.
+  // Rotation is captured yaw-only (Z axis) since every sampled live piece has qx=qy=0; pitch/roll
+  // on tilted geometry, if any exists, is lost.
+  const pieceRows = await db.query(`
+    select instance_id, building_type, transform
+    from dune.building_instances
+    where building_id = $1
+    order by instance_id`, [baseId]);
+  const instances = pieceRows.rows.map((row) => {
+    const t = row.transform || [];
+    return {
+      instance_id: row.instance_id,
+      building_type: row.building_type,
+      x: (Number(t[0]) || 0) - anchor.x,
+      y: (Number(t[1]) || 0) - anchor.y,
+      z: (Number(t[2]) || 0) - anchor.z,
+      rotation: quaternionYawDegrees(t[5], t[6])
+    };
+  });
+
+  const placeableRows = (await tableExists(db, "placeables"))
+    ? await db.query(`
+        select p.id as placeable_id, p.building_type,
+               ((a.transform).location).x as x,
+               ((a.transform).location).y as y,
+               ((a.transform).location).z as z,
+               ((a.transform).rotation).z as qz,
+               ((a.transform).rotation).w as qw
+        from dune.placeables p
+        join dune.actors a on a.id = p.id
+        where p.owner_entity_id = $1
+          and a.transform is not null
+        order by p.id`, [base.owner_entity_id])
+    : { rows: [] };
+  const placeables = placeableRows.rows.map((row) => ({
+    placeable_id: row.placeable_id,
+    building_type: row.building_type,
+    x: Number(row.x) - anchor.x,
+    y: Number(row.y) - anchor.y,
+    z: Number(row.z) - anchor.z,
+    rx: 0,
+    ry: 0,
+    rz: quaternionYawDegrees(row.qz, row.qw)
+  }));
+
+  return {
+    base_id: base.base_id,
+    name: base.name,
+    owner_name: base.owner_name,
+    map: base.map,
+    x: anchor.x,
+    y: anchor.y,
+    z: anchor.z,
+    piece_count: instances.length,
+    placeable_count: placeables.length,
+    instances,
+    placeables
+  };
+}
+
 export async function listStorage(db) {
   if (!(await tableExists(db, "placeables"))) return unsupported("storage", ["dune.placeables"]);
   const result = await db.query(`
@@ -4029,8 +4310,8 @@ export async function addonOpsActivitySummary(db) {
 function emptyActivitySummary() {
   return {
     totalPlayers: 0, onlinePlayers: 0,
-    activeLast1h: null, activeLast24h: null, activeLast7d: null,
-    inactivePlayers: null, returningPlayers: null, newPlayers: null,
+    activeLast1h: 0, activeLast24h: 0, activeLast7d: 0,
+    inactivePlayers: 0, returningPlayers: 0, newPlayers: 0,
     playersDead: 0,
     guildActivity: [], factionActivity: [], mapActivity: []
   };
@@ -4211,4 +4492,303 @@ export async function addonOpsEconomySummary(db) {
 
 function emptyEconomySummary() {
   return { totalCurrencyHolders: 0, totalSupply: 0, activeOrders: 0, fulfilledOrders: 0, taxCollected: 0, currencyBreakdown: [], topTradedItems: [] };
+}
+export async function migrateDiscordAdapterSchema(db) {
+  const migrate = async (tx) => {
+    await tx.query(`
+      create table if not exists dune.discord_player_links (
+        discord_user_id text primary key,
+        player_controller_id text not null,
+        linked_at timestamp with time zone not null default now()
+      )`);
+    await tx.query("alter table dune.discord_player_links alter column linked_at set default now()");
+    await tx.query("update dune.discord_player_links set linked_at = now() where linked_at is null");
+    await tx.query("alter table dune.discord_player_links alter column linked_at set not null");
+    await tx.query(`
+      delete from dune.discord_player_links older
+      using dune.discord_player_links newer
+      where older.player_controller_id = newer.player_controller_id
+        and (older.linked_at, older.discord_user_id) < (newer.linked_at, newer.discord_user_id)`);
+    await tx.query(`
+      create unique index if not exists discord_player_links_player_controller_id_uidx
+      on dune.discord_player_links (player_controller_id)`);
+    await tx.query(`
+      create table if not exists dune.discord_pending_links (
+        code text primary key,
+        discord_user_id text not null,
+        player_controller_id text not null,
+        character_name text not null,
+        created_at timestamp with time zone not null default now(),
+        expires_at timestamp with time zone not null
+      )`);
+    await tx.query("alter table dune.discord_pending_links alter column created_at set default now()");
+    await tx.query("update dune.discord_pending_links set created_at = now() where created_at is null");
+    await tx.query("alter table dune.discord_pending_links alter column created_at set not null");
+    await tx.query("delete from dune.discord_pending_links where expires_at <= now()");
+    await tx.query(`
+      delete from dune.discord_pending_links older
+      using dune.discord_pending_links newer
+      where older.discord_user_id = newer.discord_user_id
+        and (older.created_at, older.code) < (newer.created_at, newer.code)`);
+    await tx.query(`
+      delete from dune.discord_pending_links older
+      using dune.discord_pending_links newer
+      where older.player_controller_id = newer.player_controller_id
+        and (older.created_at, older.code) < (newer.created_at, newer.code)`);
+    await tx.query(`
+      create unique index if not exists discord_pending_links_discord_user_id_uidx
+      on dune.discord_pending_links (discord_user_id)`);
+    await tx.query(`
+      create unique index if not exists discord_pending_links_player_controller_id_uidx
+      on dune.discord_pending_links (player_controller_id)`);
+  };
+  if (typeof db.transaction === "function") return db.transaction(migrate);
+  return migrate(db);
+}
+
+export async function resolvePlayerByName(db, characterName) {
+  const result = await db.query(`
+    select distinct on (ps.player_controller_id)
+           ps.player_controller_id::text as player_controller_id,
+           ps.character_name,
+           ps.player_pawn_id::text as player_pawn_id,
+           coalesce(ps.online_status::text, 'Offline') as online_status,
+           coalesce(ac.funcom_id, '') as funcom_id,
+           coalesce(ac."user", '') as fls_id
+    from dune.player_state ps
+    left join dune.accounts ac on ac.id = ps.account_id
+    where lower(ps.character_name) = lower($1)
+    order by ps.player_controller_id,
+             case when coalesce(ps.online_status::text, '') = 'Online' then 0 else 1 end,
+             ps.player_pawn_id desc`, [String(characterName).trim()]);
+  return result.rows;
+}
+
+export async function getLinkedPlayer(db, discordUserId) {
+  const result = await db.query(`
+    select dpl.discord_user_id,
+           dpl.player_controller_id,
+           coalesce(ps.character_name, '') as character_name,
+           coalesce(ps.player_pawn_id::text, '0') as player_pawn_id,
+           coalesce(ps.online_status::text, 'Offline') as online_status
+    from dune.discord_player_links dpl
+    join dune.player_state ps on ps.player_controller_id::text = dpl.player_controller_id
+    where dpl.discord_user_id = $1
+    limit 1`, [String(discordUserId)]);
+  return result.rows[0] || null;
+}
+
+export async function discordPlayerLink(db, discordUserId, playerControllerId) {
+  const link = async (tx) => {
+    const conflict = await tx.query(`
+      select discord_user_id
+      from dune.discord_player_links
+      where player_controller_id = $1
+        and discord_user_id <> $2
+      for update`, [playerControllerId, String(discordUserId)]);
+    if (conflict.rowCount) {
+      return { conflict: true };
+    }
+    await tx.query(`
+      insert into dune.discord_player_links (discord_user_id, player_controller_id)
+      values ($1, $2)
+      on conflict (discord_user_id) do update
+        set player_controller_id = excluded.player_controller_id,
+            linked_at = now()`, [String(discordUserId), playerControllerId]);
+    return { conflict: false, player: await getLinkedPlayer(tx, discordUserId) };
+  };
+  const result = typeof db.transaction === "function" ? await db.transaction(link) : await link(db);
+  if (result.conflict) {
+    const error = new Error("This character is already linked to another Discord account.");
+    error.code = "character_already_linked";
+    error.statusCode = 409;
+    throw error;
+  }
+  return result.player;
+}
+
+export async function discordPlayerUnlink(db, discordUserId) {
+  const player = await getLinkedPlayer(db, discordUserId);
+  await db.query("delete from dune.discord_player_links where discord_user_id = $1", [String(discordUserId)]);
+  return Boolean(player);
+}
+
+export async function playerOwnedStorageQuery(db, playerControllerId) {
+  const result = await db.query(`
+    select p.id,
+           coalesce(max(case when pa.actor_name not like '##%' and pa.actor_name <> 'None' then pa.actor_name end), p.building_type) as name,
+           p.building_type as class,
+           coalesce(a.map, '') as map,
+           count(i.id)::int as item_count
+    from dune.placeables p
+    left join dune.actors a on a.id = p.id
+    left join dune.inventories inv on inv.actor_id = p.id
+    left join dune.items i on i.inventory_id = inv.id
+    left join dune.actor_fgl_entities afe on afe.entity_id = p.owner_entity_id
+    left join dune.permission_actor_rank par on par.permission_actor_id = afe.actor_id
+    left join dune.permission_actor pa on pa.actor_id = par.permission_actor_id
+    where par.player_id = $1
+      and par.rank = 1
+      and p.is_hologram = false
+      and p.owner_entity_id is not null
+      and p.owner_entity_id != 0
+    group by p.id, p.building_type, a.map
+    order by p.id`, [playerControllerId]);
+  return { rows: result.rows };
+}
+
+export async function guildStorageQuery(db, playerControllerId) {
+  const result = await db.query(`
+    select p.id,
+           coalesce(max(case when pa.actor_name not like '##%' and pa.actor_name <> 'None' then pa.actor_name end), p.building_type) as name,
+           p.building_type as class,
+           coalesce(a.map, '') as map,
+           count(i.id)::int as item_count
+    from dune.placeables p
+    left join dune.actors a on a.id = p.id
+    left join dune.inventories inv on inv.actor_id = p.id
+    left join dune.items i on i.inventory_id = inv.id
+    left join dune.actor_fgl_entities afe on afe.entity_id = p.owner_entity_id
+    left join dune.permission_actor_rank par on par.permission_actor_id = afe.actor_id
+    left join dune.guild_members gm on gm.player_id = par.player_id
+    left join dune.guild_members self_gm on self_gm.player_id = $1
+    left join dune.permission_actor pa on pa.actor_id = par.permission_actor_id
+    where gm.guild_id = self_gm.guild_id
+      and p.is_hologram = false
+      and p.owner_entity_id is not null
+      and p.owner_entity_id != 0
+    group by p.id, p.building_type, a.map
+    order by p.id`, [playerControllerId]);
+  return { rows: result.rows };
+}
+
+export async function searchItemsInContainers(db, { playerControllerId, query, scope = "owned" }) {
+  const searchTerm = `%${String(query).trim()}%`;
+
+  if (scope === "owned") {
+    const result = await db.query(`
+      select i.id,
+             i.template_id,
+             i.stack_size,
+             i.quality_level,
+             i.inventory_id,
+             inv.actor_id as container_id,
+             coalesce(
+               nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'CurrentDurability'), null),
+               null
+             ) as current_durability,
+             coalesce(
+               nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'MaxDurability')::numeric, 0),
+               nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'DecayedMaxDurability')::numeric, 0),
+               null
+             ) as max_durability
+      from dune.items i
+      join dune.inventories inv on i.inventory_id = inv.id
+      join dune.placeables p on p.id = inv.actor_id
+      left join dune.actor_fgl_entities afe on afe.entity_id = p.owner_entity_id
+      left join dune.permission_actor_rank par on par.permission_actor_id = afe.actor_id
+      where par.player_id = $1
+        and par.rank = 1
+        and i.template_id ilike $2
+      order by i.template_id
+      limit 200`, [playerControllerId, searchTerm]);
+    return { rows: result.rows };
+  }
+
+  if (scope === "guild") {
+    const result = await db.query(`
+      select distinct i.id,
+             i.template_id,
+             i.stack_size,
+             i.quality_level,
+             i.inventory_id,
+             inv.actor_id as container_id,
+             coalesce(
+               nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'CurrentDurability'), null),
+               null
+             ) as current_durability,
+             coalesce(
+               nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'MaxDurability')::numeric, 0),
+               nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'DecayedMaxDurability')::numeric, 0),
+               null
+             ) as max_durability
+      from dune.items i
+      join dune.inventories inv on i.inventory_id = inv.id
+      join dune.placeables p on p.id = inv.actor_id
+      left join dune.actor_fgl_entities afe on afe.entity_id = p.owner_entity_id
+      left join dune.permission_actor_rank par on par.permission_actor_id = afe.actor_id
+      left join dune.guild_members gm on gm.player_id = par.player_id
+      left join dune.guild_members self_gm on self_gm.player_id = $1
+      where gm.guild_id = self_gm.guild_id
+        and i.template_id ilike $2
+      order by i.template_id
+      limit 200`, [playerControllerId, searchTerm]);
+    return { rows: result.rows };
+  }
+
+  throw new Error(`Unsupported search scope: ${scope}. Use "owned" or "guild".`);
+}
+
+export async function searchItemsInPlayerInventory(db, playerPawnId, query) {
+  const searchTerm = `%${String(query).trim()}%`;
+  const result = await db.query(`
+    select i.id,
+           i.template_id,
+           i.stack_size,
+           i.quality_level,
+           i.position_index,
+           i.inventory_id,
+           coalesce(
+             nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'CurrentDurability'), null),
+             null
+           ) as current_durability,
+           coalesce(
+             nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'MaxDurability')::numeric, 0),
+             nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'DecayedMaxDurability')::numeric, 0),
+             null
+           ) as max_durability
+    from dune.items i
+    join dune.inventories inv on i.inventory_id = inv.id
+    where inv.actor_id = $1
+      and i.template_id ilike $2
+    order by i.template_id
+    limit 200`, [intParam(playerPawnId, "player pawn id", 1), searchTerm]);
+  return { rows: result.rows };
+}
+
+export async function createPendingLink(db, discordUserId, playerControllerId, characterName, code, expiresAt) {
+  const create = async (tx) => {
+    await tx.query(`
+      delete from dune.discord_pending_links
+      where discord_user_id = $1`, [String(discordUserId)]);
+    const result = await tx.query(`
+      insert into dune.discord_pending_links (code, discord_user_id, player_controller_id, character_name, expires_at)
+      values ($1, $2, $3, $4, $5)
+      on conflict (code) do nothing`, [code, String(discordUserId), playerControllerId, characterName, expiresAt]);
+    return result.rowCount === 1;
+  };
+  if (typeof db.transaction === "function") return db.transaction(create);
+  return create(db);
+}
+
+export async function deletePendingLink(db, discordUserId, code) {
+  const result = await db.query(`
+    delete from dune.discord_pending_links
+    where discord_user_id = $1 and code = $2`, [String(discordUserId), code]);
+  return result.rowCount || 0;
+}
+
+export async function consumePendingLink(db, discordUserId, code) {
+  const result = await db.query(`
+    delete from dune.discord_pending_links
+    where code = $1
+      and discord_user_id = $2
+      and expires_at > now()
+    returning discord_user_id, player_controller_id, character_name`, [code, String(discordUserId)]);
+  return result.rows[0] || null;
+}
+
+export async function cleanupExpiredPendingLinks(db) {
+  const result = await db.query("delete from dune.discord_pending_links where expires_at <= now()");
+  return result.rowCount;
 }

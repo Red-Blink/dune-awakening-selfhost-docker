@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { exportBlueprint, importBlueprint, listBlueprints, blueprintCapabilities, deleteBlueprint } from "../src/blueprints.js";
+import { exportBaseAsBlueprint } from "../src/duneDb.js";
 
 const SAMPLE_INSTANCE = {
   building_type: "MTX_Smug_Foundation",
@@ -335,6 +336,46 @@ test("export blueprint returns full JSON structure", async () => {
   assert.equal(result.instances.length, 2);
   assert.equal(result.placeables.length, 1);
   assert.equal(result.pentashields.length, 1);
+});
+
+test("live base export can be imported without losing relative transforms", async () => {
+  const liveDb = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.buildings b")) {
+        return { rows: [{
+          base_id: "42",
+          name: "Round Trip Base",
+          owner_name: "Builder",
+          map: "Survival_1",
+          x: "1000",
+          y: "2000",
+          z: "3000",
+          owner_entity_id: "9001"
+        }] };
+      }
+      if (text.includes("select instance_id, building_type, transform")) {
+        return { rows: [{ instance_id: 7, building_type: "MTX_Smug_Foundation", transform: [1125, 2250, 3375, 0, 0, 0, 1] }] };
+      }
+      if (text.includes("select p.id as placeable_id")) {
+        assert.deepEqual(values, ["9001"]);
+        return { rows: [{ placeable_id: 9, building_type: "Generator_Placeable", x: 950, y: 2100, z: 3025, qz: 0, qw: 1 }] };
+      }
+      return { rows: [] };
+    }
+  };
+
+  const exported = await exportBaseAsBlueprint(liveDb, 42);
+  const { db, instances, placeables } = fakeBlueprintDb([]);
+  const imported = await importBlueprint(db, 123, exported);
+
+  assert.equal(imported.blueprintName, "Round Trip Base");
+  assert.equal(instances.length, 1);
+  assert.equal(instances[0].instance_id, 7);
+  assert.equal(instances[0].transform, "{125,250,375,0}");
+  assert.equal(placeables.length, 1);
+  assert.equal(placeables[0].placeable_id, 9);
+  assert.equal(placeables[0].transform, "{-50,100,25,0,0,0}");
 });
 
 test("export blueprint handles empty blueprint", async () => {

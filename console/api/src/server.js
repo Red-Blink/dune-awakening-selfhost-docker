@@ -30,6 +30,8 @@ import { updateEnvFileValue as updateEnvValue } from "./services/envFile.js";
 import { funcomAuthMismatchDetected, matchingFuncomAuthLines, saveFuncomTokenValue as writeFuncomToken, validDockerSince } from "./services/funcomAuth.js";
 import { readCharacterTransferSettings, saveCharacterTransferSettings } from "./services/characterTransferSettings.js";
 import { handleDiscordAdapterRoute, isDiscordAdapterRoute } from "./integrations/discord/routes.js";
+import { discordAdapterEnabled } from "./integrations/discord/adapter.js";
+import { initializeDiscordAdapterSchema } from "./integrations/discord/schema.js";
 import { liveItemGrantOk, liveItemGrantWarning } from "./grantResults.js";
 import { primeMessageOfTheDayOnlineState, readMessageOfTheDay, restoreMessageOfTheDay, runMessageOfTheDayScan, saveMessageOfTheDay } from "./services/messageOfTheDay.js";
 import { primePlayerAnnouncementOnlineState, readPlayerAnnouncements, restorePlayerAnnouncements, runPlayerAnnouncementScan, savePlayerAnnouncements } from "./services/playerAnnouncements.js";
@@ -99,6 +101,11 @@ createServer(async (req, res) => {
   }
   scheduleBootAutoStart();
   publicDirectory.start();
+  if (discordAdapterEnabled(config)) {
+    initializeDiscordAdapterSchema(db).catch((error) => {
+      console.warn(`Discord adapter schema initialization failed: ${redact(error?.message || error)}`);
+    });
+  }
 });
 
 setInterval(() => {
@@ -269,7 +276,7 @@ async function handleApi(req, res) {
     return json(res, 200, { ok: true });
   }
   if (isDiscordAdapterRoute(path)) {
-    return handleDiscordAdapterRoute({ req, res, path, config, readJson, json });
+    return handleDiscordAdapterRoute({ req, res, path, config, readJson, json, db });
   }
 
   const session = auth.requireAuth(req, res);
@@ -380,6 +387,14 @@ async function handleApi(req, res) {
   if (path === "/api/players/search") return dbJson(res, () => duneDb.listPlayers(db, { q: url.searchParams.get("q") || "" }));
   if (path === "/api/guilds") return dbJson(res, () => duneDb.listGuilds(db, { q: url.searchParams.get("q") || "" }));
   if (path.match(/^\/api\/guilds\/[^/]+\/members$/)) return dbJson(res, () => duneDb.guildMembers(db, decodeURIComponent(path.split("/")[3])));
+  if (path === "/api/bases") return dbJson(res, () => duneDb.listBases(db, {
+    q: url.searchParams.get("q") || "",
+    page: url.searchParams.get("page") || 0,
+    pageSize: url.searchParams.get("pageSize") || 50,
+    sortColumn: url.searchParams.get("sortColumn") || "name",
+    sortDirection: url.searchParams.get("sortDirection") || "asc"
+  }));
+  if (path.match(/^\/api\/bases\/[^/]+\/export$/) && req.method === "GET") return baseBlueprintDownloadRoute(req, res, path);
   if (path === "/api/admin/items/catalog") return json(res, 200, { rows: listCatalogItems(config.repoRoot, { q: url.searchParams.get("q") || "", limit: url.searchParams.get("limit") || 500 }) });
   if (path === "/api/admin/items/search") return commandJson(res, "adminItemSearch", { q: url.searchParams.get("q") || "" });
   if (path === "/api/admin/items") return commandJson(res, url.searchParams.get("category") ? "adminItemListCategory" : "adminItemList", { category: url.searchParams.get("category") || "" });
@@ -1672,18 +1687,36 @@ async function storageGiveItemRoute(req, res, path) {
   }, { storageId });
 }
 
+function writeJsonAttachment(res, data, filename) {
+  res.writeHead(200, {
+    "content-type": "application/json; charset=utf-8",
+    "content-disposition": `attachment; filename="${filename}"`
+  });
+  res.end(JSON.stringify(data));
+}
+
 async function blueprintExportRoute(req, res, path) {
   const idPart = decodeURIComponent(path.split("/")[3]);
   const blueprintId = Number(idPart);
   if (!Number.isFinite(blueprintId) || blueprintId < 1) return json(res, 400, { error: "Invalid blueprint ID" });
   try {
     const data = await exportBlueprint(db, blueprintId);
-    const filename = data.name ? `${sanitizeBlueprintFilename(data.name)}.json` : `blueprint_${blueprintId}.json`;
-    res.writeHead(200, {
-      "content-type": "application/json; charset=utf-8",
-      "content-disposition": `attachment; filename="${filename}"`
-    });
-    res.end(JSON.stringify(data));
+    const filename = data.name ? `${sanitizeFilename(data.name, "blueprint")}.json` : `blueprint_${blueprintId}.json`;
+    writeJsonAttachment(res, data, filename);
+  } catch (error) {
+    const status = error.unsupported ? 501 : 500;
+    return json(res, status, { ok: false, error: redact(error.message || error) });
+  }
+}
+
+async function baseBlueprintDownloadRoute(req, res, path) {
+  const idPart = decodeURIComponent(path.split("/")[3]);
+  const baseId = Number(idPart);
+  if (!Number.isFinite(baseId) || baseId < 1) return json(res, 400, { error: "Invalid base ID" });
+  try {
+    const data = await duneDb.exportBaseAsBlueprint(db, baseId);
+    const filename = data.name ? `${sanitizeFilename(data.name, "base")}.json` : `base_${baseId}.json`;
+    writeJsonAttachment(res, data, filename);
   } catch (error) {
     const status = error.unsupported ? 501 : 500;
     return json(res, status, { ok: false, error: redact(error.message || error) });
@@ -1701,7 +1734,7 @@ async function blueprintBulkExportRoute(req, res) {
     const entries = [];
     for (const id of ids) {
       const data = await exportBlueprint(db, id);
-      const baseName = sanitizeBlueprintFilename(data.name || `blueprint_${id}`).replace(/\.json$/i, "") || `blueprint_${id}`;
+      const baseName = sanitizeFilename(data.name || `blueprint_${id}`, `blueprint_${id}`).replace(/\.json$/i, "") || `blueprint_${id}`;
       let filename = `${baseName}.json`;
       let suffix = 2;
       while (usedNames.has(filename.toLowerCase())) filename = `${baseName}_${suffix++}.json`;
@@ -1753,8 +1786,8 @@ async function blueprintImportRoute(req, res) {
   }
 }
 
-function sanitizeBlueprintFilename(s) {
-  return String(s).replace(/[\x00-\x1f\x7f<>:"/\\|?*]/g, "_").trim() || "blueprint";
+function sanitizeFilename(s, fallback = "export") {
+  return String(s).replace(/[\x00-\x1f\x7f<>:"/\\|?*]/g, "_").trim() || fallback;
 }
 
 async function blueprintsDeleteRoute(req, res, path) {

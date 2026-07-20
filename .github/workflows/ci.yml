@@ -19,6 +19,20 @@ permissions:
 jobs:
   api-tests:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: dune
+          POSTGRES_PASSWORD: dune
+          POSTGRES_DB: dune
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd="pg_isready -U dune"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
       - uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a
