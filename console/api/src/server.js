@@ -1715,7 +1715,8 @@ async function baseBlueprintDownloadRoute(req, res, path) {
   if (!Number.isFinite(baseId) || baseId < 1) return json(res, 400, { error: "Invalid base ID" });
   try {
     const data = await duneDb.exportBaseAsBlueprint(db, baseId);
-    const filename = data.name ? `${sanitizeFilename(data.name, "base")}.json` : `base_${baseId}.json`;
+    const owner = sanitizeFilename(data.owner_name || "unknown_player", "unknown_player").replace(/\s+/g, "_");
+    const filename = `${owner}_base_${baseId}.json`;
     writeJsonAttachment(res, data, filename);
   } catch (error) {
     const status = error.unsupported ? 501 : 500;

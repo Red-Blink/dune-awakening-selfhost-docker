@@ -13,6 +13,7 @@ type SharedWithEntry = { name: string; rank: number; label: string };
 type BaseRow = Record<string, unknown> & {
   base_id: string;
   name: string;
+  base_type: string;
   owner_name: string;
   map: string;
   x: number;
@@ -25,8 +26,6 @@ type BaseRow = Record<string, unknown> & {
 };
 
 const BASES_AUTO_REFRESH_MS = 15 * 60_000; // 15 minutes — listBases is expensive
-const BASES_AUTO_REFRESH_RETRY_MS = 60_000; // backoff if a due refresh hasn't landed yet (in-flight/failed)
-const BASES_RELATIVE_TIME_TICK_MS = 30_000; // UI-only re-render cadence for "time ago" text — never fetches
 const BASES_PAGE_SIZES = [25, 50, 100, 200] as const;
 const BASES_DEFAULT_PAGE_SIZE = 50;
 
@@ -61,16 +60,11 @@ function withCoordinates(row: Record<string, unknown>): BaseRow {
   return { ...row, x, y, z, coordinates: `${x}, ${y}, ${z}` } as BaseRow;
 }
 
-function formatRelativeTime(fromMs: number, nowMs: number): string {
-  const diffSec = Math.max(0, Math.round((nowMs - fromMs) / 1000));
-  if (diffSec < 45) return "just now";
-  const diffMin = Math.round(diffSec / 60);
-  if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? "" : "s"} ago`;
-  const diffHr = Math.round(diffMin / 60);
-  return `${diffHr} hour${diffHr === 1 ? "" : "s"} ago`;
-}
-
 function renderBaseCell(row: Record<string, unknown>, column: string) {
+  if (column === "name") {
+    const name = String(row.name || "");
+    return name ? <span className="bases-name" title={name}>{name}</span> : "—";
+  }
   if (column !== "shared_with") {
     const value = row[column];
     if (Array.isArray(value)) return value.join(", ");
@@ -100,7 +94,6 @@ export function BasesPanel({ onError }: BasesPanelProps) {
   const [totalPieces, setTotalPieces] = useState(() => basesCache?.totalPieces ?? 0);
   const [totalPlaceables, setTotalPlaceables] = useState(() => basesCache?.totalPlaceables ?? 0);
   const [loading, setLoading] = useState(() => basesCache === null);
-  const [now, setNow] = useState(() => Date.now());
   const [downloadingId, setDownloadingId] = useState("");
   const requestIdRef = useRef(0);
   const skipNextSearchReset = useRef(true);
@@ -159,7 +152,6 @@ export function BasesPanel({ onError }: BasesPanelProps) {
     let timeoutId: number | undefined;
     const params = { q: submittedQ, page, pageSize, sortColumn, sortDirection };
     const cacheHit = sameView(basesCache, submittedQ, page, pageSize, sortColumn, sortDirection) ? basesCache : null;
-    const isStale = () => !cacheHit || Date.now() - cacheHit.lastFetchedAt >= BASES_AUTO_REFRESH_MS;
 
     if (cacheHit) {
       setRows(cacheHit.rows);
@@ -170,28 +162,24 @@ export function BasesPanel({ onError }: BasesPanelProps) {
       setLoading(false);
     }
 
-    const scheduleNext = (fromTime: number) => {
+    const scheduleNext = () => {
       if (cancelled) return;
       window.clearTimeout(timeoutId);
-      const dueIn = fromTime + BASES_AUTO_REFRESH_MS - Date.now();
-      const delay = dueIn > 0 ? dueIn : BASES_AUTO_REFRESH_RETRY_MS;
-      timeoutId = window.setTimeout(() => { void tick(); }, delay);
+      timeoutId = window.setTimeout(() => { void tick(); }, BASES_AUTO_REFRESH_MS);
     };
 
     const tick = async () => {
       if (document.visibilityState !== "hidden") await load(params, { silent: true });
-      if (!cancelled) scheduleNext(basesCache?.lastFetchedAt ?? Date.now());
+      scheduleNext();
     };
 
-    if (!cacheHit || isStale()) {
-      void load(params).then(() => { if (!cancelled) scheduleNext(Date.now()); });
-    } else {
-      scheduleNext(cacheHit.lastFetchedAt);
-    }
+    // Always refresh on entry. Cached rows remain visible while the current data is fetched.
+    void load(params, { silent: Boolean(cacheHit) }).then(scheduleNext);
 
     const onVisibilityChange = () => {
-      if (document.visibilityState === "visible" && isStale()) {
-        void load(params, { silent: true }).then(() => { if (!cancelled) scheduleNext(Date.now()); });
+      const currentCache = sameView(basesCache, submittedQ, page, pageSize, sortColumn, sortDirection) ? basesCache : null;
+      if (document.visibilityState === "visible" && (!currentCache || Date.now() - currentCache.lastFetchedAt >= BASES_AUTO_REFRESH_MS)) {
+        void load(params, { silent: true }).then(scheduleNext);
       }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
@@ -203,11 +191,6 @@ export function BasesPanel({ onError }: BasesPanelProps) {
     };
   }, [submittedQ, page, pageSize, sortColumn, sortDirection, load]);
 
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), BASES_RELATIVE_TIME_TICK_MS);
-    return () => window.clearInterval(id);
-  }, []);
-
   async function handleDownloadBlueprint(row: BaseRow) {
     const id = String(row.base_id);
     setDownloadingId(id);
@@ -217,7 +200,9 @@ export function BasesPanel({ onError }: BasesPanelProps) {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = row.name ? `${String(row.name).replace(/[^a-zA-Z0-9_-]/g, "_")}.json` : `base_${id}.json`;
+      const responseFilename = response.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1];
+      anchor.download = responseFilename
+        || `${String(row.owner_name || "unknown_player").replace(/[^a-zA-Z0-9_-]/g, "_")}_base_${id}.json`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (error) {
@@ -237,7 +222,6 @@ export function BasesPanel({ onError }: BasesPanelProps) {
     </section>;
   }
 
-  const lastFetchedAt = basesCache?.lastFetchedAt ?? null;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const rangeStart = totalCount === 0 ? 0 : page * pageSize + 1;
   const rangeEnd = totalCount === 0 ? 0 : rangeStart + rows.length - 1;
@@ -264,9 +248,6 @@ export function BasesPanel({ onError }: BasesPanelProps) {
       <div className="panel-title">
         <h2>Bases</h2>
         <div className="action-row">
-          {lastFetchedAt !== null && (
-            <span className="muted">Refreshed {formatRelativeTime(lastFetchedAt, now)}</span>
-          )}
           <button onClick={() => void load({ q: submittedQ, page, pageSize, sortColumn, sortDirection })}>Refresh</button>
         </div>
       </div>
@@ -278,36 +259,16 @@ export function BasesPanel({ onError }: BasesPanelProps) {
           value={q}
           onChange={(event) => setQ(event.target.value)}
           onKeyDown={(event) => { if (event.key === "Enter") submitSearch(); }}
-          placeholder="Search base or owner name"
+          placeholder="Search name, type, or owner"
         />
-      </div>
-      <div className="panel-title bases-row-count">
-        <div className="action-row">
-          <button onClick={submitSearch}>Search</button>
-          <button onClick={handleClearSearch} disabled={!q && !submittedQ}>Clear</button>
-          <p className="action-help-note">
-            Showing {rangeStart}-{rangeEnd} of {totalCount} rows.
-          </p>
-        </div>
-        <div className="database-pagination-controls">
-          <label className="compact-select">
-            Rows
-            <select value={String(pageSize)} onChange={(event) => changePageSize(Number(event.target.value))}>
-              {BASES_PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
-            </select>
-          </label>
-          <button disabled={!hasPreviousPage} onClick={() => setPage(0)}>First</button>
-          <button disabled={!hasPreviousPage} onClick={() => setPage(page - 1)}>Previous</button>
-          <span className="muted database-page-indicator">Page {page + 1} of {totalPages}</span>
-          <button disabled={!hasNextPage} onClick={() => setPage(page + 1)}>Next</button>
-          <button disabled={!hasNextPage} onClick={() => setPage(totalPages - 1)}>Last</button>
-        </div>
+        <button onClick={submitSearch}>Search</button>
+        <button onClick={handleClearSearch} disabled={!q && !submittedQ}>Clear</button>
       </div>
       <DataTable
         rows={rows}
-        columns={["base_id", "name", "owner_name", "shared_with", "map", "coordinates", "piece_count", "placeable_count"]}
+        columns={["base_id", "name", "base_type", "owner_name", "shared_with", "map", "coordinates", "piece_count", "placeable_count"]}
         tableClassName="bases-table"
-        actionClassName="actions-column"
+        actionClassName="actions-column bases-actions-column"
         renderCell={renderBaseCell}
         action={(row) => {
           const base = row as BaseRow;
@@ -322,6 +283,24 @@ export function BasesPanel({ onError }: BasesPanelProps) {
         rowKey={(row) => String(row.base_id)}
         emptyMessage="No bases have been found yet."
       />
+      <div className="panel-title bases-pagination-footer">
+        <p className="action-help-note">
+          Showing {rangeStart}-{rangeEnd} of {totalCount} rows.
+        </p>
+        <div className="database-pagination-controls">
+          <label className="compact-select">
+            Rows
+            <select value={String(pageSize)} onChange={(event) => changePageSize(Number(event.target.value))}>
+              {BASES_PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+            </select>
+          </label>
+          <button disabled={!hasPreviousPage} onClick={() => setPage(0)}>First</button>
+          <button disabled={!hasPreviousPage} onClick={() => setPage(page - 1)}>Previous</button>
+          <span className="muted database-page-indicator">Page {page + 1} of {totalPages}</span>
+          <button disabled={!hasNextPage} onClick={() => setPage(page + 1)}>Next</button>
+          <button disabled={!hasNextPage} onClick={() => setPage(totalPages - 1)}>Last</button>
+        </div>
+      </div>
     </section>
   );
 }

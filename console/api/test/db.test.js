@@ -841,7 +841,7 @@ test("list bases returns rows with piece and placeable counts and a total count"
       }
       if (text.includes("from paged p")) {
         return { rows: [
-          { base_id: "1006", name: "Sietch One", owner_name: "Leader One", map: "TheDeepDesert", x: "100", y: "200", z: "30", total_count: "1", piece_count: "589", placeable_count: "126", shared_with: [{ name: "Ally Two", rank: 2 }] }
+          { base_id: "1006", name: "Sietch One", base_type: "Sub-Fief", owner_name: "Leader One", map: "TheDeepDesert", x: "100", y: "200", z: "30", total_count: "1", piece_count: "589", placeable_count: "126", shared_with: [{ name: "Ally Two", rank: 2 }] }
         ] };
       }
       return { rows: [] };
@@ -854,7 +854,7 @@ test("list bases returns rows with piece and placeable counts and a total count"
   assert.equal(result.totalPieces, 700);
   assert.equal(result.totalPlaceables, 140);
   assert.deepEqual(result.rows, [
-    { base_id: "1006", name: "Sietch One", owner_name: "Leader One", map: "TheDeepDesert", x: 100, y: 200, z: 30, piece_count: 589, placeable_count: 126, shared_with: [{ name: "Ally Two", rank: 2, label: "Co-Owner" }] }
+    { base_id: "1006", name: "Sietch One", base_type: "Sub-Fief", owner_name: "Leader One", map: "TheDeepDesert", x: 100, y: 200, z: 30, piece_count: 589, placeable_count: 126, shared_with: [{ name: "Ally Two", rank: 2, label: "Co-Owner" }] }
   ]);
 });
 
@@ -870,8 +870,8 @@ test("list bases excludes the owner from shared_with, coalesces missing entries,
       }
       if (text.includes("from paged p")) {
         return { rows: [
-          { base_id: "1006", name: "Sietch One", owner_name: "Leader One", map: "TheDeepDesert", x: "100", y: "200", z: "30", total_count: "2", piece_count: "589", placeable_count: "126", shared_with: [{ name: "Ally Two", rank: 2 }, { name: "Ally Three", rank: 7 }] },
-          { base_id: "1007", name: "Sietch Two", owner_name: "Leader Two", map: "TheDeepDesert", x: "10", y: "20", z: "3", total_count: "2", piece_count: "12", placeable_count: "0", shared_with: null }
+          { base_id: "1006", name: "Sietch One", base_type: "Sub-Fief", owner_name: "Leader One", map: "TheDeepDesert", x: "100", y: "200", z: "30", total_count: "2", piece_count: "589", placeable_count: "126", shared_with: [{ name: "Ally Two", rank: 2 }, { name: "Ally Three", rank: 7 }] },
+          { base_id: "1007", name: "Sietch Two", base_type: "Advanced Sub-Fief", owner_name: "Leader Two", map: "TheDeepDesert", x: "10", y: "20", z: "3", total_count: "2", piece_count: "12", placeable_count: "0", shared_with: null }
         ] };
       }
       return { rows: [] };
@@ -889,7 +889,7 @@ test("list bases excludes the owner from shared_with, coalesces missing entries,
   assert.ok(!("total_count" in result.rows[0]), "total_count must not leak onto individual rows");
 });
 
-test("list bases filters by name or owner name via a having clause and paginates with limit/offset", async () => {
+test("list bases filters by name, type, or owner via a having clause and paginates with limit/offset", async () => {
   const calls = [];
   const db = {
     query: async (text, values = []) => {
@@ -904,10 +904,13 @@ test("list bases filters by name or owner name via a having clause and paginates
   await listBases(db, { q: "Sietch", page: 2, pageSize: 25 });
   const baseQuery = calls.find((call) => call.text.includes("from dune.buildings b"));
   assert.ok(baseQuery);
-  assert.match(baseQuery.text, /having coalesce\(pa\.actor_name, ''\) ilike \$1 or coalesce\(owner\.character_name, ''\) ilike \$1/);
+  assert.match(baseQuery.text, /like '%totemsmall%' then 'Sub-Fief'/);
+  assert.match(baseQuery.text, /then 'Totem_Small_Patent'/);
+  assert.match(baseQuery.text, /then 'Totem_Patent'/);
+  assert.match(baseQuery.text, /having \(case[\s\S]+end\) ilike \$1 or coalesce\(owner\.character_name, ''\) ilike \$1/);
   assert.match(baseQuery.text, /limit \$2 offset \$3/);
   assert.deepEqual(baseQuery.values, ["%Sietch%", 25, 50]);
-  assert.ok(baseQuery.text.includes("order by lower(coalesce(raw_name, '')) asc, id asc"), "paged CTE must sort the complete matched result before pagination");
+  assert.ok(baseQuery.text.includes("order by lower(coalesce(name, '')) asc, id asc"), "paged CTE must sort the resolved base name before pagination");
 });
 
 test("list bases applies requested sorting before pagination", async () => {
@@ -946,7 +949,7 @@ test("list bases falls back to safe sorting for unsupported input", async () => 
   await listBases(db, { sortColumn: "name desc; drop table dune.buildings", sortDirection: "sideways" });
   const baseQuery = calls.find((call) => call.text.includes("from dune.buildings b"));
   assert.ok(baseQuery);
-  assert.match(baseQuery.text, /row_number\(\) over \(order by lower\(coalesce\(raw_name, ''\)\) asc, id asc\)/);
+  assert.match(baseQuery.text, /row_number\(\) over \(order by lower\(coalesce\(name, ''\)\) asc, id asc\)/);
   assert.doesNotMatch(baseQuery.text, /drop table/i);
 });
 
@@ -970,7 +973,7 @@ test("list bases resolves shared_with via the base's actor id, not its building 
   assert.ok(baseQuery);
   // matched CTE must carry the actor id through (a.id, distinct from the building id b.id)...
   assert.ok(baseQuery.text.includes("a.id as actor_id"), "matched CTE must select the actor id");
-  assert.ok(baseQuery.text.includes("group by b.id, a.id, pa.actor_name"), "actor_id must be in matched's GROUP BY");
+  assert.ok(baseQuery.text.includes("group by b.id, a.id, a.class, pa.actor_name"), "actor id and stable base class must be in matched's GROUP BY");
   // ...and the shared-with LATERAL must filter on that actor id, never the building id.
   assert.ok(baseQuery.text.includes("par.permission_actor_id = p.actor_id"), "shared LATERAL must join on the actor id");
   assert.ok(!baseQuery.text.includes("par.permission_actor_id = p.id"), "shared LATERAL must not regress to the building id");
@@ -1113,7 +1116,7 @@ test("export base returns instances and placeables in blueprint-importable relat
       }
       if (text.includes("from dune.buildings b")) {
         return { rows: [
-          { base_id: "1006", name: "Sietch One", owner_name: "Leader One", map: "HaggaBasin", x: String(anchor.x), y: String(anchor.y), z: String(anchor.z), owner_entity_id: ownerEntityId }
+          { base_id: "1006", name: "Sietch One", base_type: "Sub-Fief", owner_name: "Leader One", map: "HaggaBasin", x: String(anchor.x), y: String(anchor.y), z: String(anchor.z), owner_entity_id: ownerEntityId }
         ] };
       }
       if (text.includes("select instance_id, building_type, transform")) {
@@ -1131,6 +1134,7 @@ test("export base returns instances and placeables in blueprint-importable relat
   assert.ok(placeableQuery.text.includes("join dune.actors a on a.id = p.id"), "placeables share the actors id space directly, not via owner_entity_id");
   assert.equal(result.base_id, "1006");
   assert.equal(result.name, "Sietch One");
+  assert.equal(result.base_type, "Sub-Fief");
   assert.equal(result.owner_name, "Leader One");
   assert.equal(result.map, "HaggaBasin");
   assert.equal(result.piece_count, 1);

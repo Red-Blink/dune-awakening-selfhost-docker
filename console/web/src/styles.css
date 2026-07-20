@@ -1089,9 +1089,9 @@ body.debug .technical-details { display: block; }
   min-width: 144px;
   padding-right: 38px;
 }
-.players-search-row, .guilds-search-row { flex-wrap: nowrap; }
-.players-search-row input, .guilds-search-row input { width: auto; min-width: 0; flex: 1 1 auto; }
-.players-search-row button, .guilds-search-row button { width: auto; flex: 0 0 auto; }
+.players-search-row, .guilds-search-row, .bases-search-row { flex-wrap: nowrap; }
+.players-search-row input, .guilds-search-row input, .bases-search-row input { width: auto; min-width: 0; flex: 1 1 auto; }
+.players-search-row button, .guilds-search-row button, .bases-search-row button { width: auto; flex: 0 0 auto; }
 .players-table th:nth-child(4),
 .players-table td:nth-child(4) { text-align: center; }
 .players-table td:nth-child(4) .player-status-cell { justify-content: center; }
@@ -1320,11 +1320,27 @@ body.debug .technical-details { display: block; }
 .blueprints-table th:last-child, .blueprints-table td:last-child { width: 154px; text-align: center; overflow: visible; }
 .blueprint-name { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-strong); font-weight: 700; }
 .blueprint-actions-column .icon-toggle-group { justify-content: center; }
+.bases-table { width: 100%; min-width: 1320px; table-layout: fixed; }
+.bases-table th:nth-child(1), .bases-table td:nth-child(1) { width: 82px; text-align: center; }
+.bases-table th:nth-child(2), .bases-table td:nth-child(2) { width: 220px; }
+.bases-table th:nth-child(3), .bases-table td:nth-child(3) { width: 120px; }
+.bases-table th:nth-child(4), .bases-table td:nth-child(4) { width: 130px; }
+.bases-table th:nth-child(5), .bases-table td:nth-child(5) { width: 135px; }
+.bases-table th:nth-child(6), .bases-table td:nth-child(6) { width: 110px; }
+.bases-table th:nth-child(7), .bases-table td:nth-child(7) { width: 170px; }
+.bases-table th:nth-child(8), .bases-table td:nth-child(8) { width: 120px; text-align: center; }
+.bases-table th:nth-child(9), .bases-table td:nth-child(9) { width: 140px; text-align: center; }
+.bases-table th.bases-actions-column, .bases-table td.bases-actions-column { width: 92px; overflow: visible; }
+.bases-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bases-pagination-footer { margin-top: 12px; margin-bottom: 0; align-items: center; }
+.bases-pagination-footer .action-help-note { margin: 0; }
 @media (max-width: 760px) {
   .blueprint-file-field { flex-basis: 100%; max-width: none; }
   .blueprint-list-toolbar, .blueprint-list-toolbar .service-actions { align-items: stretch; }
   .blueprint-list-toolbar .service-actions { width: 100%; margin-left: 0; justify-content: flex-start; }
   .blueprints-table { min-width: 720px; }
+  .bases-pagination-footer { align-items: stretch; }
+  .bases-pagination-footer .database-pagination-controls { justify-content: flex-start; }
 }
 .gauge { display: grid; gap: 4px; background: #171a1d; border: 1px solid #302b25; border-radius: 8px; padding: 12px; }
 .service-table { display: grid; gap: 10px; margin-top: 14px; }
