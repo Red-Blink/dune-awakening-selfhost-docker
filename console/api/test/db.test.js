@@ -243,7 +243,7 @@ test("landsraad overview reads current term tasks and rewards", async () => {
         return { rows: [{ task_id: "42", board_index: 1, display_name: "Alexin", goal_amount: 1000, faction_progress: 250, completed: false }] };
       }
       if (text.includes("from dune.landsraad_task_rewards")) {
-        return { rows: [{ task_id: "42", threshold: 500, template_id: "Reward", amount: 1 }] };
+        return { rows: [{ row_locator: "(7,1)", task_id: "42", threshold: 500, template_id: "Reward", amount: 1 }] };
       }
       return { rows: [] };
     }
@@ -253,6 +253,7 @@ test("landsraad overview reads current term tasks and rewards", async () => {
   assert.equal(result.term.term_id, 7);
   assert.equal(result.tasks[0].task_id, "42");
   assert.equal(result.rewards[0].threshold, 500);
+  assert.equal(result.rewards[0].row_locator, "(7,1)");
   assert.ok(calls.some((call) => String(call.text).includes("where t.term_id = $1") && call.values[0] === 7));
   const taskQuery = calls.find((call) => String(call.text).includes("from dune.landsraad_tasks t") && String(call.text).includes("group by"));
   assert.ok(taskQuery);
@@ -267,17 +268,18 @@ test("landsraad goal and reward mutations validate and target explicit rows", as
       if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
       if (text.includes("update dune.landsraad_tasks") && text.includes("where id = $2")) return { rows: [{ task_id: "42", goal_amount: 7500 }], rowCount: 1 };
       if (text.includes("update dune.landsraad_tasks") && text.includes("where term_id = $2")) return { rows: [], rowCount: 4 };
-      if (text.includes("update dune.landsraad_task_rewards")) return { rows: [{ task_id: "42", threshold: 2000, template_id: "Template", amount: 3 }], rowCount: 1 };
+      if (text.includes("update dune.landsraad_task_rewards")) return { rows: [{ row_locator: "(8,2)", task_id: "42", threshold: 2000, template_id: "Template", amount: 3 }], rowCount: 1 };
       return { rows: [] };
     }
   };
   await updateLandsraadTaskGoal(db, 42, 7500);
   await updateLandsraadTermTaskGoals(db, 7, 8000);
-  await updateLandsraadRewardTier(db, { taskId: 42, threshold: 1000, newThreshold: 2000, templateId: "Template", amount: 3 });
+  await updateLandsraadRewardTier(db, { rowLocator: "(8,1)", taskId: 42, threshold: 1000, newThreshold: 2000, templateId: "Template", amount: 3 });
   assert.ok(calls.some((call) => String(call.text).includes("where id = $2") && call.values.join(",") === "7500,42"));
   assert.ok(calls.some((call) => String(call.text).includes("where term_id = $2") && call.values.join(",") === "8000,7"));
-  assert.ok(calls.some((call) => String(call.text).includes("threshold = $5") && call.values.join(",") === "2000,Template,3,42,1000"));
-  await assert.rejects(() => updateLandsraadRewardTier(db, { taskId: 42, threshold: 1000, newThreshold: 1000, templateId: "", amount: 1 }), /Reward template id/);
+  assert.ok(calls.some((call) => String(call.text).includes("ctid = $4::tid") && call.values.join(",") === "2000,Template,3,(8,1),42,1000"));
+  await assert.rejects(() => updateLandsraadRewardTier(db, { rowLocator: "(8,1)", taskId: 42, threshold: 1000, newThreshold: 1000, templateId: "", amount: 1 }), /Reward template id/);
+  await assert.rejects(() => updateLandsraadRewardTier(db, { rowLocator: "invalid", taskId: 42, threshold: 1000, newThreshold: 1000, templateId: "Template", amount: 1 }), /valid Landsraad reward row locator/);
 });
 
 test("landsraad player contribution recalculates faction and guild totals in one transaction", async () => {
