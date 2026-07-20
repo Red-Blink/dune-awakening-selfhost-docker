@@ -2121,7 +2121,8 @@ function permissionRankLabel(rank) {
 
 const BASE_SORT_COLUMNS = {
   base_id: { order: ["id"] },
-  name: { order: ["lower(coalesce(raw_name, ''))"] },
+  name: { order: ["lower(coalesce(name, ''))"] },
+  base_type: { order: ["lower(coalesce(base_type, ''))"] },
   owner_name: { order: ["lower(coalesce(owner_name, ''))"], owner: true },
   shared_with: { order: ["shared_count"], shared: true },
   map: { order: ["lower(coalesce(map, ''))"] },
@@ -2129,6 +2130,22 @@ const BASE_SORT_COLUMNS = {
   piece_count: { order: ["piece_count"], pieces: true },
   placeable_count: { order: ["placeable_count"], placeables: true }
 };
+
+const BASE_TYPE_SQL = `case
+  when lower(coalesce(a.class, '')) like '%totemsmall%' then 'Sub-Fief'
+  when lower(coalesce(a.class, '')) like '%totem%' then 'Advanced Sub-Fief'
+  else 'Unknown'
+end`;
+
+const BASE_NAME_SQL = `case
+  when nullif(btrim(pa.actor_name), '') is not null
+    and lower(btrim(pa.actor_name)) <> 'none'
+    and btrim(pa.actor_name) not like '##%'
+  then btrim(pa.actor_name)
+  when lower(coalesce(a.class, '')) like '%totemsmall%' then 'Totem_Small_Patent'
+  when lower(coalesce(a.class, '')) like '%totem%' then 'Totem_Patent'
+  else 'Unnamed Base'
+end`;
 
 export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColumn = "name", sortDirection = "asc" } = {}) {
   const requiredTables = ["buildings", "building_instances", "actor_fgl_entities", "actors"];
@@ -2154,7 +2171,7 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColum
   let having = "";
   if (searching) {
     values.push(`%${q}%`);
-    having = `having coalesce(pa.actor_name, '') ilike $${values.length} or coalesce(owner.character_name, '') ilike $${values.length}`;
+    having = `having (${BASE_NAME_SQL}) ilike $${values.length} or (${BASE_TYPE_SQL}) ilike $${values.length} or coalesce(owner.character_name, '') ilike $${values.length}`;
   }
   values.push(safePageSize, offset);
   const limitParamIndex = values.length - 1;
@@ -2203,8 +2220,8 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColum
         select b.id,
                a.id as actor_id,
                max(bi.owner_entity_id) as owner_entity_id,
-               pa.actor_name as raw_name,
-               coalesce(pa.actor_name, 'Base ' || b.id::text) as name,
+               ${BASE_NAME_SQL} as name,
+               ${BASE_TYPE_SQL} as base_type,
                ${matchedOwnerSelect}coalesce(a.map, '') as map,
                a.transform,
                ${matchedSortSelect}
@@ -2215,7 +2232,7 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColum
         left join dune.permission_actor pa on pa.actor_id = a.id
         ${matchedOwnerJoin}
         where a.transform is not null
-        group by b.id, a.id, pa.actor_name, ${matchedGroupByOwner}a.map, a.transform
+        group by b.id, a.id, a.class, pa.actor_name, ${matchedGroupByOwner}a.map, a.transform
         ${having}
       ),
       paged as (
@@ -2228,6 +2245,7 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColum
       )
       select p.id::text as base_id,
              p.name,
+             p.base_type,
              ${finalOwnerSelect}
              p.map,
              p.x,
@@ -2300,7 +2318,8 @@ export async function exportBaseAsBlueprint(db, id) {
   }
   const baseRow = await db.query(`
     select b.id::text as base_id,
-           coalesce(pa.actor_name, 'Base ' || b.id::text) as name,
+           ${BASE_NAME_SQL} as name,
+           ${BASE_TYPE_SQL} as base_type,
            coalesce(owner.character_name, '') as owner_name,
            coalesce(a.map, '') as map,
            ((a.transform).location).x as x,
@@ -2322,7 +2341,7 @@ export async function exportBaseAsBlueprint(db, id) {
       limit 1
     ) owner on true
     where b.id = $1
-    group by b.id, pa.actor_name, owner.character_name, a.map, a.transform`, [baseId]);
+    group by b.id, pa.actor_name, owner.character_name, a.class, a.map, a.transform`, [baseId]);
   if (!baseRow.rows.length) throw new UnsupportedCapabilityError(`Base ${baseId} was not found.`);
   const base = baseRow.rows[0];
   const anchor = { x: Number(base.x), y: Number(base.y), z: Number(base.z) };
@@ -2378,6 +2397,7 @@ export async function exportBaseAsBlueprint(db, id) {
   return {
     base_id: base.base_id,
     name: base.name,
+    base_type: base.base_type,
     owner_name: base.owner_name,
     map: base.map,
     x: anchor.x,

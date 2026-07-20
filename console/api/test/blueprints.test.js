@@ -346,6 +346,7 @@ test("live base export can be imported without losing relative transforms", asyn
         return { rows: [{
           base_id: "42",
           name: "Round Trip Base",
+          base_type: "Sub-Fief",
           owner_name: "Builder",
           map: "Survival_1",
           x: "1000",
@@ -369,6 +370,7 @@ test("live base export can be imported without losing relative transforms", asyn
   const { db, instances, placeables } = fakeBlueprintDb([]);
   const imported = await importBlueprint(db, 123, exported);
 
+  assert.equal(exported.base_type, "Sub-Fief");
   assert.equal(imported.blueprintName, "Round Trip Base");
   assert.equal(instances.length, 1);
   assert.equal(instances[0].instance_id, 7);

@@ -65,6 +65,7 @@ export function friendlyColumnName(value: string) {
     category: "Category",
     id: "ID",
     raw_name: "Raw Name",
+    base_type: "Type",
     backupName: "Backup Name",
     battlegroupId: "Battlegroup ID",
     size: "Size",
