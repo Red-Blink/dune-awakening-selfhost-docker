@@ -605,7 +605,7 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
     try {
       const result = await mapsApi.removeChoamTerminals(center.key);
       await loadChoamTerminals();
-      setChoamResult({ status: "succeeded", title: "CHOAM Terminals Removed", message: result.removed ? `${result.removed} terminal${result.removed === 1 ? "" : "s"} removed. Restart the battlegroup to unload them in-game.` : "No console-managed terminals were installed at this trade center." });
+      setChoamResult({ status: "succeeded", title: "CHOAM Terminals Removed", message: result.removed ? `${result.removed} terminal${result.removed === 1 ? "" : "s"} removed. Restart the battlegroup to unload them in-game.` : "No console-managed terminals were installed at this trade post." });
     } catch (error) {
       setChoamResult({ status: "failed", title: "CHOAM Terminal Removal Failed", message: error instanceof Error ? error.message : String(error) });
     } finally {
@@ -1643,7 +1643,7 @@ function ChoamTerminalsEditor({
     {!overview ? <div className="empty">CHOAM terminal state is loading.</div> : null}
     {overview && !overview.supported ? <div className="empty">{overview.reason || "CHOAM terminal placement is unavailable."}</div> : null}
     {overview?.supported ? <div className="settings-list-wrap choam-terminals-table-wrap"><table className="settings-list-table choam-terminals-table">
-      <thead><tr><th>Trade Center</th><th>Coverage</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Trade Post</th><th>Coverage</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>{overview.tradeCenters.map((center) => {
         const placements = overview.placements.filter((entry) => entry.trade_center_key === center.key && entry.actor_present);
         const installed = placements.length;
