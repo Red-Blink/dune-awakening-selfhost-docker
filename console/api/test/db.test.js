@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
-import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, augmentInventoryItem, augmentNewestPlayerItem, changeDunePassword, completeJourneyNode, completeTutorial, deleteInventoryItem, exportBase, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listBases, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerInventory, playerJourney, playerPosition, playerProfile, playerResearchItems, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
+import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, augmentInventoryItem, augmentNewestPlayerItem, changeDunePassword, completeJourneyNode, completeTutorial, deleteInventoryItem, exportBaseAsBlueprint, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listBases, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerInventory, playerJourney, playerPosition, playerProfile, playerResearchItems, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
   assert.deepEqual(discoverDbConfig({}), {
@@ -998,7 +998,7 @@ test("export base throws an unsupported error when required tables are missing",
   const db = {
     query: async () => ({ rows: [{ exists: false }] })
   };
-  await assert.rejects(() => exportBase(db, 1006), UnsupportedCapabilityError);
+  await assert.rejects(() => exportBaseAsBlueprint(db, 1006), UnsupportedCapabilityError);
 });
 
 test("export base resolves the owner via the base's actor id", async () => {
@@ -1013,12 +1013,12 @@ test("export base resolves the owner via the base's actor id", async () => {
       return { rows: [] };
     }
   };
-  // No matching base row in this mock, so exportBase throws after issuing the identity
+  // No matching base row in this mock, so exportBaseAsBlueprint throws after issuing the identity
   // query below — that's fine, we only need to inspect the query text it sent.
-  await assert.rejects(() => exportBase(db, 1006), UnsupportedCapabilityError);
+  await assert.rejects(() => exportBaseAsBlueprint(db, 1006), UnsupportedCapabilityError);
   const baseQuery = calls.find((call) => call.text.includes("from dune.buildings b"));
   assert.ok(baseQuery);
-  assert.ok(baseQuery.text.includes("where par.permission_actor_id = a.id"), "exportBase owner LATERAL must resolve via the base's actor id");
+  assert.ok(baseQuery.text.includes("where par.permission_actor_id = a.id"), "exportBaseAsBlueprint owner LATERAL must resolve via the base's actor id");
 });
 
 test("export base returns instances and placeables in blueprint-importable relative coordinates", async () => {
@@ -1048,7 +1048,7 @@ test("export base returns instances and placeables in blueprint-importable relat
       return { rows: [] };
     }
   };
-  const result = await exportBase(db, 1006);
+  const result = await exportBaseAsBlueprint(db, 1006);
   const placeableQuery = calls.find((call) => call.text.includes("select p.id as placeable_id"));
   assert.deepEqual(placeableQuery.values, [ownerEntityId]);
   assert.ok(placeableQuery.text.includes("join dune.actors a on a.id = p.id"), "placeables share the actors id space directly, not via owner_entity_id");

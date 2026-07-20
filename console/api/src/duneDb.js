@@ -2231,7 +2231,7 @@ function quaternionYawDegrees(qz, qw) {
   return (2 * Math.atan2(Number(qz) || 0, Number(qw) || 0)) * (180 / Math.PI);
 }
 
-export async function exportBase(db, id) {
+export async function exportBaseAsBlueprint(db, id) {
   const baseId = intParam(id, "base id", 1);
   const requiredTables = ["buildings", "building_instances", "actor_fgl_entities", "actors"];
   for (const table of requiredTables) {

@@ -384,7 +384,7 @@ async function handleApi(req, res) {
     page: url.searchParams.get("page") || 0,
     pageSize: url.searchParams.get("pageSize") || 50
   }));
-  if (path.match(/^\/api\/bases\/[^/]+\/export$/) && req.method === "GET") return baseExportRoute(req, res, path);
+  if (path.match(/^\/api\/bases\/[^/]+\/export$/) && req.method === "GET") return baseBlueprintDownloadRoute(req, res, path);
   if (path === "/api/admin/items/catalog") return json(res, 200, { rows: listCatalogItems(config.repoRoot, { q: url.searchParams.get("q") || "", limit: url.searchParams.get("limit") || 500 }) });
   if (path === "/api/admin/items/search") return commandJson(res, "adminItemSearch", { q: url.searchParams.get("q") || "" });
   if (path === "/api/admin/items") return commandJson(res, url.searchParams.get("category") ? "adminItemListCategory" : "adminItemList", { category: url.searchParams.get("category") || "" });
@@ -1682,12 +1682,12 @@ async function blueprintExportRoute(req, res, path) {
   }
 }
 
-async function baseExportRoute(req, res, path) {
+async function baseBlueprintDownloadRoute(req, res, path) {
   const idPart = decodeURIComponent(path.split("/")[3]);
   const baseId = Number(idPart);
   if (!Number.isFinite(baseId) || baseId < 1) return json(res, 400, { error: "Invalid base ID" });
   try {
-    const data = await duneDb.exportBase(db, baseId);
+    const data = await duneDb.exportBaseAsBlueprint(db, baseId);
     const filename = data.name ? `${sanitizeFilename(data.name, "base")}.json` : `base_${baseId}.json`;
     writeJsonAttachment(res, data, filename);
   } catch (error) {

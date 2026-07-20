@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Download, Unlock } from "lucide-react";
+import { Download } from "lucide-react";
 import { basesApi } from "../../api/bases";
 import { apiDownload } from "../../api/client";
 import { DataTable, useSortableRows } from "../../components/common/DataTable";
@@ -97,7 +97,7 @@ export function BasesPanel({ onError }: BasesPanelProps) {
   const [totalPlaceables, setTotalPlaceables] = useState(() => basesCache?.totalPlaceables ?? 0);
   const [loading, setLoading] = useState(() => basesCache === null);
   const [now, setNow] = useState(() => Date.now());
-  const [exportingId, setExportingId] = useState("");
+  const [downloadingId, setDownloadingId] = useState("");
   const requestIdRef = useRef(0);
   const skipNextSearchReset = useRef(true);
   const sort = useSortableRows(rows);
@@ -112,6 +112,11 @@ export function BasesPanel({ onError }: BasesPanelProps) {
 
   function submitSearch() {
     setSubmittedQ(q);
+  }
+
+  function handleClearSearch() {
+    setQ("");
+    setSubmittedQ("");
   }
 
   const load = useCallback(async (params: { q: string; page: number; pageSize: number }, options: { silent?: boolean } = {}) => {
@@ -198,9 +203,9 @@ export function BasesPanel({ onError }: BasesPanelProps) {
     return () => window.clearInterval(id);
   }, []);
 
-  async function handleExport(row: BaseRow) {
+  async function handleDownloadBlueprint(row: BaseRow) {
     const id = String(row.base_id);
-    setExportingId(id);
+    setDownloadingId(id);
     try {
       const response = await apiDownload(`/api/bases/${encodeURIComponent(id)}/export`);
       const blob = await response.blob();
@@ -213,7 +218,7 @@ export function BasesPanel({ onError }: BasesPanelProps) {
     } catch (error) {
       onError(errorText(error));
     } finally {
-      setExportingId("");
+      setDownloadingId("");
     }
   }
 
@@ -264,6 +269,7 @@ export function BasesPanel({ onError }: BasesPanelProps) {
       <div className="panel-title bases-row-count">
         <div className="action-row">
           <button onClick={submitSearch}>Search</button>
+          <button onClick={handleClearSearch} disabled={!q && !submittedQ}>Clear</button>
           <p className="action-help-note">
             Showing {rangeStart}-{rangeEnd} of {totalCount} rows.
           </p>
@@ -292,8 +298,7 @@ export function BasesPanel({ onError }: BasesPanelProps) {
           const base = row as BaseRow;
           const id = String(base.base_id);
           return <span className="icon-toggle-group">
-            <button className="icon-toggle-button" title="Export base" aria-label="Export base" disabled={exportingId === id} onClick={(event) => { event.stopPropagation(); void handleExport(base); }}><Download size={16} /></button>
-            <button className="icon-toggle-button" title="Coming soon" aria-label="Release claim" disabled><Unlock size={16} /></button>
+            <button className="icon-toggle-button" title="Download Base as Blueprint" aria-label="Download Base as Blueprint" disabled={downloadingId === id} onClick={(event) => { event.stopPropagation(); void handleDownloadBlueprint(base); }}><Download size={16} /></button>
           </span>;
         }}
         sortColumn={sort.sortColumn}
