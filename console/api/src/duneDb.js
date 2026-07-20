@@ -2110,7 +2110,18 @@ function permissionRankLabel(rank) {
   return PERMISSION_RANK_LABELS[rank] || `Rank ${rank}`;
 }
 
-export async function listBases(db, { q = "", page = 0, pageSize = 50 } = {}) {
+const BASE_SORT_COLUMNS = {
+  base_id: { order: ["id"] },
+  name: { order: ["lower(coalesce(raw_name, ''))"] },
+  owner_name: { order: ["lower(coalesce(owner_name, ''))"], owner: true },
+  shared_with: { order: ["shared_count"], shared: true },
+  map: { order: ["lower(coalesce(map, ''))"] },
+  coordinates: { order: ["x", "y", "z"] },
+  piece_count: { order: ["piece_count"], pieces: true },
+  placeable_count: { order: ["placeable_count"], placeables: true }
+};
+
+export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColumn = "name", sortDirection = "asc" } = {}) {
   const requiredTables = ["buildings", "building_instances", "actor_fgl_entities", "actors"];
   for (const table of requiredTables) {
     if (!(await tableExists(db, table))) {
@@ -2120,12 +2131,16 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50 } = {}) {
   const safePageSize = intParam(pageSize, "pageSize", 1, 200);
   const safePage = intParam(page, "page", 0);
   const offset = safePage * safePageSize;
+  const safeSortColumn = Object.hasOwn(BASE_SORT_COLUMNS, sortColumn) ? sortColumn : "name";
+  const safeSortDirection = String(sortDirection).toLowerCase() === "desc" ? "desc" : "asc";
+  const sortSpec = BASE_SORT_COLUMNS[safeSortColumn];
 
   // Owner resolution (lowest-rank permission holder) is a per-base correlated LATERAL —
   // expensive at scale. When searching, the `having` clause needs it to filter on, so it
   // must run inside `matched` (before pagination) for every candidate base. When not
   // searching, defer it to the final SELECT so it only runs for the page being displayed.
   const searching = Boolean(q);
+  const resolveOwnerBeforePaging = searching || sortSpec.owner;
   const values = [];
   let having = "";
   if (searching) {
@@ -2136,8 +2151,8 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50 } = {}) {
   const limitParamIndex = values.length - 1;
   const offsetParamIndex = values.length;
 
-  const matchedOwnerSelect = searching ? "coalesce(owner.character_name, '') as owner_name,\n               " : "";
-  const matchedOwnerJoin = searching ? `
+  const matchedOwnerSelect = resolveOwnerBeforePaging ? "coalesce(owner.character_name, '') as owner_name,\n               " : "";
+  const matchedOwnerJoin = resolveOwnerBeforePaging ? `
         left join lateral (
           select ps.character_name
           from dune.permission_actor_rank par
@@ -2147,10 +2162,10 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50 } = {}) {
           order by par.rank asc, ps.character_name asc
           limit 1
         ) owner on true` : "";
-  const matchedGroupByOwner = searching ? "owner.character_name, " : "";
+  const matchedGroupByOwner = resolveOwnerBeforePaging ? "owner.character_name, " : "";
 
-  const finalOwnerSelect = searching ? "p.owner_name," : "coalesce(owner.character_name, '') as owner_name,";
-  const finalOwnerJoin = searching ? "" : `
+  const finalOwnerSelect = resolveOwnerBeforePaging ? "p.owner_name," : "coalesce(owner.character_name, '') as owner_name,";
+  const finalOwnerJoin = resolveOwnerBeforePaging ? "" : `
       left join lateral (
         select ps.character_name
         from dune.permission_actor_rank par
@@ -2160,7 +2175,18 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50 } = {}) {
         order by par.rank asc, ps.character_name asc
         limit 1
       ) owner on true`;
-  const sharedOwnerRef = searching ? "p.owner_name" : "coalesce(owner.character_name, '')";
+  const sharedOwnerRef = resolveOwnerBeforePaging ? "p.owner_name" : "coalesce(owner.character_name, '')";
+  const matchedSortSelect = [
+    "((a.transform).location).x as x",
+    "((a.transform).location).y as y",
+    "((a.transform).location).z as z",
+    sortSpec.pieces ? "(select count(*) from dune.building_instances count_bi where count_bi.building_id = b.id)::int as piece_count" : "",
+    sortSpec.placeables ? "(select count(*) from dune.placeables count_pl where count_pl.owner_entity_id in (select distinct bi2.owner_entity_id from dune.building_instances bi2 where bi2.building_id = b.id))::int as placeable_count" : "",
+    sortSpec.shared ? "(select count(*) from dune.permission_actor_rank count_par where count_par.permission_actor_id = a.id and count_par.rank <> 1)::int as shared_count" : ""
+  ].filter(Boolean).join(",\n               ");
+  const pagedOrder = [...sortSpec.order, ...(sortSpec.order.includes("id") ? [] : ["id"])].map((column) => `${column} ${safeSortDirection}`).join(", ");
+  const finalPieceCount = sortSpec.pieces ? "p.piece_count" : "(select count(*) from dune.building_instances bi where bi.building_id = p.id)::int";
+  const finalPlaceableCount = sortSpec.placeables ? "p.placeable_count" : "(select count(*) from dune.placeables pl where pl.owner_entity_id = p.owner_entity_id)::int";
 
   try {
     const result = await db.query(`
@@ -2171,7 +2197,8 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50 } = {}) {
                pa.actor_name as raw_name,
                coalesce(pa.actor_name, 'Base ' || b.id::text) as name,
                ${matchedOwnerSelect}coalesce(a.map, '') as map,
-               a.transform
+               a.transform,
+               ${matchedSortSelect}
         from dune.buildings b
         join dune.building_instances bi on bi.building_id = b.id
         join dune.actor_fgl_entities afe on afe.entity_id = bi.owner_entity_id
@@ -2183,21 +2210,23 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50 } = {}) {
         ${having}
       ),
       paged as (
-        select *, count(*) over() as total_count
+        select *,
+               count(*) over() as total_count,
+               row_number() over (order by ${pagedOrder}) as sort_position
         from matched
-        order by lower(coalesce(raw_name, '')), id
+        order by ${pagedOrder}
         limit $${limitParamIndex} offset $${offsetParamIndex}
       )
       select p.id::text as base_id,
              p.name,
              ${finalOwnerSelect}
              p.map,
-             ((p.transform).location).x as x,
-             ((p.transform).location).y as y,
-             ((p.transform).location).z as z,
+             p.x,
+             p.y,
+             p.z,
              p.total_count,
-             (select count(*) from dune.building_instances bi where bi.building_id = p.id)::int as piece_count,
-             (select count(*) from dune.placeables pl where pl.owner_entity_id = p.owner_entity_id)::int as placeable_count,
+             ${finalPieceCount} as piece_count,
+             ${finalPlaceableCount} as placeable_count,
              coalesce(shared.entries, '[]'::jsonb) as shared_with
       from paged p
       ${finalOwnerJoin}
@@ -2210,7 +2239,7 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50 } = {}) {
           and par.rank <> 1
           and ps.character_name is distinct from ${sharedOwnerRef}
       ) shared on true
-      order by lower(coalesce(p.name, '')), p.id`, values);
+      order by p.sort_position`, values);
 
     const totalsResult = await db.query(`
       with valid_bases as (
@@ -2231,7 +2260,7 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50 } = {}) {
       totalBases: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_bases) : 0,
       totalPieces: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_pieces) : 0,
       totalPlaceables: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_placeables) : 0,
-      rows: result.rows.map(({ total_count, ...row }) => ({
+      rows: result.rows.map(({ total_count, sort_position, ...row }) => ({
         ...row,
         x: Number(row.x),
         y: Number(row.y),

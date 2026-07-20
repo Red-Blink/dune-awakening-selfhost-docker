@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Download } from "lucide-react";
 import { basesApi } from "../../api/bases";
 import { apiDownload } from "../../api/client";
-import { DataTable, useSortableRows } from "../../components/common/DataTable";
+import { DataTable, type SortDirection } from "../../components/common/DataTable";
 
 type BasesPanelProps = {
   onError: (text: string) => void;
@@ -34,6 +34,8 @@ type BasesCache = {
   q: string;
   page: number;
   pageSize: number;
+  sortColumn: string;
+  sortDirection: SortDirection;
   rows: BaseRow[];
   totalCount: number;
   totalBases: number;
@@ -44,8 +46,8 @@ type BasesCache = {
 
 let basesCache: BasesCache | null = null;
 
-function sameView(cache: BasesCache | null, q: string, page: number, pageSize: number) {
-  return !!cache && cache.q === q && cache.page === page && cache.pageSize === pageSize;
+function sameView(cache: BasesCache | null, q: string, page: number, pageSize: number, sortColumn: string, sortDirection: SortDirection) {
+  return !!cache && cache.q === q && cache.page === page && cache.pageSize === pageSize && cache.sortColumn === sortColumn && cache.sortDirection === sortDirection;
 }
 
 function errorText(error: unknown) {
@@ -90,6 +92,8 @@ export function BasesPanel({ onError }: BasesPanelProps) {
   const [submittedQ, setSubmittedQ] = useState(() => basesCache?.q ?? "");
   const [page, setPage] = useState(() => basesCache?.page ?? 0);
   const [pageSize, setPageSize] = useState<number>(() => basesCache?.pageSize ?? BASES_DEFAULT_PAGE_SIZE);
+  const [sortColumn, setSortColumn] = useState(() => basesCache?.sortColumn ?? "name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>(() => basesCache?.sortDirection ?? "asc");
   const [rows, setRows] = useState<BaseRow[]>(() => basesCache?.rows ?? []);
   const [totalCount, setTotalCount] = useState(() => basesCache?.totalCount ?? 0);
   const [totalBases, setTotalBases] = useState(() => basesCache?.totalBases ?? 0);
@@ -100,7 +104,6 @@ export function BasesPanel({ onError }: BasesPanelProps) {
   const [downloadingId, setDownloadingId] = useState("");
   const requestIdRef = useRef(0);
   const skipNextSearchReset = useRef(true);
-  const sort = useSortableRows(rows);
 
   useEffect(() => {
     if (skipNextSearchReset.current) {
@@ -119,7 +122,7 @@ export function BasesPanel({ onError }: BasesPanelProps) {
     setSubmittedQ("");
   }
 
-  const load = useCallback(async (params: { q: string; page: number; pageSize: number }, options: { silent?: boolean } = {}) => {
+  const load = useCallback(async (params: { q: string; page: number; pageSize: number; sortColumn: string; sortDirection: SortDirection }, options: { silent?: boolean } = {}) => {
     const requestId = ++requestIdRef.current;
     if (!options.silent) onError("");
     try {
@@ -135,6 +138,8 @@ export function BasesPanel({ onError }: BasesPanelProps) {
         q: params.q,
         page: params.page,
         pageSize: params.pageSize,
+        sortColumn: params.sortColumn,
+        sortDirection: params.sortDirection,
         rows: nextRows,
         totalCount: result.totalCount || 0,
         totalBases: result.totalBases || 0,
@@ -152,8 +157,8 @@ export function BasesPanel({ onError }: BasesPanelProps) {
   useEffect(() => {
     let cancelled = false;
     let timeoutId: number | undefined;
-    const params = { q: submittedQ, page, pageSize };
-    const cacheHit = sameView(basesCache, submittedQ, page, pageSize) ? basesCache : null;
+    const params = { q: submittedQ, page, pageSize, sortColumn, sortDirection };
+    const cacheHit = sameView(basesCache, submittedQ, page, pageSize, sortColumn, sortDirection) ? basesCache : null;
     const isStale = () => !cacheHit || Date.now() - cacheHit.lastFetchedAt >= BASES_AUTO_REFRESH_MS;
 
     if (cacheHit) {
@@ -196,7 +201,7 @@ export function BasesPanel({ onError }: BasesPanelProps) {
       window.clearTimeout(timeoutId);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [submittedQ, page, pageSize, load]);
+  }, [submittedQ, page, pageSize, sortColumn, sortDirection, load]);
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), BASES_RELATIVE_TIME_TICK_MS);
@@ -244,6 +249,16 @@ export function BasesPanel({ onError }: BasesPanelProps) {
     setPage(0);
   }
 
+  function handleSort(column: string) {
+    setPage(0);
+    if (column === sortColumn) {
+      setSortDirection((current) => current === "asc" ? "desc" : "asc");
+      return;
+    }
+    setSortColumn(column);
+    setSortDirection("asc");
+  }
+
   return (
     <section className="panel">
       <div className="panel-title">
@@ -252,7 +267,7 @@ export function BasesPanel({ onError }: BasesPanelProps) {
           {lastFetchedAt !== null && (
             <span className="muted">Refreshed {formatRelativeTime(lastFetchedAt, now)}</span>
           )}
-          <button onClick={() => void load({ q: submittedQ, page, pageSize })}>Refresh</button>
+          <button onClick={() => void load({ q: submittedQ, page, pageSize, sortColumn, sortDirection })}>Refresh</button>
         </div>
       </div>
       <p className="action-help-note">
@@ -289,7 +304,7 @@ export function BasesPanel({ onError }: BasesPanelProps) {
         </div>
       </div>
       <DataTable
-        rows={sort.sortedRows}
+        rows={rows}
         columns={["base_id", "name", "owner_name", "shared_with", "map", "coordinates", "piece_count", "placeable_count"]}
         tableClassName="bases-table"
         actionClassName="actions-column"
@@ -301,9 +316,9 @@ export function BasesPanel({ onError }: BasesPanelProps) {
             <button className="icon-toggle-button" title="Download Base as Blueprint" aria-label="Download Base as Blueprint" disabled={downloadingId === id} onClick={(event) => { event.stopPropagation(); void handleDownloadBlueprint(base); }}><Download size={16} /></button>
           </span>;
         }}
-        sortColumn={sort.sortColumn}
-        sortDirection={sort.sortDirection}
-        onSort={sort.onSort}
+        sortColumn={sortColumn}
+        sortDirection={sortDirection}
+        onSort={handleSort}
         rowKey={(row) => String(row.base_id)}
         emptyMessage="No bases have been found yet."
       />

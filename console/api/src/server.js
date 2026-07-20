@@ -382,7 +382,9 @@ async function handleApi(req, res) {
   if (path === "/api/bases") return dbJson(res, () => duneDb.listBases(db, {
     q: url.searchParams.get("q") || "",
     page: url.searchParams.get("page") || 0,
-    pageSize: url.searchParams.get("pageSize") || 50
+    pageSize: url.searchParams.get("pageSize") || 50,
+    sortColumn: url.searchParams.get("sortColumn") || "name",
+    sortDirection: url.searchParams.get("sortDirection") || "asc"
   }));
   if (path.match(/^\/api\/bases\/[^/]+\/export$/) && req.method === "GET") return baseBlueprintDownloadRoute(req, res, path);
   if (path === "/api/admin/items/catalog") return json(res, 200, { rows: listCatalogItems(config.repoRoot, { q: url.searchParams.get("q") || "", limit: url.searchParams.get("limit") || 500 }) });

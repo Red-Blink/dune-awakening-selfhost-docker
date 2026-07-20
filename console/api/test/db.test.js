@@ -905,7 +905,47 @@ test("list bases filters by name or owner name via a having clause and paginates
   assert.match(baseQuery.text, /having coalesce\(pa\.actor_name, ''\) ilike \$1 or coalesce\(owner\.character_name, ''\) ilike \$1/);
   assert.match(baseQuery.text, /limit \$2 offset \$3/);
   assert.deepEqual(baseQuery.values, ["%Sietch%", 25, 50]);
-  assert.ok(baseQuery.text.includes("order by lower(coalesce(raw_name, '')), id"), "paged CTE must sort by the raw (nullable) actor name, matching pre-pagination sort behavior");
+  assert.ok(baseQuery.text.includes("order by lower(coalesce(raw_name, '')) asc, id asc"), "paged CTE must sort the complete matched result before pagination");
+});
+
+test("list bases applies requested sorting before pagination", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: BASE_REQUIRED_TABLES.includes(name) }] };
+      }
+      return { rows: [] };
+    }
+  };
+  await listBases(db, { page: 1, pageSize: 25, sortColumn: "piece_count", sortDirection: "desc" });
+  const baseQuery = calls.find((call) => call.text.includes("from dune.buildings b"));
+  assert.ok(baseQuery);
+  assert.match(baseQuery.text, /as piece_count/);
+  assert.match(baseQuery.text, /row_number\(\) over \(order by piece_count desc, id desc\)/);
+  assert.match(baseQuery.text, /limit \$1 offset \$2/);
+  assert.deepEqual(baseQuery.values, [25, 25]);
+});
+
+test("list bases falls back to safe sorting for unsupported input", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: BASE_REQUIRED_TABLES.includes(name) }] };
+      }
+      return { rows: [] };
+    }
+  };
+  await listBases(db, { sortColumn: "name desc; drop table dune.buildings", sortDirection: "sideways" });
+  const baseQuery = calls.find((call) => call.text.includes("from dune.buildings b"));
+  assert.ok(baseQuery);
+  assert.match(baseQuery.text, /row_number\(\) over \(order by lower\(coalesce\(raw_name, ''\)\) asc, id asc\)/);
+  assert.doesNotMatch(baseQuery.text, /drop table/i);
 });
 
 test("list bases resolves shared_with via the base's actor id, not its building id", async () => {
