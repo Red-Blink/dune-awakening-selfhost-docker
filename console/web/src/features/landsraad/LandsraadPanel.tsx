@@ -155,7 +155,7 @@ export function LandsraadPanel({ confirmAction, onError }: LandsraadAdminSection
     await run(
       `reward:${rewardKey(reward)}`,
       "Saving reward",
-      () => adminApi.setLandsraadRewardTier({ taskId: reward.task_id, threshold: reward.threshold, newThreshold: threshold, templateId, amount }),
+      () => adminApi.setLandsraadRewardTier({ rowLocator: reward.row_locator, taskId: reward.task_id, threshold: reward.threshold, newThreshold: threshold, templateId, amount }),
       "Reward Saved"
     );
   }
@@ -289,7 +289,7 @@ export function LandsraadPanel({ confirmAction, onError }: LandsraadAdminSection
 }
 
 function rewardKey(reward: LandsraadReward) {
-  return `${reward.task_id}:${reward.threshold}`;
+  return reward.row_locator;
 }
 
 function playerActorId(player: Record<string, unknown>) {

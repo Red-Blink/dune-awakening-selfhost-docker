@@ -333,7 +333,8 @@ export async function landsraadOverview(db) {
 
     if (hasRewards) {
       rewards = (await db.query(`
-        select r.task_id::text as task_id,
+        select r.ctid::text as row_locator,
+               r.task_id::text as task_id,
                r.threshold::int as threshold,
                coalesce(r.template_id, '') as template_id,
                coalesce(r.amount, 0)::int as amount
@@ -390,7 +391,13 @@ export async function updateLandsraadTermTaskGoals(db, termId, goalAmount) {
 
 export async function updateLandsraadRewardTier(db, values = {}) {
   await requireCapability(await tableExists(db, "landsraad_task_rewards"), "Landsraad rewards require dune.landsraad_task_rewards.");
-  const { taskId, threshold, newThreshold, templateId, amount } = values;
+  const { rowLocator, taskId, threshold, newThreshold, templateId, amount } = values;
+  const safeRowLocator = String(rowLocator ?? "").trim();
+  if (!/^\(\d+,\d+\)$/.test(safeRowLocator)) {
+    const error = new Error("A valid Landsraad reward row locator is required. Reload the page and try again.");
+    error.statusCode = 400;
+    throw error;
+  }
   const safeTaskId = intParam(taskId, "task id", 1);
   const oldThreshold = intParam(threshold, "reward threshold", 0, 2147483647);
   const nextThreshold = Object.prototype.hasOwnProperty.call(values, "newThreshold")
@@ -408,12 +415,14 @@ export async function updateLandsraadRewardTier(db, values = {}) {
        set threshold = $1,
            template_id = $2,
            amount = $3
-     where task_id = $4
-       and threshold = $5
-     returning task_id::text as task_id,
+     where ctid = $4::tid
+       and task_id = $5
+       and threshold = $6
+     returning ctid::text as row_locator,
+               task_id::text as task_id,
                threshold::int as threshold,
                template_id,
-               amount::int`, [nextThreshold, nextTemplateId, nextAmount, safeTaskId, oldThreshold]);
+               amount::int`, [nextThreshold, nextTemplateId, nextAmount, safeRowLocator, safeTaskId, oldThreshold]);
   if (!result.rowCount) {
     const error = new Error(`Landsraad reward tier ${oldThreshold} for task ${safeTaskId} was not found.`);
     error.statusCode = 404;

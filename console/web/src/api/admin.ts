@@ -72,6 +72,7 @@ export type LandsraadTask = {
 };
 
 export type LandsraadReward = {
+  row_locator: string;
   task_id: string;
   threshold: number;
   template_id: string;
@@ -107,7 +108,7 @@ export const adminApi = {
   landsraad: () => api<LandsraadOverview>("/api/admin/landsraad"),
   setLandsraadTaskGoal: (taskId: string | number, goalAmount: number) => post<{ ok: boolean }>("/api/admin/landsraad/task-goal", { taskId, goalAmount }),
   setLandsraadTermTaskGoals: (termId: string | number, goalAmount: number) => post<{ ok: boolean; updatedRows: number }>("/api/admin/landsraad/term-task-goals", { termId, goalAmount }),
-  setLandsraadRewardTier: (body: { taskId: string | number; threshold: number; newThreshold: number; templateId: string; amount: number }) => post<{ ok: boolean }>("/api/admin/landsraad/reward-tier", body),
+  setLandsraadRewardTier: (body: { rowLocator: string; taskId: string | number; threshold: number; newThreshold: number; templateId: string; amount: number }) => post<{ ok: boolean }>("/api/admin/landsraad/reward-tier", body),
   setLandsraadPlayerContribution: (body: { playerId: string | number; taskId: string | number; amount: number }) => post<{ ok: boolean; message?: string }>("/api/admin/landsraad/player-contribution", body),
   kickAllOnline: (confirmation: string) => post<{ task: Task }>("/api/players/kick-all-online", { confirmation }),
   broadcast: (title: string, body: string, durationSec: number) => post<{ supported: boolean; reason?: string; ok?: boolean; stdout?: string; stderr?: string; note?: string }>("/api/admin/broadcast", { title, body, durationSec }),
