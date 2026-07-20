@@ -9,14 +9,16 @@ export function parseUpdateTask(task: Task) {
   const text = task.logLines.map((line) => line.line).join("\n");
   const current = firstVersionMatch(text, [/current(?: stack)?(?: build| version)?\s*[:=]\s*([^\n]+)/i, /installed(?: build| version)?\s*[:=]\s*([^\n]+)/i, /local(?: build| version)?\s*[:=]\s*([^\n]+)/i]);
   const latest = firstVersionMatch(text, [/latest(?: release| build| version)?\s*[:=]\s*([^\n]+)/i, /remote(?: build| version)?\s*[:=]\s*([^\n]+)/i, /available(?: build| version)?\s*[:=]\s*([^\n]+)/i]);
-  if (task.status === "failed") return { status: "Check Failed", current, latest, reason: task.errorMessage || summarizeCommandText(text) };
-  if (task.status !== "succeeded") return { status: "Checking...", current, latest, reason: task.progressMessage || "" };
+  const repository = firstVersionMatch(text, [/github repo\s*[:=]\s*([^\n]+)/i]);
+  const versions = { current, latest, repository };
+  if (task.status === "failed") return { status: "Check Failed", ...versions, reason: task.errorMessage || summarizeCommandText(text) };
+  if (task.status !== "succeeded") return { status: "Checking...", ...versions, reason: task.progressMessage || "" };
   const updateAvailable = /update available|newer|can update|available update/i.test(text);
   const latestStatus = /up to date|already latest|no update|latest/i.test(text) && !updateAvailable;
-  if (sameUpdateVersion(current, latest)) return { status: "Latest", current, latest, reason: summarizeCommandText(text) };
-  if (updateAvailable) return { status: "Update Available", current, latest, reason: summarizeCommandText(text) };
-  if (latestStatus) return { status: "Latest", current, latest, reason: summarizeCommandText(text) };
-  return { status: current || latest ? "Completed" : "Version details unavailable", current, latest, reason: current || latest ? summarizeCommandText(text) : "Unable to parse version details from completed check." };
+  if (sameUpdateVersion(current, latest)) return { status: "Latest", ...versions, reason: summarizeCommandText(text) };
+  if (updateAvailable) return { status: "Update Available", ...versions, reason: summarizeCommandText(text) };
+  if (latestStatus) return { status: "Latest", ...versions, reason: summarizeCommandText(text) };
+  return { status: current || latest ? "Completed" : "Version details unavailable", ...versions, reason: current || latest ? summarizeCommandText(text) : "Unable to parse version details from completed check." };
 }
 
 export function loadPersistedUpdateTask(key: string) {
@@ -78,6 +80,14 @@ export function formatStackVersionLabel(value: string) {
 
 export function canApplyUpdateStatus(status: Record<string, string>) {
   return status.status === "Update Available" && !sameUpdateVersion(status.current, status.latest);
+}
+
+export function stackReleaseNotesUrl(status: Record<string, string>) {
+  const repository = String(status.repository || "").trim();
+  const tag = String(status.latest || status.current || "").trim();
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) return "";
+  if (!/^v?\d[A-Za-z0-9._+-]*$/.test(tag)) return "";
+  return `https://github.com/${repository}/releases/tag/${encodeURIComponent(tag)}`;
 }
 
 export function sameUpdateVersion(current: string, latest: string) {

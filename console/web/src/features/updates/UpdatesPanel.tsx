@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronUp } from "lucide-react";
 import { setupApi, type Task } from "../../api/setup";
 import { updatesApi } from "../../api/updates";
 import { KeyValueGrid, StatusPill } from "../../components/common/DisplayPrimitives";
@@ -14,6 +14,7 @@ import {
   normalizeUpdateVersion,
   parseUpdateTask,
   persistUpdateTask,
+  stackReleaseNotesUrl,
   STACK_UPDATE_TASK_KEY,
   UPDATE_RESULT_DISMISS_MS,
   updateDisplayValue
@@ -323,6 +324,7 @@ export function UpdatesPanel({
   const gameCanApply = canApplyUpdateStatus(gameStatus) && !gameUpdateRunning;
   const stackUpdateRunning = Boolean(stackUpdateTask && (!isTerminalTask(stackUpdateTask.status) || isDetachedStackUpdateTask(stackUpdateTask)));
   const stackCanApply = canApplyUpdateStatus(stackStatus) && !stackUpdateRunning;
+  const stackReleaseNotes = stackReleaseNotesUrl(stackStatus);
 
   return <section className="panel">
     <h2>Updates</h2>
@@ -345,6 +347,7 @@ export function UpdatesPanel({
         {stackStatus.status === "Version details unavailable" && <p className="muted">{stackStatus.reason}</p>}
         <div className="action-line">
           <button disabled={stackUpdateRunning} onClick={checkStack}>Refresh Console Check</button>
+          {stackReleaseNotes && <a className="button-link" href={stackReleaseNotes} target="_blank" rel="noreferrer"><BookOpen size={16} aria-hidden="true" />View Patch Notes</a>}
           {stackCanApply && <button className="update-action" onClick={applyStackUpdate}>Apply Console Update</button>}
         </div>
         {stackUpdateTask && <StackUpdateProgress task={stackUpdateTask} handoffPercent={stackUpdateHandoffPercent} refreshCountdown={stackUpdateRefreshCountdown} onRetry={applyStackUpdate} formatResultTitle={formatResultTitle} formatResultMessage={formatResultMessage} />}
