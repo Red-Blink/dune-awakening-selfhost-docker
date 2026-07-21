@@ -1281,7 +1281,7 @@ body.debug .technical-details { display: block; }
 .playerAdmin_specializationTable td:first-child .inline-action-result-wrap { display: flex; justify-content: flex-start; width: 100%; min-height: 0; margin-top: 5px; white-space: normal; }
 .playerAdmin_specializationTable td:first-child .inline-action-result { font-size: 12px; line-height: 1.3; text-align: left; }
 .spec-level-badge, .spec-keystone-yes { display: inline-flex; align-items: center; justify-content: center; gap: 5px; color: #ceb894; }
-.spec-level-badge { min-width: 42px; min-height: 28px; padding: 4px 8px; border: 1px solid rgba(214, 185, 140, .2); border-radius: 6px; background: rgba(255, 255, 255, .03); font-weight: 700; }
+.spec-level-badge { width: 60px; min-width: 60px; max-width: 60px; min-height: 28px; box-sizing: border-box; padding: 4px 8px; border: 1px solid rgba(214, 185, 140, .2); border-radius: 6px; background: rgba(255, 255, 255, .03); font-weight: 700; }
 .spec-level-max, .spec-keystone-yes { color: #8ed0a8; }
 .spec-keystone-no { color: #746c61; }
 .specialization-xp-control { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; }
