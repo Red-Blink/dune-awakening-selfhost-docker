@@ -1113,8 +1113,8 @@ body.debug .technical-details { display: block; }
 .playerAdmin_summaryActions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px solid rgba(214, 185, 140, .14); padding-top: 12px; }
 .playerAdmin_summaryActions button { width: auto; }
 .playerAdmin_summaryActions .playerAdmin_actionNote { flex: 1 0 100%; padding-left: 0; }
-.playerAdmin_tabs { display: flex; flex-wrap: wrap; gap: 8px; }
-.playerAdmin_tabs button { min-width: 112px; min-height: 54px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 6px; border-color: #3b3329; background: #171a1d; color: #e9dcc8; font-size: 14px; font-weight: 700; white-space: nowrap; padding: 8px 16px; }
+.playerAdmin_tabs { display: grid; grid-template-columns: repeat(8, minmax(132px, 1fr)); gap: 8px; width: 100%; overflow-x: auto; }
+.playerAdmin_tabs button { width: 100%; min-width: 0; min-height: 54px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 6px; border-color: #3b3329; background: #171a1d; color: #e9dcc8; font-size: 14px; font-weight: 700; white-space: nowrap; padding: 8px 10px; }
 .playerAdmin_tabs button svg { flex: 0 0 auto; }
 .playerAdmin_tabs button.active { border-color: #c68b4a; background: rgba(198, 139, 74, .16); color: #ffd08a; }
 .playerAdmin_content { display: grid; gap: 12px; }
@@ -1249,12 +1249,11 @@ body.debug .technical-details { display: block; }
 .playerAdmin_iconRailLabel { justify-self: start; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; padding: 7px 14px; border: 1px solid rgba(255, 208, 138, .38); border-radius: 6px; background: #14171a; color: #ffd08a; font-size: 16px; font-weight: 700; white-space: nowrap; }
 .playerAdmin_spawnVehicleRow select { max-width: 190px; }
 .specialization-tab { gap: 14px; }
-.specialization-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.specialization-header-left { display: grid; gap: 7px; flex: 1 1 420px; min-width: 0; }
-.specialization-header-left h4 { margin: 0; }
-.specialization-offline-notice { display: flex; align-items: flex-start; gap: 7px; margin: 0; color: #bcae98; line-height: 1.4; }
+.specialization-header { display: grid; grid-template-columns: minmax(180px, 1fr) auto; align-items: center; gap: 10px 16px; }
+.specialization-header h4 { margin: 0; }
+.specialization-offline-notice { grid-column: 1 / -1; display: flex; align-items: center; gap: 7px; margin: 0; color: #bcae98; line-height: 1.4; white-space: nowrap; }
 .specialization-offline-notice svg { flex: 0 0 auto; margin-top: 3px; color: #c68b4a; }
-.specialization-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: 1 1 520px; flex-wrap: wrap; min-width: 0; }
+.specialization-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .specialization-header-actions button { width: auto; white-space: nowrap; }
 .specialization-header-actions .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-end; min-height: 0; }
 .playerAdmin_specializationTableWrap { overflow: auto; max-height: none; }
@@ -1450,7 +1449,7 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
   .home-backdrop { inset: 0; }
   .grid, .two-col { grid-template-columns: 1fr; }
   .health-grid, .health-grid-compact { grid-template-columns: 1fr; }
-  .playerAdmin_tabs button { min-width: 100px; }
+  .playerAdmin_tabs { grid-template-columns: repeat(8, minmax(132px, 1fr)); }
   .live-map-layout { grid-template-columns: 1fr; }
   .live-map-frame { height: 62vh; min-height: 420px; }
   .live-map-stats { grid-template-columns: 1fr; }
@@ -2046,6 +2045,9 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 
 @media (max-width: 760px) {
   .choam-terminals-toolbar { align-items: flex-start; flex-direction: column; }
+  .specialization-header { grid-template-columns: 1fr; }
+  .specialization-header-actions { justify-content: flex-start; }
+  .specialization-offline-notice { white-space: normal; }
 }
 .spicefield-row-actions { gap: 6px; margin: 0; }
 .spicefield-row-actions button { min-width: 72px; }

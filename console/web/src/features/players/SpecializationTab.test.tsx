@@ -77,11 +77,19 @@ describe("SpecializationTab", () => {
     });
 
     it("displays level badges", async () => {
-      vi.mocked(playersApi.specs).mockResolvedValue(mockSpecsResponse);
+      vi.mocked(playersApi.specs).mockResolvedValue({
+        ...mockSpecsResponse,
+        rows: [
+          ...mockSpecsResponse.rows.slice(0, 2),
+          { track_type: "Planetologist", xp_amount: 0, level: 12.146068 }
+        ]
+      });
       render(<SpecializationTab {...defaultProps} />);
       await waitFor(() => {
         expect(screen.getByText("3")).toBeInTheDocument();
         expect(screen.getByText("7")).toBeInTheDocument();
+        expect(screen.getByText("12")).toBeInTheDocument();
+        expect(screen.queryByText("12.146068")).not.toBeInTheDocument();
       });
     });
 

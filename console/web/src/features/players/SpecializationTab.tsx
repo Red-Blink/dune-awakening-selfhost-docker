@@ -70,7 +70,7 @@ export function SpecializationTab({
       setRows((response.rows || []).map((row) => ({
         trackType: String(row.track_type || row.trackType || ""),
         xp: Number(row.xp_amount ?? row.xp ?? 0),
-        level: Number(row.level ?? 0),
+        level: Math.max(0, Math.floor(Number(row.level ?? 0) || 0)),
         keystone: Boolean(row.keystone || row.has_keystone)
       })).filter((row) => row.trackType));
       const learnedRows = Array.isArray(response.skillModules) ? response.skillModules as Record<string, unknown>[] : [];
@@ -218,13 +218,7 @@ export function SpecializationTab({
   return (
     <section className="playerAdmin_box specialization-tab">
       <div className="specialization-header">
-        <div className="specialization-header-left">
-          <h4>Specialization Tracks</h4>
-          <p className="specialization-offline-notice">
-            <Shield size={14} />
-            The player must be offline for all specialization changes. A relog is required to see changes in-game.
-          </p>
-        </div>
+        <h4>Specialization Tracks</h4>
         <div className="specialization-header-actions">
           <button
             disabled={!dbPlayerId || loading}
@@ -250,6 +244,10 @@ export function SpecializationTab({
           </button>
           <InlineActionResult result={actionResult} resultKey="specKeystones" />
         </div>
+        <p className="specialization-offline-notice">
+          <Shield size={14} />
+          The player must be offline for all specialization changes. A relog is required to see changes in-game.
+        </p>
       </div>
 
       {error && <p className="playerAdmin_note danger">{error}</p>}
