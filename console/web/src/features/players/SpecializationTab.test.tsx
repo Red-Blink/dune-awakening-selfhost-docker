@@ -36,7 +36,8 @@ const mockSpecsResponse = {
   ],
   skillModules: [
     { module_id: "Skills.Key.Trooper1", level: 2 }
-  ]
+  ],
+  capabilities: {}
 };
 
 beforeEach(() => {
@@ -47,7 +48,7 @@ beforeEach(() => {
 describe("SpecializationTab", () => {
   describe("rendering", () => {
     it("shows loading state when no data", async () => {
-      vi.mocked(playersApi.specs).mockResolvedValue({ rows: [], skillModules: [] });
+      vi.mocked(playersApi.specs).mockResolvedValue({ rows: [], skillModules: [], capabilities: {} });
       render(<SpecializationTab {...defaultProps} />);
       await waitFor(() => {
         expect(screen.getByText(/No specialization tracks were found/i)).toBeInTheDocument();
@@ -109,7 +110,7 @@ describe("SpecializationTab", () => {
         expect(screen.getByText("Trooper")).toBeInTheDocument();
       });
 
-      const addButtons = screen.getAllByText("Add XP");
+      const addButtons = screen.getAllByRole("button", { name: /Add XP to/i });
       expect(addButtons.length).toBeGreaterThan(0);
       addButtons.forEach((btn) => {
         expect(btn).toBeDisabled();
@@ -161,7 +162,7 @@ describe("SpecializationTab", () => {
         expect(screen.getByText("Trooper")).toBeInTheDocument();
       });
 
-      const addButtons = screen.getAllByText("Add XP");
+      const addButtons = screen.getAllByRole("button", { name: /Add XP to/i });
       await fireEvent.click(addButtons[0]);
 
       await waitFor(() => {
@@ -183,10 +184,12 @@ describe("SpecializationTab", () => {
       const xpInputs = screen.getAllByRole("spinbutton");
       await fireEvent.change(xpInputs[0], { target: { value: "" } });
 
-      const addButtons = screen.getAllByText("Add XP");
+      const addButtons = screen.getAllByRole("button", { name: /Add XP to/i });
       await fireEvent.click(addButtons[0]);
 
-      expect(screen.getByText(/Enter an XP amount first/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/Enter an XP amount first/i)).toBeInTheDocument();
+      });
     });
 
     it("shows error when player is online and Add XP is attempted", async () => {
@@ -343,7 +346,8 @@ describe("SpecializationTab", () => {
 
       vi.mocked(playersApi.specs).mockResolvedValue({
         rows: [{ track_type: "Bene Gesserit", xp_amount: 20000, level: 10 }],
-        skillModules: []
+        skillModules: [],
+        capabilities: {}
       });
 
       const reloadButton = screen.getByText("Reload").closest("button");
