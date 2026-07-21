@@ -1113,8 +1113,8 @@ body.debug .technical-details { display: block; }
 .playerAdmin_summaryActions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px solid rgba(214, 185, 140, .14); padding-top: 12px; }
 .playerAdmin_summaryActions button { width: auto; }
 .playerAdmin_summaryActions .playerAdmin_actionNote { flex: 1 0 100%; padding-left: 0; }
-.playerAdmin_tabs { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; overflow-x: auto; }
-.playerAdmin_tabs button { width: 100%; min-height: 54px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 6px; border-color: #3b3329; background: #171a1d; color: #e9dcc8; font-size: 14px; font-weight: 700; white-space: nowrap; }
+.playerAdmin_tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.playerAdmin_tabs button { flex: 1 1 0; min-width: 112px; min-height: 54px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 6px; border-color: #3b3329; background: #171a1d; color: #e9dcc8; font-size: 14px; font-weight: 700; white-space: nowrap; padding: 8px 12px; }
 .playerAdmin_tabs button svg { flex: 0 0 auto; }
 .playerAdmin_tabs button.active { border-color: #c68b4a; background: rgba(198, 139, 74, .16); color: #ffd08a; }
 .playerAdmin_content { display: grid; gap: 12px; }
@@ -1427,7 +1427,7 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
   .home-backdrop { inset: 0; }
   .grid, .two-col { grid-template-columns: 1fr; }
   .health-grid, .health-grid-compact { grid-template-columns: 1fr; }
-  .playerAdmin_tabs { grid-template-columns: repeat(8, minmax(112px, 1fr)); }
+  .playerAdmin_tabs button { min-width: 100px; }
   .live-map-layout { grid-template-columns: 1fr; }
   .live-map-frame { height: 62vh; min-height: 420px; }
   .live-map-stats { grid-template-columns: 1fr; }
