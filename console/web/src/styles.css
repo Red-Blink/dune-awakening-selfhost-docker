@@ -1256,13 +1256,13 @@ body.debug .technical-details { display: block; }
 .specialization-header-actions button { width: auto; white-space: nowrap; }
 .specialization-header-actions .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-end; min-height: 0; }
 .playerAdmin_specializationTableWrap { overflow: auto; max-height: none; }
-.playerAdmin_specializationTable { width: 100%; min-width: 940px; table-layout: fixed; }
-.playerAdmin_specializationTable .playerAdmin_specTrackCol { width: 22%; }
-.playerAdmin_specializationTable .playerAdmin_specXpCol { width: 12%; }
-.playerAdmin_specializationTable .playerAdmin_specLevelCol { width: 9%; }
-.playerAdmin_specializationTable .playerAdmin_specKeystoneCol { width: 13%; }
-.playerAdmin_specializationTable .playerAdmin_specAddXpCol { width: 21%; }
-.playerAdmin_specializationTable .playerAdmin_specActionCol { width: 23%; }
+.playerAdmin_specializationTable { width: 100%; min-width: 1060px; table-layout: fixed; }
+.playerAdmin_specializationTable .playerAdmin_specTrackCol { width: 20%; }
+.playerAdmin_specializationTable .playerAdmin_specXpCol { width: 11%; }
+.playerAdmin_specializationTable .playerAdmin_specLevelCol { width: 8%; }
+.playerAdmin_specializationTable .playerAdmin_specKeystoneCol { width: 12%; }
+.playerAdmin_specializationTable .playerAdmin_specAddXpCol { width: 25%; }
+.playerAdmin_specializationTable .playerAdmin_specActionCol { width: 24%; }
 .playerAdmin_specializationTable th,
 .playerAdmin_specializationTable td { max-width: none; box-sizing: border-box; }
 .playerAdmin_specializationTable th { font-size: 12px; text-transform: uppercase; }
@@ -1285,10 +1285,10 @@ body.debug .technical-details { display: block; }
 .spec-level-max, .spec-keystone-yes { color: #8ed0a8; }
 .spec-keystone-no { color: #746c61; }
 .specialization-xp-control { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; }
-.specialization-xp-control button { flex: 0 0 84px; width: 84px; min-width: 84px; justify-content: center; padding-inline: 8px; }
+.specialization-xp-control button { flex: 0 0 104px; width: 104px; min-width: 104px; justify-content: center; padding-inline: 8px; }
 .playerAdmin_specializationTable .playerAdmin_actionCell { display: flex; align-items: center; justify-content: center; flex-wrap: nowrap; gap: 8px; width: 100%; min-width: 0; }
-.playerAdmin_specializationTable .playerAdmin_actionCell button { flex: 0 0 84px; width: 84px; min-width: 84px; padding-inline: 8px; justify-content: center; white-space: nowrap; }
-.playerAdmin_specXpInput { flex: 0 0 84px; width: 84px; min-width: 84px; max-width: 84px; }
+.playerAdmin_specializationTable .playerAdmin_actionCell button { flex: 0 0 104px; width: 104px; min-width: 104px; padding-inline: 8px; justify-content: center; white-space: nowrap; }
+.playerAdmin_specXpInput { flex: 0 0 104px; width: 104px; min-width: 104px; max-width: 104px; }
 .playerAdmin_note.danger { color: #ff9c8f; }
 .playerAdmin_cardGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
 .playerAdmin_card { border: 1px solid #302b25; background: #101316; border-radius: 8px; padding: 12px; display: grid; gap: 6px; min-height: 96px; }
