@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Brain, ChevronDown, ChevronUp, Hammer, Map as MapIcon, Microscope, ScrollText, ShieldCheck, UserRound } from "lucide-react";
+import { Brain, ChevronDown, ChevronUp, Hammer, Map as MapIcon, Microscope, ScrollText, ShieldCheck, Star, UserRound } from "lucide-react";
 import { adminApi } from "../../api/admin";
 import { playersApi } from "../../api/players";
 import type { Task } from "../../api/setup";
@@ -12,6 +12,7 @@ import { augmentLimitForItem, filterAugmentsForItem, formatAugmentOptions } from
 import { PlayerCategoryIconRail } from "./PlayerCategoryIconRail";
 import { PlayerDetailTab } from "./PlayerDetailTab";
 import { PlayerSummary } from "./PlayerSummary";
+import { SpecializationTab } from "./SpecializationTab";
 import { adminTaskFailureDetail, friendlyCraftingSource, friendlyInlineError, friendlyVehicleName, friendlyVehicleTemplateName, parseSkillModuleRows, parseVehicleCatalog, playerAdmin_bulkItemFailure, playerAdmin_friendlyFailure, playerAdmin_taskFailureMessage, titleCaseWords, vehicleSpawnDistanceLabel, vehicleSpawnOffsetUnits } from "./playerAdminUtils";
 import { BlueprintsPanel } from "../blueprints/BlueprintsPanel";
 
@@ -20,8 +21,6 @@ type ResearchItemRow = { itemKey: string; displayName: string; category: string;
 type SkillModuleCatalogRow = { skillModule: string; category: string; id: string; maxLevel: number };
 type SkillCard = { name: string; type: string; rank: string };
 type StarterSkillPreset = { label: string; modules: { id: string; level: number }[] };
-type SpecializationTrackRow = { trackType: string; xp: number; level: number };
-type LearnedSkillModuleRow = { module_id?: string; moduleId?: string; id?: string; skill_points_spent?: number; skillPointsSpent?: number; level?: number; rank?: number };
 type JourneyRow = { id: string; name: string; rawName: string; category: string; depth: number; parentId: string; dependency?: string; status: string; complete: boolean; revealed?: boolean; pendingReward?: boolean; tags?: number; state?: number | null };
 
 type ConfirmAction = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
@@ -60,6 +59,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     { label: "Crafting", icon: Hammer },
     { label: "Research", icon: Microscope },
     { label: "Skills", icon: Brain },
+    { label: "Specialization", icon: Star },
     { label: "Journey", icon: MapIcon },
     { label: "Blueprints", icon: ScrollText },
     { label: "Admin", icon: ShieldCheck }
@@ -108,10 +108,6 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
   const [playerAdmin_skillCatalogError, playerAdmin_setSkillCatalogError] = useState("");
   const [playerAdmin_skillBaseline, playerAdmin_setSkillBaseline] = useState<Record<string, number>>({});
   const [playerAdmin_skillChanges, playerAdmin_setSkillChanges] = useState<Record<string, number>>({});
-  const [playerAdmin_specializationRows, playerAdmin_setSpecializationRows] = useState<SpecializationTrackRow[]>([]);
-  const [playerAdmin_specializationLoading, playerAdmin_setSpecializationLoading] = useState(false);
-  const [playerAdmin_specializationError, playerAdmin_setSpecializationError] = useState("");
-  const [playerAdmin_specializationXpAmount, playerAdmin_setSpecializationXpAmount] = useState("1000");
   const [playerAdmin_journeyRows, playerAdmin_setJourneyRows] = useState<Record<string, JourneyRow[]>>({ story: [], contract: [], codex: [], tutorial: [] });
   const [playerAdmin_journeyLoading, playerAdmin_setJourneyLoading] = useState(false);
   const [playerAdmin_journeyError, playerAdmin_setJourneyError] = useState("");
@@ -391,111 +387,8 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
       playerAdmin_setSkillCatalogLoading(false);
     }
   }
-  async function playerAdmin_loadSpecializations() {
-    if (!dbPlayerId) return;
-    playerAdmin_setSpecializationLoading(true);
-    playerAdmin_setSpecializationError("");
-    try {
-      const response = await playersApi.specs(dbPlayerId);
-      playerAdmin_setSpecializationRows((response.rows || []).map((row) => ({
-        trackType: String(row.track_type || row.trackType || ""),
-        xp: Number(row.xp_amount ?? row.xp ?? 0),
-        level: Number(row.level ?? 0)
-      })).filter((row) => row.trackType));
-      const learnedRows = Array.isArray(response.skillModules) ? response.skillModules as LearnedSkillModuleRow[] : [];
-      playerAdmin_setSkillBaseline(Object.fromEntries(learnedRows.map((row) => {
-        const moduleId = String(row.module_id || row.moduleId || row.id || "");
-        const level = Number(row.level ?? row.rank ?? row.skill_points_spent ?? row.skillPointsSpent ?? 0);
-        return [moduleId, Math.max(0, level)];
-      }).filter(([moduleId, level]) => moduleId && Number(level) > 0)));
-      playerAdmin_setSkillChanges({});
-    } catch (error) {
-      playerAdmin_setSpecializationRows([]);
-      playerAdmin_setSpecializationError(friendlyInlineError(error));
-    } finally {
-      playerAdmin_setSpecializationLoading(false);
-    }
-  }
   async function playerAdmin_reloadSkills() {
-    await Promise.all([
-      playerAdmin_loadSkillCatalog(),
-      playerAdmin_loadSpecializations()
-    ]);
-  }
-  async function playerAdmin_addSpecializationXp(trackType: string) {
-    const amount = Number(playerAdmin_specializationXpAmount) || 0;
-    if (!amount) {
-      playerAdmin_showResult(`spec_${trackType}`, "Enter an XP amount first.", "danger");
-      return;
-    }
-    onError("");
-      playerAdmin_showResult(`spec_${trackType}`, "Updating XP", "neutral", true);
-    try {
-      await playersApi.addSpecializationXp(dbPlayerId, { trackType, amount, confirmation: "ADD SPECIALIZATION XP" });
-      playerAdmin_showResult(`spec_${trackType}`, "XP updated. Relog required.", "success");
-      playerAdmin_addLog("Add Specialization XP", trackType, String(amount), "Succeeded");
-      await playerAdmin_loadSpecializations();
-    } catch (error) {
-      const message = friendlyInlineError(error);
-      playerAdmin_showResult(`spec_${trackType}`, message, "danger");
-      playerAdmin_addLog("Add Specialization XP", trackType, String(amount), `Failed: ${message}`);
-    }
-  }
-  async function playerAdmin_grantMaxSpecialization(trackType: string) {
-    onError("");
-    playerAdmin_showResult(`spec_${trackType}`, "Granting max level", "neutral", true);
-    try {
-      await playersApi.grantMaxSpecialization(dbPlayerId, { trackType, confirmation: "GRANT MAX SPECIALIZATION" });
-      playerAdmin_showResult(`spec_${trackType}`, "Max level granted. Relog required.", "success");
-      playerAdmin_addLog("Grant Max Specialization", trackType, "1", "Succeeded");
-      await playerAdmin_loadSpecializations();
-    } catch (error) {
-      const message = friendlyInlineError(error);
-      playerAdmin_showResult(`spec_${trackType}`, message, "danger");
-      playerAdmin_addLog("Grant Max Specialization", trackType, "1", `Failed: ${message}`);
-    }
-  }
-  async function playerAdmin_resetSpecialization(trackType: string) {
-    if (!(await confirmAction(`Reset ${trackType} specialization for ${playerName}?`))) return;
-    onError("");
-    playerAdmin_showResult(`spec_${trackType}`, "Resetting track", "neutral", true);
-    try {
-      await playersApi.resetSpecialization(dbPlayerId, { trackType, confirmation: "RESET SPECIALIZATION" });
-      playerAdmin_showResult(`spec_${trackType}`, "Track reset. Relog required.", "success");
-      playerAdmin_addLog("Reset Specialization", trackType, "1", "Succeeded");
-      await playerAdmin_loadSpecializations();
-    } catch (error) {
-      const message = friendlyInlineError(error);
-      playerAdmin_showResult(`spec_${trackType}`, message, "danger");
-      playerAdmin_addLog("Reset Specialization", trackType, "1", `Failed: ${message}`);
-    }
-  }
-  async function playerAdmin_grantAllKeystones() {
-    onError("");
-    playerAdmin_showResult("specKeystones", "Granting keystones", "neutral", true);
-    try {
-      await playersApi.grantAllSpecializationKeystones(dbPlayerId, "GRANT ALL KEYSTONES");
-      playerAdmin_showResult("specKeystones", "Keystones granted. Relog required.", "success");
-      playerAdmin_addLog("Grant All Keystones", playerName, "1", "Succeeded");
-    } catch (error) {
-      const message = friendlyInlineError(error);
-      playerAdmin_showResult("specKeystones", message, "danger");
-      playerAdmin_addLog("Grant All Keystones", playerName, "1", `Failed: ${message}`);
-    }
-  }
-  async function playerAdmin_resetAllKeystones() {
-    if (!(await confirmAction(`Reset all specialization keystones for ${playerName}?`))) return;
-    onError("");
-    playerAdmin_showResult("specKeystones", "Resetting keystones", "neutral", true);
-    try {
-      await playersApi.resetAllSpecializationKeystones(dbPlayerId, "RESET ALL KEYSTONES");
-      playerAdmin_showResult("specKeystones", "Keystones reset. Relog required.", "success");
-      playerAdmin_addLog("Reset All Keystones", playerName, "1", "Succeeded");
-    } catch (error) {
-      const message = friendlyInlineError(error);
-      playerAdmin_showResult("specKeystones", message, "danger");
-      playerAdmin_addLog("Reset All Keystones", playerName, "1", `Failed: ${message}`);
-    }
+    await playerAdmin_loadSkillCatalog();
   }
   function playerAdmin_skillKey(school: string, name: string) {
     return `${normalizeSkillSchool(school)}:${normalizeSkillName(name)}`;
@@ -685,21 +578,18 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     if (playerAdmin_activeTab === "Research") void playerAdmin_loadResearchItems();
   }, [playerAdmin_activeTab, dbPlayerId]);
   useEffect(() => {
-    if (playerAdmin_activeTab === "Skills") {
-      void playerAdmin_loadSkillCatalog();
-      void playerAdmin_loadSpecializations();
-    }
+    if (playerAdmin_activeTab === "Skills") void playerAdmin_loadSkillCatalog();
   }, [playerAdmin_activeTab, dbPlayerId]);
   useEffect(() => {
     if (playerAdmin_activeTab !== "Skills" || !dbPlayerId) return;
     const refreshVisibleSkills = () => {
       if (document.visibilityState === "visible" && playerAdmin_skillChangeCount === 0) {
-        void playerAdmin_loadSpecializations();
+        void playerAdmin_loadSkillCatalog();
       }
     };
     const refreshFocusedSkills = () => {
       if (playerAdmin_skillChangeCount === 0) {
-        void playerAdmin_loadSpecializations();
+        void playerAdmin_loadSkillCatalog();
       }
     };
     document.addEventListener("visibilitychange", refreshVisibleSkills);
@@ -760,47 +650,6 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
         <code>{module?.id || "Module ID not found"}</code>
       </article>;
     })}</div>
-  );
-  const playerAdmin_specializationTable = (
-    <div className="playerAdmin_tableWrap playerAdmin_specializationTableWrap">
-      <table className="playerAdmin_table playerAdmin_specializationTable">
-        <colgroup>
-          <col className="playerAdmin_specTrackCol" />
-          <col className="playerAdmin_specXpCol" />
-          <col className="playerAdmin_specLevelCol" />
-          <col className="playerAdmin_specAddXpCol" />
-          <col className="playerAdmin_specResultCol" />
-          <col className="playerAdmin_specActionCol" />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>Track</th>
-            <th>XP</th>
-            <th>Level</th>
-            <th>Add XP</th>
-            <th>Result</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {playerAdmin_specializationRows.map((row) => (
-            <tr key={row.trackType}>
-              <td>{row.trackType}</td>
-              <td>{row.xp.toLocaleString()}</td>
-              <td>{row.level}</td>
-              <td><input className="playerAdmin_specXpInput" type="number" value={playerAdmin_specializationXpAmount} onChange={(event) => playerAdmin_setSpecializationXpAmount(event.target.value)} /></td>
-              <td className="playerAdmin_resultCell"><InlineActionResult result={playerAdmin_actionResult} resultKey={`spec_${row.trackType}`} /></td>
-              <td className="playerAdmin_actionCell">
-                <button disabled={!dbPlayerId || playerAdmin_actionResult?.pending} onClick={() => playerAdmin_addSpecializationXp(row.trackType)}>Add XP</button>
-                <button disabled={!dbPlayerId || playerAdmin_actionResult?.pending} onClick={() => playerAdmin_grantMaxSpecialization(row.trackType)}>Grant Max</button>
-                <button className="danger" disabled={!dbPlayerId || playerAdmin_actionResult?.pending} onClick={() => playerAdmin_resetSpecialization(row.trackType)}>Reset</button>
-              </td>
-            </tr>
-          ))}
-          {!playerAdmin_specializationRows.length && <tr><td colSpan={6}>{playerAdmin_specializationLoading ? "Loading specializations..." : "No specialization tracks were found."}</td></tr>}
-        </tbody>
-      </table>
-    </div>
   );
   const playerAdmin_actionRow = (playerAdmin_key: string, playerAdmin_label: React.ReactNode, playerAdmin_input: React.ReactNode, playerAdmin_buttonLabel: string, playerAdmin_onClick: () => void, playerAdmin_disabled = false, playerAdmin_note = "") => (
     <div className="playerAdmin_actionGroup">
@@ -947,7 +796,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
       }
       playerAdmin_showResult("starterSkills", `${playerAdmin_starterSkillPreset.label} restored for ${playerName}.`, "success");
       playerAdmin_addLog("Restore Starter Skills", playerAdmin_skillSchool, String(playerAdmin_starterSkillPreset.modules.length), "Succeeded");
-      await playerAdmin_loadSpecializations();
+      await playerAdmin_loadSkillCatalog();
     } catch (error) {
       const message = friendlyInlineError(error);
       playerAdmin_showResult("starterSkills", message, "danger");
@@ -1221,7 +1070,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
               <div className="playerAdmin_filterRow playerAdmin_filterRowRight">
                 <span className="playerAdmin_note">{playerAdmin_skillChangeCount} Unsaved Change{playerAdmin_skillChangeCount === 1 ? "" : "s"}</span>
                 <button disabled={!playerAdmin_canRunLiveAction || !playerAdmin_starterSkillPreset || playerAdmin_actionResult?.pending} onClick={() => playerAdmin_restoreStarterSkills()}>Restore Starter Skills</button>
-                <button disabled={playerAdmin_skillCatalogLoading || playerAdmin_specializationLoading} onClick={() => playerAdmin_reloadSkills()}>{playerAdmin_skillCatalogLoading || playerAdmin_specializationLoading ? "Loading..." : "Reload"}</button>
+                <button disabled={playerAdmin_skillCatalogLoading} onClick={() => playerAdmin_reloadSkills()}>{playerAdmin_skillCatalogLoading ? "Loading..." : "Reload"}</button>
                 <InlineActionResult result={playerAdmin_actionResult} resultKey="starterSkills" />
               </div>
             </div>
@@ -1238,19 +1087,24 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
             {playerAdmin_skillCatalogError && <p className="playerAdmin_note danger">{playerAdmin_skillCatalogError}</p>}
             {playerAdmin_skillSchool && <div className="playerAdmin_section"><h5>{playerAdmin_skillSchool}</h5>{playerAdmin_skillTrees[playerAdmin_skillSchool].map((playerAdmin_tree) => playerAdmin_toggleBox(`skill_${playerAdmin_skillSchool}_${playerAdmin_tree.tree}`, playerAdmin_tree.tree, playerAdmin_tree.cards.length ? playerAdmin_skillCards(playerAdmin_skillSchool, playerAdmin_tree.cards) : <p>Leave empty for now.</p>))}{playerAdmin_skillChangeCount > 0 && <div className="playerAdmin_saveBar"><button disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={() => playerAdmin_saveSkillChanges()}>Save</button><button disabled={playerAdmin_actionResult?.pending} onClick={() => playerAdmin_discardSkillChanges()}>Discard</button><InlineActionResult result={playerAdmin_actionResult} resultKey="skillSave" /></div>}</div>}
           </section>
-          {playerAdmin_toggleBox("skills_specializations", "Specializations", <div className="playerAdmin_section">
-            <div className="playerAdmin_boxHeaderLine">
-              <p>The player must be offline.</p>
-              <div className="playerAdmin_filterRow playerAdmin_filterRowRight">
-                <button disabled={!dbPlayerId || playerAdmin_specializationLoading} onClick={() => playerAdmin_loadSpecializations()}>{playerAdmin_specializationLoading ? "Loading..." : "Reload"}</button>
-                <button disabled={!dbPlayerId || playerAdmin_actionResult?.pending} onClick={() => playerAdmin_grantAllKeystones()}>Grant All Keystones</button>
-                <button className="danger" disabled={!dbPlayerId || playerAdmin_actionResult?.pending} onClick={() => playerAdmin_resetAllKeystones()}>Reset All Keystones</button>
-                <InlineActionResult result={playerAdmin_actionResult} resultKey="specKeystones" />
-              </div>
-            </div>
-            {playerAdmin_specializationError && <p className="playerAdmin_note danger">{playerAdmin_specializationError}</p>}
-            {playerAdmin_specializationTable}
-          </div>)}
+        </div>
+      )}
+      {playerAdmin_activeTab === "Specialization" && (
+        <div className="playerAdmin_content">
+          <SpecializationTab
+            dbPlayerId={dbPlayerId}
+            actionPlayerId={actionPlayerId}
+            playerName={playerName}
+            isOnline={playerAdmin_isOnline}
+            onError={onError}
+            confirmAction={confirmAction}
+            onSkillBaselineChange={(baseline) => {
+              playerAdmin_setSkillBaseline(baseline);
+              playerAdmin_setSkillChanges({});
+            }}
+            waitForTask={waitForTask}
+            formatMutationResult={formatMutationResult}
+          />
         </div>
       )}
       {playerAdmin_activeTab === "Journey" && <div className="playerAdmin_content"><section className="playerAdmin_box"><h4>Journey Browser</h4><div className="playerAdmin_boxHeaderLine playerAdmin_filterHeaderLine"><p>A relog is required to see the change.</p><div className="playerAdmin_filterToolsRow"><input className="playerAdmin_filterTextInput" value={playerAdmin_journeyFilter} onChange={(event) => playerAdmin_setJourneyFilter(event.target.value)} placeholder="Filter by name, ID, status, or dependency" aria-label="Filter Journey Browser" />{playerAdmin_journeyFilter && <button type="button" onClick={() => playerAdmin_setJourneyFilter("")}>Clear</button>}<span className="playerAdmin_note">{playerAdmin_journeyFilterTerms.length ? `${playerAdmin_filteredJourneyEntryCount} of ${playerAdmin_journeyEntryCount}` : playerAdmin_journeyEntryCount} Journey Entr{(playerAdmin_journeyFilterTerms.length ? playerAdmin_filteredJourneyEntryCount : playerAdmin_journeyEntryCount) === 1 ? "y" : "ies"} Detected</span></div></div>{playerAdmin_journeyError && <p className="playerAdmin_note danger">{playerAdmin_journeyError}</p>}{playerAdmin_toggleBox("journey_story", `Story (${playerAdmin_filteredJourneyRows.story.length}${playerAdmin_journeyFilterTerms.length ? `/${playerAdmin_journeyRows.story.length}` : ""})`, playerAdmin_journeyTable(playerAdmin_filteredJourneyRows.story, playerAdmin_journeyFilterTerms.length ? "No story entries match this filter." : "No story entries were found.", playerAdmin_journeySortStory, playerAdmin_journeyResizeStory))}{playerAdmin_toggleBox("journey_contract", `Contracts (${playerAdmin_filteredJourneyRows.contract.length}${playerAdmin_journeyFilterTerms.length ? `/${playerAdmin_journeyRows.contract.length}` : ""})`, playerAdmin_journeyTable(playerAdmin_filteredJourneyRows.contract, playerAdmin_journeyFilterTerms.length ? "No contract entries match this filter." : "No contract entries were found.", playerAdmin_journeySortContract, playerAdmin_journeyResizeContract))}{playerAdmin_toggleBox("journey_codex", `Codex (${playerAdmin_filteredJourneyRows.codex.length}${playerAdmin_journeyFilterTerms.length ? `/${playerAdmin_journeyRows.codex.length}` : ""})`, playerAdmin_journeyTable(playerAdmin_filteredJourneyRows.codex, playerAdmin_journeyFilterTerms.length ? "No codex entries match this filter." : "No codex entries were found.", playerAdmin_journeySortCodex, playerAdmin_journeyResizeCodex))}{playerAdmin_toggleBox("journey_tutorial", `Tutorial (${playerAdmin_filteredJourneyRows.tutorial.length}${playerAdmin_journeyFilterTerms.length ? `/${playerAdmin_journeyRows.tutorial.length}` : ""})`, playerAdmin_journeyTable(playerAdmin_filteredJourneyRows.tutorial, playerAdmin_journeyFilterTerms.length ? "No tutorial entries match this filter." : "No tutorial entries were found.", playerAdmin_journeySortTutorial, playerAdmin_journeyResizeTutorial))}</section></div>}
