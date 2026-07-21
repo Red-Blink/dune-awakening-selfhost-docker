@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { KeyRound, RotateCcw, Shield, Trophy, Zap } from "lucide-react";
 import { playersApi } from "../../api/players";
-import type { Task } from "../../api/setup";
 import { InlineActionResult } from "../../components/common/InlineActionResult";
 import { formatCell } from "../../lib/display";
 
@@ -13,14 +12,12 @@ type ActionResult = { key: string; tone: "success" | "danger" | "neutral"; text:
 
 type SpecializationTabProps = {
   dbPlayerId: string;
-  actionPlayerId: string;
   playerName: string;
   isOnline: boolean;
   onError: (text: string) => void;
   confirmAction: ConfirmAction;
   onSkillBaselineChange?: (baseline: Record<string, number>) => void;
-  waitForTask?: (task: Task) => Promise<Task>;
-  formatMutationResult?: (result: unknown) => string;
+  onActionLog?: (actionType: string, target: string, amount: string, notes: string) => void;
 };
 
 function friendlyInlineError(error: unknown) {
@@ -29,22 +26,20 @@ function friendlyInlineError(error: unknown) {
 
 export function SpecializationTab({
   dbPlayerId,
-  actionPlayerId,
   playerName,
   isOnline,
   onError,
   confirmAction,
   onSkillBaselineChange,
-  waitForTask,
-  formatMutationResult
+  onActionLog
 }: SpecializationTabProps) {
   const [rows, setRows] = useState<SpecializationTrackRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [xpAmount, setXpAmount] = useState("1000");
   const [actionResult, setActionResult] = useState<ActionResult | null>(null);
-  const [busyActionKey, setBusyActionKey] = useState("");
   const resultTimer = useRef<number | null>(null);
+  const loadRequest = useRef(0);
 
   useEffect(() => {
     void load();
@@ -60,14 +55,19 @@ export function SpecializationTab({
   }
 
   async function load() {
+    const request = ++loadRequest.current;
     if (!dbPlayerId) {
       setRows([]);
+      setError("");
+      setLoading(false);
+      onSkillBaselineChange?.({});
       return;
     }
     setLoading(true);
     setError("");
     try {
       const response = await playersApi.specs(dbPlayerId);
+      if (request !== loadRequest.current) return;
       setRows((response.rows || []).map((row) => ({
         trackType: String(row.track_type || row.trackType || ""),
         xp: Number(row.xp_amount ?? row.xp ?? 0),
@@ -82,23 +82,12 @@ export function SpecializationTab({
       }).filter(([moduleId, level]) => moduleId && Number(level) > 0));
       onSkillBaselineChange?.(baseline);
     } catch (err) {
+      if (request !== loadRequest.current) return;
       setRows([]);
       setError(friendlyInlineError(err));
+      onSkillBaselineChange?.({});
     } finally {
-      setLoading(false);
-    }
-  }
-
-  async function runAction(key: string, pendingText: string, action: () => Promise<unknown>, successText: string, logAction: { actionType: string; target: string; amount: string }, successTone: "success" | "danger" = "success", failureText?: string | ((error: unknown) => string)) {
-    onError("");
-    showResult(key, pendingText, "neutral", true);
-    try {
-      const response = await action();
-      const responseText = formatMutationResult ? formatMutationResult(response) : "";
-      showResult(key, responseText && responseText !== "Action completed." ? responseText : successText, successTone);
-    } catch (err) {
-      const message = typeof failureText === "function" ? failureText(err) : failureText || friendlyInlineError(err);
-      showResult(key, message, "danger");
+      if (request === loadRequest.current) setLoading(false);
     }
   }
 
@@ -117,10 +106,12 @@ export function SpecializationTab({
     try {
       await playersApi.addSpecializationXp(dbPlayerId, { trackType, amount, confirmation: "ADD SPECIALIZATION XP" });
       showResult(`spec_${trackType}`, "XP updated. Relog required.", "success");
+      onActionLog?.("Add Specialization XP", trackType, String(amount), "Succeeded");
       await load();
     } catch (err) {
       const message = friendlyInlineError(err);
       showResult(`spec_${trackType}`, message, "danger");
+      onActionLog?.("Add Specialization XP", trackType, String(amount), `Failed: ${message}`);
     }
   }
 
@@ -140,14 +131,20 @@ export function SpecializationTab({
     try {
       await playersApi.grantMaxSpecialization(dbPlayerId, { trackType, confirmation: "GRANT MAX SPECIALIZATION" });
       showResult(`spec_${trackType}`, "Max level granted. Relog required.", "success");
+      onActionLog?.("Grant Max Specialization", trackType, "1", "Succeeded");
       await load();
     } catch (err) {
       const message = friendlyInlineError(err);
       showResult(`spec_${trackType}`, message, "danger");
+      onActionLog?.("Grant Max Specialization", trackType, "1", `Failed: ${message}`);
     }
   }
 
   async function resetTrack(trackType: string) {
+    if (isOnline) {
+      showResult(`spec_${trackType}`, "The player must be offline for specialization changes.", "danger");
+      return;
+    }
     if (!(await confirmAction(`Reset ${trackType} specialization for ${playerName}?`, {
       title: "Reset Specialization",
       danger: true,
@@ -158,10 +155,12 @@ export function SpecializationTab({
     try {
       await playersApi.resetSpecialization(dbPlayerId, { trackType, confirmation: "RESET SPECIALIZATION" });
       showResult(`spec_${trackType}`, "Track reset. Relog required.", "success");
+      onActionLog?.("Reset Specialization", trackType, "1", "Succeeded");
       await load();
     } catch (err) {
       const message = friendlyInlineError(err);
       showResult(`spec_${trackType}`, message, "danger");
+      onActionLog?.("Reset Specialization", trackType, "1", `Failed: ${message}`);
     }
   }
 
@@ -181,14 +180,20 @@ export function SpecializationTab({
     try {
       await playersApi.grantAllSpecializationKeystones(dbPlayerId, "GRANT ALL KEYSTONES");
       showResult("specKeystones", "Keystones granted. Relog required.", "success");
+      onActionLog?.("Grant All Keystones", playerName, "1", "Succeeded");
       await load();
     } catch (err) {
       const message = friendlyInlineError(err);
       showResult("specKeystones", message, "danger");
+      onActionLog?.("Grant All Keystones", playerName, "1", `Failed: ${message}`);
     }
   }
 
   async function resetAllKeystones() {
+    if (isOnline) {
+      showResult("specKeystones", "The player must be offline for specialization changes.", "danger");
+      return;
+    }
     if (!(await confirmAction(`Reset all specialization keystones for ${playerName}?`, {
       title: "Reset All Keystones",
       danger: true,
@@ -199,14 +204,16 @@ export function SpecializationTab({
     try {
       await playersApi.resetAllSpecializationKeystones(dbPlayerId, "RESET ALL KEYSTONES");
       showResult("specKeystones", "Keystones reset. Relog required.", "success");
+      onActionLog?.("Reset All Keystones", playerName, "1", "Succeeded");
       await load();
     } catch (err) {
       const message = friendlyInlineError(err);
       showResult("specKeystones", message, "danger");
+      onActionLog?.("Reset All Keystones", playerName, "1", `Failed: ${message}`);
     }
   }
 
-  const isBusy = actionResult?.pending || Boolean(busyActionKey);
+  const isBusy = Boolean(actionResult?.pending);
   const canAct = Boolean(dbPlayerId) && !isOnline;
 
   return (
@@ -236,7 +243,7 @@ export function SpecializationTab({
           </button>
           <button
             className="danger"
-            disabled={!dbPlayerId || isBusy}
+            disabled={!canAct || isBusy}
             onClick={() => void resetAllKeystones()}
             aria-label="Reset All Keystones"
           >

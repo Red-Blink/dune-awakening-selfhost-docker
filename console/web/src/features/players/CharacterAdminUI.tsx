@@ -19,6 +19,7 @@ import { BlueprintsPanel } from "../blueprints/BlueprintsPanel";
 type CraftingRecipeRow = { recipeId: string; displayName: string; category: string; source: string; qualityLevel: number; unlocked: boolean };
 type ResearchItemRow = { itemKey: string; displayName: string; category: string; productGroup: string; type: string; unlockedState: string; unlocked: boolean; isNew: boolean };
 type SkillModuleCatalogRow = { skillModule: string; category: string; id: string; maxLevel: number };
+type LearnedSkillModuleRow = { module_id?: unknown; moduleId?: unknown; id?: unknown; level?: unknown; rank?: unknown; skill_points_spent?: unknown; skillPointsSpent?: unknown };
 type SkillCard = { name: string; type: string; rank: string };
 type StarterSkillPreset = { label: string; modules: { id: string; level: number }[] };
 type JourneyRow = { id: string; name: string; rawName: string; category: string; depth: number; parentId: string; dependency?: string; status: string; complete: boolean; revealed?: boolean; pendingReward?: boolean; tags?: number; state?: number | null };
@@ -106,6 +107,8 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
   const [playerAdmin_skillCatalog, playerAdmin_setSkillCatalog] = useState<SkillModuleCatalogRow[]>([]);
   const [playerAdmin_skillCatalogLoading, playerAdmin_setSkillCatalogLoading] = useState(false);
   const [playerAdmin_skillCatalogError, playerAdmin_setSkillCatalogError] = useState("");
+  const [playerAdmin_skillBaselineLoading, playerAdmin_setSkillBaselineLoading] = useState(false);
+  const [playerAdmin_skillBaselineError, playerAdmin_setSkillBaselineError] = useState("");
   const [playerAdmin_skillBaseline, playerAdmin_setSkillBaseline] = useState<Record<string, number>>({});
   const [playerAdmin_skillChanges, playerAdmin_setSkillChanges] = useState<Record<string, number>>({});
   const [playerAdmin_journeyRows, playerAdmin_setJourneyRows] = useState<Record<string, JourneyRow[]>>({ story: [], contract: [], codex: [], tutorial: [] });
@@ -119,6 +122,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
   const [playerAdmin_vehicleCatalog, playerAdmin_setVehicleCatalog] = useState<Record<string, string[]>>({});
   const [playerAdmin_vehicleDecayThreshold, playerAdmin_setVehicleDecayThreshold] = useState("50");
   const playerAdmin_resultTimer = useRef<number | null>(null);
+  const playerAdmin_skillBaselineRequest = useRef(0);
   useEffect(() => {
     playerAdmin_setFilteredAugments(filterAugmentsForItem({
       itemId: playerAdmin_itemId,
@@ -387,8 +391,39 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
       playerAdmin_setSkillCatalogLoading(false);
     }
   }
+  async function playerAdmin_loadSkillBaseline() {
+    const request = ++playerAdmin_skillBaselineRequest.current;
+    if (!dbPlayerId) {
+      playerAdmin_setSkillBaseline({});
+      playerAdmin_setSkillChanges({});
+      playerAdmin_setSkillBaselineError("");
+      playerAdmin_setSkillBaselineLoading(false);
+      return;
+    }
+    playerAdmin_setSkillBaselineLoading(true);
+    playerAdmin_setSkillBaselineError("");
+    try {
+      const response = await playersApi.specs(dbPlayerId);
+      if (request !== playerAdmin_skillBaselineRequest.current) return;
+      const learnedRows = Array.isArray(response.skillModules) ? response.skillModules as LearnedSkillModuleRow[] : [];
+      const baseline = Object.fromEntries(learnedRows.map((row) => {
+        const moduleId = String(row.module_id || row.moduleId || row.id || "");
+        const level = Number(row.level ?? row.rank ?? row.skill_points_spent ?? row.skillPointsSpent ?? 0);
+        return [moduleId, Math.max(0, level)];
+      }).filter(([moduleId, level]) => moduleId && Number(level) > 0));
+      playerAdmin_setSkillBaseline(baseline);
+      playerAdmin_setSkillChanges({});
+    } catch (error) {
+      if (request !== playerAdmin_skillBaselineRequest.current) return;
+      playerAdmin_setSkillBaseline({});
+      playerAdmin_setSkillChanges({});
+      playerAdmin_setSkillBaselineError(friendlyInlineError(error));
+    } finally {
+      if (request === playerAdmin_skillBaselineRequest.current) playerAdmin_setSkillBaselineLoading(false);
+    }
+  }
   async function playerAdmin_reloadSkills() {
-    await playerAdmin_loadSkillCatalog();
+    await Promise.all([playerAdmin_loadSkillCatalog(), playerAdmin_loadSkillBaseline()]);
   }
   function playerAdmin_skillKey(school: string, name: string) {
     return `${normalizeSkillSchool(school)}:${normalizeSkillName(name)}`;
@@ -578,18 +613,18 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     if (playerAdmin_activeTab === "Research") void playerAdmin_loadResearchItems();
   }, [playerAdmin_activeTab, dbPlayerId]);
   useEffect(() => {
-    if (playerAdmin_activeTab === "Skills") void playerAdmin_loadSkillCatalog();
-  }, [playerAdmin_activeTab, dbPlayerId]);
+    if (playerAdmin_activeTab === "Skills") void playerAdmin_reloadSkills();
+  }, [playerAdmin_activeTab, dbPlayerId, actionPlayerId]);
   useEffect(() => {
     if (playerAdmin_activeTab !== "Skills" || !dbPlayerId) return;
     const refreshVisibleSkills = () => {
       if (document.visibilityState === "visible" && playerAdmin_skillChangeCount === 0) {
-        void playerAdmin_loadSkillCatalog();
+        void playerAdmin_loadSkillBaseline();
       }
     };
     const refreshFocusedSkills = () => {
       if (playerAdmin_skillChangeCount === 0) {
-        void playerAdmin_loadSkillCatalog();
+        void playerAdmin_loadSkillBaseline();
       }
     };
     document.addEventListener("visibilitychange", refreshVisibleSkills);
@@ -614,6 +649,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
   useEffect(() => {
     playerAdmin_setSkillBaseline({});
     playerAdmin_setSkillChanges({});
+    playerAdmin_setSkillBaselineError("");
   }, [actionPlayerId]);
   useEffect(() => () => { if (playerAdmin_resultTimer.current) window.clearTimeout(playerAdmin_resultTimer.current); }, []);
   const playerAdmin_table = (playerAdmin_columns: string[], playerAdmin_rows: Record<string, string>[]) => (
@@ -796,7 +832,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
       }
       playerAdmin_showResult("starterSkills", `${playerAdmin_starterSkillPreset.label} restored for ${playerName}.`, "success");
       playerAdmin_addLog("Restore Starter Skills", playerAdmin_skillSchool, String(playerAdmin_starterSkillPreset.modules.length), "Succeeded");
-      await playerAdmin_loadSkillCatalog();
+      await playerAdmin_loadSkillBaseline();
     } catch (error) {
       const message = friendlyInlineError(error);
       playerAdmin_showResult("starterSkills", message, "danger");
@@ -1070,7 +1106,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
               <div className="playerAdmin_filterRow playerAdmin_filterRowRight">
                 <span className="playerAdmin_note">{playerAdmin_skillChangeCount} Unsaved Change{playerAdmin_skillChangeCount === 1 ? "" : "s"}</span>
                 <button disabled={!playerAdmin_canRunLiveAction || !playerAdmin_starterSkillPreset || playerAdmin_actionResult?.pending} onClick={() => playerAdmin_restoreStarterSkills()}>Restore Starter Skills</button>
-                <button disabled={playerAdmin_skillCatalogLoading} onClick={() => playerAdmin_reloadSkills()}>{playerAdmin_skillCatalogLoading ? "Loading..." : "Reload"}</button>
+                <button disabled={playerAdmin_skillCatalogLoading || playerAdmin_skillBaselineLoading} onClick={() => playerAdmin_reloadSkills()}>{playerAdmin_skillCatalogLoading || playerAdmin_skillBaselineLoading ? "Loading..." : "Reload"}</button>
                 <InlineActionResult result={playerAdmin_actionResult} resultKey="starterSkills" />
               </div>
             </div>
@@ -1085,6 +1121,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
               includeAll={false}
             />
             {playerAdmin_skillCatalogError && <p className="playerAdmin_note danger">{playerAdmin_skillCatalogError}</p>}
+            {playerAdmin_skillBaselineError && <p className="playerAdmin_note danger">{playerAdmin_skillBaselineError}</p>}
             {playerAdmin_skillSchool && <div className="playerAdmin_section"><h5>{playerAdmin_skillSchool}</h5>{playerAdmin_skillTrees[playerAdmin_skillSchool].map((playerAdmin_tree) => playerAdmin_toggleBox(`skill_${playerAdmin_skillSchool}_${playerAdmin_tree.tree}`, playerAdmin_tree.tree, playerAdmin_tree.cards.length ? playerAdmin_skillCards(playerAdmin_skillSchool, playerAdmin_tree.cards) : <p>Leave empty for now.</p>))}{playerAdmin_skillChangeCount > 0 && <div className="playerAdmin_saveBar"><button disabled={!playerAdmin_canRunLiveAction || playerAdmin_actionResult?.pending} onClick={() => playerAdmin_saveSkillChanges()}>Save</button><button disabled={playerAdmin_actionResult?.pending} onClick={() => playerAdmin_discardSkillChanges()}>Discard</button><InlineActionResult result={playerAdmin_actionResult} resultKey="skillSave" /></div>}</div>}
           </section>
         </div>
@@ -1093,7 +1130,6 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
         <div className="playerAdmin_content">
           <SpecializationTab
             dbPlayerId={dbPlayerId}
-            actionPlayerId={actionPlayerId}
             playerName={playerName}
             isOnline={playerAdmin_isOnline}
             onError={onError}
@@ -1102,8 +1138,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
               playerAdmin_setSkillBaseline(baseline);
               playerAdmin_setSkillChanges({});
             }}
-            waitForTask={waitForTask}
-            formatMutationResult={formatMutationResult}
+            onActionLog={(actionType, target, amount, notes) => playerAdmin_addLog(actionType, target, amount, notes)}
           />
         </div>
       )}

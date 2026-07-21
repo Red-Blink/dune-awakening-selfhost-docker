@@ -17,6 +17,7 @@ vi.mock("../../api/players", () => ({
 const mockConfirmAction = vi.fn();
 const mockOnError = vi.fn();
 const mockOnSkillBaselineChange = vi.fn();
+const mockOnActionLog = vi.fn();
 
 const defaultProps = {
   dbPlayerId: "player-123",
@@ -25,7 +26,8 @@ const defaultProps = {
   isOnline: false,
   onError: mockOnError,
   confirmAction: mockConfirmAction,
-  onSkillBaselineChange: mockOnSkillBaselineChange
+  onSkillBaselineChange: mockOnSkillBaselineChange,
+  onActionLog: mockOnActionLog
 };
 
 const mockSpecsResponse = {
@@ -128,6 +130,17 @@ describe("SpecializationTab", () => {
       expect(keystoneButton).toBeDisabled();
     });
 
+    it("disables Reset All Keystones button when player is online", async () => {
+      vi.mocked(playersApi.specs).mockResolvedValue(mockSpecsResponse);
+      render(<SpecializationTab {...defaultProps} isOnline={true} />);
+      await waitFor(() => {
+        expect(screen.getByText("Trooper")).toBeInTheDocument();
+      });
+
+      expect(screen.getByRole("button", { name: "Reset All Keystones" })).toBeDisabled();
+      expect(playersApi.resetAllSpecializationKeystones).not.toHaveBeenCalled();
+    });
+
     it("enables action buttons when player is offline", async () => {
       vi.mocked(playersApi.specs).mockResolvedValue(mockSpecsResponse);
       render(<SpecializationTab {...defaultProps} isOnline={false} />);
@@ -148,7 +161,7 @@ describe("SpecializationTab", () => {
       vi.mocked(playersApi.specs).mockResolvedValue(mockSpecsResponse);
       render(<SpecializationTab {...defaultProps} />);
       await waitFor(() => {
-        expect(screen.getByText(/The player must be offline/i)).toBeInTheDocument();
+        expect(screen.getByText(/offline for all specialization changes/i)).toBeInTheDocument();
       });
     });
   });
@@ -171,6 +184,7 @@ describe("SpecializationTab", () => {
           amount: 1000,
           confirmation: "ADD SPECIALIZATION XP"
         });
+        expect(mockOnActionLog).toHaveBeenCalledWith("Add Specialization XP", "Trooper", "1000", "Succeeded");
       });
     });
 
@@ -192,19 +206,17 @@ describe("SpecializationTab", () => {
       });
     });
 
-    it("shows error when player is online and Add XP is attempted", async () => {
+    it("does not submit Add XP while the player is online", async () => {
       vi.mocked(playersApi.specs).mockResolvedValue(mockSpecsResponse);
       render(<SpecializationTab {...defaultProps} isOnline={true} />);
       await waitFor(() => {
         expect(screen.getByText("Trooper")).toBeInTheDocument();
       });
 
-      const addButtons = screen.getAllByText("Add XP");
+      const addButtons = screen.getAllByRole("button", { name: /Add XP to/i });
       fireEvent.click(addButtons[0]);
-
-      await waitFor(() => {
-        expect(screen.getByText(/The player must be offline/i)).toBeInTheDocument();
-      });
+      expect(addButtons[0]).toBeDisabled();
+      expect(playersApi.addSpecializationXp).not.toHaveBeenCalled();
     });
   });
 
