@@ -167,6 +167,7 @@ export function GuildsPanel({ onError }: GuildsPanelProps) {
         sortColumn={sortColumn}
         sortDirection={sortDirection}
         onSort={handleSort}
+        nonSortableColumns={["guild_description"]}
         rowKey={(row) => String(row.guild_id)}
         emptyMessage="No guilds have been found yet."
       />

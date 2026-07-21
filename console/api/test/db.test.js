@@ -528,6 +528,37 @@ test("players query filters stale actor rows when player_state has current pawn 
   assert.equal(result.rows[0].actor_id, 78);
 });
 
+test("listPlayers with includeTotals false skips the unfiltered totals query and omits totalPlayers", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [{ column_name: "online_status" }] };
+      return { rows: [{ actor_id: 1, total_count: 1 }] };
+    }
+  };
+  const result = await listPlayers(db, { includeTotals: false });
+  assert.equal(calls.find((call) => call.text.includes("count(distinct dedupe_key)")), undefined,
+    "unfiltered totals query must not run when includeTotals is false");
+  assert.equal(result.totalPlayers, undefined);
+  assert.equal(result.totalCount, 1);
+});
+
+test("listPlayers reports statusFilterApplied based on online_status column presence", async () => {
+  const mockDb = (columns) => ({
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: columns.map((column_name) => ({ column_name })) };
+      return { rows: [{ actor_id: 1, total_count: 1, total_players: 1 }] };
+    }
+  });
+  const withColumn = await listPlayers(mockDb(["online_status"]), {});
+  assert.equal(withColumn.capabilities.statusFilterApplied, true);
+  const withoutColumn = await listPlayers(mockDb([]), {});
+  assert.equal(withoutColumn.capabilities.statusFilterApplied, false);
+});
+
 test("players query filters offline transferred character placeholder actor rows", async () => {
   const calls = [];
   const db = {

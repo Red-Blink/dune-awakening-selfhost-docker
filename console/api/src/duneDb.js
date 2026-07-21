@@ -1199,7 +1199,7 @@ const PLAYER_SORT_COLUMNS = {
   actor_id: { order: ["actor_id"] }
 };
 
-export async function listPlayers(db, { status = "all", q = "", page = 0, pageSize = 50, sortColumn = "character_name", sortDirection = "asc" } = {}) {
+export async function listPlayers(db, { status = "all", q = "", page = 0, pageSize = 50, sortColumn = "character_name", sortDirection = "asc", includeTotals = true } = {}) {
   if (!(await tableExists(db, "actors")) || !(await tableExists(db, "player_state"))) {
     return { ...unsupported("players", ["dune.actors", "dune.player_state"]), totalCount: 0, totalPlayers: 0 };
   }
@@ -1315,7 +1315,7 @@ export async function listPlayers(db, { status = "all", q = "", page = 0, pageSi
     from paged
     order by ${pagedOrder}`, values);
 
-  const totalsResult = await db.query(`
+  const totalsResult = includeTotals ? await db.query(`
     with player_rows as (
       select coalesce(nullif(ps.player_controller_id, 0), nullif(a.owner_account_id, 0), a.id) as dedupe_key
       from dune.actors a
@@ -1324,12 +1324,12 @@ export async function listPlayers(db, { status = "all", q = "", page = 0, pageSi
       where ${baseWhere}
     )
     select count(distinct dedupe_key)::int as total_players
-    from player_rows`);
+    from player_rows`) : null;
 
   return {
-    capabilities: { players: true, status },
+    capabilities: { players: true, status, statusFilterApplied: hasOnlineStatus },
     totalCount: result.rows[0] ? Number(result.rows[0].total_count) : 0,
-    totalPlayers: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_players) : 0,
+    totalPlayers: totalsResult ? (totalsResult.rows[0] ? Number(totalsResult.rows[0].total_players) : 0) : undefined,
     rows: result.rows.map(({ total_count, ...row }) => row)
   };
 }
@@ -1344,7 +1344,7 @@ export async function listAllPlayers(db, { status = "all", q = "" } = {}) {
   let rows = [];
   let first = null;
   for (;;) {
-    const result = await listPlayers(db, { status, q, page, pageSize: LIST_ALL_PLAYERS_PAGE_SIZE });
+    const result = await listPlayers(db, { status, q, page, pageSize: LIST_ALL_PLAYERS_PAGE_SIZE, includeTotals: false });
     if (!first) first = result;
     if (!result?.capabilities?.players) return result;
     rows = rows.concat(result.rows || []);
