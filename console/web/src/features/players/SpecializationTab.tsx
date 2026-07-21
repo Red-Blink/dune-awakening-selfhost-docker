@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { KeyRound, RotateCcw, Shield, Trophy, Zap } from "lucide-react";
 import { playersApi } from "../../api/players";
 import { InlineActionResult } from "../../components/common/InlineActionResult";
-import { formatCell } from "../../lib/display";
 
 type SpecializationTrackRow = { trackType: string; xp: number; level: number; keystone?: boolean };
 
@@ -217,7 +216,7 @@ export function SpecializationTab({
   const canAct = Boolean(dbPlayerId) && !isOnline;
 
   return (
-    <section className="specialization-tab">
+    <section className="playerAdmin_box specialization-tab">
       <div className="specialization-header">
         <div className="specialization-header-left">
           <h4>Specialization Tracks</h4>
@@ -263,7 +262,6 @@ export function SpecializationTab({
             <col className="playerAdmin_specLevelCol" />
             <col className="playerAdmin_specKeystoneCol" />
             <col className="playerAdmin_specAddXpCol" />
-            <col className="playerAdmin_specResultCol" />
             <col className="playerAdmin_specActionCol" />
           </colgroup>
           <thead>
@@ -273,7 +271,6 @@ export function SpecializationTab({
               <th>Level</th>
               <th>Keystone</th>
               <th>Add XP</th>
-              <th>Result</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -285,6 +282,7 @@ export function SpecializationTab({
                     <Trophy size={14} className="spec-track-icon" />
                     {row.trackType}
                   </div>
+                  <InlineActionResult result={actionResult} resultKey={`spec_${row.trackType}`} />
                 </td>
                 <td>{row.xp.toLocaleString()}</td>
                 <td>
@@ -299,27 +297,26 @@ export function SpecializationTab({
                     : <span className="spec-keystone-no">—</span>}
                 </td>
                 <td>
-                  <input
-                    className="playerAdmin_specXpInput"
-                    type="number"
-                    min="0"
-                    value={xpAmount}
-                    onChange={(event) => setXpAmount(event.target.value)}
-                    disabled={!canAct || isBusy}
-                    aria-label={`XP amount for ${row.trackType}`}
-                  />
-                </td>
-                <td className="playerAdmin_resultCell">
-                  <InlineActionResult result={actionResult} resultKey={`spec_${row.trackType}`} />
+                  <div className="specialization-xp-control">
+                    <input
+                      className="playerAdmin_specXpInput"
+                      type="number"
+                      min="0"
+                      value={xpAmount}
+                      onChange={(event) => setXpAmount(event.target.value)}
+                      disabled={!canAct || isBusy}
+                      aria-label={`XP amount for ${row.trackType}`}
+                    />
+                    <button
+                      disabled={!canAct || isBusy}
+                      onClick={() => void addXp(row.trackType)}
+                      aria-label={`Add XP to ${row.trackType}`}
+                    >
+                      Add
+                    </button>
+                  </div>
                 </td>
                 <td className="playerAdmin_actionCell">
-                  <button
-                    disabled={!canAct || isBusy}
-                    onClick={() => void addXp(row.trackType)}
-                    aria-label={`Add XP to ${row.trackType}`}
-                  >
-                    Add XP
-                  </button>
                   <button
                     disabled={!canAct || isBusy}
                     onClick={() => void grantMax(row.trackType)}
@@ -340,7 +337,7 @@ export function SpecializationTab({
             ))}
             {!rows.length && (
               <tr>
-                <td colSpan={7}>
+                <td colSpan={6}>
                   {loading
                     ? "Loading specializations..."
                     : "No specialization tracks were found."}
@@ -351,13 +348,6 @@ export function SpecializationTab({
         </table>
       </div>
 
-      <div className="specialization-footer">
-        <p className="specialization-help-note">
-          The player must be offline for specialization changes.
-          XP and level changes are applied directly to the game database and require a relog to appear in-game.
-          Grant Max and keystone actions require confirmation due to their high impact.
-        </p>
-      </div>
     </section>
   );
 }

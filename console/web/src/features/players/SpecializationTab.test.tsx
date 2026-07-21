@@ -148,7 +148,7 @@ describe("SpecializationTab", () => {
         expect(screen.getByText("Trooper")).toBeInTheDocument();
       });
 
-      const addButtons = screen.getAllByText("Add XP");
+      const addButtons = screen.getAllByRole("button", { name: /Add XP to/i });
       const grantButtons = screen.getAllByText("Grant Max");
       const resetButtons = screen.getAllByText("Reset");
 
