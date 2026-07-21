@@ -223,12 +223,14 @@ export function SpecializationTab({
           <button
             disabled={!dbPlayerId || loading}
             onClick={() => void load()}
+            aria-label="Reload specializations"
           >
             {loading ? "Loading..." : "Reload"}
           </button>
           <button
             disabled={!canAct || isBusy}
             onClick={() => void grantAllKeystones()}
+            aria-label="Grant All Keystones"
           >
             <KeyRound size={14} /> Grant All Keystones
           </button>
@@ -236,6 +238,7 @@ export function SpecializationTab({
             className="danger"
             disabled={!dbPlayerId || isBusy}
             onClick={() => void resetAllKeystones()}
+            aria-label="Reset All Keystones"
           >
             <RotateCcw size={14} /> Reset All Keystones
           </button>
@@ -296,6 +299,7 @@ export function SpecializationTab({
                     value={xpAmount}
                     onChange={(event) => setXpAmount(event.target.value)}
                     disabled={!canAct || isBusy}
+                    aria-label={`XP amount for ${row.trackType}`}
                   />
                 </td>
                 <td className="playerAdmin_resultCell">
@@ -305,12 +309,14 @@ export function SpecializationTab({
                   <button
                     disabled={!canAct || isBusy}
                     onClick={() => void addXp(row.trackType)}
+                    aria-label={`Add XP to ${row.trackType}`}
                   >
                     Add XP
                   </button>
                   <button
                     disabled={!canAct || isBusy}
                     onClick={() => void grantMax(row.trackType)}
+                    aria-label={`Grant Max for ${row.trackType}`}
                   >
                     Grant Max
                   </button>
@@ -318,6 +324,7 @@ export function SpecializationTab({
                     className="danger"
                     disabled={!canAct || isBusy}
                     onClick={() => void resetTrack(row.trackType)}
+                    aria-label={`Reset ${row.trackType}`}
                   >
                     Reset
                   </button>
