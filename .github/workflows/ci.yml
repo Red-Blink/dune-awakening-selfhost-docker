@@ -17,6 +17,25 @@ permissions:
   contents: read
 
 jobs:
+  web-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: console/web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: console/web
+      - name: Run console web tests
+        run: npm test
+        working-directory: console/web
+      - name: Build console web
+        run: npm run build
+        working-directory: console/web
+
   api-tests:
     runs-on: ubuntu-latest
     services:
@@ -116,6 +135,7 @@ jobs:
     name: Release gate
     if: ${{ always() }}
     needs:
+      - web-tests
       - api-tests
       - metrics-unit
       - runtime-script-unit
@@ -127,6 +147,7 @@ jobs:
     steps:
       - name: Require every release check to pass
         env:
+          WEB_TESTS: ${{ needs.web-tests.result }}
           API_TESTS: ${{ needs.api-tests.result }}
           METRICS_UNIT: ${{ needs.metrics-unit.result }}
           RUNTIME_SCRIPT_UNIT: ${{ needs.runtime-script-unit.result }}
@@ -138,6 +159,7 @@ jobs:
           set -euo pipefail
           failed=0
           for result in \
+            "$WEB_TESTS" \
             "$API_TESTS" \
             "$METRICS_UNIT" \
             "$RUNTIME_SCRIPT_UNIT" \
