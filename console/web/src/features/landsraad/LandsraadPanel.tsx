@@ -56,7 +56,7 @@ export function LandsraadPanel({ confirmAction, onError }: LandsraadAdminSection
     try {
       const [nextOverview, nextPlayers] = await Promise.all([
         adminApi.landsraad(),
-        playersApi.list().catch(() => ({ rows: [] }))
+        playersApi.listAll().catch(() => ({ rows: [] }))
       ]);
       setOverview(nextOverview);
       setPlayers(nextPlayers.rows || []);

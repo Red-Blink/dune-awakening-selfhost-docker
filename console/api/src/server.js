@@ -382,10 +382,27 @@ async function handleApi(req, res) {
   if (path === "/api/settings/admin-password" && req.method === "POST") return adminPasswordRoute(req, res);
   if (path === "/api/settings/web-port" && req.method === "POST") return webPortRoute(req, res);
 
-  if (path === "/api/players") return dbJson(res, () => duneDb.listPlayers(db, { q: url.searchParams.get("q") || "" }));
-  if (path === "/api/players/online") return dbJson(res, () => duneDb.listPlayers(db, { online: true }));
+  if (path === "/api/players") return dbJson(res, () => duneDb.listPlayers(db, {
+    q: url.searchParams.get("q") || "",
+    page: url.searchParams.get("page") || 0,
+    pageSize: url.searchParams.get("pageSize") || 50,
+    status: url.searchParams.get("status") || "all",
+    sortColumn: url.searchParams.get("sortColumn") || "character_name",
+    sortDirection: url.searchParams.get("sortDirection") || "asc"
+  }));
+  if (path === "/api/players/online") return dbJson(res, () => duneDb.listPlayers(db, {
+    status: "online",
+    page: url.searchParams.get("page") || 0,
+    pageSize: url.searchParams.get("pageSize") || 200
+  }));
   if (path === "/api/players/search") return dbJson(res, () => duneDb.listPlayers(db, { q: url.searchParams.get("q") || "" }));
-  if (path === "/api/guilds") return dbJson(res, () => duneDb.listGuilds(db, { q: url.searchParams.get("q") || "" }));
+  if (path === "/api/guilds") return dbJson(res, () => duneDb.listGuilds(db, {
+    q: url.searchParams.get("q") || "",
+    page: url.searchParams.get("page") || 0,
+    pageSize: url.searchParams.get("pageSize") || 50,
+    sortColumn: url.searchParams.get("sortColumn") || "guild_name",
+    sortDirection: url.searchParams.get("sortDirection") || "asc"
+  }));
   if (path.match(/^\/api\/guilds\/[^/]+\/members$/)) return dbJson(res, () => duneDb.guildMembers(db, decodeURIComponent(path.split("/")[3])));
   if (path === "/api/bases") return dbJson(res, () => duneDb.listBases(db, {
     q: url.searchParams.get("q") || "",
@@ -1218,7 +1235,7 @@ async function messageOfTheDayRoute(req, res) {
   try {
     const result = body.restoreDefaults ? restoreMessageOfTheDay(config) : saveMessageOfTheDay(config, body.settings || body);
     if (result.settings.enabled) {
-      const players = await duneDb.listPlayers(db, { online: true }).catch(() => ({ rows: [] }));
+      const players = await duneDb.listAllPlayers(db, { status: "online" }).catch(() => ({ rows: [] }));
       primeMessageOfTheDayOnlineState(config, players.rows || []);
     }
     audit(config, req, "admin.message-of-the-day.save", { restoreDefaults: Boolean(body.restoreDefaults), enabled: result.settings.enabled });
@@ -1244,7 +1261,7 @@ async function playerAnnouncementsRoute(req, res) {
   try {
     const result = body.restoreDefaults ? restorePlayerAnnouncements(config) : savePlayerAnnouncements(config, body.settings || body);
     if (result.settings.joinEnabled || result.settings.leaveEnabled) {
-      const players = await duneDb.listPlayers(db, { online: true }).catch(() => ({ rows: [] }));
+      const players = await duneDb.listAllPlayers(db, { status: "online" }).catch(() => ({ rows: [] }));
       primePlayerAnnouncementOnlineState(config, players.rows || []);
     }
     audit(config, req, "admin.player-announcements.save", { restoreDefaults: Boolean(body.restoreDefaults), joinEnabled: result.settings.joinEnabled, leaveEnabled: result.settings.leaveEnabled });
@@ -1555,7 +1572,7 @@ async function carePackageGrantRoute(req, res, path) {
 async function carePackageEligibleRoute(req, res) {
   try {
     const params = new URL(req.url, "http://localhost").searchParams;
-    const players = await duneDb.listPlayers(db, {});
+    const players = await duneDb.listAllPlayers(db, {});
     if (players.capabilities?.players === false) return json(res, 501, { supported: false, reason: players.reason || "Player list is unavailable" });
     return json(res, 200, carePackageEligiblePlayers(config, players.rows || [], {
       ruleId: params.get("ruleId") || "",
@@ -1569,7 +1586,7 @@ async function carePackageEligibleRoute(req, res) {
 
 async function carePackageGrantEligibleRoute(req, res) {
   try {
-    const players = await duneDb.listPlayers(db, {});
+    const players = await duneDb.listAllPlayers(db, {});
     if (players.capabilities?.players === false) return json(res, 501, { supported: false, reason: players.reason || "Player list is unavailable" });
     const result = await grantEligibleCarePackages(config, players.rows || [], await readJson(req), { db });
     audit(config, req, "care-package.grant-eligible", { supported: true, granted: result.granted, skipped: result.skipped, failed: result.failed });
@@ -1585,7 +1602,7 @@ async function carePackageRunRoute(req, res) {
   const body = await readJson(req);
   if (body.confirmation !== "RUN CARE PACKAGE SCAN") return json(res, 400, { error: "Confirmation phrase required: RUN CARE PACKAGE SCAN" });
   try {
-    const players = await duneDb.listPlayers(db, {});
+    const players = await duneDb.listAllPlayers(db, {});
     if (players.capabilities?.players === false) return json(res, 501, { supported: false, reason: players.reason || "Player list is unavailable" });
     const result = await runCarePackageAutoScan(config, players.rows || [], "manual-scan", { db });
     audit(config, req, "care-package.run", { supported: true, ...result, results: undefined });
@@ -1625,7 +1642,7 @@ async function carePackageClearHistoryRoute(req, res) {
 }
 
 async function resolveCarePackagePlayerIdentity(playerId) {
-  const players = await duneDb.listPlayers(db, {});
+  const players = await duneDb.listAllPlayers(db, {});
   const rows = players.rows || [];
   const target = String(playerId || "").toLowerCase();
   const player = rows.find((row) => [row.action_player_id, row.funcom_id, row.fls_id, row.account_id, row.actor_id, row.player_pawn_id]
@@ -1641,7 +1658,7 @@ async function resolveCarePackagePlayerIdentity(playerId) {
 }
 
 async function resolvePlayerGrantTarget(playerId) {
-  const players = await duneDb.listPlayers(db, {}).catch(() => ({ rows: [] }));
+  const players = await duneDb.listAllPlayers(db, {}).catch(() => ({ rows: [] }));
   const rows = players.rows || [];
   const target = String(playerId || "").toLowerCase();
   const player = rows.find((row) => [row.action_player_id, row.funcom_id, row.fls_id, row.account_id, row.actor_id, row.player_pawn_id]
@@ -2277,7 +2294,7 @@ async function carePackageAutoTick() {
   carePackageAutoRunning = true;
   carePackageAutoLastRun = Date.now();
   try {
-    const players = await duneDb.listPlayers(db, {});
+    const players = await duneDb.listAllPlayers(db, {});
     if (players.capabilities?.players === false) return;
     const result = await runCarePackageAutoScan(config, players.rows || [], "auto", { db });
     if (result.granted || result.failed) {
@@ -2311,7 +2328,7 @@ async function messageOfTheDayAutoTick() {
   messageOfTheDayAutoRunning = true;
   messageOfTheDayAutoLastRun = now;
   try {
-    const players = await duneDb.listPlayers(db, { online: true });
+    const players = await duneDb.listAllPlayers(db, { status: "online" });
     if (players.capabilities?.players === false) return;
     const result = await runMessageOfTheDayScan(config, players.rows || [], { db });
     if (result.sent || result.failed) {
@@ -2345,7 +2362,7 @@ async function playerAnnouncementsAutoTick() {
   playerAnnouncementsAutoRunning = true;
   playerAnnouncementsAutoLastRun = now;
   try {
-    const players = await duneDb.listPlayers(db, { online: true });
+    const players = await duneDb.listAllPlayers(db, { status: "online" });
     if (players.capabilities?.players === false) return;
     const result = await runPlayerAnnouncementScan(config, players.rows || [], { db });
     if (result.joined || result.left || result.sent || result.failed) {

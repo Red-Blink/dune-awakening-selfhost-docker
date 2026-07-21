@@ -1190,10 +1190,27 @@ export async function columnsFor(db, table, schema = "dune") {
   return new Set(result.rows.map((row) => row.column_name));
 }
 
-export async function listPlayers(db, { online = false, q = "" } = {}) {
+const PLAYER_SORT_COLUMNS = {
+  character_name: { order: ["lower(coalesce(character_name, ''))"] },
+  fls_id: { order: ["lower(coalesce(fls_id, ''))"] },
+  online_status: { order: ["online_status"] },
+  map: { order: ["lower(coalesce(map, ''))"] },
+  last_seen: { order: ["last_seen"] },
+  actor_id: { order: ["actor_id"] }
+};
+
+export async function listPlayers(db, { status = "all", q = "", page = 0, pageSize = 50, sortColumn = "character_name", sortDirection = "asc", includeTotals = true } = {}) {
   if (!(await tableExists(db, "actors")) || !(await tableExists(db, "player_state"))) {
-    return unsupported("players", ["dune.actors", "dune.player_state"]);
+    return { ...unsupported("players", ["dune.actors", "dune.player_state"]), totalCount: 0, totalPlayers: 0 };
   }
+  const safePageSize = intParam(pageSize, "pageSize", 1, 200);
+  const safePage = intParam(page, "page", 0);
+  const offset = safePage * safePageSize;
+  const safeSortColumn = Object.hasOwn(PLAYER_SORT_COLUMNS, sortColumn) ? sortColumn : "character_name";
+  const safeSortDirection = String(sortDirection).toLowerCase() === "desc" ? "desc" : "asc";
+  const sortOrder = PLAYER_SORT_COLUMNS[safeSortColumn].order;
+  const pagedOrder = [...sortOrder, ...(sortOrder.includes("actor_id") ? [] : ["actor_id"])]
+    .map((column) => `${column} ${safeSortDirection}`).join(", ");
   const playerStateColumns = await columnsFor(db, "player_state");
   const lastSeenSelect = await playerLastSeenSelect(db);
   const loginSessionSelect = playerStateColumns.has("last_login_time")
@@ -1205,28 +1222,40 @@ export async function listPlayers(db, { online = false, q = "" } = {}) {
   const currentPawnPriority = playerStateColumns.has("player_pawn_id")
     ? "when ps.player_pawn_id = a.id then 0"
     : "when false then 0";
+  const hasOnlineStatus = playerStateColumns.has("online_status");
   const lastSeenWithOnlineFallback = `
     case
-      when coalesce(ps.online_status::text, '') = 'Online'
+      when ${hasOnlineStatus ? "coalesce(ps.online_status::text, '') = 'Online'" : "false"}
         then coalesce(nullif(${lastSeenSelect}, ''), (current_timestamp at time zone 'UTC')::text)
       else ${lastSeenSelect}
     end
   `;
+  let baseWhere = "a.class ilike '%PlayerCharacter%'";
+  baseWhere += " and coalesce(ac.\"user\", '') <> 'A5C0DE5E12A00001'";
+  baseWhere += " and coalesce(ac.\"user\", '') <> 'A5C0DE5E12A00002'";
+  baseWhere += " and coalesce(ac.funcom_id, '') <> 'Server#0001'";
+  baseWhere += " and coalesce(ac.funcom_id, '') <> 'MessageOfTheDay#0001'";
+  baseWhere += " and coalesce(ps.character_name, '') <> 'Server'";
+  baseWhere += " and coalesce(ps.character_name, '') <> 'Message of the Day'";
+  if (hasOnlineStatus) {
+    baseWhere += " and not (nullif(trim(coalesce(ps.character_name, '')), '') is null and coalesce(ps.online_status::text, '') <> 'Online')";
+  }
+  baseWhere += currentPawnFilter;
+
   const values = [];
-  let where = "a.class ilike '%PlayerCharacter%'";
-  where += " and coalesce(ac.\"user\", '') <> 'A5C0DE5E12A00001'";
-  where += " and coalesce(ac.\"user\", '') <> 'A5C0DE5E12A00002'";
-  where += " and coalesce(ac.funcom_id, '') <> 'Server#0001'";
-  where += " and coalesce(ac.funcom_id, '') <> 'MessageOfTheDay#0001'";
-  where += " and coalesce(ps.character_name, '') <> 'Server'";
-  where += " and coalesce(ps.character_name, '') <> 'Message of the Day'";
-  where += " and not (nullif(trim(coalesce(ps.character_name, '')), '') is null and coalesce(ps.online_status::text, '') <> 'Online')";
-  where += currentPawnFilter;
-  if (online) where += " and coalesce(ps.online_status::text, '') = 'Online'";
+  let where = baseWhere;
+  if (hasOnlineStatus) {
+    if (status === "online") where += " and coalesce(ps.online_status::text, '') = 'Online'";
+    if (status === "offline") where += " and coalesce(ps.online_status::text, '') <> 'Online'";
+  }
   if (q) {
     values.push(`%${q}%`);
     where += ` and (ps.character_name ilike $${values.length} or ac."user" ilike $${values.length} or a.id::text = $${values.length} or a.owner_account_id::text = $${values.length})`;
   }
+  values.push(safePageSize, offset);
+  const limitParamIndex = values.length - 1;
+  const offsetParamIndex = values.length;
+
   const result = await db.query(`
     with player_rows as (
       select a.id as actor_id,
@@ -1243,7 +1272,7 @@ export async function listPlayers(db, { online = false, q = "" } = {}) {
              end as action_player_id,
              a.class,
              coalesce(a.map, '') as map,
-             coalesce(ps.online_status::text, 'Offline') as online_status,
+             ${hasOnlineStatus ? "coalesce(ps.online_status::text, 'Offline')" : "'Offline'"} as online_status,
              ${loginSessionSelect} as login_session,
              ${lastSeenWithOnlineFallback} as last_seen,
              coalesce(nullif(ps.player_controller_id, 0), nullif(a.owner_account_id, 0), a.id) as dedupe_key,
@@ -1252,7 +1281,7 @@ export async function listPlayers(db, { online = false, q = "" } = {}) {
                when coalesce(ps.character_name, '') <> '' then 1
                else 2
              end as row_priority,
-             case when coalesce(ps.online_status::text, '') = 'Online' then 0 else 1 end as online_priority
+             case when ${hasOnlineStatus ? "coalesce(ps.online_status::text, '') = 'Online'" : "false"} then 0 else 1 end as online_priority
       from dune.actors a
       left join dune.player_state ps on ps.account_id = a.owner_account_id
       left join dune.accounts ac on ac.id = a.owner_account_id
@@ -1275,16 +1304,65 @@ export async function listPlayers(db, { online = false, q = "" } = {}) {
              last_seen
       from player_rows
       order by dedupe_key, row_priority, online_priority, actor_id desc
+    ),
+    totals as (
+      select count(*)::int as total_count
+      from deduped_players
     )
-    select *
-    from deduped_players
-    order by lower(coalesce(character_name, '')), actor_id
-    limit 500`, values);
-  return { capabilities: { players: true, online }, rows: result.rows };
+    select paged.*, totals.total_count
+    from totals
+    left join lateral (
+      select *
+      from deduped_players
+      order by ${pagedOrder}
+      limit $${limitParamIndex} offset $${offsetParamIndex}
+    ) paged on true
+    order by ${pagedOrder}`, values);
+
+  const totalsResult = includeTotals ? await db.query(`
+    with player_rows as (
+      select coalesce(nullif(ps.player_controller_id, 0), nullif(a.owner_account_id, 0), a.id) as dedupe_key
+      from dune.actors a
+      left join dune.player_state ps on ps.account_id = a.owner_account_id
+      left join dune.accounts ac on ac.id = a.owner_account_id
+      where ${baseWhere}
+    )
+    select count(distinct dedupe_key)::int as total_players
+    from player_rows`) : null;
+
+  return {
+    capabilities: { players: true, status, statusFilterApplied: hasOnlineStatus },
+    totalCount: result.rows[0] ? Number(result.rows[0].total_count) : 0,
+    totalPlayers: totalsResult ? (totalsResult.rows[0] ? Number(totalsResult.rows[0].total_players) : 0) : undefined,
+    rows: result.rows
+      .filter((row) => row.actor_id !== null && row.actor_id !== undefined)
+      .map(({ total_count, ...row }) => row)
+  };
+}
+
+const LIST_ALL_PLAYERS_PAGE_SIZE = 200;
+
+// Internal call sites (care package scans, message-of-the-day, announcements, leadership)
+// need every matching player, not one UI page — loop pages instead of relying on a single
+// listPlayers() call, since that now caps at LIST_ALL_PLAYERS_PAGE_SIZE per page.
+export async function listAllPlayers(db, { status = "all", q = "" } = {}) {
+  let page = 0;
+  let rows = [];
+  let first = null;
+  for (;;) {
+    const result = await listPlayers(db, { status, q, page, pageSize: LIST_ALL_PLAYERS_PAGE_SIZE, includeTotals: false });
+    if (!first) first = result;
+    if (!result?.capabilities?.players) return result;
+    rows = rows.concat(result.rows || []);
+    // If this page returned fewer rows than requested, we've reached the last page
+    if ((result.rows || []).length < LIST_ALL_PLAYERS_PAGE_SIZE) break;
+    page += 1;
+  }
+  return { ...first, rows };
 }
 
 export async function addonLeadershipPlayers(db) {
-  const result = await listPlayers(db, {});
+  const result = await listAllPlayers(db, {});
   if (!result?.capabilities?.players) return result;
   const rows = result.rows || [];
   const [levels, factions, guilds] = await Promise.all([
@@ -1410,12 +1488,23 @@ function guildFactionDisplayName(row) {
   return row.guild_faction_name || `Faction ${factionId}`;
 }
 
-export async function listGuilds(db, { q = "" } = {}) {
-  if (!(await tableExists(db, "guilds"))) return unsupported("guilds", ["dune.guilds"]);
+const GUILD_SORT_COLUMNS = {
+  guild_name: { order: ["lower(guild_name)"] },
+  guild_faction: { order: ["lower(coalesce(guild_faction_name, guild_faction, ''))"] },
+  member_count: { order: ["member_count"] },
+  guild_id: { order: ["guild_id"] }
+};
+
+export async function listGuilds(db, { q = "", page = 0, pageSize = 50, sortColumn = "guild_name", sortDirection = "asc" } = {}) {
+  if (!(await tableExists(db, "guilds"))) {
+    return { ...unsupported("guilds", ["dune.guilds"]), totalCount: 0, totalGuilds: 0 };
+  }
   const guildColumns = await columnsFor(db, "guilds");
   const guildIdColumn = firstExistingColumn(guildColumns, ["guild_id", "id"]);
   const guildNameColumn = firstExistingColumn(guildColumns, ["guild_name", "name", "display_name"]);
-  if (!guildIdColumn || !guildNameColumn) return unsupported("guilds", ["dune.guilds"]);
+  if (!guildIdColumn || !guildNameColumn) {
+    return { ...unsupported("guilds", ["dune.guilds"]), totalCount: 0, totalGuilds: 0 };
+  }
   const guildFactionColumn = firstExistingColumn(guildColumns, ["guild_faction", "faction_id", "faction"]);
   const guildDescriptionColumn = firstExistingColumn(guildColumns, ["guild_description", "description"]);
   const hasMembers = await tableExists(db, "guild_members");
@@ -1426,32 +1515,66 @@ export async function listGuilds(db, { q = "" } = {}) {
   }
   const hasFactions = guildFactionColumn && await tableExists(db, "factions");
 
+  const safePageSize = intParam(pageSize, "pageSize", 1, 200);
+  const safePage = intParam(page, "page", 0);
+  const offset = safePage * safePageSize;
+  const safeSortColumn = Object.hasOwn(GUILD_SORT_COLUMNS, sortColumn) ? sortColumn : "guild_name";
+  const safeSortDirection = String(sortDirection).toLowerCase() === "desc" ? "desc" : "asc";
+  const sortOrder = GUILD_SORT_COLUMNS[safeSortColumn].order;
+  const pagedOrder = [...sortOrder, ...(sortOrder.includes("guild_id") ? [] : ["guild_id"])]
+    .map((column) => `${column} ${safeSortDirection}`).join(", ");
+
   const values = [];
   let where = "1=1";
   if (q) {
     values.push(`%${q}%`);
     where += ` and g.${quoteIdentifier(guildNameColumn)} ilike $${values.length}`;
   }
+  values.push(safePageSize, offset);
+  const limitParamIndex = values.length - 1;
+  const offsetParamIndex = values.length;
 
   const memberCountSelect = hasMembers && memberGuildColumn
     ? `(select count(*) from dune.guild_members gm where gm.${quoteIdentifier(memberGuildColumn)} = g.${quoteIdentifier(guildIdColumn)})`
     : "0";
 
   const result = await db.query(`
-    select g.${quoteIdentifier(guildIdColumn)}::text as guild_id,
-           coalesce(g.${quoteIdentifier(guildNameColumn)}, '') as guild_name,
-           ${guildFactionColumn ? `coalesce(g.${quoteIdentifier(guildFactionColumn)}::text, '')` : "''"} as guild_faction,
-           ${hasFactions ? "coalesce(f.name, '')" : "''"} as guild_faction_name,
-           ${guildDescriptionColumn ? `coalesce(g.${quoteIdentifier(guildDescriptionColumn)}, '')` : "''"} as guild_description,
-           ${memberCountSelect}::int as member_count
-    from dune.guilds g
-    ${hasFactions ? `left join dune.factions f on f.id = g.${quoteIdentifier(guildFactionColumn)}` : ""}
-    where ${where}
-    order by lower(coalesce(g.${quoteIdentifier(guildNameColumn)}, '')), g.${quoteIdentifier(guildIdColumn)}
-    limit 500`, values);
+    with matched as (
+      select g.${quoteIdentifier(guildIdColumn)}::text as guild_id,
+             coalesce(g.${quoteIdentifier(guildNameColumn)}, '') as guild_name,
+             ${guildFactionColumn ? `coalesce(g.${quoteIdentifier(guildFactionColumn)}::text, '')` : "''"} as guild_faction,
+             ${hasFactions ? "coalesce(f.name, '')" : "''"} as guild_faction_name,
+             ${guildDescriptionColumn ? `coalesce(g.${quoteIdentifier(guildDescriptionColumn)}, '')` : "''"} as guild_description,
+             ${memberCountSelect}::int as member_count
+      from dune.guilds g
+      ${hasFactions ? `left join dune.factions f on f.id = g.${quoteIdentifier(guildFactionColumn)}` : ""}
+      where ${where}
+    ),
+    totals as (
+      select count(*)::int as total_count
+      from matched
+    )
+    select paged.*, totals.total_count
+    from totals
+    left join lateral (
+      select *
+      from matched
+      order by ${pagedOrder}
+      limit $${limitParamIndex} offset $${offsetParamIndex}
+    ) paged on true
+    order by ${pagedOrder}`, values);
 
-  const rows = result.rows.map((row) => ({ ...row, guild_faction: guildFactionDisplayName(row) }));
-  return { capabilities: { guilds: true, guildMembers: hasMembers }, rows };
+  const totalsResult = await db.query("select count(*)::int as total_guilds from dune.guilds");
+
+  const rows = result.rows
+    .filter((row) => row.guild_id !== null && row.guild_id !== undefined)
+    .map(({ total_count, ...row }) => ({ ...row, guild_faction: guildFactionDisplayName(row) }));
+  return {
+    capabilities: { guilds: true, guildMembers: hasMembers },
+    totalCount: result.rows[0] ? Number(result.rows[0].total_count) : 0,
+    totalGuilds: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_guilds) : 0,
+    rows
+  };
 }
 
 export async function guildMembers(db, guildId) {

@@ -403,7 +403,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
   }
 
   useEffect(() => {
-    playersApi.list().then((result) => setPlayers(result.rows || [])).catch(() => undefined);
+    playersApi.listAll().then((result) => setPlayers(result.rows || [])).catch(() => undefined);
     loadMapChatOptions().catch(() => undefined);
     loadMessageOfTheDay().catch(() => undefined);
     loadPlayerAnnouncements().catch(() => undefined);

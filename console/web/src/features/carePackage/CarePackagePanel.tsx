@@ -85,7 +85,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
     setManualKitId(lastKit?.id || normalized.activeKitId || "");
     setItemsText((lastKit?.items || normalized.items || []).map(carePackageItemTextLine).join("\n"));
     setHistory((await carePackageApi.history()).rows || []);
-    setPlayers((await playersApi.list()).rows || []);
+    setPlayers((await playersApi.listAll()).rows || []);
   }
   useEffect(() => {
     run(load);

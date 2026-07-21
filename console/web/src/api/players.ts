@@ -1,9 +1,39 @@
 import { api, post } from "./client";
 import type { Task } from "./setup";
 
+type PlayersListResult = { rows: Record<string, unknown>[]; totalCount: number; totalPlayers: number; capabilities: Record<string, unknown>; reason?: string };
+
+const PLAYERS_ALL_PAGE_SIZE = 200;
+
 export const playersApi = {
-  list: (q = "") => api<{ rows: Record<string, unknown>[]; capabilities: Record<string, unknown> }>(`/api/players${q ? `?q=${encodeURIComponent(q)}` : ""}`),
-  online: () => api<{ rows: Record<string, unknown>[]; capabilities: Record<string, unknown> }>("/api/players/online"),
+  list: (params: { q?: string; page?: number; pageSize?: number; status?: "all" | "online" | "offline"; sortColumn?: string; sortDirection?: "asc" | "desc" } = {}) => {
+    const search = new URLSearchParams();
+    if (params.q) search.set("q", params.q);
+    if (params.page !== undefined) search.set("page", String(params.page));
+    if (params.pageSize !== undefined) search.set("pageSize", String(params.pageSize));
+    if (params.status) search.set("status", params.status);
+    if (params.sortColumn) search.set("sortColumn", params.sortColumn);
+    if (params.sortDirection) search.set("sortDirection", params.sortDirection);
+    const qs = search.toString();
+    return api<PlayersListResult>(`/api/players${qs ? `?${qs}` : ""}`);
+  },
+  // Fetches every matching player (not one UI page) for dropdowns/bulk actions/counts —
+  // loops the paginated endpoint since the backend caps a single page at 200 rows.
+  listAll: async (params: { q?: string; status?: "all" | "online" | "offline" } = {}) => {
+    let page = 0;
+    let rows: Record<string, unknown>[] = [];
+    let totalCount = 0;
+    for (;;) {
+      const result = await playersApi.list({ ...params, page, pageSize: PLAYERS_ALL_PAGE_SIZE });
+      rows = rows.concat(result.rows || []);
+      totalCount = result.totalCount;
+      // If this page returned fewer rows than requested, we've reached the last page
+      if ((result.rows || []).length < PLAYERS_ALL_PAGE_SIZE) break;
+      page += 1;
+    }
+    return { rows, totalCount };
+  },
+  online: () => playersApi.listAll({ status: "online" }),
   profile: (playerId: string) => api<Record<string, unknown>>(`/api/players/${encodeURIComponent(playerId)}`),
   inventory: (playerId: string) => api<{ rows: Record<string, unknown>[]; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/inventory`, { cache: "no-store" }),
   currency: (playerId: string) => api<{ rows: Record<string, unknown>[]; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/currency`),

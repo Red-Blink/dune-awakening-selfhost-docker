@@ -488,7 +488,7 @@ test("players query uses parameterized search input", async () => {
       calls.push({ text, values });
       if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
       if (text.includes("information_schema.columns")) return { rows: [] };
-      return { rows: [{ actor_id: 82, player_pawn_id: 82, account_id: 276, funcom_id: "RedBlink#75570", fls_id: "RedBlink#75570", action_player_id: "RedBlink#75570" }] };
+      return { rows: [{ actor_id: 82, player_pawn_id: 82, account_id: 276, funcom_id: "RedBlink#75570", fls_id: "RedBlink#75570", action_player_id: "RedBlink#75570", total_count: 1 }] };
     }
   };
   const result = await listPlayers(db, { q: "RedBlink'; drop table dune.actors; --" });
@@ -500,7 +500,7 @@ test("players query uses parameterized search input", async () => {
   assert.match(playerQuery.text, /A5C0DE5E12A00001/);
   assert.match(playerQuery.text, /Server#0001/);
   assert.match(playerQuery.text, /\$1/);
-  assert.deepEqual(playerQuery.values, ["%RedBlink'; drop table dune.actors; --%"]);
+  assert.equal(playerQuery.values[0], "%RedBlink'; drop table dune.actors; --%");
   assert.equal(result.rows[0].actor_id, 82);
   assert.equal(result.rows[0].player_pawn_id, 82);
   assert.equal(result.rows[0].account_id, 276);
@@ -516,16 +516,63 @@ test("players query filters stale actor rows when player_state has current pawn 
       calls.push({ text, values });
       if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
       if (text.includes("information_schema.columns")) return { rows: ["player_pawn_id", "last_login_time", "online_status"].map((column_name) => ({ column_name })) };
-      return { rows: [{ actor_id: 78, player_pawn_id: 78, account_id: 2, character_name: "RedBlink", map: "HaggaBasin", online_status: "Online" }] };
+      return { rows: [{ actor_id: 78, player_pawn_id: 78, account_id: 2, character_name: "RedBlink", map: "HaggaBasin", online_status: "Online", total_count: 1 }] };
     }
   };
 
-  const result = await listPlayers(db, { online: true });
+  const result = await listPlayers(db, { status: "online" });
   const playerQuery = calls.find((call) => call.text.includes("from dune.actors"));
   assert.ok(playerQuery);
   assert.match(playerQuery.text, /ps\.player_pawn_id = a\.id/);
   assert.equal(result.rows.length, 1);
   assert.equal(result.rows[0].actor_id, 78);
+});
+
+test("listPlayers with includeTotals false skips the unfiltered totals query and omits totalPlayers", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [{ column_name: "online_status" }] };
+      return { rows: [{ actor_id: 1, total_count: 1 }] };
+    }
+  };
+  const result = await listPlayers(db, { includeTotals: false });
+  assert.equal(calls.find((call) => call.text.includes("count(distinct dedupe_key)")), undefined,
+    "unfiltered totals query must not run when includeTotals is false");
+  assert.equal(result.totalPlayers, undefined);
+  assert.equal(result.totalCount, 1);
+});
+
+test("listPlayers preserves the filtered total when the requested page is empty", async () => {
+  const db = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [{ column_name: "online_status" }] };
+      if (text.includes("count(distinct dedupe_key)")) return { rows: [{ total_players: 12 }] };
+      return { rows: [{ actor_id: null, total_count: 12 }] };
+    }
+  };
+
+  const result = await listPlayers(db, { page: 3, pageSize: 5 });
+  assert.equal(result.totalCount, 12);
+  assert.equal(result.totalPlayers, 12);
+  assert.deepEqual(result.rows, []);
+});
+
+test("listPlayers reports statusFilterApplied based on online_status column presence", async () => {
+  const mockDb = (columns) => ({
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: columns.map((column_name) => ({ column_name })) };
+      return { rows: [{ actor_id: 1, total_count: 1, total_players: 1 }] };
+    }
+  });
+  const withColumn = await listPlayers(mockDb(["online_status"]), {});
+  assert.equal(withColumn.capabilities.statusFilterApplied, true);
+  const withoutColumn = await listPlayers(mockDb([]), {});
+  assert.equal(withoutColumn.capabilities.statusFilterApplied, false);
 });
 
 test("players query filters offline transferred character placeholder actor rows", async () => {
@@ -636,6 +683,26 @@ test("list guilds returns rows with description and member count", async () => {
   assert.equal(result.rows[0].member_count, 4);
 });
 
+test("listGuilds preserves the filtered total when the requested page is empty", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) {
+        return { rows: [{ exists: String(values[0] || "") === "dune.guilds" }] };
+      }
+      if (text.includes("information_schema.columns")) {
+        return { rows: ["guild_id", "guild_name"].map((column_name) => ({ column_name })) };
+      }
+      if (text.includes("total_guilds")) return { rows: [{ total_guilds: 12 }] };
+      return { rows: [{ guild_id: null, total_count: 12 }] };
+    }
+  };
+
+  const result = await listGuilds(db, { page: 3, pageSize: 5 });
+  assert.equal(result.totalCount, 12);
+  assert.equal(result.totalGuilds, 12);
+  assert.deepEqual(result.rows, []);
+});
+
 test("list guilds resolves faction id to a name when dune.factions has a match", async () => {
   const db = {
     query: async (text, values = []) => {
@@ -724,7 +791,7 @@ test("list guilds filters by name when a search query is given", async () => {
   const guildQuery = calls.find((call) => call.text.includes("from dune.guilds g"));
   assert.ok(guildQuery);
   assert.match(guildQuery.text, /ilike \$1/);
-  assert.deepEqual(guildQuery.values, ["%Water%"]);
+  assert.equal(guildQuery.values[0], "%Water%");
 });
 
 test("guild members returns capability response when required tables are missing", async () => {
