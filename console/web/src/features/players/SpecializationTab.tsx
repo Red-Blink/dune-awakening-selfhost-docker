@@ -346,8 +346,8 @@ export function SpecializationTab({
 
       <div className="specialization-footer">
         <p className="specialization-help-note">
-          Specialization XP and level changes are applied directly to the game database.
-          The player must relog before changes appear in-game.
+          The player must be offline for specialization changes.
+          XP and level changes are applied directly to the game database and require a relog to appear in-game.
           Grant Max and keystone actions require confirmation due to their high impact.
         </p>
       </div>
