@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
-import { addCurrency, addFactionReputation, addIntel, addSpecializationXp, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, applyLandsraadMilestonePreset, augmentInventoryItem, augmentNewestPlayerItem, changeDunePassword, completeJourneyNode, completeTutorial, deleteInventoryItem, exportBaseAsBlueprint, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listBases, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerInventory, playerJourney, playerPosition, playerProfile, playerResearchItems, portalGeneratorFuel, portalVehicles, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
+import { addCurrency, addFactionReputation, addIntel, addSpecializationXp, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, applyLandsraadMilestonePreset, augmentInventoryItem, augmentNewestPlayerItem, changeDunePassword, completeJourneyNode, completeTutorial, deleteInventoryItem, exportBaseAsBlueprint, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listBases, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerCurrency, playerFactions, playerInventory, playerJourney, playerPosition, playerProfile, playerResearchItems, portalGeneratorFuel, portalVehicles, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
   assert.deepEqual(discoverDbConfig({}), {
@@ -450,6 +450,64 @@ test("database currency writes emit Solaris live refresh hook", async () => {
   const result = await runSql(db, "update dune.player_virtual_currency_balances set balance = 5000", true);
   assert.equal(result.rowCount, 1);
   assert.ok(calls.some((call) => String(call.text).includes("dune.log_event_solaris")));
+});
+
+test("player currency labels Solari Credit and Scrip, falls back to a generic label for other ids", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("to_regprocedure")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.player_virtual_currency_balances")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [
+          { currency_id: 0, balance: "5000", label: "Solari Credit" },
+          { currency_id: 1, balance: "250", label: "Scrip" },
+          { currency_id: 7, balance: "12", label: "Currency 7" }
+        ] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerCurrency(db, "91");
+  assert.deepEqual(result.rows.map((row) => row.label), ["Solari Credit", "Scrip", "Currency 7"]);
+});
+
+test("player currency reports unsupported when the balances table is missing", async () => {
+  const db = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: false }] };
+      return { rows: [] };
+    }
+  };
+  const result = await playerCurrency(db, "91");
+  assert.equal(result.capabilities.currency, false);
+  assert.deepEqual(result.rows, []);
+});
+
+test("player factions returns per-faction reputation with resolved faction names", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
+      }
+      if (text.includes("from dune.player_faction_reputation pfr")) {
+        assert.deepEqual(values, [301]);
+        return { rows: [
+          { actor_id: 91, faction_id: 1, faction_name: "Atreides", reputation_amount: "500" },
+          { actor_id: 91, faction_id: 2, faction_name: "Harkonnen", reputation_amount: "120" }
+        ] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerFactions(db, "91");
+  assert.equal(result.capabilities.factionNames, true);
+  assert.deepEqual(result.rows.map((row) => [row.faction_name, row.reputation_amount]), [
+    ["Atreides", "500"],
+    ["Harkonnen", "120"]
+  ]);
 });
 
 test("manual currency row edit uses game balance function", async () => {

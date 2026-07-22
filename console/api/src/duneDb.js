@@ -1903,8 +1903,14 @@ export async function playerInventory(db, id) {
 export async function playerCurrency(db, id) {
   if (!(await tableExists(db, "player_virtual_currency_balances"))) return unsupported("currency", ["dune.player_virtual_currency_balances"]);
   const actorId = intParam(id, "player id", 1);
+  const hasSolarisId = await functionExists(db, "dune.get_solaris_id()");
   const result = await db.query(`
-    select currency_id, balance
+    select currency_id, balance,
+           case
+             ${hasSolarisId ? "when currency_id = dune.get_solaris_id() then 'Solari Credit'" : ""}
+             when currency_id = 1 then 'Scrip'
+             else 'Currency ' || currency_id
+           end as label
     from dune.player_virtual_currency_balances
     where player_controller_id = $1
        or player_controller_id = (select coalesce(player_controller_id, 0) from dune.player_state where player_pawn_id = $1 limit 1)
