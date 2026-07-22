@@ -1419,9 +1419,9 @@ test("player profile falls back to placeholder faction/guild when addon tables a
     }
   };
   const result = await playerProfile(db, "101");
-  assert.equal(result.player.faction, "Unassigned");
+  assert.equal(result.player.faction, "Neutral");
   assert.equal(result.player.faction_assigned, false);
-  assert.equal(result.player.guild, "Unavailable");
+  assert.equal(result.player.guild, "—");
 });
 
 test("player profile does not treat existing reputation as a faction assignment", async () => {

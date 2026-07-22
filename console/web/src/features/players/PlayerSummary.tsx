@@ -25,8 +25,8 @@ export function PlayerSummary({
       ["Funcom ID", firstDefined(player.funcom_id, fallback.funcom_id)],
       ["Status", <PlayerStatusCell value={status} />],
       ["Map", firstDefined(player.map, player.world, fallback.map)],
-      ["Faction", firstDefined(player.faction, fallback.faction)],
-      ["Guild", firstDefined(player.guild, fallback.guild)],
+      ["Faction", firstDefined(player.faction, fallback.faction) || "Neutral"],
+      ["Guild", firstDefined(player.guild, fallback.guild) || "—"],
       ["DB Player ID", dbPlayerId || "missing"],
       ["FLS ID", firstDefined(player.fls_id, fallback.fls_id, actionPlayerId) || "missing"]
     ]} />

@@ -1850,9 +1850,9 @@ export async function playerProfile(db, id) {
   const accountIdKey = String(row.account_id || "");
   const assignedFaction = currentFactions.get(controllerId) || currentFactions.get(actorIdKey) ||
     guildFactions.get(controllerId) || guildFactions.get(actorIdKey) || "";
-  row.faction = assignedFaction || reputationFactions.get(controllerId) || reputationFactions.get(actorIdKey) || "Unassigned";
+  row.faction = assignedFaction || reputationFactions.get(controllerId) || reputationFactions.get(actorIdKey) || "Neutral";
   row.faction_assigned = Boolean(assignedFaction);
-  row.guild = guilds.get(controllerId) || guilds.get(actorIdKey) || guilds.get(accountIdKey) || "Unavailable";
+  row.guild = guilds.get(controllerId) || guilds.get(actorIdKey) || guilds.get(accountIdKey) || "—";
   return { capabilities: await playerCapabilities(db), player: row };
 }
 
