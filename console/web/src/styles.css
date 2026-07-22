@@ -535,6 +535,8 @@ main { padding: 22px; min-width: 0; }
 .maps-panel > .maps-advanced-toggle { margin-top: 18px; }
 .action-section h4 { margin: 0; color: #ffd08a; }
 .action-section p { margin: 0; color: #ad9f89; }
+.nested-box { border: 1px solid #302b25; border-radius: 6px; padding: 10px; display: grid; gap: 8px; }
+.nested-box h5 { margin: 0; font-size: 13px; color: #ffd08a; }
 .danger-section { border-color: #6f3030; background: #1b1414; }
 .warning-panel { border-color: #a97932; background: #211b12; }
 .info-panel { border-color: #385067; background: #111922; }

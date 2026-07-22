@@ -72,7 +72,6 @@ export function PlayerSummary({
       ["Funcom ID", firstDefined(player.funcom_id, fallback.funcom_id)],
       ["Status", <PlayerStatusCell value={status} />],
       ["Map", firstDefined(player.map, player.world, fallback.map)],
-      ["Faction", firstDefined(player.faction, fallback.faction) || "Neutral"],
       ["Guild", firstDefined(player.guild, fallback.guild) || "—"],
       ["DB Player ID", dbPlayerId || "missing"],
       ["FLS ID", firstDefined(player.fls_id, fallback.fls_id, actionPlayerId) || "missing"],
@@ -81,11 +80,22 @@ export function PlayerSummary({
         ["XP", (progression.xp ?? 0).toLocaleString()] as [string, string],
         ["Skill Points", `${progression.unspentSkillPoints ?? 0} / ${progression.totalSkillPoints ?? 0}`] as [string, string]
       ] : []),
-      ...(intel !== null ? [["Available Intel", intel.toLocaleString()] as [string, string]] : []),
-      ...currencyRows.map((row): [string, string] => [row.label || `Currency ${row.currency_id}`, Number(row.balance).toLocaleString()]),
-      ...(solarisCoinTotal !== null ? [["Total Solari Coin", solarisCoinTotal.toLocaleString()] as [string, string]] : []),
-      ...factionRows.map((row): [string, string] => [`${row.faction_name || `Faction ${row.faction_id}`} Reputation`, String(row.reputation_amount)])
+      ...(intel !== null ? [["Available Intel", intel.toLocaleString()] as [string, string]] : [])
     ]} />
+    <div className="nested-box">
+      <h5>Faction</h5>
+      <KeyValueGrid items={[
+        ["Faction", firstDefined(player.faction, fallback.faction) || "Neutral"],
+        ...factionRows.map((row): [string, string] => [`${row.faction_name || `Faction ${row.faction_id}`} Reputation`, String(row.reputation_amount)])
+      ]} />
+    </div>
+    {(currencyRows.length > 0 || solarisCoinTotal !== null) && <div className="nested-box">
+      <h5>Currency</h5>
+      <KeyValueGrid items={[
+        ...currencyRows.map((row): [string, string] => [row.label || `Currency ${row.currency_id}`, Number(row.balance).toLocaleString()]),
+        ...(solarisCoinTotal !== null ? [["Total Solari Coin", solarisCoinTotal.toLocaleString()] as [string, string]] : [])
+      ]} />
+    </div>}
     {actions}
   </section>;
 }

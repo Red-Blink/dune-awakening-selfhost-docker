@@ -133,6 +133,7 @@ describe("PlayerSummary", () => {
         />
       );
       await waitFor(() => {
+        expect(screen.getByText("Currency")).toBeInTheDocument();
         expect(screen.getByText("Solari Credit")).toBeInTheDocument();
         expect(screen.getByText((5000).toLocaleString())).toBeInTheDocument();
         expect(screen.getByText("Scrip")).toBeInTheDocument();
@@ -140,7 +141,7 @@ describe("PlayerSummary", () => {
       });
     });
 
-    it("renders nothing extra when currency is unsupported by the schema", async () => {
+    it("renders nothing extra when currency and Solari Coin are both unsupported by the schema", async () => {
       vi.mocked(playersApi.currency).mockResolvedValue({ rows: [], capabilities: { currency: false }, reason: "Unsupported" });
       render(
         <PlayerSummary
@@ -153,6 +154,7 @@ describe("PlayerSummary", () => {
         expect(playersApi.currency).toHaveBeenCalledWith("91");
       });
       expect(screen.queryByText("Solari Credit")).not.toBeInTheDocument();
+      expect(screen.queryByText("Currency")).not.toBeInTheDocument();
     });
   });
 
@@ -178,6 +180,24 @@ describe("PlayerSummary", () => {
         expect(screen.getByText("Harkonnen Reputation")).toBeInTheDocument();
         expect(screen.getByText("120")).toBeInTheDocument();
       });
+    });
+
+    it("nests Faction and its Reputation rows inside their own Faction box", async () => {
+      vi.mocked(playersApi.factions).mockResolvedValue({
+        rows: [{ faction_id: 1, faction_name: "Atreides", reputation_amount: 500 }],
+        capabilities: {}
+      });
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette", faction: "Atreides" } }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Atreides Reputation")).toBeInTheDocument();
+      });
+      expect(screen.getByRole("heading", { level: 5, name: "Faction" })).toBeInTheDocument();
     });
   });
 
