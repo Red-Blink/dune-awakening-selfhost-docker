@@ -1904,6 +1904,7 @@ export async function playerCurrency(db, id) {
   if (!(await tableExists(db, "player_virtual_currency_balances"))) return unsupported("currency", ["dune.player_virtual_currency_balances"]);
   const actorId = intParam(id, "player id", 1);
   const hasSolarisId = await functionExists(db, "dune.get_solaris_id()");
+  const solarisId = hasSolarisId ? Number((await db.query("select dune.get_solaris_id() as id")).rows[0].id) : null;
   const result = await db.query(`
     select currency_id, balance,
            case
@@ -1915,7 +1916,19 @@ export async function playerCurrency(db, id) {
     where player_controller_id = $1
        or player_controller_id = (select coalesce(player_controller_id, 0) from dune.player_state where player_pawn_id = $1 limit 1)
     order by currency_id`, [actorId]);
-  return { capabilities: { currency: true }, rows: result.rows };
+
+  const rows = [...result.rows];
+  const expectedCurrencies = [
+    { currency_id: 1, label: "Scrip" },
+    ...(solarisId !== null ? [{ currency_id: solarisId, label: "Solari Credit" }] : [])
+  ];
+  for (const expected of expectedCurrencies) {
+    if (!rows.some((row) => row.currency_id === expected.currency_id)) {
+      rows.push({ currency_id: expected.currency_id, balance: 0, label: expected.label });
+    }
+  }
+  rows.sort((a, b) => a.currency_id - b.currency_id);
+  return { capabilities: { currency: true }, rows };
 }
 
 export async function playerSolarisCoinTotal(db, id) {

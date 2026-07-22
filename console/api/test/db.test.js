@@ -457,6 +457,7 @@ test("player currency labels Solari Credit and Scrip, falls back to a generic la
     query: async (text, values = []) => {
       if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
       if (text.includes("to_regprocedure")) return { rows: [{ exists: true }] };
+      if (text.includes("select dune.get_solaris_id() as id")) return { rows: [{ id: 0 }] };
       if (text.includes("from dune.player_virtual_currency_balances")) {
         assert.deepEqual(values, [91]);
         return { rows: [
@@ -470,6 +471,26 @@ test("player currency labels Solari Credit and Scrip, falls back to a generic la
   };
   const result = await playerCurrency(db, "91");
   assert.deepEqual(result.rows.map((row) => row.label), ["Solari Credit", "Scrip", "Currency 7"]);
+});
+
+test("player currency fills in zero balances for Solari Credit and Scrip when the player has neither", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("to_regprocedure")) return { rows: [{ exists: true }] };
+      if (text.includes("select dune.get_solaris_id() as id")) return { rows: [{ id: 0 }] };
+      if (text.includes("from dune.player_virtual_currency_balances")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerCurrency(db, "91");
+  assert.deepEqual(result.rows, [
+    { currency_id: 0, balance: 0, label: "Solari Credit" },
+    { currency_id: 1, balance: 0, label: "Scrip" }
+  ]);
 });
 
 test("player currency reports unsupported when the balances table is missing", async () => {
