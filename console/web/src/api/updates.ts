@@ -2,7 +2,7 @@ import { api, post } from "./client";
 import type { Task } from "./setup";
 
 export const updatesApi = {
-  checkGame: () => post<{ task: Task }>("/api/updates/check-game"),
+  checkGame: (options: { fresh?: boolean } = {}) => post<{ task: Task }>("/api/updates/check-game", options.fresh ? { fresh: true } : {}),
   applyGame: () => post<{ task: Task }>("/api/updates/apply-game"),
   fixSteamcmd: () => post<{ task: Task }>("/api/updates/fix-steamcmd"),
   checkStack: () => post<{ task: Task }>("/api/updates/check-stack"),

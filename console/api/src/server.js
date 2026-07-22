@@ -337,7 +337,10 @@ async function handleApi(req, res) {
   if (path === "/api/logs/services") return json(res, 200, { services: await discoverServices(config) });
   if (path.startsWith("/api/logs/")) return logsRoute(req, res, path);
 
-  if (path === "/api/updates/check-game" && req.method === "POST") return task(req, res, "updates", "updateCheck", {});
+  if (path === "/api/updates/check-game" && req.method === "POST") {
+    const body = await readJson(req);
+    return task(req, res, "updates", "updateCheck", { fresh: body.fresh === true });
+  }
   if (path === "/api/updates/apply-game" && req.method === "POST") return task(req, res, "updates", "updateApply", {});
   if (path === "/api/updates/fix-steamcmd" && req.method === "POST") return task(req, res, "updates", "updateFixSteamcmd", {});
   if (path === "/api/updates/check-stack" && req.method === "POST") return task(req, res, "updates", "selfUpdateCheck", {});
