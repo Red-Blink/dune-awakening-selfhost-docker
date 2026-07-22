@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
-import { addCurrency, addFactionReputation, addIntel, addSpecializationXp, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, applyLandsraadMilestonePreset, augmentInventoryItem, augmentNewestPlayerItem, changeDunePassword, completeJourneyNode, completeTutorial, deleteInventoryItem, exportBaseAsBlueprint, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listBases, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerCurrency, playerFactions, playerIntel, playerInventory, playerJourney, playerPosition, playerProfile, playerProgression, playerResearchItems, portalGeneratorFuel, portalVehicles, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
+import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, addSpecializationXp, applyLandsraadMilestonePreset, augmentInventoryItem, augmentNewestPlayerItem, changeDunePassword, completeJourneyNode, completeTutorial, deleteInventoryItem, exportBaseAsBlueprint, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listBases, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerCurrency, playerFactions, playerIntel, playerInventory, playerJourney, playerPosition, playerProfile, playerProgression, playerResearchItems, playerSolarisCoinTotal, portalGeneratorFuel, portalVehicles, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
   assert.deepEqual(discoverDbConfig({}), {
@@ -482,6 +482,48 @@ test("player currency reports unsupported when the balances table is missing", a
   const result = await playerCurrency(db, "91");
   assert.equal(result.capabilities.currency, false);
   assert.deepEqual(result.rows, []);
+});
+
+test("player Solari Coin total sums stack sizes across every matching inventory item", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.items i") && text.includes("i.template_id = 'SolarisCoin'")) {
+        assert.deepEqual(values, [1549]);
+        return { rows: [{ total: "51194" }] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerSolarisCoinTotal(db, "1549");
+  assert.equal(result.capabilities.solarisCoin, true);
+  assert.equal(result.total, 51194);
+});
+
+test("player Solari Coin total reports zero when the player holds none", async () => {
+  const db = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.items i") && text.includes("i.template_id = 'SolarisCoin'")) {
+        return { rows: [{ total: "0" }] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerSolarisCoinTotal(db, "91");
+  assert.equal(result.capabilities.solarisCoin, true);
+  assert.equal(result.total, 0);
+});
+
+test("player Solari Coin total reports unsupported when inventory tables are missing", async () => {
+  const db = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: false }] };
+      return { rows: [] };
+    }
+  };
+  const result = await playerSolarisCoinTotal(db, "91");
+  assert.equal(result.capabilities.solarisCoin, false);
 });
 
 test("player factions returns per-faction reputation with resolved faction names", async () => {

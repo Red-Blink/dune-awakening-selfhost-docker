@@ -37,6 +37,7 @@ export const playersApi = {
   profile: (playerId: string) => api<Record<string, unknown>>(`/api/players/${encodeURIComponent(playerId)}`),
   inventory: (playerId: string) => api<{ rows: Record<string, unknown>[]; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/inventory`, { cache: "no-store" }),
   currency: (playerId: string) => api<{ rows: Record<string, unknown>[]; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/currency`),
+  solarisCoin: (playerId: string) => api<{ total?: number; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/solaris-coin`),
   factions: (playerId: string) => api<{ rows: Record<string, unknown>[]; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/factions`),
   intel: (playerId: string) => api<{ intel?: number; maxIntel?: number; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/intel`),
   specs: (playerId: string) => api<{ rows: Record<string, unknown>[]; skillModules?: Record<string, unknown>[]; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/specs`),

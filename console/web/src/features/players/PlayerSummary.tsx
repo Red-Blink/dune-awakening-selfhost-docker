@@ -27,6 +27,7 @@ export function PlayerSummary({
   const [factionRows, setFactionRows] = useState<FactionRow[]>([]);
   const [progression, setProgression] = useState<Progression | null>(null);
   const [intel, setIntel] = useState<number | null>(null);
+  const [solarisCoinTotal, setSolarisCoinTotal] = useState<number | null>(null);
   const loadRequest = useRef(0);
 
   useEffect(() => {
@@ -36,20 +37,23 @@ export function PlayerSummary({
       setFactionRows([]);
       setProgression(null);
       setIntel(null);
+      setSolarisCoinTotal(null);
       return;
     }
     void Promise.all([
       playersApi.currency(dbPlayerId),
       playersApi.factions(dbPlayerId),
       playersApi.progression(dbPlayerId),
-      playersApi.intel(dbPlayerId)
+      playersApi.intel(dbPlayerId),
+      playersApi.solarisCoin(dbPlayerId)
     ])
-      .then(([currency, factions, progressionResult, intelResult]) => {
+      .then(([currency, factions, progressionResult, intelResult, solarisCoinResult]) => {
         if (request !== loadRequest.current) return;
         setCurrencyRows((currency.rows || []) as CurrencyRow[]);
         setFactionRows((factions.rows || []) as FactionRow[]);
         setProgression(progressionResult.capabilities?.progression ? progressionResult : null);
         setIntel(intelResult.capabilities?.intel ? (intelResult.intel ?? null) : null);
+        setSolarisCoinTotal(solarisCoinResult.capabilities?.solarisCoin ? (solarisCoinResult.total ?? null) : null);
       })
       .catch(() => {
         if (request !== loadRequest.current) return;
@@ -57,6 +61,7 @@ export function PlayerSummary({
         setFactionRows([]);
         setProgression(null);
         setIntel(null);
+        setSolarisCoinTotal(null);
       });
   }, [dbPlayerId]);
 
@@ -73,11 +78,12 @@ export function PlayerSummary({
       ["FLS ID", firstDefined(player.fls_id, fallback.fls_id, actionPlayerId) || "missing"],
       ...(progression ? [
         ["Level", String(progression.level ?? 0)] as [string, string],
-        ["XP", String(progression.xp ?? 0)] as [string, string],
+        ["XP", (progression.xp ?? 0).toLocaleString()] as [string, string],
         ["Skill Points", `${progression.unspentSkillPoints ?? 0} / ${progression.totalSkillPoints ?? 0}`] as [string, string]
       ] : []),
       ...(intel !== null ? [["Intel", String(intel)] as [string, string]] : []),
-      ...currencyRows.map((row): [string, string] => [row.label || `Currency ${row.currency_id}`, String(row.balance)]),
+      ...currencyRows.map((row): [string, string] => [row.label || `Currency ${row.currency_id}`, Number(row.balance).toLocaleString()]),
+      ...(solarisCoinTotal !== null ? [["Total Solari Coin", solarisCoinTotal.toLocaleString()] as [string, string]] : []),
       ...factionRows.map((row): [string, string] => [`${row.faction_name || `Faction ${row.faction_id}`} Reputation`, String(row.reputation_amount)])
     ]} />
     {actions}

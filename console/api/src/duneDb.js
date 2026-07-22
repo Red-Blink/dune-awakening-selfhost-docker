@@ -1918,6 +1918,20 @@ export async function playerCurrency(db, id) {
   return { capabilities: { currency: true }, rows: result.rows };
 }
 
+export async function playerSolarisCoinTotal(db, id) {
+  if (!(await tableExists(db, "items")) || !(await tableExists(db, "inventories"))) {
+    return { capabilities: { solarisCoin: false }, reason: "Unsupported by detected schema. Missing required table(s): dune.items, dune.inventories" };
+  }
+  const actorId = intParam(id, "player id", 1);
+  const result = await db.query(`
+    select coalesce(sum(i.stack_size), 0)::bigint as total
+    from dune.items i
+    join dune.inventories inv on inv.id = i.inventory_id
+    where inv.actor_id = $1
+      and i.template_id = 'SolarisCoin'`, [actorId]);
+  return { capabilities: { solarisCoin: true }, total: Number(result.rows[0]?.total || 0) };
+}
+
 export async function playerFactions(db, id) {
   if (!(await tableExists(db, "player_faction_reputation"))) return unsupported("factions", ["dune.player_faction_reputation"]);
   const hasFactions = await tableExists(db, "factions");

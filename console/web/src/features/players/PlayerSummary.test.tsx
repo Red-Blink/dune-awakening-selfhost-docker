@@ -8,7 +8,8 @@ vi.mock("../../api/players", () => ({
     currency: vi.fn(),
     factions: vi.fn(),
     progression: vi.fn(),
-    intel: vi.fn()
+    intel: vi.fn(),
+    solarisCoin: vi.fn()
   }
 }));
 
@@ -23,6 +24,7 @@ beforeEach(() => {
   vi.mocked(playersApi.factions).mockResolvedValue({ rows: [], capabilities: {} });
   vi.mocked(playersApi.progression).mockResolvedValue({ capabilities: {} });
   vi.mocked(playersApi.intel).mockResolvedValue({ capabilities: {} });
+  vi.mocked(playersApi.solarisCoin).mockResolvedValue({ capabilities: {} });
 });
 
 describe("PlayerSummary", () => {
@@ -112,6 +114,7 @@ describe("PlayerSummary", () => {
       expect(playersApi.factions).not.toHaveBeenCalled();
       expect(playersApi.progression).not.toHaveBeenCalled();
       expect(playersApi.intel).not.toHaveBeenCalled();
+      expect(playersApi.solarisCoin).not.toHaveBeenCalled();
     });
 
     it("renders each currency balance with its resolved label", async () => {
@@ -131,9 +134,9 @@ describe("PlayerSummary", () => {
       );
       await waitFor(() => {
         expect(screen.getByText("Solari Credit")).toBeInTheDocument();
-        expect(screen.getByText("5000")).toBeInTheDocument();
+        expect(screen.getByText((5000).toLocaleString())).toBeInTheDocument();
         expect(screen.getByText("Scrip")).toBeInTheDocument();
-        expect(screen.getByText("250")).toBeInTheDocument();
+        expect(screen.getByText((250).toLocaleString())).toBeInTheDocument();
       });
     });
 
@@ -198,7 +201,7 @@ describe("PlayerSummary", () => {
         expect(screen.getByText("Level")).toBeInTheDocument();
         expect(screen.getByText("11")).toBeInTheDocument();
         expect(screen.getByText("XP")).toBeInTheDocument();
-        expect(screen.getByText("4790")).toBeInTheDocument();
+        expect(screen.getByText((4790).toLocaleString())).toBeInTheDocument();
         expect(screen.getByText("Skill Points")).toBeInTheDocument();
         expect(screen.getByText("3 / 12")).toBeInTheDocument();
       });
@@ -249,6 +252,53 @@ describe("PlayerSummary", () => {
         expect(playersApi.intel).toHaveBeenCalledWith("91");
       });
       expect(screen.queryByText("Intel")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Total Solari Coin", () => {
+    it("renders the summed physical coin total formatted with the viewer's locale grouping", async () => {
+      vi.mocked(playersApi.solarisCoin).mockResolvedValue({ capabilities: { solarisCoin: true }, total: 51194 });
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette" } }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Total Solari Coin")).toBeInTheDocument();
+        expect(screen.getByText((51194).toLocaleString())).toBeInTheDocument();
+      });
+    });
+
+    it("renders zero when the player holds no Solari Coin", async () => {
+      vi.mocked(playersApi.solarisCoin).mockResolvedValue({ capabilities: { solarisCoin: true }, total: 0 });
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette" } }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Total Solari Coin")).toBeInTheDocument();
+        expect(screen.getByText("0")).toBeInTheDocument();
+      });
+    });
+
+    it("renders nothing extra when Solari Coin is unsupported by the schema", async () => {
+      vi.mocked(playersApi.solarisCoin).mockResolvedValue({ capabilities: { solarisCoin: false }, reason: "Unsupported" });
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette" } }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(playersApi.solarisCoin).toHaveBeenCalledWith("91");
+      });
+      expect(screen.queryByText("Total Solari Coin")).not.toBeInTheDocument();
     });
   });
 });
