@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { KeyValueGrid, PlayerStatusCell } from "../../components/common/DisplayPrimitives";
+import { MapPin, Users, Coins, CircleDollarSign, Banknote } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { PlayerStatusCell } from "../../components/common/DisplayPrimitives";
 import { firstDefined } from "../../lib/display";
 import { playersApi } from "../../api/players";
+
+const currencyIcon = (label: string): LucideIcon => {
+  if (label === "Solari Credit") return CircleDollarSign;
+  if (label === "Scrip") return Banknote;
+  return Coins;
+};
 
 type CurrencyRow = { currency_id: number; balance: number; label?: string };
 type FactionRow = { faction_id: number; faction_name?: string; reputation_amount: number };
@@ -65,38 +73,86 @@ export function PlayerSummary({
       });
   }, [dbPlayerId]);
 
-  return <section className="action-section">
+  const text = (value: unknown): string => (value === undefined || value === null ? "" : String(value));
+  const characterName = text(firstDefined(player.character_name, player.name, fallback.character_name)) || "—";
+  const funcomId = text(firstDefined(player.funcom_id, fallback.funcom_id));
+  const map = text(firstDefined(player.map, player.world, fallback.map));
+  const guild = text(firstDefined(player.guild, fallback.guild)) || "—";
+  const faction = text(firstDefined(player.faction, fallback.faction)) || "Neutral";
+  const flsId = text(firstDefined(player.fls_id, fallback.fls_id, actionPlayerId)) || "missing";
+
+  const currencyItems: { label: string; value: string }[] = [];
+  currencyRows
+    .filter((row) => row.label === "Solari Credit")
+    .forEach((row) => currencyItems.push({ label: "Solari Credit", value: Number(row.balance).toLocaleString() }));
+  if (solarisCoinTotal !== null) currencyItems.push({ label: "Solari Coin", value: solarisCoinTotal.toLocaleString() });
+  currencyRows
+    .filter((row) => row.label !== "Solari Credit")
+    .forEach((row) => currencyItems.push({ label: row.label || `Currency ${row.currency_id}`, value: Number(row.balance).toLocaleString() }));
+  const currencyTiles = currencyItems.map((item) => ({ ...item, Icon: currencyIcon(item.label) }));
+
+  return <section className="action-section player-summary">
     <h4>Player Summary</h4>
-    <KeyValueGrid className="player-summary-grid" items={[
-      ["Character", firstDefined(player.character_name, player.name, fallback.character_name)],
-      ["Funcom ID", firstDefined(player.funcom_id, fallback.funcom_id)],
-      ["Status", <PlayerStatusCell value={status} />],
-      ["Map", firstDefined(player.map, player.world, fallback.map)],
-      ["Guild", firstDefined(player.guild, fallback.guild) || "—"],
-      ["DB Player ID", dbPlayerId || "missing"],
-      ["FLS ID", firstDefined(player.fls_id, fallback.fls_id, actionPlayerId) || "missing"],
-      ...(progression ? [
-        ["Level", String(progression.level ?? 0)] as [string, string],
-        ["XP", (progression.xp ?? 0).toLocaleString()] as [string, string],
-        ["Skill Points", `${progression.unspentSkillPoints ?? 0} / ${progression.totalSkillPoints ?? 0}`] as [string, string]
-      ] : []),
-      ...(intel !== null ? [["Available Intel", intel.toLocaleString()] as [string, string]] : [])
-    ]} />
-    <div className="nested-box-row">
-      <div className="nested-box">
-        <KeyValueGrid className="nested-box-grid" items={[
-          ["Faction", firstDefined(player.faction, fallback.faction) || "Neutral"],
-          ...factionRows.map((row): [string, string] => [`${row.faction_name || `Faction ${row.faction_id}`} Rep`, String(row.reputation_amount)])
-        ]} />
+
+    <div className="summary-hero">
+      <div className="summary-hero-main">
+        <span className="summary-hero-name">{characterName}</span>
+        <PlayerStatusCell value={status} />
       </div>
-      {(currencyRows.length > 0 || solarisCoinTotal !== null) && <div className="nested-box">
-        <KeyValueGrid className="nested-box-grid" items={[
-          ...currencyRows.filter((row) => row.label === "Solari Credit").map((row): [string, string] => [row.label as string, Number(row.balance).toLocaleString()]),
-          ...(solarisCoinTotal !== null ? [["Solari Coin", solarisCoinTotal.toLocaleString()] as [string, string]] : []),
-          ...currencyRows.filter((row) => row.label !== "Solari Credit").map((row): [string, string] => [row.label || `Currency ${row.currency_id}`, Number(row.balance).toLocaleString()])
-        ]} />
-      </div>}
+      <div className="summary-hero-sub">
+        {map && <span className="summary-hero-meta summary-hero-map"><MapPin size={14} className="summary-hero-icon" aria-label="Map" /><span>{map}</span></span>}
+        <span className="summary-hero-meta summary-hero-guild"><Users size={14} className="summary-hero-icon" aria-label="Guild" /><span>{guild}</span></span>
+      </div>
     </div>
+
+    {(progression || intel !== null) && <div className="summary-stats">
+      {progression && <>
+        <div className="summary-stat"><span>Level</span><strong>{String(progression.level ?? 0)}</strong></div>
+        <div className="summary-stat"><span>XP</span><strong>{(progression.xp ?? 0).toLocaleString()}</strong></div>
+        <div className="summary-stat"><span>Skill Points</span><strong>{`${progression.unspentSkillPoints ?? 0} / ${progression.totalSkillPoints ?? 0}`}</strong></div>
+      </>}
+      {intel !== null && <div className="summary-stat"><span>Available Intel</span><strong>{intel.toLocaleString()}</strong></div>}
+    </div>}
+
+    <div className="summary-cols">
+      <div className="summary-block">
+        <div className="summary-block-label">Identity</div>
+        <table className="summary-kv"><tbody>
+          <tr><td>DB Player ID</td><td className="summary-mono">{dbPlayerId || "missing"}</td></tr>
+          <tr><td>Funcom ID</td><td className="summary-mono">{funcomId || "—"}</td></tr>
+          <tr><td>FLS ID</td><td className="summary-mono">{flsId}</td></tr>
+        </tbody></table>
+      </div>
+      <div className="summary-block">
+        <div className="summary-block-label">Faction</div>
+        <table className="summary-kv"><tbody>
+          <tr><td>Alignment</td><td>{faction}</td></tr>
+        </tbody></table>
+        {factionRows.length > 0 && <>
+          <div className="summary-block-label summary-sublabel">Reputation</div>
+          <table className="summary-kv"><tbody>
+            {factionRows.map((row) => <tr key={row.faction_id}>
+              <td>{row.faction_name || `Faction ${row.faction_id}`}</td>
+              <td>{String(row.reputation_amount)}</td>
+            </tr>)}
+          </tbody></table>
+        </>}
+      </div>
+    </div>
+
+    {(currencyRows.length > 0 || solarisCoinTotal !== null) && <div className="summary-block">
+      <div className="summary-block-label">Currency</div>
+      <div className="summary-currency">
+        {currencyTiles.map(({ label, value, Icon }) => <div className="summary-currency-tile" key={label}>
+          <Icon size={18} className="summary-currency-icon" aria-hidden="true" />
+          <div className="summary-currency-body">
+            <strong>{value}</strong>
+            <span>{label}</span>
+          </div>
+        </div>)}
+      </div>
+    </div>}
+
     {actions}
   </section>;
 }

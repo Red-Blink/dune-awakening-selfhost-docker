@@ -66,18 +66,19 @@ describe("PlayerSummary", () => {
 
   describe("Guild fallback", () => {
     it("shows an em dash when no guild is assigned on player or fallback", () => {
-      render(
+      const { container } = render(
         <PlayerSummary
           {...baseProps}
           detail={{ player: { character_name: "Benny Jesserette" } }}
           fallback={{}}
         />
       );
-      expect(screen.getByText("—")).toBeInTheDocument();
+      const guildMeta = container.querySelector(".summary-hero-guild");
+      expect(guildMeta?.textContent).toContain("—");
     });
 
     it("shows the real guild when present on the loaded player", () => {
-      render(
+      const { container } = render(
         <PlayerSummary
           {...baseProps}
           detail={{ player: { character_name: "Benny Jesserette", guild: "House Corrino" } }}
@@ -85,7 +86,9 @@ describe("PlayerSummary", () => {
         />
       );
       expect(screen.getByText("House Corrino")).toBeInTheDocument();
-      expect(screen.queryByText("—")).not.toBeInTheDocument();
+      const guildMeta = container.querySelector(".summary-hero-guild");
+      expect(guildMeta?.textContent).toContain("House Corrino");
+      expect(guildMeta?.textContent).not.toContain("—");
     });
 
     it("uses the fallback guild before detail has loaded", () => {
@@ -196,18 +199,38 @@ describe("PlayerSummary", () => {
         />
       );
       await waitFor(() => {
-        expect(screen.getByText("Atreides Rep")).toBeInTheDocument();
+        expect(screen.getByText("Atreides")).toBeInTheDocument();
         expect(screen.getByText("500")).toBeInTheDocument();
-        expect(screen.getByText("Harkonnen Rep")).toBeInTheDocument();
+        expect(screen.getByText("Harkonnen")).toBeInTheDocument();
         expect(screen.getByText("120")).toBeInTheDocument();
       });
     });
 
-    it("groups Faction and its Reputation rows inside their own nested box", async () => {
+    it("lists reputation standings under a Reputation sub-heading, separate from the alignment", async () => {
       vi.mocked(playersApi.factions).mockResolvedValue({
         rows: [{ faction_id: 1, faction_name: "Atreides", reputation_amount: 500 }],
         capabilities: {}
       });
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette", faction: "Harkonnen" } }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Reputation")).toBeInTheDocument();
+      });
+      const block = screen.getByText("Reputation").closest(".summary-block");
+      expect(block).not.toBeNull();
+      expect(block?.textContent).toContain("Alignment");
+      expect(block?.textContent).toContain("Harkonnen");
+      expect(block?.textContent).toContain("Atreides");
+      expect(block?.textContent).toContain("500");
+    });
+
+    it("omits the Reputation sub-heading when the player has no standings", async () => {
+      vi.mocked(playersApi.factions).mockResolvedValue({ rows: [], capabilities: {} });
       render(
         <PlayerSummary
           {...baseProps}
@@ -216,11 +239,9 @@ describe("PlayerSummary", () => {
         />
       );
       await waitFor(() => {
-        expect(screen.getByText("Atreides Rep")).toBeInTheDocument();
+        expect(screen.getByText("Alignment")).toBeInTheDocument();
       });
-      const nestedBox = screen.getByText("Atreides Rep").closest(".nested-box");
-      expect(nestedBox).not.toBeNull();
-      expect(nestedBox?.textContent).toContain("Atreides");
+      expect(screen.queryByText("Reputation")).not.toBeInTheDocument();
     });
   });
 
