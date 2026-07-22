@@ -67,7 +67,7 @@ export function PlayerSummary({
 
   return <section className="action-section">
     <h4>Player Summary</h4>
-    <KeyValueGrid items={[
+    <KeyValueGrid className="player-summary-grid" items={[
       ["Character", firstDefined(player.character_name, player.name, fallback.character_name)],
       ["Funcom ID", firstDefined(player.funcom_id, fallback.funcom_id)],
       ["Status", <PlayerStatusCell value={status} />],
@@ -82,20 +82,21 @@ export function PlayerSummary({
       ] : []),
       ...(intel !== null ? [["Available Intel", intel.toLocaleString()] as [string, string]] : [])
     ]} />
-    <div className="nested-box">
-      <h5>Faction</h5>
-      <KeyValueGrid items={[
-        ["Faction", firstDefined(player.faction, fallback.faction) || "Neutral"],
-        ...factionRows.map((row): [string, string] => [`${row.faction_name || `Faction ${row.faction_id}`} Reputation`, String(row.reputation_amount)])
-      ]} />
+    <div className="nested-box-row">
+      <div className="nested-box">
+        <KeyValueGrid className="nested-box-grid" items={[
+          ["Faction", firstDefined(player.faction, fallback.faction) || "Neutral"],
+          ...factionRows.map((row): [string, string] => [`${row.faction_name || `Faction ${row.faction_id}`} Rep`, String(row.reputation_amount)])
+        ]} />
+      </div>
+      {(currencyRows.length > 0 || solarisCoinTotal !== null) && <div className="nested-box">
+        <KeyValueGrid className="nested-box-grid" items={[
+          ...currencyRows.filter((row) => row.label === "Solari Credit").map((row): [string, string] => [row.label as string, Number(row.balance).toLocaleString()]),
+          ...(solarisCoinTotal !== null ? [["Solari Coin", solarisCoinTotal.toLocaleString()] as [string, string]] : []),
+          ...currencyRows.filter((row) => row.label !== "Solari Credit").map((row): [string, string] => [row.label || `Currency ${row.currency_id}`, Number(row.balance).toLocaleString()])
+        ]} />
+      </div>}
     </div>
-    {(currencyRows.length > 0 || solarisCoinTotal !== null) && <div className="nested-box">
-      <h5>Currency</h5>
-      <KeyValueGrid items={[
-        ...currencyRows.map((row): [string, string] => [row.label || `Currency ${row.currency_id}`, Number(row.balance).toLocaleString()]),
-        ...(solarisCoinTotal !== null ? [["Total Solari Coin", solarisCoinTotal.toLocaleString()] as [string, string]] : [])
-      ]} />
-    </div>}
     {actions}
   </section>;
 }

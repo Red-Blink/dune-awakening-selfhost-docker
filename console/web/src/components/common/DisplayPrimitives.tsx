@@ -1,10 +1,10 @@
 import { isValidElement } from "react";
 import { formatCell, formatDisplayValue, normalizeStatus } from "../../lib/display";
 
-export function KeyValueGrid({ items }: { items: [string, unknown][] }) {
+export function KeyValueGrid({ items, className = "" }: { items: [string, unknown][]; className?: string }) {
   const visible = items.filter(([, value]) => value !== undefined && value !== null && value !== "");
   if (!visible.length) return <div className="empty">No summary values available.</div>;
-  return <div className="key-value-grid">{visible.map(([key, value]) => <div className="key-value-item" key={key}>
+  return <div className={`key-value-grid ${className}`.trim()}>{visible.map(([key, value]) => <div className="key-value-item" key={key}>
     <span>{key}</span>
     <strong>{isValidElement(value) ? value : formatCell(value)}</strong>
   </div>)}</div>;

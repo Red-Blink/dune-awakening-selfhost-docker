@@ -133,7 +133,6 @@ describe("PlayerSummary", () => {
         />
       );
       await waitFor(() => {
-        expect(screen.getByText("Currency")).toBeInTheDocument();
         expect(screen.getByText("Solari Credit")).toBeInTheDocument();
         expect(screen.getByText((5000).toLocaleString())).toBeInTheDocument();
         expect(screen.getByText("Scrip")).toBeInTheDocument();
@@ -154,7 +153,29 @@ describe("PlayerSummary", () => {
         expect(playersApi.currency).toHaveBeenCalledWith("91");
       });
       expect(screen.queryByText("Solari Credit")).not.toBeInTheDocument();
-      expect(screen.queryByText("Currency")).not.toBeInTheDocument();
+    });
+
+    it("orders Solari Credit, then Solari Coin, then Scrip", async () => {
+      vi.mocked(playersApi.currency).mockResolvedValue({
+        rows: [
+          { currency_id: 0, balance: 5000, label: "Solari Credit" },
+          { currency_id: 1, balance: 250, label: "Scrip" }
+        ],
+        capabilities: {}
+      });
+      vi.mocked(playersApi.solarisCoin).mockResolvedValue({ capabilities: { solarisCoin: true }, total: 30129 });
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette" } }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Solari Coin")).toBeInTheDocument();
+      });
+      const labels = screen.getAllByText(/^(Solari Credit|Solari Coin|Scrip)$/).map((el) => el.textContent);
+      expect(labels).toEqual(["Solari Credit", "Solari Coin", "Scrip"]);
     });
   });
 
@@ -175,14 +196,14 @@ describe("PlayerSummary", () => {
         />
       );
       await waitFor(() => {
-        expect(screen.getByText("Atreides Reputation")).toBeInTheDocument();
+        expect(screen.getByText("Atreides Rep")).toBeInTheDocument();
         expect(screen.getByText("500")).toBeInTheDocument();
-        expect(screen.getByText("Harkonnen Reputation")).toBeInTheDocument();
+        expect(screen.getByText("Harkonnen Rep")).toBeInTheDocument();
         expect(screen.getByText("120")).toBeInTheDocument();
       });
     });
 
-    it("nests Faction and its Reputation rows inside their own Faction box", async () => {
+    it("groups Faction and its Reputation rows inside their own nested box", async () => {
       vi.mocked(playersApi.factions).mockResolvedValue({
         rows: [{ faction_id: 1, faction_name: "Atreides", reputation_amount: 500 }],
         capabilities: {}
@@ -195,9 +216,11 @@ describe("PlayerSummary", () => {
         />
       );
       await waitFor(() => {
-        expect(screen.getByText("Atreides Reputation")).toBeInTheDocument();
+        expect(screen.getByText("Atreides Rep")).toBeInTheDocument();
       });
-      expect(screen.getByRole("heading", { level: 5, name: "Faction" })).toBeInTheDocument();
+      const nestedBox = screen.getByText("Atreides Rep").closest(".nested-box");
+      expect(nestedBox).not.toBeNull();
+      expect(nestedBox?.textContent).toContain("Atreides");
     });
   });
 
@@ -275,7 +298,7 @@ describe("PlayerSummary", () => {
     });
   });
 
-  describe("Total Solari Coin", () => {
+  describe("Solari Coin", () => {
     it("renders the summed physical coin total formatted with the viewer's locale grouping", async () => {
       vi.mocked(playersApi.solarisCoin).mockResolvedValue({ capabilities: { solarisCoin: true }, total: 51194 });
       render(
@@ -286,7 +309,7 @@ describe("PlayerSummary", () => {
         />
       );
       await waitFor(() => {
-        expect(screen.getByText("Total Solari Coin")).toBeInTheDocument();
+        expect(screen.getByText("Solari Coin")).toBeInTheDocument();
         expect(screen.getByText((51194).toLocaleString())).toBeInTheDocument();
       });
     });
@@ -301,7 +324,7 @@ describe("PlayerSummary", () => {
         />
       );
       await waitFor(() => {
-        expect(screen.getByText("Total Solari Coin")).toBeInTheDocument();
+        expect(screen.getByText("Solari Coin")).toBeInTheDocument();
         expect(screen.getByText("0")).toBeInTheDocument();
       });
     });
@@ -318,7 +341,7 @@ describe("PlayerSummary", () => {
       await waitFor(() => {
         expect(playersApi.solarisCoin).toHaveBeenCalledWith("91");
       });
-      expect(screen.queryByText("Total Solari Coin")).not.toBeInTheDocument();
+      expect(screen.queryByText("Solari Coin")).not.toBeInTheDocument();
     });
   });
 });
