@@ -6,7 +6,9 @@ import { playersApi } from "../../api/players";
 vi.mock("../../api/players", () => ({
   playersApi: {
     currency: vi.fn(),
-    factions: vi.fn()
+    factions: vi.fn(),
+    progression: vi.fn(),
+    intel: vi.fn()
   }
 }));
 
@@ -19,6 +21,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(playersApi.currency).mockResolvedValue({ rows: [], capabilities: {} });
   vi.mocked(playersApi.factions).mockResolvedValue({ rows: [], capabilities: {} });
+  vi.mocked(playersApi.progression).mockResolvedValue({ capabilities: {} });
+  vi.mocked(playersApi.intel).mockResolvedValue({ capabilities: {} });
 });
 
 describe("PlayerSummary", () => {
@@ -106,6 +110,8 @@ describe("PlayerSummary", () => {
       );
       expect(playersApi.currency).not.toHaveBeenCalled();
       expect(playersApi.factions).not.toHaveBeenCalled();
+      expect(playersApi.progression).not.toHaveBeenCalled();
+      expect(playersApi.intel).not.toHaveBeenCalled();
     });
 
     it("renders each currency balance with its resolved label", async () => {
@@ -169,6 +175,80 @@ describe("PlayerSummary", () => {
         expect(screen.getByText("Harkonnen Reputation")).toBeInTheDocument();
         expect(screen.getByText("120")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("Progression", () => {
+    it("renders Level, XP, and Skill Points when progression is supported", async () => {
+      vi.mocked(playersApi.progression).mockResolvedValue({
+        capabilities: { progression: true },
+        level: 11,
+        xp: 4790,
+        totalSkillPoints: 12,
+        unspentSkillPoints: 3
+      });
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette" } }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Level")).toBeInTheDocument();
+        expect(screen.getByText("11")).toBeInTheDocument();
+        expect(screen.getByText("XP")).toBeInTheDocument();
+        expect(screen.getByText("4790")).toBeInTheDocument();
+        expect(screen.getByText("Skill Points")).toBeInTheDocument();
+        expect(screen.getByText("3 / 12")).toBeInTheDocument();
+      });
+    });
+
+    it("renders nothing extra when progression is unsupported by the schema", async () => {
+      vi.mocked(playersApi.progression).mockResolvedValue({ capabilities: { progression: false }, reason: "Unsupported" });
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette" } }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(playersApi.progression).toHaveBeenCalledWith("91");
+      });
+      expect(screen.queryByText("Level")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Intel", () => {
+    it("renders Intel when supported by the schema", async () => {
+      vi.mocked(playersApi.intel).mockResolvedValue({ capabilities: { intel: true }, intel: 1500, maxIntel: 2779 });
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette" } }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Intel")).toBeInTheDocument();
+        expect(screen.getByText("1500")).toBeInTheDocument();
+      });
+    });
+
+    it("renders nothing extra when intel is unsupported by the schema", async () => {
+      vi.mocked(playersApi.intel).mockResolvedValue({ capabilities: { intel: false }, reason: "Unsupported" });
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette" } }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(playersApi.intel).toHaveBeenCalledWith("91");
+      });
+      expect(screen.queryByText("Intel")).not.toBeInTheDocument();
     });
   });
 });

@@ -1934,6 +1934,53 @@ export async function playerFactions(db, id) {
   return { capabilities: { factions: true, factionNames: hasFactions }, player, rows: result.rows };
 }
 
+export async function playerProgression(db, id) {
+  if (!(await tableExists(db, "player_state")) || !(await tableExists(db, "actor_fgl_entities")) || !(await tableExists(db, "fgl_entities"))) {
+    return { capabilities: { progression: false }, reason: "Unsupported by detected schema. Missing required table(s): dune.player_state, dune.actor_fgl_entities, dune.fgl_entities" };
+  }
+  const player = await resolvePlayerMutationTarget(db, id);
+  const result = await db.query(`
+    select (fe.components->'FLevelComponent'->1->>'TotalXPEarned')::bigint as xp,
+           (fe.components->'FLevelComponent'->1->>'TotalSkillPoints')::bigint as total_skill_points,
+           (fe.components->'FLevelComponent'->1->>'UnspentSkillPoints')::bigint as unspent_skill_points
+    from dune.fgl_entities fe
+    join dune.actor_fgl_entities afe on afe.entity_id = fe.entity_id
+    where afe.slot_name = 'DuneCharacter'
+      and afe.actor_id = (
+        select player_pawn_id from dune.player_state
+        where player_controller_id = $1::bigint
+        limit 1
+      )
+    limit 1`, [player.controllerId]);
+  const row = result.rows[0];
+  const xp = Number(row?.xp || 0);
+  return {
+    capabilities: { progression: true },
+    player,
+    xp,
+    level: xpToLevel(xp),
+    totalSkillPoints: Number(row?.total_skill_points || 0),
+    unspentSkillPoints: Number(row?.unspent_skill_points || 0)
+  };
+}
+
+export async function playerIntel(db, id) {
+  if (!(await supportsIntelMutation(db))) {
+    return { capabilities: { intel: false }, reason: "Unsupported by detected schema. Missing required table(s): dune.actors (properties column)" };
+  }
+  const player = await resolvePlayerMutationTarget(db, id);
+  const result = await db.query(`
+    select (properties->'TechKnowledgePlayerComponent'->>'m_TechKnowledgePoints')::bigint as intel
+    from dune.actors
+    where id = $1 and properties ? 'TechKnowledgePlayerComponent'`, [player.actorId]);
+  return {
+    capabilities: { intel: true },
+    player,
+    intel: Number(result.rows[0]?.intel || 0),
+    maxIntel: MAX_INTEL_POINTS
+  };
+}
+
 export async function playerSpecs(db, id) {
   if (!(await tableExists(db, "specialization_tracks"))) return unsupported("specs", ["dune.specialization_tracks"]);
   const player = await resolvePlayerMutationTarget(db, id);

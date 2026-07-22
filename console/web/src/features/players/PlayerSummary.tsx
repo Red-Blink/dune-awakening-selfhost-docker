@@ -6,6 +6,7 @@ import { playersApi } from "../../api/players";
 
 type CurrencyRow = { currency_id: number; balance: number; label?: string };
 type FactionRow = { faction_id: number; faction_name?: string; reputation_amount: number };
+type Progression = { level?: number; xp?: number; totalSkillPoints?: number; unspentSkillPoints?: number };
 
 export function PlayerSummary({
   detail,
@@ -24,6 +25,8 @@ export function PlayerSummary({
   const status = firstDefined(player.online_status, fallback.online_status);
   const [currencyRows, setCurrencyRows] = useState<CurrencyRow[]>([]);
   const [factionRows, setFactionRows] = useState<FactionRow[]>([]);
+  const [progression, setProgression] = useState<Progression | null>(null);
+  const [intel, setIntel] = useState<number | null>(null);
   const loadRequest = useRef(0);
 
   useEffect(() => {
@@ -31,18 +34,29 @@ export function PlayerSummary({
     if (!dbPlayerId) {
       setCurrencyRows([]);
       setFactionRows([]);
+      setProgression(null);
+      setIntel(null);
       return;
     }
-    void Promise.all([playersApi.currency(dbPlayerId), playersApi.factions(dbPlayerId)])
-      .then(([currency, factions]) => {
+    void Promise.all([
+      playersApi.currency(dbPlayerId),
+      playersApi.factions(dbPlayerId),
+      playersApi.progression(dbPlayerId),
+      playersApi.intel(dbPlayerId)
+    ])
+      .then(([currency, factions, progressionResult, intelResult]) => {
         if (request !== loadRequest.current) return;
         setCurrencyRows((currency.rows || []) as CurrencyRow[]);
         setFactionRows((factions.rows || []) as FactionRow[]);
+        setProgression(progressionResult.capabilities?.progression ? progressionResult : null);
+        setIntel(intelResult.capabilities?.intel ? (intelResult.intel ?? null) : null);
       })
       .catch(() => {
         if (request !== loadRequest.current) return;
         setCurrencyRows([]);
         setFactionRows([]);
+        setProgression(null);
+        setIntel(null);
       });
   }, [dbPlayerId]);
 
@@ -57,6 +71,12 @@ export function PlayerSummary({
       ["Guild", firstDefined(player.guild, fallback.guild) || "—"],
       ["DB Player ID", dbPlayerId || "missing"],
       ["FLS ID", firstDefined(player.fls_id, fallback.fls_id, actionPlayerId) || "missing"],
+      ...(progression ? [
+        ["Level", String(progression.level ?? 0)] as [string, string],
+        ["XP", String(progression.xp ?? 0)] as [string, string],
+        ["Skill Points", `${progression.unspentSkillPoints ?? 0} / ${progression.totalSkillPoints ?? 0}`] as [string, string]
+      ] : []),
+      ...(intel !== null ? [["Intel", String(intel)] as [string, string]] : []),
       ...currencyRows.map((row): [string, string] => [row.label || `Currency ${row.currency_id}`, String(row.balance)]),
       ...factionRows.map((row): [string, string] => [`${row.faction_name || `Faction ${row.faction_id}`} Reputation`, String(row.reputation_amount)])
     ]} />
