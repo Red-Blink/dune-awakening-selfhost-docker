@@ -224,7 +224,7 @@ describe("PlayerSummary", () => {
   });
 
   describe("Intel", () => {
-    it("renders Intel when supported by the schema", async () => {
+    it("renders Available Intel when supported by the schema", async () => {
       vi.mocked(playersApi.intel).mockResolvedValue({ capabilities: { intel: true }, intel: 1500, maxIntel: 2779 });
       render(
         <PlayerSummary
@@ -234,8 +234,8 @@ describe("PlayerSummary", () => {
         />
       );
       await waitFor(() => {
-        expect(screen.getByText("Intel")).toBeInTheDocument();
-        expect(screen.getByText("1500")).toBeInTheDocument();
+        expect(screen.getByText("Available Intel")).toBeInTheDocument();
+        expect(screen.getByText((1500).toLocaleString())).toBeInTheDocument();
       });
     });
 
@@ -251,7 +251,7 @@ describe("PlayerSummary", () => {
       await waitFor(() => {
         expect(playersApi.intel).toHaveBeenCalledWith("91");
       });
-      expect(screen.queryByText("Intel")).not.toBeInTheDocument();
+      expect(screen.queryByText("Available Intel")).not.toBeInTheDocument();
     });
   });
 

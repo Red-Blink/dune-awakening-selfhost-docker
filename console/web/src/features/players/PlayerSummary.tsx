@@ -81,7 +81,7 @@ export function PlayerSummary({
         ["XP", (progression.xp ?? 0).toLocaleString()] as [string, string],
         ["Skill Points", `${progression.unspentSkillPoints ?? 0} / ${progression.totalSkillPoints ?? 0}`] as [string, string]
       ] : []),
-      ...(intel !== null ? [["Intel", String(intel)] as [string, string]] : []),
+      ...(intel !== null ? [["Available Intel", intel.toLocaleString()] as [string, string]] : []),
       ...currencyRows.map((row): [string, string] => [row.label || `Currency ${row.currency_id}`, Number(row.balance).toLocaleString()]),
       ...(solarisCoinTotal !== null ? [["Total Solari Coin", solarisCoinTotal.toLocaleString()] as [string, string]] : []),
       ...factionRows.map((row): [string, string] => [`${row.faction_name || `Faction ${row.faction_id}`} Reputation`, String(row.reputation_amount)])
