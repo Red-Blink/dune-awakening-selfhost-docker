@@ -2203,6 +2203,33 @@ export async function liveMapServices(db, map = "") {
   return { capabilities: { services: true, farmState: hasFarm }, rows: result.rows };
 }
 
+// Partition topology rows for combat-state resolution. Returns
+// `dune.world_partition` metadata (partition id, dimension index, database
+// label) joined with `farm_state` runtime availability. These fields are
+// descriptive metadata only — callers must resolve PvP/PvE combat state via
+// `services/mapCombatState.js`, never by inferring it from the columns
+// returned here.
+export async function mapCombatPartitionRows(db, map) {
+  if (!(await tableExists(db, "world_partition"))) return unsupportedMap("combatState", ["dune.world_partition"]);
+  const hasFarm = await tableExists(db, "farm_state");
+  const values = [];
+  const where = mapFilterClause(map, values, "wp");
+  const result = await db.query(`
+    select wp.partition_id::text as partition_id,
+           coalesce(wp.map, '') as map,
+           coalesce(wp.dimension_index, 0) as dimension_index,
+           coalesce(wp.label, '') as database_label,
+           coalesce(wp.server_id, '') as server_id,
+           coalesce(wp.blocked, false) as blocked,
+           ${hasFarm ? "coalesce(fs.alive, false)" : "false"} as alive,
+           ${hasFarm ? "coalesce(fs.ready, false)" : "false"} as ready
+    from dune.world_partition wp
+    ${hasFarm ? "left join dune.farm_state fs on fs.server_id = wp.server_id" : ""}
+    where 1=1 ${where}
+    order by wp.dimension_index, wp.partition_id`, values);
+  return { capabilities: { combatState: true, farmState: hasFarm }, rows: result.rows };
+}
+
 export async function liveMapMarkers(db, map = "") {
   const [players, vehicles, bases, storage] = await Promise.all([
     liveMapPlayers(db, map),
@@ -4684,6 +4711,76 @@ export async function migrateDiscordAdapterSchema(db) {
     await tx.query(`
       create unique index if not exists discord_pending_links_player_controller_id_uidx
       on dune.discord_pending_links (player_controller_id)`);
+
+    // Multi-account linking — FINDING-LINK-6
+    // (docs/security/discord-player-link-hardening.md). dune.discord_player_links
+    // above uniques on discord_user_id alone, so one Discord user can only
+    // ever have ONE linked character at a time; re-linking silently
+    // overwrites the previous link. dune.discord_account_links is
+    // additive: it uniques on (discord_user_id, player_controller_id)
+    // instead, letting one Discord user link multiple characters/accounts,
+    // while still keeping player_controller_id unique on its own (a
+    // character still belongs to exactly one Discord user, never shared).
+    // Deliberately does NOT replace or migrate discord_player_links — both
+    // tables coexist; see linkAdditionalPlayerProvider() /
+    // FINDING-LINK-6's "Minimal Impact" note for why no data migration is
+    // required.
+    await tx.query(`
+      create table if not exists dune.discord_account_links (
+        id bigint generated always as identity primary key,
+        discord_user_id text not null,
+        player_controller_id text not null,
+        is_default boolean not null default false,
+        linked_at timestamp with time zone not null default now()
+      )`);
+    await tx.query(`
+      create unique index if not exists discord_account_links_user_player_uidx
+      on dune.discord_account_links (discord_user_id, player_controller_id)`);
+    await tx.query(`
+      create unique index if not exists discord_account_links_player_uidx
+      on dune.discord_account_links (player_controller_id)`);
+    // Partial unique index: at most one default row per discord_user_id.
+    // (Zero defaults is allowed — e.g. immediately after linking a second
+    // account before the caller has chosen a default — but never more than
+    // one.)
+    await tx.query(`
+      create unique index if not exists discord_account_links_default_uidx
+      on dune.discord_account_links (discord_user_id) where is_default`);
+
+    // Pending links for the multi-account flow are keyed by
+    // (discord_user_id, player_controller_id) rather than discord_user_id
+    // alone, so a user verifying a second/third account does not collide
+    // with — or silently cancel — a still-pending verification for a
+    // different character. This mirrors dune.discord_pending_links'
+    // shape but with a wider uniqueness key.
+    await tx.query(`
+      create table if not exists dune.discord_pending_account_links (
+        code text primary key,
+        discord_user_id text not null,
+        player_controller_id text not null,
+        character_name text not null,
+        created_at timestamp with time zone not null default now(),
+        expires_at timestamp with time zone not null
+      )`);
+    await tx.query("delete from dune.discord_pending_account_links where expires_at <= now()");
+    await tx.query(`
+      delete from dune.discord_pending_account_links older
+      using dune.discord_pending_account_links newer
+      where older.discord_user_id = newer.discord_user_id
+        and older.player_controller_id = newer.player_controller_id
+        and (older.created_at, older.code) < (newer.created_at, newer.code)`);
+    await tx.query(`
+      delete from dune.discord_pending_account_links older
+      using dune.discord_pending_account_links newer
+      where older.player_controller_id = newer.player_controller_id
+        and older.discord_user_id <> newer.discord_user_id
+        and (older.created_at, older.code) < (newer.created_at, newer.code)`);
+    await tx.query(`
+      create unique index if not exists discord_pending_account_links_user_player_uidx
+      on dune.discord_pending_account_links (discord_user_id, player_controller_id)`);
+    await tx.query(`
+      create unique index if not exists discord_pending_account_links_player_uidx
+      on dune.discord_pending_account_links (player_controller_id)`);
   };
   if (typeof db.transaction === "function") return db.transaction(migrate);
   return migrate(db);
@@ -4721,6 +4818,29 @@ export async function getLinkedPlayer(db, discordUserId) {
   return result.rows[0] || null;
 }
 
+// Checks the given discord_*_links table for a row that would conflict
+// with linking playerControllerId to discordUserId. Used to enforce "a
+// character belongs to exactly one Discord user" ACROSS both the
+// single-link (dune.discord_player_links) and multi-account
+// (dune.discord_account_links) tables, not just within whichever table a
+// given operation is writing to. Without this cross-table check, the two
+// flows each only enforced that invariant within their own table — a
+// character already owned by one Discord user via one flow could be
+// silently claimed by a DIFFERENT Discord user via the other flow. Locks
+// the matching row (if any) with "for update" so this check is race-safe
+// against a concurrent link attempt in the other table within the same
+// transaction. `table` must be a fixed, non-user-controlled string
+// literal from a caller in this module — never pass through user input.
+async function otherTableLinkConflict(tx, table, playerControllerId, discordUserId) {
+  const result = await tx.query(`
+    select discord_user_id
+    from dune.${table}
+    where player_controller_id = $1
+      and discord_user_id <> $2
+    for update`, [playerControllerId, String(discordUserId)]);
+  return result.rowCount > 0;
+}
+
 export async function discordPlayerLink(db, discordUserId, playerControllerId) {
   const link = async (tx) => {
     const conflict = await tx.query(`
@@ -4730,6 +4850,12 @@ export async function discordPlayerLink(db, discordUserId, playerControllerId) {
         and discord_user_id <> $2
       for update`, [playerControllerId, String(discordUserId)]);
     if (conflict.rowCount) {
+      return { conflict: true };
+    }
+    // FINDING-LINK-6 cross-table check: reject if this character is
+    // already linked to a DIFFERENT Discord user via the multi-account
+    // table, even though this is the single-link table's own insert.
+    if (await otherTableLinkConflict(tx, "discord_account_links", playerControllerId, discordUserId)) {
       return { conflict: true };
     }
     await tx.query(`
@@ -4754,6 +4880,169 @@ export async function discordPlayerUnlink(db, discordUserId) {
   const player = await getLinkedPlayer(db, discordUserId);
   await db.query("delete from dune.discord_player_links where discord_user_id = $1", [String(discordUserId)]);
   return Boolean(player);
+}
+
+// ─── Multi-account linking (dune.discord_account_links) — FINDING-LINK-6 ──
+//
+// Independent of, and additive to, the single-link functions above. See
+// migrateDiscordAdapterSchema()'s comment for why both tables coexist.
+
+export async function listLinkedAccounts(db, discordUserId) {
+  const result = await db.query(`
+    select dal.discord_user_id,
+           dal.player_controller_id,
+           dal.is_default,
+           dal.linked_at,
+           coalesce(ps.character_name, '') as character_name,
+           coalesce(ps.player_pawn_id::text, '0') as player_pawn_id,
+           coalesce(ps.online_status::text, 'Offline') as online_status
+    from dune.discord_account_links dal
+    join dune.player_state ps on ps.player_controller_id::text = dal.player_controller_id
+    where dal.discord_user_id = $1
+    order by dal.is_default desc, dal.linked_at asc`, [String(discordUserId)]);
+  return result.rows;
+}
+
+// Links an additional character to a Discord user who may already have
+// other linked accounts. Unlike discordPlayerLink() (single-link,
+// "on conflict do update" overwrite semantics), this INSERTs a new row and
+// throws on a genuine conflict rather than silently replacing anything.
+// The first account a user links becomes their default automatically;
+// subsequent accounts are not default unless setDefaultLinkedAccount() is
+// called.
+export async function linkAdditionalAccount(db, discordUserId, playerControllerId) {
+  const link = async (tx) => {
+    const conflict = await tx.query(`
+      select discord_user_id
+      from dune.discord_account_links
+      where player_controller_id = $1
+        and discord_user_id <> $2
+      for update`, [playerControllerId, String(discordUserId)]);
+    if (conflict.rowCount) {
+      return { conflict: "character_already_linked" };
+    }
+    // FINDING-LINK-6 cross-table check: reject if this character is
+    // already linked to a DIFFERENT Discord user via the legacy
+    // single-link table. See otherTableLinkConflict()'s comment above
+    // discordPlayerLink() for why this check exists in both directions.
+    if (await otherTableLinkConflict(tx, "discord_player_links", playerControllerId, discordUserId)) {
+      return { conflict: "character_already_linked" };
+    }
+    const existing = await tx.query(`
+      select 1 from dune.discord_account_links
+      where discord_user_id = $1 and player_controller_id = $2`,
+      [String(discordUserId), playerControllerId]);
+    if (existing.rowCount) {
+      return { conflict: "already_linked_to_this_account" };
+    }
+    const hasAnyExisting = await tx.query(`
+      select 1 from dune.discord_account_links where discord_user_id = $1 limit 1`,
+      [String(discordUserId)]);
+    const shouldBeDefault = hasAnyExisting.rowCount === 0;
+    await tx.query(`
+      insert into dune.discord_account_links (discord_user_id, player_controller_id, is_default)
+      values ($1, $2, $3)`, [String(discordUserId), playerControllerId, shouldBeDefault]);
+    return { conflict: null };
+  };
+  const result = typeof db.transaction === "function" ? await db.transaction(link) : await link(db);
+  if (result.conflict === "character_already_linked") {
+    const error = new Error("This character is already linked to another Discord account.");
+    error.code = "character_already_linked";
+    error.statusCode = 409;
+    throw error;
+  }
+  if (result.conflict === "already_linked_to_this_account") {
+    const error = new Error("This character is already linked to your Discord account.");
+    error.code = "already_linked_to_this_account";
+    error.statusCode = 409;
+    throw error;
+  }
+  return listLinkedAccounts(db, discordUserId);
+}
+
+export async function unlinkAdditionalAccount(db, discordUserId, playerControllerId) {
+  const unlink = async (tx) => {
+    const existing = await tx.query(`
+      select is_default from dune.discord_account_links
+      where discord_user_id = $1 and player_controller_id = $2`,
+      [String(discordUserId), playerControllerId]);
+    if (!existing.rowCount) return { removed: false };
+    await tx.query(`
+      delete from dune.discord_account_links
+      where discord_user_id = $1 and player_controller_id = $2`,
+      [String(discordUserId), playerControllerId]);
+    // If the removed account was the default, promote the next-oldest
+    // remaining link (if any) to default so the user always has at most
+    // one unambiguous default rather than none, as long as they still
+    // have at least one linked account.
+    if (existing.rows[0].is_default) {
+      await tx.query(`
+        update dune.discord_account_links
+        set is_default = true
+        where id = (
+          select id from dune.discord_account_links
+          where discord_user_id = $1
+          order by linked_at asc
+          limit 1
+        )`, [String(discordUserId)]);
+    }
+    return { removed: true };
+  };
+  const result = typeof db.transaction === "function" ? await db.transaction(unlink) : await unlink(db);
+  return result.removed;
+}
+
+export async function setDefaultLinkedAccount(db, discordUserId, playerControllerId) {
+  const setDefault = async (tx) => {
+    const existing = await tx.query(`
+      select 1 from dune.discord_account_links
+      where discord_user_id = $1 and player_controller_id = $2`,
+      [String(discordUserId), playerControllerId]);
+    if (!existing.rowCount) return { found: false };
+    await tx.query(`
+      update dune.discord_account_links set is_default = false
+      where discord_user_id = $1 and is_default`, [String(discordUserId)]);
+    await tx.query(`
+      update dune.discord_account_links set is_default = true
+      where discord_user_id = $1 and player_controller_id = $2`,
+      [String(discordUserId), playerControllerId]);
+    return { found: true };
+  };
+  const result = typeof db.transaction === "function" ? await db.transaction(setDefault) : await setDefault(db);
+  return result.found;
+}
+
+export async function createPendingAccountLink(db, discordUserId, playerControllerId, characterName, code, expiresAt) {
+  const create = async (tx) => {
+    await tx.query(`
+      delete from dune.discord_pending_account_links
+      where discord_user_id = $1 and player_controller_id = $2`,
+      [String(discordUserId), playerControllerId]);
+    const result = await tx.query(`
+      insert into dune.discord_pending_account_links (code, discord_user_id, player_controller_id, character_name, expires_at)
+      values ($1, $2, $3, $4, $5)
+      on conflict (code) do nothing`, [code, String(discordUserId), playerControllerId, characterName, expiresAt]);
+    return result.rowCount === 1;
+  };
+  if (typeof db.transaction === "function") return db.transaction(create);
+  return create(db);
+}
+
+export async function deletePendingAccountLink(db, discordUserId, code) {
+  const result = await db.query(`
+    delete from dune.discord_pending_account_links
+    where discord_user_id = $1 and code = $2`, [String(discordUserId), code]);
+  return result.rowCount || 0;
+}
+
+export async function consumePendingAccountLink(db, discordUserId, code) {
+  const result = await db.query(`
+    delete from dune.discord_pending_account_links
+    where code = $1
+      and discord_user_id = $2
+      and expires_at > now()
+    returning discord_user_id, player_controller_id, character_name`, [code, String(discordUserId)]);
+  return result.rows[0] || null;
 }
 
 export async function playerOwnedStorageQuery(db, playerControllerId) {

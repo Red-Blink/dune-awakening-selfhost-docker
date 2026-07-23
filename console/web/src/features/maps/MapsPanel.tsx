@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Download, Grid2X2, List, Lock } from "lucide-react";
-import { mapsApi, type ChoamTerminalOverview, type ChoamTradeCenter, type LiveMapMemoryRow, type MapRuntimeSettings, type MemoryBalancerState, type SpicefieldTypeRow, type UserSettingField, type UserSettingsSchema } from "../../api/maps";
+import { mapsApi, type ChoamTerminalOverview, type ChoamTradeCenter, type LiveMapMemoryRow, type MapCombatStateResult, type MapRuntimeSettings, type MemoryBalancerState, type PartitionCombatStateRow, type SpicefieldTypeRow, type UserSettingField, type UserSettingsSchema } from "../../api/maps";
 import { setupApi, type Task } from "../../api/setup";
 import { SecretInput } from "../../components/SecretInput";
 import { KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/common/DisplayPrimitives";
@@ -232,6 +232,7 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
   const [startupParallelism, setStartupParallelism] = useState("1");
   const [runtimeSettingsSaving, setRuntimeSettingsSaving] = useState(false);
   const [runtimeSettingsResult, setRuntimeSettingsResult] = useState<HomeTaskResult | null>(null);
+  const [combatStateByMap, setCombatStateByMap] = useState<Record<string, MapCombatStateResult>>({});
   const [sietchesText, setSietchesText] = useState("");
   const [sietchDimensionsText, setSietchDimensionsText] = useState("");
   const [sietchDimensionIdsText, setSietchDimensionIdsText] = useState("");
@@ -530,6 +531,20 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
       }
     }
   }
+  async function loadCombatState(map: string) {
+    // Combat state (PvP/PvE/MIXED/CONFLICT/UNKNOWN) is resolved server-side
+    // from the effective UserGame.ini configuration — never inferred here
+    // from dimension index, database labels, or display names. See
+    // console/api/src/services/mapCombatState.js for the resolver.
+    try {
+      const result = await mapsApi.combatState(map);
+      setCombatStateByMap((current) => ({ ...current, [map]: result }));
+    } catch {
+      // Combat state is supplementary metadata for this panel; a failure
+      // to resolve it must not block or error the rest of the Maps tab.
+      // Partition rows simply render without a combat-state badge.
+    }
+  }
   async function loadLiveMemory() {
     const result = await mapsApi.liveMemory();
     const now = Date.now();
@@ -678,6 +693,8 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
     run(loadRuntimeSettings);
     run(loadSietches);
     run(loadSpicefields);
+    void loadCombatState("Survival_1").catch(() => {});
+    void loadCombatState("DeepDesert_1").catch(() => {});
   }, []);
   useEffect(() => {
     const persisted = loadPersistedMapsTask();
@@ -786,6 +803,8 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
       if (document.visibilityState !== "visible") return;
       void refreshMapRuntime().catch(() => {});
       void loadSietches({ preserveDrafts: true }).catch(() => {});
+      void loadCombatState("Survival_1").catch(() => {});
+      void loadCombatState("DeepDesert_1").catch(() => {});
     }, MAP_RUNTIME_REFRESH_MS);
     return () => window.clearInterval(id);
   }, []);
@@ -795,6 +814,8 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
       void refreshMapRuntime().catch(() => {});
       void loadLiveMemory().catch(() => {});
       void loadSietches({ preserveDrafts: true }).catch(() => {});
+      void loadCombatState("Survival_1").catch(() => {});
+      void loadCombatState("DeepDesert_1").catch(() => {});
     };
     window.addEventListener("focus", refreshVisibleMaps);
     document.addEventListener("visibilitychange", refreshVisibleMaps);
@@ -1431,9 +1452,11 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
             const childResultActive = mapsResultTarget === childTarget;
             const childMapSettingsResultActive = Boolean(childResultActive && mapsResult && mapsResultScope === "maps" && isMapSettingsResult(mapsResult));
             const childForceDespawnResultActive = Boolean(childResultActive && mapsResult && mapsResultScope === "maps" && isForceDespawnResult(mapsResult) && !isDeepDesertDualResult(mapsResult));
-            return <Fragment key={`deepdesert-${String(deepRow.partitionId || deepRow.dimension || "")}`}><tr className="sietch-child-row"><td><span className="sietch-child-name">{deepDesertPartitionName(deepRow)}</span><span className="sietch-child-meta">Partition {String(deepRow.partitionId || "Unknown")} / Dimension {String(deepRow.dimension || "Unknown")}</span></td><td><MapRuntimeStatus value={childStatus} /></td><td>Dual</td><td><MemoryUsageBar row={childMemoryRow} fallback={liveMemoryFallback({ ...row, status: childStatus })} configuredLimit={deepMemory} /></td><td className="actions-column"><button className="stable-action-button" onClick={() => selectDeepDesertPartition(deepRow)}>{childSelected ? "Close" : "Edit"}</button></td></tr>
+            const childCombatRow = combatStateByMap["DeepDesert_1"]?.partitions.find((p) => p.partitionId === String(deepRow.partitionId || "")) || null;
+            const childName = deepDesertPartitionName(deepRow, childCombatRow);
+            return <Fragment key={`deepdesert-${String(deepRow.partitionId || deepRow.dimension || "")}`}><tr className="sietch-child-row"><td><span className="sietch-child-name">{childName}</span><span className="sietch-child-meta">Partition {String(deepRow.partitionId || "Unknown")} / Dimension {String(deepRow.dimension || "Unknown")}{childCombatRow?.configurationDrift ? " / Restart required to apply saved PvP-PvE settings" : ""}</span></td><td><MapRuntimeStatus value={childStatus} /></td><td>Dual</td><td><MemoryUsageBar row={childMemoryRow} fallback={liveMemoryFallback({ ...row, status: childStatus })} configuredLimit={deepMemory} /></td><td className="actions-column"><button className="stable-action-button" onClick={() => selectDeepDesertPartition(deepRow)}>{childSelected ? "Close" : "Edit"}</button></td></tr>
               {childSelected && <tr className="inline-edit-row"><td colSpan={5}><section className="inline-edit-panel">
-                <div className="panel-title"><h4>Edit {deepDesertPartitionName(deepRow)}</h4></div>
+                <div className="panel-title"><h4>Edit {childName}</h4></div>
                 <KeyValueGrid items={[["Partition", deepRow.partitionId], ["Dimension", deepRow.dimension], ["Status", childStatus], ["Memory", deepMemory]]} />
                 <div className="action-line">
                   <label className="memory-number-field">Memory<input type="number" min="0.01" step="0.01" inputMode="decimal" value={memory} onChange={(event) => setMemory(event.target.value)} placeholder="8" /></label>
@@ -1931,13 +1954,23 @@ function partitionMemoryValue(memoryText: string, partitionId: string, fallback:
   return String(row?.memory || fallback || "");
 }
 
-function deepDesertPartitionName(row: Record<string, unknown>) {
+// `combatRow`, when available, comes from the /api/maps/combat-state
+// resolver (see console/api/src/services/mapCombatState.js), which derives
+// PvP/PvE state from the partition's effective UserGame.ini configuration.
+// This function must NOT infer PvP/PvE from `row.dimension` — dimension
+// index is positional metadata only and does not determine combat state
+// (see the "Dual Deep Desert" resolver contract).
+export function deepDesertPartitionName(row: Record<string, unknown>, combatRow?: PartitionCombatStateRow | null) {
   const label = String(row.label || "").trim();
   if (label && !/^[-\d\s]+$/.test(label)) return label;
   const dimension = Number(row.dimension);
-  if (dimension === 0) return "Deep Desert PvP";
-  if (dimension === 1) return "Deep Desert PvE";
-  return `Deep Desert ${Number.isFinite(dimension) ? dimension + 1 : "Instance"}`;
+  const suffix = Number.isFinite(dimension) ? ` ${dimension + 1}` : "";
+  if (combatRow) {
+    if (combatRow.configuredState === "PVP") return `Deep Desert${suffix} (PvP)`;
+    if (combatRow.configuredState === "PVE") return `Deep Desert${suffix} (PvE)`;
+    if (combatRow.configuredState === "CONFLICT") return `Deep Desert${suffix} (Conflicting PvP/PvE config)`;
+  }
+  return `Deep Desert${suffix || " Instance"}`;
 }
 
 type UserGameTarget = { key: string; map: string; partitionId: string; label: string };

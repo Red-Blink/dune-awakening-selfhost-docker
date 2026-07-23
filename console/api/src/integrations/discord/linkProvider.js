@@ -11,9 +11,52 @@ import {
 import { policyError } from "./policy.js";
 import { publishCarePackageWhisper } from "../../rmq.js";
 import { ensureCarePackageServerPersona } from "../../carePackage.js";
+import { createLoginRateLimiter } from "../../rateLimit.js";
 
 const CODE_LENGTH = 6;
 const CODE_EXPIRY_MINUTES = 5;
+
+// Verification-attempt rate limiting — FINDING-LINK-3
+// (docs/security/discord-player-link-hardening.md). Codes are 6 chars from
+// a 32-symbol alphabet (~30 bits of entropy) with a 5-minute expiry and had
+// no attempt throttling: a party able to reach this route (e.g. holding the
+// adapter bearer token) could pick a target discordUserId and try many
+// codes with no lockout. Reuses the same per-key + global-aggregate
+// lockout shape already proven for login attempts
+// (docs/security/login-rate-limit-defense.md) rather than inventing a new
+// limiter shape. Keyed by discordUserId, since consumePendingLink() itself
+// is scoped to (code, discord_user_id) — an attacker must already know or
+// guess the target's Discord user ID, and this limiter makes repeated
+// guessing against one target ID costly regardless of how many different
+// codes are tried.
+const DEFAULT_VERIFY_MAX_ATTEMPTS = 5;
+const DEFAULT_VERIFY_GLOBAL_MAX_ATTEMPTS = 50;
+const DEFAULT_VERIFY_WINDOW_MS = 5 * 60 * 1000;
+const DEFAULT_VERIFY_BLOCK_MS = 15 * 60 * 1000;
+
+function envInt(name, fallback) {
+  const value = Number.parseInt(process.env[name] || "", 10);
+  return Number.isSafeInteger(value) && value > 0 ? value : fallback;
+}
+
+function createVerifyRateLimiter() {
+  return createLoginRateLimiter({
+    maxAttempts: envInt("DUNE_DISCORD_LINK_VERIFY_MAX_ATTEMPTS", DEFAULT_VERIFY_MAX_ATTEMPTS),
+    globalMaxAttempts: envInt("DUNE_DISCORD_LINK_VERIFY_GLOBAL_MAX_ATTEMPTS", DEFAULT_VERIFY_GLOBAL_MAX_ATTEMPTS),
+    windowMs: envInt("DUNE_DISCORD_LINK_VERIFY_WINDOW_MS", DEFAULT_VERIFY_WINDOW_MS),
+    blockMs: envInt("DUNE_DISCORD_LINK_VERIFY_BLOCK_MS", DEFAULT_VERIFY_BLOCK_MS)
+  });
+}
+
+let verifyRateLimiter = createVerifyRateLimiter();
+
+// Test-only: replaces the module-level limiter with a fresh instance (or a
+// caller-supplied fake) so tests don't leak lockout state into each other
+// and can use fast/deterministic clocks. Mirrors the "reset between tests"
+// pattern used by other module-level singletons in this codebase.
+export function resetVerifyRateLimiterForTests(customLimiter) {
+  verifyRateLimiter = customLimiter || createVerifyRateLimiter();
+}
 
 function generateVerificationCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -96,14 +139,26 @@ export async function verifyPlayerLinkProvider(db, { discordUserId, code }) {
     throw policyError("invalid_request", "code is required.");
   }
 
+  const rateLimitKey = String(discordUserId || "");
+  const rateLimit = verifyRateLimiter.check(rateLimitKey);
+  if (!rateLimit.allowed) {
+    throw policyError(
+      "verify_rate_limited",
+      `Too many verification attempts. Wait ${rateLimit.retryAfterSeconds}s, then try /dune data link <character> again for a new code.`,
+      429
+    );
+  }
+
   const pending = await consumePendingLink(db, discordUserId, String(code).trim().toUpperCase());
 
   if (!pending) {
+    verifyRateLimiter.recordFailure(rateLimitKey);
     return { ok: false, error: "Invalid or expired verification code. Use /dune data link <character> to generate a new one." };
   }
 
   await discordPlayerLink(db, discordUserId, pending.player_controller_id);
   const linked = await getLinkedPlayer(db, discordUserId);
+  verifyRateLimiter.recordSuccess(rateLimitKey);
 
   return {
     ok: true,

@@ -6,7 +6,7 @@ import {
   discordAdapterStatus, discordWritesEnabled, DISCORD_ADAPTER_ROUTES, DISCORD_PLANNED_ADAPTER_ROUTES,
   validateDiscordActor, discordRoleMappingFromEnv
 } from "./adapter.js";
-import { policyError, requireDiscordCapability, DISCORD_CAPABILITIES } from "./policy.js";
+import { policyError, requireDiscordCapability, requireSelfScopedCapability, DISCORD_CAPABILITIES } from "./policy.js";
 import { discordStatusProvider } from "./statusProvider.js";
 import { discordReadinessProvider, discordServicesProvider } from "./readOnlyProviders.js";
 import {
@@ -21,6 +21,14 @@ import {
   whoamiProvider,
   requireLinkedPlayer
 } from "./linkProvider.js";
+import {
+  linkAccountProvider,
+  verifyAccountLinkProvider,
+  unlinkAccountProvider,
+  listAccountsProvider,
+  setDefaultAccountProvider
+} from "./multiAccountLinkProvider.js";
+import { verifyActorSignature } from "./actorSignature.js";
 import {
   playerInventoryProvider,
   playerStorageProvider,
@@ -93,11 +101,23 @@ export function isDiscordAdapterRoute(path) {
   return Object.values(DISCORD_ADAPTER_ROUTES).includes(path);
 }
 
-export async function handleDiscordAdapterRoute({ req, res, path, config, readJson, json, db, statusProvider, readinessProvider, servicesProvider, populationProvider }) {
+export async function handleDiscordAdapterRoute({ req, res, path, config, readJson: readJsonBody, json, db, statusProvider, readinessProvider, servicesProvider, populationProvider }) {
   const safeStatusProvider = typeof statusProvider === "function" ? statusProvider : () => discordStatusProvider(config);
   const safeReadinessProvider = typeof readinessProvider === "function" ? readinessProvider : () => discordReadinessProvider(config);
   const safeServicesProvider = typeof servicesProvider === "function" ? servicesProvider : () => discordServicesProvider(config);
   const safePopulationProvider = typeof populationProvider === "function" ? populationProvider : () => defaultPopulationProvider(config);
+
+  // Reads the JSON body for a Discord adapter POST route and, when
+  // DUNE_DISCORD_ACTOR_SECRET is configured, verifies that body.actor
+  // carries a valid HMAC signature before any route handler trusts
+  // actor.userId/actor.roleIds. See actorSignature.js (FINDING-LINK-1).
+  // No-ops (verification only, no behavior change) when no secret is
+  // configured, preserving today's behavior for unmigrated bots.
+  async function readJson(request) {
+    const body = await readJsonBody(request);
+    verifyActorSignature({ actorPayload: body?.actor, headers: request.headers, config, route: path });
+    return body;
+  }
   try {
     if (!discordAdapterEnabled(config)) throw policyError("adapter_disabled", "Discord adapter is disabled.", 404);
     requireDiscordBotToken(req, config);
@@ -221,7 +241,7 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
     if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_LINK && req.method === "POST") {
       const body = await readJson(req);
       const actor = validateDiscordActor(body.actor);
-      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.PLAYER_LINK_WRITE);
+      requireSelfScopedCapability(actor, mapping, DISCORD_CAPABILITIES.PLAYER_LINK_WRITE);
       return json(res, 200, await linkPlayerProvider(db, config, {
         discordUserId: actor.userId,
         characterName: body.characterName
@@ -232,7 +252,7 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
     if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_LINK_VERIFY && req.method === "POST") {
       const body = await readJson(req);
       const actor = validateDiscordActor(body.actor);
-      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.PLAYER_LINK_WRITE);
+      requireSelfScopedCapability(actor, mapping, DISCORD_CAPABILITIES.PLAYER_LINK_WRITE);
       return json(res, 200, await verifyPlayerLinkProvider(db, {
         discordUserId: actor.userId,
         code: body.code
@@ -243,9 +263,68 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
     if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_UNLINK && req.method === "POST") {
       const body = await readJson(req);
       const actor = validateDiscordActor(body.actor);
-      requireDiscordCapability(actor, mapping, DISCORD_CAPABILITIES.PLAYER_LINK_WRITE);
+      requireSelfScopedCapability(actor, mapping, DISCORD_CAPABILITIES.PLAYER_LINK_WRITE);
       return json(res, 200, await unlinkProvider(db, {
         discordUserId: actor.userId
+      }));
+    }
+
+    // Multi-account: link an additional character (FINDING-LINK-6).
+    // Distinct from PLAYERS_LINK above: this is additive (a Discord user
+    // may hold several linked characters at once) rather than overwrite,
+    // and uses its own capability/rate limiter — see
+    // multiAccountLinkProvider.js and docs/security/discord-player-link-hardening.md.
+    if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_ACCOUNTS_LINK && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      requireSelfScopedCapability(actor, mapping, DISCORD_CAPABILITIES.ACCOUNT_LINK_WRITE);
+      return json(res, 200, await linkAccountProvider(db, config, {
+        discordUserId: actor.userId,
+        characterName: body.characterName
+      }));
+    }
+
+    // Multi-account: verify a pending additional-account link
+    if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_ACCOUNTS_LINK_VERIFY && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      requireSelfScopedCapability(actor, mapping, DISCORD_CAPABILITIES.ACCOUNT_LINK_WRITE);
+      return json(res, 200, await verifyAccountLinkProvider(db, {
+        discordUserId: actor.userId,
+        code: body.code
+      }));
+    }
+
+    // Multi-account: unlink one additional character (does not affect the
+    // legacy single-link flow's discord_player_links entry, if any).
+    if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_ACCOUNTS_UNLINK && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      requireSelfScopedCapability(actor, mapping, DISCORD_CAPABILITIES.ACCOUNT_LINK_WRITE);
+      return json(res, 200, await unlinkAccountProvider(db, {
+        discordUserId: actor.userId,
+        playerControllerId: body.playerControllerId
+      }));
+    }
+
+    // Multi-account: list all characters linked to the calling Discord user
+    if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_ACCOUNTS_LIST && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      requireSelfScopedCapability(actor, mapping, DISCORD_CAPABILITIES.ACCOUNT_LINK_WRITE);
+      return json(res, 200, await listAccountsProvider(db, {
+        discordUserId: actor.userId
+      }));
+    }
+
+    // Multi-account: change which linked character is the default
+    if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_ACCOUNTS_SET_DEFAULT && req.method === "POST") {
+      const body = await readJson(req);
+      const actor = validateDiscordActor(body.actor);
+      requireSelfScopedCapability(actor, mapping, DISCORD_CAPABILITIES.ACCOUNT_LINK_WRITE);
+      return json(res, 200, await setDefaultAccountProvider(db, {
+        discordUserId: actor.userId,
+        playerControllerId: body.playerControllerId
       }));
     }
 

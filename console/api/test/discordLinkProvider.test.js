@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { linkPlayerProvider, verifyPlayerLinkProvider } from "../src/integrations/discord/linkProvider.js";
+import { linkPlayerProvider, verifyPlayerLinkProvider, resetVerifyRateLimiterForTests } from "../src/integrations/discord/linkProvider.js";
 import { discordPlayerLink } from "../src/duneDb.js";
+import { createLoginRateLimiter } from "../src/rateLimit.js";
+
+test.beforeEach(() => {
+  resetVerifyRateLimiterForTests();
+});
 
 function createLinkDb(playerOverrides = {}) {
   const state = {
@@ -55,6 +60,14 @@ function createLinkDb(playerOverrides = {}) {
       if (text.includes("from dune.discord_player_links") && text.includes("for update")) {
         const conflict = state.link && state.link.playerControllerId === values[0] && state.link.discordUserId !== values[1];
         return { rows: conflict ? [{ discord_user_id: state.link.discordUserId }] : [], rowCount: conflict ? 1 : 0 };
+      }
+      // FINDING-LINK-6 cross-table check (otherTableLinkConflict()):
+      // discordPlayerLink() also checks dune.discord_account_links for a
+      // conflicting owner. This test file only exercises the single-link
+      // flow and never populates discord_account_links, so this always
+      // reports no conflict.
+      if (text.includes("from dune.discord_account_links") && text.includes("for update")) {
+        return { rows: [], rowCount: 0 };
       }
       if (text.includes("insert into dune.discord_player_links")) {
         state.link = { discordUserId: values[0], playerControllerId: values[1] };
@@ -114,6 +127,114 @@ test("a different Discord user cannot consume another user's challenge", async (
   assert.equal(db.state.pending, null);
   assert.deepEqual(db.state.link, { discordUserId: "discord-1", playerControllerId: "42" });
 });
+
+// FINDING-LINK-3 (docs/security/discord-player-link-hardening.md): repeated
+// wrong-code guesses against one discordUserId must be throttled and
+// eventually locked out, rather than allowed indefinitely.
+test("repeated wrong-code verification attempts for one discordUserId are rate limited", async () => {
+  let currentTime = 1000;
+  resetVerifyRateLimiterForTests(createLoginRateLimiter({
+    maxAttempts: 3,
+    globalMaxAttempts: 99,
+    windowMs: 60000,
+    blockMs: 60000,
+    now: () => currentTime
+  }));
+
+  const db = createLinkDb();
+  await linkPlayerProvider(db, {}, { discordUserId: "discord-1", characterName: "Chani" }, {
+    ensurePersona: async () => persona,
+    publishWhisper: async () => {}
+  });
+
+  // Three wrong guesses consume the allowance...
+  for (let i = 0; i < 3; i += 1) {
+    const attempt = await verifyPlayerLinkProvider(db, { discordUserId: "discord-1", code: "ACP-WRONG" });
+    assert.equal(attempt.ok, false);
+  }
+
+  // ...and the fourth is rejected before it ever reaches the database,
+  // even though the real pending code is still valid and unexpired.
+  const realCode = db.state.pending.code;
+  await assert.rejects(
+    () => verifyPlayerLinkProvider(db, { discordUserId: "discord-1", code: realCode }),
+    (error) => error.code === "verify_rate_limited" && error.statusCode === 429
+  );
+  assert.ok(db.state.pending, "the real pending link must survive a rate-limited attempt, not be consumed");
+
+  // After the block window elapses, a correct guess succeeds again.
+  currentTime += 60001;
+  const recovered = await verifyPlayerLinkProvider(db, { discordUserId: "discord-1", code: realCode });
+  assert.equal(recovered.ok, true);
+});
+
+test("rate limiting is scoped per discordUserId — one user's lockout does not block another", async () => {
+  let currentTime = 1000;
+  resetVerifyRateLimiterForTests(createLoginRateLimiter({
+    maxAttempts: 2,
+    globalMaxAttempts: 99,
+    windowMs: 60000,
+    blockMs: 60000,
+    now: () => currentTime
+  }));
+
+  const db = createLinkDb();
+  await linkPlayerProvider(db, {}, { discordUserId: "discord-1", characterName: "Chani" }, {
+    ensurePersona: async () => persona,
+    publishWhisper: async () => {}
+  });
+
+  await verifyPlayerLinkProvider(db, { discordUserId: "discord-1", code: "ACP-WRONG" });
+  await verifyPlayerLinkProvider(db, { discordUserId: "discord-1", code: "ACP-WRONG" });
+  await assert.rejects(
+    () => verifyPlayerLinkProvider(db, { discordUserId: "discord-1", code: "ACP-WRONG" }),
+    (error) => error.code === "verify_rate_limited"
+  );
+
+  // A different discordUserId with no pending link of their own is still
+  // allowed to attempt verification (and correctly gets a normal
+  // "invalid or expired" business result, not a 429).
+  const other = await verifyPlayerLinkProvider(db, { discordUserId: "discord-2", code: "ACP-WRONG" });
+  assert.equal(other.ok, false);
+  assert.match(other.error, /Invalid or expired/i);
+});
+
+test("a successful verification clears the rate-limit lockout for that discordUserId", async () => {
+  resetVerifyRateLimiterForTests(createLoginRateLimiter({
+    maxAttempts: 2,
+    globalMaxAttempts: 99,
+    windowMs: 60000,
+    blockMs: 60000
+  }));
+
+  const db = createLinkDb();
+  await linkPlayerProvider(db, {}, { discordUserId: "discord-1", characterName: "Chani" }, {
+    ensurePersona: async () => persona,
+    publishWhisper: async () => {}
+  });
+  const code = db.state.pending.code;
+
+  await verifyPlayerLinkProvider(db, { discordUserId: "discord-1", code: "ACP-WRONG" });
+  const accepted = await verifyPlayerLinkProvider(db, { discordUserId: "discord-1", code });
+  assert.equal(accepted.ok, true);
+
+  // Re-link and verify again immediately — the earlier successful
+  // verification should have reset this discordUserId's failure count,
+  // not left it one attempt away from lockout.
+  await unlinkAndRelink(db);
+  const secondCode = db.state.pending.code;
+  const secondAttempt = await verifyPlayerLinkProvider(db, { discordUserId: "discord-1", code: secondCode });
+  assert.equal(secondAttempt.ok, true);
+});
+
+async function unlinkAndRelink(db) {
+  db.state.link = null;
+  db.state.pending = null;
+  await linkPlayerProvider(db, {}, { discordUserId: "discord-1", characterName: "Chani" }, {
+    ensurePersona: async () => persona,
+    publishWhisper: async () => {}
+  });
+}
 
 test("failed whisper delivery removes the unusable pending challenge", async () => {
   const db = createLinkDb();

@@ -74,8 +74,12 @@ publish_snapshot_once() {
   python3 - <<'PY'
 import json
 import subprocess
+import sys
 import time
 from pathlib import Path
+
+sys.path.insert(0, "runtime/scripts")
+import usersettings  # noqa: E402
 
 config_path = Path("runtime/generated/sietch-config.json")
 config = json.loads(config_path.read_text()) if config_path.exists() else {"partitions": {}}
@@ -107,18 +111,50 @@ result = subprocess.run(
     capture_output=True,
 )
 
-defaults = {
-    "Difficulty": "Custom",
-    "CoreSettings": {
-        "serverDisplayName": "",
-        "doubleDifficultyLoot": "False",
-    },
-    "CombatSettings": {
-        "securityZonesForceEnablePvp": "False",
-        "areSecurityZonesEnabled": "True",
-        "shouldForceEnablePvpOnAllPartitions": "False",
-    },
-}
+usersettings_config = usersettings.load_config()
+
+
+def combat_settings_for_partition(partition_id: str) -> dict:
+    """Resolve this partition's PvP/PvE combat state via the canonical
+    resolver (the same merged UserGame.ini logic used by
+    `usersettings.py partition-values`), instead of publishing a single
+    hard-coded CombatSettings block for every partition.
+
+    Only fields with a known, real source are published. When the
+    partition's combat state cannot be determined (UNKNOWN/CONFLICT), the
+    PvP/PvE-affecting fields are omitted entirely rather than publishing a
+    guessed value, so downstream consumers cannot mistake an unresolved
+    state for an accurate partition-specific reading.
+    """
+    values = usersettings.merged_partition_values(
+        usersettings_config, "DeepDesert_1", str(partition_id)
+    )
+    resolved = usersettings.resolve_partition_combat_state(values)
+
+    settings = {
+        "Difficulty": "Custom",
+        "CoreSettings": {
+            "serverDisplayName": "",
+            "doubleDifficultyLoot": "False",
+        },
+        "CombatSettings": {
+            "areSecurityZonesEnabled": "True" if resolved["securityZonesEnabled"] else "False",
+        },
+    }
+
+    if resolved["state"] in ("PVP", "PVE"):
+        # shouldForceEnablePvpOnAllPartitions reflects the actual resolved
+        # force-all flag only when it is what determined this partition's
+        # state; otherwise it is left unset rather than defaulted to False,
+        # since a wrong "False" would misrepresent a force-all-PvP server.
+        settings["CombatSettings"]["shouldForceEnablePvpOnAllPartitions"] = (
+            "True" if resolved["source"] == "force-pvp-all-partitions" else "False"
+        )
+    # When state is CONFLICT or UNKNOWN, PvP/PvE-affecting fields are
+    # intentionally omitted — see docstring above.
+
+    return settings
+
 
 for line in result.stdout.splitlines():
     if not line.strip():
@@ -131,6 +167,7 @@ for line in result.stdout.splitlines():
     display_name = partitions.get(partition_id, {}).get("display_name", "")
     if not display_name:
         display_name = "Deep Desert" if not label else f"Deep Desert {label}"
+    combat_settings = combat_settings_for_partition(partition_id)
     payload = {
         "reportTimestamp": int(time.time()),
         "partitionId": int(partition_id),
@@ -144,7 +181,7 @@ for line in result.stdout.splitlines():
         "playerHardCapOverride": -1,
         "wauCapCurve": -1,
         "players": [],
-        "serverGameplaySettings": json.loads(json.dumps(defaults)),
+        "serverGameplaySettings": combat_settings,
     }
     payload["serverGameplaySettings"]["CoreSettings"]["serverDisplayName"] = display_name
     print(json.dumps(payload, separators=(",", ":")))
