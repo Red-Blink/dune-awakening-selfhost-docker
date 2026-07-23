@@ -36,6 +36,7 @@ current_image_refs() {
     printf '%s:%s\n' \
       registry.funcom.com/funcom/self-hosting/seabass-server "$world_tag" \
       registry.funcom.com/funcom/self-hosting/seabass-server-bg-director "$world_tag" \
+      dune-director-compat "$world_tag" \
       registry.funcom.com/funcom/self-hosting/seabass-server-db-utils "$world_tag" \
       registry.funcom.com/funcom/self-hosting/seabass-server-gateway "$world_tag" \
       registry.funcom.com/funcom/self-hosting/seabass-server-rabbitmq "$world_tag" \
@@ -78,6 +79,7 @@ obsolete_dune_image_ids() {
       registry.funcom.com/funcom/self-hosting/igw-postgres|\
       registry.funcom.com/funcom/self-hosting/seabass-server|\
       registry.funcom.com/funcom/self-hosting/seabass-server-bg-director|\
+      dune-director-compat|\
       registry.funcom.com/funcom/self-hosting/seabass-server-db-utils|\
       registry.funcom.com/funcom/self-hosting/seabass-server-gateway|\
       registry.funcom.com/funcom/self-hosting/seabass-server-rabbitmq|\
