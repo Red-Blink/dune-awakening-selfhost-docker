@@ -15,8 +15,8 @@ test.beforeEach(() => {
   resetAccountLinkVerifyRateLimiterForTests();
 });
 
-// In-memory mock exercising the real dune.discord_account_links /
-// dune.discord_pending_account_links SQL shapes from duneDb.js, mirroring
+// In-memory mock exercising the real console.discord_account_links /
+// console.discord_pending_account_links SQL shapes from duneDb.js, mirroring
 // discordLinkProvider.test.js's createLinkDb() pattern but for the
 // FINDING-LINK-6 multi-account tables. Distinct from and independent of
 // the single-link mock — proves the two flows do not share state.
@@ -43,7 +43,7 @@ function createMultiAccountDb(players = []) {
 
       // listLinkedAccounts: selects from discord_account_links dal joined
       // to player_state ps.
-      if (text.includes("from dune.discord_account_links dal") && text.includes("join dune.player_state ps")) {
+      if (text.includes("from console.discord_account_links dal") && text.includes("join dune.player_state ps")) {
         const rows = state.accounts
           .filter((a) => a.discordUserId === values[0])
           .sort((a, b) => (b.isDefault - a.isDefault) || (a.linkedAt - b.linkedAt))
@@ -62,35 +62,35 @@ function createMultiAccountDb(players = []) {
       }
 
       // linkAdditionalAccount: conflict check (for update)
-      if (text.includes("from dune.discord_account_links") && text.includes("for update")) {
+      if (text.includes("from console.discord_account_links") && text.includes("for update")) {
         const conflict = state.accounts.find((a) => a.playerControllerId === values[0] && a.discordUserId !== values[1]);
         return { rows: conflict ? [{ discord_user_id: conflict.discordUserId }] : [], rowCount: conflict ? 1 : 0 };
       }
 
       // FINDING-LINK-6 cross-table check (otherTableLinkConflict()):
-      // linkAdditionalAccount() also checks dune.discord_player_links for
+      // linkAdditionalAccount() also checks console.discord_player_links for
       // a conflicting owner from the legacy single-link flow. This test
       // file only exercises the multi-account flow and never populates
       // discord_player_links, so this always reports no conflict — the
       // cross-table check itself is proven separately in duneDb tests.
-      if (text.includes("from dune.discord_player_links") && text.includes("for update")) {
+      if (text.includes("from console.discord_player_links") && text.includes("for update")) {
         return { rows: [], rowCount: 0 };
       }
 
       // linkAdditionalAccount: already-linked-to-this-account check
-      if (text.includes("select 1 from dune.discord_account_links") && text.includes("player_controller_id = $2")) {
+      if (text.includes("select 1 from console.discord_account_links") && text.includes("player_controller_id = $2")) {
         const exists = state.accounts.some((a) => a.discordUserId === values[0] && a.playerControllerId === values[1]);
         return { rows: exists ? [{}] : [], rowCount: exists ? 1 : 0 };
       }
 
       // linkAdditionalAccount: has-any-existing check
-      if (text.includes("select 1 from dune.discord_account_links where discord_user_id = $1 limit 1")) {
+      if (text.includes("select 1 from console.discord_account_links where discord_user_id = $1 limit 1")) {
         const exists = state.accounts.some((a) => a.discordUserId === values[0]);
         return { rows: exists ? [{}] : [], rowCount: exists ? 1 : 0 };
       }
 
       // linkAdditionalAccount: insert
-      if (text.includes("insert into dune.discord_account_links")) {
+      if (text.includes("insert into console.discord_account_links")) {
         state.accounts.push({
           discordUserId: values[0],
           playerControllerId: values[1],
@@ -101,20 +101,20 @@ function createMultiAccountDb(players = []) {
       }
 
       // unlinkAdditionalAccount: is_default lookup
-      if (text.includes("select is_default from dune.discord_account_links")) {
+      if (text.includes("select is_default from console.discord_account_links")) {
         const found = state.accounts.find((a) => a.discordUserId === values[0] && a.playerControllerId === values[1]);
         return { rows: found ? [{ is_default: found.isDefault }] : [], rowCount: found ? 1 : 0 };
       }
 
       // unlinkAdditionalAccount: delete
-      if (text.includes("delete from dune.discord_account_links") && text.includes("player_controller_id = $2") && !text.includes("for update")) {
+      if (text.includes("delete from console.discord_account_links") && text.includes("player_controller_id = $2") && !text.includes("for update")) {
         const before = state.accounts.length;
         state.accounts = state.accounts.filter((a) => !(a.discordUserId === values[0] && a.playerControllerId === values[1]));
         return { rows: [], rowCount: before - state.accounts.length };
       }
 
       // unlinkAdditionalAccount: promote next-oldest to default
-      if (text.includes("update dune.discord_account_links") && text.includes("order by linked_at asc")) {
+      if (text.includes("update console.discord_account_links") && text.includes("order by linked_at asc")) {
         const remaining = state.accounts.filter((a) => a.discordUserId === values[0]).sort((a, b) => a.linkedAt - b.linkedAt);
         if (remaining.length) remaining[0].isDefault = true;
         return { rows: [], rowCount: remaining.length ? 1 : 0 };
@@ -134,13 +134,13 @@ function createMultiAccountDb(players = []) {
       }
 
       // createPendingAccountLink: clear prior pending for (user, character)
-      if (text.includes("delete from dune.discord_pending_account_links") && text.includes("player_controller_id = $2")) {
+      if (text.includes("delete from console.discord_pending_account_links") && text.includes("player_controller_id = $2")) {
         state.pending = state.pending.filter((p) => !(p.discordUserId === values[0] && p.playerControllerId === values[1]));
         return { rows: [], rowCount: 1 };
       }
 
       // createPendingAccountLink: insert
-      if (text.includes("insert into dune.discord_pending_account_links")) {
+      if (text.includes("insert into console.discord_pending_account_links")) {
         if (state.pending.some((p) => p.code === values[0])) return { rows: [], rowCount: 0 };
         state.pending.push({
           code: values[0],
@@ -153,14 +153,14 @@ function createMultiAccountDb(players = []) {
       }
 
       // deletePendingAccountLink
-      if (text.includes("delete from dune.discord_pending_account_links") && text.includes("code = $2")) {
+      if (text.includes("delete from console.discord_pending_account_links") && text.includes("code = $2")) {
         const before = state.pending.length;
         state.pending = state.pending.filter((p) => !(p.discordUserId === values[0] && p.code === values[1]));
         return { rows: [], rowCount: before - state.pending.length };
       }
 
       // consumePendingAccountLink
-      if (text.includes("delete from dune.discord_pending_account_links") && text.includes("expires_at > now()")) {
+      if (text.includes("delete from console.discord_pending_account_links") && text.includes("expires_at > now()")) {
         const match = state.pending.find((p) => p.code === values[0] && p.discordUserId === values[1]);
         if (match) {
           state.pending = state.pending.filter((p) => p !== match);

@@ -1,13 +1,15 @@
 // Multi-account player linking — FINDING-LINK-6
 // (docs/security/discord-player-link-hardening.md).
 //
-// Independent of linkProvider.js's single-link flow (dune.discord_player_links,
+// Independent of linkProvider.js's single-link flow (console.discord_player_links,
 // unique on discord_user_id alone — one linked character per Discord user,
 // globally, with silent overwrite on re-link). This module lets one Discord
-// user link multiple accounts/characters via dune.discord_account_links
+// user link multiple accounts/characters via console.discord_account_links
 // (unique on (discord_user_id, player_controller_id), with
 // player_controller_id still unique on its own so a character never belongs
-// to more than one Discord user).
+// to more than one Discord user). Both tables live in the `console` schema,
+// not `dune` — see migrateDiscordAdapterSchema()'s comment in duneDb.js for
+// why this project's own state must never live in the game's own schema.
 //
 // Both flows coexist by design — see migrateDiscordAdapterSchema()'s
 // comment in duneDb.js. This module does not replace or migrate data from

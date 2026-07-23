@@ -664,7 +664,7 @@ test("account-link routes reject a public-tier actor and allow an observer-tier 
       if (text.includes("from dune.player_state ps") && text.includes("lower(ps.character_name)")) {
         return { rows: [player], rowCount: 1 };
       }
-      if (text.includes("from dune.discord_account_links dal")) {
+      if (text.includes("from console.discord_account_links dal")) {
         const rows = accounts.filter((a) => a.discordUserId === values[0]).map((a) => ({
           discord_user_id: a.discordUserId,
           player_controller_id: a.playerControllerId,
@@ -676,8 +676,8 @@ test("account-link routes reject a public-tier actor and allow an observer-tier 
         return { rows, rowCount: rows.length };
       }
       if (text.includes("for update")) return { rows: [], rowCount: 0 };
-      if (text.includes("select 1 from dune.discord_account_links")) return { rows: [], rowCount: 0 };
-      if (text.includes("insert into dune.discord_account_links")) {
+      if (text.includes("select 1 from console.discord_account_links")) return { rows: [], rowCount: 0 };
+      if (text.includes("insert into console.discord_account_links")) {
         accounts.push({ discordUserId: values[0], playerControllerId: values[1], isDefault: Boolean(values[2]) });
         return { rows: [], rowCount: 1 };
       }

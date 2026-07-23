@@ -296,7 +296,7 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
     }
 
     // Multi-account: unlink one additional character (does not affect the
-    // legacy single-link flow's discord_player_links entry, if any).
+    // legacy single-link flow's console.discord_player_links entry, if any).
     if (path === DISCORD_ADAPTER_ROUTES.PLAYERS_ACCOUNTS_UNLINK && req.method === "POST") {
       const body = await readJson(req);
       const actor = validateDiscordActor(body.actor);

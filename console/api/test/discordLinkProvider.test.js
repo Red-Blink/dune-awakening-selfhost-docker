@@ -29,12 +29,12 @@ function createLinkDb(playerOverrides = {}) {
       if (text.includes("from dune.player_state ps") && text.includes("lower(ps.character_name)")) {
         return { rows: [state.player], rowCount: 1 };
       }
-      if (text.includes("delete from dune.discord_pending_links") && text.includes("discord_user_id = $1 and code = $2")) {
+      if (text.includes("delete from console.discord_pending_links") && text.includes("discord_user_id = $1 and code = $2")) {
         const matches = state.pending?.discordUserId === values[0] && state.pending?.code === values[1];
         if (matches) state.pending = null;
         return { rows: [], rowCount: matches ? 1 : 0 };
       }
-      if (text.includes("delete from dune.discord_pending_links") && text.includes("expires_at > now()")) {
+      if (text.includes("delete from console.discord_pending_links") && text.includes("expires_at > now()")) {
         const matches = state.pending?.code === values[0] && state.pending?.discordUserId === values[1];
         const row = matches ? {
           discord_user_id: state.pending.discordUserId,
@@ -44,11 +44,11 @@ function createLinkDb(playerOverrides = {}) {
         if (matches) state.pending = null;
         return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
       }
-      if (text.includes("delete from dune.discord_pending_links") && text.includes("discord_user_id = $1")) {
+      if (text.includes("delete from console.discord_pending_links") && text.includes("discord_user_id = $1")) {
         if (state.pending?.discordUserId === values[0]) state.pending = null;
         return { rows: [], rowCount: 1 };
       }
-      if (text.includes("insert into dune.discord_pending_links")) {
+      if (text.includes("insert into console.discord_pending_links")) {
         state.pending = {
           code: values[0],
           discordUserId: values[1],
@@ -57,23 +57,23 @@ function createLinkDb(playerOverrides = {}) {
         };
         return { rows: [], rowCount: 1 };
       }
-      if (text.includes("from dune.discord_player_links") && text.includes("for update")) {
+      if (text.includes("from console.discord_player_links") && text.includes("for update")) {
         const conflict = state.link && state.link.playerControllerId === values[0] && state.link.discordUserId !== values[1];
         return { rows: conflict ? [{ discord_user_id: state.link.discordUserId }] : [], rowCount: conflict ? 1 : 0 };
       }
       // FINDING-LINK-6 cross-table check (otherTableLinkConflict()):
-      // discordPlayerLink() also checks dune.discord_account_links for a
+      // discordPlayerLink() also checks console.discord_account_links for a
       // conflicting owner. This test file only exercises the single-link
       // flow and never populates discord_account_links, so this always
       // reports no conflict.
-      if (text.includes("from dune.discord_account_links") && text.includes("for update")) {
+      if (text.includes("from console.discord_account_links") && text.includes("for update")) {
         return { rows: [], rowCount: 0 };
       }
-      if (text.includes("insert into dune.discord_player_links")) {
+      if (text.includes("insert into console.discord_player_links")) {
         state.link = { discordUserId: values[0], playerControllerId: values[1] };
         return { rows: [], rowCount: 1 };
       }
-      if (text.includes("from dune.discord_player_links dpl")) {
+      if (text.includes("from console.discord_player_links dpl")) {
         if (!state.link || state.link.discordUserId !== values[0]) return { rows: [], rowCount: 0 };
         return {
           rows: [{
