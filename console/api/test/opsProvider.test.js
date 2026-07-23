@@ -163,14 +163,55 @@ test("opsEconomyProvider returns the real empty shape when no economy tables exi
   assert.equal(response.result.taxCollected, 0);
 });
 
-// The five OPS domains with no backing query anywhere in this codebase
-// (inventory, location, soc, prometheus, and dashboard's aggregation of
-// them) must remain unchanged "status: planned" placeholders — do not
-// fabricate data for these.
-test("the five untouched OPS providers still return status: planned placeholders", async () => {
+test("opsInventoryProvider returns real inventory/storage data wrapped in { ok, result }", async () => {
+  const db = mockDb({
+    tables: new Set(["items", "inventories", "placeables"]),
+    query: (text) => {
+      if (text.includes("from dune.items i") && text.includes("count(*)::int as total_items")) {
+        return { rows: [{ total_items: 5 }] };
+      }
+      if (text.includes("from dune.items i") && text.includes("group by i.template_id")) {
+        return { rows: [{ template_id: "Stone", count: 5, total_stack: 2477 }] };
+      }
+      if (text.includes("from dune.placeables p") && text.includes("building_type in")) {
+        return { rows: [{ id: 13, name: "", class: "SpiceSilo_Placeable", map: "HaggaBasin", item_count: 5, owner_name: "Sihaya" }] };
+      }
+      return null;
+    }
+  });
+
+  const response = await opsInventoryProvider({}, db);
+  assert.equal(response.ok, true);
+  assert.equal(response.result.totalItems, 5);
+  assert.equal(response.result.totalInventories, 1);
+  assert.ok(Array.isArray(response.result.itemsByTemplate));
+  assert.equal(response.result.itemsByTemplate[0].template_id, "Stone");
+  assert.equal(response.result.itemsByTemplate[0].count, 5);
+  // totalCrafted has no real source anywhere in this schema (verified by
+  // direct search — only per-player recipe-unlock tracking exists, a
+  // different concept). It must always be null, never a guessed number.
+  assert.equal(response.result.totalCrafted, null);
+  assert.ok(Array.isArray(response.result.storageUsage));
+  assert.equal(response.result.storageUsage[0].inventoryId, 13);
+  assert.equal(response.result.storageUsage[0].itemCount, 5);
+});
+
+test("opsInventoryProvider returns the real empty shape (not a placeholder) when items/inventories/placeables don't exist", async () => {
+  const db = mockDb({ tables: new Set() });
+  const response = await opsInventoryProvider({}, db);
+  assert.equal(response.ok, true);
+  assert.equal("status" in response.result, false, "must not resemble the old placeholder shape");
+  assert.deepEqual(response.result, { totalItems: 0, totalInventories: 0, itemsByTemplate: [], totalCrafted: null, storageUsage: [] });
+});
+
+// The three OPS domains with no backing query anywhere in this codebase
+// (soc, prometheus), or an unresolved privacy consideration blocking a
+// wire-up (location — see dune-ops-observability-addon's
+// docs/tabs/LOCATION.md), must remain unchanged "status: planned"
+// placeholders — do not fabricate data for these.
+test("the three untouched OPS providers still return status: planned placeholders", async () => {
   const db = mockDb();
   for (const [provider, domain] of [
-    [opsInventoryProvider, "inventory"],
     [opsLocationProvider, "location"],
     [opsSocProvider, "soc"],
     [opsPrometheusProvider, "prometheus"]
@@ -186,7 +227,7 @@ test("the five untouched OPS providers still return status: planned placeholders
 test("opsDashboardProvider aggregates a mix of real data and planned placeholders", async () => {
   const db = mockDb({
     columns: { player_state: [] },
-    tables: new Set(["player_state", "player_death_log", "resourcefield_state", "player_virtual_currency_balances"]),
+    tables: new Set(["player_state", "player_death_log", "resourcefield_state", "player_virtual_currency_balances", "items", "inventories", "placeables"]),
     query: (text) => {
       if (text.includes("from dune.player_state") && text.includes("count(*)::int as total_players")) {
         return { rows: [{ total_players: 5, online_players: 2, players_dead: 0, active_last_1h: 0, active_last_24h: 0, active_last_7d: 0, inactive_players: 0, returning_players: 0, new_players: 0 }] };
@@ -200,13 +241,22 @@ test("opsDashboardProvider aggregates a mix of real data and planned placeholder
       if (text.includes("from dune.player_virtual_currency_balances") && text.includes("count(distinct player_controller_id)")) {
         return { rows: [{ holders: 1, total_supply: 10 }] };
       }
+      if (text.includes("from dune.items i") && text.includes("count(*)::int as total_items")) {
+        return { rows: [{ total_items: 2 }] };
+      }
+      if (text.includes("from dune.items i") && text.includes("group by i.template_id")) {
+        return { rows: [{ template_id: "Stone", count: 2, total_stack: 100 }] };
+      }
+      if (text.includes("from dune.placeables p") && text.includes("building_type in")) {
+        return { rows: [{ id: 1, name: "", class: "GenericContainer_Placeable", map: "HaggaBasin", item_count: 2, owner_name: "Test" }] };
+      }
       return null;
     }
   });
 
   const response = await opsDashboardProvider({}, db);
   assert.equal(response.ok, true);
-  // Real data for the four wired domains. opsDashboardProvider() stores
+  // Real data for the five wired domains. opsDashboardProvider() stores
   // each provider's full response (not just its .result) under
   // dashboard[domain], since it aggregates via Promise.allSettled over
   // the providers' own return values.
@@ -215,8 +265,9 @@ test("opsDashboardProvider aggregates a mix of real data and planned placeholder
   assert.equal(response.dashboard.combat.result.totalDeaths, 1);
   assert.equal(response.dashboard.resources.result.totalFields, 3);
   assert.equal(response.dashboard.economy.result.totalCurrencyHolders, 1);
-  // Still-planned placeholders for the untouched four
-  assert.equal(response.dashboard.inventory.status, "planned");
+  assert.equal(response.dashboard.inventory.result.totalItems, 2);
+  assert.equal(response.dashboard.inventory.result.totalCrafted, null);
+  // Still-planned placeholders for the untouched three
   assert.equal(response.dashboard.location.status, "planned");
   assert.equal(response.dashboard.soc.status, "planned");
   assert.equal(response.dashboard.prometheus.status, "planned");

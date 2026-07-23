@@ -54,6 +54,7 @@ test("reports adapter health with isolated link-state writes", async () => {
     "/api/integrations/discord/ops/activity",
     "/api/integrations/discord/ops/combat",
     "/api/integrations/discord/ops/economy",
+    "/api/integrations/discord/ops/inventory",
     "/api/integrations/discord/ops/resources",
     "/api/integrations/discord/players/accounts/link",
     "/api/integrations/discord/players/accounts/link/verify",
@@ -77,15 +78,18 @@ test("reports adapter health with isolated link-state writes", async () => {
     "/api/integrations/discord/version"
   ].sort());
   assert.ok(result.plannedRoutes.includes("/api/integrations/discord/logs"));
-  // ops/activity, ops/combat, ops/resources, ops/economy are now wired to
-  // real duneDb.js queries and moved to liveRoutes (see the four
-  // assertions above); the remaining five OPS routes have no backing
-  // query and are still correctly reported as planned.
-  assert.ok(result.plannedRoutes.includes("/api/integrations/discord/ops/inventory"));
+  // ops/activity, ops/combat, ops/resources, ops/economy, ops/inventory
+  // are now wired to real duneDb.js queries and moved to liveRoutes (see
+  // the five assertions above); the remaining three OPS routes have no
+  // backing query (soc, prometheus) or an unresolved privacy
+  // consideration blocking a wire-up (location — see
+  // dune-ops-observability-addon's docs/tabs/LOCATION.md) and are still
+  // correctly reported as planned.
   assert.ok(result.plannedRoutes.includes("/api/integrations/discord/ops/location"));
   assert.ok(result.plannedRoutes.includes("/api/integrations/discord/ops/soc"));
   assert.ok(result.plannedRoutes.includes("/api/integrations/discord/ops/prometheus"));
-  assert.ok(!result.liveRoutes.includes("/api/integrations/discord/ops/inventory"));
+  assert.ok(!result.liveRoutes.includes("/api/integrations/discord/ops/location"));
+  assert.ok(result.liveRoutes.includes("/api/integrations/discord/ops/inventory"));
 });
 
 test("forces writes disabled even if environment attempts to enable them", () => {
@@ -816,14 +820,15 @@ test("account-link verify route rate limits independently from the single-link v
   }
 });
 
-// OPS observability routes — real data wiring (Phase 1 of the cross-repo
+// OPS observability routes — real data wiring (Phase 1/2 of the cross-repo
 // stats/live-data remediation effort). ops/activity, ops/combat,
-// ops/resources, ops/economy are now backed by real duneDb.js queries via
-// opsProvider.js; the other five OPS routes remain unimplemented
-// placeholders. Exercises the actual HTTP route path (not just the
-// provider function directly) to prove db reaches the provider correctly
-// through handleDiscordAdapterRoute()'s routing.
-test("ops/activity route returns real data through the HTTP route path, ops/inventory remains a planned placeholder", async () => {
+// ops/resources, ops/economy, ops/inventory are now backed by real
+// duneDb.js queries via opsProvider.js; the other three OPS routes
+// (location, soc, prometheus) remain unimplemented placeholders. Exercises
+// the actual HTTP route path (not just the provider function directly) to
+// prove db reaches the provider correctly through
+// handleDiscordAdapterRoute()'s routing.
+test("ops/activity and ops/inventory routes return real data through the HTTP route path, ops/location remains a planned placeholder", async () => {
   const tokenFile = "/tmp/discord-adapter-ops-live-test-token.txt";
   writeFileSync(tokenFile, "server-test-token");
   const testConfig = { discordBotApiTokenFile: tokenFile, discordAdapterEnabled: true, auditLog: "/tmp/discord-adapter-ops-live-test-audit.jsonl", generatedDir: "/tmp/discord-adapter-ops-live-test-generated" };
@@ -835,6 +840,15 @@ test("ops/activity route returns real data through the HTTP route path, ops/inve
       if (text.includes("information_schema.columns")) return { rows: [] };
       if (text.includes("from dune.player_state") && text.includes("count(*)::int as total_players")) {
         return { rows: [{ total_players: 9, online_players: 4, players_dead: 1, active_last_1h: 0, active_last_24h: 0, active_last_7d: 0, inactive_players: 0, returning_players: 0, new_players: 0 }] };
+      }
+      if (text.includes("from dune.items") && text.includes("count(*)::int as total_items")) {
+        return { rows: [{ total_items: 5 }] };
+      }
+      if (text.includes("from dune.items") && text.includes("group by i.template_id")) {
+        return { rows: [{ template_id: "Stone", count: 5, total_stack: 2477 }] };
+      }
+      if (text.includes("from dune.placeables p") && text.includes("building_type in")) {
+        return { rows: [{ id: 13, name: "", class: "SpiceSilo_Placeable", map: "HaggaBasin", item_count: 5, owner_name: "Sihaya" }] };
       }
       return { rows: [] };
     }
@@ -872,8 +886,6 @@ test("ops/activity route returns real data through the HTTP route path, ops/inve
           assert.equal(activityBody.result.onlinePlayers, 4);
           assert.equal("status" in activityBody, false, "must not look like the old placeholder shape");
 
-          // A route with no backing query is untouched and still returns
-          // its placeholder shape through the same dispatch path.
           const inventoryResponse = await fetch(`${base}/api/integrations/discord/ops/inventory`, {
             method: "POST",
             headers: { ...auth, "content-type": "application/json" },
@@ -882,7 +894,23 @@ test("ops/activity route returns real data through the HTTP route path, ops/inve
           assert.equal(inventoryResponse.status, 200);
           const inventoryBody = await inventoryResponse.json();
           assert.equal(inventoryBody.ok, true);
-          assert.equal(inventoryBody.status, "planned");
+          assert.equal(inventoryBody.result.totalItems, 5);
+          assert.equal(inventoryBody.result.totalInventories, 1);
+          assert.equal(inventoryBody.result.totalCrafted, null, "totalCrafted has no real source and must stay null, never a guessed number");
+          assert.equal("status" in inventoryBody, false, "must not look like the old placeholder shape");
+
+          // A route with no backing query (or an unresolved privacy
+          // consideration, for location) is untouched and still returns
+          // its placeholder shape through the same dispatch path.
+          const locationResponse = await fetch(`${base}/api/integrations/discord/ops/location`, {
+            method: "POST",
+            headers: { ...auth, "content-type": "application/json" },
+            body: JSON.stringify({ actor: observerActor })
+          });
+          assert.equal(locationResponse.status, 200);
+          const locationBody = await locationResponse.json();
+          assert.equal(locationBody.ok, true);
+          assert.equal(locationBody.status, "planned");
 
           server.close();
           resolve();

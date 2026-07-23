@@ -4663,6 +4663,77 @@ export async function addonOpsEconomySummary(db) {
 function emptyEconomySummary() {
   return { totalCurrencyHolders: 0, totalSupply: 0, activeOrders: 0, fulfilledOrders: 0, taxCollected: 0, currencyBreakdown: [], topTradedItems: [] };
 }
+
+// addonOpsInventorySummary: aggregate-only, read-only inventory/storage
+// summary for the OPS observability addon's Inventory tab. Reuses
+// listStorage()'s existing storage-container query for storageUsage/
+// totalInventories (already used by /api/storage — see that route in
+// server.js) rather than duplicating its SQL. itemsByTemplate is a new
+// query grouping dune.items by template_id across all non-hologram,
+// owned storage containers, enriched with human-readable names/
+// categories from the same local admin-items.json catalog
+// adminItemMetadata()/playerInventory() already use.
+//
+// totalCrafted has no real source anywhere in this schema — verified by
+// direct search (only per-player recipe-*unlock* tracking exists, which
+// is a different concept from a crafted-item count) — and is returned
+// as null unconditionally. Do not estimate this from itemsByTemplate,
+// storageUsage, or any other proxy; an unavailable field must stay
+// unavailable, never a guessed number that merely looks plausible.
+export async function addonOpsInventorySummary(db) {
+  if (!(await tableExists(db, "items")) || !(await tableExists(db, "inventories")) || !(await tableExists(db, "placeables"))) {
+    return emptyInventorySummary();
+  }
+
+  let totalItems = 0;
+  let itemsByTemplate = [];
+  try {
+    const totals = await db.query(`
+      select count(*)::int as total_items
+      from dune.items i
+      join dune.inventories inv on i.inventory_id = inv.id
+      join dune.placeables p on p.id = inv.actor_id
+      where p.is_hologram = false and p.owner_entity_id is not null and p.owner_entity_id != 0`);
+    totalItems = Number(totals.rows?.[0]?.total_items || 0);
+
+    const byTemplate = await db.query(`
+      select i.template_id::text as template_id,
+             count(*)::int as count,
+             coalesce(sum(i.stack_size), 0)::bigint as total_stack
+      from dune.items i
+      join dune.inventories inv on i.inventory_id = inv.id
+      join dune.placeables p on p.id = inv.actor_id
+      where p.is_hologram = false and p.owner_entity_id is not null and p.owner_entity_id != 0
+      group by i.template_id
+      order by count desc
+      limit 50`);
+    const metadata = adminItemMetadata();
+    itemsByTemplate = (byTemplate.rows || []).map((row) => {
+      const meta = metadata.get(row.template_id);
+      return { ...row, name: meta?.name || row.template_id, category: meta?.category || "" };
+    });
+  } catch { }
+
+  let storageUsage = [];
+  let totalInventories = 0;
+  try {
+    const storage = await listStorage(db);
+    storageUsage = (storage.rows || []).map((row) => ({ inventoryId: row.id, itemCount: row.item_count, totalStack: null }));
+    totalInventories = storageUsage.length;
+  } catch { }
+
+  return {
+    totalItems,
+    totalInventories,
+    itemsByTemplate,
+    totalCrafted: null,
+    storageUsage
+  };
+}
+
+function emptyInventorySummary() {
+  return { totalItems: 0, totalInventories: 0, itemsByTemplate: [], totalCrafted: null, storageUsage: [] };
+}
 // All Discord-linking state lives in a dedicated `console` schema, NOT
 // in `dune` — the `dune` schema belongs entirely to the game server
 // itself (Funcom's igw-postgres image owns and manages it; every table
