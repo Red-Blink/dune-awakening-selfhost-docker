@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
-import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, augmentInventoryItem, augmentNewestPlayerItem, changeDunePassword, completeJourneyNode, completeTutorial, deleteInventoryItem, exportBaseAsBlueprint, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listBases, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerInventory, playerJourney, playerPosition, playerProfile, playerResearchItems, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
+import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, augmentInventoryItem, augmentNewestPlayerItem, changeDunePassword, completeJourneyNode, completeTutorial, deleteInventoryItem, exportBaseAsBlueprint, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listBases, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerInventory, playerJourney, playerPosition, playerProfile, playerResearchItems, portalGeneratorFuel, portalVehicles, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
   assert.deepEqual(discoverDbConfig({}), {
@@ -80,6 +80,70 @@ test("formats multi-statement database query results using the final row result"
     rowCount: 1,
     command: "SELECT"
   });
+});
+
+test("player portal calculates normal and spice generator fuel with their game durations", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values) => {
+      calls.push({ text, values });
+      return {
+        rows: [
+          { base_id: "133", generator_type: "fuel", generator_count: 1, fuel_cells: 49, runtime_seconds: 359051 },
+          { base_id: "133", generator_type: "spice", generator_count: 1, fuel_cells: 2, runtime_seconds: 13500 }
+        ]
+      };
+    }
+  };
+
+  const result = await portalGeneratorFuel(db, [133, 200]);
+
+  assert.deepEqual(calls[0].values, [[133, 200], 7200, 5400]);
+  assert.match(calls[0].text, /SpicedFuelCell/);
+  assert.match(calls[0].text, /m_FuelBurningInitialTime/);
+  assert.deepEqual(result.get("133"), {
+    fuelCells: 51,
+    generatorCount: 2,
+    runtimeSeconds: 13500,
+    generators: [
+      {
+        type: "fuel",
+        name: "Fuel-Powered Generator",
+        fuelName: "Fuel Cell",
+        fuelCells: 49,
+        generatorCount: 1,
+        runtimeSeconds: 359051
+      },
+      {
+        type: "spice",
+        name: "Spice-Powered Generator",
+        fuelName: "Spice-infused Fuel Cell",
+        fuelCells: 2,
+        generatorCount: 1,
+        runtimeSeconds: 13500
+      }
+    ]
+  });
+});
+
+test("player portal skips the generator query when there are no bases", async () => {
+  const db = { query: async () => assert.fail("generator query should not run") };
+  assert.deepEqual(await portalGeneratorFuel(db, []), new Map());
+});
+
+test("player portal prefers custom vehicle names and ignores internal labels", async () => {
+  const db = {
+    query: async () => ({ rows: [
+      { id: "183", type: "BP_LightOrnithopter_Choam_C", custom_name: " Scout Ornithopter 2 ", modules: [] },
+      { id: "140", type: "BP_LightOrnithopter_Choam_C", custom_name: "##LightOrnithopterChoam", modules: [] }
+    ] })
+  };
+
+  const result = await portalVehicles(db, [129]);
+
+  assert.equal(result.rows[0].name, "Scout Ornithopter 2");
+  assert.equal(result.rows[1].name, "Scout Ornithopter");
+  assert.equal(Object.hasOwn(result.rows[0], "custom_name"), false);
 });
 
 test("builds table preview query with quoted identifiers and parameters", async () => {
@@ -908,7 +972,7 @@ test("list bases returns rows with piece and placeable counts and a total count"
       }
       if (text.includes("from paged p")) {
         return { rows: [
-          { base_id: "1006", name: "Sietch One", base_type: "Sub-Fief", owner_name: "Leader One", map: "TheDeepDesert", x: "100", y: "200", z: "30", total_count: "1", piece_count: "589", placeable_count: "126", shared_with: [{ name: "Ally Two", rank: 2 }] }
+          { base_id: "1006", name: "Sietch One", base_type: "Sub-Fief", owner_name: "Leader One", map: "TheDeepDesert", partition_id: "8", x: "100", y: "200", z: "30", total_count: "1", piece_count: "589", placeable_count: "126", shared_with: [{ name: "Ally Two", rank: 2 }] }
         ] };
       }
       return { rows: [] };
@@ -921,7 +985,7 @@ test("list bases returns rows with piece and placeable counts and a total count"
   assert.equal(result.totalPieces, 700);
   assert.equal(result.totalPlaceables, 140);
   assert.deepEqual(result.rows, [
-    { base_id: "1006", name: "Sietch One", base_type: "Sub-Fief", owner_name: "Leader One", map: "TheDeepDesert", x: 100, y: 200, z: 30, piece_count: 589, placeable_count: 126, shared_with: [{ name: "Ally Two", rank: 2, label: "Co-Owner" }] }
+    { base_id: "1006", name: "Sietch One", base_type: "Sub-Fief", owner_name: "Leader One", map: "TheDeepDesert", partition_id: 8, x: 100, y: 200, z: 30, piece_count: 589, placeable_count: 126, shared_with: [{ name: "Ally Two", rank: 2, label: "Co-Owner" }] }
   ]);
 });
 
