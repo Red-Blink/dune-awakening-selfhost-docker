@@ -197,7 +197,7 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
       const body = await readJson(req);
       const provider = OPS_PROVIDERS[path];
       if (provider) {
-        return json(res, 200, await provider(config));
+        return json(res, 200, await provider(config, db));
       }
       return json(res, 200, { ok: false, error: `OPS provider not found for: ${path}` });
     }

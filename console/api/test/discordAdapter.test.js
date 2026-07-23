@@ -51,6 +51,10 @@ test("reports adapter health with isolated link-state writes", async () => {
     "/api/integrations/discord/guilds/find",
     "/api/integrations/discord/guilds/storage",
     "/api/integrations/discord/health",
+    "/api/integrations/discord/ops/activity",
+    "/api/integrations/discord/ops/combat",
+    "/api/integrations/discord/ops/economy",
+    "/api/integrations/discord/ops/resources",
     "/api/integrations/discord/players/accounts/link",
     "/api/integrations/discord/players/accounts/link/verify",
     "/api/integrations/discord/players/accounts/list",
@@ -73,7 +77,15 @@ test("reports adapter health with isolated link-state writes", async () => {
     "/api/integrations/discord/version"
   ].sort());
   assert.ok(result.plannedRoutes.includes("/api/integrations/discord/logs"));
-  assert.ok(result.plannedRoutes.includes("/api/integrations/discord/ops/activity"));
+  // ops/activity, ops/combat, ops/resources, ops/economy are now wired to
+  // real duneDb.js queries and moved to liveRoutes (see the four
+  // assertions above); the remaining five OPS routes have no backing
+  // query and are still correctly reported as planned.
+  assert.ok(result.plannedRoutes.includes("/api/integrations/discord/ops/inventory"));
+  assert.ok(result.plannedRoutes.includes("/api/integrations/discord/ops/location"));
+  assert.ok(result.plannedRoutes.includes("/api/integrations/discord/ops/soc"));
+  assert.ok(result.plannedRoutes.includes("/api/integrations/discord/ops/prometheus"));
+  assert.ok(!result.liveRoutes.includes("/api/integrations/discord/ops/inventory"));
 });
 
 test("forces writes disabled even if environment attempts to enable them", () => {
@@ -793,6 +805,84 @@ test("account-link verify route rate limits independently from the single-link v
           // account-link route's lockout for the same discordUserId.
           const singleAfterAccountLockout = await verifySingleOnce();
           assert.equal(singleAfterAccountLockout.status, 200);
+
+          server.close();
+          resolve();
+        } catch (e) { server.close(); reject(e); }
+      });
+    });
+  } finally {
+    try { unlinkSync(tokenFile); } catch {}
+  }
+});
+
+// OPS observability routes — real data wiring (Phase 1 of the cross-repo
+// stats/live-data remediation effort). ops/activity, ops/combat,
+// ops/resources, ops/economy are now backed by real duneDb.js queries via
+// opsProvider.js; the other five OPS routes remain unimplemented
+// placeholders. Exercises the actual HTTP route path (not just the
+// provider function directly) to prove db reaches the provider correctly
+// through handleDiscordAdapterRoute()'s routing.
+test("ops/activity route returns real data through the HTTP route path, ops/inventory remains a planned placeholder", async () => {
+  const tokenFile = "/tmp/discord-adapter-ops-live-test-token.txt";
+  writeFileSync(tokenFile, "server-test-token");
+  const testConfig = { discordBotApiTokenFile: tokenFile, discordAdapterEnabled: true, auditLog: "/tmp/discord-adapter-ops-live-test-audit.jsonl", generatedDir: "/tmp/discord-adapter-ops-live-test-generated" };
+
+  const db = {
+    transaction: (fn) => fn(db),
+    async query(text, values = []) {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [] };
+      if (text.includes("from dune.player_state") && text.includes("count(*)::int as total_players")) {
+        return { rows: [{ total_players: 9, online_players: 4, players_dead: 1, active_last_1h: 0, active_last_24h: 0, active_last_7d: 0, inactive_players: 0, returning_players: 0, new_players: 0 }] };
+      }
+      return { rows: [] };
+    }
+  };
+
+  try {
+    await new Promise((resolve, reject) => {
+      const server = createServer(async (req, res) => {
+        const url = new URL(req.url || "/", "http://local");
+        const path = url.pathname;
+        const readJson = async () => {
+          const chunks = [];
+          for await (const chunk of req) chunks.push(chunk);
+          return Buffer.concat(chunks).length ? JSON.parse(Buffer.concat(chunks).toString()) : {};
+        };
+        const json = (r, code, body) => { r.writeHead(code, { "content-type": "application/json" }); r.end(JSON.stringify(body)); };
+        await handleDiscordAdapterRoute({ req, res, path, config: testConfig, readJson, json, db });
+      });
+      const auth = { authorization: "Bearer server-test-token" };
+
+      server.listen(async () => {
+        try {
+          const base = `http://127.0.0.1:${server.address().port}`;
+          const observerActor = actor(["role-observer"]);
+
+          const activityResponse = await fetch(`${base}/api/integrations/discord/ops/activity`, {
+            method: "POST",
+            headers: { ...auth, "content-type": "application/json" },
+            body: JSON.stringify({ actor: observerActor })
+          });
+          assert.equal(activityResponse.status, 200);
+          const activityBody = await activityResponse.json();
+          assert.equal(activityBody.ok, true);
+          assert.equal(activityBody.result.totalPlayers, 9);
+          assert.equal(activityBody.result.onlinePlayers, 4);
+          assert.equal("status" in activityBody, false, "must not look like the old placeholder shape");
+
+          // A route with no backing query is untouched and still returns
+          // its placeholder shape through the same dispatch path.
+          const inventoryResponse = await fetch(`${base}/api/integrations/discord/ops/inventory`, {
+            method: "POST",
+            headers: { ...auth, "content-type": "application/json" },
+            body: JSON.stringify({ actor: observerActor })
+          });
+          assert.equal(inventoryResponse.status, 200);
+          const inventoryBody = await inventoryResponse.json();
+          assert.equal(inventoryBody.ok, true);
+          assert.equal(inventoryBody.status, "planned");
 
           server.close();
           resolve();

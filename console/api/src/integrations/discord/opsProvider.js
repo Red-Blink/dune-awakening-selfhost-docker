@@ -4,6 +4,25 @@
 // Integration: When the OPS observability addon provides a server-side bridge,
 // replace each function body with the corresponding bridge action call.
 // The addon's bridge actions are defined in yacketrj/dune-ops-observability-addon.
+//
+// Four of the nine providers below (activity, combat, resources, economy)
+// are wired to real, already-working duneDb.js query functions — the same
+// ones the addon-bridge handler in server.js already calls successfully
+// for installed third-party addons (see addonOpsActivitySummary() et al.,
+// called from server.js's "ops.activity.summary" etc. bridge actions).
+// This is the Discord adapter calling the identical underlying queries
+// through a different, already-existing auth path (requireDiscordBotToken
+// in routes.js, not assertInstalledAddonPermission) — not a new capability,
+// permission system, or write path. The remaining five (inventory,
+// location, soc, prometheus, and dashboard's references to those four)
+// have no backing query anywhere in this codebase and remain placeholders.
+
+import {
+  addonOpsActivitySummary,
+  addonOpsCombatDeaths,
+  addonOpsResourcesSummary,
+  addonOpsEconomySummary
+} from "../../duneDb.js";
 
 const OPS_BRIDGE_ACTIONS = Object.freeze({
   "ops-activity":   { action: "ops.activity.summary",     desc: "Player activity statistics" },
@@ -26,55 +45,66 @@ export function opsBridgeDescription(routeKey) {
 }
 
 // Provider functions — each maps to a Discord adapter OPS route.
-// TODO: Wire to server-side bridge actions when available from the addon.
+// TODO: Wire the remaining five (inventory, location, soc, prometheus) to
+// server-side bridge actions when available from the addon.
 
-export async function opsActivityProvider(config) {
-  // TODO: return await opsBridgeRequest(config, "ops.activity.summary");
-  return opsPlaceholder("activity");
+export async function opsActivityProvider(config, db) {
+  const result = await addonOpsActivitySummary(db);
+  return { ok: true, result };
 }
 
-export async function opsCombatProvider(config) {
-  // TODO: return await opsBridgeRequest(config, "ops.combat.deaths");
-  return opsPlaceholder("combat");
+export async function opsCombatProvider(config, db) {
+  const result = await addonOpsCombatDeaths(db);
+  return { ok: true, result };
 }
 
-export async function opsResourcesProvider(config) {
-  // TODO: return await opsBridgeRequest(config, "ops.resources.summary");
-  return opsPlaceholder("resources");
+export async function opsResourcesProvider(config, db) {
+  const result = await addonOpsResourcesSummary(db);
+  return { ok: true, result };
 }
 
-export async function opsEconomyProvider(config) {
-  // TODO: return await opsBridgeRequest(config, "ops.economy.summary");
-  return opsPlaceholder("economy");
+export async function opsEconomyProvider(config, db) {
+  const result = await addonOpsEconomySummary(db);
+  return { ok: true, result };
 }
 
-export async function opsInventoryProvider(config) {
+// Signature kept as (config, db) for consistency with the four real
+// providers above, even though these five placeholders don't use db yet —
+// no backing query exists anywhere in this codebase for these domains.
+// Do not implement these from Core; they require the OPS observability
+// addon's own bridge (yacketrj/dune-ops-observability-addon).
+export async function opsInventoryProvider(config, db) {
   // TODO: return await opsBridgeRequest(config, "ops.inventory.summary");
   return opsPlaceholder("inventory");
 }
 
-export async function opsLocationProvider(config) {
+export async function opsLocationProvider(config, db) {
   // TODO: return await opsBridgeRequest(config, "ops.location.activity");
   return opsPlaceholder("location");
 }
 
-export async function opsSocProvider(config) {
+export async function opsSocProvider(config, db) {
   // TODO: return await opsBridgeRequest(config, "ops.soc.summary");
   return opsPlaceholder("soc");
 }
 
-export async function opsPrometheusProvider(config) {
+export async function opsPrometheusProvider(config, db) {
   // TODO: return await opsBridgeRequest(config, "ops.health.prometheus");
   return opsPlaceholder("prometheus");
 }
 
-export async function opsDashboardProvider(config) {
-  // Aggregate from all other providers
+export async function opsDashboardProvider(config, db) {
+  // Aggregate from all other providers. Four of these (activity, combat,
+  // resources, economy) now return real data; the other four
+  // (inventory, location, soc, prometheus) remain "status: planned"
+  // placeholders. This intentionally produces a mixed shape — that is
+  // the correct, honest reflection of Core's actual current state, not
+  // something to hide or special-case.
   const results = await Promise.allSettled([
-    opsActivityProvider(config), opsCombatProvider(config),
-    opsResourcesProvider(config), opsEconomyProvider(config),
-    opsInventoryProvider(config), opsLocationProvider(config),
-    opsSocProvider(config), opsPrometheusProvider(config),
+    opsActivityProvider(config, db), opsCombatProvider(config, db),
+    opsResourcesProvider(config, db), opsEconomyProvider(config, db),
+    opsInventoryProvider(config, db), opsLocationProvider(config, db),
+    opsSocProvider(config, db), opsPrometheusProvider(config, db),
   ]);
   const data = {};
   results.forEach((r, i) => {
