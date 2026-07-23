@@ -51,32 +51,31 @@ export function PlayerSummary({
       setVitals(null);
       return;
     }
-    void Promise.all([
+    void Promise.allSettled([
       playersApi.currency(dbPlayerId),
       playersApi.factions(dbPlayerId),
       playersApi.progression(dbPlayerId),
       playersApi.intel(dbPlayerId),
       playersApi.solarisCoin(dbPlayerId),
       playersApi.vitals(dbPlayerId)
-    ])
-      .then(([currency, factions, progressionResult, intelResult, solarisCoinResult, vitalsResult]) => {
-        if (request !== loadRequest.current) return;
-        setCurrencyRows((currency.rows || []) as CurrencyRow[]);
-        setFactionRows((factions.rows || []) as FactionRow[]);
-        setProgression(progressionResult.capabilities?.progression ? progressionResult : null);
-        setIntel(intelResult.capabilities?.intel ? (intelResult.intel ?? null) : null);
-        setSolarisCoinTotal(solarisCoinResult.capabilities?.solarisCoin ? (solarisCoinResult.total ?? null) : null);
-        setVitals(vitalsResult.capabilities?.vitals ? { currentHealth: vitalsResult.currentHealth ?? null, maxHealth: vitalsResult.maxHealth ?? 0, hydration: vitalsResult.hydration ?? null, maxHydration: vitalsResult.maxHydration ?? 0, spiceAddictionLevel: vitalsResult.spiceAddictionLevel ?? null, maxSpiceAddictionLevel: vitalsResult.maxSpiceAddictionLevel ?? 0 } : null);
-      })
-      .catch(() => {
-        if (request !== loadRequest.current) return;
-        setCurrencyRows([]);
-        setFactionRows([]);
-        setProgression(null);
-        setIntel(null);
-        setSolarisCoinTotal(null);
-        setVitals(null);
-      });
+    ]).then(([currency, factions, progressionResult, intelResult, solarisCoinResult, vitalsResult]) => {
+      if (request !== loadRequest.current) return;
+      setCurrencyRows(currency.status === "fulfilled" ? ((currency.value.rows || []) as CurrencyRow[]) : []);
+      setFactionRows(factions.status === "fulfilled" ? ((factions.value.rows || []) as FactionRow[]) : []);
+      setProgression(progressionResult.status === "fulfilled" && progressionResult.value.capabilities?.progression ? progressionResult.value : null);
+      setIntel(intelResult.status === "fulfilled" && intelResult.value.capabilities?.intel ? (intelResult.value.intel ?? null) : null);
+      setSolarisCoinTotal(solarisCoinResult.status === "fulfilled" && solarisCoinResult.value.capabilities?.solarisCoin ? (solarisCoinResult.value.total ?? null) : null);
+      setVitals(vitalsResult.status === "fulfilled" && vitalsResult.value.capabilities?.vitals
+        ? {
+            currentHealth: vitalsResult.value.currentHealth ?? null,
+            maxHealth: vitalsResult.value.maxHealth ?? 0,
+            hydration: vitalsResult.value.hydration ?? null,
+            maxHydration: vitalsResult.value.maxHydration ?? 0,
+            spiceAddictionLevel: vitalsResult.value.spiceAddictionLevel ?? null,
+            maxSpiceAddictionLevel: vitalsResult.value.maxSpiceAddictionLevel ?? 0
+          }
+        : null);
+    });
   }, [dbPlayerId]);
 
   const text = (value: unknown): string => (value === undefined || value === null ? "" : String(value));

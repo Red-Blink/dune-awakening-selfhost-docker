@@ -360,6 +360,36 @@ describe("PlayerSummary", () => {
     });
   });
 
+  describe("Partial failure resilience", () => {
+    it("still renders sections whose requests succeeded when one request rejects", async () => {
+      vi.mocked(playersApi.intel).mockRejectedValue(new Error("network error"));
+      vi.mocked(playersApi.progression).mockResolvedValue({
+        capabilities: { progression: true },
+        level: 19,
+        xp: 9692,
+        totalSkillPoints: 18,
+        unspentSkillPoints: 6
+      });
+      vi.mocked(playersApi.factions).mockResolvedValue({
+        capabilities: { factions: true },
+        rows: [{ faction_id: 1, faction_name: "Atreides", reputation_amount: 500 }]
+      });
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette" } }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(screen.getByText("9,692")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Atreides")).toBeInTheDocument();
+      expect(screen.getByText("500")).toBeInTheDocument();
+      expect(screen.queryByText("Available Intel")).not.toBeInTheDocument();
+    });
+  });
+
   describe("Solari Coin", () => {
     it("renders the summed physical coin total formatted with the viewer's locale grouping", async () => {
       vi.mocked(playersApi.solarisCoin).mockResolvedValue({ capabilities: { solarisCoin: true }, total: 51194 });

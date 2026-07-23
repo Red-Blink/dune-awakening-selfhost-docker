@@ -1994,14 +1994,17 @@ export async function playerProgression(db, id) {
       )
     limit 1`, [player.controllerId]);
   const row = result.rows[0];
-  const xp = Number(row?.xp || 0);
+  if (!row || row.xp === null) {
+    return { capabilities: { progression: false }, player, reason: "No DuneCharacter FLevelComponent found for this player." };
+  }
+  const xp = Number(row.xp || 0);
   return {
     capabilities: { progression: true },
     player,
     xp,
     level: xpToLevel(xp),
-    totalSkillPoints: Number(row?.total_skill_points || 0),
-    unspentSkillPoints: Number(row?.unspent_skill_points || 0)
+    totalSkillPoints: Number(row.total_skill_points || 0),
+    unspentSkillPoints: Number(row.unspent_skill_points || 0)
   };
 }
 
@@ -2014,10 +2017,14 @@ export async function playerIntel(db, id) {
     select (properties->'TechKnowledgePlayerComponent'->>'m_TechKnowledgePoints')::bigint as intel
     from dune.actors
     where id = $1 and properties ? 'TechKnowledgePlayerComponent'`, [player.actorId]);
+  const row = result.rows[0];
+  if (!row) {
+    return { capabilities: { intel: false }, player, reason: "No TechKnowledgePlayerComponent found for this player." };
+  }
   return {
     capabilities: { intel: true },
     player,
-    intel: Number(result.rows[0]?.intel || 0),
+    intel: Number(row.intel || 0),
     maxIntel: MAX_INTEL_POINTS
   };
 }

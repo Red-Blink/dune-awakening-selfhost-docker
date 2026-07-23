@@ -607,6 +607,25 @@ test("player progression reports unsupported when required addon tables are miss
   assert.equal(result.capabilities.progression, false);
 });
 
+test("player progression reports unavailable when the player has no matching DuneCharacter entity", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
+      }
+      if (text.includes("from dune.fgl_entities fe") && text.includes("join dune.actor_fgl_entities afe")) {
+        return { rows: [] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerProgression(db, "91");
+  assert.equal(result.capabilities.progression, false);
+  assert.equal(result.xp, undefined);
+});
+
 test("player intel reads TechKnowledge points for the player's actor", async () => {
   const db = {
     query: async (text, values = []) => {
@@ -639,6 +658,26 @@ test("player intel reports unsupported when actors table lacks a properties colu
   };
   const result = await playerIntel(db, "91");
   assert.equal(result.capabilities.intel, false);
+});
+
+test("player intel reports unavailable when the actor has no TechKnowledgePlayerComponent", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [{ column_name: "properties" }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
+      }
+      if (text.includes("TechKnowledgePlayerComponent")) {
+        return { rows: [] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerIntel(db, "91");
+  assert.equal(result.capabilities.intel, false);
+  assert.equal(result.intel, undefined);
 });
 
 test("manual currency row edit uses game balance function", async () => {
