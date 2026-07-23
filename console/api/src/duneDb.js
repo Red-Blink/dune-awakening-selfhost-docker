@@ -39,6 +39,8 @@ const VITALITY_HEALTH_TIERS = [
   { level: 91, bonus: 5 }
 ];
 const BASE_MAX_HEALTH = 150;
+const BASE_MAX_HYDRATION = 100;
+const BASE_MAX_ADDICTION = 10;
 
 function maxHealthForCombatLevel(combatLevel) {
   return VITALITY_HEALTH_TIERS.reduce((total, tier) => (combatLevel >= tier.level ? total + tier.bonus : total), BASE_MAX_HEALTH);
@@ -2057,7 +2059,9 @@ export async function playerVitals(db, id) {
     currentHealth: toNum(health?.current_health),
     maxHealth: maxHealthForCombatLevel(combatLevel),
     hydration: toNum(gas?.hydration),
-    spiceAddictionLevel: toNum(gas?.spice_addiction_level)
+    maxHydration: BASE_MAX_HYDRATION,
+    spiceAddictionLevel: toNum(gas?.spice_addiction_level),
+    maxSpiceAddictionLevel: BASE_MAX_ADDICTION
   };
 }
 

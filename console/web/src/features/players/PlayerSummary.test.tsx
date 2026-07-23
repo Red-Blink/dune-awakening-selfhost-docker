@@ -324,7 +324,7 @@ describe("PlayerSummary", () => {
 
   describe("Vitals", () => {
     it("renders Health, Hydration, and Spice Addiction when vitals are supported", async () => {
-      vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: true }, currentHealth: 175, maxHealth: 205, hydration: 84, spiceAddictionLevel: 12 });
+      vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: true }, currentHealth: 175, maxHealth: 205, hydration: 84, maxHydration: 100, spiceAddictionLevel: 8, maxSpiceAddictionLevel: 10 });
       render(
         <PlayerSummary
           {...baseProps}
@@ -336,9 +336,9 @@ describe("PlayerSummary", () => {
         expect(screen.getByText("Health")).toBeInTheDocument();
         expect(screen.getByText("175 / 205")).toBeInTheDocument();
         expect(screen.getByText("Hydration")).toBeInTheDocument();
-        expect(screen.getByText((84).toLocaleString())).toBeInTheDocument();
+        expect(screen.getByText("84 / 100")).toBeInTheDocument();
         expect(screen.getByText("Spice Addiction")).toBeInTheDocument();
-        expect(screen.getByText((12).toLocaleString())).toBeInTheDocument();
+        expect(screen.getByText("8 / 10")).toBeInTheDocument();
       });
     });
 

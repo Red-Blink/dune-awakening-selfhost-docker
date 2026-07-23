@@ -15,7 +15,7 @@ const currencyIcon = (label: string): LucideIcon => {
 type CurrencyRow = { currency_id: number; balance: number; label?: string };
 type FactionRow = { faction_id: number; faction_name?: string; reputation_amount: number };
 type Progression = { level?: number; xp?: number; totalSkillPoints?: number; unspentSkillPoints?: number };
-type Vitals = { currentHealth: number | null; maxHealth: number; hydration: number | null; spiceAddictionLevel: number | null };
+type Vitals = { currentHealth: number | null; maxHealth: number; hydration: number | null; maxHydration: number; spiceAddictionLevel: number | null; maxSpiceAddictionLevel: number };
 
 export function PlayerSummary({
   detail,
@@ -66,7 +66,7 @@ export function PlayerSummary({
         setProgression(progressionResult.capabilities?.progression ? progressionResult : null);
         setIntel(intelResult.capabilities?.intel ? (intelResult.intel ?? null) : null);
         setSolarisCoinTotal(solarisCoinResult.capabilities?.solarisCoin ? (solarisCoinResult.total ?? null) : null);
-        setVitals(vitalsResult.capabilities?.vitals ? { currentHealth: vitalsResult.currentHealth ?? null, maxHealth: vitalsResult.maxHealth ?? 0, hydration: vitalsResult.hydration ?? null, spiceAddictionLevel: vitalsResult.spiceAddictionLevel ?? null } : null);
+        setVitals(vitalsResult.capabilities?.vitals ? { currentHealth: vitalsResult.currentHealth ?? null, maxHealth: vitalsResult.maxHealth ?? 0, hydration: vitalsResult.hydration ?? null, maxHydration: vitalsResult.maxHydration ?? 0, spiceAddictionLevel: vitalsResult.spiceAddictionLevel ?? null, maxSpiceAddictionLevel: vitalsResult.maxSpiceAddictionLevel ?? 0 } : null);
       })
       .catch(() => {
         if (request !== loadRequest.current) return;
@@ -125,8 +125,8 @@ export function PlayerSummary({
         <div className="summary-block-label">Vitals</div>
         <table className="summary-kv"><tbody>
           <tr><td>Health</td><td>{vitals.currentHealth !== null ? `${Math.round(vitals.currentHealth).toLocaleString()} / ${vitals.maxHealth.toLocaleString()}` : "—"}</td></tr>
-          <tr><td>Hydration</td><td>{vitals.hydration !== null ? Math.round(vitals.hydration).toLocaleString() : "—"}</td></tr>
-          <tr><td>Spice Addiction</td><td>{vitals.spiceAddictionLevel !== null ? Math.round(vitals.spiceAddictionLevel).toLocaleString() : "—"}</td></tr>
+          <tr><td>Hydration</td><td>{vitals.hydration !== null ? `${Math.round(vitals.hydration).toLocaleString()} / ${vitals.maxHydration.toLocaleString()}` : "—"}</td></tr>
+          <tr><td>Spice Addiction</td><td>{vitals.spiceAddictionLevel !== null ? `${Math.round(vitals.spiceAddictionLevel).toLocaleString()} / ${vitals.maxSpiceAddictionLevel.toLocaleString()}` : "—"}</td></tr>
         </tbody></table>
       </div>}
       <div className="summary-block">
