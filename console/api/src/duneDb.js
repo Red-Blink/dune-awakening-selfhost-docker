@@ -31,6 +31,18 @@ import {
 } from "./duneDb/presentation.js";
 
 const MAX_INTEL_POINTS = 2779;
+const VITALITY_HEALTH_TIERS = [
+  { level: 6, bonus: 15 },
+  { level: 26, bonus: 5 },
+  { level: 56, bonus: 5 },
+  { level: 77, bonus: 25 },
+  { level: 91, bonus: 5 }
+];
+const BASE_MAX_HEALTH = 150;
+
+function maxHealthForCombatLevel(combatLevel) {
+  return VITALITY_HEALTH_TIERS.reduce((total, tier) => (combatLevel >= tier.level ? total + tier.bonus : total), BASE_MAX_HEALTH);
+}
 const MAX_TABLE_PREVIEW_ROWS = 10000;
 const INVENTORY_EDITABLE_COLUMNS = new Set(["stack_size", "quality_level", "position_index", "current_durability", "max_durability"]);
 let craftingRecipeCatalogCache = null;
@@ -2005,6 +2017,47 @@ export async function playerIntel(db, id) {
     player,
     intel: Number(result.rows[0]?.intel || 0),
     maxIntel: MAX_INTEL_POINTS
+  };
+}
+
+export async function playerVitals(db, id) {
+  if (!(await supportsPlayerVitals(db))) {
+    return { capabilities: { vitals: false }, reason: "Unsupported by detected schema. Missing required table(s)/column: dune.actors (gas_attributes column), dune.player_state, dune.actor_fgl_entities, dune.fgl_entities" };
+  }
+  const player = await resolvePlayerMutationTarget(db, id);
+  const hasSpecTracks = await tableExists(db, "specialization_tracks");
+  const [healthResult, gasResult, combatResult] = await Promise.all([
+    db.query(`
+      select (fe.components->'FHealthComponent'->1->>'m_CurrentHealth')::numeric as current_health
+      from dune.fgl_entities fe
+      join dune.actor_fgl_entities afe on afe.entity_id = fe.entity_id
+      where afe.slot_name = 'DuneCharacter'
+        and afe.actor_id = (
+          select player_pawn_id from dune.player_state
+          where player_controller_id = $1::bigint
+          limit 1
+        )
+      limit 1`, [player.controllerId]),
+    db.query(`
+      select (gas_attributes->'DuneHydrationAttributeSet'->'CurrentHydration'->>'CurrentValue')::numeric as hydration,
+             (gas_attributes->'DuneSpiceAddictionAttributeSet'->'SpiceAddictionLevel'->>'CurrentValue')::numeric as spice_addiction_level
+      from dune.actors
+      where id = $1`, [player.actorId]),
+    hasSpecTracks
+      ? db.query(`select level from dune.specialization_tracks where player_id = $1 and track_type::text = 'Combat' limit 1`, [player.controllerId])
+      : Promise.resolve({ rows: [] })
+  ]);
+  const health = healthResult.rows[0];
+  const gas = gasResult.rows[0];
+  const combatLevel = Number(combatResult.rows[0]?.level || 0);
+  const toNum = (v) => (v === undefined || v === null ? null : Number(v));
+  return {
+    capabilities: { vitals: true },
+    player,
+    currentHealth: toNum(health?.current_health),
+    maxHealth: maxHealthForCombatLevel(combatLevel),
+    hydration: toNum(gas?.hydration),
+    spiceAddictionLevel: toNum(gas?.spice_addiction_level)
   };
 }
 
@@ -4487,6 +4540,7 @@ async function playerCapabilities(db) {
     repairGear: await supportsRepairGear(db),
     repairVehicleDecay: await supportsRepairVehicleDecay(db),
     refuelVehicle: await supportsRefuelVehicle(db),
+    vitals: await supportsPlayerVitals(db),
     progression: false,
     events: false,
     stats: false,
@@ -4498,6 +4552,13 @@ async function supportsIntelMutation(db) {
   if (!(await tableExists(db, "actors"))) return false;
   const actorColumns = await columnsFor(db, "actors");
   return actorColumns.has("properties");
+}
+
+async function supportsPlayerVitals(db) {
+  if (!(await tableExists(db, "actors")) || !(await tableExists(db, "player_state")) ||
+      !(await tableExists(db, "actor_fgl_entities")) || !(await tableExists(db, "fgl_entities"))) return false;
+  const actorColumns = await columnsFor(db, "actors");
+  return actorColumns.has("gas_attributes");
 }
 
 async function supportsCraftingRecipes(db) {

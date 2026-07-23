@@ -519,6 +519,7 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/players\/[^/]+\/specs$/)) return dbPlayerRoute(res, path, duneDb.playerSpecs);
   if (path.match(/^\/api\/players\/[^/]+\/position$/)) return dbPlayerRoute(res, path, duneDb.playerPosition);
   if (path.match(/^\/api\/players\/[^/]+\/progression$/)) return dbPlayerRoute(res, path, duneDb.playerProgression);
+  if (path.match(/^\/api\/players\/[^/]+\/vitals$/)) return dbPlayerRoute(res, path, duneDb.playerVitals);
   if (path.match(/^\/api\/players\/[^/]+\/events$/)) return dbPlayerUnsupported(res, path, "events");
   if (path.match(/^\/api\/players\/[^/]+\/stats$/)) return dbPlayerUnsupported(res, path, "stats");
   if (path.match(/^\/api\/players\/[^/]+\/history$/)) return dbPlayerUnsupported(res, path, "history");

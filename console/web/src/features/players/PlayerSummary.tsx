@@ -15,6 +15,7 @@ const currencyIcon = (label: string): LucideIcon => {
 type CurrencyRow = { currency_id: number; balance: number; label?: string };
 type FactionRow = { faction_id: number; faction_name?: string; reputation_amount: number };
 type Progression = { level?: number; xp?: number; totalSkillPoints?: number; unspentSkillPoints?: number };
+type Vitals = { currentHealth: number | null; maxHealth: number; hydration: number | null; spiceAddictionLevel: number | null };
 
 export function PlayerSummary({
   detail,
@@ -36,6 +37,7 @@ export function PlayerSummary({
   const [progression, setProgression] = useState<Progression | null>(null);
   const [intel, setIntel] = useState<number | null>(null);
   const [solarisCoinTotal, setSolarisCoinTotal] = useState<number | null>(null);
+  const [vitals, setVitals] = useState<Vitals | null>(null);
   const loadRequest = useRef(0);
 
   useEffect(() => {
@@ -46,6 +48,7 @@ export function PlayerSummary({
       setProgression(null);
       setIntel(null);
       setSolarisCoinTotal(null);
+      setVitals(null);
       return;
     }
     void Promise.all([
@@ -53,15 +56,17 @@ export function PlayerSummary({
       playersApi.factions(dbPlayerId),
       playersApi.progression(dbPlayerId),
       playersApi.intel(dbPlayerId),
-      playersApi.solarisCoin(dbPlayerId)
+      playersApi.solarisCoin(dbPlayerId),
+      playersApi.vitals(dbPlayerId)
     ])
-      .then(([currency, factions, progressionResult, intelResult, solarisCoinResult]) => {
+      .then(([currency, factions, progressionResult, intelResult, solarisCoinResult, vitalsResult]) => {
         if (request !== loadRequest.current) return;
         setCurrencyRows((currency.rows || []) as CurrencyRow[]);
         setFactionRows((factions.rows || []) as FactionRow[]);
         setProgression(progressionResult.capabilities?.progression ? progressionResult : null);
         setIntel(intelResult.capabilities?.intel ? (intelResult.intel ?? null) : null);
         setSolarisCoinTotal(solarisCoinResult.capabilities?.solarisCoin ? (solarisCoinResult.total ?? null) : null);
+        setVitals(vitalsResult.capabilities?.vitals ? { currentHealth: vitalsResult.currentHealth ?? null, maxHealth: vitalsResult.maxHealth ?? 0, hydration: vitalsResult.hydration ?? null, spiceAddictionLevel: vitalsResult.spiceAddictionLevel ?? null } : null);
       })
       .catch(() => {
         if (request !== loadRequest.current) return;
@@ -70,6 +75,7 @@ export function PlayerSummary({
         setProgression(null);
         setIntel(null);
         setSolarisCoinTotal(null);
+        setVitals(null);
       });
   }, [dbPlayerId]);
 
@@ -115,14 +121,14 @@ export function PlayerSummary({
     </div>}
 
     <div className="summary-cols">
-      <div className="summary-block">
-        <div className="summary-block-label">Identity</div>
+      {vitals && <div className="summary-block">
+        <div className="summary-block-label">Vitals</div>
         <table className="summary-kv"><tbody>
-          <tr><td>DB Player ID</td><td className="summary-mono">{dbPlayerId || "missing"}</td></tr>
-          <tr><td>Funcom ID</td><td className="summary-mono">{funcomId || "—"}</td></tr>
-          <tr><td>FLS ID</td><td className="summary-mono">{flsId}</td></tr>
+          <tr><td>Health</td><td>{vitals.currentHealth !== null ? `${Math.round(vitals.currentHealth).toLocaleString()} / ${vitals.maxHealth.toLocaleString()}` : "—"}</td></tr>
+          <tr><td>Hydration</td><td>{vitals.hydration !== null ? Math.round(vitals.hydration).toLocaleString() : "—"}</td></tr>
+          <tr><td>Spice Addiction</td><td>{vitals.spiceAddictionLevel !== null ? Math.round(vitals.spiceAddictionLevel).toLocaleString() : "—"}</td></tr>
         </tbody></table>
-      </div>
+      </div>}
       <div className="summary-block">
         <div className="summary-block-label">Faction</div>
         <table className="summary-kv"><tbody>
@@ -137,6 +143,14 @@ export function PlayerSummary({
             </tr>)}
           </tbody></table>
         </>}
+      </div>
+      <div className="summary-block">
+        <div className="summary-block-label">Identity</div>
+        <table className="summary-kv"><tbody>
+          <tr><td>DB Player ID</td><td className="summary-mono">{dbPlayerId || "missing"}</td></tr>
+          <tr><td>Funcom ID</td><td className="summary-mono">{funcomId || "—"}</td></tr>
+          <tr><td>FLS ID</td><td className="summary-mono">{flsId}</td></tr>
+        </tbody></table>
       </div>
     </div>
 

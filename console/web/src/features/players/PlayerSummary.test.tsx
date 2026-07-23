@@ -9,7 +9,8 @@ vi.mock("../../api/players", () => ({
     factions: vi.fn(),
     progression: vi.fn(),
     intel: vi.fn(),
-    solarisCoin: vi.fn()
+    solarisCoin: vi.fn(),
+    vitals: vi.fn()
   }
 }));
 
@@ -25,6 +26,7 @@ beforeEach(() => {
   vi.mocked(playersApi.progression).mockResolvedValue({ capabilities: {} });
   vi.mocked(playersApi.intel).mockResolvedValue({ capabilities: {} });
   vi.mocked(playersApi.solarisCoin).mockResolvedValue({ capabilities: {} });
+  vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: {} });
 });
 
 describe("PlayerSummary", () => {
@@ -118,6 +120,7 @@ describe("PlayerSummary", () => {
       expect(playersApi.progression).not.toHaveBeenCalled();
       expect(playersApi.intel).not.toHaveBeenCalled();
       expect(playersApi.solarisCoin).not.toHaveBeenCalled();
+      expect(playersApi.vitals).not.toHaveBeenCalled();
     });
 
     it("renders each currency balance with its resolved label", async () => {
@@ -316,6 +319,44 @@ describe("PlayerSummary", () => {
         expect(playersApi.intel).toHaveBeenCalledWith("91");
       });
       expect(screen.queryByText("Available Intel")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Vitals", () => {
+    it("renders Health, Hydration, and Spice Addiction when vitals are supported", async () => {
+      vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: true }, currentHealth: 175, maxHealth: 205, hydration: 84, spiceAddictionLevel: 12 });
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette" } }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Health")).toBeInTheDocument();
+        expect(screen.getByText("175 / 205")).toBeInTheDocument();
+        expect(screen.getByText("Hydration")).toBeInTheDocument();
+        expect(screen.getByText((84).toLocaleString())).toBeInTheDocument();
+        expect(screen.getByText("Spice Addiction")).toBeInTheDocument();
+        expect(screen.getByText((12).toLocaleString())).toBeInTheDocument();
+      });
+    });
+
+    it("renders nothing extra when vitals are unsupported by the schema", async () => {
+      vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: false }, reason: "Unsupported" });
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette" } }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(playersApi.vitals).toHaveBeenCalledWith("91");
+      });
+      expect(screen.queryByText("Health")).not.toBeInTheDocument();
+      expect(screen.queryByText("Hydration")).not.toBeInTheDocument();
+      expect(screen.queryByText("Spice Addiction")).not.toBeInTheDocument();
     });
   });
 

@@ -43,6 +43,7 @@ export const playersApi = {
   specs: (playerId: string) => api<{ rows: Record<string, unknown>[]; skillModules?: Record<string, unknown>[]; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/specs`),
   position: (playerId: string) => api<Record<string, unknown>>(`/api/players/${encodeURIComponent(playerId)}/position`),
   progression: (playerId: string) => api<{ level?: number; xp?: number; totalSkillPoints?: number; unspentSkillPoints?: number; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/progression`),
+  vitals: (playerId: string) => api<{ currentHealth?: number | null; maxHealth?: number; hydration?: number | null; spiceAddictionLevel?: number | null; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/vitals`),
   events: (playerId: string) => api<Record<string, unknown>>(`/api/players/${encodeURIComponent(playerId)}/events`),
   stats: (playerId: string) => api<Record<string, unknown>>(`/api/players/${encodeURIComponent(playerId)}/stats`),
   history: (playerId: string) => api<Record<string, unknown>>(`/api/players/${encodeURIComponent(playerId)}/history`),
