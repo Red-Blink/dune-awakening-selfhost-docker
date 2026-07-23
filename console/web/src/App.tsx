@@ -33,6 +33,12 @@ import { formatUiSentence, stripAnsi, summarizeCommandText, titleCase } from "./
 
 type Tab = "Home" | "Server Control" | "Services" | "Players" | "Guilds" | "Bases" | "Landsraad" | "Admin Tools" | "Live Map" | "Maps" | "Care Package" | "Addons" | "Database" | "Storage" | "Backups" | "Logs" | "Updates" | "Settings";
 type SetupState = { files: Record<string, boolean>; config: Record<string, unknown> };
+type PublicDirectoryStatus = {
+  mode?: string;
+  serverId?: string | null;
+  remoteListed?: boolean;
+  listingClaimed?: boolean;
+};
 let openConfirmDialog: ((request: ConfirmDialogRequest) => void) | null = null;
 
 const AddonsPanel = lazy(() => import("./features/addons/AddonsPanel").then((module) => ({ default: module.AddonsPanel })));
@@ -127,7 +133,11 @@ const navGroups: { title: string; items: { tab: Tab; icon: React.ReactNode }[] }
 
 const COMMUNITY_CONTRIBUTORS_URL = "https://github.com/Red-Blink/dune-awakening-selfhost-docker/graphs/contributors";
 const DUNE_DOCKER_WEBSITE_URL = "https://dunedocker.app/";
-const REDBLINK_DISCORD_URL = "https://discord.gg/9pQqytu6BU";
+
+function publicServerListingUrl(serverId: string) {
+  return `${DUNE_DOCKER_WEBSITE_URL}server.html?id=${encodeURIComponent(serverId)}`;
+}
+const REDBLINK_DISCORD_URL = "https://discord.gg/duneawakeningdocker";
 const REDBLINK_KOFI_URL = "https://ko-fi.com/redblink";
 
 function DiscordLogo({ size = 18 }: { size?: number }) {
@@ -194,6 +204,7 @@ export function App() {
   const stackRestartSuccessAnnounced = useRef(false);
   const stackStatusLoadRef = useRef<Promise<HomeLoadResult> | null>(null);
   const [setupState, setSetupState] = useState<SetupState | null>(null);
+  const [publicDirectoryStatus, setPublicDirectoryStatus] = useState<PublicDirectoryStatus | null>(null);
   const [setupStateLoaded, setSetupStateLoaded] = useState(false);
   const [setupJump, setSetupJump] = useState({ step: 0, nonce: 0 });
   const [redeploySetupOpen, setRedeploySetupOpen] = useState(false);
@@ -227,6 +238,7 @@ export function App() {
       setSetupStateLoaded(false);
       setAddonCount(0);
       setOnlinePlayerCount(0);
+      setPublicDirectoryStatus(null);
       return;
     }
     let cancelled = false;
@@ -241,6 +253,27 @@ export function App() {
       setSetupStateLoaded(true);
     });
     return () => { cancelled = true; };
+  }, [auth]);
+
+  useEffect(() => {
+    if (!auth) return;
+    let cancelled = false;
+    const refreshDirectoryStatus = async () => {
+      try {
+        const next = await api<PublicDirectoryStatus>("/api/public-directory/status");
+        if (!cancelled) setPublicDirectoryStatus(next);
+      } catch {
+        if (!cancelled) setPublicDirectoryStatus(null);
+      }
+    };
+    void refreshDirectoryStatus();
+    const timer = window.setInterval(refreshDirectoryStatus, 30000);
+    window.addEventListener("public-directory-claim-changed", refreshDirectoryStatus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("public-directory-claim-changed", refreshDirectoryStatus);
+    };
   }, [auth]);
 
   useEffect(() => {
@@ -534,6 +567,13 @@ export function App() {
             <span>{visibleSubtitle}</span>
           </div>
           <div className="topbar-links" aria-label="Community links">
+            {publicDirectoryStatus?.mode === "public" && publicDirectoryStatus.serverId && <a
+              className={`listing-claim-badge ${publicDirectoryStatus.listingClaimed ? "claimed" : "unclaimed"}`}
+              href={publicServerListingUrl(publicDirectoryStatus.serverId)}
+              target="_blank"
+              rel="noreferrer"
+              title="Open Public Server Listing"
+            >{publicDirectoryStatus.listingClaimed ? "Claimed Listing" : "Unclaimed Listing"}</a>}
             <a className="community-button discord" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer" title="Join Discord"><span>Join Discord</span><DiscordLogo size={19} /></a>
             <a className="community-button support" href={REDBLINK_KOFI_URL} target="_blank" rel="noreferrer" title="Support Project"><span>Support Project</span><KofiLogo size={19} /></a>
           </div>
@@ -584,7 +624,10 @@ export function App() {
             formatResultTitle={formatResultTitle}
             formatResultMessage={formatResultMessage}
           /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Settings" && <LazyTabBoundary label="Loading Settings"><SettingsPanel onPasswordChanged={logoutAfterPasswordChange} /></LazyTabBoundary>}
+        {!redeploySetupOpen && tab === "Settings" && <LazyTabBoundary label="Loading Settings"><SettingsPanel
+          onPasswordChanged={logoutAfterPasswordChange}
+          publicListingUrl={publicDirectoryStatus?.serverId ? publicServerListingUrl(publicDirectoryStatus.serverId) : undefined}
+        /></LazyTabBoundary>}
         {!redeploySetupOpen && tab !== "Maps" && <TaskProgress task={task} onDismiss={() => setTask(null)} />}
         <AppFooter />
       </main>
