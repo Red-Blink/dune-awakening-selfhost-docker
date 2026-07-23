@@ -75,15 +75,15 @@ export function UpdatesPanel({
   const autoGameStatusLabel = !autoGameLoaded && !autoGameSaving ? "Checking" : autoGameDisplayActive ? "Enabled" : "Disabled";
   const autoGameDisplayTimerLabel = !autoGameLoaded && !autoGameSaving ? "Checking" : autoGameSaving ? autoGameEnabled ? "Activating" : "Deactivating" : autoGameEnabled ? autoGameTimerLabel : "Inactive";
 
-  async function checkGame() {
+  async function checkGame(options: { fresh?: boolean } = {}) {
     setGameStatus({ status: "Checking...", current: "", latest: "", reason: "" });
-    const final = await waitForTask((await updatesApi.checkGame()).task);
+    const final = await waitForTask((await updatesApi.checkGame(options)).task);
     setGameStatus(parseUpdateTask(final));
   }
 
-  async function refreshGameStatus() {
+  async function refreshGameStatus(options: { fresh?: boolean } = {}) {
     try {
-      await checkGame();
+      await checkGame(options);
     } catch (error) {
       setGameStatus({ status: "Check Failed", current: "", latest: "", reason: error instanceof Error ? error.message : String(error) });
     }
@@ -214,7 +214,7 @@ export function UpdatesPanel({
         setGameUpdateTask(current);
         persistUpdateTask(GAME_UPDATE_TASK_KEY, current);
       }
-      if (!cancelled && current.status === "succeeded") refreshGameStatus();
+      if (!cancelled && current.status === "succeeded") refreshGameStatus({ fresh: true });
     })().catch(() => {
       if (cancelled) return;
       persistUpdateTask(GAME_UPDATE_TASK_KEY, null);
@@ -335,7 +335,7 @@ export function UpdatesPanel({
         {gameStatus.status === "Check Failed" && gameStatus.reason && <p className="danger-note">{gameStatus.reason}</p>}
         {gameStatus.status === "Version details unavailable" && <p className="muted">{gameStatus.reason}</p>}
         <div className="action-line">
-          <button disabled={gameUpdateRunning} onClick={checkGame}>Refresh Game Check</button>
+          <button disabled={gameUpdateRunning} onClick={() => checkGame({ fresh: true })}>Refresh Game Check</button>
           {gameCanApply && <button className="update-action" onClick={applyGameUpdate}>Apply Game Update</button>}
         </div>
         {gameUpdateTask && <GameUpdateProgress task={gameUpdateTask} repairTask={gameSteamcmdFixTask} onRetry={applyGameUpdate} onFixSteamcmd={fixSteamcmd} formatResultTitle={formatResultTitle} formatResultMessage={formatResultMessage} />}
