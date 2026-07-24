@@ -1,7 +1,11 @@
-import test from "node:test";
+import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
-import { addCurrency, addFactionReputation, addIntel, addSpecializationXp, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, applyLandsraadMilestonePreset, augmentInventoryItem, augmentNewestPlayerItem, changeDunePassword, completeJourneyNode, completeTutorial, deleteInventoryItem, exportBaseAsBlueprint, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listBases, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerInventory, playerJourney, playerPosition, playerProfile, playerResearchItems, portalGeneratorFuel, portalVehicles, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
+import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, addSpecializationXp, applyLandsraadMilestonePreset, augmentInventoryItem, augmentNewestPlayerItem, changeDunePassword, completeJourneyNode, completeTutorial, deleteInventoryItem, exportBaseAsBlueprint, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listBases, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerCurrency, playerFactions, playerIntel, playerInventory, playerJourney, playerPosition, playerProfile, playerProgression, playerResearchItems, playerSolarisCoinTotal, playerVitals, portalGeneratorFuel, portalVehicles, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError, _resetPlayerTargetCacheForTests } from "../src/duneDb.js";
+
+beforeEach(() => {
+  _resetPlayerTargetCacheForTests();
+});
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
   assert.deepEqual(discoverDbConfig({}), {
@@ -450,6 +454,405 @@ test("database currency writes emit Solaris live refresh hook", async () => {
   const result = await runSql(db, "update dune.player_virtual_currency_balances set balance = 5000", true);
   assert.equal(result.rowCount, 1);
   assert.ok(calls.some((call) => String(call.text).includes("dune.log_event_solaris")));
+});
+
+test("player currency labels Solari Credit and Scrip, falls back to a generic label for other ids", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("to_regprocedure")) return { rows: [{ exists: true }] };
+      if (text.includes("select dune.get_solaris_id() as id")) return { rows: [{ id: 0 }] };
+      if (text.includes("from dune.player_virtual_currency_balances")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [
+          { currency_id: 0, balance: "5000", label: "Solari Credit" },
+          { currency_id: 1, balance: "250", label: "Scrip" },
+          { currency_id: 7, balance: "12", label: "Currency 7" }
+        ] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerCurrency(db, "91");
+  assert.deepEqual(result.rows.map((row) => row.label), ["Solari Credit", "Scrip", "Currency 7"]);
+});
+
+test("player currency fills in zero balances for Solari Credit and Scrip when the player has neither", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("to_regprocedure")) return { rows: [{ exists: true }] };
+      if (text.includes("select dune.get_solaris_id() as id")) return { rows: [{ id: 0 }] };
+      if (text.includes("from dune.player_virtual_currency_balances")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerCurrency(db, "91");
+  assert.deepEqual(result.rows, [
+    { currency_id: 0, balance: 0, label: "Solari Credit" },
+    { currency_id: 1, balance: 0, label: "Scrip" }
+  ]);
+});
+
+test("player currency reports unsupported when the balances table is missing", async () => {
+  const db = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: false }] };
+      return { rows: [] };
+    }
+  };
+  const result = await playerCurrency(db, "91");
+  assert.equal(result.capabilities.currency, false);
+  assert.deepEqual(result.rows, []);
+});
+
+test("player Solari Coin total sums stack sizes across every matching inventory item", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.items i") && text.includes("i.template_id = 'SolarisCoin'")) {
+        assert.deepEqual(values, [1549]);
+        return { rows: [{ total: "51194" }] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerSolarisCoinTotal(db, "1549");
+  assert.equal(result.capabilities.solarisCoin, true);
+  assert.equal(result.total, 51194);
+});
+
+test("player Solari Coin total reports zero when the player holds none", async () => {
+  const db = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.items i") && text.includes("i.template_id = 'SolarisCoin'")) {
+        return { rows: [{ total: "0" }] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerSolarisCoinTotal(db, "91");
+  assert.equal(result.capabilities.solarisCoin, true);
+  assert.equal(result.total, 0);
+});
+
+test("player Solari Coin total reports unsupported when inventory tables are missing", async () => {
+  const db = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: false }] };
+      return { rows: [] };
+    }
+  };
+  const result = await playerSolarisCoinTotal(db, "91");
+  assert.equal(result.capabilities.solarisCoin, false);
+});
+
+test("player factions lists every known faction, each with its own reputation", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
+      }
+      if (text.includes("from dune.factions f")) {
+        assert.match(text, /coalesce\(pfr\.reputation_amount, 0\)/);
+        assert.match(text, /f\.name <> 'None'/);
+        assert.deepEqual(values, [301]);
+        return { rows: [
+          { faction_id: 1, faction_name: "Atreides", reputation_amount: "500" },
+          { faction_id: 2, faction_name: "Harkonnen", reputation_amount: "120" },
+          { faction_id: 4, faction_name: "Smuggler", reputation_amount: "75" }
+        ] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerFactions(db, "91");
+  assert.equal(result.capabilities.factionNames, true);
+  assert.deepEqual(result.rows.map((row) => [row.faction_name, row.reputation_amount]), [
+    ["Atreides", "500"],
+    ["Harkonnen", "120"],
+    ["Smuggler", "75"]
+  ]);
+});
+
+test("player factions coalesces an untouched faction's reputation to 0 and excludes 'None'", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
+      }
+      if (text.includes("from dune.factions f")) {
+        assert.deepEqual(values, [301]);
+        return { rows: [
+          { faction_id: 1, faction_name: "Atreides", reputation_amount: "500" },
+          { faction_id: 2, faction_name: "Harkonnen", reputation_amount: "0" },
+          { faction_id: 4, faction_name: "Smuggler", reputation_amount: "0" }
+        ] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerFactions(db, "91");
+  assert.deepEqual(result.rows.map((row) => row.faction_name), ["Atreides", "Harkonnen", "Smuggler"]);
+  assert.equal(result.rows.find((row) => row.faction_name === "Harkonnen").reputation_amount, "0");
+  assert.equal(result.rows.some((row) => row.faction_name === "None"), false);
+});
+
+test("player progression computes level from XP and reports skill points", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
+      }
+      if (text.includes("from dune.fgl_entities fe") && text.includes("join dune.actor_fgl_entities afe")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [{ xp: "4790", total_skill_points: "12", unspent_skill_points: "3" }] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerProgression(db, "91");
+  assert.equal(result.capabilities.progression, true);
+  assert.equal(result.xp, 4790);
+  assert.equal(result.level, 11);
+  assert.equal(result.totalSkillPoints, 12);
+  assert.equal(result.unspentSkillPoints, 3);
+});
+
+test("player progression reports unsupported when required addon tables are missing", async () => {
+  const db = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: false }] };
+      return { rows: [] };
+    }
+  };
+  const result = await playerProgression(db, "91");
+  assert.equal(result.capabilities.progression, false);
+});
+
+test("player progression reports unavailable when the player has no matching DuneCharacter entity", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
+      }
+      if (text.includes("from dune.fgl_entities fe") && text.includes("join dune.actor_fgl_entities afe")) {
+        return { rows: [] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerProgression(db, "91");
+  assert.equal(result.capabilities.progression, false);
+  assert.equal(result.xp, undefined);
+});
+
+test("player intel reads TechKnowledge points for the player's actor", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [{ column_name: "properties" }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
+      }
+      if (text.includes("TechKnowledgePlayerComponent")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [{ intel: "1500" }] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerIntel(db, "91");
+  assert.equal(result.capabilities.intel, true);
+  assert.equal(result.intel, 1500);
+  assert.equal(result.maxIntel, 2779);
+});
+
+test("player intel reports unsupported when actors table lacks a properties column", async () => {
+  const db = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [] };
+      return { rows: [] };
+    }
+  };
+  const result = await playerIntel(db, "91");
+  assert.equal(result.capabilities.intel, false);
+});
+
+test("player intel reports unavailable when the actor has no TechKnowledgePlayerComponent", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [{ column_name: "properties" }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
+      }
+      if (text.includes("TechKnowledgePlayerComponent")) {
+        return { rows: [] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerIntel(db, "91");
+  assert.equal(result.capabilities.intel, false);
+  assert.equal(result.intel, undefined);
+});
+
+test("player intel reports unavailable when the component key exists but carries no point value", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [{ column_name: "properties" }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
+      }
+      if (text.includes("TechKnowledgePlayerComponent")) {
+        return { rows: [{ intel: null }] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerIntel(db, "91");
+  assert.equal(result.capabilities.intel, false);
+  assert.equal(result.intel, undefined);
+});
+
+test("player vitals reports health, hydration, and spice addiction with derived max health from Combat level", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [{ column_name: "gas_attributes" }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
+      }
+      if (text.includes("from dune.fgl_entities fe") && text.includes("join dune.actor_fgl_entities afe")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [{ current_health: "175.5" }] };
+      }
+      if (text.includes("gas_attributes->'DuneHydrationAttributeSet'")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [{ hydration: "83.958465", spice_addiction_level: "8.2" }] };
+      }
+      if (text.includes("from dune.specialization_tracks where player_id")) {
+        assert.deepEqual(values, [301]);
+        return { rows: [{ level: "77" }] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerVitals(db, "91");
+  assert.equal(result.capabilities.vitals, true);
+  assert.equal(result.currentHealth, 175.5);
+  assert.equal(result.maxHealth, 200);
+  assert.equal(result.hydration, 83.958465);
+  assert.equal(result.maxHydration, 100);
+  assert.equal(result.spiceAddictionLevel, 8.2);
+  assert.equal(result.maxSpiceAddictionLevel, 10);
+});
+
+test("player vitals reports unsupported when required addon tables/columns are missing", async () => {
+  const db = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: false }] };
+      return { rows: [] };
+    }
+  };
+  const result = await playerVitals(db, "91");
+  assert.equal(result.capabilities.vitals, false);
+});
+
+test("player vitals reports null (not zero) health/hydration/spice when no matching data exists", async () => {
+  const db = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [{ column_name: "gas_attributes" }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerVitals(db, "91");
+  assert.equal(result.capabilities.vitals, true);
+  assert.equal(result.currentHealth, null);
+  assert.equal(result.hydration, null);
+  assert.equal(result.spiceAddictionLevel, null);
+  assert.equal(result.maxHealth, 150);
+});
+
+test("player vitals treats Combat level as 0 (base max health only) when specialization_tracks doesn't exist", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: values[0] !== "dune.specialization_tracks" }] };
+      if (text.includes("information_schema.columns")) return { rows: [{ column_name: "gas_attributes" }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
+      }
+      if (text.includes("from dune.fgl_entities fe") && text.includes("join dune.actor_fgl_entities afe")) {
+        return { rows: [{ current_health: "150" }] };
+      }
+      if (text.includes("gas_attributes->'DuneHydrationAttributeSet'")) {
+        return { rows: [{ hydration: "50", spice_addiction_level: "2" }] };
+      }
+      if (text.includes("from dune.specialization_tracks where player_id")) {
+        throw new Error("should not query specialization_tracks when the table doesn't exist");
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerVitals(db, "91");
+  assert.equal(result.maxHealth, 150);
+});
+
+test("player vitals derives max health from every Vitality passive tier boundary", async () => {
+  const tierCases = [
+    { combatLevel: 0, maxHealth: 150 },
+    { combatLevel: 5, maxHealth: 150 },
+    { combatLevel: 6, maxHealth: 165 },
+    { combatLevel: 25, maxHealth: 165 },
+    { combatLevel: 26, maxHealth: 170 },
+    { combatLevel: 55, maxHealth: 170 },
+    { combatLevel: 56, maxHealth: 175 },
+    { combatLevel: 76, maxHealth: 175 },
+    { combatLevel: 77, maxHealth: 200 },
+    { combatLevel: 90, maxHealth: 200 },
+    { combatLevel: 91, maxHealth: 205 },
+    { combatLevel: 150, maxHealth: 205 }
+  ];
+  for (const { combatLevel, maxHealth } of tierCases) {
+    const db = {
+      query: async (text) => {
+        if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+        if (text.includes("information_schema.columns")) return { rows: [{ column_name: "gas_attributes" }] };
+        if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+          return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
+        }
+        if (text.includes("from dune.specialization_tracks where player_id")) {
+          return { rows: [{ level: combatLevel }] };
+        }
+        return { rows: [] };
+      }
+    };
+    const result = await playerVitals(db, "91");
+    assert.equal(result.maxHealth, maxHealth, `combat level ${combatLevel} should yield max health ${maxHealth}`);
+  }
 });
 
 test("manual currency row edit uses game balance function", async () => {
@@ -1352,7 +1755,7 @@ test("player profile includes faction and guild when addon tables are present", 
         return { rows: [] };
       }
       if (text.includes("as fls_id") && text.includes("where a.id = $1")) {
-        return { rows: [{ actor_id: 101, player_pawn_id: 101, account_id: 201, character_name: "Test One", player_controller_id: 301, funcom_id: "FN1", fls_id: "user1", action_player_id: "user1", class: "Foo", map: "Survival_1", online_status: "Online" }] };
+        return { rows: [{ actor_id: 101, player_pawn_id: 101, account_id: 201, character_name: "Test One", player_controller_id: 301, player_state_id: 102, funcom_id: "FN1", fls_id: "user1", platform_id: "76561197986776594", platform_name: "Steam", action_player_id: "user1", class: "Foo", map: "Survival_1", online_status: "Online" }] };
       }
       if (text.includes("from dune.player_faction pf")) {
         return { rows: [{ actor_id: "301", faction_id: "1", faction_name: "Atreides" }] };
@@ -1367,6 +1770,9 @@ test("player profile includes faction and guild when addon tables are present", 
   assert.equal(result.player.faction, "Atreides");
   assert.equal(result.player.faction_assigned, true);
   assert.equal(result.player.guild, "Water Sellers");
+  assert.equal(result.player.player_state_id, 102);
+  assert.equal(result.player.platform_id, "76561197986776594");
+  assert.equal(result.player.platform_name, "Steam");
 });
 
 test("player profile uses guild allegiance when personal faction is unassigned", async () => {
@@ -1419,9 +1825,9 @@ test("player profile falls back to placeholder faction/guild when addon tables a
     }
   };
   const result = await playerProfile(db, "101");
-  assert.equal(result.player.faction, "Unassigned");
+  assert.equal(result.player.faction, "Neutral");
   assert.equal(result.player.faction_assigned, false);
-  assert.equal(result.player.guild, "Unavailable");
+  assert.equal(result.player.guild, "—");
 });
 
 test("player profile does not treat existing reputation as a faction assignment", async () => {

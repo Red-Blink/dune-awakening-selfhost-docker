@@ -535,6 +535,33 @@ main { padding: 22px; min-width: 0; }
 .maps-panel > .maps-advanced-toggle { margin-top: 18px; }
 .action-section h4 { margin: 0; color: #ffd08a; }
 .action-section p { margin: 0; color: #ad9f89; }
+.player-summary { gap: 14px; }
+.summary-hero { display: grid; gap: 6px; }
+.summary-hero-main { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.summary-hero-name { font-size: 18px; font-weight: 600; color: #fff1d4; }
+.summary-hero-sub { display: flex; flex-wrap: wrap; gap: 18px; color: #ad9f89; font-size: 13px; }
+.summary-hero-meta { display: inline-flex; align-items: center; gap: 6px; }
+.summary-hero-icon { color: #8a7f6d; flex: 0 0 auto; }
+.summary-hero-meta > span:last-child { color: #e8e0cd; }
+.summary-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.summary-stat { background: #171a1d; border: 1px solid #302b25; border-radius: 8px; padding: 12px; display: grid; gap: 4px; }
+.summary-stat span { color: #ad9f89; font-size: 13px; }
+.summary-stat strong { color: #fff1d4; font-size: 22px; font-weight: 600; overflow-wrap: anywhere; }
+.summary-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.summary-block { display: grid; gap: 8px; align-content: start; }
+.summary-block-label { color: #c68b4a; text-transform: uppercase; font-size: 12px; letter-spacing: 0.05em; }
+.summary-sublabel { margin-top: 6px; }
+.summary-kv { width: 100%; border-collapse: collapse; font-size: 13px; }
+.summary-kv td { padding: 5px 0; vertical-align: top; }
+.summary-kv td:first-child { color: #ad9f89; }
+.summary-kv td:last-child { text-align: right; color: #fff1d4; overflow-wrap: anywhere; padding-left: 12px; }
+.summary-kv td.summary-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+.summary-currency { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.summary-currency-tile { background: #171a1d; border: 1px solid #302b25; border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
+.summary-currency-icon { color: #c68b4a; flex: 0 0 auto; }
+.summary-currency-body { display: grid; gap: 2px; min-width: 0; }
+.summary-currency-tile strong { color: #fff1d4; font-size: 16px; font-weight: 600; }
+.summary-currency-tile span { color: #ad9f89; font-size: 12px; }
 .danger-section { border-color: #6f3030; background: #1b1414; }
 .warning-panel { border-color: #a97932; background: #211b12; }
 .info-panel { border-color: #385067; background: #111922; }
@@ -1133,7 +1160,7 @@ body.debug .technical-details { display: block; }
 .playerAdmin_summaryActions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px solid rgba(214, 185, 140, .14); padding-top: 12px; }
 .playerAdmin_summaryActions button { width: auto; }
 .playerAdmin_summaryActions .playerAdmin_actionNote { flex: 1 0 100%; padding-left: 0; }
-.playerAdmin_tabs { display: grid; grid-template-columns: repeat(8, minmax(132px, 1fr)); gap: 8px; width: 100%; overflow-x: auto; }
+.playerAdmin_tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 8px; width: 100%; }
 .playerAdmin_tabs button { width: 100%; min-width: 0; min-height: 54px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 6px; border-color: #3b3329; background: #171a1d; color: #e9dcc8; font-size: 14px; font-weight: 700; white-space: nowrap; padding: 8px 10px; }
 .playerAdmin_tabs button svg { flex: 0 0 auto; }
 .playerAdmin_tabs button.active { border-color: #c68b4a; background: rgba(198, 139, 74, .16); color: #ffd08a; }
@@ -1154,7 +1181,7 @@ body.debug .technical-details { display: block; }
 .playerAdmin_boxHeaderLine { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .playerAdmin_boxHeaderLine > p { margin: 0; font-style: italic; color: #ad9f89; flex: 1 1 260px; min-width: 0; }
 .playerAdmin_boxHeaderLine .playerAdmin_filterRow { margin-left: auto; }
-.playerAdmin_box .playerAdmin_section > .playerAdmin_actionGroup .playerAdmin_actionRow { display: grid; grid-template-columns: 210px 360px 78px minmax(220px, 1fr); align-items: start; }
+.playerAdmin_box .playerAdmin_section:not(.playerAdmin_quickRewardsSection) > .playerAdmin_actionGroup .playerAdmin_actionRow { display: grid; grid-template-columns: 210px 360px 78px minmax(220px, 1fr); align-items: start; }
 .playerAdmin_quickRewardsSection {
   grid-template-columns: 300px 360px 78px minmax(220px, 1fr);
   column-gap: 12px;
@@ -1469,7 +1496,6 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
   .home-backdrop { inset: 0; }
   .grid, .two-col { grid-template-columns: 1fr; }
   .health-grid, .health-grid-compact { grid-template-columns: 1fr; }
-  .playerAdmin_tabs { grid-template-columns: repeat(8, minmax(132px, 1fr)); }
   .live-map-layout { grid-template-columns: 1fr; }
   .live-map-frame { height: 62vh; min-height: 420px; }
   .live-map-stats { grid-template-columns: 1fr; }
@@ -2121,6 +2147,14 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
   .landsraad-persistent-status { justify-content: flex-start; min-height: 0; }
   .landsraad-modifier-groups { grid-template-columns: 1fr; }
   .landsraad-persistent-actions > div { width: 100%; justify-content: flex-start; }
+
+  .playerAdmin_box .playerAdmin_section > .playerAdmin_actionGroup .playerAdmin_actionRow { grid-template-columns: 1fr; }
+  .playerAdmin_box .playerAdmin_section > .playerAdmin_actionGroup .playerAdmin_actionRow > button { width: auto; justify-self: start; }
+  .playerAdmin_quickRewardsSection { grid-template-columns: 1fr; }
+  .playerAdmin_quickRewardsSection .playerAdmin_actionLabel,
+  .playerAdmin_quickRewardsSection .playerAdmin_fieldGroup,
+  .playerAdmin_quickRewardsSection .playerAdmin_actionGroup button,
+  .playerAdmin_quickRewardsSection .inline-action-result-wrap { grid-column: 1; }
 }
 @media (max-width: 720px) {
   .landsraad-modifier-grid { grid-template-columns: 1fr; }

@@ -31,11 +31,27 @@ import {
 } from "./duneDb/presentation.js";
 
 const MAX_INTEL_POINTS = 2779;
+const VITALITY_HEALTH_TIERS = [
+  { level: 6, bonus: 15 },
+  { level: 26, bonus: 5 },
+  { level: 56, bonus: 5 },
+  { level: 77, bonus: 25 },
+  { level: 91, bonus: 5 }
+];
+const BASE_MAX_HEALTH = 150;
+const BASE_MAX_HYDRATION = 100;
+const BASE_MAX_ADDICTION = 10;
+
+function maxHealthForCombatLevel(combatLevel) {
+  return VITALITY_HEALTH_TIERS.reduce((total, tier) => (combatLevel >= tier.level ? total + tier.bonus : total), BASE_MAX_HEALTH);
+}
 const MAX_TABLE_PREVIEW_ROWS = 10000;
 const INVENTORY_EDITABLE_COLUMNS = new Set(["stack_size", "quality_level", "position_index", "current_durability", "max_durability"]);
 let craftingRecipeCatalogCache = null;
 let adminItemMetadataCache = null;
 let augmentCompatibilityCache = null;
+const PLAYER_TARGET_CACHE_TTL_MS = 3000;
+const playerTargetCache = new Map(); // id -> { promise, expiresAt }
 
 export class UnsupportedCapabilityError extends Error {
   constructor(message, details = {}) {
@@ -1823,8 +1839,11 @@ export async function playerProfile(db, id) {
            coalesce(a.owner_account_id, 0) as account_id,
            coalesce(ps.character_name, '') as character_name,
            coalesce(ps.player_controller_id, 0) as player_controller_id,
+           coalesce(ps.id, 0) as player_state_id,
            coalesce(ac.funcom_id, '') as funcom_id,
            coalesce(ac."user", '') as fls_id,
+           coalesce(ac.platform_id, '') as platform_id,
+           coalesce(ac.platform_name, '') as platform_name,
            case
              when nullif(ac."user", '') is not null then ac."user"
              when a.owner_account_id is not null and a.owner_account_id <> 0 then a.owner_account_id::text
@@ -1850,9 +1869,9 @@ export async function playerProfile(db, id) {
   const accountIdKey = String(row.account_id || "");
   const assignedFaction = currentFactions.get(controllerId) || currentFactions.get(actorIdKey) ||
     guildFactions.get(controllerId) || guildFactions.get(actorIdKey) || "";
-  row.faction = assignedFaction || reputationFactions.get(controllerId) || reputationFactions.get(actorIdKey) || "Unassigned";
+  row.faction = assignedFaction || reputationFactions.get(controllerId) || reputationFactions.get(actorIdKey) || "Neutral";
   row.faction_assigned = Boolean(assignedFaction);
-  row.guild = guilds.get(controllerId) || guilds.get(actorIdKey) || guilds.get(accountIdKey) || "Unavailable";
+  row.guild = guilds.get(controllerId) || guilds.get(actorIdKey) || guilds.get(accountIdKey) || "—";
   return { capabilities: await playerCapabilities(db), player: row };
 }
 
@@ -1903,29 +1922,156 @@ export async function playerInventory(db, id) {
 export async function playerCurrency(db, id) {
   if (!(await tableExists(db, "player_virtual_currency_balances"))) return unsupported("currency", ["dune.player_virtual_currency_balances"]);
   const actorId = intParam(id, "player id", 1);
+  const hasSolarisId = await functionExists(db, "dune.get_solaris_id()");
+  const solarisId = hasSolarisId ? Number((await db.query("select dune.get_solaris_id() as id")).rows[0].id) : null;
   const result = await db.query(`
-    select currency_id, balance
+    select currency_id, balance,
+           case
+             ${hasSolarisId ? "when currency_id = dune.get_solaris_id() then 'Solari Credit'" : ""}
+             when currency_id = 1 then 'Scrip'
+             else 'Currency ' || currency_id
+           end as label
     from dune.player_virtual_currency_balances
     where player_controller_id = $1
        or player_controller_id = (select coalesce(player_controller_id, 0) from dune.player_state where player_pawn_id = $1 limit 1)
     order by currency_id`, [actorId]);
-  return { capabilities: { currency: true }, rows: result.rows };
+
+  const rows = [...result.rows];
+  const expectedCurrencies = [
+    { currency_id: 1, label: "Scrip" },
+    ...(solarisId !== null ? [{ currency_id: solarisId, label: "Solari Credit" }] : [])
+  ];
+  for (const expected of expectedCurrencies) {
+    if (!rows.some((row) => row.currency_id === expected.currency_id)) {
+      rows.push({ currency_id: expected.currency_id, balance: 0, label: expected.label });
+    }
+  }
+  rows.sort((a, b) => a.currency_id - b.currency_id);
+  return { capabilities: { currency: true }, rows };
+}
+
+export async function playerSolarisCoinTotal(db, id) {
+  if (!(await tableExists(db, "items")) || !(await tableExists(db, "inventories"))) {
+    return { capabilities: { solarisCoin: false }, reason: "Unsupported by detected schema. Missing required table(s): dune.items, dune.inventories" };
+  }
+  const actorId = intParam(id, "player id", 1);
+  const result = await db.query(`
+    select coalesce(sum(i.stack_size), 0)::bigint as total
+    from dune.items i
+    join dune.inventories inv on inv.id = i.inventory_id
+    where inv.actor_id = $1
+      and i.template_id = 'SolarisCoin'`, [actorId]);
+  return { capabilities: { solarisCoin: true }, total: Number(result.rows[0]?.total || 0) };
 }
 
 export async function playerFactions(db, id) {
   if (!(await tableExists(db, "player_faction_reputation"))) return unsupported("factions", ["dune.player_faction_reputation"]);
   const hasFactions = await tableExists(db, "factions");
-  const player = await resolvePlayerMutationTarget(db, id);
-  const result = await db.query(`
-    select pfr.actor_id,
-           pfr.faction_id,
-           ${hasFactions ? "coalesce(f.name, '')" : "''"} as faction_name,
-           pfr.reputation_amount
-    from dune.player_faction_reputation pfr
-    ${hasFactions ? "left join dune.factions f on f.id = pfr.faction_id" : ""}
-    where pfr.actor_id = $1
-    order by pfr.faction_id`, [player.controllerId]);
+  const player = await resolvePlayerMutationTargetCached(db, id);
+  const result = hasFactions
+    ? await db.query(`
+        select f.id as faction_id,
+               f.name as faction_name,
+               coalesce(pfr.reputation_amount, 0) as reputation_amount
+        from dune.factions f
+        left join dune.player_faction_reputation pfr on pfr.faction_id = f.id and pfr.actor_id = $1
+        where f.name <> 'None'
+        order by f.id`, [player.controllerId])
+    : await db.query(`
+        select pfr.faction_id, '' as faction_name, pfr.reputation_amount
+        from dune.player_faction_reputation pfr
+        where pfr.actor_id = $1
+        order by pfr.faction_id`, [player.controllerId]);
   return { capabilities: { factions: true, factionNames: hasFactions }, player, rows: result.rows };
+}
+
+export async function playerProgression(db, id) {
+  if (!(await supportsPlayerProgression(db))) {
+    return unsupported("progression", ["dune.player_state", "dune.actor_fgl_entities", "dune.fgl_entities"]);
+  }
+  const player = await resolvePlayerMutationTargetCached(db, id);
+  const result = await db.query(`
+    select (fe.components->'FLevelComponent'->1->>'TotalXPEarned')::bigint as xp,
+           (fe.components->'FLevelComponent'->1->>'TotalSkillPoints')::bigint as total_skill_points,
+           (fe.components->'FLevelComponent'->1->>'UnspentSkillPoints')::bigint as unspent_skill_points
+    from dune.fgl_entities fe
+    join dune.actor_fgl_entities afe on afe.entity_id = fe.entity_id
+    where afe.slot_name = 'DuneCharacter'
+      and afe.actor_id = $1::bigint
+    limit 1`, [player.actorId]);
+  const row = result.rows[0];
+  if (!row || row.xp === null) {
+    return { capabilities: { progression: false }, player, reason: "No DuneCharacter FLevelComponent found for this player." };
+  }
+  const xp = Number(row.xp || 0);
+  return {
+    capabilities: { progression: true },
+    player,
+    xp,
+    level: xpToLevel(xp),
+    totalSkillPoints: Number(row.total_skill_points || 0),
+    unspentSkillPoints: Number(row.unspent_skill_points || 0)
+  };
+}
+
+export async function playerIntel(db, id) {
+  if (!(await supportsIntelMutation(db))) {
+    return unsupported("intel", ["dune.actors (properties column)"]);
+  }
+  const player = await resolvePlayerMutationTargetCached(db, id);
+  const result = await db.query(`
+    select (properties->'TechKnowledgePlayerComponent'->>'m_TechKnowledgePoints')::bigint as intel
+    from dune.actors
+    where id = $1 and properties ? 'TechKnowledgePlayerComponent'`, [player.actorId]);
+  const row = result.rows[0];
+  if (!row || row.intel === null) {
+    return { capabilities: { intel: false }, player, reason: "No TechKnowledgePlayerComponent found for this player." };
+  }
+  return {
+    capabilities: { intel: true },
+    player,
+    intel: Number(row.intel || 0),
+    maxIntel: MAX_INTEL_POINTS
+  };
+}
+
+export async function playerVitals(db, id) {
+  if (!(await supportsPlayerVitals(db))) {
+    return unsupported("vitals", ["dune.actors (gas_attributes column)", "dune.player_state", "dune.actor_fgl_entities", "dune.fgl_entities"]);
+  }
+  const player = await resolvePlayerMutationTargetCached(db, id);
+  const hasSpecTracks = await tableExists(db, "specialization_tracks");
+  const [healthResult, gasResult, combatResult] = await Promise.all([
+    db.query(`
+      select (fe.components->'FHealthComponent'->1->>'m_CurrentHealth')::numeric as current_health
+      from dune.fgl_entities fe
+      join dune.actor_fgl_entities afe on afe.entity_id = fe.entity_id
+      where afe.slot_name = 'DuneCharacter'
+        and afe.actor_id = $1::bigint
+      limit 1`, [player.actorId]),
+    db.query(`
+      select (gas_attributes->'DuneHydrationAttributeSet'->'CurrentHydration'->>'CurrentValue')::numeric as hydration,
+             (gas_attributes->'DuneSpiceAddictionAttributeSet'->'SpiceAddictionLevel'->>'CurrentValue')::numeric as spice_addiction_level
+      from dune.actors
+      where id = $1`, [player.actorId]),
+    hasSpecTracks
+      ? db.query(`select level from dune.specialization_tracks where player_id = $1 and track_type::text = 'Combat' limit 1`, [player.controllerId])
+      : Promise.resolve({ rows: [] })
+  ]);
+  const health = healthResult.rows[0];
+  const gas = gasResult.rows[0];
+  const combatLevel = Number(combatResult.rows[0]?.level || 0);
+  const toNum = (v) => (v === undefined || v === null ? null : Number(v));
+  return {
+    capabilities: { vitals: true },
+    player,
+    currentHealth: toNum(health?.current_health),
+    maxHealth: maxHealthForCombatLevel(combatLevel),
+    hydration: toNum(gas?.hydration),
+    maxHydration: BASE_MAX_HYDRATION,
+    spiceAddictionLevel: toNum(gas?.spice_addiction_level),
+    maxSpiceAddictionLevel: BASE_MAX_ADDICTION
+  };
 }
 
 export async function playerSpecs(db, id) {
@@ -4407,7 +4553,8 @@ async function playerCapabilities(db) {
     repairGear: await supportsRepairGear(db),
     repairVehicleDecay: await supportsRepairVehicleDecay(db),
     refuelVehicle: await supportsRefuelVehicle(db),
-    progression: false,
+    vitals: await supportsPlayerVitals(db),
+    progression: await supportsPlayerProgression(db),
     events: false,
     stats: false,
     history: false
@@ -4418,6 +4565,17 @@ async function supportsIntelMutation(db) {
   if (!(await tableExists(db, "actors"))) return false;
   const actorColumns = await columnsFor(db, "actors");
   return actorColumns.has("properties");
+}
+
+async function supportsPlayerVitals(db) {
+  if (!(await tableExists(db, "actors")) || !(await tableExists(db, "player_state")) ||
+      !(await tableExists(db, "actor_fgl_entities")) || !(await tableExists(db, "fgl_entities"))) return false;
+  const actorColumns = await columnsFor(db, "actors");
+  return actorColumns.has("gas_attributes");
+}
+
+async function supportsPlayerProgression(db) {
+  return (await tableExists(db, "player_state")) && (await tableExists(db, "actor_fgl_entities")) && (await tableExists(db, "fgl_entities"));
 }
 
 async function supportsCraftingRecipes(db) {
@@ -4673,6 +4831,24 @@ async function resolvePlayerMutationTarget(db, id) {
     playerStateId: Number(row.player_state_id || 0),
     onlineStatus: row.online_status || "Offline"
   };
+}
+
+// Short-TTL cache for read-only capability endpoints (factions/progression/intel/vitals) that
+// otherwise each independently re-run the same actors/player_state join when the Player Summary
+// panel fires them as parallel requests. NOT used for mutation code paths — those must always
+// see a fresh onlineStatus for requireOfflinePlayer() to be safe.
+async function resolvePlayerMutationTargetCached(db, id) {
+  const key = String(id);
+  const cached = playerTargetCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.promise;
+  const promise = resolvePlayerMutationTarget(db, id);
+  playerTargetCache.set(key, { promise, expiresAt: Date.now() + PLAYER_TARGET_CACHE_TTL_MS });
+  promise.catch(() => playerTargetCache.delete(key));
+  return promise;
+}
+
+export function _resetPlayerTargetCacheForTests() {
+  playerTargetCache.clear();
 }
 
 function playerOnline(player) {
