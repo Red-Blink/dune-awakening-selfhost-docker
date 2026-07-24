@@ -39,6 +39,7 @@ import { persistSpicefieldOverride } from "./services/spicefieldOverrides.js";
 import { exportBlueprint, importBlueprint, listBlueprints, deleteBlueprint } from "./blueprints.js";
 import { createZipArchive } from "./services/zipArchive.js";
 import { grantAddonItem } from "./addonItemGrants.js";
+import { EDA_EXCHANGE_BOT_ADDON_ID, ADDON_SCHEDULER_PERMISSION, createAddonJobScheduler, probeBuybackEligibility, readBuybackSchedule, saveBuybackSchedule } from "./addonJobs.js";
 import { createPublicDirectoryReporter, normalizeDiscordInvite, readDirectorySettings } from "./services/publicDirectory.js";
 import { choamTerminalOverview, installChoamTerminals, removeChoamTerminals } from "./services/choamTerminals.js";
 
@@ -66,6 +67,11 @@ const POSTGRES_UNAVAILABLE_MESSAGE = "Postgres is not running or is restarting. 
 const DEFAULT_ALWAYS_ON_STARTUP_PARALLELISM = 1;
 const MAX_ALWAYS_ON_STARTUP_PARALLELISM = 16;
 const BACKGROUND_SCAN_FAILURE_BACKOFF_MS = Math.max(30, Number(process.env.ADMIN_BACKGROUND_SCAN_FAILURE_BACKOFF_SECONDS || 60)) * 1000;
+const addonJobScheduler = createAddonJobScheduler(config, {
+  getDb: () => db,
+  mutationLimiter: mutationRateLimiter,
+  failureBackoffMs: BACKGROUND_SCAN_FAILURE_BACKOFF_MS
+});
 
 process.on("unhandledRejection", (error) => {
   console.error(`Unhandled background rejection: ${redact(error?.message || error)}`);
@@ -112,6 +118,7 @@ setInterval(() => {
   runBackgroundTick("Care Package auto-grant", carePackageAutoTick);
   runBackgroundTick("Message of the Day", messageOfTheDayAutoTick);
   runBackgroundTick("Player announcements", playerAnnouncementsAutoTick);
+  runBackgroundTick("Addon scheduled jobs", () => addonJobScheduler.tick());
 }, 10000).unref?.();
 
 setInterval(() => {
@@ -665,6 +672,7 @@ async function addonBridgeRoute(req, res, path) {
       return json(res, 400, { ok: false, error: redact(error.message || error) });
     }
   }
+  if (action.startsWith("scheduler.")) return addonSchedulerBridgeAction(req, res, id, action, body);
   if (action === "database.query" || action === "database.execute") {
     const query = String(body.query || "");
     const readOnly = isReadOnlySql(query);
@@ -681,6 +689,66 @@ async function addonBridgeRoute(req, res, path) {
   }
   audit(config, req, "addons.bridge", { id, action, ok: false, reason: "Unsupported addon action" });
   return json(res, 400, { error: `Unsupported addon action: ${action || "unknown"}` });
+}
+
+// Typed scheduler actions: the addon UI manages a server-side schedule with
+// validated parameters only. No SQL from the iframe is persisted or replayed;
+// the scheduled sweep SQL is built server-side in addonJobs.js.
+async function addonSchedulerBridgeAction(req, res, id, action, body) {
+  if (id !== EDA_EXCHANGE_BOT_ADDON_ID) {
+    audit(config, req, "addons.bridge", { id, action, ok: false, reason: "Scheduled jobs are not supported for this addon" });
+    return json(res, 400, { error: "Scheduled jobs are not supported for this addon yet." });
+  }
+  if (action === "scheduler.schedule.get") {
+    const addon = assertInstalledAddonPermission(config, id, "database:read");
+    const result = readBuybackSchedule(config);
+    audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: true });
+    return json(res, 200, { ok: true, result });
+  }
+  if (action === "scheduler.schedule.set") {
+    const payload = body.schedule && typeof body.schedule === "object" ? body.schedule : body;
+    const addon = assertInstalledAddonPermission(config, id, "database:write");
+    // Unattended background writes need an explicit extra approval from the
+    // server owner, so any save that leaves the schedule enabled requires
+    // scheduler:server too — including field updates that omit `enabled` on an
+    // already-enabled schedule. Explicitly disabling only needs database:write.
+    const leavesEnabled = payload.enabled === undefined ? readBuybackSchedule(config).enabled : payload.enabled === true;
+    if (leavesEnabled) assertInstalledAddonPermission(config, id, ADDON_SCHEDULER_PERMISSION);
+    if (!applyMutationRateLimit(req, res, `addon:${id}:scheduler.schedule.set`)) return;
+    try {
+      const result = saveBuybackSchedule(config, payload);
+      audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, enabled: result.enabled, intervalMinutes: result.intervalMinutes, exchangeId: result.exchangeId, buybackPercent: result.buybackPercent, maxBuys: result.maxBuys, ok: true });
+      return json(res, 200, { ok: true, result });
+    } catch (error) {
+      audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: false, error: redact(error.message || error) });
+      return json(res, 400, { ok: false, error: redact(error.message || error) });
+    }
+  }
+  if (action === "scheduler.probe") {
+    const addon = assertInstalledAddonPermission(config, id, "database:read");
+    try {
+      const result = await probeBuybackEligibility(config, db, body.schedule && typeof body.schedule === "object" ? body.schedule : body);
+      audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, eligible: result.eligible, exchangeId: result.exchangeId, ok: true });
+      return json(res, 200, { ok: true, result });
+    } catch (error) {
+      audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: false, error: redact(error.message || error) });
+      return json(res, 400, { ok: false, error: redact(error.message || error) });
+    }
+  }
+  if (action === "scheduler.run") {
+    const addon = assertInstalledAddonPermission(config, id, "database:write");
+    if (!applyMutationRateLimit(req, res, `addon:${id}:scheduler.run`)) return;
+    try {
+      const result = await addonJobScheduler.runNow({ trigger: "manual" });
+      audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, status: result.status, eligible: result.eligible, purchased: result.purchased, ok: true });
+      return json(res, 200, { ok: true, result });
+    } catch (error) {
+      audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: false, error: redact(error.message || error) });
+      return json(res, 400, { ok: false, error: redact(error.message || error) });
+    }
+  }
+  audit(config, req, "addons.bridge", { id, action, ok: false, reason: "Unsupported addon action" });
+  return json(res, 400, { error: `Unsupported addon action: ${action}` });
 }
 
 async function installedAddonsRoute() {

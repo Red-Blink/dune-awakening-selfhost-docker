@@ -20,7 +20,8 @@ const ALLOWED_ADDON_PERMISSIONS = new Set([
   "server:status",
   "server:restart",
   "files:addon-data",
-  "broadcast:send"
+  "broadcast:send",
+  "scheduler:server"
 ]);
 
 export async function fetchCommunityAddons(fetchImpl = globalThis.fetch, indexUrl = COMMUNITY_ADDONS_INDEX_URL) {
@@ -252,11 +253,17 @@ export function removeInstalledAddon(config, addonId) {
   const id = normalizeAddonId(addonId);
   const addonDir = resolve(addonsInstalledRoot(config), id);
   if (!existsSync(addonDir)) throw new Error(`Installed addon not found: ${id}`);
+  removeAddonJobState(config, id);
   rmSync(addonDir, { recursive: true, force: true });
   const state = readAddonState(config);
   delete state[id];
   writeAddonState(config, state);
   return { ok: true, id };
+}
+
+function removeAddonJobState(config, addonId) {
+  const addonJobsDir = resolve(config.repoRoot, "runtime/addons/jobs", addonId);
+  if (existsSync(addonJobsDir)) rmSync(addonJobsDir, { recursive: true, force: true });
 }
 
 export function installedAddonContentPath(config, addonId, contentPath) {
