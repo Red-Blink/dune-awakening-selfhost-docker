@@ -102,7 +102,7 @@ export function PlayerSummary({
     { label: "DB Player ID", value: dbPlayerId || "missing" },
     { label: "Account ID", value: accountId || "—" },
     { label: "Player Controller ID", value: controllerId || "—" },
-    { label: "Player State ID", value: playerStateId || "—" }    
+    { label: "Player State ID", value: playerStateId || "—" }
   ];
   const identityColumns: (typeof identityRows)[] = [];
   for (let i = 0; i < identityRows.length; i += 5) identityColumns.push(identityRows.slice(i, i + 5));
