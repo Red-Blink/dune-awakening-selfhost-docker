@@ -95,14 +95,14 @@ export function PlayerSummary({
   const platformName = text(player.platform_name);
 
   const identityRows: { label: string; value: string }[] = [
-    { label: "DB Player ID", value: dbPlayerId || "missing" },
+    { label: "Platform Name", value: platformName || "—" },
+    { label: "Platform ID", value: platformId || "—" },
     { label: "Funcom ID", value: funcomId || "—" },
     { label: "FLS ID", value: flsId },
+    { label: "DB Player ID", value: dbPlayerId || "missing" },
     { label: "Account ID", value: accountId || "—" },
     { label: "Player Controller ID", value: controllerId || "—" },
-    { label: "Player State ID", value: playerStateId || "—" },
-    { label: "Platform ID", value: platformId || "—" },
-    { label: "Platform Name", value: platformName || "—" }
+    { label: "Player State ID", value: playerStateId || "—" }    
   ];
   const identityColumns: (typeof identityRows)[] = [];
   for (let i = 0; i < identityRows.length; i += 5) identityColumns.push(identityRows.slice(i, i + 5));
