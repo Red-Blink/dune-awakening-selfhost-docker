@@ -85,6 +85,30 @@ test("public modifier reporting preserves differing map values without exposing 
   }
 });
 
+test("public modifier reporting includes scoped UserEngine overrides", () => {
+  const files = fixture();
+  const path = join(files.generatedDir, "gameplay-profile.ini");
+  try {
+    writeFileSync(path, [
+      "[Global:/Script/DuneSandbox.SpiceAddictionSubsystem]",
+      "m_bIsSpiceAddictionEnabled=False",
+      "",
+      "[MapEngine:Survival_1:ConsoleVariables]",
+      "Sandstorm.Enabled=0",
+      "",
+      "[PartitionEngine:DeepDesert_1:8:ConsoleVariables]",
+      "sandworm.dune.Enabled=0"
+    ].join("\n"));
+    assert.deepEqual(readPublicModifiers(path), {
+      Sandstorms: "Disabled",
+      Sandworms: "Disabled",
+      "Spice Addiction": "Disabled"
+    });
+  } finally {
+    files.cleanup();
+  }
+});
+
 test("heartbeat includes an empty Discord invite so stale directory links are removed", () => {
   const payload = buildHeartbeatPayload(
     { serverId: "server-id", secret: "secret" },

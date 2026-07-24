@@ -290,7 +290,15 @@ export function taskOperations(operation, payload = {}) {
   }
   if (operation === "userSettingsSaveAndRestart") return ["userSettingsSave", "userSettingsMaterializeCurrent", ...restartOperations(payload)];
   if (operation === "userSettingsResetAndRestart") {
-    const resetOperation = payload.scope === "engine" ? "userSettingsResetEngineGameplay" : payload.scope === "global" ? "userSettingsResetGlobalGame" : "userSettingsResetGame";
+    const resetOperation = payload.scope === "engine"
+      ? "userSettingsResetEngineGameplay"
+      : payload.scope === "mapEngine"
+        ? "userSettingsResetMapEngine"
+        : payload.scope === "partitionEngine"
+          ? "userSettingsResetPartitionEngine"
+          : payload.scope === "global"
+            ? "userSettingsResetGlobalGame"
+            : "userSettingsResetGame";
     return [resetOperation, "userSettingsMaterializeCurrent", ...restartOperations(payload)];
   }
   if (operation === "userSettingsRawAndRestart") {

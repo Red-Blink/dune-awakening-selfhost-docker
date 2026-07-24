@@ -236,6 +236,10 @@ export function buildDuneArgs(operation, payload = {}) {
       return ["deepdesert", "dual", validateDeepDesertAction(payload.action), "--yes", ...(payload.action === "disable" ? ["--force"] : [])];
     case "userSettingsEngineValues":
       return ["usersettings", "engine-values"];
+    case "userSettingsMapEngineValues":
+      return ["usersettings", "map-engine-values", validateMapName(payload.map)];
+    case "userSettingsPartitionEngineValues":
+      return ["usersettings", "partition-engine-values", validateMapName(payload.map), validatePartitionId(payload.partitionId)];
     case "userSettingsMetadata":
       return ["usersettings", "metadata"];
     case "userSettingsProfileRaw":
@@ -264,6 +268,10 @@ export function buildDuneArgs(operation, payload = {}) {
       return buildDuneArgs("userSettingsSave", payload);
     case "userSettingsResetEngineGameplay":
       return ["usersettings", "reset-engine-gameplay"];
+    case "userSettingsResetMapEngine":
+      return ["usersettings", "reset-map-engine", validateMapName(payload.map)];
+    case "userSettingsResetPartitionEngine":
+      return ["usersettings", "reset-partition-engine", validateMapName(payload.map), validatePartitionId(payload.partitionId)];
     case "userSettingsResetGlobalGame":
       return ["usersettings", "reset-global-game"];
     case "userSettingsResetGame":
@@ -271,6 +279,10 @@ export function buildDuneArgs(operation, payload = {}) {
     case "userSettingsResetAndRestart":
       return payload.scope === "engine"
         ? buildDuneArgs("userSettingsResetEngineGameplay", payload)
+        : payload.scope === "mapEngine"
+          ? buildDuneArgs("userSettingsResetMapEngine", payload)
+          : payload.scope === "partitionEngine"
+            ? buildDuneArgs("userSettingsResetPartitionEngine", payload)
         : payload.scope === "global"
           ? buildDuneArgs("userSettingsResetGlobalGame", payload)
           : buildDuneArgs("userSettingsResetGame", payload);
@@ -303,7 +315,7 @@ function encodeTextArg(value) {
 
 function validateSettingsScope(value) {
   const raw = String(value || "").trim();
-  if (["engine", "global", "map", "partition", "profile"].includes(raw)) return raw;
+  if (["engine", "mapEngine", "partitionEngine", "global", "map", "partition", "profile"].includes(raw)) return raw;
   throw new Error(`Unsupported settings scope: ${raw}`);
 }
 

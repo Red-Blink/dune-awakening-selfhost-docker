@@ -2,7 +2,7 @@ import { api, post } from "./client";
 import type { Task } from "./setup";
 
 export type UserSettingField = {
-  scope: "engine" | "game" | "partition" | "partitionEngine";
+  scope: "engine" | "mapEngine" | "partitionEngine" | "game" | "partition";
   id: string;
   section: string | null;
   key: string | null;
@@ -12,6 +12,7 @@ export type UserSettingField = {
 
 export type UserSettingsSchema = {
   engine: UserSettingField[];
+  mapEngine: UserSettingField[];
   game: UserSettingField[];
   partition: UserSettingField[];
   partitionEngine: UserSettingField[];
@@ -106,10 +107,10 @@ export const mapsApi = {
   userGame: (map: string, partitionId?: string) => api<{ stdout: string; stderr?: string; exitCode?: number }>(`/api/maps/usergame?map=${encodeURIComponent(map)}${partitionId ? `&partitionId=${encodeURIComponent(partitionId)}` : ""}`),
   userSettingsSchema: () => api<UserSettingsSchema>("/api/maps/user-settings/schema"),
   userSettingsRestartPending: () => api<{ pending: boolean }>("/api/maps/user-settings/restart-pending"),
-  userSettingsValues: (scope: "engine" | "global" | "map" | "partition", map?: string, partitionId?: string) => api<{ stdout: string }>(`/api/maps/user-settings/values?scope=${encodeURIComponent(scope)}${map ? `&map=${encodeURIComponent(map)}` : ""}${partitionId ? `&partitionId=${encodeURIComponent(partitionId)}` : ""}`),
+  userSettingsValues: (scope: "engine" | "mapEngine" | "partitionEngine" | "global" | "map" | "partition", map?: string, partitionId?: string) => api<{ stdout: string }>(`/api/maps/user-settings/values?scope=${encodeURIComponent(scope)}${map ? `&map=${encodeURIComponent(map)}` : ""}${partitionId ? `&partitionId=${encodeURIComponent(partitionId)}` : ""}`),
   rawUserSettings: (kind: "engine" | "game" | "profile" | "client-game", map?: string, partitionId?: string) => api<{ content: string }>(`/api/maps/user-settings/raw?kind=${encodeURIComponent(kind)}${map ? `&map=${encodeURIComponent(map)}` : ""}${partitionId ? `&partitionId=${encodeURIComponent(partitionId)}` : ""}`),
-  saveUserSettings: (body: { scope: "engine" | "global" | "map" | "partition"; map?: string; partitionId?: string; values: Record<string, string>; restart?: boolean }) => post<{ task: Task }>("/api/maps/user-settings/save", body),
-  resetUserSettings: (body: { scope: "engine" | "global" | "map" | "partition"; map?: string; partitionId?: string; confirmation: string }) => post<{ task: Task }>("/api/maps/user-settings/reset", body),
+  saveUserSettings: (body: { scope: "engine" | "mapEngine" | "partitionEngine" | "global" | "map" | "partition"; map?: string; partitionId?: string; values: Record<string, string>; restart?: boolean }) => post<{ task: Task }>("/api/maps/user-settings/save", body),
+  resetUserSettings: (body: { scope: "engine" | "mapEngine" | "partitionEngine" | "global" | "map" | "partition"; map?: string; partitionId?: string; confirmation: string }) => post<{ task: Task }>("/api/maps/user-settings/reset", body),
   saveRawUserSettings: (body: { scope: "engine" | "game" | "global" | "profile"; map?: string; partitionId?: string; content: string }) => post<{ task: Task }>("/api/maps/user-settings/raw", body),
   materializeUserSettings: (confirmation: string) => post<{ task: Task }>("/api/maps/user-settings/materialize", { confirmation }),
   sietches: () => api<{ stdout: string }>("/api/sietches"),

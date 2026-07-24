@@ -1465,6 +1465,10 @@ async function userSettingsValuesRoute(res, url) {
   const partitionId = url.searchParams.get("partitionId") || "";
   const operation = scope === "engine"
     ? "userSettingsEngineValues"
+    : scope === "mapEngine"
+      ? "userSettingsMapEngineValues"
+      : scope === "partitionEngine"
+        ? "userSettingsPartitionEngineValues"
     : scope === "partition"
       ? "userSettingsPartitionValues"
       : scope === "map"
@@ -1501,7 +1505,7 @@ async function userSettingsRawWriteRoute(req, res) {
 }
 
 function userSettingsTaskPayload(body) {
-  const scope = ["engine", "global", "map", "partition", "profile"].includes(String(body.scope || "")) ? String(body.scope) : "map";
+  const scope = ["engine", "mapEngine", "partitionEngine", "global", "map", "partition", "profile"].includes(String(body.scope || "")) ? String(body.scope) : "map";
   const map = String(body.map || "Survival_1");
   const partitionId = String(body.partitionId || "").trim();
   const values = body.values && typeof body.values === "object" && !Array.isArray(body.values) ? body.values : {};

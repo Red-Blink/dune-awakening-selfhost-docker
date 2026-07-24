@@ -245,6 +245,8 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
   const [sietchPasswordTouched, setSietchPasswordTouched] = useState<Record<string, boolean>>({});
   const [selectedMapName, setSelectedMapName] = useState("");
   const [selectedPartitionId, setSelectedPartitionId] = useState("");
+  const [engineMapName, setEngineMapName] = useState("__global__");
+  const [enginePartitionId, setEnginePartitionId] = useState("");
   const [userGameMapName, setUserGameMapName] = useState("");
   const [userGamePartitionId, setUserGamePartitionId] = useState("");
   const [selectedGameCategory, setSelectedGameCategory] = useState("");
@@ -507,6 +509,17 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
     setEngineDraft(parsed);
     setRawEngine(raw.content || "");
     setRawEngineOriginal(raw.content || "");
+  }
+  async function loadSelectedEngineSettings(mapName: string, partitionId?: string) {
+    if (mapName === "__global__") {
+      await loadUserEngine();
+      return;
+    }
+    const scope = partitionId ? "partitionEngine" : "mapEngine";
+    const values = await mapsApi.userSettingsValues(scope, mapName, partitionId);
+    const parsed = parseUserSettingsMap(values.stdout || "");
+    setEngineValues(parsed);
+    setEngineDraft(parsed);
   }
   async function loadSelectedSettings(mapName: string, partitionId?: string) {
     const [values, raw] = await Promise.all([mapsApi.userGame(mapName, partitionId), mapsApi.rawUserSettings("game", mapName, partitionId)]);
@@ -858,6 +871,8 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
       : isUserGameDeepDesertRuntime ? "2" : userGamePartitionId;
   const isUserGameGlobal = userGameName === "__global__";
   const userGameTargetKey = userGameName ? settingsTargetKey(userGameName, isUserGameGlobal ? "" : effectiveUserGamePartitionId) : "";
+  const isEngineGlobal = engineMapName === "__global__";
+  const engineTargetKey = settingsTargetKey(engineMapName, isEngineGlobal ? "" : enginePartitionId);
   const gameFields = schema ? (effectivePartitionId ? schema.partition : schema.game).filter((field) => field.id !== "partition_pve_enabled" || effectivePartitionId) : [];
   const userGameFields = schema && userGameName ? (!isUserGameGlobal && effectiveUserGamePartitionId ? schema.partition : schema.game).filter((field) => field.id !== "partition_pve_enabled" || (!isUserGameGlobal && effectiveUserGamePartitionId)) : [];
   const gameGroups = groupSettingsFields(userGameFields, true);
@@ -865,7 +880,12 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
   const activeGameFields = activeGameCategory === "All" ? userGameFields : gameGroups.find(([category]) => category === activeGameCategory)?.[1] || [];
   const filteredGameFields = filterSettingsFields(activeGameFields, modifierFilter);
   const filteredSpicefieldRows = filterSpicefieldRows(spicefieldRows, spicefieldFilter);
-  const engineFields = (schema?.engine || []).filter((field) => !["server_display_name", "server_login_password", "port", "igw_port"].includes(field.id));
+  const engineSchemaFields = isEngineGlobal
+    ? schema?.engine || []
+    : enginePartitionId
+      ? schema?.partitionEngine || []
+      : schema?.mapEngine || [];
+  const engineFields = engineSchemaFields.filter((field) => !["server_display_name", "server_login_password", "port", "igw_port"].includes(field.id));
   const engineDirty = changedKeys(engineValues, engineDraft, engineFields.map((field) => field.id));
   const gameDirty = changedKeys(gameValues, gameDraft, userGameFields.map((field) => field.id));
   const currentActiveSietches = String(survivalSietchRows.filter((row) => row.active).length || survivalSietchRows.length || "");
@@ -960,15 +980,29 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
     setSelectedGameCategory("");
     void loadSelectedSettings(target.map, target.partitionId || undefined).catch((error) => onError(error instanceof Error ? error.message : String(error)));
   }
+  function selectEngineTarget(next: string) {
+    const target = userGameTargets.find((item) => item.key === next);
+    if (!target) return;
+    setEngineMapName(target.map);
+    setEnginePartitionId(target.partitionId);
+    void loadSelectedEngineSettings(target.map, target.partitionId || undefined).catch((error) => onError(error instanceof Error ? error.message : String(error)));
+  }
   async function saveEngine() {
     if (!(await confirmSettingsRestart("UserEngine"))) return;
+    const isGlobal = engineMapName === "__global__";
+    const scope = isGlobal ? "engine" : enginePartitionId ? "partitionEngine" : "mapEngine";
     await runTaskAndRefresh(
-      () => mapsApi.saveUserSettings({ scope: "engine", values: valuesForDirtyFields(engineValues, engineDraft, engineFields) }),
+      () => mapsApi.saveUserSettings({
+        scope,
+        map: isGlobal ? undefined : engineMapName,
+        partitionId: isGlobal ? undefined : enginePartitionId || undefined,
+        values: valuesForDirtyFields(engineValues, engineDraft, engineFields)
+      }),
       "Saving UserEngine changes",
       "UserEngine Saved",
       { resultScope: "modifiers", restartAcceptedMessage: "Changes saved successfully. The maps are restarting and should be back up soon." }
     );
-    await loadUserEngine();
+    await loadSelectedEngineSettings(engineMapName, enginePartitionId || undefined);
   }
   async function saveSelectedMapSettings(row: Record<string, unknown>) {
     const rowName = String(row.map || "");
@@ -1538,6 +1572,9 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
         {(settingsTab === "engine" || settingsTab === "game") && <button className="settings-download-button" type="button" title={userGameName && !isUserGameGlobal ? "Download client Game.ini for the selected UserGame target" : "Download client Game.ini for global UserGame values"} onClick={() => run(downloadClientGameIni)}><Download size={16} /> Game.ini</button>}
       </div>
       {settingsTab === "engine" ? <>
+        <div className="settings-selector-row">
+          <label className="compact-select">Target<select value={engineTargetKey} onChange={(event) => selectEngineTarget(event.target.value)}>{userGameTargets.map((target) => <option key={target.key} value={target.key}>{target.label}</option>)}</select></label>
+        </div>
         <SettingsEditor fields={engineFields} values={engineDraft} onChange={(id, value) => setEngineDraft({ ...engineDraft, [id]: value })} />
         <div className="action-row"><button disabled={!engineDirty.length} onClick={() => run(saveEngine)}>Save</button><button disabled={!engineDirty.length} onClick={() => setEngineDraft(engineValues)}>Discard Changes</button></div>
       </> : settingsTab === "game" ? <>

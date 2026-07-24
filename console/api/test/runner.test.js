@@ -121,10 +121,14 @@ test("builds allowlisted command arguments without shell interpolation", () => {
   assert.deepEqual(buildDuneArgs("sietchesSetDisplay", { partitionId: 38, displayName: "" }), ["sietches", "set-display", "38", ""]);
   assert.deepEqual(buildDuneArgs("deepdesertAction", { action: "disable" }), ["deepdesert", "dual", "disable", "--yes", "--force"]);
   assert.deepEqual(buildDuneArgs("userSettingsEngineValues"), ["usersettings", "engine-values"]);
+  assert.deepEqual(buildDuneArgs("userSettingsMapEngineValues", { map: "Survival_1" }), ["usersettings", "map-engine-values", "Survival_1"]);
+  assert.deepEqual(buildDuneArgs("userSettingsPartitionEngineValues", { map: "Survival_1", partitionId: 3 }), ["usersettings", "partition-engine-values", "Survival_1", "3"]);
   assert.deepEqual(buildDuneArgs("userSettingsGlobalValues"), ["usersettings", "global-values"]);
   assert.deepEqual(buildDuneArgs("userSettingsMapValues", { map: "Survival_1" }), ["usersettings", "map-values", "Survival_1"]);
   assert.deepEqual(buildDuneArgs("userSettingsPartitionValues", { map: "Survival_1", partitionId: 1 }), ["usersettings", "partition-values", "Survival_1", "1"]);
   assert.deepEqual(buildDuneArgs("userSettingsResetAndRestart", { scope: "global" }), ["usersettings", "reset-global-game"]);
+  assert.deepEqual(buildDuneArgs("userSettingsResetAndRestart", { scope: "mapEngine", map: "Survival_1" }), ["usersettings", "reset-map-engine", "Survival_1"]);
+  assert.deepEqual(buildDuneArgs("userSettingsResetAndRestart", { scope: "partitionEngine", map: "Survival_1", partitionId: 3 }), ["usersettings", "reset-partition-engine", "Survival_1", "3"]);
   assert.throws(() => buildDuneArgs("adminAddXp", { playerId: "bad;id", amount: 1000 }));
   assert.throws(() => buildDuneArgs("backupRestore", { backup: "../dump.backup" }));
   assert.throws(() => buildDuneArgs("adminGiveItem", { playerId: "FLS_TEST", itemName: "", quantity: 1 }));
@@ -170,6 +174,17 @@ test("validates admin catalog wrapper arguments", () => {
 test("uses the global UserGame reset operation in restart tasks", () => {
   assert.deepEqual(taskOperations("userSettingsResetAndRestart", { scope: "global", restartMode: "none" }), [
     "userSettingsResetGlobalGame",
+    "userSettingsMaterializeCurrent"
+  ]);
+});
+
+test("uses scoped UserEngine reset operations in restart tasks", () => {
+  assert.deepEqual(taskOperations("userSettingsResetAndRestart", { scope: "mapEngine", restartMode: "none" }), [
+    "userSettingsResetMapEngine",
+    "userSettingsMaterializeCurrent"
+  ]);
+  assert.deepEqual(taskOperations("userSettingsResetAndRestart", { scope: "partitionEngine", restartMode: "none" }), [
+    "userSettingsResetPartitionEngine",
     "userSettingsMaterializeCurrent"
   ]);
 });

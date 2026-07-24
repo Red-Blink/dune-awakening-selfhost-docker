@@ -597,8 +597,8 @@ function publicModifierKey(section, key) {
 function publicModifierSection(header) {
   const parts = header.split(":");
   if (parts[0] === "Engine" || parts[0] === "Global") return parts.slice(1).join(":");
-  if (parts[0] === "Map") return parts.slice(2).join(":");
-  if (parts[0] === "Partition") return parts.slice(3).join(":");
+  if (parts[0] === "Map" || parts[0] === "MapEngine") return parts.slice(2).join(":");
+  if (parts[0] === "Partition" || parts[0] === "PartitionEngine") return parts.slice(3).join(":");
   return "";
 }
 
