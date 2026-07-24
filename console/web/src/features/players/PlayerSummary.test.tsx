@@ -435,7 +435,7 @@ describe("PlayerSummary", () => {
 
   describe("Vitals", () => {
     it("renders Health, Hydration, and Spice Addiction when vitals are supported", async () => {
-      vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: true }, currentHealth: 175, maxHealth: 205, maxHealthEstimated: false, hydration: 84, maxHydration: 100, spiceAddictionLevel: 8, maxSpiceAddictionLevel: 10 });
+      vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: true }, currentHealth: 175, maxHealth: 205, hydration: 84, maxHydration: 100, spiceAddictionLevel: 8, maxSpiceAddictionLevel: 10 });
       render(
         <PlayerSummary
           {...baseProps}
@@ -451,21 +451,6 @@ describe("PlayerSummary", () => {
         expect(screen.getByText("Spice Addiction")).toBeInTheDocument();
         expect(screen.getByText("8 / 10")).toBeInTheDocument();
       });
-    });
-
-    it("renders Health with (est.) when maxHealthEstimated is true", async () => {
-      vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: true }, currentHealth: 175, maxHealth: 205, maxHealthEstimated: true, hydration: 84, maxHydration: 100, spiceAddictionLevel: 8, maxSpiceAddictionLevel: 10 });
-      render(
-        <PlayerSummary
-          {...baseProps}
-          detail={{ player: { character_name: "Benny Jesserette" } }}
-          fallback={{}}
-        />
-      );
-      await waitFor(() => {
-        expect(screen.getByText("Health")).toBeInTheDocument();
-      });
-      expect(screen.getByText(/175 \/ 205 \(est\.\)/)).toBeInTheDocument();
     });
 
     it("renders nothing extra when vitals are unsupported by the schema", async () => {

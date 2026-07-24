@@ -15,7 +15,7 @@ const currencyIcon = (label: string): LucideIcon => {
 type CurrencyRow = { currency_id: number; balance: number; label?: string };
 type FactionRow = { faction_id: number; faction_name?: string; reputation_amount: number };
 type Progression = { level?: number; xp?: number; totalSkillPoints?: number; unspentSkillPoints?: number };
-type Vitals = { currentHealth: number | null; maxHealth: number; maxHealthEstimated: boolean; hydration: number | null; maxHydration: number; spiceAddictionLevel: number | null; maxSpiceAddictionLevel: number };
+type Vitals = { currentHealth: number | null; maxHealth: number; hydration: number | null; maxHydration: number; spiceAddictionLevel: number | null; maxSpiceAddictionLevel: number };
 
 export function PlayerSummary({
   detail,
@@ -73,7 +73,6 @@ export function PlayerSummary({
         ? {
             currentHealth: vitalsResult.value.currentHealth ?? null,
             maxHealth: vitalsResult.value.maxHealth ?? 0,
-            maxHealthEstimated: vitalsResult.value.maxHealthEstimated ?? true,
             hydration: vitalsResult.value.hydration ?? null,
             maxHydration: vitalsResult.value.maxHydration ?? 0,
             spiceAddictionLevel: vitalsResult.value.spiceAddictionLevel ?? null,
@@ -152,7 +151,7 @@ export function PlayerSummary({
       {vitals && <div className="summary-block">
         <div className="summary-block-label">Vitals</div>
         <table className="summary-kv"><tbody>
-          <tr><td>Health</td><td>{vitals.currentHealth !== null ? `${Math.round(vitals.currentHealth).toLocaleString()} / ${vitals.maxHealth.toLocaleString()}${vitals.maxHealthEstimated ? " (est.)" : ""}` : "—"}</td></tr>
+          <tr><td>Health</td><td>{vitals.currentHealth !== null ? `${Math.round(vitals.currentHealth).toLocaleString()} / ${vitals.maxHealth.toLocaleString()}` : "—"}</td></tr>
           <tr><td>Hydration</td><td>{vitals.hydration !== null ? `${Math.round(vitals.hydration).toLocaleString()} / ${vitals.maxHydration.toLocaleString()}` : "—"}</td></tr>
           <tr><td>Spice Addiction</td><td>{vitals.spiceAddictionLevel !== null ? `${Math.round(vitals.spiceAddictionLevel).toLocaleString()} / ${vitals.maxSpiceAddictionLevel.toLocaleString()}` : "—"}</td></tr>
         </tbody></table>

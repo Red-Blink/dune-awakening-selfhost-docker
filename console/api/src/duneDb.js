@@ -2060,16 +2060,13 @@ export async function playerVitals(db, id) {
   ]);
   const health = healthResult.rows[0];
   const gas = gasResult.rows[0];
-  const combatLevelRow = combatResult.rows[0];
-  const combatLevel = Number(combatLevelRow?.level || 0);
-  const combatLevelConfirmed = Boolean(combatLevelRow);
+  const combatLevel = Number(combatResult.rows[0]?.level || 0);
   const toNum = (v) => (v === undefined || v === null ? null : Number(v));
   return {
     capabilities: { vitals: true },
     player,
     currentHealth: toNum(health?.current_health),
     maxHealth: maxHealthForCombatLevel(combatLevel),
-    maxHealthEstimated: !combatLevelConfirmed,
     hydration: toNum(gas?.hydration),
     maxHydration: BASE_MAX_HYDRATION,
     spiceAddictionLevel: toNum(gas?.spice_addiction_level),

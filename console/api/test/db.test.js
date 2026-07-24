@@ -761,7 +761,6 @@ test("player vitals reports health, hydration, and spice addiction with derived 
   assert.equal(result.capabilities.vitals, true);
   assert.equal(result.currentHealth, 175.5);
   assert.equal(result.maxHealth, 200);
-  assert.equal(result.maxHealthEstimated, false);
   assert.equal(result.hydration, 83.958465);
   assert.equal(result.maxHydration, 100);
   assert.equal(result.spiceAddictionLevel, 8.2);
@@ -796,7 +795,6 @@ test("player vitals reports null (not zero) health/hydration/spice when no match
   assert.equal(result.hydration, null);
   assert.equal(result.spiceAddictionLevel, null);
   assert.equal(result.maxHealth, 150);
-  assert.equal(result.maxHealthEstimated, true);
 });
 
 test("player vitals treats Combat level as 0 (base max health only) when specialization_tracks doesn't exist", async () => {
@@ -821,7 +819,6 @@ test("player vitals treats Combat level as 0 (base max health only) when special
   };
   const result = await playerVitals(db, "91");
   assert.equal(result.maxHealth, 150);
-  assert.equal(result.maxHealthEstimated, true);
 });
 
 test("player vitals derives max health from every Vitality passive tier boundary", async () => {
@@ -855,7 +852,6 @@ test("player vitals derives max health from every Vitality passive tier boundary
     };
     const result = await playerVitals(db, "91");
     assert.equal(result.maxHealth, maxHealth, `combat level ${combatLevel} should yield max health ${maxHealth}`);
-    assert.equal(result.maxHealthEstimated, false, `combat level ${combatLevel} should be confirmed`);
   }
 });
 
