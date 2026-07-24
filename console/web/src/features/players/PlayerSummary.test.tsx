@@ -192,7 +192,7 @@ describe("PlayerSummary", () => {
           { faction_id: 1, faction_name: "Atreides", reputation_amount: 500 },
           { faction_id: 2, faction_name: "Harkonnen", reputation_amount: 120 }
         ],
-        capabilities: {}
+        capabilities: { factions: true }
       });
       render(
         <PlayerSummary
@@ -212,7 +212,7 @@ describe("PlayerSummary", () => {
     it("lists reputation standings under a Reputation sub-heading, separate from the alignment", async () => {
       vi.mocked(playersApi.factions).mockResolvedValue({
         rows: [{ faction_id: 1, faction_name: "Atreides", reputation_amount: 500 }],
-        capabilities: {}
+        capabilities: { factions: true }
       });
       render(
         <PlayerSummary
@@ -232,7 +232,22 @@ describe("PlayerSummary", () => {
       expect(block?.textContent).toContain("500");
     });
 
-    it("omits the Reputation sub-heading when the player has no standings", async () => {
+    it("keeps the Reputation sub-heading visible even when the player has no standings", async () => {
+      vi.mocked(playersApi.factions).mockResolvedValue({ rows: [], capabilities: { factions: true } });
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette", faction: "Atreides" } }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Alignment")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Reputation")).toBeInTheDocument();
+    });
+
+    it("hides the Reputation sub-heading when the factions capability is unsupported", async () => {
       vi.mocked(playersApi.factions).mockResolvedValue({ rows: [], capabilities: {} });
       render(
         <PlayerSummary

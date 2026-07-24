@@ -547,7 +547,7 @@ test("player Solari Coin total reports unsupported when inventory tables are mis
   assert.equal(result.capabilities.solarisCoin, false);
 });
 
-test("player factions returns per-faction reputation with resolved faction names", async () => {
+test("player factions lists every known faction, each with its own reputation", async () => {
   const db = {
     query: async (text, values = []) => {
       if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
@@ -555,11 +555,14 @@ test("player factions returns per-faction reputation with resolved faction names
         assert.deepEqual(values, [91]);
         return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
       }
-      if (text.includes("from dune.player_faction_reputation pfr")) {
+      if (text.includes("from dune.factions f")) {
+        assert.match(text, /coalesce\(pfr\.reputation_amount, 0\)/);
+        assert.match(text, /f\.name <> 'None'/);
         assert.deepEqual(values, [301]);
         return { rows: [
-          { actor_id: 91, faction_id: 1, faction_name: "Atreides", reputation_amount: "500" },
-          { actor_id: 91, faction_id: 2, faction_name: "Harkonnen", reputation_amount: "120" }
+          { faction_id: 1, faction_name: "Atreides", reputation_amount: "500" },
+          { faction_id: 2, faction_name: "Harkonnen", reputation_amount: "120" },
+          { faction_id: 4, faction_name: "Smuggler", reputation_amount: "75" }
         ] };
       }
       return { rows: [] };
@@ -569,8 +572,34 @@ test("player factions returns per-faction reputation with resolved faction names
   assert.equal(result.capabilities.factionNames, true);
   assert.deepEqual(result.rows.map((row) => [row.faction_name, row.reputation_amount]), [
     ["Atreides", "500"],
-    ["Harkonnen", "120"]
+    ["Harkonnen", "120"],
+    ["Smuggler", "75"]
   ]);
+});
+
+test("player factions coalesces an untouched faction's reputation to 0 and excludes 'None'", async () => {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.actors a") && text.includes("left join dune.player_state ps")) {
+        assert.deepEqual(values, [91]);
+        return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
+      }
+      if (text.includes("from dune.factions f")) {
+        assert.deepEqual(values, [301]);
+        return { rows: [
+          { faction_id: 1, faction_name: "Atreides", reputation_amount: "500" },
+          { faction_id: 2, faction_name: "Harkonnen", reputation_amount: "0" },
+          { faction_id: 4, faction_name: "Smuggler", reputation_amount: "0" }
+        ] };
+      }
+      return { rows: [] };
+    }
+  };
+  const result = await playerFactions(db, "91");
+  assert.deepEqual(result.rows.map((row) => row.faction_name), ["Atreides", "Harkonnen", "Smuggler"]);
+  assert.equal(result.rows.find((row) => row.faction_name === "Harkonnen").reputation_amount, "0");
+  assert.equal(result.rows.some((row) => row.faction_name === "None"), false);
 });
 
 test("player progression computes level from XP and reports skill points", async () => {

@@ -1963,15 +1963,20 @@ export async function playerFactions(db, id) {
   if (!(await tableExists(db, "player_faction_reputation"))) return unsupported("factions", ["dune.player_faction_reputation"]);
   const hasFactions = await tableExists(db, "factions");
   const player = await resolvePlayerMutationTarget(db, id);
-  const result = await db.query(`
-    select pfr.actor_id,
-           pfr.faction_id,
-           ${hasFactions ? "coalesce(f.name, '')" : "''"} as faction_name,
-           pfr.reputation_amount
-    from dune.player_faction_reputation pfr
-    ${hasFactions ? "left join dune.factions f on f.id = pfr.faction_id" : ""}
-    where pfr.actor_id = $1
-    order by pfr.faction_id`, [player.controllerId]);
+  const result = hasFactions
+    ? await db.query(`
+        select f.id as faction_id,
+               f.name as faction_name,
+               coalesce(pfr.reputation_amount, 0) as reputation_amount
+        from dune.factions f
+        left join dune.player_faction_reputation pfr on pfr.faction_id = f.id and pfr.actor_id = $1
+        where f.name <> 'None'
+        order by f.id`, [player.controllerId])
+    : await db.query(`
+        select pfr.faction_id, '' as faction_name, pfr.reputation_amount
+        from dune.player_faction_reputation pfr
+        where pfr.actor_id = $1
+        order by pfr.faction_id`, [player.controllerId]);
   return { capabilities: { factions: true, factionNames: hasFactions }, player, rows: result.rows };
 }
 

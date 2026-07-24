@@ -34,6 +34,7 @@ export function PlayerSummary({
   const status = firstDefined(player.online_status, fallback.online_status);
   const [currencyRows, setCurrencyRows] = useState<CurrencyRow[]>([]);
   const [factionRows, setFactionRows] = useState<FactionRow[]>([]);
+  const [factionsSupported, setFactionsSupported] = useState(false);
   const [progression, setProgression] = useState<Progression | null>(null);
   const [intel, setIntel] = useState<number | null>(null);
   const [solarisCoinTotal, setSolarisCoinTotal] = useState<number | null>(null);
@@ -45,6 +46,7 @@ export function PlayerSummary({
     if (!dbPlayerId) {
       setCurrencyRows([]);
       setFactionRows([]);
+      setFactionsSupported(false);
       setProgression(null);
       setIntel(null);
       setSolarisCoinTotal(null);
@@ -62,6 +64,7 @@ export function PlayerSummary({
       if (request !== loadRequest.current) return;
       setCurrencyRows(currency.status === "fulfilled" ? ((currency.value.rows || []) as CurrencyRow[]) : []);
       setFactionRows(factions.status === "fulfilled" ? ((factions.value.rows || []) as FactionRow[]) : []);
+      setFactionsSupported(factions.status === "fulfilled" && factions.value.capabilities?.factions === true);
       setProgression(progressionResult.status === "fulfilled" && progressionResult.value.capabilities?.progression ? progressionResult.value : null);
       setIntel(intelResult.status === "fulfilled" && intelResult.value.capabilities?.intel ? (intelResult.value.intel ?? null) : null);
       setSolarisCoinTotal(solarisCoinResult.status === "fulfilled" && solarisCoinResult.value.capabilities?.solarisCoin ? (solarisCoinResult.value.total ?? null) : null);
@@ -133,7 +136,7 @@ export function PlayerSummary({
         <table className="summary-kv"><tbody>
           <tr><td>Alignment</td><td>{faction}</td></tr>
         </tbody></table>
-        {factionRows.length > 0 && <>
+        {factionsSupported && <>
           <div className="summary-block-label summary-sublabel">Reputation</div>
           <table className="summary-kv"><tbody>
             {factionRows.map((row) => <tr key={row.faction_id}>
