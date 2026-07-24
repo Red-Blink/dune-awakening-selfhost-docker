@@ -36,6 +36,7 @@ import { liveItemGrantOk, liveItemGrantWarning } from "./grantResults.js";
 import { primeMessageOfTheDayOnlineState, readMessageOfTheDay, restoreMessageOfTheDay, runMessageOfTheDayScan, saveMessageOfTheDay } from "./services/messageOfTheDay.js";
 import { primePlayerAnnouncementOnlineState, readPlayerAnnouncements, restorePlayerAnnouncements, runPlayerAnnouncementScan, savePlayerAnnouncements } from "./services/playerAnnouncements.js";
 import { persistSpicefieldOverride } from "./services/spicefieldOverrides.js";
+import { applySavedLandsraadMilestonePreset, createLandsraadMilestoneReconciler, readLandsraadMilestonePreset, saveLandsraadMilestonePreset } from "./services/landsraadMilestones.js";
 import { exportBlueprint, importBlueprint, listBlueprints, deleteBlueprint } from "./blueprints.js";
 import { createZipArchive } from "./services/zipArchive.js";
 import { grantAddonItem } from "./addonItemGrants.js";
@@ -72,6 +73,7 @@ const addonJobScheduler = createAddonJobScheduler(config, {
   mutationLimiter: mutationRateLimiter,
   failureBackoffMs: BACKGROUND_SCAN_FAILURE_BACKOFF_MS
 });
+const landsraadMilestoneReconciler = createLandsraadMilestoneReconciler(config, { getDb: () => db });
 
 process.on("unhandledRejection", (error) => {
   console.error(`Unhandled background rejection: ${redact(error?.message || error)}`);
@@ -119,6 +121,7 @@ setInterval(() => {
   runBackgroundTick("Message of the Day", messageOfTheDayAutoTick);
   runBackgroundTick("Player announcements", playerAnnouncementsAutoTick);
   runBackgroundTick("Addon scheduled jobs", () => addonJobScheduler.tick());
+  runBackgroundTick("Landsraad milestone preset", () => landsraadMilestoneReconciler.tick());
 }, 10000).unref?.();
 
 setInterval(() => {
@@ -436,6 +439,7 @@ async function handleApi(req, res) {
   if (path === "/api/admin/landsraad") return landsraadRoute(req, res, "overview");
   if (path === "/api/admin/landsraad/task-goal") return landsraadRoute(req, res, "task-goal");
   if (path === "/api/admin/landsraad/term-task-goals") return landsraadRoute(req, res, "term-task-goals");
+  if (path === "/api/admin/landsraad/milestone-preset") return landsraadRoute(req, res, "milestone-preset");
   if (path === "/api/admin/landsraad/reward-tier") return landsraadRoute(req, res, "reward-tier");
   if (path === "/api/admin/landsraad/player-contribution") return landsraadRoute(req, res, "player-contribution");
   if (path === "/api/admin/broadcast" && req.method === "POST") return broadcastRoute(req, res);
@@ -1354,12 +1358,17 @@ async function playerAnnouncementsRoute(req, res) {
 
 async function landsraadRoute(req, res, action) {
   if (req.method === "GET" && action === "overview") return dbJson(res, () => duneDb.landsraadOverview(db));
+  if (req.method === "GET" && action === "milestone-preset") return json(res, 200, { preset: readLandsraadMilestonePreset(config) });
   if (req.method !== "POST") return json(res, 405, { error: "Method not allowed" });
   const body = await readJson(req);
   try {
     let result;
     if (action === "task-goal") result = await duneDb.updateLandsraadTaskGoal(db, body.taskId, body.goalAmount);
     else if (action === "term-task-goals") result = await duneDb.updateLandsraadTermTaskGoals(db, body.termId, body.goalAmount);
+    else if (action === "milestone-preset") {
+      saveLandsraadMilestonePreset(config, body);
+      result = await applySavedLandsraadMilestonePreset(config, db);
+    }
     else if (action === "reward-tier") result = await duneDb.updateLandsraadRewardTier(db, body);
     else if (action === "player-contribution") result = await duneDb.setLandsraadPlayerContribution(db, body);
     else return json(res, 404, { error: "Not found" });

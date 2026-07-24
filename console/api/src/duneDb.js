@@ -391,6 +391,133 @@ export async function updateLandsraadTermTaskGoals(db, termId, goalAmount) {
   return { ok: true, updatedRows: result.rowCount || 0, termId: id, goalAmount: goal };
 }
 
+export async function applyLandsraadMilestonePreset(db, values = {}) {
+  await requireCapability(await tableExists(db, "landsraad_tasks"), "Landsraad milestone presets require dune.landsraad_tasks.");
+  await requireCapability(await tableExists(db, "landsraad_task_rewards"), "Landsraad milestone presets require dune.landsraad_task_rewards.");
+  if (typeof db.transaction !== "function") throw new Error("Landsraad milestone presets require rollback-safe transaction support.");
+
+  const goalAmount = intParam(values.goalAmount, "Landsraad goal amount", 0, 2147483647);
+  const thresholds = normalizeLandsraadThresholds(values.thresholds);
+  const termResult = await db.query(`
+    select term_id::text as term_id
+    from dune.landsraad_decree_term
+    order by term_id desc
+    limit 1`);
+  const termId = termResult.rows[0]?.term_id;
+  if (!termId) return { ok: true, applied: false, reason: "No current Landsraad term is available yet." };
+
+  const readiness = await landsraadMilestoneReadiness(db, termId, thresholds.length);
+  if (!readiness.ready) return { ok: true, applied: false, termId, ...readiness };
+
+  return db.transaction(async (tx) => {
+    const currentTerm = await tx.query(`
+      select term_id::text as term_id
+      from dune.landsraad_decree_term
+      order by term_id desc
+      limit 1
+      for update`);
+    if (currentTerm.rows[0]?.term_id !== termId) {
+      return { ok: true, applied: false, termId: currentTerm.rows[0]?.term_id || null, reason: "The Landsraad term changed while the preset was being applied." };
+    }
+
+    const currentReadiness = await landsraadMilestoneReadiness(tx, termId, thresholds.length);
+    if (!currentReadiness.ready) return { ok: true, applied: false, termId, ...currentReadiness };
+
+    const maximumResult = await tx.query(`
+      select coalesce(max(r.threshold), 0)::bigint as maximum
+      from dune.landsraad_task_rewards r
+      join dune.landsraad_tasks t on t.id = r.task_id
+      where t.term_id = $1`, [termId]);
+    const maximum = Math.max(Number(maximumResult.rows[0]?.maximum || 0), ...thresholds);
+    const temporaryBase = maximum + 1;
+    if (!Number.isSafeInteger(temporaryBase) || temporaryBase + thresholds.length > 2147483647) {
+      throw new Error("Current Landsraad thresholds are too large to update safely.");
+    }
+
+    const goals = await tx.query(`
+      update dune.landsraad_tasks
+         set goal_amount = $1
+       where term_id = $2`, [goalAmount, termId]);
+    const staged = await tx.query(`
+      with ranked as (
+        select r.ctid as row_locator,
+               row_number() over (partition by r.task_id order by r.threshold, r.ctid)::int as tier
+        from dune.landsraad_task_rewards r
+        join dune.landsraad_tasks t on t.id = r.task_id
+        where t.term_id = $1
+      )
+      update dune.landsraad_task_rewards r
+         set threshold = $2 + ranked.tier
+        from ranked
+       where r.ctid = ranked.row_locator`, [termId, temporaryBase]);
+
+    let rewardsUpdated = 0;
+    for (let index = 0; index < thresholds.length; index += 1) {
+      const updated = await tx.query(`
+        update dune.landsraad_task_rewards r
+           set threshold = $1
+          from dune.landsraad_tasks t
+         where t.id = r.task_id
+           and t.term_id = $2
+           and r.threshold = $3`, [thresholds[index], termId, temporaryBase + index + 1]);
+      rewardsUpdated += updated.rowCount || 0;
+    }
+
+    if ((staged.rowCount || 0) !== rewardsUpdated) {
+      throw new Error("Not every Landsraad reward milestone could be updated safely.");
+    }
+    return {
+      ok: true,
+      applied: true,
+      termId,
+      goalAmount,
+      thresholds,
+      tasksUpdated: goals.rowCount || 0,
+      rewardsUpdated
+    };
+  });
+}
+
+async function landsraadMilestoneReadiness(db, termId, expectedTierCount) {
+  const result = await db.query(`
+    select count(*)::int as task_count,
+           coalesce(min(reward_count), 0)::int as minimum_tiers,
+           coalesce(max(reward_count), 0)::int as maximum_tiers
+    from (
+      select t.id, count(r.*)::int as reward_count
+      from dune.landsraad_tasks t
+      left join dune.landsraad_task_rewards r on r.task_id = t.id
+      where t.term_id = $1
+      group by t.id
+    ) current_tasks`, [termId]);
+  const row = result.rows[0] || {};
+  const taskCount = Number(row.task_count || 0);
+  const minimumTiers = Number(row.minimum_tiers || 0);
+  const maximumTiers = Number(row.maximum_tiers || 0);
+  if (!taskCount) return { ready: false, taskCount, minimumTiers, maximumTiers, reason: "The current Landsraad term has no tasks yet." };
+  if (minimumTiers !== expectedTierCount || maximumTiers !== expectedTierCount) {
+    return {
+      ready: false,
+      taskCount,
+      minimumTiers,
+      maximumTiers,
+      reason: `The current Landsraad term has ${minimumTiers === maximumTiers ? minimumTiers : `${minimumTiers}-${maximumTiers}`} reward tiers per house; this preset contains ${expectedTierCount}.`
+    };
+  }
+  return { ready: true, taskCount, minimumTiers, maximumTiers };
+}
+
+function normalizeLandsraadThresholds(values) {
+  if (!Array.isArray(values) || !values.length || values.length > 20) {
+    throw new Error("Landsraad milestone presets require between 1 and 20 reward thresholds.");
+  }
+  const thresholds = values.map((value, index) => intParam(value, `Landsraad reward level ${index + 1} threshold`, 1, 2147483647));
+  for (let index = 1; index < thresholds.length; index += 1) {
+    if (thresholds[index] <= thresholds[index - 1]) throw new Error("Landsraad reward thresholds must increase from one level to the next.");
+  }
+  return thresholds;
+}
+
 export async function updateLandsraadRewardTier(db, values = {}) {
   await requireCapability(await tableExists(db, "landsraad_task_rewards"), "Landsraad rewards require dune.landsraad_task_rewards.");
   const { rowLocator, taskId, threshold, newThreshold, templateId, amount } = values;

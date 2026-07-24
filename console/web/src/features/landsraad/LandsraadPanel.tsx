@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { adminApi, type LandsraadOverview, type LandsraadReward, type LandsraadTask } from "../../api/admin";
+import { adminApi, type LandsraadMilestonePreset, type LandsraadOverview, type LandsraadReward, type LandsraadTask } from "../../api/admin";
 import { mapsApi } from "../../api/maps";
 import { playersApi } from "../../api/players";
 import { setupApi, type Task } from "../../api/setup";
@@ -22,6 +22,8 @@ export function LandsraadPanel({ confirmAction, onError }: LandsraadAdminSection
   const [goalDrafts, setGoalDrafts] = useState<Record<string, string>>({});
   const [rewardDrafts, setRewardDrafts] = useState<Record<string, { threshold: string; templateId: string; amount: string }>>({});
   const [bulkGoal, setBulkGoal] = useState("");
+  const [milestonePreset, setMilestonePreset] = useState<LandsraadMilestonePreset | null>(null);
+  const [milestoneDraft, setMilestoneDraft] = useState({ enabled: false, goalAmount: "", thresholds: [] as string[] });
   const [contributionPlayer, setContributionPlayer] = useState("");
   const [contributionTask, setContributionTask] = useState("");
   const [contributionAmount, setContributionAmount] = useState("");
@@ -37,6 +39,8 @@ export function LandsraadPanel({ confirmAction, onError }: LandsraadAdminSection
     ...reward,
     task: taskNameById.get(reward.task_id) || `Task ${reward.task_id}`
   })), [overview, taskNameById]);
+  const currentTermThresholds = useMemo(() => overview ? detectedMilestoneThresholds(overview) : [], [overview]);
+  const milestoneTierMismatch = currentTermThresholds.length > 0 && currentTermThresholds.length !== milestoneDraft.thresholds.length;
 
   useEffect(() => {
     void load();
@@ -54,9 +58,10 @@ export function LandsraadPanel({ confirmAction, onError }: LandsraadAdminSection
     setResult(null);
     onError("");
     try {
-      const [nextOverview, nextPlayers] = await Promise.all([
+      const [nextOverview, nextPlayers, presetResponse] = await Promise.all([
         adminApi.landsraad(),
-        playersApi.listAll().catch(() => ({ rows: [] }))
+        playersApi.listAll().catch(() => ({ rows: [] })),
+        adminApi.landsraadMilestonePreset()
       ]);
       setOverview(nextOverview);
       setPlayers(nextPlayers.rows || []);
@@ -66,6 +71,14 @@ export function LandsraadPanel({ confirmAction, onError }: LandsraadAdminSection
         templateId: String(reward.template_id || ""),
         amount: String(reward.amount ?? 0)
       }])));
+      const preset = presetResponse.preset;
+      const detectedThresholds = detectedMilestoneThresholds(nextOverview);
+      setMilestonePreset(preset);
+      setMilestoneDraft({
+        enabled: preset.enabled,
+        goalAmount: String(preset.thresholds.length ? preset.goalAmount : nextOverview.tasks?.[0]?.goal_amount ?? 0),
+        thresholds: (preset.thresholds.length ? preset.thresholds : detectedThresholds).map(String)
+      });
       if (!contributionTask && nextOverview.tasks?.[0]) setContributionTask(nextOverview.tasks[0].task_id);
       if (!contributionPlayer && nextPlayers.rows?.[0]) setContributionPlayer(playerActorId(nextPlayers.rows[0]));
     } catch (error) {
@@ -141,6 +154,35 @@ export function LandsraadPanel({ confirmAction, onError }: LandsraadAdminSection
     }
     if (!(await confirmAction(`Set every current Landsraad task goal to ${value}?`, { title: "Update Landsraad Goals", confirmLabel: "Update Goals" }))) return;
     await run("bulk-goal", "Saving all goals", () => adminApi.setLandsraadTermTaskGoals(termId, value), "All Current-Term Task Goals Saved");
+  }
+
+  async function saveMilestonePreset() {
+    const goalAmount = Number(milestoneDraft.goalAmount);
+    const thresholds = milestoneDraft.thresholds.map(Number);
+    if (!Number.isInteger(goalAmount) || goalAmount < 0 || !thresholds.length || thresholds.some((value) => !Number.isInteger(value) || value < 1)) {
+      setResult({ key: "milestone-preset", text: "Enter a whole goal at or above zero and reward thresholds greater than zero.", tone: "danger" });
+      return;
+    }
+    if (thresholds.some((value, index) => index > 0 && value <= thresholds[index - 1])) {
+      setResult({ key: "milestone-preset", text: "Reward thresholds must increase from one level to the next.", tone: "danger" });
+      return;
+    }
+    if (!(await confirmAction(
+      `Apply the ${thresholds.length}-level milestone preset to every house in the current Landsraad term?`,
+      { title: "Apply Landsraad Milestones", confirmLabel: "Save And Apply" }
+    ))) return;
+
+    const responseRef: { current: Awaited<ReturnType<typeof adminApi.saveLandsraadMilestonePreset>> | null } = { current: null };
+    await run(
+      "milestone-preset",
+      "Applying milestones",
+      async () => { responseRef.current = await adminApi.saveLandsraadMilestonePreset({ enabled: milestoneDraft.enabled, goalAmount, thresholds }); },
+      "Milestone Preset Saved"
+    );
+    if (responseRef.current && !responseRef.current.result.applied) {
+      setResult({ key: "milestone-preset", text: responseRef.current.result.reason || "Preset saved and waiting for the current term.", tone: "neutral" });
+      resultTimer.current = window.setTimeout(() => setResult(null), 6500);
+    }
   }
 
   async function saveReward(reward: LandsraadReward) {
@@ -235,6 +277,32 @@ export function LandsraadPanel({ confirmAction, onError }: LandsraadAdminSection
 
       <div className="section-divider landsraad-section-divider" />
 
+      <section className="landsraad-milestone-preset">
+        <div className="landsraad-milestone-heading">
+          <div>
+            <h4>Milestone Preset</h4>
+            <p className="muted">Set the goal and reward thresholds for every house. Reward items and quantities are preserved.</p>
+          </div>
+          <div className="landsraad-milestone-heading-actions">
+            {milestonePreset?.lastAppliedTermId && <span className="landsraad-preset-status">Applied To Term {milestonePreset.lastAppliedTermId}</span>}
+            {milestoneTierMismatch && <button className="secondary" onClick={() => setMilestoneDraft((current) => ({ ...current, thresholds: currentTermThresholds.map(String) }))}>Use Current Term Levels</button>}
+          </div>
+        </div>
+        {milestoneDraft.thresholds.length ? <>
+          <div className="landsraad-milestone-fields">
+            <label>Overall Goal<input type="number" min="0" step="1" value={milestoneDraft.goalAmount} onChange={(event) => setMilestoneDraft((current) => ({ ...current, goalAmount: event.target.value }))} /></label>
+            {milestoneDraft.thresholds.map((threshold, index) => <label key={index}>Level {index + 1} Reward Threshold<input type="number" min="1" step="1" value={threshold} onChange={(event) => setMilestoneDraft((current) => ({ ...current, thresholds: current.thresholds.map((value, thresholdIndex) => thresholdIndex === index ? event.target.value : value) }))} /></label>)}
+          </div>
+          <div className="landsraad-milestone-actions">
+            <label className={`switch-checkbox landsraad-cycle-toggle ${milestoneDraft.enabled ? "enabled" : "disabled"}`}><input type="checkbox" checked={milestoneDraft.enabled} onChange={(event) => setMilestoneDraft((current) => ({ ...current, enabled: event.target.checked }))} /><span className="switch-label">Apply Automatically Each Cycle</span><strong className="switch-state">{milestoneDraft.enabled ? "ON" : "OFF"}</strong></label>
+            <div className="landsraad-milestone-result"><InlineActionResult result={result} resultKey="milestone-preset" format={false} /></div>
+            <button onClick={() => void saveMilestonePreset()}>Save And Apply</button>
+          </div>
+        </> : <p className="empty">Reward levels will appear after the current Landsraad term generates its milestones.</p>}
+      </section>
+
+      <div className="section-divider landsraad-section-divider" />
+
       {overview?.term && <div className="landsraad-bulk-row">
         <label className="compact-select">Set All Current Goals<input type="number" min="0" step="1" value={bulkGoal} onChange={(event) => setBulkGoal(event.target.value)} /></label>
         <button onClick={() => void saveAllGoals()}>Apply To Term</button>
@@ -290,6 +358,16 @@ export function LandsraadPanel({ confirmAction, onError }: LandsraadAdminSection
 
 function rewardKey(reward: LandsraadReward) {
   return reward.row_locator;
+}
+
+function detectedMilestoneThresholds(overview: LandsraadOverview) {
+  const firstTaskId = overview.tasks?.[0]?.task_id;
+  if (!firstTaskId) return [];
+  return overview.rewards
+    .filter((reward) => reward.task_id === firstTaskId)
+    .map((reward) => Number(reward.threshold))
+    .filter((threshold) => Number.isInteger(threshold) && threshold >= 0)
+    .sort((left, right) => left - right);
 }
 
 function playerActorId(player: Record<string, unknown>) {

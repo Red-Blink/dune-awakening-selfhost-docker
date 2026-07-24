@@ -87,6 +87,15 @@ export type LandsraadOverview = {
   rewards: LandsraadReward[];
 };
 
+export type LandsraadMilestonePreset = {
+  enabled: boolean;
+  goalAmount: number;
+  thresholds: number[];
+  lastAppliedTermId: string | null;
+  lastAppliedAt: string;
+  lastResult: string;
+};
+
 export const adminApi = {
   itemCatalog: (q = "", limit = 10000) => api<{ rows: ItemCatalogEntry[] }>(`/api/admin/items/catalog?q=${encodeURIComponent(q)}&limit=${encodeURIComponent(String(limit))}`),
   itemSearch: (q: string) => api<{ stdout: string }>(`/api/admin/items/search?q=${encodeURIComponent(q)}`),
@@ -106,6 +115,8 @@ export const adminApi = {
   savePlayerAnnouncements: (settings: PlayerAnnouncementSettings) => post<{ ok: boolean; settings: PlayerAnnouncementSettings; defaults: PlayerAnnouncementSettings }>("/api/admin/player-announcements", { settings }),
   restorePlayerAnnouncements: () => post<{ ok: boolean; settings: PlayerAnnouncementSettings; defaults: PlayerAnnouncementSettings }>("/api/admin/player-announcements", { restoreDefaults: true }),
   landsraad: () => api<LandsraadOverview>("/api/admin/landsraad"),
+  landsraadMilestonePreset: () => api<{ preset: LandsraadMilestonePreset }>("/api/admin/landsraad/milestone-preset"),
+  saveLandsraadMilestonePreset: (body: { enabled: boolean; goalAmount: number; thresholds: number[] }) => post<{ preset: LandsraadMilestonePreset; result: { applied: boolean; reason?: string; termId?: string } }>("/api/admin/landsraad/milestone-preset", body),
   setLandsraadTaskGoal: (taskId: string | number, goalAmount: number) => post<{ ok: boolean }>("/api/admin/landsraad/task-goal", { taskId, goalAmount }),
   setLandsraadTermTaskGoals: (termId: string | number, goalAmount: number) => post<{ ok: boolean; updatedRows: number }>("/api/admin/landsraad/term-task-goals", { termId, goalAmount }),
   setLandsraadRewardTier: (body: { rowLocator: string; taskId: string | number; threshold: number; newThreshold: number; templateId: string; amount: number }) => post<{ ok: boolean }>("/api/admin/landsraad/reward-tier", body),
