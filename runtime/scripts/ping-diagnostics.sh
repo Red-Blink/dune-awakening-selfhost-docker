@@ -322,7 +322,16 @@ if container_running dune-postgres; then
       echo "  $map game=${game_addr}:${game_port} igw=${igw_addr}:${igw_port} ready=$ready alive=$alive"
       expected_game="$overmap_game_port"
       expected_igw="$overmap_igw_port"
-      [ "$map" = "Survival_1" ] && expected_game="$survival_game_port" && expected_igw="$survival_igw_port"
+      if [ "$map" = "Survival_1" ]; then
+        expected_game="$survival_game_port"
+        expected_igw="$survival_igw_port"
+        if [ "$game_port" -gt "$survival_game_port" ] 2>/dev/null \
+          && [ "$game_port" -le "$((client_port_base + 33))" ] 2>/dev/null; then
+          dimension_offset="$((game_port - survival_game_port))"
+          expected_game="$game_port"
+          expected_igw="$((survival_igw_port + 1 + dimension_offset))"
+        fi
+      fi
       [ "$game_addr" = "$server_ip" ] && ok "$map farm_state game_addr=$game_addr" || fail_msg "$map farm_state game_addr=$game_addr expected $server_ip"
       [ "$igw_addr" = "$igw_advertised_ip" ] && ok "$map farm_state igw_addr=$igw_addr" || fail_msg "$map farm_state igw_addr=$igw_addr expected $igw_advertised_ip"
       [ "$game_port" = "$expected_game" ] && ok "$map farm_state game_port=$game_port" || fail_msg "$map farm_state game_port=$game_port expected $expected_game"
