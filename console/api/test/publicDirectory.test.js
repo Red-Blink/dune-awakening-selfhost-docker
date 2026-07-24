@@ -336,6 +336,7 @@ test("reporter sends only the public directory contract and persists its identit
       baseUrl: "https://directory.test/api/v1/servers",
       fetchImpl: async (url, options) => {
         requests.push({ url, options });
+        if (url.endsWith("/claim-status")) return response({ ok: true, claimed: true, playerPortalEnabled: false });
         return response({ ok: true, nextHeartbeatSeconds: 75, listingClaimed: true });
       },
       setTimeoutFn: (_fn, delay) => {
@@ -347,9 +348,12 @@ test("reporter sends only the public directory contract and persists its identit
 
     await reporter.tick();
 
-    assert.equal(requests.length, 1);
-    assert.equal(requests[0].url, "https://directory.test/api/v1/servers/heartbeat");
-    const payload = JSON.parse(requests[0].options.body);
+    assert.equal(requests.length, 2);
+    const heartbeat = requests.find(request => request.url.endsWith("/heartbeat"));
+    const claimStatus = requests.find(request => request.url.endsWith("/claim-status"));
+    assert.ok(heartbeat);
+    assert.ok(claimStatus);
+    const payload = JSON.parse(heartbeat.options.body);
     assert.deepEqual(Object.keys(payload).sort(), [
       "capacity",
       "discordInvite",
@@ -445,7 +449,6 @@ test("reporter uploads only player portal identities requested by the claimed li
       db: fakeDb(),
       getBattlegroupRunning: () => true,
       baseUrl: "https://directory.test/api/v1/servers",
-      claimBaseUrl: "https://beta-directory.test/api/v1/servers",
       playerPortalJourneyData: journeyData,
       playerPortalSkillData: skillData,
       collectPlayerPortalSnapshots: async (_db, hashes, loadedJourneys, loadedSkills) => {
@@ -465,6 +468,7 @@ test("reporter uploads only player portal identities requested by the claimed li
     });
 
     await reporter.tick();
+    assert.ok(requests.some(request => request.url.endsWith(`/claim-status`)));
     const upload = requests.find(request => request.url.endsWith("/player-portal/snapshot"));
     assert.ok(upload);
     const body = JSON.parse(upload.options.body);

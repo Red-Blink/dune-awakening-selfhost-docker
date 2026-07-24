@@ -227,17 +227,15 @@ export function createPublicDirectoryReporter(config, options = {}) {
         ? receipt.listingClaimed
         : state.listingClaimed === true;
       let playerPortalStatus = null;
-      if (claimBaseUrl !== baseUrl) {
-        try {
-          const claimStatus = await requestJson(fetchImpl, `${claimBaseUrl}/${encodeURIComponent(identity.serverId)}/claim-status`, {
-            method: "GET",
-            headers: { authorization: `Bearer ${identity.secret}` }
-          });
-          listingClaimed = claimStatus.claimed === true;
-          playerPortalStatus = claimStatus;
-        } catch {
-          // Claim status is optional while the directory service is being upgraded.
-        }
+      try {
+        const claimStatus = await requestJson(fetchImpl, `${claimBaseUrl}/${encodeURIComponent(identity.serverId)}/claim-status`, {
+          method: "GET",
+          headers: { authorization: `Bearer ${identity.secret}` }
+        });
+        listingClaimed = claimStatus.claimed === true;
+        playerPortalStatus = claimStatus;
+      } catch {
+        // Claim status is optional while the directory service is being upgraded.
       }
       if (playerPortalStatus?.playerPortalEnabled === true && Array.isArray(playerPortalStatus.requestedAccountHashes)) {
         const requested = playerPortalStatus.requestedAccountHashes
