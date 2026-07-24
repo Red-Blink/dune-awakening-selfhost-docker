@@ -171,7 +171,7 @@ test("scheduler bridge actions over HTTP", async (t) => {
     });
 
     await t.test("scheduler.run reports a missing exchangeId without touching the database", async () => {
-      rmSync(join(repoRoot, "runtime/addons/jobs/eda-exchange-bot-buyback.json"), { force: true });
+      rmSync(join(repoRoot, "runtime/addons/jobs/eda-exchange-bot/buyback.json"), { force: true });
       const { status, body } = await bridge("eda-exchange-bot", { action: "scheduler.run" });
       assert.equal(status, 400);
       assert.equal(body.ok, false);

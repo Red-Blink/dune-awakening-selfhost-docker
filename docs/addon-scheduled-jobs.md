@@ -13,7 +13,7 @@ The scheduler ticks with the console's other background tasks (the 10-second int
 
 The sweep SQL is built **server-side** from the addon's bundled `web/market-seed-plan.json` (in `runtime/addons/installed/eda-exchange-bot/`) and the validated schedule parameters. The console never persists or replays SQL text sent by the addon iframe, following the same typed-action model as `admin.items.grant`.
 
-The sweep uses `FOR UPDATE OF o, s SKIP LOCKED`, so a scheduled sweep racing a manual sweep from the addon page is safe at the database level.
+The sweep uses `FOR UPDATE OF o, s SKIP LOCKED`, so a scheduled sweep racing a manual sweep from the addon page is safe at the database level. It runs through the Console database transaction helper, which guarantees a rollback before the connection returns to the pool if any statement fails.
 
 ## The `scheduler:server` permission
 
@@ -21,7 +21,9 @@ Unattended background writes require an explicit opt-in beyond `database:write`.
 
 ## Schedule state
 
-The schedule persists in `runtime/addons/jobs/eda-exchange-bot-buyback.json` (owner-only file, written atomically) and survives console restarts. If the console was down when a run came due, the scheduler recomputes `nextRunAt` one interval out at boot instead of firing immediately.
+The schedule persists in `runtime/addons/jobs/eda-exchange-bot/buyback.json` (owner-only file, written atomically) and survives console restarts. If the console was down when a run came due, the scheduler recomputes `nextRunAt` one interval out at boot instead of firing immediately.
+
+Uninstalling the addon removes its persisted scheduled-job files. Reinstalling therefore cannot unexpectedly resume a schedule configured before the uninstall.
 
 Fields:
 

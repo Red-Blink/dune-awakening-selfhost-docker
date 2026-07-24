@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { assertInstalledAddonPermission, fetchCommunityAddons, installedAddonContentPath, listInstalledAddons, normalizeAddonManifest, normalizeAddonPermissions, normalizeAddonProvenance, normalizeCommunityAddonManifest, normalizeCommunityAddonsIndex, removeInstalledAddon, setInstalledAddonEnabled, syncInstalledAddonLifecycle, validateZipEntries } from "../src/addons.js";
@@ -148,7 +148,7 @@ test("normalizes addon provenance fields", () => {
 
 test("normalizes addon permission arrays and structured permissions", () => {
   assert.deepEqual(normalizeAddonPermissions(["players:read", "players:read"]), ["players:read"]);
-  assert.deepEqual(normalizeAddonPermissions({ database: ["read", "write"], server: ["status"] }), ["database:read", "database:write", "server:status"]);
+  assert.deepEqual(normalizeAddonPermissions({ database: ["read", "write"], server: ["status"], scheduler: ["server"] }), ["database:read", "database:write", "scheduler:server", "server:status"]);
   assert.deepEqual(normalizeAddonPermissions({ admin: ["grant-items"] }), ["admin:grant-items"]);
   assert.throws(() => normalizeAddonPermissions(["database:drop"]), /not supported/);
   assert.throws(() => normalizeAddonPermissions({ database: "read" }), /must be an array/);
@@ -177,6 +177,17 @@ test("tracks installed addon enable disable and removal state", () => {
       permissions: ["players:read"]
     }));
     const config = { repoRoot };
+    const jobsDir = join(repoRoot, "runtime/addons/jobs");
+    const addonJobsDir = join(jobsDir, "leadership-board-demo");
+    const otherAddonJobsDir = join(jobsDir, "another-addon");
+    mkdirSync(addonJobsDir, { recursive: true });
+    mkdirSync(otherAddonJobsDir, { recursive: true });
+    const addonJob = join(addonJobsDir, "refresh.json");
+    const addonJobTemp = join(addonJobsDir, "refresh.json.123.tmp");
+    const otherAddonJob = join(otherAddonJobsDir, "refresh.json");
+    writeFileSync(addonJob, "{}");
+    writeFileSync(addonJobTemp, "{}");
+    writeFileSync(otherAddonJob, "{}");
     assert.equal(listInstalledAddons(config).addons[0].status, "Disabled");
     assert.throws(() => setInstalledAddonEnabled(config, "leadership-board-demo", true), /must be approved/);
     writeFileSync(join(repoRoot, "runtime/addons/state.json"), JSON.stringify({
@@ -205,6 +216,10 @@ test("tracks installed addon enable disable and removal state", () => {
     assert.throws(() => installedAddonContentPath(config, "leadership-board-demo", "web/index.html"), /disabled/);
     assert.deepEqual(removeInstalledAddon(config, "leadership-board-demo"), { ok: true, id: "leadership-board-demo" });
     assert.deepEqual(listInstalledAddons(config).addons, []);
+    assert.equal(existsSync(addonJobsDir), false, "uninstall removes the addon's scheduled-job directory");
+    assert.equal(existsSync(addonJob), false, "uninstall removes persisted addon jobs");
+    assert.equal(existsSync(addonJobTemp), false, "uninstall removes interrupted atomic-write files for addon jobs");
+    assert.equal(existsSync(otherAddonJob), true, "uninstall preserves other addons' jobs");
   } finally {
     rmSync(repoRoot, { recursive: true, force: true });
   }

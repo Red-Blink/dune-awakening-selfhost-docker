@@ -38,17 +38,18 @@ function makeRepoRoot(plan = SAMPLE_PLAN) {
 }
 
 function schedulePath(repoRoot) {
-  return join(repoRoot, "runtime/addons/jobs", `${EDA_EXCHANGE_BOT_ADDON_ID}-buyback.json`);
+  return join(repoRoot, "runtime/addons/jobs", EDA_EXCHANGE_BOT_ADDON_ID, "buyback.json");
 }
 
 // Fake db: the first statement of the eligibility probe is WITH, the sweep
-// starts with BEGIN; capability support queries get empty rows (unsupported).
+// starts with its first temp table; capability support queries get empty rows.
 function fakeDb({ eligible = "0", sweepRow = null, onQuery = null } = {}) {
   const probes = [];
   const sweeps = [];
   const db = {
     probes,
     sweeps,
+    transactions: 0,
     query: async (sql) => {
       if (onQuery) {
         const intercepted = await onQuery(sql);
@@ -59,7 +60,7 @@ function fakeDb({ eligible = "0", sweepRow = null, onQuery = null } = {}) {
         probes.push(sql);
         return { rows: [{ eligible_orders: String(eligible) }], fields: [{ name: "eligible_orders" }], rowCount: 1, command: "SELECT" };
       }
-      if (/^BEGIN;/.test(text)) {
+      if (/^CREATE TEMP TABLE market_buy_plan/.test(text)) {
         sweeps.push(sql);
         return {
           rows: [sweepRow || { purchased: "2", total_units: "20", total_solari: "999", threshold_percent: "60", max_buys: "500" }],
@@ -69,6 +70,10 @@ function fakeDb({ eligible = "0", sweepRow = null, onQuery = null } = {}) {
         };
       }
       return { rows: [], fields: [], rowCount: 0, command: "SELECT" };
+    },
+    transaction: async (fn) => {
+      db.transactions += 1;
+      return fn({ query: db.query });
     }
   };
   return db;
@@ -192,6 +197,7 @@ test("builds buyback SQL server-side from the bundled seed plan", () => {
     assert.match(sweepSql, /999999999/, "payment entries use the never-expires sentinel");
     assert.match(sweepSql, /\(ARRAY\[1\.0,1\.0,1\.25,1\.5,1\.75,2\.0\]\)/, "grade multipliers are applied in SQL");
     assert.match(sweepSql, /o\.exchange_id = 77\b/);
+    assert.doesNotMatch(sweepSql, /\b(?:BEGIN|COMMIT)\s*;/i, "transaction ownership stays with the database wrapper");
 
     assert.throws(() => buildBuybackSql(plan, { ...schedule, exchangeId: "77; DROP TABLE dune.items" }), /exchangeId is invalid/);
   } finally {
@@ -292,6 +298,7 @@ test("eligible run takes exactly one backup before the sweep and audits the resu
 
     assert.equal(db.probes.length, 1);
     assert.equal(db.sweeps.length, 1);
+    assert.equal(db.transactions, 1, "eligible sweep runs through the rollback-safe transaction helper");
     assert.match(db.sweeps[0], /LIMIT 50 FOR UPDATE OF o, s SKIP LOCKED/);
     assert.equal(backups.length, 1, "eligible run takes exactly one backup");
     assert.deepEqual(backups[0].args, ["db", "backup"]);
@@ -474,6 +481,23 @@ test("manual runNow sweeps immediately and leaves a disabled schedule unarmed", 
 
     rmSync(schedulePath(repoRoot));
     await assert.rejects(() => scheduler.runNow(), /Save a schedule with an exchangeId/);
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("eligible runs refuse to sweep without rollback-safe transaction support", async () => {
+  const repoRoot = makeRepoRoot();
+  const config = { repoRoot, mockMode: false };
+  try {
+    const db = fakeDb({ eligible: "1" });
+    delete db.transaction;
+    const { scheduler, backups } = makeScheduler(config, { db });
+    saveBuybackSchedule(config, { enabled: false, exchangeId: "42" });
+
+    await assert.rejects(() => scheduler.runNow(), /requires database transaction support/);
+    assert.equal(backups.length, 0, "no unnecessary backup is taken when the sweep cannot run safely");
+    assert.equal(db.sweeps.length, 0, "no write starts without guaranteed rollback support");
   } finally {
     rmSync(repoRoot, { recursive: true, force: true });
   }

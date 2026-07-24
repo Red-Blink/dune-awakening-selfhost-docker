@@ -204,8 +204,7 @@ export function buildBuybackSql(plan, schedule) {
   const threshold = schedule.buybackPercent;
   const maxBuys = schedule.maxBuys;
   const valuesSql = buybackPlanValuesSql(plan, schedule);
-  return `BEGIN;
-CREATE TEMP TABLE market_buy_plan (template_id TEXT PRIMARY KEY, max_unit_price BIGINT NOT NULL) ON COMMIT DROP;
+  return `CREATE TEMP TABLE market_buy_plan (template_id TEXT PRIMARY KEY, max_unit_price BIGINT NOT NULL) ON COMMIT DROP;
 CREATE TEMP TABLE market_buy_result (purchased INTEGER NOT NULL, total_units BIGINT NOT NULL, total_solari BIGINT NOT NULL, threshold_percent INTEGER NOT NULL, max_buys INTEGER NOT NULL) ON COMMIT DROP;
 CREATE TEMP TABLE market_buy_diagnostics (player_sell_orders BIGINT NOT NULL, known_player_sell_orders BIGINT NOT NULL, eligible_player_sell_orders BIGINT NOT NULL, above_threshold_sell_orders BIGINT NOT NULL, unknown_template_sell_orders BIGINT NOT NULL) ON COMMIT DROP;
 INSERT INTO market_buy_plan (template_id, max_unit_price) VALUES
@@ -247,8 +246,7 @@ BEGIN
     END LOOP;
     INSERT INTO market_buy_result (purchased, total_units, total_solari, threshold_percent, max_buys) VALUES (v_purchased, v_units, v_solari, ${threshold}, ${maxBuys});
 END $$;
-SELECT r.purchased, r.total_units, r.total_solari, r.threshold_percent, r.max_buys, d.player_sell_orders, d.known_player_sell_orders, d.eligible_player_sell_orders, d.above_threshold_sell_orders, d.unknown_template_sell_orders FROM market_buy_result r CROSS JOIN market_buy_diagnostics d;
-COMMIT;`;
+SELECT r.purchased, r.total_units, r.total_solari, r.threshold_percent, r.max_buys, d.player_sell_orders, d.known_player_sell_orders, d.eligible_player_sell_orders, d.above_threshold_sell_orders, d.unknown_template_sell_orders FROM market_buy_result r CROSS JOIN market_buy_diagnostics d;`;
 }
 
 export async function probeBuybackEligibility(config, db, overrides = {}) {
@@ -419,10 +417,16 @@ async function executeBuybackRun(config, db, schedule, { runDuneImpl }) {
       detail: `No eligible player listings at ${schedule.buybackPercent}% threshold on exchange ${schedule.exchangeId}; sweep and backup skipped.`
     };
   }
+  if (typeof db?.transaction !== "function") {
+    throw new Error("Exchange buyback requires database transaction support.");
+  }
   if (!config.mockMode) {
     await runDuneImpl(config, buildDuneArgs("backupCreate"), { env: { DB_BACKUP_ORIGIN: `addon-${EDA_EXCHANGE_BOT_ADDON_ID}` } });
   }
-  const sweep = await runSql(db, buildBuybackSql(plan, schedule), true);
+  // Keep the entire sweep on one checked-out client. createDb.transaction()
+  // guarantees ROLLBACK before releasing that client if any statement fails,
+  // preventing an aborted transaction from being returned to the pool.
+  const sweep = await db.transaction((tx) => runSql(tx, buildBuybackSql(plan, schedule), true));
   const row = sweep?.rows?.[0] || {};
   // purchased is a plain INTEGER bounded by maxBuys; the unit/solari totals
   // are BIGINT sums, so they stay decimal strings end-to-end like exchange
@@ -457,7 +461,7 @@ function requireScheduleExchangeId(schedule) {
 }
 
 function buybackSchedulePath(config) {
-  return resolve(config.repoRoot, "runtime/addons/jobs", `${EDA_EXCHANGE_BOT_ADDON_ID}-buyback.json`);
+  return resolve(config.repoRoot, "runtime/addons/jobs", EDA_EXCHANGE_BOT_ADDON_ID, "buyback.json");
 }
 
 function writeBuybackSchedule(config, schedule) {
