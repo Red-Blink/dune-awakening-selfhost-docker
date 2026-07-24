@@ -2018,7 +2018,7 @@ export async function playerIntel(db, id) {
     from dune.actors
     where id = $1 and properties ? 'TechKnowledgePlayerComponent'`, [player.actorId]);
   const row = result.rows[0];
-  if (!row) {
+  if (!row || row.intel === null) {
     return { capabilities: { intel: false }, player, reason: "No TechKnowledgePlayerComponent found for this player." };
   }
   return {
