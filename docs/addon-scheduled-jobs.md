@@ -35,6 +35,8 @@ Fields:
 | `maxBuys` | Maximum listings bought per sweep (1–5000, default 500). |
 | `lastRunAt` / `lastRunStatus` / `lastRunDetail` / `nextRunAt` | Status reporting (`idle`, `swept`, or `error`). |
 
+Validation note for addon authors: `intervalMinutes` is the only field that silently clamps into its range; `exchangeId`, `priceMultiplier`, `buybackPercent`, and `maxBuys` reject out-of-range or malformed values with an error. `exchangeId` must be sent as a decimal **string**, and run results report `totalUnits`/`totalSolari` as decimal strings too (BIGINT-safe).
+
 Failures (database offline, backup failure) record an `error` status, apply the standard background failure backoff, and re-arm the next attempt.
 
 ## Bridge actions

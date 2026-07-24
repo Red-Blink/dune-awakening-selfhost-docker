@@ -29,9 +29,20 @@ const GRADE_MULTIPLIERS = [1.0, 1.0, 1.25, 1.5, 1.75, 2.0];
 const GRADE_MULTIPLIER_SQL = "(ARRAY[1.0,1.0,1.25,1.5,1.75,2.0])[LEAST(GREATEST(COALESCE(o.quality_level, 0), 0), 5) + 1]";
 
 // Sentinel expiration used by EDA's market bot for seller "Take Solari"
-// payment entries. The game server's dune_exchange_expire_orders proc purges
+// payment entries. The game server's exchange housekeeping procs purge
 // past-dated orders; a payment entry must never expire or the seller's item
 // is consumed with no Solari paid out.
+//
+// Time-base note: dune_exchange_orders.expiration_time is NOT a Unix epoch.
+// The exchange procs compare it against the game server's own clock, whose
+// values sit well below 999,999,999 — Easy Dune Admin's marketbot
+// (internal/marketbot/exchange.go, the source this fix is ported from)
+// reconstructs "gameNow" from real player/bot listing expirations using
+// `WHERE expiration_time < 999_999_999` as the non-sentinel filter, which
+// only works because live expirations are below that cutoff. Its deployed
+// sellerPaymentExpiry() returns exactly this sentinel. Do not "fix" this to a
+// far-future Unix timestamp; it must simply stay far above the game clock and
+// aligned with the sentinel the addon's own browser sweep writes.
 const PAYMENT_SENTINEL_EXPIRY = 999999999;
 
 // PostgreSQL BIGINT ids can exceed Number.MAX_SAFE_INTEGER (2^53 - 1), so
@@ -97,6 +108,12 @@ export function readBuybackSchedule(config) {
   }
 }
 
+// Read-modify-write over the schedule file. This function and
+// persistRunCompletion in createAddonJobScheduler are deliberately fully
+// synchronous (no await between read and write), so within the single console
+// process they cannot interleave and clobber each other's fields; the atomic
+// temp-file rename covers crash safety. Multiple console processes sharing one
+// repoRoot are not a supported deployment for runtime/ state files.
 export function saveBuybackSchedule(config, payload = {}, { now = () => Date.now() } = {}) {
   const previous = readBuybackSchedule(config);
   const next = normalizeBuybackSchedule(payload, previous);
@@ -275,6 +292,7 @@ export function createAddonJobScheduler(config, options = {}) {
   function persistRunCompletion(completedAtMs, status, detail) {
     // Re-read before writing so a schedule.set that landed while the run was
     // in flight (new interval, disabled, new exchange) is not clobbered.
+    // Synchronous read-modify-write: see the note on saveBuybackSchedule.
     const current = readBuybackSchedule(config);
     writeBuybackSchedule(config, {
       ...current,
@@ -396,8 +414,8 @@ async function executeBuybackRun(config, db, schedule, { runDuneImpl }) {
       status: "idle",
       eligible: 0,
       purchased: 0,
-      totalUnits: 0,
-      totalSolari: 0,
+      totalUnits: "0",
+      totalSolari: "0",
       detail: `No eligible player listings at ${schedule.buybackPercent}% threshold on exchange ${schedule.exchangeId}; sweep and backup skipped.`
     };
   }
@@ -406,9 +424,12 @@ async function executeBuybackRun(config, db, schedule, { runDuneImpl }) {
   }
   const sweep = await runSql(db, buildBuybackSql(plan, schedule), true);
   const row = sweep?.rows?.[0] || {};
+  // purchased is a plain INTEGER bounded by maxBuys; the unit/solari totals
+  // are BIGINT sums, so they stay decimal strings end-to-end like exchange
+  // ids do (never converted with Number()).
   const purchased = Number(row.purchased || 0);
-  const totalUnits = Number(row.total_units || 0);
-  const totalSolari = Number(row.total_solari || 0);
+  const totalUnits = decimalString(row.total_units);
+  const totalSolari = decimalString(row.total_solari);
   return {
     status: "swept",
     eligible,
@@ -417,6 +438,11 @@ async function executeBuybackRun(config, db, schedule, { runDuneImpl }) {
     totalSolari,
     detail: `Bought ${purchased} listings (${totalUnits} units) for ${totalSolari} solari on exchange ${schedule.exchangeId} (${eligible} eligible).`
   };
+}
+
+function decimalString(value) {
+  const text = String(value ?? "0").trim();
+  return /^-?[0-9]+$/.test(text) ? text : "0";
 }
 
 function eligibleCount(result) {

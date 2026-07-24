@@ -709,8 +709,11 @@ async function addonSchedulerBridgeAction(req, res, id, action, body) {
     const payload = body.schedule && typeof body.schedule === "object" ? body.schedule : body;
     const addon = assertInstalledAddonPermission(config, id, "database:write");
     // Unattended background writes need an explicit extra approval from the
-    // server owner, so enabling the schedule requires scheduler:server too.
-    if (payload.enabled) assertInstalledAddonPermission(config, id, ADDON_SCHEDULER_PERMISSION);
+    // server owner, so any save that leaves the schedule enabled requires
+    // scheduler:server too — including field updates that omit `enabled` on an
+    // already-enabled schedule. Explicitly disabling only needs database:write.
+    const leavesEnabled = payload.enabled === undefined ? readBuybackSchedule(config).enabled : payload.enabled === true;
+    if (leavesEnabled) assertInstalledAddonPermission(config, id, ADDON_SCHEDULER_PERMISSION);
     if (!applyMutationRateLimit(req, res, `addon:${id}:scheduler.schedule.set`)) return;
     try {
       const result = saveBuybackSchedule(config, payload);
