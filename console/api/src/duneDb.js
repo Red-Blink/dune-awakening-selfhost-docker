@@ -1976,7 +1976,7 @@ export async function playerFactions(db, id) {
 }
 
 export async function playerProgression(db, id) {
-  if (!(await tableExists(db, "player_state")) || !(await tableExists(db, "actor_fgl_entities")) || !(await tableExists(db, "fgl_entities"))) {
+  if (!(await supportsPlayerProgression(db))) {
     return { capabilities: { progression: false }, reason: "Unsupported by detected schema. Missing required table(s): dune.player_state, dune.actor_fgl_entities, dune.fgl_entities" };
   }
   const player = await resolvePlayerMutationTarget(db, id);
@@ -4552,7 +4552,7 @@ async function playerCapabilities(db) {
     repairVehicleDecay: await supportsRepairVehicleDecay(db),
     refuelVehicle: await supportsRefuelVehicle(db),
     vitals: await supportsPlayerVitals(db),
-    progression: false,
+    progression: await supportsPlayerProgression(db),
     events: false,
     stats: false,
     history: false
@@ -4570,6 +4570,10 @@ async function supportsPlayerVitals(db) {
       !(await tableExists(db, "actor_fgl_entities")) || !(await tableExists(db, "fgl_entities"))) return false;
   const actorColumns = await columnsFor(db, "actors");
   return actorColumns.has("gas_attributes");
+}
+
+async function supportsPlayerProgression(db) {
+  return (await tableExists(db, "player_state")) && (await tableExists(db, "actor_fgl_entities")) && (await tableExists(db, "fgl_entities"));
 }
 
 async function supportsCraftingRecipes(db) {
