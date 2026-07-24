@@ -1837,8 +1837,11 @@ export async function playerProfile(db, id) {
            coalesce(a.owner_account_id, 0) as account_id,
            coalesce(ps.character_name, '') as character_name,
            coalesce(ps.player_controller_id, 0) as player_controller_id,
+           coalesce(ps.id, 0) as player_state_id,
            coalesce(ac.funcom_id, '') as funcom_id,
            coalesce(ac."user", '') as fls_id,
+           coalesce(ac.platform_id, '') as platform_id,
+           coalesce(ac.platform_name, '') as platform_name,
            case
              when nullif(ac."user", '') is not null then ac."user"
              when a.owner_account_id is not null and a.owner_account_id <> 0 then a.owner_account_id::text

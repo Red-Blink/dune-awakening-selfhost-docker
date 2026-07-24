@@ -1751,7 +1751,7 @@ test("player profile includes faction and guild when addon tables are present", 
         return { rows: [] };
       }
       if (text.includes("as fls_id") && text.includes("where a.id = $1")) {
-        return { rows: [{ actor_id: 101, player_pawn_id: 101, account_id: 201, character_name: "Test One", player_controller_id: 301, funcom_id: "FN1", fls_id: "user1", action_player_id: "user1", class: "Foo", map: "Survival_1", online_status: "Online" }] };
+        return { rows: [{ actor_id: 101, player_pawn_id: 101, account_id: 201, character_name: "Test One", player_controller_id: 301, player_state_id: 102, funcom_id: "FN1", fls_id: "user1", platform_id: "76561197986776594", platform_name: "Steam", action_player_id: "user1", class: "Foo", map: "Survival_1", online_status: "Online" }] };
       }
       if (text.includes("from dune.player_faction pf")) {
         return { rows: [{ actor_id: "301", faction_id: "1", faction_name: "Atreides" }] };
@@ -1766,6 +1766,9 @@ test("player profile includes faction and guild when addon tables are present", 
   assert.equal(result.player.faction, "Atreides");
   assert.equal(result.player.faction_assigned, true);
   assert.equal(result.player.guild, "Water Sellers");
+  assert.equal(result.player.player_state_id, 102);
+  assert.equal(result.player.platform_id, "76561197986776594");
+  assert.equal(result.player.platform_name, "Steam");
 });
 
 test("player profile uses guild allegiance when personal faction is unassigned", async () => {

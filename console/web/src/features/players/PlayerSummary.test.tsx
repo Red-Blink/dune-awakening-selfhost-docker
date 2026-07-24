@@ -263,6 +263,44 @@ describe("PlayerSummary", () => {
     });
   });
 
+  describe("Identity", () => {
+    it("splits into two columns of at most 5 rows, with the heading only on the first", async () => {
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{
+            player: {
+              character_name: "Benny Jesserette",
+              account_id: 201,
+              player_controller_id: 301,
+              player_state_id: 102,
+              platform_id: "76561197986776594",
+              platform_name: "Steam",
+              funcom_id: "FN1",
+              fls_id: "user1"
+            }
+          }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Account ID")).toBeInTheDocument();
+      });
+      expect(screen.getAllByText("Identity")).toHaveLength(1);
+      const blocks = screen.getAllByText("DB Player ID").map((el) => el.closest(".summary-block"));
+      const identityBlock = blocks[0];
+      expect(identityBlock).not.toBeNull();
+      const rows = identityBlock!.querySelectorAll("tr");
+      expect(rows).toHaveLength(5);
+      const secondBlock = screen.getByText("Player State ID").closest(".summary-block");
+      expect(secondBlock).not.toBeNull();
+      const secondRows = secondBlock!.querySelectorAll("tr");
+      expect(secondRows).toHaveLength(3);
+      expect(screen.getByText("76561197986776594")).toBeInTheDocument();
+      expect(screen.getByText("Steam")).toBeInTheDocument();
+    });
+  });
+
   describe("Progression", () => {
     it("renders Level, XP, and Skill Points when progression is supported", async () => {
       vi.mocked(playersApi.progression).mockResolvedValue({

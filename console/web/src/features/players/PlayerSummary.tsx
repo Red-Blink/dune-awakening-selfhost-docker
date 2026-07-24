@@ -88,6 +88,24 @@ export function PlayerSummary({
   const guild = text(firstDefined(player.guild, fallback.guild)) || "—";
   const faction = text(firstDefined(player.faction, fallback.faction)) || "Neutral";
   const flsId = text(firstDefined(player.fls_id, fallback.fls_id, actionPlayerId)) || "missing";
+  const accountId = text(firstDefined(player.account_id, fallback.account_id));
+  const controllerId = text(firstDefined(player.player_controller_id, fallback.player_controller_id));
+  const playerStateId = text(player.player_state_id);
+  const platformId = text(player.platform_id);
+  const platformName = text(player.platform_name);
+
+  const identityRows: { label: string; value: string }[] = [
+    { label: "DB Player ID", value: dbPlayerId || "missing" },
+    { label: "Funcom ID", value: funcomId || "—" },
+    { label: "FLS ID", value: flsId },
+    { label: "Account ID", value: accountId || "—" },
+    { label: "Player Controller ID", value: controllerId || "—" },
+    { label: "Player State ID", value: playerStateId || "—" },
+    { label: "Platform ID", value: platformId || "—" },
+    { label: "Platform Name", value: platformName || "—" }
+  ];
+  const identityColumns: (typeof identityRows)[] = [];
+  for (let i = 0; i < identityRows.length; i += 5) identityColumns.push(identityRows.slice(i, i + 5));
 
   const currencyItems: { label: string; value: string }[] = [];
   currencyRows
@@ -146,14 +164,12 @@ export function PlayerSummary({
           </tbody></table>
         </>}
       </div>
-      <div className="summary-block">
-        <div className="summary-block-label">Identity</div>
+      {identityColumns.map((rows, index) => <div className="summary-block" key={`identity-${index}`}>
+        {index === 0 && <div className="summary-block-label">Identity</div>}
         <table className="summary-kv"><tbody>
-          <tr><td>DB Player ID</td><td className="summary-mono">{dbPlayerId || "missing"}</td></tr>
-          <tr><td>Funcom ID</td><td className="summary-mono">{funcomId || "—"}</td></tr>
-          <tr><td>FLS ID</td><td className="summary-mono">{flsId}</td></tr>
+          {rows.map((row) => <tr key={row.label}><td>{row.label}</td><td className="summary-mono">{row.value}</td></tr>)}
         </tbody></table>
-      </div>
+      </div>)}
     </div>
 
     {(currencyRows.length > 0 || solarisCoinTotal !== null) && <div className="summary-block">
