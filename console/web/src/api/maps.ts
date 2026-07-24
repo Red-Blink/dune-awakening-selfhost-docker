@@ -56,6 +56,32 @@ export type SpicefieldTypeRow = {
   global_spawn_weight: number | null;
 };
 
+export type PartitionCombatState = "PVP" | "PVE" | "CONFLICT" | "UNKNOWN";
+export type MapCombatState = "PVP" | "PVE" | "MIXED" | "CONFLICT" | "UNKNOWN";
+export type PartitionRuntimeStatus = "RUNNING" | "STARTING" | "OFFLINE" | "STOPPED" | "UNASSIGNED" | "UNKNOWN";
+
+export type PartitionCombatStateRow = {
+  map: string;
+  partitionId: string;
+  dimensionIndex: number | null;
+  databaseLabel: string | null;
+  runtimeStatus: PartitionRuntimeStatus;
+  configuredState: PartitionCombatState;
+  materializedState: PartitionCombatState | null;
+  source: string;
+  securityZonesEnabled: boolean;
+  restartRequired: boolean;
+  configurationDrift: boolean;
+  warnings: string[];
+};
+
+export type MapCombatStateResult = {
+  map: string;
+  mapState: MapCombatState;
+  partitions: PartitionCombatStateRow[];
+  reason?: string;
+};
+
 export type ChoamTradeCenter = { key: string; name: string };
 export type ChoamSietch = { partition_id: string; dimension_index: number; label: string };
 export type ChoamTerminalPlacement = {
@@ -117,5 +143,6 @@ export const mapsApi = {
   sietchDimensions: (map = "Survival_1", ids = false) => api<{ stdout: string }>(`/api/sietches/dimensions?map=${encodeURIComponent(map)}${ids ? "&ids=1" : ""}`),
   updateSietches: (body: Record<string, unknown>) => post<{ task: Task }>("/api/sietches/update", body),
   deepdesert: () => api<{ stdout: string }>("/api/deepdesert"),
-  updateDeepdesert: (body: { action: string; confirmation: string }) => post<{ task: Task }>("/api/deepdesert/update", body)
+  updateDeepdesert: (body: { action: string; confirmation: string }) => post<{ task: Task }>("/api/deepdesert/update", body),
+  combatState: (map: string) => api<MapCombatStateResult>(`/api/maps/combat-state?map=${encodeURIComponent(map)}`)
 };

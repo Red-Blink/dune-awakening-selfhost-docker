@@ -39,6 +39,7 @@ import { persistSpicefieldOverride } from "./services/spicefieldOverrides.js";
 import { applySavedLandsraadMilestonePreset, createLandsraadMilestoneReconciler, readLandsraadMilestonePreset, saveLandsraadMilestonePreset } from "./services/landsraadMilestones.js";
 import { exportBlueprint, importBlueprint, listBlueprints, deleteBlueprint } from "./blueprints.js";
 import { createZipArchive } from "./services/zipArchive.js";
+import { resolveMapCombatState } from "./services/mapCombatState.js";
 import { grantAddonItem } from "./addonItemGrants.js";
 import { EDA_EXCHANGE_BOT_ADDON_ID, ADDON_SCHEDULER_PERMISSION, createAddonJobScheduler, probeBuybackEligibility, readBuybackSchedule, saveBuybackSchedule } from "./addonJobs.js";
 import { createPublicDirectoryReporter, normalizeDiscordInvite, readDirectorySettings } from "./services/publicDirectory.js";
@@ -573,6 +574,7 @@ async function handleApi(req, res) {
   if (path === "/api/maps/memory") return commandJson(res, "memoryStatus");
   if (path.match(/^\/api\/maps\/spicefields\/[^/]+$/) && req.method === "PATCH") return mapsSpicefieldUpdateRoute(req, res, path);
   if (path === "/api/maps/spicefields") return dbJson(res, () => duneDb.listSpicefieldTypes(db));
+  if (path === "/api/maps/combat-state") return mapCombatStateRoute(res, url);
   if (path === "/api/maps/choam-terminals" && req.method === "POST") return mapsChoamTerminalInstallRoute(req, res);
   if (path === "/api/maps/choam-terminals" && req.method === "DELETE") return mapsChoamTerminalRemoveRoute(req, res);
   if (path === "/api/maps/choam-terminals") return dbJson(res, () => choamTerminalOverview(db));
@@ -1406,6 +1408,32 @@ async function memoryBalancerRoute(req, res) {
   const state = await memoryBalancer.setEnabled(enabled);
   audit(config, req, "maps.memory.balancer", { enabled });
   return json(res, 200, state);
+}
+
+// Read-only, aggregate-only PvP/PvE combat state for a map's partitions.
+// Resolved from the effective UserGame.ini configuration via
+// services/mapCombatState.js — never from database labels, dimension
+// index, display names, or lifecycle mode. See docs on
+// services/mapCombatState.js for the full contract.
+async function mapCombatStateRoute(res, url) {
+  const map = String(url.searchParams.get("map") || "").trim();
+  if (!map) return json(res, 400, { error: "map query parameter is required." });
+  return dbJson(res, async () => {
+    const partitionResult = await duneDb.mapCombatPartitionRows(db, map);
+    if (partitionResult.capabilities?.combatState === false) {
+      return { map, mapState: "UNKNOWN", partitions: [], reason: partitionResult.reason };
+    }
+    const partitionRows = partitionResult.rows.map((row) => ({
+      partitionId: row.partition_id,
+      dimensionIndex: row.dimension_index,
+      databaseLabel: row.database_label || null,
+      serverId: row.server_id || "",
+      ready: Boolean(row.ready),
+      alive: Boolean(row.alive),
+      blocked: Boolean(row.blocked)
+    }));
+    return resolveMapCombatState(config, map, partitionRows);
+  });
 }
 
 async function mapSettingsRoute(req, res) {

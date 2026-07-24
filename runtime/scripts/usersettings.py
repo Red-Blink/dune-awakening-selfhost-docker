@@ -2233,6 +2233,270 @@ def materialize(map_name: str, saved_dir: str, partition_id: str | None = None) 
     return 0
 
 
+# ─── Partition combat-state resolver ────────────────────────────────────────
+#
+# Resolves the effective PvP/PvE combat state of a map partition from the
+# same merged UserGame.ini configuration fields that generate the partition
+# runtime files (see `merged_partition_values` / PARTITION_FIELDS above).
+#
+# This resolver intentionally does NOT use database dimension indexes,
+# database labels, display names, service names, container names, or
+# lifecycle modes as inputs. Those remain descriptive metadata only and are
+# attached by callers (e.g. the Console API) alongside this resolver's
+# output, never as a substitute for it.
+
+PARTITION_COMBAT_STATES = ("PVP", "PVE", "CONFLICT", "UNKNOWN")
+MAP_COMBAT_STATES = ("PVP", "PVE", "MIXED", "CONFLICT", "UNKNOWN")
+
+# Fields compared between the persisted profile ("configured") and the
+# materialized runtime UserGame.ini ("materialized") to detect drift/pending
+# restarts. Order is not significant.
+COMBAT_STATE_FIELDS = (
+    "force_pvp_all_partitions",
+    "partition_pvp_enabled",
+    "partition_pve_enabled",
+    "legacy_pvp_enabled",
+    "server_pve",
+    "security_zones_enabled",
+)
+
+
+def bool_or_none(value) -> bool | None:
+    """Tri-state boolean normalization.
+
+    Recognizes 1/true/yes/on as True and 0/false/no/off as False
+    (case-insensitive, surrounding whitespace ignored). Anything else
+    (including None/empty) returns None so that callers can distinguish
+    "explicitly false" from "unknown/unsupported" rather than silently
+    coercing incomplete configuration into a false reading.
+    """
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off"}:
+        return False
+    return None
+
+
+def resolve_partition_combat_state(values: dict) -> dict:
+    """Resolve a single partition's PvP/PvE combat state.
+
+    `values` must contain (or omit, for UNKNOWN) the keys:
+      force_pvp_all_partitions, partition_pvp_enabled, partition_pve_enabled,
+      legacy_pvp_enabled, server_pve, security_zones_enabled
+
+    Returns a dict with keys: state, source, securityZonesEnabled, warnings,
+    unresolvedFields. `state` is one of PARTITION_COMBAT_STATES.
+
+    Precedence (highest to lowest):
+      1. partition_pvp_enabled AND partition_pve_enabled       -> CONFLICT
+      2. force_pvp_all_partitions AND partition_pve_enabled    -> CONFLICT
+      3. force_pvp_all_partitions                              -> PVP
+      4. partition_pvp_enabled                                 -> PVP
+      5. partition_pve_enabled                                 -> PVE
+      6. legacy_pvp_enabled AND NOT server_pve                 -> PVP
+      7. NOT legacy_pvp_enabled AND server_pve                 -> PVE
+      8. otherwise                                              -> UNKNOWN
+
+    Explicit partition selectors (rules 1, 2, 4, 5) always take precedence
+    over the legacy compatibility fields (rules 6, 7). Unresolved (None)
+    values never satisfy a positive comparison, so missing/unsupported
+    configuration cannot be mistaken for an explicit selection.
+    """
+    force_all_pvp = bool_or_none(values.get("force_pvp_all_partitions"))
+    partition_pvp = bool_or_none(values.get("partition_pvp_enabled"))
+    partition_pve = bool_or_none(values.get("partition_pve_enabled"))
+    legacy_pvp = bool_or_none(values.get("legacy_pvp_enabled"))
+    server_pve = bool_or_none(values.get("server_pve"))
+    security_zones_enabled = bool_or_none(values.get("security_zones_enabled"))
+
+    unresolved_fields = [
+        key for key, raw in (
+            ("force_pvp_all_partitions", values.get("force_pvp_all_partitions")),
+            ("partition_pvp_enabled", values.get("partition_pvp_enabled")),
+            ("partition_pve_enabled", values.get("partition_pve_enabled")),
+            ("legacy_pvp_enabled", values.get("legacy_pvp_enabled")),
+            ("server_pve", values.get("server_pve")),
+            ("security_zones_enabled", values.get("security_zones_enabled")),
+        )
+        if bool_or_none(raw) is None
+    ]
+
+    warnings: list[str] = []
+
+    if partition_pvp is True and partition_pve is True:
+        return {
+            "state": "CONFLICT",
+            "source": "partition-selectors",
+            "securityZonesEnabled": bool(security_zones_enabled),
+            "warnings": ["Partition is explicitly included in both PvP and PvE selectors."],
+            "unresolvedFields": unresolved_fields,
+        }
+
+    if force_all_pvp is True and partition_pve is True:
+        return {
+            "state": "CONFLICT",
+            "source": "force-all-vs-partition",
+            "securityZonesEnabled": bool(security_zones_enabled),
+            "warnings": ["Global force-PvP conflicts with the partition PvE selector."],
+            "unresolvedFields": unresolved_fields,
+        }
+
+    if security_zones_enabled is False:
+        warnings.append("Security zones are disabled; PvP and abilities may be available everywhere.")
+
+    if force_all_pvp is True:
+        return {
+            "state": "PVP",
+            "source": "force-pvp-all-partitions",
+            "securityZonesEnabled": bool(security_zones_enabled),
+            "warnings": warnings,
+            "unresolvedFields": unresolved_fields,
+        }
+
+    if partition_pvp is True:
+        return {
+            "state": "PVP",
+            "source": "partition-pvp-selector",
+            "securityZonesEnabled": bool(security_zones_enabled),
+            "warnings": warnings,
+            "unresolvedFields": unresolved_fields,
+        }
+
+    if partition_pve is True:
+        return {
+            "state": "PVE",
+            "source": "partition-pve-selector",
+            "securityZonesEnabled": bool(security_zones_enabled),
+            "warnings": warnings,
+            "unresolvedFields": unresolved_fields,
+        }
+
+    if legacy_pvp is True and server_pve is False:
+        return {
+            "state": "PVP",
+            "source": "legacy-flags",
+            "securityZonesEnabled": bool(security_zones_enabled),
+            "warnings": warnings,
+            "unresolvedFields": unresolved_fields,
+        }
+
+    if legacy_pvp is False and server_pve is True:
+        return {
+            "state": "PVE",
+            "source": "legacy-flags",
+            "securityZonesEnabled": bool(security_zones_enabled),
+            "warnings": warnings,
+            "unresolvedFields": unresolved_fields,
+        }
+
+    return {
+        "state": "UNKNOWN",
+        "source": "unresolved",
+        "securityZonesEnabled": bool(security_zones_enabled),
+        "warnings": warnings,
+        "unresolvedFields": unresolved_fields,
+    }
+
+
+def aggregate_map_combat_state(partition_states: list) -> str:
+    """Aggregate independently-resolved partition states into a map state.
+
+      every partition PVP                -> PVP
+      every partition PVE                 -> PVE
+      at least one PVP and one PVE        -> MIXED
+      any partition CONFLICT              -> CONFLICT
+      no configured/determinable states   -> UNKNOWN
+
+    UNKNOWN partitions are excluded from the PVP/PVE/MIXED vote (they are
+    "undeterminable", not a vote for either side) but do not by themselves
+    force the map to UNKNOWN unless every partition is UNKNOWN.
+    """
+    if not partition_states:
+        return "UNKNOWN"
+    if any(state == "CONFLICT" for state in partition_states):
+        return "CONFLICT"
+    determinable = {state for state in partition_states if state in ("PVP", "PVE")}
+    if not determinable:
+        return "UNKNOWN"
+    if determinable == {"PVP"}:
+        return "PVP"
+    if determinable == {"PVE"}:
+        return "PVE"
+    return "MIXED"
+
+
+def materialized_partition_combat_values(map_name: str, partition_id: str) -> dict | None:
+    """Read the effective combat-relevant fields from the live/materialized
+    UserGame.ini for a partition, if that runtime file exists. Returns None
+    when no materialized file is present (e.g. the partition has never been
+    started), which callers must not treat as UNKNOWN/false — it simply
+    means there is nothing materialized to compare against yet.
+    """
+    target_map = canonical_map(map_name)
+    path = live_usergame_path(target_map, str(partition_id))
+    if not path.exists():
+        return None
+
+    pvp_pve_section = "/Script/DuneSandbox.PvpPveSettings"
+    game_mode_section = "/Script/DuneSandbox.DuneGameMode"
+    security_zones_section = "/Script/DuneSandbox.SecurityZonesSubsystem"
+
+    force_all = read_ini_value(path, pvp_pve_section, "m_bShouldForceEnablePvpOnAllPartitions")
+    partition_pvp = read_ini_array_contains(path, pvp_pve_section, "m_PvpEnabledPartitions", str(partition_id))
+    partition_pve = read_ini_array_contains(path, pvp_pve_section, "m_PveEnabledPartitions", str(partition_id))
+    legacy_pvp = read_ini_value(path, game_mode_section, "bPvPEnabled")
+    server_pve = read_ini_value(path, game_mode_section, "bServerPVE")
+    security_zones = read_ini_value(path, security_zones_section, "m_bAreSecurityZonesEnabled")
+
+    return {
+        "force_pvp_all_partitions": force_all if force_all is not None else "False",
+        "partition_pvp_enabled": "True" if partition_pvp else "False",
+        "partition_pve_enabled": "True" if partition_pve else "False",
+        "legacy_pvp_enabled": legacy_pvp if legacy_pvp is not None else "False",
+        "server_pve": server_pve if server_pve is not None else "True",
+        "security_zones_enabled": security_zones if security_zones is not None else "True",
+    }
+
+
+def partition_combat_state_command(map_name: str, partition_id: str) -> int:
+    """Print a structured JSON combat-state result for one partition,
+    comparing the persisted/configured settings against the materialized
+    runtime UserGame.ini (when present)."""
+    config = load_config()
+    target_map = canonical_map(map_name)
+    target_partition = str(partition_id)
+
+    configured_values = merged_partition_values(config, target_map, target_partition)
+    configured_result = resolve_partition_combat_state(configured_values)
+
+    materialized_values = materialized_partition_combat_values(target_map, target_partition)
+    materialized_result = resolve_partition_combat_state(materialized_values) if materialized_values is not None else None
+
+    configuration_drift = materialized_values is not None and any(
+        str(materialized_values.get(field, "")) != str(configured_values.get(field, ""))
+        for field in COMBAT_STATE_FIELDS
+    )
+
+    payload = {
+        "map": target_map,
+        "partitionId": target_partition,
+        "configuredState": configured_result["state"],
+        "configuredSource": configured_result["source"],
+        "materializedState": materialized_result["state"] if materialized_result else None,
+        "materializedSource": materialized_result["source"] if materialized_result else None,
+        "securityZonesEnabled": configured_result["securityZonesEnabled"],
+        "restartRequired": configuration_drift,
+        "configurationDrift": configuration_drift,
+        "warnings": configured_result["warnings"],
+        "unresolvedFields": configured_result["unresolvedFields"],
+    }
+    print(json.dumps(payload, separators=(",", ":")))
+    return 0
+
+
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
         return 2
@@ -2278,6 +2542,8 @@ def main(argv: list[str]) -> int:
         return print_usergame_rows(merged_map_values(config, canonical_map(argv[2])), MAP_FIELDS)
     if command == "partition-values" and len(argv) == 4:
         return print_usergame_rows(merged_partition_values(config, canonical_map(argv[2]), argv[3]), PARTITION_FIELDS)
+    if command == "partition-combat-state" and len(argv) == 4:
+        return partition_combat_state_command(argv[2], argv[3])
     if command == "partition-engine-values" and len(argv) == 4:
         return print_rows(merged_partition_engine_values(config, canonical_map(argv[2]), argv[3]), PARTITION_ENGINE_FIELDS)
     if command == "engine-set" and len(argv) == 4:

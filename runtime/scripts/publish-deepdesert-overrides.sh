@@ -242,7 +242,11 @@ publish_snapshot_once() {
   python3 - <<'PY'
 import json
 import subprocess
+import sys
 import time
+
+sys.path.insert(0, "runtime/scripts")
+import usersettings  # noqa: E402
 
 query = """
 select wp.partition_id,
@@ -270,43 +274,93 @@ result = subprocess.run(
     capture_output=True,
 )
 
-defaults = {
-    "Difficulty": "Custom",
-    "CoreSettings": {
-        "serverDisplayName": "",
-        "doubleDifficultyLoot": False,
-    },
-    "SurvivalSettings": {
-        "hydrationEnabled": True,
-        "sandstormEnabled": 1,
-        "sandStormAutoSpawn": True,
-        "sandStormCoriolisAutoSpawnEnabled": True,
-        "sandStormTreasureEnabled": 1,
-        "sandwormEnabled": 1,
-        "sandwormSpawnType": None,
-        "sandwormDangerZonesEnabled": True,
-        "vehicleSandwormCollisionInteraction": False,
-        "vehicleSandwormInvulnerabilitySecondsOnExit": 900,
-        "vehicleSandwormInvulnerabilitySecondsOnServerRestart": 7200,
-    },
-    "CombatSettings": {
-        "securityZonesForceEnablePvp": False,
-        "areSecurityZonesEnabled": True,
-        "shouldForceEnablePvpOnAllPartitions": False,
-        "itemDeteriorationUpdateRate": 1,
-        "vehicleDurabilityDamageMultiplier": 1,
-        "inventoryDecayedMaxDurabilityThreshold": 0.2,
-    },
-    "HarvestingSettings": {
-        "miningOutputMultiplier": 1,
-        "vehicleMiningOutputMultiplier": 1,
-        "securityZonesPvpResourceMultiplier": 2.5,
-    },
-    "PersistenceSettings": {
-        "buildingBlueprintMaxExtensions": 4,
-        "baseBackupMaxExtensions": 8,
-    },
-}
+usersettings_config = usersettings.load_config()
+
+
+def combat_settings_for_partition(partition_id: str) -> dict:
+    """Resolve this partition's PvP/PvE combat state via the canonical
+    resolver (the same merged UserGame.ini logic used by
+    `usersettings.py partition-values`), instead of publishing a single
+    hard-coded CombatSettings block for every Deep Desert partition.
+
+    This mirrors publish-deepdesert-state.sh's and publish-sietch-overrides.sh's
+    identical fix. This script was the third, previously-unfixed sibling
+    publisher with this exact bug: it publishes to the SAME RabbitMQ
+    target (completions/server_state.DeepDesert_1, via the
+    deepdesertOverrideFilteredState filter exchange) as
+    publish-deepdesert-state.sh, and spawn-server.sh runs both scripts
+    back-to-back at Deep Desert startup (state.sh then overrides.sh) --
+    so this script's previously-generic, identical-for-every-partition
+    payload was silently overwriting the correct, per-partition-resolved
+    payload publish-deepdesert-state.sh had just published moments
+    earlier. Only fields with a known, real source are published here;
+    when the partition's combat state cannot be determined
+    (UNKNOWN/CONFLICT), the PvP/PvE-affecting fields are omitted entirely
+    rather than publishing a guessed value.
+    """
+    values = usersettings.merged_partition_values(
+        usersettings_config, "DeepDesert_1", str(partition_id)
+    )
+    resolved = usersettings.resolve_partition_combat_state(values)
+
+    # Field values are serialized as strings ("True"/"False"), matching
+    # publish-deepdesert-state.sh's and publish-sietch-overrides.sh's
+    # snapshot-publish convention for this exact field set (see #106 for
+    # the pre-existing, deliberately-not-fixed-here string/bool
+    # inconsistency between the snapshot-publish and forward-relay code
+    # paths in the Sietch script -- this function only needs to match its
+    # own snapshot-publish sibling, not resolve that separate finding).
+    settings = {
+        "areSecurityZonesEnabled": "True" if resolved["securityZonesEnabled"] else "False",
+        "itemDeteriorationUpdateRate": "1.0",
+        "vehicleDurabilityDamageMultiplier": "1.0",
+        "inventoryDecayedMaxDurabilityThreshold": "0.2",
+    }
+    if resolved["state"] in ("PVP", "PVE"):
+        # shouldForceEnablePvpOnAllPartitions reflects the actual resolved
+        # force-all flag only when it is what determined this partition's
+        # state; otherwise it is omitted rather than defaulted to False,
+        # since a wrong False would misrepresent a force-all-PvP server.
+        settings["shouldForceEnablePvpOnAllPartitions"] = (
+            "True" if resolved["source"] == "force-pvp-all-partitions" else "False"
+        )
+    # When state is CONFLICT or UNKNOWN, PvP/PvE-affecting fields are
+    # intentionally omitted rather than publishing a guessed value.
+    return settings
+
+
+def gameplay_settings_for_partition(partition_id: str, display_name: str) -> dict:
+    return {
+        "Difficulty": "Custom",
+        "CoreSettings": {
+            "serverDisplayName": display_name,
+            "doubleDifficultyLoot": False,
+        },
+        "SurvivalSettings": {
+            "hydrationEnabled": True,
+            "sandstormEnabled": 1,
+            "sandStormAutoSpawn": True,
+            "sandStormCoriolisAutoSpawnEnabled": True,
+            "sandStormTreasureEnabled": 1,
+            "sandwormEnabled": 1,
+            "sandwormSpawnType": None,
+            "sandwormDangerZonesEnabled": True,
+            "vehicleSandwormCollisionInteraction": False,
+            "vehicleSandwormInvulnerabilitySecondsOnExit": 900,
+            "vehicleSandwormInvulnerabilitySecondsOnServerRestart": 7200,
+        },
+        "CombatSettings": combat_settings_for_partition(partition_id),
+        "HarvestingSettings": {
+            "miningOutputMultiplier": 1,
+            "vehicleMiningOutputMultiplier": 1,
+            "securityZonesPvpResourceMultiplier": 2.5,
+        },
+        "PersistenceSettings": {
+            "buildingBlueprintMaxExtensions": 4,
+            "baseBackupMaxExtensions": 8,
+        },
+    }
+
 
 for line in result.stdout.splitlines():
     if not line.strip():
@@ -318,8 +372,6 @@ for line in result.stdout.splitlines():
         continue
     is_ready = ready.lower() in ("t", "true", "1")
     display_name = label if is_ready else ""
-    settings = json.loads(json.dumps(defaults))
-    settings["CoreSettings"]["serverDisplayName"] = display_name
     payload = {
         "reportTimestamp": int(time.time()),
         "partitionId": int(partition_id),
@@ -333,7 +385,7 @@ for line in result.stdout.splitlines():
         "playerHardCapOverride": -1,
         "wauCapCurve": -1,
         "players": [],
-        "serverGameplaySettings": settings,
+        "serverGameplaySettings": gameplay_settings_for_partition(partition_id, display_name),
     }
     print(json.dumps(payload, separators=(",", ":")))
 PY

@@ -2380,6 +2380,33 @@ export async function liveMapServices(db, map = "") {
   return { capabilities: { services: true, farmState: hasFarm }, rows: result.rows };
 }
 
+// Partition topology rows for combat-state resolution. Returns
+// `dune.world_partition` metadata (partition id, dimension index, database
+// label) joined with `farm_state` runtime availability. These fields are
+// descriptive metadata only — callers must resolve PvP/PvE combat state via
+// `services/mapCombatState.js`, never by inferring it from the columns
+// returned here.
+export async function mapCombatPartitionRows(db, map) {
+  if (!(await tableExists(db, "world_partition"))) return unsupportedMap("combatState", ["dune.world_partition"]);
+  const hasFarm = await tableExists(db, "farm_state");
+  const values = [];
+  const where = mapFilterClause(map, values, "wp");
+  const result = await db.query(`
+    select wp.partition_id::text as partition_id,
+           coalesce(wp.map, '') as map,
+           coalesce(wp.dimension_index, 0) as dimension_index,
+           coalesce(wp.label, '') as database_label,
+           coalesce(wp.server_id, '') as server_id,
+           coalesce(wp.blocked, false) as blocked,
+           ${hasFarm ? "coalesce(fs.alive, false)" : "false"} as alive,
+           ${hasFarm ? "coalesce(fs.ready, false)" : "false"} as ready
+    from dune.world_partition wp
+    ${hasFarm ? "left join dune.farm_state fs on fs.server_id = wp.server_id" : ""}
+    where 1=1 ${where}
+    order by wp.dimension_index, wp.partition_id`, values);
+  return { capabilities: { combatState: true, farmState: hasFarm }, rows: result.rows };
+}
+
 export async function liveMapMarkers(db, map = "") {
   const [players, vehicles, bases, storage] = await Promise.all([
     liveMapPlayers(db, map),
