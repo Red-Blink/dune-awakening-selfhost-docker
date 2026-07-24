@@ -13,8 +13,35 @@ ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = Path(os.environ.get("DUNE_USERSETTINGS_CONFIG", str(ROOT / "runtime" / "generated" / "usersettings.json")))
 PROFILE_PATH = Path(os.environ.get("DUNE_GAMEPLAY_PROFILE", str(ROOT / "runtime" / "generated" / "gameplay-profile.ini")))
 SIETCH_CONFIG_PATH = ROOT / "runtime" / "generated" / "sietch-config.json"
+LANDSRAAD_RESTART_MARKER_PATH = Path(os.environ.get("DUNE_LANDSRAAD_RESTART_MARKER", str(ROOT / "runtime" / "generated" / "landsraad-restart-required")))
 
 BUILDING_SETTINGS_SECTION = "/Script/DuneSandbox.BuildingSettings"
+LANDSRAAD_SETTINGS_SECTION = "/Script/DuneSandbox.LandsraadSettings"
+LANDSRAAD_DATA_KEY = "Data"
+LANDSRAAD_DATA_TEMPLATE = '(m_NumberOfWeeksTermRetention=4,m_NumberOfDecreesToNominate=3,m_NumberOfGuildsInHighscoreList=5,m_TermStartedMessage=(Name="LandsraadTermStarted"),m_VotingStartedMessage=(Name="LandsraadVotingStarted"),m_TaskProgressedMessage=(Name="LandsraadProgressNotification"),m_DecreeActivatedMessage=(Name="LandsraadDecreeActivated"),m_bIsPlayerVotingEnabled=True,m_bIsTerritoryControlEnabled=True,m_BoardLayouts=(/Script/DuneSandbox.BoardLayoutDataAsset\'"/Game/Dune/Systems/Landsraad/BoardLayouts/DefaultLandsraadBoardLayout.DefaultLandsraadBoardLayout"\'),m_LandsraadVotingPeriodDurationInSec=118500,m_LandsraadCycleDurationInSeconds=604800,m_LandsraadSuspendedPeriodDurationInSeconds=300,m_FirstTaskRevealDelayFromCompetitionStartInSeconds=0.000000,m_LandsraadRevealedTaskTimestampMinuteDifference=1,m_LandsraadTaskProgressUpdateFrequency=15.000000,m_LandsraadTaskDailyRevealFrequency=25.000000,m_LandsraadProgressFactionBalanceCurve=/Script/Engine.CurveFloat\'"/Game/Dune/Systems/Landsraad/Curve_LandsraadProgressFactionBalanceCurve.Curve_LandsraadProgressFactionBalanceCurve"\',m_LandsraadContractsPerVotingBlock=3,m_LandsraadContractsRepeatCooldownSeconds=14400,m_LandsraadContractsMaxActiveAmount=3,m_LandsraadContractsAbandonCooldownSeconds=2,m_LandsraadContractsDailyBonusPerDay=35,m_LandsraadContractsDailyBonusMax=35,m_LandsraadContractsDailyBonusReferenceTimestamp=1760572800,m_LandsraadContractsDailyBonusRefreshCycleLength=7200,m_LandsraadContractsTimeToShowRewardInteractiveNotification=30.000000,m_LandsraadContractsTimeToShowErrorNotification=70.000000,m_LandsraadContractsTimeToShowPendingClaimRewardTutorial=300,m_LandsraadTaskRewardsData="/Game/Dune/Systems/Landsraad/DA_TaskRewardsDataAsset.DA_TaskRewardsDataAsset",m_LandsraadHouseSelectContractDialogContentWidget="/Game/Dune/GUI/Widgets/Menus/Gameplay/PlayerMenu/Landsraad/W_LandsraadHouseSelectContractDialog.W_LandsraadHouseSelectContractDialog_C",m_LandsraadContractReportDialogContentWidget="/Game/Dune/GUI/Widgets/Menus/Gameplay/PlayerMenu/Landsraad/W_LandsraadContractReportDialog.W_LandsraadContractReportDialog_C",m_LandsraadClaimHouseRewardDialogWidget="/Game/Dune/GUI/Widgets/Menus/Gameplay/PlayerMenu/Landsraad/W_LandsraadHouseRewardClaimDialog.W_LandsraadHouseRewardClaimDialog_C",m_TaskGoalAmount=56000,m_ControlPointsPerCycle=2,m_LandsraadContractsUnlockGameplayTag=(TagName="Journey.LandsraadContractsUnlocked"),m_LandsraadContractsNewMarkerGameplayTags=(GameplayTags=((TagName="DialogueFlags.Factions.LandsraadOnboardingActive"))),m_ControlPointAreaMaterial="/Game/Dune/Systems/Landsraad/Materials/M_LandsRaadControlPointCapsule.M_LandsRaadControlPointCapsule")'
+LANDSRAAD_DATA_FIELDS = {
+    "landsraad_term_retention_weeks": ("m_NumberOfWeeksTermRetention", "4", "integer", 1, 52),
+    "landsraad_decrees_to_nominate": ("m_NumberOfDecreesToNominate", "3", "integer", 1, 20),
+    "landsraad_highscore_guilds": ("m_NumberOfGuildsInHighscoreList", "5", "integer", 1, 100),
+    "landsraad_player_voting_enabled": ("m_bIsPlayerVotingEnabled", "True", "boolean", None, None),
+    "landsraad_territory_control_enabled": ("m_bIsTerritoryControlEnabled", "True", "boolean", None, None),
+    "landsraad_voting_period_seconds": ("m_LandsraadVotingPeriodDurationInSec", "118500", "integer", 60, 6048000),
+    "landsraad_cycle_duration_seconds": ("m_LandsraadCycleDurationInSeconds", "604800", "integer", 3600, 31536000),
+    "landsraad_suspended_period_seconds": ("m_LandsraadSuspendedPeriodDurationInSeconds", "300", "integer", 0, 604800),
+    "landsraad_first_task_reveal_delay_seconds": ("m_FirstTaskRevealDelayFromCompetitionStartInSeconds", "0", "number", 0, 604800),
+    "landsraad_task_reveal_minute_difference": ("m_LandsraadRevealedTaskTimestampMinuteDifference", "1", "integer", 0, 10080),
+    "landsraad_task_progress_update_seconds": ("m_LandsraadTaskProgressUpdateFrequency", "15", "number", 1, 3600),
+    "landsraad_task_daily_reveal_frequency": ("m_LandsraadTaskDailyRevealFrequency", "25", "number", 1, 10080),
+    "landsraad_contracts_per_voting_block": ("m_LandsraadContractsPerVotingBlock", "3", "integer", 1, 100),
+    "landsraad_contract_repeat_cooldown_seconds": ("m_LandsraadContractsRepeatCooldownSeconds", "14400", "integer", 0, 2592000),
+    "landsraad_max_active_contracts": ("m_LandsraadContractsMaxActiveAmount", "3", "integer", 1, 100),
+    "landsraad_contract_abandon_cooldown_seconds": ("m_LandsraadContractsAbandonCooldownSeconds", "2", "integer", 0, 604800),
+    "landsraad_daily_contract_bonus": ("m_LandsraadContractsDailyBonusPerDay", "35", "integer", 0, 1000000),
+    "landsraad_max_daily_contract_bonus": ("m_LandsraadContractsDailyBonusMax", "35", "integer", 0, 1000000),
+    "landsraad_daily_bonus_refresh_seconds": ("m_LandsraadContractsDailyBonusRefreshCycleLength", "7200", "integer", 60, 2592000),
+    "landsraad_task_goal_amount": ("m_TaskGoalAmount", "56000", "integer", 1, 2147483647),
+    "landsraad_control_points_per_cycle": ("m_ControlPointsPerCycle", "2", "integer", 0, 1000000),
+}
 STAKING_EXTENSION_DEFAULT_TIMES = (
     "60.000000",
     "120.000000",
@@ -475,6 +502,110 @@ def split_ini_assignment(line: str) -> tuple[str, str, str] | None:
     return prefix, left.strip(), right.strip()
 
 
+def split_unreal_struct(value: str) -> list[str]:
+    raw = value.strip()
+    if raw.startswith("(") and raw.endswith(")"):
+        raw = raw[1:-1]
+    parts: list[str] = []
+    start = 0
+    depth = 0
+    quote = ""
+    escaped = False
+    for index, char in enumerate(raw):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and quote:
+            escaped = True
+            continue
+        if quote:
+            if char == quote:
+                quote = ""
+            continue
+        if char in {'"', "'"}:
+            quote = char
+        elif char == "(":
+            depth += 1
+        elif char == ")":
+            depth = max(0, depth - 1)
+        elif char == "," and depth == 0:
+            parts.append(raw[start:index].strip())
+            start = index + 1
+    tail = raw[start:].strip()
+    if tail:
+        parts.append(tail)
+    return parts
+
+
+def unreal_struct_values(value: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for part in split_unreal_struct(value):
+        if "=" not in part:
+            continue
+        key, member_value = part.split("=", 1)
+        values[key.strip()] = member_value.strip()
+    return values
+
+
+def update_unreal_struct(value: str, member: str, member_value: str) -> str:
+    parts = split_unreal_struct(value)
+    updated = False
+    for index, part in enumerate(parts):
+        if "=" not in part:
+            continue
+        key, _ = part.split("=", 1)
+        if key.strip() == member:
+            parts[index] = f"{member}={member_value}"
+            updated = True
+            break
+    if not updated:
+        parts.append(f"{member}={member_value}")
+    return f"({','.join(parts)})"
+
+
+def normalize_landsraad_data_value(field_id: str, value: str) -> str:
+    _, _, field_type, minimum, maximum = LANDSRAAD_DATA_FIELDS[field_id]
+    raw = str(value).strip()
+    if field_type == "boolean":
+        if raw.lower() not in {"true", "false", "1", "0", "yes", "no", "on", "off"}:
+            raise SystemExit(f"{field_id} must be True or False.")
+        return "True" if truthy(raw) else "False"
+    try:
+        number = int(raw) if field_type == "integer" else float(raw)
+    except ValueError as exc:
+        raise SystemExit(f"{field_id} must be a valid number.") from exc
+    if minimum is not None and number < minimum:
+        raise SystemExit(f"{field_id} must be at least {minimum}.")
+    if maximum is not None and number > maximum:
+        raise SystemExit(f"{field_id} must be at most {maximum}.")
+    if field_type == "integer":
+        return str(number)
+    return format(number, ".6f").rstrip("0").rstrip(".") or "0"
+
+
+def landsraad_data_for_scope(profile: dict, scope: str, map_name: str = "", partition_id: str = "") -> str:
+    value = profile_get_key(profile, scope, LANDSRAAD_SETTINGS_SECTION, LANDSRAAD_DATA_KEY, map_name, partition_id)
+    if not value:
+        return LANDSRAAD_DATA_TEMPLATE
+    current_parts = split_unreal_struct(value)
+    current_members = unreal_struct_values(value)
+    for part in split_unreal_struct(LANDSRAAD_DATA_TEMPLATE):
+        if "=" not in part:
+            continue
+        member = part.split("=", 1)[0].strip()
+        if member not in current_members:
+            current_parts.append(part)
+    return f"({','.join(current_parts)})"
+
+
+def landsraad_virtual_values(data: str) -> dict[str, str]:
+    members = unreal_struct_values(data)
+    return {
+        field_id: members.get(member, default)
+        for field_id, (member, default, _field_type, _minimum, _maximum) in LANDSRAAD_DATA_FIELDS.items()
+    }
+
+
 def profile_get_key(profile: dict, scope: str, section: str, key: str, map_name: str = "", partition_id: str = "") -> str | None:
     block = find_profile_section(profile, scope, section, map_name, partition_id)
     if not block:
@@ -876,6 +1007,20 @@ def validate_profile_port_ranges(profile: dict) -> None:
 
 
 def set_profile_field(profile: dict, scope: str, map_name: str, partition_id: str, field_id: str, value: str) -> None:
+    if field_id in LANDSRAAD_DATA_FIELDS:
+        if scope != "global":
+            raise SystemExit("Landsraad schedule and contract modifiers must use global scope.")
+        member = LANDSRAAD_DATA_FIELDS[field_id][0]
+        normalized = normalize_landsraad_data_value(field_id, value)
+        current = landsraad_data_for_scope(profile, "global")
+        profile_set_key(
+            profile,
+            "global",
+            LANDSRAAD_SETTINGS_SECTION,
+            LANDSRAAD_DATA_KEY,
+            update_unreal_struct(current, member, normalized),
+        )
+        return
     if scope == "engine":
         if field_id not in ENGINE_FIELDS:
             raise SystemExit(f"Unknown engine field: {field_id}")
@@ -968,6 +1113,8 @@ def profile_map_values(profile: dict, map_name: str) -> dict[str, str]:
         map_value = profile_get_key(profile, "map", section, ini_key, target_map)
         if map_value is not None:
             values[key] = map_value
+    global_data = profile_get_key(profile, "global", LANDSRAAD_SETTINGS_SECTION, LANDSRAAD_DATA_KEY)
+    values.update(landsraad_virtual_values(global_data or LANDSRAAD_DATA_TEMPLATE))
     return sync_legacy_guild_values(values)
 
 
@@ -980,6 +1127,8 @@ def profile_global_values(profile: dict) -> dict[str, str]:
         global_value = profile_get_key(profile, "global", section, ini_key)
         if global_value is not None:
             values[key] = global_value
+    global_data = profile_get_key(profile, "global", LANDSRAAD_SETTINGS_SECTION, LANDSRAAD_DATA_KEY)
+    values.update(landsraad_virtual_values(global_data or LANDSRAAD_DATA_TEMPLATE))
     return sync_legacy_guild_values(values)
 
 
@@ -1043,8 +1192,15 @@ def merged_partition_engine_values(config: dict, map_name: str, partition_id: st
     return profile_partition_engine_values(read_profile(), map_name, partition_id)
 
 
-def print_rows(rows: dict[str, str], order: dict[str, tuple[str | None, str | None, str]]) -> int:
+def print_rows(rows: dict[str, str], order: dict) -> int:
     for key in order:
+        print(f"{key}\t{rows.get(key, '')}")
+    return 0
+
+
+def print_usergame_rows(rows: dict[str, str], order: dict) -> int:
+    print_rows(rows, order)
+    for key in LANDSRAAD_DATA_FIELDS:
         print(f"{key}\t{rows.get(key, '')}")
     return 0
 
@@ -1547,12 +1703,14 @@ def bulk_save(scope: str, map_name: str, partition_id: str, encoded_values: str)
     target_map = canonical_map(map_name or "Survival_1")
     target_partition = str(partition_id or "").strip()
     profile = read_profile()
+    landsraad_changed = False
     for field_id, value in values.items():
         if not isinstance(field_id, str):
             raise SystemExit("Settings field names must be strings.")
         serialized = str(value)
         if "\x00" in serialized:
             raise SystemExit(f"{field_id} contains an invalid NUL character.")
+        landsraad_changed = landsraad_changed or field_id == "landsraad_enabled" or field_id in LANDSRAAD_DATA_FIELDS
         if scope == "engine":
             set_profile_field(profile, "engine", "", "", field_id, serialized)
         elif scope == "global":
@@ -1566,6 +1724,8 @@ def bulk_save(scope: str, map_name: str, partition_id: str, encoded_values: str)
     if scope == "engine":
         validate_profile_port_ranges(profile)
     write_profile(profile)
+    if landsraad_changed:
+        atomic_write_text(LANDSRAAD_RESTART_MARKER_PATH, "Landsraad UserGame settings changed.\n", 0o664)
     return 0
 
 
@@ -1721,6 +1881,24 @@ Dune.GlobalVehicleMiningOutputMultiplier=10
         raise SystemExit("Base backup tool time restriction did not feed interactive map values.")
     if "m_BaseBackupToolTimeRestrictionInSeconds=60" not in compiled_usergame_ini(reparsed, "Survival_1", "3"):
         raise SystemExit("Base backup tool time restriction did not compile from interactive profile update.")
+    set_profile_field(reparsed, "global", "", "", "landsraad_cycle_duration_seconds", "1209600")
+    set_profile_field(reparsed, "global", "", "", "landsraad_player_voting_enabled", "False")
+    landsraad_data = profile_get_key(reparsed, "global", LANDSRAAD_SETTINGS_SECTION, LANDSRAAD_DATA_KEY) or ""
+    landsraad_members = unreal_struct_values(landsraad_data)
+    if landsraad_members.get("m_LandsraadCycleDurationInSeconds") != "1209600":
+        raise SystemExit("Landsraad cycle duration did not update the managed Data structure.")
+    if landsraad_members.get("m_bIsPlayerVotingEnabled") != "False":
+        raise SystemExit("Landsraad voting toggle did not update the managed Data structure.")
+    if "m_LandsraadTaskRewardsData" not in landsraad_members or "m_ControlPointAreaMaterial" not in landsraad_members:
+        raise SystemExit("Landsraad modifier update dropped required internal Data members.")
+    if profile_global_values(reparsed)["landsraad_cycle_duration_seconds"] != "1209600":
+        raise SystemExit("Managed Landsraad Data did not feed global modifier values.")
+    try:
+        set_profile_field(reparsed, "global", "", "", "landsraad_cycle_duration_seconds", "59")
+        raise SystemExit("Invalid Landsraad cycle duration was accepted.")
+    except SystemExit as exc:
+        if str(exc) == "Invalid Landsraad cycle duration was accepted.":
+            raise
     building_defaults = profile_map_values(parse_profile_text(""), "Survival_1")
     expected_building_defaults = {
         "build_range": "3000.000000",
@@ -1923,11 +2101,11 @@ def main(argv: list[str]) -> int:
     if command == "engine-values":
         return print_rows(merged_engine_values(config), ENGINE_FIELDS)
     if command == "global-values":
-        return print_rows(merged_global_values(config), MAP_FIELDS)
+        return print_usergame_rows(merged_global_values(config), MAP_FIELDS)
     if command == "map-values" and len(argv) == 3:
-        return print_rows(merged_map_values(config, canonical_map(argv[2])), MAP_FIELDS)
+        return print_usergame_rows(merged_map_values(config, canonical_map(argv[2])), MAP_FIELDS)
     if command == "partition-values" and len(argv) == 4:
-        return print_rows(merged_partition_values(config, canonical_map(argv[2]), argv[3]), PARTITION_FIELDS)
+        return print_usergame_rows(merged_partition_values(config, canonical_map(argv[2]), argv[3]), PARTITION_FIELDS)
     if command == "partition-engine-values" and len(argv) == 4:
         return print_rows(merged_partition_engine_values(config, canonical_map(argv[2]), argv[3]), PARTITION_ENGINE_FIELDS)
     if command == "engine-set" and len(argv) == 4:

@@ -577,6 +577,7 @@ async function handleApi(req, res) {
   if (path === "/api/maps/choam-terminals" && req.method === "DELETE") return mapsChoamTerminalRemoveRoute(req, res);
   if (path === "/api/maps/choam-terminals") return dbJson(res, () => choamTerminalOverview(db));
   if (path === "/api/maps/user-settings/schema") return userSettingsSchemaRoute(res);
+  if (path === "/api/maps/user-settings/restart-pending") return json(res, 200, { pending: existsSync(resolve(config.repoRoot, "runtime/generated/landsraad-restart-required")) });
   if (path === "/api/maps/user-settings/values") return userSettingsValuesRoute(res, url);
   if (path === "/api/maps/user-settings/raw" && req.method === "POST") return userSettingsRawWriteRoute(req, res);
   if (path === "/api/maps/user-settings/raw") return userSettingsRawRoute(res, url);
@@ -1504,13 +1505,14 @@ function userSettingsTaskPayload(body) {
   const map = String(body.map || "Survival_1");
   const partitionId = String(body.partitionId || "").trim();
   const values = body.values && typeof body.values === "object" && !Array.isArray(body.values) ? body.values : {};
+  const restart = body.restart === false ? { restartMode: "none", restartLabel: "saved configuration" } : restartPayload(scope, map, partitionId);
   return {
     scope,
     map,
     partitionId,
     values,
     content: String(body.content || ""),
-    ...restartPayload(scope, map, partitionId)
+    ...restart
   };
 }
 

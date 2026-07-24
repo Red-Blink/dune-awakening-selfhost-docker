@@ -174,6 +174,13 @@ test("uses the global UserGame reset operation in restart tasks", () => {
   ]);
 });
 
+test("can save and materialize UserGame modifiers without restarting immediately", () => {
+  assert.deepEqual(taskOperations("userSettingsSaveAndRestart", { scope: "global", restartMode: "none" }), [
+    "userSettingsSave",
+    "userSettingsMaterializeCurrent"
+  ]);
+});
+
 test("does not respawn maps when changing a running map to disabled", () => {
   assert.deepEqual(taskOperations("mapsApplySettings", { modeChanged: true, mode: "disabled", restartMode: "respawn" }), [
     "mapsSetMode"

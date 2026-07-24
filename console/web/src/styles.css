@@ -1923,17 +1923,24 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 .landsraad-summary-grid strong { color: #ceb894; font-size: .78rem; text-transform: uppercase; }
 .landsraad-bulk-row, .landsraad-contribution-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
 .landsraad-bulk-row .compact-select { flex: 0 1 220px; }
-.landsraad-persistent-settings { display: grid; grid-template-columns: max-content minmax(180px, 1fr) auto; gap: 14px; align-items: end; padding: 12px; border: 1px solid rgba(214, 185, 140, .13); border-radius: 8px; background: rgba(255,255,255,.025); }
+.landsraad-persistent-settings { display: grid; gap: 16px; padding: 14px; border: 1px solid rgba(214, 185, 140, .13); border-radius: 8px; background: rgba(255,255,255,.025); }
+.landsraad-persistent-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .landsraad-persistent-copy { display: grid; gap: 4px; min-width: 0; }
 .landsraad-persistent-copy h4 { margin: 0; color: #ffd08a; }
-.landsraad-persistent-copy p { margin: 0; max-width: none; white-space: nowrap; }
-.landsraad-persistent-status { display: flex; align-items: center; justify-content: center; min-height: 38px; min-width: 0; }
+.landsraad-persistent-copy p { margin: 0; max-width: none; }
+.landsraad-persistent-status { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-height: 38px; min-width: 0; }
 .landsraad-persistent-status .inline-action-result-wrap { align-self: center; flex: 0 1 auto; min-width: 0; min-height: 24px; }
 .landsraad-persistent-status .inline-action-result { display: inline-flex; align-items: center; min-height: 24px; line-height: 1.2; white-space: nowrap; }
-.landsraad-persistent-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; min-width: min(100%, 460px); }
-.landsraad-persistent-controls label { display: inline-flex; flex-direction: row; gap: 8px; align-items: center; min-width: max-content; color: #ceb894; font-size: 1rem; font-weight: 400; white-space: nowrap; }
-.landsraad-persistent-controls select { flex: 0 1 180px; height: auto; }
-.landsraad-persistent-controls button { height: auto; }
+.landsraad-modifier-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.landsraad-modifier-group { min-width: 0; margin: 0; padding: 12px; border: 1px solid rgba(214, 185, 140, .13); border-radius: 6px; }
+.landsraad-modifier-group legend { padding: 0 7px; color: #ffd08a; font-size: .84rem; font-weight: 700; }
+.landsraad-modifier-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.landsraad-modifier-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(110px, 140px); gap: 10px; align-items: center; min-width: 0; color: #ceb894; font-size: .82rem; }
+.landsraad-modifier-field > span { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+.landsraad-modifier-field small { color: #8f8a80; font-size: .7rem; font-weight: 400; }
+.landsraad-modifier-field input, .landsraad-modifier-field select { width: 100%; min-width: 0; }
+.landsraad-persistent-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid rgba(214, 185, 140, .13); padding-top: 12px; }
+.landsraad-persistent-actions > div { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 .landsraad-section-divider { margin-top: 2px; }
 .landsraad-milestone-preset { display: grid; gap: 14px; }
 .landsraad-milestone-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -2110,12 +2117,16 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 .deep-desert-dual-line .inline-task-result { margin-left: 0; flex: 0 1 auto; min-width: 0; max-width: 320px; }
 .hidden-file-input { display: none; }
 @media (max-width: 1320px) {
-  .landsraad-persistent-settings { grid-template-columns: 1fr; }
-  .landsraad-persistent-copy p { white-space: normal; }
+  .landsraad-persistent-heading, .landsraad-persistent-actions { align-items: flex-start; flex-direction: column; }
   .landsraad-persistent-status { justify-content: flex-start; min-height: 0; }
-  .landsraad-persistent-controls { justify-content: flex-start; min-width: 0; }
+  .landsraad-modifier-groups { grid-template-columns: 1fr; }
+  .landsraad-persistent-actions > div { width: 100%; justify-content: flex-start; }
 }
 @media (max-width: 720px) {
+  .landsraad-modifier-grid { grid-template-columns: 1fr; }
+  .landsraad-modifier-field { grid-template-columns: minmax(0, 1fr) minmax(100px, 130px); }
+  .landsraad-persistent-actions > div { align-items: stretch; flex-direction: column; }
+  .landsraad-persistent-actions button { width: 100%; }
   .playerAdmin_actionNote { padding-left: 0; }
   .playerAdmin_repairRow { grid-template-columns: 1fr; align-items: start; }
   .playerAdmin_repairRow button { justify-self: start; }
