@@ -11,7 +11,7 @@ source runtime/scripts/host-paths.sh
 source runtime/scripts/runtime-env.sh
 source runtime/scripts/image-tags.sh
 WORLD_IMAGE_TAG="$(resolve_world_image_tag)"
-IMAGE="$(runtime/scripts/build-director-compat.sh)"
+IMAGE="registry.funcom.com/funcom/self-hosting/seabass-server-bg-director:${WORLD_IMAGE_TAG}"
 DIRECTOR_PORT="$(resolve_director_port)"
 
 TOKEN_FILE="runtime/secrets/funcom-token.txt"
