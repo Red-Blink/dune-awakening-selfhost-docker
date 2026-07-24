@@ -21,10 +21,69 @@ import {
   readConfiguredCapacity,
   readDirectoryInstallationKey,
   readPreviousDirectoryInstallationKey,
+  readPublicModifiers,
   readDirectorySettings,
   readGameBuild,
   reconcilePublicProbe
 } from "../src/services/publicDirectory.js";
+
+test("public modifier reporting is allowlisted and omits defaults and secrets", () => {
+  const files = fixture();
+  const path = join(files.generatedDir, "gameplay-profile.ini");
+  try {
+    writeFileSync(path, [
+      "[Engine:ConsoleVariables]",
+      "Dune.GlobalMiningOutputMultiplier=7.77",
+      "Dune.GlobalVehicleMiningOutputMultiplier=1.000000",
+      "Bgd.ServerLoginPassword=must-not-leak",
+      "Unknown.PrivateSetting=42",
+      "Sandstorm.Enabled=0",
+      "",
+      "[Partition:Survival_1:1:/Script/DuneSandbox.DuneGameMode]",
+      "m_GlobalXPMultiplier=3.5",
+      "m_WaterConsumptionRate=0.5",
+      "m_DefaultReconnectGracePeriodSeconds=600",
+      "",
+      "[Global:/Script/DuneSandbox.BuildingSettings]",
+      "m_PickupTotalDurabilityPercentageReduction=0.25",
+      "",
+      "[Global:/Script/DuneSandbox.ContractsSubsystem]",
+      "m_bIsEnabled=invalid"
+    ].join("\n"));
+    assert.deepEqual(readPublicModifiers(path), {
+      "Mining Output": "7.77x",
+      Sandstorms: "Disabled",
+      "XP Multiplier": "3.5x",
+      "Water Consumption": "0.5x",
+      "Reconnect Grace Period": "10 minutes",
+      "Building Pickup Durability Loss": "25%"
+    });
+  } finally {
+    files.cleanup();
+  }
+});
+
+test("public modifier reporting preserves differing map values without exposing map internals", () => {
+  const files = fixture();
+  const path = join(files.generatedDir, "gameplay-profile.ini");
+  try {
+    writeFileSync(path, [
+      "[Partition:Survival_1:1:/Script/DuneSandbox.DuneGameMode]",
+      "m_GlobalXPMultiplier=2",
+      "",
+      "[Partition:Survival_1:2:/Script/DuneSandbox.DuneGameMode]",
+      "m_GlobalXPMultiplier=3.0",
+      "",
+      "[Partition:Survival_1:3:/Script/DuneSandbox.DuneGameMode]",
+      "m_GlobalXPMultiplier=1.000000"
+    ].join("\n"));
+    assert.deepEqual(readPublicModifiers(path), {
+      "XP Multiplier": "Varies: 2x, 3x"
+    });
+  } finally {
+    files.cleanup();
+  }
+});
 
 test("heartbeat includes an empty Discord invite so stale directory links are removed", () => {
   const payload = buildHeartbeatPayload(
@@ -158,7 +217,11 @@ test("directory snapshot uses compact database aggregates and local metadata", a
       installationKey: readDirectoryInstallationKey(files.repoRoot),
       previousInstallationKey: "",
       sietches: 2,
-      discordInvite: "https://discord.gg/Test_Code"
+      discordInvite: "https://discord.gg/Test_Code",
+      publicMetadata: {
+        modifiers: {},
+        progression: { characters: 0, averageLevel: 0, highestLevel: 0 }
+      }
     });
     assert.equal(readGameBuild(files.repoRoot), "2036754");
     assert.equal(readConfiguredCapacity(files.repoRoot), 120);
@@ -242,7 +305,7 @@ test("reporter sends a fresh offline heartbeat when the battlegroup is stopped",
       getBattlegroupRunning: () => false,
       fetchImpl: async (_url, options) => {
         payload = JSON.parse(options.body);
-        return response({ ok: true, nextHeartbeatSeconds: 60 });
+        return response({ ok: true, nextHeartbeatSeconds: 60, listingClaimed: false });
       },
       setTimeoutFn: () => ({ unref() {} })
     });
@@ -273,7 +336,8 @@ test("reporter sends only the public directory contract and persists its identit
       baseUrl: "https://directory.test/api/v1/servers",
       fetchImpl: async (url, options) => {
         requests.push({ url, options });
-        return response({ ok: true, nextHeartbeatSeconds: 75 });
+        if (url.endsWith("/claim-status")) return response({ ok: true, claimed: true, playerPortalEnabled: false });
+        return response({ ok: true, nextHeartbeatSeconds: 75, listingClaimed: true });
       },
       setTimeoutFn: (_fn, delay) => {
         delays.push(delay);
@@ -284,9 +348,12 @@ test("reporter sends only the public directory contract and persists its identit
 
     await reporter.tick();
 
-    assert.equal(requests.length, 1);
-    assert.equal(requests[0].url, "https://directory.test/api/v1/servers/heartbeat");
-    const payload = JSON.parse(requests[0].options.body);
+    assert.equal(requests.length, 2);
+    const heartbeat = requests.find(request => request.url.endsWith("/heartbeat"));
+    const claimStatus = requests.find(request => request.url.endsWith("/claim-status"));
+    assert.ok(heartbeat);
+    assert.ok(claimStatus);
+    const payload = JSON.parse(heartbeat.options.body);
     assert.deepEqual(Object.keys(payload).sort(), [
       "capacity",
       "discordInvite",
@@ -294,6 +361,7 @@ test("reporter sends only the public directory contract and persists its identit
       "name",
       "personalizedPingEnabled",
       "playersOnline",
+      "publicMetadata",
       "publicMode",
       "ready",
       "region",
@@ -318,6 +386,95 @@ test("reporter sends only the public directory contract and persists its identit
     assert.equal(identity.secret, payload.secret);
     assert.equal(statSync(join(files.secretsDir, "public-directory.json")).mode & 0o777, 0o600);
     assert.equal(reporter.publicState().remoteListed, true);
+    assert.equal(reporter.publicState().listingClaimed, true);
+  } finally {
+    files.cleanup();
+  }
+});
+
+test("claim endpoint override does not redirect normal directory heartbeats", async () => {
+  const files = fixture();
+  const requests = [];
+  try {
+    const identity = getOrCreateIdentity(join(files.secretsDir, "public-directory.json"));
+    const reporter = createPublicDirectoryReporter({
+      repoRoot: files.repoRoot,
+      generatedDir: files.generatedDir,
+      secretsDir: files.secretsDir
+    }, {
+      db: fakeDb(),
+      getBattlegroupRunning: () => true,
+      baseUrl: "https://directory.test/api/v1/servers",
+      claimBaseUrl: "https://beta-directory.test/api/v1/servers/",
+      fetchImpl: async (url, options) => {
+        requests.push({ url, options });
+        if (url.endsWith("/claim-status")) return response({ ok: true, claimed: false, playerPortalEnabled: false });
+        return response({
+          ok: true,
+          nextHeartbeatSeconds: 60,
+          ...(url.endsWith("/heartbeat") ? { listingClaimed: false } : {})
+        });
+      },
+      setTimeoutFn: () => ({ unref() {} })
+    });
+
+    await reporter.tick();
+    await reporter.verifyClaim("9F06-E912-70F0");
+
+    assert.equal(requests[0].url, "https://directory.test/api/v1/servers/heartbeat");
+    assert.equal(
+      requests[2].url,
+      `https://beta-directory.test/api/v1/servers/${identity.serverId}/verify-claim`
+    );
+    assert.equal(requests[2].options.headers.authorization, `Bearer ${identity.secret}`);
+    assert.deepEqual(JSON.parse(requests[2].options.body), { code: "9F06E91270F0" });
+    assert.equal(reporter.publicState().listingClaimed, true);
+  } finally {
+    files.cleanup();
+  }
+});
+
+test("reporter uploads only player portal identities requested by the claimed listing", async () => {
+  const files = fixture();
+  const requests = [];
+  const requestedHash = "a".repeat(64);
+  const journeyData = { journey_aliases: { journey: "Friendly Journey" } };
+  const skillData = [{ id: "Skills.Ability.Test", name: "Friendly Skill" }];
+  try {
+    const reporter = createPublicDirectoryReporter({
+      repoRoot: files.repoRoot,
+      generatedDir: files.generatedDir,
+      secretsDir: files.secretsDir
+    }, {
+      db: fakeDb(),
+      getBattlegroupRunning: () => true,
+      baseUrl: "https://directory.test/api/v1/servers",
+      playerPortalJourneyData: journeyData,
+      playerPortalSkillData: skillData,
+      collectPlayerPortalSnapshots: async (_db, hashes, loadedJourneys, loadedSkills) => {
+        assert.deepEqual(hashes, [requestedHash]);
+        assert.equal(loadedJourneys, journeyData);
+        assert.equal(loadedSkills, skillData);
+        return [{ accountHash: requestedHash, found: true, data: { overview: { characterName: "Test" } } }];
+      },
+      fetchImpl: async (url, options) => {
+        requests.push({ url, options });
+        if (url.endsWith("/heartbeat")) return response({ ok: true, nextHeartbeatSeconds: 60, listingClaimed: true });
+        if (url.endsWith("/claim-status")) return response({ ok: true, claimed: true, playerPortalEnabled: true, requestedAccountHashes: [requestedHash] });
+        return response({ ok: true, stored: 1 });
+      },
+      setTimeoutFn: () => ({ unref() {} }),
+      now: () => Date.parse("2026-07-22T12:00:00Z")
+    });
+
+    await reporter.tick();
+    assert.ok(requests.some(request => request.url.endsWith(`/claim-status`)));
+    const upload = requests.find(request => request.url.endsWith("/player-portal/snapshot"));
+    assert.ok(upload);
+    const body = JSON.parse(upload.options.body);
+    assert.equal(body.snapshots.length, 1);
+    assert.equal(body.snapshots[0].accountHash, requestedHash);
+    assert.equal(Object.hasOwn(body.snapshots[0], "platformId"), false);
   } finally {
     files.cleanup();
   }

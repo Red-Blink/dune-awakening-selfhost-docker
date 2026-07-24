@@ -11,7 +11,7 @@ This project is unofficial. It is not affiliated with, endorsed by, sponsored by
 ## Project Links
 
 - [Official Website](https://dunedocker.app/) - Project information, installation guidance, FAQ, and the public server directory
-- [Discord Community](https://discord.gg/9pQqytu6BU) - Support, updates, addons, and community discussion
+- [Discord Community](https://discord.gg/duneawakeningdocker) - Support, updates, addons, and community discussion
 - [Support the Project](https://ko-fi.com/redblink) - Help support development, testing, and project infrastructure
 
 ## Features

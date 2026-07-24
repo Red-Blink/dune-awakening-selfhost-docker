@@ -6,6 +6,17 @@ import { stripAnsi } from "../../lib/display";
 export const VEHICLE_SPAWN_OFFSET_UNITS = 2000; // 20 meters in Unreal units.
 export const FLYING_VEHICLE_SPAWN_OFFSET_UNITS = 2000; // 20 meters in Unreal units.
 
+const PLAYER_FACTIONS: Record<string, { id: number; name: string }> = {
+  atreides: { id: 1, name: "Atreides" },
+  harkonnen: { id: 2, name: "Harkonnen" },
+  smuggler: { id: 4, name: "Smuggler" }
+};
+
+export function playerAssignedFaction(value: unknown, assigned: unknown) {
+  if (assigned !== true) return null;
+  return PLAYER_FACTIONS[String(value || "").trim().toLowerCase()] || null;
+}
+
 export function vehicleSpawnOffsetUnits(vehicleId: string) {
   return /ornithopter/i.test(String(vehicleId || "")) ? FLYING_VEHICLE_SPAWN_OFFSET_UNITS : VEHICLE_SPAWN_OFFSET_UNITS;
 }

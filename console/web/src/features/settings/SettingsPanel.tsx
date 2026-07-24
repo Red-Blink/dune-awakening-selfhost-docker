@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronUp, ExternalLink, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { api, post } from "../../api/client";
 import { SecretInput } from "../../components/SecretInput";
 import { KeyValueGrid, StatusPill } from "../../components/common/DisplayPrimitives";
@@ -13,15 +13,15 @@ type PublicDirectorySettings = {
   state?: string;
   lastSuccessAt?: string | null;
   error?: string | null;
-  discordInvite?: string;
   probeError?: string | null;
 };
 
 type SettingsPanelProps = {
   onPasswordChanged: () => Promise<void>;
+  publicListingUrl?: string;
 };
 
-export function SettingsPanel({ onPasswordChanged }: SettingsPanelProps) {
+export function SettingsPanel({ onPasswordChanged, publicListingUrl }: SettingsPanelProps) {
   const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -35,8 +35,7 @@ export function SettingsPanel({ onPasswordChanged }: SettingsPanelProps) {
   const [publicProfileOpen, setPublicProfileOpen] = useState(false);
   const [publicProfileSaving, setPublicProfileSaving] = useState(false);
   const [publicProfileResult, setPublicProfileResult] = useState<SettingsTaskResult | null>(null);
-  const [discordInvite, setDiscordInvite] = useState("");
-  const [savedDiscordInvite, setSavedDiscordInvite] = useState("");
+  const [claimCode, setClaimCode] = useState("");
   const [loginPasswordOpen, setLoginPasswordOpen] = useState(false);
   const [webPortOpen, setWebPortOpen] = useState(false);
   const [webPort, setWebPort] = useState("");
@@ -48,8 +47,6 @@ export function SettingsPanel({ onPasswordChanged }: SettingsPanelProps) {
     const config = (nextSettings.config as Record<string, unknown> | undefined) || {};
     const directory = (nextSettings.publicDirectory as PublicDirectorySettings | undefined) || {};
     setWebPort(String(config.port || "8088"));
-    setDiscordInvite(directory.discordInvite || "");
-    setSavedDiscordInvite(directory.discordInvite || "");
   }
   useEffect(() => {
     refresh().catch(() => undefined);
@@ -151,26 +148,22 @@ export function SettingsPanel({ onPasswordChanged }: SettingsPanelProps) {
       setServerListingSaving(false);
     }
   }
-  async function saveDiscordInvite(nextInvite: string) {
+  async function verifyListingClaim() {
     setPublicProfileSaving(true);
-    setPublicProfileResult({ status: "running", title: nextInvite ? "Saving Discord Invite..." : "Removing Discord Invite..." });
+    setPublicProfileResult({ status: "running", title: "Verifying Listing Claim..." });
     try {
-      const result = await post<{ ok: boolean; publicDirectory: PublicDirectorySettings }>("/api/settings/public-directory", {
-        discordInvite: nextInvite
-      });
-      const saved = result.publicDirectory.discordInvite || "";
-      setDiscordInvite(saved);
-      setSavedDiscordInvite(saved);
-      setSettings((current) => current ? { ...current, publicDirectory: result.publicDirectory } : current);
+      const result = await post<{ ok: boolean; message: string }>("/api/settings/public-directory/claim", { code: claimCode });
+      setClaimCode("");
       setPublicProfileResult({
         status: "succeeded",
-        title: saved ? "Discord Invite Saved" : "Discord Invite Removed",
-        message: saved ? "The invite will appear with this server's public listing." : "The Discord link was removed from the public listing."
+        title: "Public Listing Claimed",
+        message: result.message
       });
+      window.dispatchEvent(new Event("public-directory-claim-changed"));
     } catch (error) {
       setPublicProfileResult({
         status: "failed",
-        title: nextInvite ? "Discord Invite Not Saved" : "Discord Invite Not Removed",
+        title: "Listing Claim Failed",
         message: error instanceof Error ? error.message : String(error)
       });
     } finally {
@@ -207,28 +200,23 @@ export function SettingsPanel({ onPasswordChanged }: SettingsPanelProps) {
           <span>Public Listing Profile</span>
         </button>
         {publicProfileOpen && <div className="playerAdmin_toggleBody">
-          <p className="muted">Optional community details shown with this server on DuneDocker.app.</p>
+          <p className="muted">Public descriptions, community links, recruitment details, and Player Portal settings are managed on DuneDocker.app. Generate a claim code from {publicListingUrl
+            ? <a className="settings-server-page-link" href={publicListingUrl} target="_blank" rel="noreferrer">[Your Server Page]</a>
+            : "[Your Server Page]"}, then paste it below.</p>
           <label className="settings-discord-field">
-            <span className="field-label-row">
-              <span className="settings-discord-label"><DiscordLogo size={17} />Discord Invite</span>
-              {savedDiscordInvite && <a className="settings-discord-open" href={savedDiscordInvite} target="_blank" rel="noreferrer">Open Invite<ExternalLink size={14} /></a>}
-            </span>
+            <span className="field-label-row"><span className="settings-discord-label">Generated Claim Code</span></span>
             <input
               disabled={publicProfileSaving}
-              type="url"
-              value={discordInvite}
-              onChange={(event) => setDiscordInvite(event.target.value)}
-              placeholder="https://discord.gg/your-invite"
-              autoComplete="url"
+              value={claimCode}
+              onChange={(event) => setClaimCode(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 14))}
+              placeholder="ABCD-EF12-3456"
+              autoComplete="off"
             />
           </label>
           <div className="action-row">
-            <button disabled={publicProfileSaving || !discordInvite.trim() || discordInvite.trim() === savedDiscordInvite} onClick={() => { void saveDiscordInvite(discordInvite.trim()); }}>
-              {publicProfileSaving ? "Saving..." : "Save Discord Invite"}
+            <button disabled={publicProfileSaving || claimCode.replace(/[^A-Z0-9]/g, "").length !== 12} onClick={() => { void verifyListingClaim(); }}>
+              {publicProfileSaving ? "Verifying..." : "Verify Generated Code"}
             </button>
-            {savedDiscordInvite && <button className="settings-discord-remove" disabled={publicProfileSaving} onClick={() => { void saveDiscordInvite(""); }} title="Remove Discord Invite">
-              <Trash2 size={16} />Remove
-            </button>}
             {publicProfileResult && <span className={`inline-task-result result-${publicProfileResult.status === "succeeded" ? "ok" : publicProfileResult.status === "failed" ? "fail" : "running"}`}>
               <strong className={publicProfileResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(publicProfileResult.title, publicProfileResult.status === "running")}</strong>
               {publicProfileResult.message && <span className="inline-task-message">{formatResultMessage(publicProfileResult.message)}</span>}
@@ -281,12 +269,6 @@ export function SettingsPanel({ onPasswordChanged }: SettingsPanelProps) {
       </div>
     </div>
   </section>;
-}
-
-function DiscordLogo({ size = 18 }: { size?: number }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-    <path fill="currentColor" d="M20.3 4.4A18.4 18.4 0 0 0 15.8 3l-.2.4a13.1 13.1 0 0 1 4 2 14.2 14.2 0 0 0-5-1.5 14.8 14.8 0 0 0-5.2 0 14.2 14.2 0 0 0-5 1.5 13.1 13.1 0 0 1 4-2L8.2 3a18.4 18.4 0 0 0-4.5 1.4C.9 8.5.1 12.5.5 16.5A18.7 18.7 0 0 0 6 19.2l.7-.9a11.6 11.6 0 0 1-1.8-.9l.4-.3a13.2 13.2 0 0 0 13.4 0l.4.3a11.6 11.6 0 0 1-1.8.9l.7.9a18.7 18.7 0 0 0 5.5-2.7c.5-4.6-.8-8.5-3.2-12.1ZM8.4 14.2c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm7.2 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z" />
-  </svg>;
 }
 
 function formatResultTitle(value: unknown, pending = false) {

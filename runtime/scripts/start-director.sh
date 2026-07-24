@@ -11,7 +11,7 @@ source runtime/scripts/host-paths.sh
 source runtime/scripts/runtime-env.sh
 source runtime/scripts/image-tags.sh
 WORLD_IMAGE_TAG="$(resolve_world_image_tag)"
-IMAGE="registry.funcom.com/funcom/self-hosting/seabass-server-bg-director:${WORLD_IMAGE_TAG}"
+IMAGE="$(runtime/scripts/build-director-compat.sh)"
 DIRECTOR_PORT="$(resolve_director_port)"
 
 TOKEN_FILE="runtime/secrets/funcom-token.txt"
@@ -259,7 +259,8 @@ EOF
 : > "$FAKE_K8S_SERVICEACCOUNT_DIR/ca.crt"
 
 chmod -R 755 "$FAKE_K8S_SERVICEACCOUNT_DIR"
-chmod -R 755 runtime/director/config
+chmod 755 runtime/director/config
+chmod 600 runtime/director/config/director_config.ini
 
 if [ ! -f runtime/director/config/director_config.ini ]; then
   echo "Failed to prepare director config file: runtime/director/config/director_config.ini"

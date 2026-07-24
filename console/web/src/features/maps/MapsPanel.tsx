@@ -70,6 +70,11 @@ function isForceDespawnResult(result: HomeTaskResult | null) {
   return /\bdespawn/i.test(`${result.title || ""}\n${result.message || ""}`);
 }
 
+function isForceSpawnResult(result: HomeTaskResult | null) {
+  if (!result) return false;
+  return /\bspawn(?:ing|ed)?\b/i.test(`${result.title || ""}\n${result.message || ""}`) && !/\bdespawn/i.test(`${result.title || ""}\n${result.message || ""}`);
+}
+
 function isMapSettingsResult(result: HomeTaskResult | null) {
   if (!result) return false;
   return /\bmap settings\b|saving .+ settings|settings saved/i.test(`${result.title || ""}\n${result.message || ""}`);
@@ -1201,12 +1206,26 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
     if (!(await confirmAction(`Force despawn ${rowName}?`))) return;
     await runTaskAndRefresh(() => mapsApi.despawn(target, "DESPAWN MAP"), `Despawning ${rowName}`, `${rowName} Despawned`, { resultTarget: mapResultTarget(rowName) });
   }
+  async function forceSpawnMap(row: Record<string, unknown>) {
+    const rowName = String(row.map || "").trim();
+    if (!rowName || rowName === "Survival_1" || rowName === "Overmap") return;
+    const target = String(row.partitionId || row.partition || rowName).trim();
+    if (!target || !(await confirmAction(`Force spawn ${rowName}?`, { danger: false, confirmLabel: "Force Spawn" }))) return;
+    await runTaskAndRefresh(() => mapsApi.spawn(target, "SPAWN MAP"), `Spawning ${rowName}`, `${rowName} Spawned`, { resultTarget: mapResultTarget(rowName) });
+  }
   async function forceDespawnDeepDesertPartition(row: Record<string, unknown>) {
     const partitionId = String(row.partitionId || "").trim();
     if (!partitionId) return;
     const label = deepDesertPartitionName(row);
     if (!(await confirmAction(`Force despawn ${label}?`))) return;
     await runTaskAndRefresh(() => mapsApi.despawn(partitionId, "DESPAWN MAP"), `Despawning ${label}`, `${label} Despawned`, { resultTarget: mapResultTarget("DeepDesert_1", partitionId) });
+  }
+  async function forceSpawnDeepDesertPartition(row: Record<string, unknown>) {
+    const partitionId = String(row.partitionId || "").trim();
+    if (!partitionId) return;
+    const label = deepDesertPartitionName(row);
+    if (!(await confirmAction(`Force spawn ${label}?`, { danger: false, confirmLabel: "Force Spawn" }))) return;
+    await runTaskAndRefresh(() => mapsApi.spawn(partitionId, "SPAWN MAP"), `Spawning ${label}`, `${label} Spawned`, { resultTarget: mapResultTarget("DeepDesert_1", partitionId) });
   }
   async function saveGame() {
     if (!userGameName) return;
@@ -1336,7 +1355,7 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
   const startupParallelismDirty = Number(startupParallelism) !== runtimeParallelismValue;
   return <section className="panel maps-panel">
     <div className="panel-title"><h2>Maps & Sietches</h2><div className="maps-title-actions">{memoryBalancer?.enabled && <span className={`maps-memory-balancer-status ${memoryBalancer.lastError ? "danger" : ""}`}>{memoryBalancer.lastError ? `Memory Balancer error: ${memoryBalancer.lastError}` : memoryBalancer.lastMessage || "Memory Balancer is monitoring running maps"}</span>}<button className={`switch-toggle maps-memory-balancer-toggle ${memoryBalancer?.enabled ? "enabled" : "disabled"}`} disabled={memoryBalancerSaving} onClick={() => run(toggleMemoryBalancer)}><span className="switch-label">Memory Balancer</span><strong className="switch-state">{memoryBalancer?.enabled ? "ON" : "OFF"}</strong></button><button disabled={loading} onClick={() => run(loadMaps)}>{loading ? "Refreshing..." : "Refresh Maps"}</button></div></div>
-    {mapsResult && mapsResultScope === "maps" && !isDeepDesertDualResult(mapsResult) && !isForceDespawnResult(mapsResult) && !isMapSettingsResult(mapsResult) ? <div className="maps-result-slot"><HomeTaskResultCard result={mapsResult} /></div> : null}
+    {mapsResult && mapsResultScope === "maps" && !isDeepDesertDualResult(mapsResult) && !isForceDespawnResult(mapsResult) && !isForceSpawnResult(mapsResult) && !isMapSettingsResult(mapsResult) ? <div className="maps-result-slot"><HomeTaskResultCard result={mapsResult} /></div> : null}
     <section className="action-section">
       <h4>Maps Overview</h4>
       <MapModeGuide />
@@ -1376,12 +1395,14 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
         const canForceDespawn = isDeepDesertRow && deepDesertDualEnabled
           ? [displayStatus, ...dynamicDeepDesertRows.map((deepRow) => partitionStatusById.get(String(deepRow.partitionId || "")) || String(deepRow.status || ""))].some((status) => mapCanForceDespawn({ status }))
           : mapCanForceDespawn({ ...row, status: displayStatus });
+        const canForceSpawn = !canForceDespawn && mapCanForceSpawn({ ...row, status: displayStatus });
         const dualDeepDesertResultActive = Boolean(mapsResult && mapsResultScope === "maps" && isDeepDesertDualResult(mapsResult));
         const rowTarget = mapResultTarget(rowName);
         const rowTaskQueueState = mapsTaskQueueStates[rowTarget];
         const rowResultActive = mapsResultTarget === rowTarget;
         const rowMapSettingsResultActive = Boolean(rowResultActive && mapsResult && mapsResultScope === "maps" && isMapSettingsResult(mapsResult));
         const rowForceDespawnResultActive = Boolean(rowResultActive && mapsResult && mapsResultScope === "maps" && isForceDespawnResult(mapsResult) && !isDeepDesertDualResult(mapsResult));
+        const rowForceSpawnResultActive = Boolean(rowResultActive && mapsResult && mapsResultScope === "maps" && isForceSpawnResult(mapsResult));
         return <Fragment key={rowName}><tr><td>{isSurvivalRow ? <SietchMapName name={rowName} sietch={primarySurvivalSietch} draft={primaryDraft} /> : rowName}</td><td><MapRuntimeStatus value={displayStatus} /></td><td>{String(row.mode || "Not Available")}</td><td><MemoryUsageBar row={memoryRow} fallback={liveMemoryFallback(row)} configuredLimit={row.memory} /></td><td className="actions-column"><button className="stable-action-button" onClick={() => selectMap(row)}>{isSelected ? "Close" : "Edit"}</button></td></tr>
           {isSelected && <tr className="inline-edit-row" key={`${rowName}-edit`}><td colSpan={5}>
             <section className="inline-edit-panel">
@@ -1396,12 +1417,17 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
                 {isSurvivalRow && primarySurvivalSietch && primarySietchDraft && <label>Name<input value={primarySietchDraft.displayName} placeholder="Default name" onChange={(event) => setSietchDrafts({ ...sietchDrafts, [primarySurvivalSietch.partitionId]: { ...primarySietchDraft, displayName: event.target.value } })} /></label>}
                 {isSurvivalRow && primarySurvivalSietch && primarySietchDraft && <label>Password<SecretInput value={sietchPasswordInputValue(primarySurvivalSietch, primarySietchDraft, Boolean(sietchPasswordTouched[primarySurvivalSietch.partitionId]))} placeholder={passwordPlaceholder(sietchHasPassword(primarySurvivalSietch, primarySietchDraft))} onFocus={(event) => { if (!sietchPasswordTouched[primarySurvivalSietch.partitionId] && primarySurvivalSietch.passwordSet) event.currentTarget.select(); }} onChange={(event) => { setSietchPasswordTouched({ ...sietchPasswordTouched, [primarySurvivalSietch.partitionId]: true }); setSietchDrafts({ ...sietchDrafts, [primarySurvivalSietch.partitionId]: { ...primarySietchDraft, password: event.target.value } }); }} /></label>}
                 <button disabled={!mapSettingsDirty || Boolean(rowTaskQueueState)} onClick={() => run(() => saveSelectedMapSettings(row))}>{rowTaskQueueState?.phase === "queued" ? "Queued" : rowTaskQueueState?.phase === "running" ? "Saving..." : "Save Map Settings"}</button>
-                {rowName !== "Survival_1" && rowName !== "Overmap" && <button className="danger" disabled={!canForceDespawn} title={canForceDespawn ? "Force despawn this running map" : "Map is not running"} onClick={() => run(() => forceDespawnMap(row))}>Force Despawn</button>}
+                {rowName !== "Survival_1" && rowName !== "Overmap" && canForceSpawn && <button title="Force spawn this stopped map" onClick={() => run(() => forceSpawnMap(row))}>Force Spawn</button>}
+                {rowName !== "Survival_1" && rowName !== "Overmap" && canForceDespawn && <button className="danger" title="Force despawn this running map" onClick={() => run(() => forceDespawnMap(row))}>Force Despawn</button>}
                 {rowMapSettingsResultActive && mapsResult ? <span className={`inline-task-result map-action-result result-${inlineTaskResultClass(mapsResult)}`}>
                   <strong className={mapsResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(mapsResult.title, mapsResult.status === "running")}</strong>
                   {mapsResult.message && <span className="inline-task-message">{formatResultMessage(mapsResult.message)}</span>}
                 </span> : null}
                 {rowName !== "Survival_1" && rowName !== "Overmap" && rowForceDespawnResultActive && mapsResult ? <span className={`inline-task-result map-action-result result-${inlineTaskResultClass(mapsResult)}`}>
+                  <strong className={mapsResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(mapsResult.title, mapsResult.status === "running")}</strong>
+                  {mapsResult.message && <span className="inline-task-message">{formatResultMessage(mapsResult.message)}</span>}
+                </span> : null}
+                {rowName !== "Survival_1" && rowName !== "Overmap" && rowForceSpawnResultActive && mapsResult ? <span className={`inline-task-result map-action-result result-${inlineTaskResultClass(mapsResult)}`}>
                   <strong className={mapsResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(mapsResult.title, mapsResult.status === "running")}</strong>
                   {mapsResult.message && <span className="inline-task-message">{formatResultMessage(mapsResult.message)}</span>}
                 </span> : null}
@@ -1426,11 +1452,13 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
             const childStatus = deepDesertDualConfiguring ? "Configuring" : statusWithLiveMemory(partitionStatusById.get(String(deepRow.partitionId || "")) || String(deepRow.status || "Not Available"), childMemoryRow, row.mode);
             const childMemoryDirty = childSelected && memory !== memoryInputValue(deepMemory);
             const childCanForceDespawn = mapCanForceDespawn({ ...deepRow, status: childStatus });
+            const childCanForceSpawn = !childCanForceDespawn && mapCanForceSpawn({ ...deepRow, status: childStatus });
             const childTarget = mapResultTarget("DeepDesert_1", String(deepRow.partitionId || ""));
             const childTaskQueueState = mapsTaskQueueStates[childTarget];
             const childResultActive = mapsResultTarget === childTarget;
             const childMapSettingsResultActive = Boolean(childResultActive && mapsResult && mapsResultScope === "maps" && isMapSettingsResult(mapsResult));
             const childForceDespawnResultActive = Boolean(childResultActive && mapsResult && mapsResultScope === "maps" && isForceDespawnResult(mapsResult) && !isDeepDesertDualResult(mapsResult));
+            const childForceSpawnResultActive = Boolean(childResultActive && mapsResult && mapsResultScope === "maps" && isForceSpawnResult(mapsResult));
             return <Fragment key={`deepdesert-${String(deepRow.partitionId || deepRow.dimension || "")}`}><tr className="sietch-child-row"><td><span className="sietch-child-name">{deepDesertPartitionName(deepRow)}</span><span className="sietch-child-meta">Partition {String(deepRow.partitionId || "Unknown")} / Dimension {String(deepRow.dimension || "Unknown")}</span></td><td><MapRuntimeStatus value={childStatus} /></td><td>Dual</td><td><MemoryUsageBar row={childMemoryRow} fallback={liveMemoryFallback({ ...row, status: childStatus })} configuredLimit={deepMemory} /></td><td className="actions-column"><button className="stable-action-button" onClick={() => selectDeepDesertPartition(deepRow)}>{childSelected ? "Close" : "Edit"}</button></td></tr>
               {childSelected && <tr className="inline-edit-row"><td colSpan={5}><section className="inline-edit-panel">
                 <div className="panel-title"><h4>Edit {deepDesertPartitionName(deepRow)}</h4></div>
@@ -1439,12 +1467,17 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
                   <label className="memory-number-field">Memory<input type="number" min="0.01" step="0.01" inputMode="decimal" value={memory} onChange={(event) => setMemory(event.target.value)} placeholder="8" /></label>
                   <span className="unit-label">GB</span>
                   <button disabled={!childMemoryDirty || Boolean(childTaskQueueState)} onClick={() => run(() => saveDeepDesertPartitionSettings(deepRow))}>{childTaskQueueState?.phase === "queued" ? "Queued" : childTaskQueueState?.phase === "running" ? "Saving..." : "Save"}</button>
-                  <button className="danger" disabled={!childCanForceDespawn} title={childCanForceDespawn ? "Force despawn this Deep Desert instance" : "Deep Desert instance is not running"} onClick={() => run(() => forceDespawnDeepDesertPartition(deepRow))}>Force Despawn</button>
+                  {childCanForceSpawn && <button title="Force spawn this stopped Deep Desert instance" onClick={() => run(() => forceSpawnDeepDesertPartition(deepRow))}>Force Spawn</button>}
+                  {childCanForceDespawn && <button className="danger" title="Force despawn this running Deep Desert instance" onClick={() => run(() => forceDespawnDeepDesertPartition(deepRow))}>Force Despawn</button>}
                   {childMapSettingsResultActive && mapsResult ? <span className={`inline-task-result map-action-result result-${inlineTaskResultClass(mapsResult)}`}>
                     <strong className={mapsResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(mapsResult.title, mapsResult.status === "running")}</strong>
                     {mapsResult.message && <span className="inline-task-message">{formatResultMessage(mapsResult.message)}</span>}
                   </span> : null}
                   {childForceDespawnResultActive && mapsResult ? <span className={`inline-task-result map-action-result result-${inlineTaskResultClass(mapsResult)}`}>
+                    <strong className={mapsResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(mapsResult.title, mapsResult.status === "running")}</strong>
+                    {mapsResult.message && <span className="inline-task-message">{formatResultMessage(mapsResult.message)}</span>}
+                  </span> : null}
+                  {childForceSpawnResultActive && mapsResult ? <span className={`inline-task-result map-action-result result-${inlineTaskResultClass(mapsResult)}`}>
                     <strong className={mapsResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(mapsResult.title, mapsResult.status === "running")}</strong>
                     {mapsResult.message && <span className="inline-task-message">{formatResultMessage(mapsResult.message)}</span>}
                   </span> : null}
@@ -2276,6 +2309,10 @@ function isTruthyDbValue(value: unknown) {
 
 function mapCanForceDespawn(row: Record<string, unknown>) {
   return /^(Ready|Loading|Starting|Warming|Running)$/i.test(String(row.status || "").trim());
+}
+
+function mapCanForceSpawn(row: Record<string, unknown>) {
+  return /^(Not Running|Not Available|Stopped|Offline|Unassigned)$/i.test(String(row.status || "").trim());
 }
 
 function mapRuntimeNeedsLiveApply(status: unknown) {

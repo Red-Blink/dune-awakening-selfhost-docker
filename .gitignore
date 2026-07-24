@@ -24,6 +24,8 @@ console/api/node_modules/
 console/web/node_modules/
 console/web/dist/
 *.tsbuildinfo
+**/bin/
+**/obj/
 
 # Python/cache
 __pycache__/

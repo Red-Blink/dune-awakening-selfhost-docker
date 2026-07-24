@@ -1,5 +1,6 @@
 import { assertIdentifier, intParam, isReadOnlySql, quoteIdentifier, quoteQualified, rowsResult } from "./db.js";
 import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import {
   craftingRecipeCatalogRows,
@@ -1422,8 +1423,18 @@ async function leadershipLevels(db) {
 
 async function leadershipFactions(db) {
   const current = await leadershipCurrentFactions(db);
-  if (current.size) return current;
-  return leadershipReputationFactions(db);
+  const [guild, reputation] = await Promise.all([
+    leadershipGuildFactions(db),
+    leadershipReputationFactions(db)
+  ]);
+  const factions = new Map(current);
+  for (const [actorId, faction] of guild) {
+    if (!factions.has(actorId)) factions.set(actorId, faction);
+  }
+  for (const [actorId, faction] of reputation) {
+    if (!factions.has(actorId)) factions.set(actorId, faction);
+  }
+  return factions;
 }
 
 async function leadershipCurrentFactions(db) {
@@ -1455,6 +1466,32 @@ async function leadershipReputationFactions(db) {
     where coalesce(pfr.reputation_amount, 0) > 0
     order by pfr.actor_id, coalesce(pfr.reputation_amount, 0) desc, pfr.faction_id`);
   for (const row of result.rows) factions.set(String(row.actor_id), factionDisplayName(row));
+  return factions;
+}
+
+async function leadershipGuildFactions(db) {
+  const factions = new Map();
+  if (!(await tableExists(db, "guild_members")) || !(await tableExists(db, "guilds"))) return factions;
+  const memberColumns = await columnsFor(db, "guild_members");
+  const guildColumns = await columnsFor(db, "guilds");
+  const memberPlayerColumn = firstExistingColumn(memberColumns, ["player_id", "player_controller_id", "actor_id", "account_id", "player_pawn_id"]);
+  const memberGuildColumn = firstExistingColumn(memberColumns, ["guild_id", "id"]);
+  const guildIdColumn = firstExistingColumn(guildColumns, ["guild_id", "id"]);
+  const guildFactionColumn = firstExistingColumn(guildColumns, ["guild_faction", "faction_id", "faction"]);
+  if (!memberPlayerColumn || !memberGuildColumn || !guildIdColumn || !guildFactionColumn) return factions;
+  const hasFactions = await tableExists(db, "factions");
+  const result = await db.query(`
+    select gm.${quoteIdentifier(memberPlayerColumn)}::text as player_id,
+           g.${quoteIdentifier(guildFactionColumn)}::text as faction_id,
+           ${hasFactions ? "coalesce(f.name, '')" : "''"} as faction_name
+    from dune.guild_members gm
+    join dune.guilds g on g.${quoteIdentifier(guildIdColumn)} = gm.${quoteIdentifier(memberGuildColumn)}
+    ${hasFactions ? `left join dune.factions f on f.id = g.${quoteIdentifier(guildFactionColumn)}` : ""}
+    where g.${quoteIdentifier(guildFactionColumn)} is not null
+      and g.${quoteIdentifier(guildFactionColumn)} <> ${NEUTRAL_GUILD_FACTION_ID}`);
+  for (const row of result.rows) {
+    if (row.player_id) factions.set(String(row.player_id), factionDisplayName(row));
+  }
   return factions;
 }
 
@@ -1674,14 +1711,19 @@ export async function playerProfile(db, id) {
     where a.id = $1`, [actorId]);
   if (!result.rows[0]) throw new Error("Player not found");
   const row = result.rows[0];
-  const [factions, guilds] = await Promise.all([
-    leadershipFactions(db).catch(() => new Map()),
+  const [currentFactions, guildFactions, reputationFactions, guilds] = await Promise.all([
+    leadershipCurrentFactions(db).catch(() => new Map()),
+    leadershipGuildFactions(db).catch(() => new Map()),
+    leadershipReputationFactions(db).catch(() => new Map()),
     leadershipGuilds(db).catch(() => new Map())
   ]);
   const controllerId = String(row.player_controller_id || "");
   const actorIdKey = String(row.actor_id || "");
   const accountIdKey = String(row.account_id || "");
-  row.faction = factions.get(controllerId) || factions.get(actorIdKey) || "Unassigned";
+  const assignedFaction = currentFactions.get(controllerId) || currentFactions.get(actorIdKey) ||
+    guildFactions.get(controllerId) || guildFactions.get(actorIdKey) || "";
+  row.faction = assignedFaction || reputationFactions.get(controllerId) || reputationFactions.get(actorIdKey) || "Unassigned";
+  row.faction_assigned = Boolean(assignedFaction);
   row.guild = guilds.get(controllerId) || guilds.get(actorIdKey) || guilds.get(accountIdKey) || "Unavailable";
   return { capabilities: await playerCapabilities(db), player: row };
 }
@@ -1768,6 +1810,10 @@ export async function playerSpecs(db, id) {
     where player_id = $1
     order by track_type`, [player.controllerId]);
   const byTrack = new Map(result.rows.map((row) => [String(row.track_type), row]));
+  const points = await db.query(`
+    select coalesce((fe.components->'FLevelComponent'->1->>'UnspentSkillPoints')::int,0) unspent_points
+    from dune.actor_fgl_entities afe join dune.fgl_entities fe on fe.entity_id=afe.entity_id
+    where afe.slot_name='DuneCharacter' and afe.actor_id=$1 limit 1`, [player.actorId]).catch(() => ({ rows: [] }));
   return {
     capabilities: {
       specs: true,
@@ -1775,6 +1821,7 @@ export async function playerSpecs(db, id) {
       keystones: await tableExists(db, "purchased_specialization_keystones")
     },
     player,
+    unspentPoints: Number(points.rows[0]?.unspent_points) || 0,
     skillModules: await playerSkillModules(db, player),
     rows: tracks.map((track) => {
       const row = byTrack.get(track);
@@ -2346,6 +2393,7 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColum
                ${BASE_NAME_SQL} as name,
                ${BASE_TYPE_SQL} as base_type,
                ${matchedOwnerSelect}coalesce(a.map, '') as map,
+               coalesce(a.partition_id, 0) as partition_id,
                a.transform,
                ${matchedSortSelect}
         from dune.buildings b
@@ -2355,7 +2403,7 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColum
         left join dune.permission_actor pa on pa.actor_id = a.id
         ${matchedOwnerJoin}
         where a.transform is not null
-        group by b.id, a.id, a.class, pa.actor_name, ${matchedGroupByOwner}a.map, a.transform
+        group by b.id, a.id, a.class, pa.actor_name, ${matchedGroupByOwner}a.map, a.partition_id, a.transform
         ${having}
       ),
       paged as (
@@ -2371,6 +2419,7 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColum
              p.base_type,
              ${finalOwnerSelect}
              p.map,
+             p.partition_id,
              p.x,
              p.y,
              p.z,
@@ -2412,6 +2461,7 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColum
       totalPlaceables: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_placeables) : 0,
       rows: result.rows.map(({ total_count, sort_position, ...row }) => ({
         ...row,
+        partition_id: Number(row.partition_id || 0),
         x: Number(row.x),
         y: Number(row.y),
         z: Number(row.z),
@@ -2944,6 +2994,413 @@ export async function playerJourney(db, id, journeyTagsData = {}) {
     tags: 0
   }));
   return { capabilities: { journey: true }, player, rows: { story: storyRows, contract: contractRows, codex: codexRows, tutorial } };
+}
+
+// Build private, read-only snapshots only for Steam identities requested by the
+// directory. Raw platform IDs never leave the battlegroup.
+export async function playerPortalSnapshots(db, requestedAccountHashes, journeyTagsData = {}, skillModulesData = []) {
+  const requested = new Set((Array.isArray(requestedAccountHashes) ? requestedAccountHashes : [])
+    .map((value) => String(value || "").toLowerCase())
+    .filter((value) => /^[0-9a-f]{64}$/.test(value))
+    .slice(0, 25));
+  if (!requested.size) return [];
+
+  const identities = await db.query(`
+    select distinct on (ac.id)
+      ac.id::text account_id, ac.platform_id,
+      ps.character_name, ps.player_controller_id::text controller_id,
+      ps.player_pawn_id::text actor_id, ps.online_status::text online_status,
+      coalesce(ps.last_avatar_activity, ps.last_login_time) last_seen,
+      coalesce(a.map, '') player_map, coalesce(a.partition_id, 0) player_partition_id,
+      ((a.transform).location).x player_x,
+      ((a.transform).location).y player_y,
+      ((a.transform).location).z player_z
+    from dune.accounts ac
+    join dune.player_state ps on ps.account_id=ac.id
+    join dune.actors a on a.id=ps.player_pawn_id
+    where lower(coalesce(ac.platform_name,''))='steam'
+      and ac.platform_id ~ '^[0-9]{17}$'
+      and ps.player_pawn_id is not null
+    order by ac.id, ps.last_avatar_activity desc nulls last`);
+  const matched = identities.rows.map((row) => ({
+    ...row,
+    accountHash: createHash("sha256").update(String(row.platform_id)).digest("hex")
+  })).filter((row) => requested.has(row.accountHash));
+  if (!matched.length) return [...requested].map((accountHash) => ({ accountHash, found: false }));
+
+  const leadership = await addonLeadershipPlayers(db).catch(() => ({ rows: [] }));
+  const leaders = new Map((leadership.rows || []).map((row) => [String(row.actorId), row]));
+  const snapshots = [];
+  for (const identity of matched) {
+    const actorId = Number(identity.actor_id);
+    const controllerId = Number(identity.controller_id);
+    const [currency, factions, specs, crafting, research, journeys, bases, intel, keystones, blueprints, vehicles, guild] = await Promise.all([
+      playerCurrency(db, actorId).catch(() => ({ rows: [] })),
+      playerFactions(db, actorId).catch(() => ({ rows: [] })),
+      playerSpecs(db, actorId).catch(() => ({ rows: [], skillModules: [] })),
+      playerCraftingRecipes(db, actorId).catch(() => ({ rows: [] })),
+      playerResearchItems(db, actorId).catch(() => ({ rows: [] })),
+      playerJourney(db, actorId, journeyTagsData).catch(() => ({ rows: {} })),
+      listBases(db, { pageSize: 200 }).catch(() => ({ rows: [] })),
+      db.query(`select coalesce((properties->'TechKnowledgePlayerComponent'->>'m_TechKnowledgePoints')::bigint,0)::text intel from dune.actors where id=$1`, [actorId]).catch(() => ({ rows: [] })),
+      db.query(`select keystone_id::text from dune.purchased_specialization_keystones where player_id=$1 order by keystone_id`, [controllerId]).catch(() => ({ rows: [] })),
+      db.query(`select id::text,item_id::text,building_blueprint_map from dune.building_blueprints where player_id=$1 order by id`, [controllerId]).catch(() => ({ rows: [] })),
+      portalVehicles(db, [actorId, controllerId, Number(identity.account_id)]).catch(() => ({ rows: [] })),
+      portalGuild(db, identity).catch(() => null)
+    ]);
+    const leader = leaders.get(String(actorId)) || {};
+    const baseRows = (bases.rows || []).filter((base) =>
+      base.owner_name === identity.character_name ||
+      (base.shared_with || []).some((entry) => entry.name === identity.character_name));
+    const fuelByBase = await portalGeneratorFuel(db, baseRows.map((base) => base.base_id)).catch(() => new Map());
+    const skillModules = (specs.skillModules || []).map((skill) => portalSkillRow(skill, skillModulesData));
+    const journeyRows = Object.values(journeys.rows || {}).flat();
+    const unlockedCrafting = (crafting.rows || []).filter((row) => row.unlocked);
+    const unlockedResearch = (research.rows || []).filter((row) => row.unlocked);
+    const solaris = (currency.rows || []).find((row) => Number(row.currency_id) === 0)?.balance || 0;
+
+    snapshots.push({
+      accountHash: identity.accountHash,
+      found: true,
+      data: {
+        overview: {
+          characterName: identity.character_name || "Unknown Player",
+          level: Math.min(200, Math.max(0, Number(leader.level) || 0)),
+          faction: leader.faction || "Unassigned",
+          guild: leader.guild || "Unavailable",
+          online: String(identity.online_status || "").toLowerCase() === "online",
+          lastSeen: identity.last_seen || "",
+          map: identity.player_map || "",
+          partitionId: Number(identity.player_partition_id) || 0,
+          x: Number(identity.player_x) || 0,
+          y: Number(identity.player_y) || 0,
+          z: Number(identity.player_z) || 0
+        },
+        wallet: {
+          solaris: Number(solaris) || 0,
+          intel: Number(intel.rows[0]?.intel) || 0,
+          factionReputation: (factions.rows || []).map((row) => ({
+            faction: row.faction_name || `Faction ${row.faction_id}`,
+            reputation: Number(row.reputation_amount) || 0
+          }))
+        },
+        specializations: {
+          tracks: (specs.rows || []).map((row) => ({ name: row.track_type, level: Math.floor(Number(row.level) || 0), xp: Number(row.xp_amount) || 0 })),
+          purchasedKeystones: keystones.rows.map((row) => row.keystone_id),
+          skills: skillModules,
+          unspentPoints: Number(specs.unspentPoints) || 0
+        },
+        unlocks: {
+          skills: skillModules,
+          research: unlockedResearch.map((row) => ({ id: row.itemKey || "", name: row.displayName || row.itemKey || "Research" })),
+          schematics: unlockedCrafting.map((row) => ({ id: row.recipeId || "", name: row.displayName || row.recipeId || "Schematic" })),
+          blueprints: blueprints.rows.map((row) => ({ id: row.id, itemId: row.item_id, map: row.building_blueprint_map || "" }))
+        },
+        journeys: {
+          completed: journeyRows.filter((row) => row.complete).map(portalJourneyRow),
+          current: journeyRows.filter((row) => !row.complete && row.status && row.status !== "Locked").map(portalJourneyRow),
+          remaining: journeyRows.filter((row) => !row.complete).length
+        },
+        vehicles: vehicles.rows,
+        bases: baseRows.map((base) => ({
+          id: base.base_id, name: base.name, type: base.base_type,
+          ownership: base.owner_name === identity.character_name ? "Owned" : "Shared",
+          pieceCount: Number(base.piece_count || 0),
+          placeableCount: Number(base.placeable_count || 0),
+          buildingCount: Number(base.piece_count || 0) + Number(base.placeable_count || 0),
+          fuelCells: fuelByBase.get(String(base.base_id))?.fuelCells || 0,
+          generatorCount: fuelByBase.get(String(base.base_id))?.generatorCount || 0,
+          generatorRuntimeSeconds: fuelByBase.get(String(base.base_id))?.runtimeSeconds || 0,
+          generators: fuelByBase.get(String(base.base_id))?.generators || [],
+          map: base.map || "",
+          partitionId: Number(base.partition_id) || 0,
+          x: Number(base.x) || 0,
+          y: Number(base.y) || 0,
+          z: Number(base.z) || 0
+        })),
+        guild
+      }
+    });
+  }
+  const found = new Set(snapshots.map((entry) => entry.accountHash));
+  for (const accountHash of requested) if (!found.has(accountHash)) snapshots.push({ accountHash, found: false });
+  return snapshots;
+}
+
+function portalJourneyRow(row) {
+  return { id: row.id || row.rawName || "", name: row.name || row.rawName || "Journey", status: row.status || "" };
+}
+
+function portalSkillRow(skill, catalog) {
+  const id = String(skill?.module_id || skill?.id || "");
+  const known = (Array.isArray(catalog) ? catalog : []).find((entry) => entry?.id === id) || {};
+  const parts = id.split(".");
+  return {
+    id,
+    name: String(known.name || parts.at(-1) || "Unknown Skill").replace(/^XX_/, ""),
+    specialization: portalSkillSpecialization(known.category),
+    type: portalSkillType(parts[1]),
+    rank: Number(skill?.skill_points_spent || skill?.rank || 0),
+    maxRank: Number(known.maxLevel || 0)
+  };
+}
+
+function portalSkillSpecialization(value) {
+  const label = String(value || "General");
+  return label === "BeneGesserit" ? "Bene Gesserit" : label;
+}
+
+function portalSkillType(value) {
+  return ({ Ability: "Ability", Attribute: "Passive", Key: "Keystone", Perk: "Technique", Science: "Science", Spice: "Spice" })[value] || "Skill";
+}
+
+export async function portalVehicles(db, playerIds) {
+  const result = await db.query(`
+    with module_durability as (
+      select vm.id, vm.vehicle_id, vm.template_id, vm.stats,
+        coalesce((vm.stats->'FVehicleModuleDurabilityStats'->1->>'CurrentDurability')::numeric, 0) current_durability,
+        max(coalesce((vm.stats->'FVehicleModuleDurabilityStats'->1->>'CurrentDurability')::numeric, 0)) over(partition by vm.template_id) max_durability,
+        count(*) over(partition by vm.template_id) durability_samples
+      from dune.vehicle_modules vm
+    ), vehicle_fuel as (
+      select v.id vehicle_id,
+        fuel.current_fuel,
+        generator.template_id generator_template
+      from dune.vehicles v
+      left join lateral (
+        select (fe.components->'FVehicleComponent'->1->>'CurrentFuel')::numeric current_fuel
+        from dune.actor_fgl_entities afe
+        join dune.fgl_entities fe on fe.entity_id=afe.entity_id
+        where afe.actor_id=v.id and fe.components ? 'FVehicleComponent'
+        limit 1
+      ) fuel on true
+      left join lateral (
+        select vm.template_id
+        from dune.vehicle_modules vm
+        where vm.vehicle_id=v.id and vm.template_id ilike '%Generator%'
+        limit 1
+      ) generator on true
+    ), fuel_capacity as (
+      select generator_template,
+        max(current_fuel) max_fuel,
+        count(*) filter(where current_fuel is not null)::int fuel_samples
+      from vehicle_fuel
+      where generator_template is not null
+      group by generator_template
+    )
+    select v.id::text id, regexp_replace(a.class, '^.*/|\\..*$', '', 'g') type,
+      pa.actor_name custom_name,
+      coalesce(floor(100 * sum(vm.current_durability) / nullif(sum(vm.max_durability), 0)), 0)::int condition_percent,
+      fuel.current_fuel,
+      case when capacity.fuel_samples >= 2 then capacity.max_fuel else null end max_fuel,
+      case when capacity.fuel_samples >= 2 then
+        greatest(0, least(100, floor(100 * fuel.current_fuel / nullif(capacity.max_fuel, 0))))::int
+      else null end fuel_percent,
+      coalesce(a.map, '') map, coalesce(a.partition_id, 0)::int partition_id,
+      ((a.transform).location).x::numeric x,
+      ((a.transform).location).y::numeric y,
+      ((a.transform).location).z::numeric z,
+      coalesce(jsonb_agg(jsonb_build_object(
+        'templateId',vm.template_id,
+        'condition',vm.current_durability,
+        'maxCondition',case when vm.durability_samples >= 2 then vm.max_durability else null end,
+        'conditionPercent',case when vm.durability_samples >= 2 then
+          greatest(0, least(100, floor(100 * vm.current_durability / nullif(vm.max_durability, 0))))::int
+        else null end
+      ) order by vm.template_id) filter(where vm.id is not null),'[]'::jsonb) modules
+    from dune.vehicles v
+    join dune.actors a on a.id=v.id
+    left join dune.permission_actor pa on pa.actor_id=v.id
+    left join vehicle_fuel fuel on fuel.vehicle_id=v.id
+    left join fuel_capacity capacity on capacity.generator_template=fuel.generator_template
+    left join dune.permission_actor_rank par on par.permission_actor_id=v.id and par.player_id=any($1::bigint[])
+    left join module_durability vm on vm.vehicle_id=v.id
+    where par.player_id is not null or a.owner_account_id=any($1::bigint[])
+    group by v.id,a.class,a.map,a.partition_id,a.transform,pa.actor_name,fuel.current_fuel,capacity.max_fuel,capacity.fuel_samples
+    order by v.id`, [playerIds]);
+  return {
+    ...result,
+    rows: result.rows.map((row) => {
+      const { custom_name: customName, ...vehicle } = row;
+      return {
+        ...vehicle,
+        name: portalCustomActorName(customName) || portalVehicleDisplayName(row.type),
+        modules: (row.modules || []).map((module) => ({
+          ...module,
+          name: portalVehicleModuleName(module.templateId)
+        }))
+      };
+    })
+  };
+}
+
+function portalCustomActorName(value) {
+  const name = String(value || "").trim();
+  return name && name.toLowerCase() !== "none" && !name.startsWith("##") ? name : "";
+}
+
+function portalVehicleModuleName(templateId) {
+  const id = String(templateId || "");
+  const direct = adminItemMetadata().get(id)?.name;
+  if (direct) return direct;
+  const wing = id.match(/^(OrnithopterLightLocomotion)(Front|Back)(Left|Right)_(\d+)$/i);
+  if (wing) {
+    const base = adminItemMetadata().get(`${wing[1]}_${wing[4]}`)?.name || "Scout Ornithopter Wing";
+    return `${base} (${wing[2]} ${wing[3]})`;
+  }
+  return id || "Vehicle Module";
+}
+
+function portalVehicleDisplayName(type) {
+  const value = String(type || "").toLowerCase();
+  if (value.includes("lightornithopter")) return "Scout Ornithopter";
+  if (value.includes("mediumornithopter")) return "Assault Ornithopter";
+  if (value.includes("transportornithopter")) return "Carrier Ornithopter";
+  if (value.includes("sandcrawler")) return "Sandcrawler";
+  if (value.includes("sandbike")) return "Sandbike";
+  if (value.includes("buggy")) return "Buggy";
+  if (value.includes("tank")) return "Battle Tank";
+  return String(type || "Vehicle");
+}
+
+const NORMAL_GENERATOR_FUEL_SECONDS = 2 * 60 * 60;
+const SPICE_GENERATOR_FUEL_SECONDS = 90 * 60;
+
+export async function portalGeneratorFuel(db, baseIds) {
+  if (!baseIds.length) return new Map();
+  const result = await db.query(`
+    with farm_clock as (
+      select coalesce((
+        select greatest(
+          0,
+          extract(epoch from (universe_lastactive_timestamp - universe_time_timestamp))
+            - coalesce(down_time_accumulation, 0)::numeric / 1000000.0
+        )
+        from dune.farm_variables
+        limit 1
+      ), 0) universe_time
+    ), base_entities as (
+      select distinct b.id, bi.owner_entity_id
+      from dune.buildings b
+      join dune.building_instances bi on bi.building_id=b.id
+      where b.id=any($1::bigint[])
+    ), generator_fuel as (
+      select be.id::text base_id, p.id generator_id,
+        coalesce(fuel.queued_cells, 0)::int fuel_cells,
+        generator.fuel_id,
+        case when lower(generator.fuel_id)='spicedfuelcell' then $3::int else $2::int end cell_seconds,
+        generator.fuel_state,
+        clock.universe_time
+      from base_entities be
+      join dune.placeables p on p.owner_entity_id=be.owner_entity_id
+        and lower(p.building_type) like '%generator%placeable%'
+      cross join farm_clock clock
+      left join lateral (
+        select
+          coalesce(
+            nullif(state.fuel_state->'m_FuelBurningId'->>'Name', ''),
+            case when lower(p.building_type) like '%spice%' then 'SpicedFuelCell' else 'Oil' end
+          ) fuel_id,
+          state.fuel_state
+        from lateral (
+          select (
+            select fe.components->'FFuelPoweredPlaceableComponent'->1
+            from dune.actor_fgl_entities afe
+            join dune.fgl_entities fe on fe.entity_id=afe.entity_id
+            where afe.actor_id=p.id
+              and fe.components->'FFuelPoweredPlaceableComponent'->1 is not null
+            limit 1
+          ) fuel_state
+        ) state
+      ) generator on true
+      left join lateral (
+        select coalesce(sum(i.stack_size), 0)::int queued_cells
+        from dune.inventories inv
+        join dune.items i on i.inventory_id=inv.id
+        where inv.actor_id=p.id
+          and lower(i.template_id)=lower(coalesce(
+            generator.fuel_id,
+            case when lower(p.building_type) like '%spice%' then 'SpicedFuelCell' else 'Oil' end
+          ))
+      ) fuel on true
+    ), generator_runtime as (
+      select base_id, generator_id,
+        case when lower(fuel_id)='spicedfuelcell' then 'spice' else 'fuel' end generator_type,
+        fuel_cells,
+        fuel_cells * cell_seconds + case
+          when fuel_state->'m_FuelBurningId'->>'Name' is null then 0
+          else greatest(
+            0,
+            cell_seconds - greatest(
+              0,
+              universe_time
+                - coalesce(nullif(fuel_state->>'m_FuelBurningInitialTime', '')::numeric, universe_time)
+                + coalesce(nullif(fuel_state->>'m_FuelBurningPassedTimeSinceStart', '')::numeric, 0)
+            )
+          )
+        end runtime_seconds
+      from generator_fuel
+    )
+    select base_id, generator_type, count(*)::int generator_count, sum(fuel_cells)::int fuel_cells,
+      min(runtime_seconds)::int runtime_seconds
+    from generator_runtime group by base_id, generator_type`, [
+      baseIds,
+      NORMAL_GENERATOR_FUEL_SECONDS,
+      SPICE_GENERATOR_FUEL_SECONDS
+    ]);
+  const byBase = new Map();
+  for (const row of result.rows) {
+    const baseId = String(row.base_id);
+    const type = row.generator_type === "spice" ? "spice" : "fuel";
+    const detail = {
+      type,
+      name: type === "spice" ? "Spice-Powered Generator" : "Fuel-Powered Generator",
+      fuelName: type === "spice" ? "Spice-infused Fuel Cell" : "Fuel Cell",
+      fuelCells: Number(row.fuel_cells) || 0,
+      generatorCount: Number(row.generator_count) || 0,
+      runtimeSeconds: Number(row.runtime_seconds) || 0
+    };
+    const current = byBase.get(baseId) || {
+      fuelCells: 0,
+      generatorCount: 0,
+      runtimeSeconds: null,
+      generators: []
+    };
+    current.fuelCells += detail.fuelCells;
+    current.generatorCount += detail.generatorCount;
+    current.runtimeSeconds = current.runtimeSeconds == null
+      ? detail.runtimeSeconds
+      : Math.min(current.runtimeSeconds, detail.runtimeSeconds);
+    current.generators.push(detail);
+    current.generators.sort((left, right) => left.type === right.type ? 0 : left.type === "fuel" ? -1 : 1);
+    byBase.set(baseId, current);
+  }
+  for (const value of byBase.values()) value.runtimeSeconds ||= 0;
+  return byBase;
+}
+
+async function portalGuild(db, identity) {
+  const result = await db.query(`
+    select g.guild_id::text guild_id,g.guild_name,gm.role_id::text role_id
+    from dune.guild_members gm join dune.guilds g on g.guild_id=gm.guild_id
+    where gm.player_id=any($1::bigint[]) limit 1`, [[identity.actor_id, identity.controller_id, identity.account_id]]);
+  if (!result.rowCount) return null;
+  const row = result.rows[0];
+  const members = await guildMembers(db, row.guild_id);
+  const leadership = await addonLeadershipPlayers(db).catch(() => ({ rows: [] }));
+  const statuses = new Map((leadership.rows || []).map((member) => [member.name, member.status]));
+  return {
+    name: row.guild_name || "Unknown Guild", role: portalGuildRole(row.role_id),
+    membershipCount: (members.rows || []).length,
+    onlineMembers: (members.rows || []).filter((member) => String(statuses.get(member.character_name) || "").toLowerCase() === "online").map((member) => member.character_name)
+  };
+}
+
+function portalGuildRole(roleId) {
+  const value = Number(roleId);
+  if (value >= 100) return "Leader";
+  if (value > 1) return "Officer";
+  return "Member";
 }
 
 export async function completeJourneyNode(db, id, { nodeId }, journeyTagsData = {}) {

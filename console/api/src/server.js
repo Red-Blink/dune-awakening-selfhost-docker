@@ -591,6 +591,7 @@ async function handleApi(req, res) {
   if (path === "/api/deepdesert") return commandJson(res, "deepdesertStatus");
   if (path === "/api/deepdesert/update" && req.method === "POST") return deepDesertUpdateRoute(req, res);
   if (path === "/api/settings/public-directory" && req.method === "POST") return publicDirectorySettingsRoute(req, res);
+  if (path === "/api/settings/public-directory/claim" && req.method === "POST") return publicDirectoryClaimRoute(req, res);
   if (path === "/api/settings" && req.method === "POST") return writeConfig(req, res);
   if (path === "/api/settings") return json(res, 200, await setupState());
 
@@ -2489,6 +2490,23 @@ async function publicDirectorySettingsRoute(req, res) {
   });
   await publicDirectory.tick();
   return json(res, 200, { ok: true, publicDirectory: publicDirectorySettings() });
+}
+
+async function publicDirectoryClaimRoute(req, res) {
+  const body = await readJson(req);
+  const code = String(body.code || "").trim();
+  if (!code) return json(res, 400, { error: "Enter the claim code from DuneDocker.app." });
+  try {
+    const result = await publicDirectory.verifyClaim(code);
+    audit(config, req, "settings.public-directory.claim", { claimed: true, roleAssigned: result.roleAssigned === true });
+    return json(res, 200, {
+      ok: true,
+      claimed: true,
+      message: "Listing Claimed Successfully"
+    });
+  } catch (error) {
+    return json(res, 400, { error: error instanceof Error ? error.message : String(error) });
+  }
 }
 
 async function saveToken(req, res) {
