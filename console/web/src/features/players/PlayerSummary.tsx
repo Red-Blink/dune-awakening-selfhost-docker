@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { MapPin, Users, Coins, CircleDollarSign, Banknote } from "lucide-react";
+import { MapPin, Shield, Coins, CircleDollarSign, Banknote } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PlayerStatusCell } from "../../components/common/DisplayPrimitives";
 import { firstDefined } from "../../lib/display";
@@ -134,7 +134,7 @@ export function PlayerSummary({
       </div>
       <div className="summary-hero-sub">
         <span className="summary-hero-meta summary-hero-map"><MapPin size={14} className="summary-hero-icon" aria-label="Map" /><span>{map}</span></span>
-        <span className="summary-hero-meta summary-hero-guild"><Users size={14} className="summary-hero-icon" aria-label="Guild" /><span>{guild}</span></span>
+        <span className="summary-hero-meta summary-hero-guild"><Shield size={14} className="summary-hero-icon" aria-label="Guild" /><span>{guild}</span></span>
       </div>
     </div>
 
