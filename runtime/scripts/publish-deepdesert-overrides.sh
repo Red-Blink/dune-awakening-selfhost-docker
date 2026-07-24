@@ -110,11 +110,14 @@ ensure_text_router_log() {
 }
 
 load_rmq_admin_creds() {
-  local now mtime creds
-  if [ -f "$RMQ_CREDS_FILE" ]; then
+  local now mtime line_count creds cache_tmp
+  if [ -r "$RMQ_CREDS_FILE" ]; then
     now="$(date +%s)"
     mtime="$(stat -c %Y "$RMQ_CREDS_FILE" 2>/dev/null || echo 0)"
-    if [ $((now - mtime)) -lt "$RMQ_CREDS_TTL_SECONDS" ] && [ "$(wc -l < "$RMQ_CREDS_FILE" | tr -d '[:space:]')" -ge 2 ]; then
+    line_count="$(wc -l < "$RMQ_CREDS_FILE" 2>/dev/null || printf '0')"
+    line_count="$(printf '%s' "$line_count" | tr -cd '[:digit:]')"
+    line_count="${line_count:-0}"
+    if [ $((now - mtime)) -lt "$RMQ_CREDS_TTL_SECONDS" ] && [ "$line_count" -ge 2 ]; then
       cat "$RMQ_CREDS_FILE"
       return 0
     fi
@@ -163,8 +166,14 @@ print(password)
 PY
 )"
   [ -n "$creds" ] || return 1
-  printf '%s\n' "$creds" >"$RMQ_CREDS_FILE"
-  chmod 600 "$RMQ_CREDS_FILE" 2>/dev/null || true
+  cache_tmp="${RMQ_CREDS_FILE}.tmp.$$"
+  if { printf '%s\n' "$creds" >"$cache_tmp" \
+      && chmod 600 "$cache_tmp" \
+      && mv -f "$cache_tmp" "$RMQ_CREDS_FILE"; } 2>/dev/null; then
+    :
+  else
+    rm -f "$cache_tmp" 2>/dev/null || true
+  fi
   printf '%s\n' "$creds"
 }
 
