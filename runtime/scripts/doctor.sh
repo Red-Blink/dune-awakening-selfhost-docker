@@ -5,6 +5,7 @@ cd "$(dirname "$0")/../.."
 [ -f .env ] && . ./.env
 [ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
 source runtime/scripts/runtime-env.sh
+source runtime/scripts/fls-signals.sh
 
 fail=0
 warn=0
@@ -338,7 +339,7 @@ else
 fi
 
 director_logs="$(docker logs --since 15m dune-director 2>&1 || true)"
-if grep -Eq 'Battlegroups_SendBattlegroupHeartbeat.*Request successful|RMQ connection successful.*Initiating heartbeat|Population declaration: .*"IsLocked":false' <<< "$director_logs"; then
+if director_fls_logs_ready "$director_logs"; then
   ok "Director heartbeat to Funcom/FLS"
 else
   warn_msg "Director heartbeat not seen in recent logs"

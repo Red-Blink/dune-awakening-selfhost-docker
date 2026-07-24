@@ -8,6 +8,7 @@ trap 'rm -rf "$test_root"' EXIT
 mkdir -p "$test_root/project/runtime/scripts" "$test_root/bin"
 cp "$repo_root/runtime/scripts/ready.sh" "$test_root/project/runtime/scripts/ready.sh"
 cp "$repo_root/runtime/scripts/runtime-env.sh" "$test_root/project/runtime/scripts/runtime-env.sh"
+cp "$repo_root/runtime/scripts/fls-signals.sh" "$test_root/project/runtime/scripts/fls-signals.sh"
 
 cat > "$test_root/project/.env" <<'EOF'
 POSTGRES_PORT=16432

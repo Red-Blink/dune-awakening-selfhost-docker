@@ -8,6 +8,7 @@ set -a
 [ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
 set +a
 source runtime/scripts/runtime-env.sh
+source runtime/scripts/fls-signals.sh
 
 issue=0
 warming=0
@@ -517,13 +518,13 @@ if ! [ "${capacity:-0}" -gt 0 ] 2>/dev/null && [ "${configured_capacity:-0}" -gt
   capacity="$configured_capacity"
 fi
 
-if director_log_has 'Battlegroups_SendBattlegroupHeartbeat.*Request successful|Initiating heartbeat|Population declaration:'; then
+if director_fls_logs_ready "$director_logs"; then
   heartbeat_state="OK"
 else
   heartbeat_state="WAIT"
 fi
 
-if director_log_has 'Battlegroups_DeclarePopulationAndActivity.*Request successful|Population declaration:'; then
+if director_fls_logs_ready "$director_logs"; then
   population_state="OK"
 else
   population_state="WAIT"
@@ -531,9 +532,7 @@ fi
 
 if director_log_has 'Battlegroups_DeclareMaxPlayerCapacities.*Request successful'; then
   capacity_state="OK"
-elif director_log_has 'Population declaration:'; then
-  capacity_state="OK"
-elif [ "${configured_capacity:-0}" -gt 0 ] 2>/dev/null; then
+elif director_fls_logs_ready "$director_logs"; then
   capacity_state="OK"
 else
   capacity_state="WAIT"

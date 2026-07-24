@@ -8,6 +8,7 @@ set -a
 [ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
 set +a
 source runtime/scripts/runtime-env.sh
+source runtime/scripts/fls-signals.sh
 
 postgres_port="$(resolve_postgres_port)"
 rmq_admin_port="$(resolve_rmq_admin_port)"
@@ -335,19 +336,7 @@ director_fls_ready() {
 
   logs="$(docker_timeout docker logs --tail 3000 dune-director 2>&1 || true)"
 
-  if grep -q 'Battlegroups_SendBattlegroupHeartbeat.*Request successful' <<< "$logs"; then
-    return 0
-  fi
-
-  if grep -Eq 'Population declaration: .*"IsLocked":false' <<< "$logs"; then
-    return 0
-  fi
-
-  if grep -q 'RMQ connection successful.*Initiating heartbeat' <<< "$logs"; then
-    return 0
-  fi
-
-  return 1
+  director_fls_logs_ready "$logs"
 }
 
 partition_mismatch_hint_needed() {
