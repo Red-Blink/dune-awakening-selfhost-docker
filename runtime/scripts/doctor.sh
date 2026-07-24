@@ -2,6 +2,8 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
+ROOT_DIR="$(pwd)"
+HOST_ROOT_DIR="${DUNE_HOST_REPO_ROOT:-$ROOT_DIR}"
 [ -f .env ] && . ./.env
 [ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
 source runtime/scripts/runtime-env.sh
@@ -189,6 +191,78 @@ config_value() {
   ' "$file"
 }
 
+check_project_systemd_timers() {
+  local timer service label load_state active_state enabled_state working_directory exec_start
+  local installed=0 healthy=0
+  local auto_update_enabled
+
+  if ! command -v systemctl >/dev/null 2>&1; then
+    local auto_status warnings
+    auto_status="$(runtime/scripts/update.sh auto status 2>/dev/null || true)"
+    warnings="$(grep '^WARN ' <<<"$auto_status" || true)"
+    if [ -n "$warnings" ]; then
+      while IFS= read -r warning; do
+        [ -n "$warning" ] && warn_msg "${warning#WARN }"
+      done <<<"$warnings"
+    else
+      info_msg "Host systemd timer paths could not be inspected directly"
+    fi
+    return
+  fi
+
+  auto_update_enabled="$(config_value runtime/generated/update-auto.env DUNE_AUTO_UPDATE_ENABLED || true)"
+  while IFS='|' read -r timer service label; do
+    load_state="$(systemctl show "$timer" --property=LoadState --value 2>/dev/null || true)"
+    if [ -z "$load_state" ] || [ "$load_state" = "not-found" ]; then
+      continue
+    fi
+    installed=$((installed + 1))
+    active_state="$(systemctl is-active "$timer" 2>/dev/null || true)"
+    enabled_state="$(systemctl is-enabled "$timer" 2>/dev/null || true)"
+    working_directory="$(systemctl show "$service" --property=WorkingDirectory --value 2>/dev/null || true)"
+    exec_start="$(systemctl show "$service" --property=ExecStart --value 2>/dev/null || true)"
+
+    if [ "$timer" = "dune-awakening-auto-update.timer" ] \
+      && [ "$active_state" = "active" ] \
+      && [ "${auto_update_enabled:-0}" != "1" ]; then
+      warn_msg "$label timer is active while the saved preference is disabled"
+      echo "     Run: dune update auto disable"
+    fi
+
+    if [ -z "$working_directory" ] || [ "$working_directory" != "$HOST_ROOT_DIR" ]; then
+      warn_msg "$label timer points to a different checkout: ${working_directory:-unset}"
+      echo "     Expected: $HOST_ROOT_DIR"
+      continue
+    fi
+    if [ ! -d "$working_directory" ]; then
+      warn_msg "$label timer points to a missing directory: $working_directory"
+      continue
+    fi
+    case "$exec_start" in
+      *"$HOST_ROOT_DIR/"*) ;;
+      *)
+        warn_msg "$label timer ExecStart does not use the current checkout"
+        echo "     Expected path below: $HOST_ROOT_DIR"
+        continue
+        ;;
+    esac
+    healthy=$((healthy + 1))
+    ok "$label timer uses the current checkout ($active_state/$enabled_state)"
+  done <<'EOF'
+dune-awakening-auto-update.timer|dune-awakening-auto-update.service|Auto-update
+dune-awakening-scheduled-restart.timer|dune-awakening-scheduled-restart.service|Scheduled restart
+dune-awakening-scheduled-restart-warning.timer|dune-awakening-scheduled-restart-warning.service|Scheduled restart warning
+dune-awakening-ip-change-restart.timer|dune-awakening-ip-change-restart.service|Public IP change restart
+dune-awakening-db-backup.timer|dune-awakening-db-backup.service|Database backup
+EOF
+
+  if [ "$installed" -eq 0 ]; then
+    ok "No project systemd timers installed"
+  elif [ "$healthy" -eq "$installed" ]; then
+    ok "All installed project systemd timer paths are valid"
+  fi
+}
+
 echo "=== Dune doctor ==="
 echo
 
@@ -227,6 +301,10 @@ check_file .env ".env config" "Run: dune init"
 check_file runtime/secrets/funcom-token.txt "Funcom token file" "Run: dune init, or place the token in runtime/secrets/funcom-token.txt"
 check_file runtime/generated/battlegroup.env "Battlegroup config" "Run: dune init"
 check_file runtime/generated/image-tags.env "Generated image tags" "Run: dune update install during init, or re-run dune init if this is a fresh install"
+
+echo
+echo "=== Host automation ==="
+check_project_systemd_timers
 
 echo
 echo "=== Containers ==="
