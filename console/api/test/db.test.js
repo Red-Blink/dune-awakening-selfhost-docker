@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
-import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, augmentInventoryItem, augmentNewestPlayerItem, changeDunePassword, completeJourneyNode, completeTutorial, deleteInventoryItem, exportBaseAsBlueprint, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listBases, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerInventory, playerJourney, playerPosition, playerProfile, playerResearchItems, portalGeneratorFuel, portalVehicles, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
+import { addCurrency, addFactionReputation, addIntel, addSpecializationXp, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, augmentInventoryItem, augmentNewestPlayerItem, changeDunePassword, completeJourneyNode, completeTutorial, deleteInventoryItem, exportBaseAsBlueprint, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listBases, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerInventory, playerJourney, playerPosition, playerProfile, playerResearchItems, portalGeneratorFuel, portalVehicles, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
   assert.deepEqual(discoverDbConfig({}), {
@@ -2165,6 +2165,47 @@ test("faction mutation clamps reputation and syncs actor component JSON", async 
   assert.equal(result.newValue, 12474);
   assert.ok(calls.some((call) => call.text.includes("set_player_faction_reputation") && call.values[2] === 12474));
   assert.ok(calls.some((call) => call.text.includes("FactionPlayerComponent,m_FactionDataArray")));
+});
+
+test("specialization XP mutation updates fractional level from the XP curve", async () => {
+  const calls = [];
+  let specialization = { player_id: "55", track_type: "Combat", xp_amount: "1599", level: "12" };
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("to_regprocedure")) return { rows: [{ exists: true }] };
+      if (text.includes("enum_range")) return { rows: [{ track_type: "Combat" }] };
+      if (text.includes("from dune.actors a")) {
+        return { rows: [{ actor_id: 123, account_id: 44, controller_id: 55, player_state_id: 5, online_status: "Offline" }] };
+      }
+      if (text.includes("where player_id = $1 and track_type::text = $2") && text.includes("for update")) {
+        return { rows: [{ xp_amount: specialization.xp_amount, level: specialization.level }] };
+      }
+      if (text.includes("player_id::text as player_id") && text.includes("from dune.specialization_tracks")) {
+        return { rows: [{ ...specialization }] };
+      }
+      if (text.includes("dune.set_specialization_xp_and_level")) {
+        specialization = {
+          player_id: String(values[0]),
+          track_type: String(values[1]),
+          xp_amount: String(values[2]),
+          level: String(values[3])
+        };
+        return { rows: [], rowCount: 1 };
+      }
+      return { rows: [] };
+    },
+    transaction: async (fn) => fn(db)
+  };
+
+  const result = await addSpecializationXp(db, 123, { trackType: "Combat", amount: 26 });
+
+  assert.equal(result.xp, 1625);
+  assert.ok(Math.abs(result.level - 12.146067415730338) < 1e-12);
+  const update = calls.find((call) => call.text.includes("dune.set_specialization_xp_and_level"));
+  assert.deepEqual(update.values.slice(0, 3), [55, "Combat", 1625]);
+  assert.ok(Math.abs(update.values[3] - 12.146067415730338) < 1e-12);
 });
 
 test("intel mutation updates TechKnowledge points on the player actor", async () => {

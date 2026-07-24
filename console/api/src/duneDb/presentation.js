@@ -21,6 +21,19 @@ const CUMULATIVE_XP_BY_LEVEL = [
   244918, 254069, 263657, 273700, 284213, 295214, 306719, 318746, 331314, 344440
 ];
 
+const SPECIALIZATION_CUMULATIVE_XP_BY_LEVEL = [
+  0, 100, 205, 315, 431, 553, 681, 816, 958, 1107, 1264,
+  1428, 1599, 1777, 1963, 2157, 2359, 2570, 2790, 3019, 3258,
+  3504, 3757, 4017, 4285, 4561, 4845, 5137, 5438, 5748, 6067,
+  6393, 6727, 7069, 7419, 7777, 8143, 8518, 8902, 9295, 9697,
+  10107, 10525, 10951, 11385, 11827, 12277, 12736, 13204, 13681, 14167,
+  14661, 15163, 15673, 16191, 16717, 17251, 17794, 18346, 18907, 19477,
+  20052, 20632, 21217, 21807, 22402, 23002, 23608, 24220, 24838, 25462,
+  26086, 26710, 27334, 27958, 28582, 29206, 29830, 30454, 31078, 31702,
+  32326, 32950, 33574, 34198, 34822, 35446, 36070, 36694, 37318, 37942,
+  38566, 39190, 39814, 40438, 41062, 41686, 42310, 42934, 43558, 44182
+];
+
 const FACTION_TIER_THRESHOLDS = [0, 99, 249, 499, 999, 1999, 2224, 2524, 2899, 3349, 3874, 4474, 5149, 5899, 6724, 7624, 8599, 9649, 10774, 11974, 12474];
 
 export function xpToLevel(xp) {
@@ -33,6 +46,24 @@ export function xpToLevel(xp) {
     else hi = mid - 1;
   }
   return lo;
+}
+
+export function specializationXpToLevel(xp) {
+  const value = Math.max(0, Math.min(Number(xp) || 0, SPECIALIZATION_CUMULATIVE_XP_BY_LEVEL.at(-1)));
+  if (value <= 0) return 0;
+  const maxLevel = SPECIALIZATION_CUMULATIVE_XP_BY_LEVEL.length - 1;
+  if (value >= SPECIALIZATION_CUMULATIVE_XP_BY_LEVEL[maxLevel]) return maxLevel;
+
+  let lo = 0;
+  let hi = maxLevel;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi + 1) / 2);
+    if (SPECIALIZATION_CUMULATIVE_XP_BY_LEVEL[mid] <= value) lo = mid;
+    else hi = mid - 1;
+  }
+  const currentXp = SPECIALIZATION_CUMULATIVE_XP_BY_LEVEL[lo];
+  const nextXp = SPECIALIZATION_CUMULATIVE_XP_BY_LEVEL[lo + 1];
+  return lo + ((value - currentXp) / (nextXp - currentXp));
 }
 
 export function factionDisplayName(row) {

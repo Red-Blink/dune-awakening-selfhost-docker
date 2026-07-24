@@ -26,6 +26,7 @@ import {
   validateRecipeId,
   validateResearchKey,
   validateTemplateId,
+  specializationXpToLevel,
   xpToLevel
 } from "./duneDb/presentation.js";
 
@@ -1876,9 +1877,10 @@ export async function addSpecializationXp(db, id, { trackType, amount }) {
     const oldXp = Number(current.rows[0]?.xp_amount || 0);
     const oldLevel = Number(current.rows[0]?.level || 0);
     const nextXp = Math.max(0, Math.min(44182, oldXp + delta));
+    const nextLevel = specializationXpToLevel(nextXp);
     await withKnownLiveRefresh(tx, () => tx.query(
       "select dune.set_specialization_xp_and_level($1::bigint, $2::dune.specializationtracktype, $3::integer, $4::real)",
-      [player.controllerId, track, nextXp, oldLevel]
+      [player.controllerId, track, nextXp, nextLevel]
     ), { features: ["specialization"] });
     return {
       ok: true,
@@ -1886,7 +1888,8 @@ export async function addSpecializationXp(db, id, { trackType, amount }) {
       trackType: track,
       oldXp,
       xp: nextXp,
-      level: oldLevel,
+      oldLevel,
+      level: nextLevel,
       amount: delta,
       message: `${track} specialization XP was updated. The player must relog to see the change.`
     };

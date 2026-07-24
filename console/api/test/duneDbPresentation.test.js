@@ -19,6 +19,7 @@ import {
   researchRecipeId,
   researchType,
   schematicRecipeId,
+  specializationXpToLevel,
   tagsForJourneyNodeSubtree,
   tutorialStatus,
   validateMapName,
@@ -33,6 +34,15 @@ test("xpToLevel maps cumulative XP thresholds", () => {
   assert.equal(xpToLevel(39), 1);
   assert.equal(xpToLevel(40), 1);
   assert.equal(xpToLevel(344440), 200);
+});
+
+test("specializationXpToLevel maps cumulative XP and partial progress", () => {
+  assert.equal(specializationXpToLevel(0), 0);
+  assert.equal(specializationXpToLevel(100), 1);
+  assert.equal(specializationXpToLevel(1599), 12);
+  assert.ok(Math.abs(specializationXpToLevel(1625) - 12.146067415730338) < 1e-12);
+  assert.equal(specializationXpToLevel(44182), 100);
+  assert.equal(specializationXpToLevel(999999), 100);
 });
 
 test("display helpers normalize game identifiers", () => {
