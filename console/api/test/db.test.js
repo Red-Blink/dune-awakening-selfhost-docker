@@ -1,7 +1,11 @@
-import test from "node:test";
+import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { assertIdentifier, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
-import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, addSpecializationXp, applyLandsraadMilestonePreset, augmentInventoryItem, augmentNewestPlayerItem, changeDunePassword, completeJourneyNode, completeTutorial, deleteInventoryItem, exportBaseAsBlueprint, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listBases, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerCurrency, playerFactions, playerIntel, playerInventory, playerJourney, playerPosition, playerProfile, playerProgression, playerResearchItems, playerSolarisCoinTotal, playerVitals, portalGeneratorFuel, portalVehicles, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError } from "../src/duneDb.js";
+import { addCurrency, addFactionReputation, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, addSpecializationXp, applyLandsraadMilestonePreset, augmentInventoryItem, augmentNewestPlayerItem, changeDunePassword, completeJourneyNode, completeTutorial, deleteInventoryItem, exportBaseAsBlueprint, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listBases, listGuilds, listPlayers, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerCraftingRecipes, playerCurrency, playerFactions, playerIntel, playerInventory, playerJourney, playerPosition, playerProfile, playerProgression, playerResearchItems, playerSolarisCoinTotal, playerVitals, portalGeneratorFuel, portalVehicles, repairVehicleDecay, resetJourneyNode, resetTutorial, runSql, setLandsraadPlayerContribution, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError, _resetPlayerTargetCacheForTests } from "../src/duneDb.js";
+
+beforeEach(() => {
+  _resetPlayerTargetCacheForTests();
+});
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
   assert.deepEqual(discoverDbConfig({}), {
@@ -611,7 +615,7 @@ test("player progression computes level from XP and reports skill points", async
         return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
       }
       if (text.includes("from dune.fgl_entities fe") && text.includes("join dune.actor_fgl_entities afe")) {
-        assert.deepEqual(values, [301]);
+        assert.deepEqual(values, [91]);
         return { rows: [{ xp: "4790", total_skill_points: "12", unspent_skill_points: "3" }] };
       }
       return { rows: [] };
@@ -739,7 +743,7 @@ test("player vitals reports health, hydration, and spice addiction with derived 
         return { rows: [{ actor_id: 91, account_id: 201, controller_id: 301, player_state_id: 1, online_status: "Offline" }] };
       }
       if (text.includes("from dune.fgl_entities fe") && text.includes("join dune.actor_fgl_entities afe")) {
-        assert.deepEqual(values, [301]);
+        assert.deepEqual(values, [91]);
         return { rows: [{ current_health: "175.5" }] };
       }
       if (text.includes("gas_attributes->'DuneHydrationAttributeSet'")) {
@@ -757,6 +761,7 @@ test("player vitals reports health, hydration, and spice addiction with derived 
   assert.equal(result.capabilities.vitals, true);
   assert.equal(result.currentHealth, 175.5);
   assert.equal(result.maxHealth, 200);
+  assert.equal(result.maxHealthEstimated, false);
   assert.equal(result.hydration, 83.958465);
   assert.equal(result.maxHydration, 100);
   assert.equal(result.spiceAddictionLevel, 8.2);
@@ -791,6 +796,7 @@ test("player vitals reports null (not zero) health/hydration/spice when no match
   assert.equal(result.hydration, null);
   assert.equal(result.spiceAddictionLevel, null);
   assert.equal(result.maxHealth, 150);
+  assert.equal(result.maxHealthEstimated, true);
 });
 
 test("player vitals treats Combat level as 0 (base max health only) when specialization_tracks doesn't exist", async () => {
@@ -815,6 +821,7 @@ test("player vitals treats Combat level as 0 (base max health only) when special
   };
   const result = await playerVitals(db, "91");
   assert.equal(result.maxHealth, 150);
+  assert.equal(result.maxHealthEstimated, true);
 });
 
 test("player vitals derives max health from every Vitality passive tier boundary", async () => {
@@ -848,6 +855,7 @@ test("player vitals derives max health from every Vitality passive tier boundary
     };
     const result = await playerVitals(db, "91");
     assert.equal(result.maxHealth, maxHealth, `combat level ${combatLevel} should yield max health ${maxHealth}`);
+    assert.equal(result.maxHealthEstimated, false, `combat level ${combatLevel} should be confirmed`);
   }
 });
 

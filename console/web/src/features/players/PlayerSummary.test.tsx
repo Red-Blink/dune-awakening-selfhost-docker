@@ -105,6 +105,34 @@ describe("PlayerSummary", () => {
     });
   });
 
+  describe("Map fallback", () => {
+    it("shows an em dash when no map is assigned on player or fallback", () => {
+      const { container } = render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette" } }}
+          fallback={{}}
+        />
+      );
+      const mapMeta = container.querySelector(".summary-hero-map");
+      expect(mapMeta?.textContent).toContain("—");
+    });
+
+    it("shows the real map when present on the loaded player", () => {
+      const { container } = render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette", map: "Arrakis" } }}
+          fallback={{}}
+        />
+      );
+      expect(screen.getByText("Arrakis")).toBeInTheDocument();
+      const mapMeta = container.querySelector(".summary-hero-map");
+      expect(mapMeta?.textContent).toContain("Arrakis");
+      expect(mapMeta?.textContent).not.toContain("—");
+    });
+  });
+
   describe("Currency", () => {
     it("does not fetch currency/factions when there is no dbPlayerId", () => {
       render(
@@ -295,9 +323,39 @@ describe("PlayerSummary", () => {
       const secondBlock = screen.getByText("Player State ID").closest(".summary-block");
       expect(secondBlock).not.toBeNull();
       const secondRows = secondBlock!.querySelectorAll("tr");
-      expect(secondRows).toHaveLength(3);
+      expect(secondRows).toHaveLength(2);
+      expect(screen.getByText("Steam ID")).toBeInTheDocument();
       expect(screen.getByText("76561197986776594")).toBeInTheDocument();
-      expect(screen.getByText("Steam")).toBeInTheDocument();
+    });
+
+    it("shows zero-sentinel IDs as em dashes", async () => {
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{
+            player: {
+              character_name: "Benny Jesserette",
+              account_id: 0,
+              player_controller_id: 0,
+              player_state_id: 0,
+              platform_id: "76561197986776594",
+              platform_name: "Steam",
+              funcom_id: "FN1",
+              fls_id: "user1"
+            }
+          }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Account ID")).toBeInTheDocument();
+      });
+      const accountIdRow = screen.getByText("Account ID").closest("tr");
+      expect(accountIdRow?.textContent).toContain("—");
+      const controllerIdRow = screen.getByText("Player Controller ID").closest("tr");
+      expect(controllerIdRow?.textContent).toContain("—");
+      const playerStateIdRow = screen.getByText("Player State ID").closest("tr");
+      expect(playerStateIdRow?.textContent).toContain("—");
     });
   });
 
@@ -377,7 +435,7 @@ describe("PlayerSummary", () => {
 
   describe("Vitals", () => {
     it("renders Health, Hydration, and Spice Addiction when vitals are supported", async () => {
-      vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: true }, currentHealth: 175, maxHealth: 205, hydration: 84, maxHydration: 100, spiceAddictionLevel: 8, maxSpiceAddictionLevel: 10 });
+      vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: true }, currentHealth: 175, maxHealth: 205, maxHealthEstimated: false, hydration: 84, maxHydration: 100, spiceAddictionLevel: 8, maxSpiceAddictionLevel: 10 });
       render(
         <PlayerSummary
           {...baseProps}
@@ -393,6 +451,21 @@ describe("PlayerSummary", () => {
         expect(screen.getByText("Spice Addiction")).toBeInTheDocument();
         expect(screen.getByText("8 / 10")).toBeInTheDocument();
       });
+    });
+
+    it("renders Health with (est.) when maxHealthEstimated is true", async () => {
+      vi.mocked(playersApi.vitals).mockResolvedValue({ capabilities: { vitals: true }, currentHealth: 175, maxHealth: 205, maxHealthEstimated: true, hydration: 84, maxHydration: 100, spiceAddictionLevel: 8, maxSpiceAddictionLevel: 10 });
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{ player: { character_name: "Benny Jesserette" } }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Health")).toBeInTheDocument();
+      });
+      expect(screen.getByText(/175 \/ 205 \(est\.\)/)).toBeInTheDocument();
     });
 
     it("renders nothing extra when vitals are unsupported by the schema", async () => {

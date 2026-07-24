@@ -50,6 +50,8 @@ const INVENTORY_EDITABLE_COLUMNS = new Set(["stack_size", "quality_level", "posi
 let craftingRecipeCatalogCache = null;
 let adminItemMetadataCache = null;
 let augmentCompatibilityCache = null;
+const PLAYER_TARGET_CACHE_TTL_MS = 3000;
+const playerTargetCache = new Map(); // id -> { promise, expiresAt }
 
 export class UnsupportedCapabilityError extends Error {
   constructor(message, details = {}) {
@@ -1965,7 +1967,7 @@ export async function playerSolarisCoinTotal(db, id) {
 export async function playerFactions(db, id) {
   if (!(await tableExists(db, "player_faction_reputation"))) return unsupported("factions", ["dune.player_faction_reputation"]);
   const hasFactions = await tableExists(db, "factions");
-  const player = await resolvePlayerMutationTarget(db, id);
+  const player = await resolvePlayerMutationTargetCached(db, id);
   const result = hasFactions
     ? await db.query(`
         select f.id as faction_id,
@@ -1985,9 +1987,9 @@ export async function playerFactions(db, id) {
 
 export async function playerProgression(db, id) {
   if (!(await supportsPlayerProgression(db))) {
-    return { capabilities: { progression: false }, reason: "Unsupported by detected schema. Missing required table(s): dune.player_state, dune.actor_fgl_entities, dune.fgl_entities" };
+    return unsupported("progression", ["dune.player_state", "dune.actor_fgl_entities", "dune.fgl_entities"]);
   }
-  const player = await resolvePlayerMutationTarget(db, id);
+  const player = await resolvePlayerMutationTargetCached(db, id);
   const result = await db.query(`
     select (fe.components->'FLevelComponent'->1->>'TotalXPEarned')::bigint as xp,
            (fe.components->'FLevelComponent'->1->>'TotalSkillPoints')::bigint as total_skill_points,
@@ -1995,12 +1997,8 @@ export async function playerProgression(db, id) {
     from dune.fgl_entities fe
     join dune.actor_fgl_entities afe on afe.entity_id = fe.entity_id
     where afe.slot_name = 'DuneCharacter'
-      and afe.actor_id = (
-        select player_pawn_id from dune.player_state
-        where player_controller_id = $1::bigint
-        limit 1
-      )
-    limit 1`, [player.controllerId]);
+      and afe.actor_id = $1::bigint
+    limit 1`, [player.actorId]);
   const row = result.rows[0];
   if (!row || row.xp === null) {
     return { capabilities: { progression: false }, player, reason: "No DuneCharacter FLevelComponent found for this player." };
@@ -2018,9 +2016,9 @@ export async function playerProgression(db, id) {
 
 export async function playerIntel(db, id) {
   if (!(await supportsIntelMutation(db))) {
-    return { capabilities: { intel: false }, reason: "Unsupported by detected schema. Missing required table(s): dune.actors (properties column)" };
+    return unsupported("intel", ["dune.actors (properties column)"]);
   }
-  const player = await resolvePlayerMutationTarget(db, id);
+  const player = await resolvePlayerMutationTargetCached(db, id);
   const result = await db.query(`
     select (properties->'TechKnowledgePlayerComponent'->>'m_TechKnowledgePoints')::bigint as intel
     from dune.actors
@@ -2039,9 +2037,9 @@ export async function playerIntel(db, id) {
 
 export async function playerVitals(db, id) {
   if (!(await supportsPlayerVitals(db))) {
-    return { capabilities: { vitals: false }, reason: "Unsupported by detected schema. Missing required table(s)/column: dune.actors (gas_attributes column), dune.player_state, dune.actor_fgl_entities, dune.fgl_entities" };
+    return unsupported("vitals", ["dune.actors (gas_attributes column)", "dune.player_state", "dune.actor_fgl_entities", "dune.fgl_entities"]);
   }
-  const player = await resolvePlayerMutationTarget(db, id);
+  const player = await resolvePlayerMutationTargetCached(db, id);
   const hasSpecTracks = await tableExists(db, "specialization_tracks");
   const [healthResult, gasResult, combatResult] = await Promise.all([
     db.query(`
@@ -2049,12 +2047,8 @@ export async function playerVitals(db, id) {
       from dune.fgl_entities fe
       join dune.actor_fgl_entities afe on afe.entity_id = fe.entity_id
       where afe.slot_name = 'DuneCharacter'
-        and afe.actor_id = (
-          select player_pawn_id from dune.player_state
-          where player_controller_id = $1::bigint
-          limit 1
-        )
-      limit 1`, [player.controllerId]),
+        and afe.actor_id = $1::bigint
+      limit 1`, [player.actorId]),
     db.query(`
       select (gas_attributes->'DuneHydrationAttributeSet'->'CurrentHydration'->>'CurrentValue')::numeric as hydration,
              (gas_attributes->'DuneSpiceAddictionAttributeSet'->'SpiceAddictionLevel'->>'CurrentValue')::numeric as spice_addiction_level
@@ -2066,13 +2060,16 @@ export async function playerVitals(db, id) {
   ]);
   const health = healthResult.rows[0];
   const gas = gasResult.rows[0];
-  const combatLevel = Number(combatResult.rows[0]?.level || 0);
+  const combatLevelRow = combatResult.rows[0];
+  const combatLevel = Number(combatLevelRow?.level || 0);
+  const combatLevelConfirmed = Boolean(combatLevelRow);
   const toNum = (v) => (v === undefined || v === null ? null : Number(v));
   return {
     capabilities: { vitals: true },
     player,
     currentHealth: toNum(health?.current_health),
     maxHealth: maxHealthForCombatLevel(combatLevel),
+    maxHealthEstimated: !combatLevelConfirmed,
     hydration: toNum(gas?.hydration),
     maxHydration: BASE_MAX_HYDRATION,
     spiceAddictionLevel: toNum(gas?.spice_addiction_level),
@@ -4837,6 +4834,24 @@ async function resolvePlayerMutationTarget(db, id) {
     playerStateId: Number(row.player_state_id || 0),
     onlineStatus: row.online_status || "Offline"
   };
+}
+
+// Short-TTL cache for read-only capability endpoints (factions/progression/intel/vitals) that
+// otherwise each independently re-run the same actors/player_state join when the Player Summary
+// panel fires them as parallel requests. NOT used for mutation code paths — those must always
+// see a fresh onlineStatus for requireOfflinePlayer() to be safe.
+async function resolvePlayerMutationTargetCached(db, id) {
+  const key = String(id);
+  const cached = playerTargetCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.promise;
+  const promise = resolvePlayerMutationTarget(db, id);
+  playerTargetCache.set(key, { promise, expiresAt: Date.now() + PLAYER_TARGET_CACHE_TTL_MS });
+  promise.catch(() => playerTargetCache.delete(key));
+  return promise;
+}
+
+export function _resetPlayerTargetCacheForTests() {
+  playerTargetCache.clear();
 }
 
 function playerOnline(player) {

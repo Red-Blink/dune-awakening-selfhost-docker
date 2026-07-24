@@ -15,7 +15,7 @@ const currencyIcon = (label: string): LucideIcon => {
 type CurrencyRow = { currency_id: number; balance: number; label?: string };
 type FactionRow = { faction_id: number; faction_name?: string; reputation_amount: number };
 type Progression = { level?: number; xp?: number; totalSkillPoints?: number; unspentSkillPoints?: number };
-type Vitals = { currentHealth: number | null; maxHealth: number; hydration: number | null; maxHydration: number; spiceAddictionLevel: number | null; maxSpiceAddictionLevel: number };
+type Vitals = { currentHealth: number | null; maxHealth: number; maxHealthEstimated: boolean; hydration: number | null; maxHydration: number; spiceAddictionLevel: number | null; maxSpiceAddictionLevel: number };
 
 export function PlayerSummary({
   detail,
@@ -33,8 +33,7 @@ export function PlayerSummary({
   const player = ((detail?.player as Record<string, unknown> | undefined) || fallback) as Record<string, unknown>;
   const status = firstDefined(player.online_status, fallback.online_status);
   const [currencyRows, setCurrencyRows] = useState<CurrencyRow[]>([]);
-  const [factionRows, setFactionRows] = useState<FactionRow[]>([]);
-  const [factionsSupported, setFactionsSupported] = useState(false);
+  const [factionRows, setFactionRows] = useState<FactionRow[] | null>(null);
   const [progression, setProgression] = useState<Progression | null>(null);
   const [intel, setIntel] = useState<number | null>(null);
   const [solarisCoinTotal, setSolarisCoinTotal] = useState<number | null>(null);
@@ -45,8 +44,7 @@ export function PlayerSummary({
     const request = ++loadRequest.current;
     if (!dbPlayerId) {
       setCurrencyRows([]);
-      setFactionRows([]);
-      setFactionsSupported(false);
+      setFactionRows(null);
       setProgression(null);
       setIntel(null);
       setSolarisCoinTotal(null);
@@ -63,8 +61,11 @@ export function PlayerSummary({
     ]).then(([currency, factions, progressionResult, intelResult, solarisCoinResult, vitalsResult]) => {
       if (request !== loadRequest.current) return;
       setCurrencyRows(currency.status === "fulfilled" ? ((currency.value.rows || []) as CurrencyRow[]) : []);
-      setFactionRows(factions.status === "fulfilled" ? ((factions.value.rows || []) as FactionRow[]) : []);
-      setFactionsSupported(factions.status === "fulfilled" && factions.value.capabilities?.factions === true);
+      setFactionRows(
+        factions.status === "fulfilled" && factions.value.capabilities?.factions === true
+          ? ((factions.value.rows || []) as FactionRow[])
+          : null
+      );
       setProgression(progressionResult.status === "fulfilled" && progressionResult.value.capabilities?.progression ? progressionResult.value : null);
       setIntel(intelResult.status === "fulfilled" && intelResult.value.capabilities?.intel ? (intelResult.value.intel ?? null) : null);
       setSolarisCoinTotal(solarisCoinResult.status === "fulfilled" && solarisCoinResult.value.capabilities?.solarisCoin ? (solarisCoinResult.value.total ?? null) : null);
@@ -72,6 +73,7 @@ export function PlayerSummary({
         ? {
             currentHealth: vitalsResult.value.currentHealth ?? null,
             maxHealth: vitalsResult.value.maxHealth ?? 0,
+            maxHealthEstimated: vitalsResult.value.maxHealthEstimated ?? true,
             hydration: vitalsResult.value.hydration ?? null,
             maxHydration: vitalsResult.value.maxHydration ?? 0,
             spiceAddictionLevel: vitalsResult.value.spiceAddictionLevel ?? null,
@@ -82,21 +84,27 @@ export function PlayerSummary({
   }, [dbPlayerId]);
 
   const text = (value: unknown): string => (value === undefined || value === null ? "" : String(value));
+  const idText = (value: unknown): string => {
+    const resolved = text(value);
+    return resolved === "0" ? "" : resolved;
+  };
   const characterName = text(firstDefined(player.character_name, player.name, fallback.character_name)) || "—";
   const funcomId = text(firstDefined(player.funcom_id, fallback.funcom_id));
-  const map = text(firstDefined(player.map, player.world, fallback.map));
+  const map = text(firstDefined(player.map, player.world, fallback.map)) || "—";
   const guild = text(firstDefined(player.guild, fallback.guild)) || "—";
   const faction = text(firstDefined(player.faction, fallback.faction)) || "Neutral";
   const flsId = text(firstDefined(player.fls_id, fallback.fls_id, actionPlayerId)) || "missing";
-  const accountId = text(firstDefined(player.account_id, fallback.account_id));
-  const controllerId = text(firstDefined(player.player_controller_id, fallback.player_controller_id));
-  const playerStateId = text(player.player_state_id);
+  const accountId = idText(firstDefined(player.account_id, fallback.account_id));
+  const controllerId = idText(firstDefined(player.player_controller_id, fallback.player_controller_id));
+  const playerStateId = idText(player.player_state_id);
   const platformId = text(player.platform_id);
   const platformName = text(player.platform_name);
 
+  const platformLabel = platformName ? `${platformName} ID` : "Platform ID";
+  const platformValue = platformId || "—";
+
   const identityRows: { label: string; value: string }[] = [
-    { label: "Platform Name", value: platformName || "—" },
-    { label: "Platform ID", value: platformId || "—" },
+    { label: platformLabel, value: platformValue },
     { label: "Funcom ID", value: funcomId || "—" },
     { label: "FLS ID", value: flsId },
     { label: "DB Player ID", value: dbPlayerId || "missing" },
@@ -126,7 +134,7 @@ export function PlayerSummary({
         <PlayerStatusCell value={status} />
       </div>
       <div className="summary-hero-sub">
-        {map && <span className="summary-hero-meta summary-hero-map"><MapPin size={14} className="summary-hero-icon" aria-label="Map" /><span>{map}</span></span>}
+        <span className="summary-hero-meta summary-hero-map"><MapPin size={14} className="summary-hero-icon" aria-label="Map" /><span>{map}</span></span>
         <span className="summary-hero-meta summary-hero-guild"><Users size={14} className="summary-hero-icon" aria-label="Guild" /><span>{guild}</span></span>
       </div>
     </div>
@@ -144,7 +152,7 @@ export function PlayerSummary({
       {vitals && <div className="summary-block">
         <div className="summary-block-label">Vitals</div>
         <table className="summary-kv"><tbody>
-          <tr><td>Health</td><td>{vitals.currentHealth !== null ? `${Math.round(vitals.currentHealth).toLocaleString()} / ${vitals.maxHealth.toLocaleString()}` : "—"}</td></tr>
+          <tr><td>Health</td><td>{vitals.currentHealth !== null ? `${Math.round(vitals.currentHealth).toLocaleString()} / ${vitals.maxHealth.toLocaleString()}${vitals.maxHealthEstimated ? " (est.)" : ""}` : "—"}</td></tr>
           <tr><td>Hydration</td><td>{vitals.hydration !== null ? `${Math.round(vitals.hydration).toLocaleString()} / ${vitals.maxHydration.toLocaleString()}` : "—"}</td></tr>
           <tr><td>Spice Addiction</td><td>{vitals.spiceAddictionLevel !== null ? `${Math.round(vitals.spiceAddictionLevel).toLocaleString()} / ${vitals.maxSpiceAddictionLevel.toLocaleString()}` : "—"}</td></tr>
         </tbody></table>
@@ -154,7 +162,7 @@ export function PlayerSummary({
         <table className="summary-kv"><tbody>
           <tr><td>Alignment</td><td>{faction}</td></tr>
         </tbody></table>
-        {factionsSupported && <>
+        {factionRows !== null && <>
           <div className="summary-block-label summary-sublabel">Reputation</div>
           <table className="summary-kv"><tbody>
             {factionRows.map((row) => <tr key={row.faction_id}>
