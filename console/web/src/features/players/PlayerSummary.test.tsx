@@ -292,16 +292,13 @@ describe("PlayerSummary", () => {
   });
 
   describe("Identity", () => {
-    it("splits into two columns of at most 5 rows, with the heading only on the first", async () => {
+    it("renders platform, Funcom, and FLS identifiers as a plain single-table block", async () => {
       render(
         <PlayerSummary
           {...baseProps}
           detail={{
             player: {
               character_name: "Benny Jesserette",
-              account_id: 201,
-              player_controller_id: 301,
-              player_state_id: 102,
               platform_id: "76561197986776594",
               platform_name: "Steam",
               funcom_id: "FN1",
@@ -312,20 +309,55 @@ describe("PlayerSummary", () => {
         />
       );
       await waitFor(() => {
-        expect(screen.getByText("Account ID")).toBeInTheDocument();
+        expect(screen.getByText("Steam ID")).toBeInTheDocument();
       });
-      expect(screen.getAllByText("Identity")).toHaveLength(1);
-      const blocks = screen.getAllByText("DB Player ID").map((el) => el.closest(".summary-block"));
-      const identityBlock = blocks[0];
+
+      expect(screen.getAllByText("Platform Identity")).toHaveLength(1);
+      const identityBlock = screen.getByText("Platform Identity").closest(".summary-block");
       expect(identityBlock).not.toBeNull();
-      const rows = identityBlock!.querySelectorAll("tr");
-      expect(rows).toHaveLength(5);
-      const secondBlock = screen.getByText("Player State ID").closest(".summary-block");
-      expect(secondBlock).not.toBeNull();
-      const secondRows = secondBlock!.querySelectorAll("tr");
-      expect(secondRows).toHaveLength(2);
-      expect(screen.getByText("Steam ID")).toBeInTheDocument();
+
+      const table = screen.getByText("Steam ID").closest("table");
+      expect(table).not.toBeNull();
+      expect(table!.querySelectorAll("tr")).toHaveLength(3);
+
       expect(screen.getByText("76561197986776594")).toBeInTheDocument();
+      expect(screen.getByText("Funcom ID")).toBeInTheDocument();
+      expect(screen.getByText("FN1")).toBeInTheDocument();
+      expect(screen.getByText("FLS ID")).toBeInTheDocument();
+      expect(screen.getByText("user1")).toBeInTheDocument();
+    });
+  });
+
+  describe("Database Identity", () => {
+    it("renders DB Player, Account, Player Controller, and Player State in one table", async () => {
+      render(
+        <PlayerSummary
+          {...baseProps}
+          detail={{
+            player: {
+              character_name: "Benny Jesserette",
+              account_id: 201,
+              player_controller_id: 301,
+              player_state_id: 102
+            }
+          }}
+          fallback={{}}
+        />
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Account")).toBeInTheDocument();
+      });
+
+      const block = screen.getByText("Database Identity").closest(".summary-block");
+      expect(block).not.toBeNull();
+      expect(screen.getByText("DB Player").closest(".summary-block")).toBe(block);
+      expect(screen.getByText("Player State").closest(".summary-block")).toBe(block);
+
+      const table = screen.getByText("Account").closest("table");
+      expect(table).not.toBeNull();
+      expect(table!.querySelectorAll("tr")).toHaveLength(4);
+
+      expect(screen.getByText("91")).toBeInTheDocument();
     });
 
     it("shows zero-sentinel IDs as em dashes", async () => {
@@ -338,9 +370,6 @@ describe("PlayerSummary", () => {
               account_id: 0,
               player_controller_id: 0,
               player_state_id: 0,
-              platform_id: "76561197986776594",
-              platform_name: "Steam",
-              funcom_id: "FN1",
               fls_id: "user1"
             }
           }}
@@ -348,14 +377,14 @@ describe("PlayerSummary", () => {
         />
       );
       await waitFor(() => {
-        expect(screen.getByText("Account ID")).toBeInTheDocument();
+        expect(screen.getByText("Account")).toBeInTheDocument();
       });
-      const accountIdRow = screen.getByText("Account ID").closest("tr");
-      expect(accountIdRow?.textContent).toContain("—");
-      const controllerIdRow = screen.getByText("Player Controller ID").closest("tr");
-      expect(controllerIdRow?.textContent).toContain("—");
-      const playerStateIdRow = screen.getByText("Player State ID").closest("tr");
-      expect(playerStateIdRow?.textContent).toContain("—");
+      const accountRow = screen.getByText("Account").closest("tr");
+      expect(accountRow?.textContent).toContain("—");
+      const controllerRow = screen.getByText("Player Controller").closest("tr");
+      expect(controllerRow?.textContent).toContain("—");
+      const stateRow = screen.getByText("Player State").closest("tr");
+      expect(stateRow?.textContent).toContain("—");
     });
   });
 

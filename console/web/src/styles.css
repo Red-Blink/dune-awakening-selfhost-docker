@@ -1160,7 +1160,7 @@ body.debug .technical-details { display: block; }
 .playerAdmin_summaryActions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px solid rgba(214, 185, 140, .14); padding-top: 12px; }
 .playerAdmin_summaryActions button { width: auto; }
 .playerAdmin_summaryActions .playerAdmin_actionNote { flex: 1 0 100%; padding-left: 0; }
-.playerAdmin_tabs { display: grid; grid-template-columns: repeat(8, minmax(132px, 1fr)); gap: 8px; width: 100%; overflow-x: auto; }
+.playerAdmin_tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 8px; width: 100%; }
 .playerAdmin_tabs button { width: 100%; min-width: 0; min-height: 54px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 6px; border-color: #3b3329; background: #171a1d; color: #e9dcc8; font-size: 14px; font-weight: 700; white-space: nowrap; padding: 8px 10px; }
 .playerAdmin_tabs button svg { flex: 0 0 auto; }
 .playerAdmin_tabs button.active { border-color: #c68b4a; background: rgba(198, 139, 74, .16); color: #ffd08a; }
@@ -1181,7 +1181,7 @@ body.debug .technical-details { display: block; }
 .playerAdmin_boxHeaderLine { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .playerAdmin_boxHeaderLine > p { margin: 0; font-style: italic; color: #ad9f89; flex: 1 1 260px; min-width: 0; }
 .playerAdmin_boxHeaderLine .playerAdmin_filterRow { margin-left: auto; }
-.playerAdmin_box .playerAdmin_section > .playerAdmin_actionGroup .playerAdmin_actionRow { display: grid; grid-template-columns: 210px 360px 78px minmax(220px, 1fr); align-items: start; }
+.playerAdmin_box .playerAdmin_section:not(.playerAdmin_quickRewardsSection) > .playerAdmin_actionGroup .playerAdmin_actionRow { display: grid; grid-template-columns: 210px 360px 78px minmax(220px, 1fr); align-items: start; }
 .playerAdmin_quickRewardsSection {
   grid-template-columns: 300px 360px 78px minmax(220px, 1fr);
   column-gap: 12px;
@@ -1496,7 +1496,6 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
   .home-backdrop { inset: 0; }
   .grid, .two-col { grid-template-columns: 1fr; }
   .health-grid, .health-grid-compact { grid-template-columns: 1fr; }
-  .playerAdmin_tabs { grid-template-columns: repeat(8, minmax(132px, 1fr)); }
   .live-map-layout { grid-template-columns: 1fr; }
   .live-map-frame { height: 62vh; min-height: 420px; }
   .live-map-stats { grid-template-columns: 1fr; }
@@ -2148,6 +2147,14 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
   .landsraad-persistent-status { justify-content: flex-start; min-height: 0; }
   .landsraad-modifier-groups { grid-template-columns: 1fr; }
   .landsraad-persistent-actions > div { width: 100%; justify-content: flex-start; }
+
+  .playerAdmin_box .playerAdmin_section > .playerAdmin_actionGroup .playerAdmin_actionRow { grid-template-columns: 1fr; }
+  .playerAdmin_box .playerAdmin_section > .playerAdmin_actionGroup .playerAdmin_actionRow > button { width: auto; justify-self: start; }
+  .playerAdmin_quickRewardsSection { grid-template-columns: 1fr; }
+  .playerAdmin_quickRewardsSection .playerAdmin_actionLabel,
+  .playerAdmin_quickRewardsSection .playerAdmin_fieldGroup,
+  .playerAdmin_quickRewardsSection .playerAdmin_actionGroup button,
+  .playerAdmin_quickRewardsSection .inline-action-result-wrap { grid-column: 1; }
 }
 @media (max-width: 720px) {
   .landsraad-modifier-grid { grid-template-columns: 1fr; }

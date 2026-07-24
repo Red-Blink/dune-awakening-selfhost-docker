@@ -106,13 +106,13 @@ export function PlayerSummary({
     { label: platformLabel, value: platformValue },
     { label: "Funcom ID", value: funcomId || "—" },
     { label: "FLS ID", value: flsId },
-    { label: "DB Player ID", value: dbPlayerId || "missing" },
-    { label: "Account ID", value: accountId || "—" },
-    { label: "Player Controller ID", value: controllerId || "—" },
-    { label: "Player State ID", value: playerStateId || "—" }
   ];
-  const identityColumns: (typeof identityRows)[] = [];
-  for (let i = 0; i < identityRows.length; i += 5) identityColumns.push(identityRows.slice(i, i + 5));
+  const databaseIdRows: { label: string; value: string }[] = [
+    { label: "DB Player", value: dbPlayerId || "missing" },
+    { label: "Account", value: accountId || "—" },
+    { label: "Player Controller", value: controllerId || "—" },
+    { label: "Player State", value: playerStateId || "—" }
+  ];
 
   const currencyItems: { label: string; value: string }[] = [];
   currencyRows
@@ -171,12 +171,18 @@ export function PlayerSummary({
           </tbody></table>
         </>}
       </div>
-      {identityColumns.map((rows, index) => <div className="summary-block" key={`identity-${index}`}>
-        {index === 0 && <div className="summary-block-label">Identity</div>}
+      <div className="summary-block">
+        <div className="summary-block-label">Platform Identity</div>
         <table className="summary-kv"><tbody>
-          {rows.map((row) => <tr key={row.label}><td>{row.label}</td><td className="summary-mono">{row.value}</td></tr>)}
+          {identityRows.map((row) => <tr key={row.label}><td>{row.label}</td><td className="summary-mono">{row.value}</td></tr>)}
         </tbody></table>
-      </div>)}
+      </div>
+      <div className="summary-block">
+        <div className="summary-block-label">Database Identity</div>
+        <table className="summary-kv"><tbody>
+          {databaseIdRows.map((row) => <tr key={row.label}><td>{row.label}</td><td className="summary-mono">{row.value}</td></tr>)}
+        </tbody></table>
+      </div>
     </div>
 
     {(currencyRows.length > 0 || solarisCoinTotal !== null) && <div className="summary-block">
