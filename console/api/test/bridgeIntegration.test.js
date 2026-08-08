@@ -64,39 +64,62 @@ test("ops.activity.summary — live DB — playersDead non-negative", async () =
 
 // ─── ops.resources.summary integration ───
 
+// addonOpsResourcesSummary now returns a Deep Desert / Hagga Basin
+// per-instance shape (see duneDb.js's own function-level comment and
+// test/addonOpsResourcesSummary.test.js for the full behavioral
+// coverage with a real mapCombatState.js resolver sandbox). It also now
+// takes a `config` param for that resolver's subprocess calls -- an
+// empty object is a valid, real "resolver unavailable" config here,
+// which the function itself degrades gracefully from (combatState:
+// "UNKNOWN" per instance) rather than throwing, so this live-DB smoke
+// test still exercises the real query path against the real database
+// without needing a full dune-script sandbox.
+function assertResourcesSection(section) {
+  assert.equal(typeof section.summary.totalActiveFields, "number");
+  assert.equal(typeof section.summary.totalRemainingSpice, "number");
+  assert.equal(typeof section.summary.pvpInstances, "number");
+  assert.equal(typeof section.summary.pveInstances, "number");
+  assert.ok(Array.isArray(section.summary.bySize));
+  assert.ok(Array.isArray(section.instances));
+  for (const inst of section.instances) {
+    assert.equal(typeof inst.partitionId, "string");
+    assert.equal(typeof inst.dimensionIndex, "number");
+    assert.equal(typeof inst.name, "string");
+    assert.equal(typeof inst.runtimeStatus, "string");
+    assert.equal(typeof inst.combatState, "string");
+    assert.equal(typeof inst.activeFields, "number");
+    assert.equal(typeof inst.remainingSpice, "number");
+    assert.ok(Array.isArray(inst.sizes));
+    for (const s of inst.sizes) {
+      assert.equal(typeof s.size, "string");
+      assert.equal(typeof s.activeFields, "number");
+      assert.ok(s.remainingSpice === null || typeof s.remainingSpice === "number");
+    }
+  }
+}
+
 test("ops.resources.summary — live DB — returns valid structure", async () => {
   const database = await getDb();
   if (!database) return;
 
-  const result = await addonOpsResourcesSummary(database);
-  assert.equal(typeof result.totalFields, "number");
-  assert.equal(typeof result.totalValueRemaining, "number");
-  assert.ok(Array.isArray(result.resourcesByMap));
-  assert.ok(Array.isArray(result.spiceFieldsBySize));
-
-  for (const m of result.resourcesByMap) {
-    assert.equal(typeof m.map, "string");
-    assert.equal(typeof m.fields, "number");
-    assert.ok(typeof m.total_value === "number" || typeof m.total_value === "string");
-  }
-  for (const s of result.spiceFieldsBySize) {
-    assert.equal(typeof s.map, "string");
-    assert.equal(typeof s.size, "string");
-    assert.ok(typeof s.active_fields === "number" || typeof s.active_fields === "string");
-    assert.ok(typeof s.total_value === "number" || typeof s.total_value === "string");
-    assert.ok(typeof s.currently_active === "number" || typeof s.currently_active === "string");
-    assert.ok(typeof s.max_active === "number" || typeof s.max_active === "string");
-  }
+  const result = await addonOpsResourcesSummary(database, {});
+  assert.ok("deepDesert" in result);
+  assert.ok("haggaBasin" in result);
+  assertResourcesSection(result.deepDesert);
+  assertResourcesSection(result.haggaBasin);
 });
 
 test("ops.resources.summary — live DB — spice only (field_kind_id=1)", async () => {
   const database = await getDb();
   if (!database) return;
 
-  const result = await addonOpsResourcesSummary(database);
-  assert.ok(result.totalFields >= 0);
-  assert.ok(result.totalValueRemaining >= 0);
-  // Spice fields should be a subset of total with field_kind_id=1 filter
+  const result = await addonOpsResourcesSummary(database, {});
+  // Every reported field count/spice total is real and non-negative --
+  // the underlying query already filters to field_kind_id=1 (spice).
+  for (const section of [result.deepDesert, result.haggaBasin]) {
+    assert.ok(section.summary.totalActiveFields >= 0);
+    assert.ok(section.summary.totalRemainingSpice >= 0);
+  }
 });
 
 // ─── ops.combat.deaths integration ───
