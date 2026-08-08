@@ -1,0 +1,379 @@
+// Console IAM — Action catalog with 1:1 route-to-action mapping.
+//
+// Every console route that requires authorization maps to exactly one
+// action in this catalog. Routes that are always public (health, auth
+// state, login/logout, Discord OAuth) do NOT appear here — they are
+// handled before the authorization gate in server.js.
+//
+// The catalog is the single source of truth for what permissions exist.
+// The IAM policy engine and the UI editor both read from this catalog
+// to know what actions can be granted or denied.
+//
+// Naming convention: namespace:action-name (e.g. "players:kick",
+// "bases:refill-generators", "server:restart")
+//
+// ---- WHEN ADDING A NEW ROUTE IN server.js (hard requirement) ----
+//
+// 1. If the route requires authorization: add it to ROUTE_ACTIONS below
+//    in the same commit. Follow the existing "METHOD /path": "ns:action"
+//    format exactly — one line, alphabetically grouped by namespace.
+//
+// 2. If the route is always public (no IAM action needed): add the EXACT
+//    path to the PUBLIC_EXACT array in test/rbacParity.test.js. The
+//    parity test statically extracts every route from server.js and
+//    asserts 100% coverage — a missing entry is a hard test failure.
+//
+// 3. Verify: `node --test test/rbacParity.test.js` must pass before push.
+//    This gate enforces the requirement mechanically.
+
+// ---- Namespaces ----
+
+export const NAMESPACES = {
+  SETUP:       "setup",
+  SERVER:      "server",
+  LOGS:        "logs",
+  BACKUPS:     "backups",
+  DATABASE:    "database",
+  UPDATES:     "updates",
+  SETTINGS:    "settings",
+  PLAYERS:     "players",
+  GUILDS:      "guilds",
+  BASES:       "bases",
+  MAPS:        "maps",
+  SIETCHES:    "sietches",
+  DEEPDESERT:  "deepdesert",
+  ADMIN:       "admin",
+  LANDSRAAD:   "landsraad",
+  ADDONS:      "addons",
+  CAREPACKAGE: "carepackage",
+  STORAGE:     "storage",
+  BLUEPRINTS:  "blueprints",
+};
+
+// ---- Actions: route → action mapping ----
+//
+// Format: { "METHOD /path": "namespace:action" }
+// Routes with parameterized segments (e.g. /players/:id/...) use the
+// literal path pattern from server.js; the policy engine matches
+// against the normalized path.
+
+export const ROUTE_ACTIONS = {
+  // --- Setup ---
+  "GET /api/setup/state":                      "setup:read",
+  "GET /api/setup/tasks":                      "setup:read",
+  "POST /api/setup/preflight":                 "setup:write",
+  "POST /api/setup/write-config":              "setup:write",
+  "POST /api/setup/write-oauth-config":        "setup:write",
+  "POST /api/setup/save-oauth-secret":         "setup:write",
+  "POST /api/setup/save-token":                "setup:write",
+  "POST /api/setup/init":                      "setup:write",
+  "GET /api/public-directory/status":          "setup:read",
+
+  // --- Server ---
+  "GET /api/server/status":                    "server:read",
+  "GET /api/server/performance":               "server:read",
+  "GET /api/server/readiness":                 "server:read",
+  "GET /api/server/ports":                     "server:read",
+  "GET /api/server/services":                  "server:read",
+  "GET /api/server/doctor":                    "server:read",
+  "GET /api/server/funcom-token/check":        "server:read",
+  "GET /api/server/restart-schedule":          "server:read",
+  "GET /api/server/ip-change-restart":         "server:read",
+  "GET /api/server/shutdown-protection":       "server:read",
+  "POST /api/server/start":                    "server:start",
+  "POST /api/server/stop":                     "server:stop",
+  "POST /api/server/restart":                  "server:restart",
+  "POST /api/server/restart-service":          "server:restart-service",
+  "POST /api/server/network-bind/fix":         "server:network-fix",
+  "POST /api/server/storage/cleanup-images":   "server:storage-cleanup",
+  "POST /api/server/storage/cleanup-build-cache":"server:storage-cleanup",
+  "POST /api/server/funcom-token":             "server:write-config",
+  "POST /api/server/title":                    "server:write-config",
+  "POST /api/server/config":                   "server:write-config",
+  "POST /api/server/restart-schedule":         "server:write-config",
+  "POST /api/server/ip-change-restart":        "server:write-config",
+  "POST /api/server/ip-change-restart/check":  "server:write-config",
+  "POST /api/server/shutdown-protection":      "server:write-config",
+  "POST /api/server/shutdown-protection/remove":"server:write-config",
+
+  // --- Logs ---
+  "GET /api/logs/services":                    "logs:read",
+
+  // --- Backups ---
+  "GET /api/backups":                          "backups:read",
+  "GET /api/backups/auto":                     "backups:read",
+  "POST /api/backups/create":                  "backups:create",
+  "POST /api/backups/restore":                 "backups:restore",
+  "POST /api/backups/auto":                    "backups:write-config",
+  "POST /api/backups/delete-all":              "backups:delete",
+  "POST /api/backups/import-external":         "backups:import",
+
+  // --- Database ---
+  "GET /api/database/status":                  "database:read",
+  "GET /api/database/schemas":                 "database:read",
+  "GET /api/database/routines":                "database:read",
+  "GET /api/database/tables":                  "database:read",
+  "GET /api/database/search":                  "database:read",
+  "POST /api/database/query":                  "database:query",
+  "POST /api/database/export":                 "database:export",
+  "POST /api/database/password":               "database:write-config",
+
+  // --- Updates ---
+  "GET /api/updates/auto-game":                "updates:read",
+  "POST /api/updates/check-game":              "updates:check",
+  "POST /api/updates/apply-game":              "updates:apply",
+  "POST /api/updates/fix-steamcmd":            "updates:fix",
+  "POST /api/updates/check-stack":             "updates:check",
+  "POST /api/updates/apply-stack":             "updates:apply",
+  "POST /api/updates/auto-game":               "updates:write-config",
+  "POST /api/updates/repair-runtime":          "updates:repair",
+
+  // --- Settings ---
+  "GET /api/settings":                         "settings:read",
+  "POST /api/settings":                        "settings:write",
+  "POST /api/settings/admin-password":         "settings:change-password",
+  "POST /api/settings/web-port":               "settings:change-port",
+  "GET /api/settings/iam/policies":            "settings:read",
+  "PUT /api/settings/iam/policy":              "settings:write",
+  "POST /api/settings/iam/policy/test":        "settings:read",
+  "POST /api/settings/public-directory":       "settings:write",
+  "POST /api/settings/public-directory/claim": "settings:write",
+
+  // --- Players (read) ---
+  "GET /api/players":                          "players:read",
+  "GET /api/players/online":                   "players:read",
+  "GET /api/players/search":                   "players:read",
+
+  // --- Players (mutations) ---
+  "POST /api/players/kick-all-online":         "players:kick-all",
+
+  // --- Guilds (read) ---
+  "GET /api/guilds":                           "guilds:read",
+
+  // --- Bases (read) ---
+  "GET /api/bases":                            "bases:read",
+  "GET /api/bases/pending-refills":            "bases:read",
+  "GET /api/bases/auto-refill":                "bases:read",
+  "GET /api/bases/pending-water-refills":      "bases:read",
+  "GET /api/bases/auto-refill-water":          "bases:read",
+  "GET /api/bases/permission-candidates":      "bases:read",
+
+  // --- Storage (read) ---
+  "GET /api/storage":                          "storage:read",
+
+  // --- Blueprints (read) ---
+  "GET /api/blueprints":                       "blueprints:read",
+
+  // --- Admin Tools ---
+  "GET /api/admin/items/catalog":              "admin:items:read",
+  "GET /api/admin/items/search":               "admin:items:read",
+  "GET /api/admin/items":                      "admin:items:read",
+  "GET /api/admin/vehicles/structured":        "admin:vehicles:read",
+  "GET /api/admin/vehicles":                   "admin:vehicles:read",
+  "GET /api/admin/skill-modules":              "admin:skills:read",
+  "GET /api/admin/history":                    "admin:history:read",
+  "GET /api/admin/character-transfer-settings": "admin:transfer-settings:read",
+  "GET /api/admin/message-of-the-day":         "admin:motd:read",
+  "GET /api/admin/player-announcements":       "admin:announcements:read",
+  "POST /api/admin/history/clear":             "admin:history:clear",
+  "POST /api/admin/character-transfer-settings":"admin:transfer-settings:write",
+  "POST /api/admin/message-of-the-day":        "admin:motd:write",
+  "POST /api/admin/player-announcements":      "admin:announcements:write",
+  "POST /api/admin/broadcast":                 "admin:broadcast",
+  "POST /api/admin/map-chat":                  "admin:map-chat",
+  "POST /api/admin/broadcast-shutdown":        "admin:broadcast-shutdown",
+
+  // --- Landsraad ---
+  "GET /api/admin/landsraad":                  "landsraad:read",
+  "POST /api/admin/landsraad":                 "landsraad:write",
+  "POST /api/admin/landsraad/task-goal":       "landsraad:write",
+  "POST /api/admin/landsraad/term-task-goals": "landsraad:write",
+  "GET /api/admin/landsraad/milestone-preset": "landsraad:read",
+  "POST /api/admin/landsraad/milestone-preset":"landsraad:write",
+  "POST /api/admin/landsraad/reward-tier":     "landsraad:write",
+  "POST /api/admin/landsraad/player-contribution":"landsraad:write",
+
+  // --- Addons ---
+  "GET /api/addons/community":                 "addons:read",
+  "GET /api/addons/installed":                 "addons:read",
+  "POST /api/addons/community/install":        "addons:install",
+  "POST /api/addons/community/update":         "addons:update",
+
+  // --- Care Package ---
+  "GET /api/care-package/capabilities":        "carepackage:read",
+  "GET /api/care-package/config":              "carepackage:read",
+  "GET /api/care-package/grants":              "carepackage:read",
+  "GET /api/care-package/history":             "carepackage:read",
+  "GET /api/care-package/eligible":            "carepackage:read",
+  "POST /api/care-package/config":             "carepackage:write-config",
+  "POST /api/care-package/history/clear":      "carepackage:clear-history",
+  "POST /api/care-package/grant-eligible":     "carepackage:grant",
+  "POST /api/care-package/run":                "carepackage:scan",
+  "POST /api/care-package/enable":             "carepackage:write-config",
+  "POST /api/care-package/disable":            "carepackage:write-config",
+
+  // --- Map (Live Map) ---
+  "GET /api/map/status":                       "maps:read",
+  "GET /api/map/capabilities":                 "maps:read",
+  "GET /api/map/partitions":                   "maps:read",
+  "GET /api/map/markers":                      "maps:read",
+  "GET /api/map/players":                      "maps:read",
+  "GET /api/map/bases":                        "maps:read",
+  "GET /api/map/storage":                      "maps:read",
+  "GET /api/map/services":                     "maps:read",
+  "GET /api/map/overlays":                     "maps:read",
+  "POST /api/map/teleport-player":             "maps:teleport",
+
+  // --- Maps ---
+  "GET /api/maps":                             "maps:read",
+  "GET /api/maps/mode":                        "maps:read",
+  "GET /api/maps/runtime-settings":            "maps:read",
+  "GET /api/maps/autoscaler":                  "maps:read",
+  "GET /api/maps/memory":                      "maps:read",
+  "GET /api/maps/memory/live":                 "maps:read",
+  "GET /api/maps/memory/swap":                 "maps:read",
+  "GET /api/maps/memory/balancer":             "maps:read",
+  "GET /api/maps/spicefields":                 "maps:read",
+  "GET /api/maps/combat-state":                "maps:read",
+  "GET /api/maps/choam-terminals":             "maps:read",
+  "GET /api/maps/user-settings/schema":        "maps:read",
+  "GET /api/maps/user-settings/restart-pending":"maps:read",
+  "GET /api/maps/user-settings/values":        "maps:read",
+  "GET /api/maps/user-settings/raw":           "maps:read",
+  "GET /api/maps/userengine":                  "maps:read",
+  "GET /api/maps/usergame":                    "maps:read",
+  "POST /api/maps/spawn":                      "maps:spawn",
+  "POST /api/maps/despawn":                    "maps:despawn",
+  "POST /api/maps/respawn":                    "maps:restart",
+  "POST /api/maps/settings":                   "maps:write-config",
+  "POST /api/maps/mode":                       "maps:write-config",
+  "POST /api/maps/runtime-settings":           "maps:write-config",
+  "POST /api/maps/memory":                     "maps:write-config",
+  "POST /api/maps/memory/swap":                "maps:write-config",
+  "POST /api/maps/memory/balancer":            "maps:write-config",
+  "POST /api/maps/autoscaler":                 "maps:write-config",
+  "POST /api/maps/reconcile":                  "maps:reconcile",
+  "POST /api/maps/user-settings/save":         "maps:write-config",
+  "POST /api/maps/user-settings/reset":        "maps:write-config",
+  "POST /api/maps/user-settings/raw":          "maps:write-config",
+  "POST /api/maps/user-settings/materialize":  "maps:write-config",
+  "POST /api/maps/choam-terminals":            "maps:write-config",
+  "DELETE /api/maps/choam-terminals":          "maps:write-config",
+
+  // --- Sietches ---
+  "GET /api/sietches":                         "sietches:read",
+  "GET /api/sietches/dimensions":              "sietches:read",
+  "POST /api/sietches/update":                 "sietches:write",
+
+  // --- Deep Desert ---
+  "GET /api/deepdesert":                       "deepdesert:read",
+  "POST /api/deepdesert/update":               "deepdesert:write",
+};
+
+// ---- Regex / parameterized route mappings ----
+//
+// For routes with dynamic segments (e.g. /players/:id/kick),
+// the policy engine checks these prefix patterns. Order matters —
+// more specific patterns must come first.
+
+export const REGEX_ACTIONS = [
+  // Setup tasks
+  ["/api/setup/tasks/", "setup:read"],
+
+  // Logs
+  ["/api/logs/", "logs:read"],
+
+  // Database (parameterized)
+  ["/api/database/routines/", "database:read"],
+  ["/api/database/tables/", "database:read"],
+  ["/api/database/table/", "database:read"],
+
+  // Backups (parameterized)
+  ["/api/backups/", "backups:read"],
+
+  // Players (parameterized) — ordered: mutations before reads
+  ["/api/players/", "players:read"],
+
+  // Guilds (parameterized)
+  ["/api/guilds/", "guilds:read"],
+
+  // Bases (parameterized)
+  ["/api/bases/", "bases:read"],
+
+  // Storage (parameterized)
+  ["/api/storage/", "storage:read"],
+
+  // Blueprints (parameterized)
+  ["/api/blueprints/", "blueprints:read"],
+
+  // Addons (parameterized)
+  ["/api/addons/installed/", "addons:read"],
+
+  // Care Package (parameterized)
+  ["/api/care-package/grant/", "carepackage:grant"],
+  ["/api/care-package/retry/", "carepackage:grant"],
+
+  // Maps spicefields
+  ["/api/maps/spicefields/", "maps:read"],
+];
+
+// ---- Method-aware regex patterns ----
+//
+// These check both method AND prefix. Used when the same path prefix
+// has different actions depending on HTTP method.
+
+export const REGEX_ACTIONS_BY_METHOD = {
+  "POST /api/players/":    "players:mutate",
+  "DELETE /api/players/":  "players:mutate",
+  "PATCH /api/players/":   "players:mutate",
+
+  "POST /api/guilds/":     "guilds:mutate",
+  "DELETE /api/guilds/":   "guilds:mutate",
+
+  "POST /api/bases/":      "bases:mutate",
+  "DELETE /api/bases/":    "bases:mutate",
+  "PUT /api/bases/":       "bases:mutate",
+
+  "POST /api/storage/":    "storage:mutate",
+
+  "POST /api/addons/":     "addons:mutate",
+  "DELETE /api/addons/":   "addons:mutate",
+
+  "PATCH /api/maps/spicefields/": "maps:write-config",
+
+  "DELETE /api/backups/":  "backups:delete",
+
+  "POST /api/blueprints/": "blueprints:mutate",
+  "DELETE /api/blueprints/":"blueprints:mutate",
+
+  "PATCH /api/database/tables/": "database:mutate",
+};
+
+// ---- Action resolution ----
+//
+// Returns the action string for a given route path and HTTP method.
+// Returns null for public routes (no authorization needed).
+
+export function actionForRoute(path, method) {
+  if (!path || !method) return null;
+  const routeMethod = typeof method === "string" ? method.toUpperCase() : String(method || "");
+  const exactKey = `${routeMethod} ${path}`;
+
+  // Exact match
+  if (ROUTE_ACTIONS.hasOwnProperty(exactKey)) return ROUTE_ACTIONS[exactKey];
+
+  // Method-aware regex match (ordered first — more specific)
+  for (const [key, action] of Object.entries(REGEX_ACTIONS_BY_METHOD)) {
+    const [m, prefix] = key.split(" ", 2);
+    if (routeMethod === m && path.startsWith(prefix)) return action;
+  }
+
+  // Method-agnostic regex match
+  for (const [prefix, action] of REGEX_ACTIONS) {
+    if (path.startsWith(prefix)) return action;
+  }
+
+  // Unknown route — return null (server.js handles untracked routes
+  // gracefully by allowing owner-tier and denying all others)
+  return null;
+}
