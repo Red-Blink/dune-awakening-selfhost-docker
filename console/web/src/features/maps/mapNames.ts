@@ -1,4 +1,13 @@
+// Two keyspaces resolve through this one table. Most callers hold a *service*
+// id (survival_1, sh_arrakeen) from the runtime; anything reading dune.actors
+// instead holds the *game's* map name (HaggaBasin, DeepDesert), which is a
+// different string for the same place. Both are listed so callers need not
+// know which kind of id they were handed.
 const MAP_FRIENDLY_NAMES: Readonly<Record<string, string>> = Object.freeze({
+  haggabasin: "Hagga Basin",
+  deepdesert: "Deep Desert",
+  harkovillage: "Harko Village",
+  overland: "Overland",
   survival_1: "Hagga Basin",
   overmap: "Overland",
   sh_arrakeen: "Arrakeen",

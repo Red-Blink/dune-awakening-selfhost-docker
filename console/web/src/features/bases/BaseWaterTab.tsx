@@ -62,7 +62,7 @@ export function BaseWaterTab({ baseId, autoRefill, refreshToken }: BaseWaterTabP
 
   return (
     <div className="bases-water" onClick={(event) => event.stopPropagation()}>
-      <div className="bases-generator-breakdown">
+      <div className="bases-tab-body">
         {autoRefill.supported && <div className="bases-auto-refill">
           {autoRefill.unavailable
             ? <p className="bases-auto-refill-unknown" role="status">
@@ -88,11 +88,11 @@ export function BaseWaterTab({ baseId, autoRefill, refreshToken }: BaseWaterTabP
 
         {!containers.length && <p className="muted">No water storage at this base.</p>}
 
-        <div className="bases-generator-cards bases-water-cards">
+        <div className="bases-card-grid bases-water-cards">
           {containers.map((container) => (
-            <div className="bases-generator-group" key={container.type}>
-              <div className="bases-generator-group-title">{container.name}</div>
-              <dl className="bases-generator-stats">
+            <div className="bases-card" key={container.type}>
+              <div className="bases-card-title">{container.name}</div>
+              <dl className="bases-card-stats">
                 <dt>Containers</dt>
                 <dd>{container.count.toLocaleString()}</dd>
                 <dt>Water Volume</dt>

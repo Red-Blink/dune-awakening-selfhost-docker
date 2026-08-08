@@ -82,10 +82,37 @@ function normalizeItem(item, repoRoot = "") {
   };
 }
 
-function itemImagePath(repoRoot, id) {
+// repoRoot -> item id -> resolved path. The existsSync below is the entire cost
+// of a catalog response: listCatalogItems normalizes up to 10,000 rows in one
+// request and baseInventory resolves an icon per distinct template, and every
+// request repeated the same stats on the event loop.
+//
+// Keyed by repoRoot because it is a caller argument, not a constant, and nested
+// rather than joined into one string key so an item id can never collide with a
+// path separator. Both are bounded -- one repoRoot per process in practice, and
+// item ids come from the shipped catalog and the game's own template names.
+const itemImagePathCache = new Map();
+
+// Misses are cached too, so an image added to console/web/public after the
+// process started is not picked up until it restarts. Note that this directory
+// is NOT baked into the image -- docker-compose.web.yml bind-mounts the host
+// checkout at /repo and points DUNE_DOCKER_DIR at it, so the files are live on
+// disk. What makes the stale window harmless is that updating the checkout
+// restarts the console container, not that the files cannot change.
+export function itemImagePath(repoRoot, id) {
   if (!repoRoot) return "/images/items/image-unavailable.png";
+  let byId = itemImagePathCache.get(repoRoot);
+  if (!byId) {
+    byId = new Map();
+    itemImagePathCache.set(repoRoot, byId);
+  }
+  const cached = byId.get(id);
+  if (cached !== undefined) return cached;
+
   const filename = `${id}.png`;
   const relativePath = `images/items/${filename}`;
   const absolutePath = resolve(repoRoot, "console/web/public", relativePath);
-  return existsSync(absolutePath) ? `/${relativePath}` : "/images/items/image-unavailable.png";
+  const resolved = existsSync(absolutePath) ? `/${relativePath}` : "/images/items/image-unavailable.png";
+  byId.set(id, resolved);
+  return resolved;
 }

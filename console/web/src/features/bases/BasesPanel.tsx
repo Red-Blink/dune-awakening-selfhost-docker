@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Download, Droplet, Fuel, Users, X, Zap } from "lucide-react";
+import { Boxes, ChevronDown, ChevronUp, Download, Droplet, Fuel, Users, X, Zap } from "lucide-react";
+import { BaseInventoryTab } from "./BaseInventoryTab";
 import { BasePermissionsTab } from "./BasePermissionsTab";
 import { BaseWaterTab } from "./BaseWaterTab";
 import { basesApi, type AutoRefillBase, type AutoRefillWaterBase, type RefillDeviceResult, type RefillWaterDeviceResult } from "../../api/bases";
 import { mapsApi } from "../../api/maps";
+import { friendlyMapName } from "../maps/mapNames";
+import { parseSietchRows } from "../maps/sietchRows";
 import { InfoTooltip } from "../../components/common/DisplayPrimitives";
 import { serverApi } from "../../api/server";
 import { setupApi, type Task } from "../../api/setup";
@@ -260,7 +263,26 @@ function withCoordinates(row: Record<string, unknown>): BaseRow {
 // Columns narrow enough to ellipsize; a title keeps the full value readable.
 const TOOLTIP_COLUMNS = new Set(["base_type", "owner_name", "coordinates"]);
 
-function renderBaseCell(row: Record<string, unknown>, column: string) {
+function renderBaseCell(row: Record<string, unknown>, column: string, instanceNames?: Map<string, string>) {
+  if (column === "map") {
+    const mapId = String(row.map || "");
+    if (!mapId) return <span className="muted">—</span>;
+    const partitionId = String(row.partition_id || "");
+    // Looked up under the same map-scoped key the effect writes: a bare
+    // partition number is only unique once the map it belongs to is fixed.
+    const partitionMap = String(row.partitionMap || "").trim();
+    // The instance name if it has arrived, otherwise the partition number.
+    // Something identifying always renders, because two instances of one map
+    // are otherwise indistinguishable in this column.
+    const instance = (partitionId && partitionMap && instanceNames?.get(`${partitionMap}:${partitionId}`))
+      || (partitionId ? `Partition ${partitionId}` : "");
+    return (
+      <span className="bases-map-cell">
+        <span className="bases-map-name" title={mapId}>{friendlyMapName(mapId)}</span>
+        {instance && <span className="bases-map-instance" title={`Partition ${partitionId}`}>{instance}</span>}
+      </span>
+    );
+  }
   if (column === "name") {
     const name = String(row.name || "");
     return name ? <span className="bases-name" title={name}>{name}</span> : "—";
@@ -323,6 +345,11 @@ export function BasesPanel({ onError, confirmAction, formatMutationResult }: Bas
   const [sortColumn, setSortColumn] = useState(() => basesCache?.sortColumn ?? "name");
   const [sortDirection, setSortDirection] = useState<SortDirection>(() => basesCache?.sortDirection ?? "asc");
   const [rows, setRows] = useState<BaseRow[]>(() => basesCache?.rows ?? []);
+  // partition id -> operator-chosen instance name ("Deep Desert PvE", "Sietch
+  // Abbir"). Loaded after the table renders, never blocking it: the names come
+  // from a CLI-backed endpoint, and the partition number alone already
+  // distinguishes instances if that call is slow or fails outright.
+  const [instanceNames, setInstanceNames] = useState<Map<string, string>>(new Map());
   const [totalCount, setTotalCount] = useState(() => basesCache?.totalCount ?? 0);
   const [totalBases, setTotalBases] = useState(() => basesCache?.totalBases ?? 0);
   const [totalPieces, setTotalPieces] = useState(() => basesCache?.totalPieces ?? 0);
@@ -341,7 +368,7 @@ export function BasesPanel({ onError, confirmAction, formatMutationResult }: Bas
   const [canQueueWater, setCanQueueWater] = useState(false);
   // Which tab the expanded row is showing. Power is the default so expanding a
   // row behaves exactly as it did before this feature existed.
-  const [expandedTab, setExpandedTab] = useState<"power" | "water" | "permissions">("power");
+  const [expandedTab, setExpandedTab] = useState<"power" | "water" | "inventory" | "permissions">("power");
   const [cancelingId, setCancelingId] = useState("");
   const [cancelingWaterId, setCancelingWaterId] = useState("");
   const [refillingWaterId, setRefillingWaterId] = useState("");
@@ -473,6 +500,49 @@ export function BasesPanel({ onError, confirmAction, formatMutationResult }: Bas
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [submittedQ, page, pageSize, sortColumn, sortDirection, load]);
+
+  // Upgrade "Partition 59" to "Deep Desert PvE" once the names arrive. One
+  // request pair per distinct partition map on the page (the dimension table
+  // plus its partition ids, which pair up by row order), fired after the table
+  // is already on screen. Failures are swallowed on purpose -- these endpoints
+  // shell out to the runtime CLI and are absent on a console-only install, and
+  // a missing instance name must never take the base list down with it.
+  const partitionMapsKey = [...new Set(rows
+    .map((row) => String(row.partitionMap || "").trim())
+    .filter(Boolean))].sort().join(",");
+  useEffect(() => {
+    const maps = partitionMapsKey ? partitionMapsKey.split(",") : [];
+    if (!maps.length) return undefined;
+    let cancelled = false;
+    void (async () => {
+      const resolved = new Map<string, string>();
+      await Promise.all(maps.map(async (map) => {
+        try {
+          const [table, ids] = await Promise.all([
+            mapsApi.sietchDimensions(map, false),
+            mapsApi.sietchDimensions(map, true)
+          ]);
+          // A non-zero exit still answers 200 with empty stdout, so a failed
+          // command is indistinguishable from a map with no sietches unless
+          // the code is checked. Treat it as unreadable and keep the fallback.
+          if (table.exitCode || ids.exitCode) return;
+          for (const row of parseSietchRows(table.stdout || "", ids.stdout || "")) {
+            // Keyed by map as well as id, and only for ids that really came
+            // from the --ids output: a row that fell back to its dimension
+            // index would otherwise answer for another map's partition of the
+            // same number and label that base with this map's instance name.
+            if (row.displayName && row.partitionIdFromIds) {
+              resolved.set(`${map}:${row.partitionId}`, row.displayName);
+            }
+          }
+        } catch {
+          // Leave this map on the partition-number fallback.
+        }
+      }));
+      if (!cancelled && resolved.size) setInstanceNames(resolved);
+    })();
+    return () => { cancelled = true; };
+  }, [partitionMapsKey]);
 
   // A background flush drains the queue whenever a map goes down, which can
   // happen without anyone touching this panel. When the count drops, the fuel
@@ -1129,7 +1199,7 @@ export function BasesPanel({ onError, confirmAction, formatMutationResult }: Bas
         wrapClassName="bases-table-wrap"
         headerTitles
         actionClassName="actions-column bases-actions-column"
-        renderCell={renderBaseCell}
+        renderCell={(row, column) => renderBaseCell(row, column, instanceNames)}
         action={(row) => {
           const base = row as BaseRow;
           const id = String(base.base_id);
@@ -1252,7 +1322,7 @@ export function BasesPanel({ onError, confirmAction, formatMutationResult }: Bas
             + (autoRefillEntry && !lastChecked ? " Not checked yet." : "")
             + (autoRefillUnavailable ? " Last known state — the latest read failed." : "");
           return (
-            <div className="bases-generator-breakdown">
+            <div className="bases-tab-body">
               {/* Hidden entirely without the queue capability: automating a
                   refill that cannot wait for a safe window would write into a
                   possibly-live base, which is the hazard the queue prevents. */}
@@ -1291,11 +1361,11 @@ export function BasesPanel({ onError, confirmAction, formatMutationResult }: Bas
               <p className="bases-generator-reserve-note" role="note">
                 {QUEUED_RESERVE_EXPLANATION}
               </p>
-              <div className="bases-generator-cards">
+              <div className="bases-card-grid">
               {generators.map((generator, index) => (
-                <div className="bases-generator-group" key={`${generator.type}-${index}`}>
-                  <div className="bases-generator-group-title">{generator.name}</div>
-                  <dl className="bases-generator-stats">
+                <div className="bases-card" key={`${generator.type}-${index}`}>
+                  <div className="bases-card-title">{generator.name}</div>
+                  <dl className="bases-card-stats">
                     <dt>Generators</dt>
                     <dd>{generator.generatorCount.toLocaleString()}</dd>
                     <dt>Fuel Queued</dt>
@@ -1350,6 +1420,14 @@ export function BasesPanel({ onError, confirmAction, formatMutationResult }: Bas
                   className={`bases-expanded-tab${expandedTab === "water" ? " active" : ""}`}
                   onClick={() => setExpandedTab("water")}
                 ><Droplet size={15} aria-hidden="true" />Water</button>
+                <button
+                  role="tab"
+                  id={`bases-tab-inventory-${id}`}
+                  aria-selected={expandedTab === "inventory"}
+                  aria-controls={`bases-panel-inventory-${id}`}
+                  className={`bases-expanded-tab${expandedTab === "inventory" ? " active" : ""}`}
+                  onClick={() => setExpandedTab("inventory")}
+                ><Boxes size={15} aria-hidden="true" />Inventory</button>
                 {canEditPermissions && <button
                   role="tab"
                   id={`bases-tab-permissions-${id}`}
@@ -1386,6 +1464,10 @@ export function BasesPanel({ onError, confirmAction, formatMutationResult }: Bas
                         onRetry: () => { void refreshAutoRefillWater(); }
                       }}
                     />
+                  </div>
+                : expandedTab === "inventory"
+                ? <div role="tabpanel" id={`bases-panel-inventory-${id}`} aria-labelledby={`bases-tab-inventory-${id}`}>
+                    <BaseInventoryTab baseId={id} />
                   </div>
                 : <div role="tabpanel" id={`bases-panel-permissions-${id}`} aria-labelledby={`bases-tab-permissions-${id}`}>
                     <BasePermissionsTab

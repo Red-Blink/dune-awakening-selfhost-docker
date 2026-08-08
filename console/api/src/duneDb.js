@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { redact } from "./redact.js";
+import { itemImagePath } from "./adminCatalog.js";
 import { clampInt, writeJsonAtomic } from "./jsonStore.js";
 import { CARE_PACKAGE_SERVER_PERSONA, FUNCOM_GM_PERSONA } from "./systemPersonas.js";
 import {
@@ -3431,6 +3432,18 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColum
       return { ...unsupported("bases", requiredTables.map((t) => `dune.${t}`)), totalCount: 0, totalBases: 0, totalPieces: 0, totalPlaceables: 0 };
     }
   }
+  // A base's own a.map is the game's map name ("HaggaBasin"), which cannot tell
+  // two instances of it apart. world_partition resolves the partition to the
+  // name the rest of the console uses ("Survival_1") plus its dimension --
+  // together, the identity of one running instance. Optional table: without it
+  // the fields come back empty rather than the query failing.
+  const hasWorldPartition = await tableExists(db, "world_partition");
+  const partitionSelect = hasWorldPartition
+    ? "coalesce(wp.map, '') as partition_map, coalesce(wp.dimension_index, 0) as dimension_index,"
+    : "'' as partition_map, 0 as dimension_index,";
+  const partitionJoin = hasWorldPartition
+    ? "left join dune.world_partition wp on wp.partition_id = p.partition_id"
+    : "";
   const safePageSize = intParam(pageSize, "pageSize", 1, 200);
   const safePage = intParam(page, "page", 0);
   const offset = safePage * safePageSize;
@@ -3529,6 +3542,7 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColum
              ${finalOwnerSelect}
              p.map,
              p.partition_id,
+             ${partitionSelect}
              p.x,
              p.y,
              p.z,
@@ -3537,6 +3551,7 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColum
              ${finalPlaceableCount} as placeable_count,
              coalesce(shared.entries, '[]'::jsonb) as shared_with
       from paged p
+      ${partitionJoin}
       ${finalOwnerJoin}
       left join lateral (
         select jsonb_agg(jsonb_build_object('name', ps.character_name, 'rank', par.rank) order by par.rank asc, ps.character_name asc) as entries
@@ -3614,6 +3629,8 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColum
       rows: result.rows.map(({ total_count, sort_position, ...row }) => ({
         ...row,
         partition_id: Number(row.partition_id || 0),
+        partitionMap: String(row.partition_map || ""),
+        dimensionIndex: Number(row.dimension_index || 0),
         x: Number(row.x),
         y: Number(row.y),
         z: Number(row.z),
@@ -6301,6 +6318,291 @@ export async function baseWaterFuelLevels(db, baseId) {
     deviceCount: entries.length,
     devices: entries,
     lowestPercent: entries.length ? Math.min(...entries.map((entry) => entry.percent)) : null
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Base inventory
+//
+// Classification is an explicit building_type allowlist, for the same reason
+// generator_spec's is (see the comment in portalGeneratorFuel): an unknown
+// placeable must not silently acquire a group and report an invented fill
+// level. Anything not listed here is omitted rather than bucketed.
+//
+// Grouping does NOT key on dune.inventories.inventory_type even though it
+// almost lines up (4 = storage, 12 = refining/crafting, 3 = fuel-and-module).
+// Recycler and Repair Station are inventory_type 3, the same as the oil
+// generators the Power tab owns -- keying on the type would file a 25-slot
+// Recycler holding the most items of anything outside storage under "fuel".
+//
+// Display names are this console's own: the game stores no type label. Every
+// unnamed placeable's dune.permission_actor.actor_name is literally
+// '##' || building_type, and a named one holds whatever the player typed
+// ("Ore Storage", "Aluminum Refinery"), which is why the '##%' filter below
+// mirrors listStorage's.
+//
+// Where a building_type disagrees with the player-facing name, the catalog
+// patent in runtime/data/admin-items.json wins -- it is the same source the
+// console already uses for item names. SpiceSilo_Placeable is the one that
+// matters: its patent is "Small Storage Container", and the data agrees, since
+// 195 of the 198 item rows across 40 of them in the reference dump were not
+// spice. "Spice Silo" is the internal blueprint name (BP_SpiceSiloContainer),
+// not a label any player sees.
+//
+// Every label below was read off the in-game build menu. Two were not
+// derivable from the data and would have been guessed wrong:
+// GenericContainer_Placeable is "Chest" (20 slots), not the "Medium Storage
+// Container" its position in the capacity ladder suggests -- that is a real
+// but separate 100-slot building. And the fabricators are nine buildings, not
+// five: the plain and Advanced variants coexist.
+//
+// Every building_type string below was verified against the shipped server
+// paks on the production host, where each building ships a
+// DA_BLD_<building_type>.uasset. That is what caught
+// AdvancedVehicleFabricator_Placeable being singular while its own base
+// building, VehiclesFabricator_Placeable, is plural.
+//
+// The reverse does not hold: that extraction is lossy (SpiceSilo_Placeable,
+// SmallOreRefinery_Placeable and Fabricator_Placeable all fail to appear in it
+// despite being live on the same server), so a type's absence from the paks is
+// not evidence against it. An allowlist entry that never matches is inert,
+// while a missing one silently hides a container.
+const BASE_INVENTORY_TYPES = {
+  storage: {
+    name: "Storage",
+    buildingTypes: {
+      storagecontainer_placeable: "Storage Container",
+      mediumstoragecontainer_placeable: "Medium Storage Container",
+      genericcontainer_placeable: "Chest",
+      // Two building types display as the same building. SpiceSilo is the
+      // legacy name every live placement still carries (48 of them on the
+      // production server, 0 of the other); SmallStorageContainer is the
+      // asset name shipped in the paks. Both are listed so a rename in a
+      // future patch cannot silently empty the tab.
+      spicesilo_placeable: "Small Storage Container",
+      smallstoragecontainer_placeable: "Small Storage Container"
+    }
+  },
+  refining: {
+    name: "Refining",
+    buildingTypes: {
+      smallorerefinery_placeable: "Small Ore Refinery",
+      mediumorerefinery_placeable: "Medium Ore Refinery",
+      largeorerefinery_placeable: "Large Ore Refinery",
+      smallchemicalrefinery_placeable: "Small Chemical Refinery",
+      mediumchemicalrefinery_placeable: "Medium Chemical Refinery",
+      // The base spice refinery builds as plain "Spice Refinery" -- Medium and
+      // Large are separate buildables, unlike the size-prefixed ore ones.
+      spicerefinery_placeable: "Spice Refinery",
+      mediumspicerefinery_placeable: "Medium Spice Refinery",
+      largespicerefinery_placeable: "Large Spice Refinery"
+    }
+  },
+  crafting: {
+    name: "Crafting",
+    buildingTypes: {
+      // Nine fabricators: a starter "Fabricator" plus four specialisations,
+      // each of which has a separate Advanced building. Do not take the
+      // catalog at face value here -- SurvivalFabricator_Patent is *named*
+      // "Advanced Survival Fabricator Patent" while AdvancedSurvivalFabricator_
+      // Patent carries that same display name, so one of the two entries is
+      // simply wrong. The build menu has both buildings and they are distinct.
+      fabricator_placeable: "Fabricator",
+      survivalfabricator_placeable: "Survival Fabricator",
+      vehiclesfabricator_placeable: "Vehicles Fabricator",
+      weaponsfabricator_placeable: "Weapons Fabricator",
+      wearablesfabricator_placeable: "Garment Fabricator",
+      advancedsurvivalfabricator_placeable: "Advanced Survival Fabricator",
+      // Singular "Vehicle" -- the game is inconsistent here, the base building
+      // is VehiclesFabricator_Placeable but the advanced one is
+      // AdvancedVehicleFabricator_Placeable. Verified in the shipped paks.
+      advancedvehiclefabricator_placeable: "Advanced Vehicle Fabricator",
+      advancedweaponsfabricator_placeable: "Advanced Weapons Fabricator",
+      advancedwearablesfabricator_placeable: "Advanced Garment Fabricator"
+    }
+  },
+  machines: {
+    name: "Machines",
+    buildingTypes: {
+      recycler_placeable: "Recycler",
+      repairstation_placeable: "Repair Station"
+    }
+  }
+};
+
+const BASE_INVENTORY_GROUP_ORDER = ["storage", "refining", "crafting", "machines"];
+
+const BASE_INVENTORY_TRIPLES = BASE_INVENTORY_GROUP_ORDER.flatMap((group) =>
+  Object.entries(BASE_INVENTORY_TYPES[group].buildingTypes).map(
+    ([buildingType, typeName]) => [group, buildingType, typeName]));
+
+// Shaped for unnest() so a building_type is never interpolated into the SQL.
+function baseInventoryTypeParams() {
+  return [
+    BASE_INVENTORY_TRIPLES.map(([group]) => group),
+    BASE_INVENTORY_TRIPLES.map(([, buildingType]) => buildingType),
+    BASE_INVENTORY_TRIPLES.map(([, , typeName]) => typeName)
+  ];
+}
+
+// Every stored item at a base, rolled up two ways off one query: by item
+// template (what does this base hold, and where) and by container (what is in
+// this box, and how full is it).
+//
+// Read-only by design. Item writes have no live-sync path -- no pg_notify
+// channel carries them, there are no triggers on dune.items or
+// dune.inventories, and the RMQ command bus addresses items by template name
+// while every id here is a row id -- so an edit could not reach a running map
+// without a relog or a map restart.
+export async function baseInventory(db, baseId, { repoRoot = "" } = {}) {
+  for (const table of ["placeables", "inventories", "items"]) {
+    if (!(await tableExists(db, table))) {
+      throw new UnsupportedCapabilityError(`Base inventory requires dune.${table}.`);
+    }
+  }
+  const target = intParam(baseId, "base id", 1);
+  const [groups, buildingTypes, typeNames] = baseInventoryTypeParams();
+
+  const result = await db.query(`
+    with requested_claims as (
+      select distinct b.id, afe.actor_id
+      from dune.buildings b
+      join dune.building_instances bi on bi.building_id = b.id
+      join dune.actor_fgl_entities afe on afe.entity_id = bi.owner_entity_id
+      where b.id = $1
+    ), base_entities as (
+      select distinct rc.id, claim_afe.entity_id as owner_entity_id
+      from requested_claims rc
+      join dune.actor_fgl_entities claim_afe on claim_afe.actor_id = rc.actor_id
+    ), inventory_types as (
+      select * from unnest($2::text[], $3::text[], $4::text[]) as t(group_key, building_type, type_name)
+    ), containers as (
+      -- max_item_count >= 0 drops the second inventory every refinery and
+      -- fabricator carries. Both are inventory_type 12; the capped one holds
+      -- the ore and crafting inputs, while the uncapped one (max_item_count
+      -- = -1, dune.actor_inventories.component_name_hash 26344419) was empty
+      -- on all 44 of them in the reference dump. Keeping it would also mean
+      -- dividing a slot bar by a negative capacity.
+      select p.id as placeable_id, inv.id as inventory_id,
+             it.group_key, it.type_name, inv.max_item_count,
+             coalesce(max(case when pa.actor_name not like '##%' and pa.actor_name <> 'None'
+                          then pa.actor_name end), '') as container_name
+      from base_entities be
+      join dune.placeables p on p.owner_entity_id = be.owner_entity_id
+      join inventory_types it on it.building_type = lower(p.building_type)
+      join dune.inventories inv on inv.actor_id = p.id and inv.max_item_count >= 0
+      left join dune.permission_actor pa on pa.actor_id = p.id
+      where p.is_hologram = false
+      group by p.id, inv.id, it.group_key, it.type_name, inv.max_item_count
+    )
+    select c.placeable_id::text as placeable_id,
+           c.inventory_id::text as inventory_id,
+           c.group_key, c.type_name, c.container_name, c.max_item_count,
+           i.template_id, i.stack_size
+    from containers c
+    left join dune.items i on i.inventory_id = c.inventory_id
+    order by c.placeable_id, i.template_id`, [target, groups, buildingTypes, typeNames]);
+
+  const itemMetadata = adminItemMetadata();
+  const containersById = new Map();
+  const itemsByTemplate = new Map();
+  const countedInventories = new Set();
+
+  for (const row of result.rows) {
+    const placeableId = String(row.placeable_id);
+    let container = containersById.get(placeableId);
+    if (!container) {
+      container = {
+        placeableId,
+        name: row.container_name || "",
+        typeName: row.type_name,
+        group: row.group_key,
+        usedSlots: 0,
+        maxSlots: 0,
+        itemCount: 0,
+        items: []
+      };
+      containersById.set(placeableId, container);
+    }
+    // A placeable can back more than one surviving inventory, so capacity is
+    // summed per inventory rather than per row -- every item row repeats it.
+    const inventoryId = String(row.inventory_id);
+    if (!countedInventories.has(inventoryId)) {
+      countedInventories.add(inventoryId);
+      container.maxSlots += Math.max(0, Number(row.max_item_count) || 0);
+    }
+
+    // The left join emits one all-null item for an empty container.
+    const templateId = String(row.template_id || "");
+    if (!templateId) continue;
+    const quantity = Number(row.stack_size) || 0;
+    container.usedSlots += 1;
+    container.itemCount += quantity;
+
+    const metadata = itemMetadata.get(templateId);
+    const name = metadata?.name || templateId;
+    const existing = container.items.find((entry) => entry.templateId === templateId);
+    if (existing) existing.quantity += quantity;
+    else container.items.push({ templateId, name, quantity });
+
+    let item = itemsByTemplate.get(templateId);
+    if (!item) {
+      item = {
+        templateId,
+        name,
+        image: itemImagePath(repoRoot, templateId),
+        category: metadata?.category || "",
+        quantity: 0,
+        containerCount: 0,
+        containers: []
+      };
+      itemsByTemplate.set(templateId, item);
+    }
+    item.quantity += quantity;
+    const holder = item.containers.find((entry) => entry.placeableId === placeableId);
+    if (holder) holder.quantity += quantity;
+    else item.containers.push({
+      placeableId,
+      name: container.name,
+      typeName: container.typeName,
+      group: container.group,
+      quantity
+    });
+  }
+
+  const byQuantityDesc = (left, right) => right.quantity - left.quantity || left.name.localeCompare(right.name);
+  const containers = [...containersById.values()].sort((left, right) =>
+    BASE_INVENTORY_GROUP_ORDER.indexOf(left.group) - BASE_INVENTORY_GROUP_ORDER.indexOf(right.group) ||
+    right.itemCount - left.itemCount ||
+    left.placeableId.localeCompare(right.placeableId));
+  for (const container of containers) container.items.sort(byQuantityDesc);
+
+  const items = [...itemsByTemplate.values()].sort(byQuantityDesc);
+  for (const item of items) {
+    item.containers.sort(byQuantityDesc);
+    item.containerCount = item.containers.length;
+  }
+
+  return {
+    baseId: target,
+    groups: BASE_INVENTORY_GROUP_ORDER.map((group) => {
+      const owned = containers.filter((container) => container.group === group);
+      return {
+        key: group,
+        name: BASE_INVENTORY_TYPES[group].name,
+        containerCount: owned.length,
+        itemCount: owned.reduce((total, container) => total + container.itemCount, 0)
+      };
+    }),
+    containers,
+    items,
+    totals: {
+      items: containers.reduce((total, container) => total + container.itemCount, 0),
+      distinct: items.length,
+      containers: containers.length,
+      usedSlots: containers.reduce((total, container) => total + container.usedSlots, 0),
+      maxSlots: containers.reduce((total, container) => total + container.maxSlots, 0)
+    }
   };
 }
 

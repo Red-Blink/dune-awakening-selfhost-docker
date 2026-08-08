@@ -2219,8 +2219,65 @@ test("list bases returns rows with piece and placeable counts and a total count"
   assert.equal(result.totalPieces, 700);
   assert.equal(result.totalPlaceables, 140);
   assert.deepEqual(result.rows, [
-    { base_id: "1006", name: "Sietch One", base_type: "Sub-Fief", owner_name: "Leader One", map: "TheDeepDesert", partition_id: 8, x: 100, y: 200, z: 30, piece_count: 589, placeable_count: 126, shared_with: [{ name: "Ally Two", rank: 2, label: "Co-Owner" }], generatorDataAvailable: true, generatorCount: 0, fuelCells: 0, generatorRuntimeSeconds: 0, generatorUptimeMultiplier: 1, generatorUptimeEventLabel: "", generatorUptimeEventEndsAt: "", generatorUnstockedCount: 0, generatorAllUnstocked: false, generators: [] }
+    // partitionMap/dimensionIndex are empty here because this fake db reports
+    // no dune.world_partition -- the guarded branch, not a missing value.
+    { base_id: "1006", name: "Sietch One", base_type: "Sub-Fief", owner_name: "Leader One", map: "TheDeepDesert", partition_id: 8, partitionMap: "", dimensionIndex: 0, x: 100, y: 200, z: 30, piece_count: 589, placeable_count: 126, shared_with: [{ name: "Ally Two", rank: 2, label: "Co-Owner" }], generatorDataAvailable: true, generatorCount: 0, fuelCells: 0, generatorRuntimeSeconds: 0, generatorUptimeMultiplier: 1, generatorUptimeEventLabel: "", generatorUptimeEventEndsAt: "", generatorUnstockedCount: 0, generatorAllUnstocked: false, generators: [] }
   ]);
+});
+
+test("list bases resolves each base's partition to its map instance", async () => {
+  // Two bases on one game map but different partitions -- the case a.map alone
+  // cannot distinguish, and the reason partitionMap/dimensionIndex exist.
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: BASE_REQUIRED_TABLES.includes(name) || name === "dune.world_partition" }] };
+      }
+      if (text.includes("total_bases")) {
+        return { rows: [{ total_bases: "2", total_pieces: "20", total_placeables: "8" }] };
+      }
+      if (text.includes("from paged p")) {
+        return { rows: [
+          { base_id: "5001", name: "PvP Outpost", base_type: "Sub-Fief", owner_name: "A", map: "DeepDesert", partition_id: "8", partition_map: "DeepDesert_1", dimension_index: "0", x: "1", y: "2", z: "3", total_count: "2", piece_count: "10", placeable_count: "4", shared_with: [] },
+          { base_id: "5002", name: "PvE Outpost", base_type: "Sub-Fief", owner_name: "B", map: "DeepDesert", partition_id: "59", partition_map: "DeepDesert_1", dimension_index: "1", x: "4", y: "5", z: "6", total_count: "2", piece_count: "10", placeable_count: "4", shared_with: [] }
+        ] };
+      }
+      return { rows: [] };
+    }
+  };
+
+  const result = await listBases(db, { includeGenerators: false });
+
+  assert.deepEqual(result.rows.map((row) => [row.base_id, row.map, row.partition_id, row.partitionMap, row.dimensionIndex]), [
+    ["5001", "DeepDesert", 8, "DeepDesert_1", 0],
+    ["5002", "DeepDesert", 59, "DeepDesert_1", 1]
+  ]);
+  // The join is only emitted when the optional table is present.
+  const paged = calls.find((call) => call.text.includes("from paged p"));
+  assert.match(paged.text, /left join dune\.world_partition wp on wp\.partition_id = p\.partition_id/);
+});
+
+test("list bases omits the partition join when world_partition is absent", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) {
+        return { rows: [{ exists: BASE_REQUIRED_TABLES.includes(String(values[0] || "")) }] };
+      }
+      if (text.includes("total_bases")) return { rows: [{ total_bases: "0", total_pieces: "0", total_placeables: "0" }] };
+      return { rows: [] };
+    }
+  };
+
+  await listBases(db, { includeGenerators: false });
+
+  const paged = calls.find((call) => call.text.includes("from paged p"));
+  assert.ok(!paged.text.includes("dune.world_partition"), "must not join a table this schema does not have");
+  assert.match(paged.text, /'' as partition_map/);
 });
 
 test("list bases groups multiple internal building records under one claim actor", async () => {

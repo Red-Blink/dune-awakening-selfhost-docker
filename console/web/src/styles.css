@@ -562,8 +562,11 @@ main { padding: 22px; min-width: 0; }
 .summary-hero-meta > span:last-child { color: #e8e0cd; }
 .summary-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
 .summary-stat { background: #171a1d; border: 1px solid #302b25; border-radius: 8px; padding: 12px; display: grid; gap: 4px; }
-.summary-stat span { color: #ad9f89; font-size: 13px; }
-.summary-stat strong { color: #fff1d4; font-size: 22px; font-weight: 600; overflow-wrap: anywhere; }
+/* dt/dd accepted alongside span/strong so a label/value pair can be marked up
+   as a definition list without duplicating the tile's styling. */
+.summary-stat span, .summary-stat dt { color: #ad9f89; font-size: 13px; }
+.summary-stat strong, .summary-stat dd { color: #fff1d4; font-size: 22px; font-weight: 600; overflow-wrap: anywhere; }
+.summary-stat dd { margin: 0; }
 .summary-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
 .summary-block { display: grid; gap: 8px; align-content: start; }
 .summary-block-label { color: #c68b4a; text-transform: uppercase; font-size: 12px; letter-spacing: 0.05em; }
@@ -1655,6 +1658,14 @@ body.debug .technical-details { display: block; }
 .bases-table th.bases-actions-column, .bases-table td.bases-actions-column { width: 148px; }
 .bases-table td { max-width: none; white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
 .bases-name, .bases-ellipsis-cell { display: block; overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+
+/* Map over instance. Two instances of one map are identical in the map column
+   alone -- production runs DeepDesert_1 as both "Deep Desert PvP" and "Deep
+   Desert PvE" -- so the instance line is what actually identifies the row. Same
+   muted tone as the inventory card subtitle. */
+.bases-map-cell { display: grid; gap: 1px; min-width: 0; }
+.bases-map-name { overflow-wrap: anywhere; }
+.bases-map-instance { color: #bebcb6; font-size: 11.5px; overflow-wrap: anywhere; }
 .bases-generator-summary { display: block; white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
 .bases-fuel-alert { color: var(--danger-text); }
 .bases-pagination-footer { margin-top: 12px; margin-bottom: 0; align-items: center; }
@@ -2414,11 +2425,198 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
 
 .bases-water { display: grid; gap: 12px; }
 
+/* Inventory. The inset clamp() matches .bases-tab-body and
+   .bases-permissions-content exactly -- that identical value is what makes
+   Power, Water, Inventory and Permissions line their content up. */
+.bases-inventory { display: grid; width: 100%; min-width: 0; }
+/* Sits directly under .bases-card-title, which already carries the
+   4px bottom margin, so this only needs to close that gap back up.
+
+   Deliberately NOT an amber: the title, the field labels and the muted tones
+   are all the same warm family, so a fourth amber step read as one blurred
+   block rather than as a hierarchy. This is --text blended 75% toward the card
+   background -- a solid value, not opacity, which would drift against the
+   differently-tinted surfaces this card sits on. 8.40:1, still brighter than
+   the labels below it so title > subtitle > label survives. */
+.bases-inventory-card-subtitle {
+  margin: -2px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  color: #bebcb6;
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+/* The tiles are .summary-stats / .summary-stat, shared with the player
+   summary. Only the dl's own default margin needs clearing. */
+.bases-inventory-totals { margin: 0; }
+.bases-inventory-totals .summary-stat { min-width: 0; }
+
+.bases-inventory-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bases-inventory-groups { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.bases-inventory-chip {
+  width: auto;
+  border-radius: 999px;
+  padding: 5px 13px;
+  font-size: 12px;
+  background: var(--panel-muted);
+  border-color: var(--border);
+  color: var(--muted);
+}
+.bases-inventory-chip.active { background: #9b5f2a; border-color: var(--accent-strong); color: var(--text-strong); }
+.bases-inventory-chip-count { color: inherit; opacity: .75; }
+
+/* Pushed to the trailing edge so the chips (a filter) and the view switch (a
+   different axis entirely) never read as one control group. */
+.bases-inventory-views { display: inline-flex; margin-left: auto; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
+.bases-inventory-view {
+  width: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 6px 14px;
+}
+.bases-inventory-view + .bases-inventory-view { border-left: 1px solid var(--border-strong); }
+.bases-inventory-view.active { background: #25201b; color: var(--title); }
+
+.bases-inventory-search { display: flex; gap: 8px; }
+.bases-inventory-search input { flex: 1; min-width: 0; }
+.bases-inventory-search button { flex: 0 0 auto; }
+
+/* Caret first: it is the affordance for the row, so it reads before the label
+   rather than trailing 400px away at the far right. Its 22px + the 8px gap put
+   the item name at 40px from the row edge, which is where the expanded
+   breakdown indents to. */
+.bases-inventory-item-head,
+.bases-inventory-item-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 90px 92px;
+  gap: 8px;
+  align-items: center;
+  text-align: left;
+}
+.bases-inventory-item-head { padding: 6px 10px; color: var(--muted); font-size: 11px; border-bottom: 1px solid var(--border); }
+.bases-inventory-item-head > span:nth-child(3), .bases-inventory-item-head > span:nth-child(4) { text-align: right; }
+.bases-inventory-item-row {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  padding: 9px 10px;
+}
+.bases-inventory-item-row:hover { border-color: var(--border); background: var(--panel-muted); }
+.bases-inventory-item-name { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bases-inventory-item-name img { width: 22px; height: 22px; flex: 0 0 22px; object-fit: contain; border-radius: 4px; background: #25201b; }
+.bases-inventory-qty, .bases-inventory-count { text-align: right; }
+.bases-inventory-count { color: var(--muted); }
+.bases-inventory-breakdown { background: var(--panel-muted); padding: 6px 10px 9px 40px; border-bottom: 1px solid var(--border); }
+.bases-inventory-breakdown > div { display: flex; justify-content: space-between; gap: 12px; color: var(--muted-warm); font-size: 12px; padding: 4px 0; }
+.bases-inventory-show-all { width: 100%; margin-top: 10px; background: transparent; border-color: transparent; color: var(--muted-warm); font-size: 12px; }
+.bases-inventory-show-all:hover { border-color: var(--border-strong); }
+
+.bases-inventory-containers { display: grid; gap: 16px; }
+/* The count sits beside the heading, not pushed to the far edge: across a
+   full-width grid the two ends were far enough apart to read as unrelated. */
+.bases-inventory-group-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 9px; }
+.bases-inventory-group-head h4 { margin: 0; color: var(--muted-warm); font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.bases-inventory-group-head span { font-size: 12px; }
+/* The cards themselves are .bases-card / .bases-card-stats,
+   shared with Power and Water. Only the track sizing differs: a container's
+   Contents line carries three item names, and real template names ("Melange
+   Spiced Food", "Micro-sandwich Fabric") are much longer than a water type's,
+   so the 280px cap those tabs use would truncate almost every line.
+
+   Two classes, not one: .bases-card-grid is declared further down this
+   file and would otherwise win the tie at equal specificity. */
+.bases-card-grid.bases-inventory-cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 380px)); }
+/* color: transparent rather than display:none or font-size:0 -- the glyphs
+   still generate the line box, so this row keeps the exact height of every
+   other stat label and the card stays aligned with its neighbours.
+
+   Qualified with dt: the bare class loses to `.bases-card-stats dt`,
+   which sets the label colour at higher specificity. */
+.bases-card-stats dt.bases-inventory-spacer-label { color: transparent; user-select: none; }
+
+/* Sized to its label rather than the card: a full-width button in a dd read as
+   the card's primary action, competing with the card itself. */
+.bases-inventory-view-contents {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  font-size: 12px;
+  border-color: var(--border-strong);
+  background: transparent;
+  color: #f7e7c7;
+}
+.bases-inventory-view-contents .muted { font-size: 11.5px; }
+
+/* Taller and wider than .confirm-modal's 440px: this is a scrolling list, not
+   a sentence and two buttons. */
+.bases-inventory-contents-modal {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(72vh, 720px);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+.bases-inventory-contents-modal .confirm-modal-title { align-items: start; }
+.bases-inventory-contents-modal .confirm-modal-title > div { min-width: 0; }
+.bases-inventory-contents-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.bases-inventory-contents-summary > div { background: var(--panel-muted); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.bases-inventory-contents-summary dt { color: var(--muted-warm); font-size: 11.5px; }
+.bases-inventory-contents-summary dd { margin: 2px 0 0; color: var(--text); font-size: 15px; }
+
+/* The only scroll region in the dialog, so a 45-stack container cannot push
+   the Close button off screen.
+
+   scrollbar-gutter reserves the track whether or not it is needed, so a short
+   container and a long one align identically instead of the rows shifting
+   12px when the scrollbar appears. The padding-right then holds the quantity
+   column clear of that track -- without it the numbers sit under the
+   scrollbar, which is exactly where they are hardest to read. */
+.bases-inventory-contents-list {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  display: grid;
+  align-content: start;
+  padding-right: 10px;
+}
+.bases-inventory-contents-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.bases-inventory-contents-row:last-child { border-bottom: 0; }
+.bases-inventory-contents-row img { width: 24px; height: 24px; object-fit: contain; border-radius: 4px; background: #25201b; }
+.bases-inventory-contents-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bases-inventory-contents-qty { color: var(--muted-warm); font-variant-numeric: tabular-nums; }
+.bases-inventory-note { margin: 0; font-size: 12px; }
+
 /* Permissions is a single reading column with the Revert/Save bar full-bleed
    beneath it. The inset padding lives on .bases-permissions-content rather than
    here, so the bar reaches both edges of the tab panel without negative margins
    -- which would be unsafe under the position: sticky expanded cell below. The
-   clamp() matches .bases-generator-breakdown's exactly, which is what makes
+   clamp() matches .bases-tab-body's exactly, which is what makes
    Power, Water and Permissions inset their content identically. */
 .bases-permissions {
   /* Keep the editor and its action bar aligned while allowing both to use the
@@ -2783,22 +2981,26 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
 /* A plain full-width column, not a grid: the auto-refill row and the reserve
    note need the row's true full width (flex's default align-items: stretch
    gives every direct child 100% width for free), while only the actual cards
-   below get wrapped into the capped auto-fit grid in .bases-generator-cards.
+   below get wrapped into the capped auto-fit grid in .bases-card-grid.
    A single grid used to do both jobs via grid-column: 1 / -1 on those two
    children, but that only reaches the edge of the grid's own tracks -- once
    the cards' columns were capped at a fixed max-width (rather than 1fr) the
    tracks stopped summing to the container's full width, so "span every
    track" silently stopped meaning "reach the right edge" and both rows fell
    short of it. */
-.bases-generator-breakdown {
+/* The padded body every expanded-row tab renders into -- Power, Water and
+   Inventory. The clamp() is what makes all of them inset identically, and
+   --bases-permissions-inset holds the same value for the fourth. */
+.bases-tab-body {
   display: flex;
   flex-direction: column;
   gap: 12px;
   width: 100%;
+  min-width: 0;
   padding: clamp(12px, 1.5vw, 18px);
   box-sizing: border-box;
 }
-.bases-generator-cards {
+.bases-card-grid {
   display: grid;
   /* Capped at 280px rather than 1fr: with few groups (a base with one or two
      water containers, in particular) an unbounded 1fr stretches each card to
@@ -2807,7 +3009,7 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
   gap: 12px;
   align-items: stretch;
 }
-.bases-generator-cards.bases-water-cards {
+.bases-card-grid.bases-water-cards {
   align-items: start;
 }
 .bases-uptime-event-inline {
@@ -2845,17 +3047,20 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
   font-size: 12px;
   line-height: 1.4;
 }
-.bases-generator-group {
+/* Border is the sidebar's --border-strong, not a bright amber. At two or three
+   cards the amber read as definition; at twenty-seven (a real base's storage)
+   it read as noise, with every card competing for attention. The faint amber
+   wash plus the radius carry the card shape on their own. */
+.bases-card {
   min-width: 0;
   max-width: 100%;
-  border: 1px solid rgba(255, 208, 138, .72);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   padding: 12px;
   background: rgba(255, 208, 138, .045);
-  box-shadow: inset 0 0 0 1px rgba(255, 208, 138, .06);
   overflow: hidden;
 }
-.bases-generator-group-title {
+.bases-card-title {
   min-width: 0;
   color: #ffd08a;
   font-weight: 700;
@@ -2865,14 +3070,14 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
 }
 /* A definition-list grid, not a nested <table>: cells inside .bases-table
    inherit the outer column widths, centring and row borders. */
-.bases-generator-stats {
+.bases-card-stats {
   display: grid;
   grid-template-columns: 1fr;
   width: 100%;
   min-width: 0;
   margin: 0;
 }
-.bases-generator-stats dt {
+.bases-card-stats dt {
   min-width: 0;
   color: var(--muted-warm);
   padding: 6px 0 0;
@@ -2880,7 +3085,7 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
-.bases-generator-stats dd {
+.bases-card-stats dd {
   min-width: 0;
   margin: 0;
   padding: 0 0 6px;
@@ -2890,7 +3095,7 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
-.bases-generator-stats dd:last-child {
+.bases-card-stats dd:last-child {
   border-bottom: 0;
 }
 .inventory-augment-input-line {

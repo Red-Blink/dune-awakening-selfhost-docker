@@ -539,6 +539,7 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/bases\/[^/]+\/queued-refill$/) && req.method === "DELETE") return baseCancelQueuedRefillRoute(req, res, path);
   if (path.match(/^\/api\/bases\/[^/]+\/auto-refill$/) && req.method === "POST") return baseAutoRefillToggleRoute(req, res, path);
   if (path.match(/^\/api\/bases\/[^/]+\/water$/) && req.method === "GET") return baseWaterRoute(res, path);
+  if (path.match(/^\/api\/bases\/[^/]+\/inventory$/) && req.method === "GET") return baseInventoryRoute(res, path);
   if (path.match(/^\/api\/bases\/[^/]+\/refill-water$/) && req.method === "POST") return baseRefillWaterRoute(req, res, path);
   if (path.match(/^\/api\/bases\/[^/]+\/queued-water-refill$/) && req.method === "DELETE") return baseCancelQueuedWaterRefillRoute(req, res, path);
   if (path.match(/^\/api\/bases\/[^/]+\/auto-refill-water$/) && req.method === "POST") return baseAutoRefillWaterToggleRoute(req, res, path);
@@ -2286,6 +2287,19 @@ async function baseWaterRoute(res, path) {
   if (!Number.isFinite(baseId) || baseId < 1) return json(res, 400, { error: "Invalid base ID" });
   try {
     return json(res, 200, { supported: true, ...(await duneDb.baseWater(db, baseId)) });
+  } catch (error) {
+    const status = error.unsupported ? 501 : 400;
+    return json(res, status, { supported: false, error: redact(error.message || error), reason: redact(error.message || error) });
+  }
+}
+
+// Read-only, so no directDbMutation wrapper and no confirmation phrase.
+// repoRoot is passed through only to resolve each item's catalog icon.
+async function baseInventoryRoute(res, path) {
+  const baseId = Number(decodeURIComponent(path.split("/")[3]));
+  if (!Number.isFinite(baseId) || baseId < 1) return json(res, 400, { error: "Invalid base ID" });
+  try {
+    return json(res, 200, { supported: true, ...(await duneDb.baseInventory(db, baseId, { repoRoot: config.repoRoot })) });
   } catch (error) {
     const status = error.unsupported ? 501 : 400;
     return json(res, status, { supported: false, error: redact(error.message || error), reason: redact(error.message || error) });

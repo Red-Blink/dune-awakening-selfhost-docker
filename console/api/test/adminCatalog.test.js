@@ -54,6 +54,27 @@ test("catalog marks schematics and augments for database grants", () => {
   assert.equal(itemIsSchematic(resolveCatalogItem(root, { itemName: "Armor Piercing Augment" })), false);
 });
 
+// Every normalized item stats its icon, and listCatalogItems normalizes up to
+// 10,000 of them per request. Memoisation is only observable by moving the
+// filesystem underneath the second lookup: it has to answer from the cache
+// rather than notice a file that appeared in between.
+test("item image lookups are resolved once per repo root", () => {
+  const root = fixtureRepo();
+  const images = join(root, "console/web/public/images/items");
+  mkdirSync(images, { recursive: true });
+
+  assert.equal(resolveCatalogItem(root, { itemId: "PlantFiber" }).image, "/images/items/image-unavailable.png");
+  writeFileSync(join(images, "PlantFiber.png"), "");
+  assert.equal(resolveCatalogItem(root, { itemId: "PlantFiber" }).image, "/images/items/image-unavailable.png");
+
+  // Keyed by repo root, not global: another root resolves the same id fresh.
+  const other = fixtureRepo();
+  const otherImages = join(other, "console/web/public/images/items");
+  mkdirSync(otherImages, { recursive: true });
+  writeFileSync(join(otherImages, "PlantFiber.png"), "");
+  assert.equal(resolveCatalogItem(other, { itemId: "PlantFiber" }).image, "/images/items/PlantFiber.png");
+});
+
 test("ranked physical schematics are distinguished from Grade 0 live grants", () => {
   const root = fixtureRepo();
   const schematic = resolveCatalogItem(root, { itemName: "Arhun K-28 Lasgun" });

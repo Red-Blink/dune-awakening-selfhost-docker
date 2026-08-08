@@ -44,6 +44,7 @@ reference. Everything else is marked **Current** and is expected to stay accurat
 - [generator-fuel-burn-rates.md](console/generator-fuel-burn-rates.md) — Current. Per-generator fuel burn constants and where they live in code.
 - [generator-refill-caps.md](console/generator-refill-caps.md) — Current. Refill-generators endpoint behavior and per-type fuel caps.
 - [base-permissions.md](console/base-permissions.md) — Current. Editing base ownership and sharing: ranks, the config-driven roster cap, and why the change needs no map restart.
+- [base-inventory.md](console/base-inventory.md) — Current. The read-only base Inventory tab: which placeables count as storage, the two inventories every refinery carries, and why the tab cannot write.
 
 ## Runtime (`runtime/`)
 

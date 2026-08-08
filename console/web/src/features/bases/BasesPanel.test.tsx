@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { basesApi, type AutoRefillBase } from "../../api/bases";
+import { mapsApi } from "../../api/maps";
 import { BasesPanel } from "./BasesPanel";
 
 vi.mock("../../api/bases", () => ({
@@ -20,12 +21,21 @@ vi.mock("../../api/bases", () => ({
     cancelQueuedWaterRefill: vi.fn(),
     pendingWaterRefills: vi.fn(),
     autoRefillWater: vi.fn(),
-    setAutoRefillWater: vi.fn()
+    setAutoRefillWater: vi.fn(),
+    inventory: vi.fn()
   }
 }));
 
 vi.mock("../../api/client", () => ({
   apiDownload: vi.fn()
+}));
+
+vi.mock("../../api/maps", () => ({
+  mapsApi: {
+    sietchDimensions: vi.fn(),
+    restartSietch: vi.fn(),
+    respawn: vi.fn()
+  }
 }));
 
 function renderPanel(overrides: Partial<Parameters<typeof BasesPanel>[0]> = {}) {
@@ -118,7 +128,7 @@ describe("BasesPanel generator details", () => {
 
     expect(screen.getByText("Fuel-Powered Generator")).toBeInTheDocument();
     expect(screen.getByText("Spice-Powered Generator")).toBeInTheDocument();
-    expect(document.querySelectorAll(".bases-generator-group")).toHaveLength(2);
+    expect(document.querySelectorAll(".bases-card")).toHaveLength(2);
     expect(screen.getAllByText("Fuel Queued")).toHaveLength(2);
     expect(screen.getByText("1 Fuel Cell")).toBeInTheDocument();
     expect(screen.getByText("2 Spice-infused Fuel Cells")).toBeInTheDocument();
@@ -713,7 +723,48 @@ describe("BasesPanel permissions editing", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Show details for Sietch One" }));
     expect(screen.getByRole("tab", { name: "Power" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Water" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Inventory" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Sub-Fief Permissions" })).not.toBeInTheDocument();
+  });
+
+  // Inventory sits between Water and Permissions, and is ungated the way Water
+  // is: the backend response, not the tab's absence, reports an unreadable
+  // schema.
+  it("opens the Inventory tab and loads that base's stored items", async () => {
+    mockList(false);
+    vi.mocked(basesApi.inventory).mockResolvedValue({
+      supported: true,
+      baseId: 1006,
+      groups: [
+        { key: "storage", name: "Storage", containerCount: 1, itemCount: 1000 },
+        { key: "refining", name: "Refining", containerCount: 0, itemCount: 0 },
+        { key: "crafting", name: "Crafting", containerCount: 0, itemCount: 0 },
+        { key: "machines", name: "Machines", containerCount: 0, itemCount: 0 }
+      ],
+      containers: [{
+        placeableId: "40001", name: "Vault", typeName: "Storage Container", group: "storage",
+        usedSlots: 1, maxSlots: 45, itemCount: 1000,
+        items: [{ templateId: "Stone", name: "Granite Stone", quantity: 1000 }]
+      }],
+      items: [{
+        templateId: "Stone", name: "Granite Stone", image: "/images/items/image-unavailable.png",
+        category: "resources", quantity: 1000, containerCount: 1,
+        containers: [{ placeableId: "40001", name: "Vault", typeName: "Storage Container", group: "storage", quantity: 1000 }]
+      }],
+      totals: { items: 1000, distinct: 1, containers: 1, usedSlots: 1, maxSlots: 45 }
+    } as never);
+
+    renderPanel();
+    fireEvent.click(await screen.findByRole("button", { name: "Show details for Sietch One" }));
+
+    const tabs = screen.getAllByRole("tab").map((tab) => tab.getAttribute("aria-label") || tab.textContent);
+    expect(tabs).toEqual(["Power", "Water", "Inventory"]);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Inventory" }));
+    // The tab opens on the container cards, not the item rollup.
+    expect(await screen.findByText("Vault")).toBeInTheDocument();
+    expect(document.querySelectorAll(".bases-inventory-cards .bases-card")).toHaveLength(1);
+    await waitFor(() => expect(basesApi.inventory).toHaveBeenCalledWith("1006"));
   });
 
   // A base with no generators had no expand chevron before this feature. It
@@ -928,19 +979,19 @@ describe("BasesPanel water refill", () => {
     vi.mocked(basesApi.water)
       .mockResolvedValueOnce({
         supported: true,
-        baseId: 4002,
+        baseId: 1006,
         containers: [{ type: "waterCistern", name: "Water Cistern", count: 1, stored: 1250, capacity: 5000, percent: 25 }]
       })
       .mockResolvedValueOnce({
         supported: true,
-        baseId: 4002,
+        baseId: 1006,
         containers: [{ type: "waterCistern", name: "Water Cistern", count: 1, stored: 5000, capacity: 5000, percent: 100 }]
       });
     vi.mocked(basesApi.refillWater).mockResolvedValue({
       supported: true,
       result: {
         ok: true,
-        baseId: 4002,
+        baseId: 1006,
         totalAdded: 3750,
         devices: [{ placeableId: "9101", type: "waterCistern", label: "Water Cistern", before: 1250, after: 5000, added: 3750 }]
       }
@@ -1091,5 +1142,139 @@ describe("BasesPanel combined fuel/water queue and stalled banners", () => {
     expect(screen.getByText("1 fuel")).toBeInTheDocument();
     expect(screen.getByText("1 water")).toBeInTheDocument();
     expect(document.querySelectorAll(".bases-pending-refills")).toHaveLength(1);
+  });
+});
+
+describe("BasesPanel map column", () => {
+  // Verbatim `dune sietches dimensions DeepDesert_1` output from the live
+  // server, paired with its `--ids` output: two instances of one map, which is
+  // exactly the case the map name alone cannot distinguish.
+  const DEEP_DESERT_TABLE = [
+    "DIMENSION  DISPLAY NAME                     PASSWORD",
+    "0          Deep Desert PvP                  (unset)",
+    "1          Deep Desert PvE                  (unset)"
+  ].join("\n");
+  const DEEP_DESERT_IDS = "8\n59\n";
+
+  function mockTwoDeepDesertBases() {
+    vi.mocked(basesApi.list).mockResolvedValue({
+      capabilities: { bases: true },
+      totalCount: 2,
+      totalBases: 2,
+      totalPieces: 20,
+      totalPlaceables: 8,
+      rows: [
+        { ...commonRow, base_id: "5001", name: "PvP Outpost", map: "DeepDesert", partition_id: 8, partitionMap: "DeepDesert_1", dimensionIndex: 0, generatorDataAvailable: false, generatorCount: 0 },
+        { ...commonRow, base_id: "5002", name: "PvE Outpost", map: "DeepDesert", partition_id: 59, partitionMap: "DeepDesert_1", dimensionIndex: 1, generatorDataAvailable: false, generatorCount: 0 }
+      ]
+    } as never);
+  }
+
+  function mapCells() {
+    return [...document.querySelectorAll(".bases-map-cell")].map((cell) => ({
+      map: cell.querySelector(".bases-map-name")?.textContent,
+      instance: cell.querySelector(".bases-map-instance")?.textContent
+    }));
+  }
+
+  it("renders the friendly map name and upgrades the partition to its instance name", async () => {
+    mockTwoDeepDesertBases();
+    vi.mocked(mapsApi.sietchDimensions).mockImplementation((_map?: string, ids?: boolean) =>
+      Promise.resolve({ stdout: ids ? DEEP_DESERT_IDS : DEEP_DESERT_TABLE }) as never);
+
+    renderPanel();
+    expect(await screen.findByText("PvP Outpost")).toBeInTheDocument();
+
+    // "DeepDesert" is the game's internal name; the column shows the real one,
+    // keeping the raw value in the title for anyone matching against the DB.
+    await waitFor(() => expect(mapCells()).toEqual([
+      { map: "Deep Desert", instance: "Deep Desert PvP" },
+      { map: "Deep Desert", instance: "Deep Desert PvE" }
+    ]));
+    expect(document.querySelector(".bases-map-name")).toHaveAttribute("title", "DeepDesert");
+    // One pair of requests for the single distinct partition map, not per row.
+    expect(vi.mocked(mapsApi.sietchDimensions).mock.calls.map((call) => call[0])).toEqual(["DeepDesert_1", "DeepDesert_1"]);
+  });
+
+  it("falls back to the partition number when the instance names cannot be read", async () => {
+    // These endpoints shell out to the runtime CLI and are absent on a
+    // console-only install. The rows must still identify their instance.
+    mockTwoDeepDesertBases();
+    vi.mocked(mapsApi.sietchDimensions).mockRejectedValue(new Error("spawn runtime/scripts/dune ENOENT"));
+
+    renderPanel();
+    expect(await screen.findByText("PvP Outpost")).toBeInTheDocument();
+
+    expect(mapCells()).toEqual([
+      { map: "Deep Desert", instance: "Partition 8" },
+      { map: "Deep Desert", instance: "Partition 59" }
+    ]);
+  });
+
+  // Two bases on two different maps, which is what makes the id keyspace
+  // matter: a partition number is only unique once its map is fixed.
+  function mockOneBasePerMap() {
+    vi.mocked(basesApi.list).mockResolvedValue({
+      capabilities: { bases: true },
+      totalCount: 2,
+      totalBases: 2,
+      totalPieces: 20,
+      totalPlaceables: 8,
+      rows: [
+        { ...commonRow, base_id: "5001", name: "Basin Hold", map: "HaggaBasin", partition_id: 1, partitionMap: "Survival_1", dimensionIndex: 0, generatorDataAvailable: false, generatorCount: 0 },
+        { ...commonRow, base_id: "5002", name: "PvP Outpost", map: "DeepDesert", partition_id: 8, partitionMap: "DeepDesert_1", dimensionIndex: 0, generatorDataAvailable: false, generatorCount: 0 }
+      ]
+    } as never);
+  }
+
+  // Both assertions below are negative -- an instance name must NOT appear --
+  // so they need a sync point that does not depend on one arriving. A
+  // module-level cache means the panel mounts with the previous test's rows and
+  // fires this effect twice, so the call count is not usable either; wait for
+  // the call the current rows triggered, then drain the resolve pass.
+  async function settleInstanceNames(map: string) {
+    await waitFor(() => expect(vi.mocked(mapsApi.sietchDimensions)).toHaveBeenCalledWith(map, true));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+  }
+
+  // The dimension table lists rows 0 and 1 while --ids comes back empty, so
+  // parseSietchRows keys those rows by dimension index. Pooled into one map
+  // across every partition map, DeepDesert_1's dimension 1 then answers the
+  // lookup for Survival_1's partition 1 and labels the Hagga Basin base
+  // "Deep Desert PvE".
+  it("does not label a base with another map's instance when partition ids are missing", async () => {
+    mockOneBasePerMap();
+    vi.mocked(mapsApi.sietchDimensions).mockImplementation((map?: string, ids?: boolean) =>
+      Promise.resolve({ stdout: map === "DeepDesert_1" && !ids ? DEEP_DESERT_TABLE : "" }) as never);
+
+    renderPanel();
+    expect(await screen.findByText("Basin Hold")).toBeInTheDocument();
+    await settleInstanceNames("Survival_1");
+
+    expect(mapCells()).toEqual([
+      // Never "Deep Desert PvE": that name is keyed by a dimension index, and
+      // this base is on a different map entirely.
+      { map: "Hagga Basin", instance: "Partition 1" },
+      { map: "Deep Desert", instance: "Partition 8" }
+    ]);
+  });
+
+  // commandJson answers 200 with an empty stdout when the CLI exits non-zero,
+  // so the failure is only visible in exitCode.
+  it("keeps the partition fallback when the CLI reports a non-zero exit", async () => {
+    mockTwoDeepDesertBases();
+    // Plausible stdout, but the command failed -- trusting it would publish
+    // instance names read from a stale or partial table.
+    vi.mocked(mapsApi.sietchDimensions).mockImplementation((_map?: string, ids?: boolean) =>
+      Promise.resolve({ stdout: ids ? DEEP_DESERT_IDS : DEEP_DESERT_TABLE, exitCode: 1 }) as never);
+
+    renderPanel();
+    expect(await screen.findByText("PvP Outpost")).toBeInTheDocument();
+    await settleInstanceNames("DeepDesert_1");
+
+    expect(mapCells()).toEqual([
+      { map: "Deep Desert", instance: "Partition 8" },
+      { map: "Deep Desert", instance: "Partition 59" }
+    ]);
   });
 });

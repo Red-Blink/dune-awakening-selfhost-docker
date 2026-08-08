@@ -9,6 +9,9 @@ import { titleCaseWords } from "../players/playerAdminUtils";
 import { pendingRefillCountForMap, pendingRefillCountForPartition, usePendingRefills } from "../../lib/usePendingRefills";
 import type { PendingRefills } from "../../api/bases";
 import { friendlyMapName, hasFriendlyMapName } from "./mapNames";
+// Re-exported so existing importers (and MapsPanel.sietchNames.test.ts) keep working.
+export { parseSietchRows, type SietchRow } from "./sietchRows";
+import { isSietchWriteTarget, parseSietchRows, type SietchRow } from "./sietchRows";
 
 // Taking a partition down is when any generator refill queued for a base on it
 // gets written, so every control that does so says what is waiting on it.
@@ -609,10 +612,15 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
   }
   async function loadSietches(options: { preserveDrafts?: boolean } = {}) {
     const [list, dimensions, ids] = await Promise.all([mapsApi.sietches(), mapsApi.sietchDimensions("Survival_1"), mapsApi.sietchDimensions("Survival_1", true)]);
+    // A non-zero exit still answers 200 with empty stdout, so a failed command
+    // is only visible in exitCode. Discard its output rather than parsing
+    // whatever it managed to print.
+    const dimensionsText = dimensions.exitCode ? "" : (dimensions.stdout || "");
+    const idsText = ids.exitCode ? "" : (ids.stdout || "");
     setSietchesText(list.stdout || "");
-    setSietchDimensionsText(dimensions.stdout || "");
-    setSietchDimensionIdsText(ids.stdout || "");
-    const rows = parseSietchRows(dimensions.stdout || list.stdout || "", ids.stdout || "");
+    setSietchDimensionsText(dimensionsText);
+    setSietchDimensionIdsText(idsText);
+    const rows = parseSietchRows(dimensionsText || list.stdout || "", idsText);
     const drafts = Object.fromEntries(rows.map((row) => [row.partitionId, { displayName: row.displayName, password: row.password }]));
     if (rows.length) {
       if (!options.preserveDrafts) {
@@ -1238,6 +1246,12 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
     const activeSietchesDecreased = activeChanged && Number.isFinite(requestedActiveSietches) && requestedActiveSietches < currentActiveCount;
     const primaryChanged = rowName === "Survival_1" && primarySietchDirty;
     if (!modeChanged && !memoryChanged && !activeChanged && !primaryChanged) return;
+    // This save carries the primary sietch's name and password alongside the
+    // map settings, so it refuses on the same terms as the sietch Save.
+    if (rowName === "Survival_1" && primarySurvivalSietch
+      && blockedSietchEdits(survivalSietchRows, sietchDrafts, sietchPasswordTouched, primarySurvivalSietch.partitionId).length) {
+      return onError(SIETCH_PARTITION_IDS_UNREADABLE);
+    }
     const running = mapRuntimeNeedsLiveApply(row.status);
     const actions: Array<{ label: string; run: () => Promise<{ task: Task }> }> = [];
     if (modeChanged || memoryChanged) {
@@ -1307,10 +1321,9 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
     }
     if (includePartitions) {
       for (const sietch of survivalSietchRows) {
+        if (!isSietchWriteTarget(sietch)) continue;
         if (partitionId && sietch.partitionId !== partitionId) continue;
-        const draft = sietchDrafts[sietch.partitionId] || { displayName: sietch.displayName, password: sietch.password };
-        const nameChanged = draft.displayName !== sietch.displayName;
-        const passwordChanged = sietchPasswordDraftChanged(sietch, draft, Boolean(sietchPasswordTouched[sietch.partitionId]));
+        const { draft, nameChanged, passwordChanged } = sietchDraftChanges(sietch, sietchDrafts, sietchPasswordTouched);
         const targetName = sietchTargetDisplayName(sietch, draft.displayName);
         if (nameChanged && passwordChanged) {
           actions.push({
@@ -1337,6 +1350,12 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
     return actions;
   }
   async function saveSurvivalSietches() {
+    // Refuse before building anything: skipping the unwritable rows would let a
+    // dirty active-sietch count save on its own and report the whole thing as
+    // saved, silently dropping the edited names and passwords.
+    if (blockedSietchEdits(survivalSietchRows, sietchDrafts, sietchPasswordTouched).length) {
+      return onError(SIETCH_PARTITION_IDS_UNREADABLE);
+    }
     const actions = survivalSietchActions({ includeActive: true, includePartitions: true });
     if (!actions.length) return;
     if (await confirmAction(`Save ${actions.length} Survival_1 Sietch change${actions.length === 1 ? "" : "s"}?`)) {
@@ -1349,6 +1368,7 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
     }
   }
   async function saveSietchSettings(sietch: SietchRow) {
+    if (!isSietchWriteTarget(sietch)) return onError(SIETCH_PARTITION_IDS_UNREADABLE);
     const parent = mapRows.find((row) => String(row.map || "") === "Survival_1") || {};
     const draft = sietchDrafts[sietch.partitionId] || { displayName: sietch.displayName, password: sietch.password };
     const originalMemory = memoryInputValue(partitionMemoryValue(memoryText, sietch.partitionId, String(parent.memory || "")));
@@ -1396,6 +1416,7 @@ export function MapsPanel({ onError, confirmAction, confirmSettingsRestart, wait
   }
   async function restartSietch(sietch: SietchRow, resultTarget: string) {
     if (!sietch.active) return;
+    if (!isSietchWriteTarget(sietch)) return onError(SIETCH_PARTITION_IDS_UNREADABLE);
     const label = sietch.displayName || `Partition ${sietch.partitionId}`;
     if (!(await confirmAction(`Restart ${label}?`, {
       title: "Restart Sietch",
@@ -2205,6 +2226,46 @@ function sietchPasswordDraftChanged(row: SietchRow, draft: { password: string },
   return Boolean(draft.password);
 }
 
+// The draft a row is being edited with, plus which of its fields differ from
+// what the server reported. One definition, shared by the code that builds
+// sietch write actions and the code that refuses to build them, so the two can
+// never disagree about what "edited" means.
+export function sietchDraftChanges(
+  row: SietchRow,
+  drafts: Record<string, { displayName: string; password: string }>,
+  passwordTouched: Record<string, boolean> = {}
+) {
+  const draft = drafts[row.partitionId] || { displayName: row.displayName, password: row.password };
+  return {
+    draft,
+    nameChanged: draft.displayName !== row.displayName,
+    passwordChanged: sietchPasswordDraftChanged(row, draft, Boolean(passwordTouched[row.partitionId]))
+  };
+}
+
+// Rows the operator has edited that cannot be written safely, because their
+// partition id fell back to a dimension index (see isSietchWriteTarget).
+//
+// survivalSietchActions skips those rows when building actions. On its own that
+// would make a bulk Save drop the edit without saying so: with nothing else
+// dirty the Save does nothing at all, and with the active-sietch count also
+// dirty that unrelated change still runs and the save reports success while the
+// edited fields are discarded. Callers refuse the whole save instead, matching
+// what the per-sietch Save and Restart already do.
+export function blockedSietchEdits(
+  rows: SietchRow[],
+  drafts: Record<string, { displayName: string; password: string }>,
+  passwordTouched: Record<string, boolean> = {},
+  partitionId?: string
+) {
+  return rows.filter((row) => {
+    if (isSietchWriteTarget(row)) return false;
+    if (partitionId && row.partitionId !== partitionId) return false;
+    const { nameChanged, passwordChanged } = sietchDraftChanges(row, drafts, passwordTouched);
+    return nameChanged || passwordChanged;
+  });
+}
+
 function sietchHasPassword(row: SietchRow | null | undefined, draft?: { password: string }) {
   return Boolean(row?.passwordSet || row?.password || (draft?.password && draft.password !== SIETCH_PASSWORD_MASK));
 }
@@ -2402,41 +2463,12 @@ export function valuesForDirtyFields(original: Record<string, string>, draft: Re
     .map((field) => [field.id, String(draft[field.id] ?? field.default ?? "")]));
 }
 
-type SietchRow = { partitionId: string; dimension: string; displayName: string; password: string; passwordSet: boolean; active: boolean };
 const SIETCH_PASSWORD_MASK = "********";
 
-export function parseSietchRows(text: string, idsText = ""): SietchRow[] {
-  const rows: SietchRow[] = [];
-  const ids = idsText.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^\d+$/.test(line));
-  let dimensionIndex = 0;
-  for (const line of text.split(/\r?\n/)) {
-    if (/^\s*DIMENSION\b/i.test(line)) continue;
-    const tableMatch = line.match(/^\s*(\d+)\s+(.+?)\s+(\((?:un)?set\))\s*$/i);
-    if (tableMatch) {
-      const dimension = tableMatch[1];
-      const partitionId = ids[dimensionIndex] || dimension;
-      const displayName = tableMatch[2].trim();
-      const passwordSet = /^\(set\)$/i.test(tableMatch[3]);
-      rows.push({ partitionId, dimension, displayName, password: "", passwordSet, active: true });
-      dimensionIndex += 1;
-      continue;
-    }
-    const partitionMatch = line.match(/\b(?:partition|id)\s*[:=]?\s*(\d+)\b/i) || line.match(/^\s*(\d+)\s+/);
-    if (!partitionMatch) continue;
-    const dimension = partitionMatch[1];
-    const partitionId = ids[dimensionIndex] || partitionMatch[1];
-    const displayName = (line.match(/\b(?:display|name)\s*[:=]\s*([^|,\t]+)/i)?.[1] || line.match(/\bSietch\s+([A-Za-z0-9 _-]+)/i)?.[0] || `Sietch ${partitionId}`).trim();
-    const passwordValue = (line.match(/\bpassword\s*[:=]\s*([^|,\t]+)/i)?.[1] || line.match(/\((?:un)?set\)\s*$/i)?.[0] || "").trim();
-    const passwordSet = /\(set\)|\bset\b|true|yes/i.test(passwordValue) || /\(set\)\s*$/i.test(line);
-    const password = /\(set\)|\(unset\)|\bset\b|\bunset\b/i.test(passwordValue) ? "" : passwordValue;
-    const active = !/\binactive|disabled|stopped\b/i.test(line);
-    rows.push({ partitionId, dimension, displayName, password, passwordSet: passwordSet || Boolean(password), active });
-    dimensionIndex += 1;
-  }
-  const unique = new globalThis.Map<string, SietchRow>();
-  for (const row of rows) unique.set(row.partitionId, row);
-  return [...unique.values()].sort((a, b) => Number(a.dimension) - Number(b.dimension));
-}
+// Shown instead of writing when isSietchWriteTarget rejects a row, so a
+// refused Restart or Save says why rather than appearing to do nothing.
+const SIETCH_PARTITION_IDS_UNREADABLE =
+  "Sietch partition IDs could not be read from the server, so this change cannot be applied to the right Sietch. Reload the Maps tab and try again.";
 
 function memoryForMap(rows: LiveMapMemoryRow[], map: string, row?: Record<string, unknown>) {
   const normalized = normalizeMapKey(map);

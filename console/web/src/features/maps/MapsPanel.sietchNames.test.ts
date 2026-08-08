@@ -10,8 +10,8 @@ describe("Sietch display names", () => {
     ].join("\n");
 
     expect(parseSietchRows(output, "1\n31\n")).toEqual([
-      { partitionId: "1", dimension: "0", displayName: "Awesome Map", password: "", passwordSet: true, active: true },
-      { partitionId: "31", dimension: "1", displayName: "The Kulon Show", password: "", passwordSet: false, active: true },
+      { partitionId: "1", partitionIdFromIds: true, dimension: "0", displayName: "Awesome Map", password: "", passwordSet: true, active: true },
+      { partitionId: "31", partitionIdFromIds: true, dimension: "1", displayName: "The Kulon Show", password: "", passwordSet: false, active: true },
     ]);
   });
 
