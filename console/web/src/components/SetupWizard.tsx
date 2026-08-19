@@ -222,7 +222,8 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
               <p>For a normal public server, forward these ports from your router/firewall to this Docker host:</p>
               <ul className="requirements">
                 <li><strong>UDP {wizardPorts.clientBase}-{wizardPorts.clientBase + 33}</strong> for Dune game server traffic.</li>
-                <li><strong>TCP {wizardPorts.rmqGame}</strong> for RabbitMQ game traffic.</li>
+                <li><strong>TCP {wizardPorts.rmqGame}</strong> for the RabbitMQ Game Messaging Endpoint.</li>
+                <li><strong>TCP {wizardPorts.rmqGameHttp}</strong> for the RabbitMQ Game HTTP Endpoint.</li>
               </ul>
               <p className="muted">This is the port guidance most users need.</p>
             </section>
@@ -240,7 +241,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
             </section>
             <section className="action-section">
               <h4>Do Not Publicly Expose</h4>
-              <p>Keep the web admin, Postgres, Director, TextRouter, RabbitMQ admin, RabbitMQ HTTP, and other internal service ports private.</p>
+              <p>Keep the web admin, Postgres, Director, TextRouter, RabbitMQ Admin, the local RabbitMQ management mirror, and other internal service ports private.</p>
             </section>
           </div>
         </>}
@@ -263,6 +264,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
               <ReviewGrid items={[
                 ["Public Game UDP", `${wizardPorts.clientBase}-${wizardPorts.clientBase + 33}/udp`],
                 ["Public RabbitMQ Game", `${wizardPorts.rmqGame}/tcp`],
+                ["Public RabbitMQ Game HTTP", `${wizardPorts.rmqGameHttp}/tcp`],
                 ["Admin Panel", `${adminPort}/tcp private only`],
                 ["Internal Services", "Do not expose publicly"]
               ]} />
