@@ -6,7 +6,14 @@ import { invalidateInstanceNames } from "../maps/instanceNames";
 import { PlayerVehiclesTab } from "./PlayerVehiclesTab";
 
 vi.mock("../../api/maps", () => ({ mapsApi: { sietchDimensions: vi.fn() } }));
-vi.mock("../../api/vehicles", () => ({ vehiclesApi: { forPlayer: vi.fn() } }));
+vi.mock("../../api/vehicles", () => ({
+  vehiclesApi: {
+    forPlayer: vi.fn(),
+    permissions: vi.fn(),
+    setPermissions: vi.fn(),
+    permissionCandidates: vi.fn()
+  }
+}));
 
 function response(overrides: Partial<VehiclesListResponse> = {}): VehiclesListResponse {
   return {
@@ -50,6 +57,48 @@ describe("PlayerVehiclesTab", () => {
     render(<PlayerVehiclesTab playerId="42" playerName="Kovalt" />);
     expect(await screen.findByText("Kovalt has no owned or shared vehicles.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(vehiclesApi.forPlayer).toHaveBeenCalledTimes(2));
+  });
+
+  // The default fixture above sends only { vehicles: true } with no
+  // vehiclePermissions flag -- this is the regression guard that an older/
+  // capability-less API keeps the tab hidden rather than defaulting it on.
+  it("hides the Permissions tab without the vehiclePermissions capability", async () => {
+    vi.mocked(vehiclesApi.forPlayer).mockResolvedValue(response());
+    render(<PlayerVehiclesTab playerId="42" playerName="Kovalt" />);
+
+    fireEvent.click(await screen.findByLabelText("Show components for Owned Bike"));
+    expect(screen.queryByRole("tab", { name: "Permissions" })).not.toBeInTheDocument();
+  });
+
+  it("shows the Permissions tab and refetches after a save when the capability is present", async () => {
+    vi.mocked(vehiclesApi.forPlayer).mockResolvedValue(response({ capabilities: { vehicles: true, vehiclePermissions: true } }));
+    vi.mocked(vehiclesApi.permissions).mockResolvedValue({
+      supported: true,
+      vehicleId: 1,
+      actorId: "1",
+      map: "HaggaBasin",
+      mapNameId: 1,
+      entries: [{ playerId: "4", name: "Kovalt", rank: 1, label: "", canonical: true }]
+    } as never);
+    render(<PlayerVehiclesTab playerId="42" playerName="Kovalt" />);
+
+    fireEvent.click(await screen.findByLabelText("Show components for Owned Bike"));
+    fireEvent.click(await screen.findByRole("tab", { name: "Permissions" }));
+    await screen.findByText("Kovalt", { selector: ".vehicles-permissions-owner-name" });
+
+    vi.mocked(vehiclesApi.setPermissions).mockResolvedValue({
+      supported: true,
+      result: { ok: true, vehicleId: 1, actorId: "1", map: "HaggaBasin", added: 1, reranked: 0, removed: 0, total: 2, message: "Permissions were updated." }
+    } as never);
+    vi.mocked(vehiclesApi.permissionCandidates).mockResolvedValue({ rows: [{ playerId: "9", name: "Leto_A" }] } as never);
+    fireEvent.change(screen.getByPlaceholderText("Search a player to add"), { target: { value: "Leto" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Add Leto_A" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Save changes" }));
+
+    // ownedCount is derived from row.relationship, which can shift after a
+    // rank change, so a save must refetch rather than trust stale rows.
     await waitFor(() => expect(vehiclesApi.forPlayer).toHaveBeenCalledTimes(2));
   });
 });

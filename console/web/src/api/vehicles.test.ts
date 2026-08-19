@@ -34,3 +34,32 @@ describe("vehiclesApi.list", () => {
     expect(api).toHaveBeenCalledWith("/api/players/player%2F42/vehicles");
   });
 });
+
+describe("vehiclesApi permissions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("reads a vehicle's roster with an encoded vehicle id", () => {
+    vehiclesApi.permissions("vehicle/1");
+    expect(api).toHaveBeenCalledWith("/api/vehicles/vehicle%2F1/permissions");
+  });
+
+  it("PUTs the whole roster, not a delta", () => {
+    vehiclesApi.setPermissions("5001", [{ playerId: "4", rank: 1 }, { playerId: "9", rank: 3 }]);
+    expect(api).toHaveBeenCalledWith("/api/vehicles/5001/permissions", {
+      method: "PUT",
+      body: JSON.stringify({ entries: [{ playerId: "4", rank: 1 }, { playerId: "9", rank: 3 }] })
+    });
+  });
+
+  it("searches candidates with a default limit of 25", () => {
+    vehiclesApi.permissionCandidates("Leto");
+    expect(api).toHaveBeenCalledWith("/api/vehicles/permission-candidates?q=Leto&limit=25");
+  });
+
+  it("omits an empty query but still sends the limit", () => {
+    vehiclesApi.permissionCandidates("", 50);
+    expect(api).toHaveBeenCalledWith("/api/vehicles/permission-candidates?limit=50");
+  });
+});

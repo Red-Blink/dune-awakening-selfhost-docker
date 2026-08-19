@@ -10,6 +10,7 @@ export function PlayerVehiclesTab({ playerId, playerName }: { playerId: string; 
   const [rows, setRows] = useState<VehicleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [supported, setSupported] = useState(true);
+  const [canEditPermissions, setCanEditPermissions] = useState(false);
   const [message, setMessage] = useState("");
   const requestIdRef = useRef(0);
 
@@ -22,11 +23,13 @@ export function PlayerVehiclesTab({ playerId, playerName }: { playerId: string; 
       if (requestIdRef.current !== requestId) return;
       setRows(result.rows || []);
       setSupported(result.capabilities?.vehicles !== false);
+      setCanEditPermissions(result.capabilities?.vehiclePermissions === true);
       setMessage(result.reason || "");
     } catch (error) {
       if (requestIdRef.current !== requestId) return;
       setRows([]);
       setSupported(true);
+      setCanEditPermissions(false);
       setMessage(errorText(error));
     } finally {
       if (requestIdRef.current === requestId) setLoading(false);
@@ -61,7 +64,16 @@ export function PlayerVehiclesTab({ playerId, playerName }: { playerId: string; 
                   <span><strong>{ownedCount}</strong> Owned</span>
                   <span><strong>{sharedCount}</strong> Shared</span>
                 </div>
-                <VehicleTable rows={rows} context="player" emptyMessage={`${playerName} has no owned or shared vehicles.`} />
+                <VehicleTable
+                  rows={rows}
+                  context="player"
+                  emptyMessage={`${playerName} has no owned or shared vehicles.`}
+                  canEditPermissions={canEditPermissions}
+                  // ownedCount above derives from row.relationship, which
+                  // shifts after a rank change -- refetch so the summary and
+                  // the table stay in sync with what was just saved.
+                  onPermissionsSaved={() => void load()}
+                />
               </>}
       </section>
     </div>

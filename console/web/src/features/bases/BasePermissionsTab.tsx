@@ -1,11 +1,26 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2, TriangleAlert } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import {
   basesApi,
   type BasePermissionCandidate,
   type BasePermissionEntry,
   type BasePermissionRank
 } from "../../api/bases";
+import {
+  ASSOCIATE_RANK,
+  CO_OWNER_RANK,
+  EntryName,
+  OWNER_RANK,
+  RANK_OPTIONS,
+  RANK_LABELS,
+  RankSegments,
+  type DraftEntry,
+  errorText,
+  formatShareBreakdown,
+  sameRoster,
+  sortDraft,
+  toDraft
+} from "../permissions/rosterEditor";
 
 type BasePermissionsTabProps = {
   baseId: string;
@@ -13,142 +28,6 @@ type BasePermissionsTabProps = {
   onSaved: () => void;
   confirmAction: (message: string, options?: { title?: string; confirmLabel?: string; warning?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
 };
-
-const OWNER_RANK: BasePermissionRank = 1;
-const CO_OWNER_RANK: BasePermissionRank = 2;
-const ASSOCIATE_RANK: BasePermissionRank = 3;
-
-const RANK_LABELS: Record<BasePermissionRank, string> = {
-  1: "Owner",
-  2: "Co-Owner",
-  3: "Associate"
-};
-
-const RANK_OPTIONS: BasePermissionRank[] = [OWNER_RANK, CO_OWNER_RANK, ASSOCIATE_RANK];
-
-// `label` is the server's own rendering of the rank ("Owner", or "Rank 7" for
-// anything outside 1-3). Carried through so a rank the segmented control cannot
-// represent is still readable on screen -- see unknownRankLabel.
-type DraftEntry = { playerId: string; name: string; rank: BasePermissionRank; canonical: boolean; label: string };
-
-function toDraft(entries: BasePermissionEntry[]): DraftEntry[] {
-  return entries.map((entry) => ({
-    playerId: entry.playerId,
-    name: entry.name,
-    rank: entry.rank,
-    canonical: entry.canonical,
-    label: entry.label || ""
-  }));
-}
-
-function sortDraft(entries: DraftEntry[]) {
-  return [...entries].sort((left, right) => left.rank - right.rank || left.name.localeCompare(right.name));
-}
-
-function sameRoster(left: DraftEntry[], right: DraftEntry[]) {
-  if (left.length !== right.length) return false;
-  const rightByPlayer = new Map(right.map((entry) => [entry.playerId, entry.rank]));
-  return left.every((entry) => rightByPlayer.get(entry.playerId) === entry.rank);
-}
-
-function errorText(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function plural(count: number, word: string) {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
-}
-
-// "1 co-owner, 4 associates", skipping whichever count is zero so a base shared
-// with associates only does not advertise "0 co-owners". Empty when nobody is
-// on the roster -- the caller drops the element rather than rendering "".
-// `other` covers rows the game stored outside rank 1-3 plus any duplicate Owner;
-// they are real roster members and have to be counted, but calling them
-// Associates would put a rank on them that nobody chose.
-function formatShareBreakdown(coOwners: number, associates: number, other = 0) {
-  const parts: string[] = [];
-  if (coOwners) parts.push(plural(coOwners, "co-owner"));
-  if (associates) parts.push(plural(associates, "associate"));
-  if (other) parts.push(`${other} of another rank`);
-  return parts.join(", ");
-}
-
-// The three segments cover rank 1-3 only. Anything else the game stored has no
-// segment to check, so the control would render blank with no way to read the
-// real rank -- show it instead of silently dropping it.
-function unknownRankLabel(entry: DraftEntry) {
-  if (RANK_OPTIONS.includes(entry.rank)) return "";
-  return entry.label || `Rank ${entry.rank}`;
-}
-
-// Shared by the Owner hero card and the roster rows so the custodian pill and
-// the ignored-entry warning follow a player between the two as their rank
-// changes, instead of being duplicated in both places and drifting apart.
-function EntryName({ entry, isSystemCustodian, className }: {
-  entry: DraftEntry;
-  isSystemCustodian: boolean;
-  className: string;
-}) {
-  return (
-    <span className={className} title={entry.name || entry.playerId}>
-      {entry.name || `Player ${entry.playerId}`}
-      {unknownRankLabel(entry) && <span
-        className="bases-permissions-rank-unknown"
-        title="The game stored a rank this editor cannot represent. Changing it below replaces it with the rank you pick."
-      >{unknownRankLabel(entry)}</span>}
-      {isSystemCustodian && <span className="bases-permissions-system-label">System Custodian</span>}
-      {!entry.canonical && <span className="bases-permissions-orphan" title="This entry does not match a known player character, so the game ignores it. Removing it is safe.">
-        <TriangleAlert size={13} aria-label="Ignored by the game" />
-      </span>}
-    </span>
-  );
-}
-
-// Native radios rather than aria-pressed buttons: the browser supplies arrow-key
-// navigation and a single roving tab stop per group for free, so a five-member
-// roster costs five tab stops before Save instead of fifteen. aria-pressed would
-// also announce "toggle, pressed" with no set position, which is wrong for one
-// mutually exclusive value.
-function RankSegments({ entry, baseId, disabled, onChange }: {
-  entry: DraftEntry;
-  baseId: string;
-  disabled: boolean;
-  onChange: (rank: BasePermissionRank) => void;
-}) {
-  const who = entry.name || entry.playerId;
-  // baseId is in the group name so two rosters rendered at once could never
-  // merge two players' radios into one browser group, where selecting in one
-  // row would silently clear the other.
-  const groupName = `bases-rank-${baseId}-${entry.playerId}`;
-  return (
-    <div className="bases-rank-segments" role="radiogroup" aria-label={`Rank for ${who}`}>
-      {RANK_OPTIONS.map((rank) => (
-        <label className="bases-rank-segment" key={rank}>
-          <input
-            type="radio"
-            name={groupName}
-            value={rank}
-            checked={entry.rank === rank}
-            disabled={disabled}
-            // Full rank word in the accessible name, abbreviation on screen.
-            // Each abbreviation is a prefix of the full label, so the
-            // label-in-name requirement still holds for voice control.
-            aria-label={`${RANK_LABELS[rank]} for ${who}`}
-            onChange={() => onChange(rank)}
-            // Clicking an already-checked radio fires no change event, which
-            // would strand a base carrying two rank-1 rows: the duplicate's
-            // "Own" segment renders checked, so the click that is supposed to
-            // demote the other Owner would do nothing. onChange is still what
-            // arrow-key navigation fires, so both are needed. changeRank is
-            // idempotent for a rank the entry already holds.
-            onClick={() => onChange(rank)}
-          />
-          <span aria-hidden="true">{RANK_LABELS[rank]}</span>
-        </label>
-      ))}
-    </div>
-  );
-}
 
 // The Owner is the one thing an admin opens this tab to check, so it gets its
 // own card instead of being one row among many. The custodian transfer lives
@@ -499,7 +378,7 @@ export function BasePermissionsTab({ baseId, baseName, onSaved, confirmAction }:
               />
               <RankSegments
                 entry={entry}
-                baseId={baseId}
+                scopeId={baseId}
                 disabled={saving || Boolean(unclaimed)}
                 onChange={(rank) => changeRank(entry.playerId, rank)}
               />

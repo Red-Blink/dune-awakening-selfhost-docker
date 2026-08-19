@@ -26,6 +26,7 @@ type VehiclesCache = {
   totalCount: number;
   totalVehicles: number;
   supported: boolean;
+  canEditPermissions: boolean;
   reason: string;
   lastFetchedAt: number;
 };
@@ -51,6 +52,7 @@ export function VehiclesPanel({ onError }: VehiclesPanelProps) {
   const [totalCount, setTotalCount] = useState(() => vehiclesCache?.totalCount ?? 0);
   const [totalVehicles, setTotalVehicles] = useState(() => vehiclesCache?.totalVehicles ?? 0);
   const [supported, setSupported] = useState(() => vehiclesCache?.supported ?? true);
+  const [canEditPermissions, setCanEditPermissions] = useState(() => vehiclesCache?.canEditPermissions ?? false);
   const [reason, setReason] = useState(() => vehiclesCache?.reason ?? "");
   const [loading, setLoading] = useState(() => vehiclesCache === null);
   const requestIdRef = useRef(0);
@@ -96,10 +98,12 @@ export function VehiclesPanel({ onError }: VehiclesPanelProps) {
       if (requestIdRef.current !== requestId) return;
       const nextRows = result.rows || [];
       const nextSupported = result.capabilities?.vehicles !== false;
+      const nextCanEditPermissions = result.capabilities?.vehiclePermissions === true;
       setRows(nextRows);
       setTotalCount(result.totalCount || 0);
       setTotalVehicles(result.totalVehicles || 0);
       setSupported(nextSupported);
+      setCanEditPermissions(nextCanEditPermissions);
       setReason(result.reason || "");
       vehiclesCache = {
         q: params.q,
@@ -111,6 +115,7 @@ export function VehiclesPanel({ onError }: VehiclesPanelProps) {
         totalCount: result.totalCount || 0,
         totalVehicles: result.totalVehicles || 0,
         supported: nextSupported,
+        canEditPermissions: nextCanEditPermissions,
         reason: result.reason || "",
         lastFetchedAt: Date.now()
       };
@@ -132,6 +137,7 @@ export function VehiclesPanel({ onError }: VehiclesPanelProps) {
       setTotalCount(cacheHit.totalCount);
       setTotalVehicles(cacheHit.totalVehicles);
       setSupported(cacheHit.supported);
+      setCanEditPermissions(cacheHit.canEditPermissions);
       setReason(cacheHit.reason);
       setLoading(false);
     }
@@ -209,6 +215,14 @@ export function VehiclesPanel({ onError }: VehiclesPanelProps) {
           sortDirection={sortDirection}
           onSort={handleSort}
           emptyMessage="No vehicles have been found yet."
+          canEditPermissions={canEditPermissions}
+          // Owner and Shared With are rendered from the list response, so a
+          // saved roster has to refetch or the row above keeps showing the
+          // pre-edit names.
+          onPermissionsSaved={() => {
+            vehiclesCache = null;
+            void load({ q: submittedQ, page, pageSize, sortColumn, sortDirection }, { silent: true });
+          }}
         />
         <div className="panel-title vehicles-pagination-footer">
           <p className="action-help-note">Showing {rangeStart}-{rangeEnd} of {totalCount} vehicles.</p>

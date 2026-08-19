@@ -4,6 +4,7 @@ import type { VehicleModule, VehicleRow, VehicleSharedEntry } from "../../api/ve
 import { DataTable, type SortDirection } from "../../components/common/DataTable";
 import { cachedInstanceNames, resolveInstanceNames } from "../maps/instanceNames";
 import { friendlyMapName } from "../maps/mapNames";
+import { VehiclePermissionsTab } from "./VehiclePermissionsTab";
 
 const GLOBAL_COLUMNS = ["name", "type", "owner", "shared_with", "condition_percent", "fuel_percent", "location"];
 const PLAYER_COLUMNS = ["name", "type", "relationship", "owner", "condition_percent", "fuel_percent", "location"];
@@ -25,6 +26,8 @@ type VehicleTableProps = {
   sortColumn?: string;
   sortDirection?: SortDirection;
   onSort?: (column: string) => void;
+  canEditPermissions?: boolean;
+  onPermissionsSaved?: () => void;
 };
 
 function toNumber(value: unknown): number | null {
@@ -144,14 +147,18 @@ function renderComponent(module: VehicleModule, index: number) {
   );
 }
 
-export function VehicleTable({ rows, context = "global", emptyMessage = "No vehicles have been found yet.", sortColumn, sortDirection, onSort }: VehicleTableProps) {
+export function VehicleTable({ rows, context = "global", emptyMessage = "No vehicles have been found yet.", sortColumn, sortDirection, onSort, canEditPermissions = false, onPermissionsSaved }: VehicleTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedTab, setExpandedTab] = useState<"components" | "permissions">("components");
   const [instanceNames, setInstanceNames] = useState<Map<string, string>>(new Map());
   const columns = context === "player" ? PLAYER_COLUMNS : GLOBAL_COLUMNS;
   const partitionMapsKey = [...new Set(rows.map((row) => vehiclePartitionMap(row.map)).filter(Boolean))].sort().join(",");
 
   useEffect(() => {
-    if (expandedId && !rows.some((row) => String(row.id) === expandedId)) setExpandedId(null);
+    if (expandedId && !rows.some((row) => String(row.id) === expandedId)) {
+      setExpandedId(null);
+      setExpandedTab("components");
+    }
   }, [expandedId, rows]);
 
   useEffect(() => {
@@ -170,6 +177,10 @@ export function VehicleTable({ rows, context = "global", emptyMessage = "No vehi
   }, [partitionMapsKey]);
 
   function toggleExpanded(id: string) {
+    // A different vehicle's expansion should never inherit the previous one's
+    // tab -- landing on Permissions for a vehicle that was never showing it
+    // would look like a stale/wrong panel.
+    setExpandedTab("components");
     setExpandedId((current) => current === id ? null : id);
   }
 
@@ -200,8 +211,45 @@ export function VehicleTable({ rows, context = "global", emptyMessage = "No vehi
       onRowClick={(row) => toggleExpanded(String((row as VehicleRow).id))}
       isRowExpanded={(row) => expandedId === String((row as VehicleRow).id)}
       renderExpandedRow={(row) => {
-        const modules: VehicleModule[] = Array.isArray((row as VehicleRow).modules) ? (row as VehicleRow).modules : [];
-        return <div className="vehicles-expanded"><p className="vehicles-expanded-header">{modules.length} component{modules.length === 1 ? "" : "s"}</p>{modules.length === 0 ? <p className="muted">No components fitted.</p> : <div className="vehicles-component-grid">{modules.map(renderComponent)}</div>}</div>;
+        const vehicle = row as VehicleRow;
+        const id = String(vehicle.id);
+        const modules: VehicleModule[] = Array.isArray(vehicle.modules) ? vehicle.modules : [];
+        const componentsPanel = <div className="vehicles-expanded">
+          <p className="vehicles-expanded-header">{modules.length} component{modules.length === 1 ? "" : "s"}</p>
+          {modules.length === 0 ? <p className="muted">No components fitted.</p> : <div className="vehicles-component-grid">{modules.map(renderComponent)}</div>}
+        </div>;
+        if (!canEditPermissions) return componentsPanel;
+        return (
+          <div onClick={(event) => event.stopPropagation()}>
+            <div className="vehicles-expanded-tablist" role="tablist">
+              <button
+                role="tab"
+                id={`vehicles-tab-components-${id}`}
+                aria-selected={expandedTab === "components"}
+                aria-controls={`vehicles-panel-components-${id}`}
+                className={`vehicles-expanded-tab${expandedTab === "components" ? " active" : ""}`}
+                onClick={() => setExpandedTab("components")}
+              >Components</button>
+              <button
+                role="tab"
+                id={`vehicles-tab-permissions-${id}`}
+                aria-selected={expandedTab === "permissions"}
+                aria-controls={`vehicles-panel-permissions-${id}`}
+                className={`vehicles-expanded-tab${expandedTab === "permissions" ? " active" : ""}`}
+                onClick={() => setExpandedTab("permissions")}
+              >Permissions</button>
+            </div>
+            {expandedTab === "components"
+              ? <div role="tabpanel" id={`vehicles-panel-components-${id}`} aria-labelledby={`vehicles-tab-components-${id}`}>{componentsPanel}</div>
+              : <div role="tabpanel" id={`vehicles-panel-permissions-${id}`} aria-labelledby={`vehicles-tab-permissions-${id}`}>
+                  <VehiclePermissionsTab
+                    vehicleId={id}
+                    vehicleName={String(vehicle.name || `vehicle ${id}`)}
+                    onSaved={() => onPermissionsSaved?.()}
+                  />
+                </div>}
+          </div>
+        );
       }}
       emptyMessage={emptyMessage}
     />

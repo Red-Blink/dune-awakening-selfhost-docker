@@ -42,8 +42,55 @@ export type VehiclesListResponse = {
   rows: VehicleRow[];
   totalCount: number;
   totalVehicles: number;
-  capabilities: { vehicles?: boolean } & Record<string, unknown>;
+  capabilities: { vehicles?: boolean; vehiclePermissions?: boolean } & Record<string, unknown>;
   reason?: string;
+};
+
+// rank 1/2/3 = Owner/Co-Owner/Associate, same semantics as base permissions --
+// shared_with above already surfaces the rank label, this is just the editor's
+// own type for the roster it reads and writes.
+export type VehiclePermissionRank = 1 | 2 | 3;
+
+export type VehiclePermissionEntry = {
+  playerId: string;
+  name: string;
+  rank: VehiclePermissionRank;
+  label: string;
+  // False when this row names an actor that is not the account's
+  // player_controller_id. The game ignores such rows, but they are shown
+  // rather than hidden -- it is a state the console can see and the game
+  // client cannot.
+  canonical: boolean;
+};
+
+export type VehiclePermissions = {
+  supported: boolean;
+  vehicleId: number;
+  actorId: string;
+  map: string;
+  mapNameId: number;
+  // False when the vehicle has no dune.permission_actor row -- unclaimed, so
+  // the permission table's foreign key rejects every write against it.
+  // Optional so an older API that omits it reads as claimed, matching the
+  // behaviour that existed before the flag rather than a new lockout.
+  claimed?: boolean;
+  unclaimedReason?: string;
+  entries: VehiclePermissionEntry[];
+  reason?: string;
+};
+
+export type VehiclePermissionCandidate = { playerId: string; name: string };
+
+export type SetVehiclePermissionsResult = {
+  ok: boolean;
+  vehicleId: number;
+  actorId: string;
+  map: string;
+  added: number;
+  reranked: number;
+  removed: number;
+  total: number;
+  message: string;
 };
 
 export const vehiclesApi = {
@@ -57,5 +104,21 @@ export const vehiclesApi = {
     const qs = search.toString();
     return api<VehiclesListResponse>(`/api/vehicles${qs ? `?${qs}` : ""}`);
   },
-  forPlayer: (playerId: string) => api<VehiclesListResponse>(`/api/players/${encodeURIComponent(playerId)}/vehicles`)
+  forPlayer: (playerId: string) => api<VehiclesListResponse>(`/api/players/${encodeURIComponent(playerId)}/vehicles`),
+  permissions: (vehicleId: string) =>
+    api<VehiclePermissions>(`/api/vehicles/${encodeURIComponent(vehicleId)}/permissions`),
+  // A whole roster, not a delta: the server diffs it against current state and
+  // applies the difference through the game's own stored procedures in one
+  // transaction. Changes reach a running map immediately -- no restart.
+  setPermissions: (vehicleId: string, entries: { playerId: string; rank: VehiclePermissionRank }[]) =>
+    api<{ supported: boolean; result?: SetVehiclePermissionsResult; reason?: string }>(
+      `/api/vehicles/${encodeURIComponent(vehicleId)}/permissions`,
+      { method: "PUT", body: JSON.stringify({ entries }) }),
+  permissionCandidates: (q: string, limit = 25) => {
+    const search = new URLSearchParams();
+    if (q) search.set("q", q);
+    search.set("limit", String(limit));
+    return api<{ supported: boolean; rows: VehiclePermissionCandidate[]; reason?: string }>(
+      `/api/vehicles/permission-candidates?${search.toString()}`);
+  }
 };

@@ -2780,6 +2780,35 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 }
 .bases-expanded-tab.active:hover { border-color: var(--border-strong); border-bottom-color: #25201b; }
 
+/* Same spec as .bases-expanded-tab* above, under vehicles' own class names --
+   see the vehicles-permissions CSS scoping decision. */
+.vehicles-expanded-tablist {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-strong);
+  margin-bottom: 14px;
+  padding-top: 8px;
+}
+.vehicles-expanded-tab {
+  width: auto;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 9px 16px;
+  font-size: 13px;
+  margin-bottom: -1px;
+}
+.vehicles-expanded-tab:hover { color: var(--muted-warm); border-color: transparent; }
+.vehicles-expanded-tab.active {
+  background: #25201b;
+  border-color: var(--border-strong);
+  border-bottom-color: #25201b;
+  color: var(--title);
+}
+.vehicles-expanded-tab.active:hover { border-color: var(--border-strong); border-bottom-color: #25201b; }
+
 .playerAdmin_invGroupTabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .playerAdmin_invGroupTab {
   width: auto;
@@ -3683,6 +3712,285 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   }
   .bases-permissions-actions { justify-content: flex-end; }
 }
+
+/* Vehicle permissions. Same rules as .bases-permissions-* above (both editors
+   share the rosterEditor.tsx component and look identical today), kept under
+   separate class names so the two features can diverge in CSS independently
+   later without one edit touching the other's tab. */
+.vehicles-permissions {
+  --vehicles-permissions-measure: 100%;
+  --vehicles-permissions-inset: clamp(12px, 1.5vw, 18px);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.vehicles-permissions-content {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: var(--vehicles-permissions-measure);
+  min-width: 0;
+  padding: var(--vehicles-permissions-inset);
+  box-sizing: border-box;
+}
+
+.vehicles-permissions-intro {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(360px, 500px);
+  align-items: center;
+  gap: clamp(18px, 3vw, 36px);
+}
+.vehicles-permissions-intro > .action-help-note {
+  max-width: 720px;
+}
+
+.vehicles-permissions-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+  min-width: 0;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Owner card. Read-only for vehicles -- no transfer action -- so this is
+   plain identity display, not the interactive hero card bases use. */
+.vehicles-permissions-owner-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--warning);
+  border-radius: 8px;
+  background: rgba(169, 121, 50, .08);
+}
+.vehicles-permissions-owner-card-empty {
+  border-color: var(--danger-strong);
+  background: rgba(167, 73, 73, .08);
+}
+.vehicles-permissions-owner-identity {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.vehicles-permissions-owner-eyebrow {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.vehicles-permissions-owner-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-strong);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.vehicles-permissions-owner-none { color: var(--danger-text); font-style: italic; font-weight: 400; }
+
+.vehicles-permissions-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.vehicles-permissions-section-title {
+  color: var(--title);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.vehicles-permissions-section-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.vehicles-permissions-roster {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  max-height: 300px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.vehicles-permissions-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 38px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  padding: 6px 10px;
+}
+.vehicles-permissions-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.vehicles-permissions-remove { border-color: var(--danger-strong); color: var(--danger-text); }
+
+/* Segmented rank control -- same visual spec as .bases-rank-segments, under
+   its own class names per the vehicles-permissions CSS scoping decision. */
+.vehicles-rank-segments {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  height: 38px;
+  min-width: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: #151719;
+  overflow: hidden;
+}
+.vehicles-rank-segment {
+  position: relative;
+  display: flex;
+  gap: 0;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 10px;
+  border-left: 1px solid var(--border);
+  color: var(--muted-warm);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.vehicles-rank-segment:first-child { border-left: 0; }
+.vehicles-rank-segment input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+.vehicles-rank-segment:hover { background: rgba(198, 139, 74, .12); color: var(--text-strong); }
+.vehicles-rank-segment:has(input:checked) { background: #9b5f2a; color: var(--text-strong); }
+.vehicles-rank-segment:has(input:focus-visible) { outline: 2px solid var(--accent-strong); outline-offset: -2px; }
+.vehicles-rank-segments:has(input:disabled) { opacity: .45; }
+.vehicles-rank-segment:has(input:disabled) { cursor: not-allowed; }
+
+.vehicles-permissions-add { display: grid; gap: 8px; min-width: 0; }
+.vehicles-permissions-search-row { flex-wrap: wrap; align-items: center; margin: 0; }
+.vehicles-permissions-search-row .compact-select {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.vehicles-permissions-candidates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.vehicles-permissions-candidates li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 13px;
+}
+.vehicles-permissions-candidates li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vehicles-permissions-banner-slot {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+}
+.vehicles-permissions-warning { margin: 0; }
+.vehicles-permissions-error { color: var(--danger-text); margin: 0; }
+.vehicles-permissions-banner-slot .inline-task-result {
+  align-self: auto;
+  flex: 0 1 auto;
+  max-width: none;
+  margin: 0;
+}
+
+.vehicles-permissions-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+  min-width: 0;
+  min-height: 42px;
+}
+.vehicles-permissions-actions > .muted { font-size: 12px; white-space: nowrap; }
+.vehicles-permissions-actions > .muted:empty { display: none; }
+.vehicles-permissions-actions button { width: auto; }
+
+@media (max-width: 560px) {
+  .vehicles-permissions-row {
+    grid-template-columns: minmax(0, 1fr) 38px;
+    grid-template-areas: "name remove" "rank rank";
+    row-gap: 6px;
+  }
+  .vehicles-permissions-name { grid-area: name; }
+  .vehicles-rank-segments { grid-area: rank; display: grid; }
+  .vehicles-permissions-remove { grid-area: remove; }
+  .vehicles-permissions-owner-card {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+}
+@media (max-width: 700px) {
+  .vehicles-permissions-intro {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .vehicles-permissions-intro > .action-help-note { max-width: none; }
+}
+@media (max-width: 900px) {
+  .vehicles-permissions-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .vehicles-permissions-actions { justify-content: flex-end; }
+}
+
 .bases-table th.bases-expand-column, .bases-table td.bases-expand-column {
   width: 32px;
   padding-inline: 4px;

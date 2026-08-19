@@ -358,11 +358,24 @@ tab can offer a retry only where retrying could actually help.
 |--------|-------|-------------|------------|
 | GET | `/api/vehicles` | List all player vehicles (paginated), each with owner, shared-with roster, lowest-component condition %, fuel %, map/partition, coordinates, and per-component durability | `q?`, `page?`, `pageSize?`, `sortColumn?`, `sortDirection?` |
 | GET | `/api/players/{playerId}/vehicles` | List the selected player's owned and shared vehicles using the same vehicle details | `playerId` |
+| GET | `/api/vehicles/{vehicleId}/permissions` | Get a vehicle's permission roster (Owner, Co-Owners, Associates) | `vehicleId` |
+| PUT | `/api/vehicles/{vehicleId}/permissions` | Replace a vehicle's permission roster | `vehicleId`, `entries[]` (`playerId`, `rank`) |
+| GET | `/api/vehicles/permission-candidates` | Search players eligible to be added to a vehicle roster | `q?`, `limit?` |
 
-Read-only. `GET /api/vehicles` reports `capabilities.vehicles`; it is false (with a
+`GET /api/vehicles` and the player-scoped list are read-only; the three
+permission routes above are the only vehicle mutations, and they share their
+implementation with the base permission routes -- see
+[vehicle-permissions.md](vehicle-permissions.md). Unlike bases, there is no
+vehicle transfer/system-custodian route by design.
+
+`GET /api/vehicles` reports `capabilities.vehicles`; it is false (with a
 `reason`) when the schema lacks the required tables (`vehicles`, `vehicle_modules`,
 `actors`, `permission_actor`, `permission_actor_rank`, `player_state`,
-`actor_fgl_entities`, `fgl_entities`). Sortable `sortColumn` values: `id`, `name`,
+`actor_fgl_entities`, `fgl_entities`). It also reports
+`capabilities.vehiclePermissions` (the schema additionally has `dune.map_names`
+and the game's `permission_set_player_rank` / `permission_remove_player_rank`
+procedures) -- the permission routes and the Permissions tab are unavailable
+when it is false. Sortable `sortColumn` values: `id`, `name`,
 `type`, `owner`, `condition_percent`, `fuel_percent`, `map`; `q` matches vehicle
 name, type, owner, map, and exact id. Response fields mirror the paginated-list
 convention (`rows`, `totalCount`, unfiltered `totalVehicles`). Owner resolves from

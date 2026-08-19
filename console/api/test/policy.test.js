@@ -130,14 +130,14 @@ test("vehicle permission routes resolve to their own read/mutate actions", () =>
 
 test("a vehicles:read-only policy denies vehicles:mutate", () => {
   const policies = {
-    viewer: {
+    observer: {
       version: 1,
-      tier: "viewer",
+      tier: "observer",
       statements: [{ Effect: "Allow", Action: ["vehicles:read"] }]
     }
   };
-  assert.equal(evaluate({ tier: "viewer" }, "vehicles:read", policies), true);
-  assert.equal(evaluate({ tier: "viewer" }, "vehicles:mutate", policies), false);
+  assert.equal(evaluate({ tier: "observer" }, "vehicles:read", policies), true);
+  assert.equal(evaluate({ tier: "observer" }, "vehicles:mutate", policies), false);
 });
 
 test("persisting a refreshed buyback log requires market write permission", () => {

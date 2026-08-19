@@ -53,6 +53,7 @@ by nature, so it gets its own.
 - [generator-fuel-burn-rates.md](console/generator-fuel-burn-rates.md) — Current. Per-generator fuel burn constants and where they live in code.
 - [generator-refill-caps.md](console/generator-refill-caps.md) — Current. Refill-generators endpoint behavior and per-type fuel caps.
 - [base-permissions.md](console/base-permissions.md) — Current. Editing base ownership and sharing: ranks, the config-driven roster cap, and why the change needs no map restart.
+- [vehicle-permissions.md](console/vehicle-permissions.md) — Current. Editing vehicle ownership and sharing: the same roster engine as base permissions, minus the ownership-transfer action.
 - [base-inventory.md](console/base-inventory.md) — Current. The base Inventory tab: which placeables count as storage, the two inventories every refinery carries, per-slot container contents, and the stopped-map safety boundary for deleting stored items.
 - [base-deletion.md](console/base-deletion.md) — Current. Permanently deleting a base: what "the base" means for enumeration, the pending-delete queue for a live map, the mandatory pre-delete safety backup, and why a pending delete freezes every other mutation on that base.
 - [base-backups.md](console/base-backups.md) — Current. What the game's own "pick up base" tool actually does in the database, why the Bases panel excludes a picked-up base, and the Coriolis compatibility patch that preserves saved Deep Desert base actors.

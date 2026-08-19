@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mapsApi } from "../../api/maps";
 import { vehiclesApi, type VehiclesListResponse } from "../../api/vehicles";
@@ -9,7 +9,10 @@ vi.mock("../../api/maps", () => ({ mapsApi: { sietchDimensions: vi.fn() } }));
 
 vi.mock("../../api/vehicles", () => ({
   vehiclesApi: {
-    list: vi.fn()
+    list: vi.fn(),
+    permissions: vi.fn(),
+    setPermissions: vi.fn(),
+    permissionCandidates: vi.fn()
   }
 }));
 
@@ -291,5 +294,51 @@ describe("VehiclesPanel", () => {
     await waitFor(() => {
       expect(vi.mocked(vehiclesApi.list)).toHaveBeenCalledWith(expect.objectContaining({ pageSize: 100 }));
     });
+  });
+
+  it("hides the Permissions tab when the schema lacks the capability", async () => {
+    vi.mocked(vehiclesApi.list).mockResolvedValue(listResponse({ capabilities: { vehicles: true } }));
+    renderPanel();
+
+    fireEvent.click(await screen.findByLabelText("Show components for Sihaya"));
+    await screen.findByText("1 component");
+    expect(screen.queryByRole("tab", { name: "Permissions" })).not.toBeInTheDocument();
+  });
+
+  it("shows the Permissions tab and refetches the list after a save", async () => {
+    vi.mocked(vehiclesApi.list).mockResolvedValue(listResponse({ capabilities: { vehicles: true, vehiclePermissions: true } }));
+    vi.mocked(vehiclesApi.permissions).mockResolvedValue({
+      supported: true,
+      vehicleId: 5001,
+      actorId: "5001",
+      map: "HaggaBasin",
+      mapNameId: 1,
+      entries: [{ playerId: "4", name: "Duncan_Idaho", rank: 1, label: "", canonical: true }]
+    } as never);
+    renderPanel();
+
+    fireEvent.click(await screen.findByLabelText("Show components for Sihaya"));
+    fireEvent.click(await screen.findByRole("tab", { name: "Permissions" }));
+
+    await screen.findByText("Duncan_Idaho", { selector: ".vehicles-permissions-owner-name" });
+    expect(vi.mocked(vehiclesApi.list)).toHaveBeenCalledTimes(1);
+
+    vi.mocked(vehiclesApi.setPermissions).mockResolvedValue({
+      supported: true,
+      result: { ok: true, vehicleId: 5001, actorId: "5001", map: "HaggaBasin", added: 1, reranked: 0, removed: 0, total: 2, message: "Permissions were updated." }
+    } as never);
+    const search = screen.getByPlaceholderText("Search a player to add");
+    fireEvent.change(search, { target: { value: "Leto" } });
+    vi.mocked(vehiclesApi.permissionCandidates).mockResolvedValue({ rows: [{ playerId: "9", name: "Leto_A" }] } as never);
+    // Scoped to the permissions add row: the page's own vehicle search bar
+    // has its own "Search"/"Clear" buttons with the same accessible names.
+    const addRow = within(document.querySelector(".vehicles-permissions-add") as HTMLElement);
+    fireEvent.click(addRow.getByRole("button", { name: "Search" }));
+    fireEvent.click(await addRow.findByRole("button", { name: "Add Leto_A" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Save changes" }));
+
+    // A saved roster invalidates the list cache -- owner/shared_with are
+    // rendered from the list response, not the permissions tab's own state.
+    await waitFor(() => expect(vi.mocked(vehiclesApi.list)).toHaveBeenCalledTimes(2));
   });
 });

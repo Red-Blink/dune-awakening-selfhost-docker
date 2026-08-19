@@ -242,4 +242,6 @@ once per list request rather than per row.
 
 - [generator-refill-caps.md](generator-refill-caps.md) — the refill endpoint, and
   the queue this feature deliberately does not use.
+- [vehicle-permissions.md](vehicle-permissions.md) — the same roster-editing
+  engine applied to vehicles, minus the system-custodian transfer.
 - [API-REFERENCE.md](API-REFERENCE.md) — full HTTP API reference.
