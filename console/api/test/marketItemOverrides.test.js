@@ -7,6 +7,7 @@ import {
   readMarketItemOverrides,
   saveMarketItemOverrides,
   readUnsafeTemplateIds,
+  readBaseMarketTemplateIds,
   mergeMarketSeedPlanWithOverrides,
   mergeBuybackSeedPlanWithOverrides,
   listBotItemCatalogPickerItems
@@ -46,6 +47,13 @@ test("readUnsafeTemplateIds returns [] when no plan file exists, and the plan's 
     assert.deepEqual(readUnsafeTemplateIds(repo), []);
     seedPlanFile(repo, { unsafeTemplateIds: ["BadItem1"] });
     assert.deepEqual(readUnsafeTemplateIds(repo), ["BadItem1"]);
+  });
+});
+
+test("readBaseMarketTemplateIds reads both bundled and normalized row keys", () => {
+  withRepo((repo) => {
+    seedPlanFile(repo);
+    assert.deepEqual(readBaseMarketTemplateIds(repo), ["Existing1"]);
   });
 });
 
@@ -109,6 +117,16 @@ test("saveMarketItemOverrides only accepts new items that resolve in admin-items
   });
 });
 
+test("saveMarketItemOverrides rejects a base-plan item even when it has no existing override", () => {
+  withRepo((repo) => {
+    seedPlanFile(repo);
+    seedAdminItems(repo, [{ id: "Existing1", name: "Existing One", category: "weapons", source: "Weapons" }]);
+    assert.throws(
+      () => saveMarketItemOverrides(repo, { newItems: { Existing1: { price: 250, listings: 2 } } }),
+      /already in the base catalog/);
+  });
+});
+
 test("saveMarketItemOverrides removes a single grade's override when its patch normalizes empty, and supports removedNewItems", () => {
   withRepo((repo) => {
     seedPlanFile(repo);
@@ -164,11 +182,12 @@ test("mergeBuybackSeedPlanWithOverrides applies price overrides per grade and ap
   assert.equal(merged.rows.find((row) => row.templateId === "NewOne").price, 88);
 });
 
-test("listBotItemCatalogPickerItems excludes buildings/contracts/emotes and unsafe ids", () => {
+test("listBotItemCatalogPickerItems excludes base-plan, buildings/contracts/emotes, and unsafe ids", () => {
   withRepo((repo) => {
     seedPlanFile(repo, { unsafeTemplateIds: ["UnsafeWeapon"] });
     seedAdminItems(repo, [
       { id: "GoodWeapon", name: "Good Weapon", category: "weapons", source: "Weapons" },
+      { id: "Existing1", name: "Existing Weapon", category: "weapons", source: "Weapons" },
       { id: "UnsafeWeapon", name: "Unsafe Weapon", category: "weapons", source: "Weapons" },
       { id: "SomeBuilding", name: "Some Building", category: "buildings", source: "BuildingSets" },
       { id: "SomeContract", name: "Some Contract", category: "contracts", source: "Contracts" },

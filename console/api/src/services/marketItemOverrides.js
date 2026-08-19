@@ -88,6 +88,22 @@ export function readUnsafeTemplateIds(repoRoot) {
   }
 }
 
+// New items are additions to the bundled plan, not another way to edit an
+// existing row. Keep this check on the server: the picker is only a convenience
+// and API clients can submit save payloads directly.
+export function readBaseMarketTemplateIds(repoRoot) {
+  const path = resolveSeedPlanFile(repoRoot);
+  if (!path) return [];
+  try {
+    const plan = JSON.parse(readFileSync(path, "utf8"));
+    return [...new Set((Array.isArray(plan?.rows) ? plan.rows : [])
+      .map((row) => String(row?.template_id ?? row?.templateId ?? "").trim())
+      .filter(Boolean))];
+  } catch {
+    return [];
+  }
+}
+
 function findCatalogEntry(repoRoot, templateId) {
   let items;
   try {
@@ -150,6 +166,7 @@ export function saveMarketItemOverrides(repoRoot, payload = {}) {
     throw new Error("Bot item overrides payload must be a JSON object.");
   }
   const unsafeSet = new Set(readUnsafeTemplateIds(repoRoot));
+  const baseTemplateIds = new Set(readBaseMarketTemplateIds(repoRoot));
   const previous = readMarketItemOverrides(repoRoot);
   const nextOverrides = {};
   for (const [templateId, byQuality] of Object.entries(previous.overrides)) nextOverrides[templateId] = { ...byQuality };
@@ -183,7 +200,7 @@ export function saveMarketItemOverrides(repoRoot, payload = {}) {
   for (const [rawId, rawRow] of Object.entries(payload.newItems || {})) {
     const templateId = validateTemplateId(rawId);
     if (unsafeSet.has(templateId)) throw new Error(`${templateId} is flagged unsafe and cannot be added.`);
-    if (nextOverrides[templateId]) throw new Error(`${templateId} is already in the base catalog; edit it there instead of adding it as new.`);
+    if (baseTemplateIds.has(templateId)) throw new Error(`${templateId} is already in the base catalog; edit it there instead of adding it as new.`);
     const catalogEntry = findCatalogEntry(repoRoot, templateId);
     if (!catalogEntry) throw new Error(`${templateId} was not found in the item catalog.`);
     const category = String(catalogEntry.category || "").toLowerCase();
@@ -280,9 +297,11 @@ export function mergeBuybackSeedPlanWithOverrides(plan, overrides, unsafeIds = [
 // excluded categories and anything the upstream generator flagged unsafe.
 export function listBotItemCatalogPickerItems(repoRoot, { q = "", category = "" } = {}) {
   const unsafe = new Set(readUnsafeTemplateIds(repoRoot));
+  const baseTemplateIds = new Set(readBaseMarketTemplateIds(repoRoot));
   const safeCategory = String(category || "").trim().toLowerCase();
   return listCatalogItems(repoRoot, { q, limit: 3000 })
     .filter((item) => !EXCLUDED_NEW_ITEM_CATEGORIES.has(String(item.category || "").toLowerCase()))
     .filter((item) => !unsafe.has(item.id))
+    .filter((item) => !baseTemplateIds.has(item.id))
     .filter((item) => !safeCategory || String(item.category || "").toLowerCase() === safeCategory);
 }
