@@ -13,11 +13,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   buildHeartbeatPayload,
+  collectPlayerPortalContext,
   collectDirectorySnapshot,
   createPublicDirectoryReporter,
   getOrCreateIdentity,
   isBattlegroupRunning,
   normalizeDiscordInvite,
+  playerPortalSnapshotBatches,
   readConfiguredCapacity,
   recoverRunningDirectorCapacity,
   readDirectoryInstallationKey,
@@ -27,6 +29,32 @@ import {
   readGameBuild,
   reconcilePublicProbe
 } from "../src/services/publicDirectory.js";
+
+test("player portal context exposes only player-safe server policy and notice fields", () => {
+  const files = fixture();
+  try {
+    writeFileSync(join(files.generatedDir, "message-of-the-day.json"), JSON.stringify({ enabled: true, title: "Welcome", message: "Mind the sandworms." }));
+    writeFileSync(join(files.generatedDir, "restart-schedule.env"), "DUNE_SCHEDULED_RESTART_ENABLED=1\nDUNE_SCHEDULED_RESTART_TIME=05:30\nDUNE_SCHEDULED_RESTART_NOTIFY_MINUTES=20\n");
+    writeFileSync(join(files.generatedDir, "care-package.json"), JSON.stringify({ enabled: true, kits: [] }));
+    const context = collectPlayerPortalContext({ repoRoot: files.repoRoot, generatedDir: files.generatedDir }, { running: true, ready: true, playersOnline: 3, capacity: 40, sietches: 2, version: "1.2.3" });
+    assert.equal(context.serverInfo.messageOfTheDay.message, "Mind the sandworms.");
+    assert.equal(context.serverInfo.restart.localTime, "05:30");
+    assert.equal(context.serverInfo.transfers.outgoingAllowed, true);
+    assert.equal(context.carePackages.enabled, true);
+    assert.equal(JSON.stringify(context).includes("path"), false);
+  } finally {
+    files.cleanup();
+  }
+});
+
+test("large private portal snapshots are split below the website request limit", () => {
+  const observedAt = "2026-08-19T12:00:00.000Z";
+  const snapshots = Array.from({ length: 4 }, (_, index) => ({ accountHash: String(index).padStart(64, "a"), found: true, data: { storage: { payload: "x".repeat(300) } } }));
+  const batches = playerPortalSnapshotBatches(snapshots, observedAt, 700);
+  assert.ok(batches.length > 1);
+  assert.equal(batches.flat().length, snapshots.length);
+  for (const batch of batches) assert.ok(Buffer.byteLength(JSON.stringify({ observedAt, snapshots: batch })) <= 700 || batch.length === 1);
+});
 
 test("public modifier reporting is allowlisted and omits defaults and secrets", () => {
   const files = fixture();

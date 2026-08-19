@@ -160,7 +160,7 @@ describe("ExchangePanel", () => {
     await screen.findByText("Partial Stabilization Belt");
     fireEvent.click(screen.getByLabelText("Configure bots and blacklist"));
 
-    expect(await screen.findByText("Exchange filter settings")).toBeInTheDocument();
+    expect(await screen.findByText("Exchange Filter Settings")).toBeInTheDocument();
     expect(vi.mocked(exchangeApi.getConfig)).toHaveBeenCalled();
   });
 
