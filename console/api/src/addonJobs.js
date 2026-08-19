@@ -39,6 +39,17 @@ import {
   seedSchedulePath,
   createListedMarketUnitPrice
 } from "./addonSeedJob.js";
+import { readMarketItemOverrides, mergeBuybackSeedPlanWithOverrides, readUnsafeTemplateIds } from "./services/marketItemOverrides.js";
+
+// Applies the same admin-editable per-item overrides (enable/disable, price)
+// used by the reseed job, so a disabled/repriced item's buyback cap agrees
+// with what the bot actually lists rather than the bundled plan alone.
+function loadMergedBuybackSeedPlan(config, addonId) {
+  const plan = loadBuybackSeedPlan(config, addonId);
+  const overrides = readMarketItemOverrides(config.repoRoot);
+  const unsafeIds = readUnsafeTemplateIds(config.repoRoot);
+  return mergeBuybackSeedPlanWithOverrides(plan, overrides, unsafeIds);
+}
 
 export { CATEGORY_MULTIPLIER_FIELDS, COMMODITY_STACK_CATALOG, COMMODITY_STACK_GROUPS, COMMODITY_STACK_MIN, COMMODITY_STACK_MAX, COMMODITY_STACK_DEFAULT, readSeedSchedule, normalizeSeedSchedule, saveSeedSchedule, normalizeCategoryMultipliers, normalizeCommodityStacks, normalizeScheduleSource, resolveMarketSeedPlanPath, legacySeedSchedulePath, seedSchedulePath, loadMarketSeedPlan, seedRowCategoryMultiplier, seedRowListingCount, createListedMarketUnitPrice, listedMarketUnitPrice, normalizeAugmentPricing, buildMarketUnseedSql, buildBotListingCountSql, executeUnseedRun } from "./addonSeedJob.js";
 
@@ -613,7 +624,7 @@ export async function probeBuybackEligibility(config, db, overrides = {}) {
     maxBuys: overrides.maxBuys
   }, saved));
   if (!schedule.exchangeId) throw new Error("An exchangeId is required to probe buyback eligibility.");
-  const plan = loadBuybackSeedPlan(config);
+  const plan = loadMergedBuybackSeedPlan(config);
   const result = await runSql(db, buildBuybackEligibilitySql(plan, schedule), false);
   const diagnostics = buybackDiagnostics(result?.rows?.[0]);
   return {
@@ -646,7 +657,7 @@ export async function classifyBuybackListings(config, db, overrides = {}) {
   const saved = readBuybackSchedule(config);
   const schedule = withReseedAugmentPricing(config, normalizeBuybackSchedule(buybackScheduleOverrides(overrides), saved));
   if (!schedule.exchangeId) throw new Error("An exchangeId is required to classify buyback listings.");
-  const plan = loadBuybackSeedPlan(config);
+  const plan = loadMergedBuybackSeedPlan(config);
   const result = await runSql(db, buildBuybackClassifySql(plan, schedule), false);
   const names = seedPlanDisplayNames(plan);
   const entries = applyDryRunMaxBuysRanking(
@@ -959,7 +970,7 @@ export function createAddonJobScheduler(config, options = {}) {
 }
 
 async function executeBuybackRun(config, db, schedule, { runDuneImpl, trigger = "manual" } = {}) {
-  const plan = loadBuybackSeedPlan(config);
+  const plan = loadMergedBuybackSeedPlan(config);
   const names = seedPlanDisplayNames(plan);
   const source = trigger === "schedule" ? "Scheduled buyback" : "Buyback sweep";
   const priced = withReseedAugmentPricing(config, schedule);

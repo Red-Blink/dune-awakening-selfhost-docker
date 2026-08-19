@@ -6,6 +6,7 @@ import type { SortDirection } from "../../components/common/DataTable";
 import { ExchangeTable } from "./ExchangeTable";
 import { ExchangeConfigOverlay } from "./ExchangeConfigOverlay";
 import { MarketBotOverlay } from "./MarketBotOverlay";
+import { BotItemsTab } from "./BotItemsTab";
 
 type ExchangePanelProps = {
   onError: (text: string) => void;
@@ -73,6 +74,7 @@ export function ExchangePanel({ onError, confirmAction }: ExchangePanelProps) {
   const [loading, setLoading] = useState(() => exchangeCache === null);
   const [configOpen, setConfigOpen] = useState(false);
   const [marketBotOpen, setMarketBotOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"exchange" | "bot-items">("exchange");
   // The Market Bot button only appears when the status endpoint answers, so
   // viewers without the exchange:market action never see a control they
   // cannot use. Checked silently once per mount.
@@ -207,7 +209,7 @@ export function ExchangePanel({ onError, confirmAction }: ExchangePanelProps) {
     setCategory("");
   }
 
-  if (loading && !rows.length) {
+  if (activeTab === "exchange" && loading && !rows.length) {
     return (
       <section className="panel">
         <div className="loading-panel">
@@ -229,35 +231,6 @@ export function ExchangePanel({ onError, confirmAction }: ExchangePanelProps) {
       <div className="panel-title">
         <h2>Market Board</h2>
         <div className="action-row">
-          <button onClick={() => void load(currentView())}>Refresh</button>
-        </div>
-      </div>
-      {supported
-        ? <p className="action-help-note">Read-only view of the CHOAM exchange. {totalCount.toLocaleString()}{totalCount !== totalItems ? ` of ${totalItems.toLocaleString()}` : ""} item{totalItems === 1 ? "" : "s"} listed for the current filter.</p>
-        : <p className="action-help-note">{reason || "The Market Board is unsupported by the detected database schema."}</p>}
-      {supported && <>
-        <div className="action-row exchange-search-row">
-          <input
-            value={q}
-            onChange={(event) => setQ(event.target.value)}
-            onKeyDown={(event) => { if (event.key === "Enter") submitSearch(); }}
-            placeholder="Search item name, category, or template"
-          />
-          <button onClick={submitSearch}>Search</button>
-          <button onClick={handleClearSearch} disabled={!q && !submittedQ}>Clear</button>
-          <label className="compact-select exchange-category-select">
-            Category
-            <select value={categories.includes(category) ? category : ""} onChange={(event) => setCategory(event.target.value)}>
-              <option value="">All categories</option>
-              {categories.map((name) => <option key={name} value={name}>{name}</option>)}
-            </select>
-          </label>
-          <label className="compact-select exchange-owner-select">
-            Show
-            <select value={owner} onChange={(event) => changeOwner(event.target.value as ExchangeOwner)}>
-              {OWNER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </label>
           <button className="exchange-config-button" title="Configure bots and blacklist" aria-label="Configure bots and blacklist" onClick={() => setConfigOpen(true)}>
             <Settings size={16} />
           </button>
@@ -267,31 +240,67 @@ export function ExchangePanel({ onError, confirmAction }: ExchangePanelProps) {
             </button>
           )}
         </div>
-        <ExchangeTable
-          rows={rows}
-          owner={owner}
-          sortColumn={sortColumn}
-          sortDirection={sortDirection}
-          onSort={handleSort}
-          emptyMessage="No market listings match this filter."
-        />
-        <div className="panel-title exchange-pagination-footer">
-          <p className="action-help-note">Showing {rangeStart}-{rangeEnd} of {totalCount} items.</p>
-          <div className="database-pagination-controls">
-            <label className="compact-select">
-              Rows
-              <select value={String(pageSize)} onChange={(event) => changePageSize(Number(event.target.value))}>
-                {EXCHANGE_PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+      </div>
+      <div className="bases-expanded-tablist" role="tablist">
+        <button type="button" role="tab" aria-selected={activeTab === "exchange"} className={`bases-expanded-tab${activeTab === "exchange" ? " active" : ""}`} onClick={() => setActiveTab("exchange")}>Exchange</button>
+        <button type="button" role="tab" aria-selected={activeTab === "bot-items"} className={`bases-expanded-tab${activeTab === "bot-items" ? " active" : ""}`} onClick={() => setActiveTab("bot-items")}>Bot items</button>
+      </div>
+      {activeTab === "exchange" && <>
+        {supported
+          ? <p className="action-help-note">Read-only view of the CHOAM exchange. {totalCount.toLocaleString()}{totalCount !== totalItems ? ` of ${totalItems.toLocaleString()}` : ""} item{totalItems === 1 ? "" : "s"} listed for the current filter.</p>
+          : <p className="action-help-note">{reason || "The Market Board is unsupported by the detected database schema."}</p>}
+        {supported && <>
+          <div className="action-row exchange-search-row">
+            <input
+              value={q}
+              onChange={(event) => setQ(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter") submitSearch(); }}
+              placeholder="Search item name, category, or template"
+            />
+            <button onClick={submitSearch}>Search</button>
+            <button onClick={handleClearSearch} disabled={!q && !submittedQ}>Clear</button>
+            <label className="compact-select exchange-category-select">
+              Category
+              <select value={categories.includes(category) ? category : ""} onChange={(event) => setCategory(event.target.value)}>
+                <option value="">All categories</option>
+                {categories.map((name) => <option key={name} value={name}>{name}</option>)}
               </select>
             </label>
-            <button disabled={!hasPreviousPage} onClick={() => setPage(0)}>First</button>
-            <button disabled={!hasPreviousPage} onClick={() => setPage(page - 1)}>Previous</button>
-            <span className="muted database-page-indicator">Page {page + 1} of {totalPages}</span>
-            <button disabled={!hasNextPage} onClick={() => setPage(page + 1)}>Next</button>
-            <button disabled={!hasNextPage} onClick={() => setPage(totalPages - 1)}>Last</button>
+            <label className="compact-select exchange-owner-select">
+              Show
+              <select value={owner} onChange={(event) => changeOwner(event.target.value as ExchangeOwner)}>
+                {OWNER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <button onClick={() => void load(currentView())}>Refresh</button>
           </div>
-        </div>
+          <ExchangeTable
+            rows={rows}
+            owner={owner}
+            sortColumn={sortColumn}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            emptyMessage="No market listings match this filter."
+          />
+          <div className="panel-title exchange-pagination-footer">
+            <p className="action-help-note">Showing {rangeStart}-{rangeEnd} of {totalCount} items.</p>
+            <div className="database-pagination-controls">
+              <label className="compact-select">
+                Rows
+                <select value={String(pageSize)} onChange={(event) => changePageSize(Number(event.target.value))}>
+                  {EXCHANGE_PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+                </select>
+              </label>
+              <button disabled={!hasPreviousPage} onClick={() => setPage(0)}>First</button>
+              <button disabled={!hasPreviousPage} onClick={() => setPage(page - 1)}>Previous</button>
+              <span className="muted database-page-indicator">Page {page + 1} of {totalPages}</span>
+              <button disabled={!hasNextPage} onClick={() => setPage(page + 1)}>Next</button>
+              <button disabled={!hasNextPage} onClick={() => setPage(totalPages - 1)}>Last</button>
+            </div>
+          </div>
+        </>}
       </>}
+      {activeTab === "bot-items" && <BotItemsTab onError={onError} />}
       {configOpen && (
         <ExchangeConfigOverlay
           onClose={() => setConfigOpen(false)}

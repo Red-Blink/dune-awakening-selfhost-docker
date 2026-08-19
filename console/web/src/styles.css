@@ -2126,6 +2126,7 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
 /* Market Board (Exchange) */
 .exchange-search-row { margin: 12px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .exchange-search-row > input { flex: 1 1 220px; min-width: 160px; }
+.exchange-search-row > button { flex: 0 0 auto; white-space: nowrap; }
 /* Lay the filter controls out inline (label beside the select) instead of the
    default stacked label grid, so they share the search row's baseline with the
    input, buttons, and gear. The input's flex-grow right-aligns this cluster.
@@ -2200,6 +2201,21 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 .exchange-config-add input { flex: 1; min-width: 0; }
 .exchange-config-add button { width: auto; min-width: 72px; }
 .exchange-config-modal .confirm-modal-actions .primary { background: var(--accent); color: #1a130a; border-color: var(--accent); }
+
+.bot-items-add-button { width: auto; min-width: 0; white-space: nowrap; }
+.bot-items-table th, .bot-items-table td { padding: 6px 8px; }
+.bot-items-table input[type="number"] { width: 96px; }
+.bot-item-row-dirty { background: rgba(198, 139, 74, .08); }
+.bot-item-field-dirty { border-color: var(--accent); }
+.bot-item-badge { display: inline-block; margin-left: 8px; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; border-radius: 999px; padding: 2px 7px; vertical-align: middle; }
+.bot-item-badge-unsafe { background: #2b1414; border: 1px solid #5a2b2b; color: #e29a9a; }
+.bot-item-badge-new { background: #13212b; border: 1px solid #33556a; color: #a9d0e6; }
+.bot-items-footer .primary { background: var(--accent); color: #1a130a; border-color: var(--accent); }
+.bot-item-picker-list { max-height: 320px; overflow-y: auto; }
+.bot-item-picker-row { justify-content: space-between; width: 100%; }
+.bot-item-picker-row > span { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.bot-item-picker-row em { font-style: normal; font-size: 11px; color: var(--muted); }
+.bot-item-picker-row button { width: auto; min-width: 64px; }
 
 .market-bot-modal { width: min(1120px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow-y: auto; }
 .market-bot-layout { display: grid; gap: 12px; }
@@ -5009,3 +5025,5 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
     transition-duration: .01ms !important;
   }
 }
+
+.bot-items-table-wrap.table-wrap { max-height: none; overflow: visible; }

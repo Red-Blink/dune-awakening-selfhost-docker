@@ -11,6 +11,7 @@
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { readMarketItemOverrides, mergeMarketSeedPlanWithOverrides, readUnsafeTemplateIds } from "./services/marketItemOverrides.js";
 
 // Keep identity helpers local so this module does not circular-import addonJobs.js.
 export const EDA_EXCHANGE_BOT_ADDON_ID = "eda-exchange-bot";
@@ -490,7 +491,10 @@ SELECT r.status, r.exchange_id, r.access_point_id, r.owner_id, r.inventory_id, S
 }
 
 export async function executeSeedRun(config, db, schedule, { runDuneImpl, buildDuneArgs, runSql }) {
-  const plan = loadMarketSeedPlan(config);
+  const basePlan = loadMarketSeedPlan(config);
+  const overrides = readMarketItemOverrides(config.repoRoot);
+  const unsafeIds = readUnsafeTemplateIds(config.repoRoot);
+  const plan = mergeMarketSeedPlanWithOverrides(basePlan, overrides, unsafeIds);
   if (typeof db?.transaction !== "function") {
     throw new Error("Exchange seed requires database transaction support.");
   }

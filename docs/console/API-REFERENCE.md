@@ -454,6 +454,9 @@ blacklist behaves.
 | POST | `/api/exchange/market/buyback/run` | Run a buyback sweep now with the saved schedule (probe → backup → sweep) | None |
 | POST | `/api/exchange/market/seed/run` | Run a market reseed now with the saved schedule (backup → clear bot listings → seed) | None |
 | POST | `/api/exchange/market/seed/clear` | Remove the bot's NPC listings from one exchange without reseeding (probe → backup → clear; no backup when the bot has none). Player listings and pending seller payments are never touched. Requires `exchange:market-write`. Rate-limited. | body: `exchangeId?` (defaults to the saved seed schedule's exchange) |
+| GET | `/api/exchange/market/items` | Merged, display-ready bot item catalog (bundled plan rows + admin-added new items), annotated with `overridden`/`isNew`/`unsafe` per row | None |
+| GET | `/api/exchange/market/items/catalog` | Item picker for "add item": `admin-items.json` filtered to allowed categories and unsafe-id-free | query: `q?`, `category?` |
+| POST | `/api/exchange/market/items` | Save per-item overrides/new items/removals in one batch (audited, rate-limited). Requires `exchange:market-write`. | body: `overrides?` (object of templateId → `{enabled?, price?, listings?}`), `newItems?` (object of templateId → `{name?, price, listings, enabled?, qualityLevel?, stackSize?}`), `removedNewItems?` (array of templateId) |
 
 The three category multipliers (`augmentMultiplier`, `rankedArmorMultiplier`,
 `rankedWeaponMultiplier`) accept 1–5 (up to two decimals, default 1 = no change)
@@ -470,6 +473,16 @@ allowlisted commodities a reseed lists (1–20, default 2). Unknown template ids
 are ignored. Units per stack stay at the plan `stack_size`. The catalog of
 editable items is returned on `GET /api/exchange/market` as
 `commodityStackCatalog` / `commodityStackGroups`.
+
+The `/api/exchange/market/items*` routes are a separate, per-item override layer
+on top of the bundled seed plan (`runtime/generated/market-bot/items.json`, never
+written back into `market-seed-plan.json`). They are merged in at read time for
+both the seed run and the buyback price caps, so a disabled or repriced item
+behaves the same in both jobs. New items may only reference a template id already
+present in `runtime/data/admin-items.json` (never free text); `buildings`,
+`contracts`, and `emotes` categories and any id in the seed plan's
+`unsafe_template_ids` are rejected outright. See
+[exchange.md](exchange.md#bot-items-catalog-overrides) for the full behavior.
 
 Unlike the board above, these routes **do write the game database** through the
 native Market Bot engine (`addonJobs.js` / `addonSeedJob.js`). Reads, the probe, and

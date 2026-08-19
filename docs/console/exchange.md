@@ -11,6 +11,11 @@ console's own theme and components.
 
 See [API-REFERENCE.md](API-REFERENCE.md#market-board) for the endpoint contract.
 
+The panel has two tabs: **Exchange** (the read-only board below) and **Bot
+items** (the Market Bot's editable catalog — see [Bot items](#bot-items-catalog-overrides)).
+The filter gear and Market Bot icons are unrelated to the tabs and work the
+same from either one.
+
 ## What it shows
 
 The board is **aggregated by item**: one row per `(template_id, quality_level)`,
@@ -168,6 +173,37 @@ Exchange Bot addon drives through the scheduler bridge, now first-class):
   to stay open) and survive restarts. They are console-owned and authorized by RBAC
   at save time. Seed and buyback share one running lock, so they can never write the
   exchange concurrently.
+
+### Bot items (catalog overrides)
+
+The **Bot items** tab, alongside the read-only **Exchange** tab, lets an admin
+edit the Market Bot's sellable catalog per item, beyond the reseed schedule's
+category-wide multipliers and its ~30-item commodity stack allowlist:
+
+- **Overrides** — enable/disable, reprice, or change the listing count of any
+  bundled seed-plan row. A disabled item is dropped from both reseed and
+  buyback entirely, not just hidden in the UI.
+- **New items** — add a template not in the bundled plan at all. New items can
+  only be picked from `runtime/data/admin-items.json` (the same catalog behind
+  Give Items / Care Packages), never typed freely. `buildings`, `contracts`,
+  and `emotes` categories are excluded from the picker. Any template id in the
+  seed plan's own `unsafe_template_ids` list (NPC-only weapon variants,
+  story-unique items, etc., flagged by the upstream generator) is hard-blocked
+  from both the picker and from being edited if it already exists as an
+  override.
+- Overrides are stored console-side in `runtime/generated/market-bot/items.json`
+  (`{ overrides: { <template_id>: { enabled, price, listings } }, newItems: {
+  <template_id>: { name, category, price, listings, ... } } }`) and are never
+  written back into the bundled `market-seed-plan.json`. They are merged in at
+  read time for both the reseed run and the buyback price caps, so a
+  disabled/repriced item's buyback cap always agrees with what the bot
+  actually lists.
+- `GET /api/exchange/market/items` returns the merged, display-ready catalog;
+  `GET /api/exchange/market/items/catalog` backs the "add item" picker;
+  `POST /api/exchange/market/items` saves overrides/new items/removals in one
+  batch. Reads use the `exchange:market` action, saves use
+  `exchange:market-write` — the same actions as the reseed/buyback schedule
+  routes.
 
 ### EDA Exchange Bot retirement
 
