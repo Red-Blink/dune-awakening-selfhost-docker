@@ -615,10 +615,12 @@ test("reporter uploads only player portal identities requested by the claimed li
       baseUrl: "https://directory.test/api/v1/servers",
       playerPortalJourneyData: journeyData,
       playerPortalSkillData: skillData,
-      collectPlayerPortalSnapshots: async (_db, hashes, loadedJourneys, loadedSkills) => {
+      collectPlayerPortalMarketSnapshot: async () => ({ available: true, listings: [{ sellerActorId: "123" }] }),
+      collectPlayerPortalSnapshots: async (_db, hashes, loadedJourneys, loadedSkills, marketSnapshot) => {
         assert.deepEqual(hashes, [requestedHash]);
         assert.equal(loadedJourneys, journeyData);
         assert.equal(loadedSkills, skillData);
+        assert.equal(marketSnapshot.available, true);
         return [{ accountHash: requestedHash, found: true, data: { overview: { characterName: "Test" } } }];
       },
       fetchImpl: async (url, options) => {

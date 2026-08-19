@@ -292,6 +292,7 @@ const BUYBACK_RESULT_DETAIL_SQL = `CASE
 // and JSON.parse would round order ids / prices past Number.MAX_SAFE_INTEGER.
 const BUYBACK_LOG_JSON_SQL = `jsonb_build_object(
         'order_id', l.order_id::text,
+        'seller_actor_id', l.seller_actor_id::text,
         'template_id', l.template_id,
         'quality_level', l.quality_level::text,
         'item_price', l.item_price::text,
@@ -459,6 +460,7 @@ WHERE o.exchange_id = ${exchangeId}
 
 function buybackClassifySelectSql() {
   return `o.id::text AS order_id,
+    o.owner_id::text AS seller_actor_id,
     COALESCE(o.template_id, '') AS template_id,
     (${BUYBACK_ORDER_GRADE_SQL})::text AS quality_level,
     COALESCE(o.item_price, 0)::text AS item_price,
@@ -521,6 +523,7 @@ CREATE TEMP TABLE market_buy_result (purchased INTEGER NOT NULL, total_units BIG
 CREATE TEMP TABLE market_buy_claim_snapshot (order_id BIGINT NOT NULL PRIMARY KEY) ON COMMIT DROP;
 CREATE TEMP TABLE market_buy_log (
     order_id BIGINT NOT NULL PRIMARY KEY,
+    seller_actor_id BIGINT NOT NULL,
     template_id TEXT NOT NULL,
     quality_level BIGINT NOT NULL,
     item_price BIGINT NOT NULL,
@@ -579,16 +582,16 @@ BEGIN
         DELETE FROM dune.dune_exchange_sell_orders WHERE order_id = rec.order_id;
         DELETE FROM dune.dune_exchange_orders WHERE id = rec.order_id;
         IF rec.item_id IS NOT NULL THEN DELETE FROM dune.items WHERE id = rec.item_id; END IF;
-        INSERT INTO market_buy_log (order_id, template_id, quality_level, item_price, stack_size, max_unit_price, result_code, result_label, detail)
-        VALUES (rec.order_id, COALESCE(rec.template_id, ''), rec.quality_level, COALESCE(rec.item_price, 0), rec.actual_stack, rec.max_unit_price, 0, 'success', 'bought stack ' || rec.actual_stack::text || ' at ' || rec.item_price::text || '/unit (cap ' || rec.max_unit_price::text || ')');
+        INSERT INTO market_buy_log (order_id, seller_actor_id, template_id, quality_level, item_price, stack_size, max_unit_price, result_code, result_label, detail)
+        VALUES (rec.order_id, rec.seller_actor_id, COALESCE(rec.template_id, ''), rec.quality_level, COALESCE(rec.item_price, 0), rec.actual_stack, rec.max_unit_price, 0, 'success', 'bought stack ' || rec.actual_stack::text || ' at ' || rec.item_price::text || '/unit (cap ' || rec.max_unit_price::text || ')');
         v_purchased := v_purchased + 1; v_units := v_units + rec.actual_stack; v_solari := v_solari + (rec.item_price * rec.actual_stack);
     END LOOP;
     -- Leftover eligible rows only from the pre-claim snapshot (still on the
     -- board, not purchased). Skip dumps stay on the read-only classify path so
     -- this write transaction does not copy the whole exchange into a temp
     -- table. 0x5 vs 0x6 is applied in JS from purchased-before-this-row.
-    INSERT INTO market_buy_log (order_id, template_id, quality_level, item_price, stack_size, max_unit_price, result_code, result_label, detail)
-    SELECT o.id, COALESCE(o.template_id, ''), ${BUYBACK_ORDER_GRADE_SQL}, COALESCE(o.item_price, 0), ${BUYBACK_STACK_SQL}, p.max_unit_price, 0, 'eligible', ${BUYBACK_RESULT_DETAIL_SQL}
+    INSERT INTO market_buy_log (order_id, seller_actor_id, template_id, quality_level, item_price, stack_size, max_unit_price, result_code, result_label, detail)
+    SELECT o.id, o.owner_id, COALESCE(o.template_id, ''), ${BUYBACK_ORDER_GRADE_SQL}, COALESCE(o.item_price, 0), ${BUYBACK_STACK_SQL}, p.max_unit_price, 0, 'eligible', ${BUYBACK_RESULT_DETAIL_SQL}
     FROM ${BUYBACK_ORDERS_JOIN_SQL}
     WHERE o.exchange_id = ${exchangeId}
       AND ${BUYBACK_SWEEP_PLAYER_SQL}
@@ -694,6 +697,34 @@ export async function refreshBuybackLog(config, db, overrides = {}) {
     });
     return { ...classified, ...readBuybackLogUnlocked(config) };
   });
+}
+
+// Read-only source for the private player portal. Current listings are
+// classified against the operator's effective settings on each requested
+// portal sync, while recent outcomes come from the bounded five-day local log.
+export async function playerPortalMarketSnapshot(config, db) {
+  const schedule = readBuybackSchedule(config);
+  const base = {
+    available: false,
+    configured: Boolean(schedule.exchangeId),
+    enabled: schedule.enabled === true,
+    exchangeId: schedule.exchangeId || "",
+    buybackPercent: schedule.buybackPercent,
+    buybackPriceBasis: schedule.buybackPriceBasis,
+    maxBuys: schedule.maxBuys,
+    evaluatedAt: new Date().toISOString(),
+    listings: [],
+    batches: readBuybackLog(config).batches
+  };
+  if (!schedule.exchangeId) return base;
+  try {
+    const classified = await classifyBuybackListings(config, db);
+    return { ...base, available: true, evaluatedAt: new Date().toISOString(), listings: classified.entries };
+  } catch {
+    // Portal data is optional. Never interrupt the heartbeat or expose local
+    // database/seed-plan errors in a player-facing snapshot.
+    return base;
+  }
 }
 
 function buybackDiagnostics(row = {}) {
@@ -1164,6 +1195,9 @@ export function normalizeBuybackLogEntry(row = {}, names = new Map()) {
   const maxUnitPrice = row.maxUnitPrice ?? row.max_unit_price;
   return {
     orderId: decimalId(row.orderId ?? row.order_id),
+    // Retained only in the server-local log for private portal filtering.
+    // playerPortalSnapshots strips it before uploading any player data.
+    sellerActorId: decimalId(row.sellerActorId ?? row.seller_actor_id),
     templateId,
     displayName,
     qualityLevel,

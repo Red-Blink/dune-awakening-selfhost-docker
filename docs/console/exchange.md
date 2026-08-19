@@ -159,6 +159,13 @@ Exchange Bot addon drives through the scheduler bridge, now first-class):
   `runtime/generated/market-bot/buyback-log.json` (20 most recent, dropped
   after 5 days). The scheduler prunes expired batches at most hourly even when
   buyback is disabled.
+- **Dune Docker Player Portal** evaluates current listings during the existing
+  private portal sync (at most once per 60 seconds) and shows each Steam-linked
+  player their per-unit ask, the server's current maximum, eligibility or exact
+  skip reason, and recent buyback outcomes. Seller actor IDs remain local: the
+  console matches them against the requested Steam-linked character and removes
+  the IDs before uploading the player-scoped snapshot. Other players' listings
+  and raw Steam IDs are never published.
 - **Backup labeling and retention**: every Market Bot database write is preceded
   by a backup whose filename carries the origin (for example
   `dune-db-market-bot-buyback-<scope>-<timestamp>.backup`; the sidecar's

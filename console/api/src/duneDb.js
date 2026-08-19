@@ -5080,9 +5080,61 @@ export async function playerJourney(db, id, journeyTagsData = {}) {
   return { capabilities: { journey: true }, player, rows: { story: storyRows, contract: contractRows, codex: codexRows, tutorial } };
 }
 
+function portalMarketEntry(entry, extra = {}) {
+  return {
+    orderId: String(entry?.orderId || ""),
+    templateId: String(entry?.templateId || ""),
+    displayName: String(entry?.displayName || ""),
+    qualityLevel: String(entry?.qualityLevel || ""),
+    itemPrice: String(entry?.itemPrice || ""),
+    stackSize: String(entry?.stackSize || ""),
+    maxUnitPrice: String(entry?.maxUnitPrice || ""),
+    resultCode: Number.isInteger(entry?.resultCode) ? entry.resultCode : -1,
+    resultLabel: String(entry?.resultLabel || "unknown"),
+    detail: String(entry?.detail || ""),
+    ...extra
+  };
+}
+
+function portalMarketForIdentity(identity, market) {
+  if (!market || typeof market !== "object") return null;
+  const ownerIds = new Set([identity.actor_id, identity.controller_id, identity.account_id]
+    .map((value) => String(value || ""))
+    .filter(Boolean));
+  const owns = (entry) => ownerIds.has(String(entry?.sellerActorId || ""));
+  const matchingListings = (Array.isArray(market.listings) ? market.listings : []).filter(owns);
+  const listings = matchingListings.slice(0, 250).map((entry) => portalMarketEntry(entry));
+  const history = [];
+  for (const batch of Array.isArray(market.batches) ? market.batches : []) {
+    for (const entry of Array.isArray(batch?.entries) ? batch.entries : []) {
+      if (!owns(entry)) continue;
+      history.push(portalMarketEntry(entry, {
+        at: String(batch.at || ""),
+        source: String(batch.source || "")
+      }));
+      if (history.length >= 100) break;
+    }
+    if (history.length >= 100) break;
+  }
+  return {
+    available: market.available === true,
+    configured: market.configured === true,
+    enabled: market.enabled === true,
+    exchangeId: String(market.exchangeId || ""),
+    buybackPercent: Number(market.buybackPercent) || 0,
+    buybackPriceBasis: String(market.buybackPriceBasis || ""),
+    maxBuys: Number(market.maxBuys) || 0,
+    evaluatedAt: String(market.evaluatedAt || ""),
+    listings,
+    listingsTruncated: matchingListings.length > listings.length,
+    history
+  };
+}
+
 // Build private, read-only snapshots only for Steam identities requested by the
-// directory. Raw platform IDs never leave the battlegroup.
-export async function playerPortalSnapshots(db, requestedAccountHashes, journeyTagsData = {}, skillModulesData = []) {
+// directory. Raw platform IDs and local Market Bot seller IDs never leave the
+// battlegroup.
+export async function playerPortalSnapshots(db, requestedAccountHashes, journeyTagsData = {}, skillModulesData = [], marketSnapshot = null) {
   const requested = new Set((Array.isArray(requestedAccountHashes) ? requestedAccountHashes : [])
     .map((value) => String(value || "").toLowerCase())
     .filter((value) => /^[0-9a-f]{64}$/.test(value))
@@ -5210,7 +5262,8 @@ export async function playerPortalSnapshots(db, requestedAccountHashes, journeyT
           y: Number(base.y) || 0,
           z: Number(base.z) || 0
         })),
-        guild
+        guild,
+        ...(marketSnapshot ? { marketBot: portalMarketForIdentity(identity, marketSnapshot) } : {})
       }
     });
   }

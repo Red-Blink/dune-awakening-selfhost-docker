@@ -10,6 +10,7 @@ import { dirname, resolve } from "node:path";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import * as duneDb from "../duneDb.js";
+import { playerPortalMarketSnapshot } from "../addonJobs.js";
 
 const DEFAULT_BASE_URL = "https://dunedocker.app/api/v1/servers";
 const DEFAULT_HEARTBEAT_SECONDS = 30;
@@ -140,6 +141,8 @@ export function createPublicDirectoryReporter(config, options = {}) {
   const getBattlegroupRunning = options.getBattlegroupRunning || isBattlegroupRunning;
   const reconcileProbe = options.reconcileProbe || ((probe) => reconcilePublicProbe(config.repoRoot, probe));
   const collectPlayerPortalSnapshots = options.collectPlayerPortalSnapshots || duneDb.playerPortalSnapshots;
+  const collectPlayerPortalMarketSnapshot = options.collectPlayerPortalMarketSnapshot
+    || ((database) => playerPortalMarketSnapshot(config, database));
   const playerPortalJourneyData = options.playerPortalJourneyData || readJsonFile(
     resolve(config.repoRoot, "runtime/data/journey-tags.json"),
     {}
@@ -263,11 +266,19 @@ export function createPublicDirectoryReporter(config, options = {}) {
         const signature = requested.join(",");
         if (requested.length && (signature !== lastPlayerPortalRequestSignature || now() - lastPlayerPortalUploadAt >= 60_000)) {
           try {
+            let marketSnapshot = null;
+            try {
+              marketSnapshot = await collectPlayerPortalMarketSnapshot(getDb());
+            } catch {
+              // Market details are optional; core player snapshots must still
+              // upload if the local Market Bot configuration is unavailable.
+            }
             const snapshots = await collectPlayerPortalSnapshots(
               getDb(),
               requested,
               playerPortalJourneyData,
-              playerPortalSkillData
+              playerPortalSkillData,
+              marketSnapshot
             );
             await requestJson(fetchImpl, `${claimBaseUrl}/${encodeURIComponent(identity.serverId)}/player-portal/snapshot`, {
               method: "POST",

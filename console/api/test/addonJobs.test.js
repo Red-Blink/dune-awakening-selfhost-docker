@@ -259,6 +259,7 @@ test("builds buyback SQL server-side from the bundled seed plan", () => {
     const classifySql = buildBuybackClassifySql(plan, schedule);
     assert.ok(isReadOnlySql(classifySql), "classify query must be read-only SQL");
     assert.match(classifySql, /AS result_code/);
+    assert.match(classifySql, /o\.owner_id::text AS seller_actor_id/, "portal classification retains the local seller identity");
     assert.match(classifySql, /COALESCE\(o\.item_price, 0\) <= 0/, "NULL asks are invalid, not eligible");
     assert.match(classifySql, /eligible_band AS/, "eligible listings take the cap first");
     assert.match(classifySql, /skip_band AS/, "ineligible listings share one leftover top-N band");
@@ -285,6 +286,7 @@ test("builds buyback SQL server-side from the bundled seed plan", () => {
     assert.match(sweepSql, /COALESCE\(o\.item_price, 0\)/, "NULL asks cannot abort the NOT NULL log insert");
     assert.match(sweepSql, /COALESCE\(rec\.template_id, ''\)/);
     assert.match(sweepSql, /'order_id', l\.order_id::text/, "BIGINT ids stay decimal strings in JSON");
+    assert.match(sweepSql, /'seller_actor_id', l\.seller_actor_id::text/, "purchased rows retain their seller for private portal filtering");
     assert.match(sweepSql, /result_label, detail\)\s*VALUES \(rec\.order_id/, "purchases are logged in the loop, not by copying the whole exchange first");
     assert.match(sweepSql, /CREATE TEMP TABLE market_buy_claim_snapshot/, "leftovers are limited to pre-claim eligible ids");
     assert.match(sweepSql, /EXISTS \(SELECT 1 FROM market_buy_claim_snapshot/, "post-claim newcomers are not labeled skipped locked");
@@ -1193,6 +1195,17 @@ test("normalizeBuybackLogEntry prefers the seed-plan name for that template grad
   ]);
   assert.equal(normalizeBuybackLogEntry({ order_id: "1", template_id: "Sword", quality_level: "2", result_code: 0 }, names).displayName, "Sword Schematic");
   assert.equal(normalizeBuybackLogEntry({ order_id: "2", template_id: "Sword", quality_level: "0", result_code: 0 }, names).displayName, "Sword");
+});
+
+test("normalizeBuybackLogEntry keeps seller ids as exact decimal strings", () => {
+  const entry = normalizeBuybackLogEntry({
+    order_id: "9223372036854775806",
+    seller_actor_id: "9223372036854775805",
+    template_id: "Sword",
+    result_code: 0
+  });
+  assert.equal(entry.orderId, "9223372036854775806");
+  assert.equal(entry.sellerActorId, "9223372036854775805");
 });
 
 test("idle buyback with unchanged skip buckets skips classify until buckets change", async () => {

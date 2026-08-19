@@ -552,7 +552,29 @@ test("player portal snapshot bases report generatorUnstockedCount and generatorA
     }
   };
 
-  const result = await playerPortalSnapshots(db, [accountHash]);
+  const marketSnapshot = {
+    available: true,
+    configured: true,
+    enabled: true,
+    exchangeId: "77",
+    buybackPercent: 60,
+    buybackPriceBasis: "seeded",
+    maxBuys: 500,
+    evaluatedAt: "2026-08-19T12:00:00.000Z",
+    listings: [
+      { orderId: "1", sellerActorId: "123", displayName: "Water", itemPrice: "500", stackSize: "2", maxUnitPrice: "600", resultCode: 0, resultLabel: "eligible", detail: "eligible" },
+      { orderId: "2", sellerActorId: "999", displayName: "Other Player Item", resultCode: 1 }
+    ],
+    batches: [{
+      at: "2026-08-19T11:00:00.000Z",
+      source: "Scheduled buyback",
+      entries: [
+        { orderId: "3", sellerActorId: "123", displayName: "Iron", itemPrice: "100", stackSize: "3", maxUnitPrice: "120", resultCode: 0, resultLabel: "success", detail: "bought" },
+        { orderId: "4", sellerActorId: "999", displayName: "Private", resultCode: 1 }
+      ]
+    }]
+  };
+  const result = await playerPortalSnapshots(db, [accountHash], {}, [], marketSnapshot);
 
   assert.equal(result.length, 1, "should return one result");
   assert.equal(result[0].found, true, "account should be found");
@@ -565,6 +587,11 @@ test("player portal snapshot bases report generatorUnstockedCount and generatorA
   assert.equal(base.name, "Test Base", "base name should match");
   assert.equal(base.generatorUnstockedCount, 1, "base should report the count with no queued fuel");
   assert.equal(base.generatorAllUnstocked, false, "not all generators are unstocked");
+  assert.deepEqual(result[0].data.marketBot.listings.map((row) => row.orderId), ["1"]);
+  assert.deepEqual(result[0].data.marketBot.history.map((row) => row.orderId), ["3"]);
+  assert.equal(Object.hasOwn(result[0].data.marketBot.listings[0], "sellerActorId"), false, "local seller ids must not leave the server");
+  assert.equal(JSON.stringify(result[0].data.marketBot).includes("Other Player Item"), false);
+  assert.equal(JSON.stringify(result[0].data.marketBot).includes("Private"), false);
 });
 
 test("player portal prefers custom vehicle names and ignores internal labels", async () => {
