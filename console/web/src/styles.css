@@ -3948,13 +3948,25 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   align-content: center;
   gap: 8px;
 }
-.vehicles-permissions-warning { margin: 0; }
-.vehicles-permissions-error { color: var(--danger-text); margin: 0; }
+/* white-space: normal for the same reason the action-help-note fix above
+   exists: unlike .bases-table, .vehicles-table has no blanket
+   `td { white-space: normal }` reset, so this prose (including the
+   server-supplied unclaimedReason string, and common -- ~1 in 5 vehicles is
+   unclaimed) would otherwise inherit nowrap from the global `th, td` rule
+   and render as one unbroken line clipped by the expanded-row-cell's
+   overflow:hidden instead of wrapping. */
+.vehicles-permissions-warning { margin: 0; white-space: normal; }
+.vehicles-permissions-error { color: var(--danger-text); margin: 0; white-space: normal; }
 .vehicles-permissions-banner-slot .inline-task-result {
   align-self: auto;
   flex: 0 1 auto;
   max-width: none;
   margin: 0;
+  /* Same inherited-nowrap gap as .vehicles-permissions-warning/-error above --
+     the save-result message (e.g. "Permissions were updated. The change
+     applies to the running map immediately.") is exactly the kind of prose
+     that bug clips instead of wraps. */
+  white-space: normal;
 }
 
 .vehicles-permissions-actions {
