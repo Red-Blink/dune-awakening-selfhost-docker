@@ -28,25 +28,25 @@ describe("ExchangeConfigOverlay", () => {
     vi.mocked(exchangeApi.getConfig).mockResolvedValue({ includeNpcBroker: true, botOwnerIds: ["75"], blacklistedOwnerIds: [] });
     renderOverlay();
 
-    const botList = await waitFor(() => listSection("Bot user IDs"));
+    const botList = await waitFor(() => listSection("Bot User IDs"));
     expect(await within(botList).findByText("75")).toBeInTheDocument();
   });
 
   it("shows the built-in in-game broker as a removable chip by default", async () => {
     renderOverlay();
 
-    const botList = await waitFor(() => listSection("Bot user IDs"));
-    expect(within(botList).getByText("In-game broker (Revy)")).toBeInTheDocument();
-    expect(within(botList).getByLabelText("Remove In-game broker (Revy)")).toBeInTheDocument();
+    const botList = await waitFor(() => listSection("Bot User IDs"));
+    expect(within(botList).getByText("In-Game Broker (Revy)")).toBeInTheDocument();
+    expect(within(botList).getByLabelText("Remove In-Game Broker (Revy)")).toBeInTheDocument();
   });
 
   it("removes the built-in broker and saves includeNpcBroker=false, then can restore it", async () => {
     const props = renderOverlay();
 
-    const botList = await waitFor(() => listSection("Bot user IDs"));
-    fireEvent.click(within(botList).getByLabelText("Remove In-game broker (Revy)"));
+    const botList = await waitFor(() => listSection("Bot User IDs"));
+    fireEvent.click(within(botList).getByLabelText("Remove In-Game Broker (Revy)"));
     // A restore affordance appears once it is removed.
-    const restore = within(botList).getByRole("button", { name: /Restore In-game broker/ });
+    const restore = within(botList).getByRole("button", { name: /Restore In-Game Broker/ });
     expect(restore).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Save"));
@@ -60,7 +60,7 @@ describe("ExchangeConfigOverlay", () => {
 
     await screen.findByText("75");
     const blacklist = listSection("Blacklisted IDs");
-    fireEvent.change(within(blacklist).getByPlaceholderText("Add owner ID"), { target: { value: "9929" } });
+    fireEvent.change(within(blacklist).getByPlaceholderText("Add Owner ID"), { target: { value: "9929" } });
     fireEvent.click(within(blacklist).getByRole("button", { name: /Add/ }));
     fireEvent.click(screen.getByText("Save"));
 
@@ -72,8 +72,8 @@ describe("ExchangeConfigOverlay", () => {
   it("strips non-numeric input and disables Add for empty values", async () => {
     renderOverlay();
 
-    const botList = await waitFor(() => listSection("Bot user IDs"));
-    const input = within(botList).getByPlaceholderText("Add owner ID") as HTMLInputElement;
+    const botList = await waitFor(() => listSection("Bot User IDs"));
+    const input = within(botList).getByPlaceholderText("Add Owner ID") as HTMLInputElement;
     const addButton = within(botList).getByRole("button", { name: /^Add/ });
     expect(addButton).toBeDisabled();
     // Letters are stripped by the input handler, keeping the field numeric-only.

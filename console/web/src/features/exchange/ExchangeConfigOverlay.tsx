@@ -36,7 +36,7 @@ function IdListEditor({ title, hint, ids, onChange, builtIn }: { title: string; 
         ? <ul className="exchange-config-chips">
           {builtIn?.present && (
             <li className="exchange-config-chip exchange-config-chip-builtin">
-              <span>{builtIn.label}<em>built-in</em></span>
+              <span>{builtIn.label}<em>Built-In</em></span>
               <button type="button" aria-label={`Remove ${builtIn.label}`} onClick={() => builtIn.onToggle(false)}><Trash2 size={13} /></button>
             </li>
           )}
@@ -55,7 +55,7 @@ function IdListEditor({ title, hint, ids, onChange, builtIn }: { title: string; 
         <input
           value={draft}
           inputMode="numeric"
-          placeholder="Add owner ID"
+          placeholder="Add Owner ID"
           onChange={(event) => setDraft(event.target.value.replace(/[^\d]/g, ""))}
           onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); add(); } }}
         />
@@ -105,10 +105,10 @@ export function ExchangeConfigOverlay({ onClose, onSaved, onError }: ExchangeCon
   }
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Exchange filter settings" onClick={onClose}>
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Exchange Filter Settings" onClick={onClose}>
       <div className="confirm-modal exchange-config-modal" onClick={(event) => event.stopPropagation()}>
         <div className="confirm-modal-title">
-          <h3>Exchange filter settings</h3>
+          <h3>Exchange Filter Settings</h3>
           <button className="exchange-config-close" aria-label="Close" onClick={onClose}><X size={16} /></button>
         </div>
         <p>Stored in the console only. No game data is changed. Blacklisted IDs are hidden from the market on every view.</p>
@@ -116,11 +116,11 @@ export function ExchangeConfigOverlay({ onClose, onSaved, onError }: ExchangeCon
           ? <p className="muted">Loading…</p>
           : <>
             <IdListEditor
-              title="Bot user IDs"
+              title="Bot User IDs"
               hint="Counted as bot listings. The in-game broker is built in; remove it to stop treating its orders as bot."
               ids={botOwnerIds}
               onChange={setBotOwnerIds}
-              builtIn={{ present: includeNpcBroker, label: "In-game broker (Revy)", onToggle: setIncludeNpcBroker }}
+              builtIn={{ present: includeNpcBroker, label: "In-Game Broker (Revy)", onToggle: setIncludeNpcBroker }}
             />
             <IdListEditor title="Blacklisted IDs" hint="Hidden from the market on every view." ids={blacklistedOwnerIds} onChange={setBlacklistedOwnerIds} />
           </>}

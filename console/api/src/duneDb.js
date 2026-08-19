@@ -5266,10 +5266,119 @@ function portalMarketForIdentity(identity, market) {
   };
 }
 
+function portalExchangeOverview(market) {
+  if (!market || typeof market !== "object") return null;
+  const groups = new Map();
+  for (const entry of Array.isArray(market.listings) ? market.listings : []) {
+    const templateId = String(entry?.templateId || "");
+    const displayName = String(entry?.displayName || templateId || "Unknown Item");
+    const key = `${templateId}\u0000${String(entry?.qualityLevel || "")}`;
+    const price = Number(entry?.itemPrice);
+    const quantity = Math.max(0, Number(entry?.stackSize) || 0);
+    if (!Number.isFinite(price) || price < 0) continue;
+    const row = groups.get(key) || {
+      templateId,
+      displayName,
+      qualityLevel: String(entry?.qualityLevel || ""),
+      listingCount: 0,
+      totalUnits: 0,
+      lowestPrice: price,
+      highestPrice: price,
+      maxUnitPrice: Number(entry?.maxUnitPrice) || 0
+    };
+    row.listingCount += 1;
+    row.totalUnits += quantity;
+    row.lowestPrice = Math.min(row.lowestPrice, price);
+    row.highestPrice = Math.max(row.highestPrice, price);
+    row.maxUnitPrice = Math.max(row.maxUnitPrice, Number(entry?.maxUnitPrice) || 0);
+    groups.set(key, row);
+  }
+  return {
+    evaluatedAt: String(market.evaluatedAt || ""),
+    items: [...groups.values()]
+      .sort((left, right) => right.listingCount - left.listingCount || left.displayName.localeCompare(right.displayName))
+      .slice(0, 100)
+  };
+}
+
+export async function portalStorage(db, playerControllerId) {
+  const result = await db.query(`
+    with owned_containers as (
+      select distinct p.id,
+        coalesce(max(case when pa.actor_name not like '##%' and pa.actor_name <> 'None' then pa.actor_name end)
+          over (partition by p.id), p.building_type) container_name,
+        coalesce(a.map, '') map
+      from dune.placeables p
+      join dune.actors a on a.id=p.id
+      join dune.actor_fgl_entities afe on afe.entity_id=p.owner_entity_id
+      join dune.permission_actor_rank par on par.permission_actor_id=afe.actor_id
+      left join dune.permission_actor pa on pa.actor_id=par.permission_actor_id
+      where par.player_id=$1 and par.rank=1 and p.is_hologram=false
+        and p.owner_entity_id is not null and p.owner_entity_id<>0
+    ), item_rows as (
+      select oc.id::text container_id,oc.container_name,oc.map,
+        i.template_id,coalesce(i.quality_level,0)::int quality_level,
+        count(*)::int stack_count,coalesce(sum(i.stack_size),0)::bigint::text quantity
+      from owned_containers oc
+      join dune.inventories inv on inv.actor_id=oc.id
+      join dune.items i on i.inventory_id=inv.id
+      group by oc.id,oc.container_name,oc.map,i.template_id,i.quality_level
+    )
+    select * from item_rows
+    order by container_name,template_id,quality_level
+    limit 750`, [playerControllerId]);
+  const containers = new Map();
+  for (const row of result.rows || []) {
+    const id = String(row.container_id || "");
+    const container = containers.get(id) || {
+      id,
+      name: String(row.container_name || "Storage"),
+      map: String(row.map || ""),
+      itemTypes: 0,
+      totalQuantity: 0
+    };
+    container.itemTypes += 1;
+    container.totalQuantity += Number(row.quantity) || 0;
+    containers.set(id, container);
+  }
+  return {
+    truncated: (result.rows || []).length >= 750,
+    containers: [...containers.values()],
+    items: (result.rows || []).map((row) => ({
+      containerId: String(row.container_id || ""),
+      containerName: String(row.container_name || "Storage"),
+      map: String(row.map || ""),
+      templateId: String(row.template_id || ""),
+      qualityLevel: Number(row.quality_level) || 0,
+      stackCount: Number(row.stack_count) || 0,
+      quantity: Number(row.quantity) || 0
+    }))
+  };
+}
+
+export async function portalLandsraad(db, playerControllerId) {
+  const overview = await landsraadOverview(db);
+  if (overview?.capabilities?.landsraad !== true) return null;
+  let contributions = [];
+  if (overview.capabilities.playerContributions) {
+    contributions = (await db.query(`
+      select task_id::text "taskId",coalesce(amount,0)::real amount
+      from dune.landsraad_task_player_contributions
+      where player_id=$1
+      order by task_id`, [playerControllerId])).rows || [];
+  }
+  return {
+    term: overview.term,
+    tasks: overview.tasks,
+    rewards: overview.rewards,
+    contributions: contributions.map((row) => ({ taskId: String(row.taskId || row.task_id || ""), amount: Number(row.amount) || 0 }))
+  };
+}
+
 // Build private, read-only snapshots only for Steam identities requested by the
 // directory. Raw platform IDs and local Market Bot seller IDs never leave the
 // battlegroup.
-export async function playerPortalSnapshots(db, requestedAccountHashes, journeyTagsData = {}, skillModulesData = [], marketSnapshot = null) {
+export async function playerPortalSnapshots(db, requestedAccountHashes, journeyTagsData = {}, skillModulesData = [], marketSnapshot = null, portalContext = {}) {
   const requested = new Set((Array.isArray(requestedAccountHashes) ? requestedAccountHashes : [])
     .map((value) => String(value || "").toLowerCase())
     .filter((value) => /^[0-9a-f]{64}$/.test(value))
@@ -5305,7 +5414,7 @@ export async function playerPortalSnapshots(db, requestedAccountHashes, journeyT
   for (const identity of matched) {
     const actorId = Number(identity.actor_id);
     const controllerId = Number(identity.controller_id);
-    const [currency, factions, specs, crafting, research, journeys, bases, intel, keystones, blueprints, vehicles, guild] = await Promise.all([
+    const [currency, factions, specs, crafting, research, journeys, bases, intel, keystones, blueprints, vehicles, guild, storage, landsraad] = await Promise.all([
       playerCurrency(db, actorId).catch(() => ({ rows: [] })),
       playerFactions(db, actorId).catch(() => ({ rows: [] })),
       playerSpecs(db, actorId).catch(() => ({ rows: [], skillModules: [] })),
@@ -5320,13 +5429,19 @@ export async function playerPortalSnapshots(db, requestedAccountHashes, journeyT
       db.query(`select keystone_id::text from dune.purchased_specialization_keystones where player_id=$1 order by keystone_id`, [controllerId]).catch(() => ({ rows: [] })),
       db.query(`select id::text,item_id::text,building_blueprint_map from dune.building_blueprints where player_id=$1 order by id`, [controllerId]).catch(() => ({ rows: [] })),
       portalVehicles(db, [actorId, controllerId, Number(identity.account_id)]).catch(() => ({ rows: [] })),
-      portalGuild(db, identity).catch(() => null)
+      portalGuild(db, identity).catch(() => null),
+      portalStorage(db, controllerId).catch(() => ({ containers: [], items: [], truncated: false })),
+      portalLandsraad(db, controllerId).catch(() => null)
     ]);
     const leader = leaders.get(String(actorId)) || {};
     const baseRows = (bases.rows || []).filter((base) =>
       base.owner_name === identity.character_name ||
       (base.shared_with || []).some((entry) => entry.name === identity.character_name));
     const fuelByBase = await portalGeneratorFuel(db, baseRows.map((base) => base.base_id)).catch(() => new Map());
+    const waterByBase = new Map(await Promise.all(baseRows.map(async (base) => {
+      const water = await baseWater(db, base.base_id).catch(() => ({ supported: false, containers: [] }));
+      return [String(base.base_id), water];
+    })));
     const skillModules = (specs.skillModules || []).map((skill) => portalSkillRow(skill, skillModulesData));
     const journeyRows = Object.values(journeys.rows || {}).flat();
     const unlockedCrafting = (crafting.rows || []).filter((row) => row.unlocked);
@@ -5368,6 +5483,8 @@ export async function playerPortalSnapshots(db, requestedAccountHashes, journeyT
           skills: skillModules,
           research: unlockedResearch.map((row) => ({ id: row.itemKey || "", name: row.displayName || row.itemKey || "Research" })),
           schematics: unlockedCrafting.map((row) => ({ id: row.recipeId || "", name: row.displayName || row.recipeId || "Schematic" })),
+          missingResearch: (research.rows || []).filter((row) => !row.unlocked).map((row) => ({ id: row.itemKey || "", name: row.displayName || row.itemKey || "Research" })).slice(0, 500),
+          missingSchematics: (crafting.rows || []).filter((row) => !row.unlocked).map((row) => ({ id: row.recipeId || "", name: row.displayName || row.recipeId || "Schematic" })).slice(0, 500),
           blueprints: blueprints.rows.map((row) => ({ id: row.id, itemId: row.item_id, map: row.building_blueprint_map || "" }))
         },
         journeys: {
@@ -5391,13 +5508,37 @@ export async function playerPortalSnapshots(db, requestedAccountHashes, journeyT
           generatorUnstockedCount: fuelByBase.get(String(base.base_id))?.unstockedCount || 0,
           generatorAllUnstocked: fuelByBase.get(String(base.base_id))?.allGeneratorsUnstocked || false,
           generators: fuelByBase.get(String(base.base_id))?.generators || [],
+          waterSupported: waterByBase.get(String(base.base_id))?.supported === true,
+          waterContainers: waterByBase.get(String(base.base_id))?.containers || [],
           map: base.map || "",
           partitionId: Number(base.partition_id) || 0,
           x: Number(base.x) || 0,
           y: Number(base.y) || 0,
           z: Number(base.z) || 0
         })),
+        storage,
         guild,
+        landsraad,
+        serverInfo: portalContext.serverInfo || null,
+        carePackages: {
+          enabled: portalContext.carePackages?.enabled === true,
+          history: (portalContext.carePackages?.history || [])
+            .filter((row) => {
+              const rowAccount = String(row?.account_id || row?.accountId || "");
+              const rowActor = String(row?.actor_id || row?.actorId || "");
+              return (rowAccount && rowAccount === String(identity.account_id || ""))
+                || (rowActor && rowActor === String(identity.actor_id || ""));
+            })
+            .slice(0, 25)
+            .map((row) => ({
+              id: String(row.id || ""),
+              timestamp: String(row.timestamp || ""),
+              status: String(row.status || "unknown"),
+              kitName: String(row.kitName || row.kit_name || row.summary || "Care Package"),
+              summary: String(row.summary || "")
+            }))
+        },
+        exchangeOverview: portalExchangeOverview(marketSnapshot),
         ...(marketSnapshot ? { marketBot: portalMarketForIdentity(identity, marketSnapshot) } : {})
       }
     });

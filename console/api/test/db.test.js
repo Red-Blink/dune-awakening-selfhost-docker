@@ -18,7 +18,7 @@ import {
   supportsGeneratorRefillQueue
 } from "../src/duneDb.js";
 import { addBaseContainerItem, addCurrency, addFactionReputation, addGuildMember, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, addSpecializationXp, applyLandsraadMilestonePreset, augmentInventoryItem, augmentNewestPlayerItem, baseContainerSlots, baseGeneratorFuelLevels, baseGenerators, baseIsBackedUp, changeDunePassword, completeJourneyNode, completeTutorial, dbStatus, deleteBaseContainerItem, deleteInventoryItem, demoteGuildMember, disbandGuild, exportBaseAsBlueprint, generatorUptimePolicy, giveItemToPlayer, giveItemToStorage, guildMembers, landsraadOverview, listBases, listGuilds, listPlayers, listRoutines, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerBuildingUnlockState, playerCraftingRecipes, playerCurrency, playerFactions, playerIntel, playerInventory, playerInventoryAll, playerJourney, playerPortalSnapshots, playerPosition, playerProfile, playerProgression, playerResearchItems, playerSolarisCoinTotal, playerVitals, portalGeneratorFuel, portalVehicles, promoteGuildMember, refillBaseGenerators, removeGuildMember, repairFactionReputation, repairVehicleDecay, resetJourneyNode, resetTutorial, resolvePlayerTarget, routineDefinition, runSql, setLandsraadPlayerContribution, setPlayerFaction, supportsGeneratorRefill, tablePreview, teleportOfflinePlayerToCoords, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError, _resetPlayerTargetCacheForTests } from "../src/duneDb.js";
-import { listStorage, liveMapBases, liveMapStorage, trackPlayerPlaytime } from "../src/duneDb.js";
+import { listStorage, liveMapBases, liveMapStorage, portalStorage, trackPlayerPlaytime } from "../src/duneDb.js";
 
 beforeEach(() => {
   _resetPlayerTargetCacheForTests();
@@ -607,6 +607,23 @@ test("player portal prefers custom vehicle names and ignores internal labels", a
   assert.equal(result.rows[0].name, "Scout Ornithopter 2");
   assert.equal(result.rows[1].name, "Scout Ornithopter");
   assert.equal(Object.hasOwn(result.rows[0], "custom_name"), false);
+});
+
+test("player portal storage returns only the already ownership-scoped aggregate rows", async () => {
+  const calls = [];
+  const db = { query: async (sql, values) => {
+    calls.push({ sql, values });
+    return { rows: [
+      { container_id: "11", container_name: "Workshop", map: "Hagga Basin", template_id: "Iron_Ingot", quality_level: 0, stack_count: 2, quantity: "45" },
+      { container_id: "11", container_name: "Workshop", map: "Hagga Basin", template_id: "Copper_Ingot", quality_level: 0, stack_count: 1, quantity: "12" }
+    ] };
+  } };
+  const result = await portalStorage(db, 123);
+  assert.deepEqual(calls[0].values, [123]);
+  assert.match(calls[0].sql, /par\.player_id=\$1 and par\.rank=1/);
+  assert.equal(result.containers[0].totalQuantity, 57);
+  assert.equal(result.items[0].containerName, "Workshop");
+  assert.equal(JSON.stringify(result).includes("player_id"), false);
 });
 
 test("builds table preview query with quoted identifiers and parameters", async () => {
