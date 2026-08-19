@@ -1502,7 +1502,14 @@ body.debug .technical-details { display: block; }
 .playerAdmin_actionRow .playerAdmin_fieldGroup { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; align-items: start; }
 .playerAdmin_actionRow .playerAdmin_fieldGroup input, .playerAdmin_actionRow .playerAdmin_fieldGroup select { width: 100%; max-width: none; min-height: 40px; }
 .playerAdmin_actionRow button, .playerAdmin_buttonRow button { width: auto; min-height: 40px; }
-.playerAdmin_actionNote, .action-help-note { margin: 0; color: #cbbd9f; font-size: 15px; font-style: italic; line-height: 1.4; }
+/* white-space: normal is not the no-op it looks like -- both notes can render
+   inside an expanded-row-cell <td>, and the global `td { white-space: nowrap }`
+   rule (table cell default, meant for compact data cells) otherwise inherits
+   straight through, letting a long explanatory sentence render as one
+   unbroken line that visually overflows a narrow grid column instead of
+   wrapping -- reproduced in the Base/Vehicle Permissions tabs' two-column
+   intro row at viewport widths around 700-900px. */
+.playerAdmin_actionNote, .action-help-note { margin: 0; color: #cbbd9f; font-size: 15px; font-style: italic; line-height: 1.4; white-space: normal; }
 .playerAdmin_actionNote { padding-left: 190px; max-width: 900px; font-style: italic; }
 .action-help-note { max-width: 820px; }
 .playerAdmin_box > p { font-style: italic; }

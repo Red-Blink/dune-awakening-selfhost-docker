@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { VehicleModule, VehicleRow, VehicleSharedEntry } from "../../api/vehicles";
 import { DataTable, type SortDirection } from "../../components/common/DataTable";
@@ -151,6 +151,7 @@ export function VehicleTable({ rows, context = "global", emptyMessage = "No vehi
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedTab, setExpandedTab] = useState<"components" | "permissions">("components");
   const [instanceNames, setInstanceNames] = useState<Map<string, string>>(new Map());
+  const expandedContentRef = useRef<HTMLDivElement>(null);
   const columns = context === "player" ? PLAYER_COLUMNS : GLOBAL_COLUMNS;
   const partitionMapsKey = [...new Set(rows.map((row) => vehiclePartitionMap(row.map)).filter(Boolean))].sort().join(",");
 
@@ -160,6 +161,15 @@ export function VehicleTable({ rows, context = "global", emptyMessage = "No vehi
       setExpandedTab("components");
     }
   }, [expandedId, rows]);
+
+  // Moves focus into the expanded content so keyboard and screen-reader users
+  // land on what they just opened instead of staying on the (now possibly
+  // relocated) expand button. Fires only on an actual expandedId change --
+  // not on every render -- so a background row refresh never yanks focus
+  // away from a control the user is mid-interaction with.
+  useEffect(() => {
+    if (expandedId) expandedContentRef.current?.focus();
+  }, [expandedId]);
 
   useEffect(() => {
     const maps = partitionMapsKey ? partitionMapsKey.split(",") : [];
@@ -218,9 +228,12 @@ export function VehicleTable({ rows, context = "global", emptyMessage = "No vehi
           <p className="vehicles-expanded-header">{modules.length} component{modules.length === 1 ? "" : "s"}</p>
           {modules.length === 0 ? <p className="muted">No components fitted.</p> : <div className="vehicles-component-grid">{modules.map(renderComponent)}</div>}
         </div>;
-        if (!canEditPermissions) return componentsPanel;
+        // tabIndex=-1 makes this programmatically focusable (see the
+        // expandedId effect above) without adding it to the normal Tab
+        // order -- it is a landing point, not a control.
+        if (!canEditPermissions) return <div ref={expandedContentRef} tabIndex={-1}>{componentsPanel}</div>;
         return (
-          <div onClick={(event) => event.stopPropagation()}>
+          <div ref={expandedContentRef} tabIndex={-1} onClick={(event) => event.stopPropagation()}>
             <div className="vehicles-expanded-tablist" role="tablist">
               <button
                 role="tab"
