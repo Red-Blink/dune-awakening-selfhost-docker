@@ -56,7 +56,7 @@ For public/internet hosting, forward these ports:
 | Port | Protocol | Purpose |
 |---|---|---|
 | `8088` | TCP | Web admin panel; allow access only for trusted administrators |
-| `31982` | TCP | Game Messaging |
+| `31982-31983` | TCP | Game Messaging |
 | `7777-7810` | UDP | Game Traffic |
 
 Keep database and internal admin ports private. Do not expose the Web UI to untrusted users.
