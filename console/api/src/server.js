@@ -656,6 +656,9 @@ async function handleApi(req, res) {
     sortColumn: url.searchParams.get("sortColumn") || "name",
     sortDirection: url.searchParams.get("sortDirection") || "asc"
   }));
+  if (path === "/api/vehicles/permission-candidates") return vehiclePermissionCandidatesRoute(res, url);
+  if (path.match(/^\/api\/vehicles\/[^/]+\/permissions$/) && req.method === "GET") return vehiclePermissionsRoute(res, path);
+  if (path.match(/^\/api\/vehicles\/[^/]+\/permissions$/) && req.method === "PUT") return vehicleSetPermissionsRoute(req, res, path);
   if (path === "/api/admin/items/catalog") return json(res, 200, { rows: listCatalogItems(config.repoRoot, { q: url.searchParams.get("q") || "", limit: url.searchParams.get("limit") || 500 }) });
   if (path === "/api/admin/items/search") return commandJson(res, "adminItemSearch", { q: url.searchParams.get("q") || "" });
   if (path === "/api/admin/items") return commandJson(res, url.searchParams.get("category") ? "adminItemListCategory" : "adminItemList", { category: url.searchParams.get("category") || "" });
@@ -2999,6 +3002,51 @@ async function baseSystemCustodianRoute(req, res, path) {
     if (custodian.canCreate) await ensureCarePackageServerPersona(db);
     return duneDb.transferBaseToSystemCustodian(db, baseId, maxPermissions);
   }, { baseId });
+}
+
+// Vehicles are their own permission actor (dune.vehicles.id = dune.actors.id),
+// so there is no base-delete-pending/backed-up equivalent to check here -- a
+// vehicle has no "queued delete" or "picked up" state these routes need to
+// guard against. The id guard matches intParam's contract (see baseWaterRoute/
+// baseInventoryRoute), so a genuine failure in the catch is honestly ours.
+async function vehiclePermissionsRoute(res, path) {
+  const vehicleId = Number(decodeURIComponent(path.split("/")[3]));
+  if (!Number.isInteger(vehicleId) || vehicleId < 1 || vehicleId > Number.MAX_SAFE_INTEGER) {
+    return json(res, 400, { error: "Invalid vehicle ID" });
+  }
+  try {
+    return json(res, 200, { supported: true, ...(await duneDb.listVehiclePermissions(db, vehicleId)) });
+  } catch (error) {
+    return json(res, 500, { supported: false, error: redact(error?.message || "Unexpected error."), reason: redact(error?.message || "Unexpected error.") });
+  }
+}
+
+async function vehiclePermissionCandidatesRoute(res, url) {
+  try {
+    const rows = await duneDb.vehiclePermissionCandidates(db, {
+      q: url.searchParams.get("q") || "",
+      limit: url.searchParams.get("limit") || 25
+    });
+    return json(res, 200, { supported: true, rows });
+  } catch (error) {
+    return json(res, 500, { supported: false, rows: [], error: redact(error?.message || "Unexpected error."), reason: redact(error?.message || "Unexpected error.") });
+  }
+}
+
+// No confirmation phrase, matching baseSetPermissionsRoute: reversible from
+// this same editor. Still rate limited and audited -- this writes to player
+// property. The cap is read from live server config on every save, same as
+// the base route.
+async function vehicleSetPermissionsRoute(req, res, path) {
+  const vehicleId = Number(decodeURIComponent(path.split("/")[3]));
+  if (!Number.isInteger(vehicleId) || vehicleId < 1 || vehicleId > Number.MAX_SAFE_INTEGER) {
+    return json(res, 400, { error: "Invalid vehicle ID" });
+  }
+  return directDbMutation(req, res, "vehicles.set-permissions", null, async (body) => {
+    const settings = await runDune(config, buildDuneArgs("userSettingsMapValues", { map: "Survival_1" }), { timeoutMs: 8000 });
+    const maxPermissions = parseEffectivePermissionLimit(settings.stdout);
+    return duneDb.setVehiclePermissions(db, vehicleId, body.entries, maxPermissions);
+  }, { vehicleId });
 }
 
 async function baseCancelQueuedRefillRoute(req, res, path) {

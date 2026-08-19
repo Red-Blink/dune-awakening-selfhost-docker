@@ -153,6 +153,7 @@ export const ROUTE_ACTIONS = {
 
   // --- Vehicles ---
   "GET /api/vehicles":                         "vehicles:read",
+  "GET /api/vehicles/permission-candidates":   "vehicles:read",
 
   // --- Exchange (Market Board) — read-only board + console-local filter config ---
   "GET /api/exchange/items":                   "exchange:read",
@@ -332,6 +333,9 @@ export const REGEX_ACTIONS = [
   // Bases (parameterized)
   ["/api/bases/", "bases:read"],
 
+  // Vehicles (parameterized)
+  ["/api/vehicles/", "vehicles:read"],
+
   // Storage (parameterized)
   ["/api/storage/", "storage:read"],
 
@@ -365,6 +369,8 @@ export const REGEX_ACTIONS_BY_METHOD = {
   "POST /api/bases/":      "bases:mutate",
   "DELETE /api/bases/":    "bases:mutate",
   "PUT /api/bases/":       "bases:mutate",
+
+  "PUT /api/vehicles/":    "vehicles:mutate",
 
   "POST /api/storage/":    "storage:mutate",
 

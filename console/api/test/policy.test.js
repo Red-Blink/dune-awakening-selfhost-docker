@@ -121,6 +121,25 @@ test("the container item delete route resolves to bases:delete-item without shad
   assert.equal(actionForRoute("/api/bases/5/containers/9", "GET"), "bases:read");
 });
 
+test("vehicle permission routes resolve to their own read/mutate actions", () => {
+  assert.equal(actionForRoute("/api/vehicles/5/permissions", "GET"), "vehicles:read");
+  assert.equal(actionForRoute("/api/vehicles/5/permissions", "PUT"), "vehicles:mutate");
+  assert.equal(actionForRoute("/api/vehicles/permission-candidates", "GET"), "vehicles:read");
+  assert.equal(actionForRoute("/api/vehicles", "GET"), "vehicles:read");
+});
+
+test("a vehicles:read-only policy denies vehicles:mutate", () => {
+  const policies = {
+    viewer: {
+      version: 1,
+      tier: "viewer",
+      statements: [{ Effect: "Allow", Action: ["vehicles:read"] }]
+    }
+  };
+  assert.equal(evaluate({ tier: "viewer" }, "vehicles:read", policies), true);
+  assert.equal(evaluate({ tier: "viewer" }, "vehicles:mutate", policies), false);
+});
+
 test("persisting a refreshed buyback log requires market write permission", () => {
   assert.equal(actionForRoute("/api/exchange/market/buyback/log", "GET"), "exchange:market");
   assert.equal(actionForRoute("/api/exchange/market/buyback/log", "POST"), "exchange:market-write");
