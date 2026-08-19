@@ -168,7 +168,15 @@ export function VehicleTable({ rows, context = "global", emptyMessage = "No vehi
   // not on every render -- so a background row refresh never yanks focus
   // away from a control the user is mid-interaction with.
   useEffect(() => {
-    if (expandedId) expandedContentRef.current?.focus();
+    // preventScroll: a row expanding near the bottom of the viewport
+    // otherwise triggers the browser's default scroll-into-view on focus,
+    // which yanks the page out from under a mouse user who just clicked a
+    // row in place (confirmed live: a 147px jump). Keyboard/screen-reader
+    // users still get the focus move itself, which is what they need --
+    // browsers already keep a newly focused element approximately in view
+    // when it was reached via Tab, since the click that expanded it was
+    // already scrolled to.
+    if (expandedId) expandedContentRef.current?.focus({ preventScroll: true });
   }, [expandedId]);
 
   useEffect(() => {
