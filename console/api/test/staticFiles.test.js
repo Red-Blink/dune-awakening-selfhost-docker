@@ -65,3 +65,27 @@ test("serveStatic sends cache-control: no-cache for index.html and immutable for
     rmSync(dist, { recursive: true, force: true });
   }
 });
+
+test("serveStatic never tags a stale-asset fallback to index.html as an immutable asset", async () => {
+  // A pre-update browser can still reference a hashed /assets file a rebuild
+  // has since removed. safeStaticTarget falls back to index.html for that
+  // request; cacheControlForPath(path) alone would misread the /assets/
+  // prefix and cache the HTML shell forever under that JS URL, so no reload
+  // could ever recover without a hard refresh.
+  const dist = mkdtempSync(join(tmpdir(), "static-files-test-"));
+  try {
+    mkdirSync(join(dist, "assets"));
+    writeFileSync(join(dist, "index.html"), "<html></html>");
+    writeFileSync(join(dist, "assets", "index-newhash.js"), "console.log(1);");
+    const config = { staticDir: dist, appName: "Test" };
+
+    const staleAssetRes = fakeResponse();
+    serveStatic(config, { url: "/assets/index-oldhash.js" }, staleAssetRes);
+    await once(staleAssetRes, "finish");
+    assert.equal(staleAssetRes.status, 200);
+    assert.equal(staleAssetRes.headers["content-type"], "text/html; charset=utf-8");
+    assert.equal(staleAssetRes.headers["cache-control"], "no-cache");
+  } finally {
+    rmSync(dist, { recursive: true, force: true });
+  }
+});

@@ -35,6 +35,14 @@ export function serveStatic(config, req, res) {
     json(res, 200, { app: config.appName, message: "Frontend is not built yet. Run npm install && npm run build in console/web/." });
     return;
   }
-  res.writeHead(200, withSecurityHeaders({ "content-type": contentTypeForPath(target), "cache-control": cacheControlForPath(path) }));
+  // safeStaticTarget silently falls back to index.html for any unrecognized
+  // path, including a stale /assets/*.js URL a pre-update browser still
+  // references after a rebuild removes it. Deciding cache-control from the
+  // *requested* path alone would tag that fallback response -- the HTML
+  // shell -- as an immutable JS asset forever, so a stale browser could never
+  // recover without a hard refresh. Only the path that actually resolved to
+  // a real file under /assets/ earns the long-lived cache.
+  const servedRequestedAsset = path.startsWith("/assets/") && !target.endsWith("index.html");
+  res.writeHead(200, withSecurityHeaders({ "content-type": contentTypeForPath(target), "cache-control": servedRequestedAsset ? cacheControlForPath(path) : "no-cache" }));
   createReadStream(target).pipe(res);
 }
