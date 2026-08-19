@@ -648,6 +648,7 @@ function StackUpdateProgress({
     </div>
     <p>{formatResultMessage(progress.message)}</p>
     {refreshCountdown !== null && <div className="action-line"><button onClick={() => window.location.reload()}>Refresh Now</button></div>}
+    {refreshCountdown === null && helperProgress?.state === "succeeded" && <div className="action-line"><button onClick={() => window.location.reload()}>Refresh Now</button><span className="muted">The update helper finished. Refresh manually if this page does not detect it shortly.</span></div>}
     {task.status === "succeeded" && !isDetachedStackUpdateTask(task) && <div className="action-line"><button onClick={() => window.location.reload()}>Refresh Console</button></div>}
     {task.status === "failed" && <div className="action-line"><button onClick={onRetry}>Retry Console Update</button></div>}
   </div>;
