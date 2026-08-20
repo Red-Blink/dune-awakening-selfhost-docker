@@ -138,7 +138,7 @@ export function normalizeBuybackSchedule(payload = {}, previous = {}) {
     // the reconstructed "seeded" price basis matches what the market actually
     // sells at (buybackPercent then means percent of the real market price).
     ...normalizeCategoryMultipliers(payload, previous, "Buyback schedule"),
-    buybackPercent: integerField(payload.buybackPercent ?? previous.buybackPercent ?? 60, "buybackPercent", 1, 100),
+    buybackPercent: integerField(payload.buybackPercent ?? previous.buybackPercent ?? 60, "buybackPercent", 1, 500),
     buybackPriceBasis: normalizeBuybackPriceBasis(payload.buybackPriceBasis ?? previous.buybackPriceBasis ?? "seeded"),
     maxBuys: integerField(payload.maxBuys ?? previous.maxBuys ?? 500, "maxBuys", 1, 5000),
     // Never read from the payload: only the save-path options can set this

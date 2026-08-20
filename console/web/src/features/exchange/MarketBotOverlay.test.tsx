@@ -15,14 +15,29 @@ vi.mock("../../api/marketBot", () => ({
     saveSeedSchedule: vi.fn(),
     runBuyback: vi.fn(),
     runSeed: vi.fn(),
-    unseed: vi.fn()
+    unseed: vi.fn(),
+    setActivePlan: vi.fn(),
+    renamePlan: vi.fn(),
+    downloadPlanCsv: vi.fn(),
+    uploadPlanCsv: vi.fn()
   }
 }));
 
 function statusFixture(overrides: Partial<MarketBotStatus> = {}): MarketBotStatus {
+  const bundled = {
+    id: "bundled",
+    name: "Bundled",
+    source: "bundled" as const,
+    readOnly: true,
+    rows: 2910,
+    panelVersion: "0.14.0",
+    generatedAt: "2026-08-01T00:00:00+00:00",
+    active: true
+  };
   return {
     capabilities: { exchangeMarket: true },
-    plan: { available: true, source: "bundled", rows: 2910, panelVersion: "0.14.0", generatedAt: "2026-08-01T00:00:00+00:00" },
+    plan: { available: true, source: "bundled", rows: 2910, panelVersion: "0.14.0", generatedAt: "2026-08-01T00:00:00+00:00", id: "bundled", name: "Bundled" },
+    plans: { activePlanId: "bundled", items: [bundled] },
     buyback: {
       enabled: false, intervalMinutes: 30, exchangeId: "42", priceMultiplier: 5,
       augmentMultiplier: 1, rankedArmorMultiplier: 1, rankedWeaponMultiplier: 1,
@@ -65,6 +80,10 @@ beforeEach(() => {
   vi.mocked(marketBotApi.buybackLog).mockResolvedValue({ batches: [] });
   vi.mocked(marketBotApi.refreshBuybackLog).mockResolvedValue({ batches: [] });
   vi.mocked(marketBotApi.clearBuybackLog).mockResolvedValue({ batches: [] });
+  vi.mocked(marketBotApi.setActivePlan).mockResolvedValue({ activePlanId: "bundled", items: [] });
+  vi.mocked(marketBotApi.renamePlan).mockResolvedValue({ activePlanId: "bundled", items: [] });
+  vi.mocked(marketBotApi.downloadPlanCsv).mockResolvedValue(new Response("template_id\nWaterBottle\n", { headers: { "content-disposition": 'attachment; filename="market-seed-bundled.csv"' } }));
+  vi.mocked(marketBotApi.uploadPlanCsv).mockResolvedValue({ id: "cheap-water", name: "Cheap Water", rows: 1, active: true });
 });
 
 describe("MarketBotOverlay", () => {
@@ -72,6 +91,11 @@ describe("MarketBotOverlay", () => {
     renderOverlay();
 
     expect(await screen.findByText(/2,910 rows · v0\.14\.0/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Seed Plan")).toBeInTheDocument();
+    expect(screen.getByLabelText("Seed Plan Name")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Set as Active Plan" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Download CSV" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Upload CSV")).toBeInTheDocument();
     expect(screen.getByText("Buyback Sweeps")).toBeInTheDocument();
     expect(screen.queryByText("Market Reseed")).not.toBeInTheDocument();
     await selectTab("Reseed");
@@ -92,7 +116,8 @@ describe("MarketBotOverlay", () => {
 
     const percent = await screen.findByLabelText("Buyback Percent");
     expect(percent).toHaveValue(65);
-    fireEvent.change(percent, { target: { value: "70" } });
+    expect(percent).toHaveAttribute("max", "500");
+    fireEvent.change(percent, { target: { value: "250" } });
     fireEvent.change(screen.getByLabelText("Buyback Price Basis"), { target: { value: "lowest" } });
     fireEvent.click(screen.getByLabelText("Run Buyback on a Schedule"));
     fireEvent.click(screen.getByRole("button", { name: "Save Buyback Schedule" }));
@@ -104,7 +129,7 @@ describe("MarketBotOverlay", () => {
       augmentMultiplier: 1,
       rankedArmorMultiplier: 1,
       rankedWeaponMultiplier: 1,
-      buybackPercent: 70,
+      buybackPercent: 250,
       buybackPriceBasis: "lowest",
       maxBuys: 250,
       exchangeId: "42"
@@ -319,7 +344,8 @@ describe("MarketBotOverlay", () => {
 
   it("explains a missing seed plan", async () => {
     vi.mocked(marketBotApi.status).mockResolvedValue(statusFixture({
-      plan: { available: false, source: null, rows: 0, panelVersion: "", generatedAt: "" }
+      plan: { available: false, source: null, rows: 0, panelVersion: "", generatedAt: "" },
+      plans: { activePlanId: "bundled", items: [] }
     }));
     renderOverlay();
 
@@ -392,5 +418,71 @@ describe("MarketBotOverlay", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear Log" }));
     await waitFor(() => expect(marketBotApi.clearBuybackLog).toHaveBeenCalled());
     expect(await screen.findByText("Buyback sweep log cleared.")).toBeInTheDocument();
+  });
+
+  it("sets the selected named seed plan as active and saves a friendly name", async () => {
+    const bundled = { id: "bundled", name: "Bundled", source: "bundled" as const, readOnly: true, rows: 2910, panelVersion: "0.14.0", generatedAt: "", active: true };
+    const cheap = { id: "cheap-water", name: "Cheap Water", source: "custom" as const, readOnly: false, rows: 12, panelVersion: "", generatedAt: "", active: false };
+    vi.mocked(marketBotApi.status).mockResolvedValue(statusFixture({
+      plans: { activePlanId: "bundled", items: [bundled, cheap] }
+    }));
+    vi.mocked(marketBotApi.setActivePlan).mockResolvedValue({
+      activePlanId: "cheap-water",
+      items: [{ ...bundled, active: false }, { ...cheap, active: true }]
+    });
+    vi.mocked(marketBotApi.renamePlan).mockResolvedValue({
+      activePlanId: "cheap-water",
+      items: [{ ...bundled, active: false }, { ...cheap, name: "Weekend Sale", active: true }]
+    });
+    renderOverlay();
+
+    fireEvent.change(await screen.findByLabelText("Seed Plan"), { target: { value: "cheap-water" } });
+    expect(screen.getByLabelText("Seed Plan Name")).toHaveValue("Cheap Water");
+    fireEvent.click(screen.getByRole("button", { name: "Set as Active Plan" }));
+    await waitFor(() => expect(marketBotApi.setActivePlan).toHaveBeenCalledWith({ planId: "cheap-water" }));
+    expect(await screen.findByText(/Active seed plan is now Cheap Water/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Seed Plan Name"), { target: { value: "Weekend Sale" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Plan Name" }));
+    await waitFor(() => expect(marketBotApi.renamePlan).toHaveBeenCalledWith({ planId: "cheap-water", name: "Weekend Sale" }));
+  });
+
+  it("downloads the selected seed plan as CSV and uploads a named list as the active plan", async () => {
+    const createObjectURL = vi.fn(() => "blob:csv");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL });
+    vi.mocked(marketBotApi.uploadPlanCsv).mockResolvedValue({
+      id: "cheap-water",
+      name: "Cheap Water",
+      rows: 1,
+      active: true
+    });
+    renderOverlay();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Download CSV" }));
+    await waitFor(() => expect(marketBotApi.downloadPlanCsv).toHaveBeenCalledWith("bundled"));
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(await screen.findByText(/Downloaded market-seed-bundled\.csv/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Seed Plan Name"), { target: { value: "Cheap Water" } });
+    const file = new File(["template_id,price\nWaterBottle,10\n"], "list.csv", { type: "text/csv" });
+    fireEvent.change(screen.getByLabelText("Upload CSV"), { target: { files: [file] } });
+    await waitFor(() => expect(marketBotApi.uploadPlanCsv).toHaveBeenCalled());
+    const form = vi.mocked(marketBotApi.uploadPlanCsv).mock.calls[0][0];
+    expect(form.get("name")).toBe("Cheap Water");
+    expect(form.get("planId")).toBe("bundled");
+    expect(await screen.findByText(/Imported 1 row\(s\) as "Cheap Water"/)).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects SQL or non-CSV uploads before calling the import API", async () => {
+    const props = renderOverlay();
+    fireEvent.change(await screen.findByLabelText("Seed Plan Name"), { target: { value: "Cheap Water" } });
+    const sqlFile = new File(["INSERT INTO items VALUES (1);"], "attack.csv", { type: "text/csv" });
+    fireEvent.change(screen.getByLabelText("Upload CSV"), { target: { files: [sqlFile] } });
+    await waitFor(() => {
+      expect(props.onError.mock.calls.some((call) => /SQL script/i.test(String(call[0])))).toBe(true);
+    });
+    expect(marketBotApi.uploadPlanCsv).not.toHaveBeenCalled();
   });
 });

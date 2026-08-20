@@ -2272,7 +2272,12 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 .market-bot-title .memory-info-tooltip { position: static; }
 .market-bot-title .memory-info-box { left: 0; right: auto; }
 .market-bot-shell { display: grid; gap: 14px; }
-.market-bot-context { display: grid; grid-template-columns: minmax(150px, .32fr) minmax(360px, 1fr); align-items: end; gap: 12px; padding: 12px; border: 1px solid #373129; border-radius: 8px; background: #111418; }
+.market-bot-context { display: grid; grid-template-columns: 1fr; align-items: stretch; gap: 12px; padding: 12px; border: 1px solid #373129; border-radius: 8px; background: #111418; }
+.market-bot-plan-manager { display: grid; gap: 10px; }
+.market-bot-plan-fields { grid-template-columns: minmax(220px, 1.2fr) minmax(180px, 1fr); }
+.market-bot-plan-summary { margin: 0; padding: 0 2px; font-size: 12px; }
+.market-bot-plan-actions { flex-wrap: wrap; }
+.market-bot-plan-actions .button-link { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 0 12px; }
 .market-bot-plan { display: grid; gap: 4px; }
 .market-bot-plan span { color: var(--muted-warm); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
 .market-bot-plan strong { color: var(--title); font-size: 14px; }
@@ -2340,6 +2345,7 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 @media (max-width: 720px) {
   .market-bot-modal { width: calc(100vw - 20px); max-height: calc(100vh - 20px); }
   .market-bot-context { grid-template-columns: 1fr; }
+  .market-bot-plan-fields { grid-template-columns: 1fr; }
   .market-bot-schedule-grid { grid-template-columns: 1fr; }
   .market-bot-actions { display: grid; grid-template-columns: 1fr; }
   .market-bot-actions button { width: 100%; }

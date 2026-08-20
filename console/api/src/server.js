@@ -51,7 +51,7 @@ import { EDA_EXCHANGE_BOT_ADDON_ID, ADDON_SCHEDULER_PERMISSION, createAddonJobSc
 import { createPublicDirectoryReporter, normalizeDiscordInvite, readDirectorySettings } from "./services/publicDirectory.js";
 import { choamTerminalOverview, installChoamTerminals, removeChoamTerminals } from "./services/choamTerminals.js";
 import { exchangeStats, listExchangeItems, listExchangeListings, readExchangeConfig, saveExchangeConfig } from "./services/exchange.js";
-import { listMarketExchanges, marketBotStatus, saveMarketBuybackSchedule, saveMarketSeedSchedule } from "./services/exchangeMarket.js";
+import { listMarketExchanges, marketBotStatus, saveMarketBuybackSchedule, saveMarketSeedSchedule, decodeSeedPlanCsvUpload, exportMarketSeedPlanCsv, importMarketSeedPlanFromCsv, renameMarketSeedPlan, setActiveMarketSeedPlan } from "./services/exchangeMarket.js";
 import { loadMarketSeedPlan } from "./addonSeedJob.js";
 import { readMarketItemOverrides, saveMarketItemOverrides, readUnsafeTemplateIds, listBotItemCatalogPickerItems, getOverrideRow } from "./services/marketItemOverrides.js";
 import { autoRefillPublicState, createAutoRefillScheduler, setBaseAutoRefill } from "./services/autoRefill.js";
@@ -882,6 +882,10 @@ async function handleApi(req, res) {
   if (path === "/api/exchange/market/buyback/run" && req.method === "POST") return marketRunNowRoute(req, res, "buyback");
   if (path === "/api/exchange/market/seed/run" && req.method === "POST") return marketRunNowRoute(req, res, "seed");
   if (path === "/api/exchange/market/seed/clear" && req.method === "POST") return marketUnseedRoute(req, res);
+  if (path === "/api/exchange/market/plans/csv" && req.method === "GET") return marketSeedPlanCsvDownloadRoute(req, res, url);
+  if (path === "/api/exchange/market/plans/csv" && req.method === "POST") return marketSeedPlanCsvUploadRoute(req, res);
+  if (path === "/api/exchange/market/plans/active" && req.method === "POST") return marketSeedPlanActiveRoute(req, res);
+  if (path === "/api/exchange/market/plans/name" && req.method === "POST") return marketSeedPlanRenameRoute(req, res);
   if (path === "/api/exchange/market/items" && req.method === "GET") return marketItemsListRoute(res);
   if (path === "/api/exchange/market/items" && req.method === "POST") return marketItemsSaveRoute(req, res);
   if (path === "/api/exchange/market/items/catalog" && req.method === "GET") return marketItemsCatalogRoute(res, url);
@@ -1459,6 +1463,72 @@ async function marketUnseedRoute(req, res) {
     return json(res, 200, result);
   } catch (error) {
     audit(config, req, "exchange.market", { op: "seed-clear", ok: false, error: redact(error?.message || "Unexpected error.") });
+    const payload = apiErrorPayload(error, 400);
+    return json(res, payload.status, payload.body);
+  }
+}
+
+function marketSeedPlanCsvDownloadRoute(req, res, url) {
+  try {
+    const result = exportMarketSeedPlanCsv(config, url.searchParams.get("planId") || "");
+    const filename = String(result.filename || "market-seed-plan.csv").replace(/[^A-Za-z0-9._-]/g, "_");
+    res.writeHead(200, withSecurityHeaders({
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="${filename}"`
+    }));
+    res.end(result.csv);
+  } catch (error) {
+    const payload = apiErrorPayload(error, 400);
+    return json(res, payload.status, payload.body);
+  }
+}
+
+async function marketSeedPlanCsvUploadRoute(req, res) {
+  if (!applyMutationRateLimit(req, res, "exchange.market.plans.csv")) return;
+  try {
+    const form = await readMultipartForm(req, Math.min(config.maxUploadBytes, 10 * 1024 * 1024));
+    const file = form.files.find((entry) => entry.fieldName === "file") || form.files[0];
+    if (!file?.content?.length) return json(res, 400, { error: "Select a CSV file to import as a seed plan." });
+    const fileName = basename(file.fileName || "seed-plan.csv");
+    const csvText = decodeSeedPlanCsvUpload(file.content, fileName);
+    const result = importMarketSeedPlanFromCsv(config, {
+      csvText,
+      name: form.fields.name,
+      planId: form.fields.planId,
+      fileName
+    });
+    audit(config, req, "exchange.market", { op: "seed-plan-import", planId: result.id, name: result.name, rows: result.rows, ok: true });
+    return json(res, 200, result);
+  } catch (error) {
+    audit(config, req, "exchange.market", { op: "seed-plan-import", ok: false, error: redact(error?.message || "Unexpected error.") });
+    const payload = apiErrorPayload(error, 400);
+    return json(res, payload.status, payload.body);
+  }
+}
+
+async function marketSeedPlanActiveRoute(req, res) {
+  const body = await readJson(req);
+  if (!applyMutationRateLimit(req, res, "exchange.market.plans.active")) return;
+  try {
+    const plans = setActiveMarketSeedPlan(config, body?.planId);
+    audit(config, req, "exchange.market", { op: "seed-plan-active", planId: plans.activePlanId, ok: true });
+    return json(res, 200, plans);
+  } catch (error) {
+    audit(config, req, "exchange.market", { op: "seed-plan-active", ok: false, error: redact(error?.message || "Unexpected error.") });
+    const payload = apiErrorPayload(error, 400);
+    return json(res, payload.status, payload.body);
+  }
+}
+
+async function marketSeedPlanRenameRoute(req, res) {
+  const body = await readJson(req);
+  if (!applyMutationRateLimit(req, res, "exchange.market.plans.name")) return;
+  try {
+    const plans = renameMarketSeedPlan(config, body?.planId, body?.name);
+    audit(config, req, "exchange.market", { op: "seed-plan-rename", planId: body?.planId, name: body?.name, ok: true });
+    return json(res, 200, plans);
+  } catch (error) {
+    audit(config, req, "exchange.market", { op: "seed-plan-rename", ok: false, error: redact(error?.message || "Unexpected error.") });
     const payload = apiErrorPayload(error, 400);
     return json(res, payload.status, payload.body);
   }

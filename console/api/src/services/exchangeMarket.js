@@ -1,24 +1,38 @@
-import { readFileSync, statSync } from "node:fs";
 import { tableExists } from "../duneDb.js";
 import {
   readBuybackSchedule,
   saveBuybackSchedule,
   readSeedSchedule,
   saveSeedSchedule,
-  resolveMarketSeedPlanPath,
   COMMODITY_STACK_CATALOG,
   COMMODITY_STACK_GROUPS
 } from "../addonJobs.js";
+import {
+  decodeSeedPlanCsvUpload,
+  exportMarketSeedPlanCsv,
+  importMarketSeedPlanFromCsv,
+  listMarketSeedPlans,
+  marketSeedPlanSummary,
+  renameMarketSeedPlan,
+  setActiveMarketSeedPlan
+} from "./marketSeedPlans.js";
+
+export {
+  decodeSeedPlanCsvUpload,
+  exportMarketSeedPlanCsv,
+  importMarketSeedPlanFromCsv,
+  listMarketSeedPlans,
+  marketSeedPlanSummary,
+  renameMarketSeedPlan,
+  setActiveMarketSeedPlan
+};
 
 // First-class Market Bot for the CHOAM exchange: the same seed/buyback engine
 // originally introduced for the EDA Exchange Bot addon (addonJobs.js /
 // addonSeedJob.js), now surfaced and managed entirely by the Exchange panel.
-// Schedules are source:"console" and the bundled seed plan is authoritative.
+// Schedules are source:"console" and the active seed plan (bundled by default,
+// or an operator-named CSV-backed list) is what seed/buyback runs use.
 const REQUIRED_TABLES = ["dune_exchange_orders", "dune_exchange_sell_orders", "dune_exchange_accesspoints", "items", "actors"];
-
-// The plan file is ~1.2 MB of JSON; cache the parsed summary by path + mtime
-// so status polling does not re-parse it on every request.
-let planSummaryCache = null;
 
 async function marketSupported(db) {
   for (const table of REQUIRED_TABLES) {
@@ -27,36 +41,12 @@ async function marketSupported(db) {
   return true;
 }
 
-export function marketSeedPlanSummary(config) {
-  const path = resolveMarketSeedPlanPath(config);
-  if (!path) return { available: false, source: null, rows: 0, panelVersion: "", generatedAt: "" };
-  let mtimeMs = 0;
-  try { mtimeMs = statSync(path).mtimeMs; } catch { /* fall through to re-read */ }
-  if (planSummaryCache && planSummaryCache.path === path && planSummaryCache.mtimeMs === mtimeMs) {
-    return planSummaryCache.summary;
-  }
-  let summary;
-  try {
-    const plan = JSON.parse(readFileSync(path, "utf8"));
-    summary = {
-      available: Array.isArray(plan?.rows) && plan.rows.length > 0,
-      source: path.includes("runtime/addons/installed") ? "addon" : "bundled",
-      rows: Array.isArray(plan?.rows) ? plan.rows.length : 0,
-      panelVersion: String(plan?.panel_version || ""),
-      generatedAt: String(plan?.generated_at || "")
-    };
-  } catch {
-    summary = { available: false, source: null, rows: 0, panelVersion: "", generatedAt: "" };
-  }
-  planSummaryCache = { path, mtimeMs, summary };
-  return summary;
-}
-
 export async function marketBotStatus(config, db) {
   const supported = await marketSupported(db);
   return {
     capabilities: { exchangeMarket: supported },
     plan: marketSeedPlanSummary(config),
+    plans: listMarketSeedPlans(config),
     buyback: readBuybackSchedule(config),
     seed: readSeedSchedule(config),
     commodityStackCatalog: COMMODITY_STACK_CATALOG,

@@ -93,14 +93,30 @@ The Bot button beside the filter gear opens the console-managed **Market Bot**
 which itself ports Easy Dune Admin's exchange seeder — the same engine the EDA
 Exchange Bot addon drives through the scheduler bridge, now first-class):
 
-- **Market reseed** stocks the CHOAM exchange with NPC sell listings from a bundled
-  seed plan (`runtime/data/market-seed-plan.json`) at a configurable price multiplier. Every run
-  is **backup → clear the bot's own listings on that exchange → seed**; player
-  listings are never touched. Standalone augment items are seeded with their stat
-  rolls pinned to the bottom 20% of their ranges; the schedule's **augment
-  pricing** option sells them either below their schematics (half the pattern's
-  price at the same grade — the default) or at the plan's original prices. Either
-  way, buying the pattern and crafting for a better roll stays the premium path.
+- **Market reseed** stocks the CHOAM exchange with NPC sell listings from the
+  **active seed plan** (the bundled catalog at `runtime/data/market-seed-plan.json`
+  by default, or an operator-named CSV-backed list) at a configurable price
+  multiplier. Every run is **backup → clear the bot's own listings on that
+  exchange → seed**; player listings are never touched. Standalone augment items
+  are seeded with their stat rolls pinned to the bottom 20% of their ranges; the
+  schedule's **augment pricing** option sells them either below their schematics
+  (half the pattern's price at the same grade — the default) or at the plan's
+  original prices. Either way, buying the pattern and crafting for a better roll
+  stays the premium path.
+- **Named seed plans** let the operator keep more than one seeding list. The
+  Market Bot window has a seed-plan dropdown, a friendly-name field, and **Set
+  as Active Plan** to choose which list reseeds and buyback caps use. **Download
+  CSV** exports the selected plan; **Upload CSV** imports a file from the
+  operator's computer as the current seeding list (creates or replaces a named
+  custom plan and makes it active). The bundled plan is read-only and is never
+  overwritten; custom plans live in `runtime/generated/market-bot/plans/`. CSV
+  columns are `template_id`, `display_name`, `kind`, `stack_size`, `price`,
+  `category_mask`, `category_depth`, `quality_level`, `special_boost`,
+  `listings`, `durability_cur`, and `durability_max`. Uploads must be UTF-8 CSV
+  with only those columns: extra metadata, SQL/JSON/HTML, spreadsheet formulas,
+  and non-numeric cells are rejected. Missing fields are filled from the bundled
+  catalog; a `template_id` without a grade expands every bundled grade of that
+  item. Unsafe template ids are rejected.
 - **Category multipliers** (1–5x, default 1 = no change) additionally scale the
   seeded prices of three endgame categories on top of the base price multiplier:
   **augments & augment schematics** (matched by template, so the augment pricing
@@ -130,7 +146,7 @@ Exchange Bot addon drives through the scheduler bridge, now first-class):
   left as-is, so an **enabled** reseed schedule repopulates the market on its
   next run; disable the schedule to keep the market unseeded.
 - **Buyback sweeps** buy player sell listings whose per-unit ask is at or below the
-  buyback percentage of the chosen **price basis** — seeded NPC price at that
+  buyback percentage (1–500%) of the chosen **price basis** — seeded NPC price at that
   listing's grade (default), or the live player-market average / lowest ask with
   seeded fallback. The buyback schedule carries its own category multipliers
   (they may differ from reseed on purpose). The reconstructed seeded basis still

@@ -149,6 +149,13 @@ test("removing the bot's NPC listings (unseed) requires market write permission"
   assert.equal(actionForRoute("/api/exchange/market/seed/clear", "POST"), "exchange:market-write");
 });
 
+test("named seed-plan CSV import/export and active-plan changes require market write permission", () => {
+  assert.equal(actionForRoute("/api/exchange/market/plans/csv", "GET"), "exchange:market");
+  assert.equal(actionForRoute("/api/exchange/market/plans/csv", "POST"), "exchange:market-write");
+  assert.equal(actionForRoute("/api/exchange/market/plans/active", "POST"), "exchange:market-write");
+  assert.equal(actionForRoute("/api/exchange/market/plans/name", "POST"), "exchange:market-write");
+});
+
 // bases:give-item, bases:fill-item, and bases:bulk-delete-items follow the exact
 // same consent precedent as bases:delete-item above: base inventory shipped
 // read-only, so bases:mutate was never agreed to cover item creation or

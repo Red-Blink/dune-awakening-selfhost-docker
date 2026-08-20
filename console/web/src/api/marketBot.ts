@@ -1,4 +1,4 @@
-import { api, post } from "./client";
+import { api, apiDownload, post } from "./client";
 
 // First-class Market Bot (console-managed NPC market seeding and buyback).
 // Exchange ids are PostgreSQL BIGINTs that can exceed Number.MAX_SAFE_INTEGER,
@@ -63,12 +63,32 @@ export type MarketSeedSchedule = MarketCategoryMultipliers & {
 
 export type MarketBotStatus = {
   capabilities: { exchangeMarket?: boolean } & Record<string, unknown>;
-  plan: { available: boolean; source: "addon" | "bundled" | null; rows: number; panelVersion: string; generatedAt: string };
+  plan: { available: boolean; source: "addon" | "bundled" | "custom" | null; rows: number; panelVersion: string; generatedAt: string; id?: string; name?: string };
+  plans?: { activePlanId: string; items: MarketSeedPlanInfo[] };
   buyback: MarketBuybackSchedule;
   seed: MarketSeedSchedule;
   commodityStackCatalog?: CommodityStackItem[];
   commodityStackGroups?: CommodityStackGroup[];
   reason?: string;
+};
+
+export type MarketSeedPlanInfo = {
+  id: string;
+  name: string;
+  source: "bundled" | "addon" | "custom";
+  readOnly: boolean;
+  rows: number;
+  panelVersion?: string;
+  generatedAt?: string;
+  active: boolean;
+};
+
+export type MarketSeedPlanImportResult = {
+  id: string;
+  name: string;
+  rows: number;
+  active: boolean;
+  plans?: { activePlanId: string; items: MarketSeedPlanInfo[] };
 };
 
 export type MarketExchange = {
@@ -159,5 +179,9 @@ export const marketBotApi = {
   runBuyback: () => post<MarketRunResult>("/api/exchange/market/buyback/run", {}),
   runSeed: () => post<MarketRunResult>("/api/exchange/market/seed/run", {}),
   // Remove the bot's NPC listings from one exchange without reseeding.
-  unseed: (payload: { exchangeId?: string } = {}) => post<MarketRunResult>("/api/exchange/market/seed/clear", payload)
+  unseed: (payload: { exchangeId?: string } = {}) => post<MarketRunResult>("/api/exchange/market/seed/clear", payload),
+  setActivePlan: (payload: { planId: string }) => post<{ activePlanId: string; items: MarketSeedPlanInfo[] }>("/api/exchange/market/plans/active", payload),
+  renamePlan: (payload: { planId: string; name: string }) => post<{ activePlanId: string; items: MarketSeedPlanInfo[] }>("/api/exchange/market/plans/name", payload),
+  downloadPlanCsv: (planId: string) => apiDownload(`/api/exchange/market/plans/csv?planId=${encodeURIComponent(planId)}`),
+  uploadPlanCsv: (form: FormData) => api<MarketSeedPlanImportResult>("/api/exchange/market/plans/csv", { method: "POST", body: form })
 };

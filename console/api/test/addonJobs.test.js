@@ -191,7 +191,8 @@ test("normalizes schedule fields with clamped interval and strict ranges", () =>
   assert.throws(() => normalizeBuybackSchedule({ exchangeId: "9223372036854775808" }), /exchangeId/);
   assert.throws(() => normalizeBuybackSchedule({ intervalMinutes: "soon" }), /intervalMinutes/);
   assert.throws(() => normalizeBuybackSchedule({ priceMultiplier: 0 }), /priceMultiplier/);
-  assert.throws(() => normalizeBuybackSchedule({ buybackPercent: 101 }), /buybackPercent/);
+  assert.equal(normalizeBuybackSchedule({ buybackPercent: 500 }).buybackPercent, 500);
+  assert.throws(() => normalizeBuybackSchedule({ buybackPercent: 501 }), /buybackPercent/);
   assert.throws(() => normalizeBuybackSchedule({ maxBuys: 5001 }), /maxBuys/);
 });
 

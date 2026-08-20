@@ -467,7 +467,7 @@ blacklist behaves.
 
 | Method | Route | Description | Parameters |
 |--------|-------|-------------|------------|
-| GET | `/api/exchange/market` | Market Bot status: seed-plan availability, both schedules, and the commodity-stack catalog | None |
+| GET | `/api/exchange/market` | Market Bot status: seed-plan availability, named seed-plan list (`plans`), both schedules, and the commodity-stack catalog | None |
 | GET | `/api/exchange/market/exchanges` | Discover exchanges (BIGINT ids as strings; access-pointed exchanges first) | None |
 | POST | `/api/exchange/market/buyback/probe` | Read-only buyback diagnostics: total, recognized, eligible, above-threshold, unknown-template, and invalid price/stack listing counts (no backup taken) | body: `exchangeId?`, `priceMultiplier?`, `augmentMultiplier?`, `rankedArmorMultiplier?`, `rankedWeaponMultiplier?`, `buybackPercent?`, `buybackPriceBasis?`, `maxBuys?` |
 | GET | `/api/exchange/market/buyback/log` | Stored Buyback Sweep Log batches (purchased and skipped listings with reasons). Batches older than 5 days are omitted; the scheduler deletes them from disk at most hourly. | None |
@@ -478,6 +478,10 @@ blacklist behaves.
 | POST | `/api/exchange/market/buyback/run` | Run a buyback sweep now with the saved schedule (probe → backup → sweep) | None |
 | POST | `/api/exchange/market/seed/run` | Run a market reseed now with the saved schedule (backup → clear bot listings → seed) | None |
 | POST | `/api/exchange/market/seed/clear` | Remove the bot's NPC listings from one exchange without reseeding (probe → backup → clear; no backup when the bot has none). Player listings and pending seller payments are never touched. Requires `exchange:market-write`. Rate-limited. | body: `exchangeId?` (defaults to the saved seed schedule's exchange) |
+| GET | `/api/exchange/market/plans/csv` | Download the selected (or active) seed plan as CSV | query: `planId?` |
+| POST | `/api/exchange/market/plans/csv` | Upload a UTF-8 CSV as the current seeding list: creates or replaces a named custom plan and makes it active. Only the documented seed-plan columns (names and numbers) are accepted; extra columns, SQL/JSON/HTML, formulas, and non-numeric cells are rejected. The bundled plan is never overwritten. Requires `exchange:market-write`. Rate-limited. | multipart: `file` (`.csv`), `name?` (friendly name; required when creating a plan), `planId?` (existing custom plan to replace) |
+| POST | `/api/exchange/market/plans/active` | Set the active seed plan used by reseed and buyback | body: `planId` (`bundled` or a custom plan id) |
+| POST | `/api/exchange/market/plans/name` | Rename a custom seed plan | body: `planId`, `name` |
 | GET | `/api/exchange/market/items` | Merged, display-ready bot item catalog (bundled plan rows + admin-added new items), annotated with `overridden`/`isNew`/`unsafe` per row | None |
 | GET | `/api/exchange/market/items/catalog` | Item picker for "add item": `admin-items.json` filtered to allowed categories and unsafe-id-free | query: `q?`, `category?` |
 | POST | `/api/exchange/market/items` | Save per-item overrides/new items/removals in one batch (audited, rate-limited). Requires `exchange:market-write`. | body: `overrides?` (object of templateId → `{enabled?, price?, listings?}`), `newItems?` (object of templateId → `{name?, price, listings, enabled?, qualityLevel?, stackSize?}`), `removedNewItems?` (array of templateId) |
@@ -513,8 +517,10 @@ native Market Bot engine (`addonJobs.js` / `addonSeedJob.js`). Reads, the probe,
 dry-run log refresh require `exchange:market`; schedule saves, run-now, and log
 clear require `exchange:market-write` (the admin tier's `exchange:*` covers both).
 Schedules saved here are marked `source: "console"`, run unattended inside the
-console API process, and do not require an addon; the seed plan is the bundled
-`runtime/data/market-seed-plan.json`. Every write is preceded by a database
+console API process, and do not require an addon; the seed plan is the **active**
+named plan (the bundled `runtime/data/market-seed-plan.json` until the operator
+imports a CSV-backed list and sets it active). `buybackPercent` is an integer
+from 1 to 500. Every write is preceded by a database
 backup, and buyback runs probe eligibility read-only first so idle intervals
 never take a backup. See [exchange.md](exchange.md#market-bot) for behavior
 details.

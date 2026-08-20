@@ -4,8 +4,9 @@
 
 The console API runs Market Bot reseed and buyback schedules in the background.
 No browser page or addon needs to remain open. Market Bot is managed from
-**Exchange > Bot** and uses the console-bundled
-`runtime/data/market-seed-plan.json`.
+**Exchange > Bot** and uses the **active** seed plan (the bundled
+`runtime/data/market-seed-plan.json` by default, or an operator-named custom
+plan under `runtime/generated/market-bot/plans/`).
 
 ## How scheduled jobs work
 
@@ -22,7 +23,7 @@ The scheduler ticks with the console's other background tasks. A due buyback run
    at most hourly. An empty exchange skips that second query.
 
 A due reseed always takes a backup (`DB_BACKUP_ORIGIN=market-bot-seed`), clears
-only the bot's listings on the selected exchange, and writes the bundled seed
+only the bot's listings on the selected exchange, and writes the active seed
 plan.
 
 Market Bot backups (`market-bot-seed`, `market-bot-buyback`,
@@ -48,6 +49,8 @@ The console stores owner-only, atomically written schedules at:
 - `runtime/generated/market-bot/buyback-log.json` (sweep log batches; kept for
   5 days, 20 most recent). The scheduler prunes expired batches at most hourly,
   even when buyback is disabled. Appends also drop expired batches.
+- `runtime/generated/market-bot/plans.json` (active plan id and named-plan index)
+- `runtime/generated/market-bot/plans/<id>.json` (custom CSV-backed seed lists)
 
 The schedules are `source: "console"`. If the console was down when a run came due, it
 recomputes `nextRunAt` one interval out at boot instead of immediately writing to

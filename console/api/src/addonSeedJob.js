@@ -12,6 +12,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { readMarketItemOverrides, mergeMarketSeedPlanWithOverrides, readUnsafeTemplateIds } from "./services/marketItemOverrides.js";
+import { resolveActiveMarketSeedPlanPath, resolveShippedMarketSeedPlanPath } from "./services/marketSeedPlans.js";
 
 // Keep identity helpers local so this module does not circular-import addonJobs.js.
 export const EDA_EXCHANGE_BOT_ADDON_ID = "eda-exchange-bot";
@@ -261,17 +262,15 @@ export function saveSeedSchedule(config, payload = {}, { now = () => Date.now(),
   return next;
 }
 
-// The plan ships with the console (runtime/data/market-seed-plan.json) and is
-// authoritative now that Market Bot is first-class. The legacy addon copy is
-// only a fallback for an incomplete/older installation; it must never override
-// a newer plan delivered with the console.
+// The operator-chosen active seed plan is authoritative for seed and buyback
+// jobs. The shipped console copy (runtime/data/market-seed-plan.json) is the
+// default and the fallback when no custom plan is active; a legacy addon copy
+// is only used when the bundled file is missing.
 export function resolveMarketSeedPlanPath(config, addonId = EDA_EXCHANGE_BOT_ADDON_ID) {
-  const bundledPath = resolve(config.repoRoot, "runtime/data/market-seed-plan.json");
-  if (existsSync(bundledPath)) return bundledPath;
-  const addonPath = resolve(config.repoRoot, "runtime/addons/installed", addonId, "web", "market-seed-plan.json");
-  if (existsSync(addonPath)) return addonPath;
-  return null;
+  return resolveActiveMarketSeedPlanPath(config, addonId);
 }
+
+export { resolveShippedMarketSeedPlanPath };
 
 export function loadMarketSeedPlan(config, addonId = EDA_EXCHANGE_BOT_ADDON_ID) {
   const path = resolveMarketSeedPlanPath(config, addonId);

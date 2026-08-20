@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import {
   marketBotApi,
@@ -10,15 +10,17 @@ import {
   type CommodityStackItem,
   type MarketExchange,
   type MarketPriceBasis,
-  type MarketProbeResult
+  type MarketProbeResult,
+  type MarketSeedPlanInfo
 } from "../../api/marketBot";
 import { InfoTooltip } from "../../components/common/DisplayPrimitives";
+import { invalidSeedPlanCsvMessage } from "./seedPlanCsvGuard";
 
 // Console-managed NPC market bot (EDA Exchange Bot engine, first-class):
-// seed the CHOAM exchange with NPC sell listings from the bundled plan, and
-// buy back player listings priced at or below a percentage of a reference
-// price. Schedules run inside the console API process (no page needs to stay
-// open); every write is preceded by a database backup.
+// seed the CHOAM exchange with NPC sell listings from the active named seed
+// plan, and buy back player listings priced at or below a percentage of a
+// reference price. Schedules run inside the console API process (no page needs
+// to stay open); every write is preceded by a database backup.
 
 type MarketBotOverlayProps = {
   onClose: () => void;
@@ -166,6 +168,22 @@ function runSummary(schedule: { lastRunAt: string; lastRunStatus: string; lastRu
   return parts.length ? parts.join(" | ") : "No runs yet.";
 }
 
+function planOptionLabel(plan: MarketSeedPlanInfo) {
+  const count = plan.rows ? ` · ${plan.rows.toLocaleString()} rows` : "";
+  return `${plan.name}${plan.active ? " (active)" : ""}${count}`;
+}
+
+function downloadBlob(filename: string, blob: Blob) {
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(href);
+}
+
 function buybackOverrides(exchangeId: string, priceMultiplier: number, category: MarketCategoryMultipliers, buybackPercent: number, buybackPriceBasis: MarketPriceBasis, maxBuys: number) {
   return {
     ...(exchangeId ? { exchangeId } : {}),
@@ -285,6 +303,9 @@ export function MarketBotOverlay({ onClose, onError, confirmAction }: MarketBotO
   const [commodityCatalog, setCommodityCatalog] = useState<CommodityStackItem[]>([]);
   const [commodityGroups, setCommodityGroups] = useState<CommodityStackGroup[]>([]);
   const [commodityStacks, setCommodityStacks] = useState<Record<string, number>>({});
+  const [selectedPlanId, setSelectedPlanId] = useState("bundled");
+  const [planNameDraft, setPlanNameDraft] = useState("");
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
   function applyStatus(next: MarketBotStatus, options: { populateForm?: boolean } = {}) {
     setStatus(next);
@@ -307,6 +328,13 @@ export function MarketBotOverlay({ onClose, onError, confirmAction }: MarketBotO
       setAugmentPricing(next.seed.augmentPricing === "original" ? "original" : "discounted");
       setCommodityStacks(commodityStacksFrom(next.seed.commodityStacks, catalog));
       setExchangeId((current) => current || next.buyback.exchangeId || next.seed.exchangeId || "");
+      const activeId = next.plans?.activePlanId || next.plan.id || "bundled";
+      setSelectedPlanId(activeId);
+      const activePlan = next.plans?.items?.find((plan) => plan.id === activeId);
+      setPlanNameDraft(activePlan?.source === "custom" ? activePlan.name : "");
+    } else {
+      const plans = next.plans?.items || [];
+      setSelectedPlanId((current) => (current && plans.some((plan) => plan.id === current) ? current : (next.plans?.activePlanId || next.plan.id || "bundled")));
     }
   }
 
@@ -455,7 +483,7 @@ export function MarketBotOverlay({ onClose, onError, confirmAction }: MarketBotO
 
   async function runSeedNow() {
     const confirmed = await confirmAction(
-      "Reseed the NPC sell market now with the saved schedule settings? The console takes a database backup, clears the bot's own listings on that exchange, then seeds fresh from the bundled plan. Player listings are never touched.",
+      "Reseed the NPC sell market now with the saved schedule settings? The console takes a database backup, clears the bot's own listings on that exchange, then seeds fresh from the active seed plan. Player listings are never touched.",
       { title: "Run Market Reseed", confirmLabel: "Run Reseed", danger: true }
     );
     if (!confirmed) return;
@@ -483,8 +511,90 @@ export function MarketBotOverlay({ onClose, onError, confirmAction }: MarketBotO
     });
   }
 
+  function selectPlan(planId: string) {
+    setSelectedPlanId(planId);
+    const plan = status?.plans?.items?.find((item) => item.id === planId);
+    setPlanNameDraft(plan?.source === "custom" ? plan.name : "");
+  }
+
+  function setActivePlan() {
+    return run("set-active-plan", async () => {
+      const plans = await marketBotApi.setActivePlan({ planId: selectedPlanId });
+      const active = plans.items.find((item) => item.id === plans.activePlanId);
+      return `Active seed plan is now ${active?.name || selectedPlanId}.`;
+    });
+  }
+
+  function savePlanName() {
+    return run("rename-plan", async () => {
+      const plans = await marketBotApi.renamePlan({ planId: selectedPlanId, name: planNameDraft });
+      const renamed = plans.items.find((item) => item.id === selectedPlanId);
+      return `Seed plan renamed to ${renamed?.name || planNameDraft}.`;
+    });
+  }
+
+  function downloadPlanCsv() {
+    return run("download-csv", async () => {
+      const response = await marketBotApi.downloadPlanCsv(selectedPlanId);
+      const blob = await response.blob();
+      const header = response.headers.get("content-disposition") || "";
+      const filename = header.match(/filename="([^"]+)"/)?.[1] || "market-seed-plan.csv";
+      downloadBlob(filename, blob);
+      return `Downloaded ${filename}.`;
+    });
+  }
+
+  async function uploadPlanCsv(file: File | null) {
+    if (!file) return;
+    if (selectedIsReadOnly && !planNameDraft.trim()) {
+      onError("Enter a friendly name for the imported seed plan.");
+      if (csvInputRef.current) csvInputRef.current.value = "";
+      return;
+    }
+    try {
+      const text = await file.text();
+      const invalid = invalidSeedPlanCsvMessage(file.name || "", text);
+      if (invalid) {
+        onError(invalid);
+        if (csvInputRef.current) csvInputRef.current.value = "";
+        return;
+      }
+    } catch {
+      onError("The selected file could not be read as CSV.");
+      if (csvInputRef.current) csvInputRef.current.value = "";
+      return;
+    }
+    await run("upload-csv", async () => {
+      const form = new FormData();
+      form.append("file", file);
+      if (planNameDraft.trim()) form.append("name", planNameDraft.trim());
+      if (selectedPlanId) form.append("planId", selectedPlanId);
+      const result = await marketBotApi.uploadPlanCsv(form);
+      setSelectedPlanId(result.id);
+      setPlanNameDraft(result.name);
+      return `Imported ${result.rows.toLocaleString()} row(s) as "${result.name}" and set it as the active seed plan.`;
+    });
+    if (csvInputRef.current) csvInputRef.current.value = "";
+  }
+
   const supported = status?.capabilities.exchangeMarket !== false;
+  const planCatalog = status?.plans?.items?.length
+    ? status.plans.items
+    : (status?.plan?.available ? [{
+      id: status.plan.id || "bundled",
+      name: status.plan.name || "Bundled",
+      source: (status.plan.source === "custom" || status.plan.source === "addon" || status.plan.source === "bundled") ? status.plan.source : "bundled",
+      readOnly: status.plan.source !== "custom",
+      rows: status.plan.rows,
+      panelVersion: status.plan.panelVersion,
+      generatedAt: status.plan.generatedAt,
+      active: true
+    } satisfies MarketSeedPlanInfo] : []);
+  const selectedPlan = planCatalog.find((plan) => plan.id === selectedPlanId) || planCatalog.find((plan) => plan.active) || planCatalog[0];
+  const selectedIsReadOnly = selectedPlan?.readOnly !== false && selectedPlan?.source !== "custom";
+  const selectedIsActive = Boolean(selectedPlan?.active || selectedPlan?.id === status?.plans?.activePlanId);
   const planReady = status?.plan.available === true;
+  const showBot = Boolean(!loading && supported && (planReady || planCatalog.length));
   const savedBuybackExchange = status?.buyback.exchangeId || "";
   const savedSeedExchange = status?.seed.exchangeId || "";
 
@@ -497,11 +607,54 @@ export function MarketBotOverlay({ onClose, onError, confirmAction }: MarketBotO
         </div>
         {loading && <p className="muted">Loading…</p>}
         {!loading && !supported && <p className="muted">{status?.reason || "The Market Bot is unsupported by the detected database schema."}</p>}
-        {!loading && supported && !planReady && <p className="muted">The bundled market seed plan is missing. Repair or reinstall the console release.</p>}
-        {!loading && supported && planReady && status && (
+        {!loading && supported && !planReady && !planCatalog.length && <p className="muted">The bundled market seed plan is missing. Repair or reinstall the console release.</p>}
+        {!loading && supported && !planReady && planCatalog.length > 0 && <p className="muted">The active seed plan could not be read. Choose another plan or upload a CSV.</p>}
+        {showBot && status && (
           <div className="market-bot-shell">
             <div className="market-bot-context">
-              <div className="market-bot-plan"><span>Seed Plan</span><strong>{status.plan.rows.toLocaleString()} rows{status.plan.panelVersion ? ` · v${status.plan.panelVersion}` : ""}</strong></div>
+              <div className="market-bot-plan-manager">
+                <SectionTitle title="Seed Plans" id="market-bot-plans-help" help="Named seed plans are CSV-backed lists the Market Bot can stock. The bundled catalog stays read-only. Set one plan as active to use it for reseeds and buyback price caps. Download CSV exports the selected plan; Upload CSV imports a UTF-8 CSV of names and numbers only (no extra columns, SQL, JSON, or formulas)." />
+                <div className="market-bot-grid market-bot-plan-fields">
+                  <label className="compact-select">Seed Plan
+                    <select aria-label="Seed Plan" value={selectedPlan?.id || ""} onChange={(event) => selectPlan(event.target.value)}>
+                      {!planCatalog.length && <option value="">No Seed Plans</option>}
+                      {planCatalog.map((plan) => (
+                        <option key={plan.id} value={plan.id}>{planOptionLabel(plan)}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>Plan Name
+                    <input
+                      aria-label="Seed Plan Name"
+                      value={planNameDraft}
+                      onChange={(event) => setPlanNameDraft(event.target.value)}
+                      maxLength={80}
+                      placeholder={selectedIsReadOnly ? "Name for a new imported plan" : "Friendly name"}
+                    />
+                  </label>
+                </div>
+                <p className="muted market-bot-plan-summary">
+                  {selectedPlan ? `${selectedPlan.rows.toLocaleString()} rows${selectedPlan.panelVersion ? ` · v${selectedPlan.panelVersion}` : ""}${selectedIsActive ? " · active seeding list" : ""}` : "No seed plan selected."}
+                  {status.plan.available === false ? " The bot cannot seed until an available plan is active." : ""}
+                </p>
+                <div className="confirm-modal-actions market-bot-actions market-bot-plan-actions">
+                  <button type="button" onClick={() => void setActivePlan()} disabled={Boolean(busy) || !selectedPlan || selectedIsActive}>{busy === "set-active-plan" ? "Setting…" : "Set as Active Plan"}</button>
+                  <button type="button" onClick={() => void savePlanName()} disabled={Boolean(busy) || selectedIsReadOnly || !planNameDraft.trim()}>{busy === "rename-plan" ? "Saving…" : "Save Plan Name"}</button>
+                  <button type="button" onClick={() => void downloadPlanCsv()} disabled={Boolean(busy) || !selectedPlan}>{busy === "download-csv" ? "Downloading…" : "Download CSV"}</button>
+                  <label className="button-link">
+                    {busy === "upload-csv" ? "Uploading…" : "Upload CSV"}
+                    <input
+                      ref={csvInputRef}
+                      className="hidden-file-input"
+                      type="file"
+                      accept=".csv,text/csv"
+                      aria-label="Upload CSV"
+                      disabled={Boolean(busy)}
+                      onChange={(event) => void uploadPlanCsv(event.target.files?.[0] || null)}
+                    />
+                  </label>
+                </div>
+              </div>
               <label className="compact-select market-bot-exchange">
               <span className="market-bot-label-with-info">Exchange<InfoTooltip id="market-bot-exchange-help" label="About Exchange Selection">Exchanges with access points appear first because players can reach them in game. Saving a schedule binds it to the exchange selected here.</InfoTooltip></span>
               <select aria-label="Exchange" value={exchangeId} onChange={(event) => setExchangeId(event.target.value)}>
@@ -542,7 +695,7 @@ export function MarketBotOverlay({ onClose, onError, confirmAction }: MarketBotO
                   <input aria-label="Buyback Price Multiplier" type="number" min={1} max={100} value={buybackMultiplier} onChange={(event) => setBuybackMultiplier(Number(event.target.value))} />
                 </label>
                 <label>Buyback Percent
-                  <input aria-label="Buyback Percent" type="number" min={1} max={100} value={buybackPercent} onChange={(event) => setBuybackPercent(Number(event.target.value))} />
+                  <input aria-label="Buyback Percent" type="number" min={1} max={500} value={buybackPercent} onChange={(event) => setBuybackPercent(Number(event.target.value))} />
                 </label>
                 <label>Price Basis
                   <select aria-label="Buyback Price Basis" value={buybackBasis} onChange={(event) => setBuybackBasis(event.target.value as MarketPriceBasis)}>
@@ -581,7 +734,7 @@ export function MarketBotOverlay({ onClose, onError, confirmAction }: MarketBotO
             </div>}
 
             {activeTab === "reseed" && <div className="market-bot-section" role="tabpanel">
-              <SectionTitle title="Market Reseed" id="market-bot-reseed-help" help="Replaces only the bot's NPC sell listings from the bundled seed plan. Each write run creates a backup, clears the bot listings on the selected exchange, and seeds fresh stock; player listings are never touched. Augments use bottom-of-range rolls, with either discounted or original plan pricing." />
+              <SectionTitle title="Market Reseed" id="market-bot-reseed-help" help="Replaces only the bot's NPC sell listings from the active seed plan. Each write run creates a backup, clears the bot listings on the selected exchange, and seeds fresh stock; player listings are never touched. Augments use bottom-of-range rolls, with either discounted or original plan pricing." />
               <div className="market-bot-settings-block">
                 <strong>Schedule</strong>
                 <div className="market-bot-grid market-bot-schedule-grid">
