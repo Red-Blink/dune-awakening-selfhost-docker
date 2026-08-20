@@ -227,3 +227,19 @@ test("CSV import accepts apostrophes, durability tenths, and the bundled catalog
   assert.equal(rows.length, bundled.rows.length);
   assert.deepEqual(Object.keys(rows[0]).sort(), [...SEED_PLAN_CSV_COLUMNS].sort());
 });
+
+test("CSV limits rows and columns during parsing and after automatic row expansion", () => {
+  const tooManyRows = `template_id,price\n${Array.from({ length: 20001 }, (_, index) => `Item${index},1`).join("\n")}\n`;
+  assert.throws(() => parseCsv(tooManyRows), /more than 20000 rows/);
+
+  assert.throws(
+    () => parseCsv("template_id,price,,,,,,,,,,,\nWaterBottle,10,,,,,,,,,,,\n"),
+    /more than 12 columns/
+  );
+
+  const expansionCsv = `template_id,price\n${Array.from({ length: 19999 }, (_, index) => `Item${index},1`).join("\n")}\nT6_Augment_Example_Schematic,1600\n`;
+  assert.throws(
+    () => csvToPlanRows(expansionCsv, SAMPLE_PLAN, []),
+    /more than 20000 rows after grade and augment expansion/
+  );
+});

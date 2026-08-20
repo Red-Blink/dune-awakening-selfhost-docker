@@ -399,7 +399,7 @@ export function parseCsv(text) {
     } else if (char === "\n") {
       if (field.endsWith("\r")) field = field.slice(0, -1);
       pushCsvField(row, field);
-      if (row.some((value) => String(value).trim() !== "")) rows.push(row);
+      pushCsvRow(rows, row);
       row = [];
       field = "";
     } else {
@@ -413,7 +413,7 @@ export function parseCsv(text) {
   if (field.length || row.length) {
     if (field.endsWith("\r")) field = field.slice(0, -1);
     pushCsvField(row, field);
-    if (row.some((value) => String(value).trim() !== "")) rows.push(row);
+    pushCsvRow(rows, row);
   }
   return rows;
 }
@@ -477,6 +477,9 @@ export function csvToPlanRows(csvText, shippedPlan = { rows: [] }, unsafeIds = [
     throw new Error(`CSV includes unsafe template id(s) that cannot be seeded: ${sample}.`);
   }
   const rows = addMissingAugmentItems(out, bundledByKey);
+  if (rows.length > MAX_SEED_PLAN_ROWS) {
+    throw new Error(`Seed plan CSV cannot produce more than ${MAX_SEED_PLAN_ROWS} rows after grade and augment expansion.`);
+  }
   assertAugmentSchematicGrades(rows);
   return rows;
 }
@@ -760,7 +763,20 @@ function pushCsvField(row, field) {
   if (CONTROL_CHAR_PATTERN.test(field) || /[\r\n]/.test(field)) {
     throw new Error("CSV fields cannot contain control characters or line breaks.");
   }
+  if (row.length >= SEED_PLAN_CSV_COLUMNS.length) {
+    throw new Error(`CSV cannot contain more than ${SEED_PLAN_CSV_COLUMNS.length} columns.`);
+  }
   row.push(field);
+}
+
+function pushCsvRow(rows, row) {
+  if (!row.some((value) => String(value).trim() !== "")) return;
+  // One row is reserved for the header. Enforce this while parsing rather
+  // than after allocating every row in a potentially multi-megabyte upload.
+  if (rows.length >= MAX_SEED_PLAN_ROWS + 1) {
+    throw new Error(`Seed plan CSV cannot contain more than ${MAX_SEED_PLAN_ROWS} rows.`);
+  }
+  rows.push(row);
 }
 
 function canonicalizeCsvHeaders(rawHeaders, dataRows) {
