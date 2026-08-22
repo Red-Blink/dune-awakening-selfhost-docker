@@ -395,7 +395,11 @@ export function App() {
     preloadPlayerAdminIconRailAssets();
   }, []);
 
-  useStaleBuildWatcher({ enabled: auth });
+  // /api/auth/state exposes the public build version without requiring a
+  // session. Keep watching through the logged-out state too: a Console
+  // rebuild clears the in-memory session, and disabling the watcher at that
+  // moment would let the old bundle survive through the next login.
+  useStaleBuildWatcher();
 
   useEffect(() => {
     const handleSessionExpired = () => {
