@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { ALL_TABS, loadPersistedTab, persistActiveTab } from "./App";
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ALL_TABS, loadPersistedTab, persistActiveTab, useActiveTab } from "./App";
 
 // Regression coverage for the tab surviving the automatic reload
 // LazyTabBoundary triggers after a stale post-update chunk load -- without
@@ -29,5 +30,49 @@ describe("active tab persistence", () => {
       persistActiveTab(tab);
       expect(loadPersistedTab()).toBe(tab);
     }
+  });
+
+  it("does not throw and falls back to Home when sessionStorage.getItem throws", () => {
+    const spy = vi.spyOn(window.sessionStorage.__proto__, "getItem").mockImplementation(() => {
+      throw new Error("SecurityError: storage access denied");
+    });
+    expect(loadPersistedTab()).toBe("Home");
+    spy.mockRestore();
+  });
+
+  it("does not throw when sessionStorage.setItem throws (quota exceeded, private browsing)", () => {
+    const spy = vi.spyOn(window.sessionStorage.__proto__, "setItem").mockImplementation(() => {
+      throw new Error("QuotaExceededError");
+    });
+    expect(() => persistActiveTab("Care Package")).not.toThrow();
+    spy.mockRestore();
+  });
+});
+
+// Covers the actual init-from-storage + persist-on-change wiring App() uses
+// (useState(loadPersistedTab) + useEffect(persistActiveTab)) end to end,
+// not just its two halves in isolation -- a break here only shows up in
+// practice as "the reload lost my tab", with no type or lint error.
+describe("useActiveTab", () => {
+  afterEach(() => {
+    window.sessionStorage.clear();
+  });
+
+  it("initializes from whatever tab was already persisted", () => {
+    persistActiveTab("Care Package");
+    const { result } = renderHook(() => useActiveTab());
+    expect(result.current[0]).toBe("Care Package");
+  });
+
+  it("persists to sessionStorage whenever the tab changes", () => {
+    const { result } = renderHook(() => useActiveTab());
+    expect(result.current[0]).toBe("Home");
+
+    act(() => {
+      result.current[1]("Settings");
+    });
+
+    expect(result.current[0]).toBe("Settings");
+    expect(loadPersistedTab()).toBe("Settings");
   });
 });

@@ -69,6 +69,18 @@ export function persistActiveTab(tab: Tab) {
     // The tab still switches in-memory if sessionStorage is unavailable.
   }
 }
+
+// Pulled out of App() so the init-from-storage + persist-on-change wiring is
+// covered directly (via renderHook in tests) instead of only its two halves
+// in isolation -- a regression here would only show up as "the reload lost
+// my tab" in practice, not as a type or lint error.
+export function useActiveTab() {
+  const [tab, setTab] = useState<Tab>(() => loadPersistedTab());
+  useEffect(() => {
+    persistActiveTab(tab);
+  }, [tab]);
+  return [tab, setTab] as const;
+}
 type SetupState = { files: Record<string, boolean>; config: Record<string, unknown> };
 type PublicDirectoryStatus = {
   mode?: string;
@@ -342,7 +354,7 @@ function AppFooter() {
 export function App() {
   const [auth, setAuth] = useState(false);
   const [password, setPassword] = useState("");
-  const [tab, setTab] = useState<Tab>(() => loadPersistedTab());
+  const [tab, setTab] = useActiveTab();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [pinnedAddons, setPinnedAddons] = useState<PinnedAddon[]>(() => loadPinnedAddons());
   const [selectedPinnedAddonId, setSelectedPinnedAddonId] = useState("");
@@ -380,10 +392,6 @@ export function App() {
   useEffect(() => {
     preloadPlayerAdminIconRailAssets();
   }, []);
-
-  useEffect(() => {
-    persistActiveTab(tab);
-  }, [tab]);
 
   useEffect(() => {
     const handleSessionExpired = () => {
