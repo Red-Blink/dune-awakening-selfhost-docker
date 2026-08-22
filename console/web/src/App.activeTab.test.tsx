@@ -1,6 +1,11 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ALL_TABS, loadPersistedTab, persistActiveTab, useActiveTab } from "./App";
+import { LazyTabBoundary } from "./components/common/LazyTabBoundary";
+
+function ChunkFailure(): never {
+  throw new Error("Failed to fetch dynamically imported module: /assets/Panel-old.js");
+}
 
 // Regression coverage for the tab surviving the automatic reload
 // LazyTabBoundary triggers after a stale post-update chunk load -- without
@@ -74,5 +79,25 @@ describe("useActiveTab", () => {
 
     expect(result.current[0]).toBe("Settings");
     expect(loadPersistedTab()).toBe("Settings");
+  });
+
+  it("persists the destination before a lazy chunk recovery reload", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const reload = vi.fn(() => {
+      expect(loadPersistedTab()).toBe("Care Package");
+    });
+
+    function Harness() {
+      const [tab, setTab] = useActiveTab();
+      return <>
+        <button onClick={() => setTab("Care Package")}>Open Care Package</button>
+        {tab === "Care Package" && <LazyTabBoundary reload={reload}><ChunkFailure /></LazyTabBoundary>}
+      </>;
+    }
+
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Open Care Package" }));
+
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 });

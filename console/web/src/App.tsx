@@ -70,15 +70,16 @@ export function persistActiveTab(tab: Tab) {
   }
 }
 
-// Pulled out of App() so the init-from-storage + persist-on-change wiring is
-// covered directly (via renderHook in tests) instead of only its two halves
-// in isolation -- a regression here would only show up as "the reload lost
-// my tab" in practice, not as a type or lint error.
+// Persist before scheduling the render. LazyTabBoundary reloads from
+// componentDidCatch, which runs before passive effects, so writing from a
+// useEffect would still lose the destination tab during the exact recovery
+// path this state exists to support.
 export function useActiveTab() {
-  const [tab, setTab] = useState<Tab>(() => loadPersistedTab());
-  useEffect(() => {
-    persistActiveTab(tab);
-  }, [tab]);
+  const [tab, setTabState] = useState<Tab>(() => loadPersistedTab());
+  const setTab = useCallback((nextTab: Tab) => {
+    persistActiveTab(nextTab);
+    setTabState(nextTab);
+  }, []);
   return [tab, setTab] as const;
 }
 type SetupState = { files: Record<string, boolean>; config: Record<string, unknown> };
