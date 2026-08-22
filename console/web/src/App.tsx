@@ -47,11 +47,15 @@ const ACTIVE_TAB_STORAGE_KEY = "dune-console:active-tab";
 // user lands back on the tab they were opening, not Home), but should not
 // stick around and surprise someone who opens the console again days later
 // in a fresh tab.
+function isTab(value: string): value is Tab {
+  return (ALL_TABS as readonly string[]).includes(value);
+}
+
 export function loadPersistedTab(): Tab {
   if (typeof window === "undefined") return "Home";
   try {
-    const raw = window.sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
-    return (ALL_TABS as readonly string[]).includes(raw || "") ? (raw as Tab) : "Home";
+    const raw = window.sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || "";
+    return isTab(raw) ? raw : "Home";
   } catch {
     return "Home";
   }
