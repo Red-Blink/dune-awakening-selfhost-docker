@@ -20,7 +20,7 @@ describe("active tab persistence", () => {
   });
 
   it("falls back to Home for a stale/invalid persisted value", () => {
-    window.sessionStorage.setItem("arrakis.activeTab", "Some Removed Tab");
+    window.sessionStorage.setItem("dune-console:active-tab", "Some Removed Tab");
     expect(loadPersistedTab()).toBe("Home");
   });
 

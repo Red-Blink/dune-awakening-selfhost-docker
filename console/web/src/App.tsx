@@ -40,7 +40,7 @@ import { formatUiSentence, stripAnsi, summarizeCommandText, titleCase } from "./
 // current list at runtime instead of a hand-duplicated copy that could drift.
 export const ALL_TABS = ["Home", "Server Control", "Services", "Players", "Guilds", "Bases", "Vehicles", "Exchange", "Landsraad", "Admin Tools", "Live Map", "Maps", "Care Package", "Addons", "Database", "Storage", "Backups", "Logs", "Updates", "Settings"] as const;
 type Tab = typeof ALL_TABS[number];
-const ACTIVE_TAB_STORAGE_KEY = "arrakis.activeTab";
+const ACTIVE_TAB_STORAGE_KEY = "dune-console:active-tab";
 
 // Persisted in sessionStorage, not localStorage: it should survive the
 // automatic reload LazyTabBoundary triggers after a stale chunk load (so the
