@@ -41,6 +41,47 @@ IGW_SOCKET_HEALTH_SCAN_SECONDS="${DUNE_AUTOSCALER_IGW_SOCKET_HEALTH_SCAN_SECONDS
 IGW_SOCKET_STALL_SECONDS="${DUNE_AUTOSCALER_IGW_SOCKET_STALL_SECONDS:-30}"
 IGW_SOCKET_RX_QUEUE_THRESHOLD="${DUNE_AUTOSCALER_IGW_SOCKET_RX_QUEUE_THRESHOLD:-1048576}"
 IGW_SOCKET_RECOVERY_COOLDOWN_SECONDS="${DUNE_AUTOSCALER_IGW_SOCKET_RECOVERY_COOLDOWN_SECONDS:-600}"
+
+# Convert a docker-logs-style duration ("30s", "10m", "1h", or a bare integer
+# already in seconds) into whole seconds, so a scan's interval can be checked
+# against the log window it reads.
+duration_to_seconds() {
+  local value="$1"
+  case "$value" in
+    *h) echo $(( ${value%h} * 3600 )) ;;
+    *m) echo $(( ${value%m} * 60 )) ;;
+    *s) echo "${value%s}" ;;
+    *) echo "$value" ;;
+  esac
+}
+
+# Validate a *_SCAN_SECONDS override: fall back to the default on a
+# non-numeric value (matching DUNE_AUTOSCALER_DEMAND_INTERVAL's existing
+# validation above) instead of silently defeating director_heal_due's gate,
+# and clamp below the scan's own log window so a bad override can't open a
+# permanent detection gap instead of merely a delay.
+validate_scan_seconds() {
+  local var_name="$1"
+  local value="$2"
+  local default_value="$3"
+  local window_seconds="$4"
+
+  if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Invalid ${var_name}; using ${default_value} seconds." >&2
+    value="$default_value"
+  fi
+  if [ "$window_seconds" -gt 0 ] && [ "$value" -ge "$window_seconds" ]; then
+    echo "${var_name}=${value} is >= its log window (${window_seconds}s); clamping to $((window_seconds - 1))s to avoid a permanent detection gap." >&2
+    value=$((window_seconds - 1))
+  fi
+  echo "$value"
+}
+
+SINCE_SECONDS="$(duration_to_seconds "$SINCE")"
+NAMED_DESTINATION_SINCE_SECONDS="$(duration_to_seconds "$NAMED_DESTINATION_SINCE")"
+PROACTIVE_HAGGA_SCAN_SECONDS="$(validate_scan_seconds DUNE_AUTOSCALER_PROACTIVE_HAGGA_SCAN_SECONDS "${DUNE_AUTOSCALER_PROACTIVE_HAGGA_SCAN_SECONDS:-15}" 15 "$SINCE_SECONDS")"
+DEEPDESERT_LOADING_SCAN_SECONDS="$(validate_scan_seconds DUNE_AUTOSCALER_DEEPDESERT_LOADING_SCAN_SECONDS "${DUNE_AUTOSCALER_DEEPDESERT_LOADING_SCAN_SECONDS:-15}" 15 "$SINCE_SECONDS")"
+NAMED_DESTINATION_SCAN_SECONDS="$(validate_scan_seconds DUNE_AUTOSCALER_NAMED_DESTINATION_SCAN_SECONDS "${DUNE_AUTOSCALER_NAMED_DESTINATION_SCAN_SECONDS:-60}" 60 "$NAMED_DESTINATION_SINCE_SECONDS")"
 AUTOSCALER_STARTED_AT="$(date +%s)"
 
 mkdir -p "$(dirname "$STATE_FILE")"
@@ -68,6 +109,9 @@ echo "Chat exchange repair scan: ${CHAT_EXCHANGE_REPAIR_SECONDS}s"
 echo "IGWO unavailable heal scan: ${IGWO_UNAVAILABLE_SCAN_SECONDS}s"
 echo "Stale server-state heal scan: ${STALE_SERVER_STATE_SCAN_SECONDS}s"
 echo "IGW socket health scan: ${IGW_SOCKET_HEALTH_SCAN_SECONDS}s"
+echo "Proactive Hagga handoff scan: ${PROACTIVE_HAGGA_SCAN_SECONDS}s"
+echo "Deep Desert loading response scan: ${DEEPDESERT_LOADING_SCAN_SECONDS}s"
+echo "Named destination failure scan: ${NAMED_DESTINATION_SCAN_SECONDS}s"
 echo "State file: ${STATE_FILE}"
 echo
 
@@ -784,6 +828,8 @@ PY
 scan_proactive_hagga_handoffs() {
   local director_log_file proactive_rows target_json
 
+  director_heal_due proactive_hagga "$PROACTIVE_HAGGA_SCAN_SECONDS" || return 0
+
   target_json="$(survival_partition_target_json 2>/dev/null || true)"
   [ -n "$target_json" ] || return 0
 
@@ -971,6 +1017,8 @@ PY
 scan_deepdesert_loading_responses() {
   local director_log_file pending_rows now
 
+  director_heal_due deepdesert_loading "$DEEPDESERT_LOADING_SCAN_SECONDS" || return 0
+
   director_log_file="$(mktemp)"
   docker logs --since "$SINCE" dune-director > "$director_log_file" 2>&1 || true
   pending_rows="$(LOG_FILE="$director_log_file" python3 - <<'PY'
@@ -1017,6 +1065,7 @@ PY
   now="$(date +%s)"
   while IFS='|' read -r flow_id player_id origin_id request_token target_partition original_response_json; do
     [ -n "${flow_id:-}" ] || continue
+    deepdesert_travel_seen "$flow_id" && continue
 
     local origin_server_id target_json response_json
     origin_server_id="$(origin_server_id_for_origin_id "$origin_id" 2>/dev/null || true)"
@@ -1053,12 +1102,7 @@ PY
 )"
 
     publish_rmq_json "heartbeats" "$origin_server_id" "$response_json" "travel-response-dd-${flow_id}" || true
-
-    if ! deepdesert_travel_seen "$flow_id"; then
-      remember_deepdesert_travel "$flow_id" "$player_id" "$origin_id" "$request_token" "$now" "$now" "$target_partition"
-    else
-      remember_deepdesert_travel "$flow_id" "$player_id" "$origin_id" "$request_token" "$now" "$now" "$target_partition"
-    fi
+    remember_deepdesert_travel "$flow_id" "$player_id" "$origin_id" "$request_token" "$now" "$now" "$target_partition"
     echo "DEEPDESERT-QUEUE flow=$flow_id origin=$origin_id server=$origin_server_id state=loading"
   done <<< "$pending_rows"
 }
@@ -1803,12 +1847,16 @@ ensure_overmap_travel_maps_prewarmed() {
 }
 
 scan_named_destination_failures() {
-  local source_map container log_file handoff_rows
+  local source_map container log_file handoff_rows running_containers
+
+  director_heal_due named_destination_failures "$NAMED_DESTINATION_SCAN_SECONDS" || return 0
+
+  running_containers="$(docker ps --format '{{.Names}}')"
 
   for source_map in SH_Arrakeen SH_HarkoVillage Story_ProcesVerbal; do
     container="$(hub_container_for_map "$source_map" 2>/dev/null || true)"
     [ -n "$container" ] || continue
-    docker ps --format '{{.Names}}' | grep -qx "$container" || continue
+    printf '%s\n' "$running_containers" | grep -qx "$container" || continue
 
     log_file="$(mktemp)"
     docker logs --since "$NAMED_DESTINATION_SINCE" "$container" > "$log_file" 2>&1 || true
