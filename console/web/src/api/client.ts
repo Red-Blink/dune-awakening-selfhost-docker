@@ -77,6 +77,22 @@ function announceSessionExpired() {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(AUTH_SESSION_EXPIRED_EVENT));
 }
 
+// Bypasses the ordinary api() helper's caching (implicit `default` fetch
+// mode) on purpose: callers of this specific function need to know the
+// console's *actual current* running version -- used both by the console
+// update flow's own reload-readiness check and by useStaleBuildWatcher to
+// detect a version change on an idle tab -- so a cached response would
+// defeat the point.
+export async function fetchConsoleAuthState() {
+  const response = await fetch("/api/auth/state", {
+    credentials: "include",
+    cache: "no-store",
+    headers: { accept: "application/json" }
+  });
+  if (!response.ok) throw new Error(`Console state check failed: ${response.status}`);
+  return await response.json() as { config?: { version?: string } };
+}
+
 async function refreshCsrfToken() {
   try {
     const response = await fetch("/api/auth/state", { credentials: "include" });

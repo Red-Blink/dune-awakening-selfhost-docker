@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BookOpen, ChevronDown, ChevronUp } from "lucide-react";
+import { fetchConsoleAuthState } from "../../api/client";
 import { setupApi, type Task } from "../../api/setup";
 import { updatesApi, type StackUpdateProgress as StackUpdateRunProgress } from "../../api/updates";
 import { KeyValueGrid, StatusPill } from "../../components/common/DisplayPrimitives";
@@ -721,15 +722,6 @@ function saveStackUpdateExpectedVersion(value: string) {
   }
 }
 
-async function fetchConsoleAuthState() {
-  const response = await fetch("/api/auth/state", {
-    credentials: "include",
-    cache: "no-store",
-    headers: { accept: "application/json" }
-  });
-  if (!response.ok) throw new Error(`Console state check failed: ${response.status}`);
-  return await response.json() as { config?: { version?: string } };
-}
 
 function stackUpdatePercent(text: string) {
   const stages: [RegExp, number][] = [

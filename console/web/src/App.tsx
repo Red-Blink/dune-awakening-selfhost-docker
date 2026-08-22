@@ -34,6 +34,7 @@ import {
 } from "./features/server/ServerPanels";
 import { parseUpdateTask, stackVersionButtonLabel, stackVersionButtonTitle } from "./features/updates/updateUtils";
 import { formatUiSentence, stripAnsi, summarizeCommandText, titleCase } from "./lib/display";
+import { useStaleBuildWatcher } from "./lib/staleBuildWatcher";
 
 // The array is the source of truth (not just a type-level union) so restoring
 // a persisted tab (see loadPersistedTab below) can validate against the real,
@@ -393,6 +394,8 @@ export function App() {
   useEffect(() => {
     preloadPlayerAdminIconRailAssets();
   }, []);
+
+  useStaleBuildWatcher({ enabled: auth });
 
   useEffect(() => {
     const handleSessionExpired = () => {
