@@ -35,7 +35,36 @@ import {
 import { parseUpdateTask, stackVersionButtonLabel, stackVersionButtonTitle } from "./features/updates/updateUtils";
 import { formatUiSentence, stripAnsi, summarizeCommandText, titleCase } from "./lib/display";
 
-type Tab = "Home" | "Server Control" | "Services" | "Players" | "Guilds" | "Bases" | "Vehicles" | "Exchange" | "Landsraad" | "Admin Tools" | "Live Map" | "Maps" | "Care Package" | "Addons" | "Database" | "Storage" | "Backups" | "Logs" | "Updates" | "Settings";
+// The array is the source of truth (not just a type-level union) so restoring
+// a persisted tab (see loadPersistedTab below) can validate against the real,
+// current list at runtime instead of a hand-duplicated copy that could drift.
+export const ALL_TABS = ["Home", "Server Control", "Services", "Players", "Guilds", "Bases", "Vehicles", "Exchange", "Landsraad", "Admin Tools", "Live Map", "Maps", "Care Package", "Addons", "Database", "Storage", "Backups", "Logs", "Updates", "Settings"] as const;
+type Tab = typeof ALL_TABS[number];
+const ACTIVE_TAB_STORAGE_KEY = "arrakis.activeTab";
+
+// Persisted in sessionStorage, not localStorage: it should survive the
+// automatic reload LazyTabBoundary triggers after a stale chunk load (so the
+// user lands back on the tab they were opening, not Home), but should not
+// stick around and surprise someone who opens the console again days later
+// in a fresh tab.
+export function loadPersistedTab(): Tab {
+  if (typeof window === "undefined") return "Home";
+  try {
+    const raw = window.sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
+    return (ALL_TABS as readonly string[]).includes(raw || "") ? (raw as Tab) : "Home";
+  } catch {
+    return "Home";
+  }
+}
+
+export function persistActiveTab(tab: Tab) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(ACTIVE_TAB_STORAGE_KEY, tab);
+  } catch {
+    // The tab still switches in-memory if sessionStorage is unavailable.
+  }
+}
 type SetupState = { files: Record<string, boolean>; config: Record<string, unknown> };
 type PublicDirectoryStatus = {
   mode?: string;
@@ -309,7 +338,7 @@ function AppFooter() {
 export function App() {
   const [auth, setAuth] = useState(false);
   const [password, setPassword] = useState("");
-  const [tab, setTab] = useState<Tab>("Home");
+  const [tab, setTab] = useState<Tab>(() => loadPersistedTab());
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [pinnedAddons, setPinnedAddons] = useState<PinnedAddon[]>(() => loadPinnedAddons());
   const [selectedPinnedAddonId, setSelectedPinnedAddonId] = useState("");
@@ -347,6 +376,10 @@ export function App() {
   useEffect(() => {
     preloadPlayerAdminIconRailAssets();
   }, []);
+
+  useEffect(() => {
+    persistActiveTab(tab);
+  }, [tab]);
 
   useEffect(() => {
     const handleSessionExpired = () => {
