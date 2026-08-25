@@ -28,6 +28,11 @@ type VehicleTableProps = {
   onSort?: (column: string) => void;
   canEditPermissions?: boolean;
   onPermissionsSaved?: () => void;
+  // A deep-link request from elsewhere (the Live Map's "Open in Vehicles"
+  // button) to auto-expand one specific vehicle. focusNonce increments on
+  // every request so the same vehicle can be re-focused twice in a row.
+  focusVehicleId?: string;
+  focusNonce?: number;
 };
 
 function toNumber(value: unknown): number | null {
@@ -147,11 +152,12 @@ function renderComponent(module: VehicleModule, index: number) {
   );
 }
 
-export function VehicleTable({ rows, context = "global", emptyMessage = "No vehicles have been found yet.", sortColumn, sortDirection, onSort, canEditPermissions = false, onPermissionsSaved }: VehicleTableProps) {
+export function VehicleTable({ rows, context = "global", emptyMessage = "No vehicles have been found yet.", sortColumn, sortDirection, onSort, canEditPermissions = false, onPermissionsSaved, focusVehicleId, focusNonce }: VehicleTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedTab, setExpandedTab] = useState<"components" | "permissions">("components");
   const [instanceNames, setInstanceNames] = useState<Map<string, string>>(new Map());
   const expandedContentRef = useRef<HTMLDivElement>(null);
+  const satisfiedFocusNonceRef = useRef<number | undefined>(undefined);
   const columns = context === "player" ? PLAYER_COLUMNS : GLOBAL_COLUMNS;
   const partitionMapsKey = [...new Set(rows.map((row) => vehiclePartitionMap(row.map)).filter(Boolean))].sort().join(",");
 
@@ -161,6 +167,22 @@ export function VehicleTable({ rows, context = "global", emptyMessage = "No vehi
       setExpandedTab("components");
     }
   }, [expandedId, rows]);
+
+  // The caller's search request and this row data arrive on different
+  // renders (the id lands in `rows` only once the parent's fetch resolves),
+  // so this waits for a matching row instead of setting expandedId eagerly
+  // -- which would just get bounced straight back to null by the reset
+  // effect above while the old (non-matching) rows are still on screen.
+  // satisfiedFocusNonceRef stops a later, unrelated rows refresh (the
+  // 15-minute auto-refresh) from re-opening a panel the admin already
+  // closed by hand.
+  useEffect(() => {
+    if (focusNonce === undefined || !focusVehicleId || satisfiedFocusNonceRef.current === focusNonce) return;
+    if (!rows.some((row) => String(row.id) === focusVehicleId)) return;
+    satisfiedFocusNonceRef.current = focusNonce;
+    setExpandedTab("components");
+    setExpandedId(focusVehicleId);
+  }, [focusNonce, focusVehicleId, rows]);
 
   // Moves focus into the expanded content so keyboard and screen-reader users
   // land on what they just opened instead of staying on the (now possibly
@@ -174,8 +196,11 @@ export function VehicleTable({ rows, context = "global", emptyMessage = "No vehi
     // row in place (confirmed live: a 147px jump). Keyboard/screen-reader
     // users still get the focus move itself, which is what they need --
     // browsers already keep a newly focused element approximately in view
-    // when it was reached via Tab, since the click that expanded it was
-    // already scrolled to.
+    // when it was reached via Tab or a same-page click, since both already
+    // scrolled the row into view before it expanded. The Live Map's "Open
+    // in Vehicles" deep link (focusVehicleId below) also lands here after
+    // switching tabs and narrowing the search to one row, which puts it at
+    // the top of the page already -- same "already in view" outcome.
     if (expandedId) expandedContentRef.current?.focus({ preventScroll: true });
   }, [expandedId]);
 

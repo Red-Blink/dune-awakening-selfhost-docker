@@ -60,6 +60,7 @@ by nature, so it gets its own.
 - [database-backups.md](console/database-backups.md) — Current. Safe database restore behavior when the backup and current deployment use different Battlegroup IDs.
 - [restart-queue.md](console/restart-queue.md) — Current. The Restart Queue toggle: player-aware countdowns with in-game warnings, the two broadcast variants, concurrency rules, crash recovery, the "Restart later" deferred-restart option, and the join-lock limitation.
 - [exchange.md](console/exchange.md) — Current. The read-only Market Board: aggregated-by-item CHOAM exchange listings, seller resolution, how bot listings are identified, the bot/blacklist filter config, the Market Bot seed/buyback engine, and the Bot items tab's per-item catalog overrides.
+- [live-map.md](console/live-map.md) — Current. The Live Map panel: partition display-name resolution, the actor/spice/POI marker data model (static archive + live decode + self-learning pool, the registry-driven POI framework), the Layers legend's hide-if-empty and default-settings mechanism, and Coriolis seed/countdown resolution.
 
 ## Runtime (`runtime/`)
 

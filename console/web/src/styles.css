@@ -1423,9 +1423,6 @@ body.debug .technical-details { display: block; }
 .danger-note, .error, .error-banner { color: var(--danger-text); overflow-wrap: anywhere; }
 .success-note { color: #9be6bd; }
 .error-banner { background: #351b1b; border: 1px solid var(--danger-strong); padding: 12px; border-radius: 6px; margin-bottom: 14px; }
-.drawer { border: 1px solid #302b25; border-radius: 8px; padding: 12px; color: #d9c8aa; background: rgba(13, 15, 17, .48); }
-.live-map-marker-drawer-title { align-items: center; }
-.live-map-marker-header-actions { margin-left: auto; flex-wrap: nowrap; }
 .inline-filter-label { display: inline-flex; align-items: center; gap: 8px; color: var(--muted-warm); font-weight: 400; }
 .inline-filter-label select { color: #fff7e6; font-weight: 400; min-width: 150px; }
 .players-filter-row { align-items: center; }
@@ -2515,7 +2512,8 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   .grid, .two-col { grid-template-columns: 1fr; }
   .health-grid, .health-grid-compact { grid-template-columns: 1fr; }
   .live-map-layout { grid-template-columns: 1fr; }
-  .live-map-frame { height: 62vh; min-height: 420px; }
+  .live-map-view-body { grid-template-columns: 1fr; }
+  .live-map-frame { width: 100%; min-width: 0; height: 62vh; min-height: 420px; }
   .live-map-stats { grid-template-columns: 1fr; }
 }
 
@@ -2535,10 +2533,13 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 .care-package-grant-header .settings-tabs { margin-bottom: 0; }
 .care-package-grant-header .inline-task-result { align-self: center; }
 .advanced-toggle-row { margin: 0; }
+.live-map-view-section { margin-bottom: 16px; }
+.live-map-view-body { display: grid; grid-template-columns: 1fr 3fr; gap: 16px; align-items: start; }
+.live-map-view-controls { display: grid; gap: 10px; align-content: start; }
 .live-map-layout { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 16px; align-items: start; }
 .live-map-sidebar { display: grid; gap: 12px; }
 .live-map-main { min-width: 0; display: grid; gap: 10px; }
-.live-map-map-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.live-map-map-buttons { display: grid; gap: 6px; }
 .live-map-map-buttons button { width: 100%; white-space: normal; min-height: 40px; }
 .live-map-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .live-map-toolbar button { width: auto; }
@@ -2617,28 +2618,92 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   .memory-swap-panel label { justify-content: space-between; }
   .memory-info-box, .bases-auto-refill .memory-info-box { position: fixed; top: auto; right: 14px; bottom: 14px; left: 14px; width: auto; }
 }
-.live-map-layer-list { display: grid; gap: 8px; }
-.live-map-layer { justify-content: flex-start; width: 100%; min-height: 34px; color: #d9c8aa; }
+.live-map-layers-header { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.live-map-layers-settings-btn { width: 26px; height: 26px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; padding: 0; background: #252017; border: 1px solid #4d4032; border-radius: 6px; color: #ceb894; cursor: pointer; }
+.live-map-layers-settings-btn:hover { color: #ffd08a; border-color: #6a5842; }
+.live-map-layers-popover { position: absolute; top: 100%; right: 0; z-index: 10; width: 320px; max-width: calc(100vw - 32px); margin-top: 6px; padding: 12px; background: #171a1d; border: 1px solid #4d4032; border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .4); }
+/* `.action-section p { margin: 0; }` (class+element, 0-1-1) otherwise beats
+   these plain-class rules (0-1-0) regardless of source order, since the
+   popover's <p> tags all live inside an .action-section -- qualifying with
+   the popover's own class matches the same specificity trap fixed
+   elsewhere in this file for the legend rows. */
+.live-map-layers-popover .live-map-layers-popover-title { margin: 0 0 4px; font-size: 13px; font-weight: 700; color: #fff1d4; }
+.live-map-layers-popover .live-map-layers-popover-hint { margin: 0 0 16px; font-size: 11px; color: #ad9f89; }
+/* scrollbar-gutter reserves the track's own width instead of overlaying it
+   on the content, so the last column (the checkboxes) doesn't sit under a
+   scrollbar thumb the way it did with plain overflow-y. The extra
+   padding-right is a generous buffer on top of that for browsers/OS
+   scrollbar styles gutter doesn't fully account for (e.g. always-visible
+   classic scrollbars can still render a few px wider than reserved). */
+.live-map-layers-popover-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; max-height: 360px; overflow-y: auto; padding-right: 18px; scrollbar-gutter: stable; }
+.live-map-layers-popover-list .live-map-layers-popover-section { margin: 8px 0 0; font-size: 13px; color: #a99d89; }
+.live-map-layers-popover-list .live-map-layers-popover-section:first-child { margin-top: 0; }
+/* Settings rows keep no counts/icons (just name + checkbox), so nothing
+   here should render smaller -- or in a different font size, or take more
+   vertical room -- than any other row. The live legend's rows are sized
+   for icon thumbnails (40px/32px/30px depending on tier) and its own
+   between-row gaps (6px/4px/4px); none of that space is earning its keep
+   here with no icons in play, so every tier collapses to one compact,
+   uniform row height with no gap between rows at all. */
+.live-map-layers-popover-list .checkbox-row.live-map-layer,
+.live-map-layers-popover-list .live-map-layer-subgroup,
+.live-map-layers-popover-list .live-map-layer-sub { min-height: 26px; font-size: 13px; color: var(--text-subtle); }
+.live-map-layers-popover-list .live-map-layer-group,
+.live-map-layers-popover-list .live-map-layer-sublist { gap: 0; }
+.live-map-layers-popover-actions { display: flex; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid #302b25; }
+.live-map-layers-popover-actions button { flex: 1 1 auto; min-height: 32px; padding: 6px; font-size: 12px; }
+/* min-width: 0 alone wasn't enough: it fixes how this element shrinks
+   against its own parent, but says nothing about its *own* implicit grid
+   track, which defaults to auto (content-based) sizing -- so once row text
+   grew from 12px to a uniform 16px, the longer labels' min-content width
+   (e.g. "ScrapMetalWreckage", "EnemyLaborOutpost") sized the track itself
+   wider than the container's box and spilled a child past it, even though
+   the container's own bounding rect measured correctly constrained.
+   grid-template-columns: minmax(0, 1fr) caps the track explicitly instead
+   of leaving it to size from content -- confirmed live via
+   getBoundingClientRect that a child row could render wider than its
+   already-correctly-sized parent until this was added. */
+.live-map-layer-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; min-width: 0; }
+.live-map-layer { justify-content: flex-start; width: 100%; min-height: 32px; color: #d9c8aa; }
+/* .checkbox-row's own width:auto (styles.css, shared utility class) comes
+   later in the cascade and otherwise wins at equal specificity, so every
+   legend row was actually sizing to its own content instead of stretching
+   to the sidebar's width -- .live-map-layer-label's flex-grow had no
+   spare width to grow into, and short labels (Flour Sand) visibly fell
+   short of where longer-labeled rows' trailing content landed. This
+   combined selector outranks both on specificity regardless of order. */
+.checkbox-row.live-map-layer { width: 100%; }
 .live-map-layer input { width: auto; margin: 0; accent-color: #c68b4a; }
 .live-map-layer .muted { margin-left: auto; }
 .live-map-legend-dot {
   display: inline-block;
-  width: 12px;
-  min-width: 12px;
-  max-width: 12px;
-  height: 12px;
-  min-height: 12px;
-  max-height: 12px;
+  width: 24px;
+  min-width: 24px;
+  max-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  max-height: 24px;
   aspect-ratio: 1;
   border: 2px solid #090b0d;
   border-radius: 999px;
   box-shadow: 0 0 4px rgba(0, 0, 0, .35);
-  flex: 0 0 12px;
+  flex: 0 0 24px;
 }
+.live-map-legend-dot-spacer { flex: 0 0 auto; width: 28px; height: 24px; }
 .live-map-frame {
   position: relative;
-  width: 100%;
-  height: min(82vh, 920px);
+  /* Both maps are square (4096x4096) -- keeping the box itself square
+     (rather than width:100%; height:82vh independently) is what makes
+     "contain" fit actually fill it with no blank top/bottom margin.
+     width:min(100%, 82vh) picks whichever of the column's width or the
+     82vh height budget is tighter, and aspect-ratio derives the other
+     dimension from that, so it still grows with available space (the
+     original ask) without reintroducing letterboxing (found live on
+     dune2 after the 920px cap was dropped: the frame got taller than
+     wide, so the square map no longer reached the frame's edges). */
+  width: min(100%, 82vh);
+  aspect-ratio: 1 / 1;
+  min-width: 560px;
   min-height: 560px;
   overflow: hidden;
   overscroll-behavior: contain;
@@ -2672,20 +2737,214 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   appearance: none;
   -webkit-appearance: none;
 }
-.live-map-marker:hover { width: 16px; height: 16px; z-index: 4; }
-.live-map-marker.marker-player { color: #ef4444; background: #ef4444; border-radius: 3px; }
-.live-map-marker.marker-player { cursor: grab; }
-.live-map-marker.marker-player.dragging { cursor: grabbing; z-index: 6; width: 18px; height: 18px; }
-.live-map-marker.marker-player.offline { color: #ef4444; background: #101316; border-color: #ef4444; box-shadow: 0 0 0 2px rgba(239, 68, 68, .2), 0 0 5px rgba(0, 0, 0, .45); }
-.live-map-marker.marker-player.online { color: #ef4444; background: #ef4444; border-color: #090b0d; }
-.live-map-marker.marker-player.teleport-preview { z-index: 5; width: 18px; height: 18px; box-shadow: 0 0 0 3px rgba(255, 208, 138, .28), 0 0 18px rgba(255, 208, 138, .42); }
-.live-map-marker.marker-vehicle { color: #7bd56f; background: #7bd56f; }
-.live-map-marker.marker-base { color: #d6a444; background: #d6a444; }
-.live-map-marker.marker-storage { color: #c084fc; background: #c084fc; }
-.live-map-legend-dot.marker-player { color: #ef4444; background: #ef4444; border-radius: 3px; }
-.live-map-legend-dot.marker-vehicle { color: #7bd56f; background: #7bd56f; }
-.live-map-legend-dot.marker-base { color: #d6a444; background: #d6a444; }
-.live-map-legend-dot.marker-storage { color: #c084fc; background: #c084fc; }
+.live-map-marker:hover { width: 16px; height: 16px; z-index: 14; }
+/* Fixed resting-state stacking order for the "primary actor" tier -- Player
+   over Vehicle over Base over Storage over everything else (which stays at
+   the implicit z-index:auto bottom layer) -- independent of marker draw
+   order. Interaction states (hover/teleport-preview/dragging) use a higher
+   14-16 band below so they always win regardless of type. */
+.live-map-marker.marker-player, .live-map-legend-dot.marker-player { background: url("/images/maps/Characters.webp") center / contain no-repeat; border: none; border-radius: 0; box-shadow: none; }
+.live-map-marker.marker-player { cursor: grab; width: 36px; height: 36px; z-index: 4; }
+.live-map-marker.marker-player:hover { width: 48px; height: 48px; }
+.live-map-marker.marker-player.dragging { cursor: grabbing; z-index: 16; width: 42px; height: 42px; }
+.live-map-marker.marker-player.offline { filter: grayscale(1) brightness(.65); }
+.live-map-marker.marker-player.teleport-preview { z-index: 15; width: 42px; height: 42px; box-shadow: 0 0 0 3px rgba(255, 208, 138, .28), 0 0 18px rgba(255, 208, 138, .42); }
+.live-map-marker.marker-base, .live-map-legend-dot.marker-base { background: url("/images/maps/Base.webp") center / contain no-repeat; border: none; border-radius: 0; box-shadow: none; }
+.live-map-marker.marker-base { width: 36px; height: 36px; z-index: 2; }
+.live-map-marker.marker-base:hover { width: 48px; height: 48px; }
+.live-map-marker.marker-storage, .live-map-legend-dot.marker-storage { background: url("/images/maps/storage.png") center / contain no-repeat; border: none; border-radius: 0; box-shadow: none; }
+.live-map-marker.marker-storage { width: 20px; height: 20px; z-index: 1; }
+.live-map-marker.marker-storage:hover { width: 26px; height: 26px; }
+.live-map-marker.marker-spice, .live-map-marker.marker-spice_active { width: 48px; height: 48px; }
+.live-map-marker.marker-spice:hover, .live-map-marker.marker-spice_active:hover { width: 60px; height: 60px; }
+.live-map-marker.marker-spice { background: url("/images/maps/spicefieldlarge.webp") center / contain no-repeat; border: none; border-radius: 0; box-shadow: none; opacity: .55; }
+.live-map-marker.marker-spice_active { background: url("/images/maps/spicefieldlarge.webp") center / contain no-repeat; border: none; border-radius: 0; box-shadow: none; filter: drop-shadow(0 0 5px rgba(232, 135, 30, .85)); }
+/* Active/pool spice markers are sized by tier (subtype) -- the base
+   marker-spice/marker-spice_active rules above are the Large tier's size;
+   these modifiers step Medium/Small down so a whole bloom's yield reads at
+   a glance instead of every tier plotting identically. */
+.live-map-marker.marker-spice.spice-size-medium, .live-map-marker.marker-spice_active.spice-size-medium { width: 34px; height: 34px; }
+.live-map-marker.marker-spice.spice-size-medium:hover, .live-map-marker.marker-spice_active.spice-size-medium:hover { width: 44px; height: 44px; }
+.live-map-marker.marker-spice.spice-size-small, .live-map-marker.marker-spice_active.spice-size-small { width: 24px; height: 24px; }
+.live-map-marker.marker-spice.spice-size-small:hover, .live-map-marker.marker-spice_active.spice-size-small:hover { width: 32px; height: 32px; }
+.live-map-marker.marker-flour_sand, .live-map-legend-dot.marker-flour_sand { background: url("/images/maps/floursand.webp") center / contain no-repeat; border: none; border-radius: 0; box-shadow: none; }
+.live-map-marker.marker-flour_sand { width: 24px; height: 24px; }
+.live-map-marker.marker-flour_sand:hover { width: 32px; height: 32px; }
+.live-map-marker.marker-ore { color: #9ca3af; background: #9ca3af; }
+.live-map-marker.marker-scrap { color: #b45309; background: #b45309; }
+.live-map-marker.marker-flora, .live-map-legend-dot.marker-flora { background: url("/images/maps/plantfiber.webp") center / contain no-repeat; border: none; border-radius: 0; box-shadow: none; }
+.live-map-marker.subtype-saguaroseed, .live-map-legend-dot.subtype-saguaroseed { background: url("/images/maps/resourcesaguarorawr.webp") center / contain no-repeat; }
+.live-map-marker.subtype-primrosefield, .live-map-legend-dot.subtype-primrosefield { background: url("/images/maps/PrimroseField.png") center / contain no-repeat; }
+.live-map-marker.marker-poi { color: #60a5fa; background: #60a5fa; }
+/* rgba fill instead of `opacity` -- opacity also fades the dark 2px border
+   and box-shadow every marker gets by default, which reads as a muddy ring
+   rather than genuine translucency on a marker this small. Doubled from
+   the base 12px/16px-hover to 24px/32px-hover per explicit ask. */
+.live-map-marker.marker-hazard { border: none; box-shadow: none; background: rgba(239, 68, 68, .5); width: 24px; height: 24px; }
+.live-map-marker.marker-hazard:hover { width: 32px; height: 32px; }
+.live-map-marker.marker-enemy { color: #f97316; background: #f97316; }
+/* Only Sandbike/Buggy have real art (see vehicleIconSubtypeClass() in
+   LiveMapPanel.tsx, which derives a subtype class from the raw vehicle
+   class path since vehicle markers carry no real `subtype` field) -- every
+   other vehicle type falls back to this plain colored dot, and the legend
+   swatch for the whole "Vehicle" category uses the bike icon as its one
+   representative image. */
+.live-map-marker.marker-vehicle { color: #22c55e; background: #22c55e; z-index: 3; }
+/* Vehicles always carry a subtype-* class too, whose generic sizing rule
+   (20px/26px hover, shared with ore/poi/hazard/etc.) has specificity 0-5-0
+   from its own three :not() exclusions -- matching that same chain here
+   (rather than just adding [class*="subtype-"], which only reaches 0-3-0
+   and loses) is what actually wins, confirmed live via the computed style
+   still reading 20px until this chain was added. */
+.live-map-marker.marker-vehicle[class*="subtype-"]:not(.marker-spice):not(.marker-spice_active):not(.marker-hazard) { width: 32px; height: 32px; }
+.live-map-marker.marker-vehicle[class*="subtype-"]:not(.marker-spice):not(.marker-spice_active):not(.marker-hazard):hover { width: 40px; height: 40px; }
+/* Same specificity-matching technique as marker-vehicle above -- POI's,
+   House Representative, and Trainer, not Ore/Scrap/Fortress/Hazard/Enemy,
+   which stay at the shared 20px/26px-hover subtype tier. */
+.live-map-marker.marker-poi[class*="subtype-"]:not(.marker-spice):not(.marker-spice_active):not(.marker-hazard),
+.live-map-marker.marker-house_representative[class*="subtype-"]:not(.marker-spice):not(.marker-spice_active):not(.marker-hazard),
+.live-map-marker.marker-trainer[class*="subtype-"]:not(.marker-spice):not(.marker-spice_active):not(.marker-hazard) { width: 28px; height: 28px; }
+.live-map-marker.marker-poi[class*="subtype-"]:not(.marker-spice):not(.marker-spice_active):not(.marker-hazard):hover,
+.live-map-marker.marker-house_representative[class*="subtype-"]:not(.marker-spice):not(.marker-spice_active):not(.marker-hazard):hover,
+.live-map-marker.marker-trainer[class*="subtype-"]:not(.marker-spice):not(.marker-spice_active):not(.marker-hazard):hover { width: 36px; height: 36px; }
+.live-map-legend-dot.marker-vehicle { background: url("/images/maps/sandbikevehicle.webp") center / contain no-repeat; border: none; border-radius: 0; box-shadow: none; }
+.live-map-marker.subtype-sandbike, .live-map-legend-dot.subtype-sandbike { background: url("/images/maps/sandbikevehicle.webp") center / contain no-repeat; }
+.live-map-marker.subtype-buggy, .live-map-legend-dot.subtype-buggy { background: url("/images/maps/buggyvehicle.webp") center / contain no-repeat; }
+.live-map-marker.subtype-sandcrawler, .live-map-legend-dot.subtype-sandcrawler { background: url("/images/maps/sandcrawlervehicle.webp") center / contain no-repeat; }
+.live-map-marker.subtype-treadwheel, .live-map-legend-dot.subtype-treadwheel { background: url("/images/maps/treadwheelvehicle.webp") center / contain no-repeat; }
+.live-map-marker.subtype-assaultornithopter, .live-map-legend-dot.subtype-assaultornithopter { background: url("/images/maps/assaultornivehicle.webp") center / contain no-repeat; }
+.live-map-marker.subtype-ornithopter, .live-map-legend-dot.subtype-ornithopter { background: url("/images/maps/ornithoptervehicle.webp") center / contain no-repeat; }
+.live-map-marker.subtype-lightornithopter, .live-map-legend-dot.subtype-lightornithopter { background: url("/images/maps/ornithoptervehicle.webp") center / contain no-repeat; }
+.live-map-marker.subtype-mediumornithopter, .live-map-legend-dot.subtype-mediumornithopter { background: url("/images/maps/ornithoptervehicle.webp") center / contain no-repeat; }
+.live-map-marker.subtype-transportornithopter, .live-map-legend-dot.subtype-transportornithopter { background: url("/images/maps/ornithoptervehicle.webp") center / contain no-repeat; }
+.live-map-marker.subtype-containervehicle, .live-map-legend-dot.subtype-containervehicle { background: url("/images/maps/cargocontainervehicle.webp") center / contain no-repeat; }
+.live-map-legend-dot.marker-spice { background: url("/images/maps/spicefieldlarge.webp") center / contain no-repeat; border: none; border-radius: 0; box-shadow: none; opacity: .55; }
+.live-map-legend-dot.marker-spice_active { background: url("/images/maps/spicefieldlarge.webp") center / contain no-repeat; border: none; border-radius: 0; box-shadow: none; filter: drop-shadow(0 0 3px rgba(232, 135, 30, .75)); }
+.live-map-legend-dot.marker-ore { color: #9ca3af; background: #9ca3af; }
+.live-map-legend-dot.marker-scrap { color: #b45309; background: #b45309; }
+.live-map-legend-dot.marker-poi { color: #60a5fa; background: #60a5fa; }
+.live-map-legend-dot.marker-hazard { border: none; box-shadow: none; background: rgba(239, 68, 68, .5); }
+.live-map-legend-dot.marker-enemy { color: #f97316; background: #f97316; }
+
+/* Per-item icons for specific ore/scrap/poi marker_types (matched by the
+   generic subtype-<lowercased marker_type> class -- see LiveMapPanel.tsx).
+   Anything without a rule here keeps its category's plain colored dot.
+   Excludes spice/spice_active (size themselves via spice-size-*) and hazard
+   (its subtypes -- Hazard_Quicksand/Drumsand/Radiation -- have no icon art
+   at all, so it should stay the plain circular colored dot too, not get
+   squared off by this icon-reset rule). */
+.live-map-marker[class*="subtype-"]:not(.marker-spice):not(.marker-spice_active):not(.marker-hazard) { border: none; border-radius: 0; box-shadow: none; width: 20px; height: 20px; }
+.live-map-marker[class*="subtype-"]:not(.marker-spice):not(.marker-spice_active):not(.marker-hazard):hover { width: 26px; height: 26px; z-index: 14; }
+.live-map-legend-dot[class*="subtype-"]:not(.marker-spice):not(.marker-spice_active):not(.marker-hazard) { border: none; border-radius: 0; box-shadow: none; }
+
+.live-map-marker.subtype-azuriteore, .live-map-legend-dot.subtype-azuriteore { background: url("/images/maps/azuriteore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-basaltore, .live-map-legend-dot.subtype-basaltore { background: url("/images/maps/basaltore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-bauxiteore, .live-map-legend-dot.subtype-bauxiteore { background: url("/images/maps/bauxiteore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-dolomiterock, .live-map-legend-dot.subtype-dolomiterock { background: url("/images/maps/dolomiterock.webp") center / contain no-repeat; }
+.live-map-marker.subtype-erythriteore, .live-map-legend-dot.subtype-erythriteore { background: url("/images/maps/erythriteore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-jasmiumore, .live-map-legend-dot.subtype-jasmiumore { background: url("/images/maps/jasmiumore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-magnetiteore, .live-map-legend-dot.subtype-magnetiteore { background: url("/images/maps/magnetiteore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-rhyoliteore, .live-map-legend-dot.subtype-rhyoliteore { background: url("/images/maps/rhyoliteore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-stravidiumore, .live-map-legend-dot.subtype-stravidiumore { background: url("/images/maps/stravidiumore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-titaniumore, .live-map-legend-dot.subtype-titaniumore { background: url("/images/maps/titaniumore.webp") center / contain no-repeat; }
+
+/* Pickup markers reuse their material's Ore/Rock icon (no separate Pickup
+   art) but render smaller, so a bloom's node vs. its harvested drop stay
+   visually distinct at a glance. */
+.live-map-marker.subtype-azuritepickup, .live-map-legend-dot.subtype-azuritepickup { background: url("/images/maps/azuriteore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-basaltpickup, .live-map-legend-dot.subtype-basaltpickup { background: url("/images/maps/basaltore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-bauxitepickup, .live-map-legend-dot.subtype-bauxitepickup { background: url("/images/maps/bauxiteore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-dolomitepickup, .live-map-legend-dot.subtype-dolomitepickup { background: url("/images/maps/dolomiterock.webp") center / contain no-repeat; }
+.live-map-marker.subtype-erythritepickup, .live-map-legend-dot.subtype-erythritepickup { background: url("/images/maps/erythriteore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-jasmiumpickup, .live-map-legend-dot.subtype-jasmiumpickup { background: url("/images/maps/jasmiumore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-magnetitepickup, .live-map-legend-dot.subtype-magnetitepickup { background: url("/images/maps/magnetiteore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-rhyolitepickup, .live-map-legend-dot.subtype-rhyolitepickup { background: url("/images/maps/rhyoliteore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-stravidiumpickup, .live-map-legend-dot.subtype-stravidiumpickup { background: url("/images/maps/stravidiumore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-titaniumpickup, .live-map-legend-dot.subtype-titaniumpickup { background: url("/images/maps/titaniumore.webp") center / contain no-repeat; }
+.live-map-marker.subtype-azuritepickup, .live-map-marker.subtype-basaltpickup, .live-map-marker.subtype-bauxitepickup, .live-map-marker.subtype-dolomitepickup, .live-map-marker.subtype-erythritepickup, .live-map-marker.subtype-jasmiumpickup, .live-map-marker.subtype-magnetitepickup, .live-map-marker.subtype-rhyolitepickup, .live-map-marker.subtype-stravidiumpickup, .live-map-marker.subtype-titaniumpickup { width: 14px; height: 14px; }
+.live-map-marker.subtype-azuritepickup:hover, .live-map-marker.subtype-basaltpickup:hover, .live-map-marker.subtype-bauxitepickup:hover, .live-map-marker.subtype-dolomitepickup:hover, .live-map-marker.subtype-erythritepickup:hover, .live-map-marker.subtype-jasmiumpickup:hover, .live-map-marker.subtype-magnetitepickup:hover, .live-map-marker.subtype-rhyolitepickup:hover, .live-map-marker.subtype-stravidiumpickup:hover, .live-map-marker.subtype-titaniumpickup:hover { width: 18px; height: 18px; }
+
+.live-map-marker.subtype-cave, .live-map-legend-dot.subtype-cave { background: url("/images/maps/cave.webp") center / contain no-repeat; }
+.live-map-marker.subtype-sietch, .live-map-legend-dot.subtype-sietch { background: url("/images/maps/sietch.webp") center / contain no-repeat; }
+.live-map-marker.subtype-ecolab, .live-map-legend-dot.subtype-ecolab { background: url("/images/maps/ecolab.webp") center / contain no-repeat; }
+.live-map-marker.subtype-enemycamp, .live-map-legend-dot.subtype-enemycamp { background: url("/images/maps/enemycamp.webp") center / contain no-repeat; }
+.live-map-marker.subtype-enemylaboroutpost, .live-map-legend-dot.subtype-enemylaboroutpost { background: url("/images/maps/enemylaboroutpost.webp") center / contain no-repeat; }
+.live-map-marker.subtype-enemyoutpost, .live-map-legend-dot.subtype-enemyoutpost { background: url("/images/maps/enemyoutpost.webp") center / contain no-repeat; }
+.live-map-marker.subtype-atreidesfortress, .live-map-legend-dot.subtype-atreidesfortress { background: url("/images/maps/atreidesfortress.webp") center / contain no-repeat; }
+.live-map-marker.subtype-harkonnenfortress, .live-map-legend-dot.subtype-harkonnenfortress { background: url("/images/maps/harkonnenfortress.webp") center / contain no-repeat; }
+.live-map-marker.subtype-tradingpost, .live-map-legend-dot.subtype-tradingpost { background: url("/images/maps/tradingpost.webp") center / contain no-repeat; }
+.live-map-marker.subtype-tradingpost { width: 32px; height: 32px; }
+.live-map-marker.subtype-tradingpost:hover { width: 40px; height: 40px; }
+.live-map-marker.subtype-taxiservice, .live-map-legend-dot.subtype-taxiservice { background: url("/images/maps/taxiservice.webp") center / contain no-repeat; }
+.live-map-marker.subtype-trainerbenegesserit, .live-map-legend-dot.subtype-trainerbenegesserit { background: url("/images/maps/trainerbenegesserit.webp") center / contain no-repeat; }
+.live-map-marker.subtype-trainermentat, .live-map-legend-dot.subtype-trainermentat { background: url("/images/maps/trainermentat.webp") center / contain no-repeat; }
+.live-map-marker.subtype-trainerplanetologist, .live-map-legend-dot.subtype-trainerplanetologist { background: url("/images/maps/trainerplanetologist.webp") center / contain no-repeat; }
+.live-map-marker.subtype-trainerswordmaster, .live-map-legend-dot.subtype-trainerswordmaster { background: url("/images/maps/trainerswordmaster.webp") center / contain no-repeat; }
+.live-map-marker.subtype-trainertrooper, .live-map-legend-dot.subtype-trainertrooper { background: url("/images/maps/trainertrooper.webp") center / contain no-repeat; }
+.live-map-marker.subtype-shipwreck, .live-map-legend-dot.subtype-shipwreck { background: url("/images/maps/shipwreck.webp") center / contain no-repeat; }
+/* House Representative NPCs -- 19 of the 24 real HouseRepresentative*
+   subtypes have supplied art; the other 5 (Alexin, Mutelli, Spinette,
+   Varota, Wallach) fall back to the shared .marker-poi dot until icons are
+   supplied for them too. */
+.live-map-marker.subtype-houserepresentativeargosaz, .live-map-legend-dot.subtype-houserepresentativeargosaz { background: url("/images/maps/houserepresentativeargosaz.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativedyvetz, .live-map-legend-dot.subtype-houserepresentativedyvetz { background: url("/images/maps/houserepresentativedyvetz.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativeecaz, .live-map-legend-dot.subtype-houserepresentativeecaz { background: url("/images/maps/houserepresentativeecaz.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativehagal, .live-map-legend-dot.subtype-houserepresentativehagal { background: url("/images/maps/houserepresentativehagal.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativehurata, .live-map-legend-dot.subtype-houserepresentativehurata { background: url("/images/maps/houserepresentativehurata.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativeimota, .live-map-legend-dot.subtype-houserepresentativeimota { background: url("/images/maps/houserepresentativeimota.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativekenola, .live-map-legend-dot.subtype-houserepresentativekenola { background: url("/images/maps/houserepresentativekenola.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativelindaren, .live-map-legend-dot.subtype-houserepresentativelindaren { background: url("/images/maps/houserepresentativelindaren.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativemaros, .live-map-legend-dot.subtype-houserepresentativemaros { background: url("/images/maps/houserepresentativemaros.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativemikarrol, .live-map-legend-dot.subtype-houserepresentativemikarrol { background: url("/images/maps/houserepresentativemikarrol.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativemoritani, .live-map-legend-dot.subtype-houserepresentativemoritani { background: url("/images/maps/houserepresentativemoritani.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativenovebruns, .live-map-legend-dot.subtype-houserepresentativenovebruns { background: url("/images/maps/houserepresentativenovebruns.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativerichese, .live-map-legend-dot.subtype-houserepresentativerichese { background: url("/images/maps/houserepresentativerichese.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativesor, .live-map-legend-dot.subtype-houserepresentativesor { background: url("/images/maps/houserepresentativesor.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativetaligari, .live-map-legend-dot.subtype-houserepresentativetaligari { background: url("/images/maps/houserepresentativetaligari.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativethorvald, .live-map-legend-dot.subtype-houserepresentativethorvald { background: url("/images/maps/houserepresentativethorvald.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativevernius, .live-map-legend-dot.subtype-houserepresentativevernius { background: url("/images/maps/houserepresentativevernius.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativewayku, .live-map-legend-dot.subtype-houserepresentativewayku { background: url("/images/maps/houserepresentativewayku.webp") center / contain no-repeat; }
+.live-map-marker.subtype-houserepresentativewydras, .live-map-legend-dot.subtype-houserepresentativewydras { background: url("/images/maps/houserepresentativewydras.webp") center / contain no-repeat; }
+
+.live-map-marker.subtype-fuelcellwreckage, .live-map-legend-dot.subtype-fuelcellwreckage { background: url("/images/maps/fuelcellwreckage.webp") center / contain no-repeat; }
+.live-map-marker.subtype-scrapmetalwreckage, .live-map-legend-dot.subtype-scrapmetalwreckage { background: url("/images/maps/scrapmetalwreckage.webp") center / contain no-repeat; }
+/* Part markers reuse their matching Wreckage's icon (no separate Part art)
+   but render smaller, same Ore/Pickup-style size distinction between a
+   wreck and the loose part harvested from it. */
+.live-map-marker.subtype-fuelcellpart, .live-map-legend-dot.subtype-fuelcellpart { background: url("/images/maps/fuelcellwreckage.webp") center / contain no-repeat; }
+.live-map-marker.subtype-scrapmetalpart, .live-map-legend-dot.subtype-scrapmetalpart { background: url("/images/maps/scrapmetalwreckage.webp") center / contain no-repeat; }
+.live-map-marker.subtype-fuelcellpart, .live-map-marker.subtype-scrapmetalpart { width: 14px; height: 14px; }
+.live-map-marker.subtype-fuelcellpart:hover, .live-map-marker.subtype-scrapmetalpart:hover { width: 18px; height: 18px; }
+.live-map-layer-group-header { margin: 4px 0 -2px; }
+.live-map-layer-group-header-toggle { display: flex; align-items: center; justify-content: flex-start; gap: 6px; flex: 1 1 auto; min-width: 0; background: transparent; border: none; padding: 0; font: inherit; color: #ceb894; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; cursor: pointer; text-align: left; }
+.live-map-layer-group-header-toggle:hover { color: #ffd08a; }
+.live-map-layer-group-header-toggle .live-map-layer-expand { pointer-events: none; }
+.live-map-layer-section-item { margin-left: 14px; padding-left: 8px; border-left: 1px solid #302b25; }
+.live-map-layer-group { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.live-map-layer-expand { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 20px; height: 20px; padding: 0; margin: 0; line-height: 1; background: transparent; border: 1px solid #514232; border-radius: 4px; color: #d9c8aa; font-size: 13px; cursor: pointer; }
+.live-map-layer-expand-spacer { flex: 0 0 auto; width: 22px; height: 20px; }
+.live-map-layer-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-map-layer-expand:hover { border-color: #c68b4a; color: #ffd08a; }
+.live-map-layer-sublist { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; margin-left: 22px; padding-left: 8px; border-left: 1px solid #302b25; }
+/* width:100% (from .checkbox-row.live-map-layer) is computed against the
+   containing block and margin is never subtracted from it, so
+   margin-left alone here pushed the row 14px past the sidebar's right
+   edge -- confirmed live via getBoundingClientRect (row.right exceeded
+   the sidebar's right edge by ~14px, matching this margin exactly). */
+/* --text-subtle, not another warm tan step -- every tier being some shade
+   of amber is what made them blend together in the first place. This is
+   the same neutral (blended toward the panel background, contrast-checked)
+   already used elsewhere in the app for exactly this "one more amber step
+   reads as a blur, not a hierarchy" problem. */
+.live-map-layer-sub { min-height: 28px; color: var(--text-subtle); margin-left: 14px; }
+/* .checkbox-row.live-map-layer's own width:100% (2-class specificity) beat
+   this rule's plain single-class specificity, silently reintroducing the
+   same overflow this was meant to fix -- confirmed live via
+   getBoundingClientRect (computed width stayed 100% of the parent, not
+   100%-14px). Matched to 3-class specificity so it actually wins. */
+.checkbox-row.live-map-layer.live-map-layer-sub { width: calc(100% - 14px); }
+.live-map-layer-subgroup-block { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.live-map-layer-subgroup { min-height: 28px; color: var(--text-subtle); }
 .live-map-target {
   position: absolute;
   width: 22px;
@@ -2701,26 +2960,84 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 .live-map-target:after { content: ""; position: absolute; background: #ff9d8f; }
 .live-map-target:before { left: 50%; top: -7px; width: 2px; height: 32px; transform: translateX(-50%); }
 .live-map-target:after { top: 50%; left: -7px; height: 2px; width: 32px; transform: translateY(-50%); }
-.live-map-player-status {
+/* Anchored to the marker div itself (position:absolute against its
+   position:relative-via-.live-map-marker ancestor -- see .live-map-marker's
+   own rule), so it pans/zooms with the map for free instead of needing its
+   own position math. A DOM descendant of the marker, not just a visual
+   neighbor, so mouseenter/leave on the marker (which ignore moving onto a
+   child, unlike mouseover/out) never closes it while the pointer is
+   actually over the panel. */
+/* The marker itself, not just the overlay child, needs the raised z-index:
+   .live-map-marker's position:absolute + its own z-index (the 1-4 type tier,
+   or 14+ on hover) already creates a stacking context, so a neighboring
+   marker in a HIGHER tier (e.g. a Player at 4 sitting near a Storage
+   marker at 1 whose overlay is open) paints over that entire marker's
+   subtree -- overlay included -- no matter how high the overlay's own
+   z-index claims to be. The 3-selector chain (ancestor + 2 classes) beats
+   every 2-class type/hover rule's specificity regardless of file order. */
+.live-map-marker-layer .live-map-marker.overlay-open { z-index: 50; }
+.live-map-marker-overlay {
   position: absolute;
+  top: calc(100% + 10px);
   left: 50%;
-  bottom: calc(100% + 7px);
   transform: translateX(-50%);
-  min-width: 58px;
-  padding: 4px 7px;
-  border: 1px solid #302b25;
-  border-radius: 6px;
-  background: rgba(13, 15, 17, .94);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, .35);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1;
-  text-align: center;
-  white-space: nowrap;
-  pointer-events: none;
+  z-index: 20;
+  width: 230px;
+  max-width: min(230px, calc(100vw - 32px));
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border: 1px solid #4d4032;
+  border-radius: 8px;
+  /* .6 alpha + blur, not a thinner wash on its own -- a plain 50% background
+     with no blur washed out illegibly over light map terrain (confirmed via
+     mockup review). The blur keeps the panel see-through while text stays
+     crisp regardless of what's under it. */
+  background: rgba(15, 17, 20, .6);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  /* Some anchor variants below cancel the base transform (translateX(-50%)
+     only makes sense for the centered case) -- transform was doubling as
+     this element's GPU layer-promotion trigger, so anchored overlays lost
+     it and rendered the backdrop-filter unblurred despite computed style
+     still reporting blur(10px) (a real, DOM-invisible browser compositing
+     quirk, not a CSS mistake). will-change promotes a layer independent of
+     which anchor variant is active, so every overlay blurs the same way. */
+  will-change: backdrop-filter;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .45);
+  color: #d9c8aa;
+  text-align: left;
+  white-space: normal;
+  cursor: default;
+  /* .live-map-marker sets line-height:0 to keep its own 12px dot free of
+     text-baseline whitespace -- this overlay is a DOM descendant of that
+     marker, so every plain-text row here inherited the 0 too, collapsing
+     each row to zero height and stacking them on top of each other
+     (confirmed live via getBoundingClientRect -- fact rows measured 0px
+     tall). Reset once here so it doesn't leak into real reading text. */
+  line-height: 1.4;
 }
-.live-map-player-status.online { color: var(--success-text); }
-.live-map-player-status.offline { color: var(--danger-text); }
+/* Edge-aware shift: the marker's on-screen position within the frame's
+   scrolled viewport is computed in JS (overlayAnchorClasses in
+   LiveMapPanel.tsx) since CSS alone can't see the scroll offset; the shift
+   itself stays a class toggle so the actual positioning lives here. Left
+   and right are mutually exclusive (only one ever applies); "above" is
+   independent and can combine with either. */
+.live-map-marker-overlay.anchor-left { left: 0; transform: none; }
+.live-map-marker-overlay.anchor-right { left: auto; right: 0; transform: none; }
+.live-map-marker-overlay.anchor-above { top: auto; bottom: calc(100% + 10px); }
+.live-map-marker-overlay-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+.live-map-marker-overlay-header strong { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; color: #fff1d4; }
+.live-map-marker-overlay-close { width: 22px; height: 22px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; padding: 0; background: #252017; border: 1px solid #4d4032; border-radius: 6px; color: #ceb894; font-size: 14px; line-height: 1; cursor: pointer; }
+.live-map-marker-overlay-close:hover { color: #ffd08a; border-color: #6a5842; }
+.live-map-marker-overlay-subtitle { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #ad9f89; margin: 0 0 8px; }
+.live-map-marker-overlay-facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; font-size: 12px; margin-bottom: 8px; }
+.live-map-marker-overlay-facts span { color: #ad9f89; }
+.live-map-marker-overlay-facts strong { color: #fff1d4; text-align: right; overflow-wrap: anywhere; }
+.live-map-marker-overlay-actions { display: flex; gap: 6px; margin-bottom: 6px; }
+.live-map-marker-overlay-action { flex: 1 1 0; min-width: 0; padding: 6px 10px; font-size: 12px; }
+.live-map-marker-overlay-teleport { display: grid; gap: 6px; margin-bottom: 8px; }
+.live-map-marker-overlay-teleport select { width: 100%; padding: 6px 8px; font-size: 12px; }
 .live-map-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .menu-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 12px 0 18px; }
 .menu-card { justify-content: center; min-height: 48px; white-space: normal; }
@@ -4939,6 +5256,17 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   clip-path: inset(0 round 8px);
   box-shadow: inset 0 0 0 1px #302b25;
 }
+.live-map-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(16, 19, 22, .82);
+}
 .live-map-canvas {
   z-index: 0;
   max-width: none;
@@ -5786,7 +6114,7 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   .sidebar-addon-children { padding-left: 10px; }
   .sidebar-addon-children button { min-height: 40px; }
   .live-map-layout { grid-template-columns: 1fr; }
-  .live-map-frame { height: clamp(420px, 62dvh, 700px); min-height: 0; }
+  .live-map-frame { width: 100%; min-width: 0; height: clamp(420px, 62dvh, 700px); min-height: 0; }
   .map-message-schedule-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .deep-desert-layout-section { width: 100%; }
 }
@@ -5895,7 +6223,7 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   .playerAdmin_filterTextInput { flex: 1 1 220px; min-width: 0; }
   .live-map-toolbar label { width: 100%; justify-content: space-between; }
   .live-map-toolbar input[type="range"].live-map-zoom-range { flex: 1 1 auto; width: auto; min-width: 120px; }
-  .live-map-frame { height: clamp(360px, 58dvh, 600px); }
+  .live-map-frame { width: 100%; min-width: 0; height: clamp(360px, 58dvh, 600px); }
   .log-box.large { min-height: clamp(300px, 52dvh, 480px); }
   .log-box, .concise-output { max-height: min(52dvh, 520px); }
   .app-footer-credit, .app-footer-directory { align-items: flex-start; }
@@ -5956,7 +6284,7 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   .memory-swap-panel label select, .memory-swap-panel label input { width: 100%; }
   .memory-swap-metrics { display: grid; grid-template-columns: 1fr; }
   .live-map-map-buttons { grid-template-columns: 1fr; }
-  .live-map-frame { height: max(320px, 52dvh); }
+  .live-map-frame { width: 100%; min-width: 0; height: max(320px, 52dvh); }
   .map-message-schedule-heading { align-items: stretch; flex-direction: column; }
   .map-message-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .map-message-schedule-heading button { width: 100%; }

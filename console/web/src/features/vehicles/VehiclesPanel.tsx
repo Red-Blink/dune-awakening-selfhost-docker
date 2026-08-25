@@ -10,6 +10,7 @@ type VehiclesPanelProps = {
   // signature mirrors the other panels so App.tsx can pass confirmDialog directly.
   confirmAction: (message: string, options?: { title?: string; confirmLabel?: string; warning?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
   formatMutationResult: (result: unknown) => string;
+  focusRequest?: { vehicleId: string; nonce: number };
 };
 
 const VEHICLES_AUTO_REFRESH_MS = 15 * 60_000; // 15 minutes — listVehicles is expensive
@@ -41,7 +42,7 @@ function errorText(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function VehiclesPanel({ onError }: VehiclesPanelProps) {
+export function VehiclesPanel({ onError, focusRequest }: VehiclesPanelProps) {
   const [q, setQ] = useState(() => vehiclesCache?.q ?? "");
   const [submittedQ, setSubmittedQ] = useState(() => vehiclesCache?.q ?? "");
   const [page, setPage] = useState(() => vehiclesCache?.page ?? 0);
@@ -65,6 +66,15 @@ export function VehiclesPanel({ onError }: VehiclesPanelProps) {
     }
     setPage(0);
   }, [submittedQ]);
+
+  useEffect(() => {
+    const id = String(focusRequest?.vehicleId || "").trim();
+    if (!id || !/^\d+$/.test(id)) return;
+    vehiclesCache = null;
+    setQ(id);
+    setSubmittedQ(id);
+    setPage(0);
+  }, [focusRequest?.nonce]);
 
   function submitSearch() {
     setSubmittedQ(q);
@@ -216,6 +226,8 @@ export function VehiclesPanel({ onError }: VehiclesPanelProps) {
           onSort={handleSort}
           emptyMessage="No vehicles have been found yet."
           canEditPermissions={canEditPermissions}
+          focusVehicleId={focusRequest?.vehicleId}
+          focusNonce={focusRequest?.nonce}
           // Owner and Shared With are rendered from the list response, so a
           // saved roster has to refetch or the row above keeps showing the
           // pre-edit names.
