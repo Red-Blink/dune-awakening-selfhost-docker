@@ -4021,8 +4021,9 @@ const ACCESS_LEVEL_LABELS = { 1: "Public", 2: "Guild", 3: "Associate", 4: "Co-Ow
 // and Water Storage are their own simple substring rules, matching the
 // same "anything with X in its name" logic for both. Order here is the
 // filter's display order.
-const CHILD_ACCESS_GROUP_ORDER = ["storage", "refining", "crafting", "generators", "water", "pentashield", "door", "other"];
+const CHILD_ACCESS_GROUP_ORDER = ["subfief", "storage", "refining", "crafting", "generators", "water", "pentashield", "door", "other"];
 const CHILD_ACCESS_GROUP_LABELS = {
+  subfief: "Sub-Fief",
   storage: "Storage",
   refining: "Refining",
   crafting: "Crafting",
@@ -4032,7 +4033,12 @@ const CHILD_ACCESS_GROUP_LABELS = {
   door: "Door",
   other: "Other"
 };
-function childAccessGroupFor(buildingType) {
+// isChild is permission_actor.is_child straight from the row: the base's own
+// root object (the totem, always exactly one per base -- Totem_Placeable or
+// Totem_Small_Placeable) is the only is_child=false row this query returns,
+// so that flag -- not a name guess -- is what marks it Sub-Fief.
+function childAccessGroupFor(buildingType, isChild) {
+  if (isChild === false) return "subfief";
   const key = String(buildingType || "").toLowerCase();
   for (const group of ["storage", "refining", "crafting"]) {
     if (Object.prototype.hasOwnProperty.call(BASE_INVENTORY_TYPES[group].buildingTypes, key)) return group;
@@ -4048,11 +4054,13 @@ function childAccessGroupFor(buildingType) {
   return "other";
 }
 
-// Every child piece on the base (doors, devices), regardless of its current
-// access level -- not just the ones that deviate from Sub-Fief. Child actors
-// normally match the base's own Sub-Fief access level but retain their own
-// setting; ownership transfers must preserve intentional per-object choices,
-// so this is a read-only list, not part of transferBaseToSystemCustodian.
+// Every object on the base with its own access level: every child piece
+// (doors, devices) plus the base's own root object (the totem, is_child =
+// false -- the "Sub-Fief" group), regardless of current access level, not
+// just the ones that deviate from it. These actors normally match the
+// base's own Sub-Fief access level but retain their own setting; ownership
+// transfers must preserve intentional per-object choices, so this is a
+// read-only list, not part of transferBaseToSystemCustodian.
 export async function listBaseChildAccess(db, baseId) {
   const target = intParam(baseId, "base id", 1);
   if (!(await baseChildAccessSupported(db))) {
@@ -4066,16 +4074,17 @@ export async function listBaseChildAccess(db, baseId) {
       where b.id = $1::bigint and bi.owner_entity_id is not null
     )
     select pa.actor_id::text as actor_id, coalesce(pa.actor_name, '') as actor_name,
-           pa.access_level::int as access_level, coalesce(p.building_type, '') as building_type
+           pa.access_level::int as access_level, coalesce(p.building_type, '') as building_type,
+           pa.is_child as is_child
     from base_entities be
     join dune.placeables p on p.owner_entity_id = be.owner_entity_id
-    join dune.permission_actor pa on pa.actor_id = p.id and pa.is_child = true
+    join dune.permission_actor pa on pa.actor_id = p.id
     order by pa.actor_id`, [target]);
   const rows = children.rows.map((row) => ({
     actorId: String(row.actor_id),
     name: friendlyChildAccessName(row),
     buildingType: String(row.building_type || ""),
-    group: childAccessGroupFor(row.building_type),
+    group: childAccessGroupFor(row.building_type, row.is_child),
     currentAccess: Number(row.access_level),
     currentAccessLabel: ACCESS_LEVEL_LABELS[Number(row.access_level)] || String(row.access_level),
     isSubFief: Number(row.access_level) === SUB_FIEF_ACCESS_LEVEL

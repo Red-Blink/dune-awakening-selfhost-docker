@@ -30,8 +30,9 @@ const ACCESS_LEVEL_LABELS: Record<BaseAccessLevel, string> = {
 };
 
 // Mirrors CHILD_ACCESS_GROUP_ORDER/CHILD_ACCESS_GROUP_LABELS in duneDb.js.
-const GROUP_ORDER: BaseChildAccessGroup[] = ["storage", "refining", "crafting", "generators", "water", "pentashield", "door", "other"];
+const GROUP_ORDER: BaseChildAccessGroup[] = ["subfief", "storage", "refining", "crafting", "generators", "water", "pentashield", "door", "other"];
 const GROUP_LABELS: Record<BaseChildAccessGroup, string> = {
+  subfief: "Sub-Fief",
   storage: "Storage",
   refining: "Refining",
   crafting: "Crafting",

@@ -352,9 +352,10 @@ function childAccessDb() {
       if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
       if (text.includes("to_regprocedure")) return { rows: [{ exists: true }] };
       if (text.includes("with base_entities")) return { rows: [
-        { actor_id: "44186", actor_name: "##MTX_Neut_DesertMechanic_Prudence_Door_Placeable", access_level: 5, building_type: "MTX_Neut_DesertMechanic_Prudence_Door_Placeable" },
-        { actor_id: "44187", actor_name: "##Neut_Desert_Mechanic_Garage_Door_Placeable", access_level: 2, building_type: "Neut_Desert_Mechanic_Garage_Door_Placeable" },
-        { actor_id: "44188", actor_name: "##Neut_Desert_Mechanic_Front_Door_Placeable", access_level: 3, building_type: "Neut_Desert_Mechanic_Front_Door_Placeable" }
+        { actor_id: "44186", actor_name: "##MTX_Neut_DesertMechanic_Prudence_Door_Placeable", access_level: 5, building_type: "MTX_Neut_DesertMechanic_Prudence_Door_Placeable", is_child: true },
+        { actor_id: "44187", actor_name: "##Neut_Desert_Mechanic_Garage_Door_Placeable", access_level: 2, building_type: "Neut_Desert_Mechanic_Garage_Door_Placeable", is_child: true },
+        { actor_id: "44188", actor_name: "##Neut_Desert_Mechanic_Front_Door_Placeable", access_level: 3, building_type: "Neut_Desert_Mechanic_Front_Door_Placeable", is_child: true },
+        { actor_id: "459", actor_name: "Kovalt Main", access_level: 3, building_type: "Totem_Placeable", is_child: false }
       ] };
       if (text.includes("select a.id::text as actor_id")) return { rows: [{ actor_id: ACTOR_ID, map: "HaggaBasin", map_name_id: 1, partition_id: 67 }] };
       if (text.includes("for update")) return { rows: [{ id: ACTOR_ID }], rowCount: 1 };
@@ -366,13 +367,16 @@ function childAccessDb() {
   return db;
 }
 
-test("listBaseChildAccess lists every child piece, flagging which ones match Sub-Fief", async () => {
+test("listBaseChildAccess lists every child piece plus the base's own root object, flagging which ones match Sub-Fief", async () => {
   const result = await listBaseChildAccess(childAccessDb(), BASE_ID);
-  assert.equal(result.inspected, 3);
+  assert.equal(result.inspected, 4);
   assert.deepEqual(result.rows, [
     { actorId: "44186", name: "DesertMechanic Prudence Door", buildingType: "MTX_Neut_DesertMechanic_Prudence_Door_Placeable", group: "door", currentAccess: 5, currentAccessLabel: "Owner", isSubFief: false },
     { actorId: "44187", name: "Desert Mechanic Garage Door", buildingType: "Neut_Desert_Mechanic_Garage_Door_Placeable", group: "door", currentAccess: 2, currentAccessLabel: "Guild", isSubFief: false },
-    { actorId: "44188", name: "Desert Mechanic Front Door", buildingType: "Neut_Desert_Mechanic_Front_Door_Placeable", group: "door", currentAccess: 3, currentAccessLabel: "Associate", isSubFief: true }
+    { actorId: "44188", name: "Desert Mechanic Front Door", buildingType: "Neut_Desert_Mechanic_Front_Door_Placeable", group: "door", currentAccess: 3, currentAccessLabel: "Associate", isSubFief: true },
+    // is_child = false: the base's own totem, not a door/device -- grouped
+    // as Sub-Fief regardless of its building_type.
+    { actorId: "459", name: "Kovalt Main", buildingType: "Totem_Placeable", group: "subfief", currentAccess: 3, currentAccessLabel: "Associate", isSubFief: true }
   ]);
 });
 
@@ -399,16 +403,20 @@ test("listBaseChildAccess categorizes a piece into the right Type filter group",
     ["Atreides_DoorTall_Placeable", "door"],
     ["Choam_Shelter_DoorWide_Placeable", "door"],
     // Not in the curated map and no other substring rule applies.
-    ["Wall_Placeable", "other"]
+    ["Wall_Placeable", "other"],
+    // is_child = false always wins Sub-Fief, regardless of building_type --
+    // even one that would otherwise match a substring rule.
+    ["Totem_Placeable", "subfief", false],
+    ["Generator_Placeable", "subfief", false]
   ];
-  for (const [buildingType, expectedGroup] of cases) {
-    await t.test(`${buildingType} -> ${expectedGroup}`, async () => {
+  for (const [buildingType, expectedGroup, isChild = true] of cases) {
+    await t.test(`${buildingType} (is_child=${isChild}) -> ${expectedGroup}`, async () => {
       const db = {
         query: async (text) => {
           if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
           if (text.includes("to_regprocedure")) return { rows: [{ exists: true }] };
           if (text.includes("with base_entities")) return { rows: [
-            { actor_id: "44190", actor_name: `##${buildingType}`, access_level: 2, building_type: buildingType }
+            { actor_id: "44190", actor_name: `##${buildingType}`, access_level: 2, building_type: buildingType, is_child: isChild }
           ] };
           return { rows: [] };
         }

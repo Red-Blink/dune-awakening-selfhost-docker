@@ -324,7 +324,7 @@ export type BaseAccessLevel = 1 | 2 | 3 | 4 | 5;
 // BASE_INVENTORY_TYPES: most child pieces (doors, generators, turbines, the
 // totem) carry no inventory at all, so this tab's grouping is broader than
 // the Inventory tab's (which only covers actual dune.inventories rows).
-export type BaseChildAccessGroup = "storage" | "refining" | "crafting" | "generators" | "water" | "pentashield" | "door" | "other";
+export type BaseChildAccessGroup = "subfief" | "storage" | "refining" | "crafting" | "generators" | "water" | "pentashield" | "door" | "other";
 
 export type BaseChildAccessRow = {
   actorId: string;
