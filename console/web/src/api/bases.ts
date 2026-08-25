@@ -320,10 +320,17 @@ export type BasePermissionEntry = {
 // (Public, Guild) or narrower (Co-Owner, Owner) than that.
 export type BaseAccessLevel = 1 | 2 | 3 | 4 | 5;
 
+// Matches childAccessGroupFor's categories in duneDb.js -- its own map, not
+// BASE_INVENTORY_TYPES: most child pieces (doors, generators, turbines, the
+// totem) carry no inventory at all, so this tab's grouping is broader than
+// the Inventory tab's (which only covers actual dune.inventories rows).
+export type BaseChildAccessGroup = "storage" | "refining" | "crafting" | "generators" | "water" | "pentashield" | "door" | "other";
+
 export type BaseChildAccessRow = {
   actorId: string;
   name: string;
   buildingType: string;
+  group: BaseChildAccessGroup;
   currentAccess: BaseAccessLevel;
   currentAccessLabel: string;
   isSubFief: boolean;

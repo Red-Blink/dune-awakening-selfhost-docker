@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { basesApi, type BaseChildAccessRow } from "../../api/bases";
+import { basesApi, type BaseChildAccessGroup, type BaseChildAccessRow } from "../../api/bases";
 import { BaseChildPermissionsTab } from "./BaseChildPermissionsTab";
 
 vi.mock("../../api/bases", () => ({
@@ -10,9 +10,12 @@ vi.mock("../../api/bases", () => ({
   }
 }));
 
-function row(actorId: string, name: string, buildingType: string, currentAccess: 1 | 2 | 3 | 4 | 5): BaseChildAccessRow {
+function row(
+  actorId: string, name: string, buildingType: string, currentAccess: 1 | 2 | 3 | 4 | 5,
+  group: BaseChildAccessGroup = "other"
+): BaseChildAccessRow {
   return {
-    actorId, name, buildingType, currentAccess,
+    actorId, name, buildingType, group, currentAccess,
     currentAccessLabel: { 1: "Public", 2: "Guild", 3: "Associate", 4: "Co-Owner", 5: "Owner" }[currentAccess],
     isSubFief: currentAccess === 3
   };
@@ -41,7 +44,7 @@ describe("BaseChildPermissionsTab", () => {
     mockRows([row("14274", "Generator", "Generator_Placeable", 2)]);
     renderTab();
 
-    expect(await screen.findByText("Generator")).toBeInTheDocument();
+    expect(await screen.findByText("Generator", { selector: "strong" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Guild for Generator" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "Associate for Generator" })).not.toBeChecked();
   });
@@ -59,12 +62,12 @@ describe("BaseChildPermissionsTab", () => {
     ]);
     renderTab();
 
-    expect(await screen.findByText("Generator")).toBeInTheDocument();
-    expect(screen.getByText("Wooden Door")).toBeInTheDocument();
+    expect(await screen.findByText("Generator", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.getByText("Wooden Door", { selector: "strong" })).toBeInTheDocument();
     expect(screen.getByText("Pieces · 2")).toBeInTheDocument();
     expect(screen.getByText("1 not Sub-Fief")).toBeInTheDocument();
-    expect(screen.getByText("Generator").closest(".bases-child-access-row")).toHaveClass("unusual");
-    expect(screen.getByText("Wooden Door").closest(".bases-child-access-row")).not.toHaveClass("unusual");
+    expect(screen.getByText("Generator", { selector: "strong" }).closest(".bases-child-access-row")).toHaveClass("unusual");
+    expect(screen.getByText("Wooden Door", { selector: "strong" }).closest(".bases-child-access-row")).not.toHaveClass("unusual");
   });
 
   it("omits the not-Sub-Fief count when every piece already matches", async () => {
@@ -102,15 +105,65 @@ describe("BaseChildPermissionsTab", () => {
     expect(basesApi.setChildAccess).not.toHaveBeenCalled();
   });
 
-  it("Reset Selected stages checked rows back to Associate", async () => {
+  it("Apply to Selected stages checked rows to the chosen level, defaulting to Associate", async () => {
     mockRows([row("14274", "Generator", "Generator_Placeable", 2)]);
     renderTab();
 
     fireEvent.click(await screen.findByRole("checkbox", { name: "Select Generator" }));
-    fireEvent.click(screen.getByRole("button", { name: "Reset Selected to Sub-Fief" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply to Selected" }));
 
     await waitFor(() => expect(screen.getByRole("radio", { name: "Associate for Generator" })).toBeChecked());
     expect(basesApi.setChildAccess).not.toHaveBeenCalled();
+  });
+
+  it("Apply to Selected uses whichever level is chosen in the Apply dropdown", async () => {
+    mockRows([row("14274", "Generator", "Generator_Placeable", 2)]);
+    renderTab();
+
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Select Generator" }));
+    fireEvent.change(screen.getByLabelText("Apply"), { target: { value: "5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply to Selected" }));
+
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Owner for Generator" })).toBeChecked());
+  });
+
+  it("filters the list by master category, and Select All only selects the currently visible pieces", async () => {
+    mockRows([
+      row("14274", "Generator", "Generator_Placeable", 2, "generators"),
+      row("14300", "Storage Container", "StorageContainer_Placeable", 2, "storage")
+    ]);
+    renderTab();
+
+    await screen.findByText("Generator", { selector: "strong" });
+    fireEvent.change(screen.getByLabelText("Type"), { target: { value: "generators" } });
+
+    expect(screen.getByText("Generator", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.queryByText("Storage Container", { selector: "strong" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Select All" }));
+    expect(screen.getByRole("checkbox", { name: "Select Generator" })).toBeChecked();
+
+    // Clearing the filter reveals the Storage Container row again, unselected --
+    // Select All while filtered never reached it.
+    fireEvent.change(screen.getByLabelText("Type"), { target: { value: "all" } });
+    expect(screen.getByRole("checkbox", { name: "Select Storage Container" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Select Generator" })).toBeChecked();
+  });
+
+  it("offers only the master categories actually present, not individual building types", async () => {
+    mockRows([
+      row("14274", "Generator", "Generator_Placeable", 2, "generators"),
+      row("14300", "Storage Container", "StorageContainer_Placeable", 2, "storage"),
+      row("14310", "Small Ore Refinery", "SmallOreRefinery_Placeable", 2, "refining"),
+      row("14320", "Water Cistern", "WaterCistern_Placeable", 2, "water")
+    ]);
+    renderTab();
+
+    const typeSelect = await screen.findByLabelText("Type");
+    const optionLabels = [...typeSelect.querySelectorAll("option")].map((option) => option.textContent);
+    // No Crafting or Other option -- no row in this fixture belongs to either,
+    // and no individual building type (e.g. "Generator") ever appears.
+    expect(optionLabels).toEqual(["All Types", "Storage", "Refining", "Generators", "Water Storage"]);
   });
 
   it("saves only the changed rows after confirmation, then reloads", async () => {

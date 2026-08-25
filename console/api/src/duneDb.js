@@ -4010,6 +4010,44 @@ async function baseChildAccessSupported(db) {
 const SUB_FIEF_ACCESS_LEVEL = 3;
 const ACCESS_LEVEL_LABELS = { 1: "Public", 2: "Guild", 3: "Associate", 4: "Co-Owner", 5: "Owner" };
 
+// Categorizes a child piece for the Base Permissions tab's Type filter.
+// Deliberately its own map, not a reuse of BASE_INVENTORY_TYPES: that one
+// drives baseInventory's SQL join against real dune.inventories rows, and
+// most child pieces here (doors, generators, turbines, the totem) carry no
+// inventory at all -- extending it would risk changing what the Inventory
+// tab actually shows for a reason unrelated to this feature. Storage/
+// Refining/Crafting still borrow that map's own curated building-type keys
+// for consistent naming where the two features genuinely overlap; Generators
+// and Water Storage are their own simple substring rules, matching the
+// same "anything with X in its name" logic for both. Order here is the
+// filter's display order.
+const CHILD_ACCESS_GROUP_ORDER = ["storage", "refining", "crafting", "generators", "water", "pentashield", "door", "other"];
+const CHILD_ACCESS_GROUP_LABELS = {
+  storage: "Storage",
+  refining: "Refining",
+  crafting: "Crafting",
+  generators: "Generators",
+  water: "Water Storage",
+  pentashield: "Pentashield",
+  door: "Door",
+  other: "Other"
+};
+function childAccessGroupFor(buildingType) {
+  const key = String(buildingType || "").toLowerCase();
+  for (const group of ["storage", "refining", "crafting"]) {
+    if (Object.prototype.hasOwnProperty.call(BASE_INVENTORY_TYPES[group].buildingTypes, key)) return group;
+  }
+  // Wind turbines are generators too (WindTurbineDirectional_Placeable,
+  // WindTurbineOmnidirectional_Placeable) -- "turbine", not "wind", so this
+  // does not also pull in Windtrap_Placeable/LargeWindtrap_Placeable, which
+  // are moisture collectors, not power generation.
+  if (key.includes("generator") || key.includes("turbine")) return "generators";
+  if (key.includes("water")) return "water";
+  if (key.includes("pentashield")) return "pentashield";
+  if (key.includes("door")) return "door";
+  return "other";
+}
+
 // Every child piece on the base (doors, devices), regardless of its current
 // access level -- not just the ones that deviate from Sub-Fief. Child actors
 // normally match the base's own Sub-Fief access level but retain their own
@@ -4037,6 +4075,7 @@ export async function listBaseChildAccess(db, baseId) {
     actorId: String(row.actor_id),
     name: friendlyChildAccessName(row),
     buildingType: String(row.building_type || ""),
+    group: childAccessGroupFor(row.building_type),
     currentAccess: Number(row.access_level),
     currentAccessLabel: ACCESS_LEVEL_LABELS[Number(row.access_level)] || String(row.access_level),
     isSubFief: Number(row.access_level) === SUB_FIEF_ACCESS_LEVEL
@@ -10242,11 +10281,19 @@ const BASE_INVENTORY_TYPES = {
       vehiclesfabricator_placeable: "Vehicles Fabricator",
       weaponsfabricator_placeable: "Weapons Fabricator",
       wearablesfabricator_placeable: "Garment Fabricator",
-      advancedsurvivalfabricator_placeable: "Advanced Survival Fabricator",
-      // Singular "Vehicle" -- the game is inconsistent here, the base building
-      // is VehiclesFabricator_Placeable but the advanced one is
-      // AdvancedVehicleFabricator_Placeable. Verified in the shipped paks.
-      advancedvehiclefabricator_placeable: "Advanced Vehicle Fabricator",
+      // Both Advanced_ entries carry a literal underscore after "Advanced"
+      // that the other three Advanced fabricators below do not -- confirmed
+      // against real placed buildings (kovalt_test.backup), not the pak
+      // asset names the no-underscore forms were pulled from (see
+      // [[reference_building_type_extraction_from_paks]]: presence in the
+      // paks is proof an asset exists, not proof of the exact instantiated
+      // building_type string). Getting this wrong silently dropped every
+      // Advanced Survival/Vehicles Fabricator out of the Inventory tab's
+      // Crafting group entirely, via baseInventory's inner join.
+      advanced_survivalfabricator_placeable: "Advanced Survival Fabricator",
+      // Also plural "Vehicles", matching the base building below it, not the
+      // singular "Vehicle" a prior pak-only read assumed.
+      advanced_vehiclesfabricator_placeable: "Advanced Vehicles Fabricator",
       advancedweaponsfabricator_placeable: "Advanced Weapons Fabricator",
       advancedwearablesfabricator_placeable: "Advanced Garment Fabricator"
     }
@@ -10286,6 +10333,7 @@ function baseInventoryTypeParams() {
     BASE_INVENTORY_TRIPLES.map(([, , typeName]) => typeName)
   ];
 }
+
 
 // Every stored item at a base, rolled up two ways off one query: by item
 // template (what does this base hold, and where) and by container (what is in

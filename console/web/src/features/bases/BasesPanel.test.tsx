@@ -1001,7 +1001,7 @@ describe("BasesPanel permissions editing", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Show details for Sietch One" }));
     expect(screen.queryByRole("tab", { name: "Sub-Fief Permissions" })).not.toBeInTheDocument();
     fireEvent.click(await screen.findByRole("tab", { name: "Base Permissions" }));
-    expect(await screen.findByText("Generator")).toBeInTheDocument();
+    expect(await screen.findByText("Generator", { selector: "strong" })).toBeInTheDocument();
   });
 
   // Inventory sits between Water and Permissions, and is ungated the way Water

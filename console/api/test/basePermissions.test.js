@@ -370,10 +370,53 @@ test("listBaseChildAccess lists every child piece, flagging which ones match Sub
   const result = await listBaseChildAccess(childAccessDb(), BASE_ID);
   assert.equal(result.inspected, 3);
   assert.deepEqual(result.rows, [
-    { actorId: "44186", name: "DesertMechanic Prudence Door", buildingType: "MTX_Neut_DesertMechanic_Prudence_Door_Placeable", currentAccess: 5, currentAccessLabel: "Owner", isSubFief: false },
-    { actorId: "44187", name: "Desert Mechanic Garage Door", buildingType: "Neut_Desert_Mechanic_Garage_Door_Placeable", currentAccess: 2, currentAccessLabel: "Guild", isSubFief: false },
-    { actorId: "44188", name: "Desert Mechanic Front Door", buildingType: "Neut_Desert_Mechanic_Front_Door_Placeable", currentAccess: 3, currentAccessLabel: "Associate", isSubFief: true }
+    { actorId: "44186", name: "DesertMechanic Prudence Door", buildingType: "MTX_Neut_DesertMechanic_Prudence_Door_Placeable", group: "door", currentAccess: 5, currentAccessLabel: "Owner", isSubFief: false },
+    { actorId: "44187", name: "Desert Mechanic Garage Door", buildingType: "Neut_Desert_Mechanic_Garage_Door_Placeable", group: "door", currentAccess: 2, currentAccessLabel: "Guild", isSubFief: false },
+    { actorId: "44188", name: "Desert Mechanic Front Door", buildingType: "Neut_Desert_Mechanic_Front_Door_Placeable", group: "door", currentAccess: 3, currentAccessLabel: "Associate", isSubFief: true }
   ]);
+});
+
+test("listBaseChildAccess categorizes a piece into the right Type filter group", async (t) => {
+  const cases = [
+    ["StorageContainer_Placeable", "storage"],
+    ["SmallOreRefinery_Placeable", "refining"],
+    ["Fabricator_Placeable", "crafting"],
+    // Substring rules, not exact curated keys: anything with "generator" or
+    // "water" in its name, matching how the user asked for these two --
+    // "Generators" and "Water Storage" for anything with water in its name.
+    ["Generator_Placeable", "generators"],
+    // Wind turbines are generators too -- "turbine", not "wind", so a
+    // moisture-collecting Windtrap (below) is not swept in alongside them.
+    ["WindTurbineDirectional_Placeable", "generators"],
+    ["WindTurbineOmnidirectional_Placeable", "generators"],
+    ["WaterCistern_Placeable", "water"],
+    ["MediumWaterCistern_Placeable", "water"],
+    ["BloodWaterExtractionAdvanced_Placeable", "water"],
+    // Moisture collector, not a generator -- no "turbine" substring.
+    ["Windtrap_Placeable", "other"],
+    ["Choam_PentashieldSurfaceHorizontal_Placeable", "pentashield"],
+    ["Choam_PentashieldSurfaceVertical_Placeable", "pentashield"],
+    ["Atreides_DoorTall_Placeable", "door"],
+    ["Choam_Shelter_DoorWide_Placeable", "door"],
+    // Not in the curated map and no other substring rule applies.
+    ["Wall_Placeable", "other"]
+  ];
+  for (const [buildingType, expectedGroup] of cases) {
+    await t.test(`${buildingType} -> ${expectedGroup}`, async () => {
+      const db = {
+        query: async (text) => {
+          if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+          if (text.includes("to_regprocedure")) return { rows: [{ exists: true }] };
+          if (text.includes("with base_entities")) return { rows: [
+            { actor_id: "44190", actor_name: `##${buildingType}`, access_level: 2, building_type: buildingType }
+          ] };
+          return { rows: [] };
+        }
+      };
+      const result = await listBaseChildAccess(db, BASE_ID);
+      assert.equal(result.rows[0].group, expectedGroup);
+    });
+  }
 });
 
 test("setBaseChildAccessLevels writes each requested level, including a piece that already matched Sub-Fief, and refuses an actor that isn't a child of this base", async () => {

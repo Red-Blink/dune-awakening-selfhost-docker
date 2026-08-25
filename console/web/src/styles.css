@@ -4475,8 +4475,24 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 }
 .bases-child-access-head > div:first-child { display: grid; gap: 3px; min-width: 0; }
 .bases-child-access-head p { margin: 0; font-size: 12px; }
-.bases-child-access-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+/* Its own full-width row below the head, not squeezed into a space-between
+   split against the "Pieces · N" title -- four controls plus that title
+   competing for one row's width was what forced a premature wrap. */
+.bases-child-access-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .bases-child-access-actions button { width: auto; white-space: nowrap; }
+/* Label text beside its select, not stacked above it (the global `label`
+   rule is `display: grid`, text row then control row) -- same fix as
+   .bases-permissions-search-row .compact-select, and for the same reason:
+   stacked labels are taller than the plain buttons alongside them, so
+   `align-items: center` centers those buttons on the *label's* full height
+   and they render visibly higher than the select boxes' own midline. */
+.bases-child-access-actions .compact-select {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
 .bases-child-access-list { display: grid; gap: 6px; max-height: 240px; overflow-y: auto; overscroll-behavior: contain; }
 .bases-child-access-row {
   display: grid;
@@ -4573,7 +4589,6 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   }
   .bases-permissions-intro > .action-help-note { max-width: none; }
   .bases-child-access-head { align-items: stretch; flex-direction: column; }
-  .bases-child-access-actions { justify-content: flex-end; }
   /* Five segments need more width than the name column leaves on a phone --
      stack the control under the checkbox/name row instead of squeezing it. */
   .bases-child-access-row {

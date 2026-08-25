@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { basesApi, type BaseAccessLevel, type BaseChildAccessRow } from "../../api/bases";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { basesApi, type BaseAccessLevel, type BaseChildAccessGroup, type BaseChildAccessRow } from "../../api/bases";
 import { errorText } from "../permissions/rosterEditor";
 
 type Props = {
@@ -27,6 +27,19 @@ const ACCESS_LEVEL_LABELS: Record<BaseAccessLevel, string> = {
   3: "Associate",
   4: "Co-Owner",
   5: "Owner"
+};
+
+// Mirrors CHILD_ACCESS_GROUP_ORDER/CHILD_ACCESS_GROUP_LABELS in duneDb.js.
+const GROUP_ORDER: BaseChildAccessGroup[] = ["storage", "refining", "crafting", "generators", "water", "pentashield", "door", "other"];
+const GROUP_LABELS: Record<BaseChildAccessGroup, string> = {
+  storage: "Storage",
+  refining: "Refining",
+  crafting: "Crafting",
+  generators: "Generators",
+  water: "Water Storage",
+  pentashield: "Pentashield",
+  door: "Door",
+  other: "Other"
 };
 
 // Same native-radio segmented control as RankSegments, under its own class
@@ -70,6 +83,8 @@ export function BaseChildPermissionsTab({ baseId, baseName, confirmAction, onErr
   const [saved, setSaved] = useState<Record<string, BaseAccessLevel>>({});
   const [draft, setDraft] = useState<Record<string, BaseAccessLevel>>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [applyLevel, setApplyLevel] = useState<BaseAccessLevel>(SUB_FIEF_ACCESS_LEVEL);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
   const [statusKind, setStatusKind] = useState<"" | "ok" | "fail">("");
@@ -87,6 +102,7 @@ export function BaseChildPermissionsTab({ baseId, baseName, confirmAction, onErr
       setSaved(levels);
       setDraft(levels);
       setSelected(new Set());
+      setTypeFilter("all");
     } catch (error) {
       setLoadError(errorText(error));
     } finally {
@@ -108,15 +124,32 @@ export function BaseChildPermissionsTab({ baseId, baseName, confirmAction, onErr
   const dirty = rows.some((row) => draft[row.actorId] !== saved[row.actorId]);
   const deviatingCount = rows.filter((row) => !row.isSubFief).length;
 
+  // Only the master categories are selectable, not individual building
+  // types -- one option per category actually present among this base's
+  // pieces, in GROUP_ORDER.
+  const presentGroups = useMemo(() => {
+    const present = new Set(rows.map((row) => row.group));
+    return GROUP_ORDER.filter((group) => present.has(group));
+  }, [rows]);
+  const visibleRows = useMemo(
+    () => typeFilter === "all" ? rows : rows.filter((row) => row.group === typeFilter),
+    [rows, typeFilter]
+  );
+  const visibleIds = useMemo(() => visibleRows.map((row) => row.actorId), [visibleRows]);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
+
   function changeLevel(actorId: string, level: BaseAccessLevel) {
     setDraft((current) => ({ ...current, [actorId]: level }));
   }
 
-  function resetSelected() {
+  // Acts on every currently checked row regardless of the type filter --
+  // once a piece is checked it stays part of the batch even if you narrow
+  // the filter afterward, matching normal filtered-table behavior.
+  function applyLevelToSelected(level: BaseAccessLevel) {
     if (!selected.size) return;
     setDraft((current) => {
       const next = { ...current };
-      for (const actorId of selected) next[actorId] = SUB_FIEF_ACCESS_LEVEL;
+      for (const actorId of selected) next[actorId] = level;
       return next;
     });
   }
@@ -129,8 +162,17 @@ export function BaseChildPermissionsTab({ baseId, baseName, confirmAction, onErr
     });
   }
 
+  // Selects (or clears) only the rows the current type filter is showing --
+  // a hidden row that was already checked stays checked, and this never
+  // reaches into pieces the filter has hidden.
   function toggleSelectAll() {
-    setSelected((current) => current.size === rows.length ? new Set() : new Set(rows.map((row) => row.actorId)));
+    setSelected((current) => {
+      const next = new Set(current);
+      for (const id of visibleIds) {
+        if (allVisibleSelected) next.delete(id); else next.add(id);
+      }
+      return next;
+    });
   }
 
   async function save() {
@@ -195,14 +237,28 @@ export function BaseChildPermissionsTab({ baseId, baseName, confirmAction, onErr
               <span className="bases-permissions-section-title">Pieces · {rows.length}</span>
               {deviatingCount > 0 && <span className="bases-permissions-section-meta">{deviatingCount} not Sub-Fief</span>}
             </div>
-            <div className="bases-child-access-actions">
-              <button disabled={saving} onClick={toggleSelectAll}>
-                {selected.size === rows.length ? "Clear" : "Select All"}
-              </button>
-              <button className="warning" disabled={saving || selected.size === 0} onClick={resetSelected}>
-                Reset Selected to Sub-Fief
-              </button>
-            </div>
+          </div>
+
+          <div className="bases-child-access-actions">
+            <label className="compact-select">
+              Type
+              <select value={typeFilter} disabled={saving} onChange={(event) => setTypeFilter(event.target.value)}>
+                <option value="all">All Types</option>
+                {presentGroups.map((group) => <option key={group} value={group}>{GROUP_LABELS[group]}</option>)}
+              </select>
+            </label>
+            <button disabled={saving} onClick={toggleSelectAll}>
+              {allVisibleSelected ? "Clear" : "Select All"}
+            </button>
+            <label className="compact-select">
+              Apply
+              <select value={String(applyLevel)} disabled={saving} onChange={(event) => setApplyLevel(Number(event.target.value) as BaseAccessLevel)}>
+                {ACCESS_LEVEL_OPTIONS.map((level) => <option key={level} value={level}>{ACCESS_LEVEL_LABELS[level]}</option>)}
+              </select>
+            </label>
+            <button className="warning" disabled={saving || selected.size === 0} onClick={() => applyLevelToSelected(applyLevel)}>
+              Apply to Selected
+            </button>
           </div>
 
           <div className="bases-child-access-list">
@@ -211,7 +267,7 @@ export function BaseChildPermissionsTab({ baseId, baseName, confirmAction, onErr
                 labels double-fires on click (the outer label's implicit
                 checkbox toggle plus whichever segment was actually clicked).
                 The checkbox gets an explicit aria-label instead. */}
-            {rows.map((row) => (
+            {visibleRows.map((row) => (
               <div className={`bases-child-access-row${row.isSubFief ? "" : " unusual"}`} key={row.actorId}>
                 <input
                   type="checkbox"

@@ -73,11 +73,31 @@ Each row shows the piece's friendly name and a segmented control of the five
 levels — the same native-radio pattern as the Sub-Fief roster's rank
 control, under its own class names and its own 5-option scale. Selecting a
 segment only stages the change in local draft state; nothing is written
-until **Save changes**, which posts every changed row in one call. A
-**Reset Selected** action (with **Select All**) stages the checked rows back
-to Associate without a network round-trip, for the common case of "put
-these back to normal" (harmless to include rows already at Associate — only
-the rows that actually changed are sent on Save).
+until **Save changes**, which posts every changed row in one call (harmless
+to include a row already at its current level — only the rows that actually
+changed are sent).
+
+A **Type** dropdown filters the list to one master category at a time —
+Storage, Refining, Crafting, Generators, Water Storage, Pentashield, Door,
+or Other — not individual building types, so a base with hundreds of pieces
+still narrows to a manageable choice. This is its own categorization, not
+the Inventory tab's `BASE_INVENTORY_TYPES`: most child pieces here (doors,
+generators, turbines, the totem) carry no inventory at all and would all
+land in "other" under that map. Storage/Refining/Crafting still borrow its
+curated building-type keys for consistent naming; Generators, Water Storage,
+Pentashield, and Door are simple case-insensitive substring rules
+("generator"/"turbine", "water", "pentashield", "door" anywhere in the
+building type), so e.g. `BloodWaterExtractionAdvanced_Placeable` counts as
+Water Storage and `Choam_PentashieldSurfaceVertical_Placeable` counts as
+Pentashield. Only categories actually present on this base appear in the
+dropdown. **Select All** only checks the pieces the current filter is
+showing — a piece checked earlier under a
+different filter stays checked even once it scrolls out of view, but Select
+All itself never reaches into pieces the filter is hiding. The **Apply**
+dropdown (defaulting to Associate) plus **Apply to Selected** stages every
+currently checked row — regardless of the active filter — to whichever
+level is chosen, the general form of "put these back to Sub-Fief" (pick
+Associate) or any other bulk change.
 
 ## Capability gating
 
