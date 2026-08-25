@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { Task } from "../../api/setup";
 import { liveMapApi } from "../../api/liveMap";
-import { LiveMapPanel } from "./LiveMapPanel";
+import { LiveMapPanel, mergeLiveMapRows } from "./LiveMapPanel";
 
 function fakeTask(status: Task["status"]): Task {
   return {
@@ -63,6 +63,17 @@ beforeEach(() => {
     defaultMap: "HaggaBasin",
     partitions: [{ map: "HaggaBasin", partition_id: 1, name: "Sietch New", marker_count: 4 }]
   });
+});
+
+it("retains static markers during live-only refreshes without carrying them across maps", () => {
+  const previous = [
+    { id: "ore-1", type: "ore" as const, map: "HaggaBasin", x: 1, y: 1 },
+    { id: "ore-2", type: "ore" as const, map: "DeepDesert", x: 2, y: 2 },
+    { id: "player-old", type: "player" as const, map: "HaggaBasin", x: 3, y: 3 }
+  ];
+  const incoming = [{ id: "player-new", type: "player" as const, map: "HaggaBasin", x: 4, y: 4 }];
+  expect(mergeLiveMapRows(previous, incoming, false, "HaggaBasin").map((row) => row.id)).toEqual(["ore-1", "player-new"]);
+  expect(mergeLiveMapRows(previous, incoming, true, "HaggaBasin")).toEqual(incoming);
 });
 
 it("shows a base owner and opens that exact base from the marker drawer", async () => {

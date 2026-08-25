@@ -1262,11 +1262,12 @@ async function liveMapMarkersRoute(res, url) {
     const configPayload = duneDb.liveMapConfigPayload(url.searchParams.get("map") || "");
     const activeMap = configPayload.map.actorMap || configPayload.map.key;
     const partitionId = url.searchParams.get("partitionId") || "";
+    const includeStatic = url.searchParams.get("static") !== "0";
     const [markers, partitions, spice, poi] = await Promise.all([
       duneDb.liveMapMarkers(db, activeMap),
       duneDb.liveMapPartitions(db).catch(() => ({ rows: [] })),
-      liveMapSpice(db, config, activeMap, { partitionId }).catch(() => ({ capabilities: { spice: false, spice_active: false, flour_sand: false }, rows: [] })),
-      liveMapPoi(db, activeMap).catch(() => ({ capabilities: {}, rows: [] }))
+      liveMapSpice(db, config, activeMap, { partitionId, includeStaticPool: includeStatic }).catch(() => ({ capabilities: { ...(includeStatic ? { spice: false } : {}), spice_active: false, flour_sand: false }, rows: [] })),
+      includeStatic ? liveMapPoi(db, activeMap).catch(() => ({ capabilities: {}, rows: [] })) : Promise.resolve({ capabilities: {}, rows: [] })
     ]);
     return {
       ...markers,

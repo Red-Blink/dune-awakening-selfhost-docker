@@ -20,6 +20,9 @@ const NEXT_CYCLE_LINE = /Next Coriolis Cycle start date UTC:\s*(\d{4})\.(\d{2})\
 // runs) is the fallback so a disabled overmap doesn't blank out the seed
 // and countdown farm-wide.
 const FALLBACK_SERVICES = ["overmap", "survival-1"];
+const CYCLE_CACHE_MS = 30000;
+const CYCLE_CACHE_MAX_ENTRIES = 128;
+const cycleCache = new Map();
 
 // Dynamic per-partition containers follow the same naming convention
 // memoryBalancer.js already relies on the other direction (container name ->
@@ -34,7 +37,7 @@ const FALLBACK_SERVICES = ["overmap", "survival-1"];
 // always reading whichever happens to be Hagga Basin's.
 function partitionContainerCandidates(map, partitionId) {
   const id = partitionId === undefined || partitionId === null ? "" : String(partitionId).trim();
-  if (!id) return [];
+  if (!/^[1-9]\d{0,18}$/.test(id)) return [];
   if (map === "HaggaBasin") return id === "1" ? ["dune-server-survival-1"] : [`dune-server-survival-1-${id}`];
   if (map === "DeepDesert") return [`dune-server-deepdesert-1-${id}`, "dune-server-deepdesert-1"];
   return [];
@@ -80,17 +83,40 @@ export async function resolveCurrentSeed(options = {}) {
   return (await resolveCoriolisCycle(options)).seed;
 }
 
-// One combined resolver so a single `docker logs` call (already invoked on
-// every live-map auto-refresh poll) covers both the seed and the countdown,
-// rather than doubling the docker call rate -- and only falls through to
+// One combined resolver so a single cached `docker logs` result covers both
+// the seed and the countdown, rather than doubling the Docker call rate --
+// and only falls through to
 // another container when the current one comes up genuinely empty. Pass the
 // selected map/partitionId so the countdown reflects that partition's own
 // container instead of always reading overmap/Hagga Basin's.
 export async function resolveCoriolisCycle({ map, partitionId, services, ...options } = {}) {
-  const candidates = services || [...partitionContainerCandidates(map, partitionId), ...FALLBACK_SERVICES];
+  const candidates = [...new Set(services || [...partitionContainerCandidates(map, partitionId), ...FALLBACK_SERVICES])];
+  // The Live Map polls every five seconds, while both values only change at
+  // the weekly Coriolis boundary. Avoid repeatedly tailing up to 10,000 log
+  // lines for every open browser. Injected log runners bypass this cache so
+  // tests and diagnostics always observe the call they requested.
+  const cacheable = !options.runLogs;
+  const cacheKey = candidates.join("\u0000");
+  const now = Date.now();
+  const cached = cacheable ? cycleCache.get(cacheKey) : null;
+  if (cached && cached.expiresAt > now) return cached.value;
+
+  let resolved = { seed: null, nextCycleAt: null };
   for (const service of candidates) {
     const result = parseCoriolisLog(await fetchCoriolisLog(service, options));
-    if (result.seed || result.nextCycleAt) return result;
+    if (result.seed || result.nextCycleAt) {
+      resolved = result;
+      break;
+    }
   }
-  return { seed: null, nextCycleAt: null };
+  if (cacheable) {
+    for (const [key, entry] of cycleCache) {
+      if (entry.expiresAt <= now) cycleCache.delete(key);
+    }
+    if (!cycleCache.has(cacheKey) && cycleCache.size >= CYCLE_CACHE_MAX_ENTRIES) {
+      cycleCache.delete(cycleCache.keys().next().value);
+    }
+    cycleCache.set(cacheKey, { expiresAt: now + CYCLE_CACHE_MS, value: resolved });
+  }
+  return resolved;
 }

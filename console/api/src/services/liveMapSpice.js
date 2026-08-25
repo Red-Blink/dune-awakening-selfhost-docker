@@ -44,6 +44,7 @@ import { liveMapSpiceFieldRows, liveMapFlourSandFieldRows } from "../duneDb.js";
 export async function liveMapSpice(db, config, map = "", {
   resolveCycle = resolveCoriolisCycle,
   partitionId = "",
+  includeStaticPool = true,
   decodePosition = decodeFieldPosition,
   fetchLiveRows = liveMapSpiceFieldRows,
   fetchFlourSandRows = liveMapFlourSandFieldRows,
@@ -51,11 +52,14 @@ export async function liveMapSpice(db, config, map = "", {
 } = {}) {
   const { seed: currentSeed, nextCycleAt } = await resolveCycle({ map, partitionId });
 
+  // The archive remains available during lightweight refreshes so active
+  // fields still use its ground-truth coordinates; only the static pool rows
+  // themselves are omitted from those responses.
   const archive = currentSeed && map !== "HaggaBasin" ? readSpiceArchive(config?.spiceLocationsFile) : null;
   const archiveFields = archive ? fieldsForSeed(archive, currentSeed) : null;
   const archiveByFieldId = new Map((archiveFields || []).map((field) => [String(field.field_id), field]));
 
-  const learnedPool = currentSeed ? readLearnedPool(config?.learnedSpiceLocationsFile) : null;
+  const learnedPool = includeStaticPool && currentSeed ? readLearnedPool(config?.learnedSpiceLocationsFile) : null;
   const learnedFields = learnedPool ? fieldsForLearnedSeed(learnedPool, currentSeed) : [];
 
   // The committed archive only ever has Large Deep-Desert data (the
@@ -63,8 +67,10 @@ export async function liveMapSpice(db, config, map = "", {
   // fills in whatever else has been observed active at least once. Archive
   // wins on a field_id collision -- it's the higher-confidence source.
   const poolFieldsById = new Map();
-  for (const field of learnedFields) poolFieldsById.set(String(field.field_id), { map: field.map, size: field.size || "Large", x: field.x, y: field.y, confidence: field.confidence || "decoded" });
-  for (const field of (archiveFields || [])) poolFieldsById.set(String(field.field_id), { map: "DeepDesert", size: "Large", x: Number(field.x), y: Number(field.y), confidence: field.confidence || "" });
+  if (includeStaticPool) {
+    for (const field of learnedFields) poolFieldsById.set(String(field.field_id), { map: field.map, size: field.size || "Large", x: field.x, y: field.y, confidence: field.confidence || "decoded" });
+    for (const field of (archiveFields || [])) poolFieldsById.set(String(field.field_id), { map: "DeepDesert", size: "Large", x: Number(field.x), y: Number(field.y), confidence: field.confidence || "" });
+  }
   const poolRows = [...poolFieldsById.entries()]
     .filter(([, field]) => !map || field.map === map)
     .map(([fieldId, field]) => spiceRow(fieldId, "spice", `${field.size} Spice`, field.map, field.x, field.y, field.confidence, field.size));
@@ -94,7 +100,7 @@ export async function liveMapSpice(db, config, map = "", {
   }
 
   return {
-    capabilities: { spice: poolRows.length > 0, spice_active: activeRows.length > 0, flour_sand: flourSandRows.length > 0 },
+    capabilities: { ...(includeStaticPool ? { spice: poolRows.length > 0 } : {}), spice_active: activeRows.length > 0, flour_sand: flourSandRows.length > 0 },
     currentSeed: currentSeed || "",
     nextCycleAt: nextCycleAt || "",
     generatedAt: archive?.generatedAt || "",

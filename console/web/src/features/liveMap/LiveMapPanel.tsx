@@ -39,6 +39,11 @@ const MIN_ZOOM_FIT_FACTOR = 1;
 // -- same translation liveMapPartitions() does server-side, in reverse.
 const LIVE_MAP_TO_COMBAT_STATE_MAP: Record<string, string> = { HaggaBasin: "Survival_1", DeepDesert: "DeepDesert_1" };
 const SPICE_TIER_TYPES = new Set(["spice", "spice_active"]);
+// These rows come from seed archives or the static world-marker atlas. They
+// are loaded on entry/map changes and refreshed periodically, but are kept
+// across the five-second live actor poll so thousands of unchanged markers
+// are not queried and serialized again on every tick.
+const STATIC_MARKER_TYPES = new Set(["spice", "ore", "scrap", "flora", "poi", "house_representative", "trainer", "fortress", "hazard", "enemy"]);
 // The bottom data table only lists actor types -- resource/POI types
 // (ore, poi, etc.) can number in the thousands and would flood a flat
 // table with rows nobody's looking to scroll through there.
@@ -208,14 +213,16 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
   const zoomAnchorRef = useRef<{ mapX: number; mapY: number; viewportX: number; viewportY: number } | null>(null);
   const liveMapDraggingPlayerRef = useRef(false);
   const pendingPlayerTeleportsRef = useRef<Record<string, { x: number; y: number; z: number; partitionId: number; expiresAt: number }>>({});
-  async function load() {
+  async function load(includeStatic = true) {
     if (liveMapDraggingPlayerRef.current) return;
     onError("");
     setLoading(true);
     try {
-      const result = await liveMapApi.markers(mapKey, partitionId);
+      const result = await liveMapApi.markers(mapKey, partitionId, includeStatic);
       const rows = result.rows || [];
-      setMarkers(applyPendingPlayerTeleports(rows));
+      setMarkers((previous) => {
+        return applyPendingPlayerTeleports(mergeLiveMapRows(previous, rows, includeStatic, result.map?.actorMap));
+      });
       // Merge newly-seen subtypes in (default visible, or whatever the user
       // saved as a default layer setting for it) -- never clobber a subtype
       // the user has already toggled off this session. A subtype with no
@@ -238,13 +245,18 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
         return next;
       });
       setOverlays(result.overlays || {});
-      setCapabilities(result.capabilities || {});
+      setCapabilities((previous) => includeStatic ? (result.capabilities || {}) : ({ ...previous, ...(result.capabilities || {}) }));
       setMapConfig(result.map || null);
       setMaps(result.maps || {});
       setPartitions(result.partitions || []);
       setCoriolisSeed(result.coriolisSeed || "");
       setCoriolisNextCycleAt(result.coriolisNextCycleAt || "");
-      if (!partitionId && result.map?.defaultPartitionId) setPartitionId(String(result.map.defaultPartitionId));
+      if (!partitionId) {
+        const mapName = result.map?.actorMap || result.map?.key;
+        const available = (result.partitions || []).filter((row) => row.map === mapName);
+        const preferred = available.find((row) => String(row.partition_id) === String(result.map?.defaultPartitionId)) || available[0];
+        if (preferred) setPartitionId(String(preferred.partition_id));
+      }
     } catch (error) {
       onError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -253,7 +265,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
   }
   useEffect(() => {
     setSwitching(true);
-    load().finally(() => setSwitching(false));
+    load(true).finally(() => setSwitching(false));
   }, [mapKey, partitionId]);
   useEffect(() => {
     const combatStateMapName = LIVE_MAP_TO_COMBAT_STATE_MAP[mapKey];
@@ -274,8 +286,12 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
   }, [mapKey]);
   useEffect(() => {
     if (!autoRefresh) return;
-    const id = window.setInterval(load, 5000);
-    return () => window.clearInterval(id);
+    const liveId = window.setInterval(() => void load(false), 5000);
+    const staticId = window.setInterval(() => void load(true), 60000);
+    return () => {
+      window.clearInterval(liveId);
+      window.clearInterval(staticId);
+    };
   }, [autoRefresh, mapKey, partitionId]);
   useEffect(() => {
     if (!coriolisNextCycleAt) return;
@@ -601,7 +617,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
       setMarkers((current) => applyPendingPlayerTeleports(current));
       setSelected((current) => current && playerMarkerId(current) === playerId ? applyPendingPlayerTeleports([current])[0] : current);
       liveMapDraggingPlayerRef.current = false;
-      await load();
+      await load(false);
       setPlayerTeleportPreview(null);
     } catch (error) {
       setPlayerTeleportPreview(null);
@@ -677,7 +693,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
       }
       pendingPlayerTeleportsRef.current[targetPlayerId] = { ...teleportPosition, expiresAt: Date.now() + 20000 };
       setMarkers((current) => applyPendingPlayerTeleports(current));
-      await load();
+      await load(false);
     } catch (error) {
       setTeleportResult({ status: "failed", title: "Teleport Failed", message: friendlyInlineError(error) });
     }
@@ -758,7 +774,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
                   }
                   const key = item.key;
                   const indent = (node: React.ReactNode, keyValue: React.Key) =>
-                    currentSection ? <div key={keyValue} className="live-map-layer-section-item">{node}</div> : node;
+                    currentSection ? <div key={keyValue} className="live-map-layer-section-item">{node}</div> : <React.Fragment key={keyValue}>{node}</React.Fragment>;
                   const subtypes = EXPANDABLE_KEYS.has(key) ? Object.keys(subtypeFilters[key] || {}).sort() : [];
                   if (subtypes.length === 0) {
                     return indent(<label className="checkbox-row live-map-layer">
@@ -891,7 +907,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
             }
             if (expandedSections[currentSection] === false) return null;
             const indent = (node: React.ReactNode, keyValue: React.Key) =>
-              currentSection ? <div key={keyValue} className="live-map-layer-section-item">{node}</div> : node;
+              currentSection ? <div key={keyValue} className="live-map-layer-section-item">{node}</div> : <React.Fragment key={keyValue}>{node}</React.Fragment>;
             // Rows with no chevron (Flour Sand) still need to reserve the
             // same width a sibling's expand button occupies -- otherwise
             // their label starts to the left of every expandable sibling's
@@ -1088,6 +1104,12 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
 }
 
 type LiveMapPoint = { px: number; py: number; inBounds: boolean };
+
+export function mergeLiveMapRows(previous: LiveMapMarker[], incoming: LiveMapMarker[], includeStatic: boolean, mapName = "") {
+  if (includeStatic) return incoming;
+  const retainedStatic = previous.filter((marker) => STATIC_MARKER_TYPES.has(String(marker.type)) && (!mapName || marker.map === mapName));
+  return [...retainedStatic, ...incoming];
+}
 
 function worldToLiveMapPoint(marker: Pick<LiveMapMarker, "x" | "y">, config: LiveMapConfig): LiveMapPoint | null {
   const x = Number(marker.x);

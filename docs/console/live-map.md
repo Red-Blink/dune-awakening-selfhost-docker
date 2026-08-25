@@ -7,7 +7,9 @@ zoomable square maps with real-time markers read directly from Postgres --
 players, vehicles, bases, storage, spice, resources, and points of interest.
 Nothing on this page polls the game server itself except the Coriolis seed
 (a `docker logs` tail) and player teleport (a live in-game move); everything
-else is a straight database read on a 5-second auto-refresh.
+else is a straight database read. Live actors and active fields refresh every
+5 seconds; the much larger static POI/resource atlas refreshes once per minute
+and is retained between live polls.
 
 See [API-REFERENCE.md](API-REFERENCE.md#live-map) for the endpoint contract.
 
@@ -148,9 +150,10 @@ The active spice-blow schedule is tied to Deep Desert's Coriolis storm
 cycle. The current seed and next-cycle time are resolved from the selected
 partition's own server container logs (`console/api/src/services/
 coriolisSeed.js`): a bounded `docker logs --tail 10000` with a 5-second
-timeout, since every server container prints the identical farm-wide seed
-and cycle boundary once at startup. Candidate container names are built
-from the map/partition (`dune-server-survival-1[-<id>]` for Hagga Basin,
+timeout and a short server-side cache, since every server container prints
+the identical farm-wide seed and cycle boundary once at startup. Candidate
+container names are built from the map/partition
+(`dune-server-survival-1[-<id>]` for Hagga Basin,
 `dune-server-deepdesert-1-<id>` for Deep Desert, both falling back to a
 farm-wide `overmap`/`survival-1` default) and re-validated against the same
 allowlist regex the rest of the console's Docker-log access uses.

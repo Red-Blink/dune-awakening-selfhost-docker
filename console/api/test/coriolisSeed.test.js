@@ -174,3 +174,13 @@ test("resolveCoriolisCycle ignores map/partitionId when no partitionId is select
   await resolveCoriolisCycle({ map: "DeepDesert", partitionId: "", runLogs });
   assert.deepEqual(seenServices, ["overmap"]);
 });
+
+test("resolveCoriolisCycle ignores malformed partition IDs instead of constructing Docker service names from them", async () => {
+  const seenServices = [];
+  const runLogs = async (service) => {
+    seenServices.push(service);
+    return { stdout: "Current Coriolis World Seed: 2\n", stderr: "" };
+  };
+  await resolveCoriolisCycle({ map: "DeepDesert", partitionId: "../../59", runLogs });
+  assert.deepEqual(seenServices, ["overmap"]);
+});

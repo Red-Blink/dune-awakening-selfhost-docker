@@ -41,10 +41,11 @@ export type LiveMapPartition = {
 
 export const liveMapApi = {
   capabilities: () => api<Record<string, unknown>>("/api/map/capabilities"),
-  markers: (map = "", partitionId = "") => {
+  markers: (map = "", partitionId = "", includeStatic = true) => {
     const params = new URLSearchParams();
     if (map) params.set("map", map);
     if (partitionId) params.set("partitionId", partitionId);
+    if (!includeStatic) params.set("static", "0");
     const query = params.toString();
     return api<{ rows: LiveMapMarker[]; overlays: Record<string, string>; capabilities: Record<string, unknown>; map: LiveMapConfig; maps: Record<string, LiveMapConfig>; defaultMap: string; partitions: LiveMapPartition[]; coriolisSeed?: string; coriolisNextCycleAt?: string }>(`/api/map/markers${query ? `?${query}` : ""}`);
   },

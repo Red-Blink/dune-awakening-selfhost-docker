@@ -208,6 +208,23 @@ test("pool rows are filtered to the requested map", async () => {
   assert.equal(spiceRows[0].id, "2");
 });
 
+test("live-only refreshes omit the static pool while retaining active fields", async () => {
+  const config = configWithArchive(SAMPLE_ARCHIVE);
+  const fetchLiveRows = async () => ({ capabilities: { spiceActive: true }, rows: [{ field_id: "5007190163237080", map: "DeepDesert", partition_id: 8, value_remaining: 2500000, size: "Large" }] });
+  const result = await liveMapSpice(null, config, "DeepDesert", {
+    includeStaticPool: false,
+    resolveCycle: async () => ({ seed: "cor-2", nextCycleAt: null }),
+    fetchLiveRows,
+    fetchFlourSandRows: noFlourSandRows,
+    decodePosition: () => ({ x: 42, y: 24, z: 0 }),
+    persistObservedFields: noPersist
+  });
+  assert.equal(result.rows.some((row) => row.type === "spice"), false);
+  assert.equal(result.rows.some((row) => row.type === "spice_active"), true);
+  assert.equal(result.rows.find((row) => row.type === "spice_active")?.x, 129775);
+  assert.equal("spice" in result.capabilities, false);
+});
+
 test("persistObservedFields is called with exactly the newly active rows when the seed resolves", async () => {
   const config = configWithArchive(undefined);
   const fetchLiveRows = async () => ({ capabilities: { spiceActive: true }, rows: [{ field_id: "5", map: "DeepDesert", partition_id: 8, value_remaining: 5000, size: "Small" }] });
