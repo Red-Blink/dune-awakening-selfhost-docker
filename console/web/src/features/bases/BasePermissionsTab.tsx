@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
   basesApi,
-  type BaseChildAccessAudit,
   type BasePermissionCandidate,
   type BasePermissionEntry,
   type BasePermissionRank
@@ -95,8 +94,6 @@ export function BasePermissionsTab({ baseId, baseName, onSaved, confirmAction }:
   // otherwise. A string rather than a boolean so the banner and every disabled
   // control's tooltip read back the same sentence the API chose.
   const [unclaimed, setUnclaimed] = useState("");
-  const [childAccess, setChildAccess] = useState<BaseChildAccessAudit>({ supported: false, inspected: 0, baselined: 0, anomalies: [] });
-  const [selectedChildActors, setSelectedChildActors] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -113,8 +110,6 @@ export function BasePermissionsTab({ baseId, baseName, onSaved, confirmAction }:
         ? result.unclaimedReason || "This base is not claimed, so its permissions cannot be edited."
         : "");
       setSystemCustodian(result.systemCustodian || { available: false, reason: "System custodian detection is unavailable." });
-      setChildAccess(result.childAccess || { supported: false, inspected: 0, baselined: 0, anomalies: [], reason: "Child access auditing is unavailable." });
-      setSelectedChildActors(new Set());
     } catch (error) {
       setLoadError(errorText(error));
     } finally {
@@ -238,39 +233,6 @@ export function BasePermissionsTab({ baseId, baseName, onSaved, confirmAction }:
     try {
       const response = await basesApi.transferToSystemCustodian(baseId);
       setStatus(response.result?.message || `Ownership was transferred to the ${custodianName} system custodian.`);
-      setStatusKind("ok");
-      await load();
-      onSaved();
-    } catch (error) {
-      setStatus(errorText(error));
-      setStatusKind("fail");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function resetSelectedChildAccess() {
-    const selected = childAccess.anomalies.filter((row) => selectedChildActors.has(row.actorId));
-    if (!selected.length) return;
-    const confirmed = await confirmAction(
-      `Reset access on ${selected.length} unusual ${selected.length === 1 ? "door or device" : "doors or devices"}?`,
-      {
-        title: "Reset Child Access",
-        confirmLabel: "Reset Access",
-        warning: "Only the selected objects will be changed. Any intentional custom access setting on them will be replaced with the detected server standard.",
-        details: [
-          { label: "Base", value: baseName },
-          { label: "Selected", value: String(selected.length), tone: "accent" }
-        ]
-      }
-    );
-    if (!confirmed) return;
-    setSaving(true);
-    setStatus("");
-    setStatusKind("");
-    try {
-      const response = await basesApi.resetChildAccess(baseId, selected.map((row) => row.actorId));
-      setStatus(response.result?.message || "Child access settings were reset.");
       setStatusKind("ok");
       await load();
       onSaved();
@@ -431,42 +393,6 @@ export function BasePermissionsTab({ baseId, baseName, onSaved, confirmAction }:
           ))}
           {!nonOwners.length && <p className="muted">This base is not shared with anyone else.</p>}
         </div>
-
-        <div className="bases-child-access-head">
-          <div>
-            <span className="bases-permissions-section-title">Child Access{childAccess.supported ? ` · ${childAccess.anomalies.length} Unusual` : ""}</span>
-            <p className="muted">Checks doors and devices without changing intentional custom settings automatically.</p>
-          </div>
-          {childAccess.supported && childAccess.anomalies.length > 0 && <div className="bases-child-access-actions">
-            <button
-              disabled={saving}
-              onClick={() => setSelectedChildActors(selectedChildActors.size === childAccess.anomalies.length
-                ? new Set()
-                : new Set(childAccess.anomalies.map((row) => row.actorId)))}
-            >{selectedChildActors.size === childAccess.anomalies.length ? "Clear" : "Select All"}</button>
-            <button className="warning" disabled={saving || selectedChildActors.size === 0} onClick={() => void resetSelectedChildAccess()}>
-              {saving ? "Resetting…" : "Reset Selected"}
-            </button>
-          </div>}
-        </div>
-        {!childAccess.supported && <p className="muted">{childAccess.reason || "Child access auditing is unavailable for this database."}</p>}
-        {childAccess.supported && childAccess.anomalies.length === 0 && <p className="bases-child-access-clean">No unusual child access settings were detected across {childAccess.inspected} checked object{childAccess.inspected === 1 ? "" : "s"}.</p>}
-        {childAccess.supported && childAccess.anomalies.length > 0 && <div className="bases-child-access-list">
-          {childAccess.anomalies.map((row) => <label className="bases-child-access-row" key={row.actorId}>
-            <input
-              type="checkbox"
-              checked={selectedChildActors.has(row.actorId)}
-              disabled={saving}
-              onChange={(event) => setSelectedChildActors((current) => {
-                const next = new Set(current);
-                if (event.target.checked) next.add(row.actorId); else next.delete(row.actorId);
-                return next;
-              })}
-            />
-            <span className="bases-child-access-name"><strong>{row.name}</strong><em>{row.kind}</em></span>
-            <span className="bases-child-access-level">Access {row.currentAccess} <span aria-hidden="true">→</span> Standard {row.expectedAccess}</span>
-          </label>)}
-        </div>}
       </div>
     </div>
   );

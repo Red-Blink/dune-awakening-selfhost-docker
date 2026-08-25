@@ -97,6 +97,15 @@ type DataTableProps = {
   headerTitles?: boolean;
   isRowExpanded?: (row: Record<string, unknown>) => boolean;
   renderExpandedRow?: (row: Record<string, unknown>) => ReactNode;
+  // A second, optional row rendered between the clicked row and the main
+  // expanded row (inline placement only), in its own <tr> rather than nested
+  // inside the main expanded row's <td>. Exists so a consumer can make it
+  // sticky: `position: sticky` on a element nested inside a <td> does not
+  // reliably hold in table layout once scrolled past, but the same
+  // declaration on a <tr> itself does -- verified live. Kept as its own prop
+  // rather than folding into renderExpandedRow's return value because a
+  // <td> cannot contain <tr> children; DataTable owns the row/cell wrapper.
+  renderExpandedSticky?: (row: Record<string, unknown>) => ReactNode;
   expandedRowPlacement?: "inline" | "after-table";
   rowKey?: (row: Record<string, unknown>) => string | number;
 };
@@ -124,6 +133,7 @@ export function DataTable({
   headerTitles = false,
   isRowExpanded,
   renderExpandedRow,
+  renderExpandedSticky,
   expandedRowPlacement = "inline",
   rowKey
 }: DataTableProps) {
@@ -140,7 +150,7 @@ export function DataTable({
   const trailingSecondaryHeader = secondaryAction && secondaryActionPosition === "end" ? <th className={secondaryActionClassName}>{secondaryActionLabel}</th> : null;
   return <>
     <div className={`table-wrap${wrapClassName ? ` ${wrapClassName}` : ""}${expandedAfterTable ? " has-expanded-row-after-table" : ""}`} role="region" aria-label="Scrollable data table" tabIndex={0}>
-      <table className={tableClassName}><thead><tr>{leadingSecondaryHeader}{cols.map((col) => { const sortable = onSort && !nonSortableColumns.includes(col); const label = columnLabels[col] || friendlyColumnName(col); return <th key={col} data-column={col} className={sortable ? "sortable" : ""} style={colStyle(col)} title={headerTitles ? label : undefined} onClick={sortable ? () => onSort?.(col) : undefined}>{label}{sortable && sortColumn === col && <span className="sort-indicator">{sortDirection === "desc" ? " ↓" : " ↑"}</span>}{resizableColumns && resize.resizeHandle(col)}</th>; })}{action && <th className={actionClassName}>Actions</th>}{trailingSecondaryHeader}</tr></thead><tbody>{rows.map((row, index) => <Fragment key={rowKey ? rowKey(row) : index}><tr onClick={() => onRowClick?.(row)} className={onRowClick ? "clickable" : ""}>{secondaryAction && secondaryActionPosition === "start" && <td className={secondaryActionClassName}>{secondaryAction(row)}</td>}{cols.map((col) => <td key={col} data-column={col} style={colStyle(col)}>{renderCell ? renderCell(row, col) : formatCell(row[col])}</td>)}{action && <td className={actionClassName}>{action(row)}</td>}{secondaryAction && secondaryActionPosition === "end" && <td className={secondaryActionClassName}>{secondaryAction(row)}</td>}</tr>{expandedRowPlacement === "inline" && isRowExpanded?.(row) && renderExpandedRow && <tr className="expanded-row"><td colSpan={totalColumns} className="expanded-row-cell">{renderExpandedRow(row)}</td></tr>}</Fragment>)}</tbody></table>
+      <table className={tableClassName}><thead><tr>{leadingSecondaryHeader}{cols.map((col) => { const sortable = onSort && !nonSortableColumns.includes(col); const label = columnLabels[col] || friendlyColumnName(col); return <th key={col} data-column={col} className={sortable ? "sortable" : ""} style={colStyle(col)} title={headerTitles ? label : undefined} onClick={sortable ? () => onSort?.(col) : undefined}>{label}{sortable && sortColumn === col && <span className="sort-indicator">{sortDirection === "desc" ? " ↓" : " ↑"}</span>}{resizableColumns && resize.resizeHandle(col)}</th>; })}{action && <th className={actionClassName}>Actions</th>}{trailingSecondaryHeader}</tr></thead><tbody>{rows.map((row, index) => <Fragment key={rowKey ? rowKey(row) : index}><tr onClick={() => onRowClick?.(row)} className={`${onRowClick ? "clickable" : ""}${isRowExpanded?.(row) ? " row-expanded" : ""}`}>{secondaryAction && secondaryActionPosition === "start" && <td className={secondaryActionClassName}>{secondaryAction(row)}</td>}{cols.map((col) => <td key={col} data-column={col} style={colStyle(col)}>{renderCell ? renderCell(row, col) : formatCell(row[col])}</td>)}{action && <td className={actionClassName}>{action(row)}</td>}{secondaryAction && secondaryActionPosition === "end" && <td className={secondaryActionClassName}>{secondaryAction(row)}</td>}</tr>{expandedRowPlacement === "inline" && isRowExpanded?.(row) && renderExpandedSticky && <tr className="expanded-row-sticky"><td colSpan={totalColumns} className="expanded-row-cell">{renderExpandedSticky(row)}</td></tr>}{expandedRowPlacement === "inline" && isRowExpanded?.(row) && renderExpandedRow && <tr className="expanded-row"><td colSpan={totalColumns} className="expanded-row-cell">{renderExpandedRow(row)}</td></tr>}</Fragment>)}</tbody></table>
     </div>
     {expandedAfterTable && renderExpandedRow && <div className="expanded-row expanded-row-outside"><div className="expanded-row-cell">{renderExpandedRow(expandedAfterTable)}</div></div>}
   </>;

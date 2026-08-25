@@ -2775,6 +2775,36 @@ test("list bases returns rows with piece and placeable counts and a total count"
   ]);
 });
 
+test("list bases reports the baseChildAccess capability from the required tables and function", async () => {
+  const childAccessTables = new Set([...BASE_REQUIRED_TABLES, "dune.placeables", "dune.permission_actor"]);
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: childAccessTables.has(String(values[0] || "")) }] };
+      if (text.includes("to_regprocedure")) {
+        return { rows: [{ exists: values[0] === "dune.permission_set_access_level(bigint,smallint)" }] };
+      }
+      if (text.includes("total_bases")) return { rows: [{ total_bases: "0", total_pieces: "0", total_placeables: "0" }] };
+      return { rows: [] };
+    }
+  };
+  const result = await listBases(db, {});
+  assert.equal(result.capabilities.baseChildAccess, true);
+});
+
+test("list bases reports baseChildAccess false when the game function is missing", async () => {
+  const childAccessTables = new Set([...BASE_REQUIRED_TABLES, "dune.placeables", "dune.permission_actor"]);
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: childAccessTables.has(String(values[0] || "")) }] };
+      if (text.includes("to_regprocedure")) return { rows: [{ exists: false }] };
+      if (text.includes("total_bases")) return { rows: [{ total_bases: "0", total_pieces: "0", total_placeables: "0" }] };
+      return { rows: [] };
+    }
+  };
+  const result = await listBases(db, {});
+  assert.equal(result.capabilities.baseChildAccess, false);
+});
+
 test("list bases scopes player results to owned and shared permission actors", async () => {
   const calls = [];
   const scopedTables = new Set([

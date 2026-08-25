@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { setBasePermissions, listBasePermissions, basePermissionSystemCustodian, transferBaseToSystemCustodian, listBaseChildAccess, resetBaseChildAccess } from "../src/duneDb.js";
+import { setBasePermissions, listBasePermissions, basePermissionSystemCustodian, transferBaseToSystemCustodian, listBaseChildAccess, setBaseChildAccessLevels } from "../src/duneDb.js";
 
 const SUPPORTED_TABLES = ["dune.permission_actor_rank", "dune.permission_actor", "dune.actors", "dune.player_state", "dune.encrypted_player_state", "dune.map_names"];
 const SUPPORTED_FUNCTIONS = [
@@ -341,6 +341,8 @@ test("listBasePermissions labels ranks and flags rows the game ignores", async (
   assert.deepEqual(result.entries.map((entry) => entry.canonical), [true, true, false]);
 });
 
+// One of the three rows already matches Sub-Fief (Associate/3) -- the list
+// covers every child piece on the base, not just the ones that deviate.
 function childAccessDb() {
   const calls = [];
   const db = {
@@ -350,12 +352,9 @@ function childAccessDb() {
       if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
       if (text.includes("to_regprocedure")) return { rows: [{ exists: true }] };
       if (text.includes("with base_entities")) return { rows: [
-        { actor_id: "44186", actor_name: "##MTX_Neut_DesertMechanic_Prudence_Door_Placeable", access_level: 5, building_type: "MTX_Neut_DesertMechanic_Prudence_Door_Placeable", is_door: true },
-        { actor_id: "44187", actor_name: "##Neut_Desert_Mechanic_Garage_Door_Placeable", access_level: 3, building_type: "Neut_Desert_Mechanic_Garage_Door_Placeable", is_door: true }
-      ] };
-      if (text.includes("group by coalesce(p.building_type")) return { rows: [
-        { building_type: "OtherDoor", is_door: true, access_level: 3, row_count: 255 },
-        { building_type: "MTX_Neut_DesertMechanic_Prudence_Door_Placeable", is_door: true, access_level: 5, row_count: 1 }
+        { actor_id: "44186", actor_name: "##MTX_Neut_DesertMechanic_Prudence_Door_Placeable", access_level: 5, building_type: "MTX_Neut_DesertMechanic_Prudence_Door_Placeable" },
+        { actor_id: "44187", actor_name: "##Neut_Desert_Mechanic_Garage_Door_Placeable", access_level: 2, building_type: "Neut_Desert_Mechanic_Garage_Door_Placeable" },
+        { actor_id: "44188", actor_name: "##Neut_Desert_Mechanic_Front_Door_Placeable", access_level: 3, building_type: "Neut_Desert_Mechanic_Front_Door_Placeable" }
       ] };
       if (text.includes("select a.id::text as actor_id")) return { rows: [{ actor_id: ACTOR_ID, map: "HaggaBasin", map_name_id: 1, partition_id: 67 }] };
       if (text.includes("for update")) return { rows: [{ id: ACTOR_ID }], rowCount: 1 };
@@ -367,25 +366,34 @@ function childAccessDb() {
   return db;
 }
 
-test("child access audit flags the lone door that differs from the live server standard", async () => {
+test("listBaseChildAccess lists every child piece, flagging which ones match Sub-Fief", async () => {
   const result = await listBaseChildAccess(childAccessDb(), BASE_ID);
-  assert.equal(result.inspected, 2);
-  assert.equal(result.anomalies.length, 1);
-  assert.deepEqual(result.anomalies[0], {
-    actorId: "44186",
-    name: "DesertMechanic Prudence Door",
-    kind: "Door",
-    currentAccess: 5,
-    expectedAccess: 3,
-    basis: "Door Standard",
-    unusual: true
-  });
+  assert.equal(result.inspected, 3);
+  assert.deepEqual(result.rows, [
+    { actorId: "44186", name: "DesertMechanic Prudence Door", buildingType: "MTX_Neut_DesertMechanic_Prudence_Door_Placeable", currentAccess: 5, currentAccessLabel: "Owner", isSubFief: false },
+    { actorId: "44187", name: "Desert Mechanic Garage Door", buildingType: "Neut_Desert_Mechanic_Garage_Door_Placeable", currentAccess: 2, currentAccessLabel: "Guild", isSubFief: false },
+    { actorId: "44188", name: "Desert Mechanic Front Door", buildingType: "Neut_Desert_Mechanic_Front_Door_Placeable", currentAccess: 3, currentAccessLabel: "Associate", isSubFief: true }
+  ]);
 });
 
-test("child access reset uses the game's notifying function and refuses unrelated actors", async () => {
+test("setBaseChildAccessLevels writes each requested level, including a piece that already matched Sub-Fief, and refuses an actor that isn't a child of this base", async () => {
   const db = childAccessDb();
-  const result = await resetBaseChildAccess(db, BASE_ID, ["44186"]);
-  assert.equal(result.reset, 1);
-  assert.deepEqual(procCalls(db, "permission_set_access_level"), [["44186", 3]]);
-  await assert.rejects(() => resetBaseChildAccess(childAccessDb(), BASE_ID, ["99999"]), /no longer unusual/i);
+  const result = await setBaseChildAccessLevels(db, BASE_ID, [
+    { actorId: "44186", accessLevel: 3 },
+    { actorId: "44188", accessLevel: 1 }
+  ]);
+  assert.equal(result.updated, 2);
+  assert.deepEqual(procCalls(db, "permission_set_access_level"), [["44186", 3], ["44188", 1]]);
+  await assert.rejects(
+    () => setBaseChildAccessLevels(childAccessDb(), BASE_ID, [{ actorId: "99999", accessLevel: 3 }]),
+    /no longer children/i);
+});
+
+test("setBaseChildAccessLevels rejects an access level outside the 1-5 scale", async () => {
+  await assert.rejects(
+    () => setBaseChildAccessLevels(childAccessDb(), BASE_ID, [{ actorId: "44186", accessLevel: 0 }]),
+    /access level/i);
+  await assert.rejects(
+    () => setBaseChildAccessLevels(childAccessDb(), BASE_ID, [{ actorId: "44186", accessLevel: 6 }]),
+    /access level/i);
 });

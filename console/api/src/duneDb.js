@@ -3978,8 +3978,7 @@ export async function listBasePermissions(db, baseId) {
     claimed,
     unclaimedReason: claimed ? "" : BASE_UNCLAIMED_MESSAGE,
     systemCustodian,
-    entries,
-    childAccess: await listBaseChildAccess(db, baseId)
+    entries
   };
 }
 
@@ -3995,19 +3994,6 @@ function friendlyChildAccessName(row) {
   return raw || "Base Object";
 }
 
-function accessMode(rows) {
-  const counts = new Map();
-  for (const row of rows) {
-    const level = Number(row.access_level);
-    const count = Number(row.row_count || 0);
-    counts.set(level, (counts.get(level) || 0) + count);
-  }
-  const ranked = [...counts.entries()].sort((left, right) => right[1] - left[1] || left[0] - right[0]);
-  const total = ranked.reduce((sum, entry) => sum + entry[1], 0);
-  if (!ranked.length || (ranked[1] && ranked[0][1] === ranked[1][1])) return null;
-  return { level: ranked[0][0], count: ranked[0][1], total };
-}
-
 async function baseChildAccessSupported(db) {
   for (const table of ["buildings", "building_instances", "placeables", "permission_actor"]) {
     if (!(await tableExists(db, table))) return false;
@@ -4015,17 +4001,24 @@ async function baseChildAccessSupported(db) {
   return functionExists(db, "dune.permission_set_access_level(bigint,smallint)");
 }
 
-// Child actors normally inherit the base roster but retain their own access
-// level. Ownership transfers must preserve intentional per-object choices, so
-// this is an audit, not part of transferBaseToSystemCustodian. A recommendation
-// is made only from a strong live-server baseline: all doors share the dominant
-// door level, while other devices need at least three peers of the exact same
-// building type and a 75% majority. This catches a lone odd door without
-// guessing at singleton devices or overwriting legitimate customization.
+// permission_actor.access_level is a distinct 5-tier scale from
+// permission_actor_rank.rank (Owner/Co-Owner/Associate, 1-3): every top-level
+// base actor and the overwhelming majority of child pieces carry exactly this
+// value, so it is the game's "matches the base's own Sub-Fief roster" default.
+// A child piece set to any other level was deliberately opened wider (Public,
+// Guild) or narrowed further (Co-Owner, Owner) than that default.
+const SUB_FIEF_ACCESS_LEVEL = 3;
+const ACCESS_LEVEL_LABELS = { 1: "Public", 2: "Guild", 3: "Associate", 4: "Co-Owner", 5: "Owner" };
+
+// Every child piece on the base (doors, devices), regardless of its current
+// access level -- not just the ones that deviate from Sub-Fief. Child actors
+// normally match the base's own Sub-Fief access level but retain their own
+// setting; ownership transfers must preserve intentional per-object choices,
+// so this is a read-only list, not part of transferBaseToSystemCustodian.
 export async function listBaseChildAccess(db, baseId) {
   const target = intParam(baseId, "base id", 1);
   if (!(await baseChildAccessSupported(db))) {
-    return { supported: false, inspected: 0, baselined: 0, anomalies: [], reason: "Child access auditing is unsupported by the detected game database." };
+    return { supported: false, inspected: 0, rows: [], reason: "Child access auditing is unsupported by the detected game database." };
   }
   const children = await db.query(`
     with base_entities as (
@@ -4035,89 +4028,53 @@ export async function listBaseChildAccess(db, baseId) {
       where b.id = $1::bigint and bi.owner_entity_id is not null
     )
     select pa.actor_id::text as actor_id, coalesce(pa.actor_name, '') as actor_name,
-           pa.access_level::int as access_level, coalesce(p.building_type, '') as building_type,
-           (coalesce(pa.actor_name, '') ilike '%door%' or coalesce(p.building_type, '') ilike '%door%') as is_door
+           pa.access_level::int as access_level, coalesce(p.building_type, '') as building_type
     from base_entities be
     join dune.placeables p on p.owner_entity_id = be.owner_entity_id
     join dune.permission_actor pa on pa.actor_id = p.id and pa.is_child = true
     order by pa.actor_id`, [target]);
-  if (!children.rows.length) return { supported: true, inspected: 0, baselined: 0, anomalies: [] };
-
-  const peerStats = await db.query(`
-    select coalesce(p.building_type, '') as building_type,
-           (coalesce(pa.actor_name, '') ilike '%door%' or coalesce(p.building_type, '') ilike '%door%') as is_door,
-           pa.access_level::int as access_level, count(*)::int as row_count
-    from dune.placeables p
-    join dune.permission_actor pa on pa.actor_id = p.id and pa.is_child = true
-    group by coalesce(p.building_type, ''), is_door, pa.access_level`);
-  const doorMode = accessMode(peerStats.rows.filter((row) => row.is_door === true));
-  const byType = new Map();
-  for (const row of peerStats.rows) {
-    const key = String(row.building_type || "");
-    if (!byType.has(key)) byType.set(key, []);
-    byType.get(key).push(row);
-  }
-
-  const rows = children.rows.map((row) => {
-    const currentAccess = Number(row.access_level);
-    let baseline = null;
-    let basis = "";
-    if (row.is_door === true && doorMode && doorMode.total >= 3) {
-      baseline = doorMode.level;
-      basis = "Door Standard";
-    } else {
-      const typeMode = accessMode(byType.get(String(row.building_type || "")) || []);
-      if (typeMode && typeMode.total >= 3 && typeMode.count / typeMode.total >= 0.75) {
-        baseline = typeMode.level;
-        basis = "Device Standard";
-      }
-    }
-    return {
-      actorId: String(row.actor_id),
-      name: friendlyChildAccessName(row),
-      kind: row.is_door === true ? "Door" : "Device",
-      currentAccess,
-      expectedAccess: baseline,
-      basis,
-      unusual: baseline !== null && currentAccess !== baseline
-    };
-  });
-  return {
-    supported: true,
-    inspected: rows.length,
-    baselined: rows.filter((row) => row.expectedAccess !== null).length,
-    anomalies: rows.filter((row) => row.unusual)
-  };
+  const rows = children.rows.map((row) => ({
+    actorId: String(row.actor_id),
+    name: friendlyChildAccessName(row),
+    buildingType: String(row.building_type || ""),
+    currentAccess: Number(row.access_level),
+    currentAccessLabel: ACCESS_LEVEL_LABELS[Number(row.access_level)] || String(row.access_level),
+    isSubFief: Number(row.access_level) === SUB_FIEF_ACCESS_LEVEL
+  }));
+  return { supported: true, inspected: rows.length, rows };
 }
 
-export async function resetBaseChildAccess(db, baseId, actorIds) {
+export async function setBaseChildAccessLevels(db, baseId, updates) {
   const target = intParam(baseId, "base id", 1);
-  if (!Array.isArray(actorIds) || actorIds.length < 1 || actorIds.length > 100) {
-    throw new Error("Choose between 1 and 100 unusual doors or devices to reset.");
+  if (!Array.isArray(updates) || updates.length < 1 || updates.length > 100) {
+    throw new Error("Choose between 1 and 100 pieces to update.");
   }
-  const selected = [...new Set(actorIds.map((id) => String(intParam(id, "child actor id", 1))))];
+  const requested = new Map(updates.map((entry) => [
+    String(intParam(entry.actorId, "child actor id", 1)),
+    intParam(entry.accessLevel, "access level", 1, 5)
+  ]));
   await requireCapability(await baseChildAccessSupported(db),
-    "Child access reset requires the game permission_set_access_level function.");
+    "Setting child access requires the game permission_set_access_level function.");
   return db.transaction(async (tx) => {
     await tx.query("set local search_path to dune, public");
     const actor = await basePermissionActor(tx, target);
     const locked = await tx.query("select id from dune.actors where id = $1::bigint for update", [actor.actorId]);
     if (!locked.rowCount) throw new Error("That base was not found.");
     const audit = await listBaseChildAccess(tx, target);
-    const unusual = new Map(audit.anomalies.map((row) => [row.actorId, row]));
-    const chosen = selected.map((id) => unusual.get(id));
-    if (chosen.some((row) => !row)) {
-      throw new Error("One or more selected objects are no longer unusual members of this base. Reload the audit and try again.");
+    const current = new Map(audit.rows.map((row) => [row.actorId, row]));
+    const chosen = [...requested.entries()].map(([actorId, accessLevel]) => ({ actorId, accessLevel, row: current.get(actorId) }));
+    if (chosen.some((entry) => !entry.row)) {
+      throw new Error("One or more selected objects are no longer children of this base. Reload and try again.");
     }
-    for (const row of chosen) {
-      await tx.query("select dune.permission_set_access_level($1::bigint, $2::smallint)", [row.actorId, row.expectedAccess]);
+    for (const entry of chosen) {
+      await tx.query("select dune.permission_set_access_level($1::bigint, $2::smallint)", [entry.actorId, entry.accessLevel]);
     }
     return {
       ok: true,
       baseId: target,
-      reset: chosen.length,
-      objects: chosen.map((row) => ({ actorId: row.actorId, name: row.name, accessLevel: row.expectedAccess })),
-      message: `${chosen.length} unusual child access setting${chosen.length === 1 ? " was" : "s were"} reset and sent to the running map.`
+      updated: chosen.length,
+      objects: chosen.map((entry) => ({ actorId: entry.actorId, name: entry.row.name, accessLevel: entry.accessLevel })),
+      message: `${chosen.length} piece${chosen.length === 1 ? "" : "s"} updated and sent to the running map.`
     };
   });
 }
@@ -4950,11 +4907,12 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColum
     // columns the generator capability check requires, so reusing that check
     // would wrongly hide Refill Water on a schema that has everything water
     // actually needs.
-    const [generatorRefill, basePermissions, waterRefill, baseDelete] = await Promise.all([
+    const [generatorRefill, basePermissions, waterRefill, baseDelete, baseChildAccess] = await Promise.all([
       supportsGeneratorRefill(db).catch(() => false),
       supportsBasePermissionEditing(db).catch(() => false),
       supportsWaterRefill(db).catch(() => false),
-      supportsBaseDelete(db).catch(() => false)
+      supportsBaseDelete(db).catch(() => false),
+      baseChildAccessSupported(db).catch(() => false)
     ]);
     // Without world_partition the console cannot tell a running map from a
     // stopped one, so the panel hides the queue entirely and refills/deletes
@@ -4967,7 +4925,7 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColum
     ]);
 
     return {
-      capabilities: { bases: true, generatorRefill, generatorRefillQueue, basePermissions, waterRefill, waterRefillQueue, baseDelete, baseDeleteQueue },
+      capabilities: { bases: true, generatorRefill, generatorRefillQueue, basePermissions, waterRefill, waterRefillQueue, baseDelete, baseDeleteQueue, baseChildAccess },
       totalCount: result.rows[0] ? Number(result.rows[0].total_count) : 0,
       totalBases: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_bases) : 0,
       totalOwned: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_owned || 0) : 0,

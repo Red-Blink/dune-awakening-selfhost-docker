@@ -62,7 +62,7 @@ issue if you get stuck on one of those.
 | Database | Schema/table browsing, SQL preview/export | — |
 | Backups | Database and base backups | §4 below, [`docs/console/database-backups.md`](console/database-backups.md) |
 | Updates | Game-server content updates | §5 below |
-| Bases (accessed by expanding a base row) | Power, Water, Inventory, Sub-Fief Permissions tabs | [`docs/console/base-inventory.md`](console/base-inventory.md), [`docs/console/base-permissions.md`](console/base-permissions.md), [`docs/console/base-deletion.md`](console/base-deletion.md) |
+| Bases (accessed by expanding a base row) | Power, Water, Inventory, Sub-Fief Permissions, Base Permissions tabs | [`docs/console/base-inventory.md`](console/base-inventory.md), [`docs/console/base-permissions.md`](console/base-permissions.md), [`docs/console/base-child-permissions.md`](console/base-child-permissions.md), [`docs/console/base-deletion.md`](console/base-deletion.md) |
 | Exchange | Read-only view of the game's live CHOAM market listings | [`docs/console/exchange.md`](console/exchange.md) |
 | Addons | Browse, install, enable, and approve permissions for Community Addons | §6 below |
 | Settings | Public Server Directory claim, Web Console port, login password | §7 below |
@@ -71,7 +71,8 @@ issue if you get stuck on one of those.
 
 ## 3. Bases: power, storage, permissions, and deletion
 
-Expanding a base row in the Bases panel gives you four tabs:
+Expanding a base row in the Bases panel gives you these tabs (plus a Land
+Claim Editor not covered here):
 
 - **Power** — refill generators/water up to a per-generator-type cap
   ([`docs/console/generator-refill-caps.md`](console/generator-refill-caps.md),
@@ -87,6 +88,11 @@ Expanding a base row in the Bases panel gives you four tabs:
   with. Unlike generator refills, permission changes apply to a running
   map immediately, with no restart required. See
   [`docs/console/base-permissions.md`](console/base-permissions.md).
+- **Base Permissions** — a separate list of every individual piece (door,
+  device) on the base with its own access level, with the ability to set
+  any of them to a specific level; pieces that deviate from the base's
+  Sub-Fief default are highlighted. See
+  [`docs/console/base-child-permissions.md`](console/base-child-permissions.md).
 
 **Deleting a base** is a separate, row-level action (trash icon) — it is
 permanent and irreversible. The console shows a danger-styled confirmation

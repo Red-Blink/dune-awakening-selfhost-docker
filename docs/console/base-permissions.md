@@ -240,6 +240,11 @@ once per list request rather than per row.
 
 ## Related
 
+- [base-child-permissions.md](base-child-permissions.md) — the **Base
+  Permissions** tab, a separate editor for individual pieces (doors, devices)
+  within a claimed base. It uses a different 5-tier access scale from the
+  ranks on this page; despite three of its five levels being named the same
+  as ranks here (Associate/Co-Owner/Owner), the two scales are unrelated.
 - [generator-refill-caps.md](generator-refill-caps.md) — the refill endpoint, and
   the queue this feature deliberately does not use.
 - [vehicle-permissions.md](vehicle-permissions.md) — the same roster-editing

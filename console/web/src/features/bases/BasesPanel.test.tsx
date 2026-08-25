@@ -23,6 +23,8 @@ vi.mock("../../api/bases", () => ({
     setPermissions: vi.fn(),
     transferToSystemCustodian: vi.fn(),
     permissionCandidates: vi.fn(),
+    childAccess: vi.fn(),
+    setChildAccess: vi.fn(),
     water: vi.fn(),
     refillWater: vi.fn(),
     cancelQueuedWaterRefill: vi.fn(),
@@ -971,12 +973,35 @@ describe("BasesPanel permissions editing", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Show details for Sietch One" }));
     const powerTab = screen.getByRole("tab", { name: "Power" });
     expect(powerTab).toBeInTheDocument();
-    // Details live outside the table so its sticky header ends with the final
-    // base row instead of following the page through a tall editor tab.
-    expect(powerTab.closest("table")).toBeNull();
+    // Details render directly under the clicked row (DataTable's default
+    // "inline" placement), not in a separate panel after the whole table.
+    expect(powerTab.closest("table")).not.toBeNull();
     expect(screen.getByRole("tab", { name: "Water" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Inventory" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Sub-Fief Permissions" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Base Permissions" })).not.toBeInTheDocument();
+  });
+
+  it("shows the Base Permissions tab only when the schema supports child access auditing", async () => {
+    vi.mocked(basesApi.list).mockResolvedValue({
+      capabilities: { bases: true, basePermissions: false, baseChildAccess: true },
+      totalCount: 1,
+      totalBases: 1,
+      totalPieces: 10,
+      totalPlaceables: 4,
+      rows: [permissionRow]
+    } as never);
+    vi.mocked(basesApi.childAccess).mockResolvedValue({
+      supported: true,
+      inspected: 1,
+      rows: [{ actorId: "14274", name: "Generator", buildingType: "Generator_Placeable", currentAccess: 2, currentAccessLabel: "Guild", isSubFief: false }]
+    } as never);
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Show details for Sietch One" }));
+    expect(screen.queryByRole("tab", { name: "Sub-Fief Permissions" })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("tab", { name: "Base Permissions" }));
+    expect(await screen.findByText("Generator")).toBeInTheDocument();
   });
 
   // Inventory sits between Water and Permissions, and is ungated the way Water

@@ -3239,9 +3239,6 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 .bases-table-wrap .bases-table tbody > tr:last-child > td { border-bottom: 0; }
 .bases-table-wrap .bases-table tbody > tr:last-child > td:first-child { border-bottom-left-radius: 7px; }
 .bases-table-wrap .bases-table tbody > tr:last-child > td:last-child { border-bottom-right-radius: 7px; }
-.table-wrap.bases-table-wrap.has-expanded-row-after-table { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-.bases-table-wrap.has-expanded-row-after-table .bases-table tbody > tr:last-child > td:first-child { border-bottom-left-radius: 0; }
-.bases-table-wrap.has-expanded-row-after-table .bases-table tbody > tr:last-child > td:last-child { border-bottom-right-radius: 0; }
 
 /* Below this width the twelve columns have nowhere to go. The table has no
    intrinsic minimum, so instead of overflowing it crushes -- cells collapse to
@@ -3255,7 +3252,6 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 @media (max-width: 1100px) {
   .table-wrap.bases-table-wrap { overflow: auto; }
   .bases-table { min-width: 860px; }
-  .bases-table-wrap + .expanded-row-outside > .expanded-row-cell > * { max-width: calc(100vw - 76px); }
 }
 /* The shared `th` rule is already position:sticky, but an overflow:auto ancestor
    confines a sticky element to that ancestor's scrollport -- so with the height
@@ -3286,6 +3282,30 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
    that is this table's own direct header cell. */
 .table-wrap.bases-table-wrap { margin-top: 0; }
 .bases-table-wrap .bases-table > thead > tr > th { top: 67px; z-index: 3; }
+/* The expanded base's own row stacks sticky beneath the header (z-index 4/3
+   above) so it stays visible while scrolling a tall tab's content -- the
+   same reason the search row and header are sticky. Applied to the `<tr>`
+   itself, not its `<td>`s: verified live that `position: sticky` on a
+   `tbody` row's own cells does not hold once scrolled past (the browser lets
+   go once each individual cell's own tiny box has scrolled by), while the
+   same declaration on the row element does. `> tbody > tr.row-expanded`, not
+   a bare descendant, for the same reason as the header's `> thead > tr > th`
+   above -- it must not match a nested table's row inside the expanded
+   content itself. Each cell still needs its own opaque background since
+   `<tr>` background does not reliably paint through `border-collapse:
+   separate` cells.
+   top is 67px (header's own offset) + 51px (the header row's own rendered
+   height, rounded up from 50.59375px measured live) -- without adding the
+   header's height, both stick to the same 67px offset and the header (its
+   higher z-index) paints over and completely hides this row. */
+.bases-table-wrap .bases-table > tbody > tr.row-expanded {
+  position: sticky;
+  top: 118px;
+  z-index: 2;
+}
+.bases-table-wrap .bases-table > tbody > tr.row-expanded > td {
+  background: var(--panel);
+}
 /* Below 900px the sidebar stops being a column and becomes a sticky header at
    top:0 with z-index:100, so a search bar pinned to the same edge sits behind
    it. Offsetting by the sidebar's height would break the moment the hamburger
@@ -3301,6 +3321,20 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   border-bottom: 1px solid var(--border-strong);
   margin-bottom: 14px;
   padding-top: 8px;
+}
+/* Its own <tr> (via DataTable's renderExpandedSticky), sticky directly
+   beneath the expanded row above at 67px (header) + that row's real
+   measured height -- same reasoning as `tr.row-expanded` above: sticky on
+   an element nested inside a <td> does not reliably hold once scrolled
+   past, only on the <tr> itself. `--bases-expanded-row-height` falls back
+   to 0px -- sticking right under the header -- for the instant before the
+   ResizeObserver's first measurement lands. The cell's own background
+   comes from the existing generic `.expanded-row-cell` rule below, which
+   is already opaque. */
+.bases-table-wrap .bases-table > tbody > tr.expanded-row-sticky {
+  position: sticky;
+  top: calc(118px + var(--bases-expanded-row-height, 0px));
+  z-index: 1;
 }
 .bases-expanded-tab {
   width: auto;
@@ -4451,18 +4485,65 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   gap: 10px;
   min-width: 0;
   padding: 8px 10px;
-  border: 1px solid var(--warning);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
-  background: rgba(169, 121, 50, .07);
-  cursor: pointer;
 }
-.bases-child-access-row input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent-strong); }
+/* Every piece on the base is listed now, not just the ones that deviate --
+   the warning treatment stays reserved for the ones that actually do. */
+.bases-child-access-row.unusual {
+  border-color: var(--warning);
+  background: rgba(169, 121, 50, .07);
+}
+.bases-child-access-row input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent-strong); }
 .bases-child-access-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .bases-child-access-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-strong); font-size: 13px; }
-.bases-child-access-name em { flex: 0 0 auto; padding: 2px 6px; border: 1px solid var(--border-strong); border-radius: 999px; color: var(--muted); font-size: 10px; font-style: normal; font-weight: 700; text-transform: uppercase; }
-.bases-child-access-level { color: var(--warning); font-size: 12px; font-weight: 700; white-space: nowrap; }
-.bases-child-access-level span { padding: 0 4px; color: var(--muted); }
 .bases-child-access-clean { margin: 0; color: var(--success-text); font-size: 12px; }
+
+/* Segmented access-level control -- same visual spec as .bases-rank-segments
+   (RankSegments), under its own class names: this is a different 5-tier scale
+   (permission_actor.access_level), not the 3-tier roster rank. */
+.bases-access-segments {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  height: 34px;
+  min-width: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: #151719;
+  overflow: hidden;
+}
+.bases-access-segment {
+  position: relative;
+  display: flex;
+  gap: 0;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 8px;
+  border-left: 1px solid var(--border);
+  color: var(--muted-warm);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.bases-access-segment:first-child { border-left: 0; }
+.bases-access-segment input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+.bases-access-segment:hover { background: rgba(198, 139, 74, .12); color: var(--text-strong); }
+.bases-access-segment:has(input:checked) { background: #9b5f2a; color: var(--text-strong); }
+.bases-access-segment:has(input:focus-visible) { outline: 2px solid var(--accent-strong); outline-offset: -2px; }
+.bases-access-segments:has(input:disabled) { opacity: .45; }
+.bases-access-segment:has(input:disabled) { cursor: not-allowed; }
 
 /* Below this the row's three columns cannot hold a name, three segments and a
    trash button side by side -- inside the expanded cell the available width is
@@ -4493,8 +4574,16 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   .bases-permissions-intro > .action-help-note { max-width: none; }
   .bases-child-access-head { align-items: stretch; flex-direction: column; }
   .bases-child-access-actions { justify-content: flex-end; }
-  .bases-child-access-row { grid-template-columns: 20px minmax(0, 1fr); }
-  .bases-child-access-level { grid-column: 2; white-space: normal; }
+  /* Five segments need more width than the name column leaves on a phone --
+     stack the control under the checkbox/name row instead of squeezing it. */
+  .bases-child-access-row {
+    grid-template-columns: 20px minmax(0, 1fr);
+    grid-template-areas: "check name" "segments segments";
+    row-gap: 8px;
+  }
+  .bases-child-access-row input[type="checkbox"] { grid-area: check; }
+  .bases-child-access-name { grid-area: name; }
+  .bases-access-segments { grid-area: segments; }
 }
 @media (max-width: 900px) {
   .bases-permissions-toolbar {
@@ -4819,15 +4908,6 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   vertical-align: middle;
 }
 .bases-table td.expanded-row-cell {
-  text-align: left;
-}
-.bases-table-wrap + .expanded-row-outside {
-  border: 1px solid var(--border);
-  border-top: 0;
-  border-radius: 0 0 8px 8px;
-  background: #101316;
-}
-.bases-table-wrap + .expanded-row-outside > .expanded-row-cell {
   text-align: left;
 }
 /* A plain full-width column, not a grid: the auto-refill row and the reserve

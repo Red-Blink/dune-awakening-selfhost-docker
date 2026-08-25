@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Boxes, ChevronDown, ChevronUp, Download, Droplet, Fuel, Grid3X3, Trash2, Users, X, Zap } from "lucide-react";
+import { Boxes, ChevronDown, ChevronUp, Download, Droplet, Fuel, Grid3X3, Lock, Trash2, Users, X, Zap } from "lucide-react";
 import { BaseInventoryTab } from "./BaseInventoryTab";
+import { BaseChildPermissionsTab } from "./BaseChildPermissionsTab";
 import { BaseLandClaimTab } from "./BaseLandClaimTab";
 import { BasePermissionsTab } from "./BasePermissionsTab";
 import { BaseWaterTab } from "./BaseWaterTab";
@@ -381,13 +382,14 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
   const [canRefill, setCanRefill] = useState(false);
   const [canQueue, setCanQueue] = useState(false);
   const [canEditPermissions, setCanEditPermissions] = useState(false);
+  const [canEditChildAccess, setCanEditChildAccess] = useState(false);
   const [canRefillWater, setCanRefillWater] = useState(false);
   const [canQueueWater, setCanQueueWater] = useState(false);
   const [canDeleteBase, setCanDeleteBase] = useState(false);
   const [canQueueDelete, setCanQueueDelete] = useState(false);
   // Which tab the expanded row is showing. Power is the default so expanding a
   // row behaves exactly as it did before this feature existed.
-  const [expandedTab, setExpandedTab] = useState<"power" | "water" | "inventory" | "land-claim" | "permissions">("power");
+  const [expandedTab, setExpandedTab] = useState<"power" | "water" | "inventory" | "land-claim" | "permissions" | "child-access">("power");
   const [cancelingId, setCancelingId] = useState("");
   const [cancelingWaterId, setCancelingWaterId] = useState("");
   const [refillingWaterId, setRefillingWaterId] = useState("");
@@ -464,6 +466,7 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
       setCanRefill(Boolean(result.capabilities?.generatorRefill));
       setCanQueue(Boolean(result.capabilities?.generatorRefillQueue));
       setCanEditPermissions(Boolean(result.capabilities?.basePermissions));
+      setCanEditChildAccess(Boolean(result.capabilities?.baseChildAccess));
       setCanRefillWater(Boolean(result.capabilities?.waterRefill));
       setCanQueueWater(Boolean(result.capabilities?.waterRefillQueue));
       setCanDeleteBase(Boolean(result.capabilities?.baseDelete));
@@ -1093,6 +1096,31 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
     target.scrollIntoView?.({ block: "nearest" });
   }, [expandedBaseId, rows]);
 
+  // The expanded row's own height varies with its content (a wrapped
+  // Generators/Shared With cell makes some bases' rows taller than others),
+  // so the sticky tablist below it can't use a fixed pixel offset -- it has
+  // to know this specific row's real height. Measured via ResizeObserver
+  // (not just once on expand) because the row can reflow after mount, e.g.
+  // once generator data finishes loading and wraps onto another line.
+  // Must stay above the `loading` early return -- see the effect above.
+  useEffect(() => {
+    if (!expandedBaseId) return undefined;
+    const wrap = document.querySelector<HTMLElement>(".table-wrap.bases-table-wrap");
+    const row = wrap?.querySelector<HTMLElement>("tr.row-expanded");
+    if (!wrap || !row) return undefined;
+    const update = () => wrap.style.setProperty("--bases-expanded-row-height", `${row.getBoundingClientRect().height}px`);
+    update();
+    // Not available under jsdom in tests -- degrade to the one-time
+    // measurement above rather than throwing.
+    if (typeof ResizeObserver === "undefined") return () => wrap.style.removeProperty("--bases-expanded-row-height");
+    const observer = new ResizeObserver(update);
+    observer.observe(row);
+    return () => {
+      observer.disconnect();
+      wrap.style.removeProperty("--bases-expanded-row-height");
+    };
+  }, [expandedBaseId, expandedTab, rows]);
+
   const panelClassName = embedded ? "playerAdmin_box player-bases-panel" : "panel";
   const PanelHeading = embedded ? "h4" : "h2";
 
@@ -1220,6 +1248,12 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
     });
   }
 
+  // The expanded row's own height varies with its content (a wrapped
+  // Generators/Shared With cell makes some bases' rows taller than others),
+  // so the sticky tablist below it can't use a fixed pixel offset -- it has
+  // to know this specific row's real height. Measured via ResizeObserver
+  // (not just once on expand) because the row can reflow after mount, e.g.
+  // once generator data finishes loading and wraps onto another line.
   function handleSort(column: string) {
     setPage(0);
     if (column === sortColumn) {
@@ -1487,7 +1521,83 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
         rowKey={(row) => String(row.base_id)}
         onRowClick={(row) => toggleExpanded(String(row.base_id))}
         isRowExpanded={(row) => expandedBaseId === String(row.base_id)}
-        expandedRowPlacement="after-table"
+        // Its own <tr>, sticky beneath the expanded row above (see that CSS
+        // rule's comment): position: sticky on an element nested inside a
+        // <td> does not reliably hold once scrolled past, only on a <tr>
+        // itself -- verified live. Everything the tab strip needs
+        // (expandedTab, setExpandedTab, the capability flags) is already in
+        // this component's scope, same as renderExpandedRow below.
+        renderExpandedSticky={(row) => {
+          const base = row as BaseRow;
+          const id = String(base.base_id);
+          return (
+            <div className="bases-expanded-tablist" role="tablist" aria-label="Base details" onClick={(event) => event.stopPropagation()}>
+              <button
+                role="tab"
+                id={`bases-tab-power-${id}`}
+                aria-selected={expandedTab === "power"}
+                aria-controls={`bases-panel-power-${id}`}
+                className={`bases-expanded-tab${expandedTab === "power" ? " active" : ""}`}
+                onClick={() => setExpandedTab("power")}
+              ><Zap size={15} aria-hidden="true" />Power</button>
+              <button
+                role="tab"
+                id={`bases-tab-water-${id}`}
+                aria-selected={expandedTab === "water"}
+                aria-controls={`bases-panel-water-${id}`}
+                className={`bases-expanded-tab${expandedTab === "water" ? " active" : ""}`}
+                onClick={() => setExpandedTab("water")}
+              ><Droplet size={15} aria-hidden="true" />Water</button>
+              <button
+                role="tab"
+                id={`bases-tab-inventory-${id}`}
+                aria-selected={expandedTab === "inventory"}
+                aria-controls={`bases-panel-inventory-${id}`}
+                className={`bases-expanded-tab${expandedTab === "inventory" ? " active" : ""}`}
+                onClick={() => setExpandedTab("inventory")}
+              ><Boxes size={15} aria-hidden="true" />Inventory</button>
+              <button
+                role="tab"
+                id={`bases-tab-land-claim-${id}`}
+                aria-selected={expandedTab === "land-claim"}
+                aria-controls={`bases-panel-land-claim-${id}`}
+                className={`bases-expanded-tab${expandedTab === "land-claim" ? " active" : ""}`}
+                onClick={() => setExpandedTab("land-claim")}
+              ><Grid3X3 size={15} aria-hidden="true" />Land Claim Editor</button>
+              {canEditPermissions && <button
+                role="tab"
+                id={`bases-tab-permissions-${id}`}
+                aria-selected={expandedTab === "permissions"}
+                aria-controls={`bases-panel-permissions-${id}`}
+                className={`bases-expanded-tab${expandedTab === "permissions" ? " active" : ""}`}
+                // The label wraps onto two deliberate lines, so name the tab
+                // explicitly rather than letting the accessible name be
+                // assembled from two adjacent inline spans.
+                aria-label="Sub-Fief Permissions"
+                onClick={() => setExpandedTab("permissions")}
+              ><Users size={15} aria-hidden="true" /><span className="bases-expanded-tab-lines">
+                <span>Sub-Fief</span>
+                <span>Permissions</span>
+              </span></button>}
+              {canEditChildAccess && <button
+                role="tab"
+                id={`bases-tab-child-access-${id}`}
+                aria-selected={expandedTab === "child-access"}
+                aria-controls={`bases-panel-child-access-${id}`}
+                className={`bases-expanded-tab${expandedTab === "child-access" ? " active" : ""}`}
+                // See the Sub-Fief Permissions tab's matching comment: the
+                // label wraps onto two deliberate lines, so name the tab
+                // explicitly rather than letting the accessible name be
+                // assembled from two adjacent inline spans.
+                aria-label="Base Permissions"
+                onClick={() => setExpandedTab("child-access")}
+              ><Lock size={15} aria-hidden="true" /><span className="bases-expanded-tab-lines">
+                <span>Base</span>
+                <span>Permissions</span>
+              </span></button>}
+            </div>
+          );
+        }}
         renderExpandedRow={(row) => {
           const base = row as BaseRow;
           const id = String(base.base_id);
@@ -1589,58 +1699,11 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
 
           // Power and Water always render (Water needs no capability the way
           // Permissions does -- see baseWater's "no capability gate" note in
-          // the plan); Permissions only when the schema supports it.
+          // the plan); Permissions only when the schema supports it. The tab
+          // strip itself now renders via renderExpandedSticky above, in its
+          // own sticky <tr> -- this is the tabpanel content only.
           return (
             <div className="bases-expanded-tabs" onClick={(event) => event.stopPropagation()}>
-              <div className="bases-expanded-tablist" role="tablist" aria-label="Base details">
-                <button
-                  role="tab"
-                  id={`bases-tab-power-${id}`}
-                  aria-selected={expandedTab === "power"}
-                  aria-controls={`bases-panel-power-${id}`}
-                  className={`bases-expanded-tab${expandedTab === "power" ? " active" : ""}`}
-                  onClick={() => setExpandedTab("power")}
-                ><Zap size={15} aria-hidden="true" />Power</button>
-                <button
-                  role="tab"
-                  id={`bases-tab-water-${id}`}
-                  aria-selected={expandedTab === "water"}
-                  aria-controls={`bases-panel-water-${id}`}
-                  className={`bases-expanded-tab${expandedTab === "water" ? " active" : ""}`}
-                  onClick={() => setExpandedTab("water")}
-                ><Droplet size={15} aria-hidden="true" />Water</button>
-                <button
-                  role="tab"
-                  id={`bases-tab-inventory-${id}`}
-                  aria-selected={expandedTab === "inventory"}
-                  aria-controls={`bases-panel-inventory-${id}`}
-                  className={`bases-expanded-tab${expandedTab === "inventory" ? " active" : ""}`}
-                  onClick={() => setExpandedTab("inventory")}
-                ><Boxes size={15} aria-hidden="true" />Inventory</button>
-                <button
-                  role="tab"
-                  id={`bases-tab-land-claim-${id}`}
-                  aria-selected={expandedTab === "land-claim"}
-                  aria-controls={`bases-panel-land-claim-${id}`}
-                  className={`bases-expanded-tab${expandedTab === "land-claim" ? " active" : ""}`}
-                  onClick={() => setExpandedTab("land-claim")}
-                ><Grid3X3 size={15} aria-hidden="true" />Land Claim Editor</button>
-                {canEditPermissions && <button
-                  role="tab"
-                  id={`bases-tab-permissions-${id}`}
-                  aria-selected={expandedTab === "permissions"}
-                  aria-controls={`bases-panel-permissions-${id}`}
-                  className={`bases-expanded-tab${expandedTab === "permissions" ? " active" : ""}`}
-                  // The label wraps onto two deliberate lines, so name the tab
-                  // explicitly rather than letting the accessible name be
-                  // assembled from two adjacent inline spans.
-                  aria-label="Sub-Fief Permissions"
-                  onClick={() => setExpandedTab("permissions")}
-                ><Users size={15} aria-hidden="true" /><span className="bases-expanded-tab-lines">
-                  <span>Sub-Fief</span>
-                  <span>Permissions</span>
-                </span></button>}
-              </div>
               {expandedTab === "power"
                 ? <div role="tabpanel" id={`bases-panel-power-${id}`} aria-labelledby={`bases-tab-power-${id}`}>{renderPower()}</div>
                 : expandedTab === "water"
@@ -1680,7 +1743,8 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
                       onError={onError}
                     />
                   </div>
-                : <div role="tabpanel" id={`bases-panel-permissions-${id}`} aria-labelledby={`bases-tab-permissions-${id}`}>
+                : expandedTab === "permissions"
+                ? <div role="tabpanel" id={`bases-panel-permissions-${id}`} aria-labelledby={`bases-tab-permissions-${id}`}>
                     <BasePermissionsTab
                       baseId={id}
                       baseName={String(base.name || `base ${id}`)}
@@ -1692,6 +1756,14 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
                         basesCache = null;
                         void load({ q: submittedQ, page, pageSize, sortColumn, sortDirection }, { silent: true });
                       }}
+                    />
+                  </div>
+                : <div role="tabpanel" id={`bases-panel-child-access-${id}`} aria-labelledby={`bases-tab-child-access-${id}`}>
+                    <BaseChildPermissionsTab
+                      baseId={id}
+                      baseName={String(base.name || `base ${id}`)}
+                      confirmAction={confirmAction}
+                      onError={onError}
                     />
                   </div>}
             </div>

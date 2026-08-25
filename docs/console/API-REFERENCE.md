@@ -270,6 +270,8 @@ Player rows include `total_playtime_seconds`. The console samples `player_state.
 | POST | `/api/bases/{baseId}/system-custodian` | Transfer ownership to the Server or detected GM system custodian while preserving the roster; provisions Server when no custodian exists | `baseId` |
 | PUT | `/api/bases/{baseId}/permissions` | Replace a base's permission roster | `baseId`, `entries[]` (`playerId`, `rank`) |
 | GET | `/api/bases/permission-candidates` | Search players eligible to be added to a roster | `q?`, `limit?` |
+| GET | `/api/bases/{baseId}/child-access` | Every child piece (door, device) on a base with its access level — a different 5-tier scale from the roster rank above; Sub-Fief is Associate (3) | `baseId` |
+| POST | `/api/bases/{baseId}/child-access` | Set specific pieces to specific access levels (1-5). Requires `{ updates: [{ actorId, accessLevel }], confirmation: "SET CHILD ACCESS" }` | `baseId`, `updates[]` |
 | DELETE | `/api/bases/{baseId}` | Permanently delete a base and everything on it (queued instead if the map isn't safely writable right now); takes a full-database safety backup first. Requires `{ confirmation: "DELETE BASE" }` | `baseId` |
 | GET | `/api/bases/pending-deletes` | List queued base deletes, grouped by restart target | None |
 | DELETE | `/api/bases/{baseId}/queued-delete` | Cancel a base's queued delete | `baseId` |

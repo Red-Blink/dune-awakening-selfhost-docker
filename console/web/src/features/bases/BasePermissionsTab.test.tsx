@@ -7,7 +7,6 @@ vi.mock("../../api/bases", () => ({
   basesApi: {
     permissions: vi.fn(),
     setPermissions: vi.fn(),
-    resetChildAccess: vi.fn(),
     transferToSystemCustodian: vi.fn(),
     permissionCandidates: vi.fn()
   }
@@ -364,34 +363,5 @@ describe("BasePermissionsTab load states", () => {
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByText("Shared with · 2")).toBeInTheDocument();
     expect(basesApi.permissions).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe("BasePermissionsTab child access", () => {
-  it("shows unusual doors and resets only the selected objects after confirmation", async () => {
-    vi.mocked(basesApi.permissions).mockResolvedValue({
-      supported: true,
-      baseId: 1006,
-      actorId: "1004",
-      map: "HaggaBasin",
-      mapNameId: 1,
-      entries: DEFAULT_ROSTER,
-      childAccess: {
-        supported: true,
-        inspected: 12,
-        baselined: 8,
-        anomalies: [{ actorId: "44186", name: "Desert Mechanic Prudence Door", kind: "Door", currentAccess: 5, expectedAccess: 3, basis: "Door Standard", unusual: true }]
-      }
-    } as never);
-    vi.mocked(basesApi.resetChildAccess).mockResolvedValue({ supported: true, result: { ok: true, baseId: 1006, reset: 1, message: "Access reset." } } as never);
-    const props = renderTab();
-
-    expect(await screen.findByText("Desert Mechanic Prudence Door")).toBeInTheDocument();
-    expect(screen.getByText(/Access 5/)).toHaveTextContent("Access 5 → Standard 3");
-    fireEvent.click(screen.getByRole("checkbox"));
-    fireEvent.click(screen.getByRole("button", { name: "Reset Selected" }));
-
-    await waitFor(() => expect(props.confirmAction).toHaveBeenCalled());
-    await waitFor(() => expect(basesApi.resetChildAccess).toHaveBeenCalledWith("1006", ["44186"]));
   });
 });
