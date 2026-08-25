@@ -2166,6 +2166,31 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
   place-items: center;
   cursor: pointer;
 }
+.vehicles-table th.vehicles-actions-column, .vehicles-table td.vehicles-actions-column { width: 60px; }
+/* Mirrors .bases-queued-delete/.bases-queued-delete-cancel exactly -- same
+   danger-toned pill, same reasoning (flex-shrink: 0 so the actions column
+   squashes the row before it squashes this pill's icon). */
+.vehicles-queued-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  background: rgba(167, 73, 73, .16);
+  color: var(--danger-text);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.vehicles-queued-delete .vehicles-queued-delete-cancel {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  min-width: 0;
+}
 .vehicles-expand-chevron { opacity: 0.6; vertical-align: middle; }
 .vehicles-name-cell { display: flex; flex-direction: column; gap: 2px; white-space: normal; }
 .vehicles-name { color: #fff1d4; font-weight: 500; }

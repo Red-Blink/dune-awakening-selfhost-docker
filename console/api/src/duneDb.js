@@ -4556,6 +4556,112 @@ export async function transferVehicleToSystemCustodian(db, vehicleId, maxPermiss
   };
 }
 
+// ---------------------------------------------------------------------------
+// Vehicle deletion
+//
+// Mirrors base deletion (see deleteBaseCompletely and the "Base deletion"
+// queue section below) with one structural simplification: a vehicle IS its
+// own actor (dune.vehicles.id = dune.actors.id), so there is no multi-hop
+// actor enumeration the way baseDeletionActorIds needs for buildings and
+// placeables -- just the one id, plus whatever the game's own declared
+// foreign keys cascade from it.
+//
+// Verified against a real production schema dump (.claude/dune_backup.sql)
+// and confirmed live against a restored copy in a rolled-back transaction:
+// vehicles(id)->actors(id), vehicle_modules(vehicle_id)->vehicles(id),
+// inventories(vehicle_module_id)->vehicle_modules(id),
+// backup_vehicles(vehicle_id)->vehicles(id), and
+// recovered_vehicles(vehicle_id)->vehicles(id) are all ON DELETE CASCADE.
+// permission_actor_destroy still has to run first: markers/player_markers
+// are keyed on marker_hash_id, which has no FK to actors at all -- the same
+// reason deleteBaseCompletely calls it before delete_actors.
+// ---------------------------------------------------------------------------
+
+async function supportsVehicleDelete(db) {
+  for (const table of ["vehicles", "vehicle_modules", "actors"]) {
+    if (!(await tableExists(db, table))) return false;
+  }
+  return await functionExists(db, "dune.permission_actor_destroy(bigint)")
+    && await functionExists(db, "dune.delete_actors(bigint[])");
+}
+
+// Mirrors supportsBaseDeleteQueue: without dune.world_partition there is no
+// way to tell a running map from a stopped one, so the panel hides the queue
+// and deletes stay immediate rather than offering a control that silently
+// risks a live server resurrecting the deleted rows.
+export async function supportsVehicleDeleteQueue(db, { vehicleDelete } = {}) {
+  const supported = vehicleDelete !== undefined ? vehicleDelete : await supportsVehicleDelete(db);
+  if (!supported) return false;
+  return tableExists(db, "world_partition");
+}
+
+// The states Funcom's own delete_actors_and_respawns_on_server (the
+// Coriolis-storm cleanup procedure -- see docs/console/base-backups.md)
+// refuses to delete through: a vehicle mid-overmap-transit, or stashed
+// pending recovery. Transcribed, not invented -- an admin delete should
+// honor the same exclusions the game's own cleanup already does. Gated on
+// the table existing at all so an older schema without dune.actor_state
+// simply skips the guard instead of breaking.
+const VEHICLE_DELETE_BLOCKED_STATES = new Set(["Travel", "VehicleBackup", "VehicleRecovery"]);
+
+async function vehicleBlockedDeleteState(db, actorId) {
+  if (!(await tableExists(db, "actor_state"))) return "";
+  const result = await db.query("select state::text as state from dune.actor_state where actor_id = $1::bigint", [actorId]);
+  const state = String(result.rows[0]?.state || "");
+  return VEHICLE_DELETE_BLOCKED_STATES.has(state) ? state : "";
+}
+
+// Permanently deletes a vehicle and everything on it -- modules, their
+// inventories and items, any backup/recovery record, and its permission
+// roster. A destructive, irreversible operation with the same all-or-nothing
+// guarantee as deleteBaseCompletely, for the same reason: a partial failure
+// here cannot be retried against player-recoverable state. The caller
+// (server.js) owns the mandatory pre-delete safety backup -- this function
+// never shells out to the `dune` CLI.
+//
+// Deliberately does not require the vehicle to be claimed: vehiclePermissionActor
+// (unlike setVehiclePermissions' path) never joins through permission_actor,
+// so an unclaimed junk vehicle resolves and deletes exactly like a claimed
+// one -- arguably the primary use case for this feature.
+export async function deleteVehicleCompletely(db, vehicleId) {
+  await requireCapability(await supportsVehicleDelete(db),
+    "Vehicle deletion requires dune.vehicles, dune.vehicle_modules, dune.actors, and the dune.permission_actor_destroy(bigint)/delete_actors(bigint[]) functions.");
+  const target = intParam(vehicleId, "vehicle id", 1);
+  return db.transaction(async (tx) => {
+    await tx.query("set local search_path to dune, public");
+    // Re-resolved inside the transaction, never trusted from a snapshot
+    // taken when the confirm dialog opened or the delete was queued -- same
+    // discipline deleteBaseCompletely applies to its actor enumeration.
+    const actor = await vehiclePermissionActor(tx, target);
+    const locked = await tx.query("select id from dune.actors where id = $1::bigint for update", [actor.actorId]);
+    if (!locked.rowCount) throw new Error("That vehicle was not found.");
+    const blockedState = await vehicleBlockedDeleteState(tx, actor.actorId);
+    if (blockedState) {
+      throw new Error(`This vehicle is currently ${blockedState} and cannot be deleted until that clears. Try again once the vehicle is no longer mid-transit or pending recovery.`);
+    }
+    const modules = await tx.query(
+      "select count(*)::int as n from dune.vehicle_modules where vehicle_id = $1::bigint", [target]);
+    // permission_actor_destroy first: it is the only thing that clears
+    // markers/player_markers, which are keyed on the claim actor id but not
+    // FK-cascaded from actors. Its permission_actor/permission_actor_rank
+    // deletes are redundant with the cascade that follows, but a DELETE
+    // matching zero rows is a harmless no-op -- same as base deletion.
+    await tx.query("select dune.permission_actor_destroy($1::bigint)", [actor.actorId]);
+    // Cascades away vehicles, vehicle_modules, inventories, items,
+    // backup_vehicles, and recovered_vehicles via their declared
+    // ON DELETE CASCADE foreign keys, verified above.
+    await tx.query("select dune.delete_actors($1::bigint[])", [[actor.actorId]]);
+    return {
+      ok: true,
+      vehicleId: target,
+      actorId: actor.actorId,
+      map: actor.map,
+      partitionId: actor.partitionId,
+      deletedModuleCount: modules.rows[0].n
+    };
+  });
+}
+
 const BASE_SORT_COLUMNS = {
   base_id: { order: ["id"] },
   name: { order: ["lower(coalesce(name, ''))"] },
@@ -6997,7 +7103,7 @@ export async function listVehicles(db, { q = "", page = 0, pageSize = 50, sortCo
   for (const table of requiredTables) {
     if (!(await tableExists(db, table))) {
       const result = unsupported("vehicles", requiredTables.map((t) => `dune.${t}`));
-      return { ...result, capabilities: { ...result.capabilities, vehiclePermissions: false }, totalCount: 0, totalVehicles: 0 };
+      return { ...result, capabilities: { ...result.capabilities, vehiclePermissions: false, vehicleDelete: false, vehicleDeleteQueue: false }, totalCount: 0, totalVehicles: 0 };
     }
   }
 
@@ -7160,16 +7266,23 @@ export async function listVehicles(db, { q = "", page = 0, pageSize = 50, sortCo
     const vehiclePermissions = await permissionEditingSupported(db, {
       knownTables: new Set(["permission_actor_rank", "permission_actor", "actors", "player_state"])
     }).catch(() => false);
+    // Probed the same way and for the same reason as listBases' baseDelete:
+    // without the shipped delete procedures the panel hides the action
+    // rather than offering a control that fails on click.
+    const vehicleDelete = await supportsVehicleDelete(db).catch(() => false);
+    const vehicleDeleteQueue = vehicleDelete
+      ? await supportsVehicleDeleteQueue(db, { vehicleDelete }).catch(() => false)
+      : false;
 
     return {
-      capabilities: { vehicles: true, vehiclePermissions },
+      capabilities: { vehicles: true, vehiclePermissions, vehicleDelete, vehicleDeleteQueue },
       totalCount: result.rows[0] ? Number(result.rows[0].total_count) : 0,
       totalVehicles: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_vehicles) : 0,
       rows
     };
   } catch (error) {
     const result = unsupported("vehicles", requiredTables.map((t) => `dune.${t}`));
-    return { ...result, capabilities: { ...result.capabilities, vehiclePermissions: false }, totalCount: 0, totalVehicles: 0, reason: `Vehicles query failed: ${error.message}` };
+    return { ...result, capabilities: { ...result.capabilities, vehiclePermissions: false, vehicleDelete: false, vehicleDeleteQueue: false }, totalCount: 0, totalVehicles: 0, reason: `Vehicles query failed: ${error.message}` };
   }
 }
 
@@ -9639,6 +9752,24 @@ export async function baseRefillTarget(db, baseId, { observed } = {}) {
   };
 }
 
+// Same probe as baseRefillTarget, for a vehicle. Simpler than the base
+// version: a vehicle is its own actor, so vehiclePermissionActor already
+// resolves {map, partitionId} directly -- no separate baseMapLocation-style
+// resolver needed, and no "orphaned owner entity" case to distinguish (that
+// case is specific to a base's building_instances->actor_fgl_entities chain,
+// which a vehicle has no equivalent of).
+export async function vehicleWriteTarget(db, vehicleId, { observed } = {}) {
+  const resolvedObserved = observed !== undefined ? observed : await observeRefillPartitions(db);
+  if (!resolvedObserved) return { map: "", partitionId: 0, queueSupported: false, writeSafeNow: true };
+  const actor = await vehiclePermissionActor(db, vehicleId);
+  return {
+    map: actor.map,
+    partitionId: actor.partitionId,
+    queueSupported: true,
+    writeSafeNow: partitionWriteSafe(resolvedObserved, actor.partitionId)
+  };
+}
+
 // A database that is restarting, or a schema mid-migration, will succeed on a
 // later tick. Mirrors the filter runBackgroundTick and the death poller already
 // use for the same "the stack is moving, not broken" states.
@@ -9906,6 +10037,172 @@ function reconcileQueuedBaseDeletes(repoRoot, outcomes) {
     if (outcome.keep) next.push({ ...entry, attempts: outcome.attempts, nextRetryAt: outcome.nextRetryAt, lastError: outcome.lastError });
   }
   writeQueuedBaseDeletes(repoRoot, next);
+  return next;
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle delete queue
+//
+// Structural copy of the base-delete queue immediately above, vehicleId in
+// place of baseId. Not merged into a shared engine: this codebase's stated
+// convention (see usePendingRefills.ts on the frontend) is a separate copy
+// per resource rather than a shared abstraction, and refactoring the single
+// most destructive code path in the console to generalize it is a bigger,
+// separately-reviewable change than adding a vehicle delete feature is.
+// Own cap and own env vars deliberately: vehicles are far more numerous than
+// bases, so a "queue is getting full" signal means something different for
+// each and the two knobs should not be coupled.
+// ---------------------------------------------------------------------------
+
+const PENDING_VEHICLE_DELETE_PATH = "runtime/generated/pending-vehicle-deletes.json";
+const MAX_PENDING_VEHICLE_DELETES = 200;
+
+function pendingVehicleDeleteMaxAgeMs() {
+  return clampInt(process.env.ADMIN_VEHICLE_DELETE_MAX_AGE_MS, 7 * 24 * 60 * 60 * 1000, 1, Number.MAX_SAFE_INTEGER);
+}
+function pendingVehicleDeleteRetryDelayMs() {
+  return clampInt(process.env.ADMIN_VEHICLE_DELETE_RETRY_DELAY_MS, 60000, 1, Number.MAX_SAFE_INTEGER);
+}
+
+function pendingVehicleDeleteFile(repoRoot) {
+  return resolve(repoRoot || "", PENDING_VEHICLE_DELETE_PATH);
+}
+
+// Intent only, like normalizePendingBaseDelete -- no captured actor-id list,
+// so flushVehicleDeletes re-enumerates fresh at flush time rather than
+// trusting what existed when the delete was requested.
+function normalizePendingVehicleDelete(entry) {
+  const vehicleId = Math.floor(Number(entry?.vehicleId));
+  if (!Number.isInteger(vehicleId) || vehicleId < 1) return null;
+  const partitionId = Math.floor(Number(entry?.partitionId));
+  return {
+    vehicleId,
+    map: String(entry?.map ?? "").slice(0, 120),
+    partitionId: Number.isInteger(partitionId) && partitionId > 0 ? partitionId : 0,
+    queuedAt: typeof entry?.queuedAt === "string" ? entry.queuedAt.slice(0, 40) : "",
+    attempts: clampInt(entry?.attempts, 0, 0, MAX_DELETE_FLUSH_ATTEMPTS),
+    nextRetryAt: Number.isFinite(Number(entry?.nextRetryAt)) ? Number(entry.nextRetryAt) : 0,
+    lastError: String(entry?.lastError ?? "").slice(0, 300)
+  };
+}
+
+export function listQueuedVehicleDeletes(repoRoot) {
+  const file = pendingVehicleDeleteFile(repoRoot);
+  if (!existsSync(file)) return [];
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    if (!Array.isArray(parsed)) return [];
+    // One entry per vehicle, so a double-clicked button cannot queue it twice.
+    const seen = new Set();
+    return parsed.map(normalizePendingVehicleDelete).filter((entry) => {
+      if (!entry || seen.has(entry.vehicleId)) return false;
+      seen.add(entry.vehicleId);
+      return true;
+    });
+  } catch (error) {
+    console.warn(`Ignoring unreadable pending vehicle delete queue: ${redact(error?.message || "Unexpected error.")}`);
+    return [];
+  }
+}
+
+function writeQueuedVehicleDeletes(repoRoot, entries) {
+  writeJsonAtomic(pendingVehicleDeleteFile(repoRoot), entries);
+  return entries;
+}
+
+export function queueVehicleDelete(repoRoot, { vehicleId, map = "", partitionId = 0, now = () => new Date() } = {}) {
+  const entry = normalizePendingVehicleDelete({ vehicleId, map, partitionId, queuedAt: now().toISOString() });
+  if (!entry) throw new Error("Invalid vehicle id");
+  const others = listQueuedVehicleDeletes(repoRoot).filter((row) => row.vehicleId !== entry.vehicleId);
+  if (others.length >= MAX_PENDING_VEHICLE_DELETES) {
+    throw new Error(`The pending delete queue already holds ${MAX_PENDING_VEHICLE_DELETES} vehicles. Restart the affected maps to apply them first.`);
+  }
+  writeQueuedVehicleDeletes(repoRoot, [...others, entry]);
+  return entry;
+}
+
+export function cancelQueuedVehicleDelete(repoRoot, vehicleId) {
+  const target = intParam(vehicleId, "vehicle id", 1);
+  const entries = listQueuedVehicleDeletes(repoRoot);
+  const remaining = entries.filter((entry) => entry.vehicleId !== target);
+  if (remaining.length === entries.length) throw new Error("That vehicle has no queued delete.");
+  writeQueuedVehicleDeletes(repoRoot, remaining);
+  return { ok: true, vehicleId: target, pending: remaining.length };
+}
+
+// vehiclePermissionActor throws exactly one message for a vehicle that was
+// destroyed or never existed ("That vehicle was not found") -- unlike bases,
+// there is no "no resolvable owner entity" alternative to also match, since
+// vehiclePermissionActor has no left-join/nullable-owner-entity chain the
+// way baseMapLocation does.
+function vehicleDeleteAlreadyGone(message) {
+  return /was not found/i.test(message);
+}
+
+// Mirrors flushBaseDeletes. Same onBeforeApply-runs-at-most-once-per-pass
+// semantics, for the same reason: a full database backup is not cheap, and
+// several vehicles can flush in the same pass.
+export async function flushVehicleDeletes(db, repoRoot, { now = Date.now, onBeforeApply } = {}) {
+  const pending = listQueuedVehicleDeletes(repoRoot);
+  if (!pending.length) return { flushed: [], pending: 0 };
+  const observed = await observeRefillPartitions(db, { now });
+  if (!observed) return { flushed: [], pending: pending.length, unsupported: true };
+
+  const flushed = [];
+  const outcomes = new Map();
+  const timestamp = now();
+  let backedUp = false;
+  for (const entry of pending) {
+    const queuedMs = Date.parse(entry.queuedAt);
+    if (Number.isFinite(queuedMs) && timestamp - queuedMs >= pendingVehicleDeleteMaxAgeMs()) {
+      const message = `Queued for longer than the ${Math.round(pendingVehicleDeleteMaxAgeMs() / 3600000)}h limit without being applied.`;
+      outcomes.set(entry.vehicleId, { queuedAt: entry.queuedAt, keep: false });
+      flushed.push({ vehicleId: entry.vehicleId, map: entry.map, partitionId: entry.partitionId, ok: false, expired: true, dropped: true, error: message });
+      continue;
+    }
+    if (!partitionWriteSafe(observed, entry.partitionId)) continue;
+    if (entry.nextRetryAt && timestamp < entry.nextRetryAt) continue;
+    if (!backedUp && onBeforeApply) {
+      try {
+        await onBeforeApply();
+        backedUp = true;
+      } catch (error) {
+        return { flushed: [], pending: pending.length, backupFailed: true, error: String(error?.message || "Unexpected error.").slice(0, 300) };
+      }
+    }
+    try {
+      const result = await deleteVehicleCompletely(db, entry.vehicleId);
+      outcomes.set(entry.vehicleId, { queuedAt: entry.queuedAt, keep: false });
+      flushed.push({ vehicleId: entry.vehicleId, map: entry.map, partitionId: entry.partitionId, ok: true, ...result });
+    } catch (error) {
+      const message = String(error?.message || "Unexpected error.").slice(0, 300);
+      if (vehicleDeleteAlreadyGone(message)) {
+        outcomes.set(entry.vehicleId, { queuedAt: entry.queuedAt, keep: false });
+        flushed.push({ vehicleId: entry.vehicleId, map: entry.map, partitionId: entry.partitionId, ok: true, alreadyGone: true });
+        continue;
+      }
+      const attempts = isTransientFlushError(message) ? entry.attempts : entry.attempts + 1;
+      const dropped = attempts >= MAX_DELETE_FLUSH_ATTEMPTS;
+      const nextRetryAt = timestamp + pendingVehicleDeleteRetryDelayMs();
+      outcomes.set(entry.vehicleId, { queuedAt: entry.queuedAt, keep: !dropped, attempts, nextRetryAt, lastError: message });
+      flushed.push({ vehicleId: entry.vehicleId, map: entry.map, partitionId: entry.partitionId, ok: false, attempts, dropped, error: message });
+    }
+  }
+  const remaining = outcomes.size ? reconcileQueuedVehicleDeletes(repoRoot, outcomes) : pending;
+  return { flushed, pending: remaining.length };
+}
+
+function reconcileQueuedVehicleDeletes(repoRoot, outcomes) {
+  const next = [];
+  for (const entry of listQueuedVehicleDeletes(repoRoot)) {
+    const outcome = outcomes.get(entry.vehicleId);
+    if (!outcome || outcome.queuedAt !== entry.queuedAt) {
+      next.push(entry);
+      continue;
+    }
+    if (outcome.keep) next.push({ ...entry, attempts: outcome.attempts, nextRetryAt: outcome.nextRetryAt, lastError: outcome.lastError });
+  }
+  writeQueuedVehicleDeletes(repoRoot, next);
   return next;
 }
 

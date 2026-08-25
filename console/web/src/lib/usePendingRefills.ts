@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { basesApi, type PendingRefills } from "../api/bases";
+import { vehiclesApi, type PendingVehicleDeletes } from "../api/vehicles";
 
 // The queue is a small file read on the API side, and it changes without the
 // operator doing anything: any restart -- from this console, the scheduler, or
@@ -78,6 +79,37 @@ export function usePendingBaseDeletes(enabled = true) {
   const refresh = useCallback(async () => {
     try {
       const next = await basesApi.pendingDeletes();
+      setPending(next);
+      return next;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    const tick = () => { if (!cancelled) void refresh(); };
+    tick();
+    const intervalId = window.setInterval(tick, PENDING_REFILL_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [enabled, refresh]);
+
+  return { pending, refresh };
+}
+
+// Mirrors usePendingBaseDeletes for the pending vehicle-delete queue -- own
+// hook, own type (PendingVehicleDeletes, not PendingRefills), same
+// per-resource duplication convention as every hook above.
+export function usePendingVehicleDeletes(enabled = true) {
+  const [pending, setPending] = useState<PendingVehicleDeletes | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const next = await vehiclesApi.pendingDeletes();
       setPending(next);
       return next;
     } catch {

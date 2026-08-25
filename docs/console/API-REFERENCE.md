@@ -373,13 +373,16 @@ tab can offer a retry only where retrying could actually help.
 | PUT | `/api/vehicles/{vehicleId}/permissions` | Replace a vehicle's permission roster | `vehicleId`, `entries[]` (`playerId`, `rank`) |
 | POST | `/api/vehicles/{vehicleId}/system-custodian` | Transfer ownership to the Server or detected GM system custodian while preserving the roster; provisions Server when no custodian exists | `vehicleId` |
 | GET | `/api/vehicles/permission-candidates` | Search players eligible to be added to a vehicle roster | `q?`, `limit?` |
+| DELETE | `/api/vehicles/{vehicleId}` | Permanently delete a vehicle and everything on it (queued instead if the map isn't safely writable right now); takes a full-database safety backup first. Requires `{ confirmation: "DELETE VEHICLE" }` | `vehicleId` |
+| GET | `/api/vehicles/pending-deletes` | List queued vehicle deletes, grouped by restart target | None |
+| DELETE | `/api/vehicles/{vehicleId}/queued-delete` | Cancel a vehicle's queued delete | `vehicleId` |
 
-`GET /api/vehicles` and the player-scoped list are read-only; the four
-permission routes above are the only vehicle mutations, and they share their
-implementation with the base permission routes -- see
+`GET /api/vehicles` and the player-scoped list are read-only; the permission
+routes share their implementation with the base permission routes -- see
 [vehicle-permissions.md](vehicle-permissions.md). The system-custodian route
-mirrors the base one exactly, minus the delete-pending/backed-up guard, since
-a vehicle has neither state.
+mirrors the base one exactly, minus the backed-up guard, since a vehicle has
+no picked-up state. The delete route mirrors `DELETE /api/bases/{baseId}` --
+see [vehicle-deletion.md](vehicle-deletion.md).
 
 `GET /api/vehicles` reports `capabilities.vehicles`; it is false (with a
 `reason`) when the schema lacks the required tables (`vehicles`, `vehicle_modules`,
@@ -388,7 +391,12 @@ a vehicle has neither state.
 `capabilities.vehiclePermissions` (the schema additionally has `dune.map_names`
 and the game's `permission_set_player_rank` / `permission_remove_player_rank`
 procedures) -- the permission routes and the Permissions tab are unavailable
-when it is false. Sortable `sortColumn` values: `id`, `name`,
+when it is false. `capabilities.vehicleDelete` similarly gates the Delete
+Vehicle action (`dune.vehicles`/`vehicle_modules`/`actors` plus
+`permission_actor_destroy`/`delete_actors`), and `capabilities.vehicleDeleteQueue`
+additionally requires `dune.world_partition` -- without it, deletes are
+always immediate rather than queued when the map is live. See
+[vehicle-deletion.md](vehicle-deletion.md). Sortable `sortColumn` values: `id`, `name`,
 `type`, `owner`, `condition_percent`, `fuel_percent`, `map`; `q` matches vehicle
 name, type, owner, map, and exact id. Response fields mirror the paginated-list
 convention (`rows`, `totalCount`, unfiltered `totalVehicles`). Owner resolves from

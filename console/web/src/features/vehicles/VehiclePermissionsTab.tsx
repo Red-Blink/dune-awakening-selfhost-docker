@@ -24,14 +24,19 @@ import {
   toDraft
 } from "../permissions/rosterEditor";
 
+const VEHICLE_DELETE_PENDING_MESSAGE = "This vehicle has a pending delete queued and cannot be modified. Cancel the delete first.";
+
 type VehiclePermissionsTabProps = {
   vehicleId: string;
   vehicleName: string;
   onSaved: () => void;
   confirmAction: (message: string, options?: { title?: string; confirmLabel?: string; warning?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
+  // Defaults off: v1 scoped to the global Vehicles panel, so a mount point
+  // that never passes it (PlayerVehiclesTab) behaves exactly as before.
+  deletePending?: boolean;
 };
 
-export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved, confirmAction }: VehiclePermissionsTabProps) {
+export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved, confirmAction, deletePending = false }: VehiclePermissionsTabProps) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [saved, setSaved] = useState<DraftEntry[]>([]);
@@ -227,6 +232,11 @@ export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved, confirm
   const otherRankCount = nonOwners.length - coOwnerCount - associateCount;
   const shareBreakdown = formatShareBreakdown(coOwnerCount, associateCount, otherRankCount);
   const ownerIsCustodian = Boolean(systemCustodian.available && owner && owner.playerId === systemCustodian.playerId);
+  // Unclaimed and delete-pending are two distinct reasons the roster can be
+  // locked; merged into one gate for every disabled/tooltip check below so
+  // neither has to be checked twice, while the banner still shows whichever
+  // reason actually applies.
+  const locked = unclaimed || (deletePending ? VEHICLE_DELETE_PENDING_MESSAGE : "");
 
   return (
     <div className="vehicles-permissions" onClick={(event) => event.stopPropagation()}>
@@ -241,7 +251,7 @@ export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved, confirm
             systemCustodian={systemCustodian}
             saving={saving}
             dirty={dirty}
-            unclaimed={unclaimed}
+            unclaimed={locked}
             onTransfer={() => void transferToSystemCustodian()}
             classPrefix="vehicles"
             subject="vehicle"
@@ -274,8 +284,8 @@ export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved, confirm
                   <span>{candidate.name}</span>
                   <button
                     className="icon-toggle-button"
-                    disabled={alreadyOnRoster.has(candidate.playerId) || saving || Boolean(unclaimed)}
-                    title={unclaimed || (alreadyOnRoster.has(candidate.playerId) ? "Already shared with this vehicle" : `Add ${candidate.name} as ${RANK_LABELS[addRank]}`)}
+                    disabled={alreadyOnRoster.has(candidate.playerId) || saving || Boolean(locked)}
+                    title={locked || (alreadyOnRoster.has(candidate.playerId) ? "Already shared with this vehicle" : `Add ${candidate.name} as ${RANK_LABELS[addRank]}`)}
                     aria-label={`Add ${candidate.name}`}
                     onClick={() => addCandidate(candidate)}
                   ><Plus size={15} /></button>
@@ -289,8 +299,8 @@ export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved, confirm
             <button disabled={!dirty || saving} onClick={() => setDraft(saved)}>Revert</button>
             <button
               className="update-action"
-              disabled={!dirty || !owner || saving || Boolean(unclaimed)}
-              title={unclaimed || `Save permissions for ${vehicleName}`}
+              disabled={!dirty || !owner || saving || Boolean(locked)}
+              title={locked || `Save permissions for ${vehicleName}`}
               onClick={() => void save()}
             >{saving ? "Saving…" : "Save changes"}</button>
           </div>
@@ -299,15 +309,15 @@ export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved, confirm
         {/* Do not reserve an empty message area. Warnings and results appear
             only when they have useful information, matching the compact action
             layouts elsewhere in the console. */}
-        {(dirty || !owner || unclaimed || status) && <div className="vehicles-permissions-banner-slot">
+        {(dirty || !owner || locked || status) && <div className="vehicles-permissions-banner-slot">
           {dirty && <p className="confirm-modal-warning vehicles-permissions-warning" role="status">
             Saving writes to the live database and notifies the running map server. An online player may need to reopen the vehicle's interaction panel to see the change.
           </p>}
-          {unclaimed && <p className="vehicles-permissions-error" role="alert">{unclaimed}</p>}
-          {/* Suppressed on an unclaimed vehicle: it has no Owner either, but
-              "set one before saving" describes an action that cannot be
-              completed there and would bury the reason that can. */}
-          {!owner && !unclaimed && <p className="vehicles-permissions-error" role="alert">
+          {locked && <p className="vehicles-permissions-error" role="alert">{locked}</p>}
+          {/* Suppressed while locked: it has no Owner either, but "set one
+              before saving" describes an action that cannot be completed
+              there and would bury the reason that can. */}
+          {!owner && !locked && <p className="vehicles-permissions-error" role="alert">
             This vehicle has no Owner. Set one before saving.
           </p>}
           {status && <p
@@ -339,15 +349,15 @@ export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved, confirm
               <RankSegments
                 entry={entry}
                 scopeId={vehicleId}
-                disabled={saving || Boolean(unclaimed)}
+                disabled={saving || Boolean(locked)}
                 onChange={(rank) => changeRank(entry.playerId, rank)}
                 groupClassName="vehicles-rank-segments"
                 segmentClassName="vehicles-rank-segment"
               />
               <button
                 className="icon-toggle-button vehicles-permissions-remove"
-                disabled={saving || Boolean(unclaimed)}
-                title={unclaimed || `Remove ${entry.name || entry.playerId}`}
+                disabled={saving || Boolean(locked)}
+                title={locked || `Remove ${entry.name || entry.playerId}`}
                 aria-label={`Remove ${entry.name || entry.playerId}`}
                 onClick={() => removeEntry(entry.playerId)}
               ><Trash2 size={15} /></button>

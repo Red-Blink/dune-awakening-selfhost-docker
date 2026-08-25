@@ -163,3 +163,10 @@ DELETE /api/bases/{baseId}
 base's map is confirmed down; otherwise the delete already ran and
 `deletedActorCount`/`deletedBuildingCount`/`deletedPlaceableCount` describe
 what was removed.
+
+## Related
+
+- [vehicle-deletion.md](vehicle-deletion.md) — the same shape applied to
+  vehicles, as a parallel queue rather than a shared one. A vehicle needs no
+  multi-hop actor enumeration (it is already its own actor), but adds a
+  vehicle-specific `dune.actor_state` guard bases have no equivalent of.

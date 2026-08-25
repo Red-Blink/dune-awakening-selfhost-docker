@@ -80,3 +80,25 @@ test("vehicleSystemCustodianRoute uses the same strict guard before its directDb
   const mutationAt = body.indexOf("directDbMutation");
   assert.ok(guardAt !== -1 && guardAt < mutationAt, "vehicleSystemCustodianRoute must reject a bad id before mutating");
 });
+
+test("vehicleDeleteRoute uses the same strict guard before its directDbMutation call", () => {
+  const body = routeBody("vehicleDeleteRoute");
+  assert.match(body, /!Number\.isInteger\(vehicleId\)[\s\S]*?vehicleId > Number\.MAX_SAFE_INTEGER/);
+  const guardAt = body.indexOf("Invalid vehicle ID");
+  const mutationAt = body.indexOf("directDbMutation");
+  assert.ok(guardAt !== -1 && guardAt < mutationAt, "vehicleDeleteRoute must reject a bad id before mutating");
+});
+
+test("vehicleDeleteRoute sends the DELETE VEHICLE confirmation phrase", () => {
+  const body = routeBody("vehicleDeleteRoute");
+  assert.match(body, /"vehicles\.delete", "DELETE VEHICLE"/);
+});
+
+test("vehicleCancelQueuedDeleteRoute uses the same strict guard and sends no confirmation phrase", () => {
+  const body = routeBody("vehicleCancelQueuedDeleteRoute");
+  assert.match(body, /!Number\.isInteger\(vehicleId\)[\s\S]*?vehicleId > Number\.MAX_SAFE_INTEGER/);
+  const guardAt = body.indexOf("Invalid vehicle ID");
+  const mutationAt = body.indexOf("directDbMutation");
+  assert.ok(guardAt !== -1 && guardAt < mutationAt, "vehicleCancelQueuedDeleteRoute must reject a bad id before mutating");
+  assert.match(body, /"vehicles\.cancel-queued-delete", null/, "cancelling a queued delete must not require a confirmation phrase -- it is reversible");
+});

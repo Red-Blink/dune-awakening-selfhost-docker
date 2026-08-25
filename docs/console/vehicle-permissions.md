@@ -15,10 +15,12 @@ restart — they reach a running map immediately. See
 Vehicle permissions share nearly all of their implementation with
 [base permissions](base-permissions.md): the same `dune.permission_actor_rank`
 table, the same shipped stored procedures, the same transactional roster-diff
-engine (`mutatePermissionRoster` in `duneDb.js`), and, as of this feature, the
-same Transfer to Custodian action bases have. The one deliberate difference is
-that the vehicle route has no delete-pending/backed-up guard, because a
-vehicle has neither state (see [System custodian](#system-custodian) below).
+engine (`mutatePermissionRoster` in `duneDb.js`), and the same Transfer to
+Custodian action bases have. The one deliberate difference is that these
+routes have no backed-up guard, because a vehicle has no equivalent of a
+base being picked up. They **do** now have a delete-pending guard — see
+[vehicle-deletion.md](vehicle-deletion.md) — since vehicles can have their
+own queued delete now, the same way bases can.
 
 ## Ranks
 
@@ -95,9 +97,10 @@ battlegroup — the same identity Care Packages and MOTD use — so nothing abou
 detection or provisioning is vehicle-specific.
 
 The one real difference from the base route:
-`POST /api/vehicles/:vehicleId/system-custodian` has no
-delete-pending/backed-up guard, because a vehicle has neither a queued-delete
-nor a picked-up/backed-up state for the route to check.
+`POST /api/vehicles/:vehicleId/system-custodian` has no backed-up guard,
+because a vehicle has no picked-up/backed-up state. It does check
+delete-pending now, the same as the roster save route above — see
+[vehicle-deletion.md](vehicle-deletion.md#irreversibility).
 
 ## The roster cap comes from server config
 
@@ -151,4 +154,6 @@ that.
 - [base-permissions.md](base-permissions.md) — the feature this one is
   modeled on; read it first for the parts that are identical (the notify
   mechanism, search_path, write ordering, and the roster cap).
+- [vehicle-deletion.md](vehicle-deletion.md) — permanently deleting a
+  vehicle; the delete-pending guard these routes now check.
 - [API-REFERENCE.md](API-REFERENCE.md) — full HTTP API reference.

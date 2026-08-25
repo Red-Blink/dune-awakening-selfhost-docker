@@ -160,6 +160,7 @@ export const ROUTE_ACTIONS = {
   // --- Vehicles ---
   "GET /api/vehicles":                         "vehicles:read",
   "GET /api/vehicles/permission-candidates":   "vehicles:read",
+  "GET /api/vehicles/pending-deletes":         "vehicles:read",
 
   // --- Exchange (Market Board) — read-only board + console-local filter config ---
   "GET /api/exchange/items":                   "exchange:read",
@@ -487,7 +488,21 @@ export const REGEX_ACTIONS_BY_METHOD_PATTERN = [
   // transfer under a read-only grant. Named narrowly, rather than adding a
   // broad "POST /api/vehicles/" prefix rule, so any future POST vehicle route
   // still fails closed until it is deliberately added here.
-  { method: "POST", pattern: /^\/api\/vehicles\/[^/]+\/system-custodian$/, action: "vehicles:mutate" }
+  { method: "POST", pattern: /^\/api\/vehicles\/[^/]+\/system-custodian$/, action: "vehicles:mutate" },
+  // DELETE /api/vehicles/{vehicleId} — the actual, irreversible vehicle
+  // delete. Same reasoning as bases:delete above: every other vehicle
+  // mutation (roster save, custodian transfer, refuel, repair) is
+  // reversible; this is not, so it gets its own action rather than folding
+  // into vehicles:mutate.
+  { method: "DELETE", pattern: /^\/api\/vehicles\/[^/]+$/, action: "vehicles:delete" },
+  // DELETE /api/vehicles/{vehicleId}/queued-delete — cancelling a queued
+  // delete, which is reversible, so it stays in vehicles:mutate like every
+  // other vehicle mutation. Needs its own explicit pattern for the same
+  // reason the system-custodian POST above does: REGEX_ACTIONS_BY_METHOD has
+  // no "DELETE /api/vehicles/" prefix rule for it to fall through to, so
+  // without this line it would resolve via the method-agnostic
+  // "/api/vehicles/" -> vehicles:read fallback instead.
+  { method: "DELETE", pattern: /^\/api\/vehicles\/[^/]+\/queued-delete$/, action: "vehicles:mutate" }
 ];
 
 // ---- Action resolution ----
