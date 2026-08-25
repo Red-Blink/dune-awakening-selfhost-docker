@@ -7,9 +7,12 @@ vi.mock("../../api/vehicles", () => ({
   vehiclesApi: {
     permissions: vi.fn(),
     setPermissions: vi.fn(),
-    permissionCandidates: vi.fn()
+    permissionCandidates: vi.fn(),
+    transferToSystemCustodian: vi.fn()
   }
 }));
+
+type SystemCustodian = { available: boolean; canCreate?: boolean; playerId?: string; name?: string; reason?: string };
 
 function entry(playerId: string, name: string, rank: VehiclePermissionRank, canonical = true): VehiclePermissionEntry {
   return { playerId, name, rank, label: "", canonical };
@@ -17,6 +20,7 @@ function entry(playerId: string, name: string, rank: VehiclePermissionRank, cano
 
 function mockRoster(
   entries: VehiclePermissionEntry[],
+  systemCustodian?: SystemCustodian,
   claim: { claimed?: boolean; unclaimedReason?: string } = {}
 ) {
   vi.mocked(vehiclesApi.permissions).mockResolvedValue({
@@ -25,6 +29,7 @@ function mockRoster(
     actorId: "3001",
     map: "DeepDesert",
     mapNameId: 7,
+    systemCustodian,
     entries,
     ...claim
   } as never);
@@ -35,6 +40,7 @@ function renderTab(overrides: Partial<Parameters<typeof VehiclePermissionsTab>[0
     vehicleId: "3001",
     vehicleName: "Sandcrawler MK-II",
     onSaved: vi.fn(),
+    confirmAction: vi.fn().mockResolvedValue(true),
     ...overrides
   };
   render(<VehiclePermissionsTab {...props} />);
@@ -130,16 +136,6 @@ describe("VehiclePermissionsTab layout", () => {
     expect(screen.getByRole("radio", { name: "Associate for Chani" })).toBeChecked();
   });
 
-  // The explicit non-goal of this feature: no ownership-transfer control of
-  // any kind, anywhere in the tab.
-  it("never renders a transfer or custodian control", async () => {
-    mockRoster(DEFAULT_ROSTER);
-    renderTab();
-    await screen.findByText("DarkShark", { selector: ".vehicles-permissions-owner-name" });
-
-    expect(screen.queryByRole("button", { name: /transfer/i })).not.toBeInTheDocument();
-    expect(screen.queryByText(/custodian/i)).not.toBeInTheDocument();
-  });
 });
 
 describe("VehiclePermissionsTab ownerless state", () => {
@@ -160,17 +156,21 @@ describe("VehiclePermissionsTab ownerless state", () => {
 describe("VehiclePermissionsTab unclaimed vehicle", () => {
   const UNCLAIMED = "This vehicle is not claimed -- it has no dune.permission_actor row.";
 
-  it("explains the unclaimed state and blocks every write", async () => {
-    mockRoster([], { claimed: false, unclaimedReason: UNCLAIMED });
+  it("explains the unclaimed state and blocks every write, Transfer included", async () => {
+    mockRoster([], { available: true, playerId: "900000201", name: "Server" }, {
+      claimed: false,
+      unclaimedReason: UNCLAIMED
+    });
     renderTab();
 
     expect(await screen.findByText(UNCLAIMED)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Transfer to Server" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
     expect(screen.queryByText(/This vehicle has no Owner/)).not.toBeInTheDocument();
   });
 
   it("leaves the roster read-only rather than letting edits accumulate", async () => {
-    mockRoster(DEFAULT_ROSTER, { claimed: false, unclaimedReason: UNCLAIMED });
+    mockRoster(DEFAULT_ROSTER, undefined, { claimed: false, unclaimedReason: UNCLAIMED });
     renderTab();
 
     await screen.findByText(UNCLAIMED);
@@ -185,6 +185,124 @@ describe("VehiclePermissionsTab unclaimed vehicle", () => {
     await screen.findByText("DarkShark", { selector: ".vehicles-permissions-owner-name" });
     expect(screen.getByRole("radio", { name: "Associate for Yaida" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Remove Yaida" })).toBeEnabled();
+  });
+});
+
+describe("VehiclePermissionsTab system custodian", () => {
+  it("shows the custodian pill in the hero when the custodian owns the vehicle", async () => {
+    mockRoster(
+      [entry("900000201", "Server", 1), entry("29", "Yaida", 2)],
+      { available: true, playerId: "900000201", name: "Server" }
+    );
+    renderTab();
+
+    await screen.findByText("Server", { selector: ".vehicles-permissions-owner-name" });
+    expect(ownerName()?.querySelector(".bases-permissions-system-label")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Owned by Server" })).toBeDisabled();
+  });
+
+  it("shows the custodian pill on the roster row when the custodian is not the Owner", async () => {
+    mockRoster(
+      [entry("4", "DarkShark", 1), entry("900000201", "Server", 3)],
+      { available: true, playerId: "900000201", name: "Server" }
+    );
+    renderTab();
+
+    await screen.findByText("DarkShark", { selector: ".vehicles-permissions-owner-name" });
+    expect(ownerName()?.querySelector(".bases-permissions-system-label")).toBeNull();
+    expect(document.querySelector(".vehicles-permissions-row .bases-permissions-system-label")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Transfer to Server" })).toBeEnabled();
+  });
+
+  it("keeps the unavailability reason inside the owner card", async () => {
+    mockRoster(
+      [entry("4", "DarkShark", 1)],
+      { available: false, reason: "No supported system custodian was found." }
+    );
+    renderTab();
+
+    const reason = await screen.findByText("No supported system custodian was found.");
+    expect(document.querySelector(".vehicles-permissions-owner-card")).toContainElement(reason);
+    expect(screen.getByRole("button", { name: "Transfer to Custodian" })).toBeDisabled();
+  });
+
+  it("disables Transfer while the roster is dirty", async () => {
+    mockRoster(
+      [entry("4", "DarkShark", 1), entry("29", "Yaida", 2)],
+      { available: true, playerId: "900000201", name: "Server" }
+    );
+    renderTab();
+
+    fireEvent.click(await screen.findByRole("radio", { name: "Associate for Yaida" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Revert" })).toBeEnabled());
+    expect(screen.getByRole("button", { name: "Transfer to Server" })).toBeDisabled();
+  });
+
+  it("confirms, posts, and reloads on Transfer", async () => {
+    mockRoster(
+      [entry("4", "DarkShark", 1), entry("29", "Yaida", 2)],
+      { available: true, playerId: "900000201", name: "Server" }
+    );
+    vi.mocked(vehiclesApi.transferToSystemCustodian).mockResolvedValue({
+      supported: true,
+      result: { ok: true, vehicleId: 3001, actorId: "3001", map: "DeepDesert", added: 1, reranked: 1, removed: 0, total: 2, message: "Ownership was transferred to the Server system custodian." }
+    } as never);
+    const props = renderTab();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Transfer to Server" }));
+
+    await waitFor(() => expect(vehiclesApi.transferToSystemCustodian).toHaveBeenCalledWith("3001"));
+    expect(props.confirmAction).toHaveBeenCalled();
+    await waitFor(() => expect(vehiclesApi.permissions).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(props.onSaved).toHaveBeenCalled());
+  });
+
+  it("does not post when the confirmation is declined", async () => {
+    mockRoster(
+      [entry("4", "DarkShark", 1), entry("29", "Yaida", 2)],
+      { available: true, playerId: "900000201", name: "Server" }
+    );
+    renderTab({ confirmAction: vi.fn().mockResolvedValue(false) });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Transfer to Server" }));
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Saving…" })).not.toBeInTheDocument());
+    expect(vehiclesApi.transferToSystemCustodian).not.toHaveBeenCalled();
+  });
+
+  it("removes the custodian from the roster, rather than demoting it, when another player is promoted to Owner", async () => {
+    mockRoster(
+      [entry("900000201", "Server", 1), entry("29", "Yaida", 3)],
+      { available: true, playerId: "900000201", name: "Server" }
+    );
+    renderTab();
+
+    fireEvent.click(await screen.findByRole("radio", { name: "Owner for Yaida" }));
+
+    await waitFor(() => expect(ownerName()).toHaveTextContent("Yaida"));
+    expect(screen.queryByText("Server")).not.toBeInTheDocument();
+    expect(screen.getByText("Shared with · 0")).toBeInTheDocument();
+  });
+
+  it("removes the custodian from the roster, rather than demoting it, when a new player is added directly as Owner", async () => {
+    mockRoster(
+      [entry("900000201", "Server", 1), entry("29", "Yaida", 3)],
+      { available: true, playerId: "900000201", name: "Server" }
+    );
+    vi.mocked(vehiclesApi.permissionCandidates).mockResolvedValue({
+      rows: [{ playerId: "32", name: "Chani" }]
+    } as never);
+    renderTab();
+
+    await screen.findByText("Yaida", { selector: ".vehicles-permissions-name" });
+    fireEvent.change(screen.getByLabelText("Add as"), { target: { value: "1" } });
+    fireEvent.change(screen.getByPlaceholderText("Search a player to add"), { target: { value: "Chani" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Add Chani" }));
+
+    await waitFor(() => expect(ownerName()).toHaveTextContent("Chani"));
+    expect(screen.queryByText("Server")).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Associate for Yaida" })).toBeChecked();
   });
 });
 

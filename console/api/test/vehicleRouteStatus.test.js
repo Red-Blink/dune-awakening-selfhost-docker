@@ -72,3 +72,11 @@ test("vehicleSetPermissionsRoute uses the same strict guard before its directDbM
   const mutationAt = body.indexOf("directDbMutation");
   assert.ok(guardAt !== -1 && guardAt < mutationAt, "vehicleSetPermissionsRoute must reject a bad id before mutating");
 });
+
+test("vehicleSystemCustodianRoute uses the same strict guard before its directDbMutation call", () => {
+  const body = routeBody("vehicleSystemCustodianRoute");
+  assert.match(body, /!Number\.isInteger\(vehicleId\)[\s\S]*?vehicleId > Number\.MAX_SAFE_INTEGER/);
+  const guardAt = body.indexOf("Invalid vehicle ID");
+  const mutationAt = body.indexOf("directDbMutation");
+  assert.ok(guardAt !== -1 && guardAt < mutationAt, "vehicleSystemCustodianRoute must reject a bad id before mutating");
+});

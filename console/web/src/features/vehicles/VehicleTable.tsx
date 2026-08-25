@@ -33,6 +33,9 @@ type VehicleTableProps = {
   // every request so the same vehicle can be re-focused twice in a row.
   focusVehicleId?: string;
   focusNonce?: number;
+  // Required, not optional: an optional prop would let a mount point silently
+  // render VehiclePermissionsTab's transfer button with no confirmation.
+  confirmAction: (message: string, options?: { title?: string; confirmLabel?: string; warning?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
 };
 
 function toNumber(value: unknown): number | null {
@@ -152,7 +155,7 @@ function renderComponent(module: VehicleModule, index: number) {
   );
 }
 
-export function VehicleTable({ rows, context = "global", emptyMessage = "No vehicles have been found yet.", sortColumn, sortDirection, onSort, canEditPermissions = false, onPermissionsSaved, focusVehicleId, focusNonce }: VehicleTableProps) {
+export function VehicleTable({ rows, context = "global", emptyMessage = "No vehicles have been found yet.", sortColumn, sortDirection, onSort, canEditPermissions = false, onPermissionsSaved, focusVehicleId, focusNonce, confirmAction }: VehicleTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedTab, setExpandedTab] = useState<"components" | "permissions">("components");
   const [instanceNames, setInstanceNames] = useState<Map<string, string>>(new Map());
@@ -292,6 +295,7 @@ export function VehicleTable({ rows, context = "global", emptyMessage = "No vehi
                     vehicleId={id}
                     vehicleName={String(vehicle.name || `vehicle ${id}`)}
                     onSaved={() => onPermissionsSaved?.()}
+                    confirmAction={confirmAction}
                   />
                 </div>}
           </div>

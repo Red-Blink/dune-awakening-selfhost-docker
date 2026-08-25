@@ -3969,7 +3969,7 @@ export async function listBasePermissions(db, baseId) {
   // instead of offering controls that end in an FK error.
   const claimed = await permissionActorClaimed(db, actorId);
   const entries = await listPermissionRoster(db, actorId);
-  const systemCustodian = await basePermissionSystemCustodian(db);
+  const systemCustodian = await permissionSystemCustodian(db);
   return {
     baseId: intParam(baseId, "base id", 1),
     actorId,
@@ -4128,7 +4128,10 @@ export async function resetBaseChildAccess(db, baseId, actorIds) {
 // than their display name: encrypted schemas do not expose a plain name, and a
 // normal character can be named "Server". The legacy name lookup is retained
 // last for installations that created Server before the reserved tuple existed.
-export async function basePermissionSystemCustodian(db) {
+// Shared by bases and vehicles: this resolves a server-wide identity, not a
+// base-scoped one -- there is exactly one reserved Server/GM custodian per
+// battlegroup, the same one Care Packages and MOTD use.
+export async function permissionSystemCustodian(db) {
   const personas = [CARE_PACKAGE_SERVER_PERSONA, FUNCOM_GM_PERSONA];
   const sources = [];
   for (const table of ["player_state", "encrypted_player_state"]) {
@@ -4419,6 +4422,20 @@ export async function setBasePermissions(db, baseId, entries, maxPermissionsPerA
   return mutateBasePermissions(db, target, safeMax, async () => desired);
 }
 
+// Pure roster transform shared by the base and vehicle transfer paths: demote
+// whoever currently holds rank 1 to Co-Owner, promote/add the custodian at
+// rank 1, and leave every other entry untouched.
+function systemCustodianRoster(existingRows, custodian) {
+  const roster = existingRows.map((row) => ({
+    playerId: String(row.player_id),
+    rank: Number(row.rank) === PERMISSION_OWNER_RANK ? 2 : Number(row.rank)
+  }));
+  const currentCustodian = roster.find((entry) => entry.playerId === custodian.playerId);
+  if (currentCustodian) currentCustodian.rank = PERMISSION_OWNER_RANK;
+  else roster.push({ playerId: custodian.playerId, rank: PERMISSION_OWNER_RANK });
+  return roster;
+}
+
 export async function transferBaseToSystemCustodian(db, baseId, maxPermissionsPerActor = DEFAULT_MAX_PERMISSIONS_PER_ACTOR) {
   await requireCapability(await supportsBasePermissionEditing(db),
     "Base permission editing requires dune.permission_actor_rank, dune.map_names, and the dune.permission_set_player_rank/permission_remove_player_rank functions.");
@@ -4426,16 +4443,9 @@ export async function transferBaseToSystemCustodian(db, baseId, maxPermissionsPe
   const safeMax = intParam(maxPermissionsPerActor, "maximum permissions per base", 1, 2147483647);
   let custodian;
   const result = await mutateBasePermissions(db, target, safeMax, async (existing, tx) => {
-    custodian = await basePermissionSystemCustodian(tx);
+    custodian = await permissionSystemCustodian(tx);
     if (!custodian.available) throw new Error(custodian.reason);
-    const roster = existing.map((row) => ({
-      playerId: String(row.player_id),
-      rank: Number(row.rank) === PERMISSION_OWNER_RANK ? 2 : Number(row.rank)
-    }));
-    const currentCustodian = roster.find((entry) => entry.playerId === custodian.playerId);
-    if (currentCustodian) currentCustodian.rank = PERMISSION_OWNER_RANK;
-    else roster.push({ playerId: custodian.playerId, rank: PERMISSION_OWNER_RANK });
-    return roster;
+    return systemCustodianRoster(existing, custodian);
   });
   return {
     ...result,
@@ -4490,6 +4500,7 @@ export async function listVehiclePermissions(db, vehicleId) {
   // would fail instead of offering controls that end in an FK error.
   const claimed = await permissionActorClaimed(db, actorId);
   const entries = await listPermissionRoster(db, actorId);
+  const systemCustodian = await permissionSystemCustodian(db);
   return {
     vehicleId: intParam(vehicleId, "vehicle id", 1),
     actorId,
@@ -4497,8 +4508,20 @@ export async function listVehiclePermissions(db, vehicleId) {
     mapNameId,
     claimed,
     unclaimedReason: claimed ? "" : VEHICLE_UNCLAIMED_MESSAGE,
+    systemCustodian,
     entries
   };
+}
+
+async function mutateVehiclePermissions(db, target, safeMax, desiredRoster) {
+  return mutatePermissionRoster(db, {
+    resolveActor: (tx) => vehiclePermissionActor(tx, target),
+    unclaimedMessage: VEHICLE_UNCLAIMED_MESSAGE,
+    notFoundMessage: "That vehicle was not found.",
+    subject: "vehicle",
+    idKey: "vehicleId",
+    idValue: target
+  }, safeMax, desiredRoster);
 }
 
 export async function setVehiclePermissions(db, vehicleId, entries, maxPermissionsPerActor = DEFAULT_MAX_PERMISSIONS_PER_ACTOR) {
@@ -4510,14 +4533,27 @@ export async function setVehiclePermissions(db, vehicleId, entries, maxPermissio
   // without taking a claim lock. It is normalized again after the lock because
   // the shared mutation path also accepts a roster built from current state.
   const desired = normalizeDesiredPermissions(entries, "vehicle");
-  return mutatePermissionRoster(db, {
-    resolveActor: (tx) => vehiclePermissionActor(tx, target),
-    unclaimedMessage: VEHICLE_UNCLAIMED_MESSAGE,
-    notFoundMessage: "That vehicle was not found.",
-    subject: "vehicle",
-    idKey: "vehicleId",
-    idValue: target
-  }, safeMax, async () => desired);
+  return mutateVehiclePermissions(db, target, safeMax, async () => desired);
+}
+
+export async function transferVehicleToSystemCustodian(db, vehicleId, maxPermissionsPerActor = DEFAULT_MAX_PERMISSIONS_PER_ACTOR) {
+  await requireCapability(await vehiclePermissionsSupported(db),
+    "Vehicle permission editing requires dune.permission_actor_rank, dune.map_names, and the dune.permission_set_player_rank/permission_remove_player_rank functions.");
+  const target = intParam(vehicleId, "vehicle id", 1);
+  const safeMax = intParam(maxPermissionsPerActor, "maximum permissions per vehicle", 1, 2147483647);
+  let custodian;
+  const result = await mutateVehiclePermissions(db, target, safeMax, async (existing, tx) => {
+    custodian = await permissionSystemCustodian(tx);
+    if (!custodian.available) throw new Error(custodian.reason);
+    return systemCustodianRoster(existing, custodian);
+  });
+  return {
+    ...result,
+    systemCustodian: custodian,
+    message: result.reranked === 0 && result.added === 0
+      ? `This vehicle is already owned by the ${custodian.name} system custodian.`
+      : `Ownership was transferred to the ${custodian.name} system custodian. The change applies to the running map immediately.`
+  };
 }
 
 const BASE_SORT_COLUMNS = {

@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, post } from "./client";
 
 export type VehicleModule = {
   templateId: string;
@@ -75,6 +75,13 @@ export type VehiclePermissions = {
   // behaviour that existed before the flag rather than a new lockout.
   claimed?: boolean;
   unclaimedReason?: string;
+  systemCustodian?: {
+    available: boolean;
+    canCreate?: boolean;
+    playerId?: string;
+    name?: string;
+    reason?: string;
+  };
   entries: VehiclePermissionEntry[];
   reason?: string;
 };
@@ -120,5 +127,8 @@ export const vehiclesApi = {
     search.set("limit", String(limit));
     return api<{ supported: boolean; rows: VehiclePermissionCandidate[]; reason?: string }>(
       `/api/vehicles/permission-candidates?${search.toString()}`);
-  }
+  },
+  transferToSystemCustodian: (vehicleId: string) =>
+    post<{ supported: boolean; result?: SetVehiclePermissionsResult; reason?: string }>(
+      `/api/vehicles/${encodeURIComponent(vehicleId)}/system-custodian`, {})
 };

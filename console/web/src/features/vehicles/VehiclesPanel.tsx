@@ -5,9 +5,9 @@ import { VehicleTable } from "./VehicleTable";
 
 type VehiclesPanelProps = {
   onError: (text: string) => void;
-  // Read-only page: confirmAction/formatMutationResult are passed by App.tsx for
-  // parity with the other panels but intentionally unused here. The confirmAction
-  // signature mirrors the other panels so App.tsx can pass confirmDialog directly.
+  // The permissions transfer-to-custodian confirmation reuses App.tsx's
+  // confirmDialog, the same way BasesPanel does. formatMutationResult is
+  // accepted for prop parity with the other panels but unused here.
   confirmAction: (message: string, options?: { title?: string; confirmLabel?: string; warning?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
   formatMutationResult: (result: unknown) => string;
   focusRequest?: { vehicleId: string; nonce: number };
@@ -42,7 +42,7 @@ function errorText(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function VehiclesPanel({ onError, focusRequest }: VehiclesPanelProps) {
+export function VehiclesPanel({ onError, confirmAction, focusRequest }: VehiclesPanelProps) {
   const [q, setQ] = useState(() => vehiclesCache?.q ?? "");
   const [submittedQ, setSubmittedQ] = useState(() => vehiclesCache?.q ?? "");
   const [page, setPage] = useState(() => vehiclesCache?.page ?? 0);
@@ -228,6 +228,7 @@ export function VehiclesPanel({ onError, focusRequest }: VehiclesPanelProps) {
           canEditPermissions={canEditPermissions}
           focusVehicleId={focusRequest?.vehicleId}
           focusNonce={focusRequest?.nonce}
+          confirmAction={confirmAction}
           // Owner and Shared With are rendered from the list response, so a
           // saved roster has to refetch or the row above keeps showing the
           // pre-edit names.

@@ -1,5 +1,7 @@
 import { TriangleAlert } from "lucide-react";
 
+export type SystemCustodian = { available: boolean; canCreate?: boolean; playerId?: string; name?: string; reason?: string };
+
 // rank 1/2/3 = Owner/Co-Owner/Associate, confirmed in both directions against a
 // live server: the game's own Permissions panel writes exactly these values.
 // The 5/4/3 badges the game UI shows beside those labels are decoration, not
@@ -53,6 +55,24 @@ export function sameRoster(left: DraftEntry[], right: DraftEntry[]) {
   return left.every((entry) => rightByPlayer.get(entry.playerId) === entry.rank);
 }
 
+// Shared by changeRank and addCandidate on both tabs: after `promotedPlayerId`
+// takes Owner, every other entry still holding OWNER_RANK has to stop being
+// Owner. An ordinary player is demoted to Co-Owner, same as always. The
+// system custodian is different -- it is a parking identity, not a real
+// player, so leaving it behind as a Co-Owner nobody added would be a stale
+// artifact of a transfer that has since been reversed. Remove it instead.
+export function demoteOtherOwners(
+  entries: DraftEntry[],
+  promotedPlayerId: string,
+  systemCustodianPlayerId: string | undefined
+): DraftEntry[] {
+  return entries
+    .filter((entry) => entry.playerId === promotedPlayerId || entry.rank !== OWNER_RANK || entry.playerId !== systemCustodianPlayerId)
+    .map((entry) => entry.playerId !== promotedPlayerId && entry.rank === OWNER_RANK
+      ? { ...entry, rank: CO_OWNER_RANK }
+      : entry);
+}
+
 export function errorText(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
@@ -86,8 +106,8 @@ export function unknownRankLabel(entry: DraftEntry) {
 // Shared by the Owner display and the roster rows so the custodian pill and
 // the ignored-entry warning follow a player between the two as their rank
 // changes, instead of being duplicated in both places and drifting apart.
-// isSystemCustodian defaults to false: vehicles have no system custodian
-// concept, so their Owner display never passes it.
+// isSystemCustodian defaults to false: callers that render a roster with no
+// detected custodian (or before detection has resolved) simply omit it.
 export function EntryName({ entry, isSystemCustodian = false, className }: {
   entry: DraftEntry;
   isSystemCustodian?: boolean;
@@ -105,6 +125,59 @@ export function EntryName({ entry, isSystemCustodian = false, className }: {
         <TriangleAlert size={13} aria-label="Ignored by the game" />
       </span>}
     </span>
+  );
+}
+
+// The Owner is the one thing an admin opens a permissions tab to check, so it
+// gets its own card instead of being one row among many. The custodian
+// transfer lives here too -- it only ever changes the Owner, and as a section
+// of its own it was the loudest thing on the tab despite being a rare action.
+// Shared by bases and vehicles: classPrefix picks the feature's CSS
+// namespace (see styles.css, which deliberately keeps the two separate so
+// either can diverge later), subject feeds the "already owned by" tooltip.
+export function OwnerHeroCard({ owner, isCustodian, systemCustodian, saving, dirty, unclaimed, onTransfer, classPrefix = "bases", subject = "base" }: {
+  owner: DraftEntry | undefined;
+  isCustodian: boolean;
+  systemCustodian: SystemCustodian;
+  saving: boolean;
+  dirty: boolean;
+  unclaimed: string;
+  onTransfer: () => void;
+  classPrefix?: "bases" | "vehicles";
+  subject?: string;
+}) {
+  const custodianName = systemCustodian.name || "Custodian";
+  const ownedByCustodian = Boolean(owner && owner.playerId === systemCustodian.playerId);
+  return (
+    <div className={`${classPrefix}-permissions-owner-card${owner ? "" : ` ${classPrefix}-permissions-owner-card-empty`}`}>
+      <div className={`${classPrefix}-permissions-owner-identity`}>
+        <span className={`${classPrefix}-permissions-owner-eyebrow`}>Owner</span>
+        {owner
+          ? <EntryName entry={owner} isSystemCustodian={isCustodian} className={`${classPrefix}-permissions-owner-name`} />
+          : <span className={`${classPrefix}-permissions-owner-name ${classPrefix}-permissions-owner-none`}>No Owner set</span>}
+      </div>
+      <button
+        className="warning"
+        // Still enabled on an ownerless base/vehicle that is *claimed*: that
+        // state arrives from the server with a clean draft, so parking
+        // ownership on the custodian is the fastest legitimate way out of it.
+        // An unclaimed one looks identical on screen -- "No Owner set" -- but
+        // has no permission_actor row for the rank write to reference, so
+        // this button was the shortest path to a raw foreign-key error and is
+        // blocked.
+        disabled={(!systemCustodian.available && !systemCustodian.canCreate) || ownedByCustodian || saving || dirty || Boolean(unclaimed)}
+        title={unclaimed
+          ? unclaimed
+          : dirty
+          ? "Save or revert roster changes first"
+          : ownedByCustodian
+          ? `This ${subject} is already owned by the ${systemCustodian.name || "detected"} system custodian`
+          : `Park ownership on the reserved ${systemCustodian.name || "detected"} system identity, preserving the current permission roster`}
+        onClick={onTransfer}
+      >{ownedByCustodian ? `Owned by ${custodianName}` : (systemCustodian.available || systemCustodian.canCreate) ? `Transfer to ${custodianName}` : "Transfer to Custodian"}</button>
+      {!systemCustodian.available && systemCustodian.reason &&
+        <p className={`${classPrefix}-permissions-error ${classPrefix}-permissions-owner-note`}>{systemCustodian.reason}</p>}
+    </div>
   );
 }
 

@@ -304,6 +304,41 @@ describe("BasePermissionsTab system custodian", () => {
     expect(document.querySelector(".bases-permissions-owner-card")).toContainElement(reason);
     expect(screen.getByRole("button", { name: "Transfer to Custodian" })).toBeDisabled();
   });
+
+  it("removes the custodian from the roster, rather than demoting it, when another player is promoted to Owner", async () => {
+    mockRoster(
+      [entry("900000201", "Server", 1), entry("29", "Yaida", 3)],
+      { available: true, playerId: "900000201", name: "Server" }
+    );
+    renderTab();
+
+    fireEvent.click(await screen.findByRole("radio", { name: "Owner for Yaida" }));
+
+    await waitFor(() => expect(ownerName()).toHaveTextContent("Yaida"));
+    expect(screen.queryByText("Server")).not.toBeInTheDocument();
+    expect(screen.getByText("Shared with · 0")).toBeInTheDocument();
+  });
+
+  it("removes the custodian from the roster, rather than demoting it, when a new player is added directly as Owner", async () => {
+    mockRoster(
+      [entry("900000201", "Server", 1), entry("29", "Yaida", 3)],
+      { available: true, playerId: "900000201", name: "Server" }
+    );
+    vi.mocked(basesApi.permissionCandidates).mockResolvedValue({
+      rows: [{ playerId: "32", name: "Chani" }]
+    } as never);
+    renderTab();
+
+    await screen.findByText("Yaida", { selector: ".bases-permissions-name" });
+    fireEvent.change(screen.getByLabelText("Add as"), { target: { value: "1" } });
+    fireEvent.change(screen.getByPlaceholderText("Search a player to add"), { target: { value: "Chani" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Add Chani" }));
+
+    await waitFor(() => expect(ownerName()).toHaveTextContent("Chani"));
+    expect(screen.queryByText("Server")).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Associate for Yaida" })).toBeChecked();
+  });
 });
 
 describe("BasePermissionsTab entry warnings", () => {

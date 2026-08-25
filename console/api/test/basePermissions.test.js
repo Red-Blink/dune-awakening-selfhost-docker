@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { setBasePermissions, listBasePermissions, basePermissionSystemCustodian, transferBaseToSystemCustodian, listBaseChildAccess, resetBaseChildAccess } from "../src/duneDb.js";
+import { setBasePermissions, listBasePermissions, permissionSystemCustodian, transferBaseToSystemCustodian, listBaseChildAccess, resetBaseChildAccess } from "../src/duneDb.js";
 
 const SUPPORTED_TABLES = ["dune.permission_actor_rank", "dune.permission_actor", "dune.actors", "dune.player_state", "dune.encrypted_player_state", "dune.map_names"];
 const SUPPORTED_FUNCTIONS = [
@@ -250,19 +250,19 @@ test("setBasePermissions locks the claim actor row, not the rank rows", async ()
 });
 
 test("system custodian detection prefers the reserved Server identity", async () => {
-  assert.deepEqual(await basePermissionSystemCustodian(createDb()), {
+  assert.deepEqual(await permissionSystemCustodian(createDb()), {
     available: true,
     playerId: "900000201",
     name: "Server"
   });
-  assert.deepEqual(await basePermissionSystemCustodian(createDb({ custodians: [], systemIdentities: [] })), {
+  assert.deepEqual(await permissionSystemCustodian(createDb({ custodians: [], systemIdentities: [] })), {
     available: false,
     canCreate: true,
     playerId: "900000201",
     name: "Server",
     reason: "The reserved Server identity will be created when ownership is transferred."
   });
-  assert.match((await basePermissionSystemCustodian(createDb({
+  assert.match((await permissionSystemCustodian(createDb({
     systemIdentities: [
       { table: "player_state", accountId: "9000002", playerId: "900000201" },
       { table: "player_state", accountId: "9000002", playerId: "900000201" }
@@ -271,7 +271,7 @@ test("system custodian detection prefers the reserved Server identity", async ()
 });
 
 test("system custodian detection falls back to Funcom GM in encrypted_player_state", async () => {
-  const result = await basePermissionSystemCustodian(createDb({
+  const result = await permissionSystemCustodian(createDb({
     canonicalPlayers: ["4", "900000101"],
     custodians: [],
     systemIdentities: [{ table: "encrypted_player_state", accountId: "9000001", playerId: "900000101" }]

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import pg from "pg";
-import { setVehiclePermissions, listVehiclePermissions, vehiclePermissionCandidates } from "../src/duneDb.js";
+import { setVehiclePermissions, listVehiclePermissions, vehiclePermissionCandidates, transferVehicleToSystemCustodian } from "../src/duneDb.js";
 import { pgConnectionConfig, pgTransactionalDb, withIsolatedDatabase } from "../test-support/pgIntegrationDb.js";
 
 const { Client } = pg;
@@ -96,9 +96,13 @@ const SEED = `
     values
       (2, 4, 4, 'DarkShark'),
       (6, 23, 23, 'Furizu'),
-      (8, 29, 29, 'Yaida');
+      (8, 29, 29, 'Yaida'),
+      (9000002, 900000201, 900000203, 'Server');
 
   insert into dune.permission_actor_rank (permission_actor_id, player_id, rank) values (${VEHICLE_ID}, 4, ${OWNER_RANK});
+  insert into dune.encrypted_player_state
+    (account_id, player_controller_id, player_state_id, player_pawn_id, encrypted_character_name)
+    values (9000001, 900000101, 900000102, 900000103, convert_to('GM', 'UTF8'));
 `;
 
 async function withDatabase(t, run) {
@@ -131,6 +135,9 @@ test("real PostgreSQL: an unclaimed vehicle is refused rather than violating the
 
     await assert.rejects(
       () => setVehiclePermissions(db, UNCLAIMED_VEHICLE_ID, [{ playerId: "4", rank: OWNER_RANK }], 32),
+      /not claimed/);
+    await assert.rejects(
+      () => transferVehicleToSystemCustodian(db, UNCLAIMED_VEHICLE_ID, 32),
       /not claimed/);
 
     await assert.rejects(
@@ -297,5 +304,35 @@ test("real PostgreSQL: the candidate picker returns player_controller_ids", asyn
     const ids = candidates.map((row) => row.playerId);
     assert.deepEqual(ids.sort(), ["23", "29", "4"].sort());
     assert.ok(!ids.includes("5"), "5 belongs to the same account as 4 but is not a controller id");
+  });
+});
+
+test("real PostgreSQL: Server can own a vehicle while the previous roster is preserved", async (t) => {
+  await withDatabase(t, async (pool) => {
+    const db = pgTransactionalDb(pool);
+    const result = await transferVehicleToSystemCustodian(db, VEHICLE_ID);
+    assert.equal(result.systemCustodian.playerId, "900000201");
+    assert.deepEqual(await ranks(pool), [
+      { playerId: "900000201", rank: OWNER_RANK },
+      { playerId: "4", rank: CO_OWNER_RANK }
+    ]);
+  });
+});
+
+test("real PostgreSQL: encrypted Funcom GM is used when Server is absent", async (t) => {
+  await withDatabase(t, async (pool) => {
+    await pool.query("delete from dune.player_state where character_name = 'Server'");
+    const db = pgTransactionalDb(pool);
+    const result = await transferVehicleToSystemCustodian(db, VEHICLE_ID);
+    assert.deepEqual(result.systemCustodian, { available: true, playerId: "900000101", name: "GM" });
+    assert.match(result.message, /GM system custodian/);
+    assert.deepEqual(await ranks(pool), [
+      { playerId: "900000101", rank: OWNER_RANK },
+      { playerId: "4", rank: CO_OWNER_RANK }
+    ]);
+
+    const roster = await listVehiclePermissions(db, VEHICLE_ID);
+    const owner = roster.entries.find((entry) => entry.rank === OWNER_RANK);
+    assert.deepEqual([owner.name, owner.playerId, owner.canonical], ["GM", "900000101", true]);
   });
 });

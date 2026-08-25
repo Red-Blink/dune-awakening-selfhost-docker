@@ -369,15 +369,17 @@ tab can offer a retry only where retrying could actually help.
 |--------|-------|-------------|------------|
 | GET | `/api/vehicles` | List all player vehicles (paginated), each with owner, shared-with roster, lowest-component condition %, fuel %, map/partition, coordinates, and per-component durability | `q?`, `page?`, `pageSize?`, `sortColumn?`, `sortDirection?` |
 | GET | `/api/players/{playerId}/vehicles` | List the selected player's owned and shared vehicles using the same vehicle details | `playerId` |
-| GET | `/api/vehicles/{vehicleId}/permissions` | Get a vehicle's permission roster (Owner, Co-Owners, Associates) | `vehicleId` |
+| GET | `/api/vehicles/{vehicleId}/permissions` | Get a vehicle's permission roster (Owner, Co-Owners, Associates) plus the detected system custodian | `vehicleId` |
 | PUT | `/api/vehicles/{vehicleId}/permissions` | Replace a vehicle's permission roster | `vehicleId`, `entries[]` (`playerId`, `rank`) |
+| POST | `/api/vehicles/{vehicleId}/system-custodian` | Transfer ownership to the Server or detected GM system custodian while preserving the roster; provisions Server when no custodian exists | `vehicleId` |
 | GET | `/api/vehicles/permission-candidates` | Search players eligible to be added to a vehicle roster | `q?`, `limit?` |
 
-`GET /api/vehicles` and the player-scoped list are read-only; the three
+`GET /api/vehicles` and the player-scoped list are read-only; the four
 permission routes above are the only vehicle mutations, and they share their
 implementation with the base permission routes -- see
-[vehicle-permissions.md](vehicle-permissions.md). Unlike bases, there is no
-vehicle transfer/system-custodian route by design.
+[vehicle-permissions.md](vehicle-permissions.md). The system-custodian route
+mirrors the base one exactly, minus the delete-pending/backed-up guard, since
+a vehicle has neither state.
 
 `GET /api/vehicles` reports `capabilities.vehicles`; it is false (with a
 `reason`) when the schema lacks the required tables (`vehicles`, `vehicle_modules`,

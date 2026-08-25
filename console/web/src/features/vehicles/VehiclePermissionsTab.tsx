@@ -10,10 +10,13 @@ import {
   CO_OWNER_RANK,
   EntryName,
   OWNER_RANK,
+  OwnerHeroCard,
   RANK_OPTIONS,
   RANK_LABELS,
   RankSegments,
   type DraftEntry,
+  type SystemCustodian,
+  demoteOtherOwners,
   errorText,
   formatShareBreakdown,
   sameRoster,
@@ -25,9 +28,10 @@ type VehiclePermissionsTabProps = {
   vehicleId: string;
   vehicleName: string;
   onSaved: () => void;
+  confirmAction: (message: string, options?: { title?: string; confirmLabel?: string; warning?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
 };
 
-export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved }: VehiclePermissionsTabProps) {
+export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved, confirmAction }: VehiclePermissionsTabProps) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [saved, setSaved] = useState<DraftEntry[]>([]);
@@ -40,6 +44,7 @@ export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved }: Vehic
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const [addRank, setAddRank] = useState<VehiclePermissionRank>(ASSOCIATE_RANK);
+  const [systemCustodian, setSystemCustodian] = useState<SystemCustodian>({ available: false });
   // The server's explanation when the vehicle has no permission_actor row,
   // empty otherwise. A string rather than a boolean so the banner and every
   // disabled control's tooltip read back the same sentence the API chose.
@@ -59,6 +64,7 @@ export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved }: Vehic
       setUnclaimed(result.claimed === false
         ? result.unclaimedReason || "This vehicle is not claimed, so its permissions cannot be edited."
         : "");
+      setSystemCustodian(result.systemCustodian || { available: false, reason: "System custodian detection is unavailable." });
     } catch (error) {
       setLoadError(errorText(error));
     } finally {
@@ -87,13 +93,16 @@ export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved }: Vehic
   // Promoting to Owner demotes whoever currently holds it, in the same local
   // edit. The server enforces the one-owner rule too, but doing it here means
   // the invariant can never be broken on screen -- there is no intermediate
-  // state showing two Owners for the user to try to save.
+  // state showing two Owners for the user to try to save. If the incumbent is
+  // the system custodian, it is removed rather than demoted -- see
+  // demoteOtherOwners.
   function changeRank(playerId: string, nextRank: VehiclePermissionRank) {
-    setDraft((current) => current.map((entry) => {
-      if (entry.playerId === playerId) return { ...entry, rank: nextRank };
-      if (nextRank === OWNER_RANK && entry.rank === OWNER_RANK) return { ...entry, rank: CO_OWNER_RANK };
-      return entry;
-    }));
+    setDraft((current) => {
+      const promoted = current.map((entry) => entry.playerId === playerId ? { ...entry, rank: nextRank } : entry);
+      return nextRank === OWNER_RANK
+        ? demoteOtherOwners(promoted, playerId, systemCustodian.available ? systemCustodian.playerId : undefined)
+        : promoted;
+    });
   }
 
   function removeEntry(playerId: string) {
@@ -105,12 +114,11 @@ export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved }: Vehic
       if (current.some((entry) => entry.playerId === candidate.playerId)) return current;
       // No label: the rank is one this editor picked, so RANK_LABELS covers it.
       const next = [...current, { playerId: candidate.playerId, name: candidate.name, rank: addRank, canonical: true, label: "" }];
-      // Adding straight to Owner has to demote the incumbent for the same
-      // reason changeRank does.
-      if (addRank !== OWNER_RANK) return next;
-      return next.map((entry) => entry.playerId === candidate.playerId || entry.rank !== OWNER_RANK
-        ? entry
-        : { ...entry, rank: CO_OWNER_RANK });
+      // Adding straight to Owner has to demote (or remove) the incumbent for
+      // the same reason changeRank does.
+      return addRank === OWNER_RANK
+        ? demoteOtherOwners(next, candidate.playerId, systemCustodian.available ? systemCustodian.playerId : undefined)
+        : next;
     });
     // Adding completes the search interaction. Reset it instead of leaving a
     // stale query and result list sitting beneath the newly-added roster row.
@@ -160,6 +168,39 @@ export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved }: Vehic
     }
   }
 
+  async function transferToSystemCustodian() {
+    if ((!systemCustodian.available && !systemCustodian.canCreate) || !systemCustodian.playerId) return;
+    const custodianName = systemCustodian.name || "System";
+    const confirmed = await confirmAction(
+      `Transfer this vehicle to the reserved ${custodianName} identity? Existing access entries will be preserved and the current Owner will become a Co-Owner.`,
+      {
+        title: `Transfer to ${custodianName} Custodian`,
+        confirmLabel: "Transfer Ownership",
+        warning: "This is an administrative parking owner. Verify the vehicle can still be entered and driven in-game after the transfer before using it broadly.",
+        details: [
+          { label: "Vehicle", value: vehicleName },
+          { label: "New Owner", value: `${custodianName} (System Custodian)`, tone: "accent" }
+        ]
+      }
+    );
+    if (!confirmed) return;
+    setSaving(true);
+    setStatus("");
+    setStatusKind("");
+    try {
+      const response = await vehiclesApi.transferToSystemCustodian(vehicleId);
+      setStatus(response.result?.message || `Ownership was transferred to the ${custodianName} system custodian.`);
+      setStatusKind("ok");
+      await load();
+      onSaved();
+    } catch (error) {
+      setStatus(errorText(error));
+      setStatusKind("fail");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return <p className="muted" role="status">Loading permissions…</p>;
   }
@@ -185,22 +226,26 @@ export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved }: Vehic
   // something false about a rank nobody chose.
   const otherRankCount = nonOwners.length - coOwnerCount - associateCount;
   const shareBreakdown = formatShareBreakdown(coOwnerCount, associateCount, otherRankCount);
+  const ownerIsCustodian = Boolean(systemCustodian.available && owner && owner.playerId === systemCustodian.playerId);
 
   return (
     <div className="vehicles-permissions" onClick={(event) => event.stopPropagation()}>
       <div className="vehicles-permissions-content">
         <div className="vehicles-permissions-intro">
           <p className="action-help-note">
-            Exactly one Owner. Promoting a player demotes the current Owner to Co-Owner. Changes apply to the running map immediately.
+            Exactly one Owner. Promoting a player demotes the current Owner to Co-Owner. Changes apply to the running map immediately. Transferring to the system custodian parks ownership on a reserved identity and keeps the roster intact.
           </p>
-          <div className={`vehicles-permissions-owner-card${owner ? "" : " vehicles-permissions-owner-card-empty"}`}>
-            <div className="vehicles-permissions-owner-identity">
-              <span className="vehicles-permissions-owner-eyebrow">Owner</span>
-              {owner
-                ? <EntryName entry={owner} className="vehicles-permissions-owner-name" />
-                : <span className="vehicles-permissions-owner-name vehicles-permissions-owner-none">No Owner set</span>}
-            </div>
-          </div>
+          <OwnerHeroCard
+            owner={owner}
+            isCustodian={ownerIsCustodian}
+            systemCustodian={systemCustodian}
+            saving={saving}
+            dirty={dirty}
+            unclaimed={unclaimed}
+            onTransfer={() => void transferToSystemCustodian()}
+            classPrefix="vehicles"
+            subject="vehicle"
+          />
         </div>
 
         <div className="vehicles-permissions-toolbar">
@@ -289,6 +334,7 @@ export function VehiclePermissionsTab({ vehicleId, vehicleName, onSaved }: Vehic
               <EntryName
                 entry={entry}
                 className="vehicles-permissions-name"
+                isSystemCustodian={systemCustodian.available && entry.playerId === systemCustodian.playerId}
               />
               <RankSegments
                 entry={entry}

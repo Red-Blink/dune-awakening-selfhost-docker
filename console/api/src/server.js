@@ -744,6 +744,7 @@ async function handleApi(req, res) {
   if (path === "/api/vehicles/permission-candidates") return vehiclePermissionCandidatesRoute(res, url);
   if (path.match(/^\/api\/vehicles\/[^/]+\/permissions$/) && req.method === "GET") return vehiclePermissionsRoute(res, path);
   if (path.match(/^\/api\/vehicles\/[^/]+\/permissions$/) && req.method === "PUT") return vehicleSetPermissionsRoute(req, res, path);
+  if (path.match(/^\/api\/vehicles\/[^/]+\/system-custodian$/) && req.method === "POST") return vehicleSystemCustodianRoute(req, res, path);
   if (path === "/api/admin/items/catalog") return json(res, 200, { rows: listCatalogItems(config.repoRoot, { q: url.searchParams.get("q") || "", limit: url.searchParams.get("limit") || 500 }) });
   if (path === "/api/admin/items/search") return commandJson(res, "adminItemSearch", { q: url.searchParams.get("q") || "" });
   if (path === "/api/admin/items") return commandJson(res, url.searchParams.get("category") ? "adminItemListCategory" : "adminItemList", { category: url.searchParams.get("category") || "" });
@@ -3496,7 +3497,7 @@ async function baseSystemCustodianRoute(req, res, path) {
   return directDbMutation(req, res, "bases.transfer-system-custodian", null, async () => {
     const settings = await runDune(config, buildDuneArgs("userSettingsMapValues", { map: "Survival_1" }), { timeoutMs: 8000 });
     const maxPermissions = parseEffectivePermissionLimit(settings.stdout);
-    const custodian = await duneDb.basePermissionSystemCustodian(db);
+    const custodian = await duneDb.permissionSystemCustodian(db);
     if (custodian.canCreate) await ensureCarePackageServerPersona(db);
     return duneDb.transferBaseToSystemCustodian(db, baseId, maxPermissions);
   }, { baseId });
@@ -3544,6 +3545,22 @@ async function vehicleSetPermissionsRoute(req, res, path) {
     const settings = await runDune(config, buildDuneArgs("userSettingsMapValues", { map: "Survival_1" }), { timeoutMs: 8000 });
     const maxPermissions = parseEffectivePermissionLimit(settings.stdout);
     return duneDb.setVehiclePermissions(db, vehicleId, body.entries, maxPermissions);
+  }, { vehicleId });
+}
+
+// No delete-pending/backed-up guard, for the same reason vehiclePermissionsRoute
+// has none: a vehicle has neither state to check.
+async function vehicleSystemCustodianRoute(req, res, path) {
+  const vehicleId = Number(decodeURIComponent(path.split("/")[3]));
+  if (!Number.isInteger(vehicleId) || vehicleId < 1 || vehicleId > Number.MAX_SAFE_INTEGER) {
+    return json(res, 400, { error: "Invalid vehicle ID" });
+  }
+  return directDbMutation(req, res, "vehicles.transfer-system-custodian", null, async () => {
+    const settings = await runDune(config, buildDuneArgs("userSettingsMapValues", { map: "Survival_1" }), { timeoutMs: 8000 });
+    const maxPermissions = parseEffectivePermissionLimit(settings.stdout);
+    const custodian = await duneDb.permissionSystemCustodian(db);
+    if (custodian.canCreate) await ensureCarePackageServerPersona(db);
+    return duneDb.transferVehicleToSystemCustodian(db, vehicleId, maxPermissions);
   }, { vehicleId });
 }
 

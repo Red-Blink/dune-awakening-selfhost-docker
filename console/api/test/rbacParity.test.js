@@ -194,3 +194,13 @@ test("parity: base container give/fill/bulk-delete routes resolve to their own n
   // sibling routes/regexes.
   assert.equal(actionForRoute("/api/bases/12858/containers/42/items/99", "DELETE"), "bases:delete-item");
 });
+
+test("parity: POST vehicle system-custodian transfer resolves to vehicles:mutate, not the read-only fallback", () => {
+  // Regression guard: REGEX_ACTIONS_BY_METHOD has no "POST /api/vehicles/"
+  // entry, so without a REGEX_ACTIONS_BY_METHOD_PATTERN entry this route
+  // would fall through to the method-agnostic "/api/vehicles/" ->
+  // vehicles:read rule, silently authorizing an ownership transfer under a
+  // read-only grant.
+  assert.equal(actionForRoute("/api/vehicles/2048/system-custodian", "POST"), "vehicles:mutate");
+  assert.notEqual(actionForRoute("/api/vehicles/2048/system-custodian", "POST"), "vehicles:read");
+});

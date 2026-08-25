@@ -476,7 +476,18 @@ export const REGEX_ACTIONS_BY_METHOD_PATTERN = [
   // combobox despite being out of scope for this feature.
   { method: "POST", pattern: /^\/api\/bases\/[^/]+\/containers\/[^/]+\/give-item$/, action: "bases:give-item" },
   { method: "POST", pattern: /^\/api\/bases\/[^/]+\/containers\/[^/]+\/give-items$/, action: "bases:give-item" },
-  { method: "POST", pattern: /^\/api\/bases\/[^/]+\/containers\/[^/]+\/fill-item$/, action: "bases:fill-item" }
+  { method: "POST", pattern: /^\/api\/bases\/[^/]+\/containers\/[^/]+\/fill-item$/, action: "bases:fill-item" },
+  // POST /api/vehicles/{vehicleId}/system-custodian — transfer to the reserved
+  // Server/GM custodian. Unlike bases (which has a blanket "POST /api/bases/"
+  // -> bases:mutate prefix rule that already covers its own system-custodian
+  // route), REGEX_ACTIONS_BY_METHOD has no "POST /api/vehicles/" entry, so
+  // without this line the route would fall through the method-aware tier
+  // entirely and resolve via the method-agnostic REGEX_ACTIONS fallback
+  // ("/api/vehicles/" -> vehicles:read) -- silently authorizing an ownership
+  // transfer under a read-only grant. Named narrowly, rather than adding a
+  // broad "POST /api/vehicles/" prefix rule, so any future POST vehicle route
+  // still fails closed until it is deliberately added here.
+  { method: "POST", pattern: /^\/api\/vehicles\/[^/]+\/system-custodian$/, action: "vehicles:mutate" }
 ];
 
 // ---- Action resolution ----

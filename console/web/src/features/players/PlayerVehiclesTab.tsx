@@ -6,7 +6,13 @@ function errorText(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function PlayerVehiclesTab({ playerId, playerName }: { playerId: string; playerName: string }) {
+type PlayerVehiclesTabProps = {
+  playerId: string;
+  playerName: string;
+  confirmAction: (message: string, options?: { title?: string; confirmLabel?: string; warning?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
+};
+
+export function PlayerVehiclesTab({ playerId, playerName, confirmAction }: PlayerVehiclesTabProps) {
   const [rows, setRows] = useState<VehicleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [supported, setSupported] = useState(true);
@@ -69,6 +75,7 @@ export function PlayerVehiclesTab({ playerId, playerName }: { playerId: string; 
                   context="player"
                   emptyMessage={`${playerName} has no owned or shared vehicles.`}
                   canEditPermissions={canEditPermissions}
+                  confirmAction={confirmAction}
                   // ownedCount above derives from row.relationship, which
                   // shifts after a rank change -- refetch so the summary and
                   // the table stay in sync with what was just saved.

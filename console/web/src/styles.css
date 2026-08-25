@@ -4548,8 +4548,8 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   border-bottom: 1px solid var(--border);
 }
 
-/* Owner card. Read-only for vehicles -- no transfer action -- so this is
-   plain identity display, not the interactive hero card bases use. */
+/* Owner card, shared markup/behavior with bases (see OwnerHeroCard in
+   rosterEditor.tsx) -- includes the transfer-to-custodian button. */
 .vehicles-permissions-owner-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -4591,6 +4591,8 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   line-height: 1.2;
 }
 .vehicles-permissions-owner-none { color: var(--danger-text); font-style: italic; font-weight: 400; }
+.vehicles-permissions-owner-card > button { width: auto; flex: 0 0 auto; }
+.vehicles-permissions-owner-note { grid-column: 1 / -1; margin: 0; font-size: 12px; }
 
 .vehicles-permissions-section-head {
   display: flex;
@@ -4778,6 +4780,7 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
     grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
   }
+  .vehicles-permissions-owner-card > button { width: 100%; }
 }
 @media (max-width: 700px) {
   .vehicles-permissions-intro {
