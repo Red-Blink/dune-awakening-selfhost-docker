@@ -3050,21 +3050,52 @@ export function liveMapConfigPayload(selected = "") {
   };
 }
 
+// Driven by world_partition, not actors -- a freshly spun-up partition
+// (e.g. a second Hagga Basin instance nobody has spawned into yet) is a
+// real, selectable partition the instant it's registered, even with zero
+// actors placed in it. The old actors-inner-join version only ever
+// listed a partition once something existed inside it, so a brand-new
+// instance was invisible in the Partition dropdown (confirmed live: a
+// second Hagga Basin partition with 0 actors never appeared at all).
 export async function liveMapPartitions(db) {
-  if (!(await tableExists(db, "actors"))) return { rows: [] };
-  const hasWorldPartition = await tableExists(db, "world_partition");
+  if (!(await tableExists(db, "world_partition"))) {
+    if (!(await tableExists(db, "actors"))) return { rows: [] };
+    const result = await db.query(`
+      select coalesce(a.map, '') as map,
+             coalesce(a.partition_id, 0) as partition_id,
+             'Partition ' || coalesce(a.partition_id, 0)::text as name,
+             count(*)::int as marker_count
+      from dune.actors a
+      where a.transform is not null and coalesce(a.partition_id, 0) > 0
+      group by a.map, a.partition_id
+      order by map, partition_id`);
+    return { rows: result.rows.map((row) => ({ ...row, partition_id: Number(row.partition_id || 0), marker_count: Number(row.marker_count || 0) })) };
+  }
+  const hasActors = await tableExists(db, "actors");
   const result = await db.query(`
-    select coalesce(a.map, '') as map,
-           coalesce(a.partition_id, 0) as partition_id,
-           ${hasWorldPartition ? "coalesce(nullif(wp.label, ''), nullif(wp.map, ''), 'Partition ' || coalesce(a.partition_id, 0)::text)" : "'Partition ' || coalesce(a.partition_id, 0)::text"} as name,
-           count(*)::int as marker_count
-    from dune.actors a
-    ${hasWorldPartition ? "join dune.world_partition wp on wp.partition_id = a.partition_id" : ""}
-    where a.transform is not null
-      and coalesce(a.partition_id, 0) > 0
-      ${hasWorldPartition ? "and nullif(wp.server_id, '') is not null" : ""}
-    group by a.map, a.partition_id${hasWorldPartition ? ", wp.label, wp.map" : ""}
-    order by map, partition_id`);
+    select
+      -- wp.map is the internal instance name ("DeepDesert_1"/"Survival_1"),
+      -- but the frontend's Partition dropdown filters by the friendly game
+      -- map name actors report (see RESOURCE_FIELD_PARTITION_JOIN above for
+      -- the same translation in the other direction) -- without this, a
+      -- partition sourced from world_partition would never match either
+      -- map tab.
+      coalesce(case lower(wp.map) when 'deepdesert_1' then 'DeepDesert' when 'survival_1' then 'HaggaBasin' else wp.map end, '') as map,
+      wp.partition_id,
+      coalesce(nullif(wp.label, ''), nullif(wp.map, ''), 'Partition ' || wp.partition_id::text) as name,
+      ${hasActors ? "count(a.id) filter (where a.transform is not null)::int" : "0"} as marker_count
+    from dune.world_partition wp
+    ${hasActors ? "left join dune.actors a on a.partition_id = wp.partition_id" : ""}
+    -- Confirmed live: dungeon/ecolab/overmap sub-instances (CB_Dungeon_*,
+    -- CB_Ecolab_*, CB_Overland_*, Overmap, ...) carry a real, non-null
+    -- server_id too -- they are genuinely running server processes, just
+    -- not ones the Live Map exposes a tab for. nullif(server_id, '') alone
+    -- does not exclude them; only the two instance names the map-name
+    -- translation above actually understands are real Live Map partitions.
+    where wp.partition_id > 0 and nullif(wp.server_id, '') is not null
+      and lower(wp.map) in ('deepdesert_1', 'survival_1')
+    group by wp.partition_id, wp.map, wp.label
+    order by map, wp.partition_id`);
   return { rows: result.rows.map((row) => ({ ...row, partition_id: Number(row.partition_id || 0), marker_count: Number(row.marker_count || 0) })) };
 }
 
@@ -3309,6 +3340,35 @@ export async function teleportPlayer(db, id, body = {}) {
     };
 }
 
+// dune.actors.class is a raw Unreal blueprint path (e.g.
+// "/Game/.../BP_Sandbike_CHOAM.BP_Sandbike_CHOAM_C"), not a clean type
+// name -- same detection LiveMapPanel.tsx's friendlyMarkerName() already
+// does client-side for the marker's display title, reused here so the
+// Layers legend can expand "Vehicle" into real per-type sub-filters the
+// same way Ores & Metals/Scrap & Wrecks already do. Order matters: the
+// Assault check must run before the generic Ornithopter one so it isn't
+// swallowed by it.
+const VEHICLE_CLASS_SUBTYPE_PATTERNS = [
+  [/sandbike/i, "Sandbike"],
+  [/buggy/i, "Buggy"],
+  [/sandcrawler/i, "SandCrawler"],
+  [/treadwheel/i, "TreadWheel"],
+  [/container/i, "ContainerVehicle"],
+  [/tank/i, "Tank"],
+  [/assault.*ornithopter|ornithopter.*assault/i, "AssaultOrnithopter"],
+  [/light.*ornithopter|ornithopter.*light/i, "LightOrnithopter"],
+  [/medium.*ornithopter|ornithopter.*medium/i, "MediumOrnithopter"],
+  [/transport.*ornithopter|ornithopter.*transport/i, "TransportOrnithopter"],
+  [/ornithopter/i, "Ornithopter"]
+];
+export function vehicleSubtypeFromClass(rawClass) {
+  const cls = String(rawClass || "");
+  for (const [pattern, subtype] of VEHICLE_CLASS_SUBTYPE_PATTERNS) {
+    if (pattern.test(cls)) return subtype;
+  }
+  return "Other";
+}
+
 export async function liveMapVehicles(db, map = "") {
   if (!(await tableExists(db, "actors")) || !(await tableExists(db, "vehicles"))) return unsupportedMap("vehicles", ["dune.actors", "dune.vehicles"]);
   const hasWorldPartition = await tableExists(db, "world_partition");
@@ -3323,14 +3383,29 @@ export async function liveMapVehicles(db, map = "") {
              coalesce(a.map, '') as map,
              coalesce(a.partition_id, 0) as partition_id,
              coalesce(a.class, '') as class,
+             coalesce(owner.character_name, '') as owner_name,
              ((a.transform).location).x as x,
              ((a.transform).location).y as y,
              ((a.transform).location).z as z
       from dune.vehicles v
       join dune.actors a on a.id = v.id
+      -- A vehicle IS its own permission actor (see vehiclePermissionActor's
+      -- comment above) -- no dune.permission_actor join needed, just rank 1
+      -- off dune.permission_actor_rank directly. An unclaimed vehicle has no
+      -- such row at all, so this stays a left join and owner_name coalesces
+      -- to empty, same as a base with no owner.
+      left join lateral (
+        select ps.character_name
+        from dune.permission_actor_rank par
+        join dune.actors player_a on player_a.id = par.player_id
+        join dune.player_state ps on ps.account_id = player_a.owner_account_id
+        where par.permission_actor_id = a.id and par.rank = ${PERMISSION_OWNER_RANK}
+        order by ps.character_name
+        limit 1
+      ) owner on true
       where a.transform is not null ${partitionWhere} ${where}
       order by a.map, a.partition_id, a.id`, values);
-    return { capabilities: { vehicles: true }, rows: result.rows.map(normalizeMarker) };
+    return { capabilities: { vehicles: true }, rows: result.rows.map((row) => ({ ...normalizeMarker(row), subtype: vehicleSubtypeFromClass(row.class) })) };
   } catch (error) {
     return { capabilities: { vehicles: false }, rows: [], reason: `Vehicle marker transform query is unsupported by this schema: ${error.message}` };
   }
@@ -3490,6 +3565,146 @@ export async function mapCombatPartitionRows(db, map) {
     where 1=1 ${where}
     order by wp.dimension_index, wp.partition_id`, values);
   return { capabilities: { combatState: true, farmState: hasFarm }, rows: result.rows };
+}
+
+// dune.resourcefield_state.map ("DeepDesert"/"HaggaBasin") and
+// dune.world_partition.map ("DeepDesert_1"/"Survival_1") are different
+// namespaces -- same mismatch documented at partitionRestartTargets below --
+// so the join has to translate the friendly map name into world_partition's
+// internal instance-name convention rather than comparing them directly.
+const RESOURCE_FIELD_PARTITION_JOIN = `
+    left join dune.world_partition wp
+      on lower(wp.map) = case lower(rfs.map)
+           when 'deepdesert' then 'deepdesert_1'
+           when 'haggabasin' then 'survival_1'
+           else lower(rfs.map)
+         end
+      and wp.dimension_index = rfs.dimension_index`;
+
+// Currently-active spice fields of any size for the live map's "Active
+// Spice Blows" layer. field_kind_id=1 is spice; value_remaining tiers are
+// 5,000/150,000/2,500,000 for Small/Medium/Large -- `size` is computed by
+// threshold (not exact match), so a field mid-harvest still classifies as
+// its spawned tier until it drops below that tier's own floor (a known,
+// accepted imprecision, same class of edge case the original Large-only
+// threshold already had). Left join, not inner, since a dimension can
+// still lack a world_partition row (confirmed live) -- partition_id stays
+// null rather than a sentinel in that case.
+export async function liveMapSpiceFieldRows(db, map = "") {
+  if (!(await tableExists(db, "resourcefield_state")) || !(await tableExists(db, "world_partition"))) {
+    return unsupportedMap("spiceActive", ["dune.resourcefield_state", "dune.world_partition"]);
+  }
+  const values = [];
+  const where = mapFilterClause(map, values, "rfs");
+  const result = await db.query(`
+    select rfs.field_id::text as field_id,
+           rfs.map,
+           wp.partition_id,
+           rfs.value_remaining,
+           case
+             when rfs.value_remaining > 150000 then 'Large'
+             when rfs.value_remaining > 5000 then 'Medium'
+             else 'Small'
+           end as size
+    from dune.resourcefield_state rfs
+    ${RESOURCE_FIELD_PARTITION_JOIN}
+    where rfs.field_kind_id = 1 ${where}
+    order by rfs.field_id`, values);
+  return {
+    capabilities: { spiceActive: true },
+    rows: result.rows.map((row) => ({ ...row, partition_id: row.partition_id == null ? null : Number(row.partition_id), value_remaining: Number(row.value_remaining) }))
+  };
+}
+
+// Currently-active flour sand fields (field_kind_id=0) -- a single fixed
+// tier (60,000), not size-classed like spice, so no value threshold needed.
+export async function liveMapFlourSandFieldRows(db, map = "") {
+  if (!(await tableExists(db, "resourcefield_state")) || !(await tableExists(db, "world_partition"))) {
+    return unsupportedMap("flourSand", ["dune.resourcefield_state", "dune.world_partition"]);
+  }
+  const values = [];
+  const where = mapFilterClause(map, values, "rfs");
+  const result = await db.query(`
+    select rfs.field_id::text as field_id,
+           rfs.map,
+           wp.partition_id,
+           rfs.value_remaining
+    from dune.resourcefield_state rfs
+    ${RESOURCE_FIELD_PARTITION_JOIN}
+    where rfs.field_kind_id = 0 ${where}
+    order by rfs.field_id`, values);
+  return {
+    capabilities: { flourSand: true },
+    rows: result.rows.map((row) => ({ ...row, partition_id: row.partition_id == null ? null : Number(row.partition_id), value_remaining: Number(row.value_remaining) }))
+  };
+}
+
+// dune.markers is the static-POI atlas (23,413+ entries on a full server --
+// caves, ore veins, scrap wrecks, vendors, hazards, etc). `marker` is a
+// composite type with real named fields (marker_type, x, y, z, payload_type)
+// -- confirmed live, no need for the text-parsing SPLIT_PART approach some
+// third-party docs use. One generic, parameterized query serves every
+// category: add a pattern-table entry for a new category and it works with
+// no new SQL.
+// Suffix-only (no leading %) -- a substring match on "%ore%" was sweeping in
+// HarkoRecustomization (an unrelated NPC/customization POI, confirmed live)
+// because "HarkoRecustomization" contains "kore" -> "ore". All real resource
+// marker_types follow a strict {Material}{Ore|Pickup|Rock} suffix, so
+// matching the suffix instead both fixes that false positive and is what
+// the live map's Ore/Pickup sub-grouping keys off of.
+const POI_CATEGORY_PATTERNS = {
+  ore: ["%Ore", "%Pickup", "%Rock"],
+  scrap: ["%scrap%", "%fuelcell%"],
+  flora: ["%bush%", "%primrose%", "%saguaro%"],
+  hazard: ["%hazard%"],
+  // Split out of "poi" into its own category -- confirmed live these are
+  // the only 3 marker_types that ever matched the old %camp%/%outpost%
+  // patterns, so pulling them out doesn't leave any other POI uncovered.
+  enemy: ["EnemyCamp", "EnemyLaborOutpost", "EnemyOutpost"],
+  // Same split, for the same reason: Fortress/House Representative/Trainer
+  // used to live inside "poi" as sub-grouped subtypes -- promoted to their
+  // own top-level categories so each gets its own legend row/checkbox
+  // instead of only being reachable by first expanding POI's.
+  fortress: ["%fortress%"],
+  house_representative: ["%houserepresentative%"],
+  trainer: ["%trainer%"],
+  poi: [
+    "%cave%", "%ecolab%", "%sietch%",
+    "%dojo%", "%vendor%", "%choam%", "%bank%", "%tradingpost%",
+    "%taxi%", "%imperialconsulate%", "%shipwreck%"
+  ]
+};
+
+export async function liveMapPoiMarkers(db, map, category) {
+  const patterns = POI_CATEGORY_PATTERNS[category];
+  if (!patterns) throw new Error(`Unknown POI category: ${category}`);
+  if (!(await tableExists(db, "markers")) || !(await tableExists(db, "map_names"))) {
+    return unsupportedMap(category, ["dune.markers", "dune.map_names"]);
+  }
+  const values = [patterns];
+  let where = "";
+  if (map) {
+    const safe = validateMapName(map);
+    if (safe) {
+      values.push(safe);
+      where = ` and mn.map_name = $${values.length}`;
+    }
+  }
+  const result = await db.query(`
+    select m.marker_hash_id::text as id,
+           (m.marker).marker_type as marker_type,
+           (m.marker).x as x,
+           (m.marker).y as y,
+           (m.marker).z as z,
+           coalesce(mn.map_name, '') as map
+    from dune.markers m
+    join dune.map_names mn on mn.map_name_id = m.map_name_id
+    where (m.marker).marker_type ilike any($1) and (m.marker).marker_type not ilike 'NoIcon' ${where}
+    order by m.marker_hash_id`, values);
+  return {
+    capabilities: { [category]: true },
+    rows: result.rows.map((row) => ({ ...row, x: Number(row.x), y: Number(row.y), z: Number(row.z) }))
+  };
 }
 
 export async function liveMapMarkers(db, map = "") {

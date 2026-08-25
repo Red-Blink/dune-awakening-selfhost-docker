@@ -18,7 +18,7 @@ import {
   supportsGeneratorRefillQueue
 } from "../src/duneDb.js";
 import { addBaseContainerItem, addCurrency, addFactionReputation, addGuildMember, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, addSpecializationXp, applyLandsraadMilestonePreset, augmentInventoryItem, augmentNewestPlayerItem, baseContainerSlots, baseGeneratorFuelLevels, baseGenerators, baseIsBackedUp, changeDunePassword, completeJourneyNode, completeTutorial, dbStatus, deleteAllBaseContainerItems, deleteBaseContainerItem, deleteInventoryItem, deleteMultipleBaseContainerItems, demoteGuildMember, disbandGuild, exportBaseAsBlueprint, fillItemToBaseContainer, fillItemToStorage, generatorUptimePolicy, giveItemToBaseContainer, giveItemToPlayer, giveItemToStorage, giveMultipleItemsToBaseContainer, guildMembers, inspectDeletedCharacterRecovery, inspectLandsraadQuestRepairs, landsraadOverview, listBases, listGuilds, listPlayers, listRoutines, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerBuildingUnlockState, playerCraftingRecipes, playerCurrency, playerCustomizationGrantState, playerFactions, playerIntel, playerInventory, playerInventoryAll, playerJourney, playerPortalSnapshots, playerPosition, playerProfile, playerProgression, playerResearchItems, playerServerMemberships, playerSolarisCoinTotal, playerTeleportDestinations, playerVitals, portalGeneratorFuel, portalVehicles, promoteGuildMember, recoverDeletedCharacter, refillBaseGenerators, removeGuildMember, repairFactionReputation, repairLandsraadQuests, repairVehicleDecay, resetJourneyNode, resetTutorial, resolvePlayerTarget, routineDefinition, runSql, setLandsraadPlayerContribution, setPlayerFaction, supportsGeneratorRefill, tablePreview, teleportOfflinePlayerToCoords, teleportPlayer, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError, _resetPlayerTargetCacheForTests } from "../src/duneDb.js";
-import { listStorage, liveMapBases, liveMapStorage, portalStorage, trackPlayerPlaytime } from "../src/duneDb.js";
+import { listStorage, liveMapBases, liveMapStorage, liveMapVehicles, portalStorage, trackPlayerPlaytime } from "../src/duneDb.js";
 
 beforeEach(() => {
   _resetPlayerTargetCacheForTests();
@@ -3676,6 +3676,31 @@ test("live map player markers validate map filter and use parameterized transfor
   assert.match(markerQuery.text, /a\.map = \$1/);
   assert.deepEqual(markerQuery.values, ["Survival_1"]);
   await assert.rejects(() => liveMapPlayers(db, "bad;map"), /Invalid map name/);
+});
+
+test("live map vehicle markers resolve owner_name the same way base markers do, including unclaimed vehicles", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      return {
+        rows: [
+          { id: 20, type: "vehicle", name: "BP_Sandbike_CHOAM_C", map: "Survival_1", partition_id: 1, class: "BP_Sandbike_CHOAM_C", owner_name: "Chani", x: "1", y: "2", z: "3" },
+          { id: 21, type: "vehicle", name: "BP_Buggy_C", map: "Survival_1", partition_id: 1, class: "BP_Buggy_C", owner_name: "", x: "4", y: "5", z: "6" }
+        ]
+      };
+    }
+  };
+  const result = await liveMapVehicles(db, "Survival_1");
+  assert.equal(result.rows[0].owner_name, "Chani");
+  assert.equal(result.rows[1].owner_name, "", "an unclaimed vehicle has no permission_actor_rank row, so owner_name stays empty");
+
+  const markerQuery = calls.find((call) => call.text.includes("from dune.vehicles v"));
+  assert.ok(markerQuery);
+  assert.match(markerQuery.text, /left join lateral/);
+  assert.match(markerQuery.text, /where par\.permission_actor_id = a\.id and par\.rank = 1/);
+  assert.match(markerQuery.text, /coalesce\(owner\.character_name, ''\) as owner_name/);
 });
 
 test("live map hides stored base and storage markers while preserving redeployed bases", async () => {

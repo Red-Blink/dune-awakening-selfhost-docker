@@ -42,6 +42,8 @@ import { primeMessageOfTheDayOnlineState, readMessageOfTheDay, recordMessageOfTh
 import { primePlayerAnnouncementOnlineState, readPlayerAnnouncements, restorePlayerAnnouncements, runPlayerAnnouncementScan, savePlayerAnnouncements } from "./services/playerAnnouncements.js";
 import * as restartQueue from "./services/restartQueue.js";
 import { persistSpicefieldOverride } from "./services/spicefieldOverrides.js";
+import { liveMapSpice } from "./services/liveMapSpice.js";
+import { liveMapPoi } from "./services/liveMapPoi.js";
 import { applySavedLandsraadMilestonePreset, createLandsraadMilestoneReconciler, readLandsraadMilestonePreset, saveLandsraadMilestonePreset } from "./services/landsraadMilestones.js";
 import { exportBlueprint, importBlueprint, listBlueprints, deleteBlueprint } from "./blueprints.js";
 import { createZipArchive } from "./services/zipArchive.js";
@@ -901,6 +903,8 @@ async function handleApi(req, res) {
   if (path === "/api/map/bases") return dbJson(res, () => duneDb.liveMapBases(db, url.searchParams.get("map") || ""));
   if (path === "/api/map/storage") return dbJson(res, () => duneDb.liveMapStorage(db, url.searchParams.get("map") || ""));
   if (path === "/api/map/services") return dbJson(res, () => duneDb.liveMapServices(db, url.searchParams.get("map") || ""));
+  if (path === "/api/map/spice") return dbJson(res, () => liveMapSpice(db, config, url.searchParams.get("map") || "", { partitionId: url.searchParams.get("partitionId") || "" }));
+  if (path === "/api/map/poi") return dbJson(res, () => liveMapPoi(db, url.searchParams.get("map") || ""));
   if (path === "/api/map/overlays") return dbJson(res, () => duneDb.liveMapMarkers(db, url.searchParams.get("map") || ""));
   if (path === "/api/maps/mode" && req.method === "POST") return confirmedTask(req, res, "maps", "mapsSetMode", {}, "SET MAP MODE");
   if (path === "/api/maps/settings" && req.method === "POST") return mapSettingsRoute(req, res);
@@ -1256,13 +1260,27 @@ function addonContentRoute(req, res, path) {
 async function liveMapMarkersRoute(res, url) {
   return dbJson(res, async () => {
     const configPayload = duneDb.liveMapConfigPayload(url.searchParams.get("map") || "");
-    const [markers, partitions] = await Promise.all([
-      duneDb.liveMapMarkers(db, configPayload.map.actorMap || configPayload.map.key),
-      duneDb.liveMapPartitions(db).catch(() => ({ rows: [] }))
+    const activeMap = configPayload.map.actorMap || configPayload.map.key;
+    const partitionId = url.searchParams.get("partitionId") || "";
+    const [markers, partitions, spice, poi] = await Promise.all([
+      duneDb.liveMapMarkers(db, activeMap),
+      duneDb.liveMapPartitions(db).catch(() => ({ rows: [] })),
+      liveMapSpice(db, config, activeMap, { partitionId }).catch(() => ({ capabilities: { spice: false, spice_active: false, flour_sand: false }, rows: [] })),
+      liveMapPoi(db, activeMap).catch(() => ({ capabilities: {}, rows: [] }))
     ]);
     return {
       ...markers,
       ...configPayload,
+      capabilities: { ...markers.capabilities, ...spice.capabilities, ...poi.capabilities },
+      overlays: { ...markers.overlays, spice: spice.reason || "" },
+      rows: [...markers.rows, ...spice.rows, ...poi.rows],
+      // Every server container reports the identical farm-wide seed and
+      // cycle boundary -- resolveCoriolisCycle just prefers asking the
+      // selected partitionId's own container first (more likely to actually
+      // be running than a fixed default) before falling back to the
+      // overmap/survival-1 default.
+      coriolisSeed: spice.currentSeed || "",
+      coriolisNextCycleAt: spice.nextCycleAt || "",
       partitions: partitions.rows || []
     };
   });

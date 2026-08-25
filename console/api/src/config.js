@@ -236,6 +236,15 @@ export function loadConfig() {
     secretsDir,
     auditLog: resolve(generatedDir, "web-admin-audit.jsonl"),
     spicefieldOverridesFile: resolve(generatedDir, "spicefield-overrides.json"),
+    // Committed data, not runtime state: Large-spice coordinates are a
+    // permanent lookup keyed by Coriolis seed (0-11) -- the same seed
+    // number produces the same pool on every Deep Desert server, so this
+    // ships in the repo and grows over time as more seeds get recorded.
+    spiceLocationsFile: resolve(repoRoot, "console/api/data/large-spice-locations.json"),
+    // Runtime companion to the committed archive above -- the console
+    // fills this in itself as it observes fields going active, growing
+    // "Static Spice Spawns" beyond what the committed archive alone has.
+    learnedSpiceLocationsFile: resolve(generatedDir, "learned-spice-locations.json"),
     landsraadMilestonePresetFile: resolve(generatedDir, "landsraad-milestones.json"),
     taskRetention: Number(process.env.ADMIN_TASK_RETENTION || 200),
     maxJsonBytes: Number(process.env.ADMIN_MAX_JSON_BYTES || 2 * 1024 * 1024),
@@ -298,6 +307,7 @@ function repairRootOwnedHostState(repoRoot) {
     resolve(repoRoot, "runtime/generated/shutdown-protection.env"),
     resolve(repoRoot, "runtime/generated/sietch-config.json"),
     resolve(repoRoot, "runtime/generated/spicefield-overrides.json"),
+    resolve(repoRoot, "runtime/generated/learned-spice-locations.json"),
     resolve(repoRoot, "runtime/generated/update-auto.env"),
     resolve(repoRoot, "runtime/generated/usersettings.json"),
     resolve(repoRoot, "runtime/generated/auto-refill-bases.json"),

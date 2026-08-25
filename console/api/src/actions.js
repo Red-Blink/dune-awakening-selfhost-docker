@@ -269,6 +269,8 @@ export const ROUTE_ACTIONS = {
   "GET /api/map/bases":                        "maps:read",
   "GET /api/map/storage":                      "maps:read",
   "GET /api/map/services":                     "maps:read",
+  "GET /api/map/spice":                        "maps:read",
+  "GET /api/map/poi":                          "maps:read",
   "GET /api/map/overlays":                     "maps:read",
   "POST /api/map/teleport-player":             "maps:teleport",
 
