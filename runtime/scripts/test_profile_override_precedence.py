@@ -240,6 +240,37 @@ class RetiredModifierAndCoriolisMetadataTests(ProfilePathTestCase):
         self.assertEqual(len(data_lines), 1)
         self.assertIn("m_VotingPeriodStartBeforeCoriolisCycleInSec=122400", data_lines[0])
 
+    def test_legacy_dunegamemode_cycle_and_wipe_fields_are_hidden_behind_coriolis(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(usersettings.metadata(), 0)
+        payload = json.loads(output.getvalue())
+        ids = {row["id"] for row in payload["game"]}
+        self.assertNotIn("cycle_duration_in_days", ids)
+        self.assertNotIn("db_wipe_enabled", ids)
+        fields = {row["id"]: row for row in payload["game"]}
+        self.assertEqual(fields["coriolis_cycle_duration_days"]["label"], "Cycle Duration Days")
+
+    def test_saving_the_canonical_coriolis_field_compiles_into_both_sections(self):
+        # cycle_duration_in_days (legacy DuneGameMode) is hidden from the editor,
+        # but compiled_usergame_ini still writes it alongside the canonical
+        # CoriolisSubsystem key -- via sync_legacy_values() backfilling
+        # profile_map_values(), not by mirroring the raw saved profile -- so any
+        # code path still reading the legacy key keeps seeing the new value.
+        profile = usersettings.empty_profile()
+        usersettings.set_profile_field(profile, "global", "", "", "coriolis_cycle_duration_days", "3")
+        rendered = usersettings.compiled_usergame_ini(profile, MAP_NAME)
+        self.assertIn(f"[{usersettings.CORIOLIS_SUBSYSTEM_SECTION}]\nm_CycleDurationInDays=3", rendered)
+        self.assertIn("[/Script/DuneSandbox.DuneGameMode]\nm_CycleDurationInDays=3", rendered)
+
+    def test_an_existing_legacy_only_value_still_surfaces_through_the_canonical_field(self):
+        legacy_section, legacy_key, _default = usersettings.MAP_FIELDS["db_wipe_enabled"]
+        profile = usersettings.parse_profile_text(
+            f"[Global:{legacy_section}]\n{legacy_key}=False\n"
+        )
+        values = usersettings.profile_map_values(profile, MAP_NAME)
+        self.assertEqual(values["coriolis_db_wipe_enabled"], "False")
+
 
 class ClientGameIniAllowlistTests(ProfilePathTestCase):
     def test_exports_only_nondefault_client_required_fields(self):

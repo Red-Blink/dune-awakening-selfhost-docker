@@ -378,6 +378,7 @@ FIELD_LABELS = {
     "coriolis_cycle_start_hour": "Cycle Start Hour",
     "coriolis_cycle_start_minute": "Cycle Start Minute",
     "coriolis_cycle_start_seed_index": "Cycle Start Seed Index",
+    "coriolis_cycle_duration_days": "Cycle Duration Days",
     "guild_settings_creation_cost": "Guild Creation Cost",
     "guild_settings_max_guilds_allowed": "Max Guilds Allowed",
     "guild_settings_max_guild_members_allowed": "Max Guild Members Allowed",
@@ -705,10 +706,19 @@ ENGINE_HEADER_INTERNAL_NAMES = {v: k for k, v in ENGINE_HEADER_DISPLAY_NAMES.ite
 _ENGINE_DISPLAY_HEADER_RE = re.compile(
     r"^\[(" + "|".join(re.escape(name) for name in ENGINE_HEADER_DISPLAY_NAMES.values()) + r"):(.*)\]$"
 )
-LEGACY_GUILD_FIELD_ALIASES = {
+# Legacy DuneGameMode keys that a newer, canonical field also writes to a
+# different section under the same effective setting. Showing both in the
+# structured editor gives admins two controls for one effective setting and
+# makes the legacy value silently win in some cases, so metadata() hides the
+# legacy id and mirror_legacy_profile_field()/sync_legacy_values() keep the
+# legacy ini key and any already-saved legacy value in sync with the canonical
+# one instead.
+LEGACY_FIELD_ALIASES = {
     "guild_creation_cost": "guild_settings_creation_cost",
     "max_guilds_allowed": "guild_settings_max_guilds_allowed",
     "max_guild_members_allowed": "guild_settings_max_guild_members_allowed",
+    "cycle_duration_in_days": "coriolis_cycle_duration_days",
+    "db_wipe_enabled": "coriolis_db_wipe_enabled",
 }
 
 
@@ -1255,8 +1265,8 @@ def append_safe_staking_extension_arrays(section_lines: dict[str, list[str]], va
         entries.extend(f".{key}={value}" for _ in range(STAKING_EXTENSION_ARRAY_LENGTH))
 
 
-def mirror_legacy_guild_profile_field(profile: dict, scope: str, map_name: str, partition_id: str, field_id: str, value: str) -> None:
-    canonical_field = LEGACY_GUILD_FIELD_ALIASES.get(field_id)
+def mirror_legacy_profile_field(profile: dict, scope: str, map_name: str, partition_id: str, field_id: str, value: str) -> None:
+    canonical_field = LEGACY_FIELD_ALIASES.get(field_id)
     if not canonical_field:
         return
     spec = MAP_FIELDS.get(canonical_field)
@@ -1270,8 +1280,8 @@ def mirror_legacy_guild_profile_field(profile: dict, scope: str, map_name: str, 
         profile_set_key(profile, "partition", spec[0], spec[1], value, canonical_map(map_name or "Survival_1"), str(partition_id or ""))
 
 
-def sync_legacy_guild_values(values: dict[str, str]) -> dict[str, str]:
-    for legacy_field, canonical_field in LEGACY_GUILD_FIELD_ALIASES.items():
+def sync_legacy_values(values: dict[str, str]) -> dict[str, str]:
+    for legacy_field, canonical_field in LEGACY_FIELD_ALIASES.items():
         legacy_default = str(MAP_FIELDS[legacy_field][2])
         canonical_default = str(MAP_FIELDS[canonical_field][2])
         legacy_value = str(values.get(legacy_field, legacy_default))
@@ -1660,7 +1670,7 @@ def set_profile_field(profile: dict, scope: str, map_name: str, partition_id: st
         spec = MAP_FIELDS[field_id]
         if spec[0] and spec[1]:
             profile_set_key(profile, "global", spec[0], spec[1], value)
-            mirror_legacy_guild_profile_field(profile, "global", "", "", field_id, value)
+            mirror_legacy_profile_field(profile, "global", "", "", field_id, value)
         return
 
     if scope == "map":
@@ -1669,7 +1679,7 @@ def set_profile_field(profile: dict, scope: str, map_name: str, partition_id: st
         spec = MAP_FIELDS[field_id]
         if spec[0] and spec[1]:
             profile_set_key(profile, "map", spec[0], spec[1], value, map_name=map_name)
-            mirror_legacy_guild_profile_field(profile, "map", map_name, "", field_id, value)
+            mirror_legacy_profile_field(profile, "map", map_name, "", field_id, value)
         return
 
     if scope == "partition":
@@ -1692,7 +1702,7 @@ def set_profile_field(profile: dict, scope: str, map_name: str, partition_id: st
         spec = MAP_FIELDS.get(field_id)
         if spec and spec[0] and spec[1]:
             profile_set_key(profile, "partition", spec[0], spec[1], value, target_map, target_partition)
-            mirror_legacy_guild_profile_field(profile, "partition", target_map, target_partition, field_id, value)
+            mirror_legacy_profile_field(profile, "partition", target_map, target_partition, field_id, value)
         return
 
     raise SystemExit("Unknown settings scope.")
@@ -1727,7 +1737,7 @@ def profile_map_values(profile: dict, map_name: str) -> dict[str, str]:
             values[key] = map_value
     global_data = profile_get_key(profile, "global", LANDSRAAD_SETTINGS_SECTION, LANDSRAAD_DATA_KEY)
     values.update(landsraad_virtual_values(global_data or LANDSRAAD_DATA_TEMPLATE))
-    return sync_legacy_guild_values(values)
+    return sync_legacy_values(values)
 
 
 def profile_global_values(profile: dict) -> dict[str, str]:
@@ -1741,7 +1751,7 @@ def profile_global_values(profile: dict) -> dict[str, str]:
             values[key] = global_value
     global_data = profile_get_key(profile, "global", LANDSRAAD_SETTINGS_SECTION, LANDSRAAD_DATA_KEY)
     values.update(landsraad_virtual_values(global_data or LANDSRAAD_DATA_TEMPLATE))
-    return sync_legacy_guild_values(values)
+    return sync_legacy_values(values)
 
 
 def profile_partition_array_selector_active(profile: dict, section: str, key: str, target_map: str, target_partition: str) -> bool:
@@ -1795,7 +1805,7 @@ def profile_partition_values(profile: dict, map_name: str, partition_id: str) ->
     values["partition_selector_mode_active"] = "True" if profile_partition_selector_mode_active(
         profile, target_map, target_partition
     ) else "False"
-    return sync_legacy_guild_values(values)
+    return sync_legacy_values(values)
 
 
 def profile_section_lines(profile: dict, scope: str, section: str, map_name: str = "", partition_id: str = "") -> list[str]:
@@ -1920,17 +1930,16 @@ def metadata() -> int:
         key: spec for key, spec in PARTITION_ENGINE_FIELDS.items()
         if key != "server_login_password"
     }
-    # Keep legacy DuneGameMode guild keys readable and compilable for existing
-    # profiles, but expose only their canonical GuildSettings counterparts in
-    # the structured editor. Showing both gives admins two controls for one
-    # effective setting and makes the legacy value silently win in some cases.
+    # Keep legacy DuneGameMode keys readable and compilable for existing
+    # profiles, but expose only their canonical counterparts (GuildSettings,
+    # CoriolisSubsystem) in the structured editor. See LEGACY_FIELD_ALIASES.
     public_game_fields = {
         key: spec for key, spec in MAP_FIELDS.items()
-        if key not in LEGACY_GUILD_FIELD_ALIASES
+        if key not in LEGACY_FIELD_ALIASES
     }
     public_partition_fields = {
         key: spec for key, spec in PARTITION_FIELDS.items()
-        if key not in LEGACY_GUILD_FIELD_ALIASES
+        if key not in LEGACY_FIELD_ALIASES
     }
     payload = {
         "engine": [row("engine", key, spec) for key, spec in public_engine_fields.items()],
@@ -2818,8 +2827,8 @@ def _advanced_editor_find_scoped_key_value(sections: list[dict], reference_block
     return None
 
 
-def _advanced_editor_legacy_guild_warnings(sections: list[dict]) -> list[str]:
-    """Flag the case sync_legacy_guild_values() (~1024) resolves silently: a non-default
+def _advanced_editor_legacy_field_warnings(sections: list[dict]) -> list[str]:
+    """Flag the case sync_legacy_values() (~1024) resolves silently: a non-default
     legacy field overriding a canonical field explicitly set to its own default. The
     canonical field's explicit line is then also dropped by the known-key filter in
     append_profile_unknown_lines(), so without this warning the admin has no way to know
@@ -2828,7 +2837,7 @@ def _advanced_editor_legacy_guild_warnings(sections: list[dict]) -> list[str]:
     for block in sections:
         section = str(block.get("ini_section", ""))
         where = _advanced_editor_block_label(block)
-        for legacy_field, canonical_field in LEGACY_GUILD_FIELD_ALIASES.items():
+        for legacy_field, canonical_field in LEGACY_FIELD_ALIASES.items():
             legacy_spec = MAP_FIELDS[legacy_field]
             canonical_spec = MAP_FIELDS[canonical_field]
             if section != legacy_spec[0]:
@@ -2873,7 +2882,7 @@ def profile_game_write_encoded(encoded_content: str) -> int:
     warnings = (
         _advanced_editor_duplicate_key_warnings(incoming.get("sections", []))
         + _advanced_editor_pvp_pve_warnings(incoming.get("sections", []))
-        + _advanced_editor_legacy_guild_warnings(incoming.get("sections", []))
+        + _advanced_editor_legacy_field_warnings(incoming.get("sections", []))
     )
     profile = read_profile()
     replace_profile_game_sections(profile, incoming)
@@ -3210,7 +3219,7 @@ Dune.GlobalVehicleMiningOutputMultiplier=10
     if not any("m_MaxGuildsAllowed was set 2 times" in w and "(1)" in w and "(2)" in w for w in dup_warnings):
         raise SystemExit("Duplicate-key Advanced Editor warning did not fire correctly.")
 
-    legacy_warnings = _advanced_editor_legacy_guild_warnings(reparsed.get("sections", []))
+    legacy_warnings = _advanced_editor_legacy_field_warnings(reparsed.get("sections", []))
     if not any("m_MaxGuildMembersAllowed=5 overrides" in w for w in legacy_warnings):
         raise SystemExit("Legacy guild-alias override warning did not fire.")
 
@@ -3223,7 +3232,7 @@ Dune.GlobalVehicleMiningOutputMultiplier=10
         "[Global:/Script/DuneSandbox.DuneGameMode]\nm_MaxGuildMembersAllowed=5\n"
         "[Global:/Script/DuneSandbox.GuildSettings]\nm_MaxGuildMembersAllowed=99\nm_MaxGuildMembersAllowed=32\n"
     ).get("sections", [])
-    last_wins_warnings = _advanced_editor_legacy_guild_warnings(last_wins_sections)
+    last_wins_warnings = _advanced_editor_legacy_field_warnings(last_wins_sections)
     if not any("m_MaxGuildMembersAllowed=5 overrides" in w and "m_MaxGuildMembersAllowed=32" in w for w in last_wins_warnings):
         raise SystemExit("Legacy guild-alias warning used the first assignment of a duplicated canonical key instead of the last-wins effective value.")
 

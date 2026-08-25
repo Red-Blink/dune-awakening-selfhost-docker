@@ -6037,6 +6037,51 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 .settings-field-description svg { flex-shrink: 0; margin-top: 1px; color: var(--accent); }
 .settings-field-description-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .settings-field input, .settings-field select, .settings-field textarea, .raw-editor-card textarea { width: 100%; }
+
+/* Same visual spec as .bases-rank-segments / .vehicles-rank-segments, under
+   its own settings-scoped class names per this repo's CSS scoping convention. */
+.settings-match-region { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.settings-match-region-label { font-size: 12px; font-weight: 700; color: #a99577; white-space: nowrap; }
+.settings-match-region-segments {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  height: 28px;
+  min-width: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: #151719;
+  overflow: hidden;
+}
+.settings-match-region-segment {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-left: 1px solid var(--border);
+  color: var(--muted-warm);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.settings-match-region-segment:first-child { border-left: 0; }
+.settings-match-region-segment input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.settings-match-region-segment:hover { background: rgba(198, 139, 74, .12); color: var(--text-strong); }
+.settings-match-region-segment:has(input:checked) { background: #9b5f2a; color: var(--text-strong); }
+.settings-match-region-segment:has(input:focus-visible) { outline: 2px solid var(--accent-strong); outline-offset: -2px; }
+.settings-match-region-segments:has(input:disabled) { opacity: .45; }
+.settings-match-region-segment:has(input:disabled) { cursor: not-allowed; }
 .character-transfer-grid { display: grid; gap: 8px; max-width: 820px; }
 .character-transfer-row {
   display: grid;

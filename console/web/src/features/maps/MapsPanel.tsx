@@ -82,6 +82,16 @@ const MAP_SORT_COLUMNS: Array<[MapSortColumn, string]> = [
   ["mode", "Mode"],
   ["memory", "Memory"]
 ];
+const CORIOLIS_CYCLE_START_HOUR_FIELD_ID = "coriolis_cycle_start_hour";
+// UTC regional master schedules. Must stay in sync with the
+// coriolis_cycle_start_hour description in runtime/scripts/usersettings.py.
+const CORIOLIS_REGION_HOURS: Record<string, number> = {
+  "Europe": 5,
+  "North America": 11,
+  "South America": 8,
+  "Asia": 9,
+  "Oceania": 19
+};
 type ConfirmAction = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; warning?: string; details?: { label: string; value: string; tone?: "danger" | "success" | "accent" }[] }) => Promise<boolean>;
 type MapsPanelProps = {
   onError: (text: string) => void;
@@ -336,6 +346,8 @@ export function MapsPanel({ onError, confirmAction, restartGate, confirmSettings
   const [engineDraft, setEngineDraft] = useState<Record<string, string>>({});
   const [gameValues, setGameValues] = useState<Record<string, string>>({});
   const [gameDraft, setGameDraft] = useState<Record<string, string>>({});
+  const [serverRegion, setServerRegion] = useState("");
+  const [coriolisHourMatchesRegion, setCoriolisHourMatchesRegion] = useState(true);
   const [rawEngine, setRawEngine] = useState("");
   const [rawGame, setRawGame] = useState("");
   const [rawEngineOriginal, setRawEngineOriginal] = useState("");
@@ -721,11 +733,21 @@ export function MapsPanel({ onError, confirmAction, restartGate, confirmSettings
     setRawEngine(raw.content || "");
     setRawEngineOriginal(raw.content || "");
   }
+  async function loadServerRegion() {
+    try {
+      const state = await setupApi.state();
+      setServerRegion(String(state.serverConfig?.SERVER_REGION || ""));
+    } catch {
+      // Match Region is a convenience on top of the Cycle Start Hour field --
+      // if the deployment region can't be read, the field just stays manual.
+      setServerRegion("");
+    }
+  }
   async function loadInitialModifierSettings() {
     // The raw Advanced editor is loaded only when it is opened. Making it part
     // of this gate would add another command before the normal modifier cards
     // can be used.
-    await Promise.all([loadSchema(), loadUserEngineValues()]);
+    await Promise.all([loadSchema(), loadUserEngineValues(), loadServerRegion()]);
     setModifierSettingsLoaded(true);
   }
   async function loadSelectedEngineSettings(mapName: string, partitionId?: string) {
@@ -1257,6 +1279,25 @@ export function MapsPanel({ onError, confirmAction, restartGate, confirmSettings
   const engineTargetKey = settingsTargetKey(engineMapName, isEngineGlobal ? "" : enginePartitionId);
   const gameFields = schema ? (effectivePartitionId ? schema.partition : schema.game).filter((field) => field.id !== "partition_pve_enabled" || effectivePartitionId) : [];
   const userGameFields = schema && userGameName ? (!isUserGameGlobal && effectiveUserGamePartitionId ? schema.partition : schema.game).filter((field) => field.id !== "partition_pve_enabled" || (!isUserGameGlobal && effectiveUserGamePartitionId)) : [];
+  const coriolisRegionHour = CORIOLIS_REGION_HOURS[serverRegion];
+  const coriolisMatchRegionAvailable = coriolisRegionHour !== undefined && userGameFields.some((field) => field.id === CORIOLIS_CYCLE_START_HOUR_FIELD_ID);
+  const coriolisHourDraftValue = gameDraft[CORIOLIS_CYCLE_START_HOUR_FIELD_ID];
+  useEffect(() => {
+    // Re-infer whenever a target's saved values (re)load.
+    if (!userGameName) return;
+    const field = schema?.game.find((candidate) => candidate.id === CORIOLIS_CYCLE_START_HOUR_FIELD_ID);
+    const regionHour = CORIOLIS_REGION_HOURS[serverRegion];
+    setCoriolisHourMatchesRegion(coriolisHourMatchesRegionInference(field, gameValues[CORIOLIS_CYCLE_START_HOUR_FIELD_ID], regionHour));
+  }, [gameValues, schema, serverRegion, userGameName]);
+  useEffect(() => {
+    // While On, keep the draft pinned to the region's hour -- covers both a
+    // manual toggle flip and a target switch landing on a different saved value.
+    const regionHour = CORIOLIS_REGION_HOURS[serverRegion];
+    if (!coriolisHourMatchesRegion || regionHour === undefined) return;
+    const desired = String(regionHour);
+    if (coriolisHourDraftValue === desired) return;
+    setGameDraft((current) => ({ ...current, [CORIOLIS_CYCLE_START_HOUR_FIELD_ID]: desired }));
+  }, [coriolisHourMatchesRegion, serverRegion, coriolisHourDraftValue]);
   const gameGroups = groupSettingsFields(userGameFields, true, modifiedSettingsFields(userGameFields, gameValues, gameDraft));
   const activeGameCategory = gameGroups.some(([category]) => category === selectedGameCategory) ? selectedGameCategory : gameGroups[0]?.[0] || "";
   const activeGameFields = activeGameCategory === "All" ? userGameFields : gameGroups.find(([category]) => category === activeGameCategory)?.[1] || [];
@@ -2228,7 +2269,7 @@ export function MapsPanel({ onError, confirmAction, restartGate, confirmSettings
             </div>
           </div>
         </div>
-        {userGameName && <SettingsCardGrid fields={filteredGameFields} values={gameDraft} onChange={(id, value) => setGameDraft({ ...gameDraft, [id]: value })} viewMode={modifierViewMode} emptyMessage={modifierEmptyMessage(!!schema, userGameFields.length, modifierFilter, activeGameCategory)} />}
+        {userGameName && <SettingsCardGrid fields={filteredGameFields} values={gameDraft} onChange={(id, value) => setGameDraft({ ...gameDraft, [id]: value })} viewMode={modifierViewMode} emptyMessage={modifierEmptyMessage(!!schema, userGameFields.length, modifierFilter, activeGameCategory)} matchRegionControl={{ fieldId: CORIOLIS_CYCLE_START_HOUR_FIELD_ID, enabled: coriolisHourMatchesRegion, available: coriolisMatchRegionAvailable, regionLabel: serverRegion, regionHour: coriolisRegionHour, onToggle: setCoriolisHourMatchesRegion }} />}
         <div className="action-row"><button disabled={!gameDirty.length || !userGameName} onClick={() => run(saveGame)}>Save</button><button disabled={!gameDirty.length} onClick={() => setGameDraft(gameValues)}>Discard Changes</button><button className="settings-reset-all-button" disabled={!userGameName || !userGameFields.length} title="Set every UserGame setting on this tab back to its default value" onClick={() => run(() => resetAllToDefaults("game"))}>Restore Defaults</button></div>
       </> : settingsTab === "spicefields" ? <>
         <SpicefieldsEditor
@@ -2377,12 +2418,15 @@ function ChoamTerminalsEditor({
   </section>;
 }
 
-function SettingsCardGrid({ fields, values, onChange, viewMode = "grid", emptyMessage = "Select a modifier category." }: { fields: UserSettingField[]; values: Record<string, string>; onChange: (id: string, value: string) => void; viewMode?: "grid" | "list"; emptyMessage?: string }) {
+type MatchRegionControl = { fieldId: string; enabled: boolean; available: boolean; regionLabel: string; regionHour?: number; onToggle: (next: boolean) => void };
+
+function SettingsCardGrid({ fields, values, onChange, viewMode = "grid", emptyMessage = "Select a modifier category.", matchRegionControl }: { fields: UserSettingField[]; values: Record<string, string>; onChange: (id: string, value: string) => void; viewMode?: "grid" | "list"; emptyMessage?: string; matchRegionControl?: MatchRegionControl }) {
   if (!fields.length) return <div className="empty">{emptyMessage}</div>;
   if (viewMode === "list") {
     return <div className="settings-list-wrap"><table className="settings-list-table"><thead><tr><th>Modifier</th><th>Setting Key</th><th>Value</th></tr></thead><tbody>{fields.map((field) => {
       const value = values[field.id] ?? field.default ?? "";
       const modified = isModifiedFromDefault(field, value);
+      const matchRegion = matchRegionControl?.fieldId === field.id ? matchRegionControl : undefined;
       return <Fragment key={field.id}>
         {(field.clientFile || modified) && <tr className="settings-list-badge-row"><td colSpan={3}>
           {field.clientFile && <span className="badge badge-info settings-list-badge" title={`Also requires updating the client's ${field.clientFile}.`}>Client &quot;{field.clientFile}&quot;</span>}
@@ -2391,13 +2435,42 @@ function SettingsCardGrid({ fields, values, onChange, viewMode = "grid", emptyMe
         <tr>
           <td><strong>{friendlySettingLabel(field.id, field.key || field.id, field.label)}</strong><small>{fieldCategory(field)}</small></td>
           <td>{field.key || field.id}</td>
-          <td><SettingInput field={field} value={value} inputId={`setting-list-${field.scope}-${field.id}`} onChange={(nextValue) => onChange(field.id, nextValue)} /></td>
+          <td>
+            {matchRegion && <MatchRegionToggle control={matchRegion} idPrefix={`setting-list-${field.scope}`} />}
+            <SettingInput field={field} value={value} inputId={`setting-list-${field.scope}-${field.id}`} onChange={(nextValue) => onChange(field.id, nextValue)} disabled={matchRegion?.enabled} />
+          </td>
         </tr>
         {field.description && <tr className="settings-list-description-row"><td colSpan={3}><span className="settings-field-description"><Info size={14} aria-hidden="true" /><span className="settings-field-description-text">{field.description}</span></span></td></tr>}
       </Fragment>;
     })}</tbody></table></div>;
   }
-  return <div className="settings-grid settings-grid-roomy">{fields.map((field) => <SettingControl key={field.id} field={field} value={values[field.id] ?? field.default ?? ""} onChange={(value) => onChange(field.id, value)} />)}</div>;
+  return <div className="settings-grid settings-grid-roomy">{fields.map((field) => <SettingControl key={field.id} field={field} value={values[field.id] ?? field.default ?? ""} onChange={(value) => onChange(field.id, value)} matchRegion={matchRegionControl?.fieldId === field.id ? matchRegionControl : undefined} />)}</div>;
+}
+
+// Same visual spec as .bases-rank-segments / .vehicles-rank-segments, under
+// its own settings-scoped class names per this repo's CSS scoping convention.
+function MatchRegionToggle({ control, idPrefix }: { control: MatchRegionControl; idPrefix: string }) {
+  const groupName = `${idPrefix}-${control.fieldId}-match-region`;
+  const title = control.available
+    ? `Set from the deployment's region: ${control.regionLabel}, ${String(control.regionHour ?? "").padStart(2, "0")}:00 UTC.`
+    : `No regional master schedule is defined for ${control.regionLabel || "this deployment's region"} -- set manually.`;
+  return <div className="settings-match-region" title={title}>
+    <span className="settings-match-region-label">Match Region</span>
+    <div className="settings-match-region-segments" role="radiogroup" aria-label="Match Region">
+      {([["On", true], ["Off", false]] as const).map(([label, isOn]) => (
+        <label className="settings-match-region-segment" key={label}>
+          <input
+            type="radio"
+            name={groupName}
+            checked={control.enabled === isOn}
+            disabled={!control.available}
+            onChange={() => control.onToggle(isOn)}
+          />
+          {label}
+        </label>
+      ))}
+    </div>
+  </div>;
 }
 
 function ModifiedBadge({ field, label, onReset }: { field: UserSettingField; label: string; onReset: () => void }) {
@@ -2408,7 +2481,7 @@ function ModifiedBadge({ field, label, onReset }: { field: UserSettingField; lab
   </span>;
 }
 
-function SettingControl({ field, value, onChange }: { field: UserSettingField; value: string; onChange: (value: string) => void }) {
+function SettingControl({ field, value, onChange, matchRegion }: { field: UserSettingField; value: string; onChange: (value: string) => void; matchRegion?: MatchRegionControl }) {
   const label = friendlySettingLabel(field.id, field.key || field.id, field.label);
   const inputId = `setting-${field.scope}-${field.id}`;
   const modified = isModifiedFromDefault(field, value);
@@ -2422,18 +2495,19 @@ function SettingControl({ field, value, onChange }: { field: UserSettingField; v
       <small>{field.key || field.id}</small>
     </div>
     {field.description && <span className="settings-field-description"><Info size={14} aria-hidden="true" /><span className="settings-field-description-text">{field.description}</span></span>}
-    <SettingInput field={field} value={value} inputId={inputId} onChange={onChange} />
+    {matchRegion && <MatchRegionToggle control={matchRegion} idPrefix={`setting-${field.scope}`} />}
+    <SettingInput field={field} value={value} inputId={inputId} onChange={onChange} disabled={matchRegion?.enabled} />
   </label>;
 }
 
-function SettingInput({ field, value, inputId, onChange }: { field: UserSettingField; value: string; inputId: string; onChange: (value: string) => void }) {
+function SettingInput({ field, value, inputId, onChange, disabled }: { field: UserSettingField; value: string; inputId: string; onChange: (value: string) => void; disabled?: boolean }) {
   return field.type === "boolean"
-    ? <select id={inputId} value={normalizeBooleanText(value)} onChange={(event) => onChange(event.target.value)}><option value="True">True</option><option value="False">False</option></select>
+    ? <select id={inputId} value={normalizeBooleanText(value)} disabled={disabled} onChange={(event) => onChange(event.target.value)}><option value="True">True</option><option value="False">False</option></select>
     : field.type === "integer" || field.type === "number"
-      ? <input id={inputId} type="number" step={field.type === "integer" ? "1" : "any"} min={field.minimum ?? undefined} max={field.maximum ?? undefined} value={value} onChange={(event) => onChange(event.target.value)} />
+      ? <input id={inputId} type="number" step={field.type === "integer" ? "1" : "any"} min={field.minimum ?? undefined} max={field.maximum ?? undefined} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
       : String(value).length > 72 || value.includes("(")
-        ? <textarea id={inputId} rows={3} value={value} onChange={(event) => onChange(event.target.value)} />
-        : <input id={inputId} value={value} onChange={(event) => onChange(event.target.value)} />;
+        ? <textarea id={inputId} rows={3} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
+        : <input id={inputId} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />;
 }
 
 export function MemoryUsageBar({ row, fallback, configuredLimit, swapEnabled = false }: { row: LiveMapMemoryRow | null; fallback: string; configuredLimit?: unknown; swapEnabled?: boolean }) {
@@ -2645,6 +2719,18 @@ export function countIniOverrides(content: string) {
 // permanently flagged against a "True"/"False" selection.
 export function isModifiedFromDefault(field: UserSettingField, value: string) {
   return settingValueChanged(field, String(field.default ?? ""), String(value ?? ""));
+}
+
+// Whether the Cycle Start Hour "Match Region" toggle should infer as On for a
+// freshly loaded saved value: never touched (still at its schema default, so
+// there is no admin preference yet) or already saved matching the region's
+// hour. Any other saved value is a deliberate manual choice and must never be
+// silently overwritten, so it infers Off.
+export function coriolisHourMatchesRegionInference(field: UserSettingField | undefined, savedValue: string, regionHour: number | undefined): boolean {
+  if (!field || regionHour === undefined) return false;
+  const fieldDefault = String(field.default ?? "");
+  const resolved = String(savedValue ?? fieldDefault);
+  return resolved === fieldDefault || Number(resolved) === regionHour;
 }
 
 // Pseudo-category listed alongside the real ones, so an admin can see just the
