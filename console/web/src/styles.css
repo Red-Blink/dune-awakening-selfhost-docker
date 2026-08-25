@@ -2534,13 +2534,27 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 .care-package-grant-header .inline-task-result { align-self: center; }
 .advanced-toggle-row { margin: 0; }
 .live-map-view-section { margin-bottom: 16px; }
-.live-map-view-body { display: grid; grid-template-columns: 1fr 3fr; gap: 16px; align-items: start; }
-.live-map-view-controls { display: grid; gap: 10px; align-content: start; }
-.live-map-layout { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 16px; align-items: start; }
+.live-map-view-body { display: grid; gap: 14px; align-items: stretch; }
+.live-map-view-controls { width: 50%; min-width: 600px; display: grid; grid-template-columns: minmax(260px, 1fr) minmax(280px, 1fr); gap: 14px; }
+.live-map-view-field, .live-map-view-summary { min-width: 0; display: grid; align-content: start; gap: 7px; }
+.live-map-view-summary { padding-top: 12px; border-top: 1px solid rgba(214, 185, 140, .13); }
+.live-map-view-label { color: #ceb894; font-size: 13px; font-weight: 700; line-height: 1.2; }
+.live-map-partition-field select { width: 100%; min-width: 0; }
+.live-map-layout {
+  --live-map-sidebar-width: 320px;
+  display: grid;
+  grid-template-columns: var(--live-map-sidebar-width) minmax(0, 1fr);
+  width: min(100%, calc(var(--live-map-sidebar-width) + 16px + 82vh));
+  margin-inline: auto;
+  gap: 16px;
+  align-items: start;
+}
 .live-map-sidebar { display: grid; gap: 12px; }
 .live-map-main { min-width: 0; display: grid; gap: 10px; }
-.live-map-map-buttons { display: grid; gap: 6px; }
+.live-map-map-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
 .live-map-map-buttons button { width: 100%; white-space: normal; min-height: 40px; }
+.live-map-coordinates-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.live-map-coordinates-clear { width: auto; min-height: 30px; padding: 5px 11px; font-size: 12px; }
 .live-map-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .live-map-toolbar button { width: auto; }
 .live-map-toolbar label { display: flex; align-items: center; gap: 8px; width: auto; color: #ceb894; }
@@ -3038,7 +3052,8 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 .live-map-marker-overlay-action { flex: 1 1 0; min-width: 0; padding: 6px 10px; font-size: 12px; }
 .live-map-marker-overlay-teleport { display: grid; gap: 6px; margin-bottom: 8px; }
 .live-map-marker-overlay-teleport select { width: 100%; padding: 6px 8px; font-size: 12px; }
-.live-map-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.live-map-stats { grid-template-columns: repeat(5, minmax(88px, 1fr)); gap: 7px; }
+.live-map-stats .key-value-item { min-height: 56px; padding: 10px 11px; align-content: center; }
 .menu-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 12px 0 18px; }
 .menu-card { justify-content: center; min-height: 48px; white-space: normal; }
 .spaced-section { margin-top: 18px; }
@@ -6033,7 +6048,8 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   .app-shell { grid-template-columns: 224px minmax(0, 1fr); }
   .sidebar { padding-inline: 16px; }
   .catalog-filter-row { grid-template-columns: minmax(240px, 340px) minmax(0, 1fr); }
-  .live-map-layout { grid-template-columns: minmax(260px, 290px) minmax(0, 1fr); }
+  .live-map-layout { --live-map-sidebar-width: 290px; }
+  .live-map-view-controls { width: 70%; min-width: 560px; }
 }
 
 @media (min-width: 901px) and (max-height: 820px) {
@@ -6113,7 +6129,9 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   .sidebar-nav button, .sidebar-nav a { min-height: 44px; }
   .sidebar-addon-children { padding-left: 10px; }
   .sidebar-addon-children button { min-height: 40px; }
-  .live-map-layout { grid-template-columns: 1fr; }
+  .live-map-layout { --live-map-sidebar-width: 0px; width: 100%; grid-template-columns: 1fr; }
+  .live-map-view-controls { width: 100%; min-width: 0; }
+  .live-map-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .live-map-frame { width: 100%; min-width: 0; height: clamp(420px, 62dvh, 700px); min-height: 0; }
   .map-message-schedule-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .deep-desert-layout-section { width: 100%; }
@@ -6283,7 +6301,9 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   .landsraad-milestone-heading-actions { align-items: stretch; flex-direction: column; }
   .memory-swap-panel label select, .memory-swap-panel label input { width: 100%; }
   .memory-swap-metrics { display: grid; grid-template-columns: 1fr; }
+  .live-map-view-controls { grid-template-columns: 1fr; }
   .live-map-map-buttons { grid-template-columns: 1fr; }
+  .live-map-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .live-map-frame { width: 100%; min-width: 0; height: max(320px, 52dvh); }
   .map-message-schedule-heading { align-items: stretch; flex-direction: column; }
   .map-message-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }

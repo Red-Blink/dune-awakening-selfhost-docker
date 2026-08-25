@@ -76,6 +76,28 @@ it("retains static markers during live-only refreshes without carrying them acro
   expect(mergeLiveMapRows(previous, incoming, true, "HaggaBasin")).toEqual(incoming);
 });
 
+it("clears coordinates selected from the map", async () => {
+  const { container } = render(<LiveMapPanel
+    onError={vi.fn()}
+    confirmAction={vi.fn().mockResolvedValue(true)}
+    waitForTask={vi.fn()}
+    taskTechnicalDetails={vi.fn().mockReturnValue("")}
+    onOpenBase={vi.fn()}
+    onOpenVehicle={vi.fn()}
+  />);
+
+  await screen.findByRole("button", { name: "Base: Desert Home" });
+  const frame = container.querySelector(".live-map-frame");
+  expect(frame).not.toBeNull();
+  fireEvent.doubleClick(frame!, { clientX: 100, clientY: 100 });
+
+  const clear = screen.getByRole("button", { name: "Clear" });
+  expect(clear).toBeEnabled();
+  fireEvent.click(clear);
+  expect(clear).toBeDisabled();
+  expect(screen.getByText("Double-click the map to pick world coordinates.")).toBeInTheDocument();
+});
+
 it("shows a base owner and opens that exact base from the marker drawer", async () => {
   const onOpenBase = vi.fn();
   render(<LiveMapPanel

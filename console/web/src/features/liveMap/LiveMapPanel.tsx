@@ -738,22 +738,34 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
       <h4>Map View</h4>
       <div className="live-map-view-body">
         <div className="live-map-view-controls">
-          <div className="live-map-map-buttons">{mapOptions.map((option) => <button key={option.key} className={option.key === mapKey ? "active" : ""} onClick={() => chooseMap(option.key)}>{option.label}</button>)}</div>
-          <label className="compact-select">Partition<select value={partitionId} onChange={(event) => setPartitionId(event.target.value)}><option value="">All Partitions</option>{partitionOptions.map((row) => <option key={`${row.map}-${row.partition_id}`} value={String(row.partition_id)}>{partitionDisplayNames[String(row.partition_id)] || row.name || "Partition"} [{row.partition_id}] ({row.marker_count})</option>)}</select></label>
+          <div className="live-map-view-field live-map-view-map-field">
+            <span className="live-map-view-label">Map</span>
+            <div className="live-map-map-buttons">{mapOptions.map((option) => <button key={option.key} className={option.key === mapKey ? "active" : ""} onClick={() => chooseMap(option.key)}>{option.label}</button>)}</div>
+          </div>
+          <label className="live-map-view-field live-map-partition-field">
+            <span className="live-map-view-label">Partition</span>
+            <select value={partitionId} onChange={(event) => setPartitionId(event.target.value)}><option value="">All Partitions</option>{partitionOptions.map((row) => <option key={`${row.map}-${row.partition_id}`} value={String(row.partition_id)}>{partitionDisplayNames[String(row.partition_id)] || row.name || "Partition"} [{row.partition_id}] ({row.marker_count})</option>)}</select>
+          </label>
         </div>
-        <div className="key-value-grid live-map-stats">
-          <div className="key-value-item"><span>Visible</span><strong>{visible.length}</strong></div>
-          <div className="key-value-item"><span>In Bounds</span><strong>{inBounds.length}</strong></div>
-          <div className="key-value-item"><span>Zoom</span><strong>{zoomDisplayPercent}%</strong></div>
-          {coriolisSeed && <div className="key-value-item"><span>Coriolis Seed</span><strong>{coriolisSeedNumber(coriolisSeed)}</strong></div>}
-          {coriolisNextCycleAt && <div className="key-value-item"><span>Coriolis Countdown</span><strong>{formatCoriolisCountdown(coriolisNextCycleAt, now)}</strong></div>}
+        <div className="live-map-view-summary">
+          <span className="live-map-view-label">Overview</span>
+          <div className="key-value-grid live-map-stats">
+            <div className="key-value-item"><span>Visible</span><strong>{visible.length}</strong></div>
+            <div className="key-value-item"><span>In Bounds</span><strong>{inBounds.length}</strong></div>
+            <div className="key-value-item"><span>Zoom</span><strong>{zoomDisplayPercent}%</strong></div>
+            {coriolisSeed && <div className="key-value-item"><span>Coriolis Seed</span><strong>{coriolisSeedNumber(coriolisSeed)}</strong></div>}
+            {coriolisNextCycleAt && <div className="key-value-item"><span>Coriolis Countdown</span><strong>{formatCoriolisCountdown(coriolisNextCycleAt, now)}</strong></div>}
+          </div>
         </div>
       </div>
     </section>
     <div className="live-map-layout">
       <aside className="live-map-sidebar">
         <section className="action-section">
-          <h4>Coordinates</h4>
+          <div className="live-map-coordinates-header">
+            <h4>Coordinates</h4>
+            <button type="button" className="live-map-coordinates-clear" disabled={!target} onClick={() => setTarget(null)}>Clear</button>
+          </div>
           {target ? <KeyValueGrid items={[["X", target.x.toFixed(0)], ["Y", target.y.toFixed(0)], ["Partition", partitionId || "All"]]} /> : <p className="muted">Double-click the map to pick world coordinates.</p>}
         </section>
         <section className="action-section">
