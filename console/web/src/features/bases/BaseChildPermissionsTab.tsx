@@ -198,8 +198,18 @@ export function BaseChildPermissionsTab({ baseId, baseName, confirmAction, onErr
     setStatus("");
     setStatusKind("");
     try {
-      const response = await basesApi.setChildAccess(baseId, updates);
-      setStatus(response.result?.message || "Access levels were updated.");
+      // The server caps a single call at 100 pieces; a base can carry up to
+      // ~300, so a large bulk apply must be split into sequential batches.
+      const batches = [];
+      for (let i = 0; i < updates.length; i += 100) batches.push(updates.slice(i, i + 100));
+      let totalUpdated = 0;
+      let lastMessage = "";
+      for (const batch of batches) {
+        const response = await basesApi.setChildAccess(baseId, batch);
+        totalUpdated += response.result?.updated ?? batch.length;
+        lastMessage = response.result?.message || lastMessage;
+      }
+      setStatus(batches.length > 1 ? `${totalUpdated} pieces were updated.` : (lastMessage || "Access levels were updated."));
       setStatusKind("ok");
       await load();
     } catch (error) {
