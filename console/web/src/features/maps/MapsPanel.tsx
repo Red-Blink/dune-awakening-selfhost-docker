@@ -347,7 +347,8 @@ export function MapsPanel({ onError, confirmAction, restartGate, confirmSettings
   const [gameValues, setGameValues] = useState<Record<string, string>>({});
   const [gameDraft, setGameDraft] = useState<Record<string, string>>({});
   const [serverRegion, setServerRegion] = useState("");
-  const [coriolisHourMatchesRegion, setCoriolisHourMatchesRegion] = useState(true);
+  const [coriolisHourManualOverride, setCoriolisHourManualOverride] = useState<boolean | null>(null);
+  const [gameValuesTargetKey, setGameValuesTargetKey] = useState("");
   const [rawEngine, setRawEngine] = useState("");
   const [rawGame, setRawGame] = useState("");
   const [rawEngineOriginal, setRawEngineOriginal] = useState("");
@@ -766,6 +767,13 @@ export function MapsPanel({ onError, confirmAction, restartGate, confirmSettings
     const parsed = parseUserSettingsMap(values.stdout || "");
     setGameValues(parsed);
     setGameDraft(parsed);
+    // userGameName/effectiveUserGamePartitionId flip synchronously on target
+    // selection, one render before this resolves -- this key lets derived
+    // state tell "gameValues is still the previous (or empty) target's" apart
+    // from "gameValues genuinely belongs to what's selected now", which
+    // matters for anything (like Match Region's auto-migration) that must
+    // never act on a stale or not-yet-loaded value.
+    setGameValuesTargetKey(settingsTargetKey(mapName, partitionId || ""));
     setRawGame(raw.content || "");
     setRawGameOriginal(raw.content || "");
   }
@@ -1282,22 +1290,54 @@ export function MapsPanel({ onError, confirmAction, restartGate, confirmSettings
   const coriolisRegionHour = CORIOLIS_REGION_HOURS[serverRegion];
   const coriolisMatchRegionAvailable = coriolisRegionHour !== undefined && userGameFields.some((field) => field.id === CORIOLIS_CYCLE_START_HOUR_FIELD_ID);
   const coriolisHourDraftValue = gameDraft[CORIOLIS_CYCLE_START_HOUR_FIELD_ID];
+  // userGameName/effectiveUserGamePartitionId flip synchronously the instant a
+  // target is picked, one render before loadSelectedSettings's async fetch
+  // resolves and actually updates gameValues/gameDraft for it. Without this,
+  // that in-between render sees the *previous* target's (or the initial
+  // empty) gameValues while userGameName already points at the new one --
+  // read as "field untouched" -- and the effects below would flicker the
+  // toggle, or worse, have the migration effect fire a save from data that
+  // was never this target's to begin with.
+  const gameValuesReady = Boolean(userGameName) && gameValuesTargetKey === userGameTargetKey;
+  // Derived synchronously (not useState+useEffect) so it's never one render
+  // behind gameValues/gameDraft -- a state+effect version briefly rendered a
+  // just-loaded custom hour as locked/disabled under its stale previous
+  // value before the correcting effect caught up on the next tick.
+  // coriolisHourManualOverride is null (follow the inference) until the
+  // admin actually clicks the toggle this session; see the reset effect
+  // below for why it can't just live as this const's own state.
+  // Before real data has loaded there is nothing to infer from, so this must
+  // default to false (unlocked), not true -- a true default would render the
+  // field as locked-to-region for one paint even for a target whose saved
+  // hour is a deliberate manual value, which is exactly the false claim the
+  // rest of this feature exists to avoid making.
+  const coriolisHourInferredMatchesRegion = gameValuesReady
+    ? coriolisHourMatchesRegionInference(schema?.game.find((candidate) => candidate.id === CORIOLIS_CYCLE_START_HOUR_FIELD_ID), gameValues[CORIOLIS_CYCLE_START_HOUR_FIELD_ID], coriolisRegionHour)
+    : false;
+  const coriolisHourMatchesRegion = coriolisHourManualOverride ?? coriolisHourInferredMatchesRegion;
   useEffect(() => {
-    // Re-infer whenever a target's saved values (re)load.
-    if (!userGameName) return;
-    const field = schema?.game.find((candidate) => candidate.id === CORIOLIS_CYCLE_START_HOUR_FIELD_ID);
-    const regionHour = CORIOLIS_REGION_HOURS[serverRegion];
-    setCoriolisHourMatchesRegion(coriolisHourMatchesRegionInference(field, gameValues[CORIOLIS_CYCLE_START_HOUR_FIELD_ID], regionHour));
-  }, [gameValues, schema, serverRegion, userGameName]);
+    // A manual toggle choice is scoped to the target it was made for --
+    // switching targets re-infers fresh rather than carrying it over.
+    setCoriolisHourManualOverride(null);
+  }, [userGameTargetKey]);
   useEffect(() => {
     // While On, keep the draft pinned to the region's hour -- covers both a
     // manual toggle flip and a target switch landing on a different saved value.
+    if (!gameValuesReady || !coriolisHourMatchesRegion) return;
     const regionHour = CORIOLIS_REGION_HOURS[serverRegion];
-    if (!coriolisHourMatchesRegion || regionHour === undefined) return;
+    if (regionHour === undefined) return;
     const desired = String(regionHour);
     if (coriolisHourDraftValue === desired) return;
     setGameDraft((current) => ({ ...current, [CORIOLIS_CYCLE_START_HOUR_FIELD_ID]: desired }));
-  }, [coriolisHourMatchesRegion, serverRegion, coriolisHourDraftValue]);
+  }, [gameValuesReady, coriolisHourMatchesRegion, serverRegion, coriolisHourDraftValue]);
+  // A scope that has never had this field saved at all gets the region's
+  // hour written once, server-side, at startup (migrate_coriolis_region_hour
+  // in usersettings.py, invoked from server.js) -- not from here. Doing it
+  // client-side meant "browse a target" silently issued a write with no
+  // confirmation, pinned whichever scope happened to be open (breaking
+  // Global -> Map -> Partition inheritance), and could never distinguish
+  // "unset" from "explicitly saved to equal the schema default", which on a
+  // Europe deployment (region hour == schema default) looped forever.
   const gameGroups = groupSettingsFields(userGameFields, true, modifiedSettingsFields(userGameFields, gameValues, gameDraft));
   const activeGameCategory = gameGroups.some(([category]) => category === selectedGameCategory) ? selectedGameCategory : gameGroups[0]?.[0] || "";
   const activeGameFields = activeGameCategory === "All" ? userGameFields : gameGroups.find(([category]) => category === activeGameCategory)?.[1] || [];
@@ -2269,7 +2309,7 @@ export function MapsPanel({ onError, confirmAction, restartGate, confirmSettings
             </div>
           </div>
         </div>
-        {userGameName && <SettingsCardGrid fields={filteredGameFields} values={gameDraft} onChange={(id, value) => setGameDraft({ ...gameDraft, [id]: value })} viewMode={modifierViewMode} emptyMessage={modifierEmptyMessage(!!schema, userGameFields.length, modifierFilter, activeGameCategory)} matchRegionControl={{ fieldId: CORIOLIS_CYCLE_START_HOUR_FIELD_ID, enabled: coriolisHourMatchesRegion, available: coriolisMatchRegionAvailable, regionLabel: serverRegion, regionHour: coriolisRegionHour, onToggle: setCoriolisHourMatchesRegion }} />}
+        {userGameName && <SettingsCardGrid fields={filteredGameFields} values={gameDraft} onChange={(id, value) => setGameDraft({ ...gameDraft, [id]: value })} viewMode={modifierViewMode} emptyMessage={modifierEmptyMessage(!!schema, userGameFields.length, modifierFilter, activeGameCategory)} matchRegionControl={{ fieldId: CORIOLIS_CYCLE_START_HOUR_FIELD_ID, enabled: coriolisHourMatchesRegion, available: coriolisMatchRegionAvailable, regionLabel: serverRegion, regionHour: coriolisRegionHour, onToggle: setCoriolisHourManualOverride }} />}
         <div className="action-row"><button disabled={!gameDirty.length || !userGameName} onClick={() => run(saveGame)}>Save</button><button disabled={!gameDirty.length} onClick={() => setGameDraft(gameValues)}>Discard Changes</button><button className="settings-reset-all-button" disabled={!userGameName || !userGameFields.length} title="Set every UserGame setting on this tab back to its default value" onClick={() => run(() => resetAllToDefaults("game"))}>Restore Defaults</button></div>
       </> : settingsTab === "spicefields" ? <>
         <SpicefieldsEditor
@@ -2485,19 +2525,24 @@ function SettingControl({ field, value, onChange, matchRegion }: { field: UserSe
   const label = friendlySettingLabel(field.id, field.key || field.id, field.label);
   const inputId = `setting-${field.scope}-${field.id}`;
   const modified = isModifiedFromDefault(field, value);
-  return <label className="settings-field" htmlFor={inputId}>
+  // A plain <div> here, not <label htmlFor>: the Match Region toggle below renders its
+  // own <label> per radio segment, and a <label> cannot legally contain another <label>
+  // -- harmless in practice (browsers still route clicks correctly; confirmed empirically
+  // during review), but not a spec-valid document. The field name stays clickable via its
+  // own inner <label> instead.
+  return <div className="settings-field">
     <div className="settings-field-heading">
       {(field.clientFile || modified) && <span className="settings-field-badges">
         {field.clientFile && <span className="badge badge-info" title={`Also requires updating the client's ${field.clientFile}.`}>Client &quot;{field.clientFile}&quot;</span>}
         {modified && <ModifiedBadge field={field} label={label} onReset={() => onChange(field.default ?? "")} />}
       </span>}
-      <strong>{label}</strong>
+      <label htmlFor={inputId}><strong>{label}</strong></label>
       <small>{field.key || field.id}</small>
     </div>
     {field.description && <span className="settings-field-description"><Info size={14} aria-hidden="true" /><span className="settings-field-description-text">{field.description}</span></span>}
     {matchRegion && <MatchRegionToggle control={matchRegion} idPrefix={`setting-${field.scope}`} />}
     <SettingInput field={field} value={value} inputId={inputId} onChange={onChange} disabled={matchRegion?.enabled} />
-  </label>;
+  </div>;
 }
 
 function SettingInput({ field, value, inputId, onChange, disabled }: { field: UserSettingField; value: string; inputId: string; onChange: (value: string) => void; disabled?: boolean }) {
@@ -2722,15 +2767,18 @@ export function isModifiedFromDefault(field: UserSettingField, value: string) {
 }
 
 // Whether the Cycle Start Hour "Match Region" toggle should infer as On for a
-// freshly loaded saved value: never touched (still at its schema default, so
-// there is no admin preference yet) or already saved matching the region's
-// hour. Any other saved value is a deliberate manual choice and must never be
-// silently overwritten, so it infers Off.
+// freshly loaded saved value: the value already equals the region's hour.
+// Any other saved value -- including the untouched schema default -- is
+// treated as a deliberate value and must never be silently overwritten, so
+// it infers Off. (A scope that has genuinely never had this field saved gets
+// the region's hour written once, server-side, at startup -- see
+// migrate_coriolis_region_hour in usersettings.py -- so by the time this
+// runs "default" and "unset" are no longer the same question.)
 export function coriolisHourMatchesRegionInference(field: UserSettingField | undefined, savedValue: string, regionHour: number | undefined): boolean {
   if (!field || regionHour === undefined) return false;
   const fieldDefault = String(field.default ?? "");
   const resolved = String(savedValue ?? fieldDefault);
-  return resolved === fieldDefault || Number(resolved) === regionHour;
+  return Number(resolved) === regionHour;
 }
 
 // Pseudo-category listed alongside the real ones, so an admin can see just the

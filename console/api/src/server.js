@@ -216,6 +216,9 @@ createServer(async (req, res) => {
   ensureExchangeHistory(db).catch((error) => {
     console.warn(`Market transaction recorder initialization failed: ${redact(error?.message || "Unexpected error.")}`);
   });
+  migrateCoriolisRegionCycleStartHour().catch((error) => {
+    console.warn(`Coriolis Cycle Start Hour region migration deferred: ${redact(error?.message || "Unexpected error.")}`);
+  });
   runBackgroundTick("Player playtime tracker", () => duneDb.trackPlayerPlaytime(db));
 });
 
@@ -5106,6 +5109,27 @@ function readSetupConfigValues() {
     }
   }
   return values;
+}
+
+// One-time, idempotent migration: if this deployment's SERVER_REGION has a known
+// Coriolis master hour and the global Cycle Start Hour has never been explicitly
+// saved, write it once. Deliberately server-side and global-scope-only, not driven
+// by the Maps UI -- an earlier version fired this from a frontend effect keyed off
+// "field still at its schema default", which could not tell "never saved" from
+// "explicitly saved to the default" (looping forever on a Europe deployment, whose
+// region hour equals the default) and pinned whichever scope an admin happened to
+// have open (breaking Global -> Map -> Partition inheritance). Idempotency here is
+// by ini-key presence (checked in Python), never by value, so it is safe to call on
+// every startup. Mirrors the fire-and-forget migration pattern already used for
+// initializeDiscordAdapterSchema/ensureExchangeHistory below.
+async function migrateCoriolisRegionCycleStartHour() {
+  const region = readSetupConfigValues().SERVER_REGION || "";
+  if (!region) return;
+  const result = await runDune(config, buildDuneArgs("userSettingsMigrateCoriolisRegionHour", { region }), { timeoutMs: 8000 });
+  const [status, detail] = String(result.stdout || "").trim().split(":");
+  if (status !== "migrated") return;
+  audit(config, null, "maps.user-settings.auto-migrate", { scope: "global", field: "coriolis_cycle_start_hour", value: detail, region });
+  markDeferredRestartPending(config, "Coriolis Cycle Start Hour (region default)");
 }
 
 function readEnvFileValue(key) {

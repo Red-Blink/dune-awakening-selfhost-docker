@@ -58,6 +58,13 @@ does (`start-all.sh`), which every restart path (manual, scheduled,
 IP-change) ultimately runs. This mirrors the existing Landsraad "Pending
 Restart" indicator, generalized to any UserEngine/UserGame save.
 
+The same indicator can also appear with no admin action at all: on first
+startup, if `SERVER_REGION` maps to a known Coriolis master schedule and the
+global Cycle Start Hour has never been explicitly saved, the console seeds it
+once and marks the same deferred-restart indicator ("Coriolis Cycle Start
+Hour (region default)"). This is a one-time migration, not a recurring
+background write — restart at your convenience like any other deferred save.
+
 ## Enabling and configuring
 
 Open **Admin Tools → Schedule Server Restart** and turn on **Restart Queue**.

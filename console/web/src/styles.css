@@ -6037,6 +6037,7 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 .settings-field-description svg { flex-shrink: 0; margin-top: 1px; color: var(--accent); }
 .settings-field-description-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .settings-field input, .settings-field select, .settings-field textarea, .raw-editor-card textarea { width: 100%; }
+.settings-field input:disabled, .settings-field select:disabled, .settings-list-table input:disabled, .settings-list-table select:disabled { opacity: .6; cursor: not-allowed; }
 
 /* Same visual spec as .bases-rank-segments / .vehicles-rank-segments, under
    its own settings-scoped class names per this repo's CSS scoping convention. */
@@ -6058,6 +6059,7 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 0;
   min-height: 28px;
   padding: 0 10px;
   border-left: 1px solid var(--border);
@@ -6070,7 +6072,7 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
   user-select: none;
 }
 .settings-match-region-segment:first-child { border-left: 0; }
-.settings-match-region-segment input {
+.settings-match-region-segments .settings-match-region-segment input {
   position: absolute;
   inset: 0;
   margin: 0;
@@ -6120,6 +6122,7 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 .settings-list-description-row td { padding-top: 0; }
 .settings-list-table input, .settings-list-table select, .settings-list-table textarea { width: 100%; margin-top: -10px; }
 .settings-list-table tr.settings-list-badge-row + tr input, .settings-list-table tr.settings-list-badge-row + tr select, .settings-list-table tr.settings-list-badge-row + tr textarea { margin-top: 0; }
+.settings-list-table .settings-match-region + input, .settings-list-table .settings-match-region + select, .settings-list-table .settings-match-region + textarea { margin-top: 0; }
 .spicefields-table { min-width: 980px; }
 .spicefields-table th:nth-child(n), .spicefields-table td:nth-child(n) { width: auto; }
 .spicefields-table th:nth-child(1), .spicefields-table td:nth-child(1) { width: 18%; }
@@ -6608,6 +6611,11 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   input[type="checkbox"], input[type="radio"] { min-height: 22px; min-width: 22px; }
   .col-resize-handle { display: none; }
   .memory-info-button, .addon-description-toggle { min-width: 44px; min-height: 44px; }
+  /* .settings-match-region-segment is a <label>, not one of the tags the generic
+     button/input/select rule above targets, so its 28px segments are otherwise
+     untouched by this media query. */
+  .settings-match-region-segments { height: 44px; }
+  .settings-match-region-segment { min-height: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -43,8 +43,19 @@ vi.mock("../../api/setup", () => ({
 
 vi.mock("../../lib/usePendingRefills", () => ({
   usePendingRefills: () => ({ pending: null, refresh: () => {} }),
+  usePendingQueues: () => ({
+    fuel: { pending: null, refresh: () => {} },
+    water: { pending: null, refresh: () => {} },
+    deletes: { pending: null, refresh: () => {} },
+    vehicleDeletes: { pending: null, refresh: () => {} },
+    permissions: { pending: null, refresh: () => {} }
+  }),
   pendingRefillCountForMap: () => 0,
-  pendingRefillCountForPartition: () => 0
+  pendingRefillCountForPartition: () => 0,
+  vehicleDeleteCountForMap: () => 0,
+  vehicleDeleteCountForPartition: () => 0,
+  childAccessPieceCountForMap: () => 0,
+  childAccessPieceCountForPartition: () => 0
 }));
 
 const CORIOLIS_CYCLE_START_HOUR_FIELD = {
@@ -83,33 +94,46 @@ async function openUserGameGlobalTab(api: Record<string, ReturnType<typeof vi.fn
   await waitFor(() => expect(api.userGame).toHaveBeenCalled());
 }
 
+function mockCoriolisHour(api: Record<string, ReturnType<typeof vi.fn>>, savedHour: string) {
+  api.userGame.mockResolvedValue({ stdout: `coriolis_cycle_start_hour\t${savedHour}\n`, exitCode: 0 });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe("coriolisHourMatchesRegionInference", () => {
-  it("is On when the saved value is still at the schema default", () => {
-    expect(coriolisHourMatchesRegionInference(CORIOLIS_CYCLE_START_HOUR_FIELD as never, "5", 11)).toBe(true);
-  });
   it("is On when the saved value already matches the region's hour", () => {
     expect(coriolisHourMatchesRegionInference(CORIOLIS_CYCLE_START_HOUR_FIELD as never, "11", 11)).toBe(true);
   });
-  it("is Off for a deliberate manual value that differs from both", () => {
+  it("is Off when the saved value is still at the untouched schema default and the default isn't the region's hour", () => {
+    // The default no longer implies "unset -- go ahead and lock it": a scope this
+    // young gets the region's hour written once, server-side, before the frontend
+    // ever sees it (migrate_coriolis_region_hour in usersettings.py). By the time
+    // this runs, a saved 5 on a non-Europe region is either a genuine manual 5 or a
+    // deployment the migration hasn't reached yet -- either way, not this toggle's
+    // call to silently overwrite.
+    expect(coriolisHourMatchesRegionInference(CORIOLIS_CYCLE_START_HOUR_FIELD as never, "5", 11)).toBe(false);
+  });
+  it("is On when the default happens to equal the region's hour", () => {
+    expect(coriolisHourMatchesRegionInference(CORIOLIS_CYCLE_START_HOUR_FIELD as never, "5", 5)).toBe(true);
+  });
+  it("is Off for a deliberate manual value that differs from the region's hour", () => {
     expect(coriolisHourMatchesRegionInference(CORIOLIS_CYCLE_START_HOUR_FIELD as never, "14", 11)).toBe(false);
   });
   it("is Off when the region has no defined master hour", () => {
-    expect(coriolisHourMatchesRegionInference(CORIOLIS_CYCLE_START_HOUR_FIELD as never, "5", undefined)).toBe(false);
+    expect(coriolisHourMatchesRegionInference(CORIOLIS_CYCLE_START_HOUR_FIELD as never, "11", undefined)).toBe(false);
   });
 });
 
 describe("MapsPanel Match Region toggle", () => {
-  it("locks the field to the region's hour when the saved value is untouched", async () => {
+  it("locks the field when the saved value already matches the region's hour", async () => {
     const api = mapsApi as unknown as Record<string, ReturnType<typeof vi.fn>>;
     api.userSettingsSchema.mockResolvedValue({
       engine: [], mapEngine: [], partitionEngine: [], partition: [],
       game: [CORIOLIS_CYCLE_START_HOUR_FIELD]
     });
-    api.userGame.mockResolvedValue({ stdout: "coriolis_cycle_start_hour\t5\n", exitCode: 0 });
+    mockCoriolisHour(api, "11");
     (setupApi.state as ReturnType<typeof vi.fn>).mockResolvedValue({
       files: {}, config: {}, serverConfig: { SERVER_REGION: "North America" }
     });
@@ -119,6 +143,28 @@ describe("MapsPanel Match Region toggle", () => {
     const hourInput = await screen.findByDisplayValue("11");
     expect(hourInput).toBeDisabled();
     expect(screen.getByRole("radio", { name: "On" })).toBeChecked();
+    // Migration is server-side only (see server.js's migrateCoriolisRegionCycleStartHour)
+    // -- merely opening this tab must never issue a write of its own.
+    expect(api.saveUserSettings).not.toHaveBeenCalled();
+  });
+
+  it("leaves an untouched (still-default) hour editable rather than locking or saving it", async () => {
+    const api = mapsApi as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    api.userSettingsSchema.mockResolvedValue({
+      engine: [], mapEngine: [], partitionEngine: [], partition: [],
+      game: [CORIOLIS_CYCLE_START_HOUR_FIELD]
+    });
+    mockCoriolisHour(api, "5");
+    (setupApi.state as ReturnType<typeof vi.fn>).mockResolvedValue({
+      files: {}, config: {}, serverConfig: { SERVER_REGION: "North America" }
+    });
+
+    await openUserGameGlobalTab(api);
+
+    const hourInput = await screen.findByDisplayValue("5");
+    expect(hourInput).toBeEnabled();
+    expect(screen.getByRole("radio", { name: "Off" })).toBeChecked();
+    expect(api.saveUserSettings).not.toHaveBeenCalled();
   });
 
   it("leaves an existing custom hour editable and does not overwrite it", async () => {
@@ -127,7 +173,7 @@ describe("MapsPanel Match Region toggle", () => {
       engine: [], mapEngine: [], partitionEngine: [], partition: [],
       game: [CORIOLIS_CYCLE_START_HOUR_FIELD]
     });
-    api.userGame.mockResolvedValue({ stdout: "coriolis_cycle_start_hour\t14\n", exitCode: 0 });
+    mockCoriolisHour(api, "14");
     (setupApi.state as ReturnType<typeof vi.fn>).mockResolvedValue({
       files: {}, config: {}, serverConfig: { SERVER_REGION: "North America" }
     });
@@ -137,6 +183,7 @@ describe("MapsPanel Match Region toggle", () => {
     const hourInput = await screen.findByDisplayValue("14");
     expect(hourInput).toBeEnabled();
     expect(screen.getByRole("radio", { name: "Off" })).toBeChecked();
+    expect(api.saveUserSettings).not.toHaveBeenCalled();
   });
 
   it("switches to manual editing when the toggle is turned Off", async () => {
@@ -145,7 +192,7 @@ describe("MapsPanel Match Region toggle", () => {
       engine: [], mapEngine: [], partitionEngine: [], partition: [],
       game: [CORIOLIS_CYCLE_START_HOUR_FIELD]
     });
-    api.userGame.mockResolvedValue({ stdout: "coriolis_cycle_start_hour\t5\n", exitCode: 0 });
+    mockCoriolisHour(api, "11");
     (setupApi.state as ReturnType<typeof vi.fn>).mockResolvedValue({
       files: {}, config: {}, serverConfig: { SERVER_REGION: "North America" }
     });
@@ -157,5 +204,28 @@ describe("MapsPanel Match Region toggle", () => {
 
     const hourInput = await screen.findByDisplayValue("11");
     expect(hourInput).toBeEnabled();
+  });
+
+  it("pins the draft to the region's hour (without saving) when the toggle is turned On", async () => {
+    const api = mapsApi as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    api.userSettingsSchema.mockResolvedValue({
+      engine: [], mapEngine: [], partitionEngine: [], partition: [],
+      game: [CORIOLIS_CYCLE_START_HOUR_FIELD]
+    });
+    mockCoriolisHour(api, "14");
+    (setupApi.state as ReturnType<typeof vi.fn>).mockResolvedValue({
+      files: {}, config: {}, serverConfig: { SERVER_REGION: "North America" }
+    });
+
+    await openUserGameGlobalTab(api);
+    await screen.findByDisplayValue("14");
+
+    fireEvent.click(screen.getByRole("radio", { name: "On" }));
+
+    const hourInput = await screen.findByDisplayValue("11");
+    expect(hourInput).toBeDisabled();
+    // Pinning the draft is a local edit an explicit Save would apply -- it must
+    // never itself issue a network write.
+    expect(api.saveUserSettings).not.toHaveBeenCalled();
   });
 });
