@@ -195,7 +195,12 @@ h1, h2, h3, h4, h5 { color: var(--title); line-height: 1.2; letter-spacing: 0; }
 .confirm-modal p { margin: 0; color: #e9dcc8; line-height: 1.45; overflow-wrap: anywhere; }
 .confirm-modal-details { display: grid; gap: 8px; margin: 0; }
 .confirm-modal-details div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; align-items: center; }
-.confirm-modal-details dt { color: var(--muted); font-size: 12px; text-transform: uppercase; }
+/* min-width/overflow-wrap: the label column is a fixed 92px so labels line up
+   across rows (each row is its own grid, so the track cannot size to content).
+   Without these a long label -- a base piece name like
+   BloodWaterExtractionAdvanced -- overflows its track and collides with the
+   value beside it instead of wrapping inside it. */
+.confirm-modal-details dt { color: var(--muted); font-size: 12px; text-transform: uppercase; min-width: 0; overflow-wrap: anywhere; }
 .confirm-modal-details dd { margin: 0; overflow-wrap: anywhere; font-weight: 800; }
 .confirm-modal-details dd.accent { color: var(--title); }
 .confirm-modal-details dd.success { color: var(--success-text); }

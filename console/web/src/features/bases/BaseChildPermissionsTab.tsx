@@ -200,7 +200,7 @@ export function BaseChildPermissionsTab({ baseId, baseName, confirmAction, onErr
       {
         title: "Set Base Permissions",
         confirmLabel: "Save Changes",
-        warning: "Changes reach the running map immediately.",
+        warning: "If this base's map is live, changes are queued and applied at its next restart.",
         details: updates.slice(0, 8).map((entry) => {
           const row = rows.find((candidate) => candidate.actorId === entry.actorId);
           return { label: row?.name || entry.actorId, value: ACCESS_LEVEL_LABELS[entry.accessLevel], tone: "accent" as const };
@@ -355,7 +355,7 @@ export function BaseChildPermissionsTab({ baseId, baseName, confirmAction, onErr
 
         {(dirty || status) && <div className="bases-permissions-banner-slot">
           {dirty && <p className="confirm-modal-warning bases-permissions-warning" role="status">
-            Saving writes to the live database and notifies the running map server.
+            Saving writes to the live database, or queues the change if this base's map is currently live.
           </p>}
           {status && <p
             className={`inline-task-result${statusKind ? ` result-${statusKind}` : ""}`}
