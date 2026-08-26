@@ -118,6 +118,27 @@ body is 1-500 characters (the same limits the game's broadcast command
 enforces) — an edit outside those bounds is rejected per-field, in the editor
 and again on save.
 
+## What a restart will flush
+
+Taking a map down is when the base-write queues are applied — queued generator
+refills, water refills, base deletes, and
+[base permission changes](base-child-permissions.md). Every restart
+confirmation therefore carries a **Queued Writes** line naming what this
+particular restart will write, scoped to the targeted partition (or totalled
+across every map for a battlegroup restart).
+
+This is resolved inside `runGatedRestart`, not by each caller, so it reaches
+every surface that can trigger a restart — the Bases queue banner, the Maps
+per-map and per-Sietch controls, the Server battlegroup buttons, the
+per-service Restart, the Landsraad persistent-rules restart, the Maps
+deferred-settings banner, and Admin Tools' **Restart Now**. Several of those
+previously showed nothing about pending writes at all.
+
+The counts are context, not a gate: an unreachable or unsupported queue
+endpoint omits the line rather than blocking a restart. Permission changes are
+counted in **pieces, not bases** — one base with six queued pieces is six
+pending writes.
+
 ## Concurrency rules
 
 Only one of these can be in flight at a time:

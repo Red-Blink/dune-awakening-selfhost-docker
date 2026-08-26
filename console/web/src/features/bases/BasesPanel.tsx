@@ -14,6 +14,7 @@ import { serverApi } from "../../api/server";
 import { setupApi, type Task } from "../../api/setup";
 import { apiDownload } from "../../api/client";
 import { DataTable, type SortDirection } from "../../components/common/DataTable";
+import { QueueBadges, queueCountsSummary, queueCountsTotal, type QueueCounts } from "../../components/common/QueueBadges";
 import { pendingRefillCountForPartition, usePendingBaseDeletes, usePendingChildAccess, usePendingRefills, usePendingWaterRefills } from "../../lib/usePendingRefills";
 import { runGatedRestart, serviceRestartTarget, type RestartGate } from "../server/restartQueueGuard";
 
@@ -1020,7 +1021,7 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
   // flushQueuedGeneratorRefills and flushQueuedWaterRefills unconditionally --
   // so one restart call covers a target with fuel, water, or both queued, and
   // the combined banner below only needs a single handler rather than two.
-  async function handleRestartForCombinedQueue(group: { map: string; partitionId: number; partitionMap: string; dimensionIndex: number; fuelCount: number; waterCount: number; deleteCount: number }) {
+  async function handleRestartForCombinedQueue(group: CombinedQueueTarget) {
     const target = queueRestartTarget(group.partitionMap, group.partitionId, group.dimensionIndex);
     if (target.kind === "none") return;
     const key = `${group.map}|${group.partitionId}`;
@@ -1028,6 +1029,7 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
     if (group.fuelCount) parts.push(`${group.fuelCount} queued generator refill${group.fuelCount === 1 ? "" : "s"}`);
     if (group.waterCount) parts.push(`${group.waterCount} queued water refill${group.waterCount === 1 ? "" : "s"}`);
     if (group.deleteCount) parts.push(`${group.deleteCount} queued base delete${group.deleteCount === 1 ? "" : "s"}`);
+    if (group.permissionCount) parts.push(`${group.permissionCount} queued permission change${group.permissionCount === 1 ? "" : "s"}`);
     onError("");
     const label = group.partitionMap || group.map;
     // Route through the restart queue: when it is enabled and players are online
@@ -1037,7 +1039,7 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
     const gated = await runGatedRestart({
       restartGate,
       label,
-      note: `Applies ${parts.join(" and ")}. Players on this map are disconnected while it restarts.`,
+      note: `Applies ${parts.length > 2 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts.join(" and ")}. Players on this map are disconnected while it restarts.`,
       target: target.kind === "sietch" || target.kind === "respawn" ? { partitionId: target.partitionId } : serviceRestartTarget(target.service),
       dispatch: (opts) => target.kind === "sietch" ? mapsApi.restartSietch(String(target.partitionId), { ...opts, label })
         : target.kind === "respawn" ? mapsApi.respawn(String(target.partitionId), "RESTART MAP", { ...opts, label })
@@ -1072,12 +1074,12 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
         );
         writeRefillStatus(
           stillQueued
-            ? `${label} restarted. Its queued refills and deletes are still queued and will apply once the map is confirmed down.`
-            : `${label} restarted. Any refills and deletes queued for it have been applied.`,
+            ? `${label} restarted. Its queued base writes are still queued and will apply once the map is confirmed down.`
+            : `${label} restarted. Any base writes queued for it have been applied.`,
           "ok"
         );
       } else {
-        const text = `${label} restart ${finished.status}. Its refills are still queued.`;
+        const text = `${label} restart ${finished.status}. Its queued base writes are still queued.`;
         writeRefillStatus(text, "fail");
         onError(text);
       }
@@ -1259,15 +1261,16 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
     }
     return [...byKey.values()];
   })();
-  const combinedQueueTotal = pendingTotal + pendingWaterTotal + pendingDeleteTotal + pendingChildAccessTotal;
+  const combinedQueueCounts: QueueCounts = {
+    fuel: pendingTotal, water: pendingWaterTotal,
+    deletes: pendingDeleteTotal, permissions: pendingChildAccessTotal
+  };
+  const combinedQueueTotal = queueCountsTotal(combinedQueueCounts);
   // The banner's own heading names only the kinds of writes actually queued,
   // so "Refills queued" stays exactly as it read before this feature existed
   // when there is nothing to delete, rather than a permanently generic label.
-  const combinedQueueHeadingParts = [
-    ...(pendingTotal > 0 || pendingWaterTotal > 0 ? ["Refills"] : []),
-    ...(pendingDeleteTotal > 0 ? ["Deletes"] : []),
-    ...(pendingChildAccessTotal > 0 ? ["Permissions"] : [])
-  ];
+  // Shared with the Server panel's battlegroup note so both word it the same.
+  const combinedQueueHeading = queueCountsSummary(combinedQueueCounts);
   // Whether any stale entry actually has a restart button in the list above. A
   // group whose partition does not resolve renders "Restart this map from the
   // Maps tab" instead, so pointing at a button that is not there would be wrong.
@@ -1366,21 +1369,8 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
           {/* Explicit spaces around the badges: they are inline elements, so
               without them the text content reads "Refills queued2 fuel1 water"
               to a screen reader and to anyone copying it. */}
-          {combinedQueueHeadingParts.length > 2
-            ? `${combinedQueueHeadingParts.slice(0, -1).join(", ")} and ${combinedQueueHeadingParts.at(-1)}`
-            : combinedQueueHeadingParts.join(" and ")} queued
-          {pendingTotal > 0 && <> <span className="bases-queue-badge bases-queue-badge-fuel">
-            <Fuel size={13} aria-hidden="true" />{pendingTotal.toLocaleString()} fuel
-          </span></>}
-          {pendingWaterTotal > 0 && <> <span className="bases-queue-badge bases-queue-badge-water">
-            <Droplet size={13} aria-hidden="true" />{pendingWaterTotal.toLocaleString()} water
-          </span></>}
-          {pendingDeleteTotal > 0 && <> <span className="bases-queue-badge bases-queue-badge-delete">
-            <Trash2 size={13} aria-hidden="true" />{pendingDeleteTotal.toLocaleString()} delete{pendingDeleteTotal === 1 ? "" : "s"}
-          </span></>}
-          {pendingChildAccessTotal > 0 && <> <span className="bases-queue-badge bases-queue-badge-permission">
-            <KeyRound size={13} aria-hidden="true" />{pendingChildAccessTotal.toLocaleString()} permission{pendingChildAccessTotal === 1 ? "" : "s"}
-          </span></>}
+          {combinedQueueHeading} queued
+          {" "}<QueueBadges counts={combinedQueueCounts} />
         </p>
         <p className="action-help-note">
           {/* No battlegroup-level advice here: this banner only offers the
@@ -1399,18 +1389,10 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
                 {group.partitionMap && group.partitionMap !== group.map ? ` (${group.partitionMap})` : ""}
                 {group.partitionId ? ` · partition ${group.partitionId}` : ""}
               </span>
-              {group.fuelCount > 0 && <span className="bases-queue-badge bases-queue-badge-fuel">
-                <Fuel size={13} aria-hidden="true" />{group.fuelCount.toLocaleString()}
-              </span>}
-              {group.waterCount > 0 && <span className="bases-queue-badge bases-queue-badge-water">
-                <Droplet size={13} aria-hidden="true" />{group.waterCount.toLocaleString()}
-              </span>}
-              {group.deleteCount > 0 && <span className="bases-queue-badge bases-queue-badge-delete">
-                <Trash2 size={13} aria-hidden="true" />{group.deleteCount.toLocaleString()}
-              </span>}
-              {group.permissionCount > 0 && <span className="bases-queue-badge bases-queue-badge-permission">
-                <KeyRound size={13} aria-hidden="true" />{group.permissionCount.toLocaleString()}
-              </span>}
+              <QueueBadges labels={false} counts={{
+                fuel: group.fuelCount, water: group.waterCount,
+                deletes: group.deleteCount, permissions: group.permissionCount
+              }} />
               {target.kind === "none"
                 ? <span className="muted">Restart this map from the Maps tab</span>
                 : restartingTargets.includes(key)

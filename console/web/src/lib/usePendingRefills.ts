@@ -147,3 +147,44 @@ export function pendingRefillCountForMap(pending: PendingRefills | null, partiti
     .filter((group) => group.partitionMap.trim().toLowerCase() === key)
     .reduce((total, group) => total + group.count, 0);
 }
+
+// The permission queue counts pieces, not bases: one base with six queued
+// pieces is six pending writes, and a restart applies all six. byTarget counts
+// queued bases, so these three read the entries instead -- the count the
+// operator sees must mean the same thing on every surface.
+export function childAccessPieceCount(pending: PendingChildAccess | null) {
+  if (!pending) return 0;
+  return pending.pending.reduce((total, entry) => total + entry.updates.length, 0);
+}
+
+export function childAccessPieceCountForPartition(pending: PendingChildAccess | null, partitionId: number) {
+  if (!pending || !partitionId) return 0;
+  return pending.pending
+    .filter((entry) => entry.partitionId === partitionId)
+    .reduce((total, entry) => total + entry.updates.length, 0);
+}
+
+// Mirrors pendingRefillCountForMap's partitionMap matching, but resolves each
+// entry's partition through byTarget first, since an entry only carries its own
+// map name (a different namespace from partitionMap).
+export function childAccessPieceCountForMap(pending: PendingChildAccess | null, partitionMap: string) {
+  const key = String(partitionMap || "").trim().toLowerCase();
+  if (!pending || !key) return 0;
+  const partitions = new Set(pending.byTarget
+    .filter((group) => group.partitionMap.trim().toLowerCase() === key)
+    .map((group) => group.partitionId));
+  return pending.pending
+    .filter((entry) => partitions.has(entry.partitionId))
+    .reduce((total, entry) => total + entry.updates.length, 0);
+}
+
+// One aggregate hook so a surface that offers a restart cannot accidentally
+// poll three of the four queues -- which is exactly how the Server battlegroup
+// note ended up showing fuel and water but never deletes or permissions.
+export function usePendingQueues(enabled = true) {
+  const fuel = usePendingRefills(enabled);
+  const water = usePendingWaterRefills(enabled);
+  const deletes = usePendingBaseDeletes(enabled);
+  const permissions = usePendingChildAccess(enabled);
+  return { fuel, water, deletes, permissions };
+}

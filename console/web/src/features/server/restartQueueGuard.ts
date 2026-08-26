@@ -1,5 +1,8 @@
+import { basesApi } from "../../api/bases";
 import { serverApi, type RestartDispatchResponse, type RestartQueueState, type RestartQueueTarget } from "../../api/server";
 import type { Task } from "../../api/setup";
+import { queueCountsTotal, type QueueCounts } from "../../components/common/QueueBadges";
+import { childAccessPieceCount, childAccessPieceCountForPartition, pendingRefillCountForPartition } from "../../lib/usePendingRefills";
 
 // Result of the restart-queue interception dialog. "immediate" bypasses the
 // queue (the restart runs now); "queue" lets the backend capture it into a
@@ -48,6 +51,49 @@ export function serviceRestartTarget(service: string): RestartQueueTarget | unde
   return undefined;
 }
 
+// What this restart is about to flush, as one dialog detail.
+//
+// Resolved here rather than by each caller so that EVERY restart confirmation
+// reports it -- the per-service Restart, the Landsraad persistent-rules
+// restart, the Maps deferred-settings banner and Admin Tools' "Restart Now"
+// all funnel through runGatedRestart but none of them knew about these
+// queues, so an operator could force a restart with no idea what it would
+// write. A battlegroup-wide restart (no target) totals every map.
+//
+// Best-effort and non-blocking: these counts are context, so a failed or
+// unsupported queue endpoint returns undefined rather than obstructing a
+// restart the operator has already decided to run.
+async function queuedWritesDetail(target?: RestartQueueTarget): Promise<RestartGateDetail | undefined> {
+  const [fuel, water, deletes, permissions] = await Promise.all([
+    basesApi.pendingRefills().catch(() => null),
+    basesApi.pendingWaterRefills().catch(() => null),
+    basesApi.pendingDeletes().catch(() => null),
+    basesApi.pendingChildAccess().catch(() => null)
+  ]);
+  const partitionId = Number(target?.partitionId || 0);
+  const counts: QueueCounts = partitionId
+    ? {
+      fuel: pendingRefillCountForPartition(fuel, partitionId),
+      water: pendingRefillCountForPartition(water, partitionId),
+      deletes: pendingRefillCountForPartition(deletes, partitionId),
+      permissions: childAccessPieceCountForPartition(permissions, partitionId)
+    }
+    : {
+      fuel: fuel?.total || 0,
+      water: water?.total || 0,
+      deletes: deletes?.total || 0,
+      permissions: childAccessPieceCount(permissions)
+    };
+  if (!queueCountsTotal(counts)) return undefined;
+  const parts = [
+    ...(counts.fuel ? [`${counts.fuel} generator refill${counts.fuel === 1 ? "" : "s"}`] : []),
+    ...(counts.water ? [`${counts.water} water refill${counts.water === 1 ? "" : "s"}`] : []),
+    ...(counts.deletes ? [`${counts.deletes} base delete${counts.deletes === 1 ? "" : "s"}`] : []),
+    ...(counts.permissions ? [`${counts.permissions} permission change${counts.permissions === 1 ? "" : "s"}`] : [])
+  ];
+  return { label: "Queued Writes", value: parts.join(", "), tone: "accent" };
+}
+
 export type GatedRestartResult =
   | { outcome: "cancelled" }
   | { outcome: "queued"; online: number; state?: RestartQueueState }
@@ -72,11 +118,16 @@ export async function runGatedRestart(params: {
   target?: RestartQueueTarget;
 }): Promise<GatedRestartResult> {
   let status: Awaited<ReturnType<typeof serverApi.restartQueue>> | null = null;
-  try {
-    status = await serverApi.restartQueue(params.target);
-  } catch {
-    status = null;
-  }
+  const [statusResult, queuedWrites] = await Promise.all([
+    serverApi.restartQueue(params.target).catch(() => null),
+    queuedWritesDetail(params.target).catch(() => undefined)
+  ]);
+  status = statusResult;
+  // Appended, not prepended: a caller's own details describe the restart being
+  // confirmed, and this is additional context about what it will flush. A
+  // caller that already spells the counts out in its note (the Bases queue
+  // banner) still gets them here in the same shape as every other surface.
+  const details = queuedWrites ? [...(params.details || []), queuedWrites] : params.details;
   const choice = await params.restartGate({
     label: params.label,
     enabled: status?.settings.enabled ?? false,
@@ -85,7 +136,7 @@ export async function runGatedRestart(params: {
     mapScoped: Boolean(params.target),
     countdownMinutes: status?.settings.defaultCountdownMinutes ?? 15,
     note: params.note,
-    details: params.details
+    details
   });
   if (choice === "cancel") return { outcome: "cancelled" };
   const response = await params.dispatch({ immediate: choice === "immediate" });

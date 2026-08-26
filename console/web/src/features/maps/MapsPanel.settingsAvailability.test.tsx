@@ -42,8 +42,16 @@ vi.mock("../../api/setup", () => ({
 
 vi.mock("../../lib/usePendingRefills", () => ({
   usePendingRefills: () => ({ pending: null, refresh: () => {} }),
+  usePendingQueues: () => ({
+    fuel: { pending: null, refresh: () => {} },
+    water: { pending: null, refresh: () => {} },
+    deletes: { pending: null, refresh: () => {} },
+    permissions: { pending: null, refresh: () => {} }
+  }),
   pendingRefillCountForMap: () => 0,
-  pendingRefillCountForPartition: () => 0
+  pendingRefillCountForPartition: () => 0,
+  childAccessPieceCountForMap: () => 0,
+  childAccessPieceCountForPartition: () => 0
 }));
 
 function renderMapsPanel() {

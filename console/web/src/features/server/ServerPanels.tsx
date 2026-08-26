@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { Droplet, Fuel, Play, Trash2 } from "lucide-react";
+import { Play, Trash2 } from "lucide-react";
 import { serverApi, type PerformanceSnapshot } from "../../api/server";
 import { runGatedRestart, serviceRestartTarget, type RestartGate } from "./restartQueueGuard";
 import { setupApi, type Task } from "../../api/setup";
@@ -11,7 +11,8 @@ import { KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/com
 import { formatDisplayValue, formatUiSentence, friendlyColumnName, stripAnsi, summarizeCommandText, titleCase } from "../../lib/display";
 import { friendlyServiceName } from "../../lib/serviceDisplay";
 import { conciseTaskError, funcomTokenMismatchDetected } from "../../lib/taskDisplay";
-import { usePendingRefills, usePendingWaterRefills } from "../../lib/usePendingRefills";
+import { QueueBadges, queueCountsSummary, queueCountsTotal, type QueueCounts } from "../../components/common/QueueBadges";
+import { childAccessPieceCount, usePendingQueues } from "../../lib/usePendingRefills";
 
 export type HomeLoadResult = { statusLoaded: boolean; readinessLoaded: boolean; statusError: string; readinessError: string; statusText: string; readinessText: string };
 export type HomeTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
@@ -22,27 +23,27 @@ export type RestartLifecycleState = { stopObserved: boolean; startObserved: bool
 // step opens a window with Postgres reachable and the map server not yet
 // booted, which the background flush uses. Both battlegroup control rows say so.
 function PendingRefillNote() {
-  const { pending } = usePendingRefills();
-  const { pending: pendingWater } = usePendingWaterRefills();
-  const fuelTotal = pending?.total || 0;
-  const waterTotal = pendingWater?.total || 0;
-  const total = fuelTotal + waterTotal;
+  const { fuel, water, deletes, permissions } = usePendingQueues();
+  // Split per resource rather than reporting one number: every queue flushes on
+  // the same restart, but which one is waiting decides whether an operator goes
+  // looking at generators, water containers, a deleted base, or a permission
+  // change. Same badge vocabulary as the Bases panel's queue banner, from the
+  // same component so the two cannot drift.
+  const counts: QueueCounts = {
+    fuel: fuel.pending?.total || 0,
+    water: water.pending?.total || 0,
+    deletes: deletes.pending?.total || 0,
+    permissions: childAccessPieceCount(permissions.pending)
+  };
+  const total = queueCountsTotal(counts);
   if (!total) return null;
-  // Split per resource rather than reporting one number: both queues flush on
-  // the same restart, but which one is waiting decides whether an operator
-  // goes looking at generators or at water containers. Same badge vocabulary
-  // as the Bases panel's queue banner.
+  const summary = queueCountsSummary(counts);
   return <p className="action-help-note pending-refill-note">
-    {fuelTotal > 0 && <span className="bases-queue-badge bases-queue-badge-fuel">
-      <Fuel size={13} aria-hidden="true" />{fuelTotal.toLocaleString()} fuel
-    </span>}
-    {waterTotal > 0 && <> <span className="bases-queue-badge bases-queue-badge-water">
-      <Droplet size={13} aria-hidden="true" />{waterTotal.toLocaleString()} water
-    </span></>}
+    <QueueBadges counts={counts} />
     {/* Explicit space: the badges are inline elements, so without it the
         paragraph's text content reads "1 waterrefills queued" to a screen
         reader and to anyone copying it. The CSS margin is visual only. */}
-    {" "}refill{total === 1 ? "" : "s"} queued across all maps. Restarting the battlegroup applies {total === 1 ? "it" : "them"}; stopping leaves {total === 1 ? "it" : "them"} queued.
+    {" "}{summary.toLowerCase()} queued across all maps. Restarting the battlegroup applies {total === 1 ? "it" : "them"}; stopping leaves {total === 1 ? "it" : "them"} queued.
   </p>;
 }
 type ConfirmAction = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }) => Promise<boolean>;
