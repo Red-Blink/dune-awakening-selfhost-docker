@@ -6,6 +6,10 @@ import { errorText } from "../permissions/rosterEditor";
 type Props = {
   baseId: string;
   baseName: string;
+  // capabilities.baseChildAccessQueue -- false on a schema without
+  // dune.world_partition, where saves always write straight through and there
+  // is no queue to poll.
+  queueSupported?: boolean;
   confirmAction: (message: string, options?: {
     title?: string;
     confirmLabel?: string;
@@ -76,7 +80,7 @@ function AccessLevelSegments({ actorId, name, level, disabled, onChange }: {
   );
 }
 
-export function BaseChildPermissionsTab({ baseId, baseName, confirmAction, onError }: Props) {
+export function BaseChildPermissionsTab({ baseId, baseName, queueSupported = false, confirmAction, onError }: Props) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [supported, setSupported] = useState(true);
@@ -90,7 +94,9 @@ export function BaseChildPermissionsTab({ baseId, baseName, confirmAction, onErr
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
   const [statusKind, setStatusKind] = useState<"" | "ok" | "fail">("");
-  const { pending: pendingQueue, refresh: refreshQueue } = usePendingChildAccess();
+  // Gated the same way BasesPanel gates it: with no queue capability there is
+  // nothing to poll for, and the hook would swallow the error every tick.
+  const { pending: pendingQueue, refresh: refreshQueue } = usePendingChildAccess(queueSupported);
 
   // What this base has waiting for its map's next restart, keyed by actorId so
   // a row can show the level it will become without pretending it already is.

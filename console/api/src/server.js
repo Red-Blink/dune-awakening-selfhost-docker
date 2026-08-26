@@ -276,7 +276,9 @@ setInterval(() => {
   if (duneDb.listQueuedBaseDeletes(config.repoRoot).length) {
     runBackgroundTick("Base delete flush", () => flushQueuedBaseDeletes());
   }
-  if (duneDb.listQueuedBaseChildAccess(config.repoRoot).length) {
+  // Size check, not a full parse: this queue carries a payload and can sit
+  // waiting for days -- see hasQueuedBaseChildAccess.
+  if (duneDb.hasQueuedBaseChildAccess(config.repoRoot)) {
     runBackgroundTick("Base permission flush", () => flushQueuedBaseChildAccess());
   }
   if (duneDb.listQueuedVehicleDeletes(config.repoRoot).length) {
@@ -3355,9 +3357,15 @@ const BASE_BACKED_UP_MESSAGE = "This base was picked up into a backup and is no 
 // Refilling fuel/water moments before deleting the base is pointless and
 // pollutes the audit log with writes about to be destroyed anyway. Best
 // effort: a base with nothing queued throws, which is fine to swallow here.
+// Every queue keyed on this base, so a delete does not leave writes aimed at
+// rows that are about to disappear. Child access belongs here too: without it
+// a queued permission change outlives its base and retries until it exhausts
+// its attempts, and the route's baseDeletePending guard can be sidestepped by
+// queueing the permission change first and the delete second.
 function cancelPendingRefillsForBase(baseId) {
   try { duneDb.cancelQueuedGeneratorRefill(config.repoRoot, baseId); } catch {}
   try { duneDb.cancelQueuedWaterRefill(config.repoRoot, baseId); } catch {}
+  try { duneDb.cancelQueuedBaseChildAccess(config.repoRoot, baseId); } catch {}
 }
 
 async function baseDeleteRoute(req, res, path) {
@@ -3396,6 +3404,10 @@ async function baseDeleteRoute(req, res, path) {
       // never called and nothing is touched.
       await runDune(config, buildDuneArgs("backupCreate"), { env: { DB_BACKUP_ORIGIN: "base-delete" } });
       const result = await duneDb.deleteBaseCompletely(db, baseId);
+      // The queued path cancels these before queueing; the immediate path has
+      // to do it after the rows are gone, or a queue entry outlives its base
+      // and retries against ids that no longer resolve.
+      cancelPendingRefillsForBase(baseId);
       return { ...result, backupCreated: true };
     } finally {
       if (!queued) {
@@ -3622,7 +3634,13 @@ async function baseSystemCustodianRoute(req, res, path) {
     const maxPermissions = parseEffectivePermissionLimit(settings.stdout);
     const custodian = await duneDb.permissionSystemCustodian(db);
     if (custodian.canCreate) await ensureCarePackageServerPersona(db);
-    return duneDb.transferBaseToSystemCustodian(db, baseId, maxPermissions);
+    const transferred = await duneDb.transferBaseToSystemCustodian(db, baseId, maxPermissions);
+    // A queued permission change carries no ownership snapshot, so one queued
+    // against the previous owner would otherwise apply to the base after it
+    // changed hands. Discard it rather than replay an authorization decision
+    // that was made about a different owner.
+    try { duneDb.cancelQueuedBaseChildAccess(config.repoRoot, baseId); } catch {}
+    return transferred;
   }, { baseId });
 }
 

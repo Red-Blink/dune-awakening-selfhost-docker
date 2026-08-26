@@ -42,6 +42,9 @@ function renderTab(overrides: Partial<Parameters<typeof BaseChildPermissionsTab>
   const props = {
     baseId: "14346",
     baseName: "Hall of the Iron Fist",
+    // Matches BasesPanel, which passes capabilities.baseChildAccessQueue.
+    // Without it the pending-queue poll is disabled and no queued state loads.
+    queueSupported: true,
     confirmAction: vi.fn().mockResolvedValue(true),
     onError: vi.fn(),
     ...overrides

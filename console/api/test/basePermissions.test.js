@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { setBasePermissions, listBasePermissions, permissionSystemCustodian, transferBaseToSystemCustodian, listBaseChildAccess, setBaseChildAccessLevels, queueBaseChildAccess, listQueuedBaseChildAccess, cancelQueuedBaseChildAccess } from "../src/duneDb.js";
+import { setBasePermissions, listBasePermissions, permissionSystemCustodian, transferBaseToSystemCustodian, listBaseChildAccess, setBaseChildAccessLevels, queueBaseChildAccess, listQueuedBaseChildAccess, cancelQueuedBaseChildAccess, flushBaseChildAccess, hasQueuedBaseChildAccess } from "../src/duneDb.js";
 
 const SUPPORTED_TABLES = ["dune.permission_actor_rank", "dune.permission_actor", "dune.actors", "dune.player_state", "dune.encrypted_player_state", "dune.map_names"];
 const SUPPORTED_FUNCTIONS = [
@@ -519,7 +519,10 @@ test("queueBaseChildAccess merges a second save into the existing entry, last wr
 
 test("queueBaseChildAccess rejects an empty or fully invalid update set", async () => {
   await withTempRepoRoot((repoRoot) => {
-    assert.throws(() => queueBaseChildAccess(repoRoot, { baseId: BASE_ID, updates: [] }), /at least one piece/i);
+    // An empty array is caught by the 1-100 length check that mirrors the
+    // immediate path; a non-empty array of unusable entries falls through to
+    // the post-normalize check.
+    assert.throws(() => queueBaseChildAccess(repoRoot, { baseId: BASE_ID, updates: [] }), /between 1 and 100 pieces/i);
     assert.throws(
       () => queueBaseChildAccess(repoRoot, { baseId: BASE_ID, updates: [{ actorId: "44186", accessLevel: 9 }] }),
       /at least one piece/i);
@@ -547,4 +550,147 @@ test("setBaseChildAccessLevels skips stale pieces only under skipStale, and refu
   await assert.rejects(
     () => setBaseChildAccessLevels(childAccessDb(), BASE_ID, [{ actorId: "999999", accessLevel: 3 }], { skipStale: true }),
     /none of the queued pieces/i);
+});
+
+// A queue-backed db double: world_partition exists, partition 59 is
+// unassigned (so partitionWriteSafe treats it as down), and the child-access
+// query returns the pieces the flush is allowed to touch.
+function flushDb({ childActorIds = ["44186", "44187"], onApply = () => {} } = {}) {
+  const db = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("to_regprocedure")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.world_partition")) {
+        return { rows: [{ partition_id: 59, unassigned: true, connected: false }] };
+      }
+      if (text.includes("with base_entities")) {
+        return { rows: childActorIds.map((actorId) => ({
+          actor_id: actorId, actor_name: `##Piece_${actorId}`, access_level: 3,
+          building_type: "Generator_Placeable", is_child: true
+        })) };
+      }
+      if (text.includes("select a.id::text as actor_id")) {
+        return { rows: [{ actor_id: ACTOR_ID, map: "DeepDesert", map_name_id: 7, partition_id: 59 }] };
+      }
+      if (text.includes("for update")) return { rows: [{ id: ACTOR_ID }], rowCount: 1 };
+      if (text.includes("permission_set_access_level")) {
+        await onApply(values);
+        return { rows: [{}] };
+      }
+      return { rows: [] };
+    },
+    transaction: async (fn) => fn(db)
+  };
+  return db;
+}
+
+test("flushBaseChildAccess applies a queued entry and clears it", async () => {
+  await withTempRepoRoot(async (repoRoot) => {
+    queueBaseChildAccess(repoRoot, {
+      baseId: BASE_ID, map: "DeepDesert", partitionId: 59,
+      updates: [{ actorId: "44186", accessLevel: 5 }]
+    });
+    const result = await flushBaseChildAccess(flushDb(), repoRoot);
+    assert.equal(result.flushed.length, 1);
+    assert.equal(result.flushed[0].ok, true);
+    assert.equal(result.flushed[0].updated, 1);
+    assert.deepEqual(listQueuedBaseChildAccess(repoRoot), []);
+  });
+});
+
+// Regression: queuedAt deliberately survives a merge, so it cannot also be the
+// "is this the payload I flushed?" check. Without the revision guard the save
+// that lands mid-flush is dropped unapplied while the flush reports ok.
+test("flushBaseChildAccess keeps a save that merges in while the entry is being flushed", async () => {
+  await withTempRepoRoot(async (repoRoot) => {
+    queueBaseChildAccess(repoRoot, {
+      baseId: BASE_ID, map: "DeepDesert", partitionId: 59,
+      updates: [{ actorId: "44186", accessLevel: 5 }]
+    });
+    let injected = false;
+    const db = flushDb({
+      onApply: async () => {
+        if (injected) return;
+        injected = true;
+        // The operator saves a different piece while the flush is mid-apply.
+        queueBaseChildAccess(repoRoot, {
+          baseId: BASE_ID, map: "DeepDesert", partitionId: 59,
+          updates: [{ actorId: "44187", accessLevel: 1 }]
+        });
+      }
+    });
+
+    const result = await flushBaseChildAccess(db, repoRoot);
+    assert.equal(result.flushed[0].ok, true);
+
+    const remaining = listQueuedBaseChildAccess(repoRoot);
+    assert.equal(remaining.length, 1, "the merged-in save must survive the flush");
+    assert.ok(
+      remaining[0].updates.some((update) => update.actorId === "44187" && update.accessLevel === 1),
+      "the piece queued mid-flush must still be pending");
+  });
+});
+
+test("queueBaseChildAccess bumps revision on merge but keeps queuedAt", async () => {
+  await withTempRepoRoot((repoRoot) => {
+    const first = queueBaseChildAccess(repoRoot, {
+      baseId: BASE_ID, updates: [{ actorId: "44186", accessLevel: 3 }]
+    });
+    const second = queueBaseChildAccess(repoRoot, {
+      baseId: BASE_ID, updates: [{ actorId: "44187", accessLevel: 3 }]
+    });
+    assert.equal(second.queuedAt, first.queuedAt, "age limit must not reset on re-save");
+    assert.equal(second.revision, first.revision + 1);
+  });
+});
+
+// The immediate path rejects >100; the queue path must not quietly accept more
+// just because the base's map happened to be up.
+test("queueBaseChildAccess enforces the same 1-100 cap as the immediate path", async () => {
+  await withTempRepoRoot((repoRoot) => {
+    const tooMany = Array.from({ length: 101 }, (_, index) => ({ actorId: String(index + 1), accessLevel: 3 }));
+    assert.throws(() => queueBaseChildAccess(repoRoot, { baseId: BASE_ID, updates: tooMany }),
+      /between 1 and 100 pieces/i);
+    assert.deepEqual(listQueuedBaseChildAccess(repoRoot), []);
+  });
+});
+
+test("flushBaseChildAccess leaves an entry queued while its map is live", async () => {
+  await withTempRepoRoot(async (repoRoot) => {
+    queueBaseChildAccess(repoRoot, {
+      baseId: BASE_ID, map: "DeepDesert", partitionId: 59,
+      updates: [{ actorId: "44186", accessLevel: 5 }]
+    });
+    const live = flushDb();
+    const base = live.query;
+    live.query = async (text, values) => {
+      if (text.includes("from dune.world_partition")) {
+        return { rows: [{ partition_id: 59, unassigned: false, connected: true }] };
+      }
+      return base(text, values);
+    };
+    const result = await flushBaseChildAccess(live, repoRoot);
+    assert.deepEqual(result.flushed, []);
+    assert.equal(listQueuedBaseChildAccess(repoRoot).length, 1, "must stay queued while the map is up");
+  });
+});
+
+// The 5s flush tick uses this instead of listing, so it must agree with the
+// list on whether anything is waiting -- an over-eager true costs one wasted
+// pass, but a false negative would silently never flush.
+test("hasQueuedBaseChildAccess agrees with the list without parsing the payload", async () => {
+  await withTempRepoRoot((repoRoot) => {
+    assert.equal(hasQueuedBaseChildAccess(repoRoot), false, "no file yet");
+
+    queueBaseChildAccess(repoRoot, {
+      baseId: BASE_ID, map: "DeepDesert", partitionId: 59,
+      updates: [{ actorId: "44186", accessLevel: 5 }]
+    });
+    assert.equal(hasQueuedBaseChildAccess(repoRoot), true);
+    assert.equal(listQueuedBaseChildAccess(repoRoot).length, 1);
+
+    cancelQueuedBaseChildAccess(repoRoot, BASE_ID);
+    assert.equal(hasQueuedBaseChildAccess(repoRoot), false, "an emptied queue must read as empty");
+    assert.deepEqual(listQueuedBaseChildAccess(repoRoot), []);
+  });
 });

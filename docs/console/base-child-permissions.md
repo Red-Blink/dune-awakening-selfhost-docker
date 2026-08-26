@@ -106,6 +106,35 @@ Queue behavior requires `dune.world_partition` (reported as
 running map from a stopped one, so writes stay immediate, matching how the
 refill and delete queues degrade on an older schema.
 
+### Queue safety
+
+A queued entry is discarded rather than replayed when the base it targets
+stops being the base the operator acted on — deleting the base (queued or
+immediate) and transferring it to the system custodian both cancel it. A
+queued change carries no ownership snapshot, so replaying one across an
+ownership change would apply an authorization decision made about a
+different owner.
+
+Both caps are enforced, not silently applied: one save is 1-100 pieces on
+the queued path exactly as on the immediate path, and a merge that would
+push an entry past 500 total pieces is refused. Truncating instead would
+report success for changes that never get written.
+
+Each entry carries a `revision` that increments on every merge. `queuedAt`
+deliberately survives a merge so re-saving cannot reset the age limit, which
+means it cannot also answer "is this still the payload I flushed?" — without
+the separate revision, a save landing while its entry is mid-flush is
+indistinguishable from the one being flushed and is dropped unapplied. The
+flush also re-checks map liveness per entry rather than once per pass, since
+applying an entry takes several round-trips and a map that comes back up
+partway through must not receive the remaining writes.
+
+Because this queue carries a payload, the 5s flush tick checks whether
+anything is waiting by file size rather than parsing it. An entry can sit for
+days waiting for its map to go down, and re-parsing the whole payload every
+five seconds is real idle cost the intent-only refill and delete queues never
+had. A file small enough to be ambiguous is parsed, so the check stays exact.
+
 `POST` accepts 1-100 updates per call and re-validates every `actorId`
 against the base's *current* child pieces inside the same locked
 transaction: an id that no longer resolves there (deleted, or never on this
@@ -118,9 +147,10 @@ Each row shows the piece's friendly name and a segmented control of the five
 levels — the same native-radio pattern as the Sub-Fief roster's rank
 control, under its own class names and its own 5-option scale. Selecting a
 segment only stages the change in local draft state; nothing is written
-until **Save changes**, which posts every changed row in one call (harmless
-to include a row already at its current level — only the rows that actually
-changed are sent).
+until **Save changes**, which posts every changed row (harmless to include a
+row already at its current level — only the rows that actually changed are
+sent). The server caps one call at 100 pieces and a base can carry several
+hundred, so the tab splits a large save into sequential batches of 100.
 
 A **Type** dropdown filters the list to one master category at a time —
 Sub-Fief, Storage, Refining, Crafting, Generators, Water Storage,

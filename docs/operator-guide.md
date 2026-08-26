@@ -91,7 +91,10 @@ Claim Editor not covered here):
 - **Base Permissions** — a separate list of every individual piece (door,
   device) on the base with its own access level, with the ability to set
   any of them to a specific level; pieces that deviate from the base's
-  Sub-Fief default are highlighted. See
+  Sub-Fief default are highlighted. Unlike Sub-Fief Permissions above,
+  these do **not** apply to a running map: the game never picks up a
+  per-piece access level change while the map is up, so a save against a
+  live map is queued and written at that map's next restart. See
   [`docs/console/base-child-permissions.md`](console/base-child-permissions.md).
 
 **Deleting a base** is a separate, row-level action (trash icon) — it is

@@ -15,7 +15,7 @@ import { setupApi, type Task } from "../../api/setup";
 import { apiDownload } from "../../api/client";
 import { DataTable, type SortDirection } from "../../components/common/DataTable";
 import { QueueBadges, queueCountsSummary, queueCountsTotal, type QueueCounts } from "../../components/common/QueueBadges";
-import { pendingRefillCountForPartition, usePendingBaseDeletes, usePendingChildAccess, usePendingRefills, usePendingWaterRefills } from "../../lib/usePendingRefills";
+import { childAccessPieceCountForPartition, pendingRefillCountForPartition, usePendingBaseDeletes, usePendingChildAccess, usePendingRefills, usePendingWaterRefills } from "../../lib/usePendingRefills";
 import { runGatedRestart, serviceRestartTarget, type RestartGate } from "../server/restartQueueGuard";
 
 type BasesPanelProps = {
@@ -1070,7 +1070,7 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
           pendingRefillCountForPartition(refreshedFuel, group.partitionId)
           || pendingRefillCountForPartition(refreshedWater, group.partitionId)
           || pendingRefillCountForPartition(refreshedDeletes, group.partitionId)
-          || pendingRefillCountForPartition(refreshedPermissions, group.partitionId)
+          || childAccessPieceCountForPartition(refreshedPermissions, group.partitionId)
         );
         writeRefillStatus(
           stillQueued
@@ -1140,16 +1140,33 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
     const wrap = document.querySelector<HTMLElement>(".table-wrap.bases-table-wrap");
     const row = wrap?.querySelector<HTMLElement>("tr.row-expanded");
     if (!wrap || !row) return undefined;
-    const update = () => wrap.style.setProperty("--bases-expanded-row-height", `${row.getBoundingClientRect().height}px`);
+    // The header row is measured for the same reason as the expanded row, and
+    // must not be assumed either: the table is table-layout:fixed with
+    // percentage columns and `th { white-space: normal }`, so headers wrap to
+    // two or three lines as the viewport narrows -- and the fixed-width
+    // actions column squeezes the percentage columns further. A hardcoded
+    // header height leaves the expanded row stuck at the same offset as a
+    // taller header, which then paints over it (the header has the higher
+    // z-index).
+    const header = wrap.querySelector<HTMLElement>(".bases-table > thead > tr");
+    const update = () => {
+      wrap.style.setProperty("--bases-expanded-row-height", `${row.getBoundingClientRect().height}px`);
+      if (header) wrap.style.setProperty("--bases-header-height", `${header.getBoundingClientRect().height}px`);
+    };
+    const clear = () => {
+      wrap.style.removeProperty("--bases-expanded-row-height");
+      wrap.style.removeProperty("--bases-header-height");
+    };
     update();
     // Not available under jsdom in tests -- degrade to the one-time
     // measurement above rather than throwing.
-    if (typeof ResizeObserver === "undefined") return () => wrap.style.removeProperty("--bases-expanded-row-height");
+    if (typeof ResizeObserver === "undefined") return clear;
     const observer = new ResizeObserver(update);
     observer.observe(row);
+    if (header) observer.observe(header);
     return () => {
       observer.disconnect();
-      wrap.style.removeProperty("--bases-expanded-row-height");
+      clear();
     };
   }, [expandedBaseId, expandedTab, rows]);
 
@@ -1309,12 +1326,6 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
     });
   }
 
-  // The expanded row's own height varies with its content (a wrapped
-  // Generators/Shared With cell makes some bases' rows taller than others),
-  // so the sticky tablist below it can't use a fixed pixel offset -- it has
-  // to know this specific row's real height. Measured via ResizeObserver
-  // (not just once on expand) because the row can reflow after mount, e.g.
-  // once generator data finishes loading and wraps onto another line.
   function handleSort(column: string) {
     setPage(0);
     if (column === sortColumn) {
@@ -1827,6 +1838,7 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
                     <BaseChildPermissionsTab
                       baseId={id}
                       baseName={String(base.name || `base ${id}`)}
+                      queueSupported={canQueueChildAccess}
                       confirmAction={confirmAction}
                       onError={onError}
                     />

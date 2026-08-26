@@ -41,22 +41,28 @@ export function QueueBadges({ counts, labels = true, size = 13 }: {
   size?: number;
 }) {
   const plural = (count: number, noun: string) => `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"}`;
+  // Explicit trailing spaces after every badge: these are inline elements, so
+  // without them the surrounding paragraph's text content runs together --
+  // "1 water2 deletes", or "3pending" -- for a screen reader and for anyone
+  // copying the line. The CSS gap/margin is visual only and does not put a
+  // character in the DOM. This was a real bug once already; the separators
+  // were lost again when these badges were extracted into this component.
   return <>
-    {counts.fuel > 0 && <span className="bases-queue-badge bases-queue-badge-fuel">
+    {counts.fuel > 0 && <><span className="bases-queue-badge bases-queue-badge-fuel">
       <Fuel size={size} aria-hidden="true" />{labels ? `${counts.fuel.toLocaleString()} fuel` : counts.fuel.toLocaleString()}
-    </span>}
-    {counts.water > 0 && <span className="bases-queue-badge bases-queue-badge-water">
+    </span>{" "}</>}
+    {counts.water > 0 && <><span className="bases-queue-badge bases-queue-badge-water">
       <Droplet size={size} aria-hidden="true" />{labels ? `${counts.water.toLocaleString()} water` : counts.water.toLocaleString()}
-    </span>}
-    {counts.deletes > 0 && <span className="bases-queue-badge bases-queue-badge-delete">
+    </span>{" "}</>}
+    {counts.deletes > 0 && <><span className="bases-queue-badge bases-queue-badge-delete">
       <Trash2 size={size} aria-hidden="true" />{labels ? plural(counts.deletes, "base delete") : counts.deletes.toLocaleString()}
-    </span>}
-    {counts.vehicleDeletes > 0 && <span className="bases-queue-badge bases-queue-badge-delete">
+    </span>{" "}</>}
+    {counts.vehicleDeletes > 0 && <><span className="bases-queue-badge bases-queue-badge-delete">
       <Car size={size} aria-hidden="true" />{labels ? plural(counts.vehicleDeletes, "vehicle delete") : counts.vehicleDeletes.toLocaleString()}
-    </span>}
+    </span>{" "}</>}
     {/* Counts pieces, not bases -- see childAccessPieceCount. */}
-    {counts.permissions > 0 && <span className="bases-queue-badge bases-queue-badge-permission">
+    {counts.permissions > 0 && <><span className="bases-queue-badge bases-queue-badge-permission">
       <KeyRound size={size} aria-hidden="true" />{labels ? plural(counts.permissions, "permission") : counts.permissions.toLocaleString()}
-    </span>}
+    </span>{" "}</>}
   </>;
 }

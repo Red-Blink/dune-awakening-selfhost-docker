@@ -1821,9 +1821,17 @@ body.debug .technical-details { display: block; }
    178px box at the old 190px width with 12px of cell padding -- exactly
    the gap this measured and fixed live: the pills had no flex-shrink:0,
    so the overflow silently squashed their icons instead of clipping.
-   230px leaves real margin above the 194px+12px=206px worst case, not
-   another zero-margin fit. */
-.bases-table th.bases-actions-column, .bases-table td.bases-actions-column { width: 230px; }
+
+   The queued-permission pill added a FIFTH item, and unlike the other four
+   it has no always-present button -- it appears only while a permission
+   change is queued, on top of whatever else is. Re-measured worst case
+   (fuel pill + water pill + Download + delete pill + permission pill):
+   246px of content against the 218px box 230px gave, which clipped the
+   last pill's cancel button out of reach (td { overflow: hidden } and
+   every item is flex-shrink:0, so it truncates rather than squashing).
+   280px restores real margin above 246px+12px=258px. Anything that adds a
+   sixth item to this column must re-measure rather than assume. */
+.bases-table th.bases-actions-column, .bases-table td.bases-actions-column { width: 280px; }
 .bases-table td { max-width: none; white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
 .bases-name, .bases-ellipsis-cell { display: block; overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
 
@@ -3309,6 +3317,23 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 @media (max-width: 1100px) {
   .table-wrap.bases-table-wrap { overflow: auto; }
   .bases-table { min-width: 860px; }
+  /* Below this the table stops shrinking and scrolls at a fixed 860px, so the
+     actions column's 280px is 280px the data columns don't get -- and they are
+     the ones actually starved here (Base Name, Owner and Shared With wrap to
+     two or three lines while the buttons sit comfortably). Reclaim it by
+     stacking the controls two-up instead of in one row: an explicit 2-column
+     grid rather than flex-wrap, so the result is a predictable 2x2 for the
+     usual four controls rather than whatever the available width happens to
+     allow. A fifth control (every queue pending at once) wraps to a third row
+     rather than clipping. Above this breakpoint the column stays 280px and
+     the row stays 4x1 -- see the width comment on .bases-actions-column. */
+  .bases-table th.bases-actions-column, .bases-table td.bases-actions-column { width: 116px; }
+  .bases-table td.bases-actions-column .icon-toggle-group {
+    display: inline-grid;
+    grid-template-columns: repeat(2, auto);
+    justify-content: center;
+    gap: 6px;
+  }
 }
 /* The shared `th` rule is already position:sticky, but an overflow:auto ancestor
    confines a sticky element to that ancestor's scrollport -- so with the height
@@ -3351,13 +3376,19 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
    content itself. Each cell still needs its own opaque background since
    `<tr>` background does not reliably paint through `border-collapse:
    separate` cells.
-   top is 67px (header's own offset) + 51px (the header row's own rendered
-   height, rounded up from 50.59375px measured live) -- without adding the
-   header's height, both stick to the same 67px offset and the header (its
-   higher z-index) paints over and completely hides this row. */
+   top is 67px (header's own offset) plus the header row's own rendered
+   height -- without adding it, both stick to the same 67px offset and the
+   header (its higher z-index) paints over and completely hides this row.
+   That height is measured into --bases-header-height rather than hardcoded:
+   the table is table-layout:fixed with percentage columns and
+   `th { white-space: normal }`, so headers wrap to two or three lines as the
+   viewport narrows and the fixed-width actions column squeezes the rest. The
+   51px fallback is the single-line height measured live (50.59375px, rounded
+   up) for the pre-measurement paint and for jsdom, where ResizeObserver does
+   not exist. */
 .bases-table-wrap .bases-table > tbody > tr.row-expanded {
   position: sticky;
-  top: 118px;
+  top: calc(67px + var(--bases-header-height, 51px));
   z-index: 2;
 }
 .bases-table-wrap .bases-table > tbody > tr.row-expanded > td {
@@ -3390,7 +3421,7 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
    is already opaque. */
 .bases-table-wrap .bases-table > tbody > tr.expanded-row-sticky {
   position: sticky;
-  top: calc(118px + var(--bases-expanded-row-height, 0px));
+  top: calc(67px + var(--bases-header-height, 51px) + var(--bases-expanded-row-height, 0px));
   z-index: 1;
 }
 .bases-expanded-tab {
@@ -4634,9 +4665,18 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 .bases-access-segment:has(input:disabled) { cursor: not-allowed; }
 
 /* Below this the row's three columns cannot hold a name, three segments and a
-   trash button side by side -- inside the expanded cell the available width is
-   calc(100vw - 76px), which is ~300px on a phone. Stack the control under the
-   name and let it span the full row. */
+   trash button side by side, so stack the control under the name and let it
+   span the full row.
+
+   Note the breakpoint is on VIEWPORT width, not the width this row actually
+   gets. Since the expanded content moved inline (into a `<td>` of a table that
+   is min-width:860px below 1100px), the cell no longer narrows with the
+   viewport the way it did when it rendered outside the table wrapper -- the
+   table scrolls horizontally instead. So on a phone this rule fires against a
+   row that is ~860px wide, not the ~300px the old outside-the-table layout
+   gave it. It still stacks correctly; it is simply no longer the width
+   pressure that motivates it. Anything added here must be measured, not
+   inferred from the viewport. */
 @media (max-width: 560px) {
   .bases-permissions-row {
     grid-template-columns: minmax(0, 1fr) 38px;

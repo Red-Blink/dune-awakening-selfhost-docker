@@ -1,7 +1,7 @@
 import { assertIdentifier, bigintParam, intParam, isReadOnlySql, quoteIdentifier, quoteQualified, rowsResult } from "./db.js";
 import { getBridgeRequestSummary } from "./audit.js";
 import { resolvePorts } from "./config.js";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { redact } from "./redact.js";
@@ -4184,11 +4184,45 @@ function normalizePendingChildAccess(entry) {
     map: String(entry?.map ?? "").slice(0, 120),
     partitionId: Number.isInteger(partitionId) && partitionId > 0 ? partitionId : 0,
     queuedAt: typeof entry?.queuedAt === "string" ? entry.queuedAt.slice(0, 40) : "",
+    // Bumped every time a save merges into this entry. queuedAt deliberately
+    // survives a merge (so re-saving cannot reset the age limit), which means
+    // it cannot also serve as the "is this still the payload I flushed?"
+    // check -- without a separate revision, a save landing mid-flush is
+    // indistinguishable from the one being flushed and gets dropped
+    // unapplied. The refill/delete queues have no payload, so they need no
+    // equivalent.
+    revision: clampInt(entry?.revision, 0, 0, Number.MAX_SAFE_INTEGER),
     attempts: clampInt(entry?.attempts, 0, 0, MAX_REFILL_FLUSH_ATTEMPTS),
     nextRetryAt: Number.isFinite(Number(entry?.nextRetryAt)) ? Number(entry.nextRetryAt) : 0,
     lastError: String(entry?.lastError ?? "").slice(0, 300),
     updates
   };
+}
+
+// A cheap "is anything waiting?" for the 5s flush tick.
+//
+// Unlike the refill and delete queues, whose entries are pure intent and stay
+// tiny, this file carries a payload -- up to 200 bases x 500 pieces. A queue
+// waiting for its map to go down can sit for days, and parsing megabytes on
+// the event loop every 5 seconds just to read `.length` is real idle cost.
+//
+// Correct by construction rather than by a tuned byte count: writeJsonAtomic
+// pretty-prints with a trailing newline, so an empty queue is three bytes
+// and one real entry is hundreds. Anything comfortably above that floor must
+// hold an entry and short-circuits; anything at or below it is parsed, which
+// is trivial at that size and stays exact if the format ever changes.
+const CHILD_ACCESS_QUEUE_NONEMPTY_BYTES = 64;
+
+export function hasQueuedBaseChildAccess(repoRoot) {
+  const file = pendingBaseChildAccessFile(repoRoot);
+  let size = 0;
+  try {
+    size = statSync(file).size;
+  } catch {
+    return false;
+  }
+  if (size > CHILD_ACCESS_QUEUE_NONEMPTY_BYTES) return true;
+  return listQueuedBaseChildAccess(repoRoot).length > 0;
 }
 
 export function listQueuedBaseChildAccess(repoRoot) {
@@ -4219,6 +4253,12 @@ function writeQueuedBaseChildAccess(repoRoot, entries) {
 // re-saved. A later save wins per piece.
 export function queueBaseChildAccess(repoRoot, { baseId, map = "", partitionId = 0, updates = [], now = () => new Date() } = {}) {
   const target = intParam(baseId, "base id", 1);
+  // Same 1-100 cap the immediate path enforces. Without it one confirmed
+  // "SET CHILD ACCESS" would accept five times as many pieces purely because
+  // the base's map happened to be up, and the excess would vanish silently.
+  if (!Array.isArray(updates) || updates.length < 1 || updates.length > 100) {
+    throw new Error("Choose between 1 and 100 pieces to update.");
+  }
   const incoming = normalizeQueuedChildAccessUpdates(updates);
   if (!incoming.length) throw new Error("Choose at least one piece to update.");
   const existing = listQueuedBaseChildAccess(repoRoot);
@@ -4227,11 +4267,18 @@ export function queueBaseChildAccess(repoRoot, { baseId, map = "", partitionId =
   if (!previous && others.length >= MAX_PENDING_BASE_CHILD_ACCESS) {
     throw new Error(`The pending base permission queue already holds ${MAX_PENDING_BASE_CHILD_ACCESS} bases. Restart the affected maps to apply them first.`);
   }
+  // Refuse rather than truncate: silently dropping the newest pieces from a
+  // merge reports success for changes that will never be applied.
+  const mergedCount = new Set([...(previous?.updates || []), ...incoming].map((update) => update.actorId)).size;
+  if (mergedCount > MAX_CHILD_ACCESS_QUEUED_UPDATES) {
+    throw new Error(`This base already has ${previous?.updates.length || 0} queued pieces; the limit is ${MAX_CHILD_ACCESS_QUEUED_UPDATES}. Restart its map to apply them first.`);
+  }
   const entry = normalizePendingChildAccess({
     baseId: target,
     map,
     partitionId,
     queuedAt: previous?.queuedAt || now().toISOString(),
+    revision: (previous?.revision || 0) + 1,
     updates: [...(previous?.updates || []), ...incoming]
   });
   if (!entry) throw new Error("Invalid base id");
@@ -4252,7 +4299,10 @@ function reconcileQueuedBaseChildAccess(repoRoot, outcomes) {
   const next = [];
   for (const entry of listQueuedBaseChildAccess(repoRoot)) {
     const outcome = outcomes.get(entry.baseId);
-    if (!outcome || outcome.queuedAt !== entry.queuedAt) {
+    // revision, not just queuedAt: a save that merged into this entry while it
+    // was being flushed keeps the same queuedAt but bumps the revision, so it
+    // must survive rather than be dropped as "already applied".
+    if (!outcome || outcome.queuedAt !== entry.queuedAt || outcome.revision !== entry.revision) {
       next.push(entry);
       continue;
     }
@@ -4277,14 +4327,21 @@ export async function flushBaseChildAccess(db, repoRoot, { now = Date.now } = {}
   const outcomes = new Map();
   const timestamp = now();
   for (const entry of pending) {
+    const stamp = { queuedAt: entry.queuedAt, revision: entry.revision };
     const queuedMs = Date.parse(entry.queuedAt);
     if (Number.isFinite(queuedMs) && timestamp - queuedMs >= pendingRefillMaxAgeMs()) {
       const message = `Queued for longer than the ${Math.round(pendingRefillMaxAgeMs() / 3600000)}h limit without being applied.`;
-      outcomes.set(entry.baseId, { queuedAt: entry.queuedAt, keep: false });
+      outcomes.set(entry.baseId, { ...stamp, keep: false });
       flushed.push({ baseId: entry.baseId, map: entry.map, partitionId: entry.partitionId, ok: false, expired: true, dropped: true, error: message });
       continue;
     }
-    if (!partitionWriteSafe(observed, entry.partitionId)) continue;
+    // Re-observed per entry, not once for the whole pass: applying an entry is
+    // several round-trips, and a map server that reconnects partway through
+    // would otherwise still be treated as down for every remaining entry --
+    // writing access levels to a running map, which is the one thing this
+    // queue exists to avoid, since the game never picks them up.
+    const fresh = await observeRefillPartitions(db, { now });
+    if (!partitionWriteSafe(fresh || observed, entry.partitionId)) continue;
     if (entry.nextRetryAt && timestamp < entry.nextRetryAt) continue;
     try {
       let updated = 0;
@@ -4294,14 +4351,14 @@ export async function flushBaseChildAccess(db, repoRoot, { now = Date.now } = {}
         updated += result.updated;
         skipped.push(...result.skipped);
       }
-      outcomes.set(entry.baseId, { queuedAt: entry.queuedAt, keep: false });
+      outcomes.set(entry.baseId, { ...stamp, keep: false });
       flushed.push({ baseId: entry.baseId, map: entry.map, partitionId: entry.partitionId, ok: true, updated, skipped });
     } catch (error) {
       const message = String(error?.message || "Unexpected error.").slice(0, 300);
       const attempts = isTransientFlushError(message) ? entry.attempts : entry.attempts + 1;
       const dropped = attempts >= MAX_REFILL_FLUSH_ATTEMPTS;
       const nextRetryAt = timestamp + pendingRefillRetryDelayMs();
-      outcomes.set(entry.baseId, { queuedAt: entry.queuedAt, keep: !dropped, attempts, nextRetryAt, lastError: message });
+      outcomes.set(entry.baseId, { ...stamp, keep: !dropped, attempts, nextRetryAt, lastError: message });
       flushed.push({ baseId: entry.baseId, map: entry.map, partitionId: entry.partitionId, ok: false, attempts, dropped, error: message });
     }
   }

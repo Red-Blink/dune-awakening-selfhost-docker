@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, ChevronDown, ChevronUp, Download, Fuel, Grid2X2, Info, List, Lock, RotateCcw } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, Download, Grid2X2, Info, List, Lock, RotateCcw } from "lucide-react";
 import { mapsApi, type ChoamTerminalOverview, type ChoamTradeCenter, type LiveMapMemoryRow, type MapCombatStateResult, type MapRuntimeSettings, type MemoryBalancerState, type MemorySwapState, type PartitionCombatStateRow, type SpicefieldTypeRow, type UserSettingField, type UserSettingsSchema } from "../../api/maps";
 import { runGatedRestart, type RestartGate, type RestartGateChoice } from "../server/restartQueueGuard";
 import { serverApi, type RestartQueueTarget } from "../../api/server";
@@ -19,7 +19,6 @@ import {
   vehicleDeleteCountForMap,
   vehicleDeleteCountForPartition
 } from "../../lib/usePendingRefills";
-import type { PendingRefills } from "../../api/bases";
 import { friendlyMapName, hasFriendlyMapName } from "./mapNames";
 import { invalidateInstanceNames } from "./instanceNames";
 // Re-exported so existing importers (and MapsPanel.sietchNames.test.ts) keep working.
