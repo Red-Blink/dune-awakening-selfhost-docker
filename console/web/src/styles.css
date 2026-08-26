@@ -1958,6 +1958,10 @@ body.debug .technical-details { display: block; }
    destructive rather than additive, and the row/banner treatment should read
    as a warning, not just another pending write. */
 .bases-queue-badge-delete { background: rgba(167, 73, 73, .18); color: var(--danger-text); }
+/* Violet rather than another warm step: fuel already owns the amber end and
+   delete the red, so a fourth warm badge would blend into both in this
+   amber-toned console instead of reading as its own category. */
+.bases-queue-badge-permission { background: rgba(139, 124, 196, .20); color: #b9aee6; }
 .bases-queued-refill {
   display: inline-flex;
   align-items: center;
@@ -1999,6 +2003,29 @@ body.debug .technical-details { display: block; }
   flex-shrink: 0;
 }
 .bases-queued-delete .bases-queued-delete-cancel {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  min-width: 0;
+}
+/* Mirrors .bases-queued-delete, violet to match .bases-queue-badge-permission. */
+.bases-queued-permission {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  background: rgba(139, 124, 196, .18);
+  color: #b9aee6;
+  white-space: nowrap;
+  /* See .bases-queued-refill's comment. */
+  flex-shrink: 0;
+}
+.bases-queued-permission .bases-queued-permission-cancel {
   width: 20px;
   height: 20px;
   flex: 0 0 20px;
@@ -4513,6 +4540,21 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 .bases-child-access-row input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent-strong); }
 .bases-child-access-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .bases-child-access-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-strong); font-size: 13px; }
+/* Marks the level this piece becomes at the map's next restart, next to the
+   level the game enforces now. Violet, matching the Bases list's queued
+   permission badge, so the same pending state reads the same on both
+   surfaces -- and stays distinct from the amber "not Sub-Fief" highlight. */
+.bases-child-access-queued {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(139, 124, 196, .18);
+  color: #b9aee6;
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .bases-child-access-clean { margin: 0; color: var(--success-text); font-size: 12px; }
 
 /* Segmented access-level control -- same visual spec as .bases-rank-segments

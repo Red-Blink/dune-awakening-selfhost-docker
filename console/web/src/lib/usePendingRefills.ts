@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { basesApi, type PendingRefills } from "../api/bases";
+import { basesApi, type PendingChildAccess, type PendingRefills } from "../api/bases";
 
 // The queue is a small file read on the API side, and it changes without the
 // operator doing anything: any restart -- from this console, the scheduler, or
@@ -78,6 +78,37 @@ export function usePendingBaseDeletes(enabled = true) {
   const refresh = useCallback(async () => {
     try {
       const next = await basesApi.pendingDeletes();
+      setPending(next);
+      return next;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    const tick = () => { if (!cancelled) void refresh(); };
+    tick();
+    const intervalId = window.setInterval(tick, PENDING_REFILL_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [enabled, refresh]);
+
+  return { pending, refresh };
+}
+
+// Mirrors usePendingBaseDeletes for the pending base-permission queue. Its
+// entries carry a payload (which pieces, to which level), so this one is typed
+// PendingChildAccess rather than PendingRefills.
+export function usePendingChildAccess(enabled = true) {
+  const [pending, setPending] = useState<PendingChildAccess | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const next = await basesApi.pendingChildAccess();
       setPending(next);
       return next;
     } catch {

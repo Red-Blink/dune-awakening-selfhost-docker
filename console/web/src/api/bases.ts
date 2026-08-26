@@ -28,6 +28,16 @@ export type PendingRefills = {
   byTarget: { map: string; partitionId: number; partitionMap: string; dimensionIndex: number; count: number }[];
 };
 
+// Unlike QueuedRefill, a queued permission change carries a payload: which
+// pieces go to which level once the map is next down.
+export type QueuedChildAccess = QueuedRefill & {
+  updates: { actorId: string; accessLevel: BaseAccessLevel }[];
+};
+
+export type PendingChildAccess = Omit<PendingRefills, "pending"> & {
+  pending: QueuedChildAccess[];
+};
+
 export type AutoRefillBase = {
   baseId: number;
   enabledAt: string;
@@ -504,9 +514,15 @@ export const basesApi = {
       { method: "PUT", body: JSON.stringify({ entries }) }),
   childAccess: (baseId: string) =>
     api<BaseChildAccessAudit>(`/api/bases/${encodeURIComponent(baseId)}/child-access`),
+  // result.queued is true when the base's map was live and the change was
+  // recorded for the next restart instead of written now.
   setChildAccess: (baseId: string, updates: { actorId: string; accessLevel: BaseAccessLevel }[]) =>
-    post<{ supported: boolean; result?: { ok: boolean; baseId: number; updated: number; message: string }; reason?: string }>(
+    post<{ supported: boolean; result?: { ok: boolean; baseId: number; updated?: number; queued?: boolean; message?: string }; reason?: string }>(
       `/api/bases/${encodeURIComponent(baseId)}/child-access`, { updates, confirmation: "SET CHILD ACCESS" }),
+  pendingChildAccess: () => api<PendingChildAccess>("/api/bases/pending-child-access"),
+  cancelQueuedChildAccess: (baseId: string) =>
+    api<{ supported: boolean; result?: { ok: boolean; baseId: number; pending: number }; reason?: string }>(
+      `/api/bases/${encodeURIComponent(baseId)}/queued-child-access`, { method: "DELETE" }),
   transferToSystemCustodian: (baseId: string) =>
     post<{ supported: boolean; result?: SetBasePermissionsResult; reason?: string }>(
       `/api/bases/${encodeURIComponent(baseId)}/system-custodian`, {}),

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { basesApi, type BaseAccessLevel, type BaseChildAccessGroup, type BaseChildAccessRow } from "../../api/bases";
+import { usePendingChildAccess } from "../../lib/usePendingRefills";
 import { errorText } from "../permissions/rosterEditor";
 
 type Props = {
@@ -89,6 +90,19 @@ export function BaseChildPermissionsTab({ baseId, baseName, confirmAction, onErr
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
   const [statusKind, setStatusKind] = useState<"" | "ok" | "fail">("");
+  const { pending: pendingQueue, refresh: refreshQueue } = usePendingChildAccess();
+
+  // What this base has waiting for its map's next restart, keyed by actorId so
+  // a row can show the level it will become without pretending it already is.
+  const queuedForBase = useMemo(
+    () => pendingQueue?.pending.find((entry) => String(entry.baseId) === String(baseId)) || null,
+    [pendingQueue, baseId]
+  );
+  const queuedLevels = useMemo(() => {
+    const levels: Record<string, BaseAccessLevel> = {};
+    for (const update of queuedForBase?.updates || []) levels[update.actorId] = update.accessLevel;
+    return levels;
+  }, [queuedForBase]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -204,18 +218,40 @@ export function BaseChildPermissionsTab({ baseId, baseName, confirmAction, onErr
       for (let i = 0; i < updates.length; i += 100) batches.push(updates.slice(i, i + 100));
       let totalUpdated = 0;
       let lastMessage = "";
+      let anyQueued = false;
       for (const batch of batches) {
         const response = await basesApi.setChildAccess(baseId, batch);
+        if (response.result?.queued) anyQueued = true;
         totalUpdated += response.result?.updated ?? batch.length;
         lastMessage = response.result?.message || lastMessage;
       }
-      setStatus(batches.length > 1 ? `${totalUpdated} pieces were updated.` : (lastMessage || "Access levels were updated."));
+      if (anyQueued) {
+        const count = updates.length;
+        setStatus(`${count} ${count === 1 ? "change is" : "changes are"} queued and will apply at this map's next restart.`);
+      } else {
+        setStatus(batches.length > 1 ? `${totalUpdated} pieces were updated.` : (lastMessage || "Access levels were updated."));
+      }
       setStatusKind("ok");
-      await load();
+      await Promise.all([load(), refreshQueue()]);
     } catch (error) {
       onError(errorText(error));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function cancelQueued() {
+    const confirmed = await confirmAction(
+      `Discard the ${queuedForBase?.updates.length || 0} queued permission change(s) for ${baseName}?`,
+      { title: "Discard Queued Changes", confirmLabel: "Discard", danger: true });
+    if (!confirmed) return;
+    try {
+      await basesApi.cancelQueuedChildAccess(baseId);
+      setStatus("Queued permission changes were discarded.");
+      setStatusKind("ok");
+      await refreshQueue();
+    } catch (error) {
+      onError(errorText(error));
     }
   }
 
@@ -234,9 +270,19 @@ export function BaseChildPermissionsTab({ baseId, baseName, confirmAction, onErr
         <p className="action-help-note">
           Every piece on this base is listed below with its current access
           level. Pieces normally match this base's Sub-Fief (Associate)
-          default. Pick a level for any piece, then save -- changes reach the
-          running map immediately.
+          default. Pick a level for any piece, then save. A running map never
+          picks up a permission change, so if this base's map is live the
+          change is queued and written at its next restart; if the map is
+          already down it is written immediately.
         </p>
+
+        {queuedForBase && <p className="confirm-modal-warning bases-permissions-warning" role="status">
+          <strong>{queuedForBase.updates.length}</strong> {queuedForBase.updates.length === 1 ? "change is" : "changes are"} queued
+          for this base and will be written when its map next restarts. The levels below are what the game
+          enforces right now.
+          {" "}
+          <button className="link-button" disabled={saving} onClick={() => void cancelQueued()}>Discard queued changes</button>
+        </p>}
 
         {!supported && <p className="muted">{reason || "Base permission auditing is unavailable for this database."}</p>}
 
@@ -289,6 +335,11 @@ export function BaseChildPermissionsTab({ baseId, baseName, confirmAction, onErr
                 />
                 <span className="bases-child-access-name">
                   <strong title={row.buildingType}>{row.name}</strong>
+                  {queuedLevels[row.actorId] !== undefined && queuedLevels[row.actorId] !== row.currentAccess && (
+                    <span className="bases-child-access-queued" title="Queued for this map's next restart">
+                      → {ACCESS_LEVEL_LABELS[queuedLevels[row.actorId]]} at restart
+                    </span>
+                  )}
                 </span>
                 <AccessLevelSegments
                   actorId={row.actorId}

@@ -271,7 +271,9 @@ Player rows include `total_playtime_seconds`. The console samples `player_state.
 | PUT | `/api/bases/{baseId}/permissions` | Replace a base's permission roster | `baseId`, `entries[]` (`playerId`, `rank`) |
 | GET | `/api/bases/permission-candidates` | Search players eligible to be added to a roster | `q?`, `limit?` |
 | GET | `/api/bases/{baseId}/child-access` | Every child piece (door, device) on a base plus its own root totem (`is_child=false`), each with its access level — a different 5-tier scale from the roster rank above; Sub-Fief is Associate (3) | `baseId` |
-| POST | `/api/bases/{baseId}/child-access` | Set specific pieces to specific access levels (1-5). Requires `{ updates: [{ actorId, accessLevel }], confirmation: "SET CHILD ACCESS" }` | `baseId`, `updates[]` |
+| POST | `/api/bases/{baseId}/child-access` | Set specific pieces to specific access levels (1-5); queued for the next map restart instead if the base's map is live (`result.queued`). Requires `{ updates: [{ actorId, accessLevel }], confirmation: "SET CHILD ACCESS" }` | `baseId`, `updates[]` |
+| GET | `/api/bases/pending-child-access` | List queued permission changes, grouped by restart target. Each entry carries its own `updates[]` payload | None |
+| DELETE | `/api/bases/{baseId}/queued-child-access` | Discard a base's queued permission changes | `baseId` |
 | DELETE | `/api/bases/{baseId}` | Permanently delete a base and everything on it (queued instead if the map isn't safely writable right now); takes a full-database safety backup first. Requires `{ confirmation: "DELETE BASE" }` | `baseId` |
 | GET | `/api/bases/pending-deletes` | List queued base deletes, grouped by restart target | None |
 | DELETE | `/api/bases/{baseId}/queued-delete` | Cancel a base's queued delete | `baseId` |
@@ -305,6 +307,15 @@ delete route is unavailable when `baseDelete` is false; without `baseDeleteQueue
 a delete against a live map is written straight away rather than queued, matching
 the refill routes' behavior on a schema without `world_partition`. See
 [Base deletion](base-deletion.md).
+
+`GET /api/bases` also reports `capabilities.baseChildAccessQueue` (child access
+plus `dune.world_partition`). Without it a child-access write against a live map
+is applied straight away rather than queued, matching how the refill and delete
+queues degrade on an older schema. Unlike those queues this one is not about an
+autosave race — the write would stick — but a running map never applies an
+access level change, so queuing keeps the console from showing a level the game
+does not enforce. See
+[base-child-permissions.md](base-child-permissions.md).
 
 `PUT` takes the whole roster rather than a delta — the server diffs it against
 current state and applies only the difference. `rank` is `1` Owner, `2` Co-Owner,

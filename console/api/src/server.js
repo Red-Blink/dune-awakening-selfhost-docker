@@ -100,7 +100,8 @@ const tasks = new TaskManager(config, {
   onMapDown: () => flushBaseRefillQueues({
     flushGenerators: flushQueuedGeneratorRefills,
     flushWater: flushQueuedWaterRefills,
-    flushDeletes: flushQueuedBaseDeletes
+    flushDeletes: flushQueuedBaseDeletes,
+    flushChildAccess: flushQueuedBaseChildAccess
   })
 });
 let db = createDb(config);
@@ -117,6 +118,8 @@ let generatorRefillFlushRunning = false;
 let waterRefillFlushRunning = false;
 // Same reasoning as generatorRefillFlushRunning, for the pending-delete queue.
 let baseDeleteFlushRunning = false;
+// Same reasoning as generatorRefillFlushRunning, for the base permission queue.
+let baseChildAccessFlushRunning = false;
 let messageOfTheDayAutoRunning = false;
 let messageOfTheDayAutoLastRun = 0;
 let messageOfTheDayAutoNextAllowedRun = 0;
@@ -270,6 +273,9 @@ setInterval(() => {
   if (duneDb.listQueuedBaseDeletes(config.repoRoot).length) {
     runBackgroundTick("Base delete flush", () => flushQueuedBaseDeletes());
   }
+  if (duneDb.listQueuedBaseChildAccess(config.repoRoot).length) {
+    runBackgroundTick("Base permission flush", () => flushQueuedBaseChildAccess());
+  }
 }, Number.isFinite(generatorRefillFlushIntervalMs) && generatorRefillFlushIntervalMs > 0 ? generatorRefillFlushIntervalMs : 5000).unref?.();
 
 // Every queued-refill write goes through here so it is audited whichever path
@@ -297,6 +303,21 @@ async function flushQueuedWaterRefills() {
     return result;
   } finally {
     waterRefillFlushRunning = false;
+  }
+}
+
+// Same reasoning as flushQueuedGeneratorRefills, for the base permission
+// queue. These change who can open a player's doors, so an unaudited apply is
+// not acceptable either.
+async function flushQueuedBaseChildAccess() {
+  if (baseChildAccessFlushRunning) return { flushed: [] };
+  baseChildAccessFlushRunning = true;
+  try {
+    const result = await duneDb.flushBaseChildAccess(db, config.repoRoot);
+    for (const entry of result.flushed || []) audit(config, null, "bases.flush-queued-child-access", entry);
+    return result;
+  } finally {
+    baseChildAccessFlushRunning = false;
   }
 }
 
@@ -708,6 +729,7 @@ async function handleApi(req, res) {
   if (path === "/api/bases/pending-water-refills") return pendingWaterRefillsRoute(res);
   if (path === "/api/bases/auto-refill-water") return basesAutoRefillWaterStateRoute(res);
   if (path === "/api/bases/pending-deletes") return pendingBaseDeletesRoute(res);
+  if (path === "/api/bases/pending-child-access") return pendingChildAccessRoute(res);
   if (path.match(/^\/api\/bases\/[^/]+\/export$/) && req.method === "GET") return baseBlueprintDownloadRoute(req, res, path);
   if (path.match(/^\/api\/bases\/[^/]+\/refill-generators$/) && req.method === "POST") return baseRefillGeneratorsRoute(req, res, path);
   if (path.match(/^\/api\/bases\/[^/]+\/queued-refill$/) && req.method === "DELETE") return baseCancelQueuedRefillRoute(req, res, path);
@@ -732,6 +754,7 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/bases\/[^/]+\/permissions$/) && req.method === "PUT") return baseSetPermissionsRoute(req, res, path);
   if (path.match(/^\/api\/bases\/[^/]+\/child-access$/) && req.method === "GET") return baseChildAccessRoute(res, path);
   if (path.match(/^\/api\/bases\/[^/]+\/child-access$/) && req.method === "POST") return baseSetChildAccessRoute(req, res, path);
+  if (path.match(/^\/api\/bases\/[^/]+\/queued-child-access$/) && req.method === "DELETE") return baseCancelQueuedChildAccessRoute(req, res, path);
   if (path.match(/^\/api\/bases\/[^/]+\/system-custodian$/) && req.method === "POST") return baseSystemCustodianRoute(req, res, path);
   if (path.match(/^\/api\/bases\/[^/]+\/queued-delete$/) && req.method === "DELETE") return baseCancelQueuedDeleteRoute(req, res, path);
   if (path.match(/^\/api\/bases\/[^/]+$/) && req.method === "DELETE") return baseDeleteRoute(req, res, path);
@@ -3490,13 +3513,66 @@ async function baseChildAccessRoute(res, path) {
   }
 }
 
+// Queued instead of written immediately when the base's map is currently
+// live. Unlike the refill queues this is not about an autosave race -- the
+// write would stick -- but a running map never picks up an access_level
+// change, so an immediate write leaves the console showing a level the game
+// does not enforce until the next restart. Deferring to the map-down window
+// keeps the two in agreement. See docs/console/base-child-permissions.md.
 async function baseSetChildAccessRoute(req, res, path) {
   const baseId = Number(decodeURIComponent(path.split("/")[3]));
   if (!Number.isInteger(baseId) || baseId < 1 || baseId > Number.MAX_SAFE_INTEGER) return json(res, 400, { error: "Invalid base ID" });
   if (baseDeletePending(baseId)) return json(res, 409, { error: BASE_DELETE_PENDING_MESSAGE });
   if (await baseBackedUp(baseId)) return json(res, 409, { error: BASE_BACKED_UP_MESSAGE });
-  return directDbMutation(req, res, "bases.set-child-access", "SET CHILD ACCESS", (body) =>
-    duneDb.setBaseChildAccessLevels(db, baseId, body.updates), { baseId });
+  return directDbMutation(req, res, "bases.set-child-access", "SET CHILD ACCESS", async (body) => {
+    const target = await duneDb.baseRefillTarget(db, baseId);
+    if (target.queueSupported && !target.writeSafeNow) {
+      const entry = duneDb.queueBaseChildAccess(config.repoRoot, {
+        baseId,
+        map: target.map,
+        partitionId: target.partitionId,
+        updates: body.updates
+      });
+      return { ok: true, queued: true, ...entry };
+    }
+    return duneDb.setBaseChildAccessLevels(db, baseId, body.updates);
+  }, { baseId });
+}
+
+async function baseCancelQueuedChildAccessRoute(req, res, path) {
+  const baseId = Number(decodeURIComponent(path.split("/")[3]));
+  if (!Number.isInteger(baseId) || baseId < 1 || baseId > Number.MAX_SAFE_INTEGER) return json(res, 400, { error: "Invalid base ID" });
+  return directDbMutation(req, res, "bases.cancel-queued-child-access", null,
+    () => duneDb.cancelQueuedBaseChildAccess(config.repoRoot, baseId), { baseId });
+}
+
+// Mirrors pendingWaterRefillsRoute.
+async function pendingChildAccessRoute(res) {
+  const pending = duneDb.listQueuedBaseChildAccess(config.repoRoot);
+  const targets = pending.length
+    ? await duneDb.partitionRestartTargets(db).catch(() => new Map())
+    : new Map();
+  const byTarget = new Map();
+  for (const entry of pending) {
+    const map = entry.map || "Unknown";
+    const key = `${map}|${entry.partitionId}`;
+    const target = targets.get(entry.partitionId);
+    const group = byTarget.get(key) || {
+      map,
+      partitionId: entry.partitionId,
+      partitionMap: target?.map || "",
+      dimensionIndex: target?.dimensionIndex ?? 0,
+      count: 0
+    };
+    group.count += 1;
+    byTarget.set(key, group);
+  }
+  return json(res, 200, {
+    supported: true,
+    total: pending.length,
+    pending,
+    byTarget: [...byTarget.values()].sort((a, b) => a.map.localeCompare(b.map) || a.partitionId - b.partitionId)
+  });
 }
 
 async function baseSystemCustodianRoute(req, res, path) {

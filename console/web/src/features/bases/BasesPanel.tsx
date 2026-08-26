@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Boxes, ChevronDown, ChevronUp, Download, Droplet, Fuel, Grid3X3, Lock, Trash2, Users, X, Zap } from "lucide-react";
+import { Boxes, ChevronDown, ChevronUp, Download, Droplet, Fuel, Grid3X3, KeyRound, Lock, Trash2, Users, X, Zap } from "lucide-react";
 import { BaseInventoryTab } from "./BaseInventoryTab";
 import { BaseChildPermissionsTab } from "./BaseChildPermissionsTab";
 import { BaseLandClaimTab } from "./BaseLandClaimTab";
@@ -14,7 +14,7 @@ import { serverApi } from "../../api/server";
 import { setupApi, type Task } from "../../api/setup";
 import { apiDownload } from "../../api/client";
 import { DataTable, type SortDirection } from "../../components/common/DataTable";
-import { pendingRefillCountForPartition, usePendingBaseDeletes, usePendingRefills, usePendingWaterRefills } from "../../lib/usePendingRefills";
+import { pendingRefillCountForPartition, usePendingBaseDeletes, usePendingChildAccess, usePendingRefills, usePendingWaterRefills } from "../../lib/usePendingRefills";
 import { runGatedRestart, serviceRestartTarget, type RestartGate } from "../server/restartQueueGuard";
 
 type BasesPanelProps = {
@@ -387,6 +387,7 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
   const [canQueueWater, setCanQueueWater] = useState(false);
   const [canDeleteBase, setCanDeleteBase] = useState(false);
   const [canQueueDelete, setCanQueueDelete] = useState(false);
+  const [canQueueChildAccess, setCanQueueChildAccess] = useState(false);
   // Which tab the expanded row is showing. Power is the default so expanding a
   // row behaves exactly as it did before this feature existed.
   const [expandedTab, setExpandedTab] = useState<"power" | "water" | "inventory" | "land-claim" | "permissions" | "child-access">("power");
@@ -395,6 +396,7 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
   const [refillingWaterId, setRefillingWaterId] = useState("");
   const [deletingId, setDeletingId] = useState("");
   const [cancelingDeleteId, setCancelingDeleteId] = useState("");
+  const [cancelingChildAccessId, setCancelingChildAccessId] = useState("");
   // Bumped after an immediate (non-queued) water refill so an already-open
   // Water tab knows to refetch -- it fetches its own data independently of
   // the bases list/row, so nothing else tells it a refill just landed.
@@ -425,6 +427,7 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
   const { pending: pendingRefills, refresh: refreshPendingRefills } = usePendingRefills(canQueue);
   const { pending: pendingWaterRefills, refresh: refreshPendingWaterRefills } = usePendingWaterRefills(canQueueWater);
   const { pending: pendingBaseDeletes, refresh: refreshPendingBaseDeletes } = usePendingBaseDeletes(canQueueDelete);
+  const { pending: pendingChildAccess, refresh: refreshPendingChildAccess } = usePendingChildAccess(canQueueChildAccess);
   const previousPendingTotal = useRef<number | null>(null);
 
   useEffect(() => {
@@ -467,6 +470,7 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
       setCanQueue(Boolean(result.capabilities?.generatorRefillQueue));
       setCanEditPermissions(Boolean(result.capabilities?.basePermissions));
       setCanEditChildAccess(Boolean(result.capabilities?.baseChildAccess));
+      setCanQueueChildAccess(Boolean(result.capabilities?.baseChildAccessQueue));
       setCanRefillWater(Boolean(result.capabilities?.waterRefill));
       setCanQueueWater(Boolean(result.capabilities?.waterRefillQueue));
       setCanDeleteBase(Boolean(result.capabilities?.baseDelete));
@@ -801,6 +805,31 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
     }
   }
 
+  // Mirrors handleCancelQueuedDelete. Discards every queued piece for the
+  // base at once -- the queue holds one entry per base, not per piece.
+  async function handleCancelQueuedChildAccess(base: BaseRow) {
+    const id = String(base.base_id);
+    const label = base.name || `base ${id}`;
+    const count = queuedChildAccessBaseIds.get(id) || 0;
+    const confirmed = await confirmAction(
+      `Discard the ${count} queued permission change(s) for "${label}"?`,
+      { title: "Discard Queued Permission Changes", confirmLabel: "Discard", danger: true });
+    if (!confirmed) return;
+    onError("");
+    setCancelingChildAccessId(id);
+    try {
+      await basesApi.cancelQueuedChildAccess(id);
+      writeRefillStatus(`Queued permission changes for "${label}" were discarded.`, "ok");
+      await refreshPendingChildAccess();
+    } catch (error) {
+      const text = errorText(error);
+      writeRefillStatus(text, "fail");
+      onError(text);
+    } finally {
+      setCancelingChildAccessId("");
+    }
+  }
+
   async function handleCancelQueuedDelete(base: BaseRow) {
     const id = String(base.base_id);
     const label = base.name || `base ${id}`;
@@ -1028,8 +1057,8 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
       // Report what the restart actually did. Without this the running line
       // stands forever and a failed restart reads as a successful one.
       const finished = await waitForTask(startedTask);
-      const [refreshedFuel, refreshedWater, refreshedDeletes] = await Promise.all([
-        refreshPendingRefills(), refreshPendingWaterRefills(), refreshPendingBaseDeletes()
+      const [refreshedFuel, refreshedWater, refreshedDeletes, refreshedPermissions] = await Promise.all([
+        refreshPendingRefills(), refreshPendingWaterRefills(), refreshPendingBaseDeletes(), refreshPendingChildAccess()
       ]);
       if (finished.status === "succeeded") {
         // The flush races the restart's own write-safety window, so a
@@ -1039,6 +1068,7 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
           pendingRefillCountForPartition(refreshedFuel, group.partitionId)
           || pendingRefillCountForPartition(refreshedWater, group.partitionId)
           || pendingRefillCountForPartition(refreshedDeletes, group.partitionId)
+          || pendingRefillCountForPartition(refreshedPermissions, group.partitionId)
         );
         writeRefillStatus(
           stillQueued
@@ -1168,18 +1198,31 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
   });
   const staleDeleteTargetKeys = new Set(staleQueuedDeletes.map((entry) => `${entry.map || "Unknown"}|${entry.partitionId}`));
 
+  // Mirrors the block above, for the pending base-permission queue. The badge
+  // counts pieces, not bases: one base with six queued pieces is six pending
+  // writes, and reading it as "1" would understate what a restart applies.
+  const pendingChildAccessTotal = (pendingChildAccess?.pending || [])
+    .reduce((total, entry) => total + entry.updates.length, 0);
+  const queuedChildAccessBaseIds = new Map((pendingChildAccess?.pending || [])
+    .map((entry) => [String(entry.baseId), entry.updates.length] as const));
+  const staleQueuedChildAccess = (pendingChildAccess?.pending || []).filter((entry) => {
+    const queuedAt = Date.parse(entry.queuedAt);
+    return Number.isFinite(queuedAt) && Date.now() - queuedAt > STALE_QUEUED_REFILL_MS;
+  });
+  const staleChildAccessTargetKeys = new Set(staleQueuedChildAccess.map((entry) => `${entry.map || "Unknown"}|${entry.partitionId}`));
+
   // Combined queue banner: one box covering all three queues. Merge byTarget
   // rows keyed on map|partitionId -- restarting a target already flushes
   // whichever queue(s) are waiting on it (see handleRestartForCombinedQueue),
   // so one restart button per target is correct even though the fuel/water/
   // delete counts come from three separate endpoints.
-  type CombinedQueueTarget = { map: string; partitionId: number; partitionMap: string; dimensionIndex: number; fuelCount: number; waterCount: number; deleteCount: number };
+  type CombinedQueueTarget = { map: string; partitionId: number; partitionMap: string; dimensionIndex: number; fuelCount: number; waterCount: number; deleteCount: number; permissionCount: number };
   const combinedQueueTargets: CombinedQueueTarget[] = (() => {
     const byKey = new Map<string, CombinedQueueTarget>();
     for (const group of pendingRefills?.byTarget || []) {
       byKey.set(`${group.map}|${group.partitionId}`, {
         map: group.map, partitionId: group.partitionId, partitionMap: group.partitionMap, dimensionIndex: group.dimensionIndex,
-        fuelCount: group.count, waterCount: 0, deleteCount: 0
+        fuelCount: group.count, waterCount: 0, deleteCount: 0, permissionCount: 0
       });
     }
     for (const group of pendingWaterRefills?.byTarget || []) {
@@ -1188,7 +1231,7 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
       if (existing) existing.waterCount = group.count;
       else byKey.set(key, {
         map: group.map, partitionId: group.partitionId, partitionMap: group.partitionMap, dimensionIndex: group.dimensionIndex,
-        fuelCount: 0, waterCount: group.count, deleteCount: 0
+        fuelCount: 0, waterCount: group.count, deleteCount: 0, permissionCount: 0
       });
     }
     for (const group of pendingBaseDeletes?.byTarget || []) {
@@ -1197,24 +1240,39 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
       if (existing) existing.deleteCount = group.count;
       else byKey.set(key, {
         map: group.map, partitionId: group.partitionId, partitionMap: group.partitionMap, dimensionIndex: group.dimensionIndex,
-        fuelCount: 0, waterCount: 0, deleteCount: group.count
+        fuelCount: 0, waterCount: 0, deleteCount: group.count, permissionCount: 0
+      });
+    }
+    // Counted from the entries rather than byTarget: byTarget counts queued
+    // bases, and this badge counts pieces, matching the headline above.
+    for (const group of pendingChildAccess?.byTarget || []) {
+      const key = `${group.map}|${group.partitionId}`;
+      const pieces = (pendingChildAccess?.pending || [])
+        .filter((entry) => `${entry.map || "Unknown"}|${entry.partitionId}` === key)
+        .reduce((total, entry) => total + entry.updates.length, 0);
+      const existing = byKey.get(key);
+      if (existing) existing.permissionCount = pieces;
+      else byKey.set(key, {
+        map: group.map, partitionId: group.partitionId, partitionMap: group.partitionMap, dimensionIndex: group.dimensionIndex,
+        fuelCount: 0, waterCount: 0, deleteCount: 0, permissionCount: pieces
       });
     }
     return [...byKey.values()];
   })();
-  const combinedQueueTotal = pendingTotal + pendingWaterTotal + pendingDeleteTotal;
+  const combinedQueueTotal = pendingTotal + pendingWaterTotal + pendingDeleteTotal + pendingChildAccessTotal;
   // The banner's own heading names only the kinds of writes actually queued,
   // so "Refills queued" stays exactly as it read before this feature existed
   // when there is nothing to delete, rather than a permanently generic label.
   const combinedQueueHeadingParts = [
     ...(pendingTotal > 0 || pendingWaterTotal > 0 ? ["Refills"] : []),
-    ...(pendingDeleteTotal > 0 ? ["Deletes"] : [])
+    ...(pendingDeleteTotal > 0 ? ["Deletes"] : []),
+    ...(pendingChildAccessTotal > 0 ? ["Permissions"] : [])
   ];
   // Whether any stale entry actually has a restart button in the list above. A
   // group whose partition does not resolve renders "Restart this map from the
   // Maps tab" instead, so pointing at a button that is not there would be wrong.
-  const combinedStaleTargetKeys = new Set([...staleTargetKeys, ...staleWaterTargetKeys, ...staleDeleteTargetKeys]);
-  const combinedStaleCount = staleQueued.length + staleQueuedWater.length + staleQueuedDeletes.length;
+  const combinedStaleTargetKeys = new Set([...staleTargetKeys, ...staleWaterTargetKeys, ...staleDeleteTargetKeys, ...staleChildAccessTargetKeys]);
+  const combinedStaleCount = staleQueued.length + staleQueuedWater.length + staleQueuedDeletes.length + staleQueuedChildAccess.length;
   const combinedStaleHasRestartButton = combinedQueueTargets.some((group) =>
     combinedStaleTargetKeys.has(`${group.map}|${group.partitionId}`)
     && queueRestartTarget(group.partitionMap, group.partitionId, group.dimensionIndex).kind !== "none");
@@ -1308,7 +1366,9 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
           {/* Explicit spaces around the badges: they are inline elements, so
               without them the text content reads "Refills queued2 fuel1 water"
               to a screen reader and to anyone copying it. */}
-          {combinedQueueHeadingParts.join(" and ")} queued
+          {combinedQueueHeadingParts.length > 2
+            ? `${combinedQueueHeadingParts.slice(0, -1).join(", ")} and ${combinedQueueHeadingParts.at(-1)}`
+            : combinedQueueHeadingParts.join(" and ")} queued
           {pendingTotal > 0 && <> <span className="bases-queue-badge bases-queue-badge-fuel">
             <Fuel size={13} aria-hidden="true" />{pendingTotal.toLocaleString()} fuel
           </span></>}
@@ -1317,6 +1377,9 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
           </span></>}
           {pendingDeleteTotal > 0 && <> <span className="bases-queue-badge bases-queue-badge-delete">
             <Trash2 size={13} aria-hidden="true" />{pendingDeleteTotal.toLocaleString()} delete{pendingDeleteTotal === 1 ? "" : "s"}
+          </span></>}
+          {pendingChildAccessTotal > 0 && <> <span className="bases-queue-badge bases-queue-badge-permission">
+            <KeyRound size={13} aria-hidden="true" />{pendingChildAccessTotal.toLocaleString()} permission{pendingChildAccessTotal === 1 ? "" : "s"}
           </span></>}
         </p>
         <p className="action-help-note">
@@ -1344,6 +1407,9 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
               </span>}
               {group.deleteCount > 0 && <span className="bases-queue-badge bases-queue-badge-delete">
                 <Trash2 size={13} aria-hidden="true" />{group.deleteCount.toLocaleString()}
+              </span>}
+              {group.permissionCount > 0 && <span className="bases-queue-badge bases-queue-badge-permission">
+                <KeyRound size={13} aria-hidden="true" />{group.permissionCount.toLocaleString()}
               </span>}
               {target.kind === "none"
                 ? <span className="muted">Restart this map from the Maps tab</span>
@@ -1492,6 +1558,23 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
                   disabled={deletingId === id}
                   onClick={(event) => { event.stopPropagation(); void handleDeleteBase(base); }}
                 ><Trash2 size={16} /></button>)}
+            {/* Unlike the four controls above, this one has no always-present
+                button: permissions are edited inside the expanded row, not
+                from here. It appears only while something is queued, so it
+                costs the fixed-width column nothing the rest of the time. */}
+            {queuedChildAccessBaseIds.has(id) && <span
+              className="bases-queued-permission"
+              title={`${queuedChildAccessBaseIds.get(id)} permission change(s) queued — applies when this map next restarts or stops`}
+            >
+              <KeyRound size={16} aria-label="Permission changes queued for this base" />
+              <button
+                className="icon-toggle-button bases-queued-permission-cancel"
+                title="Discard Queued Permission Changes"
+                aria-label="Discard Queued Permission Changes"
+                disabled={cancelingChildAccessId === id}
+                onClick={(event) => { event.stopPropagation(); void handleCancelQueuedChildAccess(base); }}
+              ><X size={14} /></button>
+            </span>}
           </span>;
         }}
         secondaryActionPosition="start"

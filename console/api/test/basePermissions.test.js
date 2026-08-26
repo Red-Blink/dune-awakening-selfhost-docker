@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { setBasePermissions, listBasePermissions, basePermissionSystemCustodian, transferBaseToSystemCustodian, listBaseChildAccess, setBaseChildAccessLevels } from "../src/duneDb.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { setBasePermissions, listBasePermissions, basePermissionSystemCustodian, transferBaseToSystemCustodian, listBaseChildAccess, setBaseChildAccessLevels, queueBaseChildAccess, listQueuedBaseChildAccess, cancelQueuedBaseChildAccess } from "../src/duneDb.js";
 
 const SUPPORTED_TABLES = ["dune.permission_actor_rank", "dune.permission_actor", "dune.actors", "dune.player_state", "dune.encrypted_player_state", "dune.map_names"];
 const SUPPORTED_FUNCTIONS = [
@@ -447,4 +450,101 @@ test("setBaseChildAccessLevels rejects an access level outside the 1-5 scale", a
   await assert.rejects(
     () => setBaseChildAccessLevels(childAccessDb(), BASE_ID, [{ actorId: "44186", accessLevel: 6 }]),
     /access level/i);
+});
+
+// The queue exists because a running map never picks up an access_level
+// change (see docs/console/base-child-permissions.md), so a save aimed at a
+// live map is recorded and written in the map-down window instead.
+async function withTempRepoRoot(fn) {
+  const repoRoot = mkdtempSync(join(tmpdir(), "dune-child-access-queue-"));
+  try {
+    return await fn(repoRoot);
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
+  }
+}
+
+test("queueBaseChildAccess records a base's pending pieces and cancel clears them", async () => {
+  await withTempRepoRoot((repoRoot) => {
+    assert.deepEqual(listQueuedBaseChildAccess(repoRoot), []);
+    const entry = queueBaseChildAccess(repoRoot, {
+      baseId: BASE_ID,
+      map: "DeepDesert",
+      partitionId: 59,
+      updates: [{ actorId: "44186", accessLevel: 3 }, { actorId: "44187", accessLevel: 5 }]
+    });
+    assert.equal(entry.baseId, BASE_ID);
+    assert.equal(entry.partitionId, 59);
+    assert.deepEqual(entry.updates, [{ actorId: "44186", accessLevel: 3 }, { actorId: "44187", accessLevel: 5 }]);
+
+    const queued = listQueuedBaseChildAccess(repoRoot);
+    assert.equal(queued.length, 1);
+    assert.equal(queued[0].updates.length, 2);
+
+    cancelQueuedBaseChildAccess(repoRoot, BASE_ID);
+    assert.deepEqual(listQueuedBaseChildAccess(repoRoot), []);
+    assert.throws(() => cancelQueuedBaseChildAccess(repoRoot, BASE_ID), /no queued permission changes/i);
+  });
+});
+
+// Unlike the refill/delete queues, whose entries are pure intent and can be
+// replaced wholesale, this entry carries a payload: a second save touching
+// different pieces must not discard the first one's.
+test("queueBaseChildAccess merges a second save into the existing entry, last write winning per piece", async () => {
+  await withTempRepoRoot((repoRoot) => {
+    const first = queueBaseChildAccess(repoRoot, {
+      baseId: BASE_ID,
+      map: "DeepDesert",
+      partitionId: 59,
+      updates: [{ actorId: "44186", accessLevel: 3 }, { actorId: "44187", accessLevel: 5 }]
+    });
+    queueBaseChildAccess(repoRoot, {
+      baseId: BASE_ID,
+      map: "DeepDesert",
+      partitionId: 59,
+      updates: [{ actorId: "44187", accessLevel: 1 }, { actorId: "44188", accessLevel: 2 }]
+    });
+
+    const queued = listQueuedBaseChildAccess(repoRoot);
+    assert.equal(queued.length, 1, "still one entry for the base");
+    assert.deepEqual(queued[0].updates, [
+      { actorId: "44186", accessLevel: 3 },
+      { actorId: "44187", accessLevel: 1 },
+      { actorId: "44188", accessLevel: 2 }
+    ]);
+    // queuedAt is preserved so re-saving cannot reset the entry's age limit.
+    assert.equal(queued[0].queuedAt, first.queuedAt);
+  });
+});
+
+test("queueBaseChildAccess rejects an empty or fully invalid update set", async () => {
+  await withTempRepoRoot((repoRoot) => {
+    assert.throws(() => queueBaseChildAccess(repoRoot, { baseId: BASE_ID, updates: [] }), /at least one piece/i);
+    assert.throws(
+      () => queueBaseChildAccess(repoRoot, { baseId: BASE_ID, updates: [{ actorId: "44186", accessLevel: 9 }] }),
+      /at least one piece/i);
+    assert.deepEqual(listQueuedBaseChildAccess(repoRoot), []);
+  });
+});
+
+// A request-time save must refuse a stale actorId, but an entry drained days
+// later would otherwise be permanently failed by one demolished door.
+test("setBaseChildAccessLevels skips stale pieces only under skipStale, and refuses when none remain", async () => {
+  await assert.rejects(
+    () => setBaseChildAccessLevels(childAccessDb(), BASE_ID, [
+      { actorId: "44186", accessLevel: 3 },
+      { actorId: "999999", accessLevel: 3 }
+    ]),
+    /no longer children of this base/i);
+
+  const result = await setBaseChildAccessLevels(childAccessDb(), BASE_ID, [
+    { actorId: "44186", accessLevel: 3 },
+    { actorId: "999999", accessLevel: 3 }
+  ], { skipStale: true });
+  assert.equal(result.updated, 1);
+  assert.deepEqual(result.skipped, ["999999"]);
+
+  await assert.rejects(
+    () => setBaseChildAccessLevels(childAccessDb(), BASE_ID, [{ actorId: "999999", accessLevel: 3 }], { skipStale: true }),
+    /none of the queued pieces/i);
 });

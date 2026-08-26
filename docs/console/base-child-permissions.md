@@ -59,8 +59,52 @@ base), so the list scrolls inside the tab rather than paginating.
 
 Like the roster editor, this calls the game's own
 `dune.permission_set_access_level(actor_id, access_level)` procedure rather
-than writing the table directly, so a running map is notified immediately —
-no restart required, and no queue.
+than writing the table directly.
+
+## Why this one is queued
+
+A running map **never** picks up an `access_level` change. Unlike the roster
+editor's `permission_set_player_rank`, this procedure takes no map id and its
+`pg_notify` payload carries no `"Map"` field, which looked like a plausible
+explanation. Live testing on DD Test1 ruled that out directly: manually
+re-firing the notify with a `"Map"` field added (matching the rank procedure's
+shape exactly) still had no live effect, and a player relogging didn't pick it
+up either — only a **map restart** applied it. There is no way to make this
+live-apply from our side; it is a limitation in the game's own server.
+
+So a save aimed at a base whose map is currently live is **queued** rather
+than written, and applied in the window where that map is confirmed down —
+which is the only window where it takes effect anyway. If the map is already
+down, the write goes through immediately. This is the same
+`baseRefillTarget` / `world_partition` write-safety machinery the generator
+refill, water refill, and base delete queues use, and the same background
+flush drains it (the 5s poll, plus the restart task runner's map-down hook).
+
+The motivation differs from those queues, though. They exist to dodge an
+autosave race — a live map overwrites an immediate write. `permission_actor`
+has no such race; the write would stick. Queuing here exists so the console
+does not show a level the game is not enforcing: before, a save appeared to
+succeed and survived a reload while the game still honored the old value,
+with nothing indicating the change was inert.
+
+While changes are queued the tab keeps showing the levels the game currently
+enforces, with a `→ <level> at restart` marker on each affected piece and a
+banner offering **Discard queued changes**. The Bases list surfaces the same
+state without opening the row: a violet key badge in the combined queue
+banner (and on each affected map's row there), plus a per-row pill with an
+inline discard. Its count is **pieces, not bases** — one base with six queued
+pieces is six pending writes, and a restart applies all six. Unlike the
+refill and delete controls, that pill only exists while something is queued;
+permissions are edited inside the expanded row, not from the actions column. Re-saving merges into the pending
+entry (later save wins per piece) rather than replacing it. At flush time a
+piece that has since been demolished is skipped rather than failing the whole
+batch — an entry can sit queued for days, and one removed door should not
+strand the rest.
+
+Queue behavior requires `dune.world_partition` (reported as
+`capabilities.baseChildAccessQueue`). Without it the console cannot tell a
+running map from a stopped one, so writes stay immediate, matching how the
+refill and delete queues degrade on an older schema.
 
 `POST` accepts 1-100 updates per call and re-validates every `actorId`
 against the base's *current* child pieces inside the same locked

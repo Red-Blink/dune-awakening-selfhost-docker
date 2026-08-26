@@ -6,9 +6,22 @@ import { BaseChildPermissionsTab } from "./BaseChildPermissionsTab";
 vi.mock("../../api/bases", () => ({
   basesApi: {
     childAccess: vi.fn(),
-    setChildAccess: vi.fn()
+    setChildAccess: vi.fn(),
+    pendingChildAccess: vi.fn(),
+    cancelQueuedChildAccess: vi.fn()
   }
 }));
+
+function mockQueue(updates: { actorId: string; accessLevel: 1 | 2 | 3 | 4 | 5 }[], baseId = 14346) {
+  vi.mocked(basesApi.pendingChildAccess).mockResolvedValue({
+    supported: true,
+    total: updates.length ? 1 : 0,
+    pending: updates.length
+      ? [{ baseId, map: "DeepDesert", partitionId: 59, queuedAt: "2026-08-25T00:00:00.000Z", attempts: 0, lastError: "", updates }]
+      : [],
+    byTarget: []
+  } as never);
+}
 
 function row(
   actorId: string, name: string, buildingType: string, currentAccess: 1 | 2 | 3 | 4 | 5,
@@ -37,7 +50,10 @@ function renderTab(overrides: Partial<Parameters<typeof BaseChildPermissionsTab>
   return props;
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockQueue([]);
+});
 
 describe("BaseChildPermissionsTab", () => {
   it("lists pieces with their current level checked in the segmented control", async () => {
@@ -180,5 +196,44 @@ describe("BaseChildPermissionsTab", () => {
 
     await waitFor(() => expect(props.confirmAction).toHaveBeenCalled());
     await waitFor(() => expect(basesApi.setChildAccess).toHaveBeenCalledWith("14346", [{ actorId: "14274", accessLevel: 3 }]));
+  });
+
+  // A running map never applies an access level change, so a save against a
+  // live map is queued. The list must keep showing what the game enforces now.
+  it("shows queued changes as pending at restart without changing the displayed level", async () => {
+    mockRows([row("14274", "Generator", "Generator_Placeable", 2)]);
+    mockQueue([{ actorId: "14274", accessLevel: 5 }]);
+    renderTab();
+
+    expect(await screen.findByText(/will be written when its map next restarts/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Owner at restart/)).toBeInTheDocument();
+    // Still Guild -- the queued level must not be shown as if already applied.
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Guild for Generator" })).toBeChecked());
+    expect(screen.getByRole("radio", { name: "Owner for Generator" })).not.toBeChecked();
+  });
+
+  it("reports a queued save rather than claiming the level was updated", async () => {
+    mockRows([row("14274", "Generator", "Generator_Placeable", 2)]);
+    vi.mocked(basesApi.setChildAccess).mockResolvedValue({
+      supported: true,
+      result: { ok: true, baseId: 14346, queued: true }
+    } as never);
+    renderTab();
+
+    fireEvent.click(await screen.findByRole("radio", { name: "Associate for Generator" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByText(/queued and will apply at this map's next restart/i)).toBeInTheDocument();
+  });
+
+  it("discards queued changes after confirmation", async () => {
+    mockRows([row("14274", "Generator", "Generator_Placeable", 2)]);
+    mockQueue([{ actorId: "14274", accessLevel: 5 }]);
+    vi.mocked(basesApi.cancelQueuedChildAccess).mockResolvedValue({ supported: true, result: { ok: true, baseId: 14346, pending: 0 } } as never);
+    renderTab();
+
+    fireEvent.click(await screen.findByRole("button", { name: /discard queued changes/i }));
+    await waitFor(() => expect(basesApi.cancelQueuedChildAccess).toHaveBeenCalledWith("14346"));
   });
 });

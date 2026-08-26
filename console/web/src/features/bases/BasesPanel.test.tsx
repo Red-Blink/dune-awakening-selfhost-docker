@@ -25,6 +25,8 @@ vi.mock("../../api/bases", () => ({
     permissionCandidates: vi.fn(),
     childAccess: vi.fn(),
     setChildAccess: vi.fn(),
+    pendingChildAccess: vi.fn(),
+    cancelQueuedChildAccess: vi.fn(),
     water: vi.fn(),
     refillWater: vi.fn(),
     cancelQueuedWaterRefill: vi.fn(),
@@ -597,6 +599,36 @@ describe("BasesPanel base deletion", () => {
     ));
     await waitFor(() => expect(basesApi.cancelQueuedDelete).toHaveBeenCalledWith("2105"));
     expect(await screen.findByText('Queued delete for "Sietch Cancel Delete" was canceled.')).toBeInTheDocument();
+  });
+
+  // A queued permission change is invisible from the list otherwise: unlike
+  // refills and deletes it has no always-present button to swap out, so the
+  // badge is the only signal a queue exists before opening the row.
+  it("shows the queued-permission pill counting pieces, and discards through basesApi.cancelQueuedChildAccess", async () => {
+    vi.mocked(basesApi.list).mockResolvedValue(listResponse(
+      { bases: true, baseChildAccess: true, baseChildAccessQueue: true },
+      { ...deletableBase, base_id: "2106", name: "Sietch Pending Permissions" }
+    ));
+    vi.mocked(basesApi.pendingChildAccess).mockResolvedValue({
+      supported: true,
+      total: 1,
+      pending: [{
+        baseId: 2106, map: "DeepDesert", partitionId: 59, queuedAt: new Date().toISOString(), attempts: 0, lastError: "",
+        updates: [{ actorId: "44186", accessLevel: 3 }, { actorId: "44187", accessLevel: 5 }]
+      }],
+      byTarget: [{ map: "DeepDesert", partitionId: 59, partitionMap: "Deep_Desert", dimensionIndex: 0, count: 1 }]
+    });
+    vi.mocked(basesApi.cancelQueuedChildAccess).mockResolvedValue({ supported: true, result: { ok: true, baseId: 2106, pending: 0 } });
+
+    const props = renderPanel();
+    await screen.findByText("Sietch Pending Permissions");
+
+    // Two pieces on one base reads as 2, not 1 -- a restart applies two writes.
+    expect(await screen.findByText(/2 permissions/)).toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Discard Queued Permission Changes" }));
+    await waitFor(() => expect(basesApi.cancelQueuedChildAccess).toHaveBeenCalledWith("2106"));
+    expect(props.confirmAction).toHaveBeenCalled();
   });
 });
 

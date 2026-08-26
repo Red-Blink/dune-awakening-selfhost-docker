@@ -4092,7 +4092,12 @@ export async function listBaseChildAccess(db, baseId) {
   return { supported: true, inspected: rows.length, rows };
 }
 
-export async function setBaseChildAccessLevels(db, baseId, updates) {
+// skipStale is for the queue flush path only: a request-time save must reject
+// an actorId that no longer resolves (the operator is acting on a stale list),
+// but an entry drained days later would be permanently failed by one demolished
+// door in an otherwise-valid batch. The flush drops those ids and applies the
+// rest, reporting what it skipped.
+export async function setBaseChildAccessLevels(db, baseId, updates, { skipStale = false } = {}) {
   const target = intParam(baseId, "base id", 1);
   if (!Array.isArray(updates) || updates.length < 1 || updates.length > 100) {
     throw new Error("Choose between 1 and 100 pieces to update.");
@@ -4110,10 +4115,13 @@ export async function setBaseChildAccessLevels(db, baseId, updates) {
     if (!locked.rowCount) throw new Error("That base was not found.");
     const audit = await listBaseChildAccess(tx, target);
     const current = new Map(audit.rows.map((row) => [row.actorId, row]));
-    const chosen = [...requested.entries()].map(([actorId, accessLevel]) => ({ actorId, accessLevel, row: current.get(actorId) }));
-    if (chosen.some((entry) => !entry.row)) {
+    const all = [...requested.entries()].map(([actorId, accessLevel]) => ({ actorId, accessLevel, row: current.get(actorId) }));
+    const skipped = all.filter((entry) => !entry.row).map((entry) => entry.actorId);
+    if (skipped.length && !skipStale) {
       throw new Error("One or more selected objects are no longer children of this base. Reload and try again.");
     }
+    const chosen = skipStale ? all.filter((entry) => entry.row) : all;
+    if (!chosen.length) throw new Error("None of the queued pieces are still children of this base.");
     for (const entry of chosen) {
       await tx.query("select dune.permission_set_access_level($1::bigint, $2::smallint)", [entry.actorId, entry.accessLevel]);
     }
@@ -4121,10 +4129,192 @@ export async function setBaseChildAccessLevels(db, baseId, updates) {
       ok: true,
       baseId: target,
       updated: chosen.length,
+      skipped,
       objects: chosen.map((entry) => ({ actorId: entry.actorId, name: entry.row.name, accessLevel: entry.accessLevel })),
-      message: `${chosen.length} piece${chosen.length === 1 ? "" : "s"} updated and sent to the running map.`
+      message: `${chosen.length} piece${chosen.length === 1 ? "" : "s"} updated. The running map applies this at its next restart.`
     };
   });
+}
+
+// Pending base child-access queue. Unlike the refill and delete queues, this
+// one does not exist to dodge an autosave race -- a permission_actor write is
+// durable immediately. It exists because the game server never picks up an
+// access_level change on a running map (relogging does not help, and a
+// pg_notify carrying the same "Map" field permission_set_player_rank uses was
+// live-tested and had no effect), so writing while the map is up leaves the
+// console showing a value the game does not honor. Queuing defers the write
+// to the window where the map is down, which is also the only window where it
+// takes effect, so what the console shows and what the game enforces agree.
+//
+// Diverges from the refill/delete queues in one way: those entries are pure
+// intent (which base), while this one carries a payload (which pieces, to
+// which levels), so re-queuing merges per actorId instead of replacing the
+// whole entry -- two saves touching different pieces must both survive.
+const PENDING_BASE_CHILD_ACCESS_PATH = "runtime/generated/pending-base-child-access.json";
+const MAX_PENDING_BASE_CHILD_ACCESS = 200;
+const MAX_CHILD_ACCESS_QUEUED_UPDATES = 500;
+
+function pendingBaseChildAccessFile(repoRoot) {
+  return resolve(repoRoot || "", PENDING_BASE_CHILD_ACCESS_PATH);
+}
+
+function normalizeQueuedChildAccessUpdates(updates) {
+  if (!Array.isArray(updates)) return [];
+  const merged = new Map();
+  for (const update of updates) {
+    const actorId = Math.floor(Number(update?.actorId));
+    const accessLevel = Math.floor(Number(update?.accessLevel));
+    if (!Number.isInteger(actorId) || actorId < 1) continue;
+    if (!Number.isInteger(accessLevel) || accessLevel < 1 || accessLevel > 5) continue;
+    merged.set(String(actorId), accessLevel);
+  }
+  return [...merged.entries()]
+    .slice(0, MAX_CHILD_ACCESS_QUEUED_UPDATES)
+    .map(([actorId, accessLevel]) => ({ actorId, accessLevel }));
+}
+
+function normalizePendingChildAccess(entry) {
+  const baseId = Math.floor(Number(entry?.baseId));
+  if (!Number.isInteger(baseId) || baseId < 1) return null;
+  const updates = normalizeQueuedChildAccessUpdates(entry?.updates);
+  if (!updates.length) return null;
+  const partitionId = Math.floor(Number(entry?.partitionId));
+  return {
+    baseId,
+    map: String(entry?.map ?? "").slice(0, 120),
+    partitionId: Number.isInteger(partitionId) && partitionId > 0 ? partitionId : 0,
+    queuedAt: typeof entry?.queuedAt === "string" ? entry.queuedAt.slice(0, 40) : "",
+    attempts: clampInt(entry?.attempts, 0, 0, MAX_REFILL_FLUSH_ATTEMPTS),
+    nextRetryAt: Number.isFinite(Number(entry?.nextRetryAt)) ? Number(entry.nextRetryAt) : 0,
+    lastError: String(entry?.lastError ?? "").slice(0, 300),
+    updates
+  };
+}
+
+export function listQueuedBaseChildAccess(repoRoot) {
+  const file = pendingBaseChildAccessFile(repoRoot);
+  if (!existsSync(file)) return [];
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    if (!Array.isArray(parsed)) return [];
+    const seen = new Set();
+    return parsed.map(normalizePendingChildAccess).filter((entry) => {
+      if (!entry || seen.has(entry.baseId)) return false;
+      seen.add(entry.baseId);
+      return true;
+    });
+  } catch (error) {
+    console.warn(`Ignoring unreadable pending base child access queue: ${redact(error?.message || "Unexpected error.")}`);
+    return [];
+  }
+}
+
+function writeQueuedBaseChildAccess(repoRoot, entries) {
+  writeJsonAtomic(pendingBaseChildAccessFile(repoRoot), entries);
+  return entries;
+}
+
+// Merges into an existing entry for the same base rather than replacing it,
+// keeping the original queuedAt so a base cannot dodge the age limit by being
+// re-saved. A later save wins per piece.
+export function queueBaseChildAccess(repoRoot, { baseId, map = "", partitionId = 0, updates = [], now = () => new Date() } = {}) {
+  const target = intParam(baseId, "base id", 1);
+  const incoming = normalizeQueuedChildAccessUpdates(updates);
+  if (!incoming.length) throw new Error("Choose at least one piece to update.");
+  const existing = listQueuedBaseChildAccess(repoRoot);
+  const previous = existing.find((row) => row.baseId === target);
+  const others = existing.filter((row) => row.baseId !== target);
+  if (!previous && others.length >= MAX_PENDING_BASE_CHILD_ACCESS) {
+    throw new Error(`The pending base permission queue already holds ${MAX_PENDING_BASE_CHILD_ACCESS} bases. Restart the affected maps to apply them first.`);
+  }
+  const entry = normalizePendingChildAccess({
+    baseId: target,
+    map,
+    partitionId,
+    queuedAt: previous?.queuedAt || now().toISOString(),
+    updates: [...(previous?.updates || []), ...incoming]
+  });
+  if (!entry) throw new Error("Invalid base id");
+  writeQueuedBaseChildAccess(repoRoot, [...others, entry]);
+  return entry;
+}
+
+export function cancelQueuedBaseChildAccess(repoRoot, baseId) {
+  const target = intParam(baseId, "base id", 1);
+  const entries = listQueuedBaseChildAccess(repoRoot);
+  const remaining = entries.filter((entry) => entry.baseId !== target);
+  if (remaining.length === entries.length) throw new Error("That base has no queued permission changes.");
+  writeQueuedBaseChildAccess(repoRoot, remaining);
+  return { ok: true, baseId: target, pending: remaining.length };
+}
+
+function reconcileQueuedBaseChildAccess(repoRoot, outcomes) {
+  const next = [];
+  for (const entry of listQueuedBaseChildAccess(repoRoot)) {
+    const outcome = outcomes.get(entry.baseId);
+    if (!outcome || outcome.queuedAt !== entry.queuedAt) {
+      next.push(entry);
+      continue;
+    }
+    if (outcome.keep) next.push({ ...entry, attempts: outcome.attempts, nextRetryAt: outcome.nextRetryAt, lastError: outcome.lastError });
+  }
+  writeQueuedBaseChildAccess(repoRoot, next);
+  return next;
+}
+
+// Applies every queued permission change whose map is currently down and
+// leaves the rest queued. Same driver and reasoning as flushWaterRefills,
+// except each entry's payload is applied in 100-update batches (the cap
+// setBaseChildAccessLevels enforces) and stale pieces are skipped rather than
+// failing the whole entry.
+export async function flushBaseChildAccess(db, repoRoot, { now = Date.now } = {}) {
+  const pending = listQueuedBaseChildAccess(repoRoot);
+  if (!pending.length) return { flushed: [], pending: 0 };
+  const observed = await observeRefillPartitions(db, { now });
+  if (!observed) return { flushed: [], pending: pending.length, unsupported: true };
+
+  const flushed = [];
+  const outcomes = new Map();
+  const timestamp = now();
+  for (const entry of pending) {
+    const queuedMs = Date.parse(entry.queuedAt);
+    if (Number.isFinite(queuedMs) && timestamp - queuedMs >= pendingRefillMaxAgeMs()) {
+      const message = `Queued for longer than the ${Math.round(pendingRefillMaxAgeMs() / 3600000)}h limit without being applied.`;
+      outcomes.set(entry.baseId, { queuedAt: entry.queuedAt, keep: false });
+      flushed.push({ baseId: entry.baseId, map: entry.map, partitionId: entry.partitionId, ok: false, expired: true, dropped: true, error: message });
+      continue;
+    }
+    if (!partitionWriteSafe(observed, entry.partitionId)) continue;
+    if (entry.nextRetryAt && timestamp < entry.nextRetryAt) continue;
+    try {
+      let updated = 0;
+      const skipped = [];
+      for (let i = 0; i < entry.updates.length; i += 100) {
+        const result = await setBaseChildAccessLevels(db, entry.baseId, entry.updates.slice(i, i + 100), { skipStale: true });
+        updated += result.updated;
+        skipped.push(...result.skipped);
+      }
+      outcomes.set(entry.baseId, { queuedAt: entry.queuedAt, keep: false });
+      flushed.push({ baseId: entry.baseId, map: entry.map, partitionId: entry.partitionId, ok: true, updated, skipped });
+    } catch (error) {
+      const message = String(error?.message || "Unexpected error.").slice(0, 300);
+      const attempts = isTransientFlushError(message) ? entry.attempts : entry.attempts + 1;
+      const dropped = attempts >= MAX_REFILL_FLUSH_ATTEMPTS;
+      const nextRetryAt = timestamp + pendingRefillRetryDelayMs();
+      outcomes.set(entry.baseId, { queuedAt: entry.queuedAt, keep: !dropped, attempts, nextRetryAt, lastError: message });
+      flushed.push({ baseId: entry.baseId, map: entry.map, partitionId: entry.partitionId, ok: false, attempts, dropped, error: message });
+    }
+  }
+  const remaining = outcomes.size ? reconcileQueuedBaseChildAccess(repoRoot, outcomes) : pending;
+  return { flushed, pending: remaining.length };
+}
+
+// Mirrors supportsBaseDeleteQueue: without dune.world_partition there is no
+// way to tell a running map from a stopped one, so changes stay immediate.
+export async function supportsBaseChildAccessQueue(db, { baseChildAccess } = {}) {
+  const supported = baseChildAccess !== undefined ? baseChildAccess : await baseChildAccessSupported(db);
+  if (!supported) return false;
+  return tableExists(db, "world_partition");
 }
 
 // System identities stay out of ordinary player search. Prefer the RedBlink
@@ -4966,14 +5156,15 @@ export async function listBases(db, { q = "", page = 0, pageSize = 50, sortColum
     // stopped one, so the panel hides the queue entirely and refills/deletes
     // stay immediate. Each check reuses the flag just computed above instead
     // of re-deriving it, and all run concurrently for the same reason as above.
-    const [generatorRefillQueue, waterRefillQueue, baseDeleteQueue] = await Promise.all([
+    const [generatorRefillQueue, waterRefillQueue, baseDeleteQueue, baseChildAccessQueue] = await Promise.all([
       generatorRefill ? supportsGeneratorRefillQueue(db, { generatorRefill }).catch(() => false) : Promise.resolve(false),
       waterRefill ? supportsWaterRefillQueue(db, { waterRefill }).catch(() => false) : Promise.resolve(false),
-      baseDelete ? supportsBaseDeleteQueue(db, { baseDelete }).catch(() => false) : Promise.resolve(false)
+      baseDelete ? supportsBaseDeleteQueue(db, { baseDelete }).catch(() => false) : Promise.resolve(false),
+      baseChildAccess ? supportsBaseChildAccessQueue(db, { baseChildAccess }).catch(() => false) : Promise.resolve(false)
     ]);
 
     return {
-      capabilities: { bases: true, generatorRefill, generatorRefillQueue, basePermissions, waterRefill, waterRefillQueue, baseDelete, baseDeleteQueue, baseChildAccess },
+      capabilities: { bases: true, generatorRefill, generatorRefillQueue, basePermissions, waterRefill, waterRefillQueue, baseDelete, baseDeleteQueue, baseChildAccess, baseChildAccessQueue },
       totalCount: result.rows[0] ? Number(result.rows[0].total_count) : 0,
       totalBases: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_bases) : 0,
       totalOwned: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_owned || 0) : 0,
