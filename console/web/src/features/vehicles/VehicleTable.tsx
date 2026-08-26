@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, X } from "lucide-react";
 import type { VehicleModule, VehicleRow, VehicleSharedEntry } from "../../api/vehicles";
 import { DataTable, type SortDirection } from "../../components/common/DataTable";
 import { cachedInstanceNames, resolveInstanceNames } from "../maps/instanceNames";
@@ -33,6 +33,19 @@ type VehicleTableProps = {
   // every request so the same vehicle can be re-focused twice in a row.
   focusVehicleId?: string;
   focusNonce?: number;
+  // Required, not optional: an optional prop would let a mount point silently
+  // render VehiclePermissionsTab's transfer button with no confirmation.
+  confirmAction: (message: string, options?: { title?: string; confirmLabel?: string; warning?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
+  // Delete is optional and defaults off, unlike confirmAction above: this is
+  // v1 scoped to the global Vehicles panel only (matching how Delete Base
+  // shipped), so PlayerVehiclesTab's mount is unaffected until these are
+  // deliberately wired through there too.
+  canDeleteVehicle?: boolean;
+  queuedDeleteVehicleIds?: Set<string>;
+  deletingId?: string;
+  cancelingDeleteId?: string;
+  onDeleteVehicle?: (vehicle: VehicleRow) => void;
+  onCancelQueuedDelete?: (vehicle: VehicleRow) => void;
 };
 
 function toNumber(value: unknown): number | null {
@@ -152,7 +165,11 @@ function renderComponent(module: VehicleModule, index: number) {
   );
 }
 
-export function VehicleTable({ rows, context = "global", emptyMessage = "No vehicles have been found yet.", sortColumn, sortDirection, onSort, canEditPermissions = false, onPermissionsSaved, focusVehicleId, focusNonce }: VehicleTableProps) {
+export function VehicleTable({
+  rows, context = "global", emptyMessage = "No vehicles have been found yet.", sortColumn, sortDirection, onSort,
+  canEditPermissions = false, onPermissionsSaved, focusVehicleId, focusNonce, confirmAction,
+  canDeleteVehicle = false, queuedDeleteVehicleIds, deletingId, cancelingDeleteId, onDeleteVehicle, onCancelQueuedDelete
+}: VehicleTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedTab, setExpandedTab] = useState<"components" | "permissions">("components");
   const [instanceNames, setInstanceNames] = useState<Map<string, string>>(new Map());
@@ -240,6 +257,31 @@ export function VehicleTable({ rows, context = "global", emptyMessage = "No vehi
       sortColumn={sortColumn}
       sortDirection={sortDirection}
       onSort={onSort}
+      actionClassName="actions-column vehicles-actions-column"
+      action={canDeleteVehicle ? (row) => {
+        const vehicle = row as VehicleRow;
+        const id = String(vehicle.id);
+        const label = vehicle.name || `vehicle ${id}`;
+        const queued = queuedDeleteVehicleIds?.has(id) ?? false;
+        return queued
+          ? <span className="vehicles-queued-delete" title="Delete queued — applies when this map next restarts or stops">
+              <Trash2 size={16} aria-label={`Delete queued for ${label}`} />
+              <button
+                className="icon-toggle-button vehicles-queued-delete-cancel"
+                title="Cancel Queued Delete"
+                aria-label={`Cancel queued delete for ${label}`}
+                disabled={cancelingDeleteId === id}
+                onClick={(event) => { event.stopPropagation(); onCancelQueuedDelete?.(vehicle); }}
+              ><X size={14} /></button>
+            </span>
+          : <button
+              className="icon-toggle-button danger"
+              title="Delete Vehicle"
+              aria-label={`Delete ${label}`}
+              disabled={deletingId === id}
+              onClick={(event) => { event.stopPropagation(); onDeleteVehicle?.(vehicle); }}
+            ><Trash2 size={16} /></button>;
+      } : undefined}
       secondaryActionPosition="start"
       secondaryActionLabel=""
       secondaryActionClassName="vehicles-expand-column"
@@ -292,6 +334,8 @@ export function VehicleTable({ rows, context = "global", emptyMessage = "No vehi
                     vehicleId={id}
                     vehicleName={String(vehicle.name || `vehicle ${id}`)}
                     onSaved={() => onPermissionsSaved?.()}
+                    confirmAction={confirmAction}
+                    deletePending={queuedDeleteVehicleIds?.has(id) ?? false}
                   />
                 </div>}
           </div>

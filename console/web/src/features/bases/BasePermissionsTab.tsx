@@ -11,10 +11,12 @@ import {
   CO_OWNER_RANK,
   EntryName,
   OWNER_RANK,
+  OwnerHeroCard,
   RANK_OPTIONS,
   RANK_LABELS,
   RankSegments,
   type DraftEntry,
+  demoteOtherOwners,
   errorText,
   formatShareBreakdown,
   sameRoster,
@@ -28,53 +30,6 @@ type BasePermissionsTabProps = {
   onSaved: () => void;
   confirmAction: (message: string, options?: { title?: string; confirmLabel?: string; warning?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
 };
-
-// The Owner is the one thing an admin opens this tab to check, so it gets its
-// own card instead of being one row among many. The custodian transfer lives
-// here too -- it only ever changes the Owner, and as a section of its own it
-// was the loudest thing on the tab despite being a rare action.
-function OwnerHeroCard({ owner, isCustodian, systemCustodian, saving, dirty, unclaimed, onTransfer }: {
-  owner: DraftEntry | undefined;
-  isCustodian: boolean;
-  systemCustodian: { available: boolean; canCreate?: boolean; playerId?: string; name?: string; reason?: string };
-  saving: boolean;
-  dirty: boolean;
-  unclaimed: string;
-  onTransfer: () => void;
-}) {
-  const custodianName = systemCustodian.name || "Custodian";
-  const ownedByCustodian = Boolean(owner && owner.playerId === systemCustodian.playerId);
-  return (
-    <div className={`bases-permissions-owner-card${owner ? "" : " bases-permissions-owner-card-empty"}`}>
-      <div className="bases-permissions-owner-identity">
-        <span className="bases-permissions-owner-eyebrow">Owner</span>
-        {owner
-          ? <EntryName entry={owner} isSystemCustodian={isCustodian} className="bases-permissions-owner-name" />
-          : <span className="bases-permissions-owner-name bases-permissions-owner-none">No Owner set</span>}
-      </div>
-      <button
-        className="warning"
-        // Still enabled on an ownerless base that is *claimed*: that state
-        // arrives from the server with a clean draft, so parking ownership on
-        // the custodian is the fastest legitimate way out of it. An unclaimed
-        // base looks identical on screen -- "No Owner set" -- but has no
-        // permission_actor row for the rank write to reference, so this button
-        // was the shortest path to a raw foreign-key error and is blocked.
-        disabled={(!systemCustodian.available && !systemCustodian.canCreate) || ownedByCustodian || saving || dirty || Boolean(unclaimed)}
-        title={unclaimed
-          ? unclaimed
-          : dirty
-          ? "Save or revert roster changes first"
-          : ownedByCustodian
-          ? `This base is already owned by the ${systemCustodian.name || "detected"} system custodian`
-          : `Park ownership on the reserved ${systemCustodian.name || "detected"} system identity, preserving the current permission roster`}
-        onClick={onTransfer}
-      >{ownedByCustodian ? `Owned by ${custodianName}` : (systemCustodian.available || systemCustodian.canCreate) ? `Transfer to ${custodianName}` : "Transfer to Custodian"}</button>
-      {!systemCustodian.available && systemCustodian.reason &&
-        <p className="bases-permissions-error bases-permissions-owner-note">{systemCustodian.reason}</p>}
-    </div>
-  );
-}
 
 export function BasePermissionsTab({ baseId, baseName, onSaved, confirmAction }: BasePermissionsTabProps) {
   const [loading, setLoading] = useState(true);
@@ -138,13 +93,16 @@ export function BasePermissionsTab({ baseId, baseName, onSaved, confirmAction }:
   // Promoting to Owner demotes whoever currently holds it, in the same local
   // edit. The server enforces the one-owner rule too, but doing it here means
   // the invariant can never be broken on screen -- there is no intermediate
-  // state showing two Owners for the user to try to save.
+  // state showing two Owners for the user to try to save. If the incumbent is
+  // the system custodian, it is removed rather than demoted -- see
+  // demoteOtherOwners.
   function changeRank(playerId: string, nextRank: BasePermissionRank) {
-    setDraft((current) => current.map((entry) => {
-      if (entry.playerId === playerId) return { ...entry, rank: nextRank };
-      if (nextRank === OWNER_RANK && entry.rank === OWNER_RANK) return { ...entry, rank: CO_OWNER_RANK };
-      return entry;
-    }));
+    setDraft((current) => {
+      const promoted = current.map((entry) => entry.playerId === playerId ? { ...entry, rank: nextRank } : entry);
+      return nextRank === OWNER_RANK
+        ? demoteOtherOwners(promoted, playerId, systemCustodian.available ? systemCustodian.playerId : undefined)
+        : promoted;
+    });
   }
 
   function removeEntry(playerId: string) {
@@ -156,12 +114,11 @@ export function BasePermissionsTab({ baseId, baseName, onSaved, confirmAction }:
       if (current.some((entry) => entry.playerId === candidate.playerId)) return current;
       // No label: the rank is one this editor picked, so RANK_LABELS covers it.
       const next = [...current, { playerId: candidate.playerId, name: candidate.name, rank: addRank, canonical: true, label: "" }];
-      // Adding straight to Owner has to demote the incumbent for the same
-      // reason changeRank does.
-      if (addRank !== OWNER_RANK) return next;
-      return next.map((entry) => entry.playerId === candidate.playerId || entry.rank !== OWNER_RANK
-        ? entry
-        : { ...entry, rank: CO_OWNER_RANK });
+      // Adding straight to Owner has to demote (or remove) the incumbent for
+      // the same reason changeRank does.
+      return addRank === OWNER_RANK
+        ? demoteOtherOwners(next, candidate.playerId, systemCustodian.available ? systemCustodian.playerId : undefined)
+        : next;
     });
     // Adding completes the search interaction. Reset it instead of leaving a
     // stale query and result list sitting beneath the newly-added roster row.

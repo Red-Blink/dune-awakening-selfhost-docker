@@ -120,8 +120,9 @@ and again on save.
 
 ## What a restart will flush
 
-Taking a map down is when the base-write queues are applied — queued generator
-refills, water refills, base deletes, and
+Taking a map down is when queued database writes are applied — generator
+refills, water refills, base deletes,
+[vehicle deletes](vehicle-deletion.md), and
 [base permission changes](base-child-permissions.md). Every restart
 confirmation therefore carries a **Queued Writes** line naming what this
 particular restart will write, scoped to the targeted partition (or totalled

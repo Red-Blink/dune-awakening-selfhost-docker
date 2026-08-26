@@ -23,7 +23,7 @@ export type RestartLifecycleState = { stopObserved: boolean; startObserved: bool
 // step opens a window with Postgres reachable and the map server not yet
 // booted, which the background flush uses. Both battlegroup control rows say so.
 function PendingRefillNote() {
-  const { fuel, water, deletes, permissions } = usePendingQueues();
+  const { fuel, water, deletes, vehicleDeletes, permissions } = usePendingQueues();
   // Split per resource rather than reporting one number: every queue flushes on
   // the same restart, but which one is waiting decides whether an operator goes
   // looking at generators, water containers, a deleted base, or a permission
@@ -33,6 +33,7 @@ function PendingRefillNote() {
     fuel: fuel.pending?.total || 0,
     water: water.pending?.total || 0,
     deletes: deletes.pending?.total || 0,
+    vehicleDeletes: vehicleDeletes.pending?.total || 0,
     permissions: childAccessPieceCount(permissions.pending)
   };
   const total = queueCountsTotal(counts);

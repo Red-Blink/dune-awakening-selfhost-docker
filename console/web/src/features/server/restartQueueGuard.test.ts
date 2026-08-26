@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { basesApi } from "../../api/bases";
+import { vehiclesApi } from "../../api/vehicles";
 import { serverApi } from "../../api/server";
 import { runGatedRestart, type RestartGateMeta } from "./restartQueueGuard";
 
@@ -14,6 +15,10 @@ vi.mock("../../api/bases", () => ({
 
 vi.mock("../../api/server", () => ({
   serverApi: { restartQueue: vi.fn() }
+}));
+
+vi.mock("../../api/vehicles", () => ({
+  vehiclesApi: { pendingDeletes: vi.fn() }
 }));
 
 function refills(total: number, partitionId = 59) {
@@ -31,6 +36,7 @@ function emptyQueues() {
   vi.mocked(basesApi.pendingRefills).mockResolvedValue(refills(0) as never);
   vi.mocked(basesApi.pendingWaterRefills).mockResolvedValue(refills(0) as never);
   vi.mocked(basesApi.pendingDeletes).mockResolvedValue(refills(0) as never);
+  vi.mocked(vehiclesApi.pendingDeletes).mockResolvedValue(refills(0) as never);
   vi.mocked(basesApi.pendingChildAccess).mockResolvedValue({ supported: true, total: 0, pending: [], byTarget: [] } as never);
 }
 
@@ -57,10 +63,11 @@ describe("runGatedRestart queued-writes detail", () => {
   // Every restart surface funnels through here -- per-service Restart,
   // Landsraad, the Maps deferred-settings banner, Admin Tools "Restart Now" --
   // and none of them knew about these queues before.
-  it("reports all four queues battlegroup-wide when no target is given", async () => {
+  it("reports every queue battlegroup-wide when no target is given", async () => {
     vi.mocked(basesApi.pendingRefills).mockResolvedValue(refills(2) as never);
     vi.mocked(basesApi.pendingWaterRefills).mockResolvedValue(refills(1) as never);
     vi.mocked(basesApi.pendingDeletes).mockResolvedValue(refills(1) as never);
+    vi.mocked(vehiclesApi.pendingDeletes).mockResolvedValue(refills(1) as never);
     vi.mocked(basesApi.pendingChildAccess).mockResolvedValue({
       supported: true,
       total: 1,
@@ -74,7 +81,7 @@ describe("runGatedRestart queued-writes detail", () => {
     const detail = (await capture())?.details?.find((entry) => entry.label === "Queued Writes");
     // Permissions count pieces, not bases: one base with two queued pieces is
     // two pending writes.
-    expect(detail?.value).toBe("2 generator refills, 1 water refill, 1 base delete, 2 permission changes");
+    expect(detail?.value).toBe("2 generator refills, 1 water refill, 1 base delete, 1 vehicle delete, 2 permission changes");
   });
 
   it("scopes counts to the targeted partition", async () => {

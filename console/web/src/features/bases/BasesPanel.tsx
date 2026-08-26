@@ -1263,7 +1263,7 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
   })();
   const combinedQueueCounts: QueueCounts = {
     fuel: pendingTotal, water: pendingWaterTotal,
-    deletes: pendingDeleteTotal, permissions: pendingChildAccessTotal
+    deletes: pendingDeleteTotal, vehicleDeletes: 0, permissions: pendingChildAccessTotal
   };
   const combinedQueueTotal = queueCountsTotal(combinedQueueCounts);
   // The banner's own heading names only the kinds of writes actually queued,
@@ -1391,7 +1391,7 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
               </span>
               <QueueBadges labels={false} counts={{
                 fuel: group.fuelCount, water: group.waterCount,
-                deletes: group.deleteCount, permissions: group.permissionCount
+                deletes: group.deleteCount, vehicleDeletes: 0, permissions: group.permissionCount
               }} />
               {target.kind === "none"
                 ? <span className="muted">Restart this map from the Maps tab</span>

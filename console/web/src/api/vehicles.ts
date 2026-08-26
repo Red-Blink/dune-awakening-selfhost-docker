@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, post } from "./client";
 
 export type VehicleModule = {
   templateId: string;
@@ -42,8 +42,28 @@ export type VehiclesListResponse = {
   rows: VehicleRow[];
   totalCount: number;
   totalVehicles: number;
-  capabilities: { vehicles?: boolean; vehiclePermissions?: boolean } & Record<string, unknown>;
+  capabilities: { vehicles?: boolean; vehiclePermissions?: boolean; vehicleDelete?: boolean; vehicleDeleteQueue?: boolean } & Record<string, unknown>;
   reason?: string;
+};
+
+export type QueuedVehicleDelete = {
+  vehicleId: number;
+  map: string;
+  partitionId: number;
+  queuedAt: string;
+  attempts: number;
+  lastError: string;
+};
+
+// Own type rather than reusing bases.ts's PendingRefills -- that one is keyed
+// on baseId, and per-resource duplication is this codebase's convention (see
+// the vehicle delete queue's own comment in duneDb.js for the same reasoning
+// applied server-side).
+export type PendingVehicleDeletes = {
+  supported: boolean;
+  total: number;
+  pending: QueuedVehicleDelete[];
+  byTarget: { map: string; partitionId: number; partitionMap: string; dimensionIndex: number; count: number }[];
 };
 
 // rank 1/2/3 = Owner/Co-Owner/Associate, same semantics as base permissions --
@@ -75,6 +95,13 @@ export type VehiclePermissions = {
   // behaviour that existed before the flag rather than a new lockout.
   claimed?: boolean;
   unclaimedReason?: string;
+  systemCustodian?: {
+    available: boolean;
+    canCreate?: boolean;
+    playerId?: string;
+    name?: string;
+    reason?: string;
+  };
   entries: VehiclePermissionEntry[];
   reason?: string;
 };
@@ -120,5 +147,32 @@ export const vehiclesApi = {
     search.set("limit", String(limit));
     return api<{ supported: boolean; rows: VehiclePermissionCandidate[]; reason?: string }>(
       `/api/vehicles/permission-candidates?${search.toString()}`);
-  }
+  },
+  transferToSystemCustodian: (vehicleId: string) =>
+    post<{ supported: boolean; result?: SetVehiclePermissionsResult; reason?: string }>(
+      `/api/vehicles/${encodeURIComponent(vehicleId)}/system-custodian`, {}),
+  // Permanently deletes the vehicle and everything on it. Like Delete Base, a
+  // delete for a map that is currently running comes back as `result.queued`:
+  // it is deferred to the next time that map is down, and a full database
+  // backup happens automatically, immediately before the delete actually
+  // runs -- never before, never skipped.
+  deleteVehicle: (vehicleId: string) =>
+    api<{
+      supported: boolean;
+      backupCreated: boolean;
+      result?: {
+        ok: boolean;
+        vehicleId: number;
+        queued?: boolean;
+        map?: string;
+        partitionId?: number;
+        actorId?: string;
+        deletedModuleCount?: number;
+      };
+      reason?: string;
+    }>(`/api/vehicles/${encodeURIComponent(vehicleId)}`, { method: "DELETE", body: JSON.stringify({ confirmation: "DELETE VEHICLE" }) }),
+  cancelQueuedDelete: (vehicleId: string) =>
+    api<{ supported: boolean; result?: { ok: boolean; vehicleId: number; pending: number }; reason?: string }>(
+      `/api/vehicles/${encodeURIComponent(vehicleId)}/queued-delete`, { method: "DELETE" }),
+  pendingDeletes: () => api<PendingVehicleDeletes>("/api/vehicles/pending-deletes")
 };

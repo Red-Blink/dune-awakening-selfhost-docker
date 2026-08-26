@@ -101,7 +101,8 @@ const tasks = new TaskManager(config, {
     flushGenerators: flushQueuedGeneratorRefills,
     flushWater: flushQueuedWaterRefills,
     flushDeletes: flushQueuedBaseDeletes,
-    flushChildAccess: flushQueuedBaseChildAccess
+    flushChildAccess: flushQueuedBaseChildAccess,
+    flushVehicleDeletes: flushQueuedVehicleDeletes
   })
 });
 let db = createDb(config);
@@ -120,6 +121,8 @@ let waterRefillFlushRunning = false;
 let baseDeleteFlushRunning = false;
 // Same reasoning as generatorRefillFlushRunning, for the base permission queue.
 let baseChildAccessFlushRunning = false;
+// Same reasoning as baseDeleteFlushRunning, for the vehicle pending-delete queue.
+let vehicleDeleteFlushRunning = false;
 let messageOfTheDayAutoRunning = false;
 let messageOfTheDayAutoLastRun = 0;
 let messageOfTheDayAutoNextAllowedRun = 0;
@@ -276,6 +279,9 @@ setInterval(() => {
   if (duneDb.listQueuedBaseChildAccess(config.repoRoot).length) {
     runBackgroundTick("Base permission flush", () => flushQueuedBaseChildAccess());
   }
+  if (duneDb.listQueuedVehicleDeletes(config.repoRoot).length) {
+    runBackgroundTick("Vehicle delete flush", () => flushQueuedVehicleDeletes());
+  }
 }, Number.isFinite(generatorRefillFlushIntervalMs) && generatorRefillFlushIntervalMs > 0 ? generatorRefillFlushIntervalMs : 5000).unref?.();
 
 // Every queued-refill write goes through here so it is audited whichever path
@@ -344,6 +350,26 @@ async function flushQueuedBaseDeletes() {
     return result;
   } finally {
     baseDeleteFlushRunning = false;
+  }
+}
+
+// Same guard reasoning as flushQueuedBaseDeletes, for the vehicle queue.
+async function flushQueuedVehicleDeletes() {
+  if (vehicleDeleteFlushRunning) return { flushed: [] };
+  vehicleDeleteFlushRunning = true;
+  try {
+    const result = await duneDb.flushVehicleDeletes(db, config.repoRoot, {
+      onBeforeApply: config.mockMode
+        ? undefined
+        : () => runDune(config, buildDuneArgs("backupCreate"), { env: { DB_BACKUP_ORIGIN: "vehicle-delete" } })
+    });
+    for (const entry of result.flushed || []) audit(config, null, "vehicles.flush-queued-delete", entry);
+    if (result.backupFailed) {
+      audit(config, null, "vehicles.flush-queued-delete-backup-failed", { error: result.error, pending: result.pending });
+    }
+    return result;
+  } finally {
+    vehicleDeleteFlushRunning = false;
   }
 }
 
@@ -765,9 +791,13 @@ async function handleApi(req, res) {
     sortColumn: url.searchParams.get("sortColumn") || "name",
     sortDirection: url.searchParams.get("sortDirection") || "asc"
   }));
+  if (path === "/api/vehicles/pending-deletes") return pendingVehicleDeletesRoute(res);
   if (path === "/api/vehicles/permission-candidates") return vehiclePermissionCandidatesRoute(res, url);
   if (path.match(/^\/api\/vehicles\/[^/]+\/permissions$/) && req.method === "GET") return vehiclePermissionsRoute(res, path);
   if (path.match(/^\/api\/vehicles\/[^/]+\/permissions$/) && req.method === "PUT") return vehicleSetPermissionsRoute(req, res, path);
+  if (path.match(/^\/api\/vehicles\/[^/]+\/system-custodian$/) && req.method === "POST") return vehicleSystemCustodianRoute(req, res, path);
+  if (path.match(/^\/api\/vehicles\/[^/]+\/queued-delete$/) && req.method === "DELETE") return vehicleCancelQueuedDeleteRoute(req, res, path);
+  if (path.match(/^\/api\/vehicles\/[^/]+$/) && req.method === "DELETE") return vehicleDeleteRoute(req, res, path);
   if (path === "/api/admin/items/catalog") return json(res, 200, { rows: listCatalogItems(config.repoRoot, { q: url.searchParams.get("q") || "", limit: url.searchParams.get("limit") || 500 }) });
   if (path === "/api/admin/items/search") return commandJson(res, "adminItemSearch", { q: url.searchParams.get("q") || "" });
   if (path === "/api/admin/items") return commandJson(res, url.searchParams.get("category") ? "adminItemListCategory" : "adminItemList", { category: url.searchParams.get("category") || "" });
@@ -863,7 +893,14 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/players\/[^/]+\/tutorials\/reset$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.tutorials.reset", "RESET TUTORIAL", (playerId, body) => duneDb.resetTutorial(db, playerId, body));
   if (path.match(/^\/api\/players\/[^/]+\/repair-gear$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.repair-gear", "REPAIR GEAR", (playerId) => duneDb.repairGear(db, playerId));
   if (path.match(/^\/api\/players\/[^/]+\/repair-vehicle-decay$/) && req.method === "POST") return playerVehicleDecayRepairRoute(req, res, path);
-  if (path.match(/^\/api\/players\/[^/]+\/refuel-vehicle$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.refuel-vehicle", "REFUEL VEHICLE", (playerId, body) => duneDb.refuelVehicle(db, playerId, body));
+  if (path.match(/^\/api\/players\/[^/]+\/refuel-vehicle$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.refuel-vehicle", "REFUEL VEHICLE", (playerId, body) => {
+    // The target vehicle id lives in the body, not the path, so it is not
+    // known until after directDbMutation's readJson -- unlike the routes
+    // below whose id comes from the URL, this can't pre-check into a 409
+    // before the phrase/rate-limit gate. Surfaces as an ordinary 400 instead.
+    if (vehicleDeletePending(Number(body?.vehicleId))) throw new Error(VEHICLE_DELETE_PENDING_MESSAGE);
+    return duneDb.refuelVehicle(db, playerId, body);
+  });
   if (path.match(/^\/api\/players\/[^/]+\/augment-item$/) && req.method === "POST") return playerDbMutation(req, res, path, "players.augment-item", "APPLY AUGMENTS", (playerId, body) => duneDb.augmentInventoryItem(db, playerId, body.itemId, { augments: body.augments, augmentQuality: body.augmentQuality }));
   if (path.match(/^\/api\/players\/[^/]+\/inventory\/[^/]+$/) && req.method === "DELETE") return inventoryDeleteRoute(req, res, path);
   if (path.match(/^\/api\/players\/[^/]+\/inventory\/[^/]+$/) && req.method === "PATCH") return inventoryUpdateRoute(req, res, path);
@@ -3583,17 +3620,19 @@ async function baseSystemCustodianRoute(req, res, path) {
   return directDbMutation(req, res, "bases.transfer-system-custodian", null, async () => {
     const settings = await runDune(config, buildDuneArgs("userSettingsMapValues", { map: "Survival_1" }), { timeoutMs: 8000 });
     const maxPermissions = parseEffectivePermissionLimit(settings.stdout);
-    const custodian = await duneDb.basePermissionSystemCustodian(db);
+    const custodian = await duneDb.permissionSystemCustodian(db);
     if (custodian.canCreate) await ensureCarePackageServerPersona(db);
     return duneDb.transferBaseToSystemCustodian(db, baseId, maxPermissions);
   }, { baseId });
 }
 
 // Vehicles are their own permission actor (dune.vehicles.id = dune.actors.id),
-// so there is no base-delete-pending/backed-up equivalent to check here -- a
-// vehicle has no "queued delete" or "picked up" state these routes need to
-// guard against. The id guard matches intParam's contract (see baseWaterRoute/
-// baseInventoryRoute), so a genuine failure in the catch is honestly ours.
+// so there is no base-backed-up equivalent to check here -- a vehicle has no
+// "picked up" state these routes need to guard against. (It does now have a
+// delete-pending state -- see vehicleDeletePending -- checked by the mutation
+// routes below, not this read-only one.) The id guard matches intParam's
+// contract (see baseWaterRoute/baseInventoryRoute), so a genuine failure in
+// the catch is honestly ours.
 async function vehiclePermissionsRoute(res, path) {
   const vehicleId = Number(decodeURIComponent(path.split("/")[3]));
   if (!Number.isInteger(vehicleId) || vehicleId < 1 || vehicleId > Number.MAX_SAFE_INTEGER) {
@@ -3627,11 +3666,116 @@ async function vehicleSetPermissionsRoute(req, res, path) {
   if (!Number.isInteger(vehicleId) || vehicleId < 1 || vehicleId > Number.MAX_SAFE_INTEGER) {
     return json(res, 400, { error: "Invalid vehicle ID" });
   }
+  if (vehicleDeletePending(vehicleId)) return json(res, 409, { error: VEHICLE_DELETE_PENDING_MESSAGE });
   return directDbMutation(req, res, "vehicles.set-permissions", null, async (body) => {
     const settings = await runDune(config, buildDuneArgs("userSettingsMapValues", { map: "Survival_1" }), { timeoutMs: 8000 });
     const maxPermissions = parseEffectivePermissionLimit(settings.stdout);
     return duneDb.setVehiclePermissions(db, vehicleId, body.entries, maxPermissions);
   }, { vehicleId });
+}
+
+// No backed-up guard (a vehicle has no such state), but it does check
+// delete-pending now -- transferring ownership on a vehicle about to be
+// destroyed is exactly the kind of write the pending-delete freeze exists to
+// avoid racing.
+async function vehicleSystemCustodianRoute(req, res, path) {
+  const vehicleId = Number(decodeURIComponent(path.split("/")[3]));
+  if (!Number.isInteger(vehicleId) || vehicleId < 1 || vehicleId > Number.MAX_SAFE_INTEGER) {
+    return json(res, 400, { error: "Invalid vehicle ID" });
+  }
+  if (vehicleDeletePending(vehicleId)) return json(res, 409, { error: VEHICLE_DELETE_PENDING_MESSAGE });
+  return directDbMutation(req, res, "vehicles.transfer-system-custodian", null, async () => {
+    const settings = await runDune(config, buildDuneArgs("userSettingsMapValues", { map: "Survival_1" }), { timeoutMs: 8000 });
+    const maxPermissions = parseEffectivePermissionLimit(settings.stdout);
+    const custodian = await duneDb.permissionSystemCustodian(db);
+    if (custodian.canCreate) await ensureCarePackageServerPersona(db);
+    return duneDb.transferVehicleToSystemCustodian(db, vehicleId, maxPermissions);
+  }, { vehicleId });
+}
+
+// Mirrors baseDeletePending: a vehicle with a delete queued is frozen from
+// every other write, for the same reason -- the hazard the queue exists to
+// avoid (a live server overwriting the write before the flush) applies just
+// as much to a permission edit or refuel racing that same delete.
+function vehicleDeletePending(vehicleId) {
+  return duneDb.listQueuedVehicleDeletes(config.repoRoot).some((entry) => entry.vehicleId === vehicleId);
+}
+
+const VEHICLE_DELETE_PENDING_MESSAGE = "This vehicle has a pending delete queued and cannot be modified. Cancel the delete first.";
+
+// Mirrors baseDeleteRoute. No baseBackedUp equivalent to check -- a vehicle
+// has no "picked up" state.
+async function vehicleDeleteRoute(req, res, path) {
+  const vehicleId = Number(decodeURIComponent(path.split("/")[3]));
+  if (!Number.isInteger(vehicleId) || vehicleId < 1 || vehicleId > Number.MAX_SAFE_INTEGER) {
+    return json(res, 400, { error: "Invalid vehicle ID" });
+  }
+  return directDbMutation(req, res, "vehicles.delete", "DELETE VEHICLE", async () => {
+    // Reserve the lock synchronously, before the first await -- same
+    // race-closing reasoning as baseDeleteRoute's placeholder queue entry.
+    duneDb.queueVehicleDelete(config.repoRoot, { vehicleId, map: "", partitionId: 0 });
+    let queued = false;
+    try {
+      const target = await duneDb.vehicleWriteTarget(db, vehicleId);
+      if (target.queueSupported && !target.writeSafeNow) {
+        const entry = duneDb.queueVehicleDelete(config.repoRoot, {
+          vehicleId,
+          map: target.map,
+          partitionId: target.partitionId
+        });
+        queued = true;
+        return { ok: true, queued: true, ...entry };
+      }
+      // Mandatory safety backup before any delete SQL runs, exactly like
+      // baseDeleteRoute. If this throws, deleteVehicleCompletely is never
+      // called and nothing is touched.
+      await runDune(config, buildDuneArgs("backupCreate"), { env: { DB_BACKUP_ORIGIN: "vehicle-delete" } });
+      const result = await duneDb.deleteVehicleCompletely(db, vehicleId);
+      return { ...result, backupCreated: true };
+    } finally {
+      if (!queued) {
+        try { duneDb.cancelQueuedVehicleDelete(config.repoRoot, vehicleId); } catch {}
+      }
+    }
+  }, { vehicleId });
+}
+
+async function vehicleCancelQueuedDeleteRoute(req, res, path) {
+  const vehicleId = Number(decodeURIComponent(path.split("/")[3]));
+  if (!Number.isInteger(vehicleId) || vehicleId < 1 || vehicleId > Number.MAX_SAFE_INTEGER) {
+    return json(res, 400, { error: "Invalid vehicle ID" });
+  }
+  return directDbMutation(req, res, "vehicles.cancel-queued-delete", null,
+    () => duneDb.cancelQueuedVehicleDelete(config.repoRoot, vehicleId), { vehicleId });
+}
+
+// Mirrors pendingBaseDeletesRoute.
+async function pendingVehicleDeletesRoute(res) {
+  const pending = duneDb.listQueuedVehicleDeletes(config.repoRoot);
+  const targets = pending.length
+    ? await duneDb.partitionRestartTargets(db).catch(() => new Map())
+    : new Map();
+  const byTarget = new Map();
+  for (const entry of pending) {
+    const map = entry.map || "Unknown";
+    const key = `${map}|${entry.partitionId}`;
+    const target = targets.get(entry.partitionId);
+    const group = byTarget.get(key) || {
+      map,
+      partitionId: entry.partitionId,
+      partitionMap: target?.map || "",
+      dimensionIndex: target?.dimensionIndex ?? 0,
+      count: 0
+    };
+    group.count += 1;
+    byTarget.set(key, group);
+  }
+  return json(res, 200, {
+    supported: true,
+    total: pending.length,
+    pending,
+    byTarget: [...byTarget.values()].sort((a, b) => a.map.localeCompare(b.map) || a.partitionId - b.partitionId)
+  });
 }
 
 async function baseCancelQueuedRefillRoute(req, res, path) {

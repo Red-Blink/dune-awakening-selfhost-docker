@@ -1,6 +1,6 @@
-import { Droplet, Fuel, KeyRound, Trash2 } from "lucide-react";
+import { Car, Droplet, Fuel, KeyRound, Trash2 } from "lucide-react";
 
-// The four base-write queues, rendered as one row of badges.
+// Every queued write applied while a map is down, rendered as one row of badges.
 //
 // This exists because these counts belong next to every control that restarts
 // a map or the battlegroup -- taking a map down is when its queued writes are
@@ -12,20 +12,21 @@ export type QueueCounts = {
   fuel: number;
   water: number;
   deletes: number;
+  vehicleDeletes: number;
   permissions: number;
 };
 
 export function queueCountsTotal(counts: QueueCounts) {
-  return counts.fuel + counts.water + counts.deletes + counts.permissions;
+  return counts.fuel + counts.water + counts.deletes + counts.vehicleDeletes + counts.permissions;
 }
 
 // "Refills, Deletes and Permissions" -- only the kinds actually queued, so a
 // battlegroup with nothing but fuel waiting still reads exactly as it did
-// before the other three queues existed.
+// before the other queue types existed.
 export function queueCountsSummary(counts: QueueCounts) {
   const parts = [
     ...(counts.fuel > 0 || counts.water > 0 ? ["Refills"] : []),
-    ...(counts.deletes > 0 ? ["Deletes"] : []),
+    ...(counts.deletes > 0 || counts.vehicleDeletes > 0 ? ["Deletes"] : []),
     ...(counts.permissions > 0 ? ["Permissions"] : [])
   ];
   if (parts.length <= 2) return parts.join(" and ");
@@ -48,7 +49,10 @@ export function QueueBadges({ counts, labels = true, size = 13 }: {
       <Droplet size={size} aria-hidden="true" />{labels ? `${counts.water.toLocaleString()} water` : counts.water.toLocaleString()}
     </span>}
     {counts.deletes > 0 && <span className="bases-queue-badge bases-queue-badge-delete">
-      <Trash2 size={size} aria-hidden="true" />{labels ? plural(counts.deletes, "delete") : counts.deletes.toLocaleString()}
+      <Trash2 size={size} aria-hidden="true" />{labels ? plural(counts.deletes, "base delete") : counts.deletes.toLocaleString()}
+    </span>}
+    {counts.vehicleDeletes > 0 && <span className="bases-queue-badge bases-queue-badge-delete">
+      <Car size={size} aria-hidden="true" />{labels ? plural(counts.vehicleDeletes, "vehicle delete") : counts.vehicleDeletes.toLocaleString()}
     </span>}
     {/* Counts pieces, not bases -- see childAccessPieceCount. */}
     {counts.permissions > 0 && <span className="bases-queue-badge bases-queue-badge-permission">

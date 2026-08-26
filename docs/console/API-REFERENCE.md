@@ -382,15 +382,20 @@ tab can offer a retry only where retrying could actually help.
 |--------|-------|-------------|------------|
 | GET | `/api/vehicles` | List all player vehicles (paginated), each with owner, shared-with roster, lowest-component condition %, fuel %, map/partition, coordinates, and per-component durability | `q?`, `page?`, `pageSize?`, `sortColumn?`, `sortDirection?` |
 | GET | `/api/players/{playerId}/vehicles` | List the selected player's owned and shared vehicles using the same vehicle details | `playerId` |
-| GET | `/api/vehicles/{vehicleId}/permissions` | Get a vehicle's permission roster (Owner, Co-Owners, Associates) | `vehicleId` |
+| GET | `/api/vehicles/{vehicleId}/permissions` | Get a vehicle's permission roster (Owner, Co-Owners, Associates) plus the detected system custodian | `vehicleId` |
 | PUT | `/api/vehicles/{vehicleId}/permissions` | Replace a vehicle's permission roster | `vehicleId`, `entries[]` (`playerId`, `rank`) |
+| POST | `/api/vehicles/{vehicleId}/system-custodian` | Transfer ownership to the Server or detected GM system custodian while preserving the roster; provisions Server when no custodian exists | `vehicleId` |
 | GET | `/api/vehicles/permission-candidates` | Search players eligible to be added to a vehicle roster | `q?`, `limit?` |
+| DELETE | `/api/vehicles/{vehicleId}` | Permanently delete a vehicle and everything on it (queued instead if the map isn't safely writable right now); takes a full-database safety backup first. Requires `{ confirmation: "DELETE VEHICLE" }` | `vehicleId` |
+| GET | `/api/vehicles/pending-deletes` | List queued vehicle deletes, grouped by restart target | None |
+| DELETE | `/api/vehicles/{vehicleId}/queued-delete` | Cancel a vehicle's queued delete | `vehicleId` |
 
-`GET /api/vehicles` and the player-scoped list are read-only; the three
-permission routes above are the only vehicle mutations, and they share their
-implementation with the base permission routes -- see
-[vehicle-permissions.md](vehicle-permissions.md). Unlike bases, there is no
-vehicle transfer/system-custodian route by design.
+`GET /api/vehicles` and the player-scoped list are read-only; the permission
+routes share their implementation with the base permission routes -- see
+[vehicle-permissions.md](vehicle-permissions.md). The system-custodian route
+mirrors the base one exactly, minus the backed-up guard, since a vehicle has
+no picked-up state. The delete route mirrors `DELETE /api/bases/{baseId}` --
+see [vehicle-deletion.md](vehicle-deletion.md).
 
 `GET /api/vehicles` reports `capabilities.vehicles`; it is false (with a
 `reason`) when the schema lacks the required tables (`vehicles`, `vehicle_modules`,
@@ -399,7 +404,12 @@ vehicle transfer/system-custodian route by design.
 `capabilities.vehiclePermissions` (the schema additionally has `dune.map_names`
 and the game's `permission_set_player_rank` / `permission_remove_player_rank`
 procedures) -- the permission routes and the Permissions tab are unavailable
-when it is false. Sortable `sortColumn` values: `id`, `name`,
+when it is false. `capabilities.vehicleDelete` similarly gates the Delete
+Vehicle action (`dune.vehicles`/`vehicle_modules`/`actors` plus
+`permission_actor_destroy`/`delete_actors`), and `capabilities.vehicleDeleteQueue`
+additionally requires `dune.world_partition` -- without it, deletes are
+always immediate rather than queued when the map is live. See
+[vehicle-deletion.md](vehicle-deletion.md). Sortable `sortColumn` values: `id`, `name`,
 `type`, `owner`, `condition_percent`, `fuel_percent`, `map`; `q` matches vehicle
 name, type, owner, map, and exact id. Response fields mirror the paginated-list
 convention (`rows`, `totalCount`, unfiltered `totalVehicles`). Owner resolves from

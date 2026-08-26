@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { vehiclesApi, type VehicleRow } from "../../api/vehicles";
 import type { SortDirection } from "../../components/common/DataTable";
+import { usePendingVehicleDeletes } from "../../lib/usePendingRefills";
 import { VehicleTable } from "./VehicleTable";
 
 type VehiclesPanelProps = {
   onError: (text: string) => void;
-  // Read-only page: confirmAction/formatMutationResult are passed by App.tsx for
-  // parity with the other panels but intentionally unused here. The confirmAction
-  // signature mirrors the other panels so App.tsx can pass confirmDialog directly.
+  // The permissions transfer-to-custodian confirmation reuses App.tsx's
+  // confirmDialog, the same way BasesPanel does. formatMutationResult is
+  // accepted for prop parity with the other panels but unused here.
   confirmAction: (message: string, options?: { title?: string; confirmLabel?: string; warning?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
   formatMutationResult: (result: unknown) => string;
   focusRequest?: { vehicleId: string; nonce: number };
@@ -28,6 +29,8 @@ type VehiclesCache = {
   totalVehicles: number;
   supported: boolean;
   canEditPermissions: boolean;
+  canDeleteVehicle: boolean;
+  canQueueDeleteVehicle: boolean;
   reason: string;
   lastFetchedAt: number;
 };
@@ -42,7 +45,7 @@ function errorText(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function VehiclesPanel({ onError, focusRequest }: VehiclesPanelProps) {
+export function VehiclesPanel({ onError, confirmAction, focusRequest }: VehiclesPanelProps) {
   const [q, setQ] = useState(() => vehiclesCache?.q ?? "");
   const [submittedQ, setSubmittedQ] = useState(() => vehiclesCache?.q ?? "");
   const [page, setPage] = useState(() => vehiclesCache?.page ?? 0);
@@ -54,10 +57,23 @@ export function VehiclesPanel({ onError, focusRequest }: VehiclesPanelProps) {
   const [totalVehicles, setTotalVehicles] = useState(() => vehiclesCache?.totalVehicles ?? 0);
   const [supported, setSupported] = useState(() => vehiclesCache?.supported ?? true);
   const [canEditPermissions, setCanEditPermissions] = useState(() => vehiclesCache?.canEditPermissions ?? false);
+  const [canDeleteVehicle, setCanDeleteVehicle] = useState(() => vehiclesCache?.canDeleteVehicle ?? false);
+  const [canQueueDeleteVehicle, setCanQueueDeleteVehicle] = useState(() => vehiclesCache?.canQueueDeleteVehicle ?? false);
   const [reason, setReason] = useState(() => vehiclesCache?.reason ?? "");
   const [loading, setLoading] = useState(() => vehiclesCache === null);
+  const [deletingId, setDeletingId] = useState("");
+  const [cancelingDeleteId, setCancelingDeleteId] = useState("");
+  const [deleteStatus, setDeleteStatus] = useState("");
+  const [deleteStatusKind, setDeleteStatusKind] = useState<"" | "ok" | "fail">("");
+  const { pending: pendingVehicleDeletes, refresh: refreshPendingVehicleDeletes } = usePendingVehicleDeletes(canQueueDeleteVehicle);
   const requestIdRef = useRef(0);
   const skipNextSearchReset = useRef(true);
+
+  useEffect(() => {
+    if (deleteStatusKind !== "ok") return undefined;
+    const timer = window.setTimeout(() => { setDeleteStatus(""); setDeleteStatusKind(""); }, 10_400);
+    return () => window.clearTimeout(timer);
+  }, [deleteStatus, deleteStatusKind]);
 
   useEffect(() => {
     if (skipNextSearchReset.current) {
@@ -109,11 +125,15 @@ export function VehiclesPanel({ onError, focusRequest }: VehiclesPanelProps) {
       const nextRows = result.rows || [];
       const nextSupported = result.capabilities?.vehicles !== false;
       const nextCanEditPermissions = result.capabilities?.vehiclePermissions === true;
+      const nextCanDeleteVehicle = result.capabilities?.vehicleDelete === true;
+      const nextCanQueueDeleteVehicle = result.capabilities?.vehicleDeleteQueue === true;
       setRows(nextRows);
       setTotalCount(result.totalCount || 0);
       setTotalVehicles(result.totalVehicles || 0);
       setSupported(nextSupported);
       setCanEditPermissions(nextCanEditPermissions);
+      setCanDeleteVehicle(nextCanDeleteVehicle);
+      setCanQueueDeleteVehicle(nextCanQueueDeleteVehicle);
       setReason(result.reason || "");
       vehiclesCache = {
         q: params.q,
@@ -126,6 +146,8 @@ export function VehiclesPanel({ onError, focusRequest }: VehiclesPanelProps) {
         totalVehicles: result.totalVehicles || 0,
         supported: nextSupported,
         canEditPermissions: nextCanEditPermissions,
+        canDeleteVehicle: nextCanDeleteVehicle,
+        canQueueDeleteVehicle: nextCanQueueDeleteVehicle,
         reason: result.reason || "",
         lastFetchedAt: Date.now()
       };
@@ -148,6 +170,8 @@ export function VehiclesPanel({ onError, focusRequest }: VehiclesPanelProps) {
       setTotalVehicles(cacheHit.totalVehicles);
       setSupported(cacheHit.supported);
       setCanEditPermissions(cacheHit.canEditPermissions);
+      setCanDeleteVehicle(cacheHit.canDeleteVehicle);
+      setCanQueueDeleteVehicle(cacheHit.canQueueDeleteVehicle);
       setReason(cacheHit.reason);
       setLoading(false);
     }
@@ -180,6 +204,77 @@ export function VehiclesPanel({ onError, focusRequest }: VehiclesPanelProps) {
     };
   }, [submittedQ, page, pageSize, sortColumn, sortDirection, load]);
 
+  // No component-count mention here the way Delete Base's dialog cites piece/
+  // placeable counts: VehicleRow has no equivalent field, only the fitted
+  // modules shown inside the expanded row, which this dialog does not have
+  // access to. A full database "SQL Safety Backup" is still taken
+  // automatically and unconditionally before any delete SQL runs -- see
+  // vehiclesApi.deleteVehicle and docs/console/vehicle-deletion.md.
+  async function handleDeleteVehicle(vehicle: VehicleRow) {
+    const id = String(vehicle.id);
+    const label = vehicle.name || `vehicle ${id}`;
+    const confirmed = await confirmAction(
+      `Delete "${label}"? This permanently deletes the vehicle and everything stored in it.`,
+      {
+        title: "Delete Vehicle",
+        confirmLabel: "Delete",
+        danger: true,
+        details: [{ label: "Owner", value: vehicle.owner || "—", tone: "danger" }],
+        warning: canQueueDeleteVehicle
+          ? "A full database backup is taken automatically before the delete runs. If this vehicle's map is running, the delete is queued and applied the next time that map restarts or stops, so a live server cannot overwrite it. If the map is already down, it is deleted now."
+          : "A full database backup is taken automatically before the delete runs, straight to the database. A running game server may not reflect the removal in-game until the map server restarts."
+      }
+    );
+    if (!confirmed) return;
+    onError("");
+    setDeletingId(id);
+    try {
+      const response = await vehiclesApi.deleteVehicle(id);
+      if (response.result?.queued) {
+        setDeleteStatus(`Delete for "${label}" is queued and applies when this map next restarts or stops.`);
+        setDeleteStatusKind("ok");
+        await refreshPendingVehicleDeletes();
+      } else {
+        setDeleteStatus(`"${label}" was deleted.`);
+        setDeleteStatusKind("ok");
+        vehiclesCache = null;
+        await load({ q: submittedQ, page, pageSize, sortColumn, sortDirection });
+      }
+    } catch (error) {
+      const text = errorText(error);
+      setDeleteStatus(text);
+      setDeleteStatusKind("fail");
+      onError(text);
+    } finally {
+      setDeletingId("");
+    }
+  }
+
+  async function handleCancelQueuedDelete(vehicle: VehicleRow) {
+    const id = String(vehicle.id);
+    const label = vehicle.name || `vehicle ${id}`;
+    const confirmed = await confirmAction(`Cancel the queued delete for "${label}"?`, {
+      title: "Cancel Queued Delete",
+      confirmLabel: "Cancel Delete"
+    });
+    if (!confirmed) return;
+    onError("");
+    setCancelingDeleteId(id);
+    try {
+      await vehiclesApi.cancelQueuedDelete(id);
+      setDeleteStatus(`Queued delete for "${label}" was canceled.`);
+      setDeleteStatusKind("ok");
+      await refreshPendingVehicleDeletes();
+    } catch (error) {
+      const text = errorText(error);
+      setDeleteStatus(text);
+      setDeleteStatusKind("fail");
+      onError(text);
+    } finally {
+      setCancelingDeleteId("");
+    }
+  }
+
   if (loading && !rows.length) {
     return (
       <section className="panel">
@@ -196,6 +291,7 @@ export function VehiclesPanel({ onError, focusRequest }: VehiclesPanelProps) {
   const rangeEnd = totalCount === 0 ? 0 : rangeStart + rows.length - 1;
   const hasPreviousPage = page > 0;
   const hasNextPage = page + 1 < totalPages;
+  const queuedDeleteVehicleIds = new Set((pendingVehicleDeletes?.pending || []).map((entry) => String(entry.vehicleId)));
 
   return (
     <section className="panel">
@@ -208,6 +304,11 @@ export function VehiclesPanel({ onError, focusRequest }: VehiclesPanelProps) {
       {supported
         ? <p className="action-help-note">Total Vehicles: {totalVehicles.toLocaleString()}</p>
         : <p className="action-help-note">{reason || "Vehicles are unsupported by the detected database schema."}</p>}
+      {deleteStatus && <p
+        className={`inline-task-result${deleteStatusKind ? ` result-${deleteStatusKind}` : ""}`}
+        role={deleteStatusKind === "fail" ? "alert" : "status"}
+        onAnimationEnd={() => { if (deleteStatusKind === "ok") { setDeleteStatus(""); setDeleteStatusKind(""); } }}
+      ><strong>{deleteStatus}</strong></p>}
       {supported && <>
         <div className="action-row vehicles-search-row">
           <input
@@ -228,6 +329,7 @@ export function VehiclesPanel({ onError, focusRequest }: VehiclesPanelProps) {
           canEditPermissions={canEditPermissions}
           focusVehicleId={focusRequest?.vehicleId}
           focusNonce={focusRequest?.nonce}
+          confirmAction={confirmAction}
           // Owner and Shared With are rendered from the list response, so a
           // saved roster has to refetch or the row above keeps showing the
           // pre-edit names.
@@ -235,6 +337,12 @@ export function VehiclesPanel({ onError, focusRequest }: VehiclesPanelProps) {
             vehiclesCache = null;
             void load({ q: submittedQ, page, pageSize, sortColumn, sortDirection }, { silent: true });
           }}
+          canDeleteVehicle={canDeleteVehicle}
+          queuedDeleteVehicleIds={queuedDeleteVehicleIds}
+          deletingId={deletingId}
+          cancelingDeleteId={cancelingDeleteId}
+          onDeleteVehicle={(vehicle) => void handleDeleteVehicle(vehicle)}
+          onCancelQueuedDelete={(vehicle) => void handleCancelQueuedDelete(vehicle)}
         />
         <div className="panel-title vehicles-pagination-footer">
           <p className="action-help-note">Showing {rangeStart}-{rangeEnd} of {totalCount} vehicles.</p>

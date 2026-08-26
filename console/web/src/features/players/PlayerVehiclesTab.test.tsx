@@ -11,9 +11,12 @@ vi.mock("../../api/vehicles", () => ({
     forPlayer: vi.fn(),
     permissions: vi.fn(),
     setPermissions: vi.fn(),
-    permissionCandidates: vi.fn()
+    permissionCandidates: vi.fn(),
+    transferToSystemCustodian: vi.fn()
   }
 }));
+
+const confirmAction = vi.fn().mockResolvedValue(true);
 
 function response(overrides: Partial<VehiclesListResponse> = {}): VehiclesListResponse {
   return {
@@ -37,7 +40,7 @@ beforeEach(() => {
 describe("PlayerVehiclesTab", () => {
   it("shows owned and shared vehicles with the same expandable vehicle presentation", async () => {
     vi.mocked(vehiclesApi.forPlayer).mockResolvedValue(response());
-    render(<PlayerVehiclesTab playerId="42" playerName="Kovalt" />);
+    render(<PlayerVehiclesTab playerId="42" playerName="Kovalt" confirmAction={confirmAction} />);
 
     expect(await screen.findByText("Owned Bike")).toBeInTheDocument();
     expect(screen.getByText("Hagga Basin · Partition 1")).toBeInTheDocument();
@@ -54,7 +57,7 @@ describe("PlayerVehiclesTab", () => {
 
   it("refreshes the filtered list on demand", async () => {
     vi.mocked(vehiclesApi.forPlayer).mockResolvedValue(response({ rows: [], totalCount: 0 }));
-    render(<PlayerVehiclesTab playerId="42" playerName="Kovalt" />);
+    render(<PlayerVehiclesTab playerId="42" playerName="Kovalt" confirmAction={confirmAction} />);
     expect(await screen.findByText("Kovalt has no owned or shared vehicles.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await waitFor(() => expect(vehiclesApi.forPlayer).toHaveBeenCalledTimes(2));
@@ -65,7 +68,7 @@ describe("PlayerVehiclesTab", () => {
   // capability-less API keeps the tab hidden rather than defaulting it on.
   it("hides the Permissions tab without the vehiclePermissions capability", async () => {
     vi.mocked(vehiclesApi.forPlayer).mockResolvedValue(response());
-    render(<PlayerVehiclesTab playerId="42" playerName="Kovalt" />);
+    render(<PlayerVehiclesTab playerId="42" playerName="Kovalt" confirmAction={confirmAction} />);
 
     fireEvent.click(await screen.findByLabelText("Show components for Owned Bike"));
     expect(screen.queryByRole("tab", { name: "Permissions" })).not.toBeInTheDocument();
@@ -81,7 +84,7 @@ describe("PlayerVehiclesTab", () => {
       mapNameId: 1,
       entries: [{ playerId: "4", name: "Kovalt", rank: 1, label: "", canonical: true }]
     } as never);
-    render(<PlayerVehiclesTab playerId="42" playerName="Kovalt" />);
+    render(<PlayerVehiclesTab playerId="42" playerName="Kovalt" confirmAction={confirmAction} />);
 
     fireEvent.click(await screen.findByLabelText("Show components for Owned Bike"));
     fireEvent.click(await screen.findByRole("tab", { name: "Permissions" }));
@@ -100,5 +103,27 @@ describe("PlayerVehiclesTab", () => {
     // ownedCount is derived from row.relationship, which can shift after a
     // rank change, so a save must refetch rather than trust stale rows.
     await waitFor(() => expect(vehiclesApi.forPlayer).toHaveBeenCalledTimes(2));
+  });
+
+  // Regression guard for the second confirmAction-threading chain (player
+  // detail, via VehicleTable): the transfer button must reach here too, not
+  // just the global Vehicles panel.
+  it("reaches the transfer-to-custodian button from the player detail mount point", async () => {
+    vi.mocked(vehiclesApi.forPlayer).mockResolvedValue(response({ capabilities: { vehicles: true, vehiclePermissions: true } }));
+    vi.mocked(vehiclesApi.permissions).mockResolvedValue({
+      supported: true,
+      vehicleId: 1,
+      actorId: "1",
+      map: "HaggaBasin",
+      mapNameId: 1,
+      systemCustodian: { available: true, playerId: "900000201", name: "Server" },
+      entries: [{ playerId: "4", name: "Kovalt", rank: 1, label: "", canonical: true }]
+    } as never);
+    render(<PlayerVehiclesTab playerId="42" playerName="Kovalt" confirmAction={confirmAction} />);
+
+    fireEvent.click(await screen.findByLabelText("Show components for Owned Bike"));
+    fireEvent.click(await screen.findByRole("tab", { name: "Permissions" }));
+
+    expect(await screen.findByRole("button", { name: "Transfer to Server" })).toBeInTheDocument();
   });
 });

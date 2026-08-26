@@ -1,8 +1,9 @@
 import { basesApi } from "../../api/bases";
+import { vehiclesApi } from "../../api/vehicles";
 import { serverApi, type RestartDispatchResponse, type RestartQueueState, type RestartQueueTarget } from "../../api/server";
 import type { Task } from "../../api/setup";
 import { queueCountsTotal, type QueueCounts } from "../../components/common/QueueBadges";
-import { childAccessPieceCount, childAccessPieceCountForPartition, pendingRefillCountForPartition } from "../../lib/usePendingRefills";
+import { childAccessPieceCount, childAccessPieceCountForPartition, pendingRefillCountForPartition, vehicleDeleteCountForPartition } from "../../lib/usePendingRefills";
 
 // Result of the restart-queue interception dialog. "immediate" bypasses the
 // queue (the restart runs now); "queue" lets the backend capture it into a
@@ -64,10 +65,11 @@ export function serviceRestartTarget(service: string): RestartQueueTarget | unde
 // unsupported queue endpoint returns undefined rather than obstructing a
 // restart the operator has already decided to run.
 async function queuedWritesDetail(target?: RestartQueueTarget): Promise<RestartGateDetail | undefined> {
-  const [fuel, water, deletes, permissions] = await Promise.all([
+  const [fuel, water, deletes, vehicleDeletes, permissions] = await Promise.all([
     basesApi.pendingRefills().catch(() => null),
     basesApi.pendingWaterRefills().catch(() => null),
     basesApi.pendingDeletes().catch(() => null),
+    vehiclesApi.pendingDeletes().catch(() => null),
     basesApi.pendingChildAccess().catch(() => null)
   ]);
   const partitionId = Number(target?.partitionId || 0);
@@ -76,12 +78,14 @@ async function queuedWritesDetail(target?: RestartQueueTarget): Promise<RestartG
       fuel: pendingRefillCountForPartition(fuel, partitionId),
       water: pendingRefillCountForPartition(water, partitionId),
       deletes: pendingRefillCountForPartition(deletes, partitionId),
+      vehicleDeletes: vehicleDeleteCountForPartition(vehicleDeletes, partitionId),
       permissions: childAccessPieceCountForPartition(permissions, partitionId)
     }
     : {
       fuel: fuel?.total || 0,
       water: water?.total || 0,
       deletes: deletes?.total || 0,
+      vehicleDeletes: vehicleDeletes?.total || 0,
       permissions: childAccessPieceCount(permissions)
     };
   if (!queueCountsTotal(counts)) return undefined;
@@ -89,6 +93,7 @@ async function queuedWritesDetail(target?: RestartQueueTarget): Promise<RestartG
     ...(counts.fuel ? [`${counts.fuel} generator refill${counts.fuel === 1 ? "" : "s"}`] : []),
     ...(counts.water ? [`${counts.water} water refill${counts.water === 1 ? "" : "s"}`] : []),
     ...(counts.deletes ? [`${counts.deletes} base delete${counts.deletes === 1 ? "" : "s"}`] : []),
+    ...(counts.vehicleDeletes ? [`${counts.vehicleDeletes} vehicle delete${counts.vehicleDeletes === 1 ? "" : "s"}`] : []),
     ...(counts.permissions ? [`${counts.permissions} permission change${counts.permissions === 1 ? "" : "s"}`] : [])
   ];
   return { label: "Queued Writes", value: parts.join(", "), tone: "accent" };

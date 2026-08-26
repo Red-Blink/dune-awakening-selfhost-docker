@@ -12,7 +12,11 @@ vi.mock("../../api/vehicles", () => ({
     list: vi.fn(),
     permissions: vi.fn(),
     setPermissions: vi.fn(),
-    permissionCandidates: vi.fn()
+    permissionCandidates: vi.fn(),
+    transferToSystemCustodian: vi.fn(),
+    deleteVehicle: vi.fn(),
+    cancelQueuedDelete: vi.fn(),
+    pendingDeletes: vi.fn()
   }
 }));
 
@@ -340,5 +344,162 @@ describe("VehiclesPanel", () => {
     // A saved roster invalidates the list cache -- owner/shared_with are
     // rendered from the list response, not the permissions tab's own state.
     await waitFor(() => expect(vi.mocked(vehiclesApi.list)).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("VehiclesPanel vehicle deletion", () => {
+  function deleteListResponse(capabilities: Record<string, unknown>, row: Record<string, unknown>) {
+    return {
+      capabilities,
+      totalCount: 1,
+      totalVehicles: 1,
+      rows: [{ ...listResponse().rows[0], ...row }]
+    };
+  }
+
+  const deletableVehicle = { id: "5101", name: "Sandcrawler Delete" };
+
+  beforeEach(() => {
+    vi.mocked(vehiclesApi.pendingDeletes).mockResolvedValue({ supported: true, total: 0, pending: [], byTarget: [] });
+  });
+
+  async function awaitFreshRows(vehicleName: string) {
+    await screen.findByText(vehicleName);
+    return screen.getByRole("button", { name: `Delete ${vehicleName}` });
+  }
+
+  it("hides the Delete Vehicle action when the schema does not support it", async () => {
+    vi.mocked(vehiclesApi.list).mockResolvedValue(deleteListResponse({ vehicles: true }, { id: "5100", name: "Sandcrawler NoDelete" }));
+
+    renderPanel();
+    await screen.findByText("Sandcrawler NoDelete");
+
+    expect(screen.queryByRole("button", { name: /^Delete /i })).not.toBeInTheDocument();
+  });
+
+  it("confirms with the owner and deletes immediately when the map is already write-safe", async () => {
+    vi.mocked(vehiclesApi.list).mockResolvedValue(deleteListResponse({ vehicles: true, vehicleDelete: true, vehicleDeleteQueue: false }, deletableVehicle));
+    vi.mocked(vehiclesApi.deleteVehicle).mockResolvedValue({
+      supported: true,
+      backupCreated: true,
+      result: { ok: true, vehicleId: 5101, actorId: "5101", deletedModuleCount: 2 }
+    });
+
+    const props = renderPanel();
+    const deleteButton = await awaitFreshRows("Sandcrawler Delete");
+    expect(deleteButton).toBeEnabled();
+
+    fireEvent.click(deleteButton);
+
+    await waitFor(() => expect(props.confirmAction).toHaveBeenCalledWith(
+      'Delete "Sandcrawler Delete"? This permanently deletes the vehicle and everything stored in it.',
+      {
+        title: "Delete Vehicle",
+        confirmLabel: "Delete",
+        danger: true,
+        details: [{ label: "Owner", value: "Duncan_Idaho", tone: "danger" }],
+        warning: expect.stringContaining("straight to the database")
+      }
+    ));
+    await waitFor(() => expect(vehiclesApi.deleteVehicle).toHaveBeenCalledWith("5101"));
+    expect(await screen.findByText('"Sandcrawler Delete" was deleted.')).toBeInTheDocument();
+    expect(vi.mocked(vehiclesApi.list).mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("does not delete when the confirm dialog is declined", async () => {
+    vi.mocked(vehiclesApi.list).mockResolvedValue(deleteListResponse(
+      { vehicles: true, vehicleDelete: true, vehicleDeleteQueue: false },
+      { id: "5102", name: "Sandcrawler Declined Delete" }
+    ));
+
+    renderPanel({ confirmAction: vi.fn().mockResolvedValue(false) });
+    fireEvent.click(await awaitFreshRows("Sandcrawler Declined Delete"));
+
+    await waitFor(() => expect(vehiclesApi.deleteVehicle).not.toHaveBeenCalled());
+  });
+
+  it("queues the delete when the map is live and warns that it will apply on the next restart", async () => {
+    vi.mocked(vehiclesApi.list).mockResolvedValue(deleteListResponse(
+      { vehicles: true, vehicleDelete: true, vehicleDeleteQueue: true },
+      { id: "5103", name: "Sandcrawler Queue Delete" }
+    ));
+    vi.mocked(vehiclesApi.deleteVehicle).mockResolvedValue({
+      supported: true,
+      backupCreated: false,
+      result: { ok: true, queued: true, vehicleId: 5103, map: "HaggaBasin", partitionId: 3 }
+    });
+
+    const props = renderPanel();
+    fireEvent.click(await awaitFreshRows("Sandcrawler Queue Delete"));
+
+    await waitFor(() => expect(props.confirmAction).toHaveBeenCalledWith(
+      'Delete "Sandcrawler Queue Delete"? This permanently deletes the vehicle and everything stored in it.',
+      expect.objectContaining({ warning: expect.stringContaining("queued and applied") })
+    ));
+    await waitFor(() => expect(vehiclesApi.deleteVehicle).toHaveBeenCalledWith("5103"));
+    expect(await screen.findByText(/is queued and applies when this map next restarts or stops/)).toBeInTheDocument();
+    expect(vehiclesApi.pendingDeletes).toHaveBeenCalled();
+  });
+
+  it("shows the queued-delete pill and blocks permission edits on that row", async () => {
+    vi.mocked(vehiclesApi.list).mockResolvedValue(deleteListResponse(
+      { vehicles: true, vehicleDelete: true, vehicleDeleteQueue: true, vehiclePermissions: true },
+      { id: "5104", name: "Sandcrawler Pending Delete" }
+    ));
+    vi.mocked(vehiclesApi.pendingDeletes).mockResolvedValue({
+      supported: true,
+      total: 1,
+      pending: [{ vehicleId: 5104, map: "HaggaBasin", partitionId: 3, queuedAt: new Date().toISOString(), attempts: 0, lastError: "" }],
+      byTarget: [{ map: "HaggaBasin", partitionId: 3, partitionMap: "Survival_1", dimensionIndex: 0, count: 1 }]
+    });
+    vi.mocked(vehiclesApi.permissions).mockResolvedValue({
+      supported: true,
+      vehicleId: 5104,
+      actorId: "5104",
+      map: "HaggaBasin",
+      mapNameId: 1,
+      entries: [{ playerId: "4", name: "Duncan_Idaho", rank: 1, label: "", canonical: true }]
+    } as never);
+
+    renderPanel();
+    await screen.findByText("Sandcrawler Pending Delete");
+
+    expect(await screen.findByRole("button", { name: "Cancel queued delete for Sandcrawler Pending Delete" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete Sandcrawler Pending Delete" })).not.toBeInTheDocument();
+
+    // Server-side, this vehicle rejects every other mutation while its
+    // delete is pending -- the Permissions tab must not offer a control that
+    // would just 409.
+    fireEvent.click(await screen.findByLabelText("Show components for Sandcrawler Pending Delete"));
+    fireEvent.click(await screen.findByRole("tab", { name: "Permissions" }));
+    const saveButton = await screen.findByRole("button", { name: "Save changes" });
+    expect(saveButton).toBeDisabled();
+    expect(saveButton).toHaveAttribute("title", "This vehicle has a pending delete queued and cannot be modified. Cancel the delete first.");
+  });
+
+  it("cancelling the queued delete calls the API and refreshes the pending list", async () => {
+    vi.mocked(vehiclesApi.list).mockResolvedValue(deleteListResponse(
+      { vehicles: true, vehicleDelete: true, vehicleDeleteQueue: true },
+      { id: "5105", name: "Sandcrawler Cancel Delete" }
+    ));
+    vi.mocked(vehiclesApi.pendingDeletes).mockResolvedValue({
+      supported: true,
+      total: 1,
+      pending: [{ vehicleId: 5105, map: "HaggaBasin", partitionId: 3, queuedAt: new Date().toISOString(), attempts: 0, lastError: "" }],
+      byTarget: [{ map: "HaggaBasin", partitionId: 3, partitionMap: "Survival_1", dimensionIndex: 0, count: 1 }]
+    });
+    vi.mocked(vehiclesApi.cancelQueuedDelete).mockResolvedValue({ supported: true, result: { ok: true, vehicleId: 5105, pending: 0 } });
+
+    const props = renderPanel();
+    await screen.findByText("Sandcrawler Cancel Delete");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel queued delete for Sandcrawler Cancel Delete" }));
+
+    await waitFor(() => expect(props.confirmAction).toHaveBeenCalledWith(
+      'Cancel the queued delete for "Sandcrawler Cancel Delete"?',
+      { title: "Cancel Queued Delete", confirmLabel: "Cancel Delete" }
+    ));
+    await waitFor(() => expect(vehiclesApi.cancelQueuedDelete).toHaveBeenCalledWith("5105"));
+    expect(await screen.findByText('Queued delete for "Sandcrawler Cancel Delete" was canceled.')).toBeInTheDocument();
   });
 });

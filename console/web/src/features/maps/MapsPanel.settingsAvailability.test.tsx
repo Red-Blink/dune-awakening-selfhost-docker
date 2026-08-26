@@ -46,10 +46,13 @@ vi.mock("../../lib/usePendingRefills", () => ({
     fuel: { pending: null, refresh: () => {} },
     water: { pending: null, refresh: () => {} },
     deletes: { pending: null, refresh: () => {} },
+    vehicleDeletes: { pending: null, refresh: () => {} },
     permissions: { pending: null, refresh: () => {} }
   }),
   pendingRefillCountForMap: () => 0,
   pendingRefillCountForPartition: () => 0,
+  vehicleDeleteCountForMap: () => 0,
+  vehicleDeleteCountForPartition: () => 0,
   childAccessPieceCountForMap: () => 0,
   childAccessPieceCountForPartition: () => 0
 }));

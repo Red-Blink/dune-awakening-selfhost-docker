@@ -15,7 +15,9 @@ import {
   childAccessPieceCountForPartition,
   pendingRefillCountForMap,
   pendingRefillCountForPartition,
-  usePendingQueues
+  usePendingQueues,
+  vehicleDeleteCountForMap,
+  vehicleDeleteCountForPartition
 } from "../../lib/usePendingRefills";
 import type { PendingRefills } from "../../api/bases";
 import { friendlyMapName, hasFriendlyMapName } from "./mapNames";
@@ -404,19 +406,21 @@ export function MapsPanel({ onError, confirmAction, restartGate, confirmSettings
   const pendingQueues = usePendingQueues();
   // Every queue that a map-down window flushes, for one partition or for every
   // partition of one world_partition map. Kept as callbacks so each restart
-  // control reads the same four numbers.
+  // control reads the same complete set of counts.
   const queueCountsForPartition = useCallback((partitionId: number): QueueCounts => ({
     fuel: pendingRefillCountForPartition(pendingQueues.fuel.pending, partitionId),
     water: pendingRefillCountForPartition(pendingQueues.water.pending, partitionId),
     deletes: pendingRefillCountForPartition(pendingQueues.deletes.pending, partitionId),
+    vehicleDeletes: vehicleDeleteCountForPartition(pendingQueues.vehicleDeletes.pending, partitionId),
     permissions: childAccessPieceCountForPartition(pendingQueues.permissions.pending, partitionId)
-  }), [pendingQueues.fuel.pending, pendingQueues.water.pending, pendingQueues.deletes.pending, pendingQueues.permissions.pending]);
+  }), [pendingQueues.fuel.pending, pendingQueues.water.pending, pendingQueues.deletes.pending, pendingQueues.vehicleDeletes.pending, pendingQueues.permissions.pending]);
   const queueCountsForMap = useCallback((partitionMap: string): QueueCounts => ({
     fuel: pendingRefillCountForMap(pendingQueues.fuel.pending, partitionMap),
     water: pendingRefillCountForMap(pendingQueues.water.pending, partitionMap),
     deletes: pendingRefillCountForMap(pendingQueues.deletes.pending, partitionMap),
+    vehicleDeletes: vehicleDeleteCountForMap(pendingQueues.vehicleDeletes.pending, partitionMap),
     permissions: childAccessPieceCountForMap(pendingQueues.permissions.pending, partitionMap)
-  }), [pendingQueues.fuel.pending, pendingQueues.water.pending, pendingQueues.deletes.pending, pendingQueues.permissions.pending]);
+  }), [pendingQueues.fuel.pending, pendingQueues.water.pending, pendingQueues.deletes.pending, pendingQueues.vehicleDeletes.pending, pendingQueues.permissions.pending]);
   const mapsLoadRef = useRef<Promise<void> | null>(null);
   const mapsRuntimeRefreshRef = useRef<Promise<void> | null>(null);
   const mapsDisplayedTerminalTaskRef = useRef<Set<string>>(new Set());

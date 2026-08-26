@@ -90,3 +90,17 @@ test("a failed delete flush does not stop the hook waiting for the other queues"
   ]);
   assert.deepEqual(result.failures, [{ refillType: "delete", error: "delete queue database unavailable" }]);
 });
+
+test("base permission and vehicle delete queues both flush during the same map-down window", async () => {
+  const result = await flushBaseRefillQueues({
+    flushGenerators: async () => ({ flushed: [] }),
+    flushWater: async () => ({ flushed: [] }),
+    flushChildAccess: async () => ({ flushed: [{ baseId: 4, updated: 2, ok: true }] }),
+    flushVehicleDeletes: async () => ({ flushed: [{ vehicleId: 5, ok: true }] })
+  });
+  assert.deepEqual(result.flushed, [
+    { baseId: 4, updated: 2, ok: true, refillType: "childAccess" },
+    { vehicleId: 5, ok: true, refillType: "vehicle-delete" }
+  ]);
+  assert.deepEqual(result.failures, []);
+});

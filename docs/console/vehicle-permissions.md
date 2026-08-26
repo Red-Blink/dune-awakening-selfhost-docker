@@ -14,10 +14,13 @@ restart — they reach a running map immediately. See
 
 Vehicle permissions share nearly all of their implementation with
 [base permissions](base-permissions.md): the same `dune.permission_actor_rank`
-table, the same shipped stored procedures, and the same transactional
-roster-diff engine (`mutatePermissionRoster` in `duneDb.js`). The one
-deliberate difference is that vehicles have **no ownership-transfer action** —
-no equivalent of bases' Transfer to Custodian.
+table, the same shipped stored procedures, the same transactional roster-diff
+engine (`mutatePermissionRoster` in `duneDb.js`), and the same Transfer to
+Custodian action bases have. The one deliberate difference is that these
+routes have no backed-up guard, because a vehicle has no equivalent of a
+base being picked up. They **do** now have a delete-pending guard — see
+[vehicle-deletion.md](vehicle-deletion.md) — since vehicles can have their
+own queued delete now, the same way bases can.
 
 ## Ranks
 
@@ -38,21 +41,21 @@ holds a 4 or 5.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/api/vehicles/:vehicleId/permissions` | The vehicle's roster, with resolved names and rank labels. |
+| `GET` | `/api/vehicles/:vehicleId/permissions` | The vehicle's roster, with resolved names and rank labels, plus `systemCustodian`. |
 | `PUT` | `/api/vehicles/:vehicleId/permissions` | Replace the roster. Body: `{ entries: [{ playerId, rank }] }`. |
+| `POST` | `/api/vehicles/:vehicleId/system-custodian` | Transfer ownership to the reserved system custodian. No body. |
 | `GET` | `/api/vehicles/permission-candidates?q=&limit=` | Player search for the add-player picker. |
-
-There is no vehicle equivalent of `POST /api/bases/:baseId/system-custodian` —
-by design, vehicles do not offer an ownership-transfer action.
 
 `PUT` takes a **whole roster**, not a delta, applied the same way bases'
 roster save is: the server diffs it against current state and applies only
 the difference, skipping an unchanged row since every write emits a
 notification.
 
-Roster saves are audited as `vehicles.set-permissions` and rate limited. No
-confirmation phrase is required by the API, matching the base roster save;
-the change is reversible from the same editor.
+Roster saves are audited as `vehicles.set-permissions`, and the custodian
+transfer as `vehicles.transfer-system-custodian`; both are rate limited. No
+confirmation phrase is required by either API endpoint, matching the base
+roster save and its transfer route — confirmation lives entirely in the UI's
+confirm dialog, and both actions are reversible from the same editor.
 
 ## What the server enforces
 
@@ -80,7 +83,24 @@ surface raw PostgreSQL text to the operator.
 
 `GET` still succeeds on such a vehicle — the roster is simply empty — and
 returns `claimed: false` plus `unclaimedReason`. The tab uses those to disable
-Save, the rank controls, and the remove buttons.
+Save, Transfer, the rank controls, and the remove buttons.
+
+## System custodian
+
+Vehicles share the exact same reserved custodian identity bases use — see
+[base-permissions.md's System custodian section](base-permissions.md#system-custodian)
+for how detection works (the RedBlink `Server` persona, falling back to
+Funcom's `GM` persona, matched by a stable account/controller/state/pawn
+tuple) and how the transfer preserves the rest of the roster (the outgoing
+Owner is demoted to Co-Owner, not removed). There is exactly one custodian per
+battlegroup — the same identity Care Packages and MOTD use — so nothing about
+detection or provisioning is vehicle-specific.
+
+The one real difference from the base route:
+`POST /api/vehicles/:vehicleId/system-custodian` has no backed-up guard,
+because a vehicle has no picked-up/backed-up state. It does check
+delete-pending now, the same as the roster save route above — see
+[vehicle-deletion.md](vehicle-deletion.md#irreversibility).
 
 ## The roster cap comes from server config
 
@@ -134,4 +154,6 @@ that.
 - [base-permissions.md](base-permissions.md) — the feature this one is
   modeled on; read it first for the parts that are identical (the notify
   mechanism, search_path, write ordering, and the roster cap).
+- [vehicle-deletion.md](vehicle-deletion.md) — permanently deleting a
+  vehicle; the delete-pending guard these routes now check.
 - [API-REFERENCE.md](API-REFERENCE.md) — full HTTP API reference.
