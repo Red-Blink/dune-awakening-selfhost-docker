@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Trash2, X } from "lucide-react";
+import { Boxes, ChevronDown, ChevronUp, Trash2, X } from "lucide-react";
 import type { VehicleModule, VehicleRow, VehicleSharedEntry } from "../../api/vehicles";
 import { DataTable, type SortDirection } from "../../components/common/DataTable";
 import { cachedInstanceNames, resolveInstanceNames } from "../maps/instanceNames";
 import { friendlyMapName } from "../maps/mapNames";
 import { VehiclePermissionsTab } from "./VehiclePermissionsTab";
+import { VehicleStorageOverlay } from "./VehicleStorageOverlay";
 
 const GLOBAL_COLUMNS = ["name", "type", "owner", "shared_with", "condition_percent", "fuel_percent", "location"];
 const PLAYER_COLUMNS = ["name", "type", "relationship", "owner", "condition_percent", "fuel_percent", "location"];
@@ -41,6 +42,14 @@ type VehicleTableProps = {
   // shipped), so PlayerVehiclesTab's mount is unaffected until these are
   // deliberately wired through there too.
   canDeleteVehicle?: boolean;
+  // Whether the server can read a vehicle's cargo hold at all
+  // (capabilities.vehicleStorage). Off by default so a mount that does not
+  // pass it through never offers a button that comes back unsupported.
+  storageSupported?: boolean;
+  // Echoes a cargo-delete failure into the panel-level banner once the modal
+  // is dismissed. Optional: PlayerVehiclesTab has no such banner, and the
+  // overlay's own inline error is the primary surface either way.
+  onError?: (text: string) => void;
   queuedDeleteVehicleIds?: Set<string>;
   deletingId?: string;
   cancelingDeleteId?: string;
@@ -168,10 +177,14 @@ function renderComponent(module: VehicleModule, index: number) {
 export function VehicleTable({
   rows, context = "global", emptyMessage = "No vehicles have been found yet.", sortColumn, sortDirection, onSort,
   canEditPermissions = false, onPermissionsSaved, focusVehicleId, focusNonce, confirmAction,
-  canDeleteVehicle = false, queuedDeleteVehicleIds, deletingId, cancelingDeleteId, onDeleteVehicle, onCancelQueuedDelete
+  canDeleteVehicle = false, storageSupported = false, onError, queuedDeleteVehicleIds, deletingId, cancelingDeleteId, onDeleteVehicle, onCancelQueuedDelete
 }: VehicleTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedTab, setExpandedTab] = useState<"components" | "permissions">("components");
+  // The open contents overlay's vehicle, or null. Held here rather than in
+  // renderExpandedRow so the modal is rendered outside the table -- inside it
+  // the dialog would live in a <td>.
+  const [storageFor, setStorageFor] = useState<VehicleRow | null>(null);
   const [instanceNames, setInstanceNames] = useState<Map<string, string>>(new Map());
   const expandedContentRef = useRef<HTMLDivElement>(null);
   const satisfiedFocusNonceRef = useRef<number | undefined>(undefined);
@@ -184,6 +197,14 @@ export function VehicleTable({
       setExpandedTab("components");
     }
   }, [expandedId, rows]);
+
+  // The overlay reads one vehicle's hold, so it cannot outlive that vehicle
+  // being on screen -- a background refresh that drops the row (a delete, or
+  // a search the admin changed) closes it rather than leaving a modal
+  // describing something no longer listed.
+  useEffect(() => {
+    if (storageFor && !rows.some((row) => String(row.id) === String(storageFor.id))) setStorageFor(null);
+  }, [rows, storageFor]);
 
   // The caller's search request and this row data arrive on different
   // renders (the id lands in `rows` only once the parent's fetch resolves),
@@ -245,6 +266,7 @@ export function VehicleTable({
   }
 
   return (
+    <>
     <DataTable
       rows={rows}
       columns={columns}
@@ -299,8 +321,26 @@ export function VehicleTable({
         const vehicle = row as VehicleRow;
         const id = String(vehicle.id);
         const modules: VehicleModule[] = Array.isArray(vehicle.modules) ? vehicle.modules : [];
+        // A vehicle has exactly one cargo hold, on the vehicle actor itself --
+        // not one per module (dune.inventories.vehicle_module_id is empty in
+        // production; see duneDb.vehicleStorage). So this is a single control
+        // on the header rather than a button per storage card, which would
+        // open the same contents twice on a hypothetical two-module vehicle.
+        // The fitted storage module is still what gates it: a vehicle with no
+        // hold has a 0/0 inventory row and nothing worth opening.
+        const hasStorage = modules.some((module) => module.isStorage);
         const componentsPanel = <div className="vehicles-expanded">
-          <p className="vehicles-expanded-header">{modules.length} component{modules.length === 1 ? "" : "s"}</p>
+          <div className="vehicles-expanded-header-row">
+            <p className="vehicles-expanded-header">{modules.length} component{modules.length === 1 ? "" : "s"}</p>
+            {storageSupported && hasStorage && <button
+              className="bases-inventory-view-contents"
+              // Stops the row's own onRowClick from collapsing the panel out
+              // from under the modal. The permissions branch below wraps its
+              // content in the same guard; the no-permissions branch does not,
+              // so it has to live on the button.
+              onClick={(event) => { event.stopPropagation(); setStorageFor(vehicle); }}
+            ><Boxes size={14} aria-hidden="true" /> View Contents</button>}
+          </div>
           {modules.length === 0 ? <p className="muted">No components fitted.</p> : <div className="vehicles-component-grid">{modules.map(renderComponent)}</div>}
         </div>;
         // tabIndex=-1 makes this programmatically focusable (see the
@@ -343,5 +383,13 @@ export function VehicleTable({
       }}
       emptyMessage={emptyMessage}
     />
+    {storageFor && <VehicleStorageOverlay
+      vehicleId={String(storageFor.id)}
+      vehicleName={String(storageFor.name || `vehicle ${storageFor.id}`)}
+      onClose={() => setStorageFor(null)}
+      confirmAction={confirmAction}
+      onError={onError}
+    />}
+    </>
   );
 }

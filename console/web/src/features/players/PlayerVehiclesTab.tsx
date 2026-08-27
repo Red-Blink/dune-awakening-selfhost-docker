@@ -17,6 +17,7 @@ export function PlayerVehiclesTab({ playerId, playerName, confirmAction }: Playe
   const [loading, setLoading] = useState(true);
   const [supported, setSupported] = useState(true);
   const [canEditPermissions, setCanEditPermissions] = useState(false);
+  const [storageSupported, setStorageSupported] = useState(false);
   const [message, setMessage] = useState("");
   const requestIdRef = useRef(0);
 
@@ -30,12 +31,14 @@ export function PlayerVehiclesTab({ playerId, playerName, confirmAction }: Playe
       setRows(result.rows || []);
       setSupported(result.capabilities?.vehicles !== false);
       setCanEditPermissions(result.capabilities?.vehiclePermissions === true);
+      setStorageSupported(result.capabilities?.vehicleStorage === true);
       setMessage(result.reason || "");
     } catch (error) {
       if (requestIdRef.current !== requestId) return;
       setRows([]);
       setSupported(true);
       setCanEditPermissions(false);
+      setStorageSupported(false);
       setMessage(errorText(error));
     } finally {
       if (requestIdRef.current === requestId) setLoading(false);
@@ -75,6 +78,7 @@ export function PlayerVehiclesTab({ playerId, playerName, confirmAction }: Playe
                   context="player"
                   emptyMessage={`${playerName} has no owned or shared vehicles.`}
                   canEditPermissions={canEditPermissions}
+                  storageSupported={storageSupported}
                   confirmAction={confirmAction}
                   // ownedCount above derives from row.relationship, which
                   // shifts after a rank change -- refetch so the summary and

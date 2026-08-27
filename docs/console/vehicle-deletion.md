@@ -40,7 +40,15 @@ written:
 
 Deleting the vehicle's `dune.actors` row cascades away `vehicles`,
 `vehicle_modules`, their `inventories` and `items`, and any
-`backup_vehicles`/`recovered_vehicles` record. As with a base, the one thing
+`backup_vehicles`/`recovered_vehicles` record.
+
+One caveat on the `vehicle_module_id` row above: it is a real constraint, but
+it is not the path a vehicle's cargo actually takes. That link is **empty in
+production** (0 of 535 inventories in a real dump) — the cargo hold hangs off
+`dune.inventories.actor_id`, so it is removed by the `actors` cascade on the
+line above it, not by this one. See
+[vehicle-storage.md](vehicle-storage.md). Nothing about the delete changes;
+the closure is the same either way. As with a base, the one thing
 that does **not** cascade from `actors` is the vehicle's map marker
 (`dune.markers`/`dune.player_markers`, keyed on the claim actor id but only
 FK-cascaded from `map_names`) — this repo previously had no confirmation that

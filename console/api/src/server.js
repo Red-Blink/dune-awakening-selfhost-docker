@@ -885,6 +885,10 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/vehicles\/[^/]+\/permissions$/) && req.method === "GET") return vehiclePermissionsRoute(res, path);
   if (path.match(/^\/api\/vehicles\/[^/]+\/permissions$/) && req.method === "PUT") return vehicleSetPermissionsRoute(req, res, path);
   if (path.match(/^\/api\/vehicles\/[^/]+\/system-custodian$/) && req.method === "POST") return vehicleSystemCustodianRoute(req, res, path);
+  if (path.match(/^\/api\/vehicles\/[^/]+\/storage$/) && req.method === "GET") return vehicleStorageRoute(res, path);
+  if (path.match(/^\/api\/vehicles\/[^/]+\/storage\/items\/[^/]+$/) && req.method === "DELETE") return vehicleStorageItemDeleteRoute(req, res, path);
+  if (path.match(/^\/api\/vehicles\/[^/]+\/storage\/items$/) && req.method === "DELETE") return vehicleStorageItemsDeleteRoute(req, res, path);
+  if (path.match(/^\/api\/vehicles\/[^/]+\/storage\/all-items$/) && req.method === "DELETE") return vehicleStorageAllItemsDeleteRoute(req, res, path);
   if (path.match(/^\/api\/vehicles\/[^/]+\/queued-delete$/) && req.method === "DELETE") return vehicleCancelQueuedDeleteRoute(req, res, path);
   if (path.match(/^\/api\/vehicles\/[^/]+$/) && req.method === "DELETE") return vehicleDeleteRoute(req, res, path);
   if (path === "/api/admin/items/catalog") return json(res, 200, { rows: listCatalogItems(config.repoRoot, { q: url.searchParams.get("q") || "", limit: url.searchParams.get("limit") || 500 }) });
@@ -3808,6 +3812,92 @@ async function vehiclePermissionsRoute(res, path) {
   } catch (error) {
     return json(res, 500, { supported: false, error: redact(error?.message || "Unexpected error."), reason: redact(error?.message || "Unexpected error.") });
   }
+}
+
+// One vehicle's cargo hold, read-only -- so no directDbMutation wrapper and
+// no confirmation phrase, same as baseContainerSlotsRoute. Same id guard as
+// vehiclePermissionsRoute above, for the same reason. A schema without the
+// inventory tables comes back as a 200 carrying supported:false rather than
+// an error status, so the overlay's Retry always means something real.
+// repoRoot is passed through only to resolve each item's catalog icon.
+async function vehicleStorageRoute(res, path) {
+  const vehicleId = Number(decodeURIComponent(path.split("/")[3]));
+  if (!Number.isInteger(vehicleId) || vehicleId < 1 || vehicleId > Number.MAX_SAFE_INTEGER) {
+    return json(res, 400, { error: "Invalid vehicle ID" });
+  }
+  try {
+    // deleteSafety rides along the same way baseContainerSlotsRoute carries
+    // its own: it is what lets the overlay disable and explain its delete
+    // controls before the operator clicks. The authoritative refusal still
+    // happens atomically inside the delete transaction.
+    const storage = await duneDb.vehicleStorage(db, vehicleId, { repoRoot: config.repoRoot });
+    return json(res, 200, {
+      ...storage,
+      deleteSafety: await duneDb.vehicleStorageDeleteSafety(db, vehicleId)
+    });
+  } catch (error) {
+    return json(res, 500, { supported: false, error: redact(error?.message || "Unexpected error."), reason: redact(error?.message || "Unexpected error.") });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle cargo deletion.
+//
+// Unlike the base container delete family there is no route-level safety
+// pre-check here. The base version's baseContainerDeleteSafety(baseId) call
+// is documented dead code on those routes -- the group always defaults to
+// "storage", so the branch can never fire, and the real check happens
+// atomically downstream. This mirrors the working half of that design without
+// the wart: duneDb.resolveVehicleCargoHold takes the lock and refuses a
+// blocked vehicle inside the transaction, and vehicleStorageDeleteSafety is
+// carried on the READ so the UI can gate ahead of the click.
+//
+// No safety backup either, unlike vehicleDeleteRoute: these are item rows, not
+// a whole vehicle.
+// ---------------------------------------------------------------------------
+
+// Matches bigintParam's contract rather than Number()'ing: an item id past
+// Number.MAX_SAFE_INTEGER silently rounds, and a destructive request that
+// retargets a different row is the worst failure mode available here.
+function validVehicleStorageItemId(itemId) {
+  return /^[1-9][0-9]*$/.test(itemId) && BigInt(itemId) <= 9223372036854775807n;
+}
+
+function parseVehicleStoragePath(path) {
+  const vehicleId = Number(decodeURIComponent(path.split("/")[3]));
+  if (!Number.isInteger(vehicleId) || vehicleId < 1 || vehicleId > Number.MAX_SAFE_INTEGER) return null;
+  return vehicleId;
+}
+
+async function vehicleStorageItemDeleteRoute(req, res, path) {
+  const vehicleId = parseVehicleStoragePath(path);
+  const itemId = decodeURIComponent(path.split("/")[6]);
+  if (vehicleId === null || !validVehicleStorageItemId(itemId)) {
+    return json(res, 400, { error: "Invalid vehicle or item ID" });
+  }
+  if (vehicleDeletePending(vehicleId)) return json(res, 409, { error: VEHICLE_DELETE_PENDING_MESSAGE });
+  return directDbMutation(req, res, "vehicles.storage-item-delete", "DELETE ITEM", async (body) => {
+    const count = body?.count === undefined || body?.count === null ? null : Number(body.count);
+    return duneDb.deleteVehicleStorageItem(db, vehicleId, itemId, { count });
+  }, { vehicleId, itemId });
+}
+
+async function vehicleStorageItemsDeleteRoute(req, res, path) {
+  const vehicleId = parseVehicleStoragePath(path);
+  if (vehicleId === null) return json(res, 400, { error: "Invalid vehicle ID" });
+  if (vehicleDeletePending(vehicleId)) return json(res, 409, { error: VEHICLE_DELETE_PENDING_MESSAGE });
+  return directDbMutation(req, res, "vehicles.storage-items-delete", "DELETE ITEMS", async (body) => {
+    return duneDb.deleteMultipleVehicleStorageItems(db, vehicleId, body?.itemIds);
+  }, { vehicleId });
+}
+
+async function vehicleStorageAllItemsDeleteRoute(req, res, path) {
+  const vehicleId = parseVehicleStoragePath(path);
+  if (vehicleId === null) return json(res, 400, { error: "Invalid vehicle ID" });
+  if (vehicleDeletePending(vehicleId)) return json(res, 409, { error: VEHICLE_DELETE_PENDING_MESSAGE });
+  return directDbMutation(req, res, "vehicles.storage-all-items-delete", "DELETE ALL ITEMS", async () => {
+    return duneDb.deleteAllVehicleStorageItems(db, vehicleId);
+  }, { vehicleId });
 }
 
 async function vehiclePermissionCandidatesRoute(res, url) {

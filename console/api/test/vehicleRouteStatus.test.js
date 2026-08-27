@@ -102,3 +102,43 @@ test("vehicleCancelQueuedDeleteRoute uses the same strict guard and sends no con
   assert.ok(guardAt !== -1 && guardAt < mutationAt, "vehicleCancelQueuedDeleteRoute must reject a bad id before mutating");
   assert.match(body, /"vehicles\.cancel-queued-delete", null/, "cancelling a queued delete must not require a confirmation phrase -- it is reversible");
 });
+
+test("vehicleStorageRoute uses the same strict guard, before the try", () => {
+  const body = routeBody("vehicleStorageRoute");
+  assert.match(body, /!Number\.isInteger\(vehicleId\)[\s\S]*?vehicleId > Number\.MAX_SAFE_INTEGER/);
+  const guardAt = body.indexOf("Invalid vehicle ID");
+  const tryAt = body.indexOf("try {");
+  assert.notEqual(guardAt, -1, "vehicleStorageRoute lost its invalid-id response");
+  assert.ok(guardAt < tryAt, "vehicleStorageRoute must reject a bad id before the try block");
+  assert.match(body.slice(0, tryAt), /json\(res, 400, \{ error: "Invalid vehicle ID" \}\)/);
+});
+
+// Read-only: no directDbMutation wrapper and no confirmation phrase, the same
+// shape baseContainerSlotsRoute has. A mutation wrapper appearing here would
+// mean the overlay had quietly grown a write path.
+test("vehicleStorageRoute stays read-only", () => {
+  const body = routeBody("vehicleStorageRoute");
+  assert.doesNotMatch(body, /directDbMutation/, "the contents route must not mutate");
+  assert.match(body, /duneDb\.vehicleStorage\(db, vehicleId, \{ repoRoot: config\.repoRoot \}\)/);
+});
+
+test("vehicleStorageRoute answers a genuine failure with 500, not 400", () => {
+  const body = routeBody("vehicleStorageRoute");
+  const catchBlock = body.slice(body.indexOf("} catch (error) {"));
+  assert.match(catchBlock, /json\(res, 500,/);
+  assert.doesNotMatch(catchBlock, /json\(res, 400,/);
+  assert.match(catchBlock, /supported: false/);
+  assert.match(catchBlock, /error: redact\(/);
+  assert.match(catchBlock, /reason: redact\(/);
+});
+
+// Route order matters: /api/vehicles/{id}/storage has to be tested before the
+// bare /api/vehicles/{id} DELETE line, or a future method-agnostic edit to
+// that line would swallow it.
+test("the storage route is registered ahead of the bare vehicle-id route", () => {
+  const storageAt = serverSource.indexOf('vehicleStorageRoute(res, path)');
+  const bareAt = serverSource.indexOf('vehicleDeleteRoute(req, res, path)');
+  assert.notEqual(storageAt, -1, "GET /api/vehicles/{id}/storage is not registered");
+  assert.ok(storageAt < bareAt, "the storage route must be matched before the bare /api/vehicles/{id} route");
+  assert.match(serverSource, /path\.match\(\/\^\\\/api\\\/vehicles\\\/\[\^\/\]\+\\\/storage\$\/\) && req\.method === "GET"/);
+});

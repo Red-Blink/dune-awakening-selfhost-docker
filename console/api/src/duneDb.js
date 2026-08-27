@@ -7509,7 +7509,8 @@ export async function listVehicles(db, { q = "", page = 0, pageSize = 50, sortCo
         })),
         modules: (row.modules || []).map((module) => ({
           ...module,
-          name: portalVehicleModuleName(module.templateId)
+          name: portalVehicleModuleName(module.templateId),
+          isStorage: isVehicleStorageModule(module.templateId)
         }))
       }));
     await attachVehicleRegions(db, rows);
@@ -7527,17 +7528,535 @@ export async function listVehicles(db, { q = "", page = 0, pageSize = 50, sortCo
     const vehicleDeleteQueue = vehicleDelete
       ? await supportsVehicleDeleteQueue(db, { vehicleDelete }).catch(() => false)
       : false;
+    // requiredTables above proved dune.vehicles exists, but not the two
+    // relations vehicleStorage actually reads -- probe them rather than
+    // inferring, so the Components tab hides View Contents instead of
+    // offering a button that comes back unsupported on click.
+    const vehicleStorage = await supportsVehicleStorage(db).catch(() => false);
 
     return {
-      capabilities: { vehicles: true, vehiclePermissions, vehicleDelete, vehicleDeleteQueue },
+      capabilities: { vehicles: true, vehiclePermissions, vehicleDelete, vehicleDeleteQueue, vehicleStorage },
       totalCount: result.rows[0] ? Number(result.rows[0].total_count) : 0,
       totalVehicles: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_vehicles) : 0,
       rows
     };
   } catch (error) {
     const result = unsupported("vehicles", requiredTables.map((t) => `dune.${t}`));
-    return { ...result, capabilities: { ...result.capabilities, vehiclePermissions: false, vehicleDelete: false, vehicleDeleteQueue: false }, totalCount: 0, totalVehicles: 0, reason: `Vehicles query failed: ${error.message}` };
+    return { ...result, capabilities: { ...result.capabilities, vehiclePermissions: false, vehicleDelete: false, vehicleDeleteQueue: false, vehicleStorage: false }, totalCount: 0, totalVehicles: 0, reason: `Vehicles query failed: ${error.message}` };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle cargo hold (Vehicles -> Components -> View Contents)
+//
+// A vehicle's cargo inventory hangs off dune.inventories.actor_id -- the
+// vehicle's own actor id, since dune.vehicles.id == dune.actors.id -- with
+// inventory_type = 0, exactly as fillItemToStorage already documents at the
+// top of its own implementation. dune.inventories.vehicle_module_id and
+// dune.vehicle_module_inventories exist in the schema but are empty in
+// production (0 of 535 / 0 rows in a real dump), so contents cannot be
+// attributed to a particular storage module -- and do not need to be: there
+// is exactly one hold per vehicle, and its max_item_count/max_item_volume
+// already track whichever *Inventory_* module is fitted.
+//
+// The inventory_type = 0 filter is load-bearing, not decoration: the same
+// actor also owns inventory_type IS NULL rows (per-component holds) that
+// carry no capacity and are not the cargo hold.
+// ---------------------------------------------------------------------------
+
+// Storage modules are catalogued per vehicle class and tier rather than by a
+// type column, so the fitted-storage test is on the template id: every entry
+// in runtime/data/admin-items.json follows it (BuggyInventory_5,
+// SandbikeInventory_2, OrnithopterMediumInventory_5, TreadwheelInventory_2,
+// BuggyInventory_Unique_Capacity_04, ...).
+export function isVehicleStorageModule(templateId) {
+  return /Inventory(_Unique_Capacity)?_\d+$/i.test(String(templateId || ""));
+}
+
+async function supportsVehicleStorage(db) {
+  for (const table of ["vehicles", "inventories", "items"]) {
+    if (!(await tableExists(db, table))) return false;
+  }
+  return true;
+}
+
+// One vehicle's cargo hold, slot by slot. Modelled on baseContainerSlots --
+// same probe-then-degrade discipline and the same slot shape -- but flat
+// rather than an inventories[] array, because a vehicle has one hold where a
+// base container can have several.
+export async function vehicleStorage(db, vehicleId, { repoRoot } = {}) {
+  const target = intParam(vehicleId, "vehicle id", 1);
+  // Every relation the query below names. A partial probe is the trap here:
+  // dune.vehicles existing says nothing about dune.inventories.
+  const required = ["vehicles", "inventories", "items"];
+  const present = await Promise.all(required.map((table) => tableExists(db, table)));
+  const missing = required.filter((_, index) => !present[index]);
+  if (missing.length) {
+    return {
+      supported: false,
+      reason: `Unsupported by detected schema. Missing required table(s): ${missing.map((table) => `dune.${table}`).join(", ")}`,
+      vehicleId: String(target),
+      slots: []
+    };
+  }
+
+  // Probed rather than assumed, for the reason baseContainerSlots gives: a
+  // missing column is a parse-time error, not a null, so an older schema
+  // would 500 the whole view instead of degrading one field.
+  const itemColumns = await columnsFor(db, "items");
+  const inventoryColumns = await columnsFor(db, "inventories");
+  const hasPositionIndex = itemColumns.has("position_index");
+  const hasStats = itemColumns.has("stats");
+  const hasVolumeOverride = itemColumns.has("volume_override");
+  const hasMaxItemVolume = inventoryColumns.has("max_item_volume");
+  // Without inventory_type there is no way to tell the cargo hold from the
+  // per-component inventories on the same actor. Rather than guess, fall back
+  // to the capacity-carrying row -- the component holds have none.
+  const hasInventoryType = inventoryColumns.has("inventory_type");
+  const holdFilter = hasInventoryType ? "inv.inventory_type = 0" : "inv.max_item_count > 0";
+  const maxItemVolumeSelect = hasMaxItemVolume ? "inv.max_item_volume" : "0::real as max_item_volume";
+  const volumeOverrideSelect = hasVolumeOverride ? "i.volume_override" : "0::real as volume_override";
+  const slotSelect = [
+    hasPositionIndex ? "i.position_index" : "null::bigint as position_index",
+    itemColumns.has("quality_level") ? "i.quality_level" : "0::bigint as quality_level",
+    hasStats
+      ? "coalesce((i.stats->'FItemStackAndDurabilityStats'->1->>'CurrentDurability'), null) as current_durability"
+      : "null::text as current_durability",
+    hasStats
+      ? `coalesce(
+             nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'MaxDurability')::numeric, 0),
+             nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'DecayedMaxDurability')::numeric, 0),
+             null
+           ) as max_durability`
+      : "null::numeric as max_durability",
+    hasStats
+      ? "i.stats->'FAugmentedItemStats'->1->'AppliedAugments' as applied_augments"
+      : "null::jsonb as applied_augments",
+    hasStats
+      ? "i.stats->'FAugmentedItemStats'->1->'AppliedAugmentQualities' as applied_augment_qualities"
+      : "null::jsonb as applied_augment_qualities"
+  ].join(",\n           ");
+  const slotOrder = hasPositionIndex ? "i.position_index nulls last, i.id" : "i.id";
+
+  // Joined through dune.vehicles rather than reading dune.inventories by
+  // actor_id directly: that is what makes an id that is some other kind of
+  // actor come back as found:false instead of quietly returning a player's
+  // or a placeable's inventory through a vehicles-scoped route.
+  const result = await db.query(`
+    with hold as (
+      select inv.id, inv.max_item_count, ${maxItemVolumeSelect}
+      from dune.vehicles v
+      join dune.inventories inv on inv.actor_id = v.id and ${holdFilter}
+      where v.id = $1
+      order by inv.id
+      limit 1
+    )
+    select h.id::text as inventory_id, h.max_item_count, h.max_item_volume,
+           i.id::text as item_id, i.template_id, i.stack_size, ${volumeOverrideSelect},
+           ${slotSelect}
+    from hold h
+    left join dune.items i on i.inventory_id = h.id
+    order by ${slotOrder}`, [target]);
+
+  if (!result.rows.length) {
+    return {
+      supported: true,
+      found: false,
+      reason: "That vehicle has no cargo hold.",
+      vehicleId: String(target),
+      slots: []
+    };
+  }
+
+  const itemMetadata = adminItemMetadata();
+  const first = result.rows[0];
+  const slots = [];
+  let currentVolume = 0;
+  let volumeComplete = hasMaxItemVolume && hasVolumeOverride;
+  for (const row of result.rows) {
+    // The left join emits one all-null item row for an empty hold, which is
+    // still needed above so the summary and the empty grid render.
+    const templateId = String(row.template_id || "");
+    if (!templateId) continue;
+    // Parallel arrays written by buildAugmentedItemStats; paired positionally
+    // and simply stopping at the shorter one, so a corrupt row degrades
+    // rather than throwing on a display path.
+    const appliedAugments = Array.isArray(row.applied_augments) ? row.applied_augments : [];
+    const appliedQualities = Array.isArray(row.applied_augment_qualities) ? row.applied_augment_qualities : [];
+    const augments = appliedAugments
+      .map((entry, index) => {
+        const augmentTemplateId = String(entry?.Name || "");
+        if (!augmentTemplateId) return null;
+        return {
+          templateId: augmentTemplateId,
+          name: itemMetadata.get(augmentTemplateId)?.name || augmentTemplateId,
+          qualityLevel: Number(appliedQualities[index]) || 0
+        };
+      })
+      .filter((augment) => augment !== null);
+    const slotQuantity = Number(row.stack_size) || 0;
+    // volume_override is per-unit (see giveItemToStorage's correction note),
+    // so this row contributes unitVolume * quantity.
+    if (hasMaxItemVolume && hasVolumeOverride) {
+      const unitVolume = resolvedItemUnitVolume(templateId, row.volume_override);
+      if (unitVolume === null) volumeComplete = false;
+      else currentVolume += unitVolume * slotQuantity;
+    }
+    slots.push({
+      itemId: String(row.item_id),
+      templateId,
+      name: itemMetadata.get(templateId)?.name || templateId,
+      // Unlike baseContainerSlots, the icon rides on this response: there is
+      // no vehicle equivalent of the base inventory rollup the bases tab
+      // harvests images from.
+      image: itemImagePath(repoRoot, templateId),
+      positionIndex: row.position_index === null || row.position_index === undefined
+        ? null
+        : Number(row.position_index),
+      quantity: slotQuantity,
+      qualityLevel: Number(row.quality_level) || 0,
+      currentDurability: row.current_durability === null || row.current_durability === undefined
+        ? null
+        : Number(row.current_durability),
+      maxDurability: row.max_durability === null || row.max_durability === undefined
+        ? null
+        : Number(row.max_durability),
+      augments
+    });
+  }
+
+  return {
+    supported: true,
+    found: true,
+    vehicleId: String(target),
+    inventoryId: String(first.inventory_id),
+    maxSlots: Math.max(0, Number(first.max_item_count) || 0),
+    usedSlots: slots.length,
+    maxVolume: Math.max(0, Number(first.max_item_volume) || 0),
+    currentVolume,
+    volumeComplete,
+    slots
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle cargo hold: deletion
+//
+// Mirrors the base container delete family (deleteBaseContainerItem and its
+// two bulk siblings), minus the base-claim CTE chain -- a vehicle's hold is
+// reached from the vehicle's own actor id -- and minus the storage/crafting
+// group check, which has no vehicle analogue.
+//
+// One thing here is deliberately STRICTER than the base version: a vehicle in
+// Travel / VehicleBackup / VehicleRecovery refuses, reusing the same
+// vehicleBlockedDeleteState guard whole-vehicle delete already applies.
+// Measured against a real dump: 35 of 91 vehicles sit in those states and
+// every one of them has an empty hold, so this blocks nothing real -- it just
+// refuses to race the game's own stash/recovery flow.
+//
+// Like the base family, this does NOT require a stopped map. The row is gone
+// immediately; a running map keeps showing it until the next restart, because
+// the engine only claims item rows at startup and nothing (pg_notify, trigger,
+// RMQ command) covers inventory.
+// ---------------------------------------------------------------------------
+
+async function supportsVehicleStorageItemDelete(db) {
+  for (const table of ["vehicles", "inventories", "items"]) {
+    if (!(await tableExists(db, table))) return false;
+  }
+  return functionExists(db, "dune.delete_item(bigint)");
+}
+
+// Read-side companion to the delete functions: what the contents overlay reads
+// to disable and explain its controls before the operator clicks. The
+// authoritative refusal still happens atomically inside
+// resolveVehicleCargoHold -- this is the advance notice, not the guard.
+//
+// Lives here rather than in server.js (where baseContainerDeleteSafety lives)
+// because every fact it reports is a database fact; there is no config or
+// process state to compose in.
+export async function vehicleStorageDeleteSafety(db, vehicleId) {
+  const target = intParam(vehicleId, "vehicle id", 1);
+  if (!(await supportsVehicleStorageItemDelete(db))) {
+    return {
+      safe: false,
+      known: true,
+      state: "",
+      reason: "Cargo deletion requires dune.vehicles, dune.inventories, dune.items, and dune.delete_item(bigint)."
+    };
+  }
+  let state = "";
+  try {
+    state = await vehicleBlockedDeleteState(db, target);
+  } catch {
+    // known:false, not safe:true -- an unverifiable state is a reason to
+    // withhold the control, not to assume the vehicle is idle.
+    return {
+      safe: false,
+      known: false,
+      state: "",
+      reason: "The console could not verify this vehicle's state, so cargo deletion is disabled."
+    };
+  }
+  if (state) return { safe: false, known: true, state, reason: vehicleBlockedCargoReason(state) };
+  return { safe: true, known: true, state: "", reason: "" };
+}
+
+function vehicleBlockedCargoReason(state) {
+  return `This vehicle is currently ${state} and its cargo cannot be changed until that clears. Try again once the vehicle is no longer mid-transit or pending recovery.`;
+}
+
+// The vehicle counterpart of resolveOwnedStorageContainer. Takes `tx`, not
+// `db`, so the FOR UPDATE lock and the deletes that follow are one atomic
+// unit -- verifying in a separate unlocked query and writing later is the
+// TOCTOU gap that had to be closed on the base give/fill paths.
+async function resolveVehicleCargoHold(tx, vehicleId) {
+  // The DISTINCT-in-a-CTE shape is not stylistic. Combining SELECT DISTINCT
+  // with FOR UPDATE OF is rejected outright by Postgres, and the base version
+  // of this shipped that way: every real invocation 500'd, and no mocked test
+  // could catch it because the fake db.query pattern-matches query text and
+  // never parses SQL. Resolve the candidate set in the CTE, then join back to
+  // the real relation to take the lock.
+  const found = await tx.query(`
+    with candidates as (
+      select distinct inv.id as inventory_id
+      from dune.vehicles v
+      join dune.inventories inv on inv.actor_id = v.id and inv.inventory_type = 0
+      where v.id = $1
+    )
+    select c.inventory_id, inv.actor_id,
+           coalesce(inv.max_item_count, 0)::int as max_item_count,
+           coalesce(inv.max_item_volume, 0)::real as max_item_volume
+    from candidates c
+    join dune.inventories inv on inv.id = c.inventory_id
+    order by c.inventory_id
+    for update of inv`, [vehicleId]);
+
+  if (!found.rows.length) throw new Error("That vehicle has no cargo hold.");
+  // Deliberately no rows[0] pick. Every vehicle in a real dump has exactly one
+  // inventory_type = 0 row, so more than one means an assumption this code
+  // rests on has stopped holding -- and a silent "success" that leaves items
+  // behind in a second hold is worse than a loud failure. The read path
+  // (vehicleStorage) still takes the first, because a display degrading is
+  // fine where a destructive path guessing is not.
+  if (found.rows.length > 1) {
+    throw new Error(`This vehicle backs ${found.rows.length} separate cargo holds, which this action does not support yet. Please report this so it can be fixed.`);
+  }
+
+  // Checked after the lock, inside the transaction: the state could otherwise
+  // change between the check and the delete.
+  const blockedState = await vehicleBlockedDeleteState(tx, vehicleId);
+  if (blockedState) throw new Error(vehicleBlockedCargoReason(blockedState));
+
+  return found.rows[0];
+}
+
+const VEHICLE_STORAGE_DELETE_CAPABILITY = "Cargo deletion requires dune.vehicles, dune.inventories, dune.items, and dune.delete_item(bigint).";
+
+// Deletes one stack, or part of one, from a vehicle's cargo hold.
+export async function deleteVehicleStorageItem(db, vehicleId, itemId, { count = null } = {}) {
+  await requireCapability(await supportsVehicleStorageItemDelete(db), VEHICLE_STORAGE_DELETE_CAPABILITY);
+  const target = intParam(vehicleId, "vehicle id", 1);
+  // bigintParam, never Number(): an item id past Number.MAX_SAFE_INTEGER
+  // silently rounds, and a destructive request that retargets a different row
+  // is the worst possible failure mode here.
+  const safeItemId = bigintParam(itemId, "item id");
+  const requestedCount = count === null || count === undefined ? null : intParam(count, "count", 1);
+
+  // Column-probed for the same reason the read path probes: a missing column
+  // is a parse-time error, not a null. These enrich the audit record with what
+  // was actually destroyed -- without quality and durability, a destroyed
+  // pristine legendary logs identically to a broken common of the same
+  // template.
+  const itemColumns = await columnsFor(db, "items");
+  const hasStats = itemColumns.has("stats");
+  const stateSelect = [
+    itemColumns.has("position_index") ? "i.position_index" : "null::bigint as position_index",
+    itemColumns.has("quality_level") ? "i.quality_level" : "0::bigint as quality_level",
+    hasStats
+      ? "coalesce((i.stats->'FItemStackAndDurabilityStats'->1->>'CurrentDurability'), null) as current_durability"
+      : "null::text as current_durability",
+    hasStats
+      ? `coalesce(
+             nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'MaxDurability')::numeric, 0),
+             nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'DecayedMaxDurability')::numeric, 0),
+             null
+           ) as max_durability`
+      : "null::numeric as max_durability"
+  ].join(",\n           ");
+
+  return db.transaction(async (tx) => {
+    // dune.delete_item and dune.delete_inventory_item reference their tables
+    // unqualified and carry no SET search_path of their own, so against any
+    // role but `dune` they raise `relation "items" does not exist` -- which
+    // aborts the transaction before the raw-delete fallback can run.
+    await tx.query("set local search_path to dune, public");
+    const hold = await resolveVehicleCargoHold(tx, target);
+
+    // for update OF i, inv -- not a bare `for update`, which cannot name a
+    // relation through a CTE. Locking inv as well is what serializes this
+    // against a concurrent delete on the same hold.
+    const found = await tx.query(`
+      select i.id::text as item_id, i.template_id, i.stack_size, i.inventory_id,
+             ${stateSelect}
+      from dune.items i
+      join dune.inventories inv on inv.id = i.inventory_id
+      where i.id = $1 and i.inventory_id = $2
+      for update of i, inv`, [safeItemId, hold.inventory_id]);
+
+    const item = found.rows[0];
+    // Scoped on the resolved hold's inventory_id, so an item belonging to
+    // another vehicle -- or to one of this vehicle's own component
+    // inventories -- simply returns zero rows.
+    if (!item) throw new Error("That item was not found in this vehicle's cargo hold.");
+
+    const stackSize = Number(item.stack_size) || 0;
+    const inventoryId = item.inventory_id;
+    const label = item.template_id || "Item";
+    // Captured before the delete: the row, and the state that came with it,
+    // is gone once the delete succeeds.
+    const destroyedState = {
+      positionIndex: item.position_index === null || item.position_index === undefined
+        ? null : Number(item.position_index),
+      qualityLevel: Number(item.quality_level) || 0,
+      currentDurability: item.current_durability === null || item.current_durability === undefined
+        ? null : Number(item.current_durability),
+      maxDurability: item.max_durability === null || item.max_durability === undefined
+        ? null : Number(item.max_durability)
+    };
+
+    // Refused, never rounded down to "delete it all". The two are not the same
+    // request, and the gap between them is a real race: the caller saw 500,
+    // asked for 400, and the stack has since dropped to 300 -- widening that
+    // into destroying all 300 removes more than was ever agreed to. Only an
+    // omitted count means "the whole slot".
+    if (requestedCount !== null && requestedCount > stackSize) {
+      throw new Error(`Cannot remove ${requestedCount}: the stack holds ${stackSize}. It may have changed since this view was loaded.`);
+    }
+    const partial = requestedCount !== null && requestedCount < stackSize;
+
+    if (partial) {
+      // Refused rather than widened: silently deleting the whole stack because
+      // the schema cannot do a partial removal would destroy more than asked.
+      await requireCapability(
+        await supportsPartialStackDelete(db),
+        "Removing part of a stack requires dune.delete_inventory_item(bigint,bigint)."
+      );
+      // The shipped procedure returns NULL instead of raising when the count
+      // exceeds the stack, so a null result is a failure, not a no-op success.
+      // A remaining of 0 is a success, which is why a truthy check is wrong.
+      const applied = await tx.query(
+        "select dune.delete_inventory_item($1::bigint, $2::bigint) as result",
+        [safeItemId, requestedCount]
+      );
+      if (applied.rows[0]?.result === null || applied.rows[0]?.result === undefined) {
+        throw new Error("Partial stack removal was rejected by the database. The requested count may exceed the stack.");
+      }
+      const after = await tx.query("select stack_size from dune.items where id = $1 and inventory_id = $2", [safeItemId, inventoryId]);
+      const remaining = after.rows[0] ? Number(after.rows[0].stack_size) || 0 : 0;
+      if (remaining !== stackSize - requestedCount) {
+        throw new Error("Partial stack removal did not change the stack by the requested amount.");
+      }
+      return {
+        ok: true,
+        vehicleId: String(target),
+        inventoryId: String(inventoryId),
+        partial: true,
+        removed: { itemId: item.item_id, templateId: item.template_id, count: requestedCount, remaining, ...destroyedState },
+        message: `Removed ${requestedCount} of ${label} from the database, leaving ${remaining}.`
+      };
+    }
+
+    // Whole slot. Verify -> raw-delete fallback -> verify: the shipped
+    // procedure is preferred for its item-tracking log, but the row
+    // disappearing is what actually matters. Every fallback statement is
+    // re-scoped on inventory_id so the raw delete cannot escape the verified
+    // hold.
+    await tx.query("select dune.delete_item($1::bigint)", [safeItemId]);
+    const stillExists = await tx.query("select exists(select 1 from dune.items where id = $1 and inventory_id = $2) as exists", [safeItemId, inventoryId]);
+    if (stillExists.rows[0]?.exists) {
+      await tx.query("delete from dune.items where id = $1 and inventory_id = $2", [safeItemId, inventoryId]);
+    }
+    const deleted = await tx.query("select not exists(select 1 from dune.items where id = $1 and inventory_id = $2) as deleted", [safeItemId, inventoryId]);
+    if (!deleted.rows[0]?.deleted) throw new Error("Cargo item delete did not remove the item from the database.");
+
+    return {
+      ok: true,
+      vehicleId: String(target),
+      inventoryId: String(inventoryId),
+      partial: false,
+      removed: { itemId: item.item_id, templateId: item.template_id, count: stackSize, remaining: 0, ...destroyedState },
+      message: `${label} was deleted from the database.`
+    };
+  });
+}
+
+// Deletes a chosen set of whole stacks. No partial-stack support -- the
+// per-stack control is where a partial removal belongs.
+export async function deleteMultipleVehicleStorageItems(db, vehicleId, itemIds) {
+  await requireCapability(await supportsVehicleStorageItemDelete(db), VEHICLE_STORAGE_DELETE_CAPABILITY);
+  const target = intParam(vehicleId, "vehicle id", 1);
+  // Deduped AFTER bigintParam normalization, so "99" and 99 collapse.
+  const safeIds = [...new Set((Array.isArray(itemIds) ? itemIds : []).map((id) => bigintParam(id, "item id")))];
+  if (!safeIds.length) throw new Error("At least one item ID is required");
+  if (safeIds.length > 200) throw new Error("Cannot delete more than 200 items in a single batch");
+
+  return db.transaction(async (tx) => {
+    await tx.query("set local search_path to dune, public");
+    const hold = await resolveVehicleCargoHold(tx, target);
+
+    // One set-based select-for-update resolves every id this batch owns. An id
+    // not found here (already gone, or never in this hold) is silently
+    // excluded -- skipped, not an error.
+    const auditDetail = await auditDetailSelectFragment(tx);
+    const found = await tx.query(`
+      select id::text as item_id, template_id, stack_size, ${auditDetail}
+      from dune.items
+      where id = any($1::bigint[]) and inventory_id = $2
+      for update`, [safeIds, hold.inventory_id]);
+
+    const removed = await finishDeletingLockedItems(tx, hold.inventory_id, found.rows);
+
+    return {
+      ok: true,
+      vehicleId: String(target),
+      inventoryId: String(hold.inventory_id),
+      removed,
+      message: `${removed.length} of ${safeIds.length} requested item(s) were deleted from the database.`
+    };
+  });
+}
+
+// Empties a vehicle's cargo hold. The list is read fresh inside the same
+// transaction that deletes it, so "all" always means everything present at the
+// moment of the lock -- never a possibly-stale list the UI fetched earlier.
+export async function deleteAllVehicleStorageItems(db, vehicleId) {
+  await requireCapability(await supportsVehicleStorageItemDelete(db), VEHICLE_STORAGE_DELETE_CAPABILITY);
+  const target = intParam(vehicleId, "vehicle id", 1);
+
+  return db.transaction(async (tx) => {
+    await tx.query("set local search_path to dune, public");
+    const hold = await resolveVehicleCargoHold(tx, target);
+
+    const auditDetail = await auditDetailSelectFragment(tx);
+    const found = await tx.query(`
+      select id::text as item_id, template_id, stack_size, ${auditDetail}
+      from dune.items
+      where inventory_id = $1
+      for update`, [hold.inventory_id]);
+
+    const removed = await finishDeletingLockedItems(tx, hold.inventory_id, found.rows);
+
+    return {
+      ok: true,
+      vehicleId: String(target),
+      inventoryId: String(hold.inventory_id),
+      removed,
+      message: removed.length > 0
+        ? `${removed.length} item(s) were deleted from the database.`
+        : "This cargo hold was already empty."
+    };
+  });
 }
 
 export async function portalVehicles(db, playerIds) {

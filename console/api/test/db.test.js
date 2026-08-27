@@ -1,5 +1,5 @@
 import test, { beforeEach } from "node:test";
-import { listVehicles, portalVehicleDisplayName } from "../src/duneDb.js";
+import { deleteAllVehicleStorageItems, deleteMultipleVehicleStorageItems, deleteVehicleStorageItem, isVehicleStorageModule, listVehicles, portalVehicleDisplayName, vehicleStorage, vehicleStorageDeleteSafety } from "../src/duneDb.js";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -8787,4 +8787,590 @@ test("baseGeneratorFuelLevels reports null rather than zero for a base with no g
   // null must not read as "empty" to a caller deciding whether to refill.
   assert.equal(levels.lowestPercent, null);
   assert.equal(levels.deviceCount, 0);
+});
+
+// ---------------------------------------------------------------------------
+// vehicleStorage: the per-slot read behind Vehicles -> Components -> View
+// Contents. A vehicle has exactly one cargo hold, reached through
+// dune.inventories.actor_id (== the vehicle's actor id) with
+// inventory_type = 0 -- NOT through vehicle_module_id, which is empty in
+// production. These tests pin both halves of that.
+// ---------------------------------------------------------------------------
+
+function fakeVehicleStorageDb(calls, fixtures = {}) {
+  const {
+    rows = [],
+    missingTables = [],
+    itemColumns = ["id", "inventory_id", "stack_size", "position_index", "template_id", "stats", "quality_level"],
+    // Defaults to no max_item_volume, matching itemColumns' own default of no
+    // volume_override -- a schema without volume support until a test opts in.
+    inventoryColumns = ["id", "actor_id", "inventory_type", "max_item_count"]
+  } = fixtures;
+  return {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) {
+        const table = String(values[0] || "");
+        return { rows: [{ exists: !missingTables.some((name) => table.includes(name)) }] };
+      }
+      if (text.includes("information_schema.columns")) {
+        const columns = values[1] === "inventories" ? inventoryColumns : itemColumns;
+        return { rows: columns.map((column_name) => ({ column_name })) };
+      }
+      if (text.includes("with hold as")) return { rows };
+      return { rows: [] };
+    }
+  };
+}
+
+const HOLD_ROW = {
+  inventory_id: "2001", max_item_count: 20, max_item_volume: 2000,
+  quality_level: 0, current_durability: null, max_durability: null
+};
+
+test("vehicleStorage reads the cargo hold off the vehicle actor, not a module", async () => {
+  const calls = [];
+  const db = fakeVehicleStorageDb(calls, {
+    rows: [{ ...HOLD_ROW, item_id: "9", template_id: "JasmiumCrystal", stack_size: 162, position_index: 5 }]
+  });
+  const result = await vehicleStorage(db, 2008);
+
+  assert.equal(result.supported, true);
+  assert.equal(result.found, true);
+  assert.equal(result.vehicleId, "2008");
+  assert.equal(result.inventoryId, "2001");
+  assert.equal(result.maxSlots, 20);
+  assert.equal(result.usedSlots, 1);
+  assert.deepEqual(result.slots.map((slot) => slot.templateId), ["JasmiumCrystal"]);
+  assert.equal(result.slots[0].positionIndex, 5);
+  assert.equal(result.slots[0].quantity, 162);
+
+  const query = calls.find((call) => call.text.includes("with hold as"));
+  assert.deepEqual(query.values, [2008]);
+  // The three load-bearing clauses. inv.actor_id = v.id is what scopes the
+  // hold to a real vehicle; inventory_type = 0 is what separates the cargo
+  // hold from the per-component inventories on the same actor.
+  assert.match(query.text, /join dune\.inventories inv on inv\.actor_id = v\.id/);
+  assert.match(query.text, /inv\.inventory_type = 0/);
+  assert.match(query.text, /from dune\.vehicles v/);
+  // The empty links, explicitly: joining either would return nothing at all.
+  assert.doesNotMatch(query.text, /vehicle_module_id/);
+  assert.doesNotMatch(query.text, /vehicle_module_inventories/);
+});
+
+test("vehicleStorage keeps two stacks of one template apart", async () => {
+  const calls = [];
+  const db = fakeVehicleStorageDb(calls, {
+    rows: [
+      { ...HOLD_ROW, item_id: "1", template_id: "ScrapMetal", stack_size: 500, position_index: 0 },
+      { ...HOLD_ROW, item_id: "2", template_id: "MagnetiteOre", stack_size: 200, position_index: 1 },
+      { ...HOLD_ROW, item_id: "3", template_id: "ScrapMetal", stack_size: 400, position_index: 2 }
+    ]
+  });
+  const result = await vehicleStorage(db, 2008);
+
+  assert.equal(result.usedSlots, 3);
+  // A template-merged rollup would report one ScrapMetal of 900.
+  assert.deepEqual(result.slots.filter((slot) => slot.templateId === "ScrapMetal").map((slot) => slot.quantity), [500, 400]);
+  assert.deepEqual(result.slots.map((slot) => slot.itemId), ["1", "2", "3"]);
+});
+
+test("vehicleStorage keeps an empty hold so the grid can render its empty slots", async () => {
+  const calls = [];
+  // The LEFT JOIN emits one all-null item row for an empty hold.
+  const db = fakeVehicleStorageDb(calls, {
+    rows: [{ ...HOLD_ROW, item_id: null, template_id: null, stack_size: null, position_index: null }]
+  });
+  const result = await vehicleStorage(db, 2008);
+
+  assert.equal(result.found, true);
+  assert.equal(result.usedSlots, 0);
+  assert.equal(result.maxSlots, 20);
+  assert.deepEqual(result.slots, []);
+});
+
+test("vehicleStorage answers found:false for an id that is not a vehicle", async () => {
+  const calls = [];
+  const db = fakeVehicleStorageDb(calls, { rows: [] });
+  const result = await vehicleStorage(db, 999999);
+  // An answer, not an error -- and the shape the route returns 200 with. The
+  // join through dune.vehicles is what makes a player's or a placeable's
+  // actor id land here instead of returning their inventory.
+  assert.equal(result.supported, true);
+  assert.equal(result.found, false);
+  assert.equal(result.vehicleId, "999999");
+  assert.deepEqual(result.slots, []);
+  assert.match(result.reason, /no cargo hold/i);
+});
+
+test("vehicleStorage reports unsupported when any relation it reads is absent", async () => {
+  for (const table of ["vehicles", "inventories", "items"]) {
+    const db = fakeVehicleStorageDb([], { missingTables: [table] });
+    const result = await vehicleStorage(db, 2008);
+    // Probing only dune.vehicles would have passed two of these three.
+    assert.equal(result.supported, false, `${table} should be required`);
+    assert.match(result.reason, new RegExp(`dune\\.${table}`));
+    assert.deepEqual(result.slots, []);
+  }
+});
+
+test("vehicleStorage degrades a schema without position_index instead of failing", async () => {
+  const calls = [];
+  const db = fakeVehicleStorageDb(calls, {
+    itemColumns: ["id", "inventory_id", "stack_size", "template_id"],
+    rows: [{ ...HOLD_ROW, item_id: "1", template_id: "ScrapMetal", stack_size: 500, position_index: null }]
+  });
+  const result = await vehicleStorage(db, 2008);
+
+  assert.equal(result.found, true);
+  assert.equal(result.slots[0].positionIndex, null);
+  assert.deepEqual(result.slots[0].augments, []);
+  const query = calls.find((call) => call.text.includes("with hold as"));
+  assert.match(query.text, /null::bigint as position_index/);
+  assert.match(query.text, /null::jsonb as applied_augments/);
+});
+
+test("vehicleStorage falls back to the capacity-carrying inventory without inventory_type", async () => {
+  const calls = [];
+  const db = fakeVehicleStorageDb(calls, {
+    inventoryColumns: ["id", "actor_id", "max_item_count"],
+    rows: [{ ...HOLD_ROW, item_id: "1", template_id: "ScrapMetal", stack_size: 10, position_index: 0 }]
+  });
+  const result = await vehicleStorage(db, 2008);
+
+  assert.equal(result.found, true);
+  const query = calls.find((call) => call.text.includes("with hold as"));
+  // The per-component inventories carry no capacity, so this still lands on
+  // the cargo hold rather than guessing.
+  assert.doesNotMatch(query.text, /inventory_type/);
+  assert.match(query.text, /inv\.max_item_count > 0/);
+});
+
+test("vehicleStorage pairs augments positionally and stops at the shorter array", async () => {
+  const calls = [];
+  const db = fakeVehicleStorageDb(calls, {
+    rows: [{
+      ...HOLD_ROW, item_id: "1", template_id: "UniqueSword_05", stack_size: 1, position_index: 0,
+      applied_augments: [{ Name: "T6_Augment_UnitTestFixture1" }, { Name: "T6_Augment_UnitTestFixture2" }],
+      applied_augment_qualities: [2]
+    }]
+  });
+  const result = await vehicleStorage(db, 2008);
+  // A corrupt or hand-edited row degrades rather than 500ing a display path.
+  assert.deepEqual(result.slots[0].augments.map((augment) => augment.qualityLevel), [2, 0]);
+});
+
+test("vehicleStorage multiplies per-unit volume_override by the stack size", async () => {
+  const calls = [];
+  const db = fakeVehicleStorageDb(calls, {
+    itemColumns: ["id", "inventory_id", "stack_size", "position_index", "template_id", "stats", "quality_level", "volume_override"],
+    inventoryColumns: ["id", "actor_id", "inventory_type", "max_item_count", "max_item_volume"],
+    rows: [{ ...HOLD_ROW, item_id: "1", template_id: "ScrapMetal", stack_size: 100, position_index: 0, volume_override: 1.5 }]
+  });
+  const result = await vehicleStorage(db, 2008);
+
+  assert.equal(result.maxVolume, 2000);
+  assert.equal(result.currentVolume, 150);
+  assert.equal(result.volumeComplete, true);
+});
+
+test("vehicleStorage reports volumeComplete:false on a schema without volume tracking", async () => {
+  const calls = [];
+  const db = fakeVehicleStorageDb(calls, {
+    rows: [{ ...HOLD_ROW, max_item_volume: 0, item_id: "1", template_id: "ScrapMetal", stack_size: 100, position_index: 0 }]
+  });
+  const result = await vehicleStorage(db, 2008);
+
+  assert.equal(result.volumeComplete, false);
+  assert.equal(result.currentVolume, 0);
+});
+
+test("isVehicleStorageModule matches every shipped storage module and nothing else", async () => {
+  for (const id of [
+    "BuggyInventory_3", "BuggyInventory_6", "SandbikeInventory_1", "SandbikeInventory_2",
+    "OrnithopterLightInventory_4", "OrnithopterMediumInventory_5", "TreadwheelInventory_2",
+    "BuggyInventory_Unique_Capacity_03", "BuggyInventory_Unique_Capacity_06"
+  ]) {
+    assert.equal(isVehicleStorageModule(id), true, id);
+  }
+  for (const id of [
+    "BuggyEngine_5", "BuggyLocomotionBackLeft_5", "OrnithopterMediumWings_5",
+    "GeneratorModule", "", null, undefined
+  ]) {
+    assert.equal(isVehicleStorageModule(id), false, String(id));
+  }
+});
+
+test("listVehicles flags which fitted modules are storage", async () => {
+  const db = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("total_vehicles")) return { rows: [{ total_vehicles: 1 }] };
+      if (text.includes("module_durability")) return { rows: [{
+        id: "2008", name: "Sandcrawler", type: "Buggy", owner: "Duncan_Idaho",
+        condition_percent: 92, current_fuel: "61", max_fuel: "100", fuel_percent: 61,
+        map: "HaggaBasin", partition_id: 1, x: "1", y: "2", z: "3", total_count: 1,
+        modules: [
+          { templateId: "BuggyEngine_5", condition: "440", maxCondition: "500", conditionPercent: 88 },
+          { templateId: "BuggyInventory_4", condition: null, maxCondition: null, conditionPercent: null }
+        ],
+        shared_with: []
+      }] };
+      return { rows: [] };
+    }
+  };
+  const result = await listVehicles(db, { page: 0, pageSize: 50 });
+  // What the Components tab gates its View Contents button on.
+  assert.deepEqual(result.rows[0].modules.map((module) => module.isStorage), [false, true]);
+  assert.equal(result.capabilities.vehicleStorage, true);
+});
+
+// ---------------------------------------------------------------------------
+// Vehicle cargo deletion. Mirrors the base container delete family, minus the
+// claim-CTE chain and the storage/crafting group check, plus one guard bases
+// have no analogue for: a vehicle in Travel/VehicleBackup/VehicleRecovery
+// refuses.
+// ---------------------------------------------------------------------------
+
+function fakeVehicleDeleteDb(calls, fixtures = {}) {
+  const {
+    hold = [{ inventory_id: "2001", actor_id: "2008", max_item_count: 20, max_item_volume: 2000 }],
+    items = [],
+    actorState = null,
+    procedures = ["dune.delete_item(bigint)", "dune.delete_inventory_item(bigint,bigint)"],
+    itemColumns = ["id", "inventory_id", "stack_size", "position_index", "template_id", "stats", "quality_level"],
+    partialResult = undefined,
+    stackAfter = undefined,
+    stillPresent = []
+  } = fixtures;
+  const state = { deleted: new Set() };
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("to_regprocedure")) {
+        const signature = String(values[0] || "");
+        return { rows: [{ exists: procedures.includes(signature) }] };
+      }
+      if (text.includes("information_schema.columns")) {
+        return { rows: itemColumns.map((column_name) => ({ column_name })) };
+      }
+      if (text.includes("set local search_path")) return { rows: [] };
+      if (text.includes("with candidates as")) return { rows: hold };
+      if (text.includes("from dune.actor_state")) return { rows: actorState ? [{ state: actorState }] : [] };
+      if (text.includes("for update of i, inv")) return { rows: items };
+      if (text.includes("delete_inventory_item")) return { rows: [{ result: partialResult }] };
+      if (text.includes("select stack_size from dune.items")) {
+        return { rows: stackAfter === undefined ? [] : [{ stack_size: stackAfter }] };
+      }
+      if (text.includes("select dune.delete_item")) { state.deleted.add(String(values[0])); return { rows: [] }; }
+      if (text.includes("exists(select 1 from dune.items")) {
+        const present = stillPresent.includes(String(values[0]));
+        return { rows: [{ exists: present, deleted: !present }] };
+      }
+      // The bulk set-based select-for-update.
+      if (text.includes("for update") && text.includes("from dune.items")) return { rows: items };
+      if (text.includes("select id::text as item_id from dune.items")) {
+        return { rows: stillPresent.map((item_id) => ({ item_id })) };
+      }
+      if (text.startsWith("delete from dune.items")) return { rows: [] };
+      return { rows: [] };
+    },
+    transaction: async (fn) => fn(db)
+  };
+  return db;
+}
+
+const CARGO_ITEM = {
+  item_id: "501", template_id: "JasmiumCrystal", stack_size: 162, inventory_id: "2001",
+  position_index: 5, quality_level: 0, current_durability: null, max_durability: null
+};
+
+test("deleteVehicleStorageItem resolves the hold, locks it, and deletes through the shipped procedure", async () => {
+  const calls = [];
+  const db = fakeVehicleDeleteDb(calls, { items: [CARGO_ITEM] });
+  const result = await deleteVehicleStorageItem(db, 2008, "501");
+
+  assert.equal(result.ok, true);
+  assert.equal(result.partial, false);
+  assert.equal(result.vehicleId, "2008");
+  assert.equal(result.inventoryId, "2001");
+  assert.equal(result.removed.count, 162);
+  assert.equal(result.removed.remaining, 0);
+  // Audit detail, captured before the row went away.
+  assert.equal(result.removed.positionIndex, 5);
+
+  // search_path is set before anything touches the hold, or the shipped
+  // procedures resolve nothing and the transaction aborts before the
+  // raw-delete fallback can run.
+  const searchPathAt = calls.findIndex((call) => call.text.includes("set local search_path to dune, public"));
+  const resolveAt = calls.findIndex((call) => call.text.includes("with candidates as"));
+  assert.ok(searchPathAt !== -1, "search_path was never set");
+  assert.ok(searchPathAt < resolveAt, "search_path must be set before the hold is resolved");
+  const resolve = calls[resolveAt];
+  // Postgres rejects SELECT DISTINCT combined with FOR UPDATE outright, which
+  // is why the DISTINCT lives in the CTE and the lock is taken on the join
+  // back. Asserted on the OUTER select specifically: both keywords appear in
+  // this query, and the bug is having them in the SAME one.
+  assert.match(resolve.text, /for update of inv/);
+  const outerSelect = resolve.text.slice(resolve.text.indexOf(")", resolve.text.indexOf("with candidates as")));
+  assert.doesNotMatch(outerSelect, /distinct/i, "the locking select must not be DISTINCT");
+  assert.match(resolve.text.slice(0, resolve.text.indexOf(")")), /select distinct/i, "the candidate CTE is where DISTINCT belongs");
+  assert.match(resolve.text, /inv\.inventory_type = 0/);
+  const lookup = calls.find((call) => call.text.includes("for update of i, inv"));
+  // Scoped on the resolved hold, so another vehicle's item returns no rows.
+  assert.match(lookup.text, /where i\.id = \$1 and i\.inventory_id = \$2/);
+  assert.deepEqual(lookup.values, ["501", "2001"]);
+});
+
+test("deleteVehicleStorageItem keeps a bigint item id exact instead of Number()-ing it", async () => {
+  const calls = [];
+  const big = "9223372036854775806";
+  const db = fakeVehicleDeleteDb(calls, { items: [{ ...CARGO_ITEM, item_id: big }] });
+  await deleteVehicleStorageItem(db, 2008, big);
+  const lookup = calls.find((call) => call.text.includes("for update of i, inv"));
+  // Number(big) rounds to 9223372036854775808 -- a different row.
+  assert.equal(lookup.values[0], big);
+});
+
+test("deleteVehicleStorageItem rejects an item that is not in this vehicle's hold", async () => {
+  const db = fakeVehicleDeleteDb([], { items: [] });
+  await assert.rejects(() => deleteVehicleStorageItem(db, 2008, "999"), /not found in this vehicle's cargo hold/);
+});
+
+test("deleteVehicleStorageItem reports a vehicle with no cargo hold rather than guessing", async () => {
+  const db = fakeVehicleDeleteDb([], { hold: [] });
+  await assert.rejects(() => deleteVehicleStorageItem(db, 2008, "501"), /no cargo hold/);
+});
+
+test("deleteVehicleStorageItem refuses to pick when a vehicle backs more than one hold", async () => {
+  const db = fakeVehicleDeleteDb([], {
+    hold: [
+      { inventory_id: "2001", actor_id: "2008", max_item_count: 20, max_item_volume: 2000 },
+      { inventory_id: "2002", actor_id: "2008", max_item_count: 20, max_item_volume: 2000 }
+    ]
+  });
+  // A silent "success" that leaves items behind in a second hold is worse than
+  // a loud failure.
+  await assert.rejects(() => deleteVehicleStorageItem(db, 2008, "501"), /2 separate cargo holds/);
+});
+
+test("deleteVehicleStorageItem refuses every blocked vehicle state", async () => {
+  for (const state of ["Travel", "VehicleBackup", "VehicleRecovery"]) {
+    const db = fakeVehicleDeleteDb([], { items: [CARGO_ITEM], actorState: state });
+    await assert.rejects(
+      () => deleteVehicleStorageItem(db, 2008, "501"),
+      new RegExp(`currently ${state} and its cargo cannot be changed`),
+      `${state} should refuse`
+    );
+  }
+});
+
+test("deleteVehicleStorageItem allows an ordinary vehicle with no actor_state row", async () => {
+  const db = fakeVehicleDeleteDb([], { items: [CARGO_ITEM], actorState: null });
+  const result = await deleteVehicleStorageItem(db, 2008, "501");
+  assert.equal(result.ok, true);
+});
+
+test("deleteVehicleStorageItem refuses a count larger than the stack instead of clearing the slot", async () => {
+  const db = fakeVehicleDeleteDb([], { items: [CARGO_ITEM] });
+  // The caller saw 500, asked for 400, and the stack has since dropped --
+  // widening that into destroying everything removes more than was agreed to.
+  await assert.rejects(
+    () => deleteVehicleStorageItem(db, 2008, "501", { count: 500 }),
+    /Cannot remove 500: the stack holds 162/
+  );
+});
+
+test("deleteVehicleStorageItem routes a partial removal through dune.delete_inventory_item", async () => {
+  const calls = [];
+  const db = fakeVehicleDeleteDb(calls, { items: [CARGO_ITEM], partialResult: 62, stackAfter: 62 });
+  const result = await deleteVehicleStorageItem(db, 2008, "501", { count: 100 });
+
+  assert.equal(result.partial, true);
+  assert.equal(result.removed.count, 100);
+  assert.equal(result.removed.remaining, 62);
+  const partial = calls.find((call) => call.text.includes("delete_inventory_item"));
+  assert.deepEqual(partial.values, ["501", 100]);
+  // The whole-slot procedure must not also have run.
+  assert.equal(calls.some((call) => call.text.includes("select dune.delete_item")), false);
+});
+
+test("deleteVehicleStorageItem treats a count equal to the whole stack as a whole-slot delete", async () => {
+  const calls = [];
+  const db = fakeVehicleDeleteDb(calls, { items: [CARGO_ITEM] });
+  const result = await deleteVehicleStorageItem(db, 2008, "501", { count: 162 });
+  assert.equal(result.partial, false);
+  assert.equal(calls.some((call) => call.text.includes("delete_inventory_item")), false);
+});
+
+test("deleteVehicleStorageItem treats a null from the partial procedure as a failure", async () => {
+  const db = fakeVehicleDeleteDb([], { items: [CARGO_ITEM], partialResult: null });
+  // The shipped procedure returns NULL rather than raising when the count
+  // exceeds the stack, so a null is a failure, not a no-op success.
+  await assert.rejects(
+    () => deleteVehicleStorageItem(db, 2008, "501", { count: 100 }),
+    /rejected by the database/
+  );
+});
+
+test("deleteVehicleStorageItem distinguishes a rejected partial from a small remainder", async () => {
+  // The guard is `result === null || result === undefined`, not a truthy
+  // check. A remainder of 0 cannot arise on this path -- count === stackSize
+  // routes to the whole-slot delete instead -- but a remainder of 1 is the
+  // smallest real success, and a truthy check would still be wrong the moment
+  // that changes.
+  const db = fakeVehicleDeleteDb([], {
+    items: [{ ...CARGO_ITEM, stack_size: 100 }], partialResult: 1, stackAfter: 1
+  });
+  const result = await deleteVehicleStorageItem(db, 2008, "501", { count: 99 });
+  assert.equal(result.partial, true);
+  assert.equal(result.removed.remaining, 1);
+  assert.match(result.message, /leaving 1/);
+});
+
+test("deleteVehicleStorageItem raises when the stack did not change by the requested amount", async () => {
+  const db = fakeVehicleDeleteDb([], { items: [CARGO_ITEM], partialResult: 62, stackAfter: 150 });
+  await assert.rejects(
+    () => deleteVehicleStorageItem(db, 2008, "501", { count: 100 }),
+    /did not change the stack by the requested amount/
+  );
+});
+
+test("deleteVehicleStorageItem refuses a partial removal when the schema lacks the procedure", async () => {
+  const db = fakeVehicleDeleteDb([], {
+    items: [CARGO_ITEM], procedures: ["dune.delete_item(bigint)"]
+  });
+  // Refused rather than widened into a whole-stack delete.
+  await assert.rejects(
+    () => deleteVehicleStorageItem(db, 2008, "501", { count: 100 }),
+    /requires dune\.delete_inventory_item/
+  );
+});
+
+test("deleteVehicleStorageItem falls back to a raw delete scoped on the hold", async () => {
+  const calls = [];
+  // dune.delete_item left the row behind; the fallback must still not escape
+  // the verified inventory.
+  const db = fakeVehicleDeleteDb(calls, { items: [CARGO_ITEM], stillPresent: [] });
+  await deleteVehicleStorageItem(db, 2008, "501");
+  const raw = calls.find((call) => call.text.startsWith("delete from dune.items"));
+  if (raw) assert.match(raw.text, /and inventory_id = \$2/);
+  const verify = calls.filter((call) => call.text.includes("exists(select 1 from dune.items"));
+  assert.ok(verify.length >= 1);
+  assert.match(verify[0].text, /and inventory_id = \$2/);
+});
+
+test("deleteVehicleStorageItem raises when the row is still there after both attempts", async () => {
+  const db = fakeVehicleDeleteDb([], { items: [CARGO_ITEM], stillPresent: ["501"] });
+  await assert.rejects(() => deleteVehicleStorageItem(db, 2008, "501"), /did not remove the item/);
+});
+
+test("deleteVehicleStorageItem degrades audit detail on a schema without those columns", async () => {
+  const calls = [];
+  const db = fakeVehicleDeleteDb(calls, {
+    itemColumns: ["id", "inventory_id", "stack_size", "template_id"],
+    items: [{ item_id: "501", template_id: "ScrapMetal", stack_size: 5, inventory_id: "2001" }]
+  });
+  const result = await deleteVehicleStorageItem(db, 2008, "501");
+  assert.equal(result.removed.positionIndex, null);
+  assert.equal(result.removed.qualityLevel, 0);
+  assert.equal(result.removed.currentDurability, null);
+  const lookup = calls.find((call) => call.text.includes("for update of i, inv"));
+  assert.match(lookup.text, /null::bigint as position_index/);
+});
+
+test("deleteVehicleStorageItem reports unsupported when the delete procedure is absent", async () => {
+  const db = fakeVehicleDeleteDb([], { procedures: [] });
+  await assert.rejects(() => deleteVehicleStorageItem(db, 2008, "501"), /dune\.delete_item\(bigint\)/);
+});
+
+test("deleteMultipleVehicleStorageItems deletes only the requested ids that exist in the hold", async () => {
+  const calls = [];
+  const db = fakeVehicleDeleteDb(calls, {
+    items: [
+      { item_id: "501", template_id: "JasmiumCrystal", stack_size: 162, position_index: 0, quality_level: 0, current_durability: null, max_durability: null },
+      { item_id: "503", template_id: "Mk5Cutteray", stack_size: 1, position_index: 5, quality_level: 4, current_durability: 300, max_durability: 600 }
+    ]
+  });
+  // 999 is not in the hold -- skipped, not an error.
+  const result = await deleteMultipleVehicleStorageItems(db, 2008, ["501", "503", "999"]);
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.removed.map((row) => row.itemId), ["501", "503"]);
+  assert.match(result.message, /2 of 3 requested item\(s\)/);
+  // Full audit detail, not just the template.
+  assert.equal(result.removed[1].qualityLevel, 4);
+  assert.equal(result.removed[1].maxDurability, 600);
+  const select = calls.find((call) => call.text.includes("= any($1::bigint[]) and inventory_id = $2"));
+  assert.equal(select.values[1], "2001");
+});
+
+test("deleteMultipleVehicleStorageItems dedupes ids after normalizing them", async () => {
+  const calls = [];
+  const db = fakeVehicleDeleteDb(calls, { items: [{ item_id: "501", template_id: "X", stack_size: 1 }] });
+  await deleteMultipleVehicleStorageItems(db, 2008, ["501", 501, "501"]);
+  const select = calls.find((call) => call.text.includes("= any($1::bigint[])"));
+  assert.deepEqual(select.values[0], ["501"]);
+});
+
+test("deleteMultipleVehicleStorageItems rejects an empty list and an oversized batch", async () => {
+  const db = fakeVehicleDeleteDb([], {});
+  await assert.rejects(() => deleteMultipleVehicleStorageItems(db, 2008, []), /At least one item ID/);
+  const tooMany = Array.from({ length: 201 }, (_, index) => String(index + 1));
+  await assert.rejects(() => deleteMultipleVehicleStorageItems(db, 2008, tooMany), /more than 200 items/);
+});
+
+test("deleteMultipleVehicleStorageItems refuses a blocked vehicle state", async () => {
+  const db = fakeVehicleDeleteDb([], { items: [{ item_id: "501", template_id: "X", stack_size: 1 }], actorState: "Travel" });
+  await assert.rejects(() => deleteMultipleVehicleStorageItems(db, 2008, ["501"]), /currently Travel/);
+});
+
+test("deleteAllVehicleStorageItems reads the list fresh inside the deleting transaction", async () => {
+  const calls = [];
+  const db = fakeVehicleDeleteDb(calls, {
+    items: [
+      { item_id: "501", template_id: "JasmiumCrystal", stack_size: 162 },
+      { item_id: "502", template_id: "JasmiumCrystal", stack_size: 40 }
+    ]
+  });
+  const result = await deleteAllVehicleStorageItems(db, 2008);
+
+  assert.equal(result.removed.length, 2);
+  assert.match(result.message, /2 item\(s\) were deleted/);
+  // Scoped by inventory only -- no caller-supplied id list to go stale.
+  const select = calls.find((call) => call.text.includes("where inventory_id = $1"));
+  assert.deepEqual(select.values, ["2001"]);
+});
+
+test("deleteAllVehicleStorageItems reports an already-empty hold distinctly", async () => {
+  const db = fakeVehicleDeleteDb([], { items: [] });
+  const result = await deleteAllVehicleStorageItems(db, 2008);
+  assert.equal(result.removed.length, 0);
+  assert.match(result.message, /already empty/);
+});
+
+test("deleteAllVehicleStorageItems refuses a blocked vehicle state", async () => {
+  const db = fakeVehicleDeleteDb([], { items: [{ item_id: "501", template_id: "X", stack_size: 1 }], actorState: "VehicleBackup" });
+  await assert.rejects(() => deleteAllVehicleStorageItems(db, 2008), /currently VehicleBackup/);
+});
+
+test("vehicleStorageDeleteSafety reports the blocking state and withholds deletion", async () => {
+  const blocked = await vehicleStorageDeleteSafety(fakeVehicleDeleteDb([], { actorState: "VehicleRecovery" }), 2008);
+  assert.equal(blocked.safe, false);
+  assert.equal(blocked.known, true);
+  assert.equal(blocked.state, "VehicleRecovery");
+  assert.match(blocked.reason, /currently VehicleRecovery/);
+
+  const ok = await vehicleStorageDeleteSafety(fakeVehicleDeleteDb([], { actorState: null }), 2008);
+  assert.equal(ok.safe, true);
+  assert.equal(ok.state, "");
+  assert.equal(ok.reason, "");
+});
+
+test("vehicleStorageDeleteSafety withholds deletion when the schema cannot support it", async () => {
+  const safety = await vehicleStorageDeleteSafety(fakeVehicleDeleteDb([], { procedures: [] }), 2008);
+  assert.equal(safety.safe, false);
+  assert.equal(safety.known, true);
+  assert.match(safety.reason, /dune\.delete_item\(bigint\)/);
 });

@@ -31,6 +31,7 @@ type VehiclesCache = {
   canEditPermissions: boolean;
   canDeleteVehicle: boolean;
   canQueueDeleteVehicle: boolean;
+  storageSupported: boolean;
   reason: string;
   lastFetchedAt: number;
 };
@@ -59,6 +60,7 @@ export function VehiclesPanel({ onError, confirmAction, focusRequest }: Vehicles
   const [canEditPermissions, setCanEditPermissions] = useState(() => vehiclesCache?.canEditPermissions ?? false);
   const [canDeleteVehicle, setCanDeleteVehicle] = useState(() => vehiclesCache?.canDeleteVehicle ?? false);
   const [canQueueDeleteVehicle, setCanQueueDeleteVehicle] = useState(() => vehiclesCache?.canQueueDeleteVehicle ?? false);
+  const [storageSupported, setStorageSupported] = useState(() => vehiclesCache?.storageSupported ?? false);
   const [reason, setReason] = useState(() => vehiclesCache?.reason ?? "");
   const [loading, setLoading] = useState(() => vehiclesCache === null);
   const [deletingId, setDeletingId] = useState("");
@@ -127,6 +129,7 @@ export function VehiclesPanel({ onError, confirmAction, focusRequest }: Vehicles
       const nextCanEditPermissions = result.capabilities?.vehiclePermissions === true;
       const nextCanDeleteVehicle = result.capabilities?.vehicleDelete === true;
       const nextCanQueueDeleteVehicle = result.capabilities?.vehicleDeleteQueue === true;
+      const nextStorageSupported = result.capabilities?.vehicleStorage === true;
       setRows(nextRows);
       setTotalCount(result.totalCount || 0);
       setTotalVehicles(result.totalVehicles || 0);
@@ -134,6 +137,7 @@ export function VehiclesPanel({ onError, confirmAction, focusRequest }: Vehicles
       setCanEditPermissions(nextCanEditPermissions);
       setCanDeleteVehicle(nextCanDeleteVehicle);
       setCanQueueDeleteVehicle(nextCanQueueDeleteVehicle);
+      setStorageSupported(nextStorageSupported);
       setReason(result.reason || "");
       vehiclesCache = {
         q: params.q,
@@ -148,6 +152,7 @@ export function VehiclesPanel({ onError, confirmAction, focusRequest }: Vehicles
         canEditPermissions: nextCanEditPermissions,
         canDeleteVehicle: nextCanDeleteVehicle,
         canQueueDeleteVehicle: nextCanQueueDeleteVehicle,
+        storageSupported: nextStorageSupported,
         reason: result.reason || "",
         lastFetchedAt: Date.now()
       };
@@ -172,6 +177,7 @@ export function VehiclesPanel({ onError, confirmAction, focusRequest }: Vehicles
       setCanEditPermissions(cacheHit.canEditPermissions);
       setCanDeleteVehicle(cacheHit.canDeleteVehicle);
       setCanQueueDeleteVehicle(cacheHit.canQueueDeleteVehicle);
+      setStorageSupported(cacheHit.storageSupported);
       setReason(cacheHit.reason);
       setLoading(false);
     }
@@ -338,6 +344,8 @@ export function VehiclesPanel({ onError, confirmAction, focusRequest }: Vehicles
             void load({ q: submittedQ, page, pageSize, sortColumn, sortDirection }, { silent: true });
           }}
           canDeleteVehicle={canDeleteVehicle}
+          storageSupported={storageSupported}
+          onError={onError}
           queuedDeleteVehicleIds={queuedDeleteVehicleIds}
           deletingId={deletingId}
           cancelingDeleteId={cancelingDeleteId}
