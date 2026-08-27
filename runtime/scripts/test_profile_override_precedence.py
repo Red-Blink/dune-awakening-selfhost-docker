@@ -207,7 +207,7 @@ class RetiredModifierAndCoriolisMetadataTests(ProfilePathTestCase):
 
     def test_coriolis_region_hours_match_field_description(self):
         # CORIOLIS_REGION_HOURS is the authoritative table (used by
-        # migrate_coriolis_region_hour); the field's own description is the text an
+        # migrate_coriolis_region_fields); the field's own description is the text an
         # admin actually reads. Parse the description independently of the dict's own
         # construction, so a typo in either place is a real test failure instead of the
         # same mistake checking itself.
@@ -235,6 +235,34 @@ class RetiredModifierAndCoriolisMetadataTests(ProfilePathTestCase):
         self.assertIsNotNone(match, "CORIOLIS_REGION_HOURS literal not found in MapsPanel.tsx -- update this test's pattern if it was reshaped")
         frontend_table = {region: int(hour) for region, hour in re.findall(r'"([^"]+)":\s*(\d+)', match.group(1))}
         self.assertEqual(frontend_table, usersettings.CORIOLIS_REGION_HOURS)
+
+    def test_coriolis_region_days_match_field_description(self):
+        # Same authority relationship as the hour table above, but the day
+        # description's grammar groups several regions under one shared weekday
+        # ("Europe, North America, and South America use Tuesday (3); Asia and
+        # Oceania use Monday (2)") rather than listing one value per region, so
+        # it needs its own parser rather than reusing the hour test's.
+        description = usersettings.FIELD_DESCRIPTIONS["coriolis_cycle_start_day"]
+        segment = description.split(":", 2)[2].strip().rstrip(".")
+        described = {}
+        for group in segment.split(";"):
+            regions_part, _, day_part = group.strip().partition(" use ")
+            day_number = int(day_part.strip().rstrip(".").split("(")[1].rstrip(")"))
+            regions_part = regions_part.replace(", and ", ", ").replace(" and ", ", ")
+            for region in regions_part.split(","):
+                region = region.strip()
+                if region:
+                    described[region] = day_number
+        self.assertEqual(described, usersettings.CORIOLIS_REGION_DAYS)
+
+    def test_coriolis_region_days_match_the_console_frontend_table(self):
+        import re
+        frontend_path = Path(__file__).resolve().parents[2] / "console" / "web" / "src" / "features" / "maps" / "MapsPanel.tsx"
+        text = frontend_path.read_text(encoding="utf-8")
+        match = re.search(r"CORIOLIS_REGION_DAYS: Record<string, number> = \{(.*?)\};", text, re.DOTALL)
+        self.assertIsNotNone(match, "CORIOLIS_REGION_DAYS literal not found in MapsPanel.tsx -- update this test's pattern if it was reshaped")
+        frontend_table = {region: int(day) for region, day in re.findall(r'"([^"]+)":\s*(\d+)', match.group(1))}
+        self.assertEqual(frontend_table, usersettings.CORIOLIS_REGION_DAYS)
 
     def test_coriolis_cycle_start_components_are_validated(self):
         profile = usersettings.empty_profile()
@@ -388,6 +416,54 @@ class RetiredModifierAndCoriolisMetadataTests(ProfilePathTestCase):
         with redirect_stdout(output):
             self.assertEqual(usersettings.bulk_save("global", MAP_NAME, "", _encode_bulk_save_payload({"coriolis_cycle_duration_days": "14"})), 0)
         self.assertNotIn("USERSETTINGS_WARNING:", output.getvalue())
+
+    def test_migrate_coriolis_region_fields_is_a_noop_for_an_unmapped_region(self):
+        self.assertEqual(usersettings.migrate_coriolis_region_fields("Atlantis"), "skip:unmapped-region")
+        values = usersettings.profile_global_values(usersettings.read_profile())
+        self.assertEqual(values["coriolis_cycle_start_hour"], usersettings.MAP_FIELDS["coriolis_cycle_start_hour"][2])
+        self.assertEqual(values["coriolis_cycle_start_day"], usersettings.MAP_FIELDS["coriolis_cycle_start_day"][2])
+
+    def test_migrate_coriolis_region_fields_migrates_both_fields_once(self):
+        self.assertEqual(usersettings.migrate_coriolis_region_fields("North America"), "migrated:coriolis_cycle_start_hour=11,coriolis_cycle_start_day=3")
+        values = usersettings.profile_global_values(usersettings.read_profile())
+        self.assertEqual(values["coriolis_cycle_start_hour"], "11")
+        self.assertEqual(values["coriolis_cycle_start_day"], "3")
+        # Idempotent by presence, not value -- a second call must be a true
+        # no-op regardless of what either field now holds.
+        self.assertEqual(usersettings.migrate_coriolis_region_fields("North America"), "skip:already-present")
+
+    def test_migrate_coriolis_region_fields_never_loops_when_the_regions_day_equals_its_default(self):
+        # coriolis_cycle_start_day's schema default is "3", which is ALSO the
+        # region value for Europe, North America, and South America -- three of
+        # the five regions, not a one-region edge case like the hour's Europe
+        # (whose region value, 5, also equals the hour default). This is the
+        # direct regression guard for the "value equals default" bug class the
+        # server-side migration exists to make structurally impossible: presence,
+        # not value, must be what stops it, or this majority case would still
+        # write on every single startup.
+        for region in ("Europe", "North America", "South America"):
+            with self.subTest(region=region):
+                usersettings.write_profile(usersettings.empty_profile())
+                first = usersettings.migrate_coriolis_region_fields(region)
+                self.assertTrue(first.startswith("migrated:"), f"{region} did not migrate on first call: {first}")
+                for attempt in range(3):
+                    with self.subTest(attempt=attempt):
+                        self.assertEqual(usersettings.migrate_coriolis_region_fields(region), "skip:already-present")
+                values = usersettings.profile_global_values(usersettings.read_profile())
+                self.assertEqual(values["coriolis_cycle_start_day"], "3")
+
+    def test_migrate_coriolis_region_fields_only_writes_the_field_not_already_present(self):
+        # An admin who already saved the hour explicitly (to any value, even a
+        # non-region one) must keep it untouched -- only the still-unset day
+        # field should be written, and in the same profile pass as the presence
+        # check, not a second read-modify-write cycle that could race it.
+        profile = usersettings.empty_profile()
+        usersettings.set_profile_field(profile, "global", "", "", "coriolis_cycle_start_hour", "22")
+        usersettings.write_profile(profile)
+        self.assertEqual(usersettings.migrate_coriolis_region_fields("Asia"), "migrated:coriolis_cycle_start_day=2")
+        values = usersettings.profile_global_values(usersettings.read_profile())
+        self.assertEqual(values["coriolis_cycle_start_hour"], "22")
+        self.assertEqual(values["coriolis_cycle_start_day"], "2")
 
 
 class ClientGameIniAllowlistTests(ProfilePathTestCase):

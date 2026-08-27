@@ -216,8 +216,8 @@ createServer(async (req, res) => {
   ensureExchangeHistory(db).catch((error) => {
     console.warn(`Market transaction recorder initialization failed: ${redact(error?.message || "Unexpected error.")}`);
   });
-  migrateCoriolisRegionCycleStartHour().catch((error) => {
-    console.warn(`Coriolis Cycle Start Hour region migration deferred: ${redact(error?.message || "Unexpected error.")}`);
+  migrateCoriolisRegionFields().catch((error) => {
+    console.warn(`Coriolis cycle start region migration deferred: ${redact(error?.message || "Unexpected error.")}`);
   });
   runBackgroundTick("Player playtime tracker", () => duneDb.trackPlayerPlaytime(db));
 });
@@ -5111,25 +5111,31 @@ function readSetupConfigValues() {
   return values;
 }
 
-// One-time, idempotent migration: if this deployment's SERVER_REGION has a known
-// Coriolis master hour and the global Cycle Start Hour has never been explicitly
-// saved, write it once. Deliberately server-side and global-scope-only, not driven
-// by the Maps UI -- an earlier version fired this from a frontend effect keyed off
-// "field still at its schema default", which could not tell "never saved" from
-// "explicitly saved to the default" (looping forever on a Europe deployment, whose
-// region hour equals the default) and pinned whichever scope an admin happened to
-// have open (breaking Global -> Map -> Partition inheritance). Idempotency here is
-// by ini-key presence (checked in Python), never by value, so it is safe to call on
-// every startup. Mirrors the fire-and-forget migration pattern already used for
+// One-time, idempotent migration: for each of coriolis_cycle_start_hour and
+// _day, if this deployment's SERVER_REGION has a known regional value and the
+// field has never been explicitly saved, write it once. Deliberately
+// server-side and global-scope-only, not driven by the Maps UI -- an earlier
+// version fired this from a frontend effect keyed off "field still at its
+// schema default", which could not tell "never saved" from "explicitly saved
+// to the default" (looped forever on a Europe deployment, whose region hour
+// equals the default -- coriolis_cycle_start_day's default equals the
+// region value for 3 of 5 regions, so this class of bug is not a one-region
+// edge case here) and pinned whichever scope an admin happened to have open
+// (breaking Global -> Map -> Partition inheritance). Idempotency here is by
+// ini-key presence per field (checked in Python), never by value, so it is
+// safe to call on every startup. Both fields are migrated in one Python
+// invocation/profile write -- see migrate_coriolis_region_fields -- so a
+// startup that needs to migrate both can't leave one written and the other
+// not. Mirrors the fire-and-forget migration pattern already used for
 // initializeDiscordAdapterSchema/ensureExchangeHistory below.
-async function migrateCoriolisRegionCycleStartHour() {
+async function migrateCoriolisRegionFields() {
   const region = readSetupConfigValues().SERVER_REGION || "";
   if (!region) return;
-  const result = await runDune(config, buildDuneArgs("userSettingsMigrateCoriolisRegionHour", { region }), { timeoutMs: 8000 });
+  const result = await runDune(config, buildDuneArgs("userSettingsMigrateCoriolisRegionFields", { region }), { timeoutMs: 8000 });
   const [status, detail] = String(result.stdout || "").trim().split(":");
   if (status !== "migrated") return;
-  audit(config, null, "maps.user-settings.auto-migrate", { scope: "global", field: "coriolis_cycle_start_hour", value: detail, region });
-  markDeferredRestartPending(config, "Coriolis Cycle Start Hour (region default)");
+  audit(config, null, "maps.user-settings.auto-migrate", { scope: "global", fields: detail, region });
+  markDeferredRestartPending(config, "Coriolis cycle start settings (region default)");
 }
 
 function readEnvFileValue(key) {

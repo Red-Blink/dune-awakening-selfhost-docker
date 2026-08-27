@@ -364,7 +364,7 @@ FIELD_DESCRIPTIONS = {
     "coriolis_auto_spawn_enabled": "Whether Coriolis storms spawn automatically on their normal cycle.",
     "coriolis_cycle_start_year": "Base year shipped in the Coriolis configuration. Normally leave this unchanged when matching a regional schedule.",
     "coriolis_cycle_start_month": "Base month (1-12) shipped in the Coriolis configuration. Normally leave this unchanged when matching a regional schedule.",
-    "coriolis_cycle_start_day": "UTC weekday: 1=Sunday through 7=Saturday. Europe, North America, and South America use Tuesday (3); Asia and Oceania use Monday (2). The region/farm selection does not automatically rewrite it.",
+    "coriolis_cycle_start_day": "UTC weekday: 1=Sunday through 7=Saturday. Regional master schedules: Europe, North America, and South America use Tuesday (3); Asia and Oceania use Monday (2).",
     "coriolis_cycle_start_hour": "UTC hour (0-23). Regional master schedules: Europe 05, North America 11, South America 08, Asia 09, and Oceania 19.",
     "coriolis_cycle_start_minute": "UTC minute (0-59) for the Coriolis cycle start.",
     "coriolis_cycle_start_seed_index": "Funcom's seed index for the base Coriolis cycle. Leave at 0 unless intentionally coordinating a different cycle seed.",
@@ -722,13 +722,14 @@ LEGACY_FIELD_ALIASES = {
     "db_wipe_enabled": "coriolis_db_wipe_enabled",
 }
 
-# UTC regional master schedules for coriolis_cycle_start_hour. This is the
-# authoritative copy -- console/web/src/features/maps/MapsPanel.tsx keeps its
-# own copy in sync (checked by
-# test_coriolis_region_hours_match_field_description in
+# UTC regional master schedules for coriolis_cycle_start_hour and
+# coriolis_cycle_start_day. These are the authoritative copies --
+# console/web/src/features/maps/MapsPanel.tsx keeps its own copies in sync
+# (checked by test_coriolis_region_hours_match_field_description and
+# test_coriolis_region_days_match_field_description in
 # test_profile_override_precedence.py) because the console frontend renders
-# the Match Region toggle's inference without a round trip, but the only
-# scope-mutating write happens here, from migrate_coriolis_region_hour.
+# each Match Region toggle's inference without a round trip, but the only
+# scope-mutating write happens here, from migrate_coriolis_region_fields.
 CORIOLIS_REGION_HOURS = {
     "Europe": 5,
     "North America": 11,
@@ -736,28 +737,52 @@ CORIOLIS_REGION_HOURS = {
     "Asia": 9,
     "Oceania": 19,
 }
+CORIOLIS_REGION_DAYS = {
+    "Europe": 3,
+    "North America": 3,
+    "South America": 3,
+    "Asia": 2,
+    "Oceania": 2,
+}
+# Every region key must resolve on both tables, or a region migrates one
+# field but not the other with no way for an admin to tell that happened --
+# migrate_coriolis_region_fields relies on this to treat "unmapped" as a
+# single yes/no question asked once, not per field.
+assert set(CORIOLIS_REGION_HOURS) == set(CORIOLIS_REGION_DAYS)
+CORIOLIS_REGION_MIGRATION_FIELDS = (
+    ("coriolis_cycle_start_hour", CORIOLIS_REGION_HOURS),
+    ("coriolis_cycle_start_day", CORIOLIS_REGION_DAYS),
+)
 
 
-def migrate_coriolis_region_hour(region: str) -> str:
-    """One-time, idempotent global-scope migration: if this deployment's
-    region has a known master hour and the global Coriolis Cycle Start Hour
-    has never been explicitly saved (the ini key is absent, not merely equal
-    to the schema default -- those are different questions, see
-    sync_legacy_values for the same distinction made the wrong way once
-    already), write the region's hour once. Safe to call on every startup:
-    idempotent by key presence, so it can never loop or re-fire once the key
-    exists, regardless of what value it holds.
+def migrate_coriolis_region_fields(region: str) -> str:
+    """One-time, idempotent global-scope migration: for each of
+    coriolis_cycle_start_hour/_day, if this deployment's region has a known
+    regional value and the field has never been explicitly saved (the ini key
+    is absent, not merely equal to the schema default -- those are different
+    questions, see sync_legacy_values for the same distinction made the wrong
+    way once already), write the region's value once. Both fields are read
+    and written in a single profile pass so a startup that needs to migrate
+    both never leaves one written and the other not from a race or a crash
+    between two separate read-modify-write cycles. Safe to call on every
+    startup: idempotent by key presence per field, so it can never loop or
+    re-fire once a key exists, regardless of what value it holds.
     """
-    regional_hour = CORIOLIS_REGION_HOURS.get(region)
-    if regional_hour is None:
+    if region not in CORIOLIS_REGION_HOURS:
         return "skip:unmapped-region"
     profile = read_profile()
-    section, ini_key, _ = MAP_FIELDS["coriolis_cycle_start_hour"]
-    if profile_get_key(profile, "global", section, ini_key) is not None:
+    migrated = []
+    for field_id, region_table in CORIOLIS_REGION_MIGRATION_FIELDS:
+        section, ini_key, _ = MAP_FIELDS[field_id]
+        if profile_get_key(profile, "global", section, ini_key) is not None:
+            continue
+        regional_value = region_table[region]
+        set_profile_field(profile, "global", "", "", field_id, str(regional_value))
+        migrated.append(f"{field_id}={regional_value}")
+    if not migrated:
         return "skip:already-present"
-    set_profile_field(profile, "global", "", "", "coriolis_cycle_start_hour", str(regional_hour))
     write_profile(profile)
-    return f"migrated:{regional_hour}"
+    return "migrated:" + ",".join(migrated)
 
 
 def field_spec(field_id: str):
@@ -3970,8 +3995,8 @@ def main(argv: list[str]) -> int:
         return raw_write_encoded("game", argv[4], argv[2], argv[3])
     if command == "bulk-save" and len(argv) == 6:
         return bulk_save(argv[2], argv[3], argv[4], argv[5])
-    if command == "migrate-coriolis-region-hour" and len(argv) == 3:
-        print(migrate_coriolis_region_hour(argv[2]))
+    if command == "migrate-coriolis-region-fields" and len(argv) == 3:
+        print(migrate_coriolis_region_fields(argv[2]))
         return 0
     if command == "materialize-current":
         return materialize_current_runtime_files()

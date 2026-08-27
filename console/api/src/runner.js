@@ -309,12 +309,12 @@ export function buildDuneArgs(operation, payload = {}) {
       return ["usersettings", "partition-values", validateMapName(payload.map), validatePartitionId(payload.partitionId)];
     case "userSettingsSave":
       return ["usersettings", "bulk-save", validateSettingsScope(payload.scope), validateMapName(payload.map || "Survival_1"), payload.partitionId ? validatePartitionId(payload.partitionId) : "", encodeJsonArg(payload.values || {})];
-    case "userSettingsMigrateCoriolisRegionHour":
+    case "userSettingsMigrateCoriolisRegionFields":
       // region comes only from the deployment's own SERVER_REGION (readSetupConfigValues,
       // an allowlisted .env read), never from a request -- spawn's argv array means there
       // is no shell to inject into regardless, and an unmapped/garbage value is a no-op
-      // on the Python side (migrate_coriolis_region_hour looks it up in a fixed dict).
-      return ["usersettings", "migrate-coriolis-region-hour", String(payload.region || "")];
+      // on the Python side (migrate_coriolis_region_fields looks it up in a fixed dict).
+      return ["usersettings", "migrate-coriolis-region-fields", String(payload.region || "")];
     case "userSettingsSaveAndRestart":
       return buildDuneArgs("userSettingsSave", payload);
     case "userSettingsResetEngineGameplay":
