@@ -89,9 +89,9 @@ const CORIOLIS_CYCLE_START_DAY_FIELD = {
   clientFile: "",
   category: "",
   label: "Cycle Start Day",
-  description: "UTC weekday: 1=Sunday through 7=Saturday. Regional master schedules: Europe, North America, and South America use Tuesday (3); Asia and Oceania use Monday (2).",
+  description: "UTC calendar day of the month (1-31). Regional master schedule anchor dates: Europe, North America, and South America use day 3; Asia and Oceania use day 2.",
   minimum: 1,
-  maximum: 7
+  maximum: 31
 };
 
 const BOTH_CORIOLIS_FIELDS = [CORIOLIS_CYCLE_START_HOUR_FIELD, CORIOLIS_CYCLE_START_DAY_FIELD];

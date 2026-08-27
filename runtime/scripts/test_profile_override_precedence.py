@@ -187,7 +187,7 @@ class RetiredModifierAndCoriolisMetadataTests(ProfilePathTestCase):
         expected = {
             "coriolis_cycle_start_year": ("m_CycleStartYear", "2024", 1, 9999),
             "coriolis_cycle_start_month": ("m_CycleStartMonth", "12", 1, 12),
-            "coriolis_cycle_start_day": ("m_CycleStartDay", "3", 1, 7),
+            "coriolis_cycle_start_day": ("m_CycleStartDay", "3", 1, 31),
             "coriolis_cycle_start_hour": ("m_CycleStartHour", "5", 0, 23),
             "coriolis_cycle_start_minute": ("m_CycleStartMinute", "0", 0, 59),
         }
@@ -200,7 +200,7 @@ class RetiredModifierAndCoriolisMetadataTests(ProfilePathTestCase):
                 self.assertEqual(field["type"], "integer")
                 self.assertEqual(field["minimum"], minimum)
                 self.assertEqual(field["maximum"], maximum)
-        self.assertIn("1=Sunday", fields["coriolis_cycle_start_day"]["description"])
+        self.assertIn("calendar day of the month", fields["coriolis_cycle_start_day"]["description"])
         self.assertIn("UTC hour", fields["coriolis_cycle_start_hour"]["description"])
         self.assertEqual(fields["coriolis_cycle_start_seed_index"]["key"], "m_CycleStartSeedIndex")
         self.assertEqual(fields["coriolis_cycle_start_seed_index"]["type"], "integer")
@@ -237,23 +237,11 @@ class RetiredModifierAndCoriolisMetadataTests(ProfilePathTestCase):
         self.assertEqual(frontend_table, usersettings.CORIOLIS_REGION_HOURS)
 
     def test_coriolis_region_days_match_field_description(self):
-        # Same authority relationship as the hour table above, but the day
-        # description's grammar groups several regions under one shared weekday
-        # ("Europe, North America, and South America use Tuesday (3); Asia and
-        # Oceania use Monday (2)") rather than listing one value per region, so
-        # it needs its own parser rather than reusing the hour test's.
+        # Keep the user-facing description honest about the two regional anchor
+        # dates. Table parity with the frontend is checked independently below.
         description = usersettings.FIELD_DESCRIPTIONS["coriolis_cycle_start_day"]
-        segment = description.split(":", 2)[2].strip().rstrip(".")
-        described = {}
-        for group in segment.split(";"):
-            regions_part, _, day_part = group.strip().partition(" use ")
-            day_number = int(day_part.strip().rstrip(".").split("(")[1].rstrip(")"))
-            regions_part = regions_part.replace(", and ", ", ").replace(" and ", ", ")
-            for region in regions_part.split(","):
-                region = region.strip()
-                if region:
-                    described[region] = day_number
-        self.assertEqual(described, usersettings.CORIOLIS_REGION_DAYS)
+        self.assertIn("Europe, North America, and South America use day 3", description)
+        self.assertIn("Asia and Oceania use day 2", description)
 
     def test_coriolis_region_days_match_the_console_frontend_table(self):
         import re
@@ -269,7 +257,7 @@ class RetiredModifierAndCoriolisMetadataTests(ProfilePathTestCase):
         for field_id, value in (
             ("coriolis_cycle_start_year", "0"),
             ("coriolis_cycle_start_month", "13"),
-            ("coriolis_cycle_start_day", "8"),
+            ("coriolis_cycle_start_day", "32"),
             ("coriolis_cycle_start_hour", "24"),
             ("coriolis_cycle_start_minute", "60"),
             ("coriolis_cycle_start_minute", "1.5"),

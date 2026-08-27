@@ -144,12 +144,12 @@ FIELD_TYPE_OVERRIDES = {
 }
 
 # Bounds for the Coriolis cycle fields shipped in Funcom's UserGame.ini
-# template. Day is a UTC weekday (1=Sunday through 7=Saturday), not a calendar
-# day. The server validates these values for Web UI, API, and CLI callers.
+# template. These five fields form a UTC calendar date and time. The server
+# validates them for Web UI, API, and CLI callers.
 CORIOLIS_CYCLE_START_BOUNDS = {
     "coriolis_cycle_start_year": (1, 9999),
     "coriolis_cycle_start_month": (1, 12),
-    "coriolis_cycle_start_day": (1, 7),
+    "coriolis_cycle_start_day": (1, 31),
     "coriolis_cycle_start_hour": (0, 23),
     "coriolis_cycle_start_minute": (0, 59),
 }
@@ -364,7 +364,7 @@ FIELD_DESCRIPTIONS = {
     "coriolis_auto_spawn_enabled": "Whether Coriolis storms spawn automatically on their normal cycle.",
     "coriolis_cycle_start_year": "Base year shipped in the Coriolis configuration. Normally leave this unchanged when matching a regional schedule.",
     "coriolis_cycle_start_month": "Base month (1-12) shipped in the Coriolis configuration. Normally leave this unchanged when matching a regional schedule.",
-    "coriolis_cycle_start_day": "UTC weekday: 1=Sunday through 7=Saturday. Regional master schedules: Europe, North America, and South America use Tuesday (3); Asia and Oceania use Monday (2).",
+    "coriolis_cycle_start_day": "UTC calendar day of the month (1-31). Regional master schedule anchor dates: Europe, North America, and South America use day 3; Asia and Oceania use day 2.",
     "coriolis_cycle_start_hour": "UTC hour (0-23). Regional master schedules: Europe 05, North America 11, South America 08, Asia 09, and Oceania 19.",
     "coriolis_cycle_start_minute": "UTC minute (0-59) for the Coriolis cycle start.",
     "coriolis_cycle_start_seed_index": "Funcom's seed index for the base Coriolis cycle. Leave at 0 unless intentionally coordinating a different cycle seed.",

@@ -100,13 +100,11 @@ const CORIOLIS_REGION_DAYS: Record<string, number> = {
   "Asia": 2,
   "Oceania": 2
 };
-// 1=Sunday through 7=Saturday, matching coriolis_cycle_start_day's own description.
-const CORIOLIS_WEEKDAY_NAMES = ["", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 function coriolisHourRegionValueLabel(hour: number | undefined): string {
   return hour === undefined ? "" : `${String(hour).padStart(2, "0")}:00 UTC`;
 }
 function coriolisDayRegionValueLabel(day: number | undefined): string {
-  return day === undefined ? "" : CORIOLIS_WEEKDAY_NAMES[day] || "";
+  return day === undefined ? "" : `Day ${day}`;
 }
 type ConfirmAction = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; warning?: string; details?: { label: string; value: string; tone?: "danger" | "success" | "accent" }[] }) => Promise<boolean>;
 type MapsPanelProps = {
