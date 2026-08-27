@@ -2,7 +2,7 @@
 
 **Status:** Current | **Last Updated:** August 2026
 
-Complete reference for all HTTP API endpoints in the Dune Docker Console. All endpoints require authentication (session cookie + CSRF token) unless otherwise noted.
+Complete reference for all HTTP API endpoints in the Dune Docker Console. All endpoints require authentication unless otherwise noted — either a browser session (session cookie + CSRF token) or a scoped API key sent as `Authorization: Bearer <key>`. See [api-keys.md](api-keys.md) for how key scopes are granted and what they can never reach.
 
 **Format:** HTTP Method | Route | Description | Parameters
 
@@ -27,6 +27,7 @@ Complete reference for all HTTP API endpoints in the Dune Docker Console. All en
 - [Addons](#addons)
 - [Logs & Monitoring](#logs--monitoring)
 - [Settings & Public Directory](#settings--public-directory)
+- [API Keys](#api-keys)
 - [Discord Adapter (Experimental)](#discord-adapter-experimental)
 - [Implementation Details](#implementation-details)
 
@@ -803,6 +804,30 @@ Layers legend's default-settings mechanism.
 | GET | `/api/public-directory/status` | Get public directory status | None |
 | POST | `/api/settings/public-directory` | Save public directory and anonymous-count settings | `enabled?`, `anonymousCountEnabled?`, `discordInvite?` |
 | POST | `/api/settings/public-directory/claim` | Claim server listing | `code` |
+
+---
+
+## API Keys
+
+Named, revocable bearer credentials for calling this API from outside the browser. Full feature documentation: [api-keys.md](api-keys.md).
+
+| Method | Route | Description | Parameters |
+|--------|-------|-------------|------------|
+| GET | `/api/settings/api-keys` | List API keys, without any secret or hash | None |
+| GET | `/api/settings/api-keys/catalog` | List the namespaces a key can be scoped to, and whether each supports writes | None |
+| POST | `/api/settings/api-keys` | Create a key. Returns the full key once, in `secret` | `name`, `scopes?` (map of namespace to `"read"` \| `"write"`), `expiresAt?` (ISO date or null), `rateLimitPerMinute?` (1-10000, default 60) |
+| PUT | `/api/settings/api-keys/{id}` | Update a key. `scopes` replaces wholesale | `id`, `name?`, `scopes?`, `enabled?`, `expiresAt?`, `rateLimitPerMinute?` |
+| DELETE | `/api/settings/api-keys/{id}` | Revoke a key permanently | `id` |
+
+These five routes map to `settings:read` and `settings:write`, and the `settings` namespace is permanently denied to API keys — so a key can never list, create, or revoke keys, including itself. Key management is a browser-session operation only.
+
+`POST` returns `{ key, secret }`. `secret` is the only time the full key exists outside the server; only its SHA-256 hash is stored, so a lost key must be revoked and replaced rather than recovered.
+
+A key omitting `scopes` is created with no access at all. Unrecognised namespaces, unrecognised levels, and the permanently denied `settings`, `database` and `setup` namespaces are dropped rather than coerced — nothing falls back to `"read"`. A `"write"` level on `updates` or `addons`, whose writes are denied to keys, is stored as `"read"`.
+
+Invalid input to the create and update routes — a blank or over-long name, or an expiry that is not a future date string — returns `400` with the reason.
+
+Requests authenticated by a key return `401` when the credential is invalid, disabled or expired, `403` when the key's scopes do not cover the route's action, and `429` with a `retry-after` header when the key exceeds its per-minute limit. A request carrying no `Authorization` header is unaffected and uses the browser session as before.
 
 ---
 

@@ -129,7 +129,13 @@ export const ROUTE_ACTIONS = {
   "POST /api/updates/check-game":              "updates:check",
   "POST /api/updates/apply-game":              "updates:apply",
   "POST /api/updates/fix-steamcmd":            "updates:fix",
-  "POST /api/updates/check-stack":             "updates:check",
+  // Its own action, deliberately NOT updates:check. updates:check is in
+  // EXTRA_READ_ACTIONS so a monitoring key can ask "is a game update
+  // available" -- that route is absorbed by updateCheckCache. This one runs
+  // selfUpdateCheck, which has no cache, so every call spawns a real
+  // subprocess. Classifying it as a write keeps it out of reach of a
+  // read-scoped key (and `updates` is write-denied to keys entirely).
+  "POST /api/updates/check-stack":             "updates:self-check",
   "POST /api/updates/apply-stack":             "updates:apply",
   "GET /api/updates/qa/status":                "updates:read",
   "POST /api/updates/qa/login":                "updates:apply",
@@ -149,6 +155,9 @@ export const ROUTE_ACTIONS = {
   "GET /api/settings/iam/policies":            "settings:read",
   "PUT /api/settings/iam/policy":              "settings:write",
   "POST /api/settings/iam/policy/test":        "settings:read",
+  "GET /api/settings/api-keys":                "settings:read",
+  "GET /api/settings/api-keys/catalog":        "settings:read",
+  "POST /api/settings/api-keys":               "settings:write",
   "POST /api/settings/public-directory":       "settings:write",
   "POST /api/settings/public-directory/claim": "settings:write",
 
@@ -379,6 +388,15 @@ export const REGEX_ACTIONS = [
 // has different actions depending on HTTP method.
 
 export const REGEX_ACTIONS_BY_METHOD = {
+  // PUT/DELETE /api/settings/api-keys/{id} -- update and revoke. There is
+  // no "/api/settings/" fallback anywhere in REGEX_ACTIONS, so without
+  // these two lines both routes resolve to null and fail closed for every
+  // tier. Kept as prefix rules rather than regexes because
+  // rbacParity.test.js extracts path.startsWith() dispatches but not
+  // path.match() ones, so this form stays visible to the parity gate.
+  "PUT /api/settings/api-keys/":    "settings:write",
+  "DELETE /api/settings/api-keys/": "settings:write",
+
   "POST /api/players/":    "players:mutate",
   "DELETE /api/players/":  "players:mutate",
   "PATCH /api/players/":   "players:mutate",

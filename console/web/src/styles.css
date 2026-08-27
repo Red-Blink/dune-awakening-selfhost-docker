@@ -6575,3 +6575,182 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
 }
 
 .bot-items-table-wrap.table-wrap { max-height: none; overflow-x: auto; }
+
+/* --- API Keys (Settings) --------------------------------------------------
+   Generic segmented control, same visual spec as .bases-rank-segments. That
+   one is left alone deliberately: it is load-bearing for base and vehicle
+   permissions, so this repeats the rules rather than refactoring both. */
+.segmented-control {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  height: 38px;
+  min-width: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: #151719;
+  overflow: hidden;
+}
+.segmented-control-segment {
+  position: relative;
+  /* Overrides the global `label { display: grid; gap: 6px }`. */
+  display: flex;
+  gap: 0;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 10px;
+  border-left: 1px solid var(--border);
+  color: var(--muted-warm);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.segmented-control-segment:first-child { border-left: 0; }
+.segmented-control-segment input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+.segmented-control-segment:hover { background: rgba(198, 139, 74, .12); color: var(--text-strong); }
+.segmented-control-segment:has(input:checked) { background: #9b5f2a; color: var(--text-strong); }
+/* Negative offset because .segmented-control clips with overflow: hidden --
+   an outset ring would be cut off on the end segments. */
+.segmented-control-segment:has(input:focus-visible) { outline: 2px solid var(--accent-strong); outline-offset: -2px; }
+.segmented-control:has(input:disabled) { opacity: .45; }
+.segmented-control-segment:has(input:disabled) { cursor: not-allowed; }
+
+.api-keys-section { display: grid; gap: 12px; }
+.api-keys-section > .muted { margin: 0; }
+.api-keys-section code { color: var(--muted-warm); }
+
+.api-key-form { display: grid; gap: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+.api-key-form-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+/* A native date input renders 1px taller than a text or number input here, so
+   the three fields need an explicit height to sit on one line. */
+.api-key-form-grid input { height: 44px; }
+
+.api-key-scope-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.api-key-scope-header .muted { margin: 0; }
+
+/* Capped so the 18-row grid cannot push the create button off screen. The cap
+   is a round number, not a multiple of the row height, so the last visible row
+   is clipped mid-row -- that is the scroll affordance. */
+.api-key-scope-grid {
+  /* Floor for one segment, in rem so it tracks the user's root font size.
+     The column can grow past it (see .api-key-scope-segments); this only stops
+     the control collapsing to its text width at the default 11px label. */
+  --api-key-segment-w: 5.75rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 0;
+  max-height: 340px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: var(--panel-muted);
+}
+/* The control column is a fixed width and the segments a fixed size, so every
+   row's None and Read segments line up vertically. Sizing the control to its
+   contents instead would put the two-segment `logs` row's segments underneath
+   a different pair of labels on the rows above it. */
+/* The COLUMNS live on the grid, not on each row, and the rows are
+   display: contents so their cells become items of it. Per-row grids sized
+   their own tracks, so the only way to line rows up was a fixed width -- which
+   in turn capped the control and clipped "Read+write" once a browser
+   minimum-font-size setting pushed the label past it. One shared track set
+   gives alignment and growth at the same time: max-content is measured across
+   every row, so the widest label sets the column and every row follows. */
+.api-key-scope-row {
+  display: contents;
+}
+/* The row generates no box, so the separator and padding move to its cells. */
+.api-key-scope-row > * {
+  align-self: center;
+  padding: 4px 0;
+  border-bottom: 1px solid #241f1a;
+}
+.api-key-scope-row:last-child > * { border-bottom: 0; }
+/* min-width: 0 is what lets the 1fr track actually shrink -- a grid item's
+   default min-width is auto, so without it the name column refuses to go below
+   its content width and the row grows an inner scrollbar. The ellipsis then
+   truncates the namespace instead of letting it run underneath the fixed 248px
+   control track. */
+.api-key-scope-name {
+  /* Block, not flex: text-overflow: ellipsis has no effect on a flex
+     container, so the namespace was hard-clipped mid-glyph instead of
+     ellipsed. The flex/gap here existed only for a high-risk warning badge on
+     write grants, deleted once `setup` became fully denied to keys and
+     `updates`/`addons` became write-denied -- leaving nothing for it to mark. */
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-warm);
+  font-size: 13px;
+}
+/* Every namespace is listed, granted or not; the granted ones are what should
+   stand out when scanning a long grid. */
+.api-key-scope-row.granted .api-key-scope-name { color: var(--text-strong); }
+.api-key-scope-segments {
+  height: 30px;
+  /* Overrides .segmented-control's minmax(0, 1fr). A fixed per-segment width
+     -- not 1fr, which would divide by segment count -- is what keeps None and
+     Read at the same x on a two-segment row (logs, updates, addons) as on a
+     three-segment one. */
+  /* A floor, not a fixed width: the label can now grow past it instead of
+     being clipped, and because every row's segments carry the same text the
+     computed widths stay identical, so None and Read still share an x. */
+  grid-auto-columns: minmax(var(--api-key-segment-w), max-content);
+  justify-self: start;
+}
+.api-key-scope-segments .segmented-control-segment { min-height: 30px; padding: 0 6px; font-size: 11px; }
+
+/* Declared AFTER the unconditional .api-key-scope-row / .api-key-scope-segments
+   rules above: same specificity, so source order decides. Placed before them it
+   was dead CSS and the row never stacked its control. */
+/* Stacked layout drops the shared-track grid entirely and gives each row its
+   own box again. The parent grid exists only to align columns ACROSS rows, and
+   once every cell is full width there is nothing left to align -- while
+   keeping it produced 4px name tracks that the 21px name overflowed straight
+   into the control beneath it. */
+@media (max-width: 560px) {
+  .api-key-scope-grid { display: block; }
+  .api-key-scope-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    padding: 8px 0;
+    border-bottom: 1px solid #241f1a;
+  }
+  .api-key-scope-row > * { padding: 0; border-bottom: 0; }
+  .api-key-scope-row:last-child { border-bottom: 0; }
+  .api-key-scope-segments { justify-self: stretch; grid-auto-columns: minmax(0, 1fr); }
+}
+
+.api-key-reveal {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--warning);
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--panel-muted);
+}
+.api-key-reveal-warning { display: flex; align-items: center; gap: 8px; color: #ffd9a8; font-size: 13px; }
+.api-key-reveal-row { display: flex; gap: 8px; align-items: center; }
+.api-key-reveal-row input {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}

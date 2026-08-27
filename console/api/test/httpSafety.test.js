@@ -235,3 +235,19 @@ test("safeStaticTarget falls back to index.html rather than returning a director
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a body of literal null does not become a TypeError at the call site", async () => {
+  // readJsonBody returned JSON.parse(text) raw, so `null` reached ~82 routes
+  // that all do `body.someField` -- a TypeError surfacing as a 500 from an
+  // authenticated route instead of a 400.
+  const parsed = await readJsonBody(Readable.from(["null"]), 1024);
+  assert.deepEqual(parsed, {});
+  assert.doesNotThrow(() => parsed.anyField);
+
+  // Everything else still reaches each route's own validation unchanged --
+  // property access on these yields undefined rather than throwing.
+  assert.equal(await readJsonBody(Readable.from(["5"]), 1024), 5);
+  assert.equal(await readJsonBody(Readable.from(['"x"']), 1024), "x");
+  assert.deepEqual(await readJsonBody(Readable.from(["[]"]), 1024), []);
+  assert.deepEqual(await readJsonBody(Readable.from(['{"a":1}']), 1024), { a: 1 });
+});

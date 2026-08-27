@@ -25,7 +25,14 @@ export async function readJsonBody(req, maxBytes) {
   if (!chunks.length) return {};
   const text = Buffer.concat(chunks).toString("utf8").trim();
   if (!text) return {};
-  return JSON.parse(text);
+  const parsed = JSON.parse(text);
+  // A body of literal `null` parses to null, and every one of the ~82
+  // readJson call sites then does `body.someField` -- a TypeError that
+  // surfaces as a 500 from an authenticated route rather than a 400.
+  // Only null is normalized: numbers, strings and arrays all allow
+  // property access (yielding undefined), so they still reach each
+  // route's own validation unchanged.
+  return parsed === null ? {} : parsed;
 }
 
 export async function readMultipartForm(req, maxBytes) {

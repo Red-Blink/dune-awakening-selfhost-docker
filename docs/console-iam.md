@@ -9,6 +9,20 @@ The Web Console applies an IAM action to every authenticated API route. Public a
 3. `policy.js` evaluates the session tier using explicit-deny precedence: Deny, then Allow, then default Deny.
 4. An unmapped authenticated route is denied. `rbacParity.test.js` prevents new routes from being merged without a mapping.
 
+## API key principals
+
+An API key is the second principal type. It authenticates with `Authorization: Bearer <key>`
+before `auth.js` runs, because a bearer request carries no CSRF token and `requireAuth` would
+reject it. Its scope is a per-namespace Read/Read+write map of its own, evaluated by
+`apiKeys.js` on top of the action this route resolved to.
+
+Keys carry no configurable tier. The `owner` tier in the synthesized principal exists only so
+`resolveSessionTier` recognises it — `owner` is `Allow *`, so the policy check is a no-op and
+the key's scope map is the single thing deciding access. `settings:*`, `database:*` and `setup:*` are
+denied to every key regardless of what its stored record says, which is what keeps key
+management a browser-session operation. `updates:*` and `addons:*` are write-denied rather than
+denied outright, so a key can poll for updates and list addons but never install either. See [console/api-keys.md](console/api-keys.md).
+
 Session tier and identity stay in the in-memory session store; they are not placed in the browser cookie. A Console process restart invalidates existing sessions, matching the previous session lifecycle and preventing stale role claims from surviving a restart.
 
 ## Policies

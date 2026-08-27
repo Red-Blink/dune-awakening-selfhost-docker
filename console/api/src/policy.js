@@ -112,7 +112,7 @@ let _allowedActions = {};
 // other tiers instead (see actions.js). bases:delete is the reason this
 // enumerates all four: it exists only in REGEX_ACTIONS_BY_METHOD_PATTERN, so
 // a version of this that only read ROUTE_ACTIONS would never surface it.
-function allKnownActions() {
+export function allKnownActions() {
   const actions = new Set(Object.values(ROUTE_ACTIONS));
   for (const [, action] of REGEX_ACTIONS) actions.add(action);
   for (const action of Object.values(REGEX_ACTIONS_BY_METHOD)) actions.add(action);
