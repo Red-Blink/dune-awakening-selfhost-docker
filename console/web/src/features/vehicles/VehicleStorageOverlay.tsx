@@ -156,7 +156,7 @@ export function VehicleStorageOverlay({ vehicleId, vehicleName, onClose, confirm
   async function requestDestructiveControlsVisible(): Promise<boolean> {
     if (destructiveControlsVisible) return true;
     const confirmed = await confirmAction(
-      "Delete Selected and Delete All permanently destroy items from the database with no undo. Deleting does not require the map to be stopped, but the change is not reflected in-game until the Survival server restarts: the row is gone immediately, and a running map keeps showing it until then.",
+      "Delete Selected and Delete All permanently destroy items from the database with no undo. Deleting does not require the map to be stopped, but the change is not reflected in-game until the affected map server restarts: the row is gone immediately, and a running map keeps showing it until then.",
       {
         title: "Show Bulk Delete Controls",
         confirmLabel: "Show Controls",
@@ -309,7 +309,7 @@ export function VehicleStorageOverlay({ vehicleId, vehicleName, onClose, confirm
         <div className="confirm-modal-title">
           <div>
             <h3 id="vehicles-storage-contents-title">{vehicleName}</h3>
-            <p className="bases-inventory-card-subtitle">Cargo hold · #{vehicleId}</p>
+            <p className="bases-inventory-card-subtitle">Cargo Hold · #{vehicleId}</p>
           </div>
           <div className="bases-inventory-contents-head-actions">
             <div className="bases-inventory-views" role="group" aria-label="Contents view">
@@ -344,7 +344,7 @@ export function VehicleStorageOverlay({ vehicleId, vehicleName, onClose, confirm
           <div><dt>Distinct</dt><dd>{distinct.toLocaleString()}</dd></div>
         </dl>}
 
-        {loading && <p className="muted" role="status">Loading contents…</p>}
+        {loading && <p className="muted" role="status">Loading Contents…</p>}
         {error && <p className="bases-permissions-error" role="alert">
           {error} <button onClick={() => void load()}>Retry</button>
         </p>}
@@ -510,7 +510,7 @@ export function VehicleStorageOverlay({ vehicleId, vehicleName, onClose, confirm
             className="danger"
             disabled={!deleteAllowed || !amountValid || deletingItemId === selectedSlot.itemId}
             onClick={() => void deleteSlot(selectedSlot, amountNumber)}
-          >{amountNumber >= selectedSlot.quantity ? "Delete stack" : `Remove ${amountNumber.toLocaleString()}`}</button>
+          >{amountNumber >= selectedSlot.quantity ? "Delete Stack" : `Remove ${amountNumber.toLocaleString()}`}</button>
         </div>}
 
         {selectedSlot && !amountValid && <p className="bases-inventory-amount-error" role="alert">
@@ -519,8 +519,8 @@ export function VehicleStorageOverlay({ vehicleId, vehicleName, onClose, confirm
 
         {found && <p className="muted bases-inventory-note">
           A database snapshot, not a live view. Deleting does not require the map to be
-          stopped, but the change is not reflected in-game until the Survival server
-          restarts.
+          stopped, but the change is not reflected in-game until the affected map
+          server restarts.
         </p>}
 
         <div className="confirm-modal-actions">

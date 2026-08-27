@@ -110,7 +110,7 @@ describe("VehicleStorageOverlay", () => {
     const dialog = screen.getByRole("dialog");
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     expect(within(dialog).getByRole("heading", { name: "Sandcrawler" })).toBeTruthy();
-    expect(dialog.textContent).toContain("Cargo hold · #2008");
+    expect(dialog.textContent).toContain("Cargo Hold · #2008");
     expect(dialog.textContent).toContain("3 / 20");
     expect(dialog.textContent).toContain("162.5 / 2000.0");
     // 162 + 40 + 1 stacked, across two distinct templates.
@@ -305,10 +305,10 @@ describe("VehicleStorageOverlay deletion", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Jasmium Crystal" })[0]);
     fireEvent.change(screen.getByLabelText("Amount of Jasmium Crystal to remove"), { target: { value: "999" } });
     expect(screen.getByRole("alert").textContent).toContain("Enter an amount between 1 and 162");
-    // The label flips to "Delete stack" at or above the stack size (same
+    // The label flips to "Delete Stack" at or above the stack size (same
     // expression the bases tab uses), but the button stays disabled -- an
     // over-count is refused, never widened into destroying the whole slot.
-    expect((screen.getByRole("button", { name: "Delete stack" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Delete Stack" }) as HTMLButtonElement).disabled).toBe(true);
     expect(vehiclesApi.deleteStorageItem).not.toHaveBeenCalled();
   });
 
