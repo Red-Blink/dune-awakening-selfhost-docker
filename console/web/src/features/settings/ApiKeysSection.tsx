@@ -6,6 +6,7 @@ import {
   grantedCount,
   endOfLocalDayIso,
   keyStatus,
+  scopeLabel,
   scopeLevelOf,
   type ApiKey,
   type ApiKeyScopes,
@@ -39,7 +40,7 @@ const COLUMN_LABELS: Record<string, string> = {
   prefix: "Prefix",
   scopes: "Scopes",
   status: "Status",
-  lastUsed: "Last used",
+  lastUsed: "Last Used",
   expires: "Expires"
 };
 
@@ -251,13 +252,13 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
         <button onClick={() => { void copySecret(); }}><Copy size={16} aria-hidden="true" /> {copied ? "Copied" : "Copy"}</button>
       </div>
       <div className="action-row">
-        <button onClick={() => setRevealed(null)}>I&apos;ve saved it</button>
+        <button onClick={() => setRevealed(null)}>I&apos;ve Saved It</button>
         <InlineActionResult result={result} resultKey="reveal" />
       </div>
     </div>}
 
     {keys === null
-      ? <p className="muted">Loading API keys...</p>
+      ? <p className="muted">Loading API Keys...</p>
       : <DataTable
         rows={rows}
         columns={COLUMNS}
@@ -305,21 +306,21 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
 
     <div className="action-row">
       {!formOpen && <button onClick={() => { resetForm(); setFormOpen(true); }}>
-        <Plus size={16} aria-hidden="true" /> Create key
+        <Plus size={16} aria-hidden="true" /> Create Key
       </button>}
       <InlineActionResult result={result} resultKey="list" />
     </div>
 
     {formOpen && <div className="api-key-form">
       <div className="settings-password-grid api-key-form-grid">
-        <label>Name<input value={name} disabled={creating} maxLength={64} placeholder="Grafana dashboard" onChange={(event) => setName(event.target.value)} /></label>
+        <label>Name<input value={name} disabled={creating} maxLength={64} placeholder="Grafana Dashboard" onChange={(event) => setName(event.target.value)} /></label>
         <label>Expires<input type="date" min={todayIso()} value={expiresAt} disabled={creating} onChange={(event) => setExpiresAt(event.target.value)} /></label>
-        <label>Rate limit / min<input type="number" min="1" max="10000" value={rateLimit} disabled={creating} onChange={(event) => setRateLimit(event.target.value.replace(/[^\d]/g, ""))} /></label>
+        <label>Rate Limit / Min<input type="number" min="1" max="10000" value={rateLimit} disabled={creating} onChange={(event) => setRateLimit(event.target.value.replace(/[^\d]/g, ""))} /></label>
       </div>
 
       <div className="api-key-scope-header">
-        <span className="muted">Scope — nothing is granted until you grant it</span>
-        <button disabled={creating || !grants} onClick={() => setDraftScopes({})}>Clear all</button>
+        <span className="muted">Scope — Nothing Is Granted Until You Grant It</span>
+        <button disabled={creating || !grants} onClick={() => setDraftScopes({})}>Clear All</button>
       </div>
 
       <div className="api-key-scope-grid">
@@ -337,9 +338,9 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
             { value: "none", label: "None", ariaLabel: `None — no access to ${entry.namespace}` },
             { value: "read", label: "Read", ariaLabel: `Read ${entry.namespace}` }
           ];
-          if (entry.supportsWrite) options.push({ value: "write", label: "Read+write", ariaLabel: `Read+write for ${entry.namespace}` });
+          if (entry.supportsWrite) options.push({ value: "write", label: "Read+Write", ariaLabel: `Read+Write for ${entry.namespace}` });
           return <div className={`api-key-scope-row${level === "none" ? "" : " granted"}`} key={entry.namespace}>
-            <span className="api-key-scope-name">{entry.namespace}</span>
+            <span className="api-key-scope-name">{scopeLabel(entry.namespace)}</span>
             <SegmentedControl
               name={`api-key-scope-${entry.namespace}`}
               ariaLabel={`Access level for ${entry.namespace}`}
@@ -355,10 +356,10 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
 
       <div className="action-row">
         <button disabled={creating || !name.trim() || !grants} onClick={() => { void createKey(); }}>
-          {creating ? "Creating..." : "Create key"}
+          {creating ? "Creating..." : "Create Key"}
         </button>
         <button disabled={creating} onClick={() => { setFormOpen(false); resetForm(); }}>Cancel</button>
-        {!grants && <span className="muted">Grant at least one namespace first</span>}
+        {!grants && <span className="muted">Grant At Least One Namespace First</span>}
         <InlineActionResult result={result} resultKey="create" />
       </div>
     </div>}

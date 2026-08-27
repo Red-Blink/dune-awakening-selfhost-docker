@@ -77,7 +77,7 @@ test("lists keys with their scopes and status", async () => {
     makeKey({ id: "c3", name: "Old bot", expiresAt: "2020-01-01T00:00:00.000Z", expired: true })
   ]);
   expect(await screen.findByText("Grafana")).toBeVisible();
-  expect(screen.getByText("bases RW, players R")).toBeVisible();
+  expect(screen.getByText("Bases RW, Players R")).toBeVisible();
   expect(screen.getByText("Active")).toBeVisible();
   expect(screen.getByText("Disabled")).toBeVisible();
   // Expiry comes from the server's own verdict, so the UI can never disagree
@@ -391,9 +391,9 @@ test("the scopes cell carries a title so long grants stay readable", async () =>
   // The global `td { max-width: 360px }` ellipses this column, and it is the one
   // that says what the key can actually do.
   renderSection([makeKey({ name: "Grafana", scopes: { players: "read", bases: "write", maps: "read" } })]);
-  const cell = await screen.findByTitle("bases RW, maps R, players R");
+  const cell = await screen.findByTitle("Bases RW, Maps R, Players R");
   expect(cell).toBeVisible();
-  expect(cell).toHaveTextContent("bases RW, maps R, players R");
+  expect(cell).toHaveTextContent("Bases RW, Maps R, Players R");
 });
 
 test("surfaces a load failure instead of rendering an empty list as success", async () => {

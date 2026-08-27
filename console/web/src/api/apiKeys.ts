@@ -105,11 +105,36 @@ export function grantedCount(scopes: ApiKeyScopes) {
   return Object.keys(scopes || {}).length;
 }
 
+const SCOPE_LABELS: Record<string, string> = {
+  admin: "Admin",
+  addons: "Addons",
+  backups: "Backups",
+  bases: "Bases",
+  blueprints: "Blueprints",
+  carepackage: "Care Package",
+  deepdesert: "Deep Desert",
+  exchange: "Exchange",
+  guilds: "Guilds",
+  landsraad: "Landsraad",
+  logs: "Logs",
+  maps: "Maps",
+  players: "Players",
+  server: "Server",
+  sietches: "Sietches",
+  storage: "Storage",
+  updates: "Updates",
+  vehicles: "Vehicles"
+};
+
+export function scopeLabel(namespace: string) {
+  return SCOPE_LABELS[namespace] || namespace.replace(/(^|[-_])([a-z])/g, (_match, prefix, letter) => `${prefix ? " " : ""}${letter.toUpperCase()}`);
+}
+
 export function describeScopes(scopes: ApiKeyScopes) {
   const entries = Object.entries(scopes || {});
   if (!entries.length) return "No access";
   return entries
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([namespace, level]) => `${namespace} ${level === "write" ? "RW" : "R"}`)
+    .map(([namespace, level]) => `${scopeLabel(namespace)} ${level === "write" ? "RW" : "R"}`)
     .join(", ");
 }
