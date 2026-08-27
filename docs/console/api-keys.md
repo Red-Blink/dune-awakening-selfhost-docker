@@ -50,7 +50,7 @@ release is covered by an existing Read grant without every key needing to be re-
 |---|---|---|
 | `players` | `players:read` | `kick-all`, `mutate` |
 | `bases` | `bases:read` | `add-item`, `bulk-delete-items`, `delete`, `delete-item`, `fill-item`, `give-item`, `mutate` |
-| `vehicles` | `vehicles:read` | `delete`, `mutate` |
+| `vehicles` | `vehicles:read` | `bulk-delete-items`, `delete`, `delete-item`, `mutate` |
 | `guilds` | `guilds:read` | `mutate` |
 | `storage` | `storage:read` | `mutate` |
 | `blueprints` | `blueprints:read` | `mutate` |
