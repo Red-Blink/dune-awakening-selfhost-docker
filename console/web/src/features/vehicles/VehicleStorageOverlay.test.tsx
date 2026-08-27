@@ -4,7 +4,12 @@ import type { VehicleStorage } from "../../api/vehicles";
 import { vehiclesApi } from "../../api/vehicles";
 import { VehicleStorageOverlay } from "./VehicleStorageOverlay";
 
-vi.mock("../../api/vehicles", () => ({ vehiclesApi: { storage: vi.fn() } }));
+vi.mock("../../api/vehicles", () => ({ vehiclesApi: {
+  storage: vi.fn(),
+  deleteStorageItem: vi.fn(),
+  deleteStorageItems: vi.fn(),
+  deleteAllStorageItems: vi.fn()
+} }));
 
 const STORAGE: VehicleStorage = {
   supported: true,
@@ -16,6 +21,7 @@ const STORAGE: VehicleStorage = {
   maxVolume: 2000,
   currentVolume: 162.5,
   volumeComplete: true,
+  deleteSafety: { safe: true, known: true, state: "", reason: "" },
   slots: [
     {
       itemId: "501", templateId: "JasmiumCrystal", name: "Jasmium Crystal",
@@ -43,9 +49,39 @@ function mockStorage(payload: VehicleStorage = STORAGE) {
 }
 
 const onClose = vi.fn();
+const onError = vi.fn();
+const confirmAction = vi.fn();
 
 function renderOverlay() {
-  return render(<VehicleStorageOverlay vehicleId="2008" vehicleName="Sandcrawler" onClose={onClose} />);
+  return render(
+    <VehicleStorageOverlay
+      vehicleId="2008"
+      vehicleName="Sandcrawler"
+      onClose={onClose}
+      confirmAction={confirmAction}
+      onError={onError}
+    />
+  );
+}
+
+function deleteResult(overrides: Record<string, unknown> = {}) {
+  return {
+    supported: true,
+    result: {
+      ok: true, vehicleId: "2008", inventoryId: "2001", partial: false,
+      removed: { itemId: "501", templateId: "JasmiumCrystal", count: 162, remaining: 0, positionIndex: 0, qualityLevel: 0, currentDurability: null, maxDurability: null },
+      message: "Jasmium Crystal was deleted from the database.",
+      ...overrides
+    }
+  };
+}
+
+// The bulk controls are hidden behind a confirm-gated toggle, exactly like the
+// bases tab's. Everything bulk-related has to go through this first.
+async function revealBulkControls() {
+  confirmAction.mockResolvedValueOnce(true);
+  fireEvent.click(screen.getByRole("checkbox", { name: /Bulk Delete Controls/i }));
+  await waitFor(() => expect(screen.getByRole("button", { name: /Delete All/ })).toBeTruthy());
 }
 
 async function loaded() {
@@ -60,6 +96,10 @@ async function toList() {
 beforeEach(() => {
   vi.clearAllMocks();
   mockStorage();
+  confirmAction.mockResolvedValue(true);
+  vi.mocked(vehiclesApi.deleteStorageItem).mockResolvedValue(deleteResult() as never);
+  vi.mocked(vehiclesApi.deleteStorageItems).mockResolvedValue({ supported: true, result: { ok: true, vehicleId: "2008", inventoryId: "2001", removed: [], message: "2 of 2 requested item(s) were deleted from the database." } } as never);
+  vi.mocked(vehiclesApi.deleteAllStorageItems).mockResolvedValue({ supported: true, result: { ok: true, vehicleId: "2008", inventoryId: "2001", removed: [], message: "3 item(s) were deleted from the database." } } as never);
 });
 
 describe("VehicleStorageOverlay", () => {
@@ -112,14 +152,14 @@ describe("VehicleStorageOverlay", () => {
     expect(detail.textContent).toContain("Augments: Power Augment (Grade 3)");
   });
 
-  it("offers no mutation controls -- this view is read-only", async () => {
+  it("offers no add or give controls -- deletion is the only mutation here", async () => {
     renderOverlay();
     await loaded();
     await toList();
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).queryByRole("button", { name: /Add Item/i })).toBeNull();
-    expect(within(dialog).queryByRole("button", { name: /Delete/i })).toBeNull();
-    expect(within(dialog).queryAllByRole("checkbox").length).toBe(0);
+    expect(within(dialog).queryByRole("button", { name: /Give/i })).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: /Fill/i })).toBeNull();
   });
 
   it("closes four ways", async () => {
@@ -208,5 +248,215 @@ describe("VehicleStorageOverlay", () => {
     deferred.resolve?.(STORAGE);
     await Promise.resolve();
     expect(screen.queryByText("Slots Used")).toBeNull();
+  });
+});
+
+describe("VehicleStorageOverlay deletion", () => {
+  it("deletes a whole stack and refetches the hold", async () => {
+    renderOverlay();
+    await loaded();
+    await toList();
+    fireEvent.click(screen.getByRole("button", { name: "Delete Jasmium Crystal from slot 0" }));
+    await waitFor(() => expect(vehiclesApi.deleteStorageItem).toHaveBeenCalled());
+    // count omitted entirely for a whole slot -- the server treats an absent
+    // count as "the whole slot" and a present one as an exact request.
+    expect(vehiclesApi.deleteStorageItem).toHaveBeenCalledWith("2008", "501", "DELETE ITEM", undefined);
+    await waitFor(() => expect(vehiclesApi.storage).toHaveBeenCalledTimes(2));
+    expect(screen.getByText(/was deleted from the database/)).toBeTruthy();
+  });
+
+  it("does not call the API when the confirmation is declined", async () => {
+    confirmAction.mockResolvedValue(false);
+    renderOverlay();
+    await loaded();
+    await toList();
+    fireEvent.click(screen.getByRole("button", { name: "Delete Jasmium Crystal from slot 0" }));
+    await waitFor(() => expect(confirmAction).toHaveBeenCalled());
+    expect(vehiclesApi.deleteStorageItem).not.toHaveBeenCalled();
+  });
+
+  it("sends a count for a partial removal and resets the amount to what remains", async () => {
+    vi.mocked(vehiclesApi.deleteStorageItem).mockResolvedValue(deleteResult({
+      partial: true,
+      removed: { itemId: "501", templateId: "JasmiumCrystal", count: 100, remaining: 62, positionIndex: 0, qualityLevel: 0, currentDurability: null, maxDurability: null },
+      message: "Removed 100 of JasmiumCrystal from the database, leaving 62."
+    }) as never);
+    renderOverlay();
+    await loaded();
+    await toList();
+    // Two stacks share this template, so the row button is not unique -- the
+    // first is slot 0, the 162 stack.
+    fireEvent.click(screen.getAllByRole("button", { name: "Jasmium Crystal" })[0]);
+    const input = screen.getByLabelText("Amount of Jasmium Crystal to remove") as HTMLInputElement;
+    // Prefilled with the whole stack when the slot is selected.
+    expect(input.value).toBe("162");
+    fireEvent.change(input, { target: { value: "100" } });
+    fireEvent.click(screen.getByRole("button", { name: "Remove 100" }));
+    await waitFor(() => expect(vehiclesApi.deleteStorageItem).toHaveBeenCalledWith("2008", "501", "DELETE ITEM", 100));
+    // Without this reset the stale 162 would immediately trip the range error
+    // on a *successful* delete.
+    await waitFor(() => expect((screen.getByLabelText("Amount of Jasmium Crystal to remove") as HTMLInputElement).value).toBe("62"));
+  });
+
+  it("rejects an amount above the stack before calling the API", async () => {
+    renderOverlay();
+    await loaded();
+    await toList();
+    fireEvent.click(screen.getAllByRole("button", { name: "Jasmium Crystal" })[0]);
+    fireEvent.change(screen.getByLabelText("Amount of Jasmium Crystal to remove"), { target: { value: "999" } });
+    expect(screen.getByRole("alert").textContent).toContain("Enter an amount between 1 and 162");
+    // The label flips to "Delete stack" at or above the stack size (same
+    // expression the bases tab uses), but the button stays disabled -- an
+    // over-count is refused, never widened into destroying the whole slot.
+    expect((screen.getByRole("button", { name: "Delete stack" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(vehiclesApi.deleteStorageItem).not.toHaveBeenCalled();
+  });
+
+  it("disables deletion and explains why when the vehicle is in a blocked state", async () => {
+    mockStorage({
+      ...STORAGE,
+      deleteSafety: {
+        safe: false, known: true, state: "VehicleRecovery",
+        reason: "This vehicle is currently VehicleRecovery and its cargo cannot be changed until that clears. Try again once the vehicle is no longer mid-transit or pending recovery."
+      }
+    });
+    renderOverlay();
+    await loaded();
+    await toList();
+    expect(document.body.textContent).toContain("This vehicle is currently VehicleRecovery");
+    expect((screen.getByRole("button", { name: "Delete Jasmium Crystal from slot 0" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("checkbox", { name: /Bulk Delete Controls/i }) as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it("withholds deletion when the vehicle's state could not be verified at all", async () => {
+    mockStorage({
+      ...STORAGE,
+      deleteSafety: { safe: false, known: false, state: "", reason: "The console could not verify this vehicle's state, so cargo deletion is disabled." }
+    });
+    renderOverlay();
+    await loaded();
+    await toList();
+    expect(document.body.textContent).toContain("could not verify this vehicle's state");
+    expect((screen.getByRole("button", { name: "Delete Jasmium Crystal from slot 0" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("reports a failed delete inline and through onError, leaving the row listed", async () => {
+    vi.mocked(vehiclesApi.deleteStorageItem).mockRejectedValueOnce(new Error("database is unreachable"));
+    renderOverlay();
+    await loaded();
+    await toList();
+    fireEvent.click(screen.getByRole("button", { name: "Delete Jasmium Crystal from slot 0" }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("database is unreachable"));
+    expect(onError).toHaveBeenCalledWith("database is unreachable");
+    // The list stays valid -- a failed delete must not blank it behind a Retry.
+    expect(document.querySelectorAll(".bases-inventory-contents-row:not(.head)").length).toBe(3);
+  });
+});
+
+describe("VehicleStorageOverlay bulk deletion", () => {
+  it("hides the checkboxes and bulk buttons until the toggle is on", async () => {
+    renderOverlay();
+    await loaded();
+    await toList();
+    expect(screen.queryByRole("button", { name: /Delete Selected/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Delete All/ })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: /Select .* for bulk delete/ })).toBeNull();
+
+    await revealBulkControls();
+    expect(screen.getByRole("button", { name: /Delete Selected/ })).toBeTruthy();
+    expect(screen.getAllByRole("checkbox", { name: /for bulk delete/ }).length).toBe(3);
+  });
+
+  it("reveals nothing when the toggle confirmation is declined", async () => {
+    renderOverlay();
+    await loaded();
+    await toList();
+    confirmAction.mockResolvedValueOnce(false);
+    fireEvent.click(screen.getByRole("checkbox", { name: /Bulk Delete Controls/i }));
+    await waitFor(() => expect(confirmAction).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: /Delete All/ })).toBeNull();
+  });
+
+  it("hides again instantly with no confirmation when switched off", async () => {
+    renderOverlay();
+    await loaded();
+    await toList();
+    await revealBulkControls();
+    const calls = confirmAction.mock.calls.length;
+    fireEvent.click(screen.getByRole("checkbox", { name: /Bulk Delete Controls/i }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Delete All/ })).toBeNull());
+    expect(confirmAction.mock.calls.length).toBe(calls);
+  });
+
+  it("deletes only the checked stacks", async () => {
+    renderOverlay();
+    await loaded();
+    await toList();
+    await revealBulkControls();
+    const boxes = screen.getAllByRole("checkbox", { name: /for bulk delete/ });
+    fireEvent.click(boxes[0]);
+    fireEvent.click(boxes[2]);
+    fireEvent.click(screen.getByRole("button", { name: /Delete Selected \(2\)/ }));
+    await waitFor(() => expect(vehiclesApi.deleteStorageItems).toHaveBeenCalled());
+    expect(vehiclesApi.deleteStorageItems).toHaveBeenCalledWith("2008", ["501", "503"], "DELETE ITEMS");
+    await waitFor(() => expect(vehiclesApi.storage).toHaveBeenCalledTimes(2));
+  });
+
+  it("disables Delete Selected until at least one stack is checked", async () => {
+    renderOverlay();
+    await loaded();
+    await toList();
+    await revealBulkControls();
+    expect((screen.getByRole("button", { name: /Delete Selected \(0\)/ }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getAllByRole("checkbox", { name: /for bulk delete/ })[0]);
+    expect((screen.getByRole("button", { name: /Delete Selected \(1\)/ }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("clears the whole hold via Delete All", async () => {
+    renderOverlay();
+    await loaded();
+    await toList();
+    await revealBulkControls();
+    fireEvent.click(screen.getByRole("button", { name: "Delete All" }));
+    await waitFor(() => expect(vehiclesApi.deleteAllStorageItems).toHaveBeenCalledWith("2008", "DELETE ALL ITEMS"));
+    await waitFor(() => expect(screen.getByText(/item\(s\) were deleted from the database/)).toBeTruthy());
+  });
+
+  it("does not call the bulk API when the confirmation is declined", async () => {
+    renderOverlay();
+    await loaded();
+    await toList();
+    await revealBulkControls();
+    confirmAction.mockResolvedValueOnce(false);
+    fireEvent.click(screen.getByRole("button", { name: "Delete All" }));
+    await waitFor(() => expect(confirmAction).toHaveBeenCalledTimes(2));
+    expect(vehiclesApi.deleteAllStorageItems).not.toHaveBeenCalled();
+  });
+
+  it("keeps the header row and data rows structurally aligned when bulk-select is offered", async () => {
+    renderOverlay();
+    await loaded();
+    await toList();
+    await revealBulkControls();
+    const head = document.querySelector(".bases-inventory-contents-row.head") as HTMLElement;
+    const row = document.querySelector(".bases-inventory-contents-row:not(.head)") as HTMLElement;
+    expect(head.classList.contains("with-checkbox")).toBe(true);
+    expect(row.classList.contains("with-checkbox")).toBe(true);
+    // Same child count, or the columns drift apart.
+    expect(head.children.length).toBe(row.children.length);
+  });
+
+  it("resets the toggle to hidden every time the overlay is reopened", async () => {
+    const { unmount } = renderOverlay();
+    await loaded();
+    await toList();
+    await revealBulkControls();
+    unmount();
+    cleanup();
+
+    renderOverlay();
+    await loaded();
+    await toList();
+    expect(screen.queryByRole("button", { name: /Delete All/ })).toBeNull();
   });
 });

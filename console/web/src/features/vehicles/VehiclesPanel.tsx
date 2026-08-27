@@ -345,6 +345,7 @@ export function VehiclesPanel({ onError, confirmAction, focusRequest }: Vehicles
           }}
           canDeleteVehicle={canDeleteVehicle}
           storageSupported={storageSupported}
+          onError={onError}
           queuedDeleteVehicleIds={queuedDeleteVehicleIds}
           deletingId={deletingId}
           cancelingDeleteId={cancelingDeleteId}

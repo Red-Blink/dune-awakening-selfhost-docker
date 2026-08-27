@@ -387,6 +387,9 @@ tab can offer a retry only where retrying could actually help.
 | POST | `/api/vehicles/{vehicleId}/system-custodian` | Transfer ownership to the Server or detected GM system custodian while preserving the roster; provisions Server when no custodian exists | `vehicleId` |
 | GET | `/api/vehicles/permission-candidates` | Search players eligible to be added to a vehicle roster | `q?`, `limit?` |
 | GET | `/api/vehicles/{vehicleId}/storage` | Read a vehicle's cargo hold slot by slot (read-only): capacity, per-slot item, quantity, grade, durability and augments | `vehicleId` |
+| DELETE | `/api/vehicles/{vehicleId}/storage/items/{itemId}` | Delete one stack from a vehicle's cargo hold, or part of it with `count`. Requires `{ confirmation: "DELETE ITEM" }` | `vehicleId`, `itemId`, `count?` |
+| DELETE | `/api/vehicles/{vehicleId}/storage/items` | Delete a chosen set of whole stacks (max 200). Requires `{ confirmation: "DELETE ITEMS" }` | `vehicleId`, `itemIds[]` |
+| DELETE | `/api/vehicles/{vehicleId}/storage/all-items` | Empty a vehicle's cargo hold. Requires `{ confirmation: "DELETE ALL ITEMS" }` | `vehicleId` |
 | DELETE | `/api/vehicles/{vehicleId}` | Permanently delete a vehicle and everything on it (queued instead if the map isn't safely writable right now); takes a full-database safety backup first. Requires `{ confirmation: "DELETE VEHICLE" }` | `vehicleId` |
 | GET | `/api/vehicles/pending-deletes` | List queued vehicle deletes, grouped by restart target | None |
 | DELETE | `/api/vehicles/{vehicleId}/queued-delete` | Cancel a vehicle's queued delete | `vehicleId` |
@@ -396,10 +399,13 @@ routes share their implementation with the base permission routes -- see
 [vehicle-permissions.md](vehicle-permissions.md). The system-custodian route
 mirrors the base one exactly, minus the backed-up guard, since a vehicle has
 no picked-up state. The delete route mirrors `DELETE /api/bases/{baseId}` --
-see [vehicle-deletion.md](vehicle-deletion.md). The storage route is read-only
-and reads the vehicle's single cargo hold -- reached through
+see [vehicle-deletion.md](vehicle-deletion.md). The storage routes read and
+delete the vehicle's single cargo hold -- reached through
 `dune.inventories.actor_id`, not `vehicle_module_id`, which is empty in
-production -- see [vehicle-storage.md](vehicle-storage.md).
+production. Deletion needs no stopped map but refuses while the vehicle is in
+`Travel`/`VehicleBackup`/`VehicleRecovery`, and is gated on `vehicles:delete-item`
+/ `vehicles:bulk-delete-items` rather than `vehicles:mutate` -- see
+[vehicle-storage.md](vehicle-storage.md).
 
 `GET /api/vehicles` reports `capabilities.vehicles`; it is false (with a
 `reason`) when the schema lacks the required tables (`vehicles`, `vehicle_modules`,

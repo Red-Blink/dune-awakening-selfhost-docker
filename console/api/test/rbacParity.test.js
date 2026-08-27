@@ -230,6 +230,22 @@ test("parity: GET vehicle storage resolves to vehicles:read via the prefix fallb
   assert.notEqual(actionForRoute("/api/vehicles/2048/storage", "GET"), "vehicles:mutate");
 });
 
+// The mirror of the three base-container carve-outs above: without these
+// explicit patterns a DELETE under /api/vehicles/ has no method-aware prefix
+// rule to land on, so it would fall through to the method-agnostic
+// "/api/vehicles/" -> vehicles:read bucket and let a read-only tier destroy
+// cargo.
+test("parity: vehicle cargo deletes resolve to their own actions, not the read-only fallback", () => {
+  for (const path of ["/api/vehicles/2048/storage/items", "/api/vehicles/2048/storage/all-items"]) {
+    assert.equal(actionForRoute(path, "DELETE"), "vehicles:bulk-delete-items");
+    assert.notEqual(actionForRoute(path, "DELETE"), "vehicles:read");
+  }
+  assert.equal(actionForRoute("/api/vehicles/2048/storage/items/77", "DELETE"), "vehicles:delete-item");
+  assert.notEqual(actionForRoute("/api/vehicles/2048/storage/items/77", "DELETE"), "vehicles:read");
+  // And the new siblings must not shadow the whole-vehicle delete beside them.
+  assert.equal(actionForRoute("/api/vehicles/2048", "DELETE"), "vehicles:delete");
+});
+
 test("parity: GET vehicle pending-deletes resolves to vehicles:read", () => {
   assert.equal(actionForRoute("/api/vehicles/pending-deletes", "GET"), "vehicles:read");
 });

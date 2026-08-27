@@ -46,6 +46,10 @@ type VehicleTableProps = {
   // (capabilities.vehicleStorage). Off by default so a mount that does not
   // pass it through never offers a button that comes back unsupported.
   storageSupported?: boolean;
+  // Echoes a cargo-delete failure into the panel-level banner once the modal
+  // is dismissed. Optional: PlayerVehiclesTab has no such banner, and the
+  // overlay's own inline error is the primary surface either way.
+  onError?: (text: string) => void;
   queuedDeleteVehicleIds?: Set<string>;
   deletingId?: string;
   cancelingDeleteId?: string;
@@ -173,7 +177,7 @@ function renderComponent(module: VehicleModule, index: number) {
 export function VehicleTable({
   rows, context = "global", emptyMessage = "No vehicles have been found yet.", sortColumn, sortDirection, onSort,
   canEditPermissions = false, onPermissionsSaved, focusVehicleId, focusNonce, confirmAction,
-  canDeleteVehicle = false, storageSupported = false, queuedDeleteVehicleIds, deletingId, cancelingDeleteId, onDeleteVehicle, onCancelQueuedDelete
+  canDeleteVehicle = false, storageSupported = false, onError, queuedDeleteVehicleIds, deletingId, cancelingDeleteId, onDeleteVehicle, onCancelQueuedDelete
 }: VehicleTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedTab, setExpandedTab] = useState<"components" | "permissions">("components");
@@ -383,6 +387,8 @@ export function VehicleTable({
       vehicleId={String(storageFor.id)}
       vehicleName={String(storageFor.name || `vehicle ${storageFor.id}`)}
       onClose={() => setStorageFor(null)}
+      confirmAction={confirmAction}
+      onError={onError}
     />}
     </>
   );
