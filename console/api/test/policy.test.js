@@ -126,6 +126,10 @@ test("vehicle permission routes resolve to their own read/mutate actions", () =>
   assert.equal(actionForRoute("/api/vehicles/5/permissions", "PUT"), "vehicles:mutate");
   assert.equal(actionForRoute("/api/vehicles/permission-candidates", "GET"), "vehicles:read");
   assert.equal(actionForRoute("/api/vehicles", "GET"), "vehicles:read");
+  // Reading a vehicle's cargo hold stays an ordinary vehicle read -- it
+  // resolves through the method-agnostic "/api/vehicles/" prefix rule rather
+  // than an entry of its own, which is exactly why it is pinned here.
+  assert.equal(actionForRoute("/api/vehicles/5/storage", "GET"), "vehicles:read");
 });
 
 test("a vehicles:read-only policy denies vehicles:mutate", () => {

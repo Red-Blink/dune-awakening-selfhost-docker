@@ -1,5 +1,5 @@
 import test, { beforeEach } from "node:test";
-import { listVehicles, portalVehicleDisplayName } from "../src/duneDb.js";
+import { isVehicleStorageModule, listVehicles, portalVehicleDisplayName, vehicleStorage } from "../src/duneDb.js";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -8787,4 +8787,240 @@ test("baseGeneratorFuelLevels reports null rather than zero for a base with no g
   // null must not read as "empty" to a caller deciding whether to refill.
   assert.equal(levels.lowestPercent, null);
   assert.equal(levels.deviceCount, 0);
+});
+
+// ---------------------------------------------------------------------------
+// vehicleStorage: the per-slot read behind Vehicles -> Components -> View
+// Contents. A vehicle has exactly one cargo hold, reached through
+// dune.inventories.actor_id (== the vehicle's actor id) with
+// inventory_type = 0 -- NOT through vehicle_module_id, which is empty in
+// production. These tests pin both halves of that.
+// ---------------------------------------------------------------------------
+
+function fakeVehicleStorageDb(calls, fixtures = {}) {
+  const {
+    rows = [],
+    missingTables = [],
+    itemColumns = ["id", "inventory_id", "stack_size", "position_index", "template_id", "stats", "quality_level"],
+    // Defaults to no max_item_volume, matching itemColumns' own default of no
+    // volume_override -- a schema without volume support until a test opts in.
+    inventoryColumns = ["id", "actor_id", "inventory_type", "max_item_count"]
+  } = fixtures;
+  return {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) {
+        const table = String(values[0] || "");
+        return { rows: [{ exists: !missingTables.some((name) => table.includes(name)) }] };
+      }
+      if (text.includes("information_schema.columns")) {
+        const columns = values[1] === "inventories" ? inventoryColumns : itemColumns;
+        return { rows: columns.map((column_name) => ({ column_name })) };
+      }
+      if (text.includes("with hold as")) return { rows };
+      return { rows: [] };
+    }
+  };
+}
+
+const HOLD_ROW = {
+  inventory_id: "2001", max_item_count: 20, max_item_volume: 2000,
+  quality_level: 0, current_durability: null, max_durability: null
+};
+
+test("vehicleStorage reads the cargo hold off the vehicle actor, not a module", async () => {
+  const calls = [];
+  const db = fakeVehicleStorageDb(calls, {
+    rows: [{ ...HOLD_ROW, item_id: "9", template_id: "JasmiumCrystal", stack_size: 162, position_index: 5 }]
+  });
+  const result = await vehicleStorage(db, 2008);
+
+  assert.equal(result.supported, true);
+  assert.equal(result.found, true);
+  assert.equal(result.vehicleId, "2008");
+  assert.equal(result.inventoryId, "2001");
+  assert.equal(result.maxSlots, 20);
+  assert.equal(result.usedSlots, 1);
+  assert.deepEqual(result.slots.map((slot) => slot.templateId), ["JasmiumCrystal"]);
+  assert.equal(result.slots[0].positionIndex, 5);
+  assert.equal(result.slots[0].quantity, 162);
+
+  const query = calls.find((call) => call.text.includes("with hold as"));
+  assert.deepEqual(query.values, [2008]);
+  // The three load-bearing clauses. inv.actor_id = v.id is what scopes the
+  // hold to a real vehicle; inventory_type = 0 is what separates the cargo
+  // hold from the per-component inventories on the same actor.
+  assert.match(query.text, /join dune\.inventories inv on inv\.actor_id = v\.id/);
+  assert.match(query.text, /inv\.inventory_type = 0/);
+  assert.match(query.text, /from dune\.vehicles v/);
+  // The empty links, explicitly: joining either would return nothing at all.
+  assert.doesNotMatch(query.text, /vehicle_module_id/);
+  assert.doesNotMatch(query.text, /vehicle_module_inventories/);
+});
+
+test("vehicleStorage keeps two stacks of one template apart", async () => {
+  const calls = [];
+  const db = fakeVehicleStorageDb(calls, {
+    rows: [
+      { ...HOLD_ROW, item_id: "1", template_id: "ScrapMetal", stack_size: 500, position_index: 0 },
+      { ...HOLD_ROW, item_id: "2", template_id: "MagnetiteOre", stack_size: 200, position_index: 1 },
+      { ...HOLD_ROW, item_id: "3", template_id: "ScrapMetal", stack_size: 400, position_index: 2 }
+    ]
+  });
+  const result = await vehicleStorage(db, 2008);
+
+  assert.equal(result.usedSlots, 3);
+  // A template-merged rollup would report one ScrapMetal of 900.
+  assert.deepEqual(result.slots.filter((slot) => slot.templateId === "ScrapMetal").map((slot) => slot.quantity), [500, 400]);
+  assert.deepEqual(result.slots.map((slot) => slot.itemId), ["1", "2", "3"]);
+});
+
+test("vehicleStorage keeps an empty hold so the grid can render its empty slots", async () => {
+  const calls = [];
+  // The LEFT JOIN emits one all-null item row for an empty hold.
+  const db = fakeVehicleStorageDb(calls, {
+    rows: [{ ...HOLD_ROW, item_id: null, template_id: null, stack_size: null, position_index: null }]
+  });
+  const result = await vehicleStorage(db, 2008);
+
+  assert.equal(result.found, true);
+  assert.equal(result.usedSlots, 0);
+  assert.equal(result.maxSlots, 20);
+  assert.deepEqual(result.slots, []);
+});
+
+test("vehicleStorage answers found:false for an id that is not a vehicle", async () => {
+  const calls = [];
+  const db = fakeVehicleStorageDb(calls, { rows: [] });
+  const result = await vehicleStorage(db, 999999);
+  // An answer, not an error -- and the shape the route returns 200 with. The
+  // join through dune.vehicles is what makes a player's or a placeable's
+  // actor id land here instead of returning their inventory.
+  assert.equal(result.supported, true);
+  assert.equal(result.found, false);
+  assert.equal(result.vehicleId, "999999");
+  assert.deepEqual(result.slots, []);
+  assert.match(result.reason, /no cargo hold/i);
+});
+
+test("vehicleStorage reports unsupported when any relation it reads is absent", async () => {
+  for (const table of ["vehicles", "inventories", "items"]) {
+    const db = fakeVehicleStorageDb([], { missingTables: [table] });
+    const result = await vehicleStorage(db, 2008);
+    // Probing only dune.vehicles would have passed two of these three.
+    assert.equal(result.supported, false, `${table} should be required`);
+    assert.match(result.reason, new RegExp(`dune\\.${table}`));
+    assert.deepEqual(result.slots, []);
+  }
+});
+
+test("vehicleStorage degrades a schema without position_index instead of failing", async () => {
+  const calls = [];
+  const db = fakeVehicleStorageDb(calls, {
+    itemColumns: ["id", "inventory_id", "stack_size", "template_id"],
+    rows: [{ ...HOLD_ROW, item_id: "1", template_id: "ScrapMetal", stack_size: 500, position_index: null }]
+  });
+  const result = await vehicleStorage(db, 2008);
+
+  assert.equal(result.found, true);
+  assert.equal(result.slots[0].positionIndex, null);
+  assert.deepEqual(result.slots[0].augments, []);
+  const query = calls.find((call) => call.text.includes("with hold as"));
+  assert.match(query.text, /null::bigint as position_index/);
+  assert.match(query.text, /null::jsonb as applied_augments/);
+});
+
+test("vehicleStorage falls back to the capacity-carrying inventory without inventory_type", async () => {
+  const calls = [];
+  const db = fakeVehicleStorageDb(calls, {
+    inventoryColumns: ["id", "actor_id", "max_item_count"],
+    rows: [{ ...HOLD_ROW, item_id: "1", template_id: "ScrapMetal", stack_size: 10, position_index: 0 }]
+  });
+  const result = await vehicleStorage(db, 2008);
+
+  assert.equal(result.found, true);
+  const query = calls.find((call) => call.text.includes("with hold as"));
+  // The per-component inventories carry no capacity, so this still lands on
+  // the cargo hold rather than guessing.
+  assert.doesNotMatch(query.text, /inventory_type/);
+  assert.match(query.text, /inv\.max_item_count > 0/);
+});
+
+test("vehicleStorage pairs augments positionally and stops at the shorter array", async () => {
+  const calls = [];
+  const db = fakeVehicleStorageDb(calls, {
+    rows: [{
+      ...HOLD_ROW, item_id: "1", template_id: "UniqueSword_05", stack_size: 1, position_index: 0,
+      applied_augments: [{ Name: "T6_Augment_UnitTestFixture1" }, { Name: "T6_Augment_UnitTestFixture2" }],
+      applied_augment_qualities: [2]
+    }]
+  });
+  const result = await vehicleStorage(db, 2008);
+  // A corrupt or hand-edited row degrades rather than 500ing a display path.
+  assert.deepEqual(result.slots[0].augments.map((augment) => augment.qualityLevel), [2, 0]);
+});
+
+test("vehicleStorage multiplies per-unit volume_override by the stack size", async () => {
+  const calls = [];
+  const db = fakeVehicleStorageDb(calls, {
+    itemColumns: ["id", "inventory_id", "stack_size", "position_index", "template_id", "stats", "quality_level", "volume_override"],
+    inventoryColumns: ["id", "actor_id", "inventory_type", "max_item_count", "max_item_volume"],
+    rows: [{ ...HOLD_ROW, item_id: "1", template_id: "ScrapMetal", stack_size: 100, position_index: 0, volume_override: 1.5 }]
+  });
+  const result = await vehicleStorage(db, 2008);
+
+  assert.equal(result.maxVolume, 2000);
+  assert.equal(result.currentVolume, 150);
+  assert.equal(result.volumeComplete, true);
+});
+
+test("vehicleStorage reports volumeComplete:false on a schema without volume tracking", async () => {
+  const calls = [];
+  const db = fakeVehicleStorageDb(calls, {
+    rows: [{ ...HOLD_ROW, max_item_volume: 0, item_id: "1", template_id: "ScrapMetal", stack_size: 100, position_index: 0 }]
+  });
+  const result = await vehicleStorage(db, 2008);
+
+  assert.equal(result.volumeComplete, false);
+  assert.equal(result.currentVolume, 0);
+});
+
+test("isVehicleStorageModule matches every shipped storage module and nothing else", async () => {
+  for (const id of [
+    "BuggyInventory_3", "BuggyInventory_6", "SandbikeInventory_1", "SandbikeInventory_2",
+    "OrnithopterLightInventory_4", "OrnithopterMediumInventory_5", "TreadwheelInventory_2",
+    "BuggyInventory_Unique_Capacity_03", "BuggyInventory_Unique_Capacity_06"
+  ]) {
+    assert.equal(isVehicleStorageModule(id), true, id);
+  }
+  for (const id of [
+    "BuggyEngine_5", "BuggyLocomotionBackLeft_5", "OrnithopterMediumWings_5",
+    "GeneratorModule", "", null, undefined
+  ]) {
+    assert.equal(isVehicleStorageModule(id), false, String(id));
+  }
+});
+
+test("listVehicles flags which fitted modules are storage", async () => {
+  const db = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("total_vehicles")) return { rows: [{ total_vehicles: 1 }] };
+      if (text.includes("module_durability")) return { rows: [{
+        id: "2008", name: "Sandcrawler", type: "Buggy", owner: "Duncan_Idaho",
+        condition_percent: 92, current_fuel: "61", max_fuel: "100", fuel_percent: 61,
+        map: "HaggaBasin", partition_id: 1, x: "1", y: "2", z: "3", total_count: 1,
+        modules: [
+          { templateId: "BuggyEngine_5", condition: "440", maxCondition: "500", conditionPercent: 88 },
+          { templateId: "BuggyInventory_4", condition: null, maxCondition: null, conditionPercent: null }
+        ],
+        shared_with: []
+      }] };
+      return { rows: [] };
+    }
+  };
+  const result = await listVehicles(db, { page: 0, pageSize: 50 });
+  // What the Components tab gates its View Contents button on.
+  assert.deepEqual(result.rows[0].modules.map((module) => module.isStorage), [false, true]);
+  assert.equal(result.capabilities.vehicleStorage, true);
 });

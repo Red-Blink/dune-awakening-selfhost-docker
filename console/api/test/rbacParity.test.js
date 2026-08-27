@@ -220,6 +220,16 @@ test("parity: DELETE vehicle queued-delete cancel resolves to vehicles:mutate, n
   assert.notEqual(actionForRoute("/api/vehicles/2048/queued-delete", "DELETE"), "vehicles:read");
 });
 
+// The read-only fallback is the CORRECT answer here, unlike the three cases
+// above -- this pins that it is reached at all, so a future explicit rule for
+// a sibling sub-resource cannot accidentally shadow it into null (which fails
+// closed and would 403 every tier, owner included).
+test("parity: GET vehicle storage resolves to vehicles:read via the prefix fallback", () => {
+  assert.equal(actionForRoute("/api/vehicles/2048/storage", "GET"), "vehicles:read");
+  assert.notEqual(actionForRoute("/api/vehicles/2048/storage", "GET"), null);
+  assert.notEqual(actionForRoute("/api/vehicles/2048/storage", "GET"), "vehicles:mutate");
+});
+
 test("parity: GET vehicle pending-deletes resolves to vehicles:read", () => {
   assert.equal(actionForRoute("/api/vehicles/pending-deletes", "GET"), "vehicles:read");
 });

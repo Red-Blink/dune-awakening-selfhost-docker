@@ -16,7 +16,8 @@ vi.mock("../../api/vehicles", () => ({
     transferToSystemCustodian: vi.fn(),
     deleteVehicle: vi.fn(),
     cancelQueuedDelete: vi.fn(),
-    pendingDeletes: vi.fn()
+    pendingDeletes: vi.fn(),
+    storage: vi.fn()
   }
 }));
 
@@ -115,6 +116,53 @@ describe("VehiclesPanel", () => {
 
     // (0, 0) on the 9x9 grid (letter = Y descending, number = X ascending) is E-5.
     expect(await screen.findByText("Sector E-5")).toBeInTheDocument();
+  });
+
+  // A vehicle's cargo hold hangs off the vehicle actor, not a module, so this
+  // is one control on the Components header gated on a fitted storage module
+  // -- not a button per component card.
+  describe("View Contents", () => {
+    const STORAGE_MODULE = { templateId: "SandbikeInventory_2", name: "Sandbike Inventory Mk2", condition: null, maxCondition: null, conditionPercent: null, isStorage: true };
+
+    async function expandWith(overrides: Partial<VehiclesListResponse>) {
+      vi.mocked(vehiclesApi.list).mockResolvedValue(listResponse(overrides));
+      renderPanel();
+      fireEvent.click(await screen.findByLabelText("Show components for Sihaya"));
+      await screen.findByText(/component/);
+    }
+
+    function withStorageModule(response: VehiclesListResponse): Partial<VehiclesListResponse> {
+      return { rows: [{ ...response.rows[0], modules: [...response.rows[0].modules, STORAGE_MODULE] }] };
+    }
+
+    it("offers the button when a storage module is fitted and the server can read holds", async () => {
+      await expandWith({ capabilities: { vehicles: true, vehicleStorage: true }, ...withStorageModule(listResponse()) });
+      expect(screen.getByRole("button", { name: /View Contents/ })).toBeInTheDocument();
+    });
+
+    it("hides the button when no storage module is fitted", async () => {
+      await expandWith({ capabilities: { vehicles: true, vehicleStorage: true } });
+      expect(screen.queryByRole("button", { name: /View Contents/ })).toBeNull();
+    });
+
+    it("hides the button when the schema cannot serve holds", async () => {
+      await expandWith({ capabilities: { vehicles: true, vehicleStorage: false }, ...withStorageModule(listResponse()) });
+      expect(screen.queryByRole("button", { name: /View Contents/ })).toBeNull();
+    });
+
+    it("opens the contents overlay without collapsing the expanded row", async () => {
+      vi.mocked(vehiclesApi.storage).mockResolvedValue({
+        supported: true, found: true, vehicleId: "5001", inventoryId: "9001",
+        maxSlots: 15, usedSlots: 0, maxVolume: 250, currentVolume: 0, volumeComplete: true, slots: []
+      } as never);
+      await expandWith({ capabilities: { vehicles: true, vehicleStorage: true }, ...withStorageModule(listResponse()) });
+      fireEvent.click(screen.getByRole("button", { name: /View Contents/ }));
+      await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+      expect(vehiclesApi.storage).toHaveBeenCalledWith("5001");
+      // The button lives inside a clickable table row; without the click guard
+      // the row would toggle shut underneath the modal.
+      expect(screen.getByText(/component/)).toBeInTheDocument();
+    });
   });
 
   it("expands a row to show its components", async () => {

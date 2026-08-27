@@ -798,6 +798,7 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/vehicles\/[^/]+\/permissions$/) && req.method === "GET") return vehiclePermissionsRoute(res, path);
   if (path.match(/^\/api\/vehicles\/[^/]+\/permissions$/) && req.method === "PUT") return vehicleSetPermissionsRoute(req, res, path);
   if (path.match(/^\/api\/vehicles\/[^/]+\/system-custodian$/) && req.method === "POST") return vehicleSystemCustodianRoute(req, res, path);
+  if (path.match(/^\/api\/vehicles\/[^/]+\/storage$/) && req.method === "GET") return vehicleStorageRoute(res, path);
   if (path.match(/^\/api\/vehicles\/[^/]+\/queued-delete$/) && req.method === "DELETE") return vehicleCancelQueuedDeleteRoute(req, res, path);
   if (path.match(/^\/api\/vehicles\/[^/]+$/) && req.method === "DELETE") return vehicleDeleteRoute(req, res, path);
   if (path === "/api/admin/items/catalog") return json(res, 200, { rows: listCatalogItems(config.repoRoot, { q: url.searchParams.get("q") || "", limit: url.searchParams.get("limit") || 500 }) });
@@ -3658,6 +3659,24 @@ async function vehiclePermissionsRoute(res, path) {
   }
   try {
     return json(res, 200, { supported: true, ...(await duneDb.listVehiclePermissions(db, vehicleId)) });
+  } catch (error) {
+    return json(res, 500, { supported: false, error: redact(error?.message || "Unexpected error."), reason: redact(error?.message || "Unexpected error.") });
+  }
+}
+
+// One vehicle's cargo hold, read-only -- so no directDbMutation wrapper and
+// no confirmation phrase, same as baseContainerSlotsRoute. Same id guard as
+// vehiclePermissionsRoute above, for the same reason. A schema without the
+// inventory tables comes back as a 200 carrying supported:false rather than
+// an error status, so the overlay's Retry always means something real.
+// repoRoot is passed through only to resolve each item's catalog icon.
+async function vehicleStorageRoute(res, path) {
+  const vehicleId = Number(decodeURIComponent(path.split("/")[3]));
+  if (!Number.isInteger(vehicleId) || vehicleId < 1 || vehicleId > Number.MAX_SAFE_INTEGER) {
+    return json(res, 400, { error: "Invalid vehicle ID" });
+  }
+  try {
+    return json(res, 200, await duneDb.vehicleStorage(db, vehicleId, { repoRoot: config.repoRoot }));
   } catch (error) {
     return json(res, 500, { supported: false, error: redact(error?.message || "Unexpected error."), reason: redact(error?.message || "Unexpected error.") });
   }

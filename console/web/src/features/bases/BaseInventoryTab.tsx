@@ -12,6 +12,7 @@ import {
 import { AugmentDropdown } from "../../components/common/AugmentDropdown";
 import { augmentLimitForItem, filterAugmentsForItem, formatAugmentOptions, itemCanUseAugments } from "../../lib/augmentEligibility";
 import { adminApi } from "../../api/admin";
+import { GRID_CELL_CAP, layoutSlots } from "../inventory/slotLayout";
 import {
   basesApi,
   type BaseContainerSlots,
@@ -41,29 +42,7 @@ type BaseInventoryTabProps = {
   confirmAction: (message: string, options?: { title?: string; confirmLabel?: string; warning?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
 };
 
-// Guards a corrupt or absurd max_item_count from rendering tens of thousands
-// of cells. Above this the modal stays in list mode.
-const GRID_CELL_CAP = 200;
-
 type ContentsView = "list" | "grid";
-
-// Lays one inventory's slots into a fixed grid. position_index has no unique
-// constraint in the schema and is not validated against max_item_count, so all
-// three of "sparse", "two slots claim the same index" and "index past the end"
-// are reachable. Anything that cannot be placed goes to `overflow` and is
-// rendered below the grid -- never dropped, because an item the delete button
-// cannot reach is the worst outcome here.
-function layoutSlots(inventory: { maxSlots: number; slots: BaseInventorySlot[] }) {
-  const size = Math.min(Math.max(0, inventory.maxSlots), GRID_CELL_CAP);
-  const cells: (BaseInventorySlot | null)[] = new Array(size).fill(null);
-  const overflow: BaseInventorySlot[] = [];
-  for (const slot of inventory.slots) {
-    const at = slot.positionIndex;
-    if (at !== null && Number.isInteger(at) && at >= 0 && at < size && cells[at] === null) cells[at] = slot;
-    else overflow.push(slot);
-  }
-  return { cells, overflow };
-}
 
 // The rollup is capped so the tab cannot blow out the height of an already
 // expanded table row; "Show all" lifts it.

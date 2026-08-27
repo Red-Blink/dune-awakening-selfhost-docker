@@ -9,6 +9,46 @@ export type VehicleModule = {
   maxCondition: number | string | null;
   conditionPercent: number | null;
   maxInferred?: boolean | null;
+  // Server-flagged (isVehicleStorageModule) rather than matched here, so the
+  // template-id pattern lives next to the query that reads the hold.
+  isStorage?: boolean;
+};
+
+// One stack in a vehicle's cargo hold. Same shape as bases.ts's
+// BaseInventorySlot -- deliberately, so the two contents overlays render
+// identically -- plus `image`, which the vehicle route resolves itself
+// because there is no vehicle equivalent of the base inventory rollup the
+// bases tab harvests icons from.
+export type VehicleStorageSlot = {
+  itemId: string;
+  templateId: string;
+  name: string;
+  image: string;
+  positionIndex: number | null;
+  quantity: number;
+  qualityLevel: number;
+  currentDurability: number | null;
+  maxDurability: number | null;
+  augments: { templateId: string; name: string; qualityLevel: number }[];
+};
+
+// A vehicle has exactly one cargo hold (dune.inventories.actor_id =
+// vehicle id, inventory_type = 0), so this is flat where BaseContainerSlots
+// carries an inventories[] array.
+export type VehicleStorage = {
+  supported: boolean;
+  found?: boolean;
+  reason?: string;
+  vehicleId: string;
+  inventoryId?: string;
+  maxSlots?: number;
+  usedSlots?: number;
+  maxVolume?: number;
+  currentVolume?: number;
+  // False when at least one item's per-unit volume is unknown, so the
+  // reported total is a lower bound -- rendered with a leading "≥".
+  volumeComplete?: boolean;
+  slots: VehicleStorageSlot[];
 };
 
 export type VehicleSharedEntry = { name: string; rank: number; label: string };
@@ -42,7 +82,7 @@ export type VehiclesListResponse = {
   rows: VehicleRow[];
   totalCount: number;
   totalVehicles: number;
-  capabilities: { vehicles?: boolean; vehiclePermissions?: boolean; vehicleDelete?: boolean; vehicleDeleteQueue?: boolean } & Record<string, unknown>;
+  capabilities: { vehicles?: boolean; vehiclePermissions?: boolean; vehicleDelete?: boolean; vehicleDeleteQueue?: boolean; vehicleStorage?: boolean } & Record<string, unknown>;
   reason?: string;
 };
 
@@ -134,6 +174,11 @@ export const vehiclesApi = {
   forPlayer: (playerId: string) => api<VehiclesListResponse>(`/api/players/${encodeURIComponent(playerId)}/vehicles`),
   permissions: (vehicleId: string) =>
     api<VehiclePermissions>(`/api/vehicles/${encodeURIComponent(vehicleId)}/permissions`),
+  // Fetched when the contents overlay opens rather than folded into the list
+  // response -- slots would roughly triple a payload that already loads a
+  // whole page of vehicles. Same reasoning as basesApi.containerSlots.
+  storage: (vehicleId: string) =>
+    api<VehicleStorage>(`/api/vehicles/${encodeURIComponent(vehicleId)}/storage`),
   // A whole roster, not a delta: the server diffs it against current state and
   // applies the difference through the game's own stored procedures in one
   // transaction. Changes reach a running map immediately -- no restart.

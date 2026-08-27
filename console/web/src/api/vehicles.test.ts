@@ -35,6 +35,17 @@ describe("vehiclesApi.list", () => {
   });
 });
 
+describe("vehiclesApi.storage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("reads a vehicle's cargo hold with an encoded vehicle id", () => {
+    vehiclesApi.storage("vehicle/1");
+    expect(api).toHaveBeenCalledWith("/api/vehicles/vehicle%2F1/storage");
+  });
+});
+
 describe("vehiclesApi permissions", () => {
   beforeEach(() => {
     vi.clearAllMocks();

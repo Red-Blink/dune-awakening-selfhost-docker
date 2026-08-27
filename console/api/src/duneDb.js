@@ -7509,7 +7509,8 @@ export async function listVehicles(db, { q = "", page = 0, pageSize = 50, sortCo
         })),
         modules: (row.modules || []).map((module) => ({
           ...module,
-          name: portalVehicleModuleName(module.templateId)
+          name: portalVehicleModuleName(module.templateId),
+          isStorage: isVehicleStorageModule(module.templateId)
         }))
       }));
     await attachVehicleRegions(db, rows);
@@ -7527,17 +7528,215 @@ export async function listVehicles(db, { q = "", page = 0, pageSize = 50, sortCo
     const vehicleDeleteQueue = vehicleDelete
       ? await supportsVehicleDeleteQueue(db, { vehicleDelete }).catch(() => false)
       : false;
+    // requiredTables above proved dune.vehicles exists, but not the two
+    // relations vehicleStorage actually reads -- probe them rather than
+    // inferring, so the Components tab hides View Contents instead of
+    // offering a button that comes back unsupported on click.
+    const vehicleStorage = await supportsVehicleStorage(db).catch(() => false);
 
     return {
-      capabilities: { vehicles: true, vehiclePermissions, vehicleDelete, vehicleDeleteQueue },
+      capabilities: { vehicles: true, vehiclePermissions, vehicleDelete, vehicleDeleteQueue, vehicleStorage },
       totalCount: result.rows[0] ? Number(result.rows[0].total_count) : 0,
       totalVehicles: totalsResult.rows[0] ? Number(totalsResult.rows[0].total_vehicles) : 0,
       rows
     };
   } catch (error) {
     const result = unsupported("vehicles", requiredTables.map((t) => `dune.${t}`));
-    return { ...result, capabilities: { ...result.capabilities, vehiclePermissions: false, vehicleDelete: false, vehicleDeleteQueue: false }, totalCount: 0, totalVehicles: 0, reason: `Vehicles query failed: ${error.message}` };
+    return { ...result, capabilities: { ...result.capabilities, vehiclePermissions: false, vehicleDelete: false, vehicleDeleteQueue: false, vehicleStorage: false }, totalCount: 0, totalVehicles: 0, reason: `Vehicles query failed: ${error.message}` };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle cargo hold (Vehicles -> Components -> View Contents)
+//
+// A vehicle's cargo inventory hangs off dune.inventories.actor_id -- the
+// vehicle's own actor id, since dune.vehicles.id == dune.actors.id -- with
+// inventory_type = 0, exactly as fillItemToStorage already documents at the
+// top of its own implementation. dune.inventories.vehicle_module_id and
+// dune.vehicle_module_inventories exist in the schema but are empty in
+// production (0 of 535 / 0 rows in a real dump), so contents cannot be
+// attributed to a particular storage module -- and do not need to be: there
+// is exactly one hold per vehicle, and its max_item_count/max_item_volume
+// already track whichever *Inventory_* module is fitted.
+//
+// The inventory_type = 0 filter is load-bearing, not decoration: the same
+// actor also owns inventory_type IS NULL rows (per-component holds) that
+// carry no capacity and are not the cargo hold.
+// ---------------------------------------------------------------------------
+
+// Storage modules are catalogued per vehicle class and tier rather than by a
+// type column, so the fitted-storage test is on the template id: every entry
+// in runtime/data/admin-items.json follows it (BuggyInventory_5,
+// SandbikeInventory_2, OrnithopterMediumInventory_5, TreadwheelInventory_2,
+// BuggyInventory_Unique_Capacity_04, ...).
+export function isVehicleStorageModule(templateId) {
+  return /Inventory(_Unique_Capacity)?_\d+$/i.test(String(templateId || ""));
+}
+
+async function supportsVehicleStorage(db) {
+  for (const table of ["vehicles", "inventories", "items"]) {
+    if (!(await tableExists(db, table))) return false;
+  }
+  return true;
+}
+
+// One vehicle's cargo hold, slot by slot. Modelled on baseContainerSlots --
+// same probe-then-degrade discipline and the same slot shape -- but flat
+// rather than an inventories[] array, because a vehicle has one hold where a
+// base container can have several.
+export async function vehicleStorage(db, vehicleId, { repoRoot } = {}) {
+  const target = intParam(vehicleId, "vehicle id", 1);
+  // Every relation the query below names. A partial probe is the trap here:
+  // dune.vehicles existing says nothing about dune.inventories.
+  const required = ["vehicles", "inventories", "items"];
+  const present = await Promise.all(required.map((table) => tableExists(db, table)));
+  const missing = required.filter((_, index) => !present[index]);
+  if (missing.length) {
+    return {
+      supported: false,
+      reason: `Unsupported by detected schema. Missing required table(s): ${missing.map((table) => `dune.${table}`).join(", ")}`,
+      vehicleId: String(target),
+      slots: []
+    };
+  }
+
+  // Probed rather than assumed, for the reason baseContainerSlots gives: a
+  // missing column is a parse-time error, not a null, so an older schema
+  // would 500 the whole view instead of degrading one field.
+  const itemColumns = await columnsFor(db, "items");
+  const inventoryColumns = await columnsFor(db, "inventories");
+  const hasPositionIndex = itemColumns.has("position_index");
+  const hasStats = itemColumns.has("stats");
+  const hasVolumeOverride = itemColumns.has("volume_override");
+  const hasMaxItemVolume = inventoryColumns.has("max_item_volume");
+  // Without inventory_type there is no way to tell the cargo hold from the
+  // per-component inventories on the same actor. Rather than guess, fall back
+  // to the capacity-carrying row -- the component holds have none.
+  const hasInventoryType = inventoryColumns.has("inventory_type");
+  const holdFilter = hasInventoryType ? "inv.inventory_type = 0" : "inv.max_item_count > 0";
+  const maxItemVolumeSelect = hasMaxItemVolume ? "inv.max_item_volume" : "0::real as max_item_volume";
+  const volumeOverrideSelect = hasVolumeOverride ? "i.volume_override" : "0::real as volume_override";
+  const slotSelect = [
+    hasPositionIndex ? "i.position_index" : "null::bigint as position_index",
+    itemColumns.has("quality_level") ? "i.quality_level" : "0::bigint as quality_level",
+    hasStats
+      ? "coalesce((i.stats->'FItemStackAndDurabilityStats'->1->>'CurrentDurability'), null) as current_durability"
+      : "null::text as current_durability",
+    hasStats
+      ? `coalesce(
+             nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'MaxDurability')::numeric, 0),
+             nullif((i.stats->'FItemStackAndDurabilityStats'->1->>'DecayedMaxDurability')::numeric, 0),
+             null
+           ) as max_durability`
+      : "null::numeric as max_durability",
+    hasStats
+      ? "i.stats->'FAugmentedItemStats'->1->'AppliedAugments' as applied_augments"
+      : "null::jsonb as applied_augments",
+    hasStats
+      ? "i.stats->'FAugmentedItemStats'->1->'AppliedAugmentQualities' as applied_augment_qualities"
+      : "null::jsonb as applied_augment_qualities"
+  ].join(",\n           ");
+  const slotOrder = hasPositionIndex ? "i.position_index nulls last, i.id" : "i.id";
+
+  // Joined through dune.vehicles rather than reading dune.inventories by
+  // actor_id directly: that is what makes an id that is some other kind of
+  // actor come back as found:false instead of quietly returning a player's
+  // or a placeable's inventory through a vehicles-scoped route.
+  const result = await db.query(`
+    with hold as (
+      select inv.id, inv.max_item_count, ${maxItemVolumeSelect}
+      from dune.vehicles v
+      join dune.inventories inv on inv.actor_id = v.id and ${holdFilter}
+      where v.id = $1
+      order by inv.id
+      limit 1
+    )
+    select h.id::text as inventory_id, h.max_item_count, h.max_item_volume,
+           i.id::text as item_id, i.template_id, i.stack_size, ${volumeOverrideSelect},
+           ${slotSelect}
+    from hold h
+    left join dune.items i on i.inventory_id = h.id
+    order by ${slotOrder}`, [target]);
+
+  if (!result.rows.length) {
+    return {
+      supported: true,
+      found: false,
+      reason: "That vehicle has no cargo hold.",
+      vehicleId: String(target),
+      slots: []
+    };
+  }
+
+  const itemMetadata = adminItemMetadata();
+  const first = result.rows[0];
+  const slots = [];
+  let currentVolume = 0;
+  let volumeComplete = hasMaxItemVolume && hasVolumeOverride;
+  for (const row of result.rows) {
+    // The left join emits one all-null item row for an empty hold, which is
+    // still needed above so the summary and the empty grid render.
+    const templateId = String(row.template_id || "");
+    if (!templateId) continue;
+    // Parallel arrays written by buildAugmentedItemStats; paired positionally
+    // and simply stopping at the shorter one, so a corrupt row degrades
+    // rather than throwing on a display path.
+    const appliedAugments = Array.isArray(row.applied_augments) ? row.applied_augments : [];
+    const appliedQualities = Array.isArray(row.applied_augment_qualities) ? row.applied_augment_qualities : [];
+    const augments = appliedAugments
+      .map((entry, index) => {
+        const augmentTemplateId = String(entry?.Name || "");
+        if (!augmentTemplateId) return null;
+        return {
+          templateId: augmentTemplateId,
+          name: itemMetadata.get(augmentTemplateId)?.name || augmentTemplateId,
+          qualityLevel: Number(appliedQualities[index]) || 0
+        };
+      })
+      .filter((augment) => augment !== null);
+    const slotQuantity = Number(row.stack_size) || 0;
+    // volume_override is per-unit (see giveItemToStorage's correction note),
+    // so this row contributes unitVolume * quantity.
+    if (hasMaxItemVolume && hasVolumeOverride) {
+      const unitVolume = resolvedItemUnitVolume(templateId, row.volume_override);
+      if (unitVolume === null) volumeComplete = false;
+      else currentVolume += unitVolume * slotQuantity;
+    }
+    slots.push({
+      itemId: String(row.item_id),
+      templateId,
+      name: itemMetadata.get(templateId)?.name || templateId,
+      // Unlike baseContainerSlots, the icon rides on this response: there is
+      // no vehicle equivalent of the base inventory rollup the bases tab
+      // harvests images from.
+      image: itemImagePath(repoRoot, templateId),
+      positionIndex: row.position_index === null || row.position_index === undefined
+        ? null
+        : Number(row.position_index),
+      quantity: slotQuantity,
+      qualityLevel: Number(row.quality_level) || 0,
+      currentDurability: row.current_durability === null || row.current_durability === undefined
+        ? null
+        : Number(row.current_durability),
+      maxDurability: row.max_durability === null || row.max_durability === undefined
+        ? null
+        : Number(row.max_durability),
+      augments
+    });
+  }
+
+  return {
+    supported: true,
+    found: true,
+    vehicleId: String(target),
+    inventoryId: String(first.inventory_id),
+    maxSlots: Math.max(0, Number(first.max_item_count) || 0),
+    usedSlots: slots.length,
+    maxVolume: Math.max(0, Number(first.max_item_volume) || 0),
+    currentVolume,
+    volumeComplete,
+    slots
+  };
 }
 
 export async function portalVehicles(db, playerIds) {

@@ -2255,6 +2255,10 @@ tr.clickable:hover { background: rgba(198, 139, 74, .12); }
 .vehicles-shared-list em { color: #ad9f89; font-style: normal; }
 .vehicles-expanded { display: flex; flex-direction: column; gap: 9px; }
 .vehicles-expanded-header { margin: 0; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: #ad9f89; }
+/* The component count and, when a storage module is fitted, the View
+   Contents button share this row. baseline rather than center so the button
+   does not drag the uppercase count off the line it sets. */
+.vehicles-expanded-header-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .vehicles-component-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
 .vehicles-component-card { background: #171a1d; border: 1px solid #302b25; border-radius: 8px; padding: 10px 11px; display: flex; flex-direction: column; gap: 6px; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .vehicles-component-name { color: #fff1d4; font-size: 13px; display: flex; flex-direction: column; gap: 1px; }
