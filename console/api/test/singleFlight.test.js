@@ -162,3 +162,56 @@ test("the wait bound never applies to a pass this call started itself", async ()
 
   assert.deepEqual(await flush({ forceFresh: true }), { flushed: ["slow"] });
 });
+
+// server.js parameterises a pass through these options -- flushQueuedVehicleDeletes
+// reads allowBlockedStates from them. Nothing else covers that: the vehicle
+// integration tests call flushVehicleDeletes directly, bypassing this wrapper
+// entirely, so a wrapper that dropped its options would leave every suite green
+// while map-down vehicle deletes silently stopped honouring the flag.
+test("the caller's options reach the run function", async () => {
+  const seen = [];
+  const flush = createSingleFlight(async (options) => { seen.push(options); return { flushed: [] }; });
+
+  await flush({ forceFresh: true, allowBlockedStates: true });
+  await flush();
+
+  assert.deepEqual(seen, [{ forceFresh: true, allowBlockedStates: true }, {}]);
+});
+
+test("a forceFresh pass runs with its own options, not the pass it waited on", async () => {
+  const gate = deferred();
+  const seen = [];
+  let first = true;
+  const flush = createSingleFlight(async (options) => {
+    seen.push(options.allowBlockedStates === true);
+    if (first) { first = false; return gate.promise; }
+    return { flushed: [] };
+  });
+
+  const tick = flush();
+  const hook = flush({ forceFresh: true, allowBlockedStates: true });
+  gate.resolve({ flushed: [] });
+  await tick;
+  await hook;
+
+  // Background tick ran without the flag; the hook's own pass ran with it.
+  assert.deepEqual(seen, [false, true]);
+});
+
+// A plain caller cannot inherit another caller's options, because it never
+// receives that pass's result at all. Only forceFresh starts a pass, so a pass
+// always runs under the options of the caller that asked for it.
+test("a plain caller never receives another caller's pass result or options", async () => {
+  const gate = deferred();
+  const seen = [];
+  const flush = createSingleFlight(async (options) => { seen.push(options); return gate.promise; });
+
+  const first = flush({ allowBlockedStates: false, tag: "first" });
+  const second = flush({ allowBlockedStates: true, tag: "second" });
+  gate.resolve({ flushed: ["from-first"] });
+
+  assert.deepEqual(await first, { flushed: ["from-first"] });
+  assert.deepEqual(await second, { flushed: [], alreadyRunning: true });
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].tag, "first");
+});

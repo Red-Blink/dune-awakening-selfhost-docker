@@ -143,10 +143,12 @@ tracked independently) and applied the next time that partition is confirmed
 down — the same 5-second poll and restart-task `onMapDown` hook that flushes
 the other queued writes, extended with its own independent vehicle-delete leg.
 
-The restart hook runs the flush as a *fresh* pass, for the reason given in
+The restart hook runs the flush as a *fresh* pass and ignores the retry
+backoff, for the reasons given in
 [base-deletion.md](base-deletion.md#why-deletes-are-queued-for-a-live-map): a
-pass already in flight observed the map as live and would report nothing to do.
-The 5s poll reuses an in-flight result.
+pass already in flight observed the map as live, and a blocked entry is inside
+its retry window most of the time. The 5s poll reuses an in-flight result and
+keeps backing off.
 
 **Same divergence as the base queue:** at flush time, finding that the
 vehicle no longer exists counts as **success**, not a failure to retry.

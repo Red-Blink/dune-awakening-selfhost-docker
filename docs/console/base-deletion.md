@@ -123,6 +123,13 @@ when the map goes down was started while that map was still live and would
 report nothing to do, so the hook waits for it and then runs its own. The 5s
 poll is the cheap case and simply reuses an in-flight result.
 
+The hook also ignores the retry backoff. A failed attempt puts an entry to
+sleep for `ADMIN_BASE_DELETE_RETRY_DELAY_MS` (60s by default) while the poll
+runs every 5s, so a persistently blocked entry is inside a backoff window most
+of the time — and the map-down window is the one moment it can actually be
+applied. Only the hook overrides that; the poll keeps backing off, which is
+what stops it hammering a failing entry.
+
 ### A picked-up base is refused, not deleted
 
 `DELETE /api/bases/:baseId` rejects a base that was picked up into a backup

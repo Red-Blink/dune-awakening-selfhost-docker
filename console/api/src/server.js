@@ -153,15 +153,18 @@ const tasks = new TaskManager(config, {
   // that result here would report "nothing to flush" for the one window in
   // which the queued writes are actually safe to apply.
   onMapDown: () => flushBaseRefillQueues({
-    flushGenerators: () => flushQueuedGeneratorRefills({ forceFresh: true }),
-    flushWater: () => flushQueuedWaterRefills({ forceFresh: true }),
-    flushDeletes: () => flushQueuedBaseDeletes({ forceFresh: true }),
-    flushChildAccess: () => flushQueuedBaseChildAccess({ forceFresh: true }),
+    // ignoreRetryBackoff: the poller's 60s backoff would otherwise skip an
+    // entry for ~55 of every 60 seconds, so most restarts silently applied
+    // nothing. Only this hook sets it; the poller keeps backing off.
+    flushGenerators: () => flushQueuedGeneratorRefills({ forceFresh: true, ignoreRetryBackoff: true }),
+    flushWater: () => flushQueuedWaterRefills({ forceFresh: true, ignoreRetryBackoff: true }),
+    flushDeletes: () => flushQueuedBaseDeletes({ forceFresh: true, ignoreRetryBackoff: true }),
+    flushChildAccess: () => flushQueuedBaseChildAccess({ forceFresh: true, ignoreRetryBackoff: true }),
     // The task hook runs only after the requested map servers have positively
     // stopped. At that point an explicit admin delete may safely remove even a
     // stale Travel/backup/recovery row; the background poller stays
     // conservative and leaves those states queued while maps may be live.
-    flushVehicleDeletes: () => flushQueuedVehicleDeletes({ forceFresh: true, allowBlockedStates: true })
+    flushVehicleDeletes: () => flushQueuedVehicleDeletes({ forceFresh: true, allowBlockedStates: true, ignoreRetryBackoff: true })
   })
 });
 let db = createDb(config);
@@ -345,15 +348,15 @@ setInterval(() => {
 // Every queued-refill write goes through here so it is audited whichever path
 // triggered it: the tick above, or the restart task runner's onMapDown hook.
 // These are real writes to player property, so an unaudited one is not acceptable.
-const flushQueuedGeneratorRefills = createSingleFlight(async () => {
-  const result = await duneDb.flushGeneratorRefills(db, config.repoRoot);
+const flushQueuedGeneratorRefills = createSingleFlight(async ({ ignoreRetryBackoff = false } = {}) => {
+  const result = await duneDb.flushGeneratorRefills(db, config.repoRoot, { ignoreRetryBackoff });
   for (const entry of result.flushed || []) audit(config, null, "bases.flush-queued-refill", entry);
   return result;
 }, { waitTimeoutMs: mapWriteFlushTimeoutMs() });
 
 // Same reasoning as flushQueuedGeneratorRefills, for the water queue.
-const flushQueuedWaterRefills = createSingleFlight(async () => {
-  const result = await duneDb.flushWaterRefills(db, config.repoRoot);
+const flushQueuedWaterRefills = createSingleFlight(async ({ ignoreRetryBackoff = false } = {}) => {
+  const result = await duneDb.flushWaterRefills(db, config.repoRoot, { ignoreRetryBackoff });
   for (const entry of result.flushed || []) audit(config, null, "bases.flush-queued-water-refill", entry);
   return result;
 }, { waitTimeoutMs: mapWriteFlushTimeoutMs() });
@@ -361,8 +364,8 @@ const flushQueuedWaterRefills = createSingleFlight(async () => {
 // Same reasoning as flushQueuedGeneratorRefills, for the base permission
 // queue. These change who can open a player's doors, so an unaudited apply is
 // not acceptable either.
-const flushQueuedBaseChildAccess = createSingleFlight(async () => {
-  const result = await duneDb.flushBaseChildAccess(db, config.repoRoot);
+const flushQueuedBaseChildAccess = createSingleFlight(async ({ ignoreRetryBackoff = false } = {}) => {
+  const result = await duneDb.flushBaseChildAccess(db, config.repoRoot, { ignoreRetryBackoff });
   for (const entry of result.flushed || []) audit(config, null, "bases.flush-queued-child-access", entry);
   return result;
 }, { waitTimeoutMs: mapWriteFlushTimeoutMs() });
@@ -371,8 +374,9 @@ const flushQueuedBaseChildAccess = createSingleFlight(async () => {
 // safety backup for this pass happens inside flushBaseDeletes's onBeforeApply
 // hook -- lazily, at most once, immediately before the first entry that is
 // actually about to be deleted, not merely because the queue is non-empty.
-const flushQueuedBaseDeletes = createSingleFlight(async () => {
+const flushQueuedBaseDeletes = createSingleFlight(async ({ ignoreRetryBackoff = false } = {}) => {
   const result = await duneDb.flushBaseDeletes(db, config.repoRoot, {
+    ignoreRetryBackoff,
     // Matches databaseQuery's explicit mock-mode guard: this runs as a
     // background tick, not through directDbMutation, so it is not skipped
     // for free the way a request-time delete's backup call is.
@@ -392,9 +396,10 @@ const flushQueuedBaseDeletes = createSingleFlight(async () => {
 // each call's options to the run function. Only the map-down hook sets it, and
 // that hook always sets forceFresh too, so it never rides along on a reused
 // in-flight result that was started without it.
-const flushQueuedVehicleDeletes = createSingleFlight(async ({ allowBlockedStates = false } = {}) => {
+const flushQueuedVehicleDeletes = createSingleFlight(async ({ allowBlockedStates = false, ignoreRetryBackoff = false } = {}) => {
   const result = await duneDb.flushVehicleDeletes(db, config.repoRoot, {
     allowBlockedStates,
+    ignoreRetryBackoff,
     onBeforeApply: config.mockMode
       ? undefined
       : () => runDune(config, buildDuneArgs("backupCreate"), { env: { DB_BACKUP_ORIGIN: "vehicle-delete" } })
