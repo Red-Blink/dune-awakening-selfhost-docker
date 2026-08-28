@@ -694,3 +694,38 @@ test("hasQueuedBaseChildAccess agrees with the list without parsing the payload"
     assert.deepEqual(listQueuedBaseChildAccess(repoRoot), []);
   });
 });
+
+// setBaseChildAccessLevels caps each call at 100 pieces and each call is its own
+// transaction, so a base with more than 100 children flushes in several commits.
+// Real bases reach 315 children. If a later batch finds its pieces gone, the
+// earlier commits still happened, and reporting the entry as "none of those
+// pieces are still part of that base" would describe a base whose doors did in
+// fact change access level.
+test("a later batch finding its pieces gone still reports what earlier batches committed", async () => {
+  await withTempRepoRoot(async (repoRoot) => {
+    const live = Array.from({ length: 100 }, (_, i) => String(50000 + i));
+    const stale = Array.from({ length: 50 }, (_, i) => String(60000 + i));
+    // Queued in two saves: the 1-100 cap is per save, and merged entries are
+    // exactly why the flush batches at all.
+    for (const batch of [live, stale]) {
+      queueBaseChildAccess(repoRoot, {
+        baseId: BASE_ID, map: "DeepDesert", partitionId: 59,
+        updates: batch.map((actorId) => ({ actorId, accessLevel: 5 }))
+      });
+    }
+    assert.equal(listQueuedBaseChildAccess(repoRoot)[0].updates.length, 150);
+    // Only the first 100 are still children, so batch 1 commits and batch 2
+    // throws "None of the queued pieces are still children of this base."
+    const applied = [];
+    const db = flushDb({ childActorIds: live, onApply: (values) => { applied.push(String(values[0])); } });
+
+    const result = await flushBaseChildAccess(db, repoRoot);
+
+    assert.equal(applied.length, 100, "the first batch must really have been written");
+    assert.equal(result.flushed.length, 1);
+    assert.equal(result.flushed[0].ok, true);
+    assert.equal(result.flushed[0].updated, 100, "must report the committed batch, not zero");
+    assert.deepEqual(result.flushed[0].skipped, stale, "only the pieces never applied are skipped");
+    assert.deepEqual(listQueuedBaseChildAccess(repoRoot), [], "and the entry is still cleared");
+  });
+});

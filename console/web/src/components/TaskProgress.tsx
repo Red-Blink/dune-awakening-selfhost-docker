@@ -1,3 +1,4 @@
+import { TriangleAlert } from "lucide-react";
 import type { Task } from "../api/setup";
 import { StatusBadge } from "./StatusBadge";
 import { useEffect, useState } from "react";
@@ -36,12 +37,14 @@ export function TaskProgress({ task, onDismiss }: { task: Task | null; onDismiss
   if (!liveTask) return null;
   const message = taskMessage(liveTask);
   const error = taskErrorMessage(liveTask, message);
+  const warnings = liveTask.warnings || [];
   return (
     <section className="panel">
       <div className="panel-title">
         <h3 className={!terminalStatuses.has(liveTask.status) ? "loading-dots" : ""}>{formatUiSentence(taskTitle(liveTask), !terminalStatuses.has(liveTask.status))}</h3>
         <div className="action-row">
           <StatusBadge status={liveTask.status} />
+          {warnings.length > 0 && <span className="badge badge-warn task-warning-count" title={warningLabel(warnings.length)} aria-label={warningLabel(warnings.length)}><TriangleAlert size={13} aria-hidden="true" />{warnings.length}</span>}
           {terminalStatuses.has(liveTask.status) && <button onClick={onDismiss}>Dismiss</button>}
         </div>
       </div>
@@ -49,12 +52,26 @@ export function TaskProgress({ task, onDismiss }: { task: Task | null; onDismiss
       {liveTask.operation === "init" && !terminalStatuses.has(liveTask.status) && <p className="task-elapsed">This can take a while on a fresh server. Elapsed time: <strong>{formatElapsed(now - new Date(liveTask.startedAt).getTime())}</strong></p>}
       {liveTask.operation === "init" && <ProgressBar progress={initTaskProgress(liveTask)} />}
       {error && <p className="error">{formatUiSentence(error)}</p>}
-      <details className={liveTask.operation === "init" ? "task-technical-details" : "technical-details"}>
+      {/* A task can succeed while a queued base or vehicle write inside it did
+          not apply. That is not a task failure -- the restart itself worked --
+          so it surfaces here rather than as an error, and in the panel body
+          rather than only inside the collapsed log. */}
+      {warnings.length > 0 && <div className="task-warnings">
+        {warnings.map((warning, index) => <p key={`${warning}-${index}`}><TriangleAlert size={14} aria-hidden="true" />{formatUiSentence(warning)}</p>)}
+      </div>}
+      <details className="task-technical-details">
         <summary>{liveTask.operation === "init" ? "Deployment Log" : "Technical details"}</summary>
         <pre className="log-box">{liveTask.logLines.slice(-120).map((line) => line.line).join("\n")}</pre>
       </details>
     </section>
   );
+}
+
+// The badge shows only a numeral, which says nothing on its own to a screen
+// reader, so this is the accessible name rather than decoration. Doubles as the
+// hover tooltip, matching how App.tsx labels its icon-only update indicator.
+function warningLabel(count: number) {
+  return count === 1 ? "1 warning" : `${count} warnings`;
 }
 
 function formatElapsed(ms: number) {

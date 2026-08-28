@@ -3969,6 +3969,21 @@ const BASE_UNCLAIMED_MESSAGE = "This base is not claimed -- it has no dune.permi
 // (or a stale bookmarked base id) would otherwise still be able to mutate
 // it. Every mutation route checks this before writing, the same way each
 // already checks the pending-delete lock.
+// Thrown by deleteBaseCompletely when the base was picked up into a backup.
+// Distinct from server.js's BASE_BACKED_UP_MESSAGE ("cannot be modified"):
+// this one is also raised from the queued flush path, long after any request
+// finished, so it has to read as a statement about the base rather than about
+// the caller's request.
+export const BASE_DELETE_BACKED_UP_MESSAGE =
+  "This base was picked up into a backup and is no longer claimed. It cannot be deleted until the player redeploys it.";
+
+// Deliberately an exact-message test, not a loose /backup/i match: it decides
+// whether a queued entry keeps its retry budget, so a database error that
+// merely mentions a backup table must never be mistaken for this state.
+export function baseDeleteBlockedByBackup(message) {
+  return String(message || "").includes(BASE_DELETE_BACKED_UP_MESSAGE);
+}
+
 export async function baseIsBackedUp(db, baseId) {
   const target = intParam(baseId, "base id", 1);
   if (!(await tableExists(db, "base_backup_linked_actors"))) return false;
@@ -4415,7 +4430,7 @@ function reconcileQueuedBaseChildAccess(repoRoot, outcomes) {
 // except each entry's payload is applied in 100-update batches (the cap
 // setBaseChildAccessLevels enforces) and stale pieces are skipped rather than
 // failing the whole entry.
-export async function flushBaseChildAccess(db, repoRoot, { now = Date.now } = {}) {
+export async function flushBaseChildAccess(db, repoRoot, { now = Date.now, ignoreRetryBackoff = false } = {}) {
   const pending = listQueuedBaseChildAccess(repoRoot);
   if (!pending.length) return { flushed: [], pending: 0 };
   const observed = await observeRefillPartitions(db, { now });
@@ -4433,17 +4448,14 @@ export async function flushBaseChildAccess(db, repoRoot, { now = Date.now } = {}
       flushed.push({ baseId: entry.baseId, map: entry.map, partitionId: entry.partitionId, ok: false, expired: true, dropped: true, error: message });
       continue;
     }
-    // Re-observed per entry, not once for the whole pass: applying an entry is
-    // several round-trips, and a map server that reconnects partway through
-    // would otherwise still be treated as down for every remaining entry --
-    // writing access levels to a running map, which is the one thing this
-    // queue exists to avoid, since the game never picks them up.
-    const fresh = await observeRefillPartitions(db, { now });
-    if (!partitionWriteSafe(fresh || observed, entry.partitionId)) continue;
-    if (entry.nextRetryAt && timestamp < entry.nextRetryAt) continue;
+    if (!(await entryWriteSafe(db, observed, entry, now))) continue;
+    if (retryBackoffBlocks(entry, timestamp, ignoreRetryBackoff)) continue;
+    // Declared outside the try because each batch below is its own
+    // transaction: when a later batch throws, batches 1..k are already
+    // committed and the catch has to report them rather than claim zero.
+    let updated = 0;
+    const skipped = [];
     try {
-      let updated = 0;
-      const skipped = [];
       for (let i = 0; i < entry.updates.length; i += 100) {
         const result = await setBaseChildAccessLevels(db, entry.baseId, entry.updates.slice(i, i + 100), { skipStale: true });
         updated += result.updated;
@@ -4453,6 +4465,14 @@ export async function flushBaseChildAccess(db, repoRoot, { now = Date.now } = {}
       flushed.push({ baseId: entry.baseId, map: entry.map, partitionId: entry.partitionId, ok: true, updated, skipped });
     } catch (error) {
       const message = String(error?.message || "Unexpected error.").slice(0, 300);
+      if (childAccessNoLongerApplicable(message)) {
+        // Every piece in a committed batch is already counted in updated or
+        // skipped, so only the ones this pass never reached are added here.
+        for (const update of entry.updates.slice(updated + skipped.length)) skipped.push(update.actorId);
+        outcomes.set(entry.baseId, { ...stamp, keep: false });
+        flushed.push({ baseId: entry.baseId, map: entry.map, partitionId: entry.partitionId, ok: true, noLongerApplicable: true, updated, skipped });
+        continue;
+      }
       const attempts = isTransientFlushError(message) ? entry.attempts : entry.attempts + 1;
       const dropped = attempts >= MAX_REFILL_FLUSH_ATTEMPTS;
       const nextRetryAt = timestamp + pendingRefillRetryDelayMs();
@@ -5511,7 +5531,11 @@ function quaternionYawDegrees(qz, qw) {
 // procedures), so a self-hosted server missing these tables/functions cannot
 // have a delete proc added for it -- it is simply unsupported.
 async function supportsBaseDelete(db) {
-  for (const table of ["buildings", "building_instances", "actor_fgl_entities", "placeables", "actors"]) {
+  // Every relation the delete path names, LEFT JOINs included: permission_actor
+  // via the in-transaction baseIsBackedUp guard, map_names via
+  // basePermissionActor. A relation the path reads must fail as a clean
+  // capability message, not as an aborted transaction after the FOR UPDATE.
+  for (const table of ["buildings", "building_instances", "actor_fgl_entities", "placeables", "actors", "permission_actor", "map_names"]) {
     if (!(await tableExists(db, table))) return false;
   }
   return await functionExists(db, "dune.permission_actor_destroy(bigint)")
@@ -5582,9 +5606,20 @@ export async function deleteBaseCompletely(db, baseId) {
     const { actor, actorIds, buildingCount, placeableCount } = await baseDeletionActorIds(tx, target);
     // Lock the claim actor row, not a maybe-empty child row -- same reasoning
     // as mutateBasePermissions: it is guaranteed to exist, and `for update`
-    // over zero rows would serialize nothing.
+    // over zero rows would serialize nothing. It serializes this delete against
+    // another console write taking the same lock; it does NOT hold off the
+    // game's own pickup path, which takes no lock on dune.actors. What keeps a
+    // pickup out is that the queue only ever flushes with the map down.
     const locked = await tx.query("select id from dune.actors where id = $1::bigint for update", [actor.actorId]);
     if (!locked.rowCount) throw new Error("That base was not found.");
+    // Re-checked here, not just at the route, for the same reason the actor ids
+    // are re-enumerated above: a delete can sit queued for hours waiting for its
+    // map to come down, and a player can pick the base up into a backup in the
+    // meantime. The route's check proves nothing about the moment the delete
+    // actually runs. A picked-up base still holds all of its data -- the backup
+    // tool only unclaims it and registers its actor ids -- so deleting one here
+    // destroys something the player expects to redeploy.
+    if (await baseIsBackedUp(tx, target)) throw new Error(BASE_DELETE_BACKED_UP_MESSAGE);
     // permission_actor_destroy first: it is the only thing that clears
     // markers/player_markers, which are keyed on the claim actor id but not
     // FK-cascaded from actors (only from map_names). Its permission_actor/
@@ -10586,6 +10621,17 @@ function partitionWriteSafe(observed, partitionId) {
   return observed.safe.has(partitionId);
 }
 
+// Re-observed per entry rather than trusting the pass-start snapshot. Applying
+// an entry is several round-trips, and a pass can outlive the window it started
+// in: a map server that reconnects partway through, or a pass the restart
+// timeout abandoned but could not cancel, would otherwise still be treated as
+// down for every remaining entry -- writing to a live map, which is the one
+// thing these queues exist to avoid, since the game never picks those writes up.
+async function entryWriteSafe(db, observed, entry, now) {
+  const fresh = await observeRefillPartitions(db, { now });
+  return partitionWriteSafe(fresh || observed, entry.partitionId);
+}
+
 // generatorRefill accepts an already-known flag so a caller that just
 // computed supportsGeneratorRefill (e.g. listBases) doesn't pay for a second,
 // redundant re-derivation of the same boolean on every call.
@@ -10684,6 +10730,16 @@ export async function vehicleWriteTarget(db, vehicleId, { observed } = {}) {
 // A database that is restarting, or a schema mid-migration, will succeed on a
 // later tick. Mirrors the filter runBackgroundTick and the death poller already
 // use for the same "the stack is moving, not broken" states.
+// Backoff exists so the 5s poller stops hammering a failing entry. The map-down
+// hook is the opposite case: a rare window with the map positively down, and the
+// only moment some entries can ever apply. Measured against a real database, a
+// blocked entry sits inside its 60s window for ~55 of every 60 seconds, so
+// honouring it there silently skipped most restarts. Only the hook passes
+// ignoreRetryBackoff; the poller keeps backing off.
+function retryBackoffBlocks(entry, timestamp, ignoreRetryBackoff) {
+  return !ignoreRetryBackoff && Boolean(entry.nextRetryAt) && timestamp < entry.nextRetryAt;
+}
+
 function isTransientFlushError(message) {
   return /connect|ECONNREFUSED|ECONNRESET|terminated|timeout|does not exist|relation|shutting down|starting up|deadlock|too many clients/i.test(message);
 }
@@ -10695,6 +10751,16 @@ function isTransientFlushError(message) {
 // domain-level "nothing to refill" results as successful reconciliation, not
 // as database failures. Keep this deliberately narrower than generic "not
 // found" matching so a schema/connection problem can never discard a request.
+// The child-access twin of refillNoLongerApplicable. setBaseChildAccessLevels
+// throws this when skipStale left nothing to apply -- every queued piece was
+// demolished while the entry waited. Retrying cannot make those pieces exist
+// again, so it is reconciliation, not a failure to burn attempts against.
+// Deliberately an exact-message test, for the same reason as the base-delete
+// matcher: it decides whether an entry is dropped.
+function childAccessNoLongerApplicable(message) {
+  return String(message || "").includes("None of the queued pieces are still children of this base.");
+}
+
 function refillNoLongerApplicable(message) {
   return message === "No generators or wind turbines were found at this base"
     || message === "No water storage was found at this base";
@@ -10708,7 +10774,7 @@ function refillNoLongerApplicable(message) {
 // before the map servers) plus any single-map despawn, and polling for "this
 // partition has no server" catches both -- including restarts triggered by the
 // scheduler, an IP change, or the CLI, none of which run through the console.
-export async function flushGeneratorRefills(db, repoRoot, { now = Date.now } = {}) {
+export async function flushGeneratorRefills(db, repoRoot, { now = Date.now, ignoreRetryBackoff = false } = {}) {
   const pending = listQueuedGeneratorRefills(repoRoot);
   if (!pending.length) return { flushed: [], pending: 0 };
   const observed = await observeRefillPartitions(db, { now });
@@ -10727,8 +10793,8 @@ export async function flushGeneratorRefills(db, repoRoot, { now = Date.now } = {
       flushed.push({ baseId: entry.baseId, map: entry.map, partitionId: entry.partitionId, ok: false, expired: true, dropped: true, error: message });
       continue;
     }
-    if (!partitionWriteSafe(observed, entry.partitionId)) continue;
-    if (entry.nextRetryAt && timestamp < entry.nextRetryAt) continue;
+    if (!(await entryWriteSafe(db, observed, entry, now))) continue;
+    if (retryBackoffBlocks(entry, timestamp, ignoreRetryBackoff)) continue;
     try {
       const result = await refillBaseGenerators(db, repoRoot, entry.baseId);
       outcomes.set(entry.baseId, { queuedAt: entry.queuedAt, keep: false });
@@ -10909,7 +10975,7 @@ function baseDeleteAlreadyGone(message) {
 //     a failed safety backup is not about any one base, and deleting others
 //     without it would defeat the point just the same. Every entry stays
 //     queued and is retried, backup included, on the next tick.
-export async function flushBaseDeletes(db, repoRoot, { now = Date.now, onBeforeApply } = {}) {
+export async function flushBaseDeletes(db, repoRoot, { now = Date.now, onBeforeApply, ignoreRetryBackoff = false } = {}) {
   const pending = listQueuedBaseDeletes(repoRoot);
   if (!pending.length) return { flushed: [], pending: 0 };
   const observed = await observeRefillPartitions(db, { now });
@@ -10929,8 +10995,37 @@ export async function flushBaseDeletes(db, repoRoot, { now = Date.now, onBeforeA
       flushed.push({ baseId: entry.baseId, map: entry.map, partitionId: entry.partitionId, ok: false, expired: true, dropped: true, error: message });
       continue;
     }
-    if (!partitionWriteSafe(observed, entry.partitionId)) continue;
-    if (entry.nextRetryAt && timestamp < entry.nextRetryAt) continue;
+    if (!(await entryWriteSafe(db, observed, entry, now))) continue;
+    if (retryBackoffBlocks(entry, timestamp, ignoreRetryBackoff)) continue;
+    // Checked before the safety backup, not only inside the transaction. A
+    // picked-up base is refused either way, but paying for a full-database
+    // backup first -- on every retry pass, for up to the age limit -- is pure
+    // waste for a delete that cannot proceed. db.sh count-prunes this origin so
+    // it cannot fill the disk; this keeps it from churning at all. The
+    // in-transaction check is the one that decides; this only avoids the cost
+    // of a refusal. If the probe itself fails, fall through and let the
+    // transaction decide.
+    //
+    // Both checks run with the map down, which is what actually keeps a pickup
+    // from racing them -- see the note on the row lock in deleteBaseCompletely.
+    if (await baseIsBackedUp(db, entry.baseId).catch(() => false)) {
+      const nextRetryAt = timestamp + pendingBaseDeleteRetryDelayMs();
+      outcomes.set(entry.baseId, { queuedAt: entry.queuedAt, keep: true, attempts: entry.attempts, nextRetryAt, lastError: BASE_DELETE_BACKED_UP_MESSAGE });
+      flushed.push({ baseId: entry.baseId, map: entry.map, partitionId: entry.partitionId, ok: false, attempts: entry.attempts, dropped: false, error: BASE_DELETE_BACKED_UP_MESSAGE });
+      continue;
+    }
+    // Same reasoning as the backed-up check above, for the other case that
+    // cannot proceed: baseIsBackedUp inner-joins the entity chain, so a base
+    // whose owner_entity_id links are gone reports false, buys a full-database
+    // backup, and then throws "no resolvable owner entity" on the next line.
+    // Measured against a restored dump, 12 of 35 buildings rows resolve to no
+    // claim actor. Resolving it here clears the entry for free instead.
+    const gone = await basePermissionActor(db, entry.baseId).then(() => null, (error) => String(error?.message || ""));
+    if (gone && baseDeleteAlreadyGone(gone)) {
+      outcomes.set(entry.baseId, { queuedAt: entry.queuedAt, keep: false });
+      flushed.push({ baseId: entry.baseId, map: entry.map, partitionId: entry.partitionId, ok: true, alreadyGone: true });
+      continue;
+    }
     if (!backedUp && onBeforeApply) {
       try {
         await onBeforeApply();
@@ -10950,7 +11045,16 @@ export async function flushBaseDeletes(db, repoRoot, { now = Date.now, onBeforeA
         flushed.push({ baseId: entry.baseId, map: entry.map, partitionId: entry.partitionId, ok: true, alreadyGone: true });
         continue;
       }
-      const attempts = isTransientFlushError(message) ? entry.attempts : entry.attempts + 1;
+      // A base parked in a backup fails identically on every pass, so counting
+      // those passes would exhaust the retry budget and silently drop a delete
+      // that was never wrong -- only blocked. Deliberately no allowBlockedStates
+      // escape hatch of the kind the vehicle queue has for Travel/recovery: those
+      // are mid-transit artifacts that a stopped map resolves, whereas a picked-up
+      // base is a deliberate player action that survives any number of restarts.
+      // The existing age-out above is what eventually clears one that never
+      // redeploys.
+      const blockedByBackup = baseDeleteBlockedByBackup(message);
+      const attempts = (blockedByBackup || isTransientFlushError(message)) ? entry.attempts : entry.attempts + 1;
       const dropped = attempts >= MAX_DELETE_FLUSH_ATTEMPTS;
       const nextRetryAt = timestamp + pendingBaseDeleteRetryDelayMs();
       outcomes.set(entry.baseId, { queuedAt: entry.queuedAt, keep: !dropped, attempts, nextRetryAt, lastError: message });
@@ -11078,7 +11182,7 @@ function vehicleDeleteAlreadyGone(message) {
 // Mirrors flushBaseDeletes. Same onBeforeApply-runs-at-most-once-per-pass
 // semantics, for the same reason: a full database backup is not cheap, and
 // several vehicles can flush in the same pass.
-export async function flushVehicleDeletes(db, repoRoot, { now = Date.now, onBeforeApply, allowBlockedStates = false } = {}) {
+export async function flushVehicleDeletes(db, repoRoot, { now = Date.now, onBeforeApply, allowBlockedStates = false, ignoreRetryBackoff = false } = {}) {
   const pending = listQueuedVehicleDeletes(repoRoot);
   if (!pending.length) return { flushed: [], pending: 0 };
   const observed = await observeRefillPartitions(db, { now });
@@ -11096,8 +11200,8 @@ export async function flushVehicleDeletes(db, repoRoot, { now = Date.now, onBefo
       flushed.push({ vehicleId: entry.vehicleId, map: entry.map, partitionId: entry.partitionId, ok: false, expired: true, dropped: true, error: message });
       continue;
     }
-    if (!partitionWriteSafe(observed, entry.partitionId)) continue;
-    if (entry.nextRetryAt && timestamp < entry.nextRetryAt) continue;
+    if (!(await entryWriteSafe(db, observed, entry, now))) continue;
+    if (retryBackoffBlocks(entry, timestamp, ignoreRetryBackoff)) continue;
     if (!backedUp && onBeforeApply) {
       try {
         await onBeforeApply();
@@ -12806,7 +12910,7 @@ function reconcileQueuedWaterRefills(repoRoot, outcomes) {
 
 // Applies every queued water refill whose map is currently down and leaves
 // the rest queued. Same driver and reasoning as flushGeneratorRefills.
-export async function flushWaterRefills(db, repoRoot, { now = Date.now } = {}) {
+export async function flushWaterRefills(db, repoRoot, { now = Date.now, ignoreRetryBackoff = false } = {}) {
   const pending = listQueuedWaterRefills(repoRoot);
   if (!pending.length) return { flushed: [], pending: 0 };
   const observed = await observeRefillPartitions(db, { now });
@@ -12823,8 +12927,8 @@ export async function flushWaterRefills(db, repoRoot, { now = Date.now } = {}) {
       flushed.push({ baseId: entry.baseId, map: entry.map, partitionId: entry.partitionId, ok: false, expired: true, dropped: true, error: message });
       continue;
     }
-    if (!partitionWriteSafe(observed, entry.partitionId)) continue;
-    if (entry.nextRetryAt && timestamp < entry.nextRetryAt) continue;
+    if (!(await entryWriteSafe(db, observed, entry, now))) continue;
+    if (retryBackoffBlocks(entry, timestamp, ignoreRetryBackoff)) continue;
     try {
       const result = await refillBaseWater(db, entry.baseId);
       outcomes.set(entry.baseId, { queuedAt: entry.queuedAt, keep: false });

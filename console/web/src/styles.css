@@ -1399,6 +1399,35 @@ main { padding: 22px; min-width: 0; }
 }
 .concise-output { max-height: 180px; }
 .technical-details, .task-technical-details { display: none; margin-top: 12px; min-width: 0; max-width: 100%; }
+/* A restart that succeeded can still carry queued writes that did not apply.
+   Warm amber, not danger red: the task itself did not fail, and colouring it
+   as a failure next to a green "succeeded" badge reads as a contradiction. */
+.task-warnings {
+  margin-top: 10px;
+  padding: 10px 12px;
+  /* var(--warning) is 4.63:1 on the panel; the previous #6b5b39 was 2.69:1,
+     under WCAG 1.4.11's 3:1 for a non-text boundary that is the only thing
+     marking this block, since it has no background of its own. */
+  border: 1px solid var(--warning);
+  border-radius: 6px;
+  display: grid;
+  gap: 6px;
+}
+/* overflow-wrap: a warning is a raw error message and can carry a long
+   unbreakable identifier; without this it overflows the bordered box and is
+   clipped rather than scrolled, losing the text an operator needs. */
+.task-warnings p { margin: 0; color: #ffd08a; display: flex; gap: 6px; overflow-wrap: anywhere; min-width: 0; }
+/* Pin the triangle to the first line: these warnings are long enough to wrap,
+   and a centred icon on a two-line paragraph drifts to the middle. Same
+   treatment as the land-claim warning rule further down. */
+.task-warnings p svg { flex: 0 0 auto; margin-top: 3px; }
+/* .badge is an inline span with no display of its own, so a bare SVG child
+   would sit on the text baseline. Deliberately a sibling class rather than a
+   change to .badge-warn, which text-only badges elsewhere still rely on. */
+.task-warning-count { display: inline-flex; align-items: center; gap: 5px; }
+/* .action-row children get min-width: 0 (:6296), so without this the icon is a
+   shrinkable flex item and collapses to zero width before the numeral wraps. */
+.task-warning-count svg { flex: 0 0 auto; }
 .task-technical-details { display: block; }
 body.debug .technical-details { display: block; }
 .update-log-details { margin-top: 6px; }
@@ -6470,6 +6499,12 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   .community-button { width: 100%; min-height: 44px; }
   .panel, .drawer, .action-section { padding: clamp(11px, 3vw, 16px); }
   .panel-title, .action-row, .action-line { align-items: stretch; }
+  /* stretch makes the StatusBadge grow to the Dismiss button and keep its text
+     on the first line, while this badge stays 25px and centres in the row --
+     measured 9px lower than its neighbour. Scoped here because the row is
+     align-items: center above this breakpoint, where the default already
+     agrees and flex-start would introduce the same 9px in the other direction. */
+  .task-warning-count { align-self: flex-start; }
   .panel-title > .action-row,
   .panel-title > .service-actions,
   .panel-title > .addons-title-actions,

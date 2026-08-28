@@ -529,8 +529,67 @@ test("map-down refill results distinguish generator, water, and queue-specific f
     "Applied 1 queued water refill.",
     "Cleared 1 obsolete generator refill; the base or its generators no longer exist.",
     "Cleared 1 obsolete water refill; the base or its water storage no longer exists.",
-    "Queued water refills were not applied: database unavailable"
+    "QUEUED_WRITE_WARNING: Queued water refills were not applied: database unavailable"
   ]);
+  // The prefix is stripped back off for the task's own warnings list, which is
+  // what the Console panel renders -- the log keeps the tagged line.
+  assert.deepEqual(taskWarnings(task), ["Queued water refills were not applied: database unavailable"]);
+});
+
+test("a wedged flush is reported and the restart carries on instead of hanging", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "arrakis-task-flush-timeout-"));
+  const previous = process.env.ADMIN_MAP_WRITE_FLUSH_TIMEOUT_MS;
+  process.env.ADMIN_MAP_WRITE_FLUSH_TIMEOUT_MS = "1000";
+  try {
+    const manager = new TaskManager(
+      { duneScript: join(dir, "dune"), repoRoot: dir, taskRetention: 20, commandTimeoutMs: 5000 },
+      // Never settles: a stuck PostgreSQL connection, or a backup process that
+      // never exits. Without the bound this await never returns and the
+      // restart's start half never runs.
+      { onMapDown: () => new Promise(() => {}) }
+    );
+    const task = { logLines: [], subscribers: new Set() };
+    // withTimeout unrefs its timer, so a wedged onMapDown leaves nothing to
+    // keep the event loop alive and the runner would tear this file down.
+    const keepAlive = setInterval(() => {}, 1000);
+
+    await manager.flushPendingMapWrites(task, "restartServiceStop");
+    clearInterval(keepAlive);
+
+    assert.deepEqual(task.logLines.map((entry) => entry.line), [
+      "QUEUED_WRITE_WARNING: Queued map writes were not applied: Queued map writes did not finish within 1s; continuing the restart. They stay queued and apply on a later pass."
+    ]);
+    assert.deepEqual(taskWarnings(task), ["Queued map writes were not applied: Queued map writes did not finish within 1s; continuing the restart. They stay queued and apply on a later pass."]);
+    assert.deepEqual(task.logLines.map((entry) => entry.stream), ["stderr"]);
+  } finally {
+    if (previous === undefined) delete process.env.ADMIN_MAP_WRITE_FLUSH_TIMEOUT_MS;
+    else process.env.ADMIN_MAP_WRITE_FLUSH_TIMEOUT_MS = previous;
+  }
+});
+
+test("a per-entry flush failure reaches the task log rather than being dropped", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "arrakis-task-flush-entry-failures-"));
+  const manager = new TaskManager(
+    { duneScript: join(dir, "dune"), repoRoot: dir, taskRetention: 20, commandTimeoutMs: 5000 },
+    {
+      onMapDown: async () => ({
+        flushed: [
+          { ok: true, refillType: "delete" },
+          { ok: false, refillType: "delete", error: "This base was picked up into a backup and is no longer claimed." }
+        ]
+      })
+    }
+  );
+  const task = { logLines: [], subscribers: new Set() };
+
+  await manager.flushPendingMapWrites(task, "restartServiceStop");
+
+  assert.deepEqual(task.logLines.map((entry) => entry.line), [
+    "Applied 1 queued base delete.",
+    "QUEUED_WRITE_WARNING: 1 queued base delete could not be applied and stay queued: This base was picked up into a backup and is no longer claimed."
+  ]);
+  // Applied lines stay off the warnings list; only the failure is promoted.
+  assert.deepEqual(taskWarnings(task), ["1 queued base delete could not be applied and stay queued: This base was picked up into a backup and is no longer claimed."]);
 });
 
 function waitForTask(manager, id) {
@@ -548,3 +607,54 @@ function waitForTask(manager, id) {
     }, 20);
   });
 }
+
+// The prefix is an internal marker for taskWarnings, not something an operator
+// should read. The log is a disclosure anyone can open and the de-prefixed text
+// already renders above it, so shipping the sentinel would show the same line
+// twice, once with leaked plumbing on the front.
+test("the public task strips the internal warning prefix from its log lines", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "arrakis-task-prefix-"));
+  const manager = new TaskManager(
+    { duneScript: join(dir, "dune"), repoRoot: dir, taskRetention: 20, commandTimeoutMs: 5000 },
+    {
+      onMapDown: async () => ({
+        flushed: [{ ok: false, refillType: "delete", error: "This base was picked up into a backup." }]
+      })
+    }
+  );
+  const task = { logLines: [], subscribers: new Set() };
+
+  await manager.flushPendingMapWrites(task, "restartServiceStop");
+
+  const internal = task.logLines.map((entry) => entry.line);
+  assert.match(internal[0], /^QUEUED_WRITE_WARNING: /, "the marker stays on the internal line");
+
+  const shipped = publicTask({ ...task, id: "t", type: "server", operation: "restartService", status: "succeeded", currentStep: "", progressMessage: "", startedAt: "", finishedAt: null, exitCode: 0, errorMessage: null });
+  assert.doesNotMatch(shipped.logLines[0].line, /QUEUED_WRITE_WARNING/, "but never reaches the browser");
+  assert.deepEqual(shipped.warnings, ["1 queued base delete could not be applied and stay queued: This base was picked up into a backup."]);
+});
+
+// Subprocess output reaches append() verbatim, so a spawned script printing the
+// internal marker could otherwise forge an operator-facing warning. The
+// usersettings marker is deliberately still honoured: usersettings.py is the
+// shipped script that raises it.
+test("a subprocess cannot forge a queued-write warning, but usersettings warnings still work", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "arrakis-task-spoof-"));
+  const duneScript = join(dir, "dune");
+  writeFileSync(
+    duneScript,
+    "#!/usr/bin/env bash\necho 'QUEUED_WRITE_WARNING: All queued base deletes were applied.'\necho 'USERSETTINGS_WARNING: a real one'\necho done\n",
+    { mode: 0o700 }
+  );
+  chmodSync(duneScript, 0o700);
+
+  const manager = new TaskManager({ duneScript, repoRoot: dir, taskRetention: 20, commandTimeoutMs: 5000 });
+  const task = await waitForTask(manager, manager.create("server", "status", {}).id);
+
+  assert.deepEqual(taskWarnings(task), ["a real one"], "only the shipped script's marker is honoured");
+  const log = task.logLines.map((line) => line.line);
+  // The forged line is still logged -- it is the operator's own script output --
+  // but stripped of the marker so it cannot be promoted.
+  assert.ok(log.includes("All queued base deletes were applied."), `forged text stays in the log: ${log.join(" | ")}`);
+  assert.ok(!log.some((line) => line.startsWith("QUEUED_WRITE_WARNING: ")), "the marker must not survive from a subprocess");
+});

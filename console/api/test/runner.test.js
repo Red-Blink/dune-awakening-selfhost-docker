@@ -329,3 +329,28 @@ test("redacts token-like sensitive values", () => {
   assert.doesNotMatch(output, /eyJaaaaaaaa/);
   assert.doesNotMatch(output, /runtime\/secrets\/funcom-token\.txt/);
 });
+
+// Credentials reach operator-facing text from more than postgres. These are
+// generic rules rather than a list of names, so a variable added later is
+// covered without anyone remembering to add it here.
+test("redacts credentials in any URI scheme, not only postgres", () => {
+  for (const uri of ["amqp://admin:RmqS3cret@rabbitmq:5672", "redis://user:hunter2@cache:6379", "https://bob:pw123@example.com/x"]) {
+    const output = redact(uri);
+    assert.doesNotMatch(output, /RmqS3cret|hunter2|pw123/);
+    // The host has to survive -- redacting it would make the error useless.
+    assert.match(output, /@(rabbitmq|cache|example\.com)/);
+  }
+});
+
+test("redacts any *_TOKEN / *_SECRET / *_KEY assignment by shape", () => {
+  const output = redact("DUNE_COMMAND_AUTH_TOKEN=abc123deadbeef rejected, X_API_KEY=zzz");
+  assert.doesNotMatch(output, /abc123deadbeef|zzz/);
+  assert.match(output, /DUNE_COMMAND_AUTH_TOKEN=<redacted>/);
+  // The surrounding message still has to read as a diagnosis.
+  assert.match(output, /rejected/);
+});
+
+test("leaves an error carrying no credential untouched, and is idempotent", () => {
+  assert.equal(redact("connect ECONNREFUSED 127.0.0.1:15432"), "connect ECONNREFUSED 127.0.0.1:15432");
+  assert.equal(redact(redact("amqp://admin:s3cret@rabbitmq:5672")), redact("amqp://admin:s3cret@rabbitmq:5672"));
+});

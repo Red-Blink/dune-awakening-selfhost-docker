@@ -10,7 +10,7 @@ import { createLoginRateLimiter, createMutationRateLimiter, createApiKeyRateLimi
 import { createApiKeyStore, GLOBAL_RATE_LIMIT_PER_MINUTE } from "./apiKeys.js";
 import { scopeCatalog } from "./apiKeyScopes.js";
 import { createBridgeRateLimiter } from "./bridgeRateLimit.js";
-import { buildSelfUpdateHelperDockerArgs, detectDockerSocketGid, TaskManager, publicTask } from "./tasks.js";
+import { buildSelfUpdateHelperDockerArgs, detectDockerSocketGid, mapWriteFlushTimeoutMs, TaskManager, publicTask } from "./tasks.js";
 import { preflight } from "./preflight.js";
 import { buildDuneArgs, isDynamicServerService, parseVehicleList, runDockerLogs, runDune, validateServiceName } from "./runner.js";
 // isReadOnlySql comes from db.js, NOT runner.js. runner's copy tests the raw
@@ -73,6 +73,7 @@ import { parseEffectiveGuildMemberLimit } from "./services/guildSettings.js";
 import { parseEffectivePermissionLimit } from "./services/permissionSettings.js";
 import { flushBaseRefillQueues } from "./services/baseRefillFlush.js";
 import { verifyBaseBackupState } from "./services/baseBackupSafety.js";
+import { createSingleFlight } from "./services/singleFlight.js";
 import { banPlayer, bannedFlsIds, createPlayerBanEnforcer, playerBanFor, unbanPlayer } from "./services/playerBans.js";
 import { findPlayerForLiveAction, playerIsOnlineForLiveAction } from "./playerLiveActions.js";
 import { retireLegacyEdaExchangeBot } from "./services/marketBotRetirement.js";
@@ -147,16 +148,18 @@ const bridgeRateLimiter = createBridgeRateLimiter();
 // Both flush paths go through flushQueuedGeneratorRefills/flushQueuedWaterRefills
 // so a write lands in the audit log no matter which one applied it.
 const tasks = new TaskManager(config, {
+  // forceFresh on every leg: the tick's in-flight pass, if there is one, was
+  // started before the map stopped and so observed it as still live. Reusing
+  // that result here would report "nothing to flush" for the one window in
+  // which the queued writes are actually safe to apply.
   onMapDown: () => flushBaseRefillQueues({
-    flushGenerators: flushQueuedGeneratorRefills,
-    flushWater: flushQueuedWaterRefills,
-    flushDeletes: flushQueuedBaseDeletes,
-    flushChildAccess: flushQueuedBaseChildAccess,
-    // A background probe may have sampled the map immediately before the stop.
-    // Wait for it, then perform a fresh pass while the map is positively down.
+    flushGenerators: () => flushQueuedGeneratorRefills({ forceFresh: true }),
+    flushWater: () => flushQueuedWaterRefills({ forceFresh: true }),
+    flushDeletes: () => flushQueuedBaseDeletes({ forceFresh: true }),
+    flushChildAccess: () => flushQueuedBaseChildAccess({ forceFresh: true }),
     // The task hook runs only after the requested map servers have positively
-    // stopped. At that point an explicit admin delete may safely remove even
-    // a stale Travel/backup/recovery row; the background poller remains
+    // stopped. At that point an explicit admin delete may safely remove even a
+    // stale Travel/backup/recovery row; the background poller stays
     // conservative and leaves those states queued while maps may be live.
     flushVehicleDeletes: () => flushQueuedVehicleDeletes({ forceFresh: true, allowBlockedStates: true })
   })
@@ -166,19 +169,13 @@ const publicDirectory = createPublicDirectoryReporter(config, { getDb: () => db 
 let carePackageAutoRunning = false;
 let carePackageAutoLastRun = 0;
 let carePackageAutoNextAllowedRun = 0;
-// The 5s poll and the restart-task onMapDown hook both call
-// flushQueuedGeneratorRefills and can overlap; refillBaseGenerators only locks
-// existing fuel rows, so an empty generator has nothing to serialize two
-// concurrent inserts against without this guard.
-let generatorRefillFlushRunning = false;
-// Same reasoning as generatorRefillFlushRunning, for the water queue.
-let waterRefillFlushRunning = false;
-// Same reasoning as generatorRefillFlushRunning, for the pending-delete queue.
-let baseDeleteFlushRunning = false;
-// Same reasoning as generatorRefillFlushRunning, for the base permission queue.
-let baseChildAccessFlushRunning = false;
-// Same reasoning as baseDeleteFlushRunning, for the vehicle pending-delete queue.
-let vehicleDeleteFlushPromise = null;
+// The 5s poll and the restart-task onMapDown hook both call every one of the
+// flushes below and can overlap; refillBaseGenerators only locks existing fuel
+// rows, so an empty generator has nothing to serialize two concurrent inserts
+// against without a guard. Each flush is therefore wrapped in createSingleFlight
+// rather than a boolean: a boolean serializes correctly but makes the hook's
+// call a no-op whenever the tick is mid-pass, which is precisely when the hook
+// matters -- see services/singleFlight.js.
 let messageOfTheDayAutoRunning = false;
 let messageOfTheDayAutoLastRun = 0;
 let messageOfTheDayAutoNextAllowedRun = 0;
@@ -348,98 +345,66 @@ setInterval(() => {
 // Every queued-refill write goes through here so it is audited whichever path
 // triggered it: the tick above, or the restart task runner's onMapDown hook.
 // These are real writes to player property, so an unaudited one is not acceptable.
-async function flushQueuedGeneratorRefills() {
-  if (generatorRefillFlushRunning) return { flushed: [] };
-  generatorRefillFlushRunning = true;
-  try {
-    const result = await duneDb.flushGeneratorRefills(db, config.repoRoot);
-    for (const entry of result.flushed || []) audit(config, null, "bases.flush-queued-refill", entry);
-    return result;
-  } finally {
-    generatorRefillFlushRunning = false;
-  }
-}
+const flushQueuedGeneratorRefills = createSingleFlight(async () => {
+  const result = await duneDb.flushGeneratorRefills(db, config.repoRoot);
+  for (const entry of result.flushed || []) audit(config, null, "bases.flush-queued-refill", entry);
+  return result;
+}, { waitTimeoutMs: mapWriteFlushTimeoutMs() });
 
 // Same reasoning as flushQueuedGeneratorRefills, for the water queue.
-async function flushQueuedWaterRefills() {
-  if (waterRefillFlushRunning) return { flushed: [] };
-  waterRefillFlushRunning = true;
-  try {
-    const result = await duneDb.flushWaterRefills(db, config.repoRoot);
-    for (const entry of result.flushed || []) audit(config, null, "bases.flush-queued-water-refill", entry);
-    return result;
-  } finally {
-    waterRefillFlushRunning = false;
-  }
-}
+const flushQueuedWaterRefills = createSingleFlight(async () => {
+  const result = await duneDb.flushWaterRefills(db, config.repoRoot);
+  for (const entry of result.flushed || []) audit(config, null, "bases.flush-queued-water-refill", entry);
+  return result;
+}, { waitTimeoutMs: mapWriteFlushTimeoutMs() });
 
 // Same reasoning as flushQueuedGeneratorRefills, for the base permission
 // queue. These change who can open a player's doors, so an unaudited apply is
 // not acceptable either.
-async function flushQueuedBaseChildAccess() {
-  if (baseChildAccessFlushRunning) return { flushed: [] };
-  baseChildAccessFlushRunning = true;
-  try {
-    const result = await duneDb.flushBaseChildAccess(db, config.repoRoot);
-    for (const entry of result.flushed || []) audit(config, null, "bases.flush-queued-child-access", entry);
-    return result;
-  } finally {
-    baseChildAccessFlushRunning = false;
-  }
-}
+const flushQueuedBaseChildAccess = createSingleFlight(async () => {
+  const result = await duneDb.flushBaseChildAccess(db, config.repoRoot);
+  for (const entry of result.flushed || []) audit(config, null, "bases.flush-queued-child-access", entry);
+  return result;
+}, { waitTimeoutMs: mapWriteFlushTimeoutMs() });
 
 // Same guard reasoning as flushQueuedGeneratorRefills. The one full-database
 // safety backup for this pass happens inside flushBaseDeletes's onBeforeApply
 // hook -- lazily, at most once, immediately before the first entry that is
 // actually about to be deleted, not merely because the queue is non-empty.
-async function flushQueuedBaseDeletes() {
-  if (baseDeleteFlushRunning) return { flushed: [] };
-  baseDeleteFlushRunning = true;
-  try {
-    const result = await duneDb.flushBaseDeletes(db, config.repoRoot, {
-      // Matches databaseQuery's explicit mock-mode guard: this runs as a
-      // background tick, not through directDbMutation, so it is not skipped
-      // for free the way a request-time delete's backup call is.
-      onBeforeApply: config.mockMode
-        ? undefined
-        : () => runDune(config, buildDuneArgs("backupCreate"), { env: { DB_BACKUP_ORIGIN: "base-delete" } })
-    });
-    for (const entry of result.flushed || []) audit(config, null, "bases.flush-queued-delete", entry);
-    if (result.backupFailed) {
-      audit(config, null, "bases.flush-queued-delete-backup-failed", { error: result.error, pending: result.pending });
-    }
-    return result;
-  } finally {
-    baseDeleteFlushRunning = false;
+const flushQueuedBaseDeletes = createSingleFlight(async () => {
+  const result = await duneDb.flushBaseDeletes(db, config.repoRoot, {
+    // Matches databaseQuery's explicit mock-mode guard: this runs as a
+    // background tick, not through directDbMutation, so it is not skipped
+    // for free the way a request-time delete's backup call is.
+    onBeforeApply: config.mockMode
+      ? undefined
+      : () => runDune(config, buildDuneArgs("backupCreate"), { env: { DB_BACKUP_ORIGIN: "base-delete" } })
+  });
+  for (const entry of result.flushed || []) audit(config, null, "bases.flush-queued-delete", entry);
+  if (result.backupFailed) {
+    audit(config, null, "bases.flush-queued-delete-backup-failed", { error: result.error, pending: result.pending });
   }
-}
+  return result;
+}, { waitTimeoutMs: mapWriteFlushTimeoutMs() });
 
 // Same guard reasoning as flushQueuedBaseDeletes, for the vehicle queue.
-async function flushQueuedVehicleDeletes({ forceFresh = false, allowBlockedStates = false } = {}) {
-  if (vehicleDeleteFlushPromise) {
-    const inFlight = await vehicleDeleteFlushPromise;
-    if (!forceFresh) return inFlight;
+// allowBlockedStates reaches the pass through createSingleFlight, which hands
+// each call's options to the run function. Only the map-down hook sets it, and
+// that hook always sets forceFresh too, so it never rides along on a reused
+// in-flight result that was started without it.
+const flushQueuedVehicleDeletes = createSingleFlight(async ({ allowBlockedStates = false } = {}) => {
+  const result = await duneDb.flushVehicleDeletes(db, config.repoRoot, {
+    allowBlockedStates,
+    onBeforeApply: config.mockMode
+      ? undefined
+      : () => runDune(config, buildDuneArgs("backupCreate"), { env: { DB_BACKUP_ORIGIN: "vehicle-delete" } })
+  });
+  for (const entry of result.flushed || []) audit(config, null, "vehicles.flush-queued-delete", entry);
+  if (result.backupFailed) {
+    audit(config, null, "vehicles.flush-queued-delete-backup-failed", { error: result.error, pending: result.pending });
   }
-  const current = (async () => {
-    const result = await duneDb.flushVehicleDeletes(db, config.repoRoot, {
-      allowBlockedStates,
-      onBeforeApply: config.mockMode
-        ? undefined
-        : () => runDune(config, buildDuneArgs("backupCreate"), { env: { DB_BACKUP_ORIGIN: "vehicle-delete" } })
-    });
-    for (const entry of result.flushed || []) audit(config, null, "vehicles.flush-queued-delete", entry);
-    if (result.backupFailed) {
-      audit(config, null, "vehicles.flush-queued-delete-backup-failed", { error: result.error, pending: result.pending });
-    }
-    return result;
-  })();
-  vehicleDeleteFlushPromise = current;
-  try {
-    return await current;
-  } finally {
-    if (vehicleDeleteFlushPromise === current) vehicleDeleteFlushPromise = null;
-  }
-}
+  return result;
+}, { waitTimeoutMs: mapWriteFlushTimeoutMs() });
 
 function runBackgroundTick(label, fn) {
   Promise.resolve()

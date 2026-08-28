@@ -246,3 +246,33 @@ test("the documented retention override is forwarded into the console container"
   assert.match(compose, /^\s+DUNE_VEHICLE_DELETE_BACKUP_KEEP:\s+"\$\{DUNE_VEHICLE_DELETE_BACKUP_KEEP:-10\}"$/m);
   assert.match(envExample, /^DUNE_VEHICLE_DELETE_BACKUP_KEEP=10$/m);
 });
+
+// A queued base delete takes a safety backup before every apply attempt, and a
+// base that cannot be deleted retries until the age limit -- so this origin
+// needs the same count cap the vehicle-delete twin has.
+test("base delete backups are pruned without touching other safety backups", () => {
+  const { fixture, bin, backupDir } = makeFixture();
+  try {
+    seedBackup(backupDir, "dune-db-all_maps-20260801-000001.backup", "base-delete");
+    seedBackup(backupDir, "dune-db-all_maps-20260802-000001.backup", "base-delete");
+    seedBackup(backupDir, "dune-db-all_maps-20260803-000001.backup", "base_delete");
+    seedBackup(backupDir, "dune-db-all_maps-20200103-000001.backup", "vehicle-delete");
+    seedBackup(backupDir, "dune-db-all_maps-20200102-000001.backup", "restore-safety");
+    seedBackup(backupDir, "dune-db-all_maps-20200101-000001.backup", "manual");
+
+    const result = runDb(fixture, bin, ["backup"], { DB_BACKUP_ORIGIN: "base-delete", DUNE_BASE_DELETE_BACKUP_KEEP: "3" });
+    assert.equal(result.status, 0, `backup must succeed (stderr: ${result.stderr})`);
+
+    const names = backupNames(backupDir);
+    assert.ok(!names.includes("dune-db-all_maps-20260801-000001.backup"), "oldest base delete backup is pruned");
+    assert.ok(names.includes("dune-db-all_maps-20260802-000001.backup"));
+    // The underscore spelling counts as the same origin, matching the twin.
+    assert.ok(names.includes("dune-db-all_maps-20260803-000001.backup"));
+    assert.ok(names.includes("dune-db-all_maps-20200101-000001.backup"), "manual backup is untouched");
+    assert.ok(names.includes("dune-db-all_maps-20200102-000001.backup"), "other safety backups are untouched");
+    assert.ok(names.includes("dune-db-all_maps-20200103-000001.backup"), "vehicle delete backups are untouched");
+    assert.match(result.stdout, /Pruned 1 Base Delete backup\(s\); the newest 3 are kept\./);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});

@@ -20,6 +20,7 @@ import {
   queueWaterRefill,
   supportsGeneratorRefillQueue
 } from "../src/duneDb.js";
+import { deleteBaseCompletely } from "../src/duneDb.js";
 import { addBaseContainerItem, addCurrency, addFactionReputation, addGuildMember, addIntel, addonLeadershipPlayers, addonOpsHealthFarms, addonOpsHealthPlayers, addonOpsHealthSummary, addonOpsHealthSummaryV2, addonPlayerIdentities, addSpecializationXp, applyLandsraadMilestonePreset, augmentInventoryItem, augmentNewestPlayerItem, baseContainerSlots, baseGeneratorFuelLevels, baseGenerators, baseIsBackedUp, changeDunePassword, completeJourneyNode, completeTutorial, dbStatus, deleteAllBaseContainerItems, deleteBaseContainerItem, deleteInventoryItem, deleteMultipleBaseContainerItems, demoteGuildMember, disbandGuild, exportBaseAsBlueprint, fillItemToBaseContainer, fillItemToStorage, generatorUptimePolicy, giveItemToBaseContainer, giveItemToPlayer, giveItemToStorage, giveMultipleItemsToBaseContainer, guildMembers, inspectDeletedCharacterRecovery, inspectLandsraadQuestRepairs, landsraadOverview, listBases, listGuilds, listPlayers, listRoutines, listSpicefieldTypes, listTables, liveMapPlayers, liveMapServices, playerBuildingUnlockState, playerCraftingRecipes, playerCurrency, playerCustomizationGrantState, playerFactions, playerIntel, playerInventory, playerInventoryAll, playerJourney, playerPortalSnapshots, playerPosition, playerProfile, playerProgression, playerResearchItems, playerServerMemberships, playerSolarisCoinTotal, playerTeleportDestinations, playerVitals, portalGeneratorFuel, portalVehicles, promoteGuildMember, recoverDeletedCharacter, refillBaseGenerators, removeGuildMember, repairFactionReputation, repairLandsraadQuests, repairVehicleDecay, resetJourneyNode, resetTutorial, resolvePlayerTarget, routineDefinition, runSql, setLandsraadPlayerContribution, setPlayerFaction, supportsGeneratorRefill, tablePreview, teleportOfflinePlayerToCoords, teleportPlayer, unlockCraftingRecipe, unlockResearchItem, updateInventoryItem, updateLandsraadRewardTier, updateLandsraadTaskGoal, updateLandsraadTermTaskGoals, updateSpicefieldType, updateTableRow, UnsupportedCapabilityError, _resetPlayerTargetCacheForTests } from "../src/duneDb.js";
 import { listStorage, liveMapBases, liveMapStorage, liveMapVehicles, portalStorage, trackPlayerPlaytime } from "../src/duneDb.js";
 
@@ -8644,6 +8645,35 @@ test("flush preserves a refill queued while it was awaiting the database", async
   });
 });
 
+// Partitions are re-observed per entry, not once at pass start. A pass is
+// several round-trips per entry and can outlive the window it began in -- a map
+// server reconnecting partway through, or a pass the restart timeout abandoned
+// but could not cancel. Writing to a live map is what these queues exist to
+// avoid, since the game never picks those writes up.
+test("a map that comes back up mid-pass stops the entries that follow", async () => {
+  await withTempRepoRoot(async (repoRoot) => {
+    _resetRefillPartitionDwellForTests();
+    queueGeneratorRefill(repoRoot, { baseId: 482, map: "Survival_1", partitionId: 3 });
+    queueGeneratorRefill(repoRoot, { baseId: 517, map: "Overmap", partitionId: 9 });
+
+    const partitions = [{ partitionId: 3, unassigned: true }, { partitionId: 9, unassigned: true }];
+    const { db } = fakeQueueDb([], { devices: [FUEL_DEVICE], partitions });
+    const inner = db.transaction;
+    db.transaction = async (fn) => {
+      // The map servers reconnect while the first entry is being written.
+      partitions[0] = { partitionId: 3, connected: true };
+      partitions[1] = { partitionId: 9, connected: true };
+      return inner(fn);
+    };
+
+    const result = await flushGeneratorRefills(db, repoRoot);
+
+    assert.deepEqual(result.flushed.map((entry) => entry.baseId), [482], "only the entry begun while the map was down");
+    assert.deepEqual(listQueuedGeneratorRefills(repoRoot).map((entry) => entry.baseId), [517],
+      "the rest stay queued for a window that is genuinely safe");
+  });
+});
+
 test("flush does not resurrect an entry canceled while it was awaiting the database", async () => {
   await withTempRepoRoot(async (repoRoot) => {
     _resetRefillPartitionDwellForTests();
@@ -9484,4 +9514,33 @@ test("vehicleStorageDeleteSafety withholds deletion when the schema cannot suppo
   assert.equal(safety.safe, false);
   assert.equal(safety.known, true);
   assert.match(safety.reason, /dune\.delete_item\(bigint\)/);
+});
+
+// supportsBaseDelete must probe every relation the delete path reads. The
+// in-transaction backed-up guard LEFT JOINs dune.permission_actor, so a schema
+// without it has to fail as a clean capability message -- not as an aborted
+// transaction after the claim actor is already locked FOR UPDATE.
+function baseDeleteCapabilityDb({ missingTable = null } = {}) {
+  const query = async (text, values = []) => {
+    if (text.includes("to_regclass")) {
+      const target = String(values[0]);
+      return okRows([{ exists: missingTable ? target !== `dune.${missingTable}` : true }]);
+    }
+    if (text.includes("to_regprocedure")) return okRows([{ exists: true }]);
+    return okRows([]);
+  };
+  return { query, transaction: async (fn) => fn({ query }) };
+}
+
+test("base delete reports unsupported capability when permission_actor is absent", async () => {
+  const db = baseDeleteCapabilityDb({ missingTable: "permission_actor" });
+  await assert.rejects(() => deleteBaseCompletely(db, 1), UnsupportedCapabilityError);
+});
+
+// Control: with the same mock and nothing missing, the capability gate passes
+// and the call gets far enough to fail on the base lookup instead. Without this
+// the test above would still pass if the probe rejected for any other reason.
+test("base delete passes the capability gate once permission_actor is present", async () => {
+  const db = baseDeleteCapabilityDb();
+  await assert.rejects(() => deleteBaseCompletely(db, 1), /was not found/);
 });

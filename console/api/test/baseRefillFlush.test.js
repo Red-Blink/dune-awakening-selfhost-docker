@@ -104,3 +104,52 @@ test("base permission and vehicle delete queues both flush during the same map-d
   ]);
   assert.deepEqual(result.failures, []);
 });
+
+// A pass that aborts at its mandatory safety backup resolves normally with an
+// empty flushed list. Without surfacing backupFailed the restart reports
+// nothing at all, so the operator sees a clean restart while the queue was
+// never touched -- the silent failure this summary exists to prevent.
+test("a queue that aborted at its safety backup is reported, not silently dropped", async () => {
+  const result = await flushBaseRefillQueues({
+    flushGenerators: async () => ({ flushed: [] }),
+    flushWater: async () => ({ flushed: [] }),
+    flushDeletes: async () => ({ flushed: [], pending: 2, backupFailed: true, error: "backup destination is full" })
+  });
+
+  assert.deepEqual(result.flushed, []);
+  assert.deepEqual(result.failures, [{ refillType: "delete", error: "backup destination is full" }]);
+});
+
+// These failure strings reach the operator's task panel. Driver errors from a
+// map-down flush routinely quote the connection string, which plain redact()
+// does not strip -- only redactDbError() does.
+test("a rejected queue has its connection string stripped before the operator sees it", async () => {
+  const result = await flushBaseRefillQueues({
+    flushGenerators: async () => ({ flushed: [] }),
+    flushWater: async () => {
+      throw new Error("connect ECONNREFUSED postgres://dune:hunter2@127.0.0.1:15432/dune");
+    }
+  });
+
+  const [failure] = result.failures;
+  assert.equal(failure.refillType, "water");
+  assert.doesNotMatch(failure.error, /hunter2/);
+  assert.match(failure.error, /ECONNREFUSED/);
+});
+
+test("a safety-backup failure has its connection string stripped too", async () => {
+  const result = await flushBaseRefillQueues({
+    flushGenerators: async () => ({ flushed: [] }),
+    flushWater: async () => ({ flushed: [] }),
+    flushDeletes: async () => ({
+      flushed: [],
+      backupFailed: true,
+      error: "pg_dump failed: postgres://dune:hunter2@127.0.0.1:15432/dune"
+    })
+  });
+
+  const [failure] = result.failures;
+  assert.equal(failure.refillType, "delete");
+  assert.doesNotMatch(failure.error, /hunter2/);
+  assert.match(failure.error, /pg_dump failed/);
+});

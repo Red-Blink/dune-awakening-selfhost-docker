@@ -9,6 +9,7 @@ import {
   cancelQueuedBaseDelete,
   listQueuedBaseDeletes,
   flushBaseDeletes,
+  BASE_DELETE_BACKED_UP_MESSAGE,
   _resetRefillPartitionDwellForTests
 } from "../src/duneDb.js";
 import { pgTransactionalDb, withIsolatedDatabase } from "../test-support/pgIntegrationDb.js";
@@ -42,23 +43,38 @@ const SCHEMA = `
   create table dune.world_partition (partition_id bigint primary key, map text, dimension_index integer default 0, server_id text);
 
   create table dune.buildings (id bigint primary key references dune.actors(id) on delete cascade);
+  -- Unique constraints transcribed from production (building_instances_uniq,
+  -- actor_fgl_entities_entity_id_key, actor_fgl_no_slot_duplication). They are
+  -- what stop a base's piece set multiplying, so a fixture without them cannot
+  -- reproduce that class of bug. actor_id is nullable here because it is
+  -- nullable in production -- the fixture must not be stricter than the real
+  -- schema, or a row production allows would never be exercised.
   create table dune.building_instances (
     building_id bigint not null references dune.actors(id) on delete cascade,
     instance_id integer not null,
-    owner_entity_id bigint
+    owner_entity_id bigint,
+    constraint building_instances_uniq unique (building_id, instance_id)
   );
   create table dune.actor_fgl_entities (
-    entity_id bigint not null,
-    actor_id bigint not null references dune.actors(id) on delete cascade
+    entity_id bigint not null unique,
+    actor_id bigint references dune.actors(id) on delete cascade,
+    slot_name text not null default '',
+    constraint actor_fgl_no_slot_duplication unique (actor_id, slot_name)
   );
   create table dune.placeables (
     id bigint primary key references dune.actors(id) on delete cascade,
     owner_entity_id bigint,
     building_type text
   );
+  -- actor_type/access_level/is_child are NOT NULL in production with no
+  -- defaults, so a fixture omitting them accepts rows the real database would
+  -- reject.
   create table dune.permission_actor (
     actor_id bigint primary key references dune.actors(id) on delete cascade,
-    actor_name text
+    actor_name text,
+    actor_type smallint not null,
+    access_level smallint not null,
+    is_child boolean not null
   );
   create table dune.permission_actor_rank (
     permission_actor_id bigint not null references dune.permission_actor(actor_id) on delete cascade,
@@ -69,6 +85,23 @@ const SCHEMA = `
   -- permission_actor_destroy clears these.
   create table dune.markers (marker_hash_id bigint primary key);
   create table dune.player_markers (marker_hash_id bigint not null, player_id bigint not null);
+  -- Transcribed from production (dune_backup.sql:17781/17793 for the tables,
+  -- 75467-75476 for the constraints). A picked-up base has a base_backups
+  -- parent row, and the link row cascades from BOTH it and dune.actors -- so
+  -- deleting the claim actor also erases the evidence that the base was ever
+  -- backed up. Modelled faithfully because a fixture that can be inserted
+  -- without a base_backups row would let a test pass against a shape the real
+  -- database rejects.
+  create table dune.base_backups (
+    id bigint primary key,
+    player_id bigint references dune.actors(id) on delete cascade,
+    base_backup_name text,
+    constraint base_backups_id_check check (id > 0)
+  );
+  create table dune.base_backup_linked_actors (
+    id bigint not null references dune.base_backups(id) on delete cascade,
+    actor_id bigint references dune.actors(id) on delete cascade
+  );
   create table dune.inventories (
     id bigint primary key,
     actor_id bigint not null references dune.actors(id) on delete cascade,
@@ -119,7 +152,7 @@ function seedBase(claimActor, buildingActors, placeableActor, entityId, playerId
   return `
     insert into dune.actors (id, map, partition_id) values (${claimActor}, 'HaggaBasin', 3);
     insert into dune.actor_fgl_entities (entity_id, actor_id) values (${entityId}, ${claimActor});
-    insert into dune.permission_actor (actor_id, actor_name) values (${claimActor}, 'Test Base ${claimActor}');
+    insert into dune.permission_actor (actor_id, actor_name, actor_type, access_level, is_child) values (${claimActor}, 'Test Base ${claimActor}', 4, 1, false);
     insert into dune.markers (marker_hash_id) values (${claimActor});
     insert into dune.player_markers (marker_hash_id, player_id) values (${claimActor}, ${playerId});
     insert into dune.inventories (id, actor_id) values (${claimActor} * 10, ${claimActor});
@@ -284,6 +317,148 @@ test("real PostgreSQL: flush applies a delete once its partition is confirmed do
       assert.equal(result.pending, 0);
       assert.deepEqual(listQueuedBaseDeletes(repoRoot), []);
       assert.equal(await actorCount(pool, [CLAIM_ACTOR]), 0);
+    });
+  });
+});
+
+// The route checks baseIsBackedUp once, before queueing. A queued delete can
+// then wait hours for its map to come down, which is more than enough time for
+// a player to pick the base up. These two cases pin the re-check that closes
+// that window, and the retry accounting that keeps a blocked entry alive.
+test("real PostgreSQL: deleteBaseCompletely refuses a base that was picked up into a backup", async (t) => {
+  await withDatabase(t, async (pool) => {
+    // Exactly what the backup tool leaves behind: the claim is gone and the
+    // actor is registered. Neither signal alone means picked-up.
+    await pool.query("delete from dune.permission_actor where actor_id = $1", [CLAIM_ACTOR]);
+    await pool.query("insert into dune.base_backups (id, player_id, base_backup_name) values (1, $1, 'Picked up')", [PLAYER_ID]);
+    await pool.query("insert into dune.base_backup_linked_actors (id, actor_id) values (1, $1)", [CLAIM_ACTOR]);
+
+    const db = pgTransactionalDb(pool);
+    await assert.rejects(
+      () => deleteBaseCompletely(db, BUILDING_ACTORS[0]),
+      (error) => error.message === BASE_DELETE_BACKED_UP_MESSAGE);
+    // Refused, and refused atomically: permission_actor_destroy runs after this
+    // guard, so the markers a redeploy needs are still there.
+    assert.equal(await actorCount(pool, [CLAIM_ACTOR, ...BUILDING_ACTORS]), 3);
+    assert.equal(await tableCount(pool, "markers"), 2);
+  });
+});
+
+test("real PostgreSQL: an unclaimed base with no backup registration still deletes", async (t) => {
+  await withDatabase(t, async (pool) => {
+    // Unclaimed alone is not picked-up -- baseIsBackedUp needs both signals, so
+    // dropping the claim must not turn into an accidental delete-blocker.
+    await pool.query("delete from dune.permission_actor where actor_id = $1", [CLAIM_ACTOR]);
+
+    const db = pgTransactionalDb(pool);
+    const result = await deleteBaseCompletely(db, BUILDING_ACTORS[0]);
+    assert.equal(result.ok, true);
+    assert.equal(await actorCount(pool, [CLAIM_ACTOR, ...BUILDING_ACTORS]), 0);
+  });
+});
+
+test("real PostgreSQL: flush retains a picked-up base without burning its retry budget", async (t) => {
+  await withDatabase(t, async (pool) => {
+    await withTempRepoRoot(async (repoRoot) => {
+      _resetRefillPartitionDwellForTests();
+      await pool.query("insert into dune.world_partition (partition_id, map, server_id) values (3, 'Survival_1', null)");
+      await pool.query("delete from dune.permission_actor where actor_id = $1", [CLAIM_ACTOR]);
+      await pool.query("insert into dune.base_backups (id, player_id, base_backup_name) values (1, $1, 'Picked up')", [PLAYER_ID]);
+      await pool.query("insert into dune.base_backup_linked_actors (id, actor_id) values (1, $1)", [CLAIM_ACTOR]);
+      queueBaseDelete(repoRoot, { baseId: BUILDING_ACTORS[0], map: "HaggaBasin", partitionId: 3 });
+
+      const db = pgTransactionalDb(pool);
+      // More rounds than MAX_DELETE_FLUSH_ATTEMPTS: a counted failure would
+      // have dropped the entry by now.
+      for (let round = 0; round < 4; round += 1) {
+        const result = await flushBaseDeletes(db, repoRoot, { now: () => 1_000_000 + round * 120_000 });
+        assert.equal(result.flushed[0].ok, false);
+        assert.equal(result.flushed[0].attempts, 0);
+        assert.equal(result.flushed[0].dropped, false);
+      }
+      assert.equal(listQueuedBaseDeletes(repoRoot)[0].attempts, 0);
+      assert.equal(await actorCount(pool, [CLAIM_ACTOR]), 1);
+    });
+  });
+});
+
+test("real PostgreSQL: flush applies the delete once the base is redeployed", async (t) => {
+  await withDatabase(t, async (pool) => {
+    await withTempRepoRoot(async (repoRoot) => {
+      _resetRefillPartitionDwellForTests();
+      await pool.query("insert into dune.world_partition (partition_id, map, server_id) values (3, 'Survival_1', null)");
+      await pool.query("delete from dune.permission_actor where actor_id = $1", [CLAIM_ACTOR]);
+      await pool.query("insert into dune.base_backups (id, player_id, base_backup_name) values (1, $1, 'Picked up')", [PLAYER_ID]);
+      await pool.query("insert into dune.base_backup_linked_actors (id, actor_id) values (1, $1)", [CLAIM_ACTOR]);
+      queueBaseDelete(repoRoot, { baseId: BUILDING_ACTORS[0], map: "HaggaBasin", partitionId: 3 });
+
+      const db = pgTransactionalDb(pool);
+      // Controlled clock: a blocked entry gets a nextRetryAt one retry delay
+      // out, so the second pass has to be far enough ahead to be eligible at
+      // all -- otherwise it skips the entry and proves nothing.
+      assert.equal((await flushBaseDeletes(db, repoRoot, { now: () => 1_000_000 })).flushed[0].ok, false);
+
+      // Redeploy: the claim comes back. The entry is still queued, so the very
+      // next eligible pass should apply it rather than needing to be re-requested.
+      await pool.query("insert into dune.permission_actor (actor_id, actor_name, actor_type, access_level, is_child) values ($1, 'Redeployed', 4, 1, false)", [CLAIM_ACTOR]);
+      const result = await flushBaseDeletes(db, repoRoot, { now: () => 1_200_000 });
+      assert.equal(result.flushed[0].ok, true);
+      assert.equal(result.pending, 0);
+      assert.equal(await actorCount(pool, [CLAIM_ACTOR]), 0);
+    });
+  });
+});
+
+// The safety backup is a full database dump, so a base that can never be
+// deleted must not buy one on every retry pass -- at a 60s retry delay and a
+// 7 day age limit that is thousands of dumps. db.sh count-prunes the origin as
+// a backstop; this keeps the churn from happening in the first place.
+test("real PostgreSQL: a blocked base is refused without paying for a safety backup", async (t) => {
+  await withDatabase(t, async (pool) => {
+    await withTempRepoRoot(async (repoRoot) => {
+      _resetRefillPartitionDwellForTests();
+      await pool.query("insert into dune.world_partition (partition_id, map, server_id) values (3, 'Survival_1', null)");
+      await pool.query("delete from dune.permission_actor where actor_id = $1", [CLAIM_ACTOR]);
+      await pool.query("insert into dune.base_backups (id, player_id, base_backup_name) values (1, $1, 'Picked up')", [PLAYER_ID]);
+      await pool.query("insert into dune.base_backup_linked_actors (id, actor_id) values (1, $1)", [CLAIM_ACTOR]);
+      queueBaseDelete(repoRoot, { baseId: BUILDING_ACTORS[0], map: "HaggaBasin", partitionId: 3 });
+
+      const db = pgTransactionalDb(pool);
+      let backupCalls = 0;
+      const result = await flushBaseDeletes(db, repoRoot, { onBeforeApply: () => { backupCalls += 1; } });
+
+      assert.equal(backupCalls, 0, "a refusal must not take a full database backup");
+      assert.equal(result.flushed[0].ok, false);
+      assert.match(result.flushed[0].error, /picked up into a backup/i);
+      assert.equal(result.flushed[0].attempts, 0, "the retry budget is still preserved");
+      assert.equal(listQueuedBaseDeletes(repoRoot).length, 1, "and the entry stays queued");
+      assert.equal(await actorCount(pool, [CLAIM_ACTOR]), 1);
+    });
+  });
+});
+
+// The other case that cannot proceed. baseIsBackedUp inner-joins the entity
+// chain, so a base whose owner_entity_id links are gone reports "not backed up",
+// would buy a full-database backup, and then throw "no resolvable owner entity"
+// on the very next line. Measured against a restored dump, 12 of 35 buildings
+// rows resolve to no claim actor, so this is the common case, not a corner.
+test("real PostgreSQL: a base with no resolvable owner is cleared without a safety backup", async (t) => {
+  await withDatabase(t, async (pool) => {
+    await withTempRepoRoot(async (repoRoot) => {
+      _resetRefillPartitionDwellForTests();
+      await pool.query("insert into dune.world_partition (partition_id, map, server_id) values (3, 'Survival_1', null)");
+      // ON DELETE SET NULL against fgl_entities is how this happens in production.
+      await pool.query("update dune.building_instances set owner_entity_id = null where building_id = $1", [BUILDING_ACTORS[0]]);
+      queueBaseDelete(repoRoot, { baseId: BUILDING_ACTORS[0], map: "HaggaBasin", partitionId: 3 });
+
+      const db = pgTransactionalDb(pool);
+      let backupCalls = 0;
+      const result = await flushBaseDeletes(db, repoRoot, { onBeforeApply: () => { backupCalls += 1; } });
+
+      assert.equal(backupCalls, 0, "an unresolvable base must not buy a full database backup");
+      assert.equal(result.flushed[0].ok, true, "resolved, not failed");
+      assert.equal(result.flushed[0].alreadyGone, true);
+      assert.deepEqual(listQueuedBaseDeletes(repoRoot), [], "and the entry is cleared, not left to retry");
     });
   });
 });

@@ -1,5 +1,13 @@
 const patterns = [
   /eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}/g,
+  // Any scheme, not just postgres: amqp://, redis:// and https:// credentials
+  // reach operator-facing text through the same error paths. Ends at a
+  // lookahead so the @host stays readable.
+  /([a-z][a-z0-9+.-]*:\/\/)[^/@\s:]+:[^/@\s]+(?=@)/gi,
+  // Any *_TOKEN / *_SECRET / *_KEY / *_PASSWORD name, so a variable added later
+  // is redacted without having to be listed here. The named patterns below stay
+  // for the spellings this does not cover (GameRmqSecret is matched by both).
+  /([A-Za-z0-9_]*(?:token|secret|passwd|api[_-]?key)[":= ]+)[^,"'\s]+/gi,
   /(ServiceAuthToken[":= ]+)[^,"'\s]+/gi,
   /(GameRmqSecret[":= ]+)[^,"'\s]+/gi,
   /(RMQ_HTTP_TOKEN_AUTH_SECRET=)[^"'\s]+/g,

@@ -729,6 +729,9 @@ backup_db() {
     vehicle-delete)
       prune_vehicle_delete_backups "$out_dir"
       ;;
+    base-delete)
+      prune_base_delete_backups "$out_dir"
+      ;;
   esac
 }
 
@@ -1223,6 +1226,7 @@ delete_all_backups() {
 # releases are cleaned up too.
 MARKET_BOT_BACKUP_KEEP="${DUNE_MARKET_BOT_BACKUP_KEEP:-5}"
 VEHICLE_DELETE_BACKUP_KEEP="${DUNE_VEHICLE_DELETE_BACKUP_KEEP:-10}"
+BASE_DELETE_BACKUP_KEEP="${DUNE_BASE_DELETE_BACKUP_KEEP:-10}"
 
 backup_origin_value() {
   local backup_file="$1"
@@ -1243,6 +1247,13 @@ backup_is_market_bot() {
 backup_is_vehicle_delete() {
   case "$(backup_origin_value "$1" | tr '[:upper:]' '[:lower:]' | tr '_' '-')" in
     vehicle-delete) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+backup_is_base_delete() {
+  case "$(backup_origin_value "$1" | tr '[:upper:]' '[:lower:]' | tr '_' '-')" in
+    base-delete) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -1277,6 +1288,41 @@ prune_vehicle_delete_backups() {
 
   if [ "$removed" -gt 0 ]; then
     echo "Pruned $removed Vehicle Delete backup(s); the newest $keep are kept."
+  fi
+}
+
+# The base-delete twin. A queued base delete takes one of these before every
+# apply attempt, and a base that cannot be deleted (picked up into a backup,
+# say) retries until the 7-day age limit -- so without a count cap this origin
+# alone can mint hundreds of full-database dumps for a single queued request.
+prune_base_delete_backups() {
+  local backup_dir="${1:-$BACKUP_DIR_DEFAULT}"
+  local keep="${2:-$BASE_DELETE_BACKUP_KEEP}"
+  local removed=0
+  local index=0
+  local name
+
+  validate_positive_integer "$keep" || return 0
+  [ -d "$backup_dir" ] || return 0
+
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    index=$((index + 1))
+    [ "$index" -gt "$keep" ] || continue
+    if delete_backup_files_for_name "$name" "$backup_dir" >/dev/null; then
+      removed=$((removed + 1))
+    fi
+  done < <(
+    iter_valid_backup_names "$backup_dir"       | while IFS= read -r candidate; do
+          [ -n "$candidate" ] || continue
+          backup_is_base_delete "$(backup_path_for_name "$candidate" "$backup_dir")" || continue
+          printf '%s	%s
+' "$(backup_timestamp_from_name "$candidate")" "$candidate"
+        done       | sort -r       | cut -f2-
+  )
+
+  if [ "$removed" -gt 0 ]; then
+    echo "Pruned $removed Base Delete backup(s); the newest $keep are kept."
   fi
 }
 
