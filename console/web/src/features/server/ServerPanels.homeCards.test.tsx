@@ -473,22 +473,14 @@ describe("HomePanel subsystem rows", () => {
       const node = Array.from(container.querySelectorAll(".home-subsystem-label")).find((item) => item.textContent === label);
       return node?.closest("button") as HTMLButtonElement;
     };
-    rowFor("Database").click();
-    expect(onNavigate).toHaveBeenCalledWith("Database");
-    // Containers, Game Servers and RabbitMQ used to route to "Services", which
-    // renders but has no sidebar entry -- the operator landed on a panel with
-    // no nav item highlighted and no way back. Server Control carries the
-    // readiness timeline, port checklist and doctor output for all of them.
-    rowFor("Containers").click();
-    expect(onNavigate).toHaveBeenCalledWith("Server Control");
-    rowFor("Game Servers").click();
-    expect(onNavigate).toHaveBeenCalledWith("Server Control");
-    rowFor("RabbitMQ").click();
-    expect(onNavigate).toHaveBeenCalledWith("Server Control");
-    rowFor("Listeners").click();
-    expect(onNavigate).toHaveBeenCalledWith("Server Control");
-    rowFor("Funcom/FLS").click();
-    expect(onNavigate).toHaveBeenCalledWith("Server Control");
+    // Every row lands on Server Control: these report health, and that is where
+    // health is diagnosed. Database deliberately included -- the Database tab is
+    // for data, not for whether Postgres is up.
+    for (const label of ["Containers", "Listeners", "Database", "Game Servers", "RabbitMQ", "Funcom/FLS"]) {
+      onNavigate.mockClear();
+      rowFor(label).click();
+      expect(onNavigate, `${label} should route to Server Control`).toHaveBeenCalledWith("Server Control");
+    }
   });
 
   it("renders plain rows, not buttons to nowhere, when no navigation is wired", async () => {

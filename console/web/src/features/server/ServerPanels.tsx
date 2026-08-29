@@ -140,16 +140,21 @@ export function performanceTrackTone(percent: number | null, sampled: boolean) {
 // Keyed on the labels summarizeHomeStatus() emits, so a renamed label loses its
 // route rather than pointing somewhere wrong.
 //
-// Every destination must be a tab the sidebar actually lists. "Services" is not
-// -- it exists in ALL_TABS but has no navGroups entry, so routing there dropped
-// the operator on a panel with no nav item highlighted and no obvious way back.
-// Server Control is the reachable home for these: it carries ReadinessTimeline,
-// PortChecklist, DoctorSummary and the Change Funcom Token form, which is what
-// you actually use to chase any of them down.
+// Every row goes to Server Control. These rows report *health*, and Server
+// Control is where health is diagnosed -- ReadinessTimeline, PortChecklist,
+// DoctorSummary and the Change Funcom Token form all live there. The Database
+// row deliberately does not go to the Database tab: that tab is for data (schema
+// browser, queries), not for whether Postgres is up and its partitions readable.
+//
+// Kept as a per-label map rather than one constant so a subsystem can be pointed
+// somewhere better later without restructuring. Every destination must be a tab
+// the sidebar lists -- "Services" is in ALL_TABS but has no navGroups entry, and
+// routing there dropped the operator on a panel with nothing highlighted and no
+// way back. App.activeTab.test.tsx guards that.
 export const HOME_SUBSYSTEM_ROUTES: Record<string, Tab> = {
   Containers: "Server Control",
   Listeners: "Server Control",
-  Database: "Database",
+  Database: "Server Control",
   "Game Servers": "Server Control",
   RabbitMQ: "Server Control",
   "Funcom/FLS": "Server Control"
