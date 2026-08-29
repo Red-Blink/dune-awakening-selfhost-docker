@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
+import type { Tab } from "../../App";
 import { Play, Trash2 } from "lucide-react";
 import { serverApi, type PerformanceSnapshot } from "../../api/server";
 import { runGatedRestart, serviceRestartTarget, type RestartGate } from "./restartQueueGuard";
@@ -8,7 +9,7 @@ import { PortChecklist } from "../../components/PortChecklist";
 import { ReadinessTimeline } from "../../components/ReadinessTimeline";
 import { SecretInput } from "../../components/SecretInput";
 import { KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/common/DisplayPrimitives";
-import { formatDisplayValue, formatUiSentence, friendlyColumnName, stripAnsi, summarizeCommandText, titleCase } from "../../lib/display";
+import { formatDisplayValue, formatUiSentence, friendlyColumnName, normalizeStatus, stripAnsi, summarizeCommandText, titleCase } from "../../lib/display";
 import { friendlyServiceName } from "../../lib/serviceDisplay";
 import { conciseTaskError, funcomTokenMismatchDetected } from "../../lib/taskDisplay";
 import { QueueBadges, queueCountsSummary, queueCountsTotal, type QueueCounts } from "../../components/common/QueueBadges";
@@ -112,7 +113,60 @@ export function isRestartLifecycleReady(action: "start" | "stop" | "restart" | "
   return action !== "restart" || state.startObserved;
 }
 
-export function HomePanel({ status, readiness, taskResult, setTaskResult, funcomTokenResult, setFuncomTokenResult, runningAction, restartStartObserved, setRunningAction, onLoad, confirmAction, restartGate }: {
+// A utilisation card's badge is derived from its own reading rather than from
+// "did any sample arrive at all". The previous `performance ? "OK" : "INFO"`
+// painted a 96%-full disk the same green as a 4%-full one, so the whole
+// Performance band could never report a problem. These strings are the ones
+// normalizeStatus() already maps to badge-pass / badge-warn / badge-fail, so
+// StatusPill needs no change. Uptime has no percentage and returns "" -- it
+// gets no badge at all rather than a fabricated OK.
+export const PERFORMANCE_WARN_PERCENT = 75;
+export const PERFORMANCE_FAIL_PERCENT = 90;
+
+export function performanceCardStatus(percent: number | null, sampled: boolean) {
+  if (percent === null) return "";
+  if (!sampled || !Number.isFinite(percent)) return "INFO";
+  if (percent > PERFORMANCE_FAIL_PERCENT) return "FAILED";
+  if (percent >= PERFORMANCE_WARN_PERCENT) return "WARN";
+  return "OK";
+}
+
+export function performanceTrackTone(percent: number | null, sampled: boolean) {
+  const status = performanceCardStatus(percent, sampled);
+  if (status === "FAILED") return "metric-track-fail";
+  if (status === "WARN") return "metric-track-warn";
+  return "";
+}
+
+// Where an unhealthy subsystem is actually dealt with. Keyed on the labels
+// summarizeHomeStatus() already produces, so the map and the summary cannot
+// drift apart silently -- a renamed label just loses its route rather than
+// pointing somewhere wrong. Listeners and Funcom/FLS both land on Server
+// Control because PortChecklist and the Change Funcom Token form live there.
+export const HOME_SUBSYSTEM_ROUTES: Record<string, Tab> = {
+  Containers: "Services",
+  Listeners: "Server Control",
+  Database: "Database",
+  "Game Servers": "Services",
+  RabbitMQ: "Services",
+  "Funcom/FLS": "Server Control"
+};
+
+// Two consecutive misses rather than one: a single failed poll is routine
+// (the console restarting, a request racing a container bounce) and flagging
+// it would cry wolf. Two misses is ~1 minute on the idle 30s cadence.
+export const STALE_POLL_THRESHOLD = 2;
+
+export function formatFreshness(lastUpdatedAt: number, now: number) {
+  if (!lastUpdatedAt) return "";
+  const seconds = Math.max(0, Math.round((now - lastUpdatedAt) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m ago`;
+}
+
+export function HomePanel({ status, readiness, taskResult, setTaskResult, funcomTokenResult, setFuncomTokenResult, runningAction, restartStartObserved, setRunningAction, onLoad, confirmAction, restartGate, onNavigate }: {
   status: string;
   readiness: string;
   taskResult: HomeTaskResult | null;
@@ -125,6 +179,9 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   onLoad: () => Promise<HomeLoadResult>;
   confirmAction: ConfirmAction;
   restartGate: RestartGate;
+  // Optional so the panel still renders standalone in tests; without it the
+  // subsystem rows are plain text instead of buttons to nowhere.
+  onNavigate?: (tab: Tab) => void;
 }) {
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState("");
@@ -132,6 +189,8 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   const [performance, setPerformance] = useState<PerformanceSnapshot | null>(null);
   const [performanceError, setPerformanceError] = useState("");
   const [hasLoaded, setHasLoaded] = useState(Boolean(status || readiness));
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(0);
+  const [pollFailures, setPollFailures] = useState(0);
   const homeActionRunId = useRef(0);
   const homeActionStartedAt = useRef(0);
   const homeRestartLifecycle = useRef<RestartLifecycleState>(createRestartLifecycleState());
@@ -147,8 +206,25 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
     if (!runningAction) homeActionStartedAt.current = 0;
   }, [runningAction]);
 
+  // The three polling effects below all swallow their errors, so without this
+  // a backend that starts failing after the first successful load leaves the
+  // last-good values on screen indefinitely with no cue that they are frozen.
+  // Recorded here rather than per-effect so every path that refreshes the
+  // panel -- poll, manual refresh, and the pre/post loads around a server
+  // action -- dates the data the same way.
+  function recordLoadOutcome(loaded: boolean) {
+    if (loaded) {
+      setLastUpdatedAt(Date.now());
+      setPollFailures(0);
+    } else {
+      setPollFailures((count) => count + 1);
+    }
+  }
+
   function applyHomeLoadResult(result: HomeLoadResult) {
-    if (result.statusLoaded || result.readinessLoaded) setHasLoaded(true);
+    const loaded = result.statusLoaded || result.readinessLoaded;
+    if (loaded) setHasLoaded(true);
+    recordLoadOutcome(loaded);
     setReadinessWarning(!result.readinessLoaded && result.readinessError ? result.readinessError : "");
     if (!result.statusLoaded && !result.readinessLoaded && result.statusError) setLocalError(friendlyHomeStatusError(result.statusError));
   }
@@ -164,10 +240,14 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
       if (result.statusLoaded || result.readinessLoaded) {
         applyHomeLoadResult(result);
       } else {
+        recordLoadOutcome(false);
         setLocalError(friendlyHomeStatusError(result.statusError || result.readinessError || "Server status and readiness checks failed."));
       }
     } catch (error) {
-      if (isActive() && refreshRunId.current === runId) setLocalError(friendlyHomeStatusError(error instanceof Error ? error.message : String(error)));
+      if (isActive() && refreshRunId.current === runId) {
+        recordLoadOutcome(false);
+        setLocalError(friendlyHomeStatusError(error instanceof Error ? error.message : String(error)));
+      }
     } finally {
       if (isActive() && refreshRunId.current === runId) setLoading(false);
     }
@@ -295,7 +375,8 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
     let active = true;
     const id = window.setInterval(async () => {
       const result = await onLoad().catch(() => null);
-      if (active && result) applyHomeLoadResult(result);
+      if (!active) return;
+      if (result) applyHomeLoadResult(result); else recordLoadOutcome(false);
     }, 5000);
     return () => {
       active = false;
@@ -309,7 +390,8 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
     const id = window.setInterval(async () => {
       if (document.hidden) return;
       const result = await onLoad().catch(() => null);
-      if (active && result) applyHomeLoadResult(result);
+      if (!active) return;
+      if (result) applyHomeLoadResult(result); else recordLoadOutcome(false);
     }, 30000);
     return () => {
       active = false;
@@ -322,7 +404,8 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
     let active = true;
     const id = window.setInterval(async () => {
       const result = await onLoad().catch(() => null);
-      if (active && result) applyHomeLoadResult(result);
+      if (!active) return;
+      if (result) applyHomeLoadResult(result); else recordLoadOutcome(false);
     }, 1500);
     return () => {
       active = false;
@@ -388,25 +471,160 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
     </section>;
   }
 
+  const funcomTokenCheckRunning = funcomTokenResult?.status === "running";
+  // Computed here rather than inside the health band so the hero can lead with
+  // the overall verdict and the subsystem rows. The summary object's shape is
+  // unchanged -- isHomeActionComplete and homeNeedsWarmRefresh still read the
+  // same identity/health entries.
+  const summary = summarizeHomeStatus(status, readiness, readinessWarning, loading, runningAction, taskResult, restartStartObserved, !funcomTokenCheckRunning && (isFuncomTokenAuthFailure(funcomTokenResult) || hasPersistedFuncomTokenAuthFailure()));
+  const overall = summary.identity.find((item) => item.label === "Overall");
+  const identityCards = summary.identity.filter((item) => item.label !== "Overall");
+
   return (
     <section className="grid">
-      <article className="hero-panel">
-        <h2>Server Overview</h2>
-        <p>Use this dashboard for setup, service health, logs, backups, updates, and player admin actions.</p>
-        <div className="action-row">
-          <button className={loading ? "refresh-status-button refreshing" : "refresh-status-button"} disabled={refreshDisabled} onClick={() => refresh()}>{loading ? <span className="loading-dots">Refreshing</span> : "Refresh Status"}</button>
-          <button disabled={startDisabled} title={controlsState.running ? "Battlegroup is already running." : ""} onClick={() => runServerAction("start")}><Play size={16} /> Start</button>
-          <button disabled={stopDisabled} onClick={() => runServerAction("stop")}>Stop</button>
-          <button disabled={restartDisabled} onClick={() => runServerAction("restart")}>Restart Battlegroup</button>
+      <article className="hero-panel wide home-hero">
+        <div className="home-hero-split">
+          <div className="home-hero-primary">
+            {/* An h3, not a styled span: it is the peer of the "Readiness &
+                Health" and "Performance" headings, so matching them by using
+                the same element guarantees the same size and colour instead of
+                restating their computed value here. The reading sits beside it
+                rather than inside, so the heading text stays just the label. */}
+            <div className="home-hero-state">
+              <h3 className="home-hero-state-label">Battlegroup Status:</h3>
+              <span className={`home-state-dot home-state-dot-${homeStateDotTone(overall?.value, summary.health)}`} aria-hidden="true" />
+              <span className="home-hero-state-value">{homeOverallHeading(overall?.value)}</span>
+            </div>
+            <p className="home-hero-identity">{homeIdentityLine(identityCards)}</p>
+            <dl className="home-hero-meta">
+              {HOME_HERO_META_LABELS.map((label) => <div className="home-hero-meta-item" key={label}>
+                <dt>{label}</dt>
+                <dd>{formatDisplayValue(identityCards.find((item) => item.label === label)?.value || "Unknown")}</dd>
+              </div>)}
+            </dl>
+            <div className="action-row">
+              <button className={loading ? "refresh-status-button refreshing" : "refresh-status-button"} disabled={refreshDisabled} onClick={() => refresh()}>{loading ? <span className="loading-dots">Refreshing</span> : "Refresh Status"}</button>
+              <button disabled={startDisabled} title={controlsState.running ? "Battlegroup is already running." : ""} onClick={() => runServerAction("start")}><Play size={16} /> Start</button>
+              <button className="danger-button" disabled={stopDisabled} onClick={() => runServerAction("stop")}>Stop</button>
+              <button disabled={restartDisabled} onClick={() => runServerAction("restart")}>Restart Battlegroup</button>
+            </div>
+            <StatusFreshness lastUpdatedAt={lastUpdatedAt} pollFailures={pollFailures} />
+            <PendingRefillNote />
+            {taskResult && <HomeTaskResultCard result={taskResult} />}
+            {localError && <p className="error">{localError}</p>}
+          </div>
+          <HomeSubsystemList items={summary.health} onNavigate={onNavigate} />
         </div>
-        <PendingRefillNote />
-        {taskResult && <HomeTaskResultCard result={taskResult} />}
-        {localError && <p className="error">{localError}</p>}
       </article>
       <PerformanceCards performance={performance} error={performanceError} />
-      <HomeHealthCards status={status} readiness={readiness} readinessWarning={readinessWarning} loading={loading} runningAction={runningAction} restartStartObserved={restartStartObserved} taskResult={taskResult} funcomTokenResult={funcomTokenResult} />
     </section>
   );
+}
+
+export type HomeStateTone = "ok" | "motion" | "off" | "attention" | "failed" | "loading" | "nodata";
+
+// The dot used to be normalizeStatus(overall.status), which put six of the ten
+// readings on the same amber: a restart the operator just triggered looked
+// identical to a readiness check that had failed. One resolves itself, the
+// other needs a human. This splits them by what the operator should do, and
+// lets a hard-failed subsystem escalate the dot past what the heading word
+// alone conveys.
+export function homeStateDotTone(overallValue: unknown, health: { status: string }[] = []): HomeStateTone {
+  const value = String(overallValue || "").trim().toLowerCase();
+  // Deliberate, self-resolving states win over everything below: while a stop
+  // or restart is in flight the subsystems are legitimately down, and painting
+  // that red would cry wolf on an action the operator just asked for.
+  if (/^(starting|stopping|restarting)\b/.test(value)) return "motion";
+  if (value === "checking") return "loading";
+  if (value === "stopped") return "off";
+  if (value === "unknown" || value === "status loaded") return "nodata";
+  // Escalation. summarizeHomeStatus can report "OK" while Funcom/FLS is
+  // FAILED -- the token-mismatch branch overrides the ready override -- so the
+  // heading word alone is not the worst thing on screen.
+  if (health.some((item) => normalizeStatus(String(item.status || "")) === "fail")) return "failed";
+  if (value === "ok") return "ok";
+  return "attention";
+}
+
+// The heading reads "Battlegroup Status: <value>", but summarizeHomeStatus
+// yields "Restarting Battlegroup" while a restart is in flight, which would
+// render as "Battlegroup Status: Restarting Battlegroup". Trimmed here rather
+// than in the summary: that value is shared with homeNeedsWarmRefresh, and the
+// duplication is purely a consequence of this heading's new prefix.
+export function homeOverallHeading(value: unknown) {
+  const text = formatDisplayValue(value || "Unknown");
+  return text.replace(/\s+battlegroup$/i, "");
+}
+
+// The two identity values that are not already in the summary line above, and
+// that an operator copies rather than reads at a glance. Rendered labelled --
+// and shown even when Unknown -- because with the Server Identity band gone
+// this is the only place they appear.
+const HOME_HERO_META_LABELS = ["Server IP", "Battlegroup"];
+
+// Title/Region/Mode/population as one line under the state heading. Unknown
+// entries are dropped rather than printed: this is a summary, and a line reading
+// "Unknown · Unknown" tells an operator nothing. When nothing at all resolves the
+// line falls back to a loading sentence, so an empty identity is still visible.
+// Uptime is deliberately absent -- the Performance band below carries it on its
+// own card, and repeating it here said the same thing twice.
+function homeIdentityLine(items: { label: string; value: string }[]) {
+  const pick = (label: string) => {
+    const value = String(items.find((item) => item.label === label)?.value || "").trim();
+    return value && !/^(unknown|unavailable)$/i.test(value) ? value : "";
+  };
+  // formatHomePopulation yields "14" or "14 / 40"; either reads as a bare
+  // trailing number, so it is labelled here rather than in the summary.
+  const population = pick("Population");
+  const parts = [pick("Title"), pick("Region"), pick("Mode"), population ? `${population} online` : ""].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "Server details are still loading.";
+}
+
+// Dates the status values on screen. Ticks on its own 1s interval so the
+// second-by-second re-render stays inside this element instead of re-rendering
+// every card in the panel.
+function StatusFreshness({ lastUpdatedAt, pollFailures }: { lastUpdatedAt: number; pollFailures: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  if (!lastUpdatedAt) return null;
+  const stale = pollFailures >= STALE_POLL_THRESHOLD;
+  const ago = formatFreshness(lastUpdatedAt, now);
+  return <p className={stale ? "home-freshness stale" : "home-freshness"}>
+    {stale ? `Status may be stale — last updated ${ago}` : `Updated ${ago}`}
+  </p>;
+}
+
+// The six readiness subsystems as one line each, replacing the old card band.
+// A row is a button when the subsystem has somewhere to be dealt with, so a
+// warning routes to the tab that can fix it instead of being a dead end.
+function HomeSubsystemList({ items, onNavigate }: { items: { label: string; value: string; status: string; detail: string }[]; onNavigate?: (tab: Tab) => void }) {
+  return <section className="home-subsystems" aria-label="Readiness and health">
+    <h3>Readiness & Health</h3>
+    <ul className="home-subsystem-list">
+      {items.map((item) => {
+        const route = HOME_SUBSYSTEM_ROUTES[item.label];
+        const body = <>
+          <span className="home-subsystem-label">{item.label}</span>
+          <span className="home-subsystem-value">
+            {/* A healthy row's value is the literal "OK" beside a "Ready"
+                pill saying the same thing twice -- and healthy is the common
+                case. Anything else ("Warming", "Token Mismatch Detected",
+                "3 of 8 up") is the detail the pill cannot carry, so it stays. */}
+            {!/^OK$/i.test(item.value) && <span>{formatDisplayValue(item.value)}</span>}
+            <StatusPill value={item.status} />
+          </span>
+        </>;
+        return <li key={item.label} className="home-subsystem-row" title={item.detail || undefined}>
+          {route && onNavigate
+            ? <button type="button" className="home-subsystem-button" onClick={() => onNavigate(route)} aria-label={`${item.label}: ${item.value}. Open ${route}`}>{body}</button>
+            : <div className="home-subsystem-static">{body}</div>}
+        </li>;
+      })}
+    </ul>
+  </section>;
 }
 
 function PerformanceCards({ performance, error }: { performance: PerformanceSnapshot | null; error: string }) {
@@ -440,12 +658,15 @@ function PerformanceCards({ performance, error }: { performance: PerformanceSnap
     <h3>Performance</h3>
     {error && !performance && <p className="error">{error}</p>}
     <div className="health-grid health-grid-compact">
-      {cards.map((item) => <article className="status-card performance-card" key={item.label}>
-        <div className="status-card-title"><span>{item.label}</span><StatusPill value={performance ? "OK" : "INFO"} /></div>
-        <strong>{item.value}</strong>
-        <p>{item.detail}</p>
-        {item.percent !== null && <div className="metric-track" aria-hidden="true"><span style={{ width: `${clampPercent(item.percent)}%` }} /></div>}
-      </article>)}
+      {cards.map((item) => {
+        const cardStatus = performanceCardStatus(item.percent, Boolean(performance));
+        return <article className="status-card performance-card" key={item.label}>
+          <div className="status-card-title"><span>{item.label}</span>{cardStatus && <StatusPill value={cardStatus} />}</div>
+          <strong>{item.value}</strong>
+          <p>{item.detail}</p>
+          {item.percent !== null && <div className="metric-track" aria-hidden="true"><span className={performanceTrackTone(item.percent, Boolean(performance))} style={{ width: `${clampPercent(item.percent)}%` }} /></div>}
+        </article>;
+      })}
     </div>
   </section>;
 }
@@ -1226,33 +1447,6 @@ function isValidHourMinuteTime(value: string) {
 
 
 
-function HomeHealthCards({ status, readiness, readinessWarning, loading, runningAction, restartStartObserved, taskResult, funcomTokenResult }: { status: string; readiness: string; readinessWarning: string; loading: boolean; runningAction: "start" | "stop" | "restart" | ""; restartStartObserved: boolean; taskResult: HomeTaskResult | null; funcomTokenResult: HomeTaskResult | null }) {
-  const funcomTokenCheckRunning = funcomTokenResult?.status === "running";
-  const summary = summarizeHomeStatus(status, readiness, readinessWarning, loading, runningAction, taskResult, restartStartObserved, !funcomTokenCheckRunning && (isFuncomTokenAuthFailure(funcomTokenResult) || hasPersistedFuncomTokenAuthFailure()));
-  return <div className="home-health wide">
-    <section className="dashboard-band">
-      <h3>Server Identity</h3>
-      <div className="health-grid">
-        {summary.identity.map((item) => <article className="status-card" key={item.label}>
-          <div className="status-card-title"><span>{item.label}</span><StatusPill value={item.status} /></div>
-          <strong>{formatDisplayValue(item.value)}</strong>
-          {item.detail && <p>{item.detail}</p>}
-        </article>)}
-      </div>
-    </section>
-    <section className="dashboard-band">
-      <h3>Readiness & Health</h3>
-      <div className="health-grid health-grid-compact">
-        {summary.health.map((item) => <article className="status-card" key={item.label}>
-          <div className="status-card-title"><span>{item.label}</span><StatusPill value={item.status} /></div>
-          <strong>{formatDisplayValue(item.value)}</strong>
-          {item.detail && <p>{item.detail}</p>}
-        </article>)}
-      </div>
-    </section>
-  </div>;
-}
-
 function DoctorSummary({ text, readiness, loading, error, onFixBinding, onCleanupImages, onCleanupBuildCache, fixingBinding, cleanupOperation, fixDisabled }: {
   text: string;
   readiness: string;
@@ -1456,7 +1650,11 @@ function summarizeHomeStatus(status: string, readiness: string, readinessWarning
   };
 }
 
-function homeNeedsWarmRefresh(status: string, readiness: string) {
+// Exported for the regression guard in ServerPanels.homeCards.test.tsx: this
+// and isHomeActionComplete both read summarizeHomeStatus()'s identity/health
+// arrays, so a future edit that drops an entry while "just changing the
+// rendering" has to fail a test rather than silently break poll cadence.
+export function homeNeedsWarmRefresh(status: string, readiness: string) {
   if (!status && !readiness) return false;
   const summary = summarizeHomeStatus(status, readiness, "", false);
   const overall = summary.identity.find((item) => item.label === "Overall");
@@ -1780,13 +1978,22 @@ function isHomeBootStarting(status: string, readiness: string) {
   return coreStartupContainerUp || readinessStarting || (coreStartupContainerUp && containerLines.length > 0 && missingContainers > 0) || (coreStartupContainerUp && listenerLines.length > 0 && missingListeners > 0);
 }
 
-function homeOverallBadge(value: string) {
+export function homeOverallBadge(value: string) {
   const normalized = String(value || "").trim().toLowerCase();
   if (/\b(restarting|restart|stopping|starting)\b/.test(normalized)) return "WARN";
   if (/^stopped$/i.test(value)) return "WARN";
   if (/^issue(?: detected)?$/i.test(value)) return "WARN";
   if (/warming/i.test(value)) return "Info";
   if (/stopped|not running|offline/i.test(value)) return "WARN";
+  // "Readiness checked" is summarizeHomeStatus's label for a readiness run that
+  // did NOT pass -- when it passes the value is "OK". Left to inferStatus the
+  // word "checked" matches its pass list and comes back green, so a failed
+  // readiness check reported itself as healthy.
+  if (normalized === "readiness checked") return "WARN";
+  // Core subsystems are up but something is flagged. inferStatus finds no
+  // keyword and falls through to "Info", the same neutral as "Unknown" and
+  // "Checking" -- indistinguishable from "nothing known yet".
+  if (normalized === "needs review") return "WARN";
   return inferStatus(value);
 }
 

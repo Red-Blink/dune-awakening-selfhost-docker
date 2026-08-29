@@ -26,6 +26,12 @@
   --danger: #a74949;
   --danger-strong: #8d3434;
   --danger-text: #ffb4a8;
+  /* For small filled indicators (an 11px status dot), where neither existing
+     danger step works: --danger-text is a pale salmon that sits right next to
+     --title's amber at that size -- measured side by side, the two were not
+     separable -- and --danger is dark enough to read as brown on the card
+     background. This is the saturated middle, only for shapes, never text. */
+  --danger-signal: #e05a4f;
   --warning: #a97932;
   background: var(--bg);
   color: var(--text);
@@ -968,6 +974,12 @@ main { padding: 22px; min-width: 0; }
 .performance-card strong { font-size: 22px; line-height: 1.15; }
 .metric-track { height: 8px; overflow: hidden; border-radius: 999px; background: #0c0e10; border: 1px solid #302b25; }
 .metric-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #6f8f5f, #c68b4a); transition: width .35s ease; }
+/* The fill colour has to carry the same verdict as the card's badge -- with a
+   single gradient for every reading, a 96%-full disk looked identical to a
+   4%-full one and the bar was decoration. Same warn/danger tokens the badges
+   use, so the two cannot disagree. */
+.metric-track span.metric-track-warn { background: linear-gradient(90deg, #a97932, #d49a5c); }
+.metric-track span.metric-track-fail { background: linear-gradient(90deg, var(--danger), var(--danger-strong)); }
 .result-list { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
 .result-row { border: 1px solid #302b25; border-radius: 6px; padding: 9px 10px; background: #14171a; color: #d9c8aa; }
 .result-ok { border-color: #3d8b62; color: #9be6bd; }
@@ -2130,9 +2142,93 @@ body.debug .technical-details { display: block; }
 .service-table { display: grid; gap: 10px; margin-top: 14px; }
 .service-actions, .service-card .service-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
 .service-actions button, .service-actions .button-link { width: auto; white-space: nowrap; }
-.home-health { display: grid; gap: 16px; }
 .dashboard-band { display: grid; gap: 10px; }
 .dashboard-band h3 { margin: 0; color: #ffd08a; }
+
+/* The hero is the only .grid child without .wide, so before this it sat in
+   column 1 of a two-column grid and left the whole right half of row 1 empty
+   on every viewport above the 900px breakpoint. It now spans the row and uses
+   that reclaimed space for the readiness subsystems. */
+.home-hero-split { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.home-hero-primary { min-width: 0; }
+.home-hero-state { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+/* Only layout here: .home-hero-state-label is an h3, so it already picks up
+   the same size, colour and weight as the "Readiness & Health" and
+   "Performance" headings. Deliberately no font-size -- restating it would let
+   the two drift apart the next time heading sizing changes. */
+.home-hero-state-label { margin: 0; }
+/* The reading shares the heading's warm family and weight but is stepped up:
+   the label names the row, the reading is the answer. The dot carries state. */
+.home-hero-state-value { color: var(--title); font-size: 1.4em; font-weight: 700; line-height: 1.2; }
+/* Three axes, not one: hue carries severity, the pulse carries "in progress",
+   and ring-vs-fill carries "no reading yet". Anyone who cannot separate the
+   hues still gets the important distinction -- a pulsing dot is working on it,
+   a hollow one has nothing to report -- which matters on a console this
+   uniformly amber. */
+.home-state-dot { flex: 0 0 auto; width: 11px; height: 11px; border-radius: 50%; background: var(--muted); }
+.home-state-dot-ok { background: var(--success-text); }
+.home-state-dot-attention { background: var(--title); }
+.home-state-dot-failed { background: var(--danger-signal); }
+/* Off on purpose. Solid, so it still reads as a known state -- the hollow
+   ring below is reserved for "we have no reading". --text-subtle, not
+   --muted: --muted is a warm beige that sits in the same family as --title's
+   amber, so at 11px "off" and "needs attention" blurred together. */
+.home-state-dot-off { background: var(--text-subtle); }
+/* Blue is already this palette's informational hue (see .badge-info); it is
+   the one family that does not blur into the warm chrome the way another
+   amber step would. */
+.home-state-dot-motion { background: #85b7eb; animation: state-dot-pulse 1.6s ease-in-out infinite; }
+.home-state-dot-loading { background: transparent; border: 2px solid var(--text-subtle); animation: state-dot-pulse 1.6s ease-in-out infinite; }
+.home-state-dot-nodata { background: transparent; border: 2px solid var(--text-subtle); }
+@keyframes state-dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .45; transform: scale(.82); }
+}
+.home-hero-identity { margin: 6px 0 0; color: var(--muted); }
+/* Server IP and Battlegroup: reference values an operator copies, so they are
+   labelled rather than folded into the "·" summary line above, and they keep
+   their own line-up when the hero narrows. */
+.home-hero-meta { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 12px 0 0; }
+.home-hero-meta-item { min-width: 0; display: grid; gap: 2px; }
+.home-hero-meta dt { color: var(--muted); font-size: 12px; }
+.home-hero-meta dd { margin: 0; color: var(--text-strong); overflow-wrap: anywhere; }
+/* Dates the values on screen. Muted at rest so it does not compete with the
+   state word; only the stale form is allowed to draw the eye. */
+.home-freshness { margin: 8px 0 0; color: var(--text-subtle); font-size: 12px; }
+.home-freshness.stale { color: var(--title); }
+
+.home-subsystems { min-width: 0; display: grid; gap: 10px; align-content: start; }
+.home-subsystems h3 { margin: 0; color: #ffd08a; }
+.home-subsystem-list { list-style: none; margin: 0; padding: 0; display: grid; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.home-subsystem-row + .home-subsystem-row { border-top: 1px solid var(--border); }
+/* The button resets the global button styling rather than inheriting it: these
+   are full-bleed rows, not controls, so they take the row's own padding and a
+   transparent background and only light up on hover. */
+.home-subsystem-button, .home-subsystem-static {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 9px 12px;
+  background: var(--panel);
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  text-align: left;
+}
+.home-subsystem-button { cursor: pointer; }
+.home-subsystem-button:hover { background: #1c2024; color: var(--text-strong); }
+.home-subsystem-button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.home-subsystem-label { min-width: 0; overflow-wrap: anywhere; }
+.home-subsystem-value { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+
+/* Stop destroys running state; it should not read as the visual peer of a
+   read-only Refresh sitting beside it. Border and text only -- the filled
+   danger treatment is reserved for confirm dialogs. */
+.danger-button { border-color: var(--danger); color: var(--danger-text); }
+.danger-button:hover:not(:disabled) { border-color: var(--danger-strong); background: rgba(167, 73, 73, .16); }
 .health-grid-compact { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
 .readiness-groups { display: grid; gap: 14px; }
 .readiness-group { display: grid; gap: 8px; }
@@ -2595,6 +2691,7 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   .sidebar-nav-heading { grid-column: 1 / -1; }
   .home-backdrop { inset: 0; }
   .grid, .two-col { grid-template-columns: 1fr; }
+  .home-hero-split { grid-template-columns: 1fr; gap: 16px; }
   .health-grid, .health-grid-compact { grid-template-columns: 1fr; }
   .live-map-layout { grid-template-columns: 1fr; }
   .live-map-view-body { grid-template-columns: 1fr; }
@@ -2604,6 +2701,9 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 
 @media (prefers-reduced-motion: reduce) {
   .home-sand-fine, .home-sand-near, .setup-finish-celebration span { animation: none; }
+  /* The dot keeps its hue and its ring/fill, so "in progress" is still
+     distinguishable from "no reading" without the motion. */
+  .home-state-dot-motion, .home-state-dot-loading { animation: none; }
 }
 
 .toggle-row { display: flex; flex-wrap: wrap; gap: 8px; }

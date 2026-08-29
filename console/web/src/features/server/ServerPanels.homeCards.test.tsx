@@ -1,0 +1,468 @@
+import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  HomePanel,
+  formatFreshness,
+  homeNeedsWarmRefresh,
+  homeOverallBadge,
+  homeOverallHeading,
+  homeStateDotTone,
+  isHomeActionComplete,
+  performanceCardStatus,
+  performanceTrackTone,
+  type HomeLoadResult
+} from "./ServerPanels";
+import { normalizeStatus } from "../../lib/display";
+
+// The panel polls performance every 3s and the Funcom token every 10s on mount.
+// Neither is what these tests are about, so both are stubbed; `performance`
+// is re-pointed per test to drive the utilisation thresholds.
+const performanceMock = vi.fn();
+const checkFuncomTokenMock = vi.fn();
+
+vi.mock("../../api/server", () => ({
+  serverApi: {
+    performance: () => performanceMock(),
+    checkFuncomToken: (since: string) => checkFuncomTokenMock(since),
+    start: vi.fn(),
+    stop: vi.fn(),
+    restart: vi.fn(),
+    status: vi.fn(),
+    readiness: vi.fn(),
+    restartQueue: vi.fn()
+  }
+}));
+
+// The pending-queue hooks each hit their own endpoint on mount; the refill note
+// they feed is not under test here.
+vi.mock("../../lib/usePendingRefills", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../lib/usePendingRefills")>();
+  return {
+    ...actual,
+    usePendingQueues: () => ({
+      fuel: { pending: null },
+      water: { pending: null },
+      deletes: { pending: null },
+      vehicleDeletes: { pending: null },
+      permissions: { pending: null }
+    })
+  };
+});
+
+const STATUS_TEXT = [
+  "Title: Kovalt",
+  "Region: EU",
+  "Mode: public",
+  "Server IP: 10.0.0.4",
+  "Battlegroup: bg-12345",
+  "Population: 14"
+].join("\n");
+
+function snapshot(cpu: number | null, memoryPercent: number | null, diskPercent: number | null) {
+  return {
+    cpuPercent: cpu,
+    memory: { usedBytes: 8e9, totalBytes: 16e9, availableBytes: 8e9, percent: memoryPercent },
+    disk: { usedBytes: 4e11, totalBytes: 5e11, freeBytes: 1e11, percent: diskPercent },
+    uptimeSeconds: 561600,
+    uptime: "6d 12h 00m",
+    sampledAt: new Date(0).toISOString()
+  };
+}
+
+function loadResult(overrides: Partial<HomeLoadResult> = {}): HomeLoadResult {
+  return {
+    statusLoaded: true,
+    readinessLoaded: true,
+    statusError: "",
+    readinessError: "",
+    statusText: STATUS_TEXT,
+    readinessText: "READY: all checks passed",
+    ...overrides
+  };
+}
+
+function renderHome(props: Partial<Parameters<typeof HomePanel>[0]> = {}) {
+  const onLoad = props.onLoad || vi.fn().mockResolvedValue(loadResult());
+  return {
+    onLoad,
+    ...render(<HomePanel
+      status={STATUS_TEXT}
+      readiness="READY: all checks passed"
+      taskResult={null}
+      setTaskResult={vi.fn()}
+      funcomTokenResult={null}
+      setFuncomTokenResult={vi.fn()}
+      runningAction=""
+      restartStartObserved={false}
+      setRunningAction={vi.fn()}
+      onLoad={onLoad}
+      confirmAction={vi.fn().mockResolvedValue(true)}
+      restartGate={vi.fn()}
+      {...props}
+    />)
+  };
+}
+
+// Find the .status-card whose title cell holds this label.
+function card(label: string) {
+  const title = screen.getAllByText(label).find((node) => node.closest(".status-card-title"));
+  const found = title?.closest(".status-card");
+  if (!found) throw new Error(`no status card for ${label}`);
+  return found as HTMLElement;
+}
+
+beforeEach(() => {
+  performanceMock.mockResolvedValue(snapshot(30, 40, 50));
+  checkFuncomTokenMock.mockResolvedValue({ ok: true, mismatch: false, checkedSince: "10m" });
+  window.localStorage.clear();
+  window.sessionStorage.clear();
+});
+
+afterEach(() => {
+  vi.clearAllMocks();
+  vi.useRealTimers();
+});
+
+describe("performanceCardStatus", () => {
+  // Before this the badge was `performance ? "OK" : "INFO"`, so a disk at 96%
+  // showed the same green pill as one at 4% and the band could never report a
+  // problem at all.
+  it("grades a reading against its own value, not merely whether a sample arrived", () => {
+    expect(performanceCardStatus(30, true)).toBe("OK");
+    expect(performanceCardStatus(74.9, true)).toBe("OK");
+    expect(performanceCardStatus(75, true)).toBe("WARN");
+    expect(performanceCardStatus(90, true)).toBe("WARN");
+    expect(performanceCardStatus(90.1, true)).toBe("FAILED");
+    expect(performanceCardStatus(96.7, true)).toBe("FAILED");
+  });
+
+  it("reports INFO until a sample lands, and no status at all without a percentage", () => {
+    expect(performanceCardStatus(30, false)).toBe("INFO");
+    expect(performanceCardStatus(Number.NaN, true)).toBe("INFO");
+    // Uptime carries percent: null -- it must render no badge rather than a
+    // fabricated OK.
+    expect(performanceCardStatus(null, true)).toBe("");
+    expect(performanceCardStatus(null, false)).toBe("");
+  });
+
+  it("moves the bar tone with the badge so the two cannot disagree", () => {
+    expect(performanceTrackTone(30, true)).toBe("");
+    expect(performanceTrackTone(85, true)).toBe("metric-track-warn");
+    expect(performanceTrackTone(95, true)).toBe("metric-track-fail");
+  });
+});
+
+describe("homeOverallHeading", () => {
+  it("passes ordinary readings through", () => {
+    expect(homeOverallHeading("OK")).toBe("OK");
+    expect(homeOverallHeading("Stopped")).toBe("Stopped");
+    expect(homeOverallHeading("Starting")).toBe("Starting");
+    expect(homeOverallHeading("Needs Review")).toBe("Needs Review");
+    expect(homeOverallHeading(undefined)).toBe("Unknown");
+  });
+
+  // summarizeHomeStatus yields "Restarting Battlegroup" mid-restart, which
+  // under the "Battlegroup Status:" prefix would say Battlegroup twice.
+  it("drops the redundant word the heading prefix already supplies", () => {
+    expect(homeOverallHeading("Restarting Battlegroup")).toBe("Restarting");
+  });
+});
+
+describe("homeOverallBadge", () => {
+  it("keeps the readings that were already correct", () => {
+    expect(normalizeStatus(homeOverallBadge("OK"))).toBe("pass");
+    expect(normalizeStatus(homeOverallBadge("Stopped"))).toBe("warn");
+    expect(normalizeStatus(homeOverallBadge("Starting"))).toBe("warn");
+    expect(normalizeStatus(homeOverallBadge("Stopping"))).toBe("warn");
+    expect(normalizeStatus(homeOverallBadge("Restarting Battlegroup"))).toBe("warn");
+    expect(normalizeStatus(homeOverallBadge("Unknown"))).toBe("info");
+    expect(normalizeStatus(homeOverallBadge("Checking"))).toBe("info");
+  });
+
+  // "Readiness checked" is only ever the label for a readiness run that did
+  // not pass -- a passing one reads "OK". inferStatus matched the word
+  // "checked" against its pass list, so the dot went green at the exact moment
+  // readiness had failed.
+  it("does not report a failed readiness check as healthy", () => {
+    expect(normalizeStatus(homeOverallBadge("Readiness checked"))).toBe("warn");
+  });
+
+  // Previously fell through to Info, the same neutral grey as "Unknown", so a
+  // flagged subsystem looked identical to nothing being known yet.
+  it("distinguishes a flagged subsystem from an unknown state", () => {
+    expect(normalizeStatus(homeOverallBadge("Needs Review"))).toBe("warn");
+    expect(normalizeStatus(homeOverallBadge("Needs Review"))).not.toBe(normalizeStatus(homeOverallBadge("Unknown")));
+  });
+});
+
+describe("homeStateDotTone", () => {
+  const healthy = [{ status: "Ready" }, { status: "Ready" }];
+  const failed = [{ status: "Ready" }, { status: "FAILED" }];
+
+  it("separates in-motion states from the ones that need a human", () => {
+    // All four of these were the same amber as "Needs Review" before.
+    expect(homeStateDotTone("Starting", healthy)).toBe("motion");
+    expect(homeStateDotTone("Stopping", healthy)).toBe("motion");
+    expect(homeStateDotTone("Restarting Battlegroup", healthy)).toBe("motion");
+    expect(homeStateDotTone("Needs Review", healthy)).toBe("attention");
+    expect(homeStateDotTone("Readiness checked", healthy)).toBe("attention");
+  });
+
+  it("treats a deliberate stop as off, not as a warning", () => {
+    expect(homeStateDotTone("Stopped", healthy)).toBe("off");
+  });
+
+  it("distinguishes having no reading from having a bad one", () => {
+    expect(homeStateDotTone("Checking", healthy)).toBe("loading");
+    expect(homeStateDotTone("Unknown", healthy)).toBe("nodata");
+    expect(homeStateDotTone("Status loaded", healthy)).toBe("nodata");
+    expect(homeStateDotTone("", healthy)).toBe("attention");
+  });
+
+  it("stays green only when nothing is wrong", () => {
+    expect(homeStateDotTone("OK", healthy)).toBe("ok");
+  });
+
+  // summarizeHomeStatus's token-mismatch branch overrides its own ready
+  // override, so "OK" can be reported while Funcom/FLS is FAILED right beside
+  // it. The dot has to reflect the worst thing on screen, not just the word.
+  it("escalates past the heading word when a subsystem has failed", () => {
+    expect(homeStateDotTone("OK", failed)).toBe("failed");
+    expect(homeStateDotTone("Needs Review", failed)).toBe("failed");
+  });
+
+  // A stop or restart takes the subsystems down on purpose; going red there
+  // would cry wolf on an action the operator just triggered.
+  it("does not escalate during an action the operator asked for", () => {
+    expect(homeStateDotTone("Restarting Battlegroup", failed)).toBe("motion");
+    expect(homeStateDotTone("Stopping", failed)).toBe("motion");
+    expect(homeStateDotTone("Stopped", failed)).toBe("off");
+  });
+});
+
+describe("formatFreshness", () => {
+  it("counts seconds, then minutes, then hours", () => {
+    const base = 1_000_000;
+    expect(formatFreshness(base, base + 8_000)).toBe("8s ago");
+    expect(formatFreshness(base, base + 59_000)).toBe("59s ago");
+    expect(formatFreshness(base, base + 61_000)).toBe("1m ago");
+    expect(formatFreshness(base, base + 3_600_000)).toBe("1h 0m ago");
+    expect(formatFreshness(base, base + 5_400_000)).toBe("1h 30m ago");
+  });
+
+  it("renders nothing before the first successful load", () => {
+    expect(formatFreshness(0, 1_000_000)).toBe("");
+  });
+});
+
+describe("HomePanel performance band", () => {
+  it("badges each utilisation card from its own reading", async () => {
+    performanceMock.mockResolvedValue(snapshot(30, 85, 95));
+    renderHome();
+    await waitFor(() => expect(within(card("CPU Usage")).getByText("OK")).toBeTruthy());
+    expect(within(card("Memory")).getByText("WARN")).toBeTruthy();
+    expect(within(card("Disk")).getByText("FAILED")).toBeTruthy();
+  });
+
+  it("tones the meter bar to match", async () => {
+    performanceMock.mockResolvedValue(snapshot(30, 85, 95));
+    renderHome();
+    await waitFor(() => expect(card("Disk").querySelector(".metric-track span")).toBeTruthy());
+    expect(card("CPU Usage").querySelector(".metric-track span")?.className).toBe("");
+    expect(card("Memory").querySelector(".metric-track span")?.className).toBe("metric-track-warn");
+    expect(card("Disk").querySelector(".metric-track span")?.className).toBe("metric-track-fail");
+  });
+
+  it("gives Uptime no badge at all rather than a constant OK", async () => {
+    renderHome();
+    await waitFor(() => expect(card("Uptime")).toBeTruthy());
+    expect(card("Uptime").querySelector(".badge")).toBeNull();
+  });
+});
+
+describe("HomePanel server identity", () => {
+  it("leads with the overall verdict as the hero heading", async () => {
+    const { container } = renderHome();
+    await waitFor(() => expect(container.querySelector(".home-hero-state")).toBeTruthy());
+    expect(container.querySelector(".home-hero-state")?.textContent).toBe("Battlegroup Status:OK");
+    expect(container.querySelector(".home-hero-state-value")?.textContent).toBe("OK");
+    // The label is an h3 so it matches the "Readiness & Health" and
+    // "Performance" section headings by element rather than by restated CSS.
+    const label = container.querySelector(".home-hero-state-label");
+    expect(label?.tagName).toBe("H3");
+    expect(label?.textContent).toBe("Battlegroup Status:");
+  });
+
+  it("summarises the identity values on one line under the state", async () => {
+    const { container } = renderHome();
+    await waitFor(() => expect(container.querySelector(".home-hero-identity")).toBeTruthy());
+    const line = container.querySelector(".home-hero-identity")?.textContent || "";
+    expect(line).toContain("Kovalt");
+    expect(line).toContain("EU");
+    expect(line).toContain("Public");
+    expect(line).toContain("14 online");
+  });
+
+  // The Performance band carries Uptime on its own card; the hero line said it
+  // a second time.
+  it("leaves uptime to the Performance band", async () => {
+    const { container } = renderHome();
+    await waitFor(() => expect(container.querySelector(".home-hero-identity")).toBeTruthy());
+    expect(container.querySelector(".home-hero-identity")?.textContent).not.toContain("6d 12h 00m");
+    expect(card("Uptime").textContent).toContain("6d 12h 00m");
+  });
+
+  it("carries Server IP and Battlegroup as labelled reference values in the hero", async () => {
+    const { container } = renderHome();
+    await waitFor(() => expect(container.querySelector(".home-hero-meta")).toBeTruthy());
+    const pairs = Array.from(container.querySelectorAll(".home-hero-meta-item")).map((node) => [
+      node.querySelector("dt")?.textContent,
+      node.querySelector("dd")?.textContent
+    ]);
+    expect(pairs).toEqual([["Server IP", "10.0.0.4"], ["Battlegroup", "bg-12345"]]);
+  });
+
+  // These two are now the only place those values appear, so an absent one has
+  // to read "Unknown" rather than silently vanish from the panel.
+  it("still names Server IP and Battlegroup when the status text omits them", async () => {
+    const onLoad = vi.fn().mockResolvedValue(loadResult({ statusText: "Title: Kovalt" }));
+    const { container } = renderHome({ status: "Title: Kovalt", onLoad });
+    await waitFor(() => expect(container.querySelector(".home-hero-meta")).toBeTruthy());
+    const pairs = Array.from(container.querySelectorAll(".home-hero-meta-item")).map((node) => [
+      node.querySelector("dt")?.textContent,
+      node.querySelector("dd")?.textContent
+    ]);
+    expect(pairs).toEqual([["Server IP", "Unknown"], ["Battlegroup", "Unknown"]]);
+  });
+
+  // The Server Identity band repeated Title/Region/Mode/Population, which the
+  // hero summary line already carries. Only the performance cards remain.
+  it("no longer renders a Server Identity band", async () => {
+    const { container } = renderHome();
+    await waitFor(() => expect(container.querySelector(".home-hero-meta")).toBeTruthy());
+    expect(container.querySelector(".home-health")).toBeNull();
+    expect(screen.queryByText("Server Identity")).toBeNull();
+    const cardLabels = Array.from(container.querySelectorAll(".status-card-title > span:not(.badge)")).map((node) => node.textContent);
+    expect(cardLabels).toEqual(["CPU Usage", "Memory", "Disk", "Uptime"]);
+  });
+
+  it("states each identity value exactly once", async () => {
+    const { container } = renderHome();
+    await waitFor(() => expect(container.querySelector(".home-hero-meta")).toBeTruthy());
+    const text = container.textContent || "";
+    for (const value of ["Kovalt", "10.0.0.4", "bg-12345"]) {
+      expect(text.split(value).length - 1).toBe(1);
+    }
+  });
+});
+
+describe("HomePanel subsystem rows", () => {
+  const SUBSYSTEMS = ["Containers", "Listeners", "Database", "Game Servers", "RabbitMQ", "Funcom/FLS"];
+
+  it("lists every readiness subsystem", async () => {
+    const { container } = renderHome();
+    await waitFor(() => expect(container.querySelectorAll(".home-subsystem-row").length).toBe(6));
+    const labels = Array.from(container.querySelectorAll(".home-subsystem-label")).map((node) => node.textContent);
+    expect(labels).toEqual(SUBSYSTEMS);
+  });
+
+  it("routes an unhealthy subsystem to the tab that can fix it", async () => {
+    const onNavigate = vi.fn();
+    const { container } = renderHome({ onNavigate });
+    await waitFor(() => expect(container.querySelectorAll(".home-subsystem-button").length).toBe(6));
+    const rowFor = (label: string) => {
+      const node = Array.from(container.querySelectorAll(".home-subsystem-label")).find((item) => item.textContent === label);
+      return node?.closest("button") as HTMLButtonElement;
+    };
+    rowFor("Database").click();
+    expect(onNavigate).toHaveBeenCalledWith("Database");
+    rowFor("Game Servers").click();
+    expect(onNavigate).toHaveBeenCalledWith("Services");
+    // PortChecklist and the Change Funcom Token form both live on Server
+    // Control, not Settings.
+    rowFor("Listeners").click();
+    expect(onNavigate).toHaveBeenCalledWith("Server Control");
+    rowFor("Funcom/FLS").click();
+    expect(onNavigate).toHaveBeenCalledWith("Server Control");
+  });
+
+  it("renders plain rows, not buttons to nowhere, when no navigation is wired", async () => {
+    const { container } = renderHome();
+    await waitFor(() => expect(container.querySelectorAll(".home-subsystem-row").length).toBe(6));
+    expect(container.querySelectorAll(".home-subsystem-button").length).toBe(0);
+    expect(container.querySelectorAll(".home-subsystem-static").length).toBe(6);
+  });
+});
+
+describe("HomePanel status freshness", () => {
+  it("dates the values once a load succeeds", async () => {
+    const { container } = renderHome();
+    await waitFor(() => expect(container.querySelector(".home-freshness")).toBeTruthy());
+    expect(container.querySelector(".home-freshness")?.textContent).toMatch(/^Updated \d+s ago$/);
+    expect(container.querySelector(".home-freshness.stale")).toBeNull();
+  });
+
+  // The three polling effects all swallow their errors, so before this a
+  // backend that started failing after the first load left the last-good
+  // values up forever with no cue that they were frozen.
+  it("warns that values may be stale after consecutive failed polls, without blanking them", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const onLoad = vi.fn().mockResolvedValue(loadResult());
+    const { container } = renderHome({ onLoad });
+    await vi.waitFor(() => expect(container.querySelector(".home-freshness")).toBeTruthy());
+
+    onLoad.mockRejectedValue(new Error("connection refused"));
+    // Two ticks of the idle 30s poll -- STALE_POLL_THRESHOLD consecutive misses.
+    for (let i = 0; i < 2; i += 1) {
+      await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
+    }
+
+    await vi.waitFor(() => expect(container.querySelector(".home-freshness.stale")).toBeTruthy());
+    expect(container.querySelector(".home-freshness")?.textContent).toMatch(/^Status may be stale/);
+    // The last good values are still on screen -- the point is to date them,
+    // not blank the panel.
+    expect(container.querySelector(".home-hero-identity")?.textContent).toContain("Kovalt");
+    expect(container.querySelector(".home-hero-meta")?.textContent).toContain("10.0.0.4");
+  });
+
+  it("clears the stale warning once a poll succeeds again", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const onLoad = vi.fn().mockResolvedValue(loadResult());
+    const { container } = renderHome({ onLoad });
+    await vi.waitFor(() => expect(container.querySelector(".home-freshness")).toBeTruthy());
+
+    onLoad.mockRejectedValue(new Error("connection refused"));
+    for (let i = 0; i < 2; i += 1) {
+      await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
+    }
+    await vi.waitFor(() => expect(container.querySelector(".home-freshness.stale")).toBeTruthy());
+
+    onLoad.mockResolvedValue(loadResult());
+    await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
+    await vi.waitFor(() => expect(container.querySelector(".home-freshness.stale")).toBeNull());
+  });
+});
+
+// Regression guard for the constraint that made this refactor safe.
+// summarizeHomeStatus is not only a view model: its health/identity arrays
+// drive the restart lifecycle. Removing the Readiness & Health *band* must not
+// remove the health *entries*. Emptying that array makes the first case here
+// fail, which is exactly the accident this guards.
+describe("summarizeHomeStatus consumers still see identity and health entries", () => {
+  const WARMING_STATUS = ["Overall: WARMING", "Title: Kovalt", "", "Game servers", "Survival_1 WARMING"].join("\n");
+
+  it("treats a READY readiness as a completed action via the health array", () => {
+    // No required-signal lines, so isHomeReadinessOperational is false and the
+    // verdict has to come from summary.health being fully OK.
+    expect(isHomeActionComplete("Title: Kovalt", "READY: all checks passed")).toBe(true);
+  });
+
+  it("still reports an incomplete action when nothing is ready", () => {
+    expect(isHomeActionComplete("", "")).toBe(false);
+  });
+
+  it("reads Overall and Game Servers to pick the warm poll cadence", () => {
+    expect(homeNeedsWarmRefresh(WARMING_STATUS, "")).toBe(true);
+    expect(homeNeedsWarmRefresh("Title: Kovalt", "READY: all checks passed")).toBe(false);
+  });
+});
