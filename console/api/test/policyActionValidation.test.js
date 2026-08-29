@@ -67,11 +67,10 @@ test("the trap was real: that Deny would have withheld nothing", () => {
     { Effect: "Allow", Action: ["players:*"] }
   ]);
   assert.equal(evaluate({ tier: "admin" }, "players:reset-progression", docs), false);
-  // ...and the route resolves to a real action that the Allow above DOES grant,
-  // so the reset stayed reachable. That action was players:mutate when this
-  // trap was found; the players:mutate split made it players:reset. Read from
-  // actionForRoute rather than hardcoded, so a further split cannot make this
-  // test quietly stop describing the live route.
+  // ...while the route resolves to a real action the Allow above DOES grant, so
+  // the reset stays reachable. Read from actionForRoute rather than hardcoded,
+  // so a future split cannot make this test quietly stop describing the live
+  // route.
   const realAction = actionForRoute("/api/players/12345/reset-progression", "POST");
   assert.ok(realAction && realAction !== "players:reset-progression");
   assert.equal(evaluate({ tier: "admin" }, realAction, docs), true);

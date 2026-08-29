@@ -37,10 +37,9 @@ const db = HOST
 
 const SCHEMA = "roenf";
 
-// EXACTLY how server.js databaseQuery and the addon bridge call it. Calling
-// runSql bare is what the first version of this file did, which silently
-// exercised the UNENFORCED path and reported the writes as succeeding -- the
-// enforcement is opt-in, so a test that forgets the option tests nothing.
+// EXACTLY how server.js databaseQuery and the addon bridge call it. Enforcement
+// is opt-in, so calling runSql bare exercises the UNENFORCED path and reports
+// writes as succeeding -- a test that omits the option tests nothing.
 const runUserSql = (sql, allowWrite = false) => runSql(db, sql, allowWrite, { enforceReadOnly: true });
 
 test("read-only enforcement", { skip }, async (t) => {

@@ -71,9 +71,9 @@ A list carries no implicit floor: listing only `players:moderate` does **not** a
 
 **The trade-off is the mirror of the paragraph above.** A level auto-covers actions added in a
 later release; a list does not. A read route added next version is reachable by `players: "read"`
-and *not* by `["players:read"]`. That is the point — you opted into a fixed set — but it means a
-list needs revisiting when the catalog grows. Levels remain the right default for broad, trusted
-keys; lists are for keys handed to something you want tightly bounded.
+and *not* by `["players:read"]` — that is the point of opting into a fixed set, but it means a
+list needs revisiting when the catalog grows. Levels stay the right default for broad, trusted
+keys; lists are for keys you want tightly bounded.
 
 Unrecognised entries are dropped rather than coerced: an action that does not exist, or belongs to
 another namespace, or is a write action in a write-denied namespace, is removed. If nothing

@@ -142,11 +142,9 @@ export function publicKey(record, expired = false) {
     id: record.id,
     name: record.name,
     prefix: record.prefix,
-    // Copied one level deeper than a spread, because a scope value may now be
-    // an ARRAY of actions. `{ ...record.scopes }` would hand every caller a
-    // reference to the stored array, so anything mutating what it got back --
-    // a sort in the UI layer, a push in a future caller -- would be editing
-    // the live key's grant in place.
+    // One level deeper than a spread: a scope value may be an ARRAY, and
+    // `{ ...record.scopes }` would share that array with every caller, so any
+    // sort or push downstream would edit the live key's grant in place.
     scopes: Object.fromEntries(Object.entries(record.scopes || {})
       .map(([namespace, value]) => [namespace, Array.isArray(value) ? [...value] : value])),
     enabled: record.enabled !== false,

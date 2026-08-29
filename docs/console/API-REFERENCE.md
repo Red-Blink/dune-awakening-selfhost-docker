@@ -705,23 +705,25 @@ Layers legend's default-settings mechanism.
 | GET | `/api/database/table/{table}` | Preview table | `table`, `limit?`, `offset?` |
 
 **`/api/database/query` authorizes on the SQL, not just the route.** The route
-resolves to the `database:query` action, which covers read-only SQL (`SELECT`,
-`WITH`, `SHOW`, `EXPLAIN`). Write SQL sent to the same route additionally
-requires `database:execute`, checked inside the handler once the body is parsed
-— a caller holding only `database:query` gets `403` on a write and nothing runs:
-no rate-limit tick, no pre-write backup.
+resolves to `database:query`, which covers read-only SQL (`SELECT`, `WITH`,
+`SHOW`, `EXPLAIN`). SQL the classifier reads as a write additionally requires
+`database:execute`, checked inside the handler once the body is parsed; a caller
+without it gets `403` before the rate-limit tick and before the pre-write backup.
 
-The permission is not the enforcement. `database:execute` is selected by a SQL
-classifier that a mutating `select dune.<fn>(...)` passes, so the read path also
-executes inside a `set transaction read only` transaction and Postgres refuses
-the write regardless of what the classifier concluded. The default `admin` policy grants
-`database:query` and denies `database:execute`; `owner` holds both. Use
-`/api/database/export` for read-only result export.
+**The permission is not the enforcement.** `database:execute` is selected by a
+classifier that a mutating `select dune.<fn>(...)` passes — so a write can be
+routed down the read path. That path executes inside a `set transaction read
+only` transaction, and Postgres refuses the write whatever the classifier
+concluded. The transaction is the guarantee; the action decides which path is
+taken and whether a backup is made.
+
+The default `admin` policy grants `database:query` and denies `database:execute`;
+`owner` holds both. Use `/api/database/export` for read-only result export.
 
 A body with nothing to execute — empty, whitespace, `;`, or entirely
-commented-out SQL — returns `400` before anything else happens. Such input
-does not start with a read keyword, so it used to classify as a write and
-trigger the pre-write backup before the query was ever rejected.
+commented-out SQL — returns `400` first. Such input does not start with a read
+keyword, so without that check it classifies as a write and triggers a full
+pre-write backup before the query is rejected.
 
 ---
 
@@ -848,13 +850,19 @@ Per-tier Allow/Deny documents for the action catalog. Architecture and evaluatio
 | PUT | `/api/settings/iam/policy` | Validate and atomically save the complete policy store | Policy store object (every tier) |
 | POST | `/api/settings/iam/policy/test` | Evaluate one action for one tier without changing policy | `action`, `tier` |
 
-`PUT` refuses a document naming an action that does not exist, returning `400` with
-`unknownActions` listing each offending `{ tier, pattern }`. The test is whether a
-pattern matches at least one catalogued action, so wildcards remain legal
-(`players:*`, `bases:delete-*`) while near-misses that match nothing (`player:*`,
-`players:reset-*`) are rejected. This matters because the failure is asymmetric: a
-misspelled action in an `Allow` grants nothing, but in a `Deny` it withholds nothing
-while reading exactly like a restriction.
+`PUT` refuses two kinds of bad action name, each with its own `400` payload:
+
+- **`unknownActions`** — the name matches nothing in the catalog. The test is
+  whether a pattern matches at least one catalogued action, so wildcards remain
+  legal (`players:*`, `bases:delete-*`) while near-misses that match nothing
+  (`player:*`, `players:reset-*`) are rejected. This matters because the failure
+  is asymmetric: a misspelled action in an `Allow` grants nothing, but in a
+  `Deny` it withholds nothing while reading exactly like a restriction.
+- **`deprecatedActions`** — the name is one the catalog used to have
+  (`players:mutate`, `guilds:mutate`, `blueprints:mutate`, `addons:mutate`). Each
+  entry carries `successors`, so the edit is mechanical. These still evaluate
+  with their original meaning, so a stored policy keeps working; only saving is
+  refused. See [../console-iam.md](../console-iam.md#upgrading-a-policy-that-names-a-removed-action).
 
 `POST .../test` returns `known` alongside `allowed`. A misspelled action answers
 `allowed: false`, which reads as a working `Deny`; `known: false` is what separates a

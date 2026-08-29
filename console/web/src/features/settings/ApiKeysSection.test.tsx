@@ -267,12 +267,10 @@ describe("the create form", () => {
   });
 
   test("an empty Custom row is not highlighted as granted", async () => {
-    // The .granted class and grantedCount have to agree. They did not: the
-    // class was keyed off "the level is not None", so a Custom row with
-    // nothing ticked lit up as reached while the same row was excluded from
-    // the count that enables Create -- the grid claimed access the key would
-    // not have. Asserted through the class because that is what paints it;
-    // jsdom has no layout engine, so the colour itself is a browser check.
+    // The .granted class and grantedCount must agree, or the grid claims
+    // access the key does not have. Asserted through the class because that is
+    // what paints it -- jsdom has no layout engine, so the rendered colour
+    // stays a browser check.
     renderSection([]);
     await openCreateForm();
 

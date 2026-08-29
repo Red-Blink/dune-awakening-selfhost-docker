@@ -407,37 +407,22 @@ export const REGEX_ACTIONS_BY_METHOD = {
   "PUT /api/settings/api-keys/":    "settings:write",
   "DELETE /api/settings/api-keys/": "settings:write",
 
-  // Catch-all for a player mutation route that nobody has classified into one
-  // of the players:* actions in REGEX_ACTIONS_BY_METHOD_PATTERN below. Every
-  // route that exists today IS classified, and rbacParity.test.js asserts that
-  // none of them lands here -- so adding a route without giving it an action
-  // fails CI rather than silently inheriting a broad grant.
+  // ---- *:unclassified sentinels ----
   //
-  // These three lines cannot simply be deleted, though it is tempting now that
-  // every route is named. REGEX_ACTIONS has a method-agnostic
-  // "/api/players/" -> players:read fallback underneath this tier, so with no
-  // method-aware rule here an unclassified POST or DELETE would resolve to
-  // players:read and be authorized by a READ-ONLY grant. Failing to
-  // players:unclassified fails closed for every tier that has not been handed
-  // players:* ; falling through to players:read fails open. Same trap the
-  // vehicles:system-custodian entry below documents.
+  // DO NOT DELETE THESE, even though every route that exists today is named in
+  // REGEX_ACTIONS_BY_METHOD_PATTERN and rbacParity.test.js proves it. They are
+  // the fail-closed floor: REGEX_ACTIONS underneath this tier is
+  // method-agnostic and maps "/api/<ns>/" to <ns>:read, so an unnamed POST or
+  // DELETE with no sentinel here resolves to a READ action and runs under a
+  // read-only grant. Same trap the vehicles:system-custodian entry documents.
   //
-  // Deliberately NOT named players:mutate any more. That name is now absent
-  // from the catalog entirely, so a hand-authored policy still granting it is
-  // refused by setPolicies and warned about at startup (see policy.js
-  // unknownActions) instead of quietly continuing to mean something. An
-  // operator who had players:mutate must now pick the narrower actions they
-  // actually want.
+  // Coverage is per method and currently uneven: players has POST/DELETE/PATCH,
+  // guilds/addons/blueprints have POST/DELETE, and no namespace has PUT.
   "POST /api/players/":    "players:unclassified",
   "DELETE /api/players/":  "players:unclassified",
   "PATCH /api/players/":   "players:unclassified",
 
-  // Same fail-closed sentinel as players:unclassified above, for the same
-  // reason: REGEX_ACTIONS has a method-agnostic "/api/guilds/" -> guilds:read
-  // fallback beneath this tier, so deleting these two lines would make an
-  // unclassified guild mutation resolve to a READ action. guilds:mutate is gone
-  // from the catalog, so a policy still naming it is refused on save and warned
-  // about at startup rather than silently meaning less than it used to.
+  // Sentinel; see *:unclassified above.
   "POST /api/guilds/":     "guilds:unclassified",
   "DELETE /api/guilds/":   "guilds:unclassified",
 
@@ -449,10 +434,7 @@ export const REGEX_ACTIONS_BY_METHOD = {
 
   "POST /api/storage/":    "storage:mutate",
 
-  // Fail-closed sentinel, as for players/guilds above: REGEX_ACTIONS has a
-  // method-agnostic "/api/addons/installed/" -> addons:read fallback, so
-  // dropping these would let an unclassified addon mutation run under a
-  // read-only grant.
+  // Sentinel; see *:unclassified above.
   "POST /api/addons/":     "addons:unclassified",
   "DELETE /api/addons/":   "addons:unclassified",
 
@@ -460,8 +442,7 @@ export const REGEX_ACTIONS_BY_METHOD = {
 
   "DELETE /api/backups/":  "backups:delete",
 
-  // Same fail-closed sentinel: "/api/blueprints/" -> blueprints:read sits
-  // beneath this tier in REGEX_ACTIONS.
+  // Sentinel; see *:unclassified above.
   "POST /api/blueprints/": "blueprints:unclassified",
   "DELETE /api/blueprints/":"blueprints:unclassified",
 
@@ -585,46 +566,35 @@ export const REGEX_ACTIONS_BY_METHOD_PATTERN = [
 
   // ---- Players ----
   //
-  // These 41 method+path pairs all resolved to a single players:mutate until
-  // 2026-08-29. That one grant covered kicking, banning, wiping a character's
-  // progression, deleting items out of their inventory, minting currency and
-  // handing out max-level specializations -- so there was no way to let someone
-  // kick and ban without also letting them destroy or fabricate. Every other
-  // namespace with a destructive operation (bases, vehicles) had already been
-  // carved up on exactly this argument; players, the namespace where the
-  // operations act on a person's saved character, had not.
-  //
-  // Grouped by consequence, because that is what an operator delegates on:
+  // 41 method+path pairs, split by consequence -- that is the unit an operator
+  // delegates on. Previously all one players:mutate, which made kicking
+  // inseparable from wiping a character.
   //
   //   players:moderate    session/account control. No economy or progression
   //                       effect. The natural moderator grant.
-  //   players:teleport    moving someone. Disruptive, but nothing is created,
-  //                       destroyed, or spent.
-  //   players:give-item   putting items (and vehicles) into the world. The
+  //   players:teleport    moving someone. Disruptive; creates and destroys
+  //                       nothing.
+  //   players:give-item   items and vehicles into the world. The
   //                       economy-inflation surface.
   //   players:grant       currency, XP, reputation, unlocks, specializations,
   //                       skill points, faction, journey/tutorial completion.
   //                       Progression handed out rather than earned.
   //   players:reset       progression destroyed: full reset, journey, tutorials,
-  //                       specializations, keystones, and clean-inventory.
+  //                       specializations, keystones, clean-inventory.
   //                       Irreversible from the player's side.
-  //   players:delete-item destroying one inventory row. Own action for the same
-  //                       reason bases:delete-item is: item destruction is not
-  //                       something a broad mutation grant can be read as
-  //                       consent for.
-  //   players:edit-item   editing one inventory row in place (quantity, etc).
-  //                       Separate from deletion so neither implies the other.
-  //   players:repair      fixing broken state -- gear durability, decayed
-  //                       vehicles, a stuck login queue, water/fuel top-ups.
-  //                       Low blast radius, high day-to-day utility, which is
-  //                       exactly why it should be grantable on its own.
-  //   players:recover     character recovery. Restores/rewrites a character,
+  //   players:delete-item destroying one inventory row. Separate for the same
+  //                       reason bases:delete-item is.
+  //   players:edit-item   editing one inventory row in place (quantity, etc),
+  //                       separate from deletion so neither implies the other.
+  //   players:repair      gear durability, decayed vehicles, a stuck login
+  //                       queue, water/fuel top-ups. Low blast radius, high
+  //                       day-to-day utility.
+  //   players:recover     character recovery -- restores/rewrites a character,
   //                       so it stands apart from both grant and repair.
   //
-  // Naming follows the issue #351 rule: no action here is a string prefix of
-  // another, so no "X*" or "X-*" wildcard can bridge two of them by accident.
-  // In particular delete-item and edit-item share no prefix, and there is no
-  // players:delete-items for a "players:delete-item*" pattern to catch.
+  // Issue #351 rule: no action may be a string prefix of another, or an "X*"
+  // wildcard bridges the two. delete-item/edit-item share no prefix, and there
+  // is no players:delete-items for "players:delete-item*" to catch.
   { method: "POST",   pattern: /^\/api\/players\/[^/]+\/kick$/, action: "players:moderate" },
   { method: "POST",   pattern: /^\/api\/players\/[^/]+\/ban$/, action: "players:moderate" },
   // The one path that multiplexes on method: GET reads ban state (and falls
@@ -680,27 +650,22 @@ export const REGEX_ACTIONS_BY_METHOD_PATTERN = [
 
   // ---- Guilds ----
   //
-  // DELETE /api/guilds/{guildId} is DISBAND -- it destroys the guild. It shared
-  // guilds:mutate with promoting a member until 2026-08-29, so there was no way
-  // to let someone fix a roster without also letting them delete the guild
-  // outright. That is precisely the reversible-vs-irreversible split that
-  // bases:delete and vehicles:delete already got; guilds had been missed.
+  // DELETE /api/guilds/{guildId} is DISBAND. It shared guilds:mutate with
+  // promoting a member, so fixing a roster and destroying the guild were one
+  // grant -- the reversible-vs-irreversible split bases and vehicles already
+  // had.
   //
   //   guilds:disband     destroys the guild. Irreversible.
-  //   guilds:membership  who is in the guild -- add and remove. Removal costs a
-  //                      player their guild-derived access, so it sits above
-  //                      rank changes and below disbanding.
-  //   guilds:rank        promote/demote within the guild. Rank only; nobody
-  //                      joins or leaves.
+  //   guilds:membership  add and remove. Removal costs a player their
+  //                      guild-derived access, so it sits above rank and below
+  //                      disband. Add/remove stay one action: two directions of
+  //                      the same roster knob. Split if a one-way case appears.
+  //   guilds:rank        promote/demote. Rank only; nobody joins or leaves.
   //
-  // Add and remove stay one action deliberately: they are two directions of the
-  // same roster knob, and an operator doing roster management needs both. Split
-  // them if a real case for one-way membership editing turns up.
-  //
-  // Both DELETE patterns are anchored, so "/api/guilds/{id}" (the guild) and
-  // "/api/guilds/{id}/members/{playerId}" (one member) cannot be confused --
-  // the same reason bases:delete needs a real regex rather than a startsWith
-  // prefix, since the variable segment comes before the distinguishing part.
+  // Both DELETE patterns are anchored so "/api/guilds/{id}" and
+  // "/api/guilds/{id}/members/{playerId}" cannot be confused -- the variable
+  // segment comes before the distinguishing part, so a startsWith prefix (as
+  // bases:delete also found) is not enough.
   { method: "DELETE", pattern: /^\/api\/guilds\/[^/]+\/members\/[^/]+$/, action: "guilds:membership" },
   { method: "POST",   pattern: /^\/api\/guilds\/[^/]+\/members$/, action: "guilds:membership" },
   { method: "POST",   pattern: /^\/api\/guilds\/[^/]+\/members\/[^/]+\/promote$/, action: "guilds:rank" },
@@ -716,17 +681,16 @@ export const REGEX_ACTIONS_BY_METHOD_PATTERN = [
 
   // ---- Addons ----
   //
-  // addons:mutate covered removing an installed addon, enabling/disabling one,
-  // AND the bridge -- the route that executes whatever the addon's manifest
-  // declares, including SQL. Lifecycle control and "run the addon's code" are
-  // not the same privilege and should never have been the same action.
+  // addons:mutate covered lifecycle AND the bridge -- the route that executes
+  // whatever the addon's manifest declares, including SQL. Lifecycle control
+  // and "run the addon's code" are not the same privilege.
   //
   //   addons:remove  uninstall an installed addon
   //   addons:toggle  enable/disable, the reversible lifecycle switch
   //   addons:bridge  the manifest-authorized action channel. Authorizes
-  //                  against the INSTALLED ADDON's declared permission rather
-  //                  than the caller (see server.js addonBridgeRoute), which is
-  //                  exactly why it deserves to be withheld separately.
+  //                  against the INSTALLED ADDON's declared permission, not the
+  //                  caller (server.js addonBridgeRoute) -- which is why it is
+  //                  withheld separately.
   //
   // API keys cannot reach any of these regardless: `addons` is in
   // KEY_WRITE_DENIED_NAMESPACES, and the bridge additionally refuses key
@@ -745,50 +709,42 @@ export const REGEX_ACTIONS_BY_METHOD_PATTERN = [
 // enforced by a second check inside the handler (server.js requireAction) once
 // the body is parsed.
 //
-// They are listed here so allKnownActions() sees them. That set is what the
-// API-key scope catalog and any policy-authoring tool read, so an action
-// missing from it is invisible to every tool an operator has — it could be
-// denied in a policy document and no UI would ever offer it.
+// Listed here so allKnownActions() sees them: that set feeds the API-key scope
+// catalog and any policy-authoring tool, so an action missing from it is
+// invisible to every tool an operator has.
 //
-//   database:execute -- POST /api/database/query resolves to database:query at
-//     the route level. That name is read-shaped, and the default admin policy
-//     granted it on that reading while explicitly denying database:mutate (the
-//     narrow, structured single-cell edit) and database:write-config. But the
-//     same route also accepts write SQL — UPDATE, DELETE, DROP — so admin's
-//     Deny on the narrow path was defeated by the raw-SQL path it still held.
-//     database:execute covers that write half, and the default admin policy
-//     denies it.
+//   database:execute -- the write half of POST /api/database/query, which
+//     resolves to the read-shaped database:query at the route level. Admin is
+//     granted database:query while denied database:mutate (the narrow
+//     single-cell edit) and database:write-config, so without this the raw-SQL
+//     path defeated the Deny on the structured one. Denied to admin by default.
+//     Selection is best-effort (see duneDb.runSql); the read path is enforced
+//     by Postgres, not by this action.
 export const CONTENT_CONDITIONAL_ACTIONS = [
   "database:execute",
 ];
 
 // ---- Removed actions, and what they became ----
 //
-// Splitting the coarse *:mutate actions is not a no-op for a policy that
-// already named one. policy.js's own header teaches the idiom
+// Deleting a split action ESCALATES an existing policy rather than narrowing
+// it. policy.js's header teaches the idiom
 //
 //     { "Effect": "Deny",  "Action": ["players:mutate"] },
 //     { "Effect": "Allow", "Action": ["players:*"] }
 //
-// and deleting players:mutate outright turns that document inside out: the Deny
-// matches nothing, the surviving wildcard matches all ten successors, and an
-// upgrade silently converts "no player mutations" into "every player mutation".
-// Measured on a real document during review: a tier GAINED 22 actions and lost
-// none, including addons:bridge and guilds:disband.
+// With the name gone the Deny matches nothing and the wildcard matches all ten
+// successors, turning "no player mutations" into "every player mutation" -- 22
+// actions gained on upgrade, including addons:bridge and guilds:disband.
 //
-// So the old names keep their MEANING at evaluation time -- a Deny on
-// players:mutate still denies everything it used to deny -- while
-// setPolicies refuses them on save, so an operator is pushed to migrate on
-// their next edit rather than being silently re-interpreted. Aliases affect
-// matchAction only; they are NOT in the catalog and cannot be granted to an
-// API key.
+// So the old names keep their MEANING in matchAction (a Deny still denies what
+// it denied, an Allow still grants what it granted) while setPolicies refuses
+// them on save, naming the successors. Aliases are NOT in the catalog and
+// cannot be granted to an API key.
 //
-// Each list is exactly the set of actions the routes that used to resolve to
-// the old name now resolve to -- no more. players:kick-all is deliberately
-// ABSENT: it was already its own action before the split (an exact
-// ROUTE_ACTIONS entry for POST /api/players/kick-all-online), so it was never
-// part of players:mutate and must not be handed over by an alias. The
-// *:unclassified sentinels ARE included, because the old *:mutate names were
+// Each list is exactly what the old name's routes resolve to now, no more.
+// players:kick-all is ABSENT: it was already its own ROUTE_ACTIONS entry
+// (POST /api/players/kick-all-online), so it was never part of players:mutate.
+// The *:unclassified sentinels ARE included -- the old *:mutate names were
 // themselves the catch-all for unmapped mutating routes.
 export const REMOVED_ACTION_ALIASES = Object.freeze({
   "players:mutate": Object.freeze([

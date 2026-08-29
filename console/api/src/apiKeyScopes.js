@@ -144,19 +144,13 @@ export function normalizeScopes(input) {
   for (const [namespace, value] of Object.entries(input)) {
     if (!allowed.has(namespace)) continue;
 
-    // An explicit action list, the precise form. Granting `players: "write"`
-    // hands over all twelve player actions at once -- kicking, banning,
-    // wiping progression, deleting inventory -- which is the whole reason the
-    // players:* and guilds:* actions were split. A list lets a key be given
-    // exactly players:read and players:moderate and nothing else.
+    // An explicit action list -- the precise form. `players: "write"` hands
+    // over all twelve player actions at once, which is what the splits exist to
+    // avoid; a list can grant exactly players:read and players:moderate.
     //
-    // The trade-off, and it is a real one: a level auto-covers actions added
-    // later (that is why levels are stored rather than expanded, see the file
-    // header), while a list does not. A read route added next release is
-    // reachable by `players: "read"` and NOT by an explicit list. That is the
-    // point -- you opted into a fixed set -- but it means a list needs
-    // revisiting when the catalog grows. Levels remain available and remain
-    // the right default for broad, trusted keys.
+    // The trade: a level auto-covers actions added in a later release (see the
+    // file header), a list does not. A list therefore needs revisiting when the
+    // catalog grows, and levels stay the right default for broad, trusted keys.
     if (Array.isArray(value)) {
       const grantable = new Set(grantableActions(namespace));
       const actions = [...new Set(value.filter((action) => grantable.has(action)))].sort();

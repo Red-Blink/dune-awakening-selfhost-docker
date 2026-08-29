@@ -127,16 +127,14 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
       // key carrying a level that means nothing.
       if (level === "none") { delete next[namespace]; return next; }
       if (level !== "custom") { next[namespace] = level; return next; }
-      // Switching to Custom seeds the list from whatever the namespace grants
-      // right now, so the control opens showing the access the operator
-      // already chose rather than silently dropping it back to nothing. An
-      // empty seed (coming from None) stays an empty array: the row is
-      // "Custom, nothing ticked yet", which createKey refuses to send.
+      // Custom seeds from what the namespace grants right now, so switching
+      // does not silently drop the operator's existing choice. An empty seed
+      // (from None) stays an empty array -- "Custom, nothing ticked yet",
+      // which createKey refuses to send.
       const entry = catalog.find((candidate) => candidate.namespace === namespace);
-      // Sorted, like toggleAction below and like the server stores it. Seeding
-      // in catalog order instead made what got SENT depend on how the operator
-      // arrived at the selection, and made the draft reorder itself the moment
-      // the saved key came back.
+      // Sorted, like toggleAction below and like the server stores it.
+      // Catalog order would make what gets SENT depend on how the operator
+      // reached the selection, and reorder the draft when the key came back.
       next[namespace] = entry ? [...selectedActions(current, entry)].sort() : [];
       return next;
     });
@@ -367,16 +365,12 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
             { value: "read", label: "Read", ariaLabel: `Read ${entry.namespace}` }
           ];
           if (entry.supportsWrite) options.push({ value: "write", label: "Read+Write", ariaLabel: `Read+Write for ${entry.namespace}` });
-          // Same catalog-driven rule as supportsWrite above: a namespace with a
-          // single action has nothing to choose between, so Custom there would
-          // be Read under another name.
+          // Catalog-driven, like supportsWrite above. See supportsCustom.
           if (supportsCustom(entry)) options.push({ value: "custom", label: "Custom", ariaLabel: `Custom actions for ${entry.namespace}` });
           const actions = grantableActions(entry);
-          // Matches grantedCount, which drops an empty action list because the
-          // server does. Keying the styling off `level !== "none"` instead lit
-          // a Custom row with nothing ticked up as granted while the same row
-          // was not counted towards enabling Create -- the grid said the
-          // namespace was reached and the button said the key reached nothing.
+          // Must match grantedCount, which drops an empty action list because
+          // the server does. `level !== "none"` alone paints an empty Custom
+          // row as reached while Create stays disabled.
           const granted = level === "custom" ? chosen.length > 0 : level !== "none";
           return <div className={`api-key-scope-row${granted ? " granted" : ""}`} key={entry.namespace}>
             <span className="api-key-scope-name">{scopeLabel(entry.namespace)}</span>

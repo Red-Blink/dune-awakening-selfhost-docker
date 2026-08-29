@@ -22,7 +22,7 @@ The Web Console applies an IAM action to every authenticated API route. Public a
 
 **The permission is not what enforces this.** `database:execute` is chosen by `isReadOnlySql`, which only asks whether the statement starts with a read keyword and avoids a blacklist — and every privileged mutation in this application is shaped `select dune.<fn>(...)`, which passes that test. `SELECT ... INTO` and `select 1; select fn()` pass it too. A keyword blacklist cannot be repaired to cover them (`delete` does not match `delete_actors`, and the schema ships hundreds of functions).
 
-So the read path executes inside a `set transaction read only` transaction: **Postgres** refuses the write, whatever the classifier concluded. `database:execute` decides which path a statement takes and whether a pre-write backup is taken; the transaction is what makes the read path actually read-only. Verified behaviourally in `databaseReadOnlyEnforcement.integration.test.js` against a real database. The check runs before the mutation rate limiter and before the pre-write backup, so a refused caller triggers neither side effect.
+So the read path executes inside a `set transaction read only` transaction: **Postgres** refuses the write, whatever the classifier concluded. `database:execute` decides which path a statement takes and whether a pre-write backup is taken; the transaction is what makes the read path actually read-only (`databaseReadOnlyEnforcement.integration.test.js` covers this against a real database). The check runs before the mutation rate limiter and before the pre-write backup, so a refused caller triggers neither side effect.
 
 Adding one: put the action in `CONTENT_CONDITIONAL_ACTIONS`, call `requireAction(req, res, action)` at the top of the handler, and decide its place in the default policies. `databaseQueryAuthz.test.js` is the pattern to copy for coverage.
 
@@ -72,7 +72,7 @@ This exists because the failure is asymmetric. A misspelled action in an **Allow
 { "Effect": "Deny", "Action": ["players:reset-progression"] }
 ```
 
-No route resolves to `players:reset-progression` — the route resolves to `players:reset` — so that statement denied nothing at all. It was this document's own example until 2026-08-28.
+No route resolves to `players:reset-progression` — the route resolves to `players:reset` — so that statement denies nothing at all. It was this document's own example.
 
 `GET /api/settings/iam/policies` returns an `actions` array alongside the policies: the full catalog, sorted. Policies are hand-authored JSON with no editor UI, so that response is the vocabulary to author against.
 
@@ -90,7 +90,7 @@ Updates that remove the owner's `settings:write` access are rejected so the loca
 
 ## The split namespaces
 
-`players:mutate` was one action covering all 41 mutating method+path pairs under `/api/players/` — kick, ban, wipe a character's progression, delete items from their inventory, mint currency, hand out max-level specializations. It was split on 2026-08-29, grouped by consequence:
+`players:mutate` was one action covering all 41 mutating method+path pairs under `/api/players/` — kick, ban, wipe a character's progression, delete items from their inventory, mint currency, hand out max-level specializations. It is split by consequence:
 
 | Action | Covers |
 |---|---|
@@ -106,7 +106,7 @@ Updates that remove the owner's `settings:write` access are rejected so the loca
 
 **`players:mutate` is no longer in the catalog, but it still means what it meant.** See [Upgrading a policy that names a removed action](#upgrading-a-policy-that-names-a-removed-action) below. Shipped defaults are unchanged — `owner` (`*`) and `admin` (`players:*`) still reach everything, and `moderator`/`player`/`observer` are untouched.
 
-`guilds:mutate` was split the same day and for the same reason. `DELETE /api/guilds/{guildId}` is **disband** — it destroys the guild — and it shared one action with promoting a member, so a roster fix and a deletion were the same grant.
+`guilds:mutate` was split for the same reason. `DELETE /api/guilds/{guildId}` is **disband** — it destroys the guild — and it shared one action with promoting a member, so a roster fix and a deletion were the same grant.
 
 | Action | Covers |
 |---|---|
@@ -142,7 +142,7 @@ Splitting a coarse action is not a no-op for a policy that already named one. Th
 { "Effect": "Allow", "Action": ["players:*"] }
 ```
 
-and simply deleting `players:mutate` turns that inside out: the `Deny` matches nothing, the surviving wildcard matches all ten successors, and the upgrade converts "no player mutations" into "every player mutation". Measured on a real document, a tier gained 22 actions and lost none — including `addons:bridge` and `guilds:disband`.
+and simply deleting `players:mutate` turns that inside out: the `Deny` matches nothing, the surviving wildcard matches all ten successors, and the upgrade converts "no player mutations" into "every player mutation" — 22 actions gained and none lost, including `addons:bridge` and `guilds:disband`.
 
 So the removed names are kept as **aliases**. `players:mutate`, `guilds:mutate`, `blueprints:mutate` and `addons:mutate` each resolve to exactly the actions the routes that used to resolve to them now resolve to:
 

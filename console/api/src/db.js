@@ -146,21 +146,16 @@ export function isReadOnlySql(query) {
 
 // True when there is something here Postgres would actually run.
 //
-// The SQL routes classify with isReadOnlySql, which answers "does this START
-// with a read keyword" -- so "" , "   ", ";", and a fully commented-out block
-// all answer NO and were therefore treated as WRITES. That sent them down the
-// write path, which takes a full pre-write backup before duneDb.runSql gets far
-// enough to reject them. Callers use this first so obviously-empty input is a
-// 400 instead of a pg_dump.
+// isReadOnlySql answers "does this START with a read keyword", so "", "   ",
+// ";" and a fully commented-out block all answer NO and classify as WRITES --
+// down the write path, which takes a full pre-write backup. Callers check this
+// first so obviously-empty input is a 400 rather than a pg_dump.
 //
-// The comment stripping is naive about string literals. That cuts both ways:
-// SELECT '--' strips to "SELECT '" (more text left behind), but
-// SELECT '/*' as a, '*/' as b strips to "select ' ' as b" -- 14 characters of
-// real SQL removed. So "it can only leave more behind" is NOT true, and this
-// function is safe for a different reason: it only ever decides whether
-// SOMETHING remains, and every case above still leaves a non-empty string. No
-// statement has been found that it falsely rejects, and the corpus in
-// databaseQueryAuthz.test.js pins the ones that were tried.
+// The comment stripping is naive about string literals, and it can remove real
+// SQL: `SELECT '/*' as a, '*/' as b` strips to `select ' ' as b`. That is safe
+// here only because this decides whether ANYTHING remains, and every such case
+// still leaves a non-empty string. Do not reuse it where the stripped text
+// itself matters. The corpus in databaseQueryAuthz.test.js pins the cases tried.
 export function hasExecutableStatement(query) {
   return stripSqlComments(query).replace(/;/g, "").trim().length > 0;
 }

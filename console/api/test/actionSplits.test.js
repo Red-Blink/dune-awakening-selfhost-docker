@@ -151,12 +151,10 @@ test("players: server.js has no mutation missing from the table", () => {
 
   const missing = [...found].filter((route) => !listed.has(route));
   assert.deepEqual(missing, [], `player mutations in server.js with no entry in EXPECTED: ${missing.join(", ")}`);
-  // Guards against the extraction silently matching nothing, which would make
-  // the assertion above pass vacuously and stop covering new routes entirely.
-  // Not hypothetical: the guilds copy of this loop shipped briefly with a
-  // damaged escape (split("\/") rather than split("\\/"), which is identity in
-  // JS) and found zero routes. 39, not 41: /ban carries no method in its
-  // dispatch and is asserted separately.
+  // Without this the assertion above passes vacuously if the extraction stops
+  // matching -- a damaged escape in the split pattern makes it find zero routes
+  // and cover nothing. 39, not 41: /ban carries no method in its dispatch and
+  // is asserted separately.
   assert.equal(found.size, 39, "route extraction found an unexpected number of player mutations");
 });
 

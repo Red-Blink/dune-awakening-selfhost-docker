@@ -14,13 +14,12 @@ import { buildSelfUpdateHelperDockerArgs, detectDockerSocketGid, TaskManager, pu
 import { preflight } from "./preflight.js";
 import { buildDuneArgs, isDynamicServerService, parseVehicleList, runDockerLogs, runDune, validateServiceName } from "./runner.js";
 // isReadOnlySql comes from db.js, NOT runner.js. runner's copy tests the raw
-// string, so a genuinely read-only SELECT with a leading `-- note` or `/* */`
-// header does not start with a read keyword and was classified a WRITE --
-// which since database:execute exists means a 403 for admin on ordinary
-// pasted SQL. db.js strips comments first (substituting a space, so it cannot
-// fuse tokens or hide a leading `delete`). Using one classifier here and in
-// duneDb.runSql also removes the divergence between the authorization
-// decision and the execution decision.
+// string, so a read-only SELECT behind a leading `-- note` or `/* */` header
+// does not start with a read keyword and classifies as a WRITE -- a 403 for
+// admin on ordinary pasted SQL. db.js strips comments first, substituting a
+// space so it cannot fuse tokens or hide a leading `delete`. Sharing one
+// classifier with duneDb.runSql also keeps the authorization decision and the
+// execution decision from diverging.
 import { createDb, hasExecutableStatement, isReadOnlySql, quoteIdentifier } from "./db.js";
 import * as duneDb from "./duneDb.js";
 import { audit, recordAdminHistory } from "./audit.js";
@@ -559,22 +558,17 @@ function dockerPsNames() {
   });
 }
 
-// Second authorization gate, for a route whose real action depends on the
-// request body rather than on its method and path. actionForRoute runs in
-// handleApi's gate with no body in hand, so a route that does two different
-// things at two different blast radii (POST /api/database/query: SELECT vs
-// DROP) can only resolve to the safer of the two there. The handler calls this
-// afterwards with the narrower action, and it re-runs BOTH checks the gate ran
-// -- the policy engine, then the key's own scope map -- so a body-decided
-// action is constrained exactly as a routed one would be.
+// Second authorization gate, for a route whose action depends on the request
+// BODY. actionForRoute runs in handleApi's gate with no body in hand, so a
+// route spanning two blast radii (POST /api/database/query: SELECT vs DROP)
+// resolves to the safer one there; the handler calls this afterwards with the
+// narrower action. Re-runs BOTH gate checks -- policy engine, then the key's
+// scope map. Additive only: it can narrow access, never widen it.
 //
-// Deliberately additive: the route-level action is already authorized by the
-// time a handler runs, so this only ever narrows access, never widens it.
-//
-// Returns true when the principal may proceed. On false it has ALREADY written
-// the 403, and the caller must return without doing any further work — in
-// particular without the rate-limit tick or the pre-write backup, both of which
-// are side effects an unauthorized caller must not be able to trigger.
+// Returns true when the principal may proceed. On false the 403 is ALREADY
+// written and the caller must return immediately -- in particular before the
+// rate-limit tick and the pre-write backup, side effects an unauthorized
+// caller must not be able to trigger.
 function requireAction(req, res, action) {
   const session = req.authSession;
   if (!session || !evaluate(session, action)) {
@@ -880,10 +874,10 @@ async function handleApi(req, res) {
     const testAction = String(body?.action || "").trim();
     const testTier = String(body?.tier || "").trim();
     if (!testAction || !testTier) return json(res, 400, { error: "Both action and tier are required." });
-    // `known` is the difference between "denied" and "not a thing". Testing a
-    // misspelled action returns allowed:false -- which reads as "my Deny works"
-    // and is the single most misleading answer this endpoint can give, since a
-    // misspelled Deny is precisely the mistake an operator comes here to check.
+    // `known` separates "denied" from "not a thing". A misspelled action
+    // returns allowed:false, which reads as "my Deny works" -- the most
+    // misleading answer this endpoint can give, since a misspelled Deny is
+    // exactly what an operator comes here to check.
     return json(res, 200, {
       action: testAction,
       tier: testTier,
@@ -1371,10 +1365,8 @@ async function addonBridgeRoute(req, res, path) {
   if (action.startsWith("scheduler.")) return addonSchedulerBridgeAction(req, res, id, action, body);
   if (action === "database.query" || action === "database.execute") {
     const query = String(body.query || "");
-    // Same guard, and for the same reason, as databaseQuery: an empty or
-    // comments-only body classifies as a write and reaches the backup spawn
-    // below. database.query happened to be shielded by its own read-only 400;
-    // database.execute was not.
+    // Same guard as databaseQuery: empty or comments-only input classifies as
+    // a write and reaches the backup spawn below.
     if (!hasExecutableStatement(query)) {
       return json(res, 400, { error: "No SQL statement to run." });
     }
@@ -2016,12 +2008,10 @@ async function safeCommand(operation, payload = {}) {
 async function databaseQuery(req, res) {
   const body = await readJson(req);
   const query = String(body.query || "");
-  // BEFORE the classification below, because isReadOnlySql answers "does this
-  // start with a read keyword" -- so an empty string answers no and used to be
-  // classified as a WRITE, taking a full pre-write backup before duneDb.runSql
-  // got far enough to reject it with "SQL query is required". Submitting "" in
-  // a loop made the host run pg_dump 20 times a minute per session, the
-  // mutation limiter's ceiling, for input that could never execute.
+  // BEFORE the classification below: isReadOnlySql answers "does this start
+  // with a read keyword", so "" answers no and classifies as a WRITE, taking a
+  // full pre-write backup before runSql rejects it. Empty input submitted in a
+  // loop therefore ran pg_dump at the mutation limiter's ceiling.
   if (!hasExecutableStatement(query)) {
     return json(res, 400, { error: "Enter a SQL query to run." });
   }
@@ -2039,17 +2029,13 @@ async function databaseQuery(req, res) {
     await runDune(config, buildDuneArgs("backupCreate"), { env: { DB_BACKUP_ORIGIN: "destructive-sql" } });
   }
   audit(config, req, "database.query", { readOnly, destructive: !readOnly });
-  // !readOnly, not the unconditional `true` this passed before: a request
-  // authorized as read-only is now also EXECUTED with writes refused, so
-  // duneDb.runSql's own classifier has to agree before anything can write.
-  // Safe as a second opinion because runner.js's isReadOnlySql (used above) is
-  // strictly the more conservative of the two -- it tests the raw string where
-  // db.js's strips comments first, so anything it calls read-only db.js calls
-  // read-only too. It can never reject a query this route just authorized.
-  // enforceReadOnly: the read path executes inside a READ ONLY transaction, so
-  // a statement the classifier called read-only cannot write even if it was
-  // wrong -- which for `select dune.<fn>(...)`, the shape every privileged
-  // mutation in this app uses, it always was.
+  // !readOnly rather than the unconditional `true` this used to pass, so a
+  // request authorized as read-only is also EXECUTED with writes refused.
+  // runSql re-classifies with the same db.js function used above, so the two
+  // decisions cannot disagree.
+  //
+  // enforceReadOnly is the actual guarantee: the read path runs inside a READ
+  // ONLY transaction, so Postgres refuses a write the classifier got wrong.
   return dbJson(res, () => duneDb.runSql(db, query, !readOnly, { enforceReadOnly: true }));
 }
 
