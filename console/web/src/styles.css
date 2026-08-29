@@ -26,6 +26,10 @@
   --danger: #a74949;
   --danger-strong: #8d3434;
   --danger-text: #ffb4a8;
+  /* For small filled indicators only, never text. At 11px --danger-text is a
+     pale salmon not separable from --title's amber (measured side by side), and
+     --danger reads brown on the card background. This is the middle. */
+  --danger-signal: #e05a4f;
   --warning: #a97932;
   background: var(--bg);
   color: var(--text);
@@ -968,6 +972,10 @@ main { padding: 22px; min-width: 0; }
 .performance-card strong { font-size: 22px; line-height: 1.15; }
 .metric-track { height: 8px; overflow: hidden; border-radius: 999px; background: #0c0e10; border: 1px solid #302b25; }
 .metric-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #6f8f5f, #c68b4a); transition: width .35s ease; }
+/* The fill has to carry the same verdict as the badge; with one gradient for
+   every reading the bar was decoration. Same tokens, so they cannot disagree. */
+.metric-track span.metric-track-warn { background: linear-gradient(90deg, #a97932, #d49a5c); }
+.metric-track span.metric-track-fail { background: linear-gradient(90deg, var(--danger), var(--danger-strong)); }
 .result-list { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
 .result-row { border: 1px solid #302b25; border-radius: 6px; padding: 9px 10px; background: #14171a; color: #d9c8aa; }
 .result-ok { border-color: #3d8b62; color: #9be6bd; }
@@ -2130,9 +2138,101 @@ body.debug .technical-details { display: block; }
 .service-table { display: grid; gap: 10px; margin-top: 14px; }
 .service-actions, .service-card .service-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
 .service-actions button, .service-actions .button-link { width: auto; white-space: nowrap; }
-.home-health { display: grid; gap: 16px; }
 .dashboard-band { display: grid; gap: 10px; }
 .dashboard-band h3 { margin: 0; color: #ffd08a; }
+
+/* The hero spans the row. Without .wide it sat in column 1 of a two-column grid
+   and left the right half of row 1 empty above the 900px breakpoint. */
+.home-hero-split { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.home-hero-primary { min-width: 0; }
+.home-hero-state { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+/* Layout only. The label is an h3, so it already matches the other section
+   headings; restating font-size here would let them drift apart. */
+.home-hero-state-label { margin: 0; }
+/* Stepped up from the label: the label names the row, the reading answers it. */
+.home-hero-state-value { color: var(--title); font-size: 1.4em; font-weight: 700; line-height: 1.2; }
+/* Three axes: hue for severity, pulse for "in progress", ring-vs-fill for "no
+   reading yet". The last two survive not being able to separate the hues, which
+   matters on a console this uniformly amber. */
+.home-state-dot { flex: 0 0 auto; width: 11px; height: 11px; border-radius: 50%; background: var(--muted); }
+.home-state-dot-ok { background: var(--success-text); }
+.home-state-dot-attention { background: var(--title); }
+.home-state-dot-failed { background: var(--danger-signal); }
+/* Off on purpose: solid, because the hollow ring means "no reading". Uses
+   --text-subtle, not the warm --muted, which blurred into --title at 11px. */
+.home-state-dot-off { background: var(--text-subtle); }
+/* Blue is already the palette's informational hue (.badge-info) and the one
+   family that does not blur into the warm chrome. */
+.home-state-dot-motion { background: #85b7eb; animation: state-dot-pulse 1.6s ease-in-out infinite; }
+/* Dashed vs solid, not just pulsing vs still: prefers-reduced-motion strips the
+   animation, which would otherwise make these two identical. */
+.home-state-dot-loading { background: transparent; border: 2px dashed var(--text-subtle); animation: state-dot-pulse 1.6s ease-in-out infinite; }
+.home-state-dot-nodata { background: transparent; border: 2px solid var(--text-subtle); }
+@keyframes state-dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .45; transform: scale(.82); }
+}
+/* overflow-wrap is load-bearing: a Title is free text and can arrive unspaced.
+   Without it the line overflowed its track and was painted under the opaque
+   subsystem list -- no scrollbar, no clipping, just unreadable. */
+.home-hero-identity { margin: 6px 0 0; color: var(--muted); overflow-wrap: anywhere; }
+/* Lifts out of the muted prose so an unreadable count is not read as a value. */
+.home-population-warn { color: var(--title); }
+/* Reference values an operator copies, so labelled rather than folded into the
+   "·" summary line above. */
+.home-hero-meta { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 12px 0 0; }
+.home-hero-meta-item { min-width: 0; display: grid; gap: 2px; }
+.home-hero-meta dt { color: var(--muted); font-size: 12px; }
+.home-hero-meta dd { margin: 0; color: var(--text-strong); overflow-wrap: anywhere; }
+/* Muted at rest; only the stale form is allowed to draw the eye. */
+.home-freshness { margin: 8px 0 0; color: var(--text-subtle); font-size: 12px; }
+.home-freshness.stale { color: var(--title); }
+
+.home-subsystems { min-width: 0; display: grid; gap: 10px; align-content: start; }
+.home-subsystems h3 { margin: 0; color: #ffd08a; }
+/* No overflow: hidden -- it clipped the inset focus ring on the first and last
+   rows, so those rows round their own fills instead. Logical longhands so the
+   two rules compose rather than overwrite when the list holds one row. */
+.home-subsystem-list { list-style: none; margin: 0; padding: 0; display: grid; border: 1px solid var(--border); border-radius: 8px; }
+.home-subsystem-row:first-child .home-subsystem-button,
+.home-subsystem-row:first-child .home-subsystem-static { border-start-start-radius: 7px; border-start-end-radius: 7px; }
+.home-subsystem-row:last-child .home-subsystem-button,
+.home-subsystem-row:last-child .home-subsystem-static { border-end-start-radius: 7px; border-end-end-radius: 7px; }
+.home-subsystem-row + .home-subsystem-row { border-top: 1px solid var(--border); }
+/* Resets the global button styling: these are full-bleed rows, not controls.
+   Opaque --panel rather than the hero's frosted surface, so the list reads as
+   one slab instead of six translucent chips. */
+.home-subsystem-button, .home-subsystem-static {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 9px 12px;
+  background: var(--panel);
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  text-align: left;
+}
+.home-subsystem-button { cursor: pointer; }
+.home-subsystem-button:hover { background: #1c2024; color: var(--text-strong); }
+.home-subsystem-button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* The label is a fixed short string; the value is the variable part and can be
+   as long as "Token Mismatch Detected", so the value is what gives way. With
+   flex: 0 0 auto on the value it refused to shrink and crushed the label to a
+   5px column, one glyph per line, at ~940px. */
+.home-subsystem-label { flex: 0 0 auto; white-space: nowrap; }
+.home-subsystem-value { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; color: var(--muted); text-align: right; }
+/* Only the text gives way -- the badge is already compact and must stay whole. */
+.home-subsystem-value > span:not(.badge) { min-width: 0; overflow-wrap: anywhere; }
+.home-subsystem-value > .badge { flex: 0 0 auto; }
+
+/* Stop destroys running state; it should not read as the peer of the read-only
+   Refresh beside it. Border and text only -- filled danger is for dialogs. */
+.danger-button { border-color: var(--danger); color: var(--danger-text); }
+.danger-button:hover:not(:disabled) { border-color: var(--danger-strong); background: rgba(167, 73, 73, .16); }
 .health-grid-compact { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
 .readiness-groups { display: grid; gap: 14px; }
 .readiness-group { display: grid; gap: 8px; }
@@ -2595,6 +2695,7 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   .sidebar-nav-heading { grid-column: 1 / -1; }
   .home-backdrop { inset: 0; }
   .grid, .two-col { grid-template-columns: 1fr; }
+  .home-hero-split { grid-template-columns: 1fr; gap: 16px; }
   .health-grid, .health-grid-compact { grid-template-columns: 1fr; }
   .live-map-layout { grid-template-columns: 1fr; }
   .live-map-view-body { grid-template-columns: 1fr; }
@@ -2604,6 +2705,8 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 
 @media (prefers-reduced-motion: reduce) {
   .home-sand-fine, .home-sand-near, .setup-finish-celebration span { animation: none; }
+  /* The hue and ring style still separate the states without the motion. */
+  .home-state-dot-motion, .home-state-dot-loading { animation: none; }
 }
 
 .toggle-row { display: flex; flex-wrap: wrap; gap: 8px; }
