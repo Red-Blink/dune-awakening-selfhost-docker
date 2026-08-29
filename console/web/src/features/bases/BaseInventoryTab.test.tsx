@@ -13,6 +13,15 @@ import { BaseInventoryTab } from "./BaseInventoryTab";
 // visually stay put while scrolling"), which stays a live-browser check.
 import "../../styles.css";
 
+// Raised from the 5s default for this file only. Importing the real stylesheet
+// above means jsdom runs the full cascade on every query, which makes this file
+// roughly an order of magnitude slower than the rest of the suite (~75s for its
+// tests, with csstree-match hitting its own iteration ceiling). Under full-suite
+// parallelism a single test can drift past 5s and time out while still passing
+// in isolation. Scoped here rather than set globally in vitest.config.ts so a
+// genuine hang anywhere else still fails fast.
+vi.setConfig({ testTimeout: 20000 });
+
 vi.mock("../../api/bases", () => ({
   basesApi: {
     inventory: vi.fn(),

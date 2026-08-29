@@ -109,9 +109,12 @@ function renderMapsPanel() {
 
 async function openUserGameGlobalTab(api: Record<string, ReturnType<typeof vi.fn>>) {
   renderMapsPanel();
-  const modifiers = await screen.findByRole("button", { name: "Expand Interactive Modifiers" });
-  await waitFor(() => expect(modifiers).toBeEnabled());
-  fireEvent.click(modifiers);
+  // Re-queried inside the waitFor rather than captured before it: the button
+  // exists while the panel is still loading, and React can replace the node on
+  // the settle re-render instead of mutating it -- a captured reference would
+  // then never become enabled.
+  await waitFor(() => expect(screen.getByRole("button", { name: "Expand Interactive Modifiers" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "Expand Interactive Modifiers" }));
   fireEvent.click(screen.getByRole("tab", { name: "UserGame" }));
   const targetSelect = await screen.findByLabelText("Target");
   fireEvent.change(targetSelect, { target: { value: "__global__::" } });

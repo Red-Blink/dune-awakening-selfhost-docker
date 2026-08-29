@@ -58,8 +58,8 @@ describe("CharacterAdminUI skill live grants", () => {
     fireEvent.click(screen.getByRole("button", { name: "Skills" }));
 
     expect(await screen.findByText("The player must be online to change skills or restore starter skills.")).toBeInTheDocument();
-    const rankButton = await screen.findByRole("button", { name: "Set Energy Capsule rank 1" });
-    await waitFor(() => expect(rankButton).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Set Energy Capsule rank 1" })).toBeDisabled());
+    const rankButton = screen.getByRole("button", { name: "Set Energy Capsule rank 1" });
     expect(rankButton).toHaveAttribute("title", "The player must be online to change skills");
 
     fireEvent.click(rankButton);

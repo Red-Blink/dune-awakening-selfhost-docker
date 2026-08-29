@@ -99,11 +99,14 @@ describe("MapsPanel modifier availability", () => {
     renderMapsPanel();
 
     expect(await screen.findByText("Loading Maps")).toBeInTheDocument();
-    const modifiers = screen.getByRole("button", { name: "Expand Interactive Modifiers" });
-    await waitFor(() => expect(modifiers).toBeEnabled());
+    // Re-queried inside the waitFor rather than captured before it: the button
+    // exists while the panel is still loading, and React can replace the node on
+    // the settle re-render instead of mutating it -- a captured reference would
+    // then never become enabled.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Expand Interactive Modifiers" })).toBeEnabled());
     expect(api.rawUserSettings).not.toHaveBeenCalled();
 
-    fireEvent.click(modifiers);
+    fireEvent.click(screen.getByRole("button", { name: "Expand Interactive Modifiers" }));
 
     expect(screen.getByRole("tab", { name: "UserEngine" })).toBeVisible();
     expect(screen.getByDisplayValue("2.0")).toBeVisible();
