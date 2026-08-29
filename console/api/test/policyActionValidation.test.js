@@ -23,8 +23,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { allKnownActions, evaluate, getAllPolicies, matchAction, setPolicies, unknownActions, loadPolicies } from "../src/policy.js";
-import { actionForRoute } from "../src/actions.js";
+import { allKnownActions, deprecatedActions, evaluate, getAllPolicies, matchAction, setPolicies, unknownActions, loadPolicies } from "../src/policy.js";
+import { actionForRoute, REMOVED_ACTION_ALIASES } from "../src/actions.js";
+import { normalizeScopes } from "../src/apiKeyScopes.js";
+import { keyAllows } from "../src/apiKeys.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const policySrc = readFileSync(join(__dirname, "../src/policy.js"), "utf8");
@@ -229,4 +231,135 @@ test("the policies endpoint hands back the vocabulary", () => {
   const handler = serverSrc.slice(serverSrc.indexOf('path === "/api/settings/iam/policies"'));
   const body = handler.slice(0, handler.indexOf("\n  }\n"));
   assert.match(body, /actions: \[\.\.\.allKnownActions\(\)\]\.sort\(\)/);
+});
+
+// ---- Removed action aliases ----
+//
+// Splitting the coarse *:mutate actions is not a no-op for a policy that
+// already named one. Deleting the name outright turned the idiom this file's
+// header teaches inside out: `Deny players:mutate` + `Allow players:*` went
+// from "no player mutations" to "every player mutation", because the Deny
+// matched nothing and the wildcard matched all ten successors. Review measured
+// a tier GAINING 22 actions and losing none, silently, on upgrade.
+
+const escalationDoc = () => ({
+  owner: ownerAllowAll,
+  moderator: {
+    version: 1,
+    tier: "moderator",
+    statements: [
+      { Effect: "Deny", Action: ["players:mutate", "guilds:mutate", "addons:mutate", "blueprints:mutate"] },
+      { Effect: "Allow", Action: ["players:*", "guilds:*", "addons:*", "blueprints:*"] }
+    ]
+  }
+});
+
+test("a Deny on a removed action still denies everything it used to", () => {
+  // The regression this exists to prevent, asserted over every successor of
+  // every alias rather than a sample.
+  const docs = escalationDoc();
+  for (const [alias, successors] of Object.entries(REMOVED_ACTION_ALIASES)) {
+    for (const action of successors) {
+      assert.equal(evaluate({ tier: "moderator" }, action, docs), false,
+        `${action} leaked past a Deny on ${alias}`);
+    }
+  }
+});
+
+test("an Allow on a removed action still grants everything it used to", () => {
+  for (const [alias, successors] of Object.entries(REMOVED_ACTION_ALIASES)) {
+    const docs = {
+      owner: ownerAllowAll,
+      moderator: { version: 1, tier: "moderator", statements: [{ Effect: "Allow", Action: [alias] }] }
+    };
+    for (const action of successors) {
+      assert.equal(evaluate({ tier: "moderator" }, action, docs), true, `${alias} should still grant ${action}`);
+    }
+  }
+});
+
+test("an alias sweeps in no more than it used to cover", () => {
+  // players:kick-all was ALREADY its own action before the split (an exact
+  // ROUTE_ACTIONS entry for POST /api/players/kick-all-online), so it was never
+  // part of players:mutate. An alias that over-reaches would silently widen the
+  // very policies it exists to preserve.
+  assert.ok(!REMOVED_ACTION_ALIASES["players:mutate"].includes("players:kick-all"));
+  const docs = {
+    owner: ownerAllowAll,
+    moderator: { version: 1, tier: "moderator", statements: [{ Effect: "Allow", Action: ["players:mutate"] }] }
+  };
+  assert.equal(evaluate({ tier: "moderator" }, "players:kick-all", docs), false);
+  assert.equal(evaluate({ tier: "moderator" }, "players:read", docs), false, "an alias must not grant reads either");
+});
+
+test("every alias names only real, current actions", () => {
+  const known = allKnownActions();
+  for (const [alias, successors] of Object.entries(REMOVED_ACTION_ALIASES)) {
+    assert.ok(successors.length, `${alias} has no successors`);
+    for (const action of successors) {
+      assert.ok(known.has(action), `${alias} points at ${action}, which is not in the catalog`);
+    }
+    assert.ok(!known.has(alias), `${alias} is still in the catalog, so it is not actually removed`);
+  }
+});
+
+test("an alias cannot shadow a live action", () => {
+  // matchAction consults aliases LAST. If a future split reused a name that is
+  // both an alias and a live action, the live meaning must win.
+  for (const action of allKnownActions()) {
+    assert.ok(!REMOVED_ACTION_ALIASES[action], `${action} is both live and an alias`);
+  }
+  // And an alias pattern matches nothing outside its own successor list.
+  assert.equal(matchAction("players:mutate", "bases:delete"), false);
+  assert.equal(matchAction("players:mutate", "players:read"), false);
+});
+
+test("setPolicies refuses a removed action and names its successors", () => {
+  const result = setPolicies(escalationDoc());
+  assert.equal(result.ok, false);
+  assert.match(result.error, /were split and no longer exist/);
+  assert.match(result.error, /players:mutate \(now players:moderate/);
+  assert.ok(result.deprecatedActions.some((entry) => entry.pattern === "players:mutate"));
+  restoreDefaults();
+});
+
+test("a removed action is reported separately from one that never existed", () => {
+  // Different problems, different fixes: one needs migrating, the other is a
+  // typo that has never done anything.
+  const docs = withAdmin([{ Effect: "Deny", Action: ["players:mutate", "players:reset-progression"] }]);
+  assert.deepEqual(deprecatedActions(docs).map((e) => e.pattern), ["players:mutate"]);
+  assert.deepEqual(unknownActions(docs).map((e) => e.pattern), ["players:reset-progression"]);
+});
+
+test("a stored policy naming a removed action loads, keeps its meaning, and says so", () => {
+  // The upgrade path: accepted on load (so the operator's document is not
+  // thrown away and not re-interpreted), refused on save (so they migrate).
+  const root = writePolicyFile(escalationDoc());
+  try {
+    const result = loadPolicies(root);
+    assert.equal(result.source, "file");
+    assert.deepEqual(result.unknownActions, [], "a removed action is not an unknown action");
+    assert.ok(result.deprecatedActions.some((e) => e.pattern === "guilds:mutate"));
+    assert.ok(result.deprecatedActions[0].successors.length, "the notice must carry the successors");
+    // Still enforced with its original meaning, from the file on disk.
+    assert.equal(evaluate({ tier: "moderator" }, "guilds:disband"), false);
+    assert.equal(evaluate({ tier: "moderator" }, "players:reset"), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    restoreDefaults();
+  }
+});
+
+test("server.js reports removed actions at startup", () => {
+  assert.match(serverSrc, /for \(const \{ tier, pattern, successors \} of policyLoad\.deprecatedActions \|\| \[\]\)/);
+  assert.match(serverSrc, /which was split into/);
+});
+
+test("an alias cannot be granted to an API key", () => {
+  // Aliases live outside the catalog on purpose, so the key scope model never
+  // offers one and normalizeScopes drops it.
+  for (const alias of Object.keys(REMOVED_ACTION_ALIASES)) {
+    assert.deepEqual(normalizeScopes({ [alias.split(":")[0]]: [alias] }), {}, alias);
+    assert.equal(keyAllows({ scopes: { players: [alias] } }, "players:reset"), false);
+  }
 });

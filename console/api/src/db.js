@@ -153,10 +153,14 @@ export function isReadOnlySql(query) {
 // enough to reject them. Callers use this first so obviously-empty input is a
 // 400 instead of a pg_dump.
 //
-// Only ever rejects input that is entirely comments, semicolons and whitespace.
-// The comment stripping is naive about string literals -- SELECT '--' strips to
-// "SELECT '" -- but that can only leave MORE text behind, never less, so it
-// cannot turn a real statement into a false rejection.
+// The comment stripping is naive about string literals. That cuts both ways:
+// SELECT '--' strips to "SELECT '" (more text left behind), but
+// SELECT '/*' as a, '*/' as b strips to "select ' ' as b" -- 14 characters of
+// real SQL removed. So "it can only leave more behind" is NOT true, and this
+// function is safe for a different reason: it only ever decides whether
+// SOMETHING remains, and every case above still leaves a non-empty string. No
+// statement has been found that it falsely rejects, and the corpus in
+// databaseQueryAuthz.test.js pins the ones that were tried.
 export function hasExecutableStatement(query) {
   return stripSqlComments(query).replace(/;/g, "").trim().length > 0;
 }

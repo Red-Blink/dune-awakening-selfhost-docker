@@ -18,7 +18,11 @@ The Web Console applies an IAM action to every authenticated API route. Public a
 |---|---|---|
 | `database:execute` | `POST /api/database/query` | the SQL is not read-only |
 
-`POST /api/database/query` resolves to `database:query`, a read-shaped name, and accepts write SQL down the same route. Before the split that made the default admin policy's `Deny` on `database:mutate` and `database:write-config` decorative: the narrow structured cell-edit was denied while arbitrary `UPDATE`/`DELETE`/`DROP` stayed reachable through the raw-SQL path admin still held. The write half is now `database:execute`, denied to `admin` by default. The check runs before the mutation rate limiter and before the pre-write backup, so a refused caller triggers neither side effect.
+`POST /api/database/query` resolves to `database:query`, a read-shaped name, and accepts write SQL down the same route. Before the split that made the default admin policy's `Deny` on `database:mutate` and `database:write-config` decorative: the narrow structured cell-edit was denied while arbitrary `UPDATE`/`DELETE`/`DROP` stayed reachable through the raw-SQL path admin still held. The write half is now `database:execute`, denied to `admin` by default.
+
+**The permission is not what enforces this.** `database:execute` is chosen by `isReadOnlySql`, which only asks whether the statement starts with a read keyword and avoids a blacklist — and every privileged mutation in this application is shaped `select dune.<fn>(...)`, which passes that test. `SELECT ... INTO` and `select 1; select fn()` pass it too. A keyword blacklist cannot be repaired to cover them (`delete` does not match `delete_actors`, and the schema ships hundreds of functions).
+
+So the read path executes inside a `set transaction read only` transaction: **Postgres** refuses the write, whatever the classifier concluded. `database:execute` decides which path a statement takes and whether a pre-write backup is taken; the transaction is what makes the read path actually read-only. Verified behaviourally in `databaseReadOnlyEnforcement.integration.test.js` against a real database. The check runs before the mutation rate limiter and before the pre-write backup, so a refused caller triggers neither side effect.
 
 Adding one: put the action in `CONTENT_CONDITIONAL_ACTIONS`, call `requireAction(req, res, action)` at the top of the handler, and decide its place in the default policies. `databaseQueryAuthz.test.js` is the pattern to copy for coverage.
 
@@ -68,7 +72,7 @@ This exists because the failure is asymmetric. A misspelled action in an **Allow
 { "Effect": "Deny", "Action": ["players:reset-progression"] }
 ```
 
-No route resolves to `players:reset-progression` — the real action is `players:mutate`, which covers every player mutation at once — so that statement denied nothing at all. It was this document's own example until 2026-08-28.
+No route resolves to `players:reset-progression` — the route resolves to `players:reset` — so that statement denied nothing at all. It was this document's own example until 2026-08-28.
 
 `GET /api/settings/iam/policies` returns an `actions` array alongside the policies: the full catalog, sorted. Policies are hand-authored JSON with no editor UI, so that response is the vocabulary to author against.
 
@@ -100,7 +104,7 @@ Updates that remove the owner's `settings:write` access are rejected so the loca
 | `players:repair` | gear, faction reputation, landsraad quests, login queue, vehicle decay, refuel, refill water |
 | `players:recover` | character recovery |
 
-**`players:mutate` no longer exists.** A hand-authored policy still naming it is refused by `PUT /api/settings/iam/policy` and warned about at startup, rather than silently continuing to mean something narrower than intended. Replace it with the narrower actions you actually want. Policies using `players:*` are unaffected, as are the shipped defaults — `owner` (`*`) and `admin` (`players:*`) still reach everything, and `moderator`/`player`/`observer` are unchanged.
+**`players:mutate` is no longer in the catalog, but it still means what it meant.** See [Upgrading a policy that names a removed action](#upgrading-a-policy-that-names-a-removed-action) below. Shipped defaults are unchanged — `owner` (`*`) and `admin` (`players:*`) still reach everything, and `moderator`/`player`/`observer` are untouched.
 
 `guilds:mutate` was split the same day and for the same reason. `DELETE /api/guilds/{guildId}` is **disband** — it destroys the guild — and it shared one action with promoting a member, so a roster fix and a deletion were the same grant.
 
@@ -129,13 +133,42 @@ Bulk export is read-only in effect — it only reads each blueprint and zips the
 
 `players:unclassified` is a fail-closed sentinel, not something to grant. The three `POST`/`DELETE`/`PATCH /api/players/` prefix rules resolve to it so that a route nobody has classified yet cannot fall through to the method-agnostic `players:read` fallback and be authorized by a read-only grant. `actionSplits.test.js` asserts no route in `server.js` actually lands on it (and likewise for `guilds:`, `blueprints:` and `addons:`), so a new route fails CI until it is given a real action.
 
+## Upgrading a policy that names a removed action
+
+Splitting a coarse action is not a no-op for a policy that already named one. This document teaches the idiom
+
+```json
+{ "Effect": "Deny",  "Action": ["players:mutate"] },
+{ "Effect": "Allow", "Action": ["players:*"] }
+```
+
+and simply deleting `players:mutate` turns that inside out: the `Deny` matches nothing, the surviving wildcard matches all ten successors, and the upgrade converts "no player mutations" into "every player mutation". Measured on a real document, a tier gained 22 actions and lost none — including `addons:bridge` and `guilds:disband`.
+
+So the removed names are kept as **aliases**. `players:mutate`, `guilds:mutate`, `blueprints:mutate` and `addons:mutate` each resolve to exactly the actions the routes that used to resolve to them now resolve to:
+
+| Removed | Now means |
+|---|---|
+| `players:mutate` | `moderate`, `teleport`, `give-item`, `grant`, `reset`, `delete-item`, `edit-item`, `repair`, `recover`, `unclassified` |
+| `guilds:mutate` | `disband`, `membership`, `rank`, `unclassified` |
+| `blueprints:mutate` | `export`, `import`, `delete`, `unclassified` |
+| `addons:mutate` | `remove`, `toggle`, `bridge`, `unclassified` |
+
+A `Deny` on a removed name still denies everything it used to; an `Allow` still grants everything it used to. `players:kick-all` is deliberately **not** in the list — it was already its own action before the split, so an alias must not hand it over.
+
+The asymmetry is the point:
+
+- **On load**, a stored policy naming a removed action is accepted and keeps its meaning. The Console logs one migration notice per name at startup, listing the successors.
+- **On save**, `PUT /api/settings/iam/policy` refuses it, with an error naming the successors so the edit is mechanical.
+
+That way an upgrade never silently re-interprets a policy and never refuses to start, while the next edit forces migration. Aliases are not in the catalog: they cannot be granted to an API key, and `GET /api/settings/iam/policies` does not offer them.
+
 ## Route maintenance
 
 When adding an authenticated API route, add its method/path mapping to `actions.js` in the same change and run:
 
 ```bash
 cd console/api
-node --test test/rbacParity.test.js test/policy.test.js test/auth.test.js test/databaseQueryAuthz.test.js test/policyActionValidation.test.js test/actionSplits.test.js
+node --test test/rbacParity.test.js test/policy.test.js test/auth.test.js test/databaseQueryAuthz.test.js test/policyActionValidation.test.js test/actionSplits.test.js test/databaseReadOnlyEnforcement.integration.test.js
 ```
 
 Parameterized routes use the method-aware and prefix mappings at the bottom of `actions.js`. Prefer exact mappings whenever the route has a fixed path.

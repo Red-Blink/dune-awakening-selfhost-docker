@@ -12,8 +12,16 @@ import { scopeCatalog } from "./apiKeyScopes.js";
 import { createBridgeRateLimiter } from "./bridgeRateLimit.js";
 import { buildSelfUpdateHelperDockerArgs, detectDockerSocketGid, TaskManager, publicTask } from "./tasks.js";
 import { preflight } from "./preflight.js";
-import { buildDuneArgs, isDynamicServerService, isReadOnlySql, parseVehicleList, runDockerLogs, runDune, validateServiceName } from "./runner.js";
-import { createDb, hasExecutableStatement, quoteIdentifier } from "./db.js";
+import { buildDuneArgs, isDynamicServerService, parseVehicleList, runDockerLogs, runDune, validateServiceName } from "./runner.js";
+// isReadOnlySql comes from db.js, NOT runner.js. runner's copy tests the raw
+// string, so a genuinely read-only SELECT with a leading `-- note` or `/* */`
+// header does not start with a read keyword and was classified a WRITE --
+// which since database:execute exists means a 403 for admin on ordinary
+// pasted SQL. db.js strips comments first (substituting a space, so it cannot
+// fuse tokens or hide a leading `delete`). Using one classifier here and in
+// duneDb.runSql also removes the divergence between the authorization
+// decision and the execution decision.
+import { createDb, hasExecutableStatement, isReadOnlySql, quoteIdentifier } from "./db.js";
 import * as duneDb from "./duneDb.js";
 import { audit, recordAdminHistory } from "./audit.js";
 import { redact } from "./redact.js";
@@ -93,6 +101,11 @@ try {
 const policyLoad = loadPolicies(config.repoRoot);
 if (policyLoad.invalid) {
   console.warn(`IAM policy file at ${policyLoad.path} is not a valid policy store; using built-in defaults.`);
+}
+for (const { tier, pattern, successors } of policyLoad.deprecatedActions || []) {
+  // Still enforced with its original meaning (see REMOVED_ACTION_ALIASES), so
+  // this is a migration notice, not a warning that access changed.
+  console.warn(`IAM policy notice: ${tier} names "${pattern}", which was split into ${successors.join(", ")}. It still applies as before; name the successors to silence this.`);
 }
 for (const { tier, pattern } of policyLoad.unknownActions) {
   // Loaded anyway (see loadPolicies), but an operator who hand-edited a Deny
@@ -1373,7 +1386,7 @@ async function addonBridgeRoute(req, res, path) {
     if (!readOnly && !config.mockMode) {
       await runDune(config, buildDuneArgs("backupCreate"), { env: { DB_BACKUP_ORIGIN: `addon-${addon.id}` } });
     }
-    const result = await duneDb.runSql(db, query, !readOnly);
+    const result = await duneDb.runSql(db, query, !readOnly, { enforceReadOnly: true });
     audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, readOnly, rowCount: result.rowCount, command: result.command, ok: true });
     return json(res, 200, { ok: true, result });
   }
@@ -2033,7 +2046,11 @@ async function databaseQuery(req, res) {
   // strictly the more conservative of the two -- it tests the raw string where
   // db.js's strips comments first, so anything it calls read-only db.js calls
   // read-only too. It can never reject a query this route just authorized.
-  return dbJson(res, () => duneDb.runSql(db, query, !readOnly));
+  // enforceReadOnly: the read path executes inside a READ ONLY transaction, so
+  // a statement the classifier called read-only cannot write even if it was
+  // wrong -- which for `select dune.<fn>(...)`, the shape every privileged
+  // mutation in this app uses, it always was.
+  return dbJson(res, () => duneDb.runSql(db, query, !readOnly, { enforceReadOnly: true }));
 }
 
 async function databaseExport(req, res) {

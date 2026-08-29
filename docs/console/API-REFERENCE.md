@@ -709,7 +709,12 @@ resolves to the `database:query` action, which covers read-only SQL (`SELECT`,
 `WITH`, `SHOW`, `EXPLAIN`). Write SQL sent to the same route additionally
 requires `database:execute`, checked inside the handler once the body is parsed
 — a caller holding only `database:query` gets `403` on a write and nothing runs:
-no rate-limit tick, no pre-write backup. The default `admin` policy grants
+no rate-limit tick, no pre-write backup.
+
+The permission is not the enforcement. `database:execute` is selected by a SQL
+classifier that a mutating `select dune.<fn>(...)` passes, so the read path also
+executes inside a `set transaction read only` transaction and Postgres refuses
+the write regardless of what the classifier concluded. The default `admin` policy grants
 `database:query` and denies `database:execute`; `owner` holds both. Use
 `/api/database/export` for read-only result export.
 

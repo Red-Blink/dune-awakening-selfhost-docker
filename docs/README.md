@@ -48,7 +48,7 @@ by nature, so it gets its own.
 ## Console (`console/api`, `console/web`)
 
 - [API-REFERENCE.md](console/API-REFERENCE.md) — Current. Full HTTP API reference for every console endpoint.
-- [api-keys.md](console/api-keys.md) — Current. Named, revocable API keys for external callers: per-namespace Read/Read+write scopes that default to no access, the `settings`/`database`/`setup` namespaces no key can ever reach and the write-denied `updates` and `addons`, hash-only storage with a one-time reveal, and per-key expiry, disable and rate limits.
+- [api-keys.md](console/api-keys.md) — Current. Named, revocable API keys for external callers: per-namespace Read/Read+write, or an explicit list of actions scopes that default to no access, the `settings`/`database`/`setup` namespaces no key can ever reach and the write-denied `updates` and `addons`, hash-only storage with a one-time reveal, and per-key expiry, disable and rate limits.
 - [blueprints.md](console/blueprints.md) — Current. Blueprint import/export developer documentation.
 - [PRE-AUGMENTED-GEAR.md](console/PRE-AUGMENTED-GEAR.md) — Current. API reference for granting gear with augments pre-applied.
 - [generator-fuel-burn-rates.md](console/generator-fuel-burn-rates.md) — Current. Per-generator fuel burn constants and where they live in code.

@@ -172,11 +172,32 @@ test("the SQL is classified once and reused", () => {
 
 test("a read-only request is executed with writes refused", () => {
   // Previously an unconditional `true`, which meant the read-only path ran with
-  // destructive SQL permitted anyway -- the classifier was the only thing
-  // standing between a SELECT grant and a DROP.
-  assert.match(body, /duneDb\.runSql\(db, query, !readOnly\)/);
+  // destructive SQL permitted anyway.
+  //
+  // The classifier is no longer what stands between a SELECT grant and a DROP:
+  // review showed `select dune.<fn>(...)` -- the shape every privileged
+  // mutation in this app uses -- classifies read-only and sailed through. The
+  // real enforcement is `enforceReadOnly`, which runs the read path inside a
+  // `set transaction read only` transaction so Postgres refuses the write.
+  //
+  // This assertion only proves the CALL SHAPE. That the enforcement actually
+  // works is proved behaviourally, against a real Postgres, in
+  // databaseReadOnlyEnforcement.integration.test.js -- a source-text assertion
+  // like this one would pass unchanged if the transaction did nothing.
+  assert.match(body, /duneDb\.runSql\(db, query, !readOnly, \{ enforceReadOnly: true \}\)/);
   assert.ok(!/duneDb\.runSql\(db, query, true\)/.test(body),
     "runSql must not be called with an unconditional allowDestructive");
+});
+
+test("both caller-supplied SQL routes opt into read-only enforcement", () => {
+  // enforceReadOnly defaults to OFF, so a route that forgets it silently gets
+  // the old, bypassable behaviour. Internal callers pass server-built SQL and
+  // deliberately do not enforce; these two take it from the caller and must.
+  const query = codeOf(functionBody("databaseQuery"));
+  const bridge = codeOf(functionBody("addonBridgeRoute"));
+  for (const [name, fn] of [["databaseQuery", query], ["addonBridgeRoute", bridge]]) {
+    assert.match(fn, /enforceReadOnly: true/, `${name} must enforce read-only on the read path`);
+  }
 });
 
 test("requireAction re-runs both gates and fails closed", () => {

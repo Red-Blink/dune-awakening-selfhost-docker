@@ -15,9 +15,14 @@
 // Every Action here must be a REAL action, or a wildcard matching at least one.
 // This example used to read "Deny players:reset-progression" -- a string no
 // route resolves to, so it denied nothing while looking like it withheld
-// progression resets (the actual action is players:mutate, which covers every
-// player mutation at once). setPolicies now refuses such a pattern instead of
-// storing it; unknownActions() is the check.
+// progression resets. The route actually resolves to players:reset.
+// setPolicies now refuses such a pattern instead of storing it;
+// unknownActions() is the check.
+//
+// A name the catalog USED to have is a different case, handled by
+// REMOVED_ACTION_ALIASES: it keeps its old meaning when evaluated, so an
+// upgrade cannot silently re-interpret a policy, but setPolicies still refuses
+// it on save so the operator migrates.
 //
 // Evaluation: for each statement in order,
 //   if action matches statement AND Effect=Deny  → DENY immediately
@@ -26,7 +31,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { ROUTE_ACTIONS, REGEX_ACTIONS, REGEX_ACTIONS_BY_METHOD, REGEX_ACTIONS_BY_METHOD_PATTERN, CONTENT_CONDITIONAL_ACTIONS } from "./actions.js";
+import { ROUTE_ACTIONS, REGEX_ACTIONS, REGEX_ACTIONS_BY_METHOD, REGEX_ACTIONS_BY_METHOD_PATTERN, CONTENT_CONDITIONAL_ACTIONS, REMOVED_ACTION_ALIASES } from "./actions.js";
 import { writeJsonAtomic } from "./jsonStore.js";
 
 // ---- Policy evaluation ----
@@ -49,7 +54,32 @@ export function matchAction(pattern, action) {
     const regex = new RegExp("^" + pattern.replace(/\*/g, ".*") + "$");
     return regex.test(action);
   }
+  // A name this catalog used to have. Checked LAST, so it can never shadow a
+  // live action, and it exists so that splitting a coarse action does not
+  // silently re-interpret a policy that already named it -- a Deny on
+  // players:mutate still denies every action players:mutate used to cover.
+  // See REMOVED_ACTION_ALIASES in actions.js for why this is not simply a
+  // deletion. setPolicies still refuses these on save.
+  const successors = REMOVED_ACTION_ALIASES[pattern];
+  if (successors) return successors.includes(action);
   return false;
+}
+
+// Patterns naming an action this catalog used to have. Distinct from
+// unknownActions: these still MEAN something (matchAction honours them), but an
+// operator saving a policy should be told to name the successors explicitly.
+export function deprecatedActions(docs) {
+  const found = [];
+  for (const [tier, document] of Object.entries(docs || {})) {
+    for (const statement of document?.statements || []) {
+      const patterns = Array.isArray(statement.Action) ? statement.Action : [statement.Action];
+      for (const pattern of patterns) {
+        if (typeof pattern !== "string") continue;
+        if (REMOVED_ACTION_ALIASES[pattern]) found.push({ tier, pattern, successors: [...REMOVED_ACTION_ALIASES[pattern]] });
+      }
+    }
+  }
+  return found;
 }
 
 export function evaluate(session, action, policies = null) {
@@ -109,19 +139,19 @@ export function loadPolicies(repoRoot = null) {
         // document away would silently revert an operator's entire policy to
         // defaults, a far bigger surprise than the dead pattern itself. The
         // caller logs what is returned here.
-        return { source: "file", path: filePath, unknownActions: unknownActions(parsed) };
+        return { source: "file", path: filePath, unknownActions: unknownActions(parsed), deprecatedActions: deprecatedActions(parsed) };
       }
       _policies = DEFAULT_POLICIES;
-      return { source: "defaults", path: filePath, invalid: true, unknownActions: [] };
+      return { source: "defaults", path: filePath, invalid: true, unknownActions: [], deprecatedActions: [] };
     } catch {
       _policies = DEFAULT_POLICIES;
-      return { source: "defaults", path: filePath, invalid: true, unknownActions: [] };
+      return { source: "defaults", path: filePath, invalid: true, unknownActions: [], deprecatedActions: [] };
     }
   }
 
   // Hardcoded fallback defaults
   _policies = DEFAULT_POLICIES;
-  return { source: "defaults", unknownActions: [] };
+  return { source: "defaults", unknownActions: [], deprecatedActions: [] };
 }
 
 let _allowedActions = {};
@@ -176,7 +206,11 @@ export function getAllPolicies(policies = null) {
 // [{ tier, pattern }]. Such a pattern is dead weight in an Allow and a silent
 // lie in a Deny: "Deny players:reset-progression" looks like it withholds
 // progression resets, but no route resolves to that string (the real one is
-// players:mutate), so it withholds nothing and the policy reads as safe.
+// players:reset), so it withholds nothing and the policy reads as safe.
+//
+// A name the catalog used to have is NOT reported here -- matchAction still
+// honours it, so it matches successors and is not dead. deprecatedActions()
+// reports those separately, because the fix is migration rather than a typo.
 //
 // Wildcards are legal and must stay legal, so the test is "does this pattern
 // match at least one real action", not "is this string in the catalog" --
@@ -207,6 +241,24 @@ export function setPolicies(docs, repoRoot = null) {
   // Refused rather than warned about: the dangerous case is a misspelled Deny,
   // and a save that "succeeded with warnings" is exactly how an operator ends
   // up believing a restriction is in force when it is not.
+  // Refused on SAVE even though matchAction still honours them at evaluation
+  // time. That asymmetry is the whole design: an existing document keeps its
+  // meaning through an upgrade, and the operator is pushed to migrate the next
+  // time they edit it, rather than being silently re-interpreted OR having the
+  // console refuse to start. The message names the successors so the edit is
+  // mechanical.
+  const deprecated = deprecatedActions(docs);
+  if (deprecated.length) {
+    const listed = deprecated
+      .map(({ tier, pattern, successors }) => `${tier}: ${pattern} (now ${successors.join(", ")})`)
+      .join("; ");
+    return {
+      ok: false,
+      error: `These actions were split and no longer exist. Name the actions you actually want instead: ${listed}.`,
+      deprecatedActions: deprecated
+    };
+  }
+
   const dead = unknownActions(docs);
   if (dead.length) {
     const listed = dead.map(({ tier, pattern }) => `${tier}: ${pattern}`).join(", ");

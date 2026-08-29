@@ -828,11 +828,44 @@ export async function searchDatabase(db, q) {
   return result.rows;
 }
 
-export async function runSql(db, query, allowDestructive = false) {
+// enforceReadOnly is for CALLER-SUPPLIED SQL only -- the console's Run Query
+// route and the addon bridge. Internal callers build their own SQL and pass it
+// with enforceReadOnly off, both because their statements are not attacker
+// controlled and because their mocked `db` objects in tests have no usable
+// transaction().
+export async function runSql(db, query, allowDestructive = false, { enforceReadOnly = false } = {}) {
   const sql = String(query || "").trim();
   if (!sql) throw new Error("SQL query is required");
   const readOnly = isReadOnlySql(sql);
   if (!allowDestructive && !readOnly) throw new Error("Only read-only SQL is allowed without destructive confirmation");
+
+  // POSTGRES refuses the write, rather than isReadOnlySql being trusted to have
+  // spotted it.
+  //
+  // The classifier only asks "does this start with a read keyword and avoid a
+  // blacklist". Every privileged mutation in this application is shaped
+  // `select dune.<fn>(...)` -- disband_guild, delete_actors,
+  // adjust_player_virtual_currency_balance -- so the whole mutation surface
+  // walked straight through, and the blacklist cannot be repaired to cover it
+  // (\bdelete\b does not match delete_actors, and the schema ships hundreds of
+  // functions). `SELECT ... INTO` and `select 1; select mutating_fn()` walked
+  // through by other routes again.
+  //
+  // That left every guard built on the classifier -- the database:execute
+  // permission, the pre-write backup, the mutation rate limiter -- decorative
+  // for exactly the statements that matter most. Asking the database is the
+  // only check that cannot be talked around.
+  if (enforceReadOnly && !allowDestructive) {
+    const result = await db.transaction(async (tx) => {
+      // Must be the first statement in the transaction, and it covers every
+      // statement in `sql` -- including later ones in a multi-statement string,
+      // which is how `select 1; select mutating_fn()` got through.
+      await tx.query("set transaction read only");
+      return tx.query(sql);
+    });
+    return rowsResult(result);
+  }
+
   const result = readOnly
     ? await db.query(sql)
     : await withKnownLiveRefresh(db, () => db.query(sql), { features: liveRefreshFeaturesForSql(sql) });

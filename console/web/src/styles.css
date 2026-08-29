@@ -6815,7 +6815,22 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
    checkbox rule -- so without this the ticks render in the browser default
    blue/purple, which reads as foreign in an amber console. Matches the
    blueprint row-select checkboxes. */
-.api-key-scope-action input { margin: 0; flex: none; accent-color: var(--accent); }
+/* An explicit size is REQUIRED, not cosmetic: the global
+   `input, select, textarea { width: 100% }` near the top of this file applies
+   to checkboxes too, and with flex: none the box cannot shrink -- it takes the
+   whole flex line and squeezes the action name to 0px, so every label in the
+   checklist renders blank. Every other checkbox rule here sets a size for the
+   same reason (.blueprint-row-select, .bases-child-access-row, .checkbox-line).
+   min-height: 0 overrides the 44px touch minimum from the pointer:coarse block. */
+.api-key-scope-action input {
+  width: 16px;
+  height: 16px;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  flex: none;
+  accent-color: var(--accent);
+}
 .api-key-scope-action code {
   overflow: hidden;
   text-overflow: ellipsis;

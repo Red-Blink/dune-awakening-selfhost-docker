@@ -762,6 +762,51 @@ export const CONTENT_CONDITIONAL_ACTIONS = [
   "database:execute",
 ];
 
+// ---- Removed actions, and what they became ----
+//
+// Splitting the coarse *:mutate actions is not a no-op for a policy that
+// already named one. policy.js's own header teaches the idiom
+//
+//     { "Effect": "Deny",  "Action": ["players:mutate"] },
+//     { "Effect": "Allow", "Action": ["players:*"] }
+//
+// and deleting players:mutate outright turns that document inside out: the Deny
+// matches nothing, the surviving wildcard matches all ten successors, and an
+// upgrade silently converts "no player mutations" into "every player mutation".
+// Measured on a real document during review: a tier GAINED 22 actions and lost
+// none, including addons:bridge and guilds:disband.
+//
+// So the old names keep their MEANING at evaluation time -- a Deny on
+// players:mutate still denies everything it used to deny -- while
+// setPolicies refuses them on save, so an operator is pushed to migrate on
+// their next edit rather than being silently re-interpreted. Aliases affect
+// matchAction only; they are NOT in the catalog and cannot be granted to an
+// API key.
+//
+// Each list is exactly the set of actions the routes that used to resolve to
+// the old name now resolve to -- no more. players:kick-all is deliberately
+// ABSENT: it was already its own action before the split (an exact
+// ROUTE_ACTIONS entry for POST /api/players/kick-all-online), so it was never
+// part of players:mutate and must not be handed over by an alias. The
+// *:unclassified sentinels ARE included, because the old *:mutate names were
+// themselves the catch-all for unmapped mutating routes.
+export const REMOVED_ACTION_ALIASES = Object.freeze({
+  "players:mutate": Object.freeze([
+    "players:moderate", "players:teleport", "players:give-item", "players:grant",
+    "players:reset", "players:delete-item", "players:edit-item", "players:repair",
+    "players:recover", "players:unclassified"
+  ]),
+  "guilds:mutate": Object.freeze([
+    "guilds:disband", "guilds:membership", "guilds:rank", "guilds:unclassified"
+  ]),
+  "blueprints:mutate": Object.freeze([
+    "blueprints:export", "blueprints:import", "blueprints:delete", "blueprints:unclassified"
+  ]),
+  "addons:mutate": Object.freeze([
+    "addons:remove", "addons:toggle", "addons:bridge", "addons:unclassified"
+  ])
+});
+
 // ---- Action resolution ----
 //
 // Returns the action string for a given route path and HTTP method.
