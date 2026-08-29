@@ -372,7 +372,13 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
           // be Read under another name.
           if (supportsCustom(entry)) options.push({ value: "custom", label: "Custom", ariaLabel: `Custom actions for ${entry.namespace}` });
           const actions = grantableActions(entry);
-          return <div className={`api-key-scope-row${level === "none" ? "" : " granted"}`} key={entry.namespace}>
+          // Matches grantedCount, which drops an empty action list because the
+          // server does. Keying the styling off `level !== "none"` instead lit
+          // a Custom row with nothing ticked up as granted while the same row
+          // was not counted towards enabling Create -- the grid said the
+          // namespace was reached and the button said the key reached nothing.
+          const granted = level === "custom" ? chosen.length > 0 : level !== "none";
+          return <div className={`api-key-scope-row${granted ? " granted" : ""}`} key={entry.namespace}>
             <span className="api-key-scope-name">{scopeLabel(entry.namespace)}</span>
             <SegmentedControl
               name={`api-key-scope-${entry.namespace}`}

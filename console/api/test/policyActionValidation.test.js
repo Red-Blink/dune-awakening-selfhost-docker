@@ -142,9 +142,12 @@ test("a valid policy still saves, and the structural checks still run first", ()
 
 test("a refused save does not change the active policy", () => {
   restoreDefaults();
-  const before = evaluate({ tier: "admin" }, "players:mutate");
+  // Probes a live catalog action, not players:mutate: that name is now a
+  // removed-action alias, so evaluating it measures alias resolution rather
+  // than the active document this test is about.
+  const before = evaluate({ tier: "admin" }, "players:reset");
   setPolicies(withAdmin([{ Effect: "Deny", Action: ["players:reset-progression"] }]));
-  assert.equal(evaluate({ tier: "admin" }, "players:mutate"), before,
+  assert.equal(evaluate({ tier: "admin" }, "players:reset"), before,
     "a rejected document must not be partially applied");
   restoreDefaults();
 });

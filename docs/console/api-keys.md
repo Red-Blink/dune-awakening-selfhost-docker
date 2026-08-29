@@ -244,8 +244,8 @@ than on an address; only the recorded last-used IP is affected.
 - Authentication runs before the session gate, so a bearer request never reaches the CSRF check.
 - An unrecognised namespace, an unrecognised level, or a misspelled level such as `"readonly"`
   normalizes to None. Nothing falls back to Read.
-- A `"write"` level on a namespace whose writes are denied (`updates`) or that has no write
-  action (`logs`) is stored and evaluated as Read, never as write.
+- A `"write"` level on a namespace whose writes are denied (`updates`, `addons`) or that has
+  no write action (`logs`) is stored and evaluated as Read, never as write.
 - Updating a key replaces its scopes wholesale. Omitting a namespace revokes it; there is no
   merge that could leave a stale grant behind.
 - An unreadable key store fails closed — no key authenticates — and logs a warning.

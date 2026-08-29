@@ -110,16 +110,11 @@ export function keyStatus(key: ApiKey): "Active" | "Disabled" | "Expired" {
   return key.enabled ? "Active" : "Disabled";
 }
 
-// Record<string, ScopeLevel> models a missing key as ScopeLevel rather than
-// undefined, and ScopeLevel has no falsy member, so `scopes[ns] ?? "none"`
-// narrows straight back to ScopeLevel at the call site. A declared return type
+// Record<string, ScopeValue> models a missing key as ScopeValue rather than
+// undefined, and ScopeValue has no falsy member, so `scopes[ns] ?? "none"`
+// narrows straight back to ScopeValue at the call site. A declared return type
 // is not narrowed that way, and the hasOwnProperty guard makes the lookup
 // honest about a namespace that was never granted.
-export function scopeLevelOf(scopes: ApiKeyScopes, namespace: string): ScopeLevel | undefined {
-  const value = scopeValueOf(scopes, namespace);
-  return Array.isArray(value) ? undefined : value;
-}
-
 export function scopeValueOf(scopes: ApiKeyScopes, namespace: string): ScopeValue | undefined {
   return Object.prototype.hasOwnProperty.call(scopes || {}, namespace) ? scopes[namespace] : undefined;
 }

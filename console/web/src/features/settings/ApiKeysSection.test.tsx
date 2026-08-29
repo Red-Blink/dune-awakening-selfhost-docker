@@ -266,6 +266,34 @@ describe("the create form", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /Create Key/i })).toBeEnabled());
   });
 
+  test("an empty Custom row is not highlighted as granted", async () => {
+    // The .granted class and grantedCount have to agree. They did not: the
+    // class was keyed off "the level is not None", so a Custom row with
+    // nothing ticked lit up as reached while the same row was excluded from
+    // the count that enables Create -- the grid claimed access the key would
+    // not have. Asserted through the class because that is what paints it;
+    // jsdom has no layout engine, so the colour itself is a browser check.
+    renderSection([]);
+    await openCreateForm();
+
+    const row = () => screen.getByLabelText("Access level for players").closest(".api-key-scope-row")!;
+
+    fireEvent.click(screen.getByLabelText("Read players"));
+    expect(row().className).toContain("granted");
+
+    // Custom seeds from the level it replaces, so this arrives with
+    // players:read already ticked -- still granted, now as a list.
+    fireEvent.click(screen.getByLabelText("Custom actions for players"));
+    expect(screen.getByRole("checkbox", { name: "players:read" })).toBeChecked();
+    expect(row().className).toContain("granted");
+
+    // Untick the only seeded action: still Custom, but reaching nothing.
+    fireEvent.click(screen.getByRole("checkbox", { name: "players:read" }));
+    expect(screen.getByText(/0 of 4 actions selected/i)).toBeInTheDocument();
+    expect(row().className).not.toContain("granted");
+    expect(screen.getByRole("button", { name: /Create Key/i })).toBeDisabled();
+  });
+
   test("switching a Custom namespace back to a level sends the level", async () => {
     renderSection([]);
     await openCreateForm();

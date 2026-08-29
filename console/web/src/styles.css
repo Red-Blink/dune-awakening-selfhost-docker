@@ -6780,19 +6780,42 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
 /* The Custom action checklist. The row is display: contents, so this fieldset
    is a direct item of .api-key-scope-grid and must be told to span BOTH
    columns -- left to itself it would drop into the name column and squeeze
-   against the 1fr track. */
+   against the 1fr track.
+
+   Spanning both columns is what the checklist needs (12 actions across three
+   auto-fill tracks rather than one long single-column list), but it also means
+   the band starts at the same x as the namespace names above and below it, so
+   the first column stops reading as "namespace" for one row. The left rule and
+   indent are what re-subordinate it: it reads as a detail panel hanging off the
+   row that opened it, not as another cell in the name column. Same idiom as
+   .dirty-note and .database-tunnel-security-note (both 3px var(--accent)),
+   without their tinted background -- this is structure, not a warning.
+
+   --accent, not --border-strong: the rule has to be SEEN to do the grouping,
+   and --border-strong is 1.86:1 against --panel-muted, under the 3:1 WCAG
+   1.4.11 asks of a boundary that carries meaning. --accent is 6.38:1.
+   --border (1.33:1) and #62513d (2.45:1) fail the same way. */
 .api-key-scope-actions {
   grid-column: 1 / -1;
   border: 0;
+  border-left: 3px solid var(--accent);
   border-bottom: 1px solid #241f1a;
   margin: 0;
-  padding: 2px 0 8px;
+  padding: 2px 0 8px 12px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
   column-gap: 16px;
   row-gap: 4px;
 }
 .api-key-scope-row:last-child > .api-key-scope-actions { border-bottom: 0; }
+/* A row that owns a checklist must not be separated from it. .api-key-scope-row
+   is display: contents, so the separator lives on each CELL -- which drew a
+   full-width rule between the namespace and its own action list, grouping the
+   list with the row beneath instead. Only the fieldset closes the group. */
+.api-key-scope-row:has(> .api-key-scope-actions) > .api-key-scope-name,
+.api-key-scope-row:has(> .api-key-scope-actions) > .api-key-scope-segments {
+  border-bottom: 0;
+}
 /* Spans the grid rather than sitting in the first cell: a legend is not a grid
    item by default in every engine, so it is placed explicitly. */
 .api-key-scope-actions legend {
@@ -6861,6 +6884,14 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   .api-key-scope-row > * { padding: 0; border-bottom: 0; }
   .api-key-scope-row:last-child { border-bottom: 0; }
   .api-key-scope-segments { justify-self: stretch; grid-auto-columns: minmax(0, 1fr); }
+  /* The rule above zeroes padding on every cell, the fieldset included, which
+     stripped the checklist of the indent and gutter that make it read as a
+     group -- at the width where the rows have already lost their columns and
+     the grouping is carrying all of the structure. Same specificity as that
+     rule, so this has to come after it. Only padding is restored: that rule
+     resets border-BOTTOM, so the left rule is still inherited from the
+     unconditional declaration above. */
+  .api-key-scope-actions { padding: 2px 0 4px 12px; }
 }
 
 .api-key-reveal {
