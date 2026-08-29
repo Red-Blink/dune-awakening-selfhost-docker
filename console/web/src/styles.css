@@ -2209,7 +2209,16 @@ body.debug .technical-details { display: block; }
 
 .home-subsystems { min-width: 0; display: grid; gap: 10px; align-content: start; }
 .home-subsystems h3 { margin: 0; color: #ffd08a; }
-.home-subsystem-list { list-style: none; margin: 0; padding: 0; display: grid; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+/* No overflow: hidden. It clipped the inset focus ring's square corners on the
+   first and last rows; the rounded slab is achieved by rounding those rows'
+   own fills instead. Logical longhands rather than the border-radius shorthand
+   so the first-child and last-child rules compose instead of overwriting each
+   other when the list holds a single row. */
+.home-subsystem-list { list-style: none; margin: 0; padding: 0; display: grid; border: 1px solid var(--border); border-radius: 8px; }
+.home-subsystem-row:first-child .home-subsystem-button,
+.home-subsystem-row:first-child .home-subsystem-static { border-start-start-radius: 7px; border-start-end-radius: 7px; }
+.home-subsystem-row:last-child .home-subsystem-button,
+.home-subsystem-row:last-child .home-subsystem-static { border-end-start-radius: 7px; border-end-end-radius: 7px; }
 .home-subsystem-row + .home-subsystem-row { border-top: 1px solid var(--border); }
 /* The button resets the global button styling rather than inheriting it: these
    are full-bleed rows, not controls, so they take the row's own padding and

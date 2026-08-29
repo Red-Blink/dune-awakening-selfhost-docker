@@ -499,7 +499,7 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
           this region with no accessible name. The three h3s below it (this
           hero's status label, Readiness & Health, Performance) are its
           children, so the level is correct as well as present. */}
-      <article className="hero-panel wide home-hero" aria-labelledby="home-hero-heading">
+      <article className="hero-panel wide" aria-labelledby="home-hero-heading">
         <h2 id="home-hero-heading" className="sr-only">Server overview</h2>
         <div className="home-hero-split">
           <div className="home-hero-primary">
@@ -642,7 +642,13 @@ function HomeSubsystemList({ items, onNavigate }: { items: { label: string; valu
     <h3>Readiness & Health</h3>
     <ul className="home-subsystem-list">
       {items.map((item) => {
-        const route = HOME_SUBSYSTEM_ROUTES[item.label];
+        // hasOwn, not a bare index: a plain object inherits Object.prototype,
+        // so a label of "constructor" or "toString" would return a truthy
+        // non-Tab value and be handed to setTab. Labels are compile-time
+        // literals today, but the value beside them is server-parsed and the
+        // two live in the same object -- this keeps the lookup fail-closed if
+        // that ever stops being true.
+        const route = Object.hasOwn(HOME_SUBSYSTEM_ROUTES, item.label) ? HOME_SUBSYSTEM_ROUTES[item.label] : undefined;
         const body = <>
           <span className="home-subsystem-label">{item.label}</span>
           <span className="home-subsystem-value">
