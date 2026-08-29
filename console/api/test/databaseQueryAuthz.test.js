@@ -44,8 +44,35 @@ function functionBody(name) {
 // not evidence: an ordering check that reads raw source can be satisfied (or
 // broken) by a comment that happens to mention the call it is looking for,
 // which is exactly what happened while writing this file.
+// String-aware, not a pair of regexes: server.js contains
+// `new URL(req.url, "http://localhost")`, and treating the // inside a string
+// literal as a comment truncates that line and shifts every index after it.
+// The bodies stripped here happen to contain no URLs today, so a naive version
+// was correct by luck. apiKeyAuthWiring.test.js documents both failure modes
+// this guards against, with the reproduction.
 function codeOf(text) {
-  return text.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
+  let out = "";
+  let quote = null;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (quote) {
+      out += ch;
+      if (ch === "\\") { out += next ?? ""; i++; continue; }
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") { quote = ch; out += ch; continue; }
+    if (ch === "/" && next === "/") { while (i < text.length && text[i] !== "\n") i++; out += "\n"; continue; }
+    if (ch === "/" && next === "*") {
+      i += 2;
+      while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++;
+      i++;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
 }
 
 const body = codeOf(functionBody("databaseQuery"));

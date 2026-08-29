@@ -15,7 +15,50 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(join(__dirname, "../src/server.js"), "utf8");
+const rawSource = readFileSync(join(__dirname, "../src/server.js"), "utf8");
+
+// Every assertion in this file reads server.js as TEXT, so a comment that
+// happens to mention a call reads to indexOf exactly like the call itself.
+// Both failure modes were reproduced against this file before it was changed:
+//
+//   false FAILURE  adding a comment above the gate that names
+//                  apiKeys.allows(bearer.key, action) broke the ordering test
+//                  while the code was still correct.
+//   false PASS     deleting the isDiscordAdapterRoute(path) fork and leaving a
+//                  comment that names it kept "the gate sits after ... the
+//                  Discord adapter fork" green -- the test went on asserting a
+//                  property that no longer existed.
+//
+// The second is the dangerous one, so comments are removed before anything is
+// matched. String-aware on purpose: handleApi contains
+// `new URL(req.url, "http://localhost")`, and a naive //-stripper truncates
+// that line mid-body and shifts every index after it.
+function stripComments(text) {
+  let out = "";
+  let quote = null;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (quote) {
+      out += ch;
+      if (ch === "\\") { out += next ?? ""; i++; continue; }
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") { quote = ch; out += ch; continue; }
+    if (ch === "/" && next === "/") { while (i < text.length && text[i] !== "\n") i++; out += "\n"; continue; }
+    if (ch === "/" && next === "*") {
+      i += 2;
+      while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++;
+      i++;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+const source = stripComments(rawSource);
 
 function handleApiBody() {
   const match = source.match(/async function handleApi\(req,\s*res\)\s*\{/);
@@ -42,6 +85,34 @@ const at = (needle) => {
 // a bare indexOf("auth.requireAuth") would match the wrong one and make these
 // ordering assertions pass vacuously.
 const GATE = "const session = bearer?.session || auth.requireAuth(req, res);";
+
+test("the comment stripper this file depends on actually works", () => {
+  // Everything below asserts against stripped text, so a stripper that quietly
+  // mangles server.js would degrade every other test in this file into
+  // something weaker without failing. Checked against the real source, not a
+  // toy string.
+  assert.ok(rawSource.includes('new URL(req.url, "http://localhost")'), "precondition: the URL line exists");
+  assert.ok(source.includes('new URL(req.url, "http://localhost")'),
+    "a // inside a string literal was treated as a comment");
+  assert.ok(rawSource.includes("// The main gate") || rawSource.includes("// Stashed for requireAction"),
+    "precondition: server.js has line comments");
+  assert.ok(!source.includes("// Stashed for requireAction"), "line comments are not removed");
+  assert.ok(!/\/\*[\s\S]*?\*\//.test(source), "block comments are not removed");
+  // Code either side of a stripped comment must survive intact.
+  assert.ok(source.includes("req.authApiKey = bearer?.key || null;"));
+  assert.ok(source.includes(GATE));
+
+  const sample = stripComments([
+    'const a = "http://x"; // trailing',
+    "/* block */ const b = `t${1}`;",
+    "const c = 'it\\'s';"
+  ].join("\n"));
+  assert.ok(sample.includes('const a = "http://x";'));
+  assert.ok(!sample.includes("trailing"));
+  assert.ok(!sample.includes("block"));
+  assert.ok(sample.includes("const b = `t${1}`;"));
+  assert.ok(sample.includes("const c = 'it\\'s';"), "an escaped quote ended the string early");
+});
 
 test("api key authentication runs before the session/CSRF gate", () => {
   assert.ok(
