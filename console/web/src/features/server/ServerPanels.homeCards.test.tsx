@@ -256,8 +256,8 @@ describe("homeStateDotTone", () => {
     expect(homeStateDotTone("Readiness checked", healthy)).toBe("attention");
   });
 
-  it("treats a deliberate stop as off, not as a warning", () => {
-    expect(homeStateDotTone("Stopped", healthy)).toBe("off");
+  it("reports a stopped battlegroup at full severity", () => {
+    expect(homeStateDotTone("Stopped", healthy)).toBe("failed");
   });
 
   it("distinguishes having no reading from having a bad one", () => {
@@ -281,10 +281,15 @@ describe("homeStateDotTone", () => {
 
   // A stop or restart takes the subsystems down on purpose; going red there
   // would cry wolf on an action the operator just triggered.
-  it("does not escalate during an action the operator asked for", () => {
+  it("does not escalate mid-action, when subsystems are down on purpose", () => {
     expect(homeStateDotTone("Restarting Battlegroup", failed)).toBe("motion");
     expect(homeStateDotTone("Stopping", failed)).toBe("motion");
-    expect(homeStateDotTone("Stopped", failed)).toBe("off");
+  });
+
+  // Stopped is already the top severity, so a failed subsystem cannot make it
+  // worse -- but it must not downgrade it either.
+  it("keeps a stopped battlegroup at failed regardless of subsystem state", () => {
+    expect(homeStateDotTone("Stopped", failed)).toBe("failed");
   });
 });
 
@@ -356,7 +361,9 @@ describe("HomePanel server identity", () => {
   it("leads with the overall verdict as the hero heading", async () => {
     const { container } = renderHome();
     await waitFor(() => expect(container.querySelector(".home-hero-state")).toBeTruthy());
-    expect(container.querySelector(".home-hero-state")?.textContent).toBe("Battlegroup Status:OK");
+    // With a space: the dot between label and reading is an empty element, so
+    // without one this reads "Battlegroup Status:OK" to a screen reader.
+    expect(container.querySelector(".home-hero-state")?.textContent).toBe("Battlegroup Status: OK");
     expect(container.querySelector(".home-hero-state-value")?.textContent).toBe("OK");
     // The label is an h3 so it matches the "Readiness & Health" and
     // "Performance" section headings by element rather than by restated CSS.
@@ -593,6 +600,68 @@ describe("HomePanel cache bypass", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
     expect(onLoad).toHaveBeenCalled();
     expect(freshFlags(onLoad).every(Boolean)).toBe(true);
+  });
+});
+
+// A stopped battlegroup used to report six rows of "Needs Review" -- there is
+// nothing to review, everything is simply off.
+describe("HomePanel when the battlegroup is stopped", () => {
+  const STOPPED_STATUS = [
+    "Overall: STOPPED",
+    "Title: Kovalt",
+    "",
+    "Containers",
+    "dune-postgres missing",
+    "dune-rmq-admin missing",
+    "dune-rmq-game missing",
+    "dune-text-router missing",
+    "dune-director missing",
+    "dune-server-gateway missing",
+    "dune-server-survival-1 missing",
+    "dune-server-overmap missing"
+  ].join("\n");
+
+  const renderStopped = () => renderHome({
+    status: STOPPED_STATUS,
+    readiness: "",
+    onLoad: vi.fn().mockResolvedValue(loadResult({ statusText: STOPPED_STATUS, readinessText: "", readinessLoaded: false }))
+  });
+
+  it("says every subsystem is stopped rather than needing review", async () => {
+    const { container } = renderStopped();
+    await waitFor(() => expect(container.querySelectorAll(".home-subsystem-row").length).toBe(6));
+    const values = Array.from(container.querySelectorAll(".home-subsystem-value")).map((node) => node.textContent);
+    expect(values.every((text) => text?.includes("Stopped"))).toBe(true);
+    expect(values.some((text) => text?.includes("Needs Review"))).toBe(false);
+  });
+
+  it("badges them FAILED, not WARN", async () => {
+    const { container } = renderStopped();
+    await waitFor(() => expect(container.querySelectorAll(".home-subsystem-row .badge").length).toBe(6));
+    const badges = Array.from(container.querySelectorAll(".home-subsystem-row .badge"));
+    expect(badges.every((b) => b.className.includes("badge-fail"))).toBe(true);
+  });
+
+  it("carries the same severity in the heading dot", async () => {
+    const { container } = renderStopped();
+    await waitFor(() => expect(container.querySelector(".home-state-dot")).toBeTruthy());
+    expect(container.querySelector(".home-state-dot")?.className).toContain("home-state-dot-failed");
+    expect(container.querySelector(".home-hero-state h3")?.textContent).toBe("Battlegroup Status:");
+  });
+
+  // The same override fires for a failed start/restart. Claiming "Stopped"
+  // there would be a false statement about what happened.
+  it("does not claim stopped when an action merely failed", async () => {
+    const { container } = renderHome({
+      status: "Title: Kovalt",
+      readiness: "",
+      taskResult: { status: "failed", title: "Battlegroup Start Failed" },
+      onLoad: vi.fn().mockResolvedValue(loadResult({ statusText: "Title: Kovalt", readinessText: "", readinessLoaded: false }))
+    });
+    await waitFor(() => expect(container.querySelectorAll(".home-subsystem-row").length).toBe(6));
+    const values = Array.from(container.querySelectorAll(".home-subsystem-value")).map((node) => node.textContent);
+    expect(values.every((text) => text?.includes("Needs Review"))).toBe(true);
+    expect(values.some((text) => text?.includes("Stopped"))).toBe(false);
   });
 });
 

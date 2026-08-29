@@ -2158,9 +2158,6 @@ body.debug .technical-details { display: block; }
 .home-state-dot-ok { background: var(--success-text); }
 .home-state-dot-attention { background: var(--title); }
 .home-state-dot-failed { background: var(--danger-signal); }
-/* Off on purpose: solid, because the hollow ring means "no reading". Uses
-   --text-subtle, not the warm --muted, which blurred into --title at 11px. */
-.home-state-dot-off { background: var(--text-subtle); }
 /* Blue is already the palette's informational hue (.badge-info) and the one
    family that does not blur into the warm chrome. */
 .home-state-dot-motion { background: #85b7eb; animation: state-dot-pulse 1.6s ease-in-out infinite; }

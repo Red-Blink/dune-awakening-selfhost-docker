@@ -501,6 +501,12 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
                 rather than inside, so the heading text stays just the label. */}
             <div className="home-hero-state">
               <h3 className="home-hero-state-label">Battlegroup Status:</h3>
+              {/* Explicit space: the dot between the label and the reading is an
+                  empty element, so without it the heading's text content reads
+                  "Battlegroup Status:Stopped" to a screen reader and to anyone
+                  copying it. Whitespace-only text between flex items is not
+                  rendered, so this costs nothing visually. */}
+              {" "}
               <span className={`home-state-dot home-state-dot-${homeStateDotTone(overall?.value, summary.health)}`} aria-hidden="true" />
               <span className="home-hero-state-value">{homeOverallHeading(overall?.value)}</span>
             </div>
@@ -541,7 +547,7 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   );
 }
 
-export type HomeStateTone = "ok" | "motion" | "off" | "attention" | "failed" | "loading" | "nodata";
+export type HomeStateTone = "ok" | "motion" | "attention" | "failed" | "loading" | "nodata";
 
 // Splits the readings by what the operator should do about them, rather than
 // putting six of the ten on one amber -- a restart in flight and a failed
@@ -552,7 +558,10 @@ export function homeStateDotTone(overallValue: unknown, health: { status: string
   // restart the subsystems are legitimately down, and red would cry wolf.
   if (/^(starting|stopping|restarting)\b/.test(value)) return "motion";
   if (value === "checking") return "loading";
-  if (value === "stopped") return "off";
+  // Stopped is reported at full severity, same as the rows below it: one
+  // state, one colour. It is checked before the escalation so a stop reads as
+  // stopped rather than as whichever subsystem happens to have failed.
+  if (value === "stopped") return "failed";
   if (value === "unknown" || value === "status loaded") return "nodata";
   // summarizeHomeStatus can report "OK" while Funcom/FLS is FAILED (the
   // token-mismatch branch overrides its ready override), so the heading word
@@ -1642,7 +1651,7 @@ function summarizeHomeStatus(status: string, readiness: string, readinessWarning
     : runningAction === "stop" ? "Stopping" : isStarting ? "Starting" : "";
   const warmingOverall = /^Warming$/i.test(rawGames.label) ? "Warming" : "";
   const overall = readinessReady && !runningAction ? "OK" : isStarting ? transitionOverall : runningAction ? transitionOverall : serverState.stopped || actionStopped ? "Stopped" : coreReadyWithReview ? "Needs Review" : warmingOverall || liveOverall;
-  const attentionHealth = !isStarting && !restartSuccessAwaitingFreshStatus && (serverState.stopped || actionStopped || actionFailed) ? attentionHomeHealthCards() : null;
+  const attentionHealth = !isStarting && !restartSuccessAwaitingFreshStatus && (serverState.stopped || actionStopped || actionFailed) ? attentionHomeHealthCards(serverState.stopped || actionStopped ? "stopped" : "failed") : null;
   const transitionAction: "start" | "stop" | "restart" | "" = restartStartObserved
     ? "start"
     : runningAction === "restart" ? ""
@@ -1924,8 +1933,14 @@ function textHasContainerReadiness(text: string, state: "OK" | "FAIL", container
   });
 }
 
-function attentionHomeHealthCards() {
-  const item = { label: "Needs Review", status: "WARN", detail: "" };
+// Applied when the battlegroup is down or an action failed. The two are not
+// the same: a stopped battlegroup has a known cause and every subsystem is off,
+// while a failed start leaves the subsystems in whatever state the failure left
+// them. Saying "Stopped" for a failed start would be a false claim.
+function attentionHomeHealthCards(reason: "stopped" | "failed") {
+  const item = reason === "stopped"
+    ? { label: "Stopped", status: "FAILED", detail: "" }
+    : { label: "Needs Review", status: "WARN", detail: "" };
   return {
     containers: item,
     listeners: item,
