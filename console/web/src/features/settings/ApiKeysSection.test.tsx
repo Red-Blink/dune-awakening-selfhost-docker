@@ -22,7 +22,7 @@ vi.mock("../../lib/clipboard", () => ({ copyText: vi.fn().mockResolvedValue(true
 import { apiKeysApi } from "../../api/apiKeys";
 
 const CATALOG: ScopeCatalogEntry[] = [
-  { namespace: "players", readActions: ["players:read"], writeActions: ["players:mutate"], supportsWrite: true },
+  { namespace: "players", readActions: ["players:read"], writeActions: ["players:moderate", "players:reset", "players:delete-item"], supportsWrite: true },
   { namespace: "bases", readActions: ["bases:read"], writeActions: ["bases:mutate"], supportsWrite: true },
   // logs has no write action; updates has several but they are denied to keys.
   // Both must render two segments, not three.
@@ -121,12 +121,29 @@ describe("the create form", () => {
     for (const namespace of ["logs", "updates"]) {
       const group = screen.getByLabelText(`Access level for ${namespace}`);
       expect(within(group).queryByLabelText(new RegExp(`Read\\+write for ${namespace}`, "i"))).toBeNull();
-      expect(within(group).getAllByRole("radio")).toHaveLength(2);
     }
 
     const players = screen.getByLabelText("Access level for players");
     expect(within(players).getByLabelText(/Read\+write for players/i)).toBeInTheDocument();
-    expect(within(players).getAllByRole("radio")).toHaveLength(3);
+  });
+
+  test("offers Custom only where there is more than one action to choose between", async () => {
+    renderSection([]);
+    await openCreateForm();
+
+    // logs has exactly one action, so Custom there would be Read under another
+    // name -- the same catalog-driven rule that hides Read+write.
+    const logs = screen.getByLabelText("Access level for logs");
+    expect(within(logs).queryByLabelText(/Custom actions for logs/i)).toBeNull();
+    expect(within(logs).getAllByRole("radio")).toHaveLength(2);
+
+    // updates has two read actions and no writes: no Read+write segment, but
+    // Custom is still meaningful.
+    const updates = screen.getByLabelText("Access level for updates");
+    expect(within(updates).getByLabelText(/Custom actions for updates/i)).toBeInTheDocument();
+    expect(within(updates).getAllByRole("radio")).toHaveLength(3);
+
+    expect(within(screen.getByLabelText("Access level for players")).getAllByRole("radio")).toHaveLength(4);
   });
 
   test("sends only the granted namespaces, with None as absence", async () => {
@@ -171,6 +188,112 @@ describe("the create form", () => {
     renderSection([]);
     await openCreateForm();
     expect(screen.queryByRole("button", { name: /set all|grant all|select all/i })).toBeNull();
+  });
+
+  test("Custom seeds from the level it replaces, so switching does not drop access", async () => {
+    renderSection([]);
+    await openCreateForm();
+
+    fireEvent.click(screen.getByLabelText(/Read\+write for players/i));
+    fireEvent.click(screen.getByLabelText("Custom actions for players"));
+
+    // Seeded from Read+write, which is every action in the namespace.
+    for (const action of ["players:read", "players:moderate", "players:reset", "players:delete-item"]) {
+      expect(screen.getByRole("checkbox", { name: action })).toBeChecked();
+    }
+    expect(screen.getByText(/4 of 4 actions selected/i)).toBeInTheDocument();
+  });
+
+  test("Custom seeded from Read carries only the read actions", async () => {
+    renderSection([]);
+    await openCreateForm();
+
+    fireEvent.click(screen.getByLabelText("Read players"));
+    fireEvent.click(screen.getByLabelText("Custom actions for players"));
+
+    expect(screen.getByRole("checkbox", { name: "players:read" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "players:moderate" })).not.toBeChecked();
+    expect(screen.getByText(/1 of 4 actions selected/i)).toBeInTheDocument();
+  });
+
+  test("a Custom namespace sends the ticked actions, not a level", async () => {
+    renderSection([]);
+    await openCreateForm();
+
+    fireEvent.change(screen.getByLabelText(/^Name/i), { target: { value: "moderation bot" } });
+    fireEvent.click(screen.getByLabelText("Custom actions for players"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "players:read" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "players:moderate" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /Create Key/i }));
+
+    await waitFor(() => expect(mocked.create).toHaveBeenCalled());
+    const [sent] = mocked.create.mock.calls[0];
+    // The whole point: the destructive actions are absent, not merely unticked.
+    expect(sent.scopes.players).toEqual(["players:moderate", "players:read"]);
+  });
+
+  test("unticking an action removes it from what is sent", async () => {
+    renderSection([]);
+    await openCreateForm();
+
+    fireEvent.change(screen.getByLabelText(/^Name/i), { target: { value: "narrower" } });
+    fireEvent.click(screen.getByLabelText(/Read\+write for players/i));
+    fireEvent.click(screen.getByLabelText("Custom actions for players"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "players:reset" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "players:delete-item" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /Create Key/i }));
+
+    await waitFor(() => expect(mocked.create).toHaveBeenCalled());
+    const [sent] = mocked.create.mock.calls[0];
+    expect(sent.scopes.players).toEqual(["players:moderate", "players:read"]);
+  });
+
+  test("a Custom row with nothing ticked does not count as a grant", async () => {
+    // The server drops an empty action list, so Create must not be enabled for
+    // a key that would reach nothing.
+    renderSection([]);
+    await openCreateForm();
+
+    fireEvent.change(screen.getByLabelText(/^Name/i), { target: { value: "empty" } });
+    fireEvent.click(screen.getByLabelText("Custom actions for players"));
+
+    expect(screen.getByText(/0 of 4 actions selected/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Create Key/i })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "players:read" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Create Key/i })).toBeEnabled());
+  });
+
+  test("switching a Custom namespace back to a level sends the level", async () => {
+    renderSection([]);
+    await openCreateForm();
+
+    fireEvent.change(screen.getByLabelText(/^Name/i), { target: { value: "relevelled" } });
+    fireEvent.click(screen.getByLabelText("Custom actions for players"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "players:read" }));
+    fireEvent.click(screen.getByLabelText("Read players"));
+
+    // The checklist is gone and the stored value is a level again, so the key
+    // keeps the auto-covering behaviour a level carries.
+    expect(screen.queryByRole("checkbox", { name: "players:read" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Create Key/i }));
+    await waitFor(() => expect(mocked.create).toHaveBeenCalled());
+    expect(mocked.create.mock.calls[0][0].scopes.players).toBe("read");
+  });
+
+  test("Clear All removes a Custom selection too", async () => {
+    renderSection([]);
+    await openCreateForm();
+
+    fireEvent.click(screen.getByLabelText("Custom actions for players"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "players:moderate" }));
+    fireEvent.click(screen.getByRole("button", { name: /Clear All/i }));
+
+    expect(screen.queryByRole("checkbox", { name: "players:moderate" })).toBeNull();
+    expect(screen.getByRole("button", { name: /Create Key/i })).toBeDisabled();
   });
 });
 

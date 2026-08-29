@@ -6,8 +6,11 @@ import {
   grantedCount,
   endOfLocalDayIso,
   keyStatus,
+  grantableActions,
   scopeLabel,
-  scopeLevelOf,
+  scopeValueOf,
+  selectedActions,
+  supportsCustom,
   type ApiKey,
   type ApiKeyScopes,
   type ScopeCatalogEntry,
@@ -25,7 +28,7 @@ type ConfirmAction = (
 
 // "none" exists only in the UI. It is the absence of a scope entry, never a
 // stored value -- see toScopes below.
-type SegmentValue = ScopeLevel | "none";
+type SegmentValue = ScopeLevel | "none" | "custom";
 
 // The server rejects a past expiry; `min` stops the picker offering one in the
 // first place, so the operator finds out before submitting rather than after.
@@ -122,8 +125,31 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
       const next = { ...current };
       // None is stored as absence, so the operator can never end up with a
       // key carrying a level that means nothing.
-      if (level === "none") delete next[namespace];
-      else next[namespace] = level;
+      if (level === "none") { delete next[namespace]; return next; }
+      if (level !== "custom") { next[namespace] = level; return next; }
+      // Switching to Custom seeds the list from whatever the namespace grants
+      // right now, so the control opens showing the access the operator
+      // already chose rather than silently dropping it back to nothing. An
+      // empty seed (coming from None) stays an empty array: the row is
+      // "Custom, nothing ticked yet", which createKey refuses to send.
+      const entry = catalog.find((candidate) => candidate.namespace === namespace);
+      // Sorted, like toggleAction below and like the server stores it. Seeding
+      // in catalog order instead made what got SENT depend on how the operator
+      // arrived at the selection, and made the draft reorder itself the moment
+      // the saved key came back.
+      next[namespace] = entry ? [...selectedActions(current, entry)].sort() : [];
+      return next;
+    });
+  }
+
+  function toggleAction(namespace: string, action: string, checked: boolean) {
+    setDraftScopes((current) => {
+      const value = current[namespace];
+      const actions = Array.isArray(value) ? value : [];
+      const next = { ...current };
+      next[namespace] = checked
+        ? [...new Set([...actions, action])].sort()
+        : actions.filter((candidate) => candidate !== action);
       return next;
     });
   }
@@ -325,7 +351,9 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
 
       <div className="api-key-scope-grid">
         {catalog.map((entry) => {
-          const level: SegmentValue = scopeLevelOf(draftScopes, entry.namespace) ?? "none";
+          const stored = scopeValueOf(draftScopes, entry.namespace);
+          const level: SegmentValue = Array.isArray(stored) ? "custom" : stored ?? "none";
+          const chosen = Array.isArray(stored) ? stored : [];
           // logs has no write action and updates' writes are denied to keys, so
           // offering a third segment there would be a control that changes
           // nothing. Driven off the catalog, not a hardcoded name.
@@ -339,6 +367,11 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
             { value: "read", label: "Read", ariaLabel: `Read ${entry.namespace}` }
           ];
           if (entry.supportsWrite) options.push({ value: "write", label: "Read+Write", ariaLabel: `Read+Write for ${entry.namespace}` });
+          // Same catalog-driven rule as supportsWrite above: a namespace with a
+          // single action has nothing to choose between, so Custom there would
+          // be Read under another name.
+          if (supportsCustom(entry)) options.push({ value: "custom", label: "Custom", ariaLabel: `Custom actions for ${entry.namespace}` });
+          const actions = grantableActions(entry);
           return <div className={`api-key-scope-row${level === "none" ? "" : " granted"}`} key={entry.namespace}>
             <span className="api-key-scope-name">{scopeLabel(entry.namespace)}</span>
             <SegmentedControl
@@ -350,6 +383,21 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
               onChange={(next) => setLevel(entry.namespace, next)}
               groupClassName="segmented-control api-key-scope-segments"
             />
+            {level === "custom" && <fieldset className="api-key-scope-actions">
+              <legend className="muted">
+                {chosen.length} of {actions.length} actions selected
+                {!chosen.length && " — tick at least one, or switch back to None"}
+              </legend>
+              {actions.map((action) => <label key={action} className="api-key-scope-action">
+                <input
+                  type="checkbox"
+                  checked={chosen.includes(action)}
+                  disabled={creating}
+                  onChange={(event) => toggleAction(entry.namespace, action, event.target.checked)}
+                />
+                <code>{action}</code>
+              </label>)}
+            </fieldset>}
           </div>;
         })}
       </div>

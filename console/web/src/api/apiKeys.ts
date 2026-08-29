@@ -4,7 +4,11 @@ import { api, post } from "./client";
 // no "none" level to store, and the server treats anything it does not
 // recognise as None rather than falling back to read.
 export type ScopeLevel = "read" | "write";
-export type ApiKeyScopes = Record<string, ScopeLevel>;
+// A namespace holds either a level or an explicit list of action names. A level
+// auto-covers actions added in a later release; a list grants exactly what it
+// names and nothing else. See docs/console/api-keys.md.
+export type ScopeValue = ScopeLevel | string[];
+export type ApiKeyScopes = Record<string, ScopeValue>;
 
 export type ApiKey = {
   id: string;
@@ -32,6 +36,20 @@ export type ScopeCatalogEntry = {
   // None/Read control for such a namespace.
   supportsWrite: boolean;
 };
+
+// Every action a namespace can be granted individually, reads first. Derived
+// from the catalog rather than fetched separately, so it cannot disagree with
+// what the server will accept.
+export function grantableActions(entry: ScopeCatalogEntry): string[] {
+  return [...entry.readActions, ...entry.writeActions];
+}
+
+// Custom is only meaningful where there is more than one action to choose
+// between -- `logs` has exactly one, so a Custom segment there would be Read
+// under another name.
+export function supportsCustom(entry: ScopeCatalogEntry): boolean {
+  return grantableActions(entry).length > 1;
+}
 
 export type CreateApiKeyInput = {
   name: string;
@@ -98,11 +116,30 @@ export function keyStatus(key: ApiKey): "Active" | "Disabled" | "Expired" {
 // is not narrowed that way, and the hasOwnProperty guard makes the lookup
 // honest about a namespace that was never granted.
 export function scopeLevelOf(scopes: ApiKeyScopes, namespace: string): ScopeLevel | undefined {
+  const value = scopeValueOf(scopes, namespace);
+  return Array.isArray(value) ? undefined : value;
+}
+
+export function scopeValueOf(scopes: ApiKeyScopes, namespace: string): ScopeValue | undefined {
   return Object.prototype.hasOwnProperty.call(scopes || {}, namespace) ? scopes[namespace] : undefined;
 }
 
+// The actions a namespace grants right now, whichever form it is stored in.
+// A level is expanded against the catalog for display only -- what gets SENT
+// stays a level, so its auto-covering behaviour is preserved.
+export function selectedActions(scopes: ApiKeyScopes, entry: ScopeCatalogEntry): string[] {
+  const value = scopeValueOf(scopes, entry.namespace);
+  if (Array.isArray(value)) return value;
+  if (value === "write") return grantableActions(entry);
+  if (value === "read") return [...entry.readActions];
+  return [];
+}
+
+// Namespaces that actually grant something. A Custom row with nothing ticked
+// is an empty array, which the server drops on save -- counting it would leave
+// Create enabled for a key that reaches nothing.
 export function grantedCount(scopes: ApiKeyScopes) {
-  return Object.keys(scopes || {}).length;
+  return Object.values(scopes || {}).filter((value) => !Array.isArray(value) || value.length > 0).length;
 }
 
 const SCOPE_LABELS: Record<string, string> = {
@@ -135,6 +172,9 @@ export function describeScopes(scopes: ApiKeyScopes) {
   if (!entries.length) return "No access";
   return entries
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([namespace, level]) => `${scopeLabel(namespace)} ${level === "write" ? "RW" : "R"}`)
+    .map(([namespace, value]) => {
+      if (Array.isArray(value)) return `${scopeLabel(namespace)} ${value.length} action${value.length === 1 ? "" : "s"}`;
+      return `${scopeLabel(namespace)} ${value === "write" ? "RW" : "R"}`;
+    })
     .join(", ");
 }

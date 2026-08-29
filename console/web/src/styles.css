@@ -6777,6 +6777,54 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   justify-self: start;
 }
 .api-key-scope-segments .segmented-control-segment { min-height: 30px; padding: 0 6px; font-size: 11px; }
+/* The Custom action checklist. The row is display: contents, so this fieldset
+   is a direct item of .api-key-scope-grid and must be told to span BOTH
+   columns -- left to itself it would drop into the name column and squeeze
+   against the 1fr track. */
+.api-key-scope-actions {
+  grid-column: 1 / -1;
+  border: 0;
+  border-bottom: 1px solid #241f1a;
+  margin: 0;
+  padding: 2px 0 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  column-gap: 16px;
+  row-gap: 4px;
+}
+.api-key-scope-row:last-child > .api-key-scope-actions { border-bottom: 0; }
+/* Spans the grid rather than sitting in the first cell: a legend is not a grid
+   item by default in every engine, so it is placed explicitly. */
+.api-key-scope-actions legend {
+  grid-column: 1 / -1;
+  float: left;
+  width: 100%;
+  padding: 0 0 4px;
+  font-size: 12px;
+}
+.api-key-scope-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--muted-warm);
+  cursor: pointer;
+}
+/* accent-color is set per component in this stylesheet -- there is no global
+   checkbox rule -- so without this the ticks render in the browser default
+   blue/purple, which reads as foreign in an amber console. Matches the
+   blueprint row-select checkboxes. */
+.api-key-scope-action input { margin: 0; flex: none; accent-color: var(--accent); }
+.api-key-scope-action code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+/* Ticked actions read as the granted ones, matching how .granted lifts a
+   namespace name out of the muted default. */
+.api-key-scope-action:has(input:checked) { color: var(--text-strong); }
 
 /* Declared AFTER the unconditional .api-key-scope-row / .api-key-scope-segments
    rules above: same specificity, so source order decides. Placed before them it

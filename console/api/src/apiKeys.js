@@ -14,6 +14,7 @@ import {
   isReadAction,
   namespaceOf,
   normalizeScopes,
+  scopeAllowsAction,
   scopesGrantAnything
 } from "./apiKeyScopes.js";
 
@@ -90,13 +91,12 @@ export function keyAllows(key, action) {
   // granting `settings: write` still cannot mint keys.
   if (KEY_DENIED_NAMESPACES.has(namespace)) return false;
   const scopes = key.scopes && typeof key.scopes === "object" ? key.scopes : {};
-  const level = scopes[namespace];
-  if (level !== "read" && level !== "write") return false;   // absent, or anything else, is None
-  // A stored "write" on a write-denied namespace (updates) degrades to read
-  // rather than being honoured. normalizeScopes already coerces it on save;
-  // this is the check that also covers a hand-edited api-keys.json.
-  if (level === "write" && !KEY_WRITE_DENIED_NAMESPACES.has(namespace)) return true;
-  return isReadAction(action);
+  // A namespace holds either a level ("read"/"write") or an explicit list of
+  // actions. Absent, or anything else, is None. scopeAllowsAction is the one
+  // place both forms are interpreted -- including the write-denied degrade
+  // that normalizeScopes applies on save and this re-applies for a
+  // hand-edited api-keys.json.
+  return scopeAllowsAction(namespace, scopes[namespace], action);
 }
 
 function badRequest(message) {
@@ -142,7 +142,13 @@ export function publicKey(record, expired = false) {
     id: record.id,
     name: record.name,
     prefix: record.prefix,
-    scopes: { ...record.scopes },
+    // Copied one level deeper than a spread, because a scope value may now be
+    // an ARRAY of actions. `{ ...record.scopes }` would hand every caller a
+    // reference to the stored array, so anything mutating what it got back --
+    // a sort in the UI layer, a push in a future caller -- would be editing
+    // the live key's grant in place.
+    scopes: Object.fromEntries(Object.entries(record.scopes || {})
+      .map(([namespace, value]) => [namespace, Array.isArray(value) ? [...value] : value])),
     enabled: record.enabled !== false,
     createdAt: record.createdAt,
     expiresAt: record.expiresAt || null,

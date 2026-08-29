@@ -46,6 +46,52 @@ deliberate omission, not a missing feature.
 The level is stored, not an expanded list of actions, so a read-shaped route added in a later
 release is covered by an existing Read grant without every key needing to be re-saved.
 
+### Per-action scopes
+
+A namespace may hold an **explicit list of actions** instead of a level. `players: "write"` grants
+all twelve player actions at once — kicking, banning, wiping progression, deleting inventory —
+which is exactly what the per-consequence action split was meant to make separable. A list grants
+only what it names:
+
+```json
+{
+  "name": "moderation bot",
+  "scopes": {
+    "players": ["players:read", "players:moderate"],
+    "server":  "read"
+  }
+}
+```
+
+That key can kick and ban, and cannot reset progression, delete an inventory row, grant currency
+or spawn a vehicle. The two forms mix freely across namespaces.
+
+A list carries no implicit floor: listing only `players:moderate` does **not** also grant
+`players:read`. Name every action you want.
+
+**The trade-off is the mirror of the paragraph above.** A level auto-covers actions added in a
+later release; a list does not. A read route added next version is reachable by `players: "read"`
+and *not* by `["players:read"]`. That is the point — you opted into a fixed set — but it means a
+list needs revisiting when the catalog grows. Levels remain the right default for broad, trusted
+keys; lists are for keys handed to something you want tightly bounded.
+
+Unrecognised entries are dropped rather than coerced: an action that does not exist, or belongs to
+another namespace, or is a write action in a write-denied namespace, is removed. If nothing
+survives, the namespace becomes None — never a fallback to Read. A complete list is stored as a
+list and is *not* collapsed into `"write"`, because the two mean different things going forward.
+
+Denied namespaces (`settings`, `database`, `setup`) cannot be reached by naming their actions
+individually; the namespace denial is checked before the scope lookup.
+
+In the Settings UI, each namespace gains a fourth **Custom** segment that opens a checklist of
+that namespace's actions. Switching to Custom seeds the list from whatever the namespace already
+grants, so moving Read+write to Custom starts with everything ticked and you remove what you don't
+want. A namespace with only one action (`logs`) offers no Custom segment, for the same reason one
+with no write actions offers no Read+write: it would be another name for Read.
+
+A Custom row with nothing ticked grants nothing and does not count towards the "grant at least one
+namespace" rule, so Create stays disabled until something is selected.
+
 | Namespace | Read grants | Read+write additionally grants |
 |---|---|---|
 | `players` | `players:read` | `delete-item`, `edit-item`, `give-item`, `grant`, `kick-all`, `moderate`, `recover`, `repair`, `reset`, `teleport`, `unclassified` |

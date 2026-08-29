@@ -13,6 +13,7 @@ import {
   KEY_DENIED_NAMESPACES,
   KEY_WRITE_DENIED_NAMESPACES,
   actionsByNamespace,
+  grantableActions,
   isReadAction,
   namespaceHasWriteActions,
   namespaceOf,
@@ -20,7 +21,9 @@ import {
   scopeCatalog,
   selectableNamespaces
 } from "../src/apiKeyScopes.js";
-import { keyAllows } from "../src/apiKeys.js";
+import { createApiKeyStore, keyAllows } from "../src/apiKeys.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 
 test("every catalog action classifies as exactly one of read or write", () => {
   for (const action of allKnownActions()) {
@@ -263,4 +266,187 @@ test("the uncached self-update check is out of reach of every key", () => {
   }
   // The cached game check stays reachable -- that is the point of the grant.
   assert.equal(keyAllows({ scopes: { updates: "read" } }, "updates:check"), true);
+});
+
+// ---- Per-action scopes ----
+//
+// A namespace level is coarse by construction: `players: "write"` hands over
+// all twelve player actions at once -- kicking, banning, wiping progression,
+// deleting inventory -- which is exactly what splitting players:mutate was
+// meant to make separable. Every carve-out was invisible to a key, the
+// principal most likely to be handed to a third party. A namespace may now
+// hold an explicit list of actions instead of a level.
+
+test("an explicit action list grants exactly what it lists", () => {
+  const key = { scopes: { players: ["players:read", "players:moderate"] } };
+  assert.equal(keyAllows(key, "players:read"), true);
+  assert.equal(keyAllows(key, "players:moderate"), true);
+  for (const withheld of ["players:reset", "players:delete-item", "players:give-item",
+                          "players:grant", "players:recover", "players:teleport",
+                          "players:kick-all", "players:unclassified"]) {
+    assert.equal(keyAllows(key, withheld), false, withheld);
+  }
+});
+
+test("a list does not imply the read actions of its namespace", () => {
+  // No implicit floor: listing one write action grants that action only.
+  const key = { scopes: { players: ["players:moderate"] } };
+  assert.equal(keyAllows(key, "players:moderate"), true);
+  assert.equal(keyAllows(key, "players:read"), false);
+});
+
+test("levels keep working exactly as before", () => {
+  // The stored form is not migrated, so every existing key must behave
+  // identically. This is the compatibility guarantee.
+  assert.equal(keyAllows({ scopes: { players: "write" } }, "players:reset"), true);
+  assert.equal(keyAllows({ scopes: { players: "write" } }, "players:read"), true);
+  assert.equal(keyAllows({ scopes: { players: "read" } }, "players:read"), true);
+  assert.equal(keyAllows({ scopes: { players: "read" } }, "players:reset"), false);
+  assert.equal(keyAllows({ scopes: {} }, "players:read"), false);
+});
+
+test("the two forms can be mixed across namespaces", () => {
+  const key = { scopes: { players: ["players:read"], bases: "read", server: "write" } };
+  assert.equal(keyAllows(key, "players:read"), true);
+  assert.equal(keyAllows(key, "players:reset"), false);
+  assert.equal(keyAllows(key, "bases:read"), true);
+  assert.equal(keyAllows(key, "bases:delete"), false);
+  assert.equal(keyAllows(key, "server:restart"), true);
+});
+
+test("a denied namespace is unreachable by an action list", () => {
+  // The namespace denial is checked before the scope lookup, so listing the
+  // action by name cannot route around it.
+  for (const scopes of [{ settings: ["settings:write"] }, { database: ["database:read"] },
+                        { setup: ["setup:read"] }]) {
+    const [[namespace, actions]] = Object.entries(scopes);
+    assert.equal(keyAllows({ scopes }, actions[0]), false, namespace);
+  }
+});
+
+test("a write-denied namespace refuses a write action in a list", () => {
+  // updates and addons are read-only for keys. normalizeScopes drops these on
+  // save; keyAllows re-checks for a hand-edited api-keys.json.
+  assert.equal(keyAllows({ scopes: { updates: ["updates:apply"] } }, "updates:apply"), false);
+  assert.equal(keyAllows({ scopes: { updates: ["updates:read"] } }, "updates:read"), true);
+  assert.equal(keyAllows({ scopes: { addons: ["addons:bridge"] } }, "addons:bridge"), false);
+  assert.equal(keyAllows({ scopes: { addons: ["addons:read"] } }, "addons:read"), true);
+});
+
+test("the POST-shaped read exceptions are grantable by name", () => {
+  assert.equal(keyAllows({ scopes: { exchange: ["exchange:market"] } }, "exchange:market"), true);
+  assert.equal(keyAllows({ scopes: { exchange: ["exchange:market"] } }, "exchange:market-write"), false);
+});
+
+// ---- normalizeScopes on the list form ----
+
+test("normalizeScopes keeps only real actions of that namespace", () => {
+  const scopes = normalizeScopes({
+    players: ["players:read", "players:moderate", "players:not-a-thing", "bases:read", 42, null]
+  });
+  assert.deepEqual(scopes, { players: ["players:moderate", "players:read"] });
+});
+
+test("normalizeScopes deduplicates and sorts a list", () => {
+  const scopes = normalizeScopes({ players: ["players:read", "players:moderate", "players:read"] });
+  assert.deepEqual(scopes.players, ["players:moderate", "players:read"]);
+});
+
+test("a list that survives nothing becomes None, never a level", () => {
+  // Same drop-rather-than-coerce rule the level form follows: an unrecognised
+  // grant must not fall back to read.
+  assert.deepEqual(normalizeScopes({ players: [] }), {});
+  assert.deepEqual(normalizeScopes({ players: ["nonsense"] }), {});
+  assert.deepEqual(normalizeScopes({ players: ["bases:read"] }), {});
+});
+
+test("normalizeScopes strips write actions from a write-denied namespace", () => {
+  assert.deepEqual(normalizeScopes({ updates: ["updates:read", "updates:apply"] }), { updates: ["updates:read"] });
+  // Nothing but writes leaves nothing, so the namespace drops entirely.
+  assert.deepEqual(normalizeScopes({ updates: ["updates:apply"] }), {});
+});
+
+test("normalizeScopes drops a list on a denied namespace", () => {
+  assert.deepEqual(normalizeScopes({ database: ["database:read"], settings: ["settings:read"] }), {});
+});
+
+test("normalizeScopes does not collapse a full list into a level", () => {
+  // Equivalent today, but NOT the same going forward: a level auto-covers
+  // actions added later, a list does not. Collapsing would silently widen the
+  // key at the next release.
+  const all = grantableActions("logs");
+  const scopes = normalizeScopes({ logs: all });
+  assert.ok(Array.isArray(scopes.logs), "a complete list must stay a list");
+  assert.deepEqual(scopes.logs, [...all].sort());
+});
+
+test("a list is stored as given, so a later action is NOT auto-covered", () => {
+  // The documented trade-off, asserted rather than described. A level covers a
+  // hypothetical new read action; a list does not.
+  const level = { scopes: { players: "read" } };
+  const list = { scopes: { players: ["players:read"] } };
+  const futureReadAction = "players:vitals:read";
+  assert.equal(isReadAction(futureReadAction), true, "precondition: this is read-shaped");
+  assert.equal(keyAllows(level, futureReadAction), true, "a level covers a new read action");
+  assert.equal(keyAllows(list, futureReadAction), false, "a list does not");
+});
+
+// ---- Round-tripping through the store ----
+
+test("a key created with an action list authenticates against exactly it", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "api-keys-actions-"));
+  try {
+    const store = createApiKeyStore({ file: join(dir, "api-keys.json") });
+    const { key } = await store.create({ name: "narrow", scopes: { players: ["players:read", "players:moderate"] } });
+    assert.deepEqual(key.scopes.players, ["players:moderate", "players:read"]);
+    const stored = store.get(key.id);
+    assert.equal(store.allows(stored, "players:moderate"), true);
+    assert.equal(store.allows(stored, "players:reset"), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the scopes a key hands back cannot alias the stored grant", async () => {
+  // publicKey copies one level deeper than a spread now that a value may be an
+  // array; without that, mutating what you got back would edit the live key.
+  const dir = mkdtempSync(join(tmpdir(), "api-keys-alias-"));
+  try {
+    const store = createApiKeyStore({ file: join(dir, "api-keys.json") });
+    const { key } = await store.create({ name: "alias", scopes: { players: ["players:read"] } });
+    key.scopes.players.push("players:reset");
+    const reread = store.get(key.id);
+    assert.deepEqual(reread.scopes.players, ["players:read"], "the stored grant was mutated from outside");
+    assert.equal(store.allows(reread, "players:reset"), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("updating scopes replaces wholesale for lists too", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "api-keys-update-"));
+  try {
+    const store = createApiKeyStore({ file: join(dir, "api-keys.json") });
+    const { key } = await store.create({ name: "swap", scopes: { players: ["players:read", "players:moderate"] } });
+    const updated = await store.update(key.id, { scopes: { players: ["players:read"] } });
+    assert.deepEqual(updated.scopes.players, ["players:read"]);
+    assert.equal(store.allows(store.get(key.id), "players:moderate"), false);
+    // And a list can be swapped back to a level.
+    const relevelled = await store.update(key.id, { scopes: { players: "read" } });
+    assert.equal(relevelled.scopes.players, "read");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("every action in the catalog is grantable by name", () => {
+  // Guards the list form against a namespace whose actions cannot be named --
+  // e.g. if grantableActions ever stopped including the write bucket.
+  for (const entry of scopeCatalog()) {
+    const grantable = grantableActions(entry.namespace);
+    for (const action of [...entry.readActions, ...entry.writeActions]) {
+      assert.ok(grantable.includes(action), `${action} is in the catalog but not grantable`);
+      assert.equal(keyAllows({ scopes: { [entry.namespace]: [action] } }, action), true, action);
+    }
+  }
 });
