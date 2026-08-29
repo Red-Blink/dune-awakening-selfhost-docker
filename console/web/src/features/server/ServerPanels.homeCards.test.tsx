@@ -634,6 +634,20 @@ describe("HomePanel when the battlegroup is stopped", () => {
     expect(badges.every((b) => b.className.includes("badge-fail"))).toBe(true);
   });
 
+  // Population is unknowable while the battlegroup is down, so reporting it as
+  // "population unavailable" in amber flagged an expected consequence as if it
+  // were a problem.
+  it("says nothing about population, rather than warning it is unavailable", async () => {
+    const { container } = renderStopped();
+    await waitFor(() => expect(container.querySelector(".home-hero-identity")).toBeTruthy());
+    const line = container.querySelector(".home-hero-identity")?.textContent || "";
+    expect(line).not.toMatch(/population/i);
+    expect(line).not.toMatch(/online/i);
+    expect(container.querySelector(".home-population-warn")).toBeNull();
+    // The rest of the identity line survives -- this drops one segment, not the line.
+    expect(line).toContain("Kovalt");
+  });
+
   it("carries the same severity in the heading dot", async () => {
     const { container } = renderStopped();
     await waitFor(() => expect(container.querySelector(".home-state-dot")).toBeTruthy());

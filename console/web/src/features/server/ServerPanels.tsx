@@ -485,7 +485,11 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   const identityCards = summary.identity.filter((item) => item.label !== "Overall");
   const populationItem = identityCards.find((item) => item.label === "Population");
   const populationWarn = /^warn$/i.test(String(populationItem?.status || ""));
-  const populationSegment = homePopulationSegment(populationItem?.value);
+  // A stopped battlegroup has no population to report, so summarizeHomeStatus
+  // yields "Unavailable" and flags it WARN. That is expected, not a problem
+  // worth an amber "population unavailable" beside the server name -- the
+  // heading already says Stopped. Drop the segment entirely instead.
+  const populationSegment = isStoppedReading(overall?.value) ? "" : homePopulationSegment(populationItem?.value);
   const identityLine = homeIdentityLine(identityCards);
 
   return (
@@ -599,6 +603,12 @@ function homeIdentityLine(items: { label: string; value: string }[]) {
   };
   const parts = [pick("Title"), pick("Region"), pick("Mode")].filter(Boolean);
   return parts.join(" · ");
+}
+
+// Matches the value summarizeHomeStatus reports once the battlegroup is down,
+// whether that came from the status text or from a completed stop action.
+export function isStoppedReading(value: unknown) {
+  return /^stopped$/i.test(String(value || "").trim());
 }
 
 // formatHomePopulation yields "14", "14 / 40", "14 / ?" or "Unavailable", all of
