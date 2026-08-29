@@ -699,10 +699,24 @@ Layers legend's default-settings mechanism.
 | GET | `/api/database/tables/{schema}/{table}/count` | Get row count | `schema`, `table`, `filter?` |
 | PATCH | `/api/database/tables/{schema}/{table}/row` | Update table row | `rowId`, `values` (object) |
 | GET | `/api/database/search` | Search database | `q` or `term` (query param) |
-| POST | `/api/database/query` | Execute SQL query | `query` (read or write) |
+| POST | `/api/database/query` | Execute SQL query | `query` (read or write) — see note below |
 | POST | `/api/database/export` | Export query results | `query` (read-only SELECT/WITH/SHOW/EXPLAIN) |
 | POST | `/api/database/password` | Change database password | `password` |
 | GET | `/api/database/table/{table}` | Preview table | `table`, `limit?`, `offset?` |
+
+**`/api/database/query` authorizes on the SQL, not just the route.** The route
+resolves to the `database:query` action, which covers read-only SQL (`SELECT`,
+`WITH`, `SHOW`, `EXPLAIN`). Write SQL sent to the same route additionally
+requires `database:execute`, checked inside the handler once the body is parsed
+— a caller holding only `database:query` gets `403` on a write and nothing runs:
+no rate-limit tick, no pre-write backup. The default `admin` policy grants
+`database:query` and denies `database:execute`; `owner` holds both. Use
+`/api/database/export` for read-only result export.
+
+A body with nothing to execute — empty, whitespace, `;`, or entirely
+commented-out SQL — returns `400` before anything else happens. Such input
+does not start with a read keyword, so it used to classify as a write and
+trigger the pre-write backup before the query was ever rejected.
 
 ---
 
@@ -816,6 +830,30 @@ Layers legend's default-settings mechanism.
 | GET | `/api/public-directory/status` | Get public directory status | None |
 | POST | `/api/settings/public-directory` | Save public directory and anonymous-count settings | `enabled?`, `anonymousCountEnabled?`, `discordInvite?` |
 | POST | `/api/settings/public-directory/claim` | Claim server listing | `code` |
+
+---
+
+## IAM Policies
+
+Per-tier Allow/Deny documents for the action catalog. Architecture and evaluation order: [../console-iam.md](../console-iam.md).
+
+| Method | Route | Description | Parameters |
+|--------|-------|-------------|------------|
+| GET | `/api/settings/iam/policies` | Active policy store, plus `actions`: the full sorted catalog of valid action names | None |
+| PUT | `/api/settings/iam/policy` | Validate and atomically save the complete policy store | Policy store object (every tier) |
+| POST | `/api/settings/iam/policy/test` | Evaluate one action for one tier without changing policy | `action`, `tier` |
+
+`PUT` refuses a document naming an action that does not exist, returning `400` with
+`unknownActions` listing each offending `{ tier, pattern }`. The test is whether a
+pattern matches at least one catalogued action, so wildcards remain legal
+(`players:*`, `bases:delete-*`) while near-misses that match nothing (`player:*`,
+`players:reset-*`) are rejected. This matters because the failure is asymmetric: a
+misspelled action in an `Allow` grants nothing, but in a `Deny` it withholds nothing
+while reading exactly like a restriction.
+
+`POST .../test` returns `known` alongside `allowed`. A misspelled action answers
+`allowed: false`, which reads as a working `Deny`; `known: false` is what separates a
+real denial from a typo.
 
 ---
 

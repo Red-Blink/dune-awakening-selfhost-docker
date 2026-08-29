@@ -125,10 +125,16 @@ test("scopeCatalog reports write support for the UI", () => {
   assert.ok(byName.get("updates").readActions.includes("updates:check"));
   assert.equal(byName.get("setup"), undefined);
   assert.ok(byName.get("players").readActions.includes("players:read"));
-  // Individual kicks resolve through the "POST /api/players/" prefix rule to
-  // players:mutate; players:kick appears only in an actions.js example comment.
-  assert.ok(byName.get("players").writeActions.includes("players:mutate"));
+  // players:mutate was split by consequence (see playersActionSplit.test.js):
+  // an individual kick now resolves to players:moderate, and players:unclassified
+  // is all that remains of the "POST /api/players/" prefix rule.
+  for (const action of ["players:moderate", "players:teleport", "players:give-item", "players:grant",
+                        "players:reset", "players:delete-item", "players:edit-item",
+                        "players:repair", "players:recover", "players:unclassified"]) {
+    assert.ok(byName.get("players").writeActions.includes(action), `missing ${action}`);
+  }
   assert.ok(byName.get("players").writeActions.includes("players:kick-all"));
+  assert.ok(!byName.get("players").writeActions.includes("players:mutate"));
 });
 
 test("normalizeScopes drops rather than coerces anything unrecognised", () => {

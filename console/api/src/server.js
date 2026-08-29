@@ -13,7 +13,7 @@ import { createBridgeRateLimiter } from "./bridgeRateLimit.js";
 import { buildSelfUpdateHelperDockerArgs, detectDockerSocketGid, TaskManager, publicTask } from "./tasks.js";
 import { preflight } from "./preflight.js";
 import { buildDuneArgs, isDynamicServerService, isReadOnlySql, parseVehicleList, runDockerLogs, runDune, validateServiceName } from "./runner.js";
-import { createDb, quoteIdentifier } from "./db.js";
+import { createDb, hasExecutableStatement, quoteIdentifier } from "./db.js";
 import * as duneDb from "./duneDb.js";
 import { audit, recordAdminHistory } from "./audit.js";
 import { redact } from "./redact.js";
@@ -38,7 +38,7 @@ import { handleDiscordAdapterRoute, isDiscordAdapterRoute } from "./integrations
 import { discordAdapterEnabled } from "./integrations/discord/adapter.js";
 import { initializeDiscordAdapterSchema } from "./integrations/discord/schema.js";
 import { actionForRoute, ROUTE_ACTIONS } from "./actions.js";
-import { evaluate, loadPolicies, getAllPolicies, setPolicies } from "./policy.js";
+import { evaluate, loadPolicies, getAllPolicies, setPolicies, allKnownActions } from "./policy.js";
 import { liveItemGrantOk, liveItemGrantWarning } from "./grantResults.js";
 import { primeMessageOfTheDayOnlineState, readMessageOfTheDay, recordMessageOfTheDayScanFailure, restoreMessageOfTheDay, runMessageOfTheDayScan, saveMessageOfTheDay } from "./services/messageOfTheDay.js";
 import { primePlayerAnnouncementOnlineState, readPlayerAnnouncements, restorePlayerAnnouncements, runPlayerAnnouncementScan, savePlayerAnnouncements } from "./services/playerAnnouncements.js";
@@ -90,7 +90,16 @@ try {
   // bridge available for this process and retry the migration next startup.
   console.warn(`EDA Exchange Bot retirement deferred: ${redact(error?.message || "Unexpected error.")}`);
 }
-loadPolicies(config.repoRoot);
+const policyLoad = loadPolicies(config.repoRoot);
+if (policyLoad.invalid) {
+  console.warn(`IAM policy file at ${policyLoad.path} is not a valid policy store; using built-in defaults.`);
+}
+for (const { tier, pattern } of policyLoad.unknownActions) {
+  // Loaded anyway (see loadPolicies), but an operator who hand-edited a Deny
+  // into the file needs to know it matches no real action and is withholding
+  // nothing. Silence here is how a policy comes to look safer than it is.
+  console.warn(`IAM policy warning: ${tier} names "${pattern}", which matches no known action and has no effect.`);
+}
 const auth = createAuth(config);
 const qaUpdates = createQaUpdates(config);
 const loginRateLimiter = createLoginRateLimiter();
@@ -537,6 +546,35 @@ function dockerPsNames() {
   });
 }
 
+// Second authorization gate, for a route whose real action depends on the
+// request body rather than on its method and path. actionForRoute runs in
+// handleApi's gate with no body in hand, so a route that does two different
+// things at two different blast radii (POST /api/database/query: SELECT vs
+// DROP) can only resolve to the safer of the two there. The handler calls this
+// afterwards with the narrower action, and it re-runs BOTH checks the gate ran
+// -- the policy engine, then the key's own scope map -- so a body-decided
+// action is constrained exactly as a routed one would be.
+//
+// Deliberately additive: the route-level action is already authorized by the
+// time a handler runs, so this only ever narrows access, never widens it.
+//
+// Returns true when the principal may proceed. On false it has ALREADY written
+// the 403, and the caller must return without doing any further work — in
+// particular without the rate-limit tick or the pre-write backup, both of which
+// are side effects an unauthorized caller must not be able to trigger.
+function requireAction(req, res, action) {
+  const session = req.authSession;
+  if (!session || !evaluate(session, action)) {
+    json(res, 403, { error: "Your account does not have permission to access this resource." });
+    return false;
+  }
+  if (req.authApiKey && !apiKeys.allows(req.authApiKey, action)) {
+    json(res, 403, { error: "This API key is not permitted to use this endpoint." });
+    return false;
+  }
+  return true;
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, "http://localhost");
   const path = url.pathname;
@@ -613,6 +651,11 @@ async function handleApi(req, res) {
   const session = bearer?.session || auth.requireAuth(req, res);
   if (!session) return;
   req.authSession = session;
+  // Stashed for requireAction(), the second gate a body-dependent route runs
+  // once it knows its narrower action. It carries the authenticated record
+  // itself rather than an id to look up again, so the second check cannot
+  // resolve to a different (or newly revoked) key than the first one did.
+  req.authApiKey = bearer?.key || null;
 
   const action = actionForRoute(path, req.method);
   if (!action || !evaluate(session, action)) {
@@ -799,7 +842,10 @@ async function handleApi(req, res) {
   if (path === "/api/settings/admin-password" && req.method === "POST") return adminPasswordRoute(req, res);
   if (path === "/api/settings/web-port" && req.method === "POST") return webPortRoute(req, res);
   if (path === "/api/settings/iam/policies" && req.method === "GET") {
-    return json(res, 200, { policies: getAllPolicies() });
+    // The catalog rides along because policies are hand-authored JSON with no
+    // editor UI: without it the only way to learn the vocabulary is to read
+    // actions.js, which is how misspelled actions get written in the first place.
+    return json(res, 200, { policies: getAllPolicies(), actions: [...allKnownActions()].sort() });
   }
   if (path === "/api/settings/iam/policy" && req.method === "PUT") {
     const body = await readJson(req);
@@ -821,7 +867,16 @@ async function handleApi(req, res) {
     const testAction = String(body?.action || "").trim();
     const testTier = String(body?.tier || "").trim();
     if (!testAction || !testTier) return json(res, 400, { error: "Both action and tier are required." });
-    return json(res, 200, { action: testAction, tier: testTier, allowed: evaluate({ tier: testTier }, testAction) });
+    // `known` is the difference between "denied" and "not a thing". Testing a
+    // misspelled action returns allowed:false -- which reads as "my Deny works"
+    // and is the single most misleading answer this endpoint can give, since a
+    // misspelled Deny is precisely the mistake an operator comes here to check.
+    return json(res, 200, {
+      action: testAction,
+      tier: testTier,
+      allowed: evaluate({ tier: testTier }, testAction),
+      known: allKnownActions().has(testAction)
+    });
   }
 
   if (path === "/api/players") return dbJson(res, () => duneDb.listPlayers(db, {
@@ -1303,6 +1358,13 @@ async function addonBridgeRoute(req, res, path) {
   if (action.startsWith("scheduler.")) return addonSchedulerBridgeAction(req, res, id, action, body);
   if (action === "database.query" || action === "database.execute") {
     const query = String(body.query || "");
+    // Same guard, and for the same reason, as databaseQuery: an empty or
+    // comments-only body classifies as a write and reaches the backup spawn
+    // below. database.query happened to be shielded by its own read-only 400;
+    // database.execute was not.
+    if (!hasExecutableStatement(query)) {
+      return json(res, 400, { error: "No SQL statement to run." });
+    }
     const readOnly = isReadOnlySql(query);
     const requiredPermission = readOnly ? "database:read" : "database:write";
     if (action === "database.query" && !readOnly) return json(res, 400, { error: "database.query accepts read-only SQL only. Use database.execute with database:write permission for write SQL." });
@@ -1941,13 +2003,37 @@ async function safeCommand(operation, payload = {}) {
 async function databaseQuery(req, res) {
   const body = await readJson(req);
   const query = String(body.query || "");
+  // BEFORE the classification below, because isReadOnlySql answers "does this
+  // start with a read keyword" -- so an empty string answers no and used to be
+  // classified as a WRITE, taking a full pre-write backup before duneDb.runSql
+  // got far enough to reject it with "SQL query is required". Submitting "" in
+  // a loop made the host run pg_dump 20 times a minute per session, the
+  // mutation limiter's ceiling, for input that could never execute.
+  if (!hasExecutableStatement(query)) {
+    return json(res, 400, { error: "Enter a SQL query to run." });
+  }
+  // Classified ONCE, and every decision below reads this one value. Calling
+  // isReadOnlySql again per decision would let the authorization answer and the
+  // execution answer disagree about the same string.
   const readOnly = isReadOnlySql(query);
+  // The route resolved to database:query, which is read-shaped and granted as
+  // such. Write SQL down this same route is a different privilege and needs
+  // database:execute on top. First, so an unauthorized write never reaches the
+  // rate-limit tick or the backup spawn below.
+  if (!readOnly && !requireAction(req, res, "database:execute")) return;
   if (!readOnly && !applyMutationRateLimit(req, res, "database.query.write")) return;
   if (!config.mockMode && !readOnly) {
     await runDune(config, buildDuneArgs("backupCreate"), { env: { DB_BACKUP_ORIGIN: "destructive-sql" } });
   }
   audit(config, req, "database.query", { readOnly, destructive: !readOnly });
-  return dbJson(res, () => duneDb.runSql(db, query, true));
+  // !readOnly, not the unconditional `true` this passed before: a request
+  // authorized as read-only is now also EXECUTED with writes refused, so
+  // duneDb.runSql's own classifier has to agree before anything can write.
+  // Safe as a second opinion because runner.js's isReadOnlySql (used above) is
+  // strictly the more conservative of the two -- it tests the raw string where
+  // db.js's strips comments first, so anything it calls read-only db.js calls
+  // read-only too. It can never reject a query this route just authorized.
+  return dbJson(res, () => duneDb.runSql(db, query, !readOnly));
 }
 
 async function databaseExport(req, res) {

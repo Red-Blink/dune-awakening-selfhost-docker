@@ -131,13 +131,34 @@ export function bigintParam(value, label, min = 1n, max = 9223372036854775807n) 
   return n.toString();
 }
 
-export function isReadOnlySql(query) {
-  const stripped = String(query || "")
+export function stripSqlComments(query) {
+  return String(query || "")
     .replace(/\/\*[\s\S]*?\*\//g, " ")
     .replace(/--[^\n]*/g, " ")
     .trim();
+}
+
+export function isReadOnlySql(query) {
+  const stripped = stripSqlComments(query);
   return /^(select|with|show|explain)\b/i.test(stripped) &&
     !/\b(insert|update|delete|drop|alter|truncate|create|grant|revoke|copy\s+.*\s+from)\b/i.test(stripped);
+}
+
+// True when there is something here Postgres would actually run.
+//
+// The SQL routes classify with isReadOnlySql, which answers "does this START
+// with a read keyword" -- so "" , "   ", ";", and a fully commented-out block
+// all answer NO and were therefore treated as WRITES. That sent them down the
+// write path, which takes a full pre-write backup before duneDb.runSql gets far
+// enough to reject them. Callers use this first so obviously-empty input is a
+// 400 instead of a pg_dump.
+//
+// Only ever rejects input that is entirely comments, semicolons and whitespace.
+// The comment stripping is naive about string literals -- SELECT '--' strips to
+// "SELECT '" -- but that can only leave MORE text behind, never less, so it
+// cannot turn a real statement into a false rejection.
+export function hasExecutableStatement(query) {
+  return stripSqlComments(query).replace(/;/g, "").trim().length > 0;
 }
 
 function normalizeQueryResult(result) {
