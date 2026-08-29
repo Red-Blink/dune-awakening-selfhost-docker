@@ -468,10 +468,16 @@ describe("HomePanel subsystem rows", () => {
     };
     rowFor("Database").click();
     expect(onNavigate).toHaveBeenCalledWith("Database");
+    // Containers, Game Servers and RabbitMQ used to route to "Services", which
+    // renders but has no sidebar entry -- the operator landed on a panel with
+    // no nav item highlighted and no way back. Server Control carries the
+    // readiness timeline, port checklist and doctor output for all of them.
+    rowFor("Containers").click();
+    expect(onNavigate).toHaveBeenCalledWith("Server Control");
     rowFor("Game Servers").click();
-    expect(onNavigate).toHaveBeenCalledWith("Services");
-    // PortChecklist and the Change Funcom Token form both live on Server
-    // Control, not Settings.
+    expect(onNavigate).toHaveBeenCalledWith("Server Control");
+    rowFor("RabbitMQ").click();
+    expect(onNavigate).toHaveBeenCalledWith("Server Control");
     rowFor("Listeners").click();
     expect(onNavigate).toHaveBeenCalledWith("Server Control");
     rowFor("Funcom/FLS").click();

@@ -138,14 +138,20 @@ export function performanceTrackTone(percent: number | null, sampled: boolean) {
 }
 
 // Keyed on the labels summarizeHomeStatus() emits, so a renamed label loses its
-// route rather than pointing somewhere wrong. Listeners and Funcom/FLS both land
-// on Server Control -- PortChecklist and the Change Funcom Token form live there.
+// route rather than pointing somewhere wrong.
+//
+// Every destination must be a tab the sidebar actually lists. "Services" is not
+// -- it exists in ALL_TABS but has no navGroups entry, so routing there dropped
+// the operator on a panel with no nav item highlighted and no obvious way back.
+// Server Control is the reachable home for these: it carries ReadinessTimeline,
+// PortChecklist, DoctorSummary and the Change Funcom Token form, which is what
+// you actually use to chase any of them down.
 export const HOME_SUBSYSTEM_ROUTES: Record<string, Tab> = {
-  Containers: "Services",
+  Containers: "Server Control",
   Listeners: "Server Control",
   Database: "Database",
-  "Game Servers": "Services",
-  RabbitMQ: "Services",
+  "Game Servers": "Server Control",
+  RabbitMQ: "Server Control",
   "Funcom/FLS": "Server Control"
 };
 

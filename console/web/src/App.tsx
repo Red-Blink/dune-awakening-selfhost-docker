@@ -305,6 +305,12 @@ const navGroups: { title: string; items: { tab: Tab; icon: React.ReactNode }[] }
   }
 ];
 
+// The tabs the sidebar actually lists. ALL_TABS is wider: "Services" and
+// "Storage" exist and render but have no nav entry, so anything that routes the
+// operator somewhere must check against this, not ALL_TABS -- landing on a tab
+// with no highlighted nav item and no way back reads as a broken jump.
+export const NAV_TABS: readonly Tab[] = navGroups.flatMap((group) => group.items.map((item) => item.tab));
+
 const COMMUNITY_CONTRIBUTORS_URL = "https://github.com/Red-Blink/dune-awakening-selfhost-docker/graphs/contributors";
 const DUNE_DOCKER_WEBSITE_URL = "https://dunedocker.app/";
 const DUNE_DOCKER_DOCS_URL = "https://docs.dunedocker.app/";

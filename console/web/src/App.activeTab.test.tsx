@@ -1,6 +1,7 @@
 import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ALL_TABS, loadPersistedTab, persistActiveTab, useActiveTab } from "./App";
+import { ALL_TABS, NAV_TABS, loadPersistedTab, persistActiveTab, useActiveTab } from "./App";
+import { HOME_SUBSYSTEM_ROUTES } from "./features/server/ServerPanels";
 import { LazyTabBoundary } from "./components/common/LazyTabBoundary";
 
 function ChunkFailure(): never {
@@ -99,5 +100,24 @@ describe("useActiveTab", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open Care Package" }));
 
     expect(reload).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Regression guard. Home's subsystem rows navigate the operator somewhere, and
+// ALL_TABS is wider than the sidebar: "Services" and "Storage" render but have
+// no nav entry. Routing to one of those drops the operator on a panel with
+// nothing highlighted and no way back, which is how it shipped once already.
+describe("Home subsystem routes stay reachable from the sidebar", () => {
+  it("targets only tabs the sidebar lists", () => {
+    const unreachable = Object.entries(HOME_SUBSYSTEM_ROUTES)
+      .filter(([, tab]) => !NAV_TABS.includes(tab))
+      .map(([label, tab]) => `${label} -> ${tab}`);
+    expect(unreachable).toEqual([]);
+  });
+
+  it("knows NAV_TABS is genuinely narrower than ALL_TABS, so the check has teeth", () => {
+    const hidden = ALL_TABS.filter((tab) => !NAV_TABS.includes(tab));
+    expect(hidden.length).toBeGreaterThan(0);
+    expect(hidden).toContain("Services");
   });
 });
