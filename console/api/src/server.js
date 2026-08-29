@@ -12,6 +12,7 @@ import { scopeCatalog } from "./apiKeyScopes.js";
 import { createBridgeRateLimiter } from "./bridgeRateLimit.js";
 import { buildSelfUpdateHelperDockerArgs, detectDockerSocketGid, TaskManager, publicTask } from "./tasks.js";
 import { preflight } from "./preflight.js";
+import { createServerStatusCache } from "./services/serverStatusCache.js";
 import { buildDuneArgs, isDynamicServerService, isReadOnlySql, parseVehicleList, runDockerLogs, runDune, validateServiceName } from "./runner.js";
 import { createDb, quoteIdentifier } from "./db.js";
 import * as duneDb from "./duneDb.js";
@@ -638,9 +639,9 @@ async function handleApi(req, res) {
   if (path === "/api/public-directory/status") return json(res, 200, publicDirectory.publicState());
   if (path.startsWith("/api/setup/tasks/")) return taskRoute(req, res, path);
 
-  if (path === "/api/server/status") return commandJson(res, "status");
+  if (path === "/api/server/status") return cachedCommandJson(res, "status", url);
   if (path === "/api/server/performance") return json(res, 200, await collectPerformanceSnapshot(config.repoRoot));
-  if (path === "/api/server/readiness") return safeCommandJson(res, "readiness");
+  if (path === "/api/server/readiness") return cachedCommandJson(res, "readiness", url);
   if (path === "/api/server/ports") return commandJson(res, "ports");
   if (path === "/api/server/services") return commandJson(res, "services");
   if (path === "/api/server/doctor") return safeCommandJson(res, "doctor");
@@ -1541,6 +1542,28 @@ function isAdminToolsHistoryLine(line) {
   return false;
 }
 
+// status and readiness are the only two cached commands: they are the pair the
+// Home panel requests on every mount and idle poll, and each costs ~4s. `status`
+// keeps commandJson's throw-on-failure behaviour, `readiness` keeps
+// safeCommand's swallow-and-report behaviour, so caching does not change what
+// either route returns -- only how often the subprocess actually runs.
+const serverStatusCache = createServerStatusCache(config, {
+  collectStatus: async () => {
+    const result = await runDune(config, buildDuneArgs("status", {}));
+    return { operation: "status", stdout: result.stdout, stderr: result.stderr, exitCode: result.code };
+  },
+  collectReadiness: () => safeCommand("readiness")
+});
+
+async function cachedCommandJson(res, operation, url) {
+  if (config.mockMode) return json(res, 200, mockCommand(operation));
+  const fresh = url?.searchParams?.get("fresh") === "1";
+  const entry = await serverStatusCache.read(operation, { fresh });
+  const { sampledAtMs, ...rest } = entry;
+  void sampledAtMs;
+  return json(res, 200, rest);
+}
+
 async function safeCommandJson(res, operation, payload = {}) {
   if (config.mockMode) return json(res, 200, mockCommand(operation));
   return json(res, 200, await safeCommand(operation, payload));
@@ -2306,6 +2329,10 @@ async function task(req, res, type, operation, payload) {
     return json(res, 400, { error: redact(error?.message || "Unexpected error.") });
   }
   if (await maybeQueueRestart(req, res, type, operation, payload)) return;
+  // Any server-group task is about to change what status/readiness report, so
+  // drop the cached snapshot now rather than letting Home show "Running" for a
+  // full TTL after a stop.
+  if (type === "server") serverStatusCache.invalidate();
   audit(config, req, `task.${operation}`, payload);
   return json(res, 202, { task: tasks.create(type, operation, payload) });
 }

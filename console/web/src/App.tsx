@@ -382,6 +382,10 @@ export function App() {
   const [funcomTokenResult, setFuncomTokenResult] = useState<HomeTaskResult | null>(() => loadPersistedFuncomTokenResult());
   const [homeRunningAction, setHomeRunningAction] = useState<"start" | "stop" | "restart" | "">("");
   const [homeRestartStarted, setHomeRestartStarted] = useState(false);
+  // Lives here, not in HomePanel: status/readiness already survive a tab
+  // switch, and component state would reset the age to zero on every remount --
+  // which is what made every visit to Home flash "Updated 0s ago".
+  const [homeSampledAtMs, setHomeSampledAtMs] = useState(0);
   const [stackVersionStatus, setStackVersionStatus] = useState<Record<string, string>>({ status: "Checking", current: "", latest: "" });
   const stackActionStartedAt = useRef(0);
   const stackActionReadyPolls = useRef(0);
@@ -558,23 +562,31 @@ export function App() {
     try { await action(); } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
   }
 
-  const loadStackStatus = useCallback(async () => {
+  // `fresh` is forwarded to the API to bypass its status cache. The in-flight
+  // dedupe below is deliberately not keyed on it: a cached read already in
+  // flight is fine to share, and the restart lifecycle re-polls on its own
+  // interval anyway.
+  const loadStackStatus = useCallback(async (options: { fresh?: boolean } = {}) => {
     if (stackStatusLoadRef.current) return stackStatusLoadRef.current;
     stackStatusLoadRef.current = (async () => {
       setError("");
       const [nextStatus, nextReadiness] = await Promise.allSettled([
-        withTimeout(serverApi.status(), 90000, "Server status check timed out."),
-        withTimeout(serverApi.readiness(), 90000, "Readiness check timed out.")
+        withTimeout(serverApi.status({ fresh: options.fresh }), 90000, "Server status check timed out."),
+        withTimeout(serverApi.readiness({ fresh: options.fresh }), 90000, "Readiness check timed out.")
       ]);
-      const result: HomeLoadResult = { statusLoaded: false, readinessLoaded: false, statusError: "", readinessError: "", statusText: "", readinessText: "" };
+      const result: HomeLoadResult = { statusLoaded: false, readinessLoaded: false, statusError: "", readinessError: "", statusText: "", readinessText: "", sampledAtMs: 0 };
       if (nextStatus.status === "fulfilled") {
         setStatus(nextStatus.value.stdout);
         result.statusText = nextStatus.value.stdout;
         result.statusLoaded = true;
+        // The server stamps when the command actually ran. Fall back to now for
+        // an older API that does not send it, so the age is never negative.
+        result.sampledAtMs = Date.parse(nextStatus.value.sampledAt || "") || Date.now();
       } else {
         result.statusError = nextStatus.reason instanceof Error ? nextStatus.reason.message : String(nextStatus.reason);
       }
       if (nextReadiness.status === "fulfilled") {
+        if (!result.sampledAtMs) result.sampledAtMs = Date.parse(nextReadiness.value.sampledAt || "") || Date.now();
         const readinessText = nextReadiness.value.stdout || nextReadiness.value.stderr || "";
         result.readinessText = readinessText;
         setReadiness(readinessText);
@@ -812,7 +824,7 @@ export function App() {
         </header>
         {error && <div className="error-banner">{error}</div>}
         {redeploySetupOpen && <SetupWizard initialStep={setupJump.step} jumpNonce={setupJump.nonce} mode="redeploy" onSetupComplete={async () => setSetupState(await setupApi.state())} />}
-        {!redeploySetupOpen && tab === "Home" && <HomePanel status={status} readiness={readiness} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onLoad={loadStackStatus} confirmAction={confirmDialog} restartGate={restartGateChoice} onNavigate={(nextTab) => { setRedeploySetupOpen(false); setSelectedPinnedAddonId(""); setTab(nextTab); }} />}
+        {!redeploySetupOpen && tab === "Home" && <HomePanel status={status} readiness={readiness} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onLoad={loadStackStatus} confirmAction={confirmDialog} restartGate={restartGateChoice} sampledAtMs={homeSampledAtMs} setSampledAtMs={setHomeSampledAtMs} onNavigate={(nextTab) => { setRedeploySetupOpen(false); setSelectedPinnedAddonId(""); setTab(nextTab); }} />}
         {!redeploySetupOpen && tab === "Server Control" && <ServerPanel setTask={setTask} setStatus={setStatus} status={status} setReadiness={setReadiness} setPorts={setPorts} setDoctor={setDoctor} ports={ports} readiness={readiness} doctor={doctor} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} onRedeploy={() => {
           setSetupJump((current) => ({ step: 0, nonce: current.nonce + 1 }));
           setSelectedPinnedAddonId("");

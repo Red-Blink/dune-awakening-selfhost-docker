@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync, statSync
 import { dirname, resolve } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import { networkInterfaces } from "node:os";
+import { clampInt } from "./jsonStore.js";
 
 export const APP_NAME = "Dune Docker Console";
 
@@ -252,6 +253,11 @@ export function loadConfig() {
     maxUploadBytes: Number(process.env.ADMIN_MAX_UPLOAD_BYTES || 1024 * 1024 * 1024),
     commandTimeoutMs: Number(process.env.ADMIN_COMMAND_TIMEOUT_MS || 120000),
     updateCheckCacheMs: Number(process.env.ADMIN_UPDATE_CHECK_CACHE_MS || 5 * 60 * 1000),
+    // status/readiness each shell out for ~4s; Home asks for both on every
+    // mount and idle poll. clampInt, not bare Number() like its neighbours: a
+    // typo'd env var here would otherwise become NaN and disable the cache
+    // silently. 0 disables it deliberately.
+    statusCacheMs: clampInt(process.env.ADMIN_STATUS_CACHE_MS, 15000, 0, 120000),
     staticDir: process.env.ADMIN_STATIC_DIR || resolve(repoRoot, "console/web/dist"),
     allowedIps: parseAllowedIps(process.env.ADMIN_ALLOWED_IPS)
   };

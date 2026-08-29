@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   HomePanel,
@@ -7,6 +8,8 @@ import {
   homeOverallBadge,
   homeOverallHeading,
   homeStateDotTone,
+  isStatusSampleStale,
+  STALE_SAMPLE_AGE_MS,
   isHomeActionComplete,
   performanceCardStatus,
   performanceTrackTone,
@@ -77,6 +80,7 @@ function loadResult(overrides: Partial<HomeLoadResult> = {}): HomeLoadResult {
     readinessError: "",
     statusText: STATUS_TEXT,
     readinessText: "READY: all checks passed",
+    sampledAtMs: Date.now(),
     ...overrides
   };
 }
@@ -109,6 +113,47 @@ function card(label: string) {
   const found = title?.closest(".status-card");
   if (!found) throw new Error(`no status card for ${label}`);
   return found as HTMLElement;
+}
+
+// App owns sampledAtMs so it outlives HomePanel unmounting on a tab switch.
+// This mirrors that, which is the only way to exercise the remount behaviour.
+function renderStateful(props: Partial<Parameters<typeof HomePanel>[0]> = {}) {
+  let setLoad: (fn: Parameters<typeof HomePanel>[0]["onLoad"]) => void = () => undefined;
+  let setMounted: (value: boolean) => void = () => undefined;
+
+  function Harness() {
+    const [sampledAtMs, setSampledAtMs] = useState(0);
+    const [mounted, setMountedState] = useState(true);
+    const [load, setLoadState] = useState(() => props.onLoad || vi.fn().mockResolvedValue(loadResult()));
+    setLoad = (fn) => act(() => setLoadState(() => fn));
+    setMounted = (value) => act(() => setMountedState(value));
+    if (!mounted) return <div />;
+    return <HomePanel
+      status={STATUS_TEXT}
+      readiness="READY: all checks passed"
+      taskResult={null}
+      setTaskResult={vi.fn()}
+      funcomTokenResult={null}
+      setFuncomTokenResult={vi.fn()}
+      runningAction=""
+      restartStartObserved={false}
+      setRunningAction={vi.fn()}
+      confirmAction={vi.fn().mockResolvedValue(true)}
+      restartGate={vi.fn()}
+      {...props}
+      onLoad={load}
+      sampledAtMs={sampledAtMs}
+      setSampledAtMs={setSampledAtMs}
+    />;
+  }
+
+  const view = render(<Harness />);
+  return {
+    ...view,
+    leaveHome: () => setMounted(false),
+    enterHome: () => setMounted(true),
+    rerenderWithLoad: (fn: Parameters<typeof HomePanel>[0]["onLoad"]) => setLoad(fn)
+  };
 }
 
 beforeEach(() => {
@@ -442,51 +487,118 @@ describe("HomePanel subsystem rows", () => {
 });
 
 describe("HomePanel status freshness", () => {
-  it("dates the values once a load succeeds", async () => {
-    const { container } = renderHome();
+  it("dates the values from the sample once a load succeeds", async () => {
+    const { container } = renderStateful();
     await waitFor(() => expect(container.querySelector(".home-freshness")).toBeTruthy());
     expect(container.querySelector(".home-freshness")?.textContent).toMatch(/^Updated \d+s ago$/);
     expect(container.querySelector(".home-freshness.stale")).toBeNull();
   });
 
-  // The three polling effects all swallow their errors, so before this a
-  // backend that started failing after the first load left the last-good
-  // values up forever with no cue that they were frozen.
-  it("warns that values may be stale after consecutive failed polls, without blanking them", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const onLoad = vi.fn().mockResolvedValue(loadResult());
-    const { container } = renderHome({ onLoad });
-    await vi.waitFor(() => expect(container.querySelector(".home-freshness")).toBeTruthy());
+  // The API caches status for ~15s, so a cache hit carries an older sampledAt.
+  // Dating the fetch instead would make a 12s-old snapshot claim to be current.
+  it("reports the age of the sample, not of the fetch", async () => {
+    const sampledAtMs = Date.now() - 12_000;
+    const { container } = renderStateful({ onLoad: vi.fn().mockResolvedValue(loadResult({ sampledAtMs })) });
+    await waitFor(() => expect(container.querySelector(".home-freshness")).toBeTruthy());
+    expect(container.querySelector(".home-freshness")?.textContent).toMatch(/^Updated 1[12] s? ?ago$|^Updated 12s ago$/);
+  });
 
-    onLoad.mockRejectedValue(new Error("connection refused"));
-    // Two ticks of the idle 30s poll -- STALE_POLL_THRESHOLD consecutive misses.
-    for (let i = 0; i < 2; i += 1) {
-      await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
-    }
-
-    await vi.waitFor(() => expect(container.querySelector(".home-freshness.stale")).toBeTruthy());
+  // No failed poll anywhere in this test: age alone is the signal now, which is
+  // what makes it survive a remount and a hidden tab.
+  it("warns on a sample older than the threshold with no failed poll", async () => {
+    const sampledAtMs = Date.now() - (STALE_SAMPLE_AGE_MS + 5_000);
+    const { container } = renderStateful({ onLoad: vi.fn().mockResolvedValue(loadResult({ sampledAtMs })) });
+    await waitFor(() => expect(container.querySelector(".home-freshness.stale")).toBeTruthy());
     expect(container.querySelector(".home-freshness")?.textContent).toMatch(/^Status may be stale/);
-    // The last good values are still on screen -- the point is to date them,
-    // not blank the panel.
+    // The last good values stay on screen -- the point is to date them, not
+    // blank the panel.
     expect(container.querySelector(".home-hero-identity")?.textContent).toContain("Kovalt");
     expect(container.querySelector(".home-hero-meta")?.textContent).toContain("10.0.0.4");
   });
 
-  it("clears the stale warning once a poll succeeds again", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+  // The assertion that actually pins the fix: with the old component-state
+  // counter both the age and the warning reset to zero on every remount, so
+  // leaving Home during an outage and coming back hid the problem.
+  it("keeps the age and the warning across leaving Home and coming back", async () => {
+    const sampledAtMs = Date.now() - (STALE_SAMPLE_AGE_MS + 5_000);
+    const onLoad = vi.fn().mockResolvedValue(loadResult({ sampledAtMs }));
+    const view = renderStateful({ onLoad });
+    await waitFor(() => expect(view.container.querySelector(".home-freshness.stale")).toBeTruthy());
+
+    view.leaveHome();
+    expect(view.container.querySelector(".home-freshness")).toBeNull();
+
+    view.enterHome();
+    // Present immediately on return, before any new load resolves.
+    expect(view.container.querySelector(".home-freshness.stale")).toBeTruthy();
+    expect(view.container.querySelector(".home-freshness")?.textContent).toMatch(/^Status may be stale/);
+  });
+
+  it("clears the warning once a fresh sample arrives", async () => {
+    const stale = Date.now() - (STALE_SAMPLE_AGE_MS + 5_000);
+    const onLoad = vi.fn().mockResolvedValue(loadResult({ sampledAtMs: stale }));
+    const { container, rerenderWithLoad } = renderStateful({ onLoad });
+    await waitFor(() => expect(container.querySelector(".home-freshness.stale")).toBeTruthy());
+
+    // Swapping the prop alone changes nothing -- the mount effect has already
+    // run. Clear it the way an operator would, via Refresh Status.
+    rerenderWithLoad(vi.fn().mockResolvedValue(loadResult({ sampledAtMs: Date.now() })));
+    screen.getByRole("button", { name: /Refresh Status/i }).click();
+
+    await waitFor(() => expect(container.querySelector(".home-freshness.stale")).toBeNull());
+    expect(container.querySelector(".home-freshness")?.textContent).toMatch(/^Updated /);
+  });
+});
+
+// The API caches status/readiness for ~15s. Anything driving the restart
+// lifecycle must bypass that cache, or isHomeActionComplete can be handed a
+// pre-restart snapshot; anything merely displaying it should not.
+describe("HomePanel cache bypass", () => {
+  const freshFlags = (onLoad: ReturnType<typeof vi.fn>) =>
+    onLoad.mock.calls.map(([opts]) => Boolean(opts?.fresh));
+
+  it("accepts a cached read on mount -- the visit that used to cost ~4s", async () => {
     const onLoad = vi.fn().mockResolvedValue(loadResult());
-    const { container } = renderHome({ onLoad });
-    await vi.waitFor(() => expect(container.querySelector(".home-freshness")).toBeTruthy());
+    renderHome({ onLoad });
+    await waitFor(() => expect(onLoad).toHaveBeenCalled());
+    expect(freshFlags(onLoad)).toEqual([false]);
+  });
 
-    onLoad.mockRejectedValue(new Error("connection refused"));
-    for (let i = 0; i < 2; i += 1) {
-      await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
-    }
-    await vi.waitFor(() => expect(container.querySelector(".home-freshness.stale")).toBeTruthy());
+  it("forces a fresh read when the operator asks for one", async () => {
+    const onLoad = vi.fn().mockResolvedValue(loadResult());
+    renderHome({ onLoad });
+    await waitFor(() => expect(onLoad).toHaveBeenCalled());
+    onLoad.mockClear();
 
-    onLoad.mockResolvedValue(loadResult());
-    await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
-    await vi.waitFor(() => expect(container.querySelector(".home-freshness.stale")).toBeNull());
+    screen.getByRole("button", { name: /Refresh Status/i }).click();
+    await waitFor(() => expect(onLoad).toHaveBeenCalled());
+    expect(freshFlags(onLoad).every(Boolean)).toBe(true);
+  });
+
+  it("forces fresh reads while the battlegroup is warming", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const warming = ["Overall: WARMING", "Title: Kovalt", "", "Game servers", "Survival_1 WARMING"].join("\n");
+    const onLoad = vi.fn().mockResolvedValue(loadResult({ statusText: warming, readinessText: "", readinessLoaded: false }));
+    renderHome({ onLoad, status: warming, readiness: "" });
+    await vi.waitFor(() => expect(onLoad).toHaveBeenCalled());
+    onLoad.mockClear();
+
+    // One tick of the 5s warm poll.
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(onLoad).toHaveBeenCalled();
+    expect(freshFlags(onLoad).every(Boolean)).toBe(true);
+  });
+});
+
+describe("isStatusSampleStale", () => {
+  const now = 1_000_000_000;
+  it("is not stale inside the window and stale outside it", () => {
+    expect(isStatusSampleStale(now - (STALE_SAMPLE_AGE_MS - 1), now)).toBe(false);
+    expect(isStatusSampleStale(now - (STALE_SAMPLE_AGE_MS + 1), now)).toBe(true);
+  });
+
+  it("treats a never-sampled panel as not stale rather than alarming on first paint", () => {
+    expect(isStatusSampleStale(0, now)).toBe(false);
   });
 });
 
