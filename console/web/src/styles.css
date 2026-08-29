@@ -2178,13 +2178,23 @@ body.debug .technical-details { display: block; }
    the one family that does not blur into the warm chrome the way another
    amber step would. */
 .home-state-dot-motion { background: #85b7eb; animation: state-dot-pulse 1.6s ease-in-out infinite; }
-.home-state-dot-loading { background: transparent; border: 2px solid var(--text-subtle); animation: state-dot-pulse 1.6s ease-in-out infinite; }
+/* Dashed vs solid, not just pulsing vs still: prefers-reduced-motion strips
+   the animation, and without a static difference "Checking" and "no reading"
+   became the same pixels for exactly the users who opted out of motion. */
+.home-state-dot-loading { background: transparent; border: 2px dashed var(--text-subtle); animation: state-dot-pulse 1.6s ease-in-out infinite; }
 .home-state-dot-nodata { background: transparent; border: 2px solid var(--text-subtle); }
 @keyframes state-dot-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: .45; transform: scale(.82); }
 }
-.home-hero-identity { margin: 6px 0 0; color: var(--muted); }
+/* overflow-wrap is load-bearing, not cosmetic: a server Title is free text and
+   can arrive with no spaces. Without it the line overflowed its grid track and
+   was painted underneath the opaque subsystem list next to it -- no scrollbar,
+   no clipping, just silently unreadable. */
+.home-hero-identity { margin: 6px 0 0; color: var(--muted); overflow-wrap: anywhere; }
+/* An unreadable player count. The rest of the line is muted prose; this one
+   segment lifts to the warn tone so the "?" is not mistaken for a real value. */
+.home-population-warn { color: var(--title); }
 /* Server IP and Battlegroup: reference values an operator copies, so they are
    labelled rather than folded into the "·" summary line above, and they keep
    their own line-up when the hero narrows. */
@@ -2202,8 +2212,10 @@ body.debug .technical-details { display: block; }
 .home-subsystem-list { list-style: none; margin: 0; padding: 0; display: grid; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .home-subsystem-row + .home-subsystem-row { border-top: 1px solid var(--border); }
 /* The button resets the global button styling rather than inheriting it: these
-   are full-bleed rows, not controls, so they take the row's own padding and a
-   transparent background and only light up on hover. */
+   are full-bleed rows, not controls, so they take the row's own padding and
+   only light up on hover. The fill is the opaque --panel rather than the
+   hero's frosted surface, so the list reads as one solid slab instead of six
+   translucent chips. */
 .home-subsystem-button, .home-subsystem-static {
   width: 100%;
   display: flex;
@@ -2221,8 +2233,16 @@ body.debug .technical-details { display: block; }
 .home-subsystem-button { cursor: pointer; }
 .home-subsystem-button:hover { background: #1c2024; color: var(--text-strong); }
 .home-subsystem-button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.home-subsystem-label { min-width: 0; overflow-wrap: anywhere; }
-.home-subsystem-value { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+/* The label is a fixed short string ("Game Servers", "Funcom/FLS"); the value
+   is the variable part and can be as long as "Token Mismatch Detected". So the
+   label holds its width and the VALUE is what gives way. The previous
+   flex: 0 0 auto on the value inverted that: the value refused to shrink and
+   crushed the label to a 5px column breaking one glyph per line at ~940px. */
+.home-subsystem-label { flex: 0 0 auto; white-space: nowrap; }
+.home-subsystem-value { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; color: var(--muted); text-align: right; }
+/* Only the text gives way -- the badge is already compact and must stay whole. */
+.home-subsystem-value > span:not(.badge) { min-width: 0; overflow-wrap: anywhere; }
+.home-subsystem-value > .badge { flex: 0 0 auto; }
 
 /* Stop destroys running state; it should not read as the visual peer of a
    read-only Refresh sitting beside it. Border and text only -- the filled
@@ -2701,8 +2721,8 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 
 @media (prefers-reduced-motion: reduce) {
   .home-sand-fine, .home-sand-near, .setup-finish-celebration span { animation: none; }
-  /* The dot keeps its hue and its ring/fill, so "in progress" is still
-     distinguishable from "no reading" without the motion. */
+  /* The dot keeps its hue and its ring style (dashed for "checking", solid for
+     "no reading"), so both stay distinguishable without the motion. */
   .home-state-dot-motion, .home-state-dot-loading { animation: none; }
 }
 

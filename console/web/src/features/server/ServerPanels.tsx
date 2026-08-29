@@ -123,9 +123,17 @@ export function isRestartLifecycleReady(action: "start" | "stop" | "restart" | "
 export const PERFORMANCE_WARN_PERCENT = 75;
 export const PERFORMANCE_FAIL_PERCENT = 90;
 
+// `null` means "no reading available", NOT "no percentage concept" -- the API
+// returns null routinely, e.g. cpuPercent on the first sample after every API
+// start, because it needs two samples to compute a delta. That must read INFO
+// ("Sampling..."), never OK. Cards with no percentage at all (Uptime) are
+// handled by the caller, which omits the badge entirely rather than passing
+// null through here.
 export function performanceCardStatus(percent: number | null, sampled: boolean) {
-  if (percent === null) return "";
-  if (!sampled || !Number.isFinite(percent)) return "INFO";
+  if (!sampled || percent === null || !Number.isFinite(percent)) return "INFO";
+  // A negative utilisation is nonsense rather than healthy; report it as
+  // unknown instead of letting it fall through to OK.
+  if (percent < 0) return "INFO";
   if (percent > PERFORMANCE_FAIL_PERCENT) return "FAILED";
   if (percent >= PERFORMANCE_WARN_PERCENT) return "WARN";
   return "OK";
@@ -479,10 +487,20 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   const summary = summarizeHomeStatus(status, readiness, readinessWarning, loading, runningAction, taskResult, restartStartObserved, !funcomTokenCheckRunning && (isFuncomTokenAuthFailure(funcomTokenResult) || hasPersistedFuncomTokenAuthFailure()));
   const overall = summary.identity.find((item) => item.label === "Overall");
   const identityCards = summary.identity.filter((item) => item.label !== "Overall");
+  const populationItem = identityCards.find((item) => item.label === "Population");
+  const populationWarn = /^warn$/i.test(String(populationItem?.status || ""));
+  const populationSegment = homePopulationSegment(populationItem?.value);
+  const identityLine = homeIdentityLine(identityCards);
 
   return (
     <section className="grid">
-      <article className="hero-panel wide home-hero">
+      {/* The h2 is visually hidden but structurally real: deleting the old
+          "Server Overview" heading left the page jumping h1 -> h3, and left
+          this region with no accessible name. The three h3s below it (this
+          hero's status label, Readiness & Health, Performance) are its
+          children, so the level is correct as well as present. */}
+      <article className="hero-panel wide home-hero" aria-labelledby="home-hero-heading">
+        <h2 id="home-hero-heading" className="sr-only">Server overview</h2>
         <div className="home-hero-split">
           <div className="home-hero-primary">
             {/* An h3, not a styled span: it is the peer of the "Readiness &
@@ -495,7 +513,18 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
               <span className={`home-state-dot home-state-dot-${homeStateDotTone(overall?.value, summary.health)}`} aria-hidden="true" />
               <span className="home-hero-state-value">{homeOverallHeading(overall?.value)}</span>
             </div>
-            <p className="home-hero-identity">{homeIdentityLine(identityCards)}</p>
+            {/* Population is rendered apart from the rest of the line so its
+                WARN can survive: summarizeHomeStatus flags an unreadable count
+                ("14 / ?" or "Unavailable"), and the deleted Server Identity
+                band was the only thing that showed that. Folding it into the
+                plain summary string dropped the signal silently. */}
+            <p className="home-hero-identity">
+              {identityLine || (populationSegment ? "" : "Server details are still loading.")}
+              {populationSegment && <>
+                {identityLine ? " · " : ""}
+                <span className={populationWarn ? "home-population-warn" : undefined}>{populationSegment}</span>
+              </>}
+            </p>
             <dl className="home-hero-meta">
               {HOME_HERO_META_LABELS.map((label) => <div className="home-hero-meta-item" key={label}>
                 <dt>{label}</dt>
@@ -573,11 +602,19 @@ function homeIdentityLine(items: { label: string; value: string }[]) {
     const value = String(items.find((item) => item.label === label)?.value || "").trim();
     return value && !/^(unknown|unavailable)$/i.test(value) ? value : "";
   };
-  // formatHomePopulation yields "14" or "14 / 40"; either reads as a bare
-  // trailing number, so it is labelled here rather than in the summary.
-  const population = pick("Population");
-  const parts = [pick("Title"), pick("Region"), pick("Mode"), population ? `${population} online` : ""].filter(Boolean);
-  return parts.length ? parts.join(" · ") : "Server details are still loading.";
+  const parts = [pick("Title"), pick("Region"), pick("Mode")].filter(Boolean);
+  return parts.join(" · ");
+}
+
+// formatHomePopulation yields "14", "14 / 40", "14 / ?" or "Unavailable"; any
+// of those reads as a bare trailing number without a label. "Unavailable" is
+// kept rather than dropped -- paired with the warn tone it is the signal that
+// the count could not be read, which is worth more than silence.
+function homePopulationSegment(value: unknown) {
+  const text = String(value || "").trim();
+  if (!text || /^unknown$/i.test(text)) return "";
+  if (/^unavailable$/i.test(text)) return "population unavailable";
+  return `${text} online`;
 }
 
 // Dates the status values on screen. Ticks on its own 1s interval so the
@@ -617,7 +654,11 @@ function HomeSubsystemList({ items, onNavigate }: { items: { label: string; valu
             <StatusPill value={item.status} />
           </span>
         </>;
-        return <li key={item.label} className="home-subsystem-row" title={item.detail || undefined}>
+        // No `title` attribute: every producer of a health card emits
+        // detail: "", so a tooltip would advertise a hover affordance that
+        // never has content -- and a hover-only one at that. If detail ever
+        // becomes real it belongs in the row body, not an attribute.
+        return <li key={item.label} className="home-subsystem-row">
           {route && onNavigate
             ? <button type="button" className="home-subsystem-button" onClick={() => onNavigate(route)} aria-label={`${item.label}: ${item.value}. Open ${route}`}>{body}</button>
             : <div className="home-subsystem-static">{body}</div>}
@@ -632,25 +673,31 @@ function PerformanceCards({ performance, error }: { performance: PerformanceSnap
     {
       label: "CPU Usage",
       value: performance?.cpuPercent == null ? "Sampling..." : `${performance.cpuPercent.toFixed(1)}%`,
-      percent: performance?.cpuPercent ?? 0,
+      percent: performance?.cpuPercent ?? null,
+      metered: true,
       detail: "Host Processor Load"
     },
     {
       label: "Memory",
       value: performance?.memory.percent == null ? "Unknown" : `${performance.memory.percent.toFixed(1)}%`,
-      percent: performance?.memory.percent ?? 0,
+      percent: performance?.memory.percent ?? null,
+      metered: true,
       detail: performance ? `${formatBytes(performance.memory.usedBytes)} / ${formatBytes(performance.memory.totalBytes)}` : "Waiting for Sample"
     },
     {
       label: "Disk",
       value: performance?.disk.percent == null ? "Unknown" : `${performance.disk.percent.toFixed(1)}%`,
-      percent: performance?.disk.percent ?? 0,
+      percent: performance?.disk.percent ?? null,
+      metered: true,
       detail: performance ? `${formatBytes(performance.disk.usedBytes)} / ${formatBytes(performance.disk.totalBytes)}` : "Waiting for Sample"
     },
     {
       label: "Uptime",
       value: performance?.uptime || "0d 00h 00m",
       percent: null,
+      // Not a utilisation figure at all, so it gets neither a badge nor a bar
+      // -- distinct from a metered card whose reading has not arrived yet.
+      metered: false,
       detail: "Host Uptime"
     }
   ];
@@ -659,12 +706,12 @@ function PerformanceCards({ performance, error }: { performance: PerformanceSnap
     {error && !performance && <p className="error">{error}</p>}
     <div className="health-grid health-grid-compact">
       {cards.map((item) => {
-        const cardStatus = performanceCardStatus(item.percent, Boolean(performance));
+        const cardStatus = item.metered ? performanceCardStatus(item.percent, Boolean(performance)) : "";
         return <article className="status-card performance-card" key={item.label}>
           <div className="status-card-title"><span>{item.label}</span>{cardStatus && <StatusPill value={cardStatus} />}</div>
           <strong>{item.value}</strong>
           <p>{item.detail}</p>
-          {item.percent !== null && <div className="metric-track" aria-hidden="true"><span className={performanceTrackTone(item.percent, Boolean(performance))} style={{ width: `${clampPercent(item.percent)}%` }} /></div>}
+          {item.metered && item.percent !== null && <div className="metric-track" aria-hidden="true"><span className={performanceTrackTone(item.percent, Boolean(performance))} style={{ width: `${clampPercent(item.percent)}%` }} /></div>}
         </article>;
       })}
     </div>
@@ -1978,6 +2025,12 @@ function isHomeBootStarting(status: string, readiness: string) {
   return coreStartupContainerUp || readinessStarting || (coreStartupContainerUp && containerLines.length > 0 && missingContainers > 0) || (coreStartupContainerUp && listenerLines.length > 0 && missingListeners > 0);
 }
 
+// NOTE: this no longer colours anything on screen. It produces
+// identity[0].status, and since the Server Identity band was removed the only
+// remaining consumer is homeNeedsWarmRefresh's poll-cadence check -- the hero
+// dot reads homeStateDotTone(overall.value) instead. Kept correct rather than
+// deleted because a status-badge helper that calls a failed readiness check
+// "Ready" is simply wrong, and it is still exercised by that cadence check.
 export function homeOverallBadge(value: string) {
   const normalized = String(value || "").trim().toLowerCase();
   if (/\b(restarting|restart|stopping|starting)\b/.test(normalized)) return "WARN";

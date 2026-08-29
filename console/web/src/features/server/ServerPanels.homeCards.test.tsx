@@ -136,13 +136,16 @@ describe("performanceCardStatus", () => {
     expect(performanceCardStatus(96.7, true)).toBe("FAILED");
   });
 
-  it("reports INFO until a sample lands, and no status at all without a percentage", () => {
+  // The API returns null routinely, not exceptionally -- cpuPercent is null on
+  // the first sample after every API start, because it needs two samples for a
+  // delta. Reporting that as OK is the exact failure this function exists to
+  // prevent, and the card literal used to collapse it to 0 before this guard.
+  it("reports INFO for a missing or nonsensical reading, never OK", () => {
     expect(performanceCardStatus(30, false)).toBe("INFO");
+    expect(performanceCardStatus(null, true)).toBe("INFO");
+    expect(performanceCardStatus(null, false)).toBe("INFO");
     expect(performanceCardStatus(Number.NaN, true)).toBe("INFO");
-    // Uptime carries percent: null -- it must render no badge rather than a
-    // fabricated OK.
-    expect(performanceCardStatus(null, true)).toBe("");
-    expect(performanceCardStatus(null, false)).toBe("");
+    expect(performanceCardStatus(-5, true)).toBe("INFO");
   });
 
   it("moves the bar tone with the badge so the two cannot disagree", () => {
@@ -273,10 +276,26 @@ describe("HomePanel performance band", () => {
     expect(card("Disk").querySelector(".metric-track span")?.className).toBe("metric-track-fail");
   });
 
-  it("gives Uptime no badge at all rather than a constant OK", async () => {
+  it("gives Uptime no badge or bar at all -- it is not a utilisation figure", async () => {
     renderHome();
     await waitFor(() => expect(card("Uptime")).toBeTruthy());
     expect(card("Uptime").querySelector(".badge")).toBeNull();
+    expect(card("Uptime").querySelector(".metric-track")).toBeNull();
+  });
+
+  // Regression: the card literal read `performance?.cpuPercent ?? 0`, which
+  // collapsed a null reading to 0 before performanceCardStatus could see it,
+  // so an unmeasured CPU rendered a green OK pill beside the text "Sampling...".
+  it("does not badge an unmeasured metric as OK", async () => {
+    performanceMock.mockResolvedValue(snapshot(null, 40, 50));
+    renderHome();
+    await waitFor(() => expect(card("CPU Usage").textContent).toContain("Sampling"));
+    expect(within(card("CPU Usage")).getByText("INFO")).toBeTruthy();
+    expect(within(card("CPU Usage")).queryByText("OK")).toBeNull();
+    // No bar either -- a 0%-wide track would read as "measured, and idle".
+    expect(card("CPU Usage").querySelector(".metric-track")).toBeNull();
+    // The metrics that did report still grade normally.
+    expect(within(card("Memory")).getByText("OK")).toBeTruthy();
   });
 });
 
@@ -301,6 +320,25 @@ describe("HomePanel server identity", () => {
     expect(line).toContain("EU");
     expect(line).toContain("Public");
     expect(line).toContain("14 online");
+  });
+
+  // The Server Identity band was the only renderer of Population's WARN, so
+  // folding population into the plain summary string dropped the signal that
+  // the count could not be read.
+  it("marks an unreadable player count instead of printing it as fact", async () => {
+    const status = "Title: Kovalt\nPopulation: 14 / ?";
+    const { container } = renderHome({ status, onLoad: vi.fn().mockResolvedValue(loadResult({ statusText: status })) });
+    await waitFor(() => expect(container.querySelector(".home-hero-identity")).toBeTruthy());
+    const warn = container.querySelector(".home-population-warn");
+    expect(warn).not.toBeNull();
+    expect(warn?.textContent).toContain("?");
+  });
+
+  it("leaves a healthy player count unmarked", async () => {
+    const { container } = renderHome();
+    await waitFor(() => expect(container.querySelector(".home-hero-identity")).toBeTruthy());
+    expect(container.querySelector(".home-population-warn")).toBeNull();
+    expect(container.querySelector(".home-hero-identity")?.textContent).toContain("14 online");
   });
 
   // The Performance band carries Uptime on its own card; the hero line said it
