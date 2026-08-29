@@ -203,7 +203,6 @@ describe("performanceCardStatus", () => {
 
 describe("homeOverallHeading", () => {
   it("passes ordinary readings through", () => {
-    expect(homeOverallHeading("OK")).toBe("OK");
     expect(homeOverallHeading("Stopped")).toBe("Stopped");
     expect(homeOverallHeading("Starting")).toBe("Starting");
     expect(homeOverallHeading("Needs Review")).toBe("Needs Review");
@@ -214,6 +213,13 @@ describe("homeOverallHeading", () => {
   // under the "Battlegroup Status:" prefix would say Battlegroup twice.
   it("drops the redundant word the heading prefix already supplies", () => {
     expect(homeOverallHeading("Restarting Battlegroup")).toBe("Restarting");
+  });
+
+  // isHomeActionComplete matches the summary value with /^OK$/, so the rename
+  // has to stay in the render layer. This pins that it is display-only.
+  it("reads a healthy battlegroup as Ready rather than OK", () => {
+    expect(homeOverallHeading("OK")).toBe("Ready");
+    expect(homeOverallHeading("ok")).toBe("Ready");
   });
 });
 
@@ -363,9 +369,9 @@ describe("HomePanel server identity", () => {
     const { container } = renderHome();
     await waitFor(() => expect(container.querySelector(".home-hero-state")).toBeTruthy());
     // With a space: the dot between label and reading is an empty element, so
-    // without one this reads "Battlegroup Status:OK" to a screen reader.
-    expect(container.querySelector(".home-hero-state")?.textContent).toBe("Battlegroup Status: OK");
-    expect(container.querySelector(".home-hero-state-value")?.textContent).toBe("OK");
+    // without one this reads "Battlegroup Status:Ready" to a screen reader.
+    expect(container.querySelector(".home-hero-state")?.textContent).toBe("Battlegroup Status: Ready");
+    expect(container.querySelector(".home-hero-state-value")?.textContent).toBe("Ready");
     // The label is an h3 so it matches the "Readiness & Health" and
     // "Performance" section headings by element rather than by restated CSS.
     const label = container.querySelector(".home-hero-state-label");
@@ -654,6 +660,25 @@ describe("HomePanel when the battlegroup is stopped", () => {
     await waitFor(() => expect(container.querySelector(".home-state-dot")).toBeTruthy());
     expect(container.querySelector(".home-state-dot")?.className).toContain("home-state-dot-failed");
     expect(container.querySelector(".home-hero-state h3")?.textContent).toBe("Battlegroup Status:");
+  });
+
+  // Reported live: the Stop banner appeared while all six rows stayed "Ready".
+  // status and readiness are separate reads, so status flipped to STOPPED while
+  // readiness was still the previous "READY:", and the readiness all-clear was
+  // winning. Every fixture above passes an empty readiness, which is why none of
+  // them caught it.
+  it("believes an observed stop over a readiness reading left over from before it", async () => {
+    const { container } = renderHome({
+      status: STOPPED_STATUS,
+      readiness: "READY: all checks passed",
+      taskResult: { status: "stopped", title: "Battlegroup Stopped" },
+      onLoad: vi.fn().mockResolvedValue(loadResult({ statusText: STOPPED_STATUS, readinessText: "READY: all checks passed" }))
+    });
+    await waitFor(() => expect(container.querySelectorAll(".home-subsystem-row").length).toBe(6));
+    const values = Array.from(container.querySelectorAll(".home-subsystem-value")).map((node) => node.textContent);
+    expect(values.every((text) => text?.includes("Stopped"))).toBe(true);
+    expect(container.querySelector(".home-hero-state-value")?.textContent).toBe("Stopped");
+    expect(container.querySelector(".home-state-dot")?.className).toContain("home-state-dot-failed");
   });
 
   // The same override fires for a failed start/restart. Claiming "Stopped"

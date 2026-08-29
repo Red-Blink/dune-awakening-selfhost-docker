@@ -578,9 +578,12 @@ export function homeStateDotTone(overallValue: unknown, health: { status: string
 
 // summarizeHomeStatus yields "Restarting Battlegroup", which under the
 // "Battlegroup Status:" prefix would say Battlegroup twice. Trimmed here, not in
-// the summary -- that value is shared with homeNeedsWarmRefresh.
+// the summary -- that value is shared with homeNeedsWarmRefresh and with
+// isHomeActionComplete, which matches /^OK$/ to detect a finished restart. So
+// "OK" is renamed for display only, never in the summary.
 export function homeOverallHeading(value: unknown) {
   const text = formatDisplayValue(value || "Unknown");
+  if (/^ok$/i.test(text.trim())) return "Ready";
   return text.replace(/\s+battlegroup$/i, "");
 }
 
@@ -1659,7 +1662,6 @@ function summarizeHomeStatus(status: string, readiness: string, readinessWarning
   const rawGames = preferKnownHomeHealth(summarizeGameServers(status), summarizeReadinessGameServers(readiness));
   const rawRabbit = preferKnownHomeHealth(summarizeRabbit(status), summarizeReadinessRabbit(readiness));
   const rawFls = preferKnownHomeHealth(summarizeFls(status), summarizeReadinessFls(readiness));
-  const readyOverride = readinessReady ? { label: "OK", status: "Ready", detail: "" } : null;
   const coreReadyWithReview = !runningAction && isHomeCoreReadyWithReview(status, readiness, rawContainers, rawListeners, rawDatabase, rawGames, rawRabbit, rawFls);
   const isStarting = runningAction === "start" || runningAction === "restart" || restartSuccessAwaitingFreshStatus || (bootStarting && !coreReadyWithReview);
   const restartSuccessObserved = taskResult?.status === "succeeded" && /restart/i.test(taskResult.title || "");
@@ -1668,8 +1670,14 @@ function summarizeHomeStatus(status: string, readiness: string, readinessWarning
     ? restartStartObserved ? "Starting" : "Restarting Battlegroup"
     : runningAction === "stop" ? "Stopping" : isStarting ? "Starting" : "";
   const warmingOverall = /^Warming$/i.test(rawGames.label) ? "Warming" : "";
-  const overall = readinessReady && !runningAction ? "OK" : isStarting ? transitionOverall : runningAction ? transitionOverall : serverState.stopped || actionStopped ? "Stopped" : coreReadyWithReview ? "Needs Review" : warmingOverall || liveOverall;
   const attentionHealth = !isStarting && !restartSuccessAwaitingFreshStatus && (serverState.stopped || actionStopped || actionFailed) ? attentionHomeHealthCards(serverState.stopped || actionStopped ? "stopped" : "failed") : null;
+  // status and readiness are two separate reads, so they can disagree: a stop
+  // updates status to STOPPED while readiness is still the previous "READY:".
+  // Believing readiness there left the heading and all six rows reading Ready
+  // under a "Battlegroup Stopped" banner. A stop we observed, or an Overall:
+  // STOPPED, beats a stale all-clear.
+  const readyOverride = readinessReady && !attentionHealth ? { label: "OK", status: "Ready", detail: "" } : null;
+  const overall = readinessReady && !runningAction && !attentionHealth ? "OK" : isStarting ? transitionOverall : runningAction ? transitionOverall : serverState.stopped || actionStopped ? "Stopped" : coreReadyWithReview ? "Needs Review" : warmingOverall || liveOverall;
   const transitionAction: "start" | "stop" | "restart" | "" = restartStartObserved
     ? "start"
     : runningAction === "restart" ? ""
