@@ -2180,8 +2180,22 @@ body.debug .technical-details { display: block; }
 .home-population-warn { color: var(--title); }
 /* Reference values an operator copies, so labelled rather than folded into the
    "·" summary line above. */
-.home-hero-meta { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 12px 0 0; }
-.home-hero-meta-item { min-width: 0; display: grid; gap: 2px; }
+.home-hero-meta { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 0; }
+/* Boxed, matching the .status-card / .key-value-item treatment used elsewhere
+   rather than a new one. flex-basis 0 so the two share the width evenly instead
+   of sizing to their content -- a short IP beside a long battlegroup id would
+   otherwise give two very lopsided boxes. */
+.home-hero-meta-item {
+  flex: 1 1 0;
+  min-width: 140px;
+  display: grid;
+  gap: 3px;
+  align-content: start;
+  padding: 9px 11px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
 .home-hero-meta dt { color: var(--muted); font-size: 12px; }
 .home-hero-meta dd { margin: 0; color: var(--text-strong); overflow-wrap: anywhere; }
 /* Muted at rest; only the stale form is allowed to draw the eye. */
