@@ -219,8 +219,17 @@ export const ROUTE_ACTIONS = {
   // --- Storage (read) ---
   "GET /api/storage":                          "storage:read",
 
-  // --- Blueprints (read) ---
+  // --- Blueprints ---
   "GET /api/blueprints":                       "blueprints:read",
+  // POST-shaped but read-only in effect: blueprintBulkExportRoute only calls
+  // exportBlueprint() per id and zips the results, and GET
+  // /api/blueprints/{id}/export already resolves to blueprints:read. It is
+  // still NOT folded into blueprints:read, deliberately -- one call can pull
+  // 500 blueprints, so an operator who granted read-only access to the
+  // blueprint list did not thereby agree to bulk extraction. Its own action
+  // lets them grant that separately, and nobody's existing read grant widens.
+  "POST /api/blueprints/export":               "blueprints:export",
+  "POST /api/blueprints/import":               "blueprints:import",
 
   // --- Admin Tools ---
   "GET /api/admin/items/catalog":              "admin:items:read",
@@ -440,15 +449,21 @@ export const REGEX_ACTIONS_BY_METHOD = {
 
   "POST /api/storage/":    "storage:mutate",
 
-  "POST /api/addons/":     "addons:mutate",
-  "DELETE /api/addons/":   "addons:mutate",
+  // Fail-closed sentinel, as for players/guilds above: REGEX_ACTIONS has a
+  // method-agnostic "/api/addons/installed/" -> addons:read fallback, so
+  // dropping these would let an unclassified addon mutation run under a
+  // read-only grant.
+  "POST /api/addons/":     "addons:unclassified",
+  "DELETE /api/addons/":   "addons:unclassified",
 
   "PATCH /api/maps/spicefields/": "maps:write-config",
 
   "DELETE /api/backups/":  "backups:delete",
 
-  "POST /api/blueprints/": "blueprints:mutate",
-  "DELETE /api/blueprints/":"blueprints:mutate",
+  // Same fail-closed sentinel: "/api/blueprints/" -> blueprints:read sits
+  // beneath this tier in REGEX_ACTIONS.
+  "POST /api/blueprints/": "blueprints:unclassified",
+  "DELETE /api/blueprints/":"blueprints:unclassified",
 
   "PATCH /api/database/tables/": "database:mutate",
 };
@@ -690,7 +705,36 @@ export const REGEX_ACTIONS_BY_METHOD_PATTERN = [
   { method: "POST",   pattern: /^\/api\/guilds\/[^/]+\/members$/, action: "guilds:membership" },
   { method: "POST",   pattern: /^\/api\/guilds\/[^/]+\/members\/[^/]+\/promote$/, action: "guilds:rank" },
   { method: "POST",   pattern: /^\/api\/guilds\/[^/]+\/members\/[^/]+\/demote$/, action: "guilds:rank" },
-  { method: "DELETE", pattern: /^\/api\/guilds\/[^/]+$/, action: "guilds:disband" }
+  { method: "DELETE", pattern: /^\/api\/guilds\/[^/]+$/, action: "guilds:disband" },
+
+  // ---- Blueprints ----
+  //
+  // blueprints:mutate covered bulk export (a read), import (creation) and
+  // delete (destruction) with one grant. Anchored so it cannot swallow
+  // /api/blueprints/{id}/export, which stays blueprints:read.
+  { method: "DELETE", pattern: /^\/api\/blueprints\/[^/]+$/, action: "blueprints:delete" },
+
+  // ---- Addons ----
+  //
+  // addons:mutate covered removing an installed addon, enabling/disabling one,
+  // AND the bridge -- the route that executes whatever the addon's manifest
+  // declares, including SQL. Lifecycle control and "run the addon's code" are
+  // not the same privilege and should never have been the same action.
+  //
+  //   addons:remove  uninstall an installed addon
+  //   addons:toggle  enable/disable, the reversible lifecycle switch
+  //   addons:bridge  the manifest-authorized action channel. Authorizes
+  //                  against the INSTALLED ADDON's declared permission rather
+  //                  than the caller (see server.js addonBridgeRoute), which is
+  //                  exactly why it deserves to be withheld separately.
+  //
+  // API keys cannot reach any of these regardless: `addons` is in
+  // KEY_WRITE_DENIED_NAMESPACES, and the bridge additionally refuses key
+  // principals outright.
+  { method: "DELETE", pattern: /^\/api\/addons\/installed\/[^/]+$/, action: "addons:remove" },
+  { method: "POST",   pattern: /^\/api\/addons\/installed\/[^/]+\/bridge$/, action: "addons:bridge" },
+  { method: "POST",   pattern: /^\/api\/addons\/installed\/[^/]+\/enable$/, action: "addons:toggle" },
+  { method: "POST",   pattern: /^\/api\/addons\/installed\/[^/]+\/disable$/, action: "addons:toggle" }
 ];
 
 // ---- Content-conditional actions ----

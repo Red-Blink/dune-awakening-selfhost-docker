@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 
 import { actionForRoute } from "../src/actions.js";
 import { allKnownActions, evaluate } from "../src/policy.js";
+import { keyAllows } from "../src/apiKeys.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const serverSrc = readFileSync(join(__dirname, "../src/server.js"), "utf8");
@@ -328,4 +329,153 @@ test("guilds: roster management is grantable without disbanding", () => {
   assert.equal(can("guilds:rank"), true);
   assert.equal(can("guilds:disband"), false, "disband must not ride along with roster edits");
   assert.equal(can("guilds:unclassified"), false);
+});
+
+// ============================ blueprints ============================
+//
+// blueprints:mutate covered bulk export (a read), import (creation) and delete
+// (destruction) with one grant.
+
+const B = "bp-9";
+
+const BLUEPRINT_EXPECTED = [
+  ["POST", "/api/blueprints/export", "blueprints:export"],
+  ["POST", "/api/blueprints/import", "blueprints:import"],
+  ["DELETE", `/api/blueprints/${B}`, "blueprints:delete"]
+];
+
+test("blueprints: every mutation resolves to its own narrow action", () => {
+  for (const [method, path, action] of BLUEPRINT_EXPECTED) {
+    assert.equal(actionForRoute(path, method), action, `${method} ${path}`);
+  }
+  assert.ok(!allKnownActions().has("blueprints:mutate"));
+});
+
+test("blueprints: bulk export is not folded into the read grant", () => {
+  // blueprintBulkExportRoute only reads (exportBlueprint per id, zipped), so it
+  // was wrong to call it a mutation -- but one call pulls up to 500 blueprints,
+  // so it is not blueprints:read either. Its own action, and blueprints:read
+  // stays exactly as wide as it was.
+  assert.equal(actionForRoute("/api/blueprints/export", "POST"), "blueprints:export");
+  assert.notEqual(actionForRoute("/api/blueprints/export", "POST"), "blueprints:read");
+  const docs = {
+    owner: { version: 1, tier: "owner", statements: [{ Effect: "Allow", Action: "*" }] },
+    player: { version: 1, tier: "player", statements: [{ Effect: "Allow", Action: ["blueprints:read"] }] }
+  };
+  assert.equal(evaluate({ tier: "player" }, "blueprints:export", docs), false,
+    "a read-only grant must not gain bulk extraction");
+  // The single-blueprint export stays a read, as it already was.
+  assert.equal(actionForRoute(`/api/blueprints/${B}/export`, "GET"), "blueprints:read");
+});
+
+test("blueprints: delete is distinguished from a sub-resource path", () => {
+  assert.equal(actionForRoute(`/api/blueprints/${B}`, "DELETE"), "blueprints:delete");
+  assert.equal(actionForRoute(`/api/blueprints/${B}/parts/p1`, "DELETE"), "blueprints:unclassified");
+});
+
+test("blueprints: an unclassified mutation fails closed, not to blueprints:read", () => {
+  for (const method of ["POST", "DELETE"]) {
+    const action = actionForRoute(`/api/blueprints/${B}/added-later`, method);
+    assert.equal(action, "blueprints:unclassified");
+    assert.notEqual(action, "blueprints:read");
+  }
+});
+
+// ============================ addons ============================
+//
+// addons:mutate covered uninstalling, enabling/disabling, AND the bridge --
+// the route that runs whatever the addon's manifest declares, including SQL.
+
+const A = "addon-x";
+
+const ADDON_EXPECTED = [
+  ["DELETE", `/api/addons/installed/${A}`, "addons:remove"],
+  ["POST", `/api/addons/installed/${A}/bridge`, "addons:bridge"],
+  ["POST", `/api/addons/installed/${A}/enable`, "addons:toggle"],
+  ["POST", `/api/addons/installed/${A}/disable`, "addons:toggle"]
+];
+
+test("addons: every mutation resolves to its own narrow action", () => {
+  for (const [method, path, action] of ADDON_EXPECTED) {
+    assert.equal(actionForRoute(path, method), action, `${method} ${path}`);
+  }
+  assert.ok(!allKnownActions().has("addons:mutate"));
+});
+
+test("addons: the bridge is withheld separately from lifecycle control", () => {
+  // The bridge authorizes against the installed addon's declared permission
+  // rather than the caller, so "may enable an addon" must not imply "may run
+  // whatever that addon declared".
+  const docs = {
+    owner: { version: 1, tier: "owner", statements: [{ Effect: "Allow", Action: "*" }] },
+    admin: {
+      version: 1,
+      tier: "admin",
+      statements: [{ Effect: "Allow", Action: ["addons:read", "addons:toggle", "addons:remove"] }]
+    }
+  };
+  assert.equal(evaluate({ tier: "admin" }, "addons:toggle", docs), true);
+  assert.equal(evaluate({ tier: "admin" }, "addons:remove", docs), true);
+  assert.equal(evaluate({ tier: "admin" }, "addons:bridge", docs), false, "the bridge must not ride along");
+});
+
+test("addons: install and update keep their existing actions", () => {
+  assert.equal(actionForRoute("/api/addons/community/install", "POST"), "addons:install");
+  assert.equal(actionForRoute("/api/addons/community/update", "POST"), "addons:update");
+});
+
+test("addons: an unclassified mutation fails closed, not to addons:read", () => {
+  for (const method of ["POST", "DELETE"]) {
+    const action = actionForRoute(`/api/addons/installed/${A}/added-later`, method);
+    assert.equal(action, "addons:unclassified");
+    assert.notEqual(action, "addons:read");
+  }
+  assert.equal(actionForRoute(`/api/addons/installed/${A}/content/app.js`, "GET"), "addons:read");
+});
+
+test("addons: no key can reach any addon write, bridge included", () => {
+  // `addons` is write-denied for keys, so none of the new actions are grantable
+  // to one. Asserted here so a future split cannot quietly open that door.
+  for (const [, , action] of ADDON_EXPECTED) {
+    assert.equal(keyAllows({ scopes: { addons: "write" } }, action), false, action);
+  }
+  assert.equal(keyAllows({ scopes: { addons: "read" } }, "addons:read"), true);
+});
+
+// ---- Shared invariants across every split namespace ----
+
+test("no action in a split namespace is a string prefix of another", () => {
+  for (const ns of ["players", "guilds", "blueprints", "addons"]) {
+    const actions = [...allKnownActions()].filter((a) => a.startsWith(`${ns}:`));
+    for (const a of actions) {
+      for (const b of actions) {
+        if (a === b) continue;
+        assert.ok(!b.startsWith(a), `${b} starts with ${a}`);
+      }
+    }
+  }
+});
+
+test("every split namespace kept its unclassified sentinel out of the lower tiers", () => {
+  for (const ns of ["players", "guilds", "blueprints", "addons"]) {
+    for (const tier of ["moderator", "player", "observer"]) {
+      assert.equal(evaluate({ tier }, `${ns}:unclassified`), false, `${tier} ${ns}`);
+    }
+    assert.equal(evaluate({ tier: "owner" }, `${ns}:unclassified`), true, `owner ${ns}`);
+  }
+});
+
+test("no *:mutate action survives anywhere in the catalog", () => {
+  // The four remaining :mutate actions are listed explicitly rather than
+  // asserting "none", so this cannot pass by accident if a split regresses.
+  // Each is a deliberate bucket, not an un-split leftover:
+  //   bases:mutate     refills and permission edits; every destructive base
+  //                    operation is already carved out around it
+  //   vehicles:mutate  roster/custodian/refuel/repair; delete and item removal
+  //                    are already separate
+  //   database:mutate  the structured single-cell row edit, distinct from the
+  //                    raw-SQL database:query / database:execute pair
+  //   storage:mutate   POST /api/storage/{id}/give-item, the only storage write
+  const mutates = [...allKnownActions()].filter((a) => a.endsWith(":mutate")).sort();
+  assert.deepEqual(mutates, ["bases:mutate", "database:mutate", "storage:mutate", "vehicles:mutate"]);
 });

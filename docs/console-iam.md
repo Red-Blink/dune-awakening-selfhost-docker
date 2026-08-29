@@ -84,7 +84,7 @@ The policy API is owner-only under the default policy:
 
 Updates that remove the owner's `settings:write` access are rejected so the local-password recovery path remains available.
 
-## The players and guilds actions
+## The split namespaces
 
 `players:mutate` was one action covering all 41 mutating method+path pairs under `/api/players/` — kick, ban, wipe a character's progression, delete items from their inventory, mint currency, hand out max-level specializations. It was split on 2026-08-29, grouped by consequence:
 
@@ -112,7 +112,22 @@ Updates that remove the owner's `settings:write` access are rejected so the loca
 
 Add and remove stay one action deliberately: two directions of the same roster knob. Both `DELETE` patterns are anchored regexes rather than prefix rules, because `/api/guilds/{id}` and `/api/guilds/{id}/members/{playerId}` share a prefix and the variable segment comes before the part that distinguishes them — the same reason `bases:delete` needs a real regex.
 
-`players:unclassified` is a fail-closed sentinel, not something to grant. The three `POST`/`DELETE`/`PATCH /api/players/` prefix rules resolve to it so that a route nobody has classified yet cannot fall through to the method-agnostic `players:read` fallback and be authorized by a read-only grant. `actionSplits.test.js` asserts no route in `server.js` actually lands on it (`guilds:unclassified` likewise), so a new route fails CI until it is given a real action.
+`blueprints:mutate` and `addons:mutate` were split on the same grounds.
+
+| Action | Covers |
+|---|---|
+| `blueprints:export` | bulk export (`POST /api/blueprints/export`) |
+| `blueprints:import` | import |
+| `blueprints:delete` | delete one blueprint |
+| `addons:remove` | uninstall an installed addon |
+| `addons:toggle` | enable, disable |
+| `addons:bridge` | the manifest-authorized action channel |
+
+Bulk export is read-only in effect — it only reads each blueprint and zips the results, and `GET /api/blueprints/{id}/export` is already `blueprints:read`. It is deliberately **not** folded into `blueprints:read`: one call pulls up to 500 blueprints, so granting read access to the list is not consent to bulk extraction. No existing read grant widens.
+
+`addons:bridge` is separate from lifecycle control because the bridge authorizes against the **installed addon's** declared permission rather than the caller — so "may enable an addon" must not imply "may run whatever that addon declared". API keys cannot reach any addon write regardless: `addons` is write-denied for keys, and the bridge refuses key principals outright.
+
+`players:unclassified` is a fail-closed sentinel, not something to grant. The three `POST`/`DELETE`/`PATCH /api/players/` prefix rules resolve to it so that a route nobody has classified yet cannot fall through to the method-agnostic `players:read` fallback and be authorized by a read-only grant. `actionSplits.test.js` asserts no route in `server.js` actually lands on it (and likewise for `guilds:`, `blueprints:` and `addons:`), so a new route fails CI until it is given a real action.
 
 ## Route maintenance
 

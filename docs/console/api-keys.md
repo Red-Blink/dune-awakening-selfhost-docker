@@ -53,7 +53,7 @@ release is covered by an existing Read grant without every key needing to be re-
 | `vehicles` | `vehicles:read` | `bulk-delete-items`, `delete`, `delete-item`, `mutate` |
 | `guilds` | `guilds:read` | `disband`, `membership`, `rank`, `unclassified` |
 | `storage` | `storage:read` | `mutate` |
-| `blueprints` | `blueprints:read` | `mutate` |
+| `blueprints` | `blueprints:read` | `delete`, `export`, `import`, `unclassified` |
 | `exchange` | `exchange:market`, `exchange:read` | `market-write`, `write-config` |
 | `maps` | `maps:read` | `despawn`, `reconcile`, `restart`, `spawn`, `teleport`, `write-config` |
 | `sietches` | `sietches:read` | `write` |
