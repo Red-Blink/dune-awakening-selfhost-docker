@@ -486,6 +486,9 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   const populationItem = identityCards.find((item) => item.label === "Population");
   const populationWarn = /^warn$/i.test(String(populationItem?.status || ""));
   const populationSegment = isPopulationUnknowable(overall?.value) ? "" : homePopulationSegment(populationItem?.value);
+  // Drives the dot and the reading beside it from one value, so the two can
+  // never disagree about severity.
+  const stateTone = homeStateDotTone(overall?.value, summary.health);
   const identityLine = homeIdentityLine(identityCards);
 
   return (
@@ -512,8 +515,8 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
                   copying it. Whitespace-only text between flex items is not
                   rendered, so this costs nothing visually. */}
               {" "}
-              <span className={`home-state-dot home-state-dot-${homeStateDotTone(overall?.value, summary.health)}`} aria-hidden="true" />
-              <span className="home-hero-state-value">{homeOverallHeading(overall?.value)}</span>
+              <span className={`home-state-dot home-state-dot-${stateTone}`} aria-hidden="true" />
+              <span className={`home-hero-state-value home-hero-state-value-${stateTone}`}>{homeOverallHeading(overall?.value)}</span>
             </div>
             {/* Population is rendered apart from the rest of the line so its
                 WARN can survive: summarizeHomeStatus flags an unreadable count

@@ -681,6 +681,17 @@ describe("HomePanel when the battlegroup is stopped", () => {
     expect(container.querySelector(".home-state-dot")?.className).toContain("home-state-dot-failed");
   });
 
+  // The reading is coloured from the same tone as the dot. Asserting they match
+  // rather than naming the class twice: the point is that they cannot disagree.
+  it("colours the reading to match its dot", async () => {
+    const { container } = renderStopped();
+    await waitFor(() => expect(container.querySelector(".home-state-dot")).toBeTruthy());
+    const dot = container.querySelector(".home-state-dot")?.className || "";
+    const value = container.querySelector(".home-hero-state-value")?.className || "";
+    expect(dot).toContain("home-state-dot-failed");
+    expect(value).toContain("home-hero-state-value-failed");
+  });
+
   // The same override fires for a failed start/restart. Claiming "Stopped"
   // there would be a false statement about what happened.
   it("does not claim stopped when an action merely failed", async () => {

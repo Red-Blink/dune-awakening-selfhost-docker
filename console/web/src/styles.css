@@ -26,10 +26,14 @@
   --danger: #a74949;
   --danger-strong: #8d3434;
   --danger-text: #ffb4a8;
-  /* For small filled indicators only, never text. At 11px --danger-text is a
-     pale salmon not separable from --title's amber (measured side by side), and
-     --danger reads brown on the card background. This is the middle. */
+  /* At 11px --danger-text is a pale salmon not separable from --title's amber
+     (measured side by side), and --danger reads brown on the card background.
+     This is the middle. 4.78:1 on --panel -- the narrowest margin of the tones,
+     so check it first if the surface colour ever changes. */
   --danger-signal: #e05a4f;
+  /* Blue is the palette's informational hue (.badge-info) and the one family
+     that does not blur into the warm chrome. 8.29:1 on --panel. */
+  --state-motion: #85b7eb;
   --warning: #a97932;
   background: var(--bg);
   color: var(--text);
@@ -2158,13 +2162,19 @@ body.debug .technical-details { display: block; }
 .home-state-dot-ok { background: var(--success-text); }
 .home-state-dot-attention { background: var(--title); }
 .home-state-dot-failed { background: var(--danger-signal); }
-/* Blue is already the palette's informational hue (.badge-info) and the one
-   family that does not blur into the warm chrome. */
-.home-state-dot-motion { background: #85b7eb; animation: state-dot-pulse 1.6s ease-in-out infinite; }
+.home-state-dot-motion { background: var(--state-motion); animation: state-dot-pulse 1.6s ease-in-out infinite; }
 /* Dashed vs solid, not just pulsing vs still: prefers-reduced-motion strips the
    animation, which would otherwise make these two identical. */
 .home-state-dot-loading { background: transparent; border: 2px dashed var(--text-subtle); animation: state-dot-pulse 1.6s ease-in-out infinite; }
 .home-state-dot-nodata { background: transparent; border: 2px solid var(--text-subtle); }
+/* The reading takes its dot's colour. At 1.4em bold this is large text, where
+   every tone clears AA on --panel; the dot stays the redundant channel for
+   anyone who cannot separate the hues. */
+.home-hero-state-value-ok { color: var(--success-text); }
+.home-hero-state-value-attention { color: var(--title); }
+.home-hero-state-value-failed { color: var(--danger-signal); }
+.home-hero-state-value-motion { color: var(--state-motion); }
+.home-hero-state-value-loading, .home-hero-state-value-nodata { color: var(--text-subtle); }
 @keyframes state-dot-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: .45; transform: scale(.82); }
