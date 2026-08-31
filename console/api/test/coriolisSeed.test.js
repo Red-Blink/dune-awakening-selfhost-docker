@@ -40,20 +40,20 @@ test("resolveCoriolisCycle parses both the seed and the next cycle's UTC start",
   const runLogs = async () => ({
     stdout: [
       "LogCoriolis: Display: Current Coriolis World Seed: 2",
-      "LogCoriolis: Display: This Coriolis Cycle start date UTC: 2026.08.18-05.00.00",
-      "LogCoriolis: Display: Next Coriolis Cycle start date UTC: 2026.08.25-05.00.00"
+      "LogCoriolis: Display: This Coriolis Cycle start date UTC: 2099.08.18-05.00.00",
+      "LogCoriolis: Display: Next Coriolis Cycle start date UTC: 2099.08.25-05.00.00"
     ].join("\n"),
     stderr: ""
   });
   const result = await resolveCoriolisCycle({ runLogs });
   assert.equal(result.seed, "cor-2");
-  assert.equal(result.nextCycleAt, "2026-08-25T05:00:00.000Z");
+  assert.equal(result.nextCycleAt, "2099-08-25T05:00:00.000Z");
 });
 
 test("resolveCoriolisCycle returns nulls when the container isn't running", async () => {
   const runLogs = async () => { throw new Error("docker logs failed with exit 1"); };
   const result = await resolveCoriolisCycle({ runLogs });
-  assert.deepEqual(result, { seed: null, nextCycleAt: null });
+  assert.deepEqual(result, { seed: null, nextCycleAt: null, staleSince: null });
 });
 
 test("resolveCoriolisCycle returns a null nextCycleAt when only the seed line is present", async () => {
@@ -68,12 +68,12 @@ test("resolveCoriolisCycle falls back to survival-1 when overmap is running but 
   const runLogs = async (service) => {
     seenServices.push(service);
     if (service === "overmap") return { stdout: "some unrelated log line\n", stderr: "" };
-    return { stdout: "Current Coriolis World Seed: 6\nNext Coriolis Cycle start date UTC: 2026.08.25-05.00.00\n", stderr: "" };
+    return { stdout: "Current Coriolis World Seed: 6\nNext Coriolis Cycle start date UTC: 2099.08.25-05.00.00\n", stderr: "" };
   };
   const result = await resolveCoriolisCycle({ runLogs });
   assert.deepEqual(seenServices, ["overmap", "survival-1"]);
   assert.equal(result.seed, "cor-6");
-  assert.equal(result.nextCycleAt, "2026-08-25T05:00:00.000Z");
+  assert.equal(result.nextCycleAt, "2099-08-25T05:00:00.000Z");
 });
 
 test("resolveCoriolisCycle falls back to survival-1 when the overmap container isn't running at all", async () => {
@@ -96,7 +96,7 @@ test("resolveCoriolisCycle does not query past the fixed fallback list", async (
   };
   const result = await resolveCoriolisCycle({ runLogs });
   assert.deepEqual(seenServices, ["overmap", "survival-1"]);
-  assert.deepEqual(result, { seed: null, nextCycleAt: null });
+  assert.deepEqual(result, { seed: null, nextCycleAt: null, staleSince: null });
 });
 
 test("resolveCoriolisCycle stops at overmap and never queries survival-1 when overmap already answers", async () => {
@@ -183,4 +183,55 @@ test("resolveCoriolisCycle ignores malformed partition IDs instead of constructi
   };
   await resolveCoriolisCycle({ map: "DeepDesert", partitionId: "../../59", runLogs });
   assert.deepEqual(seenServices, ["overmap"]);
+});
+
+// Regression: dune2 kept serving cor-2 after the 2026-08-25 boundary because
+// no container had restarted to print seed 3, putting the previous cycle's
+// static pool on the map and filing new-cycle fields under the old seed.
+test("resolveCoriolisCycle drops a seed whose own cycle boundary has already passed", async () => {
+  const runLogs = async () => ({
+    stdout: [
+      "LogCoriolis: Display: Current Coriolis World Seed: 2",
+      "LogCoriolis: Display: Next Coriolis Cycle start date UTC: 2020.01.01-05.00.00"
+    ].join("\n"),
+    stderr: ""
+  });
+  const result = await resolveCoriolisCycle({ runLogs });
+  assert.equal(result.seed, null);
+  assert.equal(result.nextCycleAt, null);
+  assert.equal(result.staleSince, "2020-01-01T05:00:00.000Z");
+});
+
+test("resolveCoriolisCycle keeps a seed whose cycle boundary is still ahead", async () => {
+  const runLogs = async () => ({
+    stdout: [
+      "LogCoriolis: Display: Current Coriolis World Seed: 7",
+      "LogCoriolis: Display: Next Coriolis Cycle start date UTC: 2999.01.01-05.00.00"
+    ].join("\n"),
+    stderr: ""
+  });
+  const result = await resolveCoriolisCycle({ runLogs });
+  assert.equal(result.seed, "cor-7");
+  assert.equal(result.nextCycleAt, "2999-01-01T05:00:00.000Z");
+  assert.equal(result.staleSince, null);
+});
+
+// Nothing to check the seed against, so it has to be passed through -- a
+// self-hoster on a build that doesn't log the boundary line still gets a pool.
+test("resolveCoriolisCycle passes through a seed logged without a cycle boundary", async () => {
+  const runLogs = async () => ({ stdout: "Current Coriolis World Seed: 4\n", stderr: "" });
+  const result = await resolveCoriolisCycle({ runLogs });
+  assert.equal(result.seed, "cor-4");
+  assert.equal(result.staleSince, null);
+});
+
+test("resolveCurrentSeed reports no seed once the logged cycle has expired", async () => {
+  const runLogs = async () => ({
+    stdout: [
+      "Current Coriolis World Seed: 2",
+      "Next Coriolis Cycle start date UTC: 2020.01.01-05.00.00"
+    ].join("\n"),
+    stderr: ""
+  });
+  assert.equal(await resolveCurrentSeed({ runLogs }), null);
 });

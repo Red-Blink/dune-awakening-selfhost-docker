@@ -47,7 +47,7 @@ export const liveMapApi = {
     if (partitionId) params.set("partitionId", partitionId);
     if (!includeStatic) params.set("static", "0");
     const query = params.toString();
-    return api<{ rows: LiveMapMarker[]; overlays: Record<string, string>; capabilities: Record<string, unknown>; map: LiveMapConfig; maps: Record<string, LiveMapConfig>; defaultMap: string; partitions: LiveMapPartition[]; coriolisSeed?: string; coriolisNextCycleAt?: string }>(`/api/map/markers${query ? `?${query}` : ""}`);
+    return api<{ rows: LiveMapMarker[]; overlays: Record<string, string>; capabilities: Record<string, unknown>; map: LiveMapConfig; maps: Record<string, LiveMapConfig>; defaultMap: string; partitions: LiveMapPartition[]; coriolisSeed?: string; coriolisNextCycleAt?: string; coriolisSeedStaleSince?: string }>(`/api/map/markers${query ? `?${query}` : ""}`);
   },
   teleportPlayer: (body: { playerId: string; x: number; y: number; z: number; yaw?: number; partitionId?: number; online?: boolean }) => post<{ ok?: boolean; task?: Task; message?: string; path?: "live" | "offline"; supported?: boolean; reason?: string }>("/api/map/teleport-player", body),
   partitions: () => api<{ rows: LiveMapPartition[] }>("/api/map/partitions"),

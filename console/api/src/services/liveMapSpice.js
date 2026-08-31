@@ -50,7 +50,12 @@ export async function liveMapSpice(db, config, map = "", {
   fetchFlourSandRows = liveMapFlourSandFieldRows,
   persistObservedFields = recordObservedFields
 } = {}) {
-  const { seed: currentSeed, nextCycleAt } = await resolveCycle({ map, partitionId });
+  // staleSince is set when the logged cycle boundary has already passed, i.e.
+  // the world re-rolled but no container has restarted to print the new seed
+  // yet. currentSeed is null in that window, so every static/learned lookup
+  // below short-circuits and nothing is written back -- the map shows only
+  // live active fields rather than the previous cycle's pool.
+  const { seed: currentSeed, nextCycleAt, staleSince } = await resolveCycle({ map, partitionId });
 
   // The archive remains available during lightweight refreshes so active
   // fields still use its ground-truth coordinates; only the static pool rows
@@ -103,6 +108,7 @@ export async function liveMapSpice(db, config, map = "", {
     capabilities: { ...(includeStaticPool ? { spice: poolRows.length > 0 } : {}), spice_active: activeRows.length > 0, flour_sand: flourSandRows.length > 0 },
     currentSeed: currentSeed || "",
     nextCycleAt: nextCycleAt || "",
+    seedStaleSince: staleSince || "",
     generatedAt: archive?.generatedAt || "",
     rows: [...poolRows, ...activeRows, ...flourSandRows]
   };

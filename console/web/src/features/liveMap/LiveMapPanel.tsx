@@ -181,6 +181,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
   const layerSettingsRef = useRef<HTMLDivElement | null>(null);
   const [coriolisSeed, setCoriolisSeed] = useState("");
   const [coriolisNextCycleAt, setCoriolisNextCycleAt] = useState("");
+  const [coriolisSeedStaleSince, setCoriolisSeedStaleSince] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const [subtypeFilters, setSubtypeFilters] = useState<Record<string, Record<string, boolean>>>({});
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
@@ -251,6 +252,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
       setPartitions(result.partitions || []);
       setCoriolisSeed(result.coriolisSeed || "");
       setCoriolisNextCycleAt(result.coriolisNextCycleAt || "");
+      setCoriolisSeedStaleSince(result.coriolisSeedStaleSince || "");
       if (!partitionId) {
         const mapName = result.map?.actorMap || result.map?.key;
         const available = (result.partitions || []).filter((row) => row.map === mapName);
@@ -755,6 +757,12 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
             <div className="key-value-item"><span>Zoom</span><strong>{zoomDisplayPercent}%</strong></div>
             {coriolisSeed && <div className="key-value-item"><span>Coriolis Seed</span><strong>{coriolisSeedNumber(coriolisSeed)}</strong></div>}
             {coriolisNextCycleAt && <div className="key-value-item"><span>Coriolis Countdown</span><strong>{formatCoriolisCountdown(coriolisNextCycleAt, now)}</strong></div>}
+            {/* The seed is only printed at container startup, so between a
+                Coriolis boundary and the next restart the server can't know
+                which seed is live. Static Spice Spawns is suppressed in that
+                window rather than showing the previous cycle's pool -- say so,
+                otherwise the empty layer reads as a bug. */}
+            {coriolisSeedStaleSince && <div className="key-value-item"><span>Coriolis Seed</span><strong title={`Cycle rolled over at ${coriolisSeedStaleSince}; the new seed is only logged when the map server restarts.`}>Awaiting restart</strong></div>}
           </div>
         </div>
       </div>

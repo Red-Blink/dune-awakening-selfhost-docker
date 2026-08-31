@@ -1465,6 +1465,7 @@ async function liveMapMarkersRoute(res, url) {
       // overmap/survival-1 default.
       coriolisSeed: spice.currentSeed || "",
       coriolisNextCycleAt: spice.nextCycleAt || "",
+      coriolisSeedStaleSince: spice.seedStaleSince || "",
       partitions: partitions.rows || []
     };
   });

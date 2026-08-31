@@ -246,3 +246,37 @@ test("persistObservedFields is not called when the current seed can't be resolve
   await liveMapSpice(null, config, "DeepDesert", { resolveCycle: async () => ({ seed: null, nextCycleAt: null }), fetchLiveRows: noLiveRows, fetchFlourSandRows: noFlourSandRows, persistObservedFields });
   assert.equal(calls.length, 0);
 });
+
+// End-to-end guard for the dune2 regression: once resolveCoriolisCycle
+// reports the logged seed as expired it hands back a null seed plus
+// staleSince, and none of the previous cycle's pool may survive that.
+test("an expired Coriolis seed serves no static pool and records nothing", async () => {
+  const config = configWithArchive(SAMPLE_ARCHIVE);
+  const persisted = [];
+  const liveRows = async () => ({ rows: [{ field_id: "5007190163237080", size: "Large", map: "DeepDesert", partition_id: 59 }] });
+  const result = await liveMapSpice(null, config, "DeepDesert", {
+    resolveCycle: async () => ({ seed: null, nextCycleAt: null, staleSince: "2026-08-25T11:00:00.000Z" }),
+    fetchLiveRows: liveRows,
+    fetchFlourSandRows: noFlourSandRows,
+    persistObservedFields: (file, seed, fields) => persisted.push({ seed, fields })
+  });
+  assert.equal(result.currentSeed, "");
+  assert.equal(result.seedStaleSince, "2026-08-25T11:00:00.000Z");
+  assert.equal(result.rows.filter((r) => r.type === "spice").length, 0);
+  assert.equal(result.capabilities.spice, false);
+  // Active fields still render -- they come from Postgres, not the seed.
+  assert.equal(result.rows.filter((r) => r.type === "spice_active").length, 1);
+  assert.deepEqual(persisted, []);
+});
+
+test("a live seed still reports no staleSince", async () => {
+  const config = configWithArchive(SAMPLE_ARCHIVE);
+  const result = await liveMapSpice(null, config, "DeepDesert", {
+    resolveCycle: async () => ({ seed: "cor-2", nextCycleAt: "2999-01-01T05:00:00.000Z", staleSince: null }),
+    fetchLiveRows: noLiveRows,
+    fetchFlourSandRows: noFlourSandRows,
+    persistObservedFields: noPersist
+  });
+  assert.equal(result.seedStaleSince, "");
+  assert.equal(result.rows.filter((r) => r.type === "spice").length, 2);
+});

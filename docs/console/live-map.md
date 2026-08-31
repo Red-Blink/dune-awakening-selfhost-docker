@@ -158,6 +158,42 @@ container names are built from the map/partition
 farm-wide `overmap`/`survival-1` default) and re-validated against the same
 allowlist regex the rest of the console's Docker-log access uses.
 
+### Why a stale seed suppresses the static pool
+
+The seed line is only printed **at container startup**, but the Deep Desert
+world re-rolls at every weekly Coriolis boundary whether or not anything
+restarts. Between a boundary and the next restart the logs therefore still
+advertise the *previous* cycle's seed, and taking that at face value put the
+previous cycle's spice pool on the map -- observed on a live server, where
+fields first seen the day after a boundary were filed under the old seed and
+39% of them later reappeared under the new one (against a 2% baseline overlap
+between genuinely different seeds).
+
+The same log block also prints when the cycle ends, so a boundary that is
+already in the past is proof the logged seed is stale. `resolveCoriolisCycle()`
+treats that seed as **unknown** rather than trusting it: it returns a null seed
+plus a `staleSince` timestamp, which makes every archive and learned-pool
+lookup short-circuit and suppresses the write-back. *Static Spice Spawns*
+therefore disappears until the map server restarts and prints the new seed,
+while *Active Spice Blows* and *Flour Sand* keep working -- they read Postgres
+and never depend on the seed. The Overview strip shows `Coriolis Seed:
+Awaiting restart` during that window so the empty layer does not read as a bug.
+
+A log block that carries a seed but no boundary line is passed through
+unchanged; there is nothing to check it against.
+
+**Anything keyed into a static file must carry the seed it belongs to.** Both
+spice files are keyed `seeds["cor-<n>"]`, and neither is read or written when
+the seed is unknown.
+
+This includes Hagga Basin, whose resources also move at a Coriolis -- so its
+learned entries are keyed by the Deep Desert seed and relearned each cycle by
+design. Measured across one boundary on a live server, Deep Desert re-rolled
+95% of its positions while Hagga Basin's mostly recurred (only 8% new), which
+makes the relearn look redundant for Hagga Basin -- it is not. Some Hagga Basin
+positions genuinely are new each cycle, and there is no way to tell a recurring
+one from a moved one after the fact, so the keying stays conservative.
+
 ## Player teleport
 
 Dragging an **online** player marker previews a new position; releasing

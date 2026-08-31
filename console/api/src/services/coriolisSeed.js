@@ -13,6 +13,12 @@ const SEED_LINE = /Current Coriolis World Seed:\s*(\d+)/;
 // "LogCoriolis: Display: Next Coriolis Cycle start date UTC: 2026.08.25-05.00.00".
 const NEXT_CYCLE_LINE = /Next Coriolis Cycle start date UTC:\s*(\d{4})\.(\d{2})\.(\d{2})-(\d{2})\.(\d{2})\.(\d{2})/;
 
+function toIso(match) {
+  if (!match) return null;
+  const [, y, mo, d, h, mi, s] = match;
+  return new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s))).toISOString();
+}
+
 // "overmap" is checked first since it's the cheapest single container to
 // ask and normally always running, but its map mode can be set to
 // "disabled" (see config.js), in which case it never logs anything --
@@ -73,14 +79,39 @@ function parseCoriolisLog(combined) {
   if (combined === null) return { seed: null, nextCycleAt: null };
   const lines = combined.split(/\r?\n/);
   const seedMatch = lastMatch(lines, SEED_LINE);
-  const nextCycleMatch = lastMatch(lines, NEXT_CYCLE_LINE);
-  const [, y, mo, d, h, mi, s] = nextCycleMatch || [];
-  const nextCycleAt = nextCycleMatch ? new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s))).toISOString() : null;
-  return { seed: seedMatch ? `cor-${seedMatch[1]}` : null, nextCycleAt };
+  return {
+    seed: seedMatch ? `cor-${seedMatch[1]}` : null,
+    nextCycleAt: toIso(lastMatch(lines, NEXT_CYCLE_LINE))
+  };
 }
 
 export async function resolveCurrentSeed(options = {}) {
   return (await resolveCoriolisCycle(options)).seed;
+}
+
+// The seed line only prints at container startup, but the Deep Desert world
+// re-rolls at every weekly Coriolis boundary whether or not anything
+// restarts. Between a boundary and the next restart the logs therefore still
+// advertise the *previous* cycle's seed -- confirmed live on dune2, where
+// fields observed the day after the 2026-08-25 boundary were filed under
+// cor-2 and 39% of them later reappeared under cor-3 (against a 2% baseline
+// overlap between genuinely different seeds). Serving that stale seed puts
+// the previous cycle's static pool on the map and poisons the learned pool
+// with the new cycle's fields.
+//
+// The same log block tells us when the seed expires, so a cycle boundary
+// already in the past is proof the logged seed is stale. Treat it as unknown
+// rather than wrong: callers already handle a null seed by dropping the
+// static-pool layer and skipping the learned-pool write, so the map falls
+// back to live active fields only until the container restarts and prints
+// the new seed. When the log has a seed but no boundary line there is
+// nothing to check it against, so it is passed through unchanged.
+function applyCycleExpiry(resolved, now) {
+  const expiresAt = resolved.nextCycleAt ? Date.parse(resolved.nextCycleAt) : NaN;
+  if (Number.isFinite(expiresAt) && expiresAt <= now) {
+    return { seed: null, nextCycleAt: null, staleSince: resolved.nextCycleAt };
+  }
+  return { ...resolved, staleSince: null };
 }
 
 // One combined resolver so a single cached `docker logs` result covers both
@@ -99,7 +130,10 @@ export async function resolveCoriolisCycle({ map, partitionId, services, ...opti
   const cacheKey = candidates.join("\u0000");
   const now = Date.now();
   const cached = cacheable ? cycleCache.get(cacheKey) : null;
-  if (cached && cached.expiresAt > now) return cached.value;
+  // The cache holds the raw parse and expiry is re-evaluated on every read,
+  // so an entry cached seconds before a boundary can't serve a seed that has
+  // since expired.
+  if (cached && cached.expiresAt > now) return applyCycleExpiry(cached.value, now);
 
   let resolved = { seed: null, nextCycleAt: null };
   for (const service of candidates) {
@@ -118,5 +152,5 @@ export async function resolveCoriolisCycle({ map, partitionId, services, ...opti
     }
     cycleCache.set(cacheKey, { expiresAt: now + CYCLE_CACHE_MS, value: resolved });
   }
-  return resolved;
+  return applyCycleExpiry(resolved, now);
 }
