@@ -3,6 +3,16 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  // Terrain assets ship pre-gzipped and are inflated in the browser, so Vite
+  // must hash and copy them rather than parse them; ?url imports fail without it.
+  assetsInclude: ["**/*.gz"],
+  build: {
+    // The gzipped layout sidecars are ~1.6 KB, under Vite's 4 KB inline limit,
+    // so they would otherwise be inlined into the main bundle and re-downloaded
+    // by every user whenever any one layout is rebuilt. Note: under `build`,
+    // unlike `assetsInclude` above.
+    assetsInlineLimit: (file: string) => (file.endsWith(".gz") ? false : undefined)
+  },
   test: {
     environment: "jsdom",
     // Off by default (no test currently imports a stylesheet). Needed so

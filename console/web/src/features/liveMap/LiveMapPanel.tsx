@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Settings } from "lucide-react";
 import { liveMapApi, type LiveMapConfig, type LiveMapMarker, type LiveMapPartition } from "../../api/liveMap";
 import { mapsApi } from "../../api/maps";
@@ -7,6 +7,39 @@ import { DataTable } from "../../components/common/DataTable";
 import { KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/common/DisplayPrimitives";
 import { firstDefined, formatUiSentence, titleCase } from "../../lib/display";
 import { friendlyInlineError } from "../players/playerAdminUtils";
+import {
+  clampLiveMapZoom,
+  liveMapMinimumZoom,
+  liveMapPixelsToWorld,
+  MAX_LIVE_MAP_ZOOM,
+  visibleWorldRect,
+  worldToLiveMapPoint,
+  type LiveMapPoint
+} from "./liveMapGeometry";
+import { labelAnchorInView, sectorGridFor } from "./liveMapSectorGrid";
+
+// On-screen size of a sector label, in CSS pixels. The SVG is drawn in map-pixel
+// space and scaled by zoom, so the font size is divided back out to keep it
+// constant rather than growing with the map -- at maximum zoom a label sized in
+// viewBox units alone would render around 368px tall.
+const SECTOR_LABEL_PX = 15;
+// Layouts 0-11 are the twelve whose meshes are bundled. The API deliberately
+// reports higher numbers rather than nulling them, so the console has to say
+// plainly that it cannot draw one instead of implying it did.
+const SHIPPED_LAYOUTS = 12;
+// The Overview strip is a narrow grid cell. The reasons produced in this file
+// and by the support probe are already short, but an asset failure carries
+// whatever the browser threw -- a hashed URL and a status code -- which would
+// wrap to several lines and double the strip's height. The full text stays in
+// the title attribute.
+const TERRAIN_REASON_MAX = 28;
+function shortTerrainReason(reason: string): string {
+  return reason.length <= TERRAIN_REASON_MAX ? reason : `${reason.slice(0, TERRAIN_REASON_MAX - 1).trimEnd()}…`;
+}
+
+// Lazily loaded so a Hagga Basin user never downloads the WebGL renderer or the
+// asset-URL table that comes with it.
+const DeepDesertTerrain = lazy(() => import("./terrain/DeepDesertTerrain"));
 import {
   clearDefaultLayerFilters,
   clearDefaultSubtypeLayerFilters,
@@ -30,10 +63,8 @@ const GATED_LAYER_KEYS = new Set(["spice", "spice_active", "flour_sand", "ore", 
 const EXPANDABLE_KEYS = new Set(["spice", "spice_active", "ore", "scrap", "flora", "poi", "house_representative", "trainer", "fortress", "hazard", "enemy", "vehicle"]);
 // Zoom was capped at 100% (1 map-pixel-unit == 1 CSS pixel), too tight for
 // precise marker/teleport placement.
-const MAX_LIVE_MAP_ZOOM = 4;
 // Minimum zoom is exactly the "contain" fit (the whole map visible, no
 // scrollbar) -- 1 means no extra shrink past that; see liveMapMinimumZoom.
-const MIN_ZOOM_FIT_FACTOR = 1;
 // The live map's own map identifiers ("HaggaBasin"/"DeepDesert") aren't the
 // instance names /api/maps/combat-state expects ("Survival_1"/"DeepDesert_1")
 // -- same translation liveMapPartitions() does server-side, in reverse.
@@ -182,6 +213,27 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
   const [coriolisSeed, setCoriolisSeed] = useState("");
   const [coriolisNextCycleAt, setCoriolisNextCycleAt] = useState("");
   const [coriolisSeedStaleSince, setCoriolisSeedStaleSince] = useState("");
+  // Which of the Deep Desert's 12 cartography layouts this Coriolis cycle
+  // selected, or null when it could not be read from the server logs -- which
+  // includes the window after a cycle boundary, when the logged layout belongs
+  // to the previous rotation (see coriolisSeed.js).
+  const [coriolisLayout, setCoriolisLayout] = useState<number | null>(null);
+  // Set once the terrain reports it cannot draw. Sticky for the session so a
+  // failing GPU is not retried on every poll.
+  const [terrainUnavailable, setTerrainUnavailable] = useState("");
+  // On by default: the rendered terrain has no grid of its own, and relating a
+  // marker to a sector is the common case. In the flat-image fallback this sits
+  // over the grid burned into the picture, which is drawn at that image's own
+  // mis-scaled extent -- the overlay is the one that agrees with the markers.
+  const [showSectorGrid, setShowSectorGrid] = useState(true);
+  // The canvas mounts empty and paints only once ~7 MB of assets are in, so the
+  // flat image stays up until it reports itself ready. Dropping the image when
+  // the lazy chunk resolved left a window showing neither.
+  //
+  // Which map and layout went ready, not a bare boolean: a child's effect runs
+  // before its parent's, so an effect here that reset the flag on a layout
+  // change would undo the readiness the child had just reported.
+  const [readyTerrainKey, setReadyTerrainKey] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [subtypeFilters, setSubtypeFilters] = useState<Record<string, Record<string, boolean>>>({});
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
@@ -211,6 +263,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
   const [teleportPickerPlayerId, setTeleportPickerPlayerId] = useState("");
   const frameRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  const sectorLabelsRef = useRef<SVGGElement | null>(null);
   const zoomAnchorRef = useRef<{ mapX: number; mapY: number; viewportX: number; viewportY: number } | null>(null);
   const liveMapDraggingPlayerRef = useRef(false);
   const pendingPlayerTeleportsRef = useRef<Record<string, { x: number; y: number; z: number; partitionId: number; expiresAt: number }>>({});
@@ -253,9 +306,15 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
       setCoriolisSeed(result.coriolisSeed || "");
       setCoriolisNextCycleAt(result.coriolisNextCycleAt || "");
       setCoriolisSeedStaleSince(result.coriolisSeedStaleSince || "");
-      if (!partitionId) {
-        const mapName = result.map?.actorMap || result.map?.key;
-        const available = (result.partitions || []).filter((row) => row.map === mapName);
+      setCoriolisLayout(typeof result.coriolisLayout === "number" ? result.coriolisLayout : null);
+      const mapName = result.map?.actorMap || result.map?.key;
+      const available = (result.partitions || []).filter((row) => row.map === mapName);
+      // Re-pick when nothing is selected OR when the selection is not one of
+      // this map's partitions. There is no neutral "All Partitions" entry to
+      // fall back to any more, so a stale id would leave the select displaying
+      // one partition while the markers were filtered by another.
+      const selectionIsValid = partitionId && available.some((row) => String(row.partition_id) === partitionId);
+      if (!selectionIsValid) {
         const preferred = available.find((row) => String(row.partition_id) === String(result.map?.defaultPartitionId)) || available[0];
         if (preferred) setPartitionId(String(preferred.partition_id));
       }
@@ -417,6 +476,85 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
   const targetPoint = target && activeMap ? worldToLiveMapPoint({ x: target.x, y: target.y }, activeMap) : null;
   const minimumZoom = liveMapMinimumZoom(activeMap, frameRef.current);
   const zoomMinPercent = Math.round(minimumZoom * 100);
+  // The rendered terrain is an upgrade over the flat image, never a replacement:
+  // anything missing here just means the image is used, with no error state.
+  //
+  // One expression decides both whether to draw terrain and what the readout
+  // says, because as two they disagreed: the API caps the layout at 63 so that a
+  // future Layout_12 is reported truthfully, the render gate stops at the eleven
+  // that ship, and the readout consulted neither -- so an unshipped layout drew
+  // the flat image while announcing "layout 12".
+  const terrainFallback = activeMap?.key !== "DeepDesert" ? null
+    : coriolisLayout === null ? "layout unknown"
+      : !(Number.isInteger(coriolisLayout) && coriolisLayout >= 0 && coriolisLayout <= SHIPPED_LAYOUTS - 1)
+        ? `layout ${coriolisLayout} not shipped`
+        : terrainUnavailable || null;
+  const terrainEligible = Boolean(activeMap?.key === "DeepDesert" && !terrainFallback);
+  // Stable identity: the terrain effects depend on this, and a new function each
+  // render would tear the WebGL context down and rebuild it on every poll.
+  const handleTerrainUnavailable = useCallback((reason: string) => {
+    setTerrainUnavailable(reason || "unavailable");
+  }, []);
+  const terrainKeyRef = useRef<string>("");
+  const handleTerrainReady = useCallback(() => setReadyTerrainKey(terrainKeyRef.current), []);
+  // Pixel-space geometry, so it scales and scrolls with the markers rather than
+  // being recomputed per frame. Memoised on identity, not just rebuilt cheaply:
+  // the label effect below depends on it, so a fresh object each render would
+  // tear down and re-add the scroll listener and the ResizeObserver on every
+  // marker hover and every five-second poll.
+  const terrainKey = `${activeMap?.key || ""}:${coriolisLayout ?? ""}`;
+  terrainKeyRef.current = terrainKey;
+  const terrainReady = readyTerrainKey === terrainKey;
+  const sectorGrid = useMemo(() => (activeMap ? sectorGridFor(activeMap) : null), [activeMap]);
+  // Keep each sector label inside the visible part of its own cell. Above about
+  // 2x zoom a 250,000 uu cell is wider than the frame, so a label pinned to the
+  // cell's true centre scrolls out of view and the grid stops answering the one
+  // question it exists for. Positions are written straight to the DOM rather
+  // than through state: this runs on every scroll frame, and re-rendering 81
+  // text nodes each time is not worth it.
+  useEffect(() => {
+    const frame = frameRef.current;
+    const group = sectorLabelsRef.current;
+    if (!frame || !group || !showSectorGrid || !sectorGrid || !terrainEligible) return;
+    let queued = 0;
+    const place = () => {
+      queued = 0;
+      const view = {
+        left: frame.scrollLeft / zoom,
+        top: frame.scrollTop / zoom,
+        right: (frame.scrollLeft + frame.clientWidth) / zoom,
+        bottom: (frame.scrollTop + frame.clientHeight) / zoom
+      };
+      const padding = (SECTOR_LABEL_PX * 1.6) / zoom;
+      const nodes = group.childNodes;
+      sectorGrid.labels.forEach((label, index) => {
+        const node = nodes[index] as SVGTextElement | undefined;
+        if (!node) return;
+        const anchor = labelAnchorInView(label, view, padding);
+        if (!anchor) {
+          node.style.display = "none";
+          return;
+        }
+        node.style.display = "";
+        node.setAttribute("x", String(anchor.px));
+        node.setAttribute("y", String(anchor.py));
+      });
+    };
+    const schedule = () => {
+      if (queued) return;
+      queued = requestAnimationFrame(place);
+    };
+    place();
+    frame.addEventListener("scroll", schedule, { passive: true });
+    const observer = new ResizeObserver(schedule);
+    observer.observe(frame);
+    return () => {
+      frame.removeEventListener("scroll", schedule);
+      observer.disconnect();
+      if (queued) cancelAnimationFrame(queued);
+    };
+  }, [showSectorGrid, sectorGrid, zoom, terrainEligible]);
+
   const zoomMaxPercent = Math.round(MAX_LIVE_MAP_ZOOM * 100);
   const zoomValuePercent = Math.round(zoom * 100);
   const zoomProgressPercent = Math.max(0, Math.min(100, ((zoomValuePercent - zoomMinPercent) / Math.max(1, zoomMaxPercent - zoomMinPercent)) * 100));
@@ -746,7 +884,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
           </div>
           <label className="live-map-view-field live-map-partition-field">
             <span className="live-map-view-label">Partition</span>
-            <select value={partitionId} onChange={(event) => setPartitionId(event.target.value)}><option value="">All Partitions</option>{partitionOptions.map((row) => <option key={`${row.map}-${row.partition_id}`} value={String(row.partition_id)}>{partitionDisplayNames[String(row.partition_id)] || row.name || "Partition"} [{row.partition_id}] ({row.marker_count})</option>)}</select>
+            <select value={partitionId} onChange={(event) => setPartitionId(event.target.value)}>{partitionOptions.length === 0 && <option value="">No partitions available</option>}{partitionOptions.map((row) => <option key={`${row.map}-${row.partition_id}`} value={String(row.partition_id)}>{partitionDisplayNames[String(row.partition_id)] || row.name || "Partition"} [{row.partition_id}] ({row.marker_count})</option>)}</select>
           </label>
         </div>
         <div className="live-map-view-summary">
@@ -756,6 +894,9 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
             <div className="key-value-item"><span>In Bounds</span><strong>{inBounds.length}</strong></div>
             <div className="key-value-item"><span>Zoom</span><strong>{zoomDisplayPercent}%</strong></div>
             {coriolisSeed && <div className="key-value-item"><span>Coriolis Seed</span><strong>{coriolisSeedNumber(coriolisSeed)}</strong></div>}
+            {activeMap?.key === "DeepDesert" && <div className="key-value-item"><span>Terrain</span><strong title={terrainFallback ? `Showing the flat map: ${terrainFallback}` : undefined}>{
+              terrainFallback ? `flat map (${shortTerrainReason(terrainFallback)})` : `layout ${coriolisLayout}`
+            }</strong></div>}
             {coriolisNextCycleAt && <div className="key-value-item"><span>Coriolis Countdown</span><strong>{formatCoriolisCountdown(coriolisNextCycleAt, now)}</strong></div>}
             {/* The seed is only printed at container startup, so between a
                 Coriolis boundary and the next restart the server can't know
@@ -774,7 +915,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
             <h4>Coordinates</h4>
             <button type="button" className="live-map-coordinates-clear" disabled={!target} onClick={() => setTarget(null)}>Clear</button>
           </div>
-          {target ? <KeyValueGrid items={[["X", target.x.toFixed(0)], ["Y", target.y.toFixed(0)], ["Partition", partitionId || "All"]]} /> : <p className="muted">Double-click the map to pick world coordinates.</p>}
+          {target ? <KeyValueGrid items={[["X", target.x.toFixed(0)], ["Y", target.y.toFixed(0)], ["Partition", partitionId || "none selected"]]} /> : <p className="muted">Double-click the map to pick world coordinates.</p>}
         </section>
         <section className="action-section">
           <div className="live-map-layers-header" ref={layerSettingsRef}>
@@ -1028,6 +1169,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
           <button onClick={() => setZoomAround(zoom * 1.18)}>Zoom In</button>
           <button onClick={() => setZoomAround(zoom * 0.84)}>Zoom Out</button>
           <button onClick={fitLiveMapView}>Fit Map</button>
+          {terrainEligible && <button aria-pressed={showSectorGrid} className={showSectorGrid ? "active" : ""} onClick={() => setShowSectorGrid((on) => !on)}>Sector Grid</button>}
           <label>Zoom<input className="live-map-zoom-range" type="range" min={zoomMinPercent} max={zoomMaxPercent} value={zoomValuePercent} style={{ "--zoom-progress": `${zoomProgressPercent}%` } as React.CSSProperties} onChange={(event) => setZoomAround(Number(event.target.value) / 100)} /></label>
           <span className="muted">Drag to Pan. Mouse Wheel Zooms.</span>
         </div>
@@ -1040,7 +1182,22 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
           onMouseLeave={() => setDrag(null)}>
           {switching && <div className="live-map-loading-overlay"><span className="spinner" aria-hidden="true" /><strong className="loading-dots">Loading Map</strong></div>}
           {activeMap ? <div className="live-map-canvas" ref={canvasRef} style={{ width: Math.floor(activeMap.width * zoom), height: Math.floor(activeMap.height * zoom) }}>
-            {activeMap.image ? <img className="live-map-image" src={activeMap.image} alt={activeMap.label} draggable={false} /> : <div className="live-map-placeholder">{activeMap.label}</div>}
+            {terrainEligible
+              ? <>
+                  {!terrainReady && activeMap.image && <img className="live-map-image" src={activeMap.image} alt={activeMap.label} draggable={false} />}
+                  <Suspense fallback={null}>
+                    <DeepDesertTerrain config={activeMap} layout={coriolisLayout as number} zoom={zoom} frameRef={frameRef} onUnavailable={handleTerrainUnavailable} onReady={handleTerrainReady} />
+                  </Suspense>
+                </>
+              : activeMap.image ? <img className="live-map-image" src={activeMap.image} alt={activeMap.label} draggable={false} /> : <div className="live-map-placeholder">{activeMap.label}</div>}
+            {showSectorGrid && sectorGrid && terrainEligible && <svg className="live-map-sector-grid" viewBox={`0 0 ${activeMap.width} ${activeMap.height}`} width={Math.floor(activeMap.width * zoom)} height={Math.floor(activeMap.height * zoom)} aria-hidden="true">
+              <g className="lines">
+                {sectorGrid.lines.map((line, index) => <line key={index} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} className={line.edge ? "edge" : ""} />)}
+              </g>
+              <g className="labels" ref={sectorLabelsRef}>
+                {sectorGrid.labels.map((label) => <text key={label.text} x={label.px} y={label.py} fontSize={SECTOR_LABEL_PX / Math.max(zoom, 0.01)}>{label.text}</text>)}
+              </g>
+            </svg>}
             <div className="live-map-marker-layer">
               {targetPoint && <span className="live-map-target" style={{ left: `${targetPoint.px * zoom}px`, top: `${targetPoint.py * zoom}px` }} />}
               {inBounds.map(({ marker, point }, index) => {
@@ -1123,7 +1280,6 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
   </section>;
 }
 
-type LiveMapPoint = { px: number; py: number; inBounds: boolean };
 
 export function mergeLiveMapRows(previous: LiveMapMarker[], incoming: LiveMapMarker[], includeStatic: boolean, mapName = "") {
   if (includeStatic) return incoming;
@@ -1131,20 +1287,6 @@ export function mergeLiveMapRows(previous: LiveMapMarker[], incoming: LiveMapMar
   return [...retainedStatic, ...incoming];
 }
 
-function worldToLiveMapPoint(marker: Pick<LiveMapMarker, "x" | "y">, config: LiveMapConfig): LiveMapPoint | null {
-  const x = Number(marker.x);
-  const y = Number(marker.y);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-  if (config.maxX === config.minX || config.maxY === config.minY) return null;
-  const px = ((x - config.minX) / (config.maxX - config.minX)) * config.width;
-  let py = ((y - config.minY) / (config.maxY - config.minY)) * config.height;
-  if (config.flipY) py = config.height - py;
-  return {
-    px,
-    py,
-    inBounds: px >= 0 && px <= config.width && py >= 0 && py <= config.height
-  };
-}
 
 // The overlay's own CSS defaults to centered-below the icon, but that
 // clips against .live-map-frame's overflow:hidden near an edge. These are
@@ -1170,31 +1312,8 @@ function overlayAnchorClasses(renderPoint: LiveMapPoint, zoom: number, frame: HT
   return classes.join(" ");
 }
 
-function liveMapPixelsToWorld(px: number, py: number, config: LiveMapConfig) {
-  if (!Number.isFinite(px) || !Number.isFinite(py) || config.width === 0 || config.height === 0) return null;
-  let normalizedY = py / config.height;
-  if (config.flipY) normalizedY = 1 - normalizedY;
-  return {
-    x: config.minX + (px / config.width) * (config.maxX - config.minX),
-    y: config.minY + normalizedY * (config.maxY - config.minY)
-  };
-}
 
-function liveMapMinimumZoom(config: LiveMapConfig | null | undefined, frame: HTMLElement | null) {
-  if (!config || !frame) return 0.16;
-  // Math.min, not Math.max -- this needs to be a "contain" fit (the whole
-  // map visible, letterboxed on the shorter axis) so the fully-zoomed-out
-  // view never overflows the frame and forces a scrollbar. Math.max would
-  // "cover" the frame instead, cropping whichever axis has the smaller
-  // required ratio.
-  const fitRatio = Math.min(frame.clientWidth / config.width, frame.clientHeight / config.height);
-  return Math.max(0.02, fitRatio * MIN_ZOOM_FIT_FACTOR);
-}
 
-function clampLiveMapZoom(value: number, minimum = 0.16) {
-  if (!Number.isFinite(value)) return minimum;
-  return Math.max(minimum, Math.min(MAX_LIVE_MAP_ZOOM, value));
-}
 
 function countMarkers(markers: LiveMapMarker[]) {
   return markers.reduce<Record<string, number>>((acc, marker) => {

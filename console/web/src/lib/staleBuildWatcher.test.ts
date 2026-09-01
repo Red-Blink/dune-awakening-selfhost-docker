@@ -123,3 +123,105 @@ describe("useStaleBuildWatcher", () => {
     expect(fetchVersion).not.toHaveBeenCalled();
   });
 });
+
+describe("useStaleBuildWatcher returning to a tab", () => {
+  function setVisibility(state: "visible" | "hidden") {
+    Object.defineProperty(document, "visibilityState", { value: state, configurable: true });
+  }
+  // A controllable clock, so the focus throttle is deterministic rather than
+  // dependent on how long the test itself takes.
+  function clockFrom(start = 0) {
+    let value = start;
+    return { now: () => value, tick: (ms: number) => { value += ms; } };
+  }
+  // Flush microtasks WITHOUT advancing timers: running pending timers would
+  // fire the 120s poll and reload anyway, so the focus path would prove nothing.
+  const settle = () => vi.advanceTimersByTimeAsync(0);
+
+  afterEach(() => setVisibility("visible"));
+
+  it("rechecks on return instead of waiting out the poll interval", async () => {
+    const reload = vi.fn();
+    const { fetchVersion, advance } = versionSource("v1.0.0:aaa", "v1.0.0:bbb");
+    const clock = clockFrom();
+    renderHook(() => useStaleBuildWatcher({ fetchVersion, reload, storage: memoryStorage(), now: clock.now }));
+    await settle();
+    advance();                       // the console was rebuilt while the tab sat in the background
+    clock.tick(10_000);              // far short of the 120s poll
+    setVisibility("visible");
+    document.dispatchEvent(new Event("visibilitychange"));
+    await settle();
+
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores the event when the tab is being hidden rather than shown", async () => {
+    const reload = vi.fn();
+    const { fetchVersion, advance } = versionSource("v1.0.0:aaa", "v1.0.0:bbb");
+    const clock = clockFrom();
+    renderHook(() => useStaleBuildWatcher({ fetchVersion, reload, storage: memoryStorage(), now: clock.now }));
+    await settle();
+    advance();
+    clock.tick(10_000);
+    setVisibility("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    await settle();
+
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it("throttles a burst of focus events into a single check", async () => {
+    const reload = vi.fn();
+    const { fetchVersion } = versionSource("v1.0.0:aaa");
+    const clock = clockFrom();
+    renderHook(() => useStaleBuildWatcher({ fetchVersion, reload, storage: memoryStorage(), now: clock.now }));
+    await settle();
+    // Count from after the baseline is established: the mounting effect's async
+    // body can run more than once under fake timers, which would make an
+    // absolute call count meaningless.
+    const baseline = fetchVersion.mock.calls.length;
+    clock.tick(10_000);
+    setVisibility("visible");
+    window.dispatchEvent(new Event("focus"));
+    window.dispatchEvent(new Event("focus"));
+    window.dispatchEvent(new Event("focus"));
+    await settle();
+
+    expect(fetchVersion.mock.calls.length - baseline).toBe(1);
+  });
+
+  it("checks again once the throttle window has passed", async () => {
+    const reload = vi.fn();
+    const { fetchVersion } = versionSource("v1.0.0:aaa");
+    const clock = clockFrom();
+    renderHook(() => useStaleBuildWatcher({ fetchVersion, reload, storage: memoryStorage(), now: clock.now }));
+    await settle();
+    const baseline = fetchVersion.mock.calls.length;
+    setVisibility("visible");
+    clock.tick(10_000);
+    window.dispatchEvent(new Event("focus"));
+    await settle();
+    clock.tick(10_000);
+    window.dispatchEvent(new Event("focus"));
+    await settle();
+
+    expect(fetchVersion.mock.calls.length - baseline).toBe(2);
+  });
+
+  it("stops listening once unmounted", async () => {
+    const reload = vi.fn();
+    const { fetchVersion, advance } = versionSource("v1.0.0:aaa", "v1.0.0:bbb");
+    const clock = clockFrom();
+    const view = renderHook(() => useStaleBuildWatcher({ fetchVersion, reload, storage: memoryStorage(), now: clock.now }));
+    await settle();
+    view.unmount();
+    advance();
+    clock.tick(10_000);
+    setVisibility("visible");
+    document.dispatchEvent(new Event("visibilitychange"));
+    window.dispatchEvent(new Event("focus"));
+    await settle();
+
+    expect(reload).not.toHaveBeenCalled();
+  });
+});

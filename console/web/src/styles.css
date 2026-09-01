@@ -2815,9 +2815,45 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 .live-map-frame.dragging { cursor: grabbing; user-select: none; }
 .live-map-frame.dragging-player { cursor: grabbing; user-select: none; }
 .live-map-canvas { position: relative; background: #101316; }
-.live-map-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; user-select: none; pointer-events: none; }
+.live-map-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; user-select: none; pointer-events: none; z-index: 0; }
+/* The terrain canvas covers the frame's viewport, not the scaled map: at
+   maximum zoom the map is 16384px, beyond MAX_TEXTURE_SIZE on many GPUs. It is
+   translated to follow the scrollport on every scroll, so it stays put while
+   the markers above it move with the content. */
+.live-map-terrain {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  display: block;
+  pointer-events: none;
+  will-change: transform;
+}
 .live-map-placeholder { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(circle at center, #251d14, #07090b 72%); color: #ffd08a; border: 1px dashed #514232; }
-.live-map-marker-layer { position: absolute; inset: 0; }
+/* Sits between the map and the markers. Drawn in map-pixel space via viewBox,
+   so one stroke-width follows the zoom instead of needing per-frame maths. */
+.live-map-sector-grid { position: absolute; top: 0; left: 0; z-index: 1; pointer-events: none; overflow: visible; }
+/* non-scaling-stroke means these widths are screen pixels, not viewBox units,
+   so the grid stays the same weight at every zoom rather than thickening as you
+   zoom in. Kept hairline-thin and dark: it is a reference overlay, and terrain
+   detail has to stay readable through it. */
+.live-map-sector-grid .lines line { stroke: rgba(16, 11, 4, .8); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.live-map-sector-grid .lines line.edge { stroke: rgba(16, 11, 4, .95); stroke-width: 2; }
+/* font-size is set inline as viewBox units divided by zoom, so the label stays
+   a constant size on screen. Sizing it in viewBox units alone would scale it
+   with the map -- at maximum zoom a cell label would render ~368px tall. */
+.live-map-sector-grid .labels text {
+  fill: rgba(28, 21, 12, .78);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: central;
+  paint-order: stroke;
+  stroke: rgba(255, 246, 230, .5);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+.live-map-marker-layer { position: absolute; inset: 0; z-index: 2; }
 .live-map-marker {
   position: absolute;
   width: 12px;
@@ -3137,7 +3173,12 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 .live-map-marker-overlay-action { flex: 1 1 0; min-width: 0; padding: 6px 10px; font-size: 12px; }
 .live-map-marker-overlay-teleport { display: grid; gap: 6px; margin-bottom: 8px; }
 .live-map-marker-overlay-teleport select { width: 100%; padding: 6px 8px; font-size: 12px; }
-.live-map-stats { grid-template-columns: repeat(5, minmax(88px, 1fr)); gap: 7px; }
+/* auto-fit, not a fixed count: the strip's items are conditional (Coriolis
+   seed, terrain layout and countdown each appear only sometimes), so a hardcoded
+   column count wraps the moment the item count exceeds it and leaves most of a
+   second row empty. Letting the track count follow the item count keeps them on
+   one row and stretched to fill, which is how the strip already looked. */
+.live-map-stats { grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 7px; }
 .live-map-stats .key-value-item { min-height: 56px; padding: 10px 11px; align-content: center; }
 .menu-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 12px 0 18px; }
 .menu-card { justify-content: center; min-height: 48px; white-space: normal; }

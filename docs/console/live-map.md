@@ -194,6 +194,170 @@ makes the relearn look redundant for Hagga Basin -- it is not. Some Hagga Basin
 positions genuinely are new each cycle, and there is no way to tell a recurring
 one from a moved one after the fact, so the keying stays conservative.
 
+### Which cartography layout is live
+
+The Deep Desert is not one fixed landscape: the game ships **12 cartography
+layouts** and each Coriolis cycle selects one, so after a reset the terrain
+genuinely changes. Only a Deep Desert map server states which one it picked,
+once at startup:
+
+```
+LogWorldLayout: Display: BP_DuneGameState_C_...: 'DA_DeepDesert_1_Layout_03'
+                layout selected with 678 content blocks.
+```
+
+`/api/map/markers` reports that number as `coriolisLayout` (`0`-`11`), or
+`null` when it cannot be read. It is parsed from the log line rather than
+derived from the seed: the two have matched every time they have been observed
+together, but this is the game stating its own choice, so it needs no mapping
+assumption and stays correct if they ever diverge.
+
+Two details worth knowing when reading `coriolisSeed.js`:
+
+- `overmap` and `survival-1` print the seed and the cycle boundary but **never**
+  the layout, so the resolver keeps walking past a container that answered with
+  only a seed -- and stops early rather than asking those two for a layout they
+  cannot log.
+- When no partition is supplied there is no single container to ask, and a bare
+  `dune-server-deepdesert-1` is not guaranteed to exist (a real deploy runs only
+  suffixed ones such as `-8` and `-59`). The markers route therefore passes the
+  known Deep Desert partition ids in, and the resolver fans out over a capped
+  few of them. The Live Map itself always has a partition selected -- there is
+  no "All Partitions" entry -- but other API callers need not supply one.
+
+`coriolisLayout` is `null` whenever the layout cannot be determined -- the
+container is down, the line has aged out of the tail, or the game reports a
+layout this console has no terrain for. Consumers must treat `null` as
+"fall back", never as an error.
+
+**It is also null once the cycle boundary has passed**, for exactly the reason
+the seed is (above): the layout line is printed only at container startup, so
+between a boundary and the next restart the logs still name the *previous*
+cycle's layout. Drawing that would put the previous rotation's terrain on the
+map -- silently, since nothing about a stale layout looks broken. The same
+expiry check that suppresses the stale seed nulls the layout, so the Live Map
+falls back to the flat image until the map server restarts.
+
+## Rendered terrain (Deep Desert)
+
+The Deep Desert map is not a picture. Instead of the flat
+`images/maps/deep-desert.png`, the console draws the game's own cartography
+meshes for whichever layout the current cycle selected -- the same proxy geometry
+the in-game map table renders, extracted from the game's `.pak` files offline.
+
+The Deep Desert ships **no terrain texture at all**; its in-game map is a mesh
+diorama, which is why upscaling an image was never an option.
+
+### How it fits together
+
+`console/web/src/features/liveMap/terrain/` holds a framework-free WebGL2
+renderer (`renderer.ts`) behind a thin React wrapper
+(`DeepDesertTerrain.tsx`), lazy-loaded so a Hagga Basin user never downloads it.
+
+**The panel keeps ownership of everything interactive.** Pan, zoom, markers and
+teleport are all DOM and unchanged; the renderer replaces only the `<img>`. It
+has no camera of its own -- it is handed the world rect currently scrolled into
+view (`visibleWorldRect` in `liveMapGeometry.ts`) and draws exactly that. Terrain
+and markers therefore land on the same pixel by construction, using one shared
+mapping rather than two that must be kept in step.
+
+That is also what corrects a long-standing inaccuracy: the shipped PNG covers
+only the 9-sector grid but is stretched across `LIVE_MAP_CONFIGS`' wider rect, so
+it disagrees with marker positions by up to a third of a sector at the edge.
+Rendering places geometry at its true world position, so the error does not exist.
+
+The canvas covers the frame's **viewport**, not the scaled map, and is translated
+to follow the scrollport on each scroll. At maximum zoom the map is 16384 px
+across -- beyond `MAX_TEXTURE_SIZE` on many GPUs, and roughly a gigabyte of
+backing store.
+
+That translation is clamped to the map's own extent, and the clamp is
+load-bearing rather than defensive: a transform on the canvas counts toward the
+frame's scrollable width, so translating by an out-of-range `scrollLeft` pushes
+the canvas past the map's edge, inflates the scroll area, and thereby makes that
+out-of-range offset legal. The result was a self-sustaining state in which
+zooming back out left the map stuck off-centre instead of returning to the fit.
+
+### Assets
+
+`terrain/assets/` is 41 gzipped files totalling 15.7 MB, inflated in the browser:
+a 6.4 MB shared half -- the 4.6 MB mesh library plus 1.8 MB of detail textures --
+and twelve per-layout sets of about 0.78 MB each. The split is the point: a
+Coriolis reset changes only the layout, so the browser re-fetches under a
+megabyte and the shared half stays cached.
+
+Vite fingerprints them into `dist/assets/`, which earns the immutable
+cache-control rule in `staticFiles.js` and, being content-addressed, cannot go
+stale. Two build settings are load-bearing and easy to lose: `assetsInclude`
+keeps `.gz` opaque so it is hashed and copied rather than parsed, and
+`build.assetsInlineLimit` stops the ~1.6 KB layout sidecars being inlined as
+base64 into the main bundle by the 4 KB default.
+
+The offline pipeline that produced these is developer-only and not in the repo --
+it needs the game's paks and a local Oodle DLL, so it can never run in CI.
+
+### When it falls back
+
+The rendered terrain is an upgrade over the flat image, never a replacement for
+it. `deep-desert.png` stays committed and stays in `LIVE_MAP_CONFIGS.image`, and
+every case below simply shows it, with no error state and no loss of function --
+markers, teleport, pan and zoom are unaffected either way.
+
+| condition | |
+|---|---|
+| not the Deep Desert | Hagga Basin always uses its image |
+| `coriolisLayout` is null | the layout could not be read, **or the cycle boundary has passed** and the logged layout belongs to the previous rotation |
+| layout outside 0-11 | the game reported one this console has no assets for |
+| no WebGL2 | browser or GPU does not provide it |
+| no `EXT_texture_compression_bptc` | the sand normals are BC7; common on desktop, absent on many mobile GPUs |
+| no `DecompressionStream` | Safari before 16.4 |
+| an asset fails to load | fetch or inflate error |
+| the context is lost | GPU reset, driver update, or the browser reclaiming it after a successful start |
+
+Which one applied is shown as **Terrain** beside the Coriolis readout, so a flat
+map is always explainable rather than mysterious. Silent degradation is what made
+the stale-layout problem invisible in the first place.
+
+`EXT_color_buffer_float` is **not** in that list: without it the renderer keeps
+drawing with a slightly flatter blend rather than refusing.
+
+### Sector grid
+
+A **Sector Grid** toolbar button overlays the Deep Desert's 9x9 lettered grid --
+250,000 uu cells spanning +/-1,125,000 uu about the map centre. Deep Desert only,
+and only while the terrain is being rendered; Hagga Basin has no lettered sector
+system, and the flat image supplies its own grid.
+
+Orientation is the easy thing to get wrong, so it is pinned by tests: **I is at
+the top and A at the bottom**, confirmed against the game's own map art, which
+carries the labels burned in. World +Y draws downward in the panel, so the letter
+runs *opposite* to screen-down and the obvious guess is upside down.
+
+The overlay is drawn in map-pixel space from the same `worldToLiveMapPoint` the
+markers use, so a marker at a cell's centre lands on that cell's label (measured:
+within 0.5 px).
+
+Lines and labels are both a constant size on screen: the strokes use
+`vector-effect: non-scaling-stroke`, and the label font size is divided back out
+by zoom (sized in viewBox units alone, a label would render ~368 px tall at
+maximum zoom).
+
+**Labels follow the viewport.** A 250,000 uu cell is wider than the frame above
+roughly 2x zoom, so a label pinned to the cell's true centre scrolls out of view
+and the grid stops answering the one question it exists for. Each label is
+instead placed at the centre of the *visible part* of its own cell, and hidden
+when too little of the cell is on screen to label. Measured across a pan at high
+zoom: a label is visible at every position, where fixed centres left 6 of 8
+positions unlabelled.
+
+**It is on by default, and it rides on the terrain.** The rendered terrain has
+no grid of its own and relating a marker to a sector is the common case, so the
+overlay is on whenever terrain is drawn. It is not offered at all on the
+flat-image fallback: that picture carries its own grid, burned in at the image's
+own mis-scaled extent, and the two disagree by up to 3.74% at the edges. Drawing
+both put two 9x9 grids about half a cell apart on screen, which reads as a
+rendering fault rather than a feature.
+
 ## Player teleport
 
 Dragging an **online** player marker previews a new position; releasing

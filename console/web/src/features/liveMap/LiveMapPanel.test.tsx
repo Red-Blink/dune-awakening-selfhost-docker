@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useEffect } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { Task } from "../../api/setup";
 import { liveMapApi } from "../../api/liveMap";
@@ -19,6 +20,19 @@ function fakeTask(status: Task["status"]): Task {
     errorMessage: null
   };
 }
+
+// The real component needs WebGL2, which jsdom has not got, so it would always
+// fall back. `ready` is controllable because the panel now keeps the flat image
+// up until the canvas reports it has something to paint.
+const terrain = vi.hoisted(() => ({ signalsReady: true }));
+vi.mock("./terrain/DeepDesertTerrain", () => ({
+  default: ({ onReady }: { onReady?: () => void }) => {
+    useEffect(() => {
+      if (terrain.signalsReady) onReady?.();
+    }, [onReady]);
+    return <canvas className="live-map-terrain" />;
+  }
+}));
 
 vi.mock("../../api/liveMap", () => ({
   liveMapApi: {
@@ -44,6 +58,7 @@ const map = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  terrain.signalsReady = true;
   vi.mocked(liveMapApi.markers).mockResolvedValue({
     rows: [
       { id: 31573, type: "base", name: "Desert Home", base_type: "Sub-Fief", owner_name: "Chani", map: "HaggaBasin", partition_id: 1, x: 500, y: 500, z: 20 },
@@ -328,4 +343,240 @@ it("confirming a Teleport sends the picked player to the overlay marker's coordi
   }));
   await waitFor(() => expect(waitForTask).toHaveBeenCalledWith(fakeTask("running")));
   expect(await screen.findByText(/Liet was teleported to Desert Home/)).toBeInTheDocument();
+});
+
+function renderPanel() {
+  return render(<LiveMapPanel
+    onError={vi.fn()}
+    confirmAction={vi.fn().mockResolvedValue(true)}
+    waitForTask={vi.fn()}
+    taskTechnicalDetails={vi.fn().mockReturnValue("")}
+    onOpenBase={vi.fn()}
+    onOpenVehicle={vi.fn()}
+  />);
+}
+
+function partitionSelect(container: HTMLElement) {
+  return [...container.querySelectorAll("select")]
+    .find((select) => [...select.options].some((option) => /Partition|Sietch/i.test(option.textContent || "")))!;
+}
+
+it("offers no All Partitions choice -- a real partition is always selected", async () => {
+  const { container } = renderPanel();
+  await screen.findByRole("button", { name: "Base: Desert Home" });
+
+  const select = partitionSelect(container);
+  const labels = [...select.options].map((option) => option.textContent);
+  expect(labels.some((label) => /all partitions/i.test(label || ""))).toBe(false);
+  expect(select.value).toBe("1");
+  // and the value shown is a real option, not an unmatched blank
+  expect([...select.options].map((option) => option.value)).toContain(select.value);
+});
+
+it("falls back to an available partition when the map's default is not one of them", async () => {
+  // The invariant that matters now that there is no neutral "All Partitions"
+  // entry: whatever the select shows must be one of the options, never an
+  // unmatched value that leaves it blank while the markers filter by something
+  // else. Here the map asks for partition 1 and the farm only serves 7.
+  const moved = { ...map, defaultPartitionId: 1 };
+  vi.mocked(liveMapApi.markers).mockResolvedValue({
+    rows: [{ id: 31573, type: "base", name: "Desert Home", base_type: "Sub-Fief", owner_name: "Chani", map: "HaggaBasin", partition_id: 7, x: 500, y: 500, z: 20 }],
+    overlays: {},
+    capabilities: { bases: true },
+    map: moved,
+    maps: { HaggaBasin: moved },
+    defaultMap: "HaggaBasin",
+    partitions: [{ map: "HaggaBasin", partition_id: 7, name: "Sietch Tabr", marker_count: 1 }]
+  } as never);
+
+  const { container } = renderPanel();
+  await screen.findByRole("button", { name: "Base: Desert Home" });
+
+  await waitFor(() => {
+    const select = partitionSelect(container);
+    expect(select.value).toBe("7");
+    expect([...select.options].map((option) => option.value)).toContain(select.value);
+  });
+});
+
+// jsdom has no ResizeObserver, and the sector-grid label effect observes the
+// map frame with one. No Hagga Basin test reaches that effect, so nothing here
+// needed it before.
+if (!("ResizeObserver" in globalThis)) {
+  (globalThis as unknown as Record<string, unknown>).ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
+// Every fixture above is Hagga Basin, so the Deep Desert half of this panel --
+// the sector grid, its toggle, the terrain gate and the Terrain readout -- had
+// no panel-level coverage at all.
+const deepDesert = {
+  key: "DeepDesert",
+  label: "The Deep Desert",
+  actorMap: "DeepDesert",
+  image: "/images/maps/deep-desert.png",
+  width: 4096,
+  height: 4096,
+  minX: -1268624.82,
+  maxX: 1163312.83,
+  minY: -1266548.17,
+  maxY: 1162416.13,
+  flipY: false,
+  defaultPartitionId: 8
+};
+
+function useDeepDesert(extra: Record<string, unknown> = {}) {
+  vi.mocked(liveMapApi.markers).mockResolvedValue({
+    rows: [
+      { id: 4242, type: "base", name: "Sietch Tabr", base_type: "Sub-Fief", owner_name: "Stilgar", map: "DeepDesert", partition_id: 8, x: -52656, y: -52066, z: 30 }
+    ],
+    overlays: {},
+    capabilities: { bases: true },
+    map: deepDesert,
+    maps: { DeepDesert: deepDesert },
+    defaultMap: "DeepDesert",
+    partitions: [{ map: "DeepDesert", partition_id: 8, name: "PvP", marker_count: 1 }],
+    ...extra
+  } as never);
+}
+
+it("draws the sector grid on the Deep Desert, with a full 9x9 of labels", async () => {
+  useDeepDesert({ coriolisLayout: 3 });
+  const { container } = renderPanel();
+  await screen.findByRole("button", { name: "Base: Sietch Tabr" });
+
+  const grid = container.querySelector("svg.live-map-sector-grid");
+  expect(grid).not.toBeNull();
+  // 10 lines each way, and a label per cell.
+  expect(grid!.querySelectorAll("line")).toHaveLength(20);
+  expect(grid!.querySelectorAll("text")).toHaveLength(81);
+  // The corners the game's own map art carries, the letter running up the screen.
+  const labels = [...grid!.querySelectorAll("text")].map((node) => node.textContent);
+  expect(labels).toContain("A1");
+  expect(labels).toContain("I9");
+});
+
+it("hides the grid when the Sector Grid toggle is switched off", async () => {
+  useDeepDesert({ coriolisLayout: 3 });
+  const { container } = renderPanel();
+  await screen.findByRole("button", { name: "Base: Sietch Tabr" });
+
+  const toggle = screen.getByRole("button", { name: "Sector Grid" });
+  // On by default: the terrain carries no grid of its own.
+  expect(toggle).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-pressed", "false");
+  expect(container.querySelector("svg.live-map-sector-grid")).toBeNull();
+});
+
+it("offers no sector grid on Hagga Basin, which has no lettered sectors", async () => {
+  const { container } = renderPanel();
+  await screen.findByRole("button", { name: "Base: Desert Home" });
+  expect(screen.queryByRole("button", { name: "Sector Grid" })).toBeNull();
+  expect(container.querySelector("svg.live-map-sector-grid")).toBeNull();
+});
+
+it("falls back to the flat image and says so when the layout is unknown", async () => {
+  useDeepDesert({ coriolisLayout: null });
+  const { container } = renderPanel();
+  await screen.findByRole("button", { name: "Base: Sietch Tabr" });
+
+  expect(container.querySelector("img.live-map-image")).not.toBeNull();
+  expect(screen.getByText("flat map (layout unknown)")).toBeInTheDocument();
+});
+
+it("reports the layout once one is known", async () => {
+  useDeepDesert({ coriolisLayout: 3 });
+  const { container } = renderPanel();
+  await screen.findByRole("button", { name: "Base: Sietch Tabr" });
+  await waitFor(() => expect(container.querySelector("canvas.live-map-terrain")).not.toBeNull());
+  expect(screen.getByText("layout 3")).toBeInTheDocument();
+  expect(container.querySelector("img.live-map-image")).toBeNull();
+});
+
+// Finding 9: the API caps the layout at 63 so a future Layout_12 is reported
+// truthfully rather than nulled, but only 0-11 ship meshes. The render gate and
+// the readout used to decide separately, so an unshipped layout drew the flat
+// image while the strip announced it as rendered.
+it("says a layout it cannot draw is not shipped, rather than claiming it rendered", async () => {
+  useDeepDesert({ coriolisLayout: 12 });
+  const { container } = renderPanel();
+  await screen.findByRole("button", { name: "Base: Sietch Tabr" });
+
+  expect(container.querySelector("img.live-map-image")).not.toBeNull();
+  expect(container.querySelector("canvas.live-map-terrain")).toBeNull();
+  expect(screen.getByText("flat map (layout 12 not shipped)")).toBeInTheDocument();
+  expect(screen.queryByText("layout 12")).toBeNull();
+});
+
+// Finding 8: the flat PNG carries its own 9x9 grid, burned in at the image's
+// own scale, so the overlay drew a second one about half a cell off.
+it("leaves the grid to the flat image, which has one burned in", async () => {
+  useDeepDesert({ coriolisLayout: null });
+  const { container } = renderPanel();
+  await screen.findByRole("button", { name: "Base: Sietch Tabr" });
+
+  expect(container.querySelector("img.live-map-image")).not.toBeNull();
+  expect(container.querySelector("svg.live-map-sector-grid")).toBeNull();
+  // and no toggle for a grid that is not ours to draw
+  expect(screen.queryByRole("button", { name: "Sector Grid" })).toBeNull();
+});
+
+// Finding 5 of the branch review: the grid geometry was rebuilt on every render
+// and is a dependency of the label-placement effect, so the scroll listener and
+// the ResizeObserver were torn down and re-added on every marker hover and
+// every five-second poll.
+it("does not re-subscribe the grid's scroll listener on an unrelated re-render", async () => {
+  useDeepDesert({ coriolisLayout: 3 });
+  const added: unknown[] = [];
+  const original = HTMLDivElement.prototype.addEventListener;
+  const spy = vi.spyOn(HTMLDivElement.prototype, "addEventListener").mockImplementation(function (
+    this: HTMLDivElement, type: string, ...rest: unknown[]
+  ) {
+    if (type === "scroll") added.push(type);
+    return (original as never as (...args: unknown[]) => void).call(this, type, ...rest);
+  } as never);
+
+  try {
+    renderPanel();
+    const marker = await screen.findByRole("button", { name: "Base: Sietch Tabr" });
+    const before = added.length;
+    expect(before).toBeGreaterThan(0);
+
+    // A re-render that has nothing to do with the map or the zoom.
+    fireEvent.mouseEnter(marker);
+    fireEvent.mouseLeave(marker);
+    fireEvent.mouseEnter(marker);
+    fireEvent.mouseLeave(marker);
+
+    expect(added.length).toBe(before);
+  } finally {
+    spy.mockRestore();
+  }
+});
+
+// Finding 7: the canvas is mounted well before it can paint -- the shared
+// library alone is 6.4 MB -- so dropping the flat image when the lazy chunk
+// resolved left a window with neither, markers floating over bare background.
+it("keeps the flat image up until the terrain reports it can paint", async () => {
+  terrain.signalsReady = false;
+  useDeepDesert({ coriolisLayout: 3 });
+  const { container } = renderPanel();
+  await screen.findByRole("button", { name: "Base: Sietch Tabr" });
+
+  // Canvas mounted, but nothing on it yet -- the image is still carrying the map.
+  expect(container.querySelector("canvas.live-map-terrain")).not.toBeNull();
+  expect(container.querySelector("img.live-map-image")).not.toBeNull();
+});
+
+it("drops the flat image once the terrain has painted", async () => {
+  useDeepDesert({ coriolisLayout: 3 });
+  const { container } = renderPanel();
+  await screen.findByRole("button", { name: "Base: Sietch Tabr" });
+
+  await waitFor(() => expect(container.querySelector("img.live-map-image")).toBeNull());
+  expect(container.querySelector("canvas.live-map-terrain")).not.toBeNull();
 });

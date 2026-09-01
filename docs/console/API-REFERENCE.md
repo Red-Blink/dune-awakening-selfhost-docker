@@ -669,13 +669,15 @@ See [blueprints.md](blueprints.md) for the full import/export design.
 ## Live Map
 
 See [live-map.md](live-map.md) for how the panel uses these endpoints --
-partition display-name resolution, the spice/POI data model, and the
-Layers legend's default-settings mechanism.
+partition display-name resolution, the spice/POI data model, the
+Layers legend's default-settings mechanism, and what `coriolisLayout`
+drives: the WebGL renderer that draws the Deep Desert's own cartography
+meshes, and the conditions under which it falls back to the flat image.
 
 | Method | Route | Description | Parameters |
 |--------|-------|-------------|------------|
 | GET | `/api/map/capabilities` | Get map feature capabilities | None |
-| GET | `/api/map/markers` | Get map markers & configuration (actors, merged with spice/POI rows; response also includes `coriolisSeed`, `coriolisNextCycleAt`) | `map?`, `partitionId?`, `static?` (`0` omits static archive/POI rows for lightweight live refreshes) |
+| GET | `/api/map/markers` | Get map markers & configuration (actors, merged with spice/POI rows; response also includes `coriolisSeed`, `coriolisNextCycleAt`, `coriolisSeedStaleSince`, and `coriolisLayout`) | `map?`, `partitionId?`, `static?` (`0` omits static archive/POI rows for lightweight live refreshes) |
 | GET | `/api/map/spice` | Get spice/flour-sand layers (static pool, active blows, flour sand) for a map/partition | `map?`, `partitionId?` (query params) |
 | GET | `/api/map/poi` | Get registry-driven POI layers (ore, scrap, flora, poi, house_representative, trainer, fortress, hazard, enemy) for a map | `map?` (query param) |
 | POST | `/api/map/teleport-player` | Teleport player to map coords | `playerId`, `x`, `y`, `z`, `yaw?`, `partitionId?`, `online?` |

@@ -4,6 +4,12 @@ import { fetchConsoleAuthState } from "../api/client";
 const RELOAD_COOLDOWN_KEY = "dune-console:stale-build-reload-at";
 const RELOAD_COOLDOWN_MS = 60_000;
 const DEFAULT_POLL_INTERVAL_MS = 120_000;
+// Returning to the tab is the moment a stale page is most likely to mislead --
+// someone rebuilds, switches back, and reads old code as a failed change. The
+// two-minute poll is right for an idle tab but far too slow for that loop, so a
+// visible/focused tab re-checks immediately. Throttled so rapid tab switching
+// cannot turn into a burst of requests.
+const FOCUS_RECHECK_MIN_GAP_MS = 5_000;
 
 type StaleBuildStorage = Pick<Storage, "getItem" | "setItem">;
 
@@ -64,8 +70,10 @@ export function useStaleBuildWatcher(options: StaleBuildWatcherOptions = {}) {
     if (!enabled) return;
     let cancelled = false;
     let baselineVersion: string | null = null;
+    let lastPollStartedAt = 0;
 
     async function poll() {
+      lastPollStartedAt = now();
       const version = await fetchVersion().catch(() => null);
       if (cancelled || !version) return;
       if (baselineVersion === null) {
@@ -89,13 +97,23 @@ export function useStaleBuildWatcher(options: StaleBuildWatcherOptions = {}) {
       reload();
     }
 
+    function recheckOnReturn() {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      if (now() - lastPollStartedAt < FOCUS_RECHECK_MIN_GAP_MS) return;
+      void poll();
+    }
+
     void poll();
     const id = window.setInterval(poll, intervalMs);
+    document.addEventListener("visibilitychange", recheckOnReturn);
+    window.addEventListener("focus", recheckOnReturn);
     return () => {
       cancelled = true;
       window.clearInterval(id);
+      document.removeEventListener("visibilitychange", recheckOnReturn);
+      window.removeEventListener("focus", recheckOnReturn);
     };
   }, [enabled, intervalMs, fetchVersion, reload, storage, now]);
 }
 
-export const staleBuildWatcherInternals = Object.freeze({ RELOAD_COOLDOWN_KEY, RELOAD_COOLDOWN_MS, DEFAULT_POLL_INTERVAL_MS });
+export const staleBuildWatcherInternals = Object.freeze({ RELOAD_COOLDOWN_KEY, RELOAD_COOLDOWN_MS, DEFAULT_POLL_INTERVAL_MS, FOCUS_RECHECK_MIN_GAP_MS });
