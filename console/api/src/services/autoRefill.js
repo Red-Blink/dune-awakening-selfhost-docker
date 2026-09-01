@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { audit } from "../audit.js";
 import { redact } from "../redact.js";
 import { clampInt, writeJsonAtomic } from "../jsonStore.js";
+import { resolveAutoRefillSetting } from "./autoRefillSettings.js";
 
 // Opt-in per-base automatic generator refills. This owns only the enrollment
 // list and the daily decision; the refill itself goes through the existing
@@ -24,14 +25,19 @@ const MAX_CONSECUTIVE_QUEUES = 3;
 // How far out an overdue scan is armed at boot. See the note in tick().
 const OVERDUE_ARM_DELAY_MS = 5 * 60 * 1000;
 
-// Fixed in code, env-overridable only -- matching how every other refill
-// tunable (ADMIN_REFILL_*) is exposed rather than adding a settings surface.
-export function autoRefillThresholdPercent(env = process.env) {
-  return clampInt(env.ADMIN_AUTO_REFILL_THRESHOLD_PERCENT, 50, 1, 99);
+// Layered: console settings file > env var > hardcoded default, resolved in
+// services/autoRefillSettings.js. These two are the ones an operator retunes
+// while watching a server, so they got a settings surface; the ADMIN_REFILL_*
+// queue tunables stay env-only.
+//
+// repoRoot is optional only so the env layer stays directly testable -- every
+// production call site passes it.
+export function autoRefillThresholdPercent(env = process.env, repoRoot = "") {
+  return resolveAutoRefillSetting("thresholdPercent", { env, repoRoot });
 }
 
-export function autoRefillIntervalHours(env = process.env) {
-  return clampInt(env.ADMIN_AUTO_REFILL_INTERVAL_HOURS, 24, 1, 168);
+export function autoRefillIntervalHours(env = process.env, repoRoot = "") {
+  return resolveAutoRefillSetting("intervalHours", { env, repoRoot });
 }
 
 function autoRefillFile(repoRoot) {
@@ -128,6 +134,25 @@ export function isAutoRefillEnabled(repoRoot, baseId) {
   return Boolean(readAutoRefillState(repoRoot).bases[String(target)]);
 }
 
+// Called after the interval setting changes. tick() only re-arms once a run
+// completes or when nextRunAt is empty, so a nextRunAt written under the old,
+// longer interval would otherwise stand -- shortening 24h to 4h would look
+// like it did nothing for up to a day.
+//
+// Clamps toward now ONLY: lengthening leaves the armed run alone, because
+// pushing back a scan the operator is already waiting on is the more
+// surprising of the two. The asymmetry is in the overlay copy and the
+// operator guide. No-ops when nothing is enrolled or the interval grew, so it
+// is safe to call on every save.
+export function clampAutoRefillNextRun(repoRoot, { now = () => Date.now(), env = process.env } = {}) {
+  const state = readAutoRefillState(repoRoot);
+  if (!Object.keys(state.bases).length || !state.nextRunAt) return state.nextRunAt;
+  const latest = now() + autoRefillIntervalHours(env, repoRoot) * 3600000;
+  const current = Date.parse(state.nextRunAt);
+  if (Number.isFinite(current) && current <= latest) return state.nextRunAt;
+  return writeAutoRefillState(repoRoot, { ...state, nextRunAt: new Date(latest).toISOString() }).nextRunAt;
+}
+
 // Idempotent in both directions: a double-clicked toggle is not an error.
 export function setBaseAutoRefill(repoRoot, baseId, enabled, { now = () => Date.now(), env = process.env } = {}) {
   const target = Number(baseId);
@@ -155,7 +180,7 @@ export function setBaseAutoRefill(repoRoot, baseId, enabled, { now = () => Date.
   } else if (wasEmpty || !nextRunAt) {
     // Arm a full interval out, so turning auto-refill on never fires an
     // immediate surprise write into a base the operator was still looking at.
-    nextRunAt = new Date(now() + autoRefillIntervalHours(env) * 3600000).toISOString();
+    nextRunAt = new Date(now() + autoRefillIntervalHours(env, repoRoot) * 3600000).toISOString();
   }
 
   const next = writeAutoRefillState(repoRoot, { ...state, bases, nextRunAt });
@@ -166,8 +191,8 @@ export function setBaseAutoRefill(repoRoot, baseId, enabled, { now = () => Date.
 export function autoRefillPublicState(repoRoot, { env = process.env } = {}) {
   const state = readAutoRefillState(repoRoot);
   return {
-    thresholdPercent: autoRefillThresholdPercent(env),
-    intervalHours: autoRefillIntervalHours(env),
+    thresholdPercent: autoRefillThresholdPercent(env, repoRoot),
+    intervalHours: autoRefillIntervalHours(env, repoRoot),
     nextRunAt: state.nextRunAt,
     lastRunAt: state.lastRunAt,
     lastRunStatus: state.lastRunStatus,
@@ -201,7 +226,7 @@ export function createAutoRefillScheduler(options = {}) {
   let armedForThisProcess = false;
 
   function intervalMs() {
-    return autoRefillIntervalHours(env) * 3600000;
+    return autoRefillIntervalHours(env, config.repoRoot) * 3600000;
   }
 
   function auditSafely(action, detail) {
@@ -361,7 +386,7 @@ export function createAutoRefillScheduler(options = {}) {
   }
 
   async function run(baseIds, enrollment) {
-    const threshold = autoRefillThresholdPercent(env);
+    const threshold = autoRefillThresholdPercent(env, config.repoRoot);
     const context = {
       enrollment,
       // Read once per scan: which bases already have an unflushed queue entry.
@@ -454,7 +479,7 @@ export function createAutoRefillScheduler(options = {}) {
   return {
     tick,
     publicState: () => autoRefillPublicState(config.repoRoot, { env }),
-    thresholdPercent: () => autoRefillThresholdPercent(env),
-    intervalHours: () => autoRefillIntervalHours(env)
+    thresholdPercent: () => autoRefillThresholdPercent(env, config.repoRoot),
+    intervalHours: () => autoRefillIntervalHours(env, config.repoRoot)
   };
 }

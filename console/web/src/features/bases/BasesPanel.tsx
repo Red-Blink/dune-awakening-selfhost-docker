@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Boxes, ChevronDown, ChevronUp, Download, Droplet, Fuel, Grid3X3, KeyRound, Lock, Trash2, Users, X, Zap } from "lucide-react";
+import { Boxes, ChevronDown, ChevronUp, Download, Droplet, Fuel, Grid3X3, KeyRound, Lock, Settings, Trash2, Users, X, Zap } from "lucide-react";
 import { BaseInventoryTab } from "./BaseInventoryTab";
 import { BaseChildPermissionsTab } from "./BaseChildPermissionsTab";
 import { BaseLandClaimTab } from "./BaseLandClaimTab";
 import { BasePermissionsTab } from "./BasePermissionsTab";
 import { BaseWaterTab } from "./BaseWaterTab";
+import { AutoRefillSettingsOverlay } from "./AutoRefillSettingsOverlay";
 import { basesApi, type AutoRefillBase, type AutoRefillWaterBase, type RefillDeviceResult, type RefillWaterDeviceResult } from "../../api/bases";
 import { friendlyMapName } from "../maps/mapNames";
 import { mapsApi } from "../../api/maps";
@@ -422,6 +423,7 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
   const [autoRefillWaterIntervalHours, setAutoRefillWaterIntervalHours] = useState(24);
   const [savingAutoRefillWaterId, setSavingAutoRefillWaterId] = useState("");
   const [autoRefillWaterUnavailable, setAutoRefillWaterUnavailable] = useState(false);
+  const [autoRefillSettingsOpen, setAutoRefillSettingsOpen] = useState(false);
   const requestIdRef = useRef(0);
   const lastExpandedRef = useRef<string | null>(null);
   const skipNextSearchReset = useRef(true);
@@ -1344,6 +1346,17 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
           {playerId && <p className="playerAdmin_note">Bases owned by or shared with {playerName}. Expand a row to use the same tools available on the main Bases page.</p>}
         </div>
         <div className="action-row">
+          {/* Hidden in the per-player embed -- that view is one player's lens
+              and these settings are global -- and hidden without a refill
+              queue, matching the per-base toggles. */}
+          {!playerId && (canQueue || canQueueWater) && (
+            <button
+              className="bases-settings-button"
+              title="Auto-refill settings"
+              aria-label="Auto-refill settings"
+              onClick={() => setAutoRefillSettingsOpen(true)}
+            ><Settings size={16} /></button>
+          )}
           <button onClick={() => void load({ q: submittedQ, page, pageSize, sortColumn, sortDirection })}>Refresh</button>
         </div>
       </div>
@@ -1866,6 +1879,13 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
           <button disabled={!hasNextPage} onClick={() => setPage(totalPages - 1)}>Last</button>
         </div>
       </div>}
+      {autoRefillSettingsOpen && <AutoRefillSettingsOverlay
+        onClose={() => setAutoRefillSettingsOpen(false)}
+        // Both tooltips interpolate these values, so they read stale until
+        // the two enrollment GETs are refetched.
+        onSaved={() => { void refreshAutoRefill(); void refreshAutoRefillWater(); }}
+        onError={onError}
+      />}
     </section>
   );
 }

@@ -9,8 +9,11 @@ import {
   isAutoRefillWaterEnabled,
   readAutoRefillWaterState,
   setBaseAutoRefillWater,
+  clampAutoRefillWaterNextRun,
   writeAutoRefillWaterState
 } from "../src/services/autoRefillWater.js";
+import { readAutoRefillState, setBaseAutoRefill } from "../src/services/autoRefill.js";
+import { saveAutoRefillSettings } from "../src/services/autoRefillSettings.js";
 import { listQueuedBaseDeletes, listQueuedWaterRefills, queueWaterRefill } from "../src/duneDb.js";
 
 // Mirrors autoRefill.test.js exactly, retargeted at the water auto-refill
@@ -469,5 +472,101 @@ test("the water auto-refill enrollment file is written atomically with owner-onl
     const raw = readFileSync(statePath(repoRoot), "utf8");
     assert.equal(raw.endsWith("}\n"), true);
     assert.equal(JSON.parse(raw).schemaVersion, 1);
+  });
+});
+
+// --- Settings layering and interval re-arm ---
+// Mirrors the generator twin in autoRefill.test.js. Kept as a full parallel set
+// rather than a shared helper so a change to one subsystem's layering cannot
+// quietly pass because the other's still works.
+
+test("a persisted water threshold overrides the env var for the scanner itself", async () => {
+  await withTempRepoRoot(async (repoRoot) => {
+    saveAutoRefillSettings(repoRoot, { waterThresholdPercent: 80 });
+    const clock = makeClock();
+    const duneDb = fakeDuneDb({ levels: { 482: { lowestPercent: 60, deviceCount: 2 } } });
+    const { scheduler } = makeScheduler(repoRoot, duneDb, clock, {});
+    setBaseAutoRefillWater(repoRoot, 482, true, { now: clock.now, env: TEST_ENV });
+    // The first tick only arms the schedule; a scan needs a primed scheduler.
+    await primeScheduler(scheduler, repoRoot, clock);
+    forceDue(repoRoot, clock);
+    await scheduler.tick();
+
+    assert.equal(listQueuedWaterRefills(repoRoot).length, 1, "queued against the saved threshold");
+  });
+});
+
+// The generator setting must not drive the water scanner, or the two
+// "independent subsystems" claim in the UI is false.
+test("the generator threshold does not affect the water scanner", async () => {
+  await withTempRepoRoot(async (repoRoot) => {
+    saveAutoRefillSettings(repoRoot, { thresholdPercent: 80 });
+    const clock = makeClock();
+    const duneDb = fakeDuneDb({ levels: { 482: { lowestPercent: 60, deviceCount: 2 } } });
+    const { scheduler } = makeScheduler(repoRoot, duneDb, clock, {});
+    setBaseAutoRefillWater(repoRoot, 482, true, { now: clock.now, env: TEST_ENV });
+    // The first tick only arms the schedule; a scan needs a primed scheduler.
+    await primeScheduler(scheduler, repoRoot, clock);
+    forceDue(repoRoot, clock);
+    await scheduler.tick();
+
+    assert.equal(listQueuedWaterRefills(repoRoot).length, 0, "60% is healthy against water's own 50% default");
+  });
+});
+
+test("the water public state reports the persisted threshold and interval", async () => {
+  await withTempRepoRoot((repoRoot) => {
+    saveAutoRefillSettings(repoRoot, { waterThresholdPercent: 35, waterIntervalHours: 6 });
+    const state = autoRefillWaterPublicState(repoRoot, { env: { ADMIN_AUTO_REFILL_WATER_THRESHOLD_PERCENT: "70" } });
+    assert.equal(state.thresholdPercent, 35);
+    assert.equal(state.intervalHours, 6);
+  });
+});
+
+test("shortening the water interval pulls an already-armed scan in", async () => {
+  await withTempRepoRoot((repoRoot) => {
+    const clock = makeClock();
+    setBaseAutoRefillWater(repoRoot, 482, true, { now: clock.now, env: TEST_ENV });
+    assert.equal(Date.parse(readAutoRefillWaterState(repoRoot).nextRunAt), clock.at() + 24 * HOUR_MS);
+
+    saveAutoRefillSettings(repoRoot, { waterIntervalHours: 2 });
+    const next = clampAutoRefillWaterNextRun(repoRoot, { now: clock.now, env: TEST_ENV });
+    assert.equal(Date.parse(next), clock.at() + 2 * HOUR_MS);
+    assert.equal(Date.parse(readAutoRefillWaterState(repoRoot).nextRunAt), clock.at() + 2 * HOUR_MS, "persisted, not just returned");
+  });
+});
+
+test("lengthening the water interval leaves the armed scan where it is", async () => {
+  await withTempRepoRoot((repoRoot) => {
+    const clock = makeClock();
+    setBaseAutoRefillWater(repoRoot, 482, true, { now: clock.now, env: TEST_ENV });
+    const armed = readAutoRefillWaterState(repoRoot).nextRunAt;
+
+    saveAutoRefillSettings(repoRoot, { waterIntervalHours: 168 });
+    assert.equal(clampAutoRefillWaterNextRun(repoRoot, { now: clock.now, env: TEST_ENV }), armed);
+    assert.equal(readAutoRefillWaterState(repoRoot).nextRunAt, armed, "no write at all");
+  });
+});
+
+test("the water re-arm no-ops with nothing enrolled", async () => {
+  await withTempRepoRoot((repoRoot) => {
+    const clock = makeClock();
+    assert.equal(clampAutoRefillWaterNextRun(repoRoot, { now: clock.now, env: TEST_ENV }), "");
+  });
+});
+
+// The two subsystems keep separate enrollment files; re-arming one must not
+// touch the other's armed run.
+test("re-arming water leaves the generator enrollment untouched", async () => {
+  await withTempRepoRoot((repoRoot) => {
+    const clock = makeClock();
+    setBaseAutoRefill(repoRoot, 482, true, { now: clock.now, env: TEST_ENV });
+    setBaseAutoRefillWater(repoRoot, 482, true, { now: clock.now, env: TEST_ENV });
+    const generatorArmed = readAutoRefillState(repoRoot).nextRunAt;
+
+    saveAutoRefillSettings(repoRoot, { waterIntervalHours: 1 });
+    clampAutoRefillWaterNextRun(repoRoot, { now: clock.now, env: TEST_ENV });
+
+    assert.equal(readAutoRefillState(repoRoot).nextRunAt, generatorArmed);
   });
 });

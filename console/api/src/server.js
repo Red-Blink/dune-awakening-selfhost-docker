@@ -66,8 +66,9 @@ import { ensureExchangeHistory, listExchangeTransactions } from "./services/exch
 import { listMarketExchanges, marketBotStatus, saveMarketBuybackSchedule, saveMarketSeedSchedule, decodeSeedPlanCsvUpload, exportMarketSeedPlanCsv, importMarketSeedPlanFromCsv, renameMarketSeedPlan, setActiveMarketSeedPlan } from "./services/exchangeMarket.js";
 import { loadMarketSeedPlan } from "./addonSeedJob.js";
 import { readMarketItemOverrides, saveMarketItemOverrides, readUnsafeTemplateIds, listBotItemCatalogPickerItems, getOverrideRow } from "./services/marketItemOverrides.js";
-import { autoRefillPublicState, createAutoRefillScheduler, setBaseAutoRefill } from "./services/autoRefill.js";
-import { autoRefillWaterPublicState, createAutoRefillWaterScheduler, setBaseAutoRefillWater } from "./services/autoRefillWater.js";
+import { autoRefillPublicState, clampAutoRefillNextRun, createAutoRefillScheduler, setBaseAutoRefill } from "./services/autoRefill.js";
+import { autoRefillWaterPublicState, clampAutoRefillWaterNextRun, createAutoRefillWaterScheduler, setBaseAutoRefillWater } from "./services/autoRefillWater.js";
+import { autoRefillSettingsView, saveAutoRefillSettings } from "./services/autoRefillSettings.js";
 import { calculateAlwaysOnHostMemorySafety } from "./services/hostMemorySafety.js";
 import { parseEffectiveGuildMemberLimit } from "./services/guildSettings.js";
 import { parseEffectivePermissionLimit } from "./services/permissionSettings.js";
@@ -924,6 +925,8 @@ async function handleApi(req, res) {
   }));
   if (path === "/api/bases/pending-refills") return pendingGeneratorRefillsRoute(res);
   if (path === "/api/bases/auto-refill") return basesAutoRefillStateRoute(res);
+  if (path === "/api/bases/auto-refill/settings" && req.method === "GET") return basesAutoRefillSettingsRoute(res);
+  if (path === "/api/bases/auto-refill/settings" && req.method === "POST") return basesAutoRefillSettingsSaveRoute(req, res);
   if (path === "/api/bases/pending-water-refills") return pendingWaterRefillsRoute(res);
   if (path === "/api/bases/auto-refill-water") return basesAutoRefillWaterStateRoute(res);
   if (path === "/api/bases/pending-deletes") return pendingBaseDeletesRoute(res);
@@ -4197,6 +4200,36 @@ async function pendingGeneratorRefillsRoute(res) {
 async function basesAutoRefillStateRoute(res) {
   const supported = await duneDb.supportsGeneratorRefillQueue(db).catch(() => false);
   return json(res, 200, { supported, ...autoRefillPublicState(config.repoRoot) });
+}
+
+// Tuning shared by both auto-refill scanners. Answers with the database down,
+// like basesAutoRefillStateRoute above: this is a file, not a query.
+async function basesAutoRefillSettingsRoute(res) {
+  return json(res, 200, autoRefillSettingsView(config.repoRoot));
+}
+
+// Console-owned configuration, so it follows the settings routes (plain handler
+// plus an explicit audit) rather than directDbMutation's confirmation machinery.
+// Unlike the per-base toggles below it IS rate limited, matching
+// exchangeConfigSaveRoute: this retunes every enrolled base at once.
+async function basesAutoRefillSettingsSaveRoute(req, res) {
+  // Before readJson, so a client spamming this never gets its body parsed.
+  if (!applyMutationRateLimit(req, res, "bases.auto-refill-settings")) return;
+  const body = await readJson(req);
+  try {
+    const saved = saveAutoRefillSettings(config.repoRoot, body);
+    // A shortened interval must pull the armed scan in, or the change looks
+    // like it did nothing until the old interval elapses. Both no-op otherwise.
+    const nextRunAt = clampAutoRefillNextRun(config.repoRoot);
+    const waterNextRunAt = clampAutoRefillWaterNextRun(config.repoRoot);
+    audit(config, req, "bases.auto-refill-settings", { ...saved, nextRunAt, waterNextRunAt });
+    return json(res, 200, { ok: true, ...autoRefillSettingsView(config.repoRoot), nextRunAt, waterNextRunAt });
+  } catch (error) {
+    return json(res, error?.statusCode === 400 ? 400 : 500, {
+      ok: false,
+      error: redact(error?.message || "Unexpected error.")
+    });
+  }
 }
 
 // Console-owned configuration rather than a database mutation, so this follows

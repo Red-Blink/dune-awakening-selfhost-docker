@@ -3,9 +3,10 @@ import { resolve } from "node:path";
 import { audit } from "../audit.js";
 import { redact } from "../redact.js";
 import { clampInt, writeJsonAtomic } from "../jsonStore.js";
+import { resolveAutoRefillSetting } from "./autoRefillSettings.js";
 
 // Opt-in per-base automatic water refills. Mirrors autoRefill.js (generator
-// auto-refill) exactly, with its own enrollment file and env-configurable
+// auto-refill) exactly, with its own enrollment file and separately configurable
 // threshold/interval so the two subsystems never share state or interfere
 // with each other. This owns only the enrollment list and the daily
 // decision; the refill itself goes through the pending water-refill queue in
@@ -27,16 +28,14 @@ const MAX_CONSECUTIVE_QUEUES = 3;
 // How far out an overdue scan is armed at boot. See the note in tick().
 const OVERDUE_ARM_DELAY_MS = 5 * 60 * 1000;
 
-// Fixed in code, env-overridable only -- matching how every other refill
-// tunable (ADMIN_REFILL_*) is exposed rather than adding a settings surface.
-// Distinct env vars from the generator version so the two can be tuned
-// independently.
-export function autoRefillWaterThresholdPercent(env = process.env) {
-  return clampInt(env.ADMIN_AUTO_REFILL_WATER_THRESHOLD_PERCENT, 50, 1, 99);
+// Layered like the generator twin in autoRefill.js -- see the note there.
+// Distinct settings keys and env vars, so the two tune independently.
+export function autoRefillWaterThresholdPercent(env = process.env, repoRoot = "") {
+  return resolveAutoRefillSetting("waterThresholdPercent", { env, repoRoot });
 }
 
-export function autoRefillWaterIntervalHours(env = process.env) {
-  return clampInt(env.ADMIN_AUTO_REFILL_WATER_INTERVAL_HOURS, 24, 1, 168);
+export function autoRefillWaterIntervalHours(env = process.env, repoRoot = "") {
+  return resolveAutoRefillSetting("waterIntervalHours", { env, repoRoot });
 }
 
 function autoRefillWaterFile(repoRoot) {
@@ -133,6 +132,17 @@ export function isAutoRefillWaterEnabled(repoRoot, baseId) {
   return Boolean(readAutoRefillWaterState(repoRoot).bases[String(target)]);
 }
 
+// Water twin of clampAutoRefillNextRun in autoRefill.js -- see the note there
+// for why this clamps toward now only and why it is safe to call on every save.
+export function clampAutoRefillWaterNextRun(repoRoot, { now = () => Date.now(), env = process.env } = {}) {
+  const state = readAutoRefillWaterState(repoRoot);
+  if (!Object.keys(state.bases).length || !state.nextRunAt) return state.nextRunAt;
+  const latest = now() + autoRefillWaterIntervalHours(env, repoRoot) * 3600000;
+  const current = Date.parse(state.nextRunAt);
+  if (Number.isFinite(current) && current <= latest) return state.nextRunAt;
+  return writeAutoRefillWaterState(repoRoot, { ...state, nextRunAt: new Date(latest).toISOString() }).nextRunAt;
+}
+
 // Idempotent in both directions: a double-clicked toggle is not an error.
 export function setBaseAutoRefillWater(repoRoot, baseId, enabled, { now = () => Date.now(), env = process.env } = {}) {
   const target = Number(baseId);
@@ -161,7 +171,7 @@ export function setBaseAutoRefillWater(repoRoot, baseId, enabled, { now = () => 
   } else if (wasEmpty || !nextRunAt) {
     // Arm a full interval out, so turning auto-refill on never fires an
     // immediate surprise write into a base the operator was still looking at.
-    nextRunAt = new Date(now() + autoRefillWaterIntervalHours(env) * 3600000).toISOString();
+    nextRunAt = new Date(now() + autoRefillWaterIntervalHours(env, repoRoot) * 3600000).toISOString();
   }
 
   const next = writeAutoRefillWaterState(repoRoot, { ...state, bases, nextRunAt });
@@ -178,8 +188,8 @@ export function setBaseAutoRefillWater(repoRoot, baseId, enabled, { now = () => 
 export function autoRefillWaterPublicState(repoRoot, { env = process.env } = {}) {
   const state = readAutoRefillWaterState(repoRoot);
   return {
-    thresholdPercent: autoRefillWaterThresholdPercent(env),
-    intervalHours: autoRefillWaterIntervalHours(env),
+    thresholdPercent: autoRefillWaterThresholdPercent(env, repoRoot),
+    intervalHours: autoRefillWaterIntervalHours(env, repoRoot),
     nextRunAt: state.nextRunAt,
     lastRunAt: state.lastRunAt,
     lastRunStatus: state.lastRunStatus,
@@ -214,7 +224,7 @@ export function createAutoRefillWaterScheduler(options = {}) {
   let armedForThisProcess = false;
 
   function intervalMs() {
-    return autoRefillWaterIntervalHours(env) * 3600000;
+    return autoRefillWaterIntervalHours(env, config.repoRoot) * 3600000;
   }
 
   function auditSafely(action, detail) {
@@ -378,7 +388,7 @@ export function createAutoRefillWaterScheduler(options = {}) {
   }
 
   async function run(baseIds, enrollment, { preserveNextRunAt = false } = {}) {
-    const threshold = autoRefillWaterThresholdPercent(env);
+    const threshold = autoRefillWaterThresholdPercent(env, config.repoRoot);
     const context = {
       enrollment,
       // Read once per scan: which bases already have an unflushed queue entry.
@@ -505,7 +515,7 @@ export function createAutoRefillWaterScheduler(options = {}) {
     tick,
     scanNow,
     publicState: () => autoRefillWaterPublicState(config.repoRoot, { env }),
-    thresholdPercent: () => autoRefillWaterThresholdPercent(env),
-    intervalHours: () => autoRefillWaterIntervalHours(env)
+    thresholdPercent: () => autoRefillWaterThresholdPercent(env, config.repoRoot),
+    intervalHours: () => autoRefillWaterIntervalHours(env, config.repoRoot)
   };
 }

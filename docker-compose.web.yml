@@ -39,6 +39,15 @@ services:
       ADMIN_SECURE_COOKIES: "${ADMIN_SECURE_COOKIES:-0}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
       ADMIN_TASK_RETENTION: "${ADMIN_TASK_RETENTION:-200}"
+      # Seed values for the Bases auto-refill settings. The console settings
+      # overlay writes runtime/generated/auto-refill-settings.json, which wins
+      # over these; they are the fallback when nothing has been set there.
+      # Without this passthrough the console never sees them at all -- there is
+      # no env_file here, so .env reaches the container only via this map.
+      ADMIN_AUTO_REFILL_THRESHOLD_PERCENT: "${ADMIN_AUTO_REFILL_THRESHOLD_PERCENT:-50}"
+      ADMIN_AUTO_REFILL_INTERVAL_HOURS: "${ADMIN_AUTO_REFILL_INTERVAL_HOURS:-24}"
+      ADMIN_AUTO_REFILL_WATER_THRESHOLD_PERCENT: "${ADMIN_AUTO_REFILL_WATER_THRESHOLD_PERCENT:-50}"
+      ADMIN_AUTO_REFILL_WATER_INTERVAL_HOURS: "${ADMIN_AUTO_REFILL_WATER_INTERVAL_HOURS:-24}"
       ADMIN_MARKET_HISTORY_RETENTION_DAYS: "${ADMIN_MARKET_HISTORY_RETENTION_DAYS:-0}"
       ADMIN_COMMAND_TIMEOUT_MS: "${ADMIN_COMMAND_TIMEOUT_MS:-1800000}"
       ADMIN_MAX_JSON_BYTES: "${ADMIN_MAX_JSON_BYTES:-2097152}"

@@ -2118,6 +2118,34 @@ body.debug .technical-details { display: block; }
   line-height: 1.4;
   color: var(--danger-text);
 }
+/* Square icon button in the Bases panel title, sized to match the Refresh
+   button beside it. Not a reuse of .exchange-config-button: that one is 43px
+   to line up with the Exchange search row's taller inputs, and lives in the
+   exchange section of this file. */
+.bases-settings-button { width: 41px; height: 41px; min-width: 0; padding: 0; display: inline-grid; place-items: center; }
+.auto-refill-settings-modal { width: min(500px, calc(100vw - 32px)); }
+/* .primary has no global styling inside a modal -- .exchange-config-modal
+   scopes its own. Same treatment here rather than leaving Save unstyled. */
+.auto-refill-settings-modal .confirm-modal-actions .primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a130a;
+}
+.auto-refill-settings-modal .confirm-modal-actions .primary:hover:not(:disabled) { background: var(--accent-strong); border-color: var(--accent-strong); }
+.auto-refill-settings-group { display: grid; gap: 9px; }
+.auto-refill-settings-group-divided { border-top: 1px solid var(--border); padding-top: 13px; }
+.auto-refill-settings-group-title { font-size: 12px; font-weight: 500; color: var(--muted-warm); }
+.auto-refill-settings-field-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; }
+.auto-refill-settings-field { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.auto-refill-settings-field > span:first-child { flex: 1; }
+.auto-refill-settings-field input { width: 74px; text-align: right; }
+.auto-refill-settings-unit { width: 14px; color: var(--muted); }
+.auto-refill-settings-reset { padding: 6px 10px; font-size: 12px; min-width: 0; }
+/* Errors and hints span both columns so they sit under the field, not beside
+   the Reset button. */
+.auto-refill-settings-field-row .danger-note,
+.auto-refill-settings-hint { grid-column: 1 / -1; margin: 0; font-size: 11px; line-height: 1.4; }
+.auto-refill-settings-note { margin: 0; font-size: 11px; line-height: 1.5; border-top: 1px solid var(--border); padding-top: 12px; }
 @media (max-width: 760px) {
   .blueprint-file-field { flex-basis: 100%; max-width: none; }
   .blueprint-list-toolbar, .blueprint-list-toolbar .service-actions { align-items: stretch; }

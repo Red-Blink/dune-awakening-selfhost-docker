@@ -16,6 +16,8 @@ vi.mock("../../api/bases", () => ({
     cancelQueuedDelete: vi.fn(),
     pendingDeletes: vi.fn(),
     autoRefill: vi.fn(),
+    autoRefillSettings: vi.fn(),
+    saveAutoRefillSettings: vi.fn(),
     setAutoRefill: vi.fn(),
     landClaim: vi.fn(),
     updateLandClaim: vi.fn(),
@@ -682,9 +684,44 @@ describe("BasesPanel auto-refill", () => {
     };
   }
 
+  function autoRefillSettingsState() {
+    const keys = ["thresholdPercent", "intervalHours", "waterThresholdPercent", "waterIntervalHours"] as const;
+    const byKey = <T,>(value: T) => Object.fromEntries(keys.map((key) => [key, value])) as Record<typeof keys[number], T>;
+    return {
+      settings: { thresholdPercent: 50, intervalHours: 24, waterThresholdPercent: 50, waterIntervalHours: 24 },
+      sources: byKey("default" as const),
+      defaults: { thresholdPercent: 50, intervalHours: 24, waterThresholdPercent: 50, waterIntervalHours: 24 },
+      limits: byKey({ min: 1, max: 168 }),
+      envNames: byKey("ADMIN_AUTO_REFILL_THRESHOLD_PERCENT")
+    };
+  }
+
   beforeEach(() => {
     vi.mocked(basesApi.pendingRefills).mockResolvedValue({ supported: true, total: 0, pending: [], byTarget: [] });
     vi.mocked(basesApi.autoRefill).mockResolvedValue(autoRefillState());
+    vi.mocked(basesApi.autoRefillSettings).mockResolvedValue(autoRefillSettingsState());
+  });
+
+  it("puts the settings gear left of Refresh and opens the overlay", async () => {
+    vi.mocked(basesApi.list).mockResolvedValue(queueCapableList({ base_id: "3002", name: "Sietch Enroll" }));
+    renderPanel();
+    const gear = await screen.findByRole("button", { name: "Auto-refill settings" });
+    expect(gear.nextElementSibling?.textContent).toBe("Refresh");
+
+    fireEvent.click(gear);
+    expect(await screen.findByText("Auto-refill settings", { selector: "h3" })).toBeInTheDocument();
+  });
+
+  // Without the refill queue there is no scanner to tune, so the gear goes --
+  // matching how the per-base toggles hide entirely in the same situation.
+  it("hides the settings gear when the database has no refill queue", async () => {
+    vi.mocked(basesApi.list).mockResolvedValue({
+      ...queueCapableList({ base_id: "3002", name: "Sietch NoQueue" }),
+      capabilities: { bases: true, generatorRefill: true }
+    });
+    renderPanel();
+    await screen.findByText("Sietch NoQueue");
+    expect(screen.queryByRole("button", { name: "Auto-refill settings" })).not.toBeInTheDocument();
   });
 
   async function expandRow(name: string) {

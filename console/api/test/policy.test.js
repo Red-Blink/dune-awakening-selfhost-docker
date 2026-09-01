@@ -121,6 +121,34 @@ test("the container item delete route resolves to bases:delete-item without shad
   assert.equal(actionForRoute("/api/bases/5/containers/9", "GET"), "bases:read");
 });
 
+// Same argument as the container routes above: rbacParity only proves an
+// action exists, not that it is the right one. Without the explicit
+// ROUTE_ACTIONS entry this POST falls through the "POST /api/bases/" prefix
+// rule to bases:mutate, which would silently let every per-base-refill grant
+// retune the global automation policy.
+test("the auto-refill settings routes resolve to their own actions without shadowing their neighbours", () => {
+  assert.equal(actionForRoute("/api/bases/auto-refill/settings", "POST"), "bases:write-config");
+  assert.equal(actionForRoute("/api/bases/auto-refill/settings", "GET"), "bases:read");
+  // The per-base enrollment toggle keeps the shared mutate bucket, and the
+  // enrollment read keeps bases:read -- the new paths sit beside them.
+  assert.equal(actionForRoute("/api/bases/5/auto-refill", "POST"), "bases:mutate");
+  assert.equal(actionForRoute("/api/bases/5/auto-refill-water", "POST"), "bases:mutate");
+  assert.equal(actionForRoute("/api/bases/auto-refill", "GET"), "bases:read");
+  assert.equal(actionForRoute("/api/bases/auto-refill-water", "GET"), "bases:read");
+});
+
+test("bases:write-config is not carried by a bases:mutate grant", () => {
+  const policies = {
+    moderator: { version: 1, tier: "moderator", statements: [{ Effect: "Allow", Action: ["bases:read", "bases:mutate"] }] }
+  };
+  // A hand-authored policy that predates the settings surface must not gain it.
+  assert.equal(evaluate({ tier: "moderator" }, "bases:mutate", policies), true);
+  assert.equal(evaluate({ tier: "moderator" }, "bases:write-config", policies), false);
+  // The shipped tiers grant bases:*, so default access is unchanged.
+  assert.equal(evaluate({ tier: "admin" }, "bases:write-config"), true);
+  assert.equal(evaluate({ tier: "owner" }, "bases:write-config"), true);
+});
+
 test("vehicle permission routes resolve to their own read/mutate actions", () => {
   assert.equal(actionForRoute("/api/vehicles/5/permissions", "GET"), "vehicles:read");
   assert.equal(actionForRoute("/api/vehicles/5/permissions", "PUT"), "vehicles:mutate");

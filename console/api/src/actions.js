@@ -210,11 +210,26 @@ export const ROUTE_ACTIONS = {
   "GET /api/bases":                            "bases:read",
   "GET /api/bases/pending-refills":            "bases:read",
   "GET /api/bases/auto-refill":                "bases:read",
+  "GET /api/bases/auto-refill/settings":       "bases:read",
   "GET /api/bases/pending-water-refills":      "bases:read",
   "GET /api/bases/auto-refill-water":          "bases:read",
   "GET /api/bases/permission-candidates":      "bases:read",
   "GET /api/bases/pending-deletes":            "bases:read",
   "GET /api/bases/pending-child-access":       "bases:read",
+
+  // --- Bases (console-owned settings) ---
+  // POST /api/bases/auto-refill/settings — thresholds and scan intervals for
+  // both scanners. Its own action for the same consent reason as
+  // bases:delete-item below: every other action in the bases:mutate bucket is
+  // scoped to one base, whereas this retunes every enrolled base at once, so a
+  // bases:mutate grant cannot be read as consent to it. Named for the
+  // per-feature settings convention (exchange:write-config, maps:write-config);
+  // owner/admin grant bases:*, so default access is unchanged.
+  //
+  // This entry is also what keeps the route off the "POST /api/bases/" →
+  // bases:mutate prefix rule, where it would resolve silently rather than
+  // failing closed.
+  "POST /api/bases/auto-refill/settings":      "bases:write-config",
 
   // --- Storage (read) ---
   "GET /api/storage":                          "storage:read",

@@ -116,6 +116,20 @@ Updates that remove the owner's `settings:write` access are rejected so the loca
 
 Add and remove stay one action deliberately: two directions of the same roster knob. Both `DELETE` patterns are anchored regexes rather than prefix rules, because `/api/guilds/{id}` and `/api/guilds/{id}/members/{playerId}` share a prefix and the variable segment comes before the part that distinguishes them — the same reason `bases:delete` needs a real regex.
 
+`bases:mutate` keeps the per-base knobs — refills, permissions, custodian, auto-refill enrollment, queue cancellations — and everything below was carved out of it for consequence or consent. Unlike the namespaces above, `bases:mutate` still exists and is still the bucket most base routes resolve to.
+
+| Action | Covers |
+|---|---|
+| `bases:delete` | delete the base and everything on it |
+| `bases:delete-item` | delete one stored item |
+| `bases:bulk-delete-items` | delete several selected stacks, or clear a container |
+| `bases:add-item` | create a new stored item |
+| `bases:give-item` | give-item, give-items |
+| `bases:fill-item` | fill an existing stack to its cap |
+| `bases:write-config` | the auto-refill thresholds and scan intervals |
+
+`bases:write-config` is the consent case rather than the blast-radius one: every other action here acts on one base and is reversible on that base, whereas the thresholds and intervals govern the automation for *every* enrolled base at once. An operator granted `bases:mutate` agreed to enroll bases, not to retune the policy behind all of them. It follows the per-feature settings convention (`exchange:write-config`, `maps:write-config`). Shipped defaults are unchanged: `owner` (`*`) and `admin` (`bases:*`) reach it, and `moderator`/`player`/`observer` keep `bases:read` only, so they can read the settings but not save them.
+
 `blueprints:mutate` and `addons:mutate` were split on the same grounds.
 
 | Action | Covers |

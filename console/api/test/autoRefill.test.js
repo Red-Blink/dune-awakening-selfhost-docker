@@ -5,12 +5,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   autoRefillPublicState,
+  clampAutoRefillNextRun,
   createAutoRefillScheduler,
   isAutoRefillEnabled,
   readAutoRefillState,
   setBaseAutoRefill,
   writeAutoRefillState
 } from "../src/services/autoRefill.js";
+import { saveAutoRefillSettings } from "../src/services/autoRefillSettings.js";
 import { listQueuedBaseDeletes, listQueuedGeneratorRefills, queueGeneratorRefill } from "../src/duneDb.js";
 
 // Must await fn: without it the finally deletes the directory at the callback's
@@ -676,5 +678,86 @@ test("the enrollment file is written atomically with owner-only permissions", as
     // Pretty-printed and newline-terminated, matching the pending refill queue.
     assert.equal(raw.endsWith("}\n"), true);
     assert.equal(JSON.parse(raw).schemaVersion, 1);
+  });
+});
+
+// --- Settings layering and interval re-arm ---
+
+test("a persisted threshold overrides the env var for the scanner itself", async () => {
+  await withTempRepoRoot(async (repoRoot) => {
+    saveAutoRefillSettings(repoRoot, { thresholdPercent: 80 });
+    // 60% is healthy against the env/default 50 but starved against the saved
+    // 80, so this only queues if run() reads the settings file.
+    const clock = makeClock();
+    const duneDb = fakeDuneDb({ levels: { 482: { lowestPercent: 60, deviceCount: 2 } } });
+    const { scheduler } = makeScheduler(repoRoot, duneDb, clock, {});
+    setBaseAutoRefill(repoRoot, 482, true, { now: clock.now, env: TEST_ENV });
+    // The first tick only arms the schedule; a scan needs a primed scheduler.
+    await primeScheduler(scheduler, repoRoot, clock);
+    forceDue(repoRoot, clock);
+    await scheduler.tick();
+
+    assert.equal(listQueuedGeneratorRefills(repoRoot).length, 1, "queued against the saved threshold");
+  });
+});
+
+test("the public state reports the persisted threshold and interval", async () => {
+  await withTempRepoRoot((repoRoot) => {
+    saveAutoRefillSettings(repoRoot, { thresholdPercent: 35, intervalHours: 6 });
+    const state = autoRefillPublicState(repoRoot, { env: { ADMIN_AUTO_REFILL_THRESHOLD_PERCENT: "70" } });
+    assert.equal(state.thresholdPercent, 35);
+    assert.equal(state.intervalHours, 6);
+  });
+});
+
+// Without this, shortening the interval looks like it did nothing until the
+// already-armed run fires -- up to a week away at the maximum interval.
+test("shortening the interval pulls an already-armed scan in", async () => {
+  await withTempRepoRoot((repoRoot) => {
+    const clock = makeClock();
+    setBaseAutoRefill(repoRoot, 482, true, { now: clock.now, env: TEST_ENV });
+    const armed = Date.parse(readAutoRefillState(repoRoot).nextRunAt);
+    assert.equal(armed, clock.at() + 24 * HOUR_MS, "armed a default interval out");
+
+    saveAutoRefillSettings(repoRoot, { intervalHours: 2 });
+    const next = clampAutoRefillNextRun(repoRoot, { now: clock.now, env: TEST_ENV });
+    assert.equal(Date.parse(next), clock.at() + 2 * HOUR_MS);
+    assert.equal(Date.parse(readAutoRefillState(repoRoot).nextRunAt), clock.at() + 2 * HOUR_MS, "persisted, not just returned");
+  });
+});
+
+test("lengthening the interval leaves the armed scan where it is", async () => {
+  await withTempRepoRoot((repoRoot) => {
+    const clock = makeClock();
+    setBaseAutoRefill(repoRoot, 482, true, { now: clock.now, env: TEST_ENV });
+    const armed = readAutoRefillState(repoRoot).nextRunAt;
+
+    saveAutoRefillSettings(repoRoot, { intervalHours: 168 });
+    assert.equal(clampAutoRefillNextRun(repoRoot, { now: clock.now, env: TEST_ENV }), armed);
+    assert.equal(readAutoRefillState(repoRoot).nextRunAt, armed, "no write at all");
+  });
+});
+
+test("the re-arm no-ops with nothing enrolled and with no armed run", async () => {
+  await withTempRepoRoot((repoRoot) => {
+    const clock = makeClock();
+    // Nothing enrolled: nextRunAt is "" and must stay that way.
+    assert.equal(clampAutoRefillNextRun(repoRoot, { now: clock.now, env: TEST_ENV }), "");
+
+    setBaseAutoRefill(repoRoot, 482, true, { now: clock.now, env: TEST_ENV });
+    setBaseAutoRefill(repoRoot, 482, false, { now: clock.now, env: TEST_ENV });
+    assert.equal(clampAutoRefillNextRun(repoRoot, { now: clock.now, env: TEST_ENV }), "");
+  });
+});
+
+test("a threshold-only save never rewrites the enrollment file", async () => {
+  await withTempRepoRoot((repoRoot) => {
+    const clock = makeClock();
+    setBaseAutoRefill(repoRoot, 482, true, { now: clock.now, env: TEST_ENV });
+    const before = readFileSync(statePath(repoRoot), "utf8");
+
+    saveAutoRefillSettings(repoRoot, { thresholdPercent: 40 });
+    clampAutoRefillNextRun(repoRoot, { now: clock.now, env: TEST_ENV });
+    assert.equal(readFileSync(statePath(repoRoot), "utf8"), before);
   });
 });

@@ -63,6 +63,31 @@ export type AutoRefillState = {
   bases: AutoRefillBase[];
 };
 
+// The four tunables shared by both auto-refill scanners. Layered console file
+// > env var > hardcoded default, which is why the payload carries more than
+// the values: `sources` says which layer won, and `defaults` is what Reset
+// restores (the env value where one is set, not the hardcoded fallback).
+export type AutoRefillSettingKey =
+  | "thresholdPercent"
+  | "intervalHours"
+  | "waterThresholdPercent"
+  | "waterIntervalHours";
+
+export type AutoRefillSettingSource = "console" | "env" | "default";
+
+export type AutoRefillSettings = {
+  settings: Record<AutoRefillSettingKey, number>;
+  sources: Record<AutoRefillSettingKey, AutoRefillSettingSource>;
+  defaults: Record<AutoRefillSettingKey, number>;
+  limits: Record<AutoRefillSettingKey, { min: number; max: number }>;
+  envNames: Record<AutoRefillSettingKey, string>;
+};
+
+// null resets a key to the env/default layer; an omitted key is left alone.
+// Sending the number instead of null on a reset would persist the current env
+// value and permanently shadow the env var.
+export type AutoRefillSettingsPatch = Partial<Record<AutoRefillSettingKey, number | null>>;
+
 // Water refill has no fuelName/capped/skipped concepts: it's a plain
 // jsonb_set straight to capacity, not a stack of discrete inventory items.
 export type RefillWaterDeviceResult = {
@@ -497,6 +522,10 @@ export const basesApi = {
   setAutoRefill: (baseId: string, enabled: boolean) =>
     post<{ ok: boolean; baseId: number; enabled: boolean; total: number }>(
       `/api/bases/${encodeURIComponent(baseId)}/auto-refill`, { enabled }),
+  autoRefillSettings: () => api<AutoRefillSettings>("/api/bases/auto-refill/settings"),
+  saveAutoRefillSettings: (patch: AutoRefillSettingsPatch) =>
+    post<AutoRefillSettings & { ok: boolean; nextRunAt: string; waterNextRunAt: string }>(
+      "/api/bases/auto-refill/settings", patch),
   permissions: (baseId: string) =>
     api<BasePermissions>(`/api/bases/${encodeURIComponent(baseId)}/permissions`),
   landClaim: (baseId: string) =>
