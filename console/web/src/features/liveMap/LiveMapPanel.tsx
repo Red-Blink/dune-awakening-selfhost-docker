@@ -4,7 +4,7 @@ import { liveMapApi, type LiveMapConfig, type LiveMapMarker, type LiveMapPartiti
 import { mapsApi } from "../../api/maps";
 import type { Task } from "../../api/setup";
 import { DataTable } from "../../components/common/DataTable";
-import { KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/common/DisplayPrimitives";
+import { StatusPill, TechnicalDetails } from "../../components/common/DisplayPrimitives";
 import { firstDefined, formatUiSentence, titleCase } from "../../lib/display";
 import { friendlyInlineError } from "../players/playerAdminUtils";
 import {
@@ -16,7 +16,7 @@ import {
   worldToLiveMapPoint,
   type LiveMapPoint
 } from "./liveMapGeometry";
-import { labelAnchorInView, sectorGridFor } from "./liveMapSectorGrid";
+import { labelAnchorInView, sectorForWorldPoint, sectorGridFor } from "./liveMapSectorGrid";
 
 // On-screen size of a sector label, in CSS pixels. The SVG is drawn in map-pixel
 // space and scaled by zoom, so the font size is divided back out to keep it
@@ -384,7 +384,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
       setSelected(null);
     }
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setSelected(null);
+      if (event.key === "Escape") { setSelected(null); setTarget(null); }
     }
     document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
@@ -502,6 +502,19 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
   // the label effect below depends on it, so a fresh object each render would
   // tear down and re-add the scroll listener and the ResizeObserver on every
   // marker hover and every five-second poll.
+  // A picked point borrows the marker overlay and the marker teleport flow by
+  // presenting itself as a marker. Everything downstream compares type and id as
+  // strings, so this needs no stable identity.
+  const pickedMarker: LiveMapMarker | null = target && activeMap ? {
+    id: "picked",
+    type: "picked_location",
+    name: "Picked Location",
+    map: activeMap.actorMap || activeMap.key,
+    partition_id: partitionId ? Number(partitionId) : undefined,
+    x: target.x,
+    y: target.y
+  } : null;
+  const pickedSector = target && activeMap?.key === "DeepDesert" ? sectorForWorldPoint(target.x, target.y) : null;
   const terrainKey = `${activeMap?.key || ""}:${coriolisLayout ?? ""}`;
   terrainKeyRef.current = terrainKey;
   const terrainReady = readyTerrainKey === terrainKey;
@@ -644,7 +657,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
   }
   function handleMapDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
     if (!activeMap || !canvasRef.current) return;
-    if ((event.target as HTMLElement).closest(".live-map-marker")) return;
+    if ((event.target as HTMLElement).closest(".live-map-marker, .live-map-target")) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const px = (event.clientX - rect.left) / zoom;
     const py = (event.clientY - rect.top) / zoom;
@@ -911,13 +924,6 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
     <div className="live-map-layout">
       <aside className="live-map-sidebar">
         <section className="action-section">
-          <div className="live-map-coordinates-header">
-            <h4>Coordinates</h4>
-            <button type="button" className="live-map-coordinates-clear" disabled={!target} onClick={() => setTarget(null)}>Clear</button>
-          </div>
-          {target ? <KeyValueGrid items={[["X", target.x.toFixed(0)], ["Y", target.y.toFixed(0)], ["Partition", partitionId || "none selected"]]} /> : <p className="muted">Double-click the map to pick world coordinates.</p>}
-        </section>
-        <section className="action-section">
           <div className="live-map-layers-header" ref={layerSettingsRef}>
             <h4>Layers</h4>
             <button type="button" className="live-map-layers-settings-btn" aria-label="Default layer settings" onClick={() => (layerSettingsOpen ? setLayerSettingsOpen(false) : openLayerSettings())}>
@@ -1171,12 +1177,12 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
           <button onClick={fitLiveMapView}>Fit Map</button>
           {terrainEligible && <button aria-pressed={showSectorGrid} className={showSectorGrid ? "active" : ""} onClick={() => setShowSectorGrid((on) => !on)}>Sector Grid</button>}
           <label>Zoom<input className="live-map-zoom-range" type="range" min={zoomMinPercent} max={zoomMaxPercent} value={zoomValuePercent} style={{ "--zoom-progress": `${zoomProgressPercent}%` } as React.CSSProperties} onChange={(event) => setZoomAround(Number(event.target.value) / 100)} /></label>
-          <span className="muted">Drag to Pan. Mouse Wheel Zooms.</span>
+          <span className="muted">Drag to Pan. Mouse Wheel Zooms. Double-click to pick a location.</span>
         </div>
         {teleportResult && <HomeTaskResultCard result={teleportResult} />}
         <div className={`live-map-frame ${drag ? "dragging" : ""} ${playerDrag ? "dragging-player" : ""}`} ref={frameRef}
           onDoubleClick={handleMapDoubleClick}
-          onMouseDown={(event) => { if ((event.target as HTMLElement).closest(".live-map-marker")) return; setDrag({ x: event.clientX, y: event.clientY, left: frameRef.current?.scrollLeft || 0, top: frameRef.current?.scrollTop || 0 }); }}
+          onMouseDown={(event) => { if ((event.target as HTMLElement).closest(".live-map-marker, .live-map-target")) return; setDrag({ x: event.clientX, y: event.clientY, left: frameRef.current?.scrollLeft || 0, top: frameRef.current?.scrollTop || 0 }); }}
           onMouseMove={(event) => { if (!drag || !frameRef.current) return; frameRef.current.scrollLeft = drag.left - (event.clientX - drag.x); frameRef.current.scrollTop = drag.top - (event.clientY - drag.y); }}
           onMouseUp={() => setDrag(null)}
           onMouseLeave={() => setDrag(null)}>
@@ -1199,7 +1205,34 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
               </g>
             </svg>}
             <div className="live-map-marker-layer">
-              {targetPoint && <span className="live-map-target" style={{ left: `${targetPoint.px * zoom}px`, top: `${targetPoint.py * zoom}px` }} />}
+              {targetPoint && pickedMarker && <div className="live-map-target" style={{ left: `${targetPoint.px * zoom}px`, top: `${targetPoint.py * zoom}px` }}>
+                <div className={`live-map-marker-overlay ${overlayAnchorClasses(targetPoint, zoom, frameRef.current)}`} role="dialog" aria-label="Picked location"
+                  onMouseDown={(event) => event.stopPropagation()}
+                  onDoubleClick={(event) => event.stopPropagation()}>
+                  <div className="live-map-marker-overlay-header">
+                    <strong>Picked Location</strong>
+                    <button type="button" className="live-map-marker-overlay-close" aria-label="Close" onClick={() => setTarget(null)}>×</button>
+                  </div>
+                  <div className="live-map-marker-overlay-subtitle">{pickedSector ? `Sector ${pickedSector}` : activeMap?.label || ""}</div>
+                  <div className="live-map-marker-overlay-facts">
+                    <span>X</span><strong>{target!.x.toFixed(0)}</strong>
+                    <span>Y</span><strong>{target!.y.toFixed(0)}</strong>
+                    <span>Partition</span><strong>{partitionDisplayNames[partitionId] || partitionId || "none selected"}</strong>
+                  </div>
+                  <div className="live-map-marker-overlay-actions">
+                    <button type="button" className="live-map-marker-overlay-action" onClick={() => openTeleportPicker(pickedMarker)}>Teleport</button>
+                  </div>
+                  {teleportPickerFor && String(teleportPickerFor.id) === "picked" && <div className="live-map-marker-overlay-teleport">
+                    <select aria-label="Teleport destination player" value={teleportPickerPlayerId} onChange={(event) => setTeleportPickerPlayerId(event.target.value)}>
+                      {onlinePlayersForMarker(pickedMarker).map((row) => <option key={playerMarkerId(row)} value={playerMarkerId(row)}>{friendlyMarkerName(row)}</option>)}
+                    </select>
+                    <div className="live-map-marker-overlay-actions">
+                      <button type="button" className="live-map-marker-overlay-action" onClick={() => void confirmTeleportToMarker(pickedMarker, teleportPickerPlayerId)}>Confirm</button>
+                      <button type="button" className="live-map-marker-overlay-action" onClick={() => setTeleportPickerFor(null)}>Cancel</button>
+                    </div>
+                  </div>}
+                </div>
+              </div>}
               {inBounds.map(({ marker, point }, index) => {
                 const playerStatus = liveMapPlayerStatus(marker);
                 const isPinned = Boolean(selected && String(selected.type) === String(marker.type) && String(selected.id) === String(marker.id));

@@ -2638,8 +2638,6 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 .live-map-main { min-width: 0; display: grid; gap: 10px; }
 .live-map-map-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
 .live-map-map-buttons button { width: 100%; white-space: normal; min-height: 40px; }
-.live-map-coordinates-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.live-map-coordinates-clear { width: auto; min-height: 30px; padding: 5px 11px; font-size: 12px; }
 .live-map-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .live-map-toolbar button { width: auto; }
 .live-map-toolbar label { display: flex; align-items: center; gap: 8px; width: auto; color: #ceb894; }
@@ -3095,6 +3093,9 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 .live-map-target:after { content: ""; position: absolute; background: #ff9d8f; }
 .live-map-target:before { left: 50%; top: -7px; width: 2px; height: 32px; transform: translateX(-50%); }
 .live-map-target:after { top: 50%; left: -7px; height: 2px; width: 32px; transform: translateY(-50%); }
+/* The crosshair itself stays click-through so it never eats a double-click, but
+   the overlay hanging off it has to take pointer events for its own buttons. */
+.live-map-target > .live-map-marker-overlay { pointer-events: auto; }
 /* Anchored to the marker div itself (position:absolute against its
    position:relative-via-.live-map-marker ancestor -- see .live-map-marker's
    own rule), so it pans/zooms with the map for free instead of needing its

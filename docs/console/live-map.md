@@ -374,6 +374,13 @@ confirming teleports them to the marker's coordinates through the same
 the button reports "Error: No online players." instead of opening the
 picker.
 
+**Double-clicking empty map** picks that point and opens the same overlay on it,
+headed *Picked Location*: the world X and Y, the partition, the sector on the
+Deep Desert, and the same Teleport button. It presents itself to the teleport
+code as a marker (`type: "picked_location"`, the one marker type the API never
+sends) so that path is shared rather than duplicated. Closing the overlay, or
+pressing Escape, clears the pick.
+
 ## Related
 
 - [API-REFERENCE.md](API-REFERENCE.md#live-map) -- full HTTP API reference.

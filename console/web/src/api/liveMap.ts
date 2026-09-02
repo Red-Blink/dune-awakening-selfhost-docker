@@ -3,7 +3,10 @@ import type { Task } from "./setup";
 
 export type LiveMapMarker = {
   id: number | string;
-  type: "player" | "vehicle" | "base" | "storage" | "spice" | "spice_active" | "flour_sand" | "ore" | "scrap" | "flora" | "poi" | "house_representative" | "trainer" | "fortress" | "hazard" | "enemy";
+  // "picked_location" is the one member the API never sends: the Live Map builds
+  // a marker-shaped value for a double-clicked point so it can reuse the marker
+  // overlay and the marker teleport flow unchanged. It never enters the rows.
+  type: "player" | "vehicle" | "base" | "storage" | "spice" | "spice_active" | "flour_sand" | "ore" | "scrap" | "flora" | "poi" | "house_representative" | "trainer" | "fortress" | "hazard" | "enemy" | "picked_location";
   name?: string;
   owner_name?: string;
   base_type?: string;

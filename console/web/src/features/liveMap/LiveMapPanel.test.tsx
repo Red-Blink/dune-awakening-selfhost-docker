@@ -91,7 +91,7 @@ it("retains static markers during live-only refreshes without carrying them acro
   expect(mergeLiveMapRows(previous, incoming, true, "HaggaBasin")).toEqual(incoming);
 });
 
-it("clears coordinates selected from the map", async () => {
+it("opens an overlay on the picked point, with its coordinates and a teleport action", async () => {
   const { container } = render(<LiveMapPanel
     onError={vi.fn()}
     confirmAction={vi.fn().mockResolvedValue(true)}
@@ -102,15 +102,21 @@ it("clears coordinates selected from the map", async () => {
   />);
 
   await screen.findByRole("button", { name: "Base: Desert Home" });
+  expect(container.querySelector(".live-map-target")).toBeNull();
+
   const frame = container.querySelector(".live-map-frame");
-  expect(frame).not.toBeNull();
   fireEvent.doubleClick(frame!, { clientX: 100, clientY: 100 });
 
-  const clear = screen.getByRole("button", { name: "Clear" });
-  expect(clear).toBeEnabled();
-  fireEvent.click(clear);
-  expect(clear).toBeDisabled();
-  expect(screen.getByText("Double-click the map to pick world coordinates.")).toBeInTheDocument();
+  // The same overlay a marker gets, not a readout in the sidebar.
+  const overlay = screen.getByRole("dialog", { name: "Picked location" });
+  expect(overlay).toBeInTheDocument();
+  expect(overlay.textContent).toContain("Picked Location");
+  expect(overlay.querySelector(".live-map-marker-overlay-facts")?.textContent).toContain("X");
+  expect(screen.getByRole("button", { name: "Teleport" })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  expect(screen.queryByRole("dialog", { name: "Picked location" })).toBeNull();
+  expect(container.querySelector(".live-map-target")).toBeNull();
 });
 
 it("shows a base owner and opens that exact base from the marker drawer", async () => {
