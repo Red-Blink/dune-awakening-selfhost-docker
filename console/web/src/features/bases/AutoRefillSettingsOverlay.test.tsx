@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { useState } from "react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { StrictMode, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AutoRefillSettingsOverlay } from "./AutoRefillSettingsOverlay";
 import { basesApi } from "../../api/bases";
@@ -151,6 +151,44 @@ describe("AutoRefillSettingsOverlay", () => {
     }) as never);
     renderOverlay();
     await waitFor(() => expect(screen.getByText(/ADMIN_AUTO_REFILL_INTERVAL_HOURS \(12\)/)).toBeInTheDocument());
+  });
+
+  // The app mounts under StrictMode, which runs effects mount -> cleanup ->
+  // mount. A mounted-ref that is only cleared on unmount stays false after the
+  // remount, so the load never clears `loading` and the dialog sits on
+  // "Loading..." forever -- which is exactly what it did in the dev server
+  // while every non-StrictMode test passed.
+  it("finishes loading when mounted under StrictMode", async () => {
+    render(<StrictMode><AutoRefillSettingsOverlay onClose={() => {}} onSaved={() => {}} onError={() => {}} /></StrictMode>);
+    await waitFor(() => expect(screen.getAllByRole("spinbutton")).toHaveLength(4));
+    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
+  });
+
+  // onError alone is not enough: the panel's banner sits behind this dialog's
+  // scrim, so an operator with the overlay open would see nothing at all.
+  it("shows a save failure inside the dialog, not only via onError", async () => {
+    vi.mocked(basesApi.saveAutoRefillSettings).mockRejectedValue(new Error("Too many requests."));
+    renderOverlay();
+    await waitFor(() => expect(fields()).toHaveLength(4));
+    fireEvent.change(generatorThreshold(), { target: { value: "40" } });
+    fireEvent.click(screen.getByText("Save"));
+
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(within(dialog).getByText("Too many requests.")).toBeInTheDocument());
+  });
+
+  it("shows a load failure in the dialog with a way to retry", async () => {
+    vi.mocked(basesApi.autoRefillSettings).mockRejectedValueOnce(new Error("Settings could not be read."));
+    renderOverlay();
+
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(within(dialog).getByText("Settings could not be read.")).toBeInTheDocument());
+    // Without the retry branch this dialog is a title and nothing else.
+    const retry = within(dialog).getByText("Try again");
+
+    fireEvent.click(retry);
+    await waitFor(() => expect(fields()).toHaveLength(4));
+    expect(within(dialog).queryByText("Settings could not be read.")).not.toBeInTheDocument();
   });
 
   // The settings POST is rate limited where the per-base toggles are not, so a

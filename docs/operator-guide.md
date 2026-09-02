@@ -129,6 +129,15 @@ as unset — though on the standard Docker deployment `docker-compose.web.yml`
 substitutes its own default for a variable that is blank or missing, so a blank
 never reaches the console there.
 
+**Upgrade note.** Until this release the four `ADMIN_AUTO_REFILL_*` variables
+never reached the console in the standard Docker deployment: the console
+service passes an explicit list of variables and these were not on it, and
+nothing loads `.env` directly. They worked only when the console was run
+outside Docker. They are now passed through, so a value you set in `.env` and
+never saw take effect **will** apply after this upgrade. If you set one while
+troubleshooting and forgot about it, check it before deploying — or set the
+value you want from the gear icon, which overrides the variable either way.
+
 Two timing details worth knowing. **A shortened interval pulls the next scan
 in**; a lengthened one applies only after the currently scheduled scan runs.
 And **a changed threshold is used by the next scan**, not immediately — at a

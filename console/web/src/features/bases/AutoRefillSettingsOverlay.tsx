@@ -41,25 +41,44 @@ export function AutoRefillSettingsOverlay({ onClose, onSaved, onError }: AutoRef
   const [overridden, setOverridden] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Reported inside the modal, not only through onError: the panel's error
+  // banner is a static div in the page behind this dialog's z-index:1000 scrim,
+  // so an operator with the overlay open cannot see it. onError is still called
+  // so the banner carries the message once the dialog is closed.
+  const [requestError, setRequestError] = useState("");
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-
+  // Set on mount as well as cleared on unmount: StrictMode runs effects
+  // mount -> cleanup -> mount, so a cleanup-only ref stays false after the
+  // remount and every later load() bails out of its finally, leaving the
+  // dialog stuck on "Loading...".
+  const mountedRef = useRef(true);
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const loaded = await basesApi.autoRefillSettings();
-        if (cancelled) return;
-        setState(loaded);
-        setDrafts(Object.fromEntries(ALL_KEYS.map((key) => [key, String(loaded.settings[key])])));
-        setOverridden(Object.fromEntries(ALL_KEYS.map((key) => [key, loaded.sources[key] === "console"])));
-      } catch (error) {
-        if (!cancelled) onError(errorText(error));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [onError]);
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setRequestError("");
+    try {
+      const loaded = await basesApi.autoRefillSettings();
+      if (!mountedRef.current) return;
+      setState(loaded);
+      setDrafts(Object.fromEntries(ALL_KEYS.map((key) => [key, String(loaded.settings[key])])));
+      setOverridden(Object.fromEntries(ALL_KEYS.map((key) => [key, loaded.sources[key] === "console"])));
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setRequestError(errorText(error));
+      onErrorRef.current(errorText(error));
+    } finally {
+      if (mountedRef.current) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
 
   // Held in a ref so this effect can run once. BasesPanel passes onClose as a
   // new inline arrow every render and re-renders every 10s (usePendingRefills
@@ -102,6 +121,7 @@ export function AutoRefillSettingsOverlay({ onClose, onSaved, onError }: AutoRef
   const save = async () => {
     if (!state || !canSave) return;
     setSaving(true);
+    setRequestError("");
     onError("");
     try {
       const patch: AutoRefillSettingsPatch = {};
@@ -112,6 +132,7 @@ export function AutoRefillSettingsOverlay({ onClose, onSaved, onError }: AutoRef
     } catch (error) {
       // Only on failure: the success path has already unmounted via onClose().
       setSaving(false);
+      setRequestError(errorText(error));
       onError(errorText(error));
     }
   };
@@ -174,6 +195,18 @@ export function AutoRefillSettingsOverlay({ onClose, onSaved, onError }: AutoRef
           Applies to every enrolled base. Stored in the console only — no game data is changed,
           and the change applies without a restart.
         </p>
+
+
+        {requestError && <p className="danger-note" role="alert">{requestError}</p>}
+
+        {/* A failed load leaves `state` null; without this branch the dialog
+            renders a title and nothing else, which reads as broken rather than
+            as failed. */}
+        {!loading && !state && (
+          <div className="auto-refill-settings-group">
+            <button onClick={() => void load()}>Try again</button>
+          </div>
+        )}
 
         {loading ? <p className="muted">Loading…</p> : state && (
           <>
