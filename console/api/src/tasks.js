@@ -379,7 +379,7 @@ function shellQuote(value) {
 }
 
 export function taskTimeoutMs(config, operation) {
-  if (["backupSystemCreate", "start", "stop", "restartAll", "stopGameServersForDbWrites", "restartService", "restartServiceStop", "restartServiceStart", "serverTitle", "serverConfig", "init", "updateApply", "updateFixSteamcmd", "selfUpdateApply", "backupRestore", "storageCleanupImages", "storageCleanupBuildCache", "userSettingsSaveAndRestart", "userSettingsResetAndRestart", "userSettingsRawAndRestart", "mapsApplySettings", "mapsRespawn", "sietchesSetActive", "sietchesRestart", "sietchesRestartStop", "sietchesRestartStart", "sietchesReconcile", "deepdesertAction"].includes(operation)) {
+  if (["backupSystemCreate", "backupSystemRestore", "start", "stop", "restartAll", "stopGameServersForDbWrites", "restartService", "restartServiceStop", "restartServiceStart", "serverTitle", "serverConfig", "init", "updateApply", "updateFixSteamcmd", "selfUpdateApply", "backupRestore", "storageCleanupImages", "storageCleanupBuildCache", "userSettingsSaveAndRestart", "userSettingsResetAndRestart", "userSettingsRawAndRestart", "mapsApplySettings", "mapsRespawn", "sietchesSetActive", "sietchesRestart", "sietchesRestartStop", "sietchesRestartStart", "sietchesReconcile", "deepdesertAction"].includes(operation)) {
     return Math.max(config.commandTimeoutMs, 30 * 60 * 1000);
   }
   return config.commandTimeoutMs;

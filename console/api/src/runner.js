@@ -132,6 +132,15 @@ export function buildDuneArgs(operation, payload = {}) {
       return ["db", "delete-system", validateBackupName(payload.backup)];
     case "backupSystemDeleteSelected":
       return ["db", "delete-system", ...validateBackupNames(payload.backups)];
+    case "backupSystemRestore": {
+      const args = ["db", "restore-system", validateBackupName(payload.backup)];
+      // Dry run unless the caller explicitly applies, so a mis-sent request
+      // previews rather than replaces the host's configuration.
+      if (!payload.apply) args.push("--dry-run");
+      if (payload.identityMode === "adopt-backup") args.push("--adopt-backup-battlegroup");
+      if (payload.identityMode === "keep-current") args.push("--keep-current-battlegroup");
+      return args;
+    }
     case "backupAutoEnable":
       {
         const args = ["db", "auto", "enable", validateUpdateTime(payload.time || "05:00")];

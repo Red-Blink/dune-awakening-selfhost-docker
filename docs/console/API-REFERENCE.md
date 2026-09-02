@@ -127,6 +127,7 @@ When the Restart Queue is enabled, the restart routes above (`/api/server/restar
 | DELETE | `/api/backups/system/{name}` | Delete a system backup and its `.yaml` sidecar. Requires `backups:delete-system` | `name` (string) |
 | POST | `/api/backups/system/delete-selected` | Delete the named system backups. Requires `backups:delete-system` | `backups` (string array) |
 | POST | `/api/backups/system/delete-all` | Delete every system backup. Requires `backups:delete-system` | None |
+| POST | `/api/backups/system/{name}/restore` | Restore a system backup: database, `.env`, `runtime/generated`, `runtime/secrets`. Dry run unless `apply` is set. Does not restart the stack. Requires `backups:restore-system` | `name` (string), `passphrase` (12-1024 chars), `apply` (optional), `identityMode` (optional: `adopt-backup` or `keep-current`) |
 | GET | `/api/backups/auto` | Get auto-backup status | None |
 | POST | `/api/backups/auto` | Save auto-backup config | `enabled`, `time`, `retentionDays`, `intervalHours` |
 

@@ -828,6 +828,9 @@ async function handleApi(req, res) {
     }
     return task(req, res, "backup", "backupSystemDeleteSelected", { backups });
   }
+  if (path.match(/^\/api\/backups\/system\/[^/]+\/restore$/) && req.method === "POST") {
+    return systemBackupRestoreRoute(req, res, decodeURIComponent(path.split("/").at(-2)));
+  }
   if (path.match(/^\/api\/backups\/system\/[^/]+$/) && req.method === "DELETE") {
     const backup = decodeURIComponent(path.split("/").pop());
     if (!validSystemArchiveName(backup)) return json(res, 400, { error: "Invalid system backup name." });
@@ -1709,6 +1712,35 @@ async function externalBackupImportRoute(req, res) {
   const result = await runDune(config, buildDuneArgs("backupList"));
   const rows = enrichBackupRows(config, parseBackupListRows(result.stdout));
   return json(res, 200, { ok: true, backup: importedName, rows, row: rows.find((row) => row.name === importedName) || null });
+}
+
+async function systemBackupRestoreRoute(req, res, name) {
+  // Decrypts and rewrites this host's configuration, secrets and database, so
+  // it is rate limited alongside the other expensive system-backup operations.
+  if (!applyMutationRateLimit(req, res, "backups.system.restore")) return;
+  if (!validSystemArchiveName(name)) return json(res, 400, { error: "Invalid system backup name." });
+
+  const body = await readJson(req);
+  const passphrase = String(body?.passphrase || "");
+  if (passphrase.length < 12) return json(res, 400, { error: "The passphrase must be at least 12 characters." });
+  if (passphrase.length > 1024) return json(res, 400, { error: "The passphrase is too long." });
+  if (new Set(passphrase).size < 5) {
+    return json(res, 400, { error: "The passphrase must use at least 5 different characters." });
+  }
+
+  const identityMode = body?.identityMode === "adopt-backup" || body?.identityMode === "keep-current"
+    ? body.identityMode
+    : "";
+  // Dry run unless apply is explicitly set: the UI previews first, and a
+  // request that loses its flag must not replace the host.
+  const apply = body?.apply === true || String(body?.apply || "") === "1";
+
+  audit(config, req, "backup.restore-system", { backup: name, apply, identityMode });
+  // The passphrase rides in options.env, never the payload above, which is what
+  // audit() records.
+  return task(req, res, "backup", "backupSystemRestore", { backup: name, apply, identityMode }, {
+    env: { DUNE_SYSTEM_BACKUP_PASSPHRASE: passphrase }
+  });
 }
 
 async function systemBackupCreateRoute(req, res) {

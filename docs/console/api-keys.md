@@ -107,7 +107,7 @@ namespace" rule, so Create stays disabled until something is selected.
 | `landsraad` | `landsraad:read` | `write` |
 | `server` | `server:read` | `network-fix`, `restart`, `restart-service`, `start`, `stop`, `storage-cleanup`, `write-config` |
 | `logs` | `logs:read` | *nothing — no write action exists* |
-| `backups` | `backups:read` | `create`, `create-system`, `delete`, `delete-system`, `download-system`, `import`, `restore`, `write-config` |
+| `backups` | `backups:read` | `create`, `create-system`, `delete`, `delete-system`, `download-system`, `import`, `restore`, `restore-system`, `write-config` |
 | `updates` | `updates:check`, `updates:read` | *nothing — write actions are denied to keys* |
 | `carepackage` | `carepackage:read` | `clear-history`, `grant`, `scan`, `write-config` |
 | `addons` | `addons:read` | *nothing — write actions are denied to keys* |
@@ -150,6 +150,11 @@ database backups:
   test, so this route's own action assignment is the only thing keeping the archive off a
   read-only grant.
 
+- **`backups:restore-system`** — `POST /api/backups/system/{name}/restore`. Replaces
+  `.env`, `runtime/generated`, `runtime/secrets` and the database on this host from an
+  archive. The most destructive action in the namespace: it can change the admin console
+  password and the database credentials out from under the running stack. Defaults to a
+  dry run; only `apply` actually writes.
 - **`backups:delete-system`** — `DELETE /api/backups/system/{name}` and the bulk
   delete routes. Separate from `backups:delete` on purpose: a system archive is the
   only copy of the credentials inside it, so destroying one should be grantable

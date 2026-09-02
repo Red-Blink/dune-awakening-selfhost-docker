@@ -498,6 +498,10 @@ export const REGEX_ACTIONS_BY_METHOD_PATTERN = [
   // backups' backups:delete -- these archives are the only copy of the
   // credentials they contain, so the two should be grantable separately.
   { method: "DELETE", pattern: /^\/api\/backups\/system\/[^/]+$/, action: "backups:delete-system" },
+  // POST /api/backups/system/{name}/restore -- replaces .env, runtime/generated,
+  // runtime/secrets and the database from an archive. Its own action: this is a
+  // whole-host takeover, not a variation on restoring a database dump.
+  { method: "POST", pattern: /^\/api\/backups\/system\/[^/]+\/restore$/, action: "backups:restore-system" },
   // DELETE /api/bases/{baseId}/containers/{placeableId}/items/{itemId} —
   // destroying one stored item. Its own action for a different reason than
   // bases:delete above: not blast radius, but consent. Base inventory shipped

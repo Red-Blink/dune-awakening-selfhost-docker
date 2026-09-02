@@ -216,3 +216,43 @@ test("listSystemBackups derives Type and Source the way the database table does"
   // something writes backup_origin: external, which no import path does yet.
   assert.equal(byName.get(orphan).source, "Local");
 });
+
+// The most destructive route in the namespace: it rewrites this host's
+// configuration, secrets and database from an archive.
+test("the restore route carries its own write-shaped action", () => {
+  const action = actionForRoute(`/api/backups/system/${ARCHIVE}/restore`, "POST");
+  assert.equal(action, "backups:restore-system");
+  assert.equal(isReadAction(action), false);
+  assert.notEqual(action, "backups:read");
+  assert.notEqual(action, "backups:restore");
+});
+
+test("restore previews by default and only applies when asked", () => {
+  const preview = buildDuneArgs("backupSystemRestore", { backup: ARCHIVE });
+  assert.deepEqual(preview, ["db", "restore-system", ARCHIVE, "--dry-run"]);
+
+  const applied = buildDuneArgs("backupSystemRestore", { backup: ARCHIVE, apply: true });
+  assert.ok(!applied.includes("--dry-run"), "apply must drop the dry-run flag");
+  assert.deepEqual(applied, ["db", "restore-system", ARCHIVE]);
+});
+
+test("restore passes the Battlegroup identity choice through to import_db", () => {
+  assert.deepEqual(
+    buildDuneArgs("backupSystemRestore", { backup: ARCHIVE, apply: true, identityMode: "adopt-backup" }),
+    ["db", "restore-system", ARCHIVE, "--adopt-backup-battlegroup"]
+  );
+  assert.deepEqual(
+    buildDuneArgs("backupSystemRestore", { backup: ARCHIVE, apply: true, identityMode: "keep-current" }),
+    ["db", "restore-system", ARCHIVE, "--keep-current-battlegroup"]
+  );
+  // An unrecognised value must not become a flag.
+  assert.deepEqual(
+    buildDuneArgs("backupSystemRestore", { backup: ARCHIVE, apply: true, identityMode: "nonsense" }),
+    ["db", "restore-system", ARCHIVE]
+  );
+});
+
+test("restore refuses a name that is not a system archive", () => {
+  assert.throws(() => buildDuneArgs("backupSystemRestore", { backup: "../etc/passwd" }), /Invalid backup name/);
+  assert.equal(validSystemArchiveName(`${ARCHIVE}.yaml`), false);
+});
