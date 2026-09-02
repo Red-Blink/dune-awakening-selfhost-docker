@@ -114,6 +114,12 @@ export const ROUTE_ACTIONS = {
   "POST /api/backups/delete-all":              "backups:delete",
   "POST /api/backups/delete-selected":         "backups:delete",
   "POST /api/backups/import-external":         "backups:import",
+  "GET /api/backups/system":                   "backups:read",
+  // Runs pg_dump and writes an encrypted archive holding .env and every file in
+  // runtime/secrets. Write-shaped, so a key scoped `backups: read` cannot reach it.
+  "POST /api/backups/system/create":           "backups:create-system",
+  "POST /api/backups/system/delete-selected":  "backups:delete-system",
+  "POST /api/backups/system/delete-all":       "backups:delete-system",
 
   // --- Database ---
   "GET /api/database/status":                  "database:read",
@@ -482,6 +488,16 @@ export const REGEX_ACTIONS_BY_METHOD_PATTERN = [
   // delete — all cancellations) still falls through to the
   // "DELETE /api/bases/" prefix rule above, unaffected.
   { method: "DELETE", pattern: /^\/api\/bases\/[^/]+$/, action: "bases:delete" },
+  // GET /api/backups/system/{name}/download -- hands over an archive containing
+  // every credential on the host, gated only by the operator's passphrase. Its
+  // own write-shaped action, NOT the "/api/backups/" prefix bucket's
+  // backups:read. A GET is invisible to the mutating-route parity test, so this
+  // entry is the only thing keeping it off a read-only grant.
+  { method: "GET", pattern: /^\/api\/backups\/system\/[^/]+\/download$/, action: "backups:download-system" },
+  // DELETE /api/backups/system/{name}. Its own action rather than the database
+  // backups' backups:delete -- these archives are the only copy of the
+  // credentials they contain, so the two should be grantable separately.
+  { method: "DELETE", pattern: /^\/api\/backups\/system\/[^/]+$/, action: "backups:delete-system" },
   // DELETE /api/bases/{baseId}/containers/{placeableId}/items/{itemId} —
   // destroying one stored item. Its own action for a different reason than
   // bases:delete above: not blast radius, but consent. Base inventory shipped

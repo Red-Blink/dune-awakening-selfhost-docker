@@ -49,7 +49,10 @@ export class TaskManager {
     return this.tasks.get(id) || null;
   }
 
-  create(type, operation, payload = {}) {
+  // `options.env` is deliberately NOT stored on the task: this.tasks retains
+  // tasks for config.taskRetention and publicTask() serializes them to callers,
+  // so a secret placed there would leak. It lives only in this closure.
+  create(type, operation, payload = {}, options = {}) {
     const id = randomUUID();
     const task = {
       id,
@@ -81,7 +84,7 @@ export class TaskManager {
     this.trim();
 
     if (!cachedHit) {
-      queueMicrotask(() => this.run(task, payload));
+      queueMicrotask(() => this.run(task, payload, options.env));
     }
     return publicTask(task);
   }
@@ -93,7 +96,7 @@ export class TaskManager {
     return () => task.subscribers.delete(write);
   }
 
-  async run(task, payload) {
+  async run(task, payload, env) {
     task.status = "running";
     task.currentStep = "Running";
     this.emit(task, "Task started");
@@ -116,7 +119,7 @@ export class TaskManager {
           const args = buildDuneArgs(operation, payload);
           result = await runDune(this.config, args, {
             allowedExitCodes: operation === "selfUpdateCheck" ? [0, 100] : [0],
-            env: operation === "init" ? { DUNE_INIT_ASSUME_YES: "1" } : {},
+            env: { ...(operation === "init" ? { DUNE_INIT_ASSUME_YES: "1" } : {}), ...(env || {}) },
             timeoutMs: taskTimeoutMs(this.config, operation),
             onLine: (text, stream) => this.append(task, text, stream)
           });
@@ -376,7 +379,7 @@ function shellQuote(value) {
 }
 
 export function taskTimeoutMs(config, operation) {
-  if (["start", "stop", "restartAll", "stopGameServersForDbWrites", "restartService", "restartServiceStop", "restartServiceStart", "serverTitle", "serverConfig", "init", "updateApply", "updateFixSteamcmd", "selfUpdateApply", "backupRestore", "storageCleanupImages", "storageCleanupBuildCache", "userSettingsSaveAndRestart", "userSettingsResetAndRestart", "userSettingsRawAndRestart", "mapsApplySettings", "mapsRespawn", "sietchesSetActive", "sietchesRestart", "sietchesRestartStop", "sietchesRestartStart", "sietchesReconcile", "deepdesertAction"].includes(operation)) {
+  if (["backupSystemCreate", "start", "stop", "restartAll", "stopGameServersForDbWrites", "restartService", "restartServiceStop", "restartServiceStart", "serverTitle", "serverConfig", "init", "updateApply", "updateFixSteamcmd", "selfUpdateApply", "backupRestore", "storageCleanupImages", "storageCleanupBuildCache", "userSettingsSaveAndRestart", "userSettingsResetAndRestart", "userSettingsRawAndRestart", "mapsApplySettings", "mapsRespawn", "sietchesSetActive", "sietchesRestart", "sietchesRestartStop", "sietchesRestartStart", "sietchesReconcile", "deepdesertAction"].includes(operation)) {
     return Math.max(config.commandTimeoutMs, 30 * 60 * 1000);
   }
   return config.commandTimeoutMs;

@@ -656,6 +656,15 @@ seed_repo_tree "$case10_root/work"
 cp "$bin_dir/docker" "$case10_root/altbin/docker"
 cat > "$case10_root/altbin/gpg" <<'EOF'
 #!/usr/bin/env bash
+# backup_system probes for AEAD support before it does any work. This stub
+# simulates a failure DURING encryption, not an unusable gpg, so the probe
+# must succeed -- otherwise the run aborts at the preflight and this case
+# silently stops covering what it claims to.
+if [ "${1:-}" = "--dump-options" ]; then
+  printf '%s
+' --aead-algo
+  exit 0
+fi
 echo "gpg: simulated disk-full failure (ENOSPC) during encryption" >&2
 exit 1
 EOF

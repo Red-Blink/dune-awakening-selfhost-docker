@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { backupIdentityDiffers, backupsApi } from "../../api/backups";
+import type { SystemBackupRow } from "../../api/backups";
 import type { Task } from "../../api/setup";
 import { DataTable } from "../../components/common/DataTable";
 import { KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/common/DisplayPrimitives";
@@ -49,6 +50,11 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
   const [backupResult, setBackupResult] = useState<BackupResult | null>(null);
   const [autoResult, setAutoResult] = useState<BackupResult | null>(null);
   const [importResult, setImportResult] = useState<BackupResult | null>(null);
+  const [systemRows, setSystemRows] = useState<SystemBackupRow[]>([]);
+  const [systemResult, setSystemResult] = useState<BackupResult | null>(null);
+  const [systemPassphrase, setSystemPassphrase] = useState("");
+  const [systemPassphraseConfirm, setSystemPassphraseConfirm] = useState("");
+  const [selectedSystemBackups, setSelectedSystemBackups] = useState<Set<string>>(new Set());
   const [importBackupFile, setImportBackupFile] = useState<File | null>(null);
   const [importMetadataFile, setImportMetadataFile] = useState<File | null>(null);
   const importBackupInputRef = useRef<HTMLInputElement | null>(null);
@@ -98,6 +104,78 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
     });
     return backupsRefreshRef.current;
   }
+  async function refreshSystemBackups() {
+    const result = await backupsApi.listSystem();
+    setSystemRows(result.rows || []);
+  }
+
+  async function createSystemBackup() {
+    // Double entry mirrors the CLI prompt: a mistyped passphrase produces an
+    // archive nobody can ever decrypt, and the archive is the only copy.
+    if (systemPassphrase.length < 12) {
+      setSystemResult({ status: "failed", title: "System Backup Failed", message: "The passphrase must be at least 12 characters." });
+      return;
+    }
+    // Mirrors the server's floor so this fails before a round trip.
+    if (new Set(systemPassphrase).size < 5) {
+      setSystemResult({ status: "failed", title: "System Backup Failed", message: "The passphrase must use at least 5 different characters." });
+      return;
+    }
+    if (systemPassphrase !== systemPassphraseConfirm) {
+      setSystemResult({ status: "failed", title: "System Backup Failed", message: "The two passphrases do not match." });
+      return;
+    }
+    setBusyAction("createSystem");
+    setSystemResult({ status: "running", title: "Creating System Backup" });
+    try {
+      const response = await backupsApi.createSystem(systemPassphrase);
+      const final = await waitForTask(response.task);
+      setSystemResult(summarizeBackupTask(final, "System Backup Created", "System Backup Failed"));
+      if (final.status === "succeeded") await refreshSystemBackups();
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      setSystemResult({ status: "failed", title: "System Backup Failed", message: reason });
+    } finally {
+      // Cleared on failure too -- never leave a passphrase sitting in the DOM.
+      setSystemPassphrase("");
+      setSystemPassphraseConfirm("");
+      setBusyAction("");
+    }
+  }
+
+  function toggleSystemBackup(name: string, checked: boolean) {
+    setSelectedSystemBackups((current) => {
+      const next = new Set(current);
+      if (checked) next.add(name); else next.delete(name);
+      return next;
+    });
+  }
+
+  // The system section keeps its own result card and busy labels so a delete
+  // here never overwrites the database backup card beside it.
+  async function runSystemBackupTask(action: string, taskFactory: () => Promise<{ task: Task }>, runningTitle: string, successTitle: string, failureTitle: string) {
+    setBusyAction(action);
+    setSystemResult({ status: "running", title: runningTitle });
+    try {
+      const response = await taskFactory();
+      const final = await waitForTask(response.task);
+      const result = summarizeBackupTask(final, successTitle, failureTitle);
+      setSystemResult(final.status === "succeeded" ? { ...result, tone: "danger" } : result);
+      if (final.status === "succeeded") {
+        setSelectedSystemBackups(new Set());
+        await refreshSystemBackups();
+      }
+      return final;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      setSystemResult({ status: "failed", title: failureTitle, message: reason });
+      onError(reason);
+      return null;
+    } finally {
+      setBusyAction("");
+    }
+  }
+
   async function runBackupTask(action: "create" | "delete" | "deleteSelected" | "deleteAll" | "restore" | "auto", taskFactory: () => Promise<{ task: Task }>, successTitle: string, failureTitle: string) {
     setBusyAction(action);
     const setter = action === "auto" ? setAutoResult : setBackupResult;
@@ -192,6 +270,9 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
     }
   }
   useEffect(() => {
+    refreshSystemBackups().catch(() => setSystemRows([]));
+  }, []);
+  useEffect(() => {
     refresh().catch((error) => {
       setBackupResult({
         status: "failed",
@@ -232,46 +313,64 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
     });
   }
   return (
-    <section className="panel">
-      <div className="panel-title"><h2>Backups</h2><div className="action-row"><button disabled={Boolean(busyAction)} onClick={() => run(refresh)}>Refresh Backups</button><button disabled={Boolean(busyAction)} onClick={() => run(() => runBackupTask("create", backupsApi.create, "Backup Created Successfully", "Backup failed"))}>Create Backup</button><button className="danger" disabled={Boolean(busyAction) || !selectedBackups.size} onClick={() => run(async () => {
-        const names = [...selectedBackups];
-        if (!(await confirmAction(`Delete ${names.length} selected backup${names.length === 1 ? "" : "s"}? This cannot be undone.`))) return;
-        const final = await runBackupTask("deleteSelected", () => backupsApi.deleteSelected(names), "Selected Backups Deleted", "Backup Delete Failed");
-        if (final?.status === "succeeded") setSelectedBackups(new Set());
-      })}>Delete Selected ({selectedBackups.size})</button><button className="danger" disabled={Boolean(busyAction) || !rows.length} onClick={() => run(async () => {
-        if (!(await confirmAction("Delete all backup files? This cannot be undone."))) return;
-        await runBackupTask("deleteAll", backupsApi.deleteAll, "Backup Deleted", "Backup Delete Failed");
-      })}>Delete All Backups</button></div></div>
+    <section className="panel backups-panel">
+      <div className="panel-title"><h2>Backups</h2></div>
       {backupRestoreTask ? <BackupResultCard result={backupRestoreTaskResult(backupRestoreTask)} /> : backupResult && <BackupResultCard result={backupResult} />}
-      {rows.length ? <DataTable rows={rows} columns={["backupName", "battlegroupId", "created", "size", "type", "source"]} secondaryActionPosition="start" secondaryActionClassName="backup-select-column" secondaryActionLabel={<label className="backup-select-checkbox" title="Select all backups"><input type="checkbox" aria-label="Select all backups" disabled={Boolean(busyAction)} checked={allSelected} onChange={(event) => setSelectedBackups(event.target.checked ? new Set(backupNames) : new Set())} /><span className="sr-only">Select All</span></label>} secondaryAction={(row) => {
-        const name = String(row.name || row.backupName || "");
-        return <label className="backup-select-checkbox"><input type="checkbox" aria-label={`Select backup ${name}`} disabled={Boolean(busyAction)} checked={selectedBackups.has(name)} onChange={(event) => toggleBackup(name, event.target.checked)} onClick={(event) => event.stopPropagation()} /><span className="sr-only">Select</span></label>;
-      }} action={(row) => <div className="service-actions">
-        <button className="icon-action restore-action" title="Restore" aria-label="Restore backup" disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); run(async () => {
-          const backup = String(row.backupName || row.name || "Selected backup");
-          const backupBattlegroupId = String(row.battlegroupId || "Unknown");
-          const identityMismatch = backupIdentityDiffers(currentBattlegroupId, backupBattlegroupId);
-          let identityMode: BackupIdentityChoice = "keep-current";
-          if (identityMismatch) {
-            identityMode = await chooseBackupIdentity({ backup, currentBattlegroupId, backupBattlegroupId });
-            if (identityMode === "cancel") return;
-          } else if (!(await confirmAction("The current Battlegroup database will be replaced.", {
-            title: "Restore Backup",
-            confirmLabel: "Restore",
-            danger: true,
-            details: [
-              { label: "Backup", value: backup, tone: "accent" },
-              { label: "Battlegroup", value: backupBattlegroupId === "Unknown" ? "Identity unavailable; current ID will be kept" : backupBattlegroupId, tone: backupBattlegroupId === "Unknown" ? "danger" : "success" }
-            ]
-          }))) return;
-          await runBackupTask("restore", () => backupsApi.restore(String(row.name), identityMode), "Restore Completed", "Backup Restore Failed");
-        }); }}><img src="/images/icons/backup-restore.png" alt="" /></button>
-        <a className="button-link icon-action download-action" title="Download" aria-label="Download backup" href={backupsApi.downloadUrl(String(row.name))} onClick={(event) => event.stopPropagation()}><img src="/images/icons/backup-download.png" alt="" /></a>
-        <button className="icon-action danger" title="Delete" aria-label="Delete backup" disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); run(async () => {
-          if (!(await confirmAction(`Delete backup ${String(row.name)}? This cannot be undone.`))) return;
-          await runBackupTask("delete", () => backupsApi.delete(String(row.name)), "Backup Deleted", "Backup Delete Failed");
-        }); }}><img src="/images/icons/backup-delete.png" alt="" /></button>
-      </div>} actionClassName="backup-table-actions" tableClassName="backup-table" /> : backupsLoading ? <div className="empty backups-loading">Loading Backups...</div> : <div className="empty backups-empty">No database backups have been created yet.</div>}
+      <section className="action-section backup-funcom-backups">
+        <div className="panel-title backup-group-title"><h4>Funcom Backups</h4></div>
+        <p className="backup-group-note">A snapshot of the game database only &mdash; characters, bases, vehicles, inventories and world state. These contain no console configuration and no credentials, so restoring one onto a fresh host still leaves every setting to re-enter by hand. Use a System Backup below to move a server to new hardware.</p>
+        <div className="action-row backup-group-actions"><button disabled={Boolean(busyAction)} onClick={() => run(refresh)}>Refresh Backups</button><button disabled={Boolean(busyAction)} onClick={() => run(() => runBackupTask("create", backupsApi.create, "Backup Created Successfully", "Backup failed"))}>Create Backup</button><button className="danger" disabled={Boolean(busyAction) || !selectedBackups.size} onClick={() => run(async () => {
+          const names = [...selectedBackups];
+          if (!(await confirmAction(`Delete ${names.length} selected backup${names.length === 1 ? "" : "s"}? This cannot be undone.`))) return;
+          const final = await runBackupTask("deleteSelected", () => backupsApi.deleteSelected(names), "Selected Backups Deleted", "Backup Delete Failed");
+          if (final?.status === "succeeded") setSelectedBackups(new Set());
+        })}>Delete Selected ({selectedBackups.size})</button><button className="danger" disabled={Boolean(busyAction) || !rows.length} onClick={() => run(async () => {
+          if (!(await confirmAction("Delete all backup files? This cannot be undone."))) return;
+          await runBackupTask("deleteAll", backupsApi.deleteAll, "Backup Deleted", "Backup Delete Failed");
+        })}>Delete All Backups</button></div>
+        {rows.length ? <DataTable rows={rows} columns={["backupName", "battlegroupId", "created", "size", "type", "source"]} secondaryActionPosition="start" secondaryActionClassName="backup-select-column" secondaryActionLabel={<label className="backup-select-checkbox" title="Select all backups"><input type="checkbox" aria-label="Select all backups" disabled={Boolean(busyAction)} checked={allSelected} onChange={(event) => setSelectedBackups(event.target.checked ? new Set(backupNames) : new Set())} /><span className="sr-only">Select All</span></label>} secondaryAction={(row) => {
+          const name = String(row.name || row.backupName || "");
+          return <label className="backup-select-checkbox"><input type="checkbox" aria-label={`Select backup ${name}`} disabled={Boolean(busyAction)} checked={selectedBackups.has(name)} onChange={(event) => toggleBackup(name, event.target.checked)} onClick={(event) => event.stopPropagation()} /><span className="sr-only">Select</span></label>;
+        }} action={(row) => <div className="service-actions">
+          <button className="icon-action restore-action" title="Restore" aria-label="Restore backup" disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); run(async () => {
+            const backup = String(row.backupName || row.name || "Selected backup");
+            const backupBattlegroupId = String(row.battlegroupId || "Unknown");
+            const identityMismatch = backupIdentityDiffers(currentBattlegroupId, backupBattlegroupId);
+            let identityMode: BackupIdentityChoice = "keep-current";
+            if (identityMismatch) {
+              identityMode = await chooseBackupIdentity({ backup, currentBattlegroupId, backupBattlegroupId });
+              if (identityMode === "cancel") return;
+            } else if (!(await confirmAction("The current Battlegroup database will be replaced.", {
+              title: "Restore Backup",
+              confirmLabel: "Restore",
+              danger: true,
+              details: [
+                { label: "Backup", value: backup, tone: "accent" },
+                { label: "Battlegroup", value: backupBattlegroupId === "Unknown" ? "Identity unavailable; current ID will be kept" : backupBattlegroupId, tone: backupBattlegroupId === "Unknown" ? "danger" : "success" }
+              ]
+            }))) return;
+            await runBackupTask("restore", () => backupsApi.restore(String(row.name), identityMode), "Restore Completed", "Backup Restore Failed");
+          }); }}><img src="/images/icons/backup-restore.png" alt="" /></button>
+          <a className="button-link icon-action download-action" title="Download" aria-label="Download backup" href={backupsApi.downloadUrl(String(row.name))} onClick={(event) => event.stopPropagation()}><img src="/images/icons/backup-download.png" alt="" /></a>
+          <button className="icon-action danger" title="Delete" aria-label="Delete backup" disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); run(async () => {
+            if (!(await confirmAction(`Delete backup ${String(row.name)}? This cannot be undone.`))) return;
+            await runBackupTask("delete", () => backupsApi.delete(String(row.name)), "Backup Deleted", "Backup Delete Failed");
+          }); }}><img src="/images/icons/backup-delete.png" alt="" /></button>
+        </div>} actionClassName="backup-table-actions" tableClassName="backup-table" /> : backupsLoading ? <div className="empty backups-loading">Loading Backups...</div> : <div className="empty backups-empty">No database backups have been created yet.</div>}
+      </section>
+      <section className="action-section backup-external-import">
+        <div className="panel-title"><h4>Import Funcom External Backup</h4></div>
+        <div className="action-line backup-import-controls">
+          <label className="wide-field">Backup File (.backup)<input ref={importBackupInputRef} type="file" accept=".backup" onChange={(event) => setImportBackupFile(event.target.files?.[0] || null)} /></label>
+          <label className="wide-field">Metadata File (.yaml)<input ref={importMetadataInputRef} type="file" accept=".yaml,.yml" onChange={(event) => setImportMetadataFile(event.target.files?.[0] || null)} /></label>
+          <div className="backup-import-actions">
+            <button disabled={Boolean(busyAction)} onClick={() => run(importExternalBackup)}>Import</button>
+            {importResult && <span className={`inline-task-result result-${importResult.status === "succeeded" ? "ok" : importResult.status === "failed" ? "fail" : "running"}`}>
+              <strong className={importResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(importResult.title, importResult.status === "running")}</strong>
+            </span>}
+          </div>
+        </div>
+      </section>
       <section className="action-section">
         <div className="panel-title"><h4>Automatic Backups</h4><label className={`switch-checkbox ${autoEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={Boolean(busyAction)} checked={autoEnabled} onChange={(event) => run(() => saveAutomaticBackups(event.target.checked))} /><span className="switch-label">Automatic Backups</span><strong className="switch-state">{autoEnabled ? "ON" : "OFF"}</strong></label></div>
         <KeyValueGrid items={[
@@ -296,18 +395,45 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
           </span>}
         </div>
       </section>
-      <section className="action-section backup-external-import">
-        <div className="panel-title"><h4>Import External Backup</h4></div>
+      <section className="action-section backup-system-backups">
+        <div className="panel-title"><h4>System Backups (Encrypted)</h4></div>
+        <p className="backup-group-note backup-note-warning">A system backup bundles the database together with <code>.env</code>, <code>runtime/generated</code> and every file in <code>runtime/secrets</code> &mdash; the Funcom token, admin console password, RMQ credentials, sietch join password and IAM policies. It is encrypted with the passphrase you set here, and <strong>there is no way to recover it without that passphrase</strong>. Store the passphrase somewhere durable and separate from the archive.</p>
         <div className="action-line backup-import-controls">
-          <label className="wide-field">Backup File (.backup)<input ref={importBackupInputRef} type="file" accept=".backup" onChange={(event) => setImportBackupFile(event.target.files?.[0] || null)} /></label>
-          <label className="wide-field">Metadata File (.yaml)<input ref={importMetadataInputRef} type="file" accept=".yaml,.yml" onChange={(event) => setImportMetadataFile(event.target.files?.[0] || null)} /></label>
+          <label className="wide-field">Passphrase<input type="password" autoComplete="new-password" value={systemPassphrase} onChange={(event) => setSystemPassphrase(event.target.value)} /></label>
+          <label className="wide-field">Confirm Passphrase<input type="password" autoComplete="new-password" value={systemPassphraseConfirm} onChange={(event) => setSystemPassphraseConfirm(event.target.value)} /></label>
           <div className="backup-import-actions">
-            <button disabled={Boolean(busyAction)} onClick={() => run(importExternalBackup)}>Import</button>
-            {importResult && <span className={`inline-task-result result-${importResult.status === "succeeded" ? "ok" : importResult.status === "failed" ? "fail" : "running"}`}>
-              <strong className={importResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(importResult.title, importResult.status === "running")}</strong>
-            </span>}
+            <button disabled={Boolean(busyAction) || !systemPassphrase || !systemPassphraseConfirm} onClick={() => run(createSystemBackup)}>Create System Backup</button>
+            <button className="danger" disabled={Boolean(busyAction) || !selectedSystemBackups.size} onClick={() => run(async () => {
+            const names = [...selectedSystemBackups];
+            if (!(await confirmAction(`Delete ${names.length} selected system backup${names.length === 1 ? "" : "s"}? Each one is the only copy of the credentials it contains, and this cannot be undone.`, { title: "Delete System Backups", confirmLabel: "Delete", danger: true }))) return;
+            await runSystemBackupTask("deleteSystemSelected", () => backupsApi.deleteSystemSelected(names), "Deleting System Backups...", "System Backups Deleted", "System Backup Delete Failed");
+          })}>Delete Selected ({selectedSystemBackups.size})</button>
+          <button className="danger" disabled={Boolean(busyAction) || !systemRows.length} onClick={() => run(async () => {
+            if (!(await confirmAction("Delete every system backup? These archives are the only copy of the credentials they contain, and this cannot be undone.", { title: "Delete All System Backups", confirmLabel: "Delete All", danger: true }))) return;
+            await runSystemBackupTask("deleteSystemAll", backupsApi.deleteSystemAll, "Deleting System Backups...", "System Backups Deleted", "System Backup Delete Failed");
+          })}>Delete All</button>
           </div>
         </div>
+        {systemResult && <BackupResultCard result={systemResult} />}
+        {systemRows.length === 0 ? <p className="muted">No system backups have been created yet.</p> : <DataTable
+          columns={["name", "battlegroupId", "createdAt", "size", "type", "source", "encryption"]}
+          columnLabels={{ name: "Backup Name", battlegroupId: "Battlegroup ID", createdAt: "Created", size: "Size", type: "Type", source: "Source", encryption: "Encryption" }}
+          rows={systemRows as unknown as Record<string, unknown>[]}
+          rowKey={(row) => String(row.name)}
+          secondaryActionPosition="start"
+          secondaryActionClassName="backup-select-column"
+          secondaryActionLabel={<label className="backup-select-checkbox" title="Select all system backups"><input type="checkbox" aria-label="Select all system backups" disabled={Boolean(busyAction)} checked={systemRows.length > 0 && selectedSystemBackups.size === systemRows.length} onChange={(event) => setSelectedSystemBackups(event.target.checked ? new Set(systemRows.map((row) => row.name)) : new Set())} /><span className="sr-only">Select All</span></label>}
+          secondaryAction={(row) => <label className="backup-select-checkbox"><input type="checkbox" aria-label={`Select system backup ${String(row.name)}`} disabled={Boolean(busyAction)} checked={selectedSystemBackups.has(String(row.name))} onChange={(event) => toggleSystemBackup(String(row.name), event.target.checked)} onClick={(event) => event.stopPropagation()} /><span className="sr-only">Select</span></label>}
+          action={(row) => <div className="service-actions">
+            <a className="button-link icon-action download-action" title="Download encrypted archive" aria-label={`Download system backup ${String(row.name)}`} href={backupsApi.systemDownloadUrl(String(row.name))} onClick={(event) => event.stopPropagation()}><img src="/images/icons/backup-download.png" alt="" /></a>
+            <button className="icon-action danger" title="Delete" aria-label={`Delete system backup ${String(row.name)}`} disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); run(async () => {
+              const name = String(row.name);
+              if (!(await confirmAction(`Delete system backup ${name}? It is the only copy of the credentials it contains, and this cannot be undone.`, { title: "Delete System Backup", confirmLabel: "Delete", danger: true }))) return;
+              await runSystemBackupTask("deleteSystem", () => backupsApi.deleteSystem(name), "Deleting System Backup...", "System Backup Deleted", "System Backup Delete Failed");
+            }); }}><img src="/images/icons/backup-delete.png" alt="" /></button>
+          </div>}
+          actionClassName="backup-table-actions"
+        />}
       </section>
     </section>
   );

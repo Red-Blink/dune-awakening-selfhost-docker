@@ -45,6 +45,8 @@ const simpleOperations = {
   backupList: ["db", "list"],
   backupDeleteAll: ["db", "delete", "--all"],
   backupAutoStatus: ["db", "auto", "status"],
+  backupSystemCreate: ["db", "backup-system"],
+  backupSystemDeleteAll: ["db", "delete-system", "--all"],
   backupAutoDisable: ["db", "auto", "disable"],
   init: ["init"],
   restartScheduleStatus: ["restart-schedule", "status"],
@@ -126,6 +128,10 @@ export function buildDuneArgs(operation, payload = {}) {
       return ["db", "delete", validateBackupName(payload.backup)];
     case "backupDeleteSelected":
       return ["db", "delete", ...validateBackupNames(payload.backups)];
+    case "backupSystemDelete":
+      return ["db", "delete-system", validateBackupName(payload.backup)];
+    case "backupSystemDeleteSelected":
+      return ["db", "delete-system", ...validateBackupNames(payload.backups)];
     case "backupAutoEnable":
       {
         const args = ["db", "auto", "enable", validateUpdateTime(payload.time || "05:00")];

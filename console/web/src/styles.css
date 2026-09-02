@@ -1478,6 +1478,13 @@ body.debug .technical-details { display: block; }
 .setup-finish-celebration span:nth-child(4) { background: #d9a7e2; animation-delay: .36s; }
 .setup-finish-celebration span:nth-child(5) { background: #fff1d4; animation-delay: .48s; }
 .danger-note, .error, .error-banner { color: var(--danger-text); overflow-wrap: anywhere; }
+/* `.action-section p { color: #ad9f89; }` (class+element, 0-1-1) otherwise beats
+   the plain-class rule above (0-1-0) regardless of source order, so every
+   danger note inside an .action-section rendered in ordinary body colour --
+   including the system-backup passphrase warning, which is the most important
+   sentence on the Backups page. Same specificity trap already documented for
+   the live-map popover further down this file. */
+.action-section p.danger-note { color: var(--danger-text); }
 .success-note { color: #9be6bd; }
 .error-banner { background: #351b1b; border: 1px solid var(--danger-strong); padding: 12px; border-radius: 6px; margin-bottom: 14px; }
 .inline-filter-label { display: inline-flex; align-items: center; gap: 8px; color: var(--muted-warm); font-weight: 400; }
@@ -2510,6 +2517,7 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 .bot-item-picker-row em { font-style: normal; font-size: 11px; color: var(--muted); }
 .bot-item-picker-row button { width: auto; min-width: 64px; }
 @media (max-width: 720px) {
+  .backup-import-actions > button { flex: 1 1 160px; min-height: 44px; }
   .updates-page-title { align-items: center; flex-direction: row; }
   .updates-page-title .qa-login-actions { width: auto; }
   .qa-build-row { align-items: flex-start; flex-direction: column; }
@@ -6203,10 +6211,24 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 .backup-auto-controls .checkbox-row { flex: 0 0 auto; min-height: 40px; align-items: center; }
 .backup-auto-controls .compact-select { flex: 0 1 210px; }
 .backup-auto-controls .inline-task-result { margin-left: 4px; }
-.backup-external-import { margin-top: 18px; }
+/* This panel's sections are direct children of .panel, so they get none of the
+   .action-sections grid gap -- each needs its own separation, including
+   Automatic Backups, which previously had none at all. */
+.backups-panel > .action-section { margin-top: 18px; }
+.backup-group-title { margin-top: 0; }
+.backup-group-note { margin: 0 0 4px; color: #ad9f89; }
+.backup-note-warning strong { color: var(--danger-text); }
+.backup-note-warning code {
+  color: #f1dfc1;
+  background: rgba(0, 0, 0, .25);
+  border: 1px solid #39332c;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.backup-group-actions { justify-content: flex-end; gap: 14px; margin: 4px 0 8px; }
 .backup-import-controls { align-items: flex-end; }
 .backup-import-controls .wide-field { flex-basis: 300px; min-width: min(300px, 100%); }
-.backup-import-actions { display: flex; align-items: center; justify-content: flex-start; gap: 12px; flex: 0 0 100%; min-height: 42px; }
+.backup-import-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 14px; flex: 0 0 100%; min-height: 42px; margin: 6px 0 4px; }
 @keyframes backupResultFadeOut {
   to { opacity: 0; transform: translateY(-4px); }
 }

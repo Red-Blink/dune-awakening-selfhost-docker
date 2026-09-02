@@ -107,7 +107,7 @@ namespace" rule, so Create stays disabled until something is selected.
 | `landsraad` | `landsraad:read` | `write` |
 | `server` | `server:read` | `network-fix`, `restart`, `restart-service`, `start`, `stop`, `storage-cleanup`, `write-config` |
 | `logs` | `logs:read` | *nothing — no write action exists* |
-| `backups` | `backups:read` | `create`, `delete`, `import`, `restore`, `write-config` |
+| `backups` | `backups:read` | `create`, `create-system`, `delete`, `delete-system`, `download-system`, `import`, `restore`, `write-config` |
 | `updates` | `updates:check`, `updates:read` | *nothing — write actions are denied to keys* |
 | `carepackage` | `carepackage:read` | `clear-history`, `grant`, `scan`, `write-config` |
 | `addons` | `addons:read` | *nothing — write actions are denied to keys* |
@@ -134,6 +134,29 @@ Two actions are POST-shaped but read-only in effect, and are reachable by a **Re
 
 `carepackage:scan` is deliberately *not* one of these: `POST /api/care-package/run` actually
 runs a grant cycle. The verb-shaped name is not the test; what the route does is.
+
+### The two system-backup scopes
+
+`backups:create-system` and `backups:download-system` are write-classified and
+deliberately separate from the rest of the namespace, because neither is really about
+database backups:
+
+- **`backups:create-system`** — `POST /api/backups/system/create`. Runs a database dump and
+  writes an encrypted archive that also contains `.env` and every file in `runtime/secrets`.
+- **`backups:download-system`** — `GET /api/backups/system/{name}/download`. Hands over that
+  archive. Its only protection is the passphrase chosen when it was created, so granting this
+  is equivalent to handing over the server to anyone who can guess or obtain that passphrase.
+  It is deliberately **not** `backups:read`: a `GET` is invisible to the mutating-route parity
+  test, so this route's own action assignment is the only thing keeping the archive off a
+  read-only grant.
+
+- **`backups:delete-system`** — `DELETE /api/backups/system/{name}` and the bulk
+  delete routes. Separate from `backups:delete` on purpose: a system archive is the
+  only copy of the credentials inside it, so destroying one should be grantable
+  independently of pruning database backups.
+
+Listing system backups (`GET /api/backups/system`) is a genuine read and stays on
+`backups:read` — the listing exposes only the non-secret sidecar fields.
 
 ### What a key can never reach
 

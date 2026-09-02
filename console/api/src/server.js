@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { createServer as createNetServer } from "node:net";
 import { totalmem } from "node:os";
 import { spawn } from "node:child_process";
-import { existsSync, writeFileSync, chmodSync, mkdirSync, createReadStream, readFileSync } from "node:fs";
+import { existsSync, writeFileSync, chmodSync, mkdirSync, createReadStream, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { loadConfig, publicConfig, parseAllowedIps, resolvePorts } from "./config.js";
 import { createAuth, setSessionCookie, clearSessionCookie, json, withSecurityHeaders } from "./auth.js";
@@ -33,6 +33,7 @@ import { assertInstalledAddonPermission, fetchCommunityAddons, installCommunityA
 import { createHardwareStatusProvider, performanceSnapshot as collectPerformanceSnapshot } from "./services/performance.js";
 import { serveStatic, contentTypeForPath } from "./http/staticFiles.js";
 import { discoverServices } from "./services/serviceDiscovery.js";
+import { listSystemBackups, systemBackupDir, validSystemArchiveName, validSystemBackupName } from "./services/systemBackups.js";
 import { createBackupDownloadArchive, enrichBackupRows, nextImportedBackupName, normalizeImportedBackupMetadata, readCurrentBattlegroupId, validBackupDownloadName } from "./services/backups.js";
 import { createMemoryBalancer } from "./services/memoryBalancer.js";
 import { collectContainerHealth } from "./services/containerHealth.js";
@@ -808,6 +809,30 @@ async function handleApi(req, res) {
   if (path === "/api/updates/repair-runtime" && req.method === "POST") return task(req, res, "updates", "readiness", {});
 
   if (path === "/api/backups") return backupsListRoute(res);
+  if (path === "/api/backups/system" && req.method === "GET") return json(res, 200, { rows: listSystemBackups(config) });
+  if (path === "/api/backups/system/create" && req.method === "POST") return systemBackupCreateRoute(req, res);
+  if (path.match(/^\/api\/backups\/system\/[^/]+\/download$/) && req.method === "GET") {
+    return sendSystemBackupArchive(req, res, decodeURIComponent(path.split("/").at(-2)));
+  }
+  if (path === "/api/backups/system/delete-all" && req.method === "POST") {
+    if (!applyMutationRateLimit(req, res, "backups.system.delete")) return;
+    return task(req, res, "backup", "backupSystemDeleteAll", {});
+  }
+  if (path === "/api/backups/system/delete-selected" && req.method === "POST") {
+    const body = await readJson(req);
+    const backups = Array.isArray(body.backups) ? body.backups : [];
+    // Checked against the system-archive shape before the permissive
+    // validateBackupName in runner.js ever sees them.
+    if (!backups.length || !backups.every((name) => validSystemArchiveName(name))) {
+      return json(res, 400, { error: "Select one or more system backups to delete." });
+    }
+    return task(req, res, "backup", "backupSystemDeleteSelected", { backups });
+  }
+  if (path.match(/^\/api\/backups\/system\/[^/]+$/) && req.method === "DELETE") {
+    const backup = decodeURIComponent(path.split("/").pop());
+    if (!validSystemArchiveName(backup)) return json(res, 400, { error: "Invalid system backup name." });
+    return task(req, res, "backup", "backupSystemDelete", { backup });
+  }
   if (path === "/api/backups/auto" && req.method === "POST") return autoBackupRoute(req, res);
   if (path === "/api/backups/import-external" && req.method === "POST") return externalBackupImportRoute(req, res);
   if (path === "/api/backups/auto") return backupAutoStatusRoute(res);
@@ -825,7 +850,7 @@ async function handleApi(req, res) {
     const backup = decodeURIComponent(path.split("/").at(-2));
     return backupDownloadRoute(req, res, backup);
   }
-  if (path.startsWith("/api/backups/") && req.method === "DELETE") {
+  if (path.startsWith("/api/backups/") && !path.startsWith("/api/backups/system/") && req.method === "DELETE") {
     const backup = decodeURIComponent(path.split("/").pop());
     return task(req, res, "backup", "backupDelete", { backup });
   }
@@ -1686,6 +1711,46 @@ async function externalBackupImportRoute(req, res) {
   return json(res, 200, { ok: true, backup: importedName, rows, row: rows.find((row) => row.name === importedName) || null });
 }
 
+async function systemBackupCreateRoute(req, res) {
+  // pg_dump + gzip + a deliberately maximal S2K is expensive, and each run
+  // leaves another archive of every credential on disk.
+  if (!applyMutationRateLimit(req, res, "backups.system.create")) return;
+  const body = await readJson(req);
+  const passphrase = String(body?.passphrase || "");
+  // Validated before any task exists, so a rejected request leaves no trace.
+  if (passphrase.length < 12) return json(res, 400, { error: "The passphrase must be at least 12 characters." });
+  if (passphrase.length > 1024) return json(res, 400, { error: "The passphrase is too long." });
+  // Not a complexity policy -- just a floor. The archive is downloadable, so a
+  // degenerate passphrase makes it trivially crackable offline no matter how
+  // strong the KDF is.
+  if (new Set(passphrase).size < 5) {
+    return json(res, 400, { error: "The passphrase must use at least 5 different characters." });
+  }
+
+  audit(config, req, "backup.create-system", {});
+  // The passphrase goes in options.env -- never the payload, which is audited,
+  // and never argv, which appears in the task result and in ps output.
+  return task(req, res, "backup", "backupSystemCreate", {}, { env: { DUNE_SYSTEM_BACKUP_PASSPHRASE: passphrase } });
+}
+
+async function sendSystemBackupArchive(req, res, name) {
+  if (!validSystemBackupName(name)) return json(res, 400, { error: "Invalid system backup name." });
+  const directory = systemBackupDir(config);
+  const archivePath = resolve(directory, name);
+  if (!archivePath.startsWith(`${directory}/`)) return json(res, 400, { error: "Invalid system backup path." });
+  if (!existsSync(archivePath)) return json(res, 404, { error: "System backup was not found." });
+
+  audit(config, req, "backup.download-system", { backup: name });
+  // Already an encrypted archive, and can be GB-scale: stream it, do not re-tar
+  // it or hold it in memory the way the database download does.
+  res.writeHead(200, withSecurityHeaders({
+    "content-type": "application/octet-stream",
+    "content-length": statSync(archivePath).size,
+    "content-disposition": `attachment; filename="${name.replace(/"/g, "")}"`
+  }));
+  createReadStream(archivePath).pipe(res);
+}
+
 async function backupDownloadRoute(req, res, backupName) {
   if (!validBackupDownloadName(backupName)) return json(res, 400, { error: "Invalid backup name." });
   const backupDir = resolve(config.repoRoot, "runtime/backups/db");
@@ -1700,11 +1765,11 @@ async function backupDownloadRoute(req, res, backupName) {
     { name: backupName, content: readFileSync(backupPath) },
     { name: `${backupName}.yaml`, content: readFileSync(metadataPath) }
   ]);
-  res.writeHead(200, {
+  res.writeHead(200, withSecurityHeaders({
     "content-type": "application/gzip",
     "content-length": archive.length,
     "content-disposition": `attachment; filename="${archiveName.replace(/"/g, "")}"`
-  });
+  }));
   res.end(archive);
 }
 
@@ -2424,15 +2489,17 @@ function dbPlayerUnsupported(res, path, feature) {
   });
 }
 
-async function task(req, res, type, operation, payload) {
+async function task(req, res, type, operation, payload, options = {}) {
   try {
     buildDuneArgs(operation, payload);
   } catch (error) {
     return json(res, 400, { error: redact(error?.message || "Unexpected error.") });
   }
   if (await maybeQueueRestart(req, res, type, operation, payload)) return;
+  // Only `payload` is audited. Secrets travel in options.env, which is never
+  // written to the audit log nor stored on the task -- keep it that way.
   audit(config, req, `task.${operation}`, payload);
-  return json(res, 202, { task: tasks.create(type, operation, payload) });
+  return json(res, 202, { task: tasks.create(type, operation, payload, options) });
 }
 
 // Restart Queue gate. When the queue is enabled and real players are online, a

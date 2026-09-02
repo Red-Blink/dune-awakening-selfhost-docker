@@ -162,11 +162,13 @@ export function nextImportedBackupName(backupDir) {
   throw new Error("Could not allocate imported backup filename.");
 }
 
-function createTarArchive(files) {
+export function createTarArchive(files) {
   const blocks = [];
   for (const file of files) {
     const header = Buffer.alloc(512, 0);
-    writeTarString(header, 0, 100, file.name);
+    const { name, prefix } = splitTarPath(file.name);
+    writeTarString(header, 0, 100, name);
+    if (prefix) writeTarString(header, 345, 155, prefix);
     writeTarOctal(header, 100, 8, 0o600);
     writeTarOctal(header, 108, 8, 0);
     writeTarOctal(header, 116, 8, 0);
@@ -175,7 +177,7 @@ function createTarArchive(files) {
     header.fill(32, 148, 156);
     header[156] = 48;
     writeTarString(header, 257, 6, "ustar");
-    writeTarString(header, 263, 2, "00");
+    header.write("00", 263, 2, "ascii");
     const checksum = header.reduce((sum, byte) => sum + byte, 0);
     writeTarOctal(header, 148, 8, checksum);
     blocks.push(header, file.content);
@@ -184,6 +186,20 @@ function createTarArchive(files) {
   }
   blocks.push(Buffer.alloc(1024, 0));
   return Buffer.concat(blocks);
+}
+
+// ustar splits long paths across a 155-byte prefix and a 100-byte name field.
+// Without this, writeTarString would silently truncate and corrupt the entry.
+function splitTarPath(value) {
+  const path = String(value);
+  if (Buffer.byteLength(path) <= 99) return { name: path, prefix: "" };
+  const segments = path.split("/");
+  for (let index = 1; index < segments.length; index += 1) {
+    const prefix = segments.slice(0, index).join("/");
+    const name = segments.slice(index).join("/");
+    if (Buffer.byteLength(name) <= 99 && Buffer.byteLength(prefix) <= 154) return { name, prefix };
+  }
+  throw new Error(`Path is too long for a tar archive: ${path}`);
 }
 
 function writeTarString(buffer, offset, length, value) {
