@@ -6,8 +6,7 @@ import {
   octDecode,
   orthoFromWorldRect,
   projectWorldPoint,
-  sampleHeightField
-} from "./terrainGeometry";
+  sampleHeightField, applyCanvasSize } from "./terrainGeometry";
 import type { TerrainLayoutMeta, TerrainLibrary, TerrainView } from "./types";
 
 // LIVE_MAP_CONFIGS.DeepDesert, verbatim from console/api/src/duneDb.js.
@@ -226,5 +225,46 @@ describe("sampleHeightField", () => {
   it("clamps outside the field instead of wrapping or reading out of bounds", () => {
     expect(sampleHeightField(field, meta, -1e6, -1e6)).toBeCloseTo(0, 6);
     expect(Number.isFinite(sampleHeightField(field, meta, 1e6, 1e6))).toBe(true);
+  });
+});
+
+// Assigning canvas.width or .height resets the drawing buffer and blanks the
+// canvas even when the value is unchanged. The paint path runs on every zoom
+// tick and every scroll event, so writing unconditionally cleared the terrain
+// and redrew it constantly -- the flicker while zooming.
+describe("applyCanvasSize", () => {
+  const canvas = () => ({ width: 0, height: 0, style: { width: "", height: "" } });
+
+  it("sizes a fresh canvas and reports the buffer reset", () => {
+    const c = canvas();
+    expect(applyCanvasSize(c, 800, 600, 2)).toBe(true);
+    expect([c.width, c.height]).toEqual([1600, 1200]);
+    expect([c.style.width, c.style.height]).toEqual(["800px", "600px"]);
+  });
+
+  it("does not touch the buffer when nothing changed", () => {
+    const c = canvas();
+    applyCanvasSize(c, 800, 600, 2);
+    let writes = 0;
+    const watched = {
+      get width() { return 1600; }, set width(_v: number) { writes++; },
+      get height() { return 1200; }, set height(_v: number) { writes++; },
+      style: c.style
+    };
+    expect(applyCanvasSize(watched, 800, 600, 2)).toBe(false);
+    expect(writes).toBe(0);
+  });
+
+  it("resizes when the frame really does change", () => {
+    const c = canvas();
+    applyCanvasSize(c, 800, 600, 2);
+    expect(applyCanvasSize(c, 900, 600, 2)).toBe(true);
+    expect(c.width).toBe(1800);
+  });
+
+  it("caps the pixel ratio at 2, so a 3x display does not triple the buffer", () => {
+    const c = canvas();
+    applyCanvasSize(c, 800, 600, 3);
+    expect(c.width).toBe(1600);
   });
 });

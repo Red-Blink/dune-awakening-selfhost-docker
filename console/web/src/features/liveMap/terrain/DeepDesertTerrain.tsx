@@ -115,7 +115,12 @@ export default function DeepDesertTerrain({
   // Track the frame's scroll and size. The canvas covers the viewport, never the
   // scaled map -- at maximum zoom that would be 16384px, over MAX_TEXTURE_SIZE on
   // plenty of GPUs and about a gigabyte of backing store.
-  useEffect(() => {
+  //
+  // Layout effect, not a plain one: a zoom change resizes the map div in the same
+  // commit, and a plain effect runs after the browser has had its chance to
+  // paint. That left one frame showing terrain at the old size and offset inside
+  // an already-resized container, which is what the flicker on zoom was.
+  useLayoutEffect(() => {
     const frame = frameRef.current;
     const canvas = canvasRef.current;
     const renderer = rendererRef.current;

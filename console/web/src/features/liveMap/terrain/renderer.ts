@@ -1,5 +1,5 @@
 import { BFS, BVS, CFS, FS, RFS, RVS, VS } from "./shaders";
-import { buildDrawCalls, depthRange, orthoFromWorldRect } from "./terrainGeometry";
+import { buildDrawCalls, depthRange, orthoFromWorldRect, applyCanvasSize } from "./terrainGeometry";
 import type { LayoutAssets, SharedAssets } from "./terrainAssets";
 import type { TerrainDrawCall, TerrainView } from "./types";
 
@@ -487,12 +487,8 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
     },
     setAssets,
     resize(cssWidth: number, cssHeight: number, dpr: number) {
-      const scale = Math.min(dpr || 1, 2);
-      pixelRatio = scale;
-      canvas.style.width = `${cssWidth}px`;
-      canvas.style.height = `${cssHeight}px`;
-      canvas.width = Math.max(1, Math.round(cssWidth * scale));
-      canvas.height = Math.max(1, Math.round(cssHeight * scale));
+      pixelRatio = Math.min(dpr || 1, 2);
+      applyCanvasSize(canvas, cssWidth, cssHeight, dpr);
     },
     setView(next: TerrainView) {
       view = next;

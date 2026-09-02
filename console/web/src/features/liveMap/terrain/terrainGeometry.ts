@@ -128,3 +128,26 @@ export function sampleHeightField(field: Uint16Array, layout: TerrainLayoutMeta,
   const raw = field[iy * n + ix];
   return layout.hfZlo + (raw / 65535) * (layout.hfZhi - layout.hfZlo);
 }
+
+/** The parts of a canvas the size guard touches, so it can be tested without one. */
+export type SizableCanvas = { width: number; height: number; style: { width: string; height: string } };
+
+/**
+ * Size a canvas, touching `width`/`height` only when they actually change.
+ *
+ * Assigning either resets the drawing buffer and blanks the canvas, even when
+ * the value is identical. This runs on every zoom tick and every scroll event,
+ * so writing unconditionally cleared the terrain and redrew it constantly --
+ * the flicker while zooming. Returns whether the buffer was reset.
+ */
+export function applyCanvasSize(canvas: SizableCanvas, cssWidth: number, cssHeight: number, dpr: number): boolean {
+  const scale = Math.min(dpr || 1, 2);
+  const w = Math.max(1, Math.round(cssWidth * scale));
+  const h = Math.max(1, Math.round(cssHeight * scale));
+  if (canvas.style.width !== `${cssWidth}px`) canvas.style.width = `${cssWidth}px`;
+  if (canvas.style.height !== `${cssHeight}px`) canvas.style.height = `${cssHeight}px`;
+  let reset = false;
+  if (canvas.width !== w) { canvas.width = w; reset = true; }
+  if (canvas.height !== h) { canvas.height = h; reset = true; }
+  return reset;
+}
