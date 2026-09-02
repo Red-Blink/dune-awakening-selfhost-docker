@@ -426,10 +426,10 @@ const deepDesert = {
   image: "/images/maps/deep-desert.png",
   width: 4096,
   height: 4096,
-  minX: -1268624.82,
-  maxX: 1163312.83,
-  minY: -1266548.17,
-  maxY: 1162416.13,
+  minX: -1177656,
+  maxX: 1072344,
+  minY: -1177066,
+  maxY: 1072934,
   flipY: false,
   defaultPartitionId: 8
 };
@@ -518,17 +518,19 @@ it("says a layout it cannot draw is not shipped, rather than claiming it rendere
   expect(screen.queryByText("layout 12")).toBeNull();
 });
 
-// Finding 8: the flat PNG carries its own 9x9 grid, burned in at the image's
-// own scale, so the overlay drew a second one about half a cell off.
-it("leaves the grid to the flat image, which has one burned in", async () => {
+// Finding 8 was that the overlay drew a second 9x9 grid about a third of a cell
+// off the one burned into the flat PNG. That was the bounds being ~8% too wide,
+// not the overlay: with the rect corrected to the square the image covers, the
+// two coincide and the overlay is welcome on the fallback again -- it carries
+// crisp, zoom-stable labels the picture cannot.
+it("still draws the grid over the flat image, now that the two agree", async () => {
   useDeepDesert({ coriolisLayout: null });
   const { container } = renderPanel();
   await screen.findByRole("button", { name: "Base: Sietch Tabr" });
 
   expect(container.querySelector("img.live-map-image")).not.toBeNull();
-  expect(container.querySelector("svg.live-map-sector-grid")).toBeNull();
-  // and no toggle for a grid that is not ours to draw
-  expect(screen.queryByRole("button", { name: "Sector Grid" })).toBeNull();
+  expect(container.querySelector("svg.live-map-sector-grid")).not.toBeNull();
+  expect(screen.getByRole("button", { name: "Sector Grid" })).toBeInTheDocument();
 });
 
 // Finding 5 of the branch review: the grid geometry was rebuilt on every render

@@ -10,10 +10,10 @@ const DEEP_DESERT: LiveMapConfig = {
   image: "/images/maps/deep-desert.png",
   width: 4096,
   height: 4096,
-  minX: -1268624.82,
-  maxX: 1163312.83,
-  minY: -1266548.17,
-  maxY: 1162416.13,
+  minX: -1177656,
+  maxX: 1072344,
+  minY: -1177066,
+  maxY: 1072934,
   flipY: false,
   defaultPartitionId: 8
 };
@@ -101,5 +101,35 @@ describe("zoom helpers", () => {
     expect(clampLiveMapZoom(99, 0.1)).toBe(MAX_LIVE_MAP_ZOOM);
     expect(clampLiveMapZoom(0.001, 0.1)).toBe(0.1);
     expect(clampLiveMapZoom(Number.NaN, 0.1)).toBe(0.1);
+  });
+});
+
+// The map rect is the sector square the image covers, but the world does not
+// stop dead at its edge. Measured on a live farm: a player and the ornithopter
+// they were flying sat 4,216 uu past the north edge, and a few world markers
+// about 1,100 uu past it. A hard cut would drop exactly the marker an admin is
+// most likely to be hunting for.
+describe("markers just outside the map square", () => {
+  const northEdge = DEEP_DESERT.maxY;
+
+  it("keeps the live farm's out-of-bounds player, at its true position", () => {
+    const point = worldToLiveMapPoint({ x: 92450, y: 1077150 }, DEEP_DESERT)!;
+    expect(point).not.toBeNull();
+    expect(point.inBounds).toBe(true);
+    // Not clamped: it really is past the edge, and is drawn there.
+    expect(point.py).toBeGreaterThan(DEEP_DESERT.height);
+    expect(point.py - DEEP_DESERT.height).toBeLessThan(16);
+  });
+
+  it("still excludes something genuinely off the map", () => {
+    const wayOut = worldToLiveMapPoint({ x: 92450, y: northEdge + 200000 }, DEEP_DESERT)!;
+    expect(wayOut.inBounds).toBe(false);
+  });
+
+  it("treats the four corners of the square as in bounds", () => {
+    for (const [x, y] of [[DEEP_DESERT.minX, DEEP_DESERT.minY], [DEEP_DESERT.maxX, DEEP_DESERT.maxY],
+                          [DEEP_DESERT.minX, DEEP_DESERT.maxY], [DEEP_DESERT.maxX, DEEP_DESERT.minY]]) {
+      expect(worldToLiveMapPoint({ x, y }, DEEP_DESERT)!.inBounds).toBe(true);
+    }
   });
 });

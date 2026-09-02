@@ -261,10 +261,20 @@ view (`visibleWorldRect` in `liveMapGeometry.ts`) and draws exactly that. Terrai
 and markers therefore land on the same pixel by construction, using one shared
 mapping rather than two that must be kept in step.
 
-That is also what corrects a long-standing inaccuracy: the shipped PNG covers
-only the 9-sector grid but is stretched across `LIVE_MAP_CONFIGS`' wider rect, so
-it disagrees with marker positions by up to a third of a sector at the edge.
-Rendering places geometry at its true world position, so the error does not exist.
+Rendering the terrain is what exposed a long-standing inaccuracy in
+`LIVE_MAP_CONFIGS`. Its Deep Desert rect was ~8% wider than the square the PNG
+covers, so the picture was stretched across a rect it does not fill and every
+marker was drawn short of where the image put it -- exact at the centre, 84,163
+uu adrift at the edges, a third of a sector cell. Terrain sidestepped it by
+placing geometry at true world positions, which made the two visibly disagree.
+The rect is now the sector square itself, so image, terrain, markers and grid
+share one frame of reference.
+
+The world does not stop at that edge, though, so `worldToLiveMapPoint` allows a
+16 px tolerance before calling a marker out of bounds. Measured on a live farm, a
+player and the ornithopter they were flying sat 4,216 uu past the north edge; a
+hard cut would drop exactly the marker an admin is most likely to be hunting for.
+Such markers are drawn at their true position, never clamped.
 
 The canvas covers the frame's **viewport**, not the scaled map, and is translated
 to follow the scrollport on each scroll. At maximum zoom the map is 16384 px
@@ -350,13 +360,12 @@ when too little of the cell is on screen to label. Measured across a pan at high
 zoom: a label is visible at every position, where fixed centres left 6 of 8
 positions unlabelled.
 
-**It is on by default, and it rides on the terrain.** The rendered terrain has
-no grid of its own and relating a marker to a sector is the common case, so the
-overlay is on whenever terrain is drawn. It is not offered at all on the
-flat-image fallback: that picture carries its own grid, burned in at the image's
-own mis-scaled extent, and the two disagree by up to 3.74% at the edges. Drawing
-both put two 9x9 grids about half a cell apart on screen, which reads as a
-rendering fault rather than a feature.
+**It is on by default.** The rendered terrain has no grid of its own and
+relating a marker to a sector is the common case. It is drawn over the flat image
+too: that picture carries its own grid, but the two now describe the same world
+square and coincide, and the overlay's labels stay crisp and constant-sized at
+any zoom where the burned-in ones do not. Before the bounds were corrected the
+two sat about a third of a cell apart, which read as a rendering fault.
 
 ## Player teleport
 

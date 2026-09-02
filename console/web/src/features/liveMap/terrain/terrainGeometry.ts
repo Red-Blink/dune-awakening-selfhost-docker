@@ -46,9 +46,9 @@ export function depthRange(layout: Pick<TerrainLayoutMeta, "zmin" | "zmax">): nu
  * pan and zoom and hands us the visible rect, so the terrain lands on exactly
  * the world rectangle the panel believes it is showing.
  *
- * That is also what corrects the shipped map image's 8.1% mis-scale: the PNG is
- * stretched to fill `LIVE_MAP_CONFIGS`' rect even though it only covers the
- * 9-sector grid, whereas rendering places geometry at its true world position.
+ * Placing geometry at true world positions is also what exposed the ~8% oversize
+ * in `LIVE_MAP_CONFIGS`' Deep Desert rect, since the stretched PNG visibly
+ * disagreed with it. The rect is the sector square now, so the two agree.
  *
  * Screen Y runs opposite to clip Y: the panel's pixel space grows downward and
  * `flipY` is false for both maps, so increasing world Y is drawn further down.

@@ -14,10 +14,10 @@ import type { TerrainLayoutMeta, TerrainLibrary, TerrainView } from "./types";
 const CONFIG = {
   width: 4096,
   height: 4096,
-  minX: -1268624.82,
-  maxX: 1163312.83,
-  minY: -1266548.17,
-  maxY: 1162416.13,
+  minX: -1177656,
+  maxX: 1072344,
+  minY: -1177066,
+  maxY: 1072934,
   flipY: false
 };
 

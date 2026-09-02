@@ -15,6 +15,18 @@ export const MIN_ZOOM_FIT_FACTOR = 1;
 
 export type LiveMapPoint = { px: number; py: number; inBounds: boolean };
 
+/**
+ * How far outside the map rect a marker may sit and still be drawn.
+ *
+ * The rect is the sector square the image covers, and the world does not stop
+ * dead at its edge: measured on a live farm, a player and the ornithopter they
+ * were flying sat 4,216 uu past the north edge, and a handful of world markers
+ * about 1,100 uu past it. A hard cut drops exactly the marker an admin is most
+ * likely to be hunting for. 16 px is about 8,800 uu here -- twice the worst case
+ * observed -- and markers are still drawn at their true position, never clamped.
+ */
+const EDGE_TOLERANCE_PX = 16;
+
 export function worldToLiveMapPoint(marker: Pick<LiveMapMarker, "x" | "y">, config: LiveMapConfig): LiveMapPoint | null {
   const x = Number(marker.x);
   const y = Number(marker.y);
@@ -26,7 +38,8 @@ export function worldToLiveMapPoint(marker: Pick<LiveMapMarker, "x" | "y">, conf
   return {
     px,
     py,
-    inBounds: px >= 0 && px <= config.width && py >= 0 && py <= config.height
+    inBounds: px >= -EDGE_TOLERANCE_PX && px <= config.width + EDGE_TOLERANCE_PX
+      && py >= -EDGE_TOLERANCE_PX && py <= config.height + EDGE_TOLERANCE_PX
   };
 }
 

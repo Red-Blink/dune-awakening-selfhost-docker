@@ -5,7 +5,7 @@ import { labelAnchorInView, sectorForWorldPoint, sectorGridFor } from "./liveMap
 const DEEP_DESERT: LiveMapConfig = {
   key: "DeepDesert", label: "The Deep Desert", actorMap: "DeepDesert",
   image: "/images/maps/deep-desert.png", width: 4096, height: 4096,
-  minX: -1268624.82, maxX: 1163312.83, minY: -1266548.17, maxY: 1162416.13,
+  minX: -1177656, maxX: 1072344, minY: -1177066, maxY: 1072934,
   flipY: false, defaultPartitionId: 8
 };
 const HAGGA: LiveMapConfig = { ...DEEP_DESERT, key: "HaggaBasin", actorMap: "HaggaBasin" };
@@ -44,9 +44,12 @@ describe("sectorForWorldPoint", () => {
   it("returns null outside the grid rather than an out-of-range letter", () => {
     expect(sectorForWorldPoint(CENTRE_X - HALF - 1, CENTRE_Y)).toBeNull();
     expect(sectorForWorldPoint(CENTRE_X, CENTRE_Y + HALF + 1)).toBeNull();
-    // The config's rect is wider than the grid, so points can legitimately fall
-    // outside it -- 3.74% of the map's width on each side.
+    // The rect and the grid now coincide, so the far corner is the grid's own
+    // exclusive edge rather than a point beyond it -- still no sector, but for a
+    // different reason.
     expect(sectorForWorldPoint(DEEP_DESERT.minX, DEEP_DESERT.minY)).toBeNull();
+    // and one cell inside that corner does have a sector
+    expect(sectorForWorldPoint(DEEP_DESERT.minX + 1, DEEP_DESERT.minY + 1)).toBe("I1");
   });
 });
 
@@ -84,11 +87,17 @@ describe("sectorGridFor", () => {
     expect(sectorGridFor(HAGGA)).toBeNull();
   });
 
-  it("keeps the grid inset from the config rect, which is wider than the grid", () => {
+  it("spans the image exactly, because the rect is the sector square", () => {
+    // The config rect used to be ~8% wider than the square the image covers, so
+    // this grid sat inset 153 px per side while the picture's own grid ran edge
+    // to edge. The two now describe the same world square.
     const grid = sectorGridFor(DEEP_DESERT)!;
     const xs = grid.lines.flatMap((line) => [line.x1, line.x2]);
-    expect(Math.min(...xs)).toBeGreaterThan(0);
-    expect(Math.max(...xs)).toBeLessThan(DEEP_DESERT.width);
+    const ys = grid.lines.flatMap((line) => [line.y1, line.y2]);
+    expect(Math.min(...xs)).toBeCloseTo(0, 6);
+    expect(Math.max(...xs)).toBeCloseTo(DEEP_DESERT.width, 6);
+    expect(Math.min(...ys)).toBeCloseTo(0, 6);
+    expect(Math.max(...ys)).toBeCloseTo(DEEP_DESERT.height, 6);
   });
 });
 

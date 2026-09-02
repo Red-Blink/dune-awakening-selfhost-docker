@@ -3130,10 +3130,15 @@ const LIVE_MAP_CONFIGS = {
     image: "/images/maps/deep-desert.png",
     width: 4096,
     height: 4096,
-    minX: -1268624.82,
-    maxX: 1163312.83,
-    minY: -1266548.17,
-    maxY: 1162416.13,
+    // The rect is the 9x9 sector square itself: 250,000 uu cells spanning
+    // +/-1,125,000 about the map centre, which is exactly what the image covers.
+    // It used to be ~8% wider, which stretched the picture across a rect it does
+    // not fill and drew every marker short of where the image puts it -- exact at
+    // the centre, 84,163 uu adrift at the edges, a third of a sector cell.
+    minX: -1177656,
+    maxX: 1072344,
+    minY: -1177066,
+    maxY: 1072934,
     flipY: false,
     defaultPartitionId: 8
   }

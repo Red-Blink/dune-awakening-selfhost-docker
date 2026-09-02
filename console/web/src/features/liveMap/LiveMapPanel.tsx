@@ -528,7 +528,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
   useEffect(() => {
     const frame = frameRef.current;
     const group = sectorLabelsRef.current;
-    if (!frame || !group || !showSectorGrid || !sectorGrid || !terrainEligible) return;
+    if (!frame || !group || !showSectorGrid || !sectorGrid) return;
     let queued = 0;
     const place = () => {
       queued = 0;
@@ -566,7 +566,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
       observer.disconnect();
       if (queued) cancelAnimationFrame(queued);
     };
-  }, [showSectorGrid, sectorGrid, zoom, terrainEligible]);
+  }, [showSectorGrid, sectorGrid, zoom]);
 
   const zoomMaxPercent = Math.round(MAX_LIVE_MAP_ZOOM * 100);
   const zoomValuePercent = Math.round(zoom * 100);
@@ -1175,7 +1175,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
           <button onClick={() => setZoomAround(zoom * 1.18)}>Zoom In</button>
           <button onClick={() => setZoomAround(zoom * 0.84)}>Zoom Out</button>
           <button onClick={fitLiveMapView}>Fit Map</button>
-          {terrainEligible && <button aria-pressed={showSectorGrid} className={showSectorGrid ? "active" : ""} onClick={() => setShowSectorGrid((on) => !on)}>Sector Grid</button>}
+          {activeMap?.key === "DeepDesert" && <button aria-pressed={showSectorGrid} className={showSectorGrid ? "active" : ""} onClick={() => setShowSectorGrid((on) => !on)}>Sector Grid</button>}
           <label>Zoom<input className="live-map-zoom-range" type="range" min={zoomMinPercent} max={zoomMaxPercent} value={zoomValuePercent} style={{ "--zoom-progress": `${zoomProgressPercent}%` } as React.CSSProperties} onChange={(event) => setZoomAround(Number(event.target.value) / 100)} /></label>
           <span className="muted">Drag to Pan. Mouse Wheel Zooms. Double-click to pick a location.</span>
         </div>
@@ -1196,7 +1196,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
                   </Suspense>
                 </>
               : activeMap.image ? <img className="live-map-image" src={activeMap.image} alt={activeMap.label} draggable={false} /> : <div className="live-map-placeholder">{activeMap.label}</div>}
-            {showSectorGrid && sectorGrid && terrainEligible && <svg className="live-map-sector-grid" viewBox={`0 0 ${activeMap.width} ${activeMap.height}`} width={Math.floor(activeMap.width * zoom)} height={Math.floor(activeMap.height * zoom)} aria-hidden="true">
+            {showSectorGrid && sectorGrid && <svg className="live-map-sector-grid" viewBox={`0 0 ${activeMap.width} ${activeMap.height}`} width={Math.floor(activeMap.width * zoom)} height={Math.floor(activeMap.height * zoom)} aria-hidden="true">
               <g className="lines">
                 {sectorGrid.lines.map((line, index) => <line key={index} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} className={line.edge ? "edge" : ""} />)}
               </g>
