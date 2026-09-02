@@ -61,12 +61,19 @@ export function AutoRefillSettingsOverlay({ onClose, onSaved, onError }: AutoRef
     return () => { cancelled = true; };
   }, [onError]);
 
+  // Held in a ref so this effect can run once. BasesPanel passes onClose as a
+  // new inline arrow every render and re-renders every 10s (usePendingRefills
+  // polls on that cadence), so keying the effect on onClose would re-focus the
+  // close button roughly mid-sentence while an operator is typing in a field.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     closeButtonRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onCloseRef.current(); };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  }, []);
 
   const errorFor = useCallback((key: AutoRefillSettingKey): string => {
     if (!state) return "";
@@ -103,9 +110,9 @@ export function AutoRefillSettingsOverlay({ onClose, onSaved, onError }: AutoRef
       onSaved();
       onClose();
     } catch (error) {
-      onError(errorText(error));
-    } finally {
+      // Only on failure: the success path has already unmounted via onClose().
       setSaving(false);
+      onError(errorText(error));
     }
   };
 
@@ -125,6 +132,8 @@ export function AutoRefillSettingsOverlay({ onClose, onSaved, onError }: AutoRef
             max={limits.max}
             step={1}
             aria-label={`${field.group}: ${field.label} (${field.unit})`}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${field.key}-error` : undefined}
             value={drafts[field.key] ?? ""}
             onChange={(event) => setDraft(field.key, event.target.value)}
           />
@@ -137,7 +146,7 @@ export function AutoRefillSettingsOverlay({ onClose, onSaved, onError }: AutoRef
           disabled={!isOverridden}
           onClick={() => reset(field.key)}
         >Reset</button>
-        {error && <p className="danger-note" role="alert">{error}</p>}
+        {error && <p className="danger-note" id={`${field.key}-error`}>{error}</p>}
         {showEnvHint && (
           <p className="muted auto-refill-settings-hint">
             Set by {state.envNames[field.key]} ({state.defaults[field.key]}). Saving here overrides it.

@@ -18,6 +18,13 @@
      differently-tinted surfaces these sit on. 8.40:1, still brighter than
      the labels beneath it so title > subtitle > label survives. */
   --text-subtle: #bebcb6;
+  /* The same neutral one step further down: --text blended ~58% toward the
+     card background rather than 75%. Supporting micro-copy sat at --muted
+     (#ad9f89), which is the same warm family as the field labels above it at
+     only a few points of saturation apart, so the two ran together. A dimmer
+     NEUTRAL separates by hue instead of fighting for lightness. 5.6:1 -- still
+     AA for the 11px it is used at. */
+  --text-faint: #979692;
   --title: #ffd08a;
   --accent: #c68b4a;
   --accent-strong: #d49a5c;
@@ -2118,11 +2125,12 @@ body.debug .technical-details { display: block; }
   line-height: 1.4;
   color: var(--danger-text);
 }
-/* Square icon button in the Bases panel title, sized to match the Refresh
-   button beside it. Not a reuse of .exchange-config-button: that one is 43px
-   to line up with the Exchange search row's taller inputs, and lives in the
-   exchange section of this file. */
-.bases-settings-button { width: 41px; height: 41px; min-width: 0; padding: 0; display: inline-grid; place-items: center; }
+/* Square icon button in the Bases panel title. 43px is the measured height of
+   the Refresh button beside it (global button rule: 10px padding + 16px line
+   box + 1px border, doubled) -- anything less sits visibly inset in the
+   centre-aligned .action-row. Not a reuse of .exchange-config-button, which is
+   the same size for a different reason and lives in the exchange section. */
+.bases-settings-button { width: 43px; height: 43px; min-width: 0; padding: 0; display: inline-grid; place-items: center; }
 .auto-refill-settings-modal { width: min(500px, calc(100vw - 32px)); }
 /* .primary has no global styling inside a modal -- .exchange-config-modal
    scopes its own. Same treatment here rather than leaving Save unstyled. */
@@ -2134,7 +2142,13 @@ body.debug .technical-details { display: block; }
 .auto-refill-settings-modal .confirm-modal-actions .primary:hover:not(:disabled) { background: var(--accent-strong); border-color: var(--accent-strong); }
 .auto-refill-settings-group { display: grid; gap: 9px; }
 .auto-refill-settings-group-divided { border-top: 1px solid var(--border); padding-top: 13px; }
-.auto-refill-settings-group-title { font-size: 12px; font-weight: 500; color: var(--muted-warm); }
+.auto-refill-settings-group-title {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
 .auto-refill-settings-field-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; }
 .auto-refill-settings-field { display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .auto-refill-settings-field > span:first-child { flex: 1; }
@@ -2143,6 +2157,26 @@ body.debug .technical-details { display: block; }
 .auto-refill-settings-reset { padding: 6px 10px; font-size: 12px; min-width: 0; }
 /* Errors and hints span both columns so they sit under the field, not beside
    the Reset button. */
+/* `.confirm-modal p` (0,1,1) sets its own colour, so the .danger-note and
+   .muted class rules (both 0,1,0) lose inside this modal and the validation
+   error renders in ordinary body text. Re-assert here, where the selector
+   outranks it -- and use the re-assertion to separate four tiers.
+   The title, section headings and muted copy were previously three steps of
+   the same warm amber, which reads as one blurred block however good the
+   contrast ratio is. So each tier differs from its neighbour in hue OR
+   treatment, not only in lightness:
+     title      h1-h5 -> --title  #ffd08a  amber, 18px      (unchanged)
+     subtitle   --text-subtle     #bebcb6  NEUTRAL grey     (breaks the family)
+     category   --accent          #c68b4a  amber, UPPERCASE + tracked
+     label      --text            #f3efe7  near-white body
+     footnote   --text-faint      #979692  NEUTRAL, dimmest, 11px            */
+.auto-refill-settings-modal .danger-note { color: var(--danger-text); }
+/* Direct children only: the lede and the "Loading..." line. The note is also a
+   direct child and also carries .muted, so it has to win on the same class
+   count -- hence `p.` on the two rules below and their order after this one. */
+.auto-refill-settings-modal > p.muted { color: var(--text-subtle); }
+.auto-refill-settings-modal p.auto-refill-settings-hint,
+.auto-refill-settings-modal p.auto-refill-settings-note { color: var(--text-faint); }
 .auto-refill-settings-field-row .danger-note,
 .auto-refill-settings-hint { grid-column: 1 / -1; margin: 0; font-size: 11px; line-height: 1.4; }
 .auto-refill-settings-note { margin: 0; font-size: 11px; line-height: 1.5; border-top: 1px solid var(--border); padding-top: 12px; }

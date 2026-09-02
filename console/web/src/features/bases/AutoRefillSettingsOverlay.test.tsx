@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AutoRefillSettingsOverlay } from "./AutoRefillSettingsOverlay";
 import { basesApi } from "../../api/bases";
@@ -179,6 +180,29 @@ describe("AutoRefillSettingsOverlay", () => {
     expect(props.onClose).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByLabelText("Close"));
     expect(props.onClose).toHaveBeenCalledTimes(2);
+  });
+
+  // BasesPanel passes onClose as a new inline arrow every render and re-renders
+  // every 10s (usePendingRefills polls on that cadence), so an effect keyed on
+  // onClose re-runs and steals focus out of whatever field is being typed in.
+  it("keeps focus in the field when the parent re-renders", async () => {
+    function Harness() {
+      const [tick, setTick] = useState(0);
+      return (
+        <>
+          <button onClick={() => setTick(tick + 1)}>re-render parent</button>
+          <AutoRefillSettingsOverlay onClose={() => {}} onSaved={() => {}} onError={() => {}} />
+        </>
+      );
+    }
+    render(<Harness />);
+    await waitFor(() => expect(fields()).toHaveLength(4));
+
+    generatorThreshold().focus();
+    expect(document.activeElement).toBe(generatorThreshold());
+
+    fireEvent.click(screen.getByText("re-render parent"));
+    expect(document.activeElement).toBe(generatorThreshold());
   });
 
   it("warns that the two intervals behave differently in each direction", async () => {

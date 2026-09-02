@@ -123,8 +123,11 @@ the environment variable (`ADMIN_AUTO_REFILL_THRESHOLD_PERCENT`,
 `ADMIN_AUTO_REFILL_INTERVAL_HOURS`, `ADMIN_AUTO_REFILL_WATER_THRESHOLD_PERCENT`,
 `ADMIN_AUTO_REFILL_WATER_INTERVAL_HOURS`) if one is set, or the default above.
 The precedence is settings page, then environment variable, then default. An
-out-of-range or unparseable environment variable falls back to the default
-rather than failing startup, and a blank one reads as unset.
+unparseable environment variable falls back to the default rather than failing
+startup; an out-of-range one is clamped to the nearest bound. A blank one reads
+as unset — though on the standard Docker deployment `docker-compose.web.yml`
+substitutes its own default for a variable that is blank or missing, so a blank
+never reaches the console there.
 
 Two timing details worth knowing. **A shortened interval pulls the next scan
 in**; a lengthened one applies only after the currently scheduled scan runs.

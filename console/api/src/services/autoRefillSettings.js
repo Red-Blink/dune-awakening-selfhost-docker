@@ -11,7 +11,10 @@ import { clampInt, writeJsonAtomic } from "../jsonStore.js";
 const AUTO_REFILL_SETTINGS_PATH = "runtime/generated/auto-refill-settings.json";
 
 // The single place these names, defaults and ranges are written down. The
-// bounds are what the scanners can act on: 0% never fires, 100% always does.
+// bounds are an operating range, not a correctness limit: the scan skips on
+// `lowest >= threshold`, so 0 would never queue anything and 100 would queue on
+// any consumption at all. Note a hand-filled device can read slightly over 100%
+// (real data has a few at 100.2), which only ever causes a skip.
 export const AUTO_REFILL_SETTING_SPECS = Object.freeze({
   thresholdPercent:      { env: "ADMIN_AUTO_REFILL_THRESHOLD_PERCENT",       fallback: 50, min: 1, max: 99  },
   intervalHours:         { env: "ADMIN_AUTO_REFILL_INTERVAL_HOURS",          fallback: 24, min: 1, max: 168 },
