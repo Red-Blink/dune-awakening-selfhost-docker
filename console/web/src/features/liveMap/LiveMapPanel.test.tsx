@@ -537,30 +537,44 @@ it("leaves the grid to the flat image, which has one burned in", async () => {
 // every five-second poll.
 it("does not re-subscribe the grid's scroll listener on an unrelated re-render", async () => {
   useDeepDesert({ coriolisLayout: 3 });
-  const added: unknown[] = [];
-  const original = HTMLDivElement.prototype.addEventListener;
-  const spy = vi.spyOn(HTMLDivElement.prototype, "addEventListener").mockImplementation(function (
-    this: HTMLDivElement, type: string, ...rest: unknown[]
-  ) {
+  const { container } = renderPanel();
+  const marker = await screen.findByRole("button", { name: "Base: Sietch Tabr" });
+  const frame = container.querySelector(".live-map-frame") as HTMLDivElement;
+  expect(frame).not.toBeNull();
+
+  // Watch this one element rather than HTMLDivElement.prototype, and watch it
+  // only once mounting has settled. Counting every div's scroll listeners from
+  // a snapshot taken mid-mount made this flaky: anything subscribing later, for
+  // any reason, looked like the grid re-subscribing.
+  //
+  // Removals are the assertion because a re-subscription cannot avoid one --
+  // React tears an effect down before running it again -- so a removal means
+  // churn and nothing else can fake it.
+  const removed: string[] = [];
+  const added: string[] = [];
+  const realAdd = frame.addEventListener.bind(frame);
+  const realRemove = frame.removeEventListener.bind(frame);
+  frame.addEventListener = ((type: string, ...rest: unknown[]) => {
     if (type === "scroll") added.push(type);
-    return (original as never as (...args: unknown[]) => void).call(this, type, ...rest);
-  } as never);
+    return (realAdd as (...args: unknown[]) => void)(type, ...rest);
+  }) as typeof frame.addEventListener;
+  frame.removeEventListener = ((type: string, ...rest: unknown[]) => {
+    if (type === "scroll") removed.push(type);
+    return (realRemove as (...args: unknown[]) => void)(type, ...rest);
+  }) as typeof frame.removeEventListener;
 
   try {
-    renderPanel();
-    const marker = await screen.findByRole("button", { name: "Base: Sietch Tabr" });
-    const before = added.length;
-    expect(before).toBeGreaterThan(0);
-
-    // A re-render that has nothing to do with the map or the zoom.
+    // Re-renders that have nothing to do with the map, the zoom or the grid.
     fireEvent.mouseEnter(marker);
     fireEvent.mouseLeave(marker);
     fireEvent.mouseEnter(marker);
     fireEvent.mouseLeave(marker);
 
-    expect(added.length).toBe(before);
+    expect(removed).toEqual([]);
+    expect(added).toEqual([]);
   } finally {
-    spy.mockRestore();
+    delete (frame as Partial<HTMLDivElement>).addEventListener;
+    delete (frame as Partial<HTMLDivElement>).removeEventListener;
   }
 });
 
