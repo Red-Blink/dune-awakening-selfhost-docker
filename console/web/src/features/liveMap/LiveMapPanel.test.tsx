@@ -498,9 +498,12 @@ it("reports the layout once one is known", async () => {
   useDeepDesert({ coriolisLayout: 3 });
   const { container } = renderPanel();
   await screen.findByRole("button", { name: "Base: Sietch Tabr" });
-  await waitFor(() => expect(container.querySelector("canvas.live-map-terrain")).not.toBeNull());
+  // The canvas mounts before its asynchronously loaded terrain is ready. Wait
+  // for the readiness signal reflected by removal of the temporary flat image,
+  // rather than merely observing the canvas element and racing onReady().
+  await waitFor(() => expect(container.querySelector("img.live-map-image")).toBeNull());
+  expect(container.querySelector("canvas.live-map-terrain")).not.toBeNull();
   expect(screen.getByText("layout 3")).toBeInTheDocument();
-  expect(container.querySelector("img.live-map-image")).toBeNull();
 });
 
 // Finding 9: the API caps the layout at 63 so a future Layout_12 is reported
