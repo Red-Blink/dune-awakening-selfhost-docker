@@ -713,5 +713,135 @@ class PartitionEngineValuesManyCommandTests(ProfilePathTestCase):
         self.assertEqual(result[PARTITION_ID][self.FIELD_ID], "The Kulon Show")
 
 
+class ProfileBlankLineHygieneTests(ProfilePathTestCase):
+    """Blank lines inside a profile block must never accumulate.
+
+    parse_profile_text() attributes the blank line separating a block from the
+    next one to that block's own lines. profile_set_key() used to append new
+    keys after it, so serialize_profile() wrote a fresh separator and the old
+    one stayed trapped inside the block; profile_remove_key() then dropped only
+    the key line, leaving the blank behind. Every add/remove cycle on an array
+    entry (the PvP/PvE partition selectors, the Deep Desert matchmaker
+    override) therefore grew its block by one permanent blank line, and those
+    orphans rode through append_profile_unknown_lines() into the deployed INI.
+    """
+
+    PVP_SECTION = "/Script/DuneSandbox.PvpPveSettings"
+    STORM_SECTION = "/Script/DuneSandbox.SandStormConfig"
+
+    def _save_global(self, values: dict) -> None:
+        usersettings.bulk_save("global", MAP_NAME, "", _encode_bulk_save_payload(values))
+
+    def _block_lines(self, scope: str, section: str) -> list[str]:
+        """A block's lines with any trailing blank dropped.
+
+        Reading back from disk re-attributes the separator blank before the next
+        [Header] to this block, so one trailing blank is normal parse output
+        rather than accumulation -- write_profile() strips it again on the next
+        write. Accumulation shows up as blanks *between* content lines, which is
+        what these assertions pin down.
+        """
+        block = usersettings.find_profile_section(usersettings.read_profile(), scope, section)
+        lines = list(block["lines"]) if block else []
+        while lines and not lines[-1].strip():
+            lines.pop()
+        return lines
+
+    def _global_block_lines(self, section: str) -> list[str]:
+        return self._block_lines("global", section)
+
+    def test_appending_a_key_does_not_trap_the_block_separator_blank(self):
+        # A block that sorts AFTER this one is what gives it a trailing separator
+        # to trip over -- the last block in the file has nothing to trap. Save it
+        # first so the separator is already there by the second write.
+        self._save_global({"outlaw_criminal_score": "9"})
+        self._save_global({"sandstorm_damage_frames_per_overlap_interval": "16"})
+        self._save_global({"sandstorm_auto_spawn_enabled": "False"})
+
+        self.assertEqual(self._global_block_lines(self.STORM_SECTION), [
+            "m_DamageFramesPerOverlapInterval=16",
+            "m_bAutoSpawnEnabled=False",
+        ])
+
+    def test_repeated_array_add_and_remove_does_not_grow_the_block(self):
+        self._save_global({"guild_creation_cost": "500"})
+        self._save_global({"sandstorm_auto_spawn_enabled": "False"})
+        self._save_global({"global_pvp_enabled_partition_add": "60"})
+        settled = self._global_block_lines(self.PVP_SECTION)
+
+        for _ in range(6):
+            self._save_global({"global_pvp_enabled_partition_add": "8"})
+            self._save_global({"global_pvp_enabled_partition_remove": "8"})
+            # Back to exactly the pre-cycle content, not that content plus a blank.
+            self.assertEqual(self._global_block_lines(self.PVP_SECTION), settled)
+
+        self._save_global({"global_pvp_enabled_partition_add": "8"})
+        self.assertEqual(self._global_block_lines(self.PVP_SECTION), [
+            "+m_PvpEnabledPartitions=60",
+            "+m_PvpEnabledPartitions=8",
+        ])
+
+    def test_orphan_blank_runs_from_older_releases_are_collapsed_on_write(self):
+        # What profiles written before the fix actually look like on disk.
+        usersettings.write_profile_text("\n".join([
+            "; UserGame.ini managed by Docker.",
+            "",
+            f"[Global:{self.PVP_SECTION}]",
+            "",
+            "",
+            "+m_PvpEnabledPartitions=60",
+            "",
+            "",
+            "",
+            "+m_PvpEnabledPartitions=8",
+            "",
+            "",
+            f"[Global:{self.STORM_SECTION}]",
+            "m_bAutoSpawnEnabled=False",
+            "",
+        ]) + "\n")
+
+        usersettings.write_profile(usersettings.read_profile())
+
+        # The run collapses to the single blank an admin could legitimately have
+        # typed there -- normalize_profile_blank_lines() deliberately stops short
+        # of removing that last one (see its docstring); what matters is that it
+        # can no longer grow, which the add/remove test above covers.
+        self.assertEqual(self._global_block_lines(self.PVP_SECTION), [
+            "+m_PvpEnabledPartitions=60",
+            "",
+            "+m_PvpEnabledPartitions=8",
+        ])
+        self.assertEqual(self._global_block_lines(self.STORM_SECTION), ["m_bAutoSpawnEnabled=False"])
+        # Values are untouched: only blank lines were ever removed.
+        self.assertEqual(
+            usersettings.profile_global_values(usersettings.read_profile())["sandstorm_auto_spawn_enabled"],
+            "False",
+        )
+
+    def test_a_single_blank_between_comment_paragraphs_survives(self):
+        # The UserEngine Advanced tab renders comment paragraphs separated by one
+        # blank line; collapsing runs must not flatten that deliberate grouping.
+        usersettings.write_profile_text("\n".join([
+            "[Engine:ConsoleVariables]",
+            "; Mining multipliers",
+            "Dune.GlobalMiningOutputMultiplier=2.4",
+            "",
+            "; Durability damage multiplier for vehicles",
+            "dw.VehicleDurabilityDamageMultiplier=0.5",
+        ]) + "\n")
+
+        usersettings.write_profile(usersettings.read_profile())
+
+        block = usersettings.find_profile_section(usersettings.read_profile(), "engine", "ConsoleVariables")
+        self.assertEqual(block["lines"], [
+            "; Mining multipliers",
+            "Dune.GlobalMiningOutputMultiplier=2.4",
+            "",
+            "; Durability damage multiplier for vehicles",
+            "dw.VehicleDurabilityDamageMultiplier=0.5",
+        ])
+
+
 if __name__ == "__main__":
     unittest.main()

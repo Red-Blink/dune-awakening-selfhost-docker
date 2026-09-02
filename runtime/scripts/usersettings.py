@@ -927,6 +927,7 @@ def preflight_persisted_settings() -> int:
 
 def write_profile(profile: dict) -> None:
     strip_retired_usergame_profile_lines(profile)
+    normalize_profile_blank_lines(profile)
     prune_empty_profile_sections(profile)
     atomic_write_text(PROFILE_PATH, serialize_profile(profile))
 
@@ -946,6 +947,38 @@ def serialize_profile(profile: dict) -> str:
         lines.append(f"[{section['header']}]")
         lines.extend(section.get("lines", []))
     return "\n".join(lines).rstrip() + "\n"
+
+
+def normalize_profile_blank_lines(profile: dict) -> None:
+    """Clean up blank-line runs inside profile blocks.
+
+    profile_remove_key() drops a key's line but never the blank line an earlier
+    append had trapped beside it, so before the profile_set_key() fix every
+    add/remove cycle on an array entry (the PvP/PvE partition selectors, the Deep
+    Desert matchmaker override) grew its block by one permanent blank line --
+    profiles written by those releases arrive here with long orphan runs.
+
+    A block's leading and trailing blanks carry no meaning -- serialize_profile()
+    owns the single separator between blocks -- so drop them, and collapse
+    interior runs to one.
+
+    Interior runs, not every interior blank: a single blank inside a block is
+    deliberate spacing an admin is entitled to keep, both between the comment
+    paragraphs the UserEngine Advanced tab renders and between their own custom
+    cvars (test_blank_line_between_custom_cvars_survives_round_trip pins that
+    down). Only a *run* is unambiguously machine-made, and with the
+    profile_set_key() fix above no new orphan can appear to grow one.
+    """
+    for block in profile.get("sections", []):
+        cleaned: list[str] = []
+        for raw in block.get("lines", []):
+            if raw.strip():
+                cleaned.append(raw)
+            elif cleaned and cleaned[-1].strip():
+                cleaned.append("")
+        while cleaned and not cleaned[-1].strip():
+            cleaned.pop()
+        block["lines"] = cleaned
 
 
 def prune_empty_profile_sections(profile: dict) -> None:
@@ -1261,10 +1294,18 @@ def profile_set_key(profile: dict, scope: str, section: str, key: str, value: st
         if current_prefix == prefix:
             target_index = index
     line = f"{target_left}={value}"
-    if target_index is None:
-        block["lines"].append(line)
-    else:
+    if target_index is not None:
         block["lines"][target_index] = line
+        return
+    # parse_profile_text() attributes the blank line that separates this block from
+    # the next one to THIS block, so a plain append lands *after* that blank.
+    # serialize_profile() then writes a fresh separator, and the old one is trapped
+    # inside the block for good -- one more orphan blank line for every key ever
+    # appended here. Insert ahead of any trailing blanks so nothing accumulates.
+    insert_at = len(block["lines"])
+    while insert_at and not block["lines"][insert_at - 1].strip():
+        insert_at -= 1
+    block["lines"].insert(insert_at, line)
 
 
 def profile_remove_key(profile: dict, scope: str, section: str, key: str, map_name: str = "", partition_id: str = "", prefixes: set[str] | None = None, value: str | None = None) -> None:
