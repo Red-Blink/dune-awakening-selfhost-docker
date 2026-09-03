@@ -150,6 +150,8 @@ jobs:
           tests/always-on-memory-safety-test.sh
           tests/autoscaler-browser-heal-safety-test.sh
           tests/autoscaler-igw-socket-health-test.sh
+          tests/autoscaler-heal-scan-rate-limit-test.sh
+          tests/autoscaler-scan-gating-inventory-test.sh
           tests/coriolis-coordinator-test.sh
           tests/db-backup-validation-test.sh
           tests/battlegroup-identity-test.sh
