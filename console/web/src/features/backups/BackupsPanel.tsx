@@ -55,6 +55,13 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
   const [systemPassphrase, setSystemPassphrase] = useState("");
   const [systemPassphraseConfirm, setSystemPassphraseConfirm] = useState("");
   const [selectedSystemBackups, setSelectedSystemBackups] = useState<Set<string>>(new Set());
+  // The restore passphrase has to survive from preview to apply, so it stays in
+  // state between the two calls -- cleared as soon as either finishes, and
+  // invalidated the moment it is edited so an apply can never run under a
+  // passphrase the preview did not prove.
+  const [restoreTarget, setRestoreTarget] = useState<SystemBackupRow | null>(null);
+  const [restorePassphrase, setRestorePassphrase] = useState("");
+  const [restorePreviewed, setRestorePreviewed] = useState(false);
   const [importBackupFile, setImportBackupFile] = useState<File | null>(null);
   const [importMetadataFile, setImportMetadataFile] = useState<File | null>(null);
   const importBackupInputRef = useRef<HTMLInputElement | null>(null);
@@ -149,6 +156,103 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
       if (checked) next.add(name); else next.delete(name);
       return next;
     });
+  }
+
+  function openSystemRestore(row: SystemBackupRow) {
+    setRestoreTarget(row);
+    setRestorePassphrase("");
+    setRestorePreviewed(false);
+    setSystemResult(null);
+  }
+
+  function closeSystemRestore() {
+    setRestoreTarget(null);
+    setRestorePassphrase("");
+    setRestorePreviewed(false);
+  }
+
+  // Restore gets its own runner. summarizeBackupTask is shaped around "a backup
+  // file was written", and runSystemBackupTask stamps success with the delete
+  // card's tone; neither describes a preview or a restore that leaves the stack
+  // running the previous configuration.
+  async function runSystemRestoreTask(action: string, taskFactory: () => Promise<{ task: Task }>, runningTitle: string, failureTitle: string, onSuccess: (details: string) => BackupResult) {
+    setBusyAction(action);
+    setSystemResult({ status: "running", title: runningTitle });
+    try {
+      const response = await taskFactory();
+      const final = await waitForTask(response.task);
+      const details = final.logLines.map((line) => line.line).join("\n");
+      if (final.status === "succeeded") setSystemResult(onSuccess(details));
+      else setSystemResult({ status: "failed", title: failureTitle, message: final.errorMessage || conciseTaskError(final), details });
+      return final;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      setSystemResult({ status: "failed", title: failureTitle, message: reason });
+      onError(reason);
+      return null;
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function previewSystemRestore() {
+    if (!restoreTarget) return;
+    const final = await runSystemRestoreTask(
+      "restoreSystemPreview",
+      () => backupsApi.restoreSystem(restoreTarget.name, { passphrase: restorePassphrase, apply: false }),
+      "Checking System Backup...",
+      "Restore Preview Failed",
+      (details) => ({
+        status: "succeeded",
+        title: "Preview Only - Nothing Changed",
+        message: "The passphrase opened the archive. Review what it would replace below, then apply.",
+        details
+      })
+    );
+    // Only a successful decrypt unlocks apply, so a wrong passphrase cannot
+    // reach the destructive call at all.
+    setRestorePreviewed(final?.status === "succeeded");
+  }
+
+  async function applySystemRestore() {
+    if (!restoreTarget || !restorePreviewed) return;
+    const backup = restoreTarget.name;
+    const backupBattlegroupId = String(restoreTarget.battlegroupId || "Unknown");
+    // Unlike the database restore, this always confirms before asking about
+    // identity: the archive replaces credentials and configuration too, so the
+    // identity question alone is not an informed confirmation of it.
+    if (!(await confirmAction("This replaces this server's configuration, credentials and database with the contents of the archive.", {
+      title: "Restore System Backup",
+      confirmLabel: "Restore",
+      danger: true,
+      details: [
+        { label: "Backup", value: backup, tone: "accent" },
+        { label: "Replaces", value: ".env, runtime/generated, runtime/secrets and the entire database", tone: "danger" },
+        { label: "After", value: "A stack restart is required; the admin password may change", tone: "danger" }
+      ]
+    }))) return;
+    let identityMode: BackupIdentityChoice = "keep-current";
+    if (backupIdentityDiffers(currentBattlegroupId, backupBattlegroupId)) {
+      identityMode = await chooseBackupIdentity({ backup, currentBattlegroupId, backupBattlegroupId });
+      if (identityMode === "cancel") return;
+    }
+    const final = await runSystemRestoreTask(
+      "restoreSystemApply",
+      () => backupsApi.restoreSystem(backup, { passphrase: restorePassphrase, apply: true, identityMode }),
+      "Restoring System Backup...",
+      "System Backup Restore Failed",
+      (details) => ({
+        status: "succeeded",
+        title: "System Backup Restored",
+        // "attention", not plain success: the restore is only half-applied from
+        // the operator's point of view until the stack is restarted.
+        tone: "attention",
+        message: "Configuration, credentials and the database were replaced. The stack is still running the previous configuration - restart it from Server Controls to pick this up. The admin password and database credentials may now differ from the ones this session is using.",
+        details
+      })
+    );
+    closeSystemRestore();
+    if (final?.status === "succeeded") await refreshSystemBackups();
   }
 
   // The system section keeps its own result card and busy labels so a delete
@@ -414,6 +518,18 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
           })}>Delete All</button>
           </div>
         </div>
+        {restoreTarget && <div className="action-section backup-system-restore">
+          <div className="panel-title"><h4>Restore System Backup</h4></div>
+          <p className="backup-group-note backup-note-warning">
+            Restoring <code>{restoreTarget.name}</code> replaces this server's <code>.env</code>, <code>runtime/generated</code>, <code>runtime/secrets</code> and <strong>the entire database</strong>. What is replaced is copied to <code>runtime/backups/</code> first. <strong>Nothing changes until you apply.</strong>
+          </p>
+          <label className="wide-field">Passphrase<input type="password" autoComplete="off" aria-label="Restore passphrase" value={restorePassphrase} onChange={(event) => { setRestorePassphrase(event.target.value); setRestorePreviewed(false); }} /></label>
+          <div className="action-row backup-group-actions">
+            <button disabled={Boolean(busyAction)} onClick={closeSystemRestore}>Cancel</button>
+            <button disabled={Boolean(busyAction) || restorePassphrase.length < 12} onClick={() => run(previewSystemRestore)}>Preview Restore</button>
+            <button className="danger" disabled={Boolean(busyAction) || !restorePreviewed} onClick={() => run(applySystemRestore)}>Apply Restore</button>
+          </div>
+        </div>}
         {systemResult && <BackupResultCard result={systemResult} />}
         {systemRows.length === 0 ? <p className="muted">No system backups have been created yet.</p> : <DataTable
           columns={["name", "battlegroupId", "createdAt", "size", "type", "source", "encryption"]}
@@ -425,6 +541,7 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
           secondaryActionLabel={<label className="backup-select-checkbox" title="Select all system backups"><input type="checkbox" aria-label="Select all system backups" disabled={Boolean(busyAction)} checked={systemRows.length > 0 && selectedSystemBackups.size === systemRows.length} onChange={(event) => setSelectedSystemBackups(event.target.checked ? new Set(systemRows.map((row) => row.name)) : new Set())} /><span className="sr-only">Select All</span></label>}
           secondaryAction={(row) => <label className="backup-select-checkbox"><input type="checkbox" aria-label={`Select system backup ${String(row.name)}`} disabled={Boolean(busyAction)} checked={selectedSystemBackups.has(String(row.name))} onChange={(event) => toggleSystemBackup(String(row.name), event.target.checked)} onClick={(event) => event.stopPropagation()} /><span className="sr-only">Select</span></label>}
           action={(row) => <div className="service-actions">
+            <button className="icon-action restore-action" title="Restore" aria-label={`Restore system backup ${String(row.name)}`} disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); openSystemRestore(row as unknown as SystemBackupRow); }}><img src="/images/icons/backup-restore.png" alt="" /></button>
             <a className="button-link icon-action download-action" title="Download encrypted archive" aria-label={`Download system backup ${String(row.name)}`} href={backupsApi.systemDownloadUrl(String(row.name))} onClick={(event) => event.stopPropagation()}><img src="/images/icons/backup-download.png" alt="" /></a>
             <button className="icon-action danger" title="Delete" aria-label={`Delete system backup ${String(row.name)}`} disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); run(async () => {
               const name = String(row.name);

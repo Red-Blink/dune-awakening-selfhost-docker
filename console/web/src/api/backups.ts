@@ -35,6 +35,10 @@ export const backupsApi = {
   // Body, never a query string: a passphrase in a URL lands in proxy and access logs.
   createSystem: (passphrase: string) => post<{ task: Task }>("/api/backups/system/create", { passphrase }),
   systemDownloadUrl: (name: string) => `/api/backups/system/${encodeURIComponent(name)}/download`,
+  // Body for the same reason as createSystem. Defaults to a dry run: a call
+  // that loses its apply flag must preview, never replace the host.
+  restoreSystem: (name: string, body: { passphrase: string; apply: boolean; identityMode?: BackupIdentityMode }) =>
+    post<{ task: Task }>(`/api/backups/system/${encodeURIComponent(name)}/restore`, body),
   deleteSystem: (name: string) => api<{ task: Task }>(`/api/backups/system/${encodeURIComponent(name)}`, { method: "DELETE" }),
   deleteSystemSelected: (backups: string[]) => post<{ task: Task }>("/api/backups/system/delete-selected", { backups }),
   deleteSystemAll: () => post<{ task: Task }>("/api/backups/system/delete-all"),

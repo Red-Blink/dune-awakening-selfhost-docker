@@ -68,11 +68,71 @@ a positive integer to keep only that many newest archives; `0` (the default)
 keeps every one. Pruning is opt-in because each archive is the only copy of the
 credentials inside it — the console's Delete controls are the deliberate path.
 
+### Getting the archive onto the new host
+
+The console can create and download system backups, but it cannot yet upload one,
+so the archive has to be placed on the new host by hand. Download it from the old
+host's Backups page, then copy it into the new host's system backup directory:
+
+```bash
+scp dune-system-20260830-120000-4711-9931.tar.gz.enc \
+    dune-system-20260830-120000-4711-9931.tar.gz.enc.yaml \
+    user@newhost:/path/to/dune/runtime/backups/system/
+```
+
+Copy the `.yaml` sidecar alongside the archive. It holds no secrets, and without
+it the listing still shows the archive but Created, Server Title and Battlegroup
+ID read `Unknown` — the sidecar is where that metadata lives.
+
+The archive keeps its original filename. Restore, download and delete all
+validate that name, so do not rename it; if your browser appended something like
+` (1)`, rename it back before copying.
+
+Once the files are in place they appear on the Backups page and can be restored
+normally.
+
 ### Restoring on the new host
 
-There is **no automated restore yet**. Decrypt and extract by hand — the exact
-command is printed when the backup is created and stored in the archive's own
-`.yaml` sidecar, which contains no secrets and is safe to read on its own:
+Open **Backups -> System Backups (Encrypted)**, press Restore on the archive,
+enter its passphrase and press **Preview Restore**. The preview decrypts the
+archive and reports what it would replace without touching anything; **Apply
+Restore** is refused until a preview has succeeded, so a wrong passphrase can
+never reach the destructive step. Editing the passphrase after a preview locks
+Apply again.
+
+The same operation from a shell:
+
+```bash
+dune db restore-system <archive> --dry-run   # report only
+dune db restore-system <archive>             # apply
+```
+
+Applying restores the database first, then `.env`, `runtime/generated/` and
+`runtime/secrets/`. That order matters: the database restore has to run while
+`.env` still describes the database it connects to. Whatever is about to be
+overwritten is copied to `runtime/backups/restore-<timestamp>/` first. If the
+database restore fails, configuration and secrets are left untouched.
+
+Nothing is restarted. Restoring `.env` can change the admin console password and
+the database credentials, so the console may be describing a restore that has
+already invalidated its own session. Restart the stack yourself once the report
+looks right:
+
+```bash
+dune restart
+```
+
+If the archive's Battlegroup ID differs from the current one, you are asked
+whether to adopt the backup's identity or keep the current one — the same
+choice, and the same handling, as a database restore.
+
+### Inspecting an archive by hand
+
+The automated path above is the supported one. To look inside an archive
+without restoring it — or on a host that has no `dune` yet — decrypt it
+manually. The exact command is printed when the backup is created and stored in
+the archive's `.yaml` sidecar, which contains no secrets and is safe to read on
+its own:
 
 ```bash
 read -r -s -p "Passphrase: " p; echo
@@ -88,7 +148,3 @@ authentication tag is verified at the **end** of the stream, so piping
 tamper is detected — and `tar` exiting 0 hides gpg's failure. If gpg reports a
 checksum error, `restore.tar.gz` is untrustworthy however complete it looks;
 delete it rather than extracting it.
-
-Restore `.env`, `runtime/generated/` and `runtime/secrets/` from the extracted
-tree, then use `dune db restore` for the database dump inside it, then restart
-the stack so the services pick up the restored configuration.

@@ -25,7 +25,8 @@ vi.mock("../../api/backups", async (importOriginal) => {
       systemDownloadUrl: vi.fn(original.backupsApi.systemDownloadUrl),
       deleteSystem: vi.fn(),
       deleteSystemSelected: vi.fn(),
-      deleteSystemAll: vi.fn()
+      deleteSystemAll: vi.fn(),
+      restoreSystem: vi.fn()
     }
   };
 });
@@ -221,5 +222,110 @@ describe("deleting system backups", () => {
     const section = await systemSection();
     fireEvent.click(await section.findByText("Delete All"));
     await waitFor(() => expect(backupsApi.deleteSystemAll).toHaveBeenCalled());
+  });
+});
+
+describe("restoring a system backup", () => {
+  // Sibling describe: stub everything it needs rather than inheriting state.
+  const ROW = {
+    name: ARCHIVE, createdAt: "2026-08-30T12:00:00-04:00", origin: "manual",
+    encryption: "aes-256-ocb-gpg-aead", serverTitle: "Kovalt", battlegroupId: "sh-abc-def",
+    type: "Manual Backup", source: "Local", hasSidecar: true, sizeBytes: 2048, size: "2 KB"
+  };
+  const RESTORE_PASSPHRASE = "correct-horse-battery-staple";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(backupsApi.list).mockResolvedValue({ stdout: "", currentBattlegroupId: "sh-1", rows: [] });
+    vi.mocked(backupsApi.autoStatus).mockResolvedValue({ stdout: "", status: { enabled: false } });
+    vi.mocked(backupsApi.listSystem).mockResolvedValue({ rows: [ROW] });
+    vi.mocked(backupsApi.restoreSystem).mockResolvedValue(
+      { task: { id: "r1", status: "queued", logLines: [{ line: "Dry run: nothing was changed" }] } } as never
+    );
+  });
+
+  async function openRestore() {
+    fireEvent.click(await screen.findByLabelText(`Restore system backup ${ARCHIVE}`));
+    return screen.findByLabelText("Restore passphrase");
+  }
+
+  async function preview(passphrase = RESTORE_PASSPHRASE) {
+    renderPanel();
+    const field = await openRestore();
+    fireEvent.change(field, { target: { value: passphrase } });
+    fireEvent.click(await screen.findByText("Preview Restore"));
+    return field;
+  }
+
+  it("previews without applying, so a first click can never replace the host", async () => {
+    await preview();
+    await waitFor(() => expect(backupsApi.restoreSystem).toHaveBeenCalledWith(ARCHIVE, {
+      passphrase: RESTORE_PASSPHRASE, apply: false
+    }));
+  });
+
+  it("keeps Apply disabled until a preview has succeeded", async () => {
+    renderPanel();
+    const field = await openRestore();
+    const applyButton = await screen.findByText("Apply Restore");
+    expect(applyButton).toBeDisabled();
+    fireEvent.change(field, { target: { value: RESTORE_PASSPHRASE } });
+    // Still locked: a filled field is not proof the passphrase opens the archive.
+    expect(applyButton).toBeDisabled();
+    fireEvent.click(await screen.findByText("Preview Restore"));
+    await waitFor(() => expect(applyButton).not.toBeDisabled());
+  });
+
+  it("re-locks Apply when the passphrase is edited after a preview", async () => {
+    const field = await preview();
+    const applyButton = await screen.findByText("Apply Restore");
+    await waitFor(() => expect(applyButton).not.toBeDisabled());
+    // Otherwise apply would run under a passphrase the preview never proved.
+    fireEvent.change(field, { target: { value: `${RESTORE_PASSPHRASE}x` } });
+    expect(applyButton).toBeDisabled();
+  });
+
+  it("leaves Apply locked when the preview fails", async () => {
+    vi.mocked(backupsApi.restoreSystem).mockRejectedValue(new Error("could not be decrypted"));
+    await preview("wrong-passphrase-here");
+    await waitFor(() => expect(screen.getByText(/could not be decrypted/i)).toBeTruthy());
+    expect(await screen.findByText("Apply Restore")).toBeDisabled();
+  });
+
+  it("applies only after confirmation, carrying the identity choice", async () => {
+    await preview();
+    await waitFor(() => expect(screen.getByText("Apply Restore")).not.toBeDisabled());
+    fireEvent.click(screen.getByText("Apply Restore"));
+    await waitFor(() => expect(backupsApi.restoreSystem).toHaveBeenLastCalledWith(ARCHIVE, {
+      passphrase: RESTORE_PASSPHRASE, apply: true, identityMode: "keep-current"
+    }));
+  });
+
+  it("does not apply when the confirmation is declined", async () => {
+    renderPanel({ confirmAction: vi.fn(async () => false) });
+    const field = await openRestore();
+    fireEvent.change(field, { target: { value: RESTORE_PASSPHRASE } });
+    fireEvent.click(await screen.findByText("Preview Restore"));
+    await waitFor(() => expect(screen.getByText("Apply Restore")).not.toBeDisabled());
+    fireEvent.click(screen.getByText("Apply Restore"));
+    // The preview call is allowed; the destructive one must not happen.
+    await waitFor(() => expect(screen.getByLabelText("Restore passphrase")).toBeTruthy());
+    expect(vi.mocked(backupsApi.restoreSystem).mock.calls.every(([, body]) => body.apply === false)).toBe(true);
+  });
+
+  it("says a restart is required once the restore succeeds", async () => {
+    await preview();
+    await waitFor(() => expect(screen.getByText("Apply Restore")).not.toBeDisabled());
+    fireEvent.click(screen.getByText("Apply Restore"));
+    // The database is restored but the running stack still holds the old
+    // configuration -- saying so is the whole point of the card.
+    await waitFor(() => expect(screen.getByText(/restart it from Server Controls/i)).toBeTruthy());
+  });
+
+  it("clears the passphrase from the DOM once the restore finishes", async () => {
+    await preview();
+    await waitFor(() => expect(screen.getByText("Apply Restore")).not.toBeDisabled());
+    fireEvent.click(screen.getByText("Apply Restore"));
+    await waitFor(() => expect(screen.queryByLabelText("Restore passphrase")).toBeNull());
   });
 });
