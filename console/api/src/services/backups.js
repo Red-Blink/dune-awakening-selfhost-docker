@@ -162,29 +162,50 @@ export function nextImportedBackupName(backupDir) {
   throw new Error("Could not allocate imported backup filename.");
 }
 
+// A tar member is 512 bytes of header, the content, then padding to the next
+// 512-byte boundary; the archive ends with 1024 zero bytes. Because none of
+// that depends on the content, the exact byte length of an archive is known
+// before any of it is written -- which is what lets the system backup download
+// stream a multi-GB file with a correct Content-Length instead of buffering it.
+export const TAR_BLOCK_BYTES = 512;
+export const TAR_TRAILER_BYTES = 1024;
+
+export function tarPadding(size) {
+  return (TAR_BLOCK_BYTES - (size % TAR_BLOCK_BYTES)) % TAR_BLOCK_BYTES;
+}
+
+export function tarArchiveLength(members) {
+  const body = members.reduce((total, member) => total + TAR_BLOCK_BYTES + member.size + tarPadding(member.size), 0);
+  return body + TAR_TRAILER_BYTES;
+}
+
+export function createTarHeader(name, size, mode = 0o600) {
+  const header = Buffer.alloc(TAR_BLOCK_BYTES, 0);
+  const { name: base, prefix } = splitTarPath(name);
+  writeTarString(header, 0, 100, base);
+  if (prefix) writeTarString(header, 345, 155, prefix);
+  writeTarOctal(header, 100, 8, mode);
+  writeTarOctal(header, 108, 8, 0);
+  writeTarOctal(header, 116, 8, 0);
+  writeTarOctal(header, 124, 12, size);
+  writeTarOctal(header, 136, 12, Math.floor(Date.now() / 1000));
+  header.fill(32, 148, 156);
+  header[156] = 48;
+  writeTarString(header, 257, 6, "ustar");
+  header.write("00", 263, 2, "ascii");
+  const checksum = header.reduce((sum, byte) => sum + byte, 0);
+  writeTarOctal(header, 148, 8, checksum);
+  return header;
+}
+
 export function createTarArchive(files) {
   const blocks = [];
   for (const file of files) {
-    const header = Buffer.alloc(512, 0);
-    const { name, prefix } = splitTarPath(file.name);
-    writeTarString(header, 0, 100, name);
-    if (prefix) writeTarString(header, 345, 155, prefix);
-    writeTarOctal(header, 100, 8, 0o600);
-    writeTarOctal(header, 108, 8, 0);
-    writeTarOctal(header, 116, 8, 0);
-    writeTarOctal(header, 124, 12, file.content.length);
-    writeTarOctal(header, 136, 12, Math.floor(Date.now() / 1000));
-    header.fill(32, 148, 156);
-    header[156] = 48;
-    writeTarString(header, 257, 6, "ustar");
-    header.write("00", 263, 2, "ascii");
-    const checksum = header.reduce((sum, byte) => sum + byte, 0);
-    writeTarOctal(header, 148, 8, checksum);
-    blocks.push(header, file.content);
-    const padding = (512 - (file.content.length % 512)) % 512;
+    blocks.push(createTarHeader(file.name, file.content.length), file.content);
+    const padding = tarPadding(file.content.length);
     if (padding) blocks.push(Buffer.alloc(padding, 0));
   }
-  blocks.push(Buffer.alloc(1024, 0));
+  blocks.push(Buffer.alloc(TAR_TRAILER_BYTES, 0));
   return Buffer.concat(blocks);
 }
 

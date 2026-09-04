@@ -26,6 +26,22 @@ export function systemBackupDir(config) {
   return resolve(config.repoRoot, SYSTEM_BACKUP_DIR);
 }
 
+// The archive and its sidecar are one backup in two files, so the download
+// serves them as one. The sidecar is skipped when absent rather than treated as
+// an error: an archive copied in by hand may arrive without one, and refusing to
+// download it then would be worse than downloading what exists.
+export function systemBackupBundleMembers(config, archiveName) {
+  const directory = systemBackupDir(config);
+  const members = [];
+  for (const name of [archiveName, `${archiveName}.yaml`]) {
+    const filePath = resolve(directory, name);
+    if (!filePath.startsWith(`${directory}/`)) continue;
+    if (!existsSync(filePath)) continue;
+    members.push({ name, path: filePath, size: statSync(filePath).size });
+  }
+  return members;
+}
+
 export function listSystemBackups(config) {
   const directory = systemBackupDir(config);
   if (!existsSync(directory)) return [];

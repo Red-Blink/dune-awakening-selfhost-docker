@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { pipeline } from "node:stream/promises";
 import { createServer as createNetServer } from "node:net";
 import { totalmem } from "node:os";
 import { spawn } from "node:child_process";
@@ -33,8 +34,8 @@ import { assertInstalledAddonPermission, fetchCommunityAddons, installCommunityA
 import { createHardwareStatusProvider, performanceSnapshot as collectPerformanceSnapshot } from "./services/performance.js";
 import { serveStatic, contentTypeForPath } from "./http/staticFiles.js";
 import { discoverServices } from "./services/serviceDiscovery.js";
-import { listSystemBackups, systemBackupDir, validSystemArchiveName, validSystemBackupName } from "./services/systemBackups.js";
-import { createBackupDownloadArchive, enrichBackupRows, nextImportedBackupName, normalizeImportedBackupMetadata, readCurrentBattlegroupId, validBackupDownloadName } from "./services/backups.js";
+import { listSystemBackups, systemBackupBundleMembers, systemBackupDir, validSystemArchiveName, validSystemBackupName } from "./services/systemBackups.js";
+import { createTarHeader, tarArchiveLength, tarPadding, TAR_TRAILER_BYTES, createBackupDownloadArchive, enrichBackupRows, nextImportedBackupName, normalizeImportedBackupMetadata, readCurrentBattlegroupId, validBackupDownloadName } from "./services/backups.js";
 import { createMemoryBalancer } from "./services/memoryBalancer.js";
 import { collectContainerHealth } from "./services/containerHealth.js";
 import { parseMemorySwapStatus } from "./services/memorySwap.js";
@@ -1773,14 +1774,44 @@ async function sendSystemBackupArchive(req, res, name) {
   if (!existsSync(archivePath)) return json(res, 404, { error: "System backup was not found." });
 
   audit(config, req, "backup.download-system", { backup: name });
-  // Already an encrypted archive, and can be GB-scale: stream it, do not re-tar
-  // it or hold it in memory the way the database download does.
+
+  // A sidecar asked for by name, and ?raw=1 for scripts, still stream the single
+  // file. Everything else gets the pair, because moving a backup to a new host
+  // means moving both and the sidecar is the easy one to forget.
+  const wantsRaw = new URL(req.url || "/", "http://localhost").searchParams.get("raw") === "1";
+  if (wantsRaw || name.endsWith(".yaml")) {
+    res.writeHead(200, withSecurityHeaders({
+      "content-type": "application/octet-stream",
+      "content-length": statSync(archivePath).size,
+      "content-disposition": `attachment; filename="${name.replace(/"/g, "")}"`
+    }));
+    createReadStream(archivePath).pipe(res);
+    return;
+  }
+
+  // Uncompressed on purpose. gzip would make Content-Length unknowable before
+  // the last byte, and the payload is already encrypted, so there is nothing
+  // for it to compress -- it would spend CPU on a GB file to save nothing.
+  const members = systemBackupBundleMembers(config, name);
   res.writeHead(200, withSecurityHeaders({
-    "content-type": "application/octet-stream",
-    "content-length": statSync(archivePath).size,
-    "content-disposition": `attachment; filename="${name.replace(/"/g, "")}"`
+    "content-type": "application/x-tar",
+    "content-length": tarArchiveLength(members),
+    "content-disposition": `attachment; filename="${name.replace(/"/g, "")}.tar"`
   }));
-  createReadStream(archivePath).pipe(res);
+  for (const member of members) {
+    res.write(createTarHeader(member.name, member.size));
+    // The declared Content-Length was computed from stat(); if the file is not
+    // the size it claimed, stop rather than finish a tar that does not match its
+    // own headers.
+    let written = 0;
+    const source = createReadStream(member.path);
+    source.on("data", (chunk) => { written += chunk.length; });
+    await pipeline(source, res, { end: false });
+    if (written !== member.size) return res.destroy();
+    const padding = tarPadding(member.size);
+    if (padding) res.write(Buffer.alloc(padding, 0));
+  }
+  res.end(Buffer.alloc(TAR_TRAILER_BYTES, 0));
 }
 
 async function backupDownloadRoute(req, res, backupName) {

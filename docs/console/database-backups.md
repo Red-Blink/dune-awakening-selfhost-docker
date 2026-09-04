@@ -70,23 +70,33 @@ credentials inside it — the console's Delete controls are the deliberate path.
 
 ### Getting the archive onto the new host
 
-The console can create and download system backups, but it cannot yet upload one,
-so the archive has to be placed on the new host by hand. Download it from the old
-host's Backups page, then copy it into the new host's system backup directory:
+The console cannot yet upload a system backup, so the archive has to be placed on
+the new host by hand. Download it from the old host's Backups page and copy it
+across:
 
 ```bash
-scp dune-system-20260830-120000-4711-9931.tar.gz.enc \
-    dune-system-20260830-120000-4711-9931.tar.gz.enc.yaml \
-    user@newhost:/path/to/dune/runtime/backups/system/
+scp dune-system-20260830-120000-4711-9931.tar.gz.enc.tar user@newhost:/tmp/
 ```
 
-Copy the `.yaml` sidecar alongside the archive. It holds no secrets, and without
-it the listing still shows the archive but Created, Server Title and Battlegroup
-ID read `Unknown` — the sidecar is where that metadata lives.
+Then extract it into the new host's system backup directory:
 
-The archive keeps its original filename. Restore, download and delete all
-validate that name, so do not rename it; if your browser appended something like
-` (1)`, rename it back before copying.
+```bash
+tar -xf dune-system-20260830-120000-4711-9931.tar.gz.enc.tar \
+    -C /path/to/dune/runtime/backups/system/
+```
+
+The download is a single `.tar` holding both files a backup is made of: the
+encrypted archive and its `.yaml` sidecar. The sidecar holds no secrets, and it is
+where Created, Server Title and Battlegroup ID come from -- an archive without one
+still lists, but those columns read `Unknown`. Bundling them means there is no
+second file to forget, and no way to pair an archive with the wrong sidecar.
+
+The `.tar` is not compressed. Its contents are already encrypted and so
+incompressible, and a known size is what lets the console stream a multi-gigabyte
+archive instead of building it in memory first.
+
+Both files keep their original names inside the `.tar`. Restore, download and
+delete all validate those names, so do not rename them after extracting.
 
 Once the files are in place they appear on the Backups page and can be restored
 normally.
@@ -130,9 +140,10 @@ choice, and the same handling, as a database restore.
 
 The automated path above is the supported one. To look inside an archive
 without restoring it — or on a host that has no `dune` yet — decrypt it
-manually. The exact command is printed when the backup is created and stored in
-the archive's `.yaml` sidecar, which contains no secrets and is safe to read on
-its own:
+manually. Extract the downloaded `.tar` first -- the sidecar's own
+`decrypt_command` names the `.tar.gz.enc` file, not the bundle around it. That
+command is also printed when the backup is created, and the sidecar it lives in
+contains no secrets and is safe to read on its own:
 
 ```bash
 read -r -s -p "Passphrase: " p; echo
