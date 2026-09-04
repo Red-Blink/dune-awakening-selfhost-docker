@@ -7188,3 +7188,8 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
 }
+
+.backup-import-progress { display: flex; align-items: center; gap: 10px; }
+.backup-import-progress > div { flex: 1; height: 6px; background: var(--panel-muted); border-radius: 3px; overflow: hidden; }
+.backup-import-progress-bar { height: 100%; background: var(--accent); transition: width .2s linear; }
+.backup-import-progress > span { color: var(--muted-warm); font-size: 12px; min-width: 36px; text-align: right; }

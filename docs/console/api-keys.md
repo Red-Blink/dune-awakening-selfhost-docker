@@ -107,7 +107,7 @@ namespace" rule, so Create stays disabled until something is selected.
 | `landsraad` | `landsraad:read` | `write` |
 | `server` | `server:read` | `network-fix`, `restart`, `restart-service`, `start`, `stop`, `storage-cleanup`, `write-config` |
 | `logs` | `logs:read` | *nothing — no write action exists* |
-| `backups` | `backups:read` | `create`, `create-system`, `delete`, `delete-system`, `download-system`, `import`, `restore`, `restore-system`, `write-config` |
+| `backups` | `backups:read` | `create`, `create-system`, `delete`, `delete-system`, `download-system`, `import`, `import-system`, `restore`, `restore-system`, `write-config` |
 | `updates` | `updates:check`, `updates:read` | *nothing — write actions are denied to keys* |
 | `carepackage` | `carepackage:read` | `clear-history`, `grant`, `scan`, `write-config` |
 | `addons` | `addons:read` | *nothing — write actions are denied to keys* |
@@ -155,6 +155,11 @@ database backups:
   archive. The most destructive action in the namespace: it can change the admin console
   password and the database credentials out from under the running stack. Defaults to a
   dry run; only `apply` actually writes.
+- **`backups:import-system`** — `POST /api/backups/system/import`. Uploads an archive
+  created on another host. Separate from `backups:import`, which takes a database dump:
+  this one accepts `.env`, every secret and the Funcom token, staged for a later restore
+  to apply. Anyone holding it can put credentials of their choosing on the host.
+
 - **`backups:delete-system`** — `DELETE /api/backups/system/{name}` and the bulk
   delete routes. Separate from `backups:delete` on purpose: a system archive is the
   only copy of the credentials inside it, so destroying one should be grantable

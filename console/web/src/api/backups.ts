@@ -1,6 +1,8 @@
 import { api, post } from "./client";
 import type { Task } from "./setup";
 
+export type SystemImportConflict = "overwrite" | "rename";
+
 export type BackupIdentityMode = "adopt-backup" | "keep-current";
 
 export type SystemBackupRow = {
@@ -39,6 +41,14 @@ export const backupsApi = {
   // that loses its apply flag must preview, never replace the host.
   restoreSystem: (name: string, body: { passphrase: string; apply: boolean; identityMode?: BackupIdentityMode }) =>
     post<{ task: Task }>(`/api/backups/system/${encodeURIComponent(name)}/restore`, body),
+  // The file itself is the body, not a multipart form: one file travels now
+  // that the archive and its sidecar are bundled, and XHR (see importSystem in
+  // BackupsPanel) is what can report upload progress -- fetch cannot.
+  importSystemUrl: (filename: string, onConflict?: SystemImportConflict) => {
+    const query = new URLSearchParams({ filename });
+    if (onConflict) query.set("onConflict", onConflict);
+    return `/api/backups/system/import?${query.toString()}`;
+  },
   deleteSystem: (name: string) => api<{ task: Task }>(`/api/backups/system/${encodeURIComponent(name)}`, { method: "DELETE" }),
   deleteSystemSelected: (backups: string[]) => post<{ task: Task }>("/api/backups/system/delete-selected", { backups }),
   deleteSystemAll: () => post<{ task: Task }>("/api/backups/system/delete-all"),

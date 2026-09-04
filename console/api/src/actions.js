@@ -114,6 +114,10 @@ export const ROUTE_ACTIONS = {
   "POST /api/backups/delete-all":              "backups:delete",
   "POST /api/backups/delete-selected":         "backups:delete",
   "POST /api/backups/import-external":         "backups:import",
+  // Its own action, not backups:import: that one takes a database dump, this
+  // one takes .env, every secret and the Funcom token, to be applied by a later
+  // restore. An operator should be able to grant one without the other.
+  "POST /api/backups/system/import":           "backups:import-system",
   "GET /api/backups/system":                   "backups:read",
   // Runs pg_dump and writes an encrypted archive holding .env and every file in
   // runtime/secrets. Write-shaped, so a key scoped `backups: read` cannot reach it.
