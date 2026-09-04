@@ -57,7 +57,14 @@ function renderPanel(overrides: Partial<Parameters<typeof BackupsPanel>[0]> = {}
   />);
 }
 
+async function openCreate() {
+  // The button now opens the panel rather than creating straight away, so the
+  // passphrase fields do not exist until it is clicked.
+  fireEvent.click(await screen.findByText("Create System Backup"));
+}
+
 async function fillPassphrases(first: string, second: string) {
+  await openCreate();
   const passphrase = await screen.findByLabelText(/^Passphrase$/);
   const confirm = await screen.findByLabelText(/Confirm Passphrase/);
   fireEvent.change(passphrase, { target: { value: first } });
@@ -114,16 +121,20 @@ describe("system backups", () => {
 
   it("will not create until both fields are filled", async () => {
     renderPanel();
-    const button = await screen.findByText("Create System Backup");
+    await openCreate();
+    const button = await screen.findByLabelText("Create the system backup");
     expect(button).toBeDisabled();
-    await fillPassphrases(PASSPHRASE, PASSPHRASE);
+    const passphrase = await screen.findByLabelText(/^Passphrase$/);
+    const confirm = await screen.findByLabelText(/Confirm Passphrase/);
+    fireEvent.change(passphrase, { target: { value: PASSPHRASE } });
+    fireEvent.change(confirm, { target: { value: PASSPHRASE } });
     expect(button).not.toBeDisabled();
   });
 
   it("refuses a mismatch without calling the API", async () => {
     renderPanel();
     await fillPassphrases(PASSPHRASE, "something-else-entirely");
-    fireEvent.click(await screen.findByText("Create System Backup"));
+    fireEvent.click(await screen.findByLabelText("Create the system backup"));
     await waitFor(() => expect(screen.getByText(/do not match/i)).toBeTruthy());
     expect(backupsApi.createSystem).not.toHaveBeenCalled();
   });
@@ -131,7 +142,7 @@ describe("system backups", () => {
   it("refuses a degenerate passphrase without calling the API", async () => {
     renderPanel();
     await fillPassphrases("aaaaaaaaaaaaaa", "aaaaaaaaaaaaaa");
-    fireEvent.click(await screen.findByText("Create System Backup"));
+    fireEvent.click(await screen.findByLabelText("Create the system backup"));
     await waitFor(() => expect(screen.getByText(/at least 5 different characters/i)).toBeTruthy());
     expect(backupsApi.createSystem).not.toHaveBeenCalled();
   });
@@ -139,7 +150,7 @@ describe("system backups", () => {
   it("refuses a short passphrase without calling the API", async () => {
     renderPanel();
     await fillPassphrases("short", "short");
-    fireEvent.click(await screen.findByText("Create System Backup"));
+    fireEvent.click(await screen.findByLabelText("Create the system backup"));
     await waitFor(() => expect(screen.getByText(/at least 12 characters/i)).toBeTruthy());
     expect(backupsApi.createSystem).not.toHaveBeenCalled();
   });
@@ -147,7 +158,7 @@ describe("system backups", () => {
   it("sends the passphrase and then clears both fields", async () => {
     renderPanel();
     const { passphrase, confirm } = await fillPassphrases(PASSPHRASE, PASSPHRASE);
-    fireEvent.click(await screen.findByText("Create System Backup"));
+    fireEvent.click(await screen.findByLabelText("Create the system backup"));
     await waitFor(() => expect(backupsApi.createSystem).toHaveBeenCalledWith(PASSPHRASE));
     // Never leave a passphrase sitting in the DOM.
     await waitFor(() => expect((passphrase as HTMLInputElement).value).toBe(""));
@@ -158,7 +169,7 @@ describe("system backups", () => {
     vi.mocked(backupsApi.createSystem).mockRejectedValue(new Error("gpg exploded"));
     renderPanel();
     const { passphrase, confirm } = await fillPassphrases(PASSPHRASE, PASSPHRASE);
-    fireEvent.click(await screen.findByText("Create System Backup"));
+    fireEvent.click(await screen.findByLabelText("Create the system backup"));
     await waitFor(() => expect((passphrase as HTMLInputElement).value).toBe(""));
     expect((confirm as HTMLInputElement).value).toBe("");
   });
@@ -403,6 +414,22 @@ describe("importing a system backup", () => {
     fireEvent.click(await screen.findByText("Import Backup"));
     await waitFor(() => expect(screen.queryByLabelText("Restore passphrase")).toBeNull());
     expect(screen.getByLabelText(/Backup file/)).toBeTruthy();
+  });
+
+  it("opening import closes create, and opening create closes import", async () => {
+    // Create, import and restore share one slot: three forms stacked above the
+    // table would be worse than any one of them being a click away.
+    renderPanel();
+    fireEvent.click(await screen.findByText("Create System Backup"));
+    expect(await screen.findByLabelText(/^Passphrase$/)).toBeTruthy();
+
+    fireEvent.click(await screen.findByText("Import Backup"));
+    await waitFor(() => expect(screen.queryByLabelText(/^Passphrase$/)).toBeNull());
+    expect(screen.getByLabelText(/Backup file/)).toBeTruthy();
+
+    fireEvent.click(await screen.findByText("Create System Backup"));
+    await waitFor(() => expect(screen.queryByLabelText(/Backup file/)).toBeNull());
+    expect(screen.getByLabelText(/^Passphrase$/)).toBeTruthy();
   });
 
   it("uploads the file and reports where it was stored", async () => {

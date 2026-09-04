@@ -65,6 +65,7 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
   // Import and restore share one panel slot: both act on a single archive and
   // are mutually exclusive in practice, so opening either closes the other
   // rather than leaving two forms competing above the table.
+  const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importProgress, setImportProgress] = useState(-1);
@@ -147,7 +148,10 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
       const response = await backupsApi.createSystem(systemPassphrase);
       const final = await waitForTask(response.task);
       setSystemResult(summarizeBackupTask(final, "System Backup Created", "System Backup Failed"));
-      if (final.status === "succeeded") await refreshSystemBackups();
+      if (final.status === "succeeded") {
+        setCreateOpen(false);
+        await refreshSystemBackups();
+      }
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       setSystemResult({ status: "failed", title: "System Backup Failed", message: reason });
@@ -167,8 +171,24 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
     });
   }
 
+  function openSystemCreate() {
+    setCreateOpen(true);
+    setSystemPassphrase("");
+    setSystemPassphraseConfirm("");
+    setImportOpen(false);
+    setRestoreTarget(null);
+    setSystemResult(null);
+  }
+
+  function closeSystemCreate() {
+    setCreateOpen(false);
+    setSystemPassphrase("");
+    setSystemPassphraseConfirm("");
+  }
+
   function openSystemImport() {
     setImportOpen(true);
+    setCreateOpen(false);
     setImportFile(null);
     setImportProgress(-1);
     setRestoreTarget(null);
@@ -233,6 +253,7 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
 
   function openSystemRestore(row: SystemBackupRow) {
     setImportOpen(false);
+    setCreateOpen(false);
     setRestoreTarget(row);
     setRestorePassphrase("");
     setRestorePreviewed(false);
@@ -577,10 +598,8 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
         <div className="panel-title"><h4>System Backups (Encrypted)</h4></div>
         <p className="backup-group-note backup-note-warning">A system backup bundles the database together with <code>.env</code>, <code>runtime/generated</code> and every file in <code>runtime/secrets</code> &mdash; the Funcom token, admin console password, RMQ credentials, sietch join password and IAM policies. It is encrypted with the passphrase you set here, and <strong>there is no way to recover it without that passphrase</strong>. Store the passphrase somewhere durable and separate from the archive.</p>
         <div className="action-line backup-import-controls">
-          <label className="wide-field">Passphrase<input type="password" autoComplete="new-password" value={systemPassphrase} onChange={(event) => setSystemPassphrase(event.target.value)} /></label>
-          <label className="wide-field">Confirm Passphrase<input type="password" autoComplete="new-password" value={systemPassphraseConfirm} onChange={(event) => setSystemPassphraseConfirm(event.target.value)} /></label>
           <div className="backup-import-actions">
-            <button disabled={Boolean(busyAction) || !systemPassphrase || !systemPassphraseConfirm} onClick={() => run(createSystemBackup)}>Create System Backup</button>
+            <button disabled={Boolean(busyAction)} onClick={openSystemCreate}>Create System Backup</button>
             <button disabled={Boolean(busyAction)} onClick={openSystemImport}>Import Backup</button>
             <button className="danger" disabled={Boolean(busyAction) || !selectedSystemBackups.size} onClick={() => run(async () => {
             const names = [...selectedSystemBackups];
@@ -593,6 +612,18 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
           })}>Delete All</button>
           </div>
         </div>
+        {createOpen && <div className="action-section backup-system-restore">
+          <div className="panel-title"><h4>Create System Backup</h4></div>
+          <p className="backup-group-note backup-note-warning">
+            Set a passphrase for the new archive. It is entered twice because a typo produces an archive <strong>nobody can ever decrypt</strong>, and this is the only copy of what is inside it.
+          </p>
+          <label className="wide-field">Passphrase<input type="password" autoComplete="new-password" value={systemPassphrase} onChange={(event) => setSystemPassphrase(event.target.value)} /></label>
+          <label className="wide-field">Confirm Passphrase<input type="password" autoComplete="new-password" value={systemPassphraseConfirm} onChange={(event) => setSystemPassphraseConfirm(event.target.value)} /></label>
+          <div className="action-row backup-group-actions">
+            <button disabled={Boolean(busyAction)} onClick={closeSystemCreate}>Cancel</button>
+            <button aria-label="Create the system backup" disabled={Boolean(busyAction) || !systemPassphrase || !systemPassphraseConfirm} onClick={() => run(createSystemBackup)}>Create</button>
+          </div>
+        </div>}
         {importOpen && <div className="action-section backup-system-restore">
           <div className="panel-title"><h4>Import System Backup</h4></div>
           <p className="backup-group-note backup-note-warning">
