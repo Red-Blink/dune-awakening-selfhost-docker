@@ -37,9 +37,15 @@ Complete reference for all HTTP API endpoints in the Dune Docker Console. All en
 
 | Method | Route | Description | Parameters |
 |--------|-------|-------------|------------|
-| GET | `/api/auth/state` | Get authentication state and CSRF token | None |
-| POST | `/api/auth/login` | Login with password | `password` (string) |
+| GET | `/api/auth/state` | Authentication state, CSRF token and — for a two-factor enrollment or re-setup session — `scope` (`enroll`/`resetup`), so a reloaded page resumes the setup screen instead of the console | None |
+| POST | `/api/auth/login` | Login with password; also carries the second factor when one is enrolled | `password` (string), optionally `totpCode` or `recoveryCode` |
 | POST | `/api/auth/logout` | Logout current session | None |
+| GET | `/api/auth/me` | The signed-in principal — `user{id,username,tier,guildId}`, `scope`, `allowedActions` (what the policy engine will allow this session) — plus second-factor state (`secondFactorEnrolled`, `secondFactorUnavailable`) | None |
+| POST | `/api/auth/2fa/setup` | Begin TOTP enrollment; returns secret, otpauth URI and QR | None (enrollment-scope session) |
+| POST | `/api/auth/2fa/confirm` | Confirm enrollment; returns the one-time recovery codes | `code` (string) |
+| POST | `/api/auth/2fa/recovery-codes/regenerate` | Issue a fresh recovery-code set, invalidating the old one | `currentPassword`, `totpCode` |
+| GET | `/api/auth/discord/start` | Begin Discord sign-in (302 to Discord; sets the PKCE state cookie). With `?setup=1` (owner session required — the admin password comes first) the round-trip is *setup mode*: the callback captures identity + guild list for the wizard and mints no session | `setup` (query, optional) |
+| GET | `/api/auth/discord/callback` | Discord redirects here; resolves the tier — the home server's owner is Owner, else the highest mapped role (or the owner allowlist when bootstrap is on); with a bot handoff configured the handoff is authoritative — applies the Discord-2FA gate, and sets the session cookie. Failures render an HTML page with a link back to sign-in and set no cookie | `code`, `state` (query) |
 | GET | `/api/health` | Health check | None |
 | GET | `/api/setup/state` | Get setup completion state | None |
 | POST | `/api/setup/preflight` | Run preflight checks | None |
@@ -844,8 +850,16 @@ pre-write backup before the query is rejected.
 
 | Method | Route | Description | Parameters |
 |--------|-------|-------------|------------|
-| POST | `/api/settings/admin-password` | Change admin password | `currentPassword`, `newPassword` |
+| POST | `/api/settings/admin-password` | Change admin password | `currentPassword`, `newPassword`, plus `totpCode` when a second factor is enrolled |
+| POST | `/api/setup/write-oauth-config` | Save Discord OAuth settings incl. role→tier mapping and the 2FA-required tiers | `DISCORD_OAUTH_CLIENT_ID`, `DISCORD_OAUTH_REDIRECT_URI`, `DISCORD_HOME_GUILD_ID`, `DISCORD_OAUTH_OWNER_ALLOWLIST`, `DISCORD_OAUTH_ALLOW_OWNER_BOOTSTRAP`, `DISCORD_CONSOLE_{ADMIN,MODERATOR,PLAYER}_ROLE_IDS`, `DISCORD_OAUTH_REQUIRE_MFA_TIERS` |
+| POST | `/api/setup/discord-finalize` | Complete the guided setup from an owner session (owner session is the authorization; no password): a server the captured identity **owns**, and the role mapping; writes the config and reports `restartRequired`; returns 400 `operator_mfa_missing` if the request asks to require Discord 2FA while the captured account has 2FA off (self-lockout guard) | `guildId`, `adminRoleIds`, `moderatorRoleIds`, `playerRoleIds`, `requireMfa` |
+| POST | `/api/setup/discord-restart` | Owner-only: rebuild and restart the console container (via the docker socket) so a just-saved Discord config takes effect; returns 202 | None |
+| GET | `/api/setup/discord-identity` | The identity captured by this owner session's setup-mode round-trip and the servers it **owns** (only owned servers are kept; every entry has `owner: true`); 404 until a round-trip has happened | None |
+| POST | `/api/setup/save-oauth-secret` | Store the Discord client secret at `runtime/secrets/discord-oauth-client-secret.txt` (0600) | `secret`, `overwrite` |
 | POST | `/api/settings/web-port` | Change web console port | `port` (number 1-65535) |
+| GET | `/api/settings/iam/policies` | The active IAM policy store plus the action catalog the Access Control editor renders: `policies`, `actions` (route keys), `actionMap` (route → action), `allActions`, `namespaces` (`settings:read`, owner-only by default) | None |
+| PUT | `/api/settings/iam/policy` | Validate and atomically replace the whole tier-keyed policy store (`runtime/generated/iam-policies.json`); refuses an action pattern outside `[a-z0-9:*-]` by name and any store that removes the owner's `settings:write` (`settings:write`) | `{ owner, admin, moderator, player, observer }` documents |
+| POST | `/api/settings/iam/policy/test` | Evaluate one action for one tier against the active store without changing it | `action`, `tier` |
 | POST | `/api/settings` | Write config | Config object |
 | GET | `/api/settings` | Get setup state | None |
 | GET | `/api/public-directory/status` | Get public directory status | None |
@@ -1028,7 +1042,20 @@ Poll status with `GET /api/setup/tasks/{id}` or stream with `GET /api/setup/task
 - Write operations do not create automatic backups; responses always report `backupCreated: false`. Take a manual backup first if you want a rollback point before a destructive query.
 
 ### Authentication
-- All endpoints except `/api/health`, `/api/auth/login`, and `/api/auth/state` require:
+- `/api/auth/2fa/setup` and `/api/auth/2fa/confirm` are reachable only with the
+  short-lived enrollment-scope session issued by `/api/auth/login` — when a
+  second factor is required but not yet enrolled, or after a recovery-code
+  sign-in (re-setup). Besides those two routes that session can reach only
+  `/api/auth/me` and `/api/auth/logout`.
+- `/api/auth/discord/start` (login mode) and `/api/auth/discord/callback` are
+  public — they *create* the session — and are metered by their own rate-limit
+  buckets (per client; no shared global lockout), separate from
+  `/api/auth/login`'s. `/api/auth/discord/start?setup=1` requires an owner
+  session.
+- All endpoints except `/api/health`, `/api/auth/login`, `/api/auth/state` and
+  the two Discord routes above require either a bearer API key
+  (`Authorization: Bearer …`, no cookie and no CSRF token — see
+  [api-keys.md](api-keys.md)) or:
   - Session cookie: `asc_session`
   - CSRF token header: `x-csrf-token`
 - Obtain CSRF token from `GET /api/auth/state`

@@ -14,8 +14,9 @@ import {
   isReadAction,
   namespaceOf,
   normalizeScopes,
+  scopesGrantAnything,
   scopeAllowsAction,
-  scopesGrantAnything
+  KEY_DENIED_ACTIONS,
 } from "./apiKeyScopes.js";
 
 export const KEY_PREFIX = "dak_";
@@ -87,6 +88,9 @@ export function keyAllows(key, action) {
   if (!key || typeof action !== "string" || !action) return false;
   const namespace = namespaceOf(action);
   if (!namespace) return false;
+  // Credential/identity actions are never key-reachable, mirroring their
+  // owner-only status for tiered sessions.
+  if (KEY_DENIED_ACTIONS.has(action)) return false;
   // Checked before the scope lookup on purpose: a hand-edited api-keys.json
   // granting `settings: write` still cannot mint keys.
   if (KEY_DENIED_NAMESPACES.has(namespace)) return false;

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadConfig, publicConfig, readConsoleBuildId, resolvePorts } from "../src/config.js";
+import { loadConfig, publicConfig, readConsoleBuildId, resolvePorts, APP_NAME } from "../src/config.js";
 
 test("frontend build ID changes when the built entry file changes", () => {
   const staticDir = mkdtempSync(join(tmpdir(), "arrakis-build-id-"));
@@ -40,6 +40,25 @@ test("web config exposes safe deployment flags and JSON body limit", () => {
 
     process.env.ADMIN_SECURE_COOKIES = "0";
     assert.equal(loadConfig().secureCookies, false);
+  } finally {
+    process.env = previous;
+    rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+// #690: totpIssuer itself is just the static fallback (APP_NAME) -- the real,
+// live SERVER_TITLE-based issuer is computed per-request from the .env FILE
+// in the /api/auth/2fa/setup route handler, not baked into boot-time config
+// via process.env (docker-compose.web.yml's environment: passthrough doesn't
+// carry SERVER_TITLE, so a process.env-based version of this silently never
+// worked -- found live). See totpOptIn.integration.test.js's two issuer
+// tests for the real, route-level coverage.
+test("totpIssuer is the static fallback app name", () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), "arrakis-config-"));
+  const previous = { ...process.env };
+  process.env.DUNE_DOCKER_DIR = repoRoot;
+  try {
+    assert.equal(loadConfig().totpIssuer, APP_NAME);
   } finally {
     process.env = previous;
     rmSync(repoRoot, { recursive: true, force: true });

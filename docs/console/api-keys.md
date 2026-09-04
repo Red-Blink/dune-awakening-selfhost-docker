@@ -107,7 +107,7 @@ namespace" rule, so Create stays disabled until something is selected.
 | `landsraad` | `landsraad:read` | `write` |
 | `server` | `server:read` | `network-fix`, `restart`, `restart-service`, `start`, `stop`, `storage-cleanup`, `write-config` |
 | `logs` | `logs:read` | *nothing — no write action exists* |
-| `backups` | `backups:read` | `create`, `delete`, `import`, `restore`, `write-config` |
+| `backups` | `backups:read` | `create`, `write-config` |
 | `updates` | `updates:check`, `updates:read` | *nothing — write actions are denied to keys* |
 | `carepackage` | `carepackage:read` | `clear-history`, `grant`, `scan`, `write-config` |
 | `addons` | `addons:read` | *nothing — write actions are denied to keys* |
@@ -165,6 +165,37 @@ grantable, their writes are unreachable at any level:
 
 A stored `"write"` level on a write-denied namespace degrades to read rather than being
 honoured, both when saving and when authorizing, so a hand-edited store cannot promote it.
+
+Finally, a few **individual actions are denied at the action level** — reachable in principle
+by their namespace's `write` scope, but blocked because they are credential, identity, or
+whole-deployment-destructive operations that must never be reachable by an external key
+(mirroring their owner-only status for signed-in sessions):
+
+- **`server:write-credentials`** — rotating the Funcom game-server token and changing the
+  server IP. A key with `server: write` keeps the operational server writes (restart schedule,
+  shutdown protection, title, restart queue) but cannot touch the credential or identity.
+- **`backups:restore`, `backups:import`, `backups:delete`** — restore overwrites the entire
+  live database (and adopts the backup's battlegroup identity), import stages an untrusted file
+  for that overwrite, and delete/delete-all destroys the recovery path. A key with
+  `backups: write` keeps `backups:create` and `backups:write-config` for backup automation.
+
+These are enforced like the namespace denials — before the scope lookup in `keyAllows()`, and
+excluded from the grantable catalog — so a hand-edited `api-keys.json` cannot reach them.
+
+**Upgrading from a build before these denials:** an existing key stored with `server: write`
+could previously call `POST /api/server/funcom-token` and `POST /api/server/ip-change-restart`
+(then `server:write-config`), and a key with `backups: write` could call restore, import and
+delete. After this change those calls return `403 This API key is not permitted to use this
+endpoint.` with no change to the stored key. If an integration depends on one of them, it needs
+an owner session instead — the tightening is deliberate (they rewrite the deployment's
+credentials or its whole database) and there is no scope that re-grants them to a key.
+
+**Data-sensitivity note on `maps: read`.** A `maps: read` grant exposes the live-map endpoints
+(`GET /api/map/players`, `/bases`, `/storage`), which return real-time player character names,
+**Funcom/FLS platform IDs**, online status, and **exact world coordinates**. Grant `maps: read`
+only to integrations you would trust with live player-location and cross-platform-identity data;
+it is not "public map tiles". (The public server-listing/player-portal upload path is separately
+anonymized; this console endpoint is not.)
 
 ## Transport
 
@@ -230,9 +261,10 @@ attempt leaves a trace to alert on.
 A key holding `updates: read` is pinned to the cached update check — it cannot force the
 uncached path that spawns a subprocess per call. That stays with the browser session.
 
-Like every other limiter in the console, this has no `X-Forwarded-For` awareness. Behind a
-reverse proxy the per-key limits still work correctly, because they key on the key id rather
-than on an address; only the recorded last-used IP is affected.
+This limiter has no `X-Forwarded-For` awareness (unlike the sign-in limiter, which honours
+`CONSOLE_TRUSTED_PROXY_IPS`). Behind a reverse proxy the per-key limits still work correctly,
+because they key on the key id rather than on an address; only the recorded last-used IP and the
+failed-credential bucket see the proxy's address.
 
 ## What the server enforces
 

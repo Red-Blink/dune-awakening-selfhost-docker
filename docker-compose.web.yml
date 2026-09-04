@@ -38,6 +38,38 @@ services:
       ADMIN_AUTH_DISABLED: "${ADMIN_AUTH_DISABLED:-0}"
       ADMIN_SECURE_COOKIES: "${ADMIN_SECURE_COOKIES:-0}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
+      # Tier 3 second factor (docs/rfc-console-auth.md §2.3/§4). Off unless the
+      # operator sets it in .env. Must be passed through here explicitly: the
+      # console reads process.env inside the container, so a value that only
+      # exists in .env on the host is invisible to it.
+      CONSOLE_TOTP_ENABLED: "${CONSOLE_TOTP_ENABLED:-0}"
+      CONSOLE_TRUSTED_PROXY_IPS: "${CONSOLE_TRUSTED_PROXY_IPS:-}"
+      # Discord OAuth sign-in (docs/rfc-console-auth.md §2.1 / §2.1.1). All optional;
+      # unset keeps password-only sign-in. Every key .env.example documents must
+      # be passed through here: the console reads process.env inside the
+      # container and never parses .env itself, so a value set only in .env is
+      # invisible to it. The two secrets may instead live in runtime/secrets/
+      # files (preferred; Settings -> Discord OAuth writes the client secret
+      # there); the inline form is passed through too so .env.example's "or set
+      # it in .env" is true.
+      DISCORD_OAUTH_CLIENT_ID: "${DISCORD_OAUTH_CLIENT_ID:-}"
+      DISCORD_OAUTH_CLIENT_SECRET: "${DISCORD_OAUTH_CLIENT_SECRET:-}"
+      # Settings -> Discord OAuth "Disable"/"Enable" (docs/design/auth-settings-consolidation-l1-design-2026-09-03.md).
+      # Same passthrough requirement as every other Discord OAuth key below:
+      # console/api/src/config.js reads this from process.env, so a value that
+      # only exists in .env on the host is invisible to it without this line.
+      DISCORD_OAUTH_DISABLED: "${DISCORD_OAUTH_DISABLED:-0}"
+      DISCORD_OAUTH_BASE_URL: "${DISCORD_OAUTH_BASE_URL:-https://discord.com/api/v10}"
+      DISCORD_OAUTH_REDIRECT_URI: "${DISCORD_OAUTH_REDIRECT_URI:-}"
+      DISCORD_HOME_GUILD_ID: "${DISCORD_HOME_GUILD_ID:-}"
+      DISCORD_OAUTH_ALLOW_OWNER_BOOTSTRAP: "${DISCORD_OAUTH_ALLOW_OWNER_BOOTSTRAP:-0}"
+      DISCORD_OAUTH_OWNER_ALLOWLIST: "${DISCORD_OAUTH_OWNER_ALLOWLIST:-}"
+      DISCORD_CONSOLE_ADMIN_ROLE_IDS: "${DISCORD_CONSOLE_ADMIN_ROLE_IDS:-}"
+      DISCORD_CONSOLE_MODERATOR_ROLE_IDS: "${DISCORD_CONSOLE_MODERATOR_ROLE_IDS:-}"
+      DISCORD_CONSOLE_PLAYER_ROLE_IDS: "${DISCORD_CONSOLE_PLAYER_ROLE_IDS:-}"
+      DISCORD_OAUTH_REQUIRE_MFA_TIERS: "${DISCORD_OAUTH_REQUIRE_MFA_TIERS:-}"
+      DISCORD_BOT_HANDOFF_URL: "${DISCORD_BOT_HANDOFF_URL:-}"
+      DISCORD_BOT_HANDOFF_SECRET: "${DISCORD_BOT_HANDOFF_SECRET:-}"
       ADMIN_TASK_RETENTION: "${ADMIN_TASK_RETENTION:-200}"
       # Seed values for the Bases auto-refill settings. The console settings
       # overlay writes runtime/generated/auto-refill-settings.json, which wins

@@ -23,7 +23,7 @@ bot with Discord so it can connect to your server.
 
 1. Go to **[discord.com/developers/applications](https://discord.com/developers/applications)**
 2. Click the **New Application** button (top right)
-3. Name your bot (e.g., "Arrakis Control Plane" or "Dune Server Status")
+3. Name your bot (e.g., "Dune Server Status" or your server's name)
 4. Click **Create**
 
 ![New Application](https://cdn.discordapp.com/attachments/1207782128457228348/1524202981606690916/content.png?ex=6a4ee425&is=6a4d92a5&hm=3f9f844d477990536c3ae4f19abfd45a55a351ed965ea67128355c6ae301686e&width=600)

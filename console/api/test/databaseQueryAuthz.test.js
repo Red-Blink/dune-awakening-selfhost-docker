@@ -107,11 +107,17 @@ test("owner may run write SQL, admin may not", () => {
   assert.equal(evaluate({ tier: "admin" }, "database:execute"), false);
 });
 
-test("admin keeps read SQL and export", () => {
+test("admin keeps read SQL; export stays owner-only", () => {
   // The split must not cost admin the read half it legitimately had.
+  //
+  // Merge-conflict finding (upstream-main-base sync): upstream's own admin
+  // default policy also grants database:export, but this fork denies it to
+  // admin via CROWN_JEWEL_DENY_ACTIONS ("full DB dump = whole-database
+  // exfiltration") -- a deliberate, pre-existing hardening decision on this
+  // branch, not a merge artifact. Adapted rather than reverted.
   assert.equal(evaluate({ tier: "admin" }, "database:query"), true);
   assert.equal(evaluate({ tier: "admin" }, "database:read"), true);
-  assert.equal(evaluate({ tier: "admin" }, "database:export"), true);
+  assert.equal(evaluate({ tier: "admin" }, "database:export"), false);
 });
 
 test("the deny survives a widened allow list", () => {

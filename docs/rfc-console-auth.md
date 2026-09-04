@@ -4,7 +4,7 @@
 **Status:** Accepted — merged via PR #170 (2026-08-18); this revision closes findings from a post-merge validation review (see §8).
 **Audit:** Three Layer 1 Eight-Hat passes (two full, one targeted), upstream identity/recovery-code/upgrade-path corrections at merge review, and a 2026-08-20 four-lens post-merge validation (Technical Writer, Security Architect, UI/UX, GRC); findings summary in §8.
 
-**Dependency note, checked directly against `upstream/main` before submitting this RFC:** §2.1 (Tier 1) and part of §2.2 (Tier 2) reference `console/api/src/integrations/discord/oauth.js` and `handoff.js` — the Discord OAuth sign-in + signed-handoff tier-resolution system. This code does **not exist on `upstream/main` today**. It was previously proposed as its own PR (#130, "Tranche 2: Discord OAuth sign-in with PKCE + tiered sessions", self-closed by the submitter, never merged) and currently exists only in this fork. The RBAC/session foundation it builds on (opaque sessions, `resolveSessionTier`, the policy engine) **did** land upstream via PR #134 and is present today — §2.3 (Tier 3) builds directly on that already-merged foundation and has no dependency gap. Sequencing is left to the maintainer's judgment: Tier 3 could be reviewed/merged independently of Tiers 1/2, or Tiers 1/2 could be resubmitted (individually or together with this RFC) if there's still interest in the Discord OAuth feature itself landing upstream. Flagging this now rather than presenting the whole design as if every piece it touches already exists on `main`.
+**Dependency note (updated for the split submission):** §2.1 (Tier 1) and part of §2.2 (Tier 2) reference `console/api/src/integrations/discord/oauth.js` and `handoff.js` — the Discord OAuth sign-in + signed-handoff tier-resolution system. That code is submitted alongside this RFC as its own stacked draft PR (base: this Tier 3 PR); §2.3 (Tier 3), the mandatory-TOTP change this RFC section otherwise documents, has no dependency on it and can be reviewed and merged independently. Sequencing is left to the maintainer's judgment.
 
 ---
 
@@ -42,7 +42,7 @@ Rather than replacing the password path with a single new "primary" mechanism (t
 
 ### 2.1 Tier 1 — Discord OAuth (fixed)
 
-**Depends on the not-yet-upstreamed Discord OAuth system** (see the dependency note at the top of this document — this section describes "what exists today" in the *fork*, not on `upstream/main`). No new requirement over what exists in the fork today. The only change is closing the fail-open bug from §1.1:
+**Depends on the Discord OAuth system submitted in the stacked companion PR** (see the dependency note at the top of this document). No new requirement over what that PR implements. The only change is closing the fail-open bug from §1.1:
 
 ```js
 // Current (condensed for readability -- the real code at oauth.js:166-183
@@ -84,6 +84,51 @@ This is the entire authorization fix — no cache, no grace window, no new persi
 - **Say something actionable to the denied user.** The login failure page for this path must state that the console could not verify the user's current Discord role and that, if they administer this install, they should check that the companion bot is running — without revealing whether the specific failure was an outage or an explicit denial. A previously-working login that starts failing during a bot restart must not be indistinguishable, to the person staring at it, from revoked access with no next step.
 
 **Trade-off, stated explicitly:** once an operator configures the bot handoff, a bot outage now means "no *new* Discord-tiered logins until the bot is back," instead of "the allowlist quietly grants owner regardless of the person's real current role." Already-active sessions are unaffected (session cookies validate against the in-memory session store, never re-checked against the handoff) — only *new* logins during an outage window are affected.
+
+#### 2.1.1 Amendment — console-native role→tier resolution (so Tier 1 works without a companion bot)
+
+*As implemented* in the companion Tier 1 PR — this whole subsection describes shipped behavior, not a proposal.
+
+**Why this amendment exists.** §2.1 as accepted resolves a Discord user's tier through a signed handoff to the operator's own bot, with a static owner allowlist as the only alternative. §1.2 of this same document names the operator with no bot as a first-class case — and for that operator, §2.1 gives "sign in with Discord as owner, if allowlisted" and nothing else. That is Discord *authentication* without Discord *authorization*, and it is not what an operator means by role-based access. This amendment adds a third tier source that the console evaluates itself, from the Discord roles the signed-in member actually holds.
+
+**What the operator configures.** The same information the companion-bot setup already gathers, as manual entries in the console's Discord OAuth settings (Settings → Discord OAuth):
+
+| Field | Required | Stored as |
+|---|---|---|
+| Home guild | yes | `DISCORD_HOME_GUILD_ID` (exists) |
+| Owner | automatic: the Discord server's owner | (derived; `DISCORD_OAUTH_OWNER_ALLOWLIST` env-only for additional owners) |
+| Admin role ID | required | `DISCORD_CONSOLE_ADMIN_ROLE_IDS` |
+| Moderator role ID | optional | `DISCORD_CONSOLE_MODERATOR_ROLE_IDS` |
+| Player role ID | recommended | `DISCORD_CONSOLE_PLAYER_ROLE_IDS` |
+| Require Discord 2FA for tiers | optional (suggested `owner,admin`) | `DISCORD_OAUTH_REQUIRE_MFA_TIERS` |
+
+Each role field accepts one or more Discord role IDs (17–19-digit snowflakes, comma-separated); the operator copies them from Discord with Developer Mode on, exactly as for the bot. Nothing is fetched from Discord to populate the form — listing a guild's roles requires a bot token, which the console deliberately does not hold.
+
+**What changes at sign-in.**
+
+1. The authorization request adds the `guilds.members.read` scope. Operators who already authorized the application under the old `identify guilds` scope are asked by Discord to re-authorize once; no other operator-visible change.
+2. After identity is fetched, the console calls `GET /users/@me/guilds/{home guild}/member` with the user's own token and reads the member's `roles` array. A 403/404 (not a member) is a deny, not an error.
+3. Tier resolution order, **unchanged for anyone with a handoff configured**:
+   - handoff configured → the handoff is authoritative, exactly as §2.1 specifies; role mapping and allowlist are not consulted. (An operator who runs the bot keeps the bot as the single source of truth — this amendment must not create two competing answers.) The Discord-account 2FA gate (step 4) is a policy layered on top of whichever tier source answered, so it applies on the handoff path too.
+   - **Invariant — separation of duties: one Discord role maps to exactly one tier.** Only admin, moderator and player are role-mappable (owner never is — see below), so the dangerous case is a role listed under admin *and* a lower tier: every holder silently becomes admin under highest-wins. Such a mapping is refused at save time by the settings API and the guided setup, and, for a hand-edited `.env`, disables Discord sign-in at boot (and refuses `/start` and the callback) with a message naming the role — never resolved silently.
+   - otherwise → the **highest** tier among: `owner` if the user ID is in the owner allowlist (only when bootstrap is enabled, as today); the tier of every mapped role the member holds. Precedence owner > admin > moderator > player. A member with no mapped role and no allowlist entry is denied.
+4. **Discord-account 2FA gate.** The `identify` scope already returns `mfa_enabled`. If the resolved tier is in `DISCORD_OAUTH_REQUIRE_MFA_TIERS` and the account has no 2FA, sign-in is denied with a message that says so and names the remedy (enable 2FA on the Discord account). This is the MFA story for Tier 1: it reuses the factor the user already carries for Discord rather than adding a second enrollment flow on top of OAuth. It does not, and is not meant to, prove anything about the *console's* own second factor; §2.3 remains the only place a console-held factor exists. **Opt-in**, not default-on: an existing operator signing in through owner bootstrap whose Discord account has no 2FA would otherwise lose Discord sign-in on upgrade (found by the ported end-to-end test, which models exactly that operator). The settings form suggests `owner,admin`; nothing is enforced until a value is saved.
+5. The callback's early deny "Discord sign-in is enabled but owner bootstrap is disabled" becomes "no tier source is configured" (reason `no_tier_source`): it fires only when there is neither a bot handoff nor a home guild — with a home guild set there is always at least one possible tier, its owner.
+
+**Owner is the Discord server's owner — derived, not configured.** `GET /users/@me/guilds` (the `guilds` scope already requested) marks the guild the signing-in user owns with `owner: true`, and Discord permits exactly one owner per server. The console therefore grants **owner** to whoever Discord says owns the home guild, with no configuration and no way to misassign it — which is also the strongest form of the separation-of-duties invariant above, since no role can ever confer owner. The former "owner user IDs" allowlist (`DISCORD_OAUTH_OWNER_ALLOWLIST`) is retained env-only, for back-compatibility and for the rare install that wants additional owners; it is no longer in the settings form. Precedence: guild owner > allowlisted owner > highest mapped role.
+
+**First-run setup is a guided flow, not a settings section.** An unconfigured console shows *Set up Discord sign-in* on the sign-in page. **The admin password comes first** — only the console owner may connect Discord, because otherwise anyone who owns some Discord server could complete a round-trip and point this console at their server. The Discord application itself (client ID, secret, redirect URI) is deployment configuration, as it is for a bot: set in `.env` as a one-time deployment step (client id, secret, redirect); the setup screen shows the exact redirect URI to register and, for an install that has none, the `.env` keys to set -- it does not collect the client secret in the first-run flow. (Rotation later is available in Settings.) Then:
+
+1. **Continue with Discord** — a real OAuth round-trip in *setup mode*: `/api/auth/discord/start?setup=1` is reachable only from an owner session and issues a pending state tagged `setup`; the callback, seeing that tag, fetches identity but **mints no tiered session and resolves no tier** — it records the operator's Discord identity and the servers they **own** (id, name; other servers are discarded) on the owner session that started it and returns to the wizard.
+2. **Everything Discord can tell the console is pre-filled** — who the operator is and the server(s) they own, the single one preselected, and therefore who the Owner is. Only a server the operator **owns** is offered or can be connected.
+3. **Map roles** — Admin (required), Moderator and Player, typed role IDs with the Developer-Mode instructions; optional *Require Discord 2FA for* (suggested on).
+4. **Save** (`POST /api/setup/discord-finalize`) — no password again: the owner session (created by the password entered to start setup) is the proof, together with the requirement that the operator owns the chosen server. Finalize refuses to require Discord 2FA for Owner/Admin while the operator's own Discord account has 2FA off (reason `operator_mfa_missing`), so the operator cannot lock themselves out on the next restart. The console writes the same keys as the settings API and reports that a restart is required; after restart the sign-in page shows *Sign in with Discord* as the primary action with *Use the admin password instead* beneath it as the break-glass path.
+
+The settings section remains for editing the role mapping and the 2FA option afterwards, and offers *Run setup again*.
+
+**What does not change.** Sessions, the policy engine, the per-tier defaults, the route→action gate, the fail-closed handoff semantics of §2.1, the `handoff_misconfigured` refusal (the former `bootstrap_disabled` refusal is superseded by `no_tier_source`, step 5), PKCE, the state cookie. Every OAuth endpoint stays rate-limited, on buckets of its own: the callback shares the login limiter's per-client limits but no global lockout bucket, and `/start` is metered per client. Player linking is out of scope for this amendment.
+
+**Trade-off, stated explicitly.** Role→tier is evaluated at sign-in only. A member whose role is removed keeps an existing session until it expires or is signed out — identical to the handoff's behaviour today (§2.1, "already-active sessions are unaffected"). Operators who need immediate revocation restart the console.
 
 ### 2.2 Tier 2 — Passkeys (opt-in, secure-context-gated)
 
@@ -128,13 +173,41 @@ A passkey login dispatches by principal type. `discord:*` re-resolves the curren
 
 **Dependency**: `@simplewebauthn/server` (npm, MIT, pinned `13.3.2`, 8 well-scoped direct dependencies for CBOR/ASN.1/X.509 parsing) + `@simplewebauthn/browser` (MIT, zero dependencies, pinned to the matching major) for the registration/authentication ceremonies, using the standard `attestationType: "none"` flow with neither the library's certificate-revocation check nor its FIDO Metadata Service integration ever enabled — keeping its own network-capable code paths entirely unreached. Because that zero-egress property is configuration, not enforcement, the test suite includes a ceremony test with `globalThis.fetch` stubbed to throw, proving full registration+authentication round-trips complete with no outbound call (§6). `qrcode` (npm, MIT, zero runtime dependencies in its browser bundle, pinned) for TOTP QR rendering (Tier 3, §2.3).
 
-### 2.3 Tier 3 — Password + mandatory TOTP + recovery codes (universal, dual-role)
+### 2.3 Tier 3 — Password + TOTP (opt-in) + recovery codes (universal, dual-role)
+
+**Correction (2026-09-02, issue #665): mandatory, forced-on-login enrollment was
+reversed to owner-initiated opt-in.** Live-testing feedback from the upstream
+maintainer (Red-Blink), relayed during the actual PR review this RFC's design
+was submitted for: *"what if I don't want to setup 2FA? Your PRs are forcing
+the users to do it... 2FA should be optional and users can opt in, from the
+settings page."* This section's original argument below (single shared,
+non-device-bound secret, so a compromise is total) is real and unchanged —
+what changed is the conclusion drawn from it: forcing every operator through
+enrollment with no way to decline is a real adoption blocker for a
+self-hosted tool, and it turned out to be the wrong trade-off even though the
+underlying risk analysis was sound. **What actually changed, precisely:**
+`POST /api/auth/login` no longer redirects an unconfigured install into a
+forced enrollment session (§4's flow below is now historical for the *login*
+trigger specifically) — a correct password logs in normally regardless of
+whether TOTP is configured. Enrollment is now owner-initiated via
+`POST /api/auth/2fa/enable` (Settings → Two-Factor Authentication), which
+requires fresh password proof and mints the exact same short-lived
+enroll-scope session §4 describes; `POST /api/auth/2fa/enable`'s counterpart,
+`POST /api/auth/2fa/disable` (fresh password + TOTP proof, then
+`secondFactor.clear()`), is new — the RFC never previously needed a disable
+path because there was no way to have opted in in the first place. Every
+other mechanic in this section — TOTP parameters, recovery-code encoding,
+recovery-login flow, rotation/session-invalidation, audit logging, backup/
+restore guidance — is unchanged; only the trigger for *starting* enrollment
+moved from automatic to explicit. Every "mandatory" in the untouched prose
+below describes the state *once an operator has opted in*, not a forced
+starting condition.
 
 This tier is **not** pure emergency break-glass. For an operator with neither Tier 1 nor Tier 2 configured — no Discord community around their server, no TLS anywhere in the access path — this is their real, everyday primary login, every session, not a degraded fallback. For an operator who *does* have Tier 1 and/or Tier 2 configured, this tier correctly serves as break-glass recovery. Both roles are real and this design must be genuinely good at both, not merely tolerable in one.
 
 This is why TOTP is **mandatory**, not optional, regardless of which role the tier is playing for a given operator: the justification is structural, not frequency-based. Tier 3 is the only tier backed by a single static, shareable, non-device-bound secret (unlike Tier 1's live Discord identity check or Tier 2's per-device passkey) — a compromised Tier 3 credential, for an operator with no Tier 1/2 configured, grants everything, unconditionally, for the entire lifetime of the install.
 
-**TOTP parameters** (named, not left to implementation): RFC 6238, HMAC-SHA1, 6 digits, 30-second period (the interoperable defaults every mainstream authenticator app supports), 160-bit server-generated secret, with a verification window of ±1 time step to tolerate ordinary clock drift. The time step accepted to confirm enrollment is persisted with the new second-factor state and rejected by the first normal login even while it remains inside that window; this makes the §4 promise that the setup code cannot immediately be replayed implementable without imposing a global one-login-per-step restriction on the shared owner credential. After 3 consecutive failed TOTP entries in one session, the error message must name the most common real cause — device clock skew — and suggest checking the device's automatic time setting, instead of repeating a bare "invalid code" forever.
+**TOTP parameters** (named, not left to implementation): RFC 6238, HMAC-SHA1, 6 digits, 30-second period (the interoperable defaults every mainstream authenticator app supports), 160-bit server-generated secret, with a verification window of ±1 time step to tolerate ordinary clock drift. The time step accepted to confirm enrollment is persisted with the new second-factor state and rejected by the first normal login even while it remains inside that window; this makes the §4 promise that the setup code cannot immediately be replayed implementable without imposing a global one-login-per-step restriction on the shared owner credential. The error message for a rejected code must name the most common real cause — device clock skew — and suggest checking the device's automatic time setting, instead of a bare "invalid code". *As implemented:* the server names the clock on every rejection; the enrollment screen additionally switches to a longer clock-skew explanation from the third consecutive failure.
 
 **Second-factor state storage**: the TOTP secret and the recovery-code digest set live together in one new file, `runtime/generated/console-second-factor.json` (`{"version": 1, "totp": {...}, "recoveryCodes": [...]}`), written via the console's existing `writeJsonAtomic()` helper with file mode `0600`. This file is covered by the same backup/restore guidance as the passkey store (below), and its deletion semantics are an explicit, documented part of the design (§3.4) — not an accident.
 
@@ -167,7 +240,7 @@ This is why TOTP is **mandatory**, not optional, regardless of which role the ti
 
 **`signCount` read-modify-write safety**: concurrent passkey logins racing on the same credential-store file need serialized reads/writes. A module-level `Promise` chain acts as a serializing queue (not a boolean lock) — each request appends its read-modify-write to the tail of the chain and awaits its own link, so concurrent requests are queued and both eventually succeed in arrival order, never rejected outright.
 
-**Rate limiting on this path is unchanged** — recovery-code checks are constant-memory hash operations and remain behind the existing login limiter (8 attempts/key, 32 global, 15-minute block), as do the passkey ceremony endpoints (§2.2). This project's console deployment guidance already recommends VPN-based access, which preserves real per-client source IPs. A generic proxy-aware fix remains separate work.
+**Rate limiting on this path is unchanged** — recovery-code checks are constant-memory hash operations and remain behind the existing login limiter (8 attempts/key, 32 global, 15-minute block), as do the passkey ceremony endpoints (§2.2). This project's console deployment guidance already recommends VPN-based access, which preserves real per-client source IPs. For installs behind a reverse proxy or tunnel, `CONSOLE_TRUSTED_PROXY_IPS` (implemented alongside Tier 3) lets the limiter key on the real client address reported by a listed proxy's `X-Forwarded-For`.
 
 ---
 
@@ -197,9 +270,10 @@ Every credential this design introduces has an explicit answer to "what happens 
 | TOTP device (codes still held) | Recovery-code login (§2.3 flow) → forced re-setup | Old recovery set invalidated; re-enroll TOTP |
 | All recovery codes (TOTP still works) | Regenerate the set from settings (fresh proof of possession) | Old sheet worthless — intended |
 | Password (any other factor state) | None at the login surface — `ADMIN_PASSWORD`/generated-secret management is host-side, exactly as today | Host access required, as today |
-| TOTP device **and** all recovery codes | **Host-filesystem reset, and nothing less**: stop the console, delete `runtime/generated/console-second-factor.json`, restart. The install now has no TOTP state, so §4's mandatory enrollment-only flow re-triggers on the next password login. | See below — this is a deliberate, visible root of trust, not a loophole |
+| TOTP device **and** all recovery codes | **Host-filesystem reset, and nothing less**: stop the console, delete `runtime/generated/console-second-factor.json`, restart. The install now has no TOTP state; the next password login is a normal, single-factor login (issue #665 — re-enrollment is opt-in via Settings, no longer forced), and §4's enrollment-only flow re-triggers only once the operator opens `POST /api/auth/2fa/enable` themselves. | See below — this is a deliberate, visible root of trust, not a loophole |
 | `webauthn-credentials.json` deleted | All passkeys unregistered; Tier 1/3 unaffected; re-register from settings | Devices re-enroll |
 | `webauthn-credentials.json` corrupted | Passkey login/registration fail closed, loudly logged at startup and shown in settings; Tier 1/3 unaffected; operator deletes/restores the file | As above |
+| Tier 1 (Discord OAuth) unavailable — bot down, app revoked, unsound role mapping, Discord API outage | Sign in with the Tier 3 password in the meantime (every relevant error page already says this explicitly) | **Depends entirely on the operator actually knowing the Tier 3 password** — added by #676, which found this is the single most consequential gap in the whole table: an Owner who has only ever used Discord OAuth is one Discord outage away from total lockout with no in-browser recovery. #676's own design doc (`docs/design/auth-settings-consolidation-l1-design-2026-09-03.md`, §5/§8) is the fuller treatment — resolved there via operator awareness (a wizard confirmation step + contextual copy), not a new bypass of this table's own Password row above. **That design doc lives on a separate, still-open PR (#677 — `docs/676-auth-settings-consolidation-design`), not on this branch**; this row's summary stands on its own regardless, but the `§5/§8` cross-reference only resolves once #677 merges — GRC hat Layer 2 audit finding, do not merge this branch's PR before #677 without either merging #677 first or removing/inlining this citation. |
 
 **The total-loss path is host filesystem access, stated out loud.** Anyone who can delete a file under `runtime/generated/` can reset the console's second factor. This is not a new weakness this design introduces — host filesystem access on a self-hosted install already implies the database, `runtime/secrets/`, and the ability to replace the console binary itself; a second factor that could *not* be reset from the host would convert every total-loss event into a permanent lockout (§2.3's dual-role framing: for many operators this is their everyday primary login) with reinstallation as the only exit. What the design owes this decision is **visibility**, not prevention: when the console starts with no TOTP state where state previously existed within the retained audit history, and whenever enrollment completes, it emits `auth.second-factor-reset-detected` / `settings.totp-setup` audit entries **and** a startup log banner — a reset the legitimate operator didn't perform is loud, not silent.
 
@@ -208,6 +282,19 @@ Every credential this design introduces has an explicit answer to "what happens 
 ---
 
 ## 4. Migration Path
+
+**Correction (2026-09-02, issue #665): the bullet below describing forced
+enrollment "on first password authentication after upgrade" is historical —
+see §2.3's correction note for what actually ships.** An in-place upgrade to
+a build with `CONSOLE_TOTP_ENABLED=1` is now invisible at the login surface:
+an existing single-factor install keeps logging in with the password alone,
+exactly as before, and the operator opts into everything described below
+(the 10-minute enrollment session, the acknowledgment-gated recovery-code
+display, the forced re-login afterward) from Settings, on their own
+schedule, via `POST /api/auth/2fa/enable`. The mechanics of the enrollment
+session itself — its scope, TTL, and the confirm/acknowledge/re-login
+sequence — are unchanged; only the sentence "on first password
+authentication after upgrade" is no longer true.
 
 - **Tier 1 fix has no upgrade-path complexity**: it's a behavior correction to already-optional, already-Discord-OAuth-configured installs only. An operator who has never configured Discord OAuth is completely unaffected.
 - **`WEBAUTHN_RP_ID` and `WEBAUTHN_ORIGIN` both unset (default) is byte-identical to today**: no new routes registered, no new file created, zero behavior change for any operator who doesn't opt in. A partial pair is rejected at boot.

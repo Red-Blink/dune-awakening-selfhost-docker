@@ -56,7 +56,7 @@ async function apiRequest<T>(path: string, options: RequestInit = {}, csrfRetrie
     }
   }
   const record = data && typeof data === "object" ? data as Record<string, unknown> : {};
-  if (isSessionAuthFailure(response.status, String(record.error || ""))) {
+  if (isSessionAuthFailure(response.status, String(record.error || ""), path)) {
     if (response.status === 403 && !csrfRetried && await refreshCsrfToken()) {
       return apiRequest<T>(path, options, true);
     }
@@ -68,8 +68,16 @@ async function apiRequest<T>(path: string, options: RequestInit = {}, csrfRetrie
   return data as T;
 }
 
-function isSessionAuthFailure(status: number, message: string) {
-  return status === 401 || (status === 403 && /authentication required|csrf token|session expired|login session/i.test(message));
+// The two enrollment routes answer a REJECTED CODE with 401 ("That code was
+// not accepted..."), not a lost session -- their session loss is a 403 with a
+// "sign in again" message. Treating that 401 as expiry tore the setup screen
+// down on the first mistyped code, regenerated the secret on the next login,
+// and made the 3-strike clock-skew hint unreachable.
+const ENROLLMENT_ROUTES = new Set(["/api/auth/2fa/setup", "/api/auth/2fa/confirm"]);
+
+function isSessionAuthFailure(status: number, message: string, path = "") {
+  if (status === 401) return !ENROLLMENT_ROUTES.has(path);
+  return status === 403 && /authentication required|csrf token|session expired|login session|sign in to begin/i.test(message);
 }
 
 function announceSessionExpired() {
@@ -108,6 +116,69 @@ async function refreshCsrfToken() {
 
 export function post<T>(path: string, body: unknown = {}) {
   return api<T>(path, { method: "POST", body: JSON.stringify(body) });
+}
+
+// #676 §7: `post()`/`api()` throw on any non-2xx, exposing only the error
+// STRING -- fine for a plain failure, but the zero-2FA guard's whole point is
+// a DISTINGUISHABLE 409 (zeroFactorWarning: true) a caller can react to
+// differently from an ordinary rejection, without the fragility of matching
+// on error text. This mirrors apiRequest's own request-building exactly
+// (headers, CSRF, credentials) but never throws -- callers get the real
+// status and parsed body for any outcome, 2xx or not.
+export async function postForResult<T extends Record<string, unknown>>(path: string, body: unknown = {}, csrfRetried = false): Promise<{ status: number; body: T }> {
+  const headers = new Headers({ "content-type": "application/json" });
+  if (csrfToken) headers.set("x-csrf-token", csrfToken);
+  const response = await fetch(path, { method: "POST", headers, credentials: "include", body: JSON.stringify(body) });
+  const text = await response.text();
+  let parsed: T;
+  try { parsed = text ? (JSON.parse(text) as T) : ({} as T); } catch { parsed = ({} as T); }
+  // Layer 3 audit finding (#676 follow-up): this duplicates apiRequest's own
+  // request-building, but originally omitted its 403-CSRF-refresh-retry and
+  // announceSessionExpired() handling entirely -- a genuinely expired/stale
+  // session hit this route's caller with a raw, confusing error instead of
+  // the app-wide "session expired, sign in again" flow every other mutation
+  // gets. Still never throws on the special 409 zeroFactorWarning outcome
+  // this function exists for (that isn't a session failure), and still
+  // returns the real status/body afterward either way, so callers keep
+  // their own non-throwing contract.
+  if (isSessionAuthFailure(response.status, String((parsed as Record<string, unknown>)?.error || ""), path)) {
+    if (response.status === 403 && !csrfRetried && await refreshCsrfToken()) {
+      return postForResult<T>(path, body, true);
+    }
+    announceSessionExpired();
+  }
+  return { status: response.status, body: parsed };
+}
+
+export interface LoginResponse {
+  status: number;
+  body: Record<string, unknown>;
+}
+
+// Dedicated entry point for /api/auth/login. Every status code this route
+// returns (200 authenticated/enrollmentRequired/resetupRequired, 401 wrong
+// password/totpRequired/recoveryFailed, 429 rate-limited, 503 second-factor
+// store unavailable) carries a real body the caller must branch on -- there
+// is no session yet at login time, so api()/apiRequest()'s blanket "401 =
+// session expired" interception (correct for every OTHER authenticated
+// route) would misrepresent all of those as a stale-session error instead.
+export async function loginRequest(body: unknown): Promise<LoginResponse> {
+  const response = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body)
+  });
+  const text = await response.text();
+  let data: Record<string, unknown> = {};
+  if (text) {
+    try {
+      data = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      data = { error: INVALID_RESPONSE_MESSAGE };
+    }
+  }
+  return { status: response.status, body: data };
 }
 
 export function friendlyApiError(value: unknown) {

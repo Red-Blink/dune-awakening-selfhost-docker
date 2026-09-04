@@ -15,6 +15,26 @@ import { allKnownActions } from "./policy.js";
 // entirely.
 export const KEY_DENIED_NAMESPACES = new Set(["settings", "database", "setup"]);
 
+// Never reachable by a key at the ACTION level, regardless of the namespace's
+// scope grant. server:write-credentials rewrites the Funcom game-server token
+// and the server IP -- credential/identity writes that are owner-only for
+// tiered sessions and must not be reachable through an external API key either
+// (a key granting `server: write` still cannot rotate the game credential).
+export const KEY_DENIED_ACTIONS = new Set([
+  // Funcom game-server token + server IP -- credential/identity writes.
+  "server:write-credentials",
+  // Destructive/whole-DB backup operations. `backups: write` is granted for
+  // backup CREATION automation, but the namespace-coarse scope would otherwise
+  // also grant: restore (overwrite the entire live DB with an attacker-supplied
+  // import, and adopt the backup's battlegroup identity), import (stage that
+  // untrusted file), and delete/delete-all (destroy the recovery path). These
+  // are owner-only for tiered sessions and must not be key-reachable either;
+  // backups:create / backups:read / backups:write-config stay reachable.
+  "backups:restore",
+  "backups:import",
+  "backups:delete",
+]);
+
 // Offered at None/Read only. `updates` because apply/fix/repair/write-config
 // self-update the console. `addons` because POST /api/addons/installed/{id}/bridge
 // authorizes against the installed addon's manifest, not the caller — so an
@@ -75,6 +95,7 @@ export function actionsByNamespace() {
   for (const action of allKnownActions()) {
     const namespace = namespaceOf(action);
     if (!namespace || KEY_DENIED_NAMESPACES.has(namespace)) continue;
+    if (KEY_DENIED_ACTIONS.has(action)) continue; // action-level deny (credential/identity)
     const bucket = isReadAction(action) ? "read" : "write";
     // A write-denied namespace's write actions are not part of what a key can
     // be granted, so they are absent from the catalog rather than listed and

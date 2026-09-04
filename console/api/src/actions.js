@@ -65,9 +65,15 @@ export const ROUTE_ACTIONS = {
   "GET /api/setup/tasks":                      "setup:read",
   "POST /api/setup/preflight":                 "setup:write",
   "POST /api/setup/write-config":              "setup:write",
-  "POST /api/setup/write-oauth-config":        "setup:write",
-  "POST /api/setup/save-oauth-secret":         "setup:write",
-  "POST /api/setup/save-token":                "setup:write",
+  // Owner-only (settings:*, which the admin tier is explicitly denied): these
+  // routes rewrite the console's own authentication trust anchor. Gating them
+  // on setup:write let an admin-tier Discord session escalate to owner.
+  "POST /api/setup/write-oauth-config":        "settings:write",
+  "POST /api/setup/save-oauth-secret":         "settings:write",
+  "GET /api/setup/discord-identity":           "settings:read",
+  "POST /api/setup/discord-finalize":          "settings:write",
+  "POST /api/setup/discord-restart":           "settings:write",
+  "POST /api/setup/save-token":                "server:write-credentials",
   "POST /api/setup/init":                      "setup:write",
   "GET /api/public-directory/status":          "setup:read",
 
@@ -92,12 +98,12 @@ export const ROUTE_ACTIONS = {
   "POST /api/server/network-bind/fix":         "server:network-fix",
   "POST /api/server/storage/cleanup-images":   "server:storage-cleanup",
   "POST /api/server/storage/cleanup-build-cache":"server:storage-cleanup",
-  "POST /api/server/funcom-token":             "server:write-config",
+  "POST /api/server/funcom-token":             "server:write-credentials",
   "POST /api/server/title":                    "server:write-config",
   "POST /api/server/config":                   "server:write-config",
   "POST /api/server/restart-schedule":         "server:write-config",
-  "POST /api/server/ip-change-restart":        "server:write-config",
-  "POST /api/server/ip-change-restart/check":  "server:write-config",
+  "POST /api/server/ip-change-restart":        "server:write-credentials",
+  "POST /api/server/ip-change-restart/check":  "server:write-credentials",
   "POST /api/server/shutdown-protection":      "server:write-config",
   "POST /api/server/shutdown-protection/remove":"server:write-config",
   "POST /api/server/restart-queue":            "server:write-config",
@@ -152,6 +158,12 @@ export const ROUTE_ACTIONS = {
   "GET /api/settings":                         "settings:read",
   "POST /api/settings":                        "settings:write",
   "POST /api/settings/admin-password":         "settings:change-password",
+  "POST /api/auth/2fa/recovery-codes/regenerate": "settings:regenerate-recovery-codes",
+  "POST /api/auth/2fa/enable":                    "settings:enable-totp",
+  "POST /api/auth/2fa/disable":                   "settings:disable-totp",
+  "POST /api/settings/discord-oauth/disable":     "settings:disable-discord-oauth",
+  "POST /api/settings/discord-oauth/enable":      "settings:enable-discord-oauth",
+  "POST /api/settings/discord-oauth/forget":      "settings:forget-discord-oauth",
   "POST /api/settings/web-port":               "settings:change-port",
   "GET /api/settings/iam/policies":            "settings:read",
   "PUT /api/settings/iam/policy":              "settings:write",
@@ -433,9 +445,27 @@ export const REGEX_ACTIONS_BY_METHOD = {
   //
   // Coverage is per method and currently uneven: players has POST/DELETE/PATCH,
   // guilds/addons/blueprints have POST/DELETE, and no namespace has PUT.
+  //
+  // Merge-conflict finding (upstream-main-base sync): an earlier revision of
+  // this resolution pointed the players prefix rule at players:mutate instead
+  // of the sentinel below, reasoning that tier1's own kick/ban/teleport split
+  // was the improvement here -- that was wrong. Upstream's real main had
+  // independently gone further and retired players:mutate as a live action
+  // entirely (actionSplits.test.js's "the old players:mutate no longer
+  // exists" is the authoritative spec: EVERY classified mutation route below
+  // must resolve to its own narrow action, e.g. players:moderate for
+  // kick/ban, via the more specific REGEX_ACTIONS_BY_METHOD_PATTERN entries
+  // below, which take precedence over this prefix rule -- this prefix rule is
+  // ONLY the fail-closed catch-all for a route nobody has classified yet, and
+  // must fail closed to the sentinel, never resolve to a retired action name).
   "POST /api/players/":    "players:unclassified",
   "DELETE /api/players/":  "players:unclassified",
   "PATCH /api/players/":   "players:unclassified",
+  // PUT included for parity with the /api/bases/ bucket: without it a future
+  // PUT /api/players/* route with no explicit entry would fall through to the
+  // method-agnostic REGEX_ACTIONS "/api/players/" -> players:read fallback and
+  // be authorized for every read-holding tier instead of failing closed.
+  "PUT /api/players/":     "players:unclassified",
 
   // Sentinel; see *:unclassified above.
   "POST /api/guilds/":     "guilds:unclassified",
@@ -473,6 +503,25 @@ export const REGEX_ACTIONS_BY_METHOD = {
 // the part that would distinguish them. Routes that need that distinction
 // go here instead, tested as a real regex before the prefix fallback.
 export const REGEX_ACTIONS_BY_METHOD_PATTERN = [
+  // --- Player MODERATION, split out of the (now-retired) players:mutate
+  //     economy bucket so a moderator/admin can act on an individual griefer
+  //     (kick/ban/unban/teleport) WITHOUT holding give-item / add-currency /
+  //     reset-progression. Every other POST/DELETE/PATCH /api/players/* route
+  //     not classified below falls through to the players:unclassified
+  //     sentinel. These are checked first (patterns run before the prefix
+  //     fallback).
+  //
+  //     Merge-conflict finding (upstream-main-base sync): kick/ban/unban were
+  //     originally two separate actions here (players:kick, players:ban) --
+  //     renamed to the single players:moderate upstream's real main already
+  //     uses for all three, since that is the name every other reference in
+  //     this codebase (CROWN_JEWEL_DENY_ACTIONS, the default policies,
+  //     actionSplits.test.js's authoritative EXPECTED table) now has to agree
+  //     with for this to be upstream-mergeable at all. ---
+  { method: "POST",   pattern: /^\/api\/players\/[^/]+\/kick$/,     action: "players:moderate" },
+  { method: "POST",   pattern: /^\/api\/players\/[^/]+\/ban$/,      action: "players:moderate" },
+  { method: "DELETE", pattern: /^\/api\/players\/[^/]+\/ban$/,      action: "players:moderate" },
+  { method: "POST",   pattern: /^\/api\/players\/[^/]+\/teleport$/, action: "players:teleport" },
   // DELETE /api/bases/{baseId} — the actual, irreversible base delete.
   // Deliberately its own action rather than the shared bases:mutate bucket
   // every other base mutation uses (refills, permission edits, cancelling
@@ -566,9 +615,11 @@ export const REGEX_ACTIONS_BY_METHOD_PATTERN = [
   // panel shipped without any way to destroy items, so an operator whose
   // hand-authored policy grants vehicles:mutate (roster edits, refuel, repair)
   // cannot have agreed to item destruction -- folding this in would silently
-  // widen every existing narrow policy. Default tiers are unaffected: owner
-  // ("*") and admin ("vehicles:*") still match, moderator/player/observer hold
-  // only vehicles:read.
+  // widen every existing narrow policy. Under the default policy owner
+  // ("*") still matches; admin/moderator/player/observer hold only vehicles:read,
+  // so the delete-item action is owner-only by default (admin's default was
+  // narrowed from vehicles:* to vehicles:read -- see the tier-model notes in
+  // console-iam.md).
   //
   // The bulk action is "vehicles:bulk-delete-items", NOT "vehicles:delete-items"
   // (issue #351's lesson, mirrored from bases): policy.js's `-*` wildcard means
