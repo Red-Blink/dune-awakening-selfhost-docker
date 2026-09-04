@@ -70,36 +70,50 @@ credentials inside it — the console's Delete controls are the deliberate path.
 
 ### Getting the archive onto the new host
 
-The console cannot yet upload a system backup, so the archive has to be placed on
-the new host by hand. Download it from the old host's Backups page and copy it
-across:
+Download the backup from the old host's Backups page. On the new host, open
+**Backups -> System Backups (Encrypted)**, press **Import Backup**, and upload
+the file you downloaded.
+
+The download is a single `.tar` holding both files a backup is made of: the
+encrypted archive and its `.yaml` sidecar. The sidecar holds no secrets, and it
+is where Created, Server Title and Battlegroup ID come from. Import accepts that
+`.tar`, or a bare `.tar.gz.enc` for an archive you already had -- in which case a
+sidecar is written for it stating only what can be read from the archive itself,
+and those three columns show `Unknown`.
+
+Importing **stores the archive; it does not apply it.** Nothing on the host
+changes until you restore it, and the passphrase is not checked at upload time --
+that happens in the restore preview.
+
+Two things import will tell you about rather than decide silently:
+
+- **A name that already exists.** You are asked whether to keep both or replace
+  the stored one. Overwriting destroys the only copy of the credentials inside
+  the archive already there, so it is never the default.
+- **A name that has been changed.** If your browser saved the file as
+  `… (1).tar`, or it was renamed by hand, it is stored under a fresh valid name
+  and the result tells you which -- restore, download and delete all validate the
+  filename, so an archive under a changed name would otherwise be unusable.
+
+The `.tar` is not compressed. Its contents are already encrypted and so
+incompressible, and a known size is what lets the console stream a multi-gigabyte
+archive in either direction instead of building it in memory first.
+
+#### On a host with no console yet
+
+Copy the files into place directly; they appear on the Backups page once the
+console is running.
 
 ```bash
 scp dune-system-20260830-120000-4711-9931.tar.gz.enc.tar user@newhost:/tmp/
 ```
-
-Then extract it into the new host's system backup directory:
 
 ```bash
 tar -xf dune-system-20260830-120000-4711-9931.tar.gz.enc.tar \
     -C /path/to/dune/runtime/backups/system/
 ```
 
-The download is a single `.tar` holding both files a backup is made of: the
-encrypted archive and its `.yaml` sidecar. The sidecar holds no secrets, and it is
-where Created, Server Title and Battlegroup ID come from -- an archive without one
-still lists, but those columns read `Unknown`. Bundling them means there is no
-second file to forget, and no way to pair an archive with the wrong sidecar.
-
-The `.tar` is not compressed. Its contents are already encrypted and so
-incompressible, and a known size is what lets the console stream a multi-gigabyte
-archive instead of building it in memory first.
-
-Both files keep their original names inside the `.tar`. Restore, download and
-delete all validate those names, so do not rename them after extracting.
-
-Once the files are in place they appear on the Backups page and can be restored
-normally.
+Both files keep their original names inside the `.tar`. Do not rename them.
 
 ### Restoring on the new host
 
