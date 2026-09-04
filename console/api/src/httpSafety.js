@@ -1,4 +1,6 @@
-import { existsSync, statSync } from "node:fs";
+import { createWriteStream, existsSync, statSync } from "node:fs";
+import { Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 
 function existsAsFile(path) {
@@ -85,6 +87,28 @@ export async function readRawBody(req, maxBytes) {
     chunks.push(buffer);
   }
   return Buffer.concat(chunks);
+}
+
+// Writes a request body straight to disk, counting as it goes. readRawBody
+// concatenates the whole upload in memory before anything looks at it, which is
+// fine for a JSON body or a database dump and not for a system archive that
+// grows with the world. Flag "wx" refuses to clobber, so a staging name can
+// never land on an existing file.
+export async function streamRequestToFile(req, destination, maxBytes) {
+  let received = 0;
+  const meter = new Transform({
+    transform(chunk, encoding, done) {
+      received += chunk.length;
+      if (received > maxBytes) {
+        const error = new Error(`Upload exceeds ${maxBytes} bytes`);
+        error.statusCode = 413;
+        return done(error);
+      }
+      done(null, chunk);
+    }
+  });
+  await pipeline(req, meter, createWriteStream(destination, { flags: "wx", mode: 0o600 }));
+  return received;
 }
 
 export function safeStaticTarget(staticDir, requestPath) {

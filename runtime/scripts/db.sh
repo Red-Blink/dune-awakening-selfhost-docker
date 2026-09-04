@@ -54,7 +54,8 @@ choice to adopt the backup identity or keep the current identity. Adopting is
 the normal choice when moving the same server to new hardware; keeping the
 current identity is for intentionally importing data into a different server.
 
-dune db backup-system bundles a fresh database dump together with .env,
+dune db backup-system requires GnuPG 2.3 or newer, for authenticated
+(AEAD/OCB) encryption. It bundles a fresh database dump together with .env,
 runtime/generated/, and runtime/secrets/ into one encrypted
 dune-system-*.tar.gz.enc archive under runtime/backups/system/ (with a
 matching .yaml sidecar containing no secrets, safe to read/share on its
@@ -81,15 +82,27 @@ To decrypt and extract (also printed in the archive's own .yaml sidecar
 and on stdout when the backup is created). Enter the passphrase at the
 prompt -- do not put it directly on the command line, which would expose
 it to any other process on this host via `ps`/`/proc/<pid>/cmdline` for
-as long as gpg is running:
+as long as gpg is running.
+
+Decrypt to a file FIRST and let gpg's exit status gate the extract. The
+authentication tag is verified at the END of the stream, so piping
+`gpg -d | tar -x` directly extracts almost the whole archive before the
+tamper is detected, and tar exiting 0 hides gpg's failure:
   read -r -s -p "Passphrase: " p; echo
   printf '%s' "$p" | gpg --batch --yes --pinentry-mode loopback \
-    --passphrase-fd 0 -d <archive> | gunzip | tar -xf -
-  unset p
+    --passphrase-fd 0 -d <archive> > restore.tar.gz \
+    && tar -xzf restore.tar.gz
+  unset p; rm -f restore.tar.gz
+If gpg reports a checksum error, restore.tar.gz is untrustworthy however
+complete it looks -- delete it rather than extracting it.
 
-There is no automated restore for system backups yet: decrypt/extract as
-above, restore .env / runtime/generated/ / runtime/secrets/ manually, then
-use `dune db restore` for the db/ dump inside it.
+To restore one: dune db restore-system <archive> [--dry-run]
+[--adopt-backup-battlegroup|--keep-current-battlegroup]. It restores the
+database first (while .env still describes the database it can reach), then
+.env, runtime/generated/ and runtime/secrets/, copying whatever it replaces
+to runtime/backups/restore-<timestamp>/ first. It does NOT restart the
+stack: .env may carry different database credentials and a different admin
+console password, so you choose when that takes effect.
 EOF
 }
 
@@ -740,6 +753,8 @@ SYSTEM_BACKUP_DIR_DEFAULT="runtime/backups/system"
 # allowed value, giving comparable KDF work factor to this backup
 # format's previous PBKDF2 iteration count.
 SYSTEM_BACKUP_S2K_COUNT=65011712
+# Opt-in only. 0 keeps every system backup, matching DB_AUTO_BACKUP_RETENTION_DAYS.
+SYSTEM_BACKUP_KEEP_DEFAULT="${DUNE_SYSTEM_BACKUP_KEEP:-0}"
 # Isolated, disposable GNUPGHOME per invocation -- never the operator's
 # own ~/.gnupg. This is symmetric passphrase encryption only (no keys
 # ever created, imported, or retained), but gpg still writes a keybox/
@@ -761,6 +776,18 @@ system_backup_ephemeral_exclude_patterns() {
   cat <<'EOF'
 dune-fake-k8s-serviceaccount-*
 EOF
+}
+
+# Whether this gpg can do authenticated (AEAD/OCB) encryption, which the
+# archive format below requires. AEAD landed in GnuPG 2.3; 2.2 rejects
+# --aead-algo outright. Probed as a capability rather than parsed from a
+# version string, because distributions backport freely -- and checked at
+# all because the console's own container ships 2.2.40, where this used to
+# fail with a bare `invalid option "--aead-algo"` only AFTER dumping the
+# whole database.
+system_backup_encryption_available() {
+  command -v gpg >/dev/null 2>&1 || return 1
+  gpg --dump-options 2>/dev/null | grep -qx -- '--aead-algo'
 }
 
 # Resolves the passphrase used to encrypt/decrypt a system backup.
@@ -801,11 +828,12 @@ resolve_system_backup_passphrase() {
 #   - .env, runtime/generated/, and runtime/secrets/ -- retained verbatim,
 #     including every credential. Nothing is redacted or excluded on the
 #     basis of being a secret; the archive's confidentiality comes
-#     entirely from AES-256-CBC encryption below, gated on the passphrase
-#     the operator supplies.
+#     entirely from the AES-256-OCB (AEAD) encryption below, gated on the
+#     passphrase the operator supplies.
 # The plaintext tar is never written to disk unencrypted outside a
 # private (mktemp -d, mode 700) staging directory that is removed by an
-# explicit, unconditional cleanup at every single exit path -- this
+# explicit cleanup on every return path, plus a signal trap for INT/TERM/HUP
+# so an external kill (the console's task timeout) cannot orphan it -- this
 # function does not rely on a RETURN/EXIT trap, because `set -e` aborting
 # out of a function does not reliably fire one (verified: an unguarded
 # failing command inside a function called as a plain statement, not as
@@ -843,7 +871,36 @@ backup_system() {
     [ -z "$staged_sidecar" ] || rm -f -- "$staged_sidecar"
     [ -z "$db_dump_dir" ] || rm -rf -- "$db_dump_dir"
     [ -z "$gnupg_home" ] || rm -rf -- "$gnupg_home"
+    trap - INT TERM HUP
   }
+
+  # The explicit-cleanup-on-every-path design above covers every RETURN, but
+  # nothing covers being killed from outside. The console runs this as a task
+  # with a 30-minute timeout that ends in killProcessTree -> SIGTERM, and
+  # without this trap that leaves $plain_tar behind -- the UNENCRYPTED tar of
+  # .env, runtime/generated/ and every file in runtime/secrets/ -- sitting in
+  # the container's /tmp. Signals only: a RETURN/EXIT trap would run into the
+  # set -e caveat described above, which is why this complements that design
+  # rather than replacing it. 143 = 128 + SIGTERM.
+  trap 'backup_system_cleanup_on_failure; exit 143' INT TERM HUP
+
+  # Checked before the passphrase prompt and long before the database dump:
+  # there is no point asking anyone to type a passphrase twice, or spending a
+  # full pg_dump, for an archive that cannot be encrypted.
+  if ! command -v gpg >/dev/null 2>&1; then
+    echo "System backup was not created because gpg is not installed." >&2
+    echo "Install gnupg (2.3 or newer) and try again." >&2
+    return 1
+  fi
+  if ! system_backup_encryption_available; then
+    echo "System backup was not created because this gpg cannot do authenticated (AEAD/OCB) encryption." >&2
+    echo "  found:    $(gpg --version 2>/dev/null | head -1)" >&2
+    echo "  required: GnuPG 2.3 or newer (--aead-algo support)" >&2
+    echo "The archive format deliberately uses an authenticated cipher so a corrupted or" >&2
+    echo "tampered archive is rejected at decrypt time instead of silently producing" >&2
+    echo "wrong plaintext, so it is not downgraded automatically." >&2
+    return 1
+  fi
 
   passphrase="$(resolve_system_backup_passphrase)" || return 1
 
@@ -1033,7 +1090,7 @@ backup_system() {
       --s2k-digest-algo SHA256 --s2k-count "$SYSTEM_BACKUP_S2K_COUNT" \
       --symmetric --cipher-algo AES256 --aead-algo OCB --force-aead \
       -o "$staged_archive"; then
-    exec {passphrase_fd}<&- 2>/dev/null || true
+    exec {passphrase_fd}<&- || true
     backup_system_cleanup_on_failure
     echo "System backup was not created because encryption failed." >&2
     return 1
@@ -1060,15 +1117,18 @@ backup_system() {
     echo "decrypt_note: >-"
     echo "  Do not pass the passphrase on the command line -- it would be"
     echo "  visible to other processes via ps/proc for as long as gpg runs."
-    echo "  Enter it at a prompt instead. gpg will reject this archive"
-    echo "  outright (nonzero exit, no output written) if it has been"
-    echo "  corrupted or tampered with -- this format is authenticated,"
-    echo "  not just encrypted."
+    echo "  Enter it at a prompt instead. This format is authenticated, so"
+    echo "  gpg exits nonzero if the archive was corrupted or tampered with,"
+    echo "  but it verifies the tag at the END of the stream and has already"
+    echo "  written nearly all of the plaintext by then. Decrypt to a file and"
+    echo "  let that exit status gate the extract; never pipe gpg into tar,"
+    echo "  which hides the failure behind tar exiting 0."
     echo "decrypt_command: |-"
     echo "  read -r -s -p \"Passphrase: \" p; echo"
     echo "  printf '%s' \"\$p\" | gpg --batch --yes --pinentry-mode loopback \\"
-    echo "    --passphrase-fd 0 -d $(basename "$archive_file") | gunzip | tar -xf -"
-    echo "  unset p"
+    echo "    --passphrase-fd 0 -d $(basename "$archive_file") > restore.tar.gz \\"
+    echo "    && tar -xzf restore.tar.gz"
+    echo "  unset p; rm -f restore.tar.gz"
   } > "$staged_sidecar"; then
     backup_system_cleanup_on_failure
     echo "System backup was not created because its metadata could not be written." >&2
@@ -1102,24 +1162,268 @@ backup_system() {
   db_dump_file=""
   db_dump_sidecar=""
 
+  # Nothing temporary is left to clean up from here on.
+  trap - INT TERM HUP
+
+  prune_system_backups "$out_dir" "$SYSTEM_BACKUP_KEEP_DEFAULT"
+
   echo "Encrypted system backup written:"
   echo "  $archive_file"
   echo "Sidecar (no secrets, safe to read):"
   echo "  $sidecar_file"
   echo
-  echo "This archive includes runtime/secrets/ (Funcom token, admin password, RMQ"
-  echo "admin credentials, etc.) and .env, encrypted with the passphrase you just set."
+  echo "This archive includes .env, runtime/generated/ and runtime/secrets/ (Funcom"
+  echo "token, admin password, RMQ admin credentials, IAM policies, etc.), encrypted"
+  echo "with the passphrase you just set."
   echo "There is no way to recover this archive's contents without that passphrase --"
   echo "store it somewhere durable (a password manager), separately from the archive."
   echo
   echo "To decrypt and extract, enter the passphrase at the prompt -- do not put it"
   echo "on the command line, which would expose it to other processes on this host."
-  echo "gpg will reject this archive outright (nonzero exit, no output written) if"
-  echo "it has been corrupted or tampered with -- this format is authenticated:"
+  echo "This format is authenticated, so gpg exits nonzero on a corrupted or tampered"
+  echo "archive -- but it verifies the tag at the END, after writing nearly all of the"
+  echo "plaintext. Decrypt to a file and let that exit status gate the extract; piping"
+  echo "gpg straight into tar extracts almost everything before the failure is seen:"
   echo "  read -r -s -p \"Passphrase: \" p; echo"
   echo "  printf '%s' \"\$p\" | gpg --batch --yes --pinentry-mode loopback \\"
-  echo "    --passphrase-fd 0 -d $(basename "$archive_file") | gunzip | tar -xf -"
-  echo "  unset p"
+  echo "    --passphrase-fd 0 -d $(basename "$archive_file") > restore.tar.gz \\"
+  echo "    && tar -xzf restore.tar.gz"
+  echo "  unset p; rm -f restore.tar.gz"
+}
+
+# Restores an encrypted system backup produced by backup_system(): the database
+# dump plus .env, runtime/generated/ and runtime/secrets/.
+#
+# Lives here rather than in the console because it has to work on a host whose
+# console is not configured yet, and because the gpg/passphrase/cleanup
+# discipline this needs is the same discipline backup_system() already has.
+#
+# Deliberately does NOT restart anything. Restoring .env can change the database
+# credentials and the admin console password, so the caller decides when the
+# stack comes back -- see the closing message.
+restore_system() {
+  local archive="${1:-}"
+  local stage_dir=""
+  local plain_tgz=""
+  local gnupg_home=""
+  local passphrase
+  local dry_run=0
+  local battlegroup_args=()
+  local safety_dir=""
+  local arg
+
+  shift || true
+  while [ "$#" -gt 0 ]; do
+    arg="$1"
+    case "$arg" in
+      --dry-run) dry_run=1; shift ;;
+      --adopt-backup-battlegroup|--keep-current-battlegroup)
+        battlegroup_args+=("$arg"); shift ;;
+      *) echo "Unknown restore-system option: $arg" >&2; exit 2 ;;
+    esac
+  done
+
+  # The staging tree holds the plaintext .env and every secret, so it must not
+  # survive a failure OR an external kill -- same reasoning as backup_system().
+  restore_system_cleanup() {
+    [ -z "$stage_dir" ] || rm -rf -- "$stage_dir"
+    [ -z "$plain_tgz" ] || rm -f -- "$plain_tgz"
+    [ -z "$gnupg_home" ] || rm -rf -- "$gnupg_home"
+    trap - INT TERM HUP
+  }
+  trap 'restore_system_cleanup; exit 143' INT TERM HUP
+
+  if [ -z "$archive" ]; then
+    echo "Usage: dune db restore-system <archive.tar.gz.enc> [--dry-run] [--adopt-backup-battlegroup|--keep-current-battlegroup]" >&2
+    restore_system_cleanup
+    exit 2
+  fi
+  case "$archive" in
+    */*) ;;
+    *) archive="$SYSTEM_BACKUP_DIR_DEFAULT/$archive" ;;
+  esac
+  if [ ! -f "$archive" ]; then
+    echo "System backup not found: $archive" >&2
+    restore_system_cleanup
+    return 1
+  fi
+  if ! system_backup_encryption_available; then
+    echo "This gpg cannot decrypt authenticated (AEAD/OCB) archives." >&2
+    echo "  found:    $(gpg --version 2>/dev/null | head -1)" >&2
+    echo "  required: GnuPG 2.3 or newer" >&2
+    restore_system_cleanup
+    return 1
+  fi
+
+  passphrase="$(resolve_system_backup_passphrase)" || { restore_system_cleanup; return 1; }
+
+  if ! stage_dir="$(mktemp -d)"; then
+    echo "Could not create a staging directory for the restore." >&2
+    restore_system_cleanup
+    return 1
+  fi
+  chmod 700 "$stage_dir"
+  if ! plain_tgz="$(mktemp)"; then
+    echo "Could not create a temporary file for the restore." >&2
+    restore_system_cleanup
+    return 1
+  fi
+  chmod 600 "$plain_tgz"
+  if ! gnupg_home="$(mktemp -d)"; then
+    echo "Could not create a private GNUPGHOME." >&2
+    restore_system_cleanup
+    return 1
+  fi
+  chmod 700 "$gnupg_home"
+
+  echo "Decrypting system backup..."
+  local passphrase_fd
+  if ! exec {passphrase_fd}<<< "$passphrase"; then
+    echo "Could not stage the passphrase for decryption." >&2
+    restore_system_cleanup
+    return 1
+  fi
+  # Decrypt to a FILE and let gpg's exit status gate the extract. Piping gpg
+  # into tar would write out almost the whole archive before the AEAD tag is
+  # verified at the end of the stream, and tar exiting 0 would hide the failure.
+  if ! GNUPGHOME="$gnupg_home" gpg --batch --yes --pinentry-mode loopback \
+      --passphrase-fd "$passphrase_fd" -d "$archive" > "$plain_tgz" 2>/dev/null; then
+    exec {passphrase_fd}<&- || true
+    echo "The archive could not be decrypted: wrong passphrase, or it is corrupted or tampered with." >&2
+    restore_system_cleanup
+    return 1
+  fi
+  exec {passphrase_fd}<&-
+  rm -rf -- "$gnupg_home"
+  gnupg_home=""
+
+  # Validate the listing BEFORE extracting: only the members backup_system()
+  # writes, no absolute paths, no traversal, and never an audit log.
+  local entry
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    case "$entry" in
+      ./generated/web-admin-audit.jsonl)
+        echo "Refusing archive: it carries an audit log, which is never restorable." >&2
+        restore_system_cleanup
+        return 1 ;;
+    esac
+    case "$entry" in
+      /*|*..*)
+        echo "Refusing archive: unsafe member: $entry" >&2
+        restore_system_cleanup
+        return 1 ;;
+    esac
+    case "$entry" in
+      ./|./env|./db/*|./generated/*|./secrets/*) ;;
+      *)
+        echo "Refusing archive: unexpected member: $entry" >&2
+        restore_system_cleanup
+        return 1 ;;
+    esac
+  done < <(tar -tzf "$plain_tgz")
+
+  mkdir -p "$stage_dir/tree"
+  if ! tar -xzf "$plain_tgz" -C "$stage_dir/tree" --no-same-owner; then
+    echo "The decrypted archive could not be extracted." >&2
+    restore_system_cleanup
+    return 1
+  fi
+  rm -f -- "$plain_tgz"
+  plain_tgz=""
+
+  local dump
+  dump="$(find "$stage_dir/tree/db" -maxdepth 1 -type f -name '*.backup' 2>/dev/null | head -1)"
+  if [ -z "$dump" ]; then
+    echo "Refusing archive: it contains no database dump." >&2
+    restore_system_cleanup
+    return 1
+  fi
+
+  local generated_count secrets_count
+  generated_count="$(find "$stage_dir/tree/generated" -type f 2>/dev/null | wc -l | tr -d '[:space:]')"
+  secrets_count="$(find "$stage_dir/tree/secrets" -type f 2>/dev/null | wc -l | tr -d '[:space:]')"
+
+  echo
+  echo "This archive will replace:"
+  echo "  .env"
+  echo "  runtime/generated/   ($generated_count files)"
+  echo "  runtime/secrets/     ($secrets_count files)"
+  echo "  the dune database    ($(basename "$dump"))"
+
+  if [ "$dry_run" = "1" ]; then
+    echo
+    echo "Dry run: nothing was changed."
+    restore_system_cleanup
+    return 0
+  fi
+
+  if [ "${DUNE_DB_ASSUME_YES:-0}" != "1" ]; then
+    local answer
+    echo
+    echo "This overwrites this host's configuration and credentials, and replaces the database."
+    read -r -p "Type RESTORE to confirm: " answer
+    if [ "$answer" != "RESTORE" ]; then
+      echo "Restore cancelled."
+      restore_system_cleanup
+      return 1
+    fi
+  fi
+
+  safety_dir="runtime/backups/restore-$(date +%Y%m%d-%H%M%S)"
+  if ! mkdir -p "$safety_dir"; then
+    echo "Could not create a safety copy directory; refusing to restore." >&2
+    restore_system_cleanup
+    return 1
+  fi
+  chmod 700 "$safety_dir"
+  [ -f .env ] && cp -a .env "$safety_dir/env"
+  [ -d runtime/generated ] && cp -a runtime/generated "$safety_dir/generated"
+  [ -d runtime/secrets ] && cp -a runtime/secrets "$safety_dir/secrets"
+  echo "Copied what is about to be replaced to: $safety_dir"
+
+  # Database FIRST, while .env still describes the database this process can
+  # reach. Swapping credentials before the restore would cut the connection the
+  # restore itself depends on.
+  echo "Restoring database..."
+  if ! import_db "$dump" "${battlegroup_args[@]}"; then
+    echo "Database restore failed. Configuration and secrets were NOT changed." >&2
+    echo "The previous state is still in: $safety_dir" >&2
+    restore_system_cleanup
+    return 1
+  fi
+
+  echo "Restoring configuration and secrets..."
+  if ! cp -a -- "$stage_dir/tree/env" .env; then
+    echo "Could not restore .env. Previous state is in: $safety_dir" >&2
+    restore_system_cleanup
+    return 1
+  fi
+  mkdir -p runtime/generated runtime/secrets
+  if ! tar -C "$stage_dir/tree/generated" -cf - . | tar -C runtime/generated -xf -; then
+    echo "Could not restore runtime/generated/. Previous state is in: $safety_dir" >&2
+    restore_system_cleanup
+    return 1
+  fi
+  if ! tar -C "$stage_dir/tree/secrets" -cf - . | tar -C runtime/secrets -xf -; then
+    echo "Could not restore runtime/secrets/. Previous state is in: $safety_dir" >&2
+    restore_system_cleanup
+    return 1
+  fi
+  chmod 700 runtime/secrets 2>/dev/null || true
+  find runtime/secrets -type f -exec chmod 600 {} + 2>/dev/null || true
+
+  restore_system_cleanup
+
+  echo
+  echo "System backup restored."
+  echo "  replaced state saved in: $safety_dir"
+  echo
+  echo "The stack is still running the PREVIOUS configuration. Restart it to pick this up:"
+  echo "  dune restart"
+  echo
+  echo "Note: .env may now carry a different admin console password and different"
+  echo "database credentials than the ones this session has been using."
 }
 
 list_system_backups() {
@@ -1130,6 +1434,162 @@ list_system_backups() {
     find "$out_dir" -maxdepth 1 -type f -name '*.tar.gz.enc' -printf '%TY-%Tm-%Td %TH:%TM:%TS  %p\n' 2>/dev/null | sed -E 's/([0-9]{2}:[0-9]{2}:[0-9]{2})\.[0-9]+/\1/' | sort || true
   else
     echo "No system backup directory found: $out_dir"
+  fi
+}
+
+# Mirrors valid_backup_basename for encrypted system archives. Anchored, and
+# deliberately rejects the *.partial.* staging names a run in flight uses.
+valid_system_backup_basename() {
+  # Bash's own =~ rather than grep -Eq: grep is line-oriented, so a multi-line
+  # argument matched if ANY of its lines did. =~ anchors the whole string.
+  [[ "${1:-}" =~ ^dune-system-[0-9]{8}-[0-9]{6}-[0-9]+-[0-9]+\.tar\.gz\.enc$ ]]
+}
+
+iter_valid_system_backup_names() {
+  local out_dir="${1:-$SYSTEM_BACKUP_DIR_DEFAULT}"
+  [ -d "$out_dir" ] || return 0
+  local path name
+  # NUL-delimited: a filename containing a newline would otherwise split into
+  # two candidates, one of which could pass validation and be deleted.
+  while IFS= read -r -d '' path; do
+    name="$(basename "$path")"
+    valid_system_backup_basename "$name" || continue
+    printf '%s
+' "$name"
+  done < <(find "$out_dir" -maxdepth 1 -type f -name '*.tar.gz.enc' -print0 2>/dev/null)
+}
+
+# The ONLY place system-backup files are removed, so the set of files that
+# belong to one archive is defined once. An archive is the .tar.gz.enc plus its
+# .yaml sidecar; leaving the sidecar behind would strand metadata describing an
+# archive that no longer exists.
+delete_system_backup_files_for_name() {
+  local name="$1"
+  local out_dir="${2:-$SYSTEM_BACKUP_DIR_DEFAULT}"
+  valid_system_backup_basename "$name" || { echo "Not a valid system backup name: $name" >&2; return 1; }
+  local file="$out_dir/$name"
+  command rm -f -- "$file"
+  [ -f "$file.yaml" ] && command rm -f -- "$file.yaml"
+  # Check the postcondition rather than rm's exit status: a read-only mount or
+  # an immutable attribute leaves the file in place, and reporting a delete
+  # that did not happen is worse than reporting the failure.
+  if [ -e "$file" ] || [ -e "$file.yaml" ]; then
+    echo "System backup could not be removed: $file" >&2
+    return 1
+  fi
+  return 0
+}
+
+# Keeps the newest $keep archives and removes the rest. Never called unless
+# DUNE_SYSTEM_BACKUP_KEEP is set to a positive integer -- an archive is the only
+# copy of the credentials inside it, so silent pruning is opt-in, not default.
+prune_system_backups() {
+  local out_dir="${1:-$SYSTEM_BACKUP_DIR_DEFAULT}"
+  local keep="${2:-$SYSTEM_BACKUP_KEEP_DEFAULT}"
+  local removed=0
+  local index=0
+  local name
+
+  validate_positive_integer "$keep" || return 0
+  [ -d "$out_dir" ] || return 0
+
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    index=$((index + 1))
+    [ "$index" -gt "$keep" ] || continue
+    if delete_system_backup_files_for_name "$name" "$out_dir" >/dev/null 2>&1; then
+      removed=$((removed + 1))
+    fi
+  done < <(iter_valid_system_backup_names "$out_dir" | sort -r)
+
+  [ "$removed" -eq 0 ] || echo "Pruned $removed old system backup(s), keeping the newest $keep."
+}
+
+delete_all_system_backups() {
+  local out_dir="${1:-$SYSTEM_BACKUP_DIR_DEFAULT}"
+  local names count answer
+  local deleted=0
+
+  if [ ! -d "$out_dir" ]; then
+    echo "No system backup directory found: $out_dir"
+    return 0
+  fi
+
+  names="$(iter_valid_system_backup_names "$out_dir" | sort || true)"
+  count="$(printf '%s
+' "$names" | sed '/^$/d' | wc -l | tr -d '[:space:]')"
+
+  if [ "${count:-0}" -eq 0 ]; then
+    echo "No system backups found in: $out_dir"
+    return 0
+  fi
+
+  echo "System backup directory: $out_dir"
+  echo "System backups found: $count"
+  echo "These archives are the only copy of the credentials they contain."
+  if [ "${DUNE_DB_ASSUME_YES:-0}" != "1" ]; then
+    read -r -p "Delete ALL system backups? Type DELETE to confirm: " answer
+    if [ "$answer" != "DELETE" ]; then
+      echo "Delete cancelled."
+      exit 1
+    fi
+  fi
+
+  local failed=0
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    if delete_system_backup_files_for_name "$name" "$out_dir"; then
+      deleted=$((deleted + 1))
+    else
+      failed=$((failed + 1))
+    fi
+  done <<< "$names"
+
+  echo "Deleted $deleted system backups."
+  if [ "$failed" -gt 0 ]; then
+    echo "$failed system backup(s) could not be removed." >&2
+    return 1
+  fi
+}
+
+delete_system_backup() {
+  local target="${1:-}"
+  local out_dir="$SYSTEM_BACKUP_DIR_DEFAULT"
+  local name answer
+  local -a names=()
+
+  if [ "$target" = "--all" ]; then
+    delete_all_system_backups "$out_dir"
+    return
+  fi
+
+  [ "$#" -gt 0 ] || { echo "Missing system backup name." >&2; exit 2; }
+  for target in "$@"; do
+    name="$(basename "$target")"
+    valid_system_backup_basename "$name" || { echo "Not a valid system backup file: $target" >&2; exit 1; }
+    [ -f "$out_dir/$name" ] || { echo "System backup does not exist: $out_dir/$name" >&2; exit 1; }
+    if [[ " ${names[*]} " != *" $name "* ]]; then names+=("$name"); fi
+  done
+
+  if [ "${DUNE_DB_ASSUME_YES:-0}" != "1" ]; then
+    read -r -p "Delete ${#names[@]} selected system backup(s)? [y/N]: " answer
+    case "$answer" in
+      y|Y|yes|YES) ;;
+      *) echo "Delete cancelled."; exit 1 ;;
+    esac
+  fi
+
+  local removed=0
+  for name in "${names[@]}"; do
+    if delete_system_backup_files_for_name "$name" "$out_dir"; then
+      removed=$((removed + 1))
+      echo "Deleted system backup: $name"
+    fi
+  done
+  echo "Deleted $removed selected system backup(s)."
+  if [ "$removed" -ne "${#names[@]}" ]; then
+    echo "$(( ${#names[@]} - removed )) system backup(s) could not be removed." >&2
+    return 1
   fi
 }
 
@@ -2746,6 +3206,13 @@ case "$cmd" in
     ;;
   list-system)
     list_system_backups "${2:-$SYSTEM_BACKUP_DIR_DEFAULT}"
+    ;;
+  restore-system)
+    restore_system "${2:-}" "${@:3}"
+    ;;
+  delete-system)
+    shift || true
+    delete_system_backup "$@"
     ;;
   status)
     status_db

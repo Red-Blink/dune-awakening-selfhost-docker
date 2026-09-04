@@ -656,6 +656,15 @@ seed_repo_tree "$case10_root/work"
 cp "$bin_dir/docker" "$case10_root/altbin/docker"
 cat > "$case10_root/altbin/gpg" <<'EOF'
 #!/usr/bin/env bash
+# backup_system probes for AEAD support before it does any work. This stub
+# simulates a failure DURING encryption, not an unusable gpg, so the probe
+# must succeed -- otherwise the run aborts at the preflight and this case
+# silently stops covering what it claims to.
+if [ "${1:-}" = "--dump-options" ]; then
+  printf '%s
+' --aead-algo
+  exit 0
+fi
 echo "gpg: simulated disk-full failure (ENOSPC) during encryption" >&2
 exit 1
 EOF
@@ -695,3 +704,342 @@ if [ -n "$case10_leaked_gnupg_home" ]; then
   exit 1
 fi
 echo "PASS disk-full-during-encryption-cleans-up"
+
+# =========================================================================
+# restore-system cases.
+#
+# Every case below builds a real archive with backup-system first, so what
+# is restored is what this script actually produced -- not a fixture that
+# can drift away from the writer.
+#
+# Each case gets its own TMPDIR. restore_system stages plaintext through
+# mktemp, and a leftover from one case must never be able to satisfy or
+# contaminate another case's leak check.
+# =========================================================================
+
+# Builds a work tree with one archive in it. Echoes the archive path.
+make_restorable_archive() {
+  local root="$1"
+  mkdir -p "$root/work"
+  seed_repo_tree "$root/work"
+  (
+    cd "$root/work"
+    PATH="$bin_dir:$PATH" DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" \
+      bash runtime/scripts/db.sh backup-system
+  ) > "$root/backup.log" 2>&1
+  find "$root/work/runtime/backups/system" -maxdepth 1 -name '*.tar.gz.enc' | head -n1
+}
+
+# Replaces the seeded state so a restore has something to visibly undo.
+diverge_host_state() {
+  local work="$1"
+  printf 'SERVER_TITLE="Diverged Server"\nADMIN_PASSWORD=diverged-pw\n' > "$work/.env"
+  printf 'diverged-token\n' > "$work/runtime/secrets/funcom-token.txt"
+  printf '{"sietches":[{"password": "diverged-sietch"}]}\n' > "$work/runtime/generated/sietch-config.json"
+}
+
+# usage: run_restore <root> <tmpdir> <passphrase> [args...]
+run_restore() {
+  local root="$1" tmp="$2" passphrase="$3"
+  shift 3
+  mkdir -p "$tmp"
+  local status=0
+  (
+    cd "$root/work"
+    PATH="$bin_dir:$PATH" TMPDIR="$tmp" \
+      DUNE_SYSTEM_BACKUP_PASSPHRASE="$passphrase" DUNE_DB_ASSUME_YES=1 \
+      bash runtime/scripts/db.sh restore-system "$@"
+  ) > "$root/restore.log" 2>&1 || status=$?
+  return "$status"
+}
+
+# Any file under a case's TMPDIR holding a real secret is a leak.
+assert_no_plaintext_leak() {
+  local label="$1" tmp="$2"
+  if grep -rqs -e "$SECRET_FUNCOM_TOKEN" -e "$SECRET_ADMIN_PASSWORD" "$tmp" 2>/dev/null; then
+    echo "FAIL $label: decrypted plaintext was left behind under $tmp"
+    grep -rls -e "$SECRET_FUNCOM_TOKEN" -e "$SECRET_ADMIN_PASSWORD" "$tmp" 2>/dev/null
+    exit 1
+  fi
+}
+
+# --- Case 11: full restore round-trip ------------------------------------
+
+case11_root="$test_root/case11"
+mkdir -p "$case11_root"
+case11_archive="$(make_restorable_archive "$case11_root")"
+if [ -z "$case11_archive" ]; then
+  echo "FAIL restore-round-trip: could not build an archive to restore"
+  cat "$case11_root/backup.log"
+  exit 1
+fi
+diverge_host_state "$case11_root/work"
+
+set +e
+run_restore "$case11_root" "$case11_root/tmp" "$TEST_PASSPHRASE" "$case11_archive"
+case11_exit=$?
+set -e
+
+if [ "$case11_exit" -ne 0 ]; then
+  echo "FAIL restore-round-trip: expected exit 0, got $case11_exit"
+  cat "$case11_root/restore.log"
+  exit 1
+fi
+if ! grep -q "$SECRET_ADMIN_PASSWORD" "$case11_root/work/.env"; then
+  echo "FAIL restore-round-trip: .env was not restored"
+  exit 1
+fi
+if ! grep -q "$SECRET_FUNCOM_TOKEN" "$case11_root/work/runtime/secrets/funcom-token.txt"; then
+  echo "FAIL restore-round-trip: the Funcom token was not restored"
+  exit 1
+fi
+if ! grep -q "$SECRET_SIETCH_PASSWORD" "$case11_root/work/runtime/generated/sietch-config.json"; then
+  echo "FAIL restore-round-trip: runtime/generated was not restored"
+  exit 1
+fi
+case11_secret_mode="$(stat -c '%a' "$case11_root/work/runtime/secrets/funcom-token.txt")"
+if [ "$case11_secret_mode" != "600" ]; then
+  echo "FAIL restore-round-trip: expected restored secret mode 600, got $case11_secret_mode"
+  exit 1
+fi
+# The safety copy must hold what was replaced, not what replaced it --
+# otherwise it is worthless as an undo.
+case11_safety="$(find "$case11_root/work/runtime/backups" -maxdepth 1 -type d -name 'restore-*' | head -n1)"
+if [ -z "$case11_safety" ]; then
+  echo "FAIL restore-round-trip: no safety copy directory was created"
+  exit 1
+fi
+if ! grep -q "diverged-pw" "$case11_safety/env" 2>/dev/null; then
+  echo "FAIL restore-round-trip: the safety copy does not contain the replaced .env"
+  exit 1
+fi
+if ! grep -qi "dune restart" "$case11_root/restore.log"; then
+  echo "FAIL restore-round-trip: the required restart was never stated"
+  exit 1
+fi
+assert_no_plaintext_leak restore-round-trip "$case11_root/tmp"
+echo "PASS restore-round-trip"
+
+# --- Case 12: --dry-run must change nothing ------------------------------
+
+case12_root="$test_root/case12"
+mkdir -p "$case12_root"
+case12_archive="$(make_restorable_archive "$case12_root")"
+diverge_host_state "$case12_root/work"
+
+set +e
+run_restore "$case12_root" "$case12_root/tmp" "$TEST_PASSPHRASE" "$case12_archive" --dry-run
+case12_exit=$?
+set -e
+
+if [ "$case12_exit" -ne 0 ]; then
+  echo "FAIL restore-dry-run-changes-nothing: expected exit 0, got $case12_exit"
+  cat "$case12_root/restore.log"
+  exit 1
+fi
+if ! grep -qi "dry run" "$case12_root/restore.log"; then
+  echo "FAIL restore-dry-run-changes-nothing: the run never reported itself as a dry run"
+  exit 1
+fi
+if ! grep -q "diverged-pw" "$case12_root/work/.env"; then
+  echo "FAIL restore-dry-run-changes-nothing: .env was modified by a dry run"
+  exit 1
+fi
+if ! grep -q "diverged-token" "$case12_root/work/runtime/secrets/funcom-token.txt"; then
+  echo "FAIL restore-dry-run-changes-nothing: secrets were modified by a dry run"
+  exit 1
+fi
+if find "$case12_root/work/runtime/backups" -maxdepth 1 -type d -name 'restore-*' | grep -q .; then
+  echo "FAIL restore-dry-run-changes-nothing: a dry run created a safety copy"
+  exit 1
+fi
+assert_no_plaintext_leak restore-dry-run-changes-nothing "$case12_root/tmp"
+echo "PASS restore-dry-run-changes-nothing"
+
+# --- Case 13: the wrong passphrase must refuse and change nothing --------
+
+case13_root="$test_root/case13"
+mkdir -p "$case13_root"
+case13_archive="$(make_restorable_archive "$case13_root")"
+diverge_host_state "$case13_root/work"
+
+set +e
+run_restore "$case13_root" "$case13_root/tmp" "wrong-passphrase-entirely" "$case13_archive"
+case13_exit=$?
+set -e
+
+if [ "$case13_exit" -eq 0 ]; then
+  echo "FAIL restore-wrong-passphrase-refuses: expected a non-zero exit"
+  cat "$case13_root/restore.log"
+  exit 1
+fi
+if ! grep -qi "could not be decrypted" "$case13_root/restore.log"; then
+  echo "FAIL restore-wrong-passphrase-refuses: no clear rejection message was printed"
+  cat "$case13_root/restore.log"
+  exit 1
+fi
+if ! grep -q "diverged-pw" "$case13_root/work/.env"; then
+  echo "FAIL restore-wrong-passphrase-refuses: .env was modified despite the failure"
+  exit 1
+fi
+assert_no_plaintext_leak restore-wrong-passphrase-refuses "$case13_root/tmp"
+echo "PASS restore-wrong-passphrase-refuses"
+
+# --- Case 14: a tampered archive must refuse and change nothing ----------
+
+case14_root="$test_root/case14"
+mkdir -p "$case14_root"
+case14_archive="$(make_restorable_archive "$case14_root")"
+diverge_host_state "$case14_root/work"
+# AEAD verifies at the END of the stream, so this also proves the restore
+# never acts on a body that decrypted before the tag was checked.
+printf '\377' | dd of="$case14_archive" bs=1 seek=900 conv=notrunc status=none
+
+set +e
+run_restore "$case14_root" "$case14_root/tmp" "$TEST_PASSPHRASE" "$case14_archive"
+case14_exit=$?
+set -e
+
+if [ "$case14_exit" -eq 0 ]; then
+  echo "FAIL restore-tampered-archive-refuses: a tampered archive was accepted"
+  cat "$case14_root/restore.log"
+  exit 1
+fi
+if ! grep -q "diverged-pw" "$case14_root/work/.env"; then
+  echo "FAIL restore-tampered-archive-refuses: .env was modified from a tampered archive"
+  exit 1
+fi
+assert_no_plaintext_leak restore-tampered-archive-refuses "$case14_root/tmp"
+echo "PASS restore-tampered-archive-refuses"
+
+# --- Case 15: the member allow-list --------------------------------------
+# A correctly-encrypted archive is still only allowed to carry the members
+# backup_system writes. Encryption proves who wrote it, not what is inside.
+
+case15_root="$test_root/case15"
+mkdir -p "$case15_root/work"
+seed_repo_tree "$case15_root/work"
+case15_gnupg="$case15_root/gnupg"
+mkdir -p "$case15_gnupg"
+chmod 700 "$case15_gnupg"
+
+# Encrypts a staged tree exactly the way backup_system does.
+seal_tree() {
+  local tree="$1" out="$2"
+  tar -C "$tree" -czf "$tree.tgz" ./
+  printf '%s' "$TEST_PASSPHRASE" \
+    | GNUPGHOME="$case15_gnupg" gpg --batch --yes --pinentry-mode loopback \
+        --passphrase-fd 0 --s2k-digest-algo SHA256 --symmetric \
+        --cipher-algo AES256 --aead-algo OCB --force-aead \
+        -o "$out" "$tree.tgz" 2>/dev/null
+}
+
+case15_check() {
+  local label="$1" tree="$2" expect="$3"
+  local archive="$case15_root/$label.tar.gz.enc"
+  seal_tree "$tree" "$archive"
+  local status=0
+  run_restore "$case15_root" "$case15_root/tmp-$label" "$TEST_PASSPHRASE" "$archive" || status=$?
+  if [ "$status" -eq 0 ]; then
+    echo "FAIL restore-refuses-unexpected-members: $label was accepted"
+    cat "$case15_root/restore.log"
+    exit 1
+  fi
+  if ! grep -qi "$expect" "$case15_root/restore.log"; then
+    echo "FAIL restore-refuses-unexpected-members: $label was refused without saying why (wanted: $expect)"
+    cat "$case15_root/restore.log"
+    exit 1
+  fi
+  assert_no_plaintext_leak restore-refuses-unexpected-members "$case15_root/tmp-$label"
+}
+
+# An audit log is the destination host's own forensic record; transplanting
+# one would destroy the record of the restore itself.
+case15_audit="$case15_root/tree-audit"
+mkdir -p "$case15_audit/db" "$case15_audit/generated"
+printf 'x\n' > "$case15_audit/env"
+printf 'dump\n' > "$case15_audit/db/test.backup"
+printf '{}\n' > "$case15_audit/generated/web-admin-audit.jsonl"
+case15_check audit-log "$case15_audit" "audit log"
+
+# Anything outside the members backup_system writes.
+case15_extra="$case15_root/tree-extra"
+mkdir -p "$case15_extra/db" "$case15_extra/oops"
+printf 'x\n' > "$case15_extra/env"
+printf 'dump\n' > "$case15_extra/db/test.backup"
+printf 'payload\n' > "$case15_extra/oops/file"
+case15_check unexpected-member "$case15_extra" "unexpected member"
+
+# A name carrying .. never reaches the extract, however it got there.
+case15_dots="$case15_root/tree-dots"
+mkdir -p "$case15_dots/db" "$case15_dots/generated"
+printf 'x\n' > "$case15_dots/env"
+printf 'dump\n' > "$case15_dots/db/test.backup"
+printf 'payload\n' > "$case15_dots/generated/..evil"
+case15_check traversal "$case15_dots" "unsafe member"
+
+echo "PASS restore-refuses-unexpected-members"
+
+# --- Case 16: a SIGTERM mid-restore leaves no plaintext behind -----------
+# The staging tree holds the decrypted .env and every secret, so an external
+# kill must not be able to strand it on disk.
+#
+# The signal is delivered during the database restore, not during decryption.
+# What gpg writes is still a gzipped tar -- nothing readable is on disk yet,
+# so a kill there would prove nothing. By the time import_db runs, the tree is
+# fully extracted and every secret is sitting in the clear.
+
+case16_root="$test_root/case16"
+mkdir -p "$case16_root"
+case16_archive="$(make_restorable_archive "$case16_root")"
+mkdir -p "$case16_root/altbin" "$case16_root/tmp"
+
+# Behaves like the shared mock up to the point the restore reaches the
+# database, then stalls so the signal lands with the tree extracted.
+cat > "$case16_root/altbin/docker" <<'STUB'
+#!/usr/bin/env bash
+case "${1:-} ${2:-}" in
+  "ps --format") printf '%s\n' dune-postgres ;;
+  *) sleep 30 ;;
+esac
+STUB
+chmod +x "$case16_root/altbin/docker"
+
+(
+  cd "$case16_root/work"
+  PATH="$case16_root/altbin:$bin_dir:$PATH" TMPDIR="$case16_root/tmp" \
+    DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" DUNE_DB_ASSUME_YES=1 \
+    bash runtime/scripts/db.sh restore-system "$case16_archive"
+) > "$case16_root/restore.log" 2>&1 &
+case16_pid=$!
+
+# Wait for the extracted secret to actually appear before signalling, rather
+# than racing a fixed sleep against it.
+case16_ready=0
+for _ in $(seq 1 200); do
+  if grep -rqs "$SECRET_FUNCOM_TOKEN" "$case16_root/tmp" 2>/dev/null; then
+    case16_ready=1
+    break
+  fi
+  sleep 0.1
+done
+if [ "$case16_ready" -ne 1 ]; then
+  kill -TERM "$case16_pid" 2>/dev/null || true
+  pkill -TERM -P "$case16_pid" 2>/dev/null || true
+  wait "$case16_pid" 2>/dev/null || true
+  echo "FAIL restore-sigterm-leaves-no-plaintext: the staged plaintext never appeared, so a signal here would prove nothing"
+  cat "$case16_root/restore.log"
+  exit 1
+fi
+
+kill -TERM "$case16_pid" 2>/dev/null || true
+pkill -TERM -P "$case16_pid" 2>/dev/null || true
+wait "$case16_pid" 2>/dev/null || true
+# The trap runs once bash regains control from the stalled child.
+for _ in $(seq 1 100); do
+  grep -rqs "$SECRET_FUNCOM_TOKEN" "$case16_root/tmp" 2>/dev/null || break
+  sleep 0.1
+done
+
+assert_no_plaintext_leak restore-sigterm-leaves-no-plaintext "$case16_root/tmp"
+echo "PASS restore-sigterm-leaves-no-plaintext"

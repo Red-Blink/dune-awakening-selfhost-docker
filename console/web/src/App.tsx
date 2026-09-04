@@ -158,6 +158,31 @@ function chooseBackupIdentity(meta: { backup: string; currentBattlegroupId: stri
   });
 }
 
+type SystemImportConflictChoice = "overwrite" | "rename" | "cancel";
+
+// Rename is the confirm (primary) action and overwrite the tertiary: the safe
+// answer should be the one an operator reaches for without reading, because the
+// dangerous one destroys the only copy of the credentials already stored.
+function chooseImportConflict(existing: string): Promise<SystemImportConflictChoice> {
+  return new Promise((resolve) => {
+    if (!openConfirmDialog) {
+      resolve("cancel");
+      return;
+    }
+    openConfirmDialog({
+      title: "Backup Already Exists",
+      message: "A system backup with that name is already stored on this host. Keep both by storing the upload under a new name, or replace the stored one.",
+      confirmLabel: "Keep Both",
+      tertiaryLabel: "Overwrite",
+      cancelLabel: "Cancel Import",
+      danger: true,
+      warning: "Overwriting destroys the only copy of the credentials inside the stored archive. There is no undo and no other copy on this host.",
+      details: [{ label: "Already stored", value: existing, tone: "accent" }],
+      resolve: (outcome) => resolve(outcome === "confirm" ? "rename" : outcome === "tertiary" ? "overwrite" : "cancel")
+    });
+  });
+}
+
 // The single confirmation dialog for a gated restart. Always shown (it is the
 // sole confirm for the action): when the queue is off, or on with nobody
 // online, it is a plain confirm that the restart runs now; when the queue is on
@@ -835,6 +860,7 @@ export function App() {
             onError={setError}
             confirmAction={confirmDialog}
             chooseBackupIdentity={chooseBackupIdentity}
+            chooseImportConflict={chooseImportConflict}
             waitForTask={waitForTaskSilently}
             waitForTaskWithUpdates={waitForTaskWithUpdates}
             withTimeout={withTimeout}

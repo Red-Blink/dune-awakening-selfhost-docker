@@ -117,10 +117,18 @@ When the Restart Queue is enabled, the restart routes above (`/api/server/restar
 | GET | `/api/backups` | List all backups | None |
 | POST | `/api/backups/create` | Create new backup | None |
 | POST | `/api/backups/restore` | Restore from backup | `backup` (string, filename) |
-| GET | `/api/backups/{backup}/download` | Download backup archive | `backup` (string) |
+| GET | `/api/backups/{backup}/download` | Download backup archive (dump + metadata) | `backup` (string) |
 | DELETE | `/api/backups/{backup}` | Delete backup | `backup` (string) |
 | POST | `/api/backups/delete-all` | Delete all backups | None |
 | POST | `/api/backups/import-external` | Import external backup | multipart form: `backup`, `metadata` |
+| GET | `/api/backups/system` | List encrypted system backups (archive + non-secret sidecar fields) | None |
+| POST | `/api/backups/system/create` | Create an encrypted system backup (database + `.env` + `runtime/generated` + `runtime/secrets`). Requires `backups:create-system` | `passphrase` (string, 12-1024 chars) |
+| POST | `/api/backups/system/import` | Upload a system backup: the `.tar` the download produces, or a bare `.tar.gz.enc`. Body is the file itself, streamed to disk. Requires `backups:import-system` | `filename` (query), `onConflict` (query: `overwrite` or `rename`) |
+| GET | `/api/backups/system/{name}/download` | Download a system backup as one uncompressed `.tar` holding the encrypted archive and its `.yaml` sidecar. Add `?raw=1` for the bare archive, or name the sidecar directly to fetch it alone. Streamed, never buffered. Requires `backups:download-system` | `name` (string), `raw` (optional) |
+| DELETE | `/api/backups/system/{name}` | Delete a system backup and its `.yaml` sidecar. Requires `backups:delete-system` | `name` (string) |
+| POST | `/api/backups/system/delete-selected` | Delete the named system backups. Requires `backups:delete-system` | `backups` (string array) |
+| POST | `/api/backups/system/delete-all` | Delete every system backup. Requires `backups:delete-system` | None |
+| POST | `/api/backups/system/{name}/restore` | Restore a system backup: database, `.env`, `runtime/generated`, `runtime/secrets`. Dry run unless `apply` is set. Does not restart the stack. Requires `backups:restore-system` | `name` (string), `passphrase` (12-1024 chars), `apply` (optional), `identityMode` (optional: `adopt-backup` or `keep-current`) |
 | GET | `/api/backups/auto` | Get auto-backup status | None |
 | POST | `/api/backups/auto` | Save auto-backup config | `enabled`, `time`, `retentionDays`, `intervalHours` |
 
