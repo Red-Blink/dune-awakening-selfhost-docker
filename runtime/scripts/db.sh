@@ -162,6 +162,71 @@ require_postgres() {
   fi
 }
 
+postgres_is_running() {
+  docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dune-postgres
+}
+
+# Brings dune-postgres up for the operations that genuinely need it: backup and
+# restore. Stopping the battlegroup does not stop Postgres, it REMOVES it
+# (every teardown in this repo is `docker rm -f`, never `docker stop`), so on a
+# stopped stack there is no container at all -- only the dune-postgres-data
+# volume -- and `dune db backup`, `backup-system` and `restore-system` all
+# failed outright, including from the console's own buttons.
+#
+# Deliberately separate from require_postgres(), which stays a pure check:
+# status_db/health_db must report reality, not change it by being asked.
+#
+# The already-running early return is a SAFETY requirement, not an
+# optimization. start-postgres.sh opens with `docker rm -f dune-postgres`, so
+# calling it against a live database destroys it -- in backup_db's case, in the
+# middle of the dump it was called to enable.
+#
+# Never stops Postgres again afterward. A backup that tidied up behind itself
+# would race an operator starting the stack while it ran and `rm -f` the
+# database out from under them; the operator's own `dune stop` is the thing
+# that stops Postgres.
+#
+# manual-stop.env is deliberately not consulted: that lock exists to stop an
+# UNATTENDED respawn of the game stack (start-all.sh, update.sh,
+# coriolis-coordinator.sh, restart-game-farm.sh all honour it), not to veto a
+# single operation an operator explicitly asked for. start-postgres.sh does not
+# consult it either.
+ensure_postgres_running() {
+  postgres_is_running && return 0
+
+  if [ "${DUNE_DB_AUTOSTART_POSTGRES:-1}" != "1" ]; then
+    echo "dune-postgres is not running, and DUNE_DB_AUTOSTART_POSTGRES is off." >&2
+    return 1
+  fi
+
+  # An existing-but-stopped container is a state nothing in this repo currently
+  # produces, but `docker start` is the cheap correct answer if one appears --
+  # and it must be tried before start-postgres.sh, whose `rm -f` would discard
+  # a container that only needed starting.
+  if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx dune-postgres; then
+    echo "Starting the existing dune-postgres container..."
+    docker start dune-postgres >/dev/null 2>&1 || true
+  else
+    echo "dune-postgres is not running. Starting it..."
+    if [ ! -f runtime/scripts/start-postgres.sh ]; then
+      echo "Cannot start Postgres: runtime/scripts/start-postgres.sh is missing." >&2
+      return 1
+    fi
+    bash runtime/scripts/start-postgres.sh || true
+  fi
+
+  # Confirmed, not assumed: start-postgres.sh waits on pg_isready itself, but
+  # the caller is about to dump or restore a database and a wrong answer here
+  # is the difference between a clear message and a confusing mid-operation
+  # failure.
+  if ! postgres_is_running; then
+    echo "dune-postgres did not come up. Start the stack and try again." >&2
+    return 1
+  fi
+  echo "Postgres is running. It is left running after this operation."
+  return 0
+}
+
 config_value() {
   local file="$1"
   local key="$2"
@@ -630,7 +695,7 @@ backup_db() {
   else
     echo "WARNING: Battlegroup identity validation is unavailable; backup metadata may record an unknown ID." >&2
   fi
-  require_postgres
+  ensure_postgres_running || exit 1
   mkdir -p "$out_dir"
 
   ts="$(date +%Y%m%d-%H%M%S)"
@@ -941,7 +1006,7 @@ backup_system() {
 
   passphrase="$(resolve_system_backup_passphrase)" || return 1
 
-  require_postgres
+  ensure_postgres_running || exit 1
   mkdir -p "$out_dir"
   chmod 700 "$out_dir" 2>/dev/null || true
 
@@ -1490,6 +1555,17 @@ restore_system() {
   # decided -- a stricter placement than Battlegroup identity gets, which only
   # resolves once already inside import_db.
   if ! choose_system_restore_audit_log_action "$archive_has_audit_log" "$host_has_audit_log" "$audit_log_requested"; then
+    restore_system_cleanup
+    return 1
+  fi
+
+  # Before the safety copy, not inside import_db. import_db checks too, and
+  # that check is what actually gates the restore, but reaching it means a
+  # safety copy has already been written for a restore that cannot proceed --
+  # which is exactly what a stopped battlegroup produced: "dune-postgres is not
+  # running" arriving after runtime/backups/restore-* existed. A dry run never
+  # gets here, so previewing an archive still needs no database at all.
+  if ! ensure_postgres_running; then
     restore_system_cleanup
     return 1
   fi
@@ -2527,7 +2603,7 @@ import_db() {
       ;;
   esac
 
-  require_postgres
+  ensure_postgres_running || exit 1
 
   case "$backup_file" in
     *.backup|*.dump)
