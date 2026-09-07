@@ -4,8 +4,13 @@ import { PreflightCheckCard } from "./PreflightCheckCard";
 import { SecretInput } from "./SecretInput";
 import { TaskProgress } from "./TaskProgress";
 import { getServerPorts, getAdminPort } from "../api/serverPorts";
+import { backupsApi } from "../api/backups";
+import { serverApi } from "../api/server";
+import { updatesApi } from "../api/updates";
+import { apiUpload } from "../api/client";
 
-type StepId = "welcome" | "host" | "docker" | "runtime" | "identity" | "token" | "ports" | "review" | "install" | "finish";
+type StepId = "welcome" | "host" | "docker" | "runtime" | "identity" | "token" | "ports" | "review" | "install" | "archive" | "passphrase" | "restore" | "finish";
+type SetupPath = "deploy" | "restore";
 const firstRunSteps: { id: StepId; label: string }[] = [
   { id: "welcome", label: "Welcome" },
   { id: "host", label: "Host Check" },
@@ -25,6 +30,24 @@ const redeploySteps: { id: StepId; label: string }[] = [
   { id: "install", label: "Install" },
   { id: "finish", label: "Finish" }
 ];
+// The restore path shares the informational steps and then diverges: identity,
+// token, ports and review all collect things the archive already carries, so
+// asking for them would mean typing values the restore overwrites minutes later.
+const restoreSteps: { id: StepId; label: string }[] = [
+  { id: "welcome", label: "Welcome" },
+  { id: "host", label: "Host Check" },
+  { id: "docker", label: "Docker Setup" },
+  { id: "runtime", label: "Runtime Location" },
+  { id: "archive", label: "Backup Archive" },
+  { id: "passphrase", label: "Passphrase" },
+  { id: "restore", label: "Restore" },
+  { id: "finish", label: "Finish" }
+];
+// Survives a reload so a refresh mid-restore comes back to the wizard rather
+// than to whichever screen the console decides to show. Deliberately holds no
+// passphrase: that is asked for again if the sequence has not reached apply.
+const RESTORE_PROGRESS_KEY = "arrakis.setupRestore";
+const restoreOperations = new Set(["updateInstallAssets", "backupSystemRestore"]);
 const regions = ["Europe", "North America", "South America", "Asia", "Oceania", "Africa"];
 type SetupConfig = { SERVER_TITLE: string; SERVER_REGION: string; SERVER_IP: string; SERVER_IP_MODE: string; HOST_DATACENTER_ID: string; STEAM_APP_ID: string };
 const terminalStatuses = new Set(["succeeded", "failed", "cancelled"]);
@@ -36,7 +59,8 @@ export const DATACENTER_ID_GUIDANCE = "Recommended for server-browser ping: ente
 export const DIRECT_LISTING_PING_GUIDANCE = "To let DuneDocker.app measure your server directly, allow or forward UDP 32000–32015 to this Docker host through the host firewall and any internet-to-DMZ firewall or router. This is optional: if the range is closed, the public listing automatically uses the ping relay instead.";
 
 export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy", onSetupComplete }: { initialStep?: number; jumpNonce?: number; mode?: "first-run" | "redeploy"; onSetupComplete?: () => void }) {
-  const steps = mode === "first-run" ? firstRunSteps : redeploySteps;
+  const [path, setPath] = useState<SetupPath>("deploy");
+  const steps = mode !== "first-run" ? redeploySteps : path === "restore" ? restoreSteps : firstRunSteps;
   // Real, resolved ports for this instance (see api/serverPorts.ts) --
   // never hardcode Instance-1 stock values here, they'll be wrong on
   // any deployment running non-default configured ports.
@@ -50,13 +74,28 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
   const [token, setToken] = useState("");
   const [existingToken, setExistingToken] = useState(false);
   const [config, setConfig] = useState<SetupConfig>(defaultSetupConfig);
+  const [archiveName, setArchiveName] = useState("");
+  const [archiveError, setArchiveError] = useState("");
+  const [uploadPercent, setUploadPercent] = useState(-1);
+  const [passphrase, setPassphrase] = useState("");
+  const [restoreStage, setRestoreStage] = useState("");
+  const [restoreError, setRestoreError] = useState("");
+  const [restoreDone, setRestoreDone] = useState(false);
   const onSetupCompleteRef = useRef(onSetupComplete);
+  // Set once a restore has been resumed, so the step clamp above stops steering.
+  const resumedRef = useRef(false);
 
   useEffect(() => {
     onSetupCompleteRef.current = onSetupComplete;
   }, [onSetupComplete]);
 
   useEffect(() => {
+    // Choosing the restore path changes steps.length, which re-fires this and
+    // would otherwise throw away the position a resumed restore just set.
+    if (resumedRef.current) {
+      setStep((current) => Math.min(current, steps.length - 1));
+      return;
+    }
     const next = Math.max(0, Math.min(initialStep, steps.length - 1));
     setStep(next);
     setMaxUnlockedStep((current) => Math.max(current, next));
@@ -76,6 +115,32 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
     let cancelled = false;
     setupApi.tasks().then(({ tasks }) => {
       if (cancelled) return;
+      // install-assets writes image-tags.env, which is enough for the server to
+      // call setup "complete" -- so a refresh mid-restore would otherwise land
+      // on the full console instead of back here. Resume the restore first.
+      const latestRestore = tasks.find((item) => restoreOperations.has(item.operation) && !terminalStatuses.has(item.status));
+      let storedRestore: { archive?: string; stage?: string } | null = null;
+      try {
+        storedRestore = JSON.parse(window.localStorage.getItem(RESTORE_PROGRESS_KEY) || "null");
+      } catch {
+        storedRestore = null;
+      }
+      if (latestRestore || storedRestore?.archive) {
+        resumedRef.current = true;
+        setPath("restore");
+        if (storedRestore?.archive) setArchiveName(storedRestore.archive);
+        const resumeStep = restoreSteps.findIndex((item) => item.id === (latestRestore ? "restore" : "passphrase"));
+        if (resumeStep >= 0) {
+          setStep(resumeStep);
+          setMaxUnlockedStep((current) => Math.max(current, resumeStep));
+        }
+        if (latestRestore) {
+          setTask(latestRestore);
+          setRestoreStage(storedRestore?.stage || "Restoring");
+          void watchTaskToEnd(latestRestore.id);
+        }
+        return;
+      }
       const latestInit = tasks.find((item) => item.operation === "init" && !terminalStatuses.has(item.status));
       if (!latestInit) return;
       setTask(latestInit);
@@ -122,6 +187,125 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
     void watchInitTask(result.task.id);
   }
 
+  // A Funcom database backup restores game data onto a server that already
+  // exists. It carries no .env, no credentials and no Battlegroup identity, so
+  // it cannot set a host up. The server refuses it by reading the archive's
+  // leading OpenPGP packet; this check exists only to say why, before a
+  // possibly large upload rather than after it.
+  function rejectReasonForArchive(file: File) {
+    if (/\.(backup|dump|sql)$/i.test(file.name)) {
+      return "That is a Funcom database backup, not a system backup. It restores game data onto a server that already exists, so it cannot set this host up. Look for dune-system-*.tar on the old server's Backups page, under System Backups (Encrypted).";
+    }
+    if (!/\.(tar|enc)$/i.test(file.name)) {
+      return "Expected the .tar downloaded from the old server's System Backups, or its .tar.gz.enc archive.";
+    }
+    return "";
+  }
+
+  async function uploadArchive(file: File) {
+    const reason = rejectReasonForArchive(file);
+    if (reason) {
+      setArchiveError(reason);
+      setArchiveName("");
+      return;
+    }
+    setArchiveError("");
+    setUploadPercent(0);
+    try {
+      // Always rename on a name collision: the first-run shell renders no
+      // confirm dialog, so there is nothing to ask the operator with.
+      const result = await apiUpload(backupsApi.importSystemUrl(file.name, "rename"), file, { onProgress: setUploadPercent });
+      if (result.status !== 200) {
+        setArchiveError(String(result.body.error || `Upload failed (${result.status}).`));
+        setArchiveName("");
+        return;
+      }
+      // The name to restore by is the one the server stored it under, not the
+      // one on this machine: import renames anything that does not match the
+      // dune-system-*.tar.gz.enc shape every later route validates, and a .tar
+      // bundle is unwrapped into that archive.
+      const stored = String(result.body.backup || "");
+      if (!stored) {
+        setArchiveError("The upload succeeded but the server did not name the stored archive.");
+        setArchiveName("");
+        return;
+      }
+      setArchiveName(stored);
+      persistRestoreProgress(stored, "uploaded");
+    } catch (error) {
+      setArchiveError(error instanceof Error ? error.message : String(error));
+      setArchiveName("");
+    } finally {
+      setUploadPercent(-1);
+    }
+  }
+
+  function persistRestoreProgress(archive: string, stage: string) {
+    try {
+      window.localStorage.setItem(RESTORE_PROGRESS_KEY, JSON.stringify({ archive, stage }));
+    } catch {
+      // A restore still works without a resume hint.
+    }
+  }
+
+  function clearRestoreProgress() {
+    try {
+      window.localStorage.removeItem(RESTORE_PROGRESS_KEY);
+    } catch {
+      // Nothing to clean up if storage is unavailable.
+    }
+  }
+
+  async function runRestoreTask(stage: string, start: () => Promise<{ task: Task }>) {
+    setRestoreStage(stage);
+    persistRestoreProgress(archiveName, stage);
+    const started = (await start()).task;
+    setTask(started);
+    const final = await watchTaskToEnd(started.id);
+    if (final.status !== "succeeded") {
+      throw new Error(final.errorMessage || `${stage} did not finish.`);
+    }
+    return final;
+  }
+
+  // Install game files, prove the passphrase, apply, then reload the console.
+  // The dry run is a step rather than an implementation detail: it is what
+  // stops a wrong passphrase reaching anything destructive.
+  async function runRestoreSequence() {
+    setRestoreError("");
+    try {
+      await runRestoreTask("Installing game files", () => updatesApi.installAssets());
+      await runRestoreTask("Checking the archive", () => backupsApi.restoreSystem(archiveName, { passphrase, apply: false }));
+      await runRestoreTask("Restoring", () => backupsApi.restoreSystem(archiveName, {
+        passphrase,
+        apply: true,
+        identityMode: "adopt-backup",
+        auditLogMode: "adopt-backup"
+      }));
+      setRestoreDone(true);
+      setRestoreStage("Restarting the console");
+      clearRestoreProgress();
+      await serverApi.reloadConsole().catch(() => undefined);
+      const finishStep = stepIndex("finish");
+      setMaxUnlockedStep((value) => Math.max(value, finishStep));
+      setStep(finishStep);
+    } catch (error) {
+      setRestoreError(error instanceof Error ? error.message : String(error));
+      setRestoreStage("");
+    }
+  }
+
+  async function watchTaskToEnd(taskId: string) {
+    let current = (await setupApi.task(taskId)).task;
+    setTask(current);
+    while (!terminalStatuses.has(current.status)) {
+      await new Promise((resolve) => window.setTimeout(resolve, 2500));
+      current = (await setupApi.task(current.id)).task;
+      setTask(current);
+    }
+    return current;
+  }
+
   async function watchInitTask(taskId: string) {
     let current = (await setupApi.task(taskId)).task;
     setTask(current);
@@ -144,6 +328,10 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
   const checksReady = checks.length > 0 && checks.every((check) => check.status !== "fail");
   const deploymentSucceeded = task?.status === "succeeded";
   const deploymentRunning = Boolean(task && !terminalStatuses.has(task.status));
+  // Mirrors the route's own rule, so a passphrase that cannot work never
+  // starts a multi-gigabyte install.
+  const passphraseReady = passphrase.length >= 12 && new Set(passphrase).size >= 5;
+  const restoreRunning = Boolean(restoreStage) && !restoreError;
   const stepReadyById: Record<StepId, boolean> = {
     welcome: true,
     host: checksReady,
@@ -154,6 +342,9 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
     ports: true,
     review: configReady && hasToken,
     install: deploymentSucceeded,
+    archive: Boolean(archiveName),
+    passphrase: passphraseReady,
+    restore: restoreDone,
     finish: true
   };
   const activeStep = steps[step]?.id || steps[0].id;
@@ -184,6 +375,46 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
             <li>Also possible: Docker Desktop on Windows/WSL2 or a virtual machine.</li>
             <li>You will need your Funcom self-host token and a server with enough CPU, memory, disk, and open game ports.</li>
           </ul>
+          {mode === "first-run" && <div className="setup-path-choice">
+            <h4>What should this host do?</h4>
+            <div className="setup-path-options">
+              <button type="button" className={`setup-path-option${path === "deploy" ? " selected" : ""}`} aria-pressed={path === "deploy"} onClick={() => setPath("deploy")}>
+                <strong>Deploy a new server</strong>
+                <span>Creates a fresh world and a new Battlegroup identity.</span>
+              </button>
+              <button type="button" className={`setup-path-option${path === "restore" ? " selected" : ""}`} aria-pressed={path === "restore"} onClick={() => setPath("restore")}>
+                <strong>Restore a Dune Docker system backup</strong>
+                <span>Moves an existing server here with its configuration, secrets and database. Encrypted archive named dune-system-*.tar.</span>
+              </button>
+            </div>
+          </div>}
+        </>}
+        {activeStep === "archive" && <>
+          <h2>Backup Archive</h2>
+          <p className="muted">The encrypted archive this console produced on the old server, downloaded from its Backups page.</p>
+          <p className="danger-note">A Funcom database backup (.backup) is a different thing and cannot be restored here: it holds the game database only, with no configuration and no credentials. Import one from Backups after setup finishes.</p>
+          <input type="file" accept=".tar,.enc,.gz" aria-label="System backup archive" disabled={uploadPercent >= 0} onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void uploadArchive(file);
+          }} />
+          {uploadPercent >= 0 && <p className="muted">Uploading... {uploadPercent}%</p>}
+          {archiveName && <p>Stored as <code>{archiveName}</code>. Nothing is applied until you confirm.</p>}
+          {archiveError && <p className="danger-note">{archiveError}</p>}
+        </>}
+        {activeStep === "passphrase" && <>
+          <h2>Passphrase</h2>
+          <p className="muted">The passphrase set when this archive was created. There is no way to open it without that passphrase.</p>
+          <SecretInput value={passphrase} onChange={(event) => setPassphrase(event.target.value)} placeholder="Archive passphrase" aria-label="Archive passphrase" />
+          {passphrase.length > 0 && !passphraseReady && <p className="danger-note">At least 12 characters and 5 different characters.</p>}
+        </>}
+        {activeStep === "restore" && <>
+          <h2>Restore</h2>
+          <p className="muted">Installs the game files this host is missing, checks the passphrase, then replaces this host's configuration, credentials and database with the archive's.</p>
+          <p className="danger-note">The archive's admin password replaces this one, so you may be asked to sign in again when the console restarts.</p>
+          {!restoreStage && !restoreDone && <button className="update-action" disabled={!archiveName || !passphraseReady} onClick={() => void runRestoreSequence()}>Start Restore</button>}
+          {restoreStage && <p>{restoreStage}...</p>}
+          {restoreError && <p className="danger-note">{restoreError}</p>}
+          {task && <TaskProgress task={task} />}
         </>}
         {activeStep === "host" && <>
           <h2>Host Check</h2>

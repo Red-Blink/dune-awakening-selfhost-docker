@@ -1392,6 +1392,16 @@ main { padding: 22px; min-width: 0; }
 .setup-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 14px; }
 .check-grid { margin-top: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
 .requirements { color: #d9c8aa; }
+.setup-path-choice { margin-top: 18px; }
+.setup-path-choice h4 { margin: 0 0 10px; }
+.setup-path-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+/* A choice, not a submit: these read as cards and the selected one is the only
+   thing the stepper acts on, so the border carries the state rather than a
+   filled background that would compete with the panel's own. */
+.setup-path-option { display: grid; gap: 6px; text-align: left; padding: 14px; height: auto; border: 1px solid #39332c; border-radius: 8px; background: rgba(0,0,0,.12); }
+.setup-path-option strong { color: #f1dfc1; }
+.setup-path-option span { color: #cbbb9c; font-size: 13px; line-height: 1.5; }
+.setup-path-option.selected { border-color: var(--accent); }
 .mini-output, .log-box, .command-preview {
   display: block;
   width: 100%;
