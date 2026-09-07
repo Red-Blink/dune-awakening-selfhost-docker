@@ -53,6 +53,7 @@ const restoreStageLabels: Record<RestoreStepId, string> = {
   assets: "Installing game files",
   verify: "Checking the archive",
   apply: "Restoring",
+  start: "Starting the Battlegroup",
   reload: "Restarting the console"
 };
 
@@ -109,6 +110,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
   const [restoreError, setRestoreError] = useState("");
   const [restoreDone, setRestoreDone] = useState(false);
   const [assetsSize, setAssetsSize] = useState("");
+  const [startWarning, setStartWarning] = useState("");
   const onSetupCompleteRef = useRef(onSetupComplete);
   // Set once a restore has been resumed, so the step clamp above stops steering.
   const resumedRef = useRef(false);
@@ -313,6 +315,15 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
         identityMode: "adopt-backup",
         auditLogMode: "adopt-backup"
       }));
+
+      // The restore is already done at this point, so a Battlegroup that will
+      // not come up is reported rather than thrown: it is recoverable from Home,
+      // and failing the whole restore over it would misdescribe what happened.
+      try {
+        await runRestoreTask("start", () => serverApi.start());
+      } catch (error) {
+        setStartWarning(error instanceof Error ? error.message : String(error));
+      }
       setRestoreStep("reload");
       setRestoreDone(true);
       clearRestoreProgress();
@@ -601,6 +612,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
             : mode === "first-run" ? "The server was installed successfully. The full console is ready to open." : "Setup completed successfully. The server has been redeployed and the full console is still available."}</p>
           {mode === "first-run" && <p className="success-note setup-success-countdown">{restoreDone ? "Restarting the console in " : "Opening the full console in "}<strong>{redirectCountdown ?? completionRedirectSeconds}</strong> seconds.</p>}
           {restoreDone && <p className="muted">The archive's admin password is now this host's, so you may be asked to sign in again.</p>}
+          {startWarning && <p className="danger-note">The Battlegroup did not start: {startWarning} Start it from Home once the console is back.</p>}
           <p className="muted">Game services can take several minutes to warm up, and the in-game browser can take a little longer to show the server.</p>
         </>}
         <div className="wizard-controls">

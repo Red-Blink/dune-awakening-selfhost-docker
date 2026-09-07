@@ -1,9 +1,9 @@
 import { Circle, CircleCheck, CircleX, LoaderCircle } from "lucide-react";
 
-export type RestoreStepId = "assets" | "verify" | "apply" | "reload";
+export type RestoreStepId = "assets" | "verify" | "apply" | "start" | "reload";
 export type RestoreStepState = "pending" | "active" | "done" | "failed";
 
-export const restoreStepOrder: RestoreStepId[] = ["assets", "verify", "apply", "reload"];
+export const restoreStepOrder: RestoreStepId[] = ["assets", "verify", "apply", "start", "reload"];
 
 // One label per state: an instruction while waiting, a report once done.
 const stepLabels: Record<RestoreStepId, Record<"pending" | "active" | "done", string>> = {
@@ -21,6 +21,11 @@ const stepLabels: Record<RestoreStepId, Record<"pending" | "active" | "done", st
     pending: "Restore database, config and secrets",
     active: "Restoring database, config and secrets",
     done: "Database, config and secrets restored"
+  },
+  start: {
+    pending: "Start the Battlegroup",
+    active: "Starting the Battlegroup",
+    done: "Battlegroup started"
   },
   reload: {
     pending: "Restart the console",

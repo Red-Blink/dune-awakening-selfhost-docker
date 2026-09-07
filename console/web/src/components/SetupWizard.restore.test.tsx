@@ -16,7 +16,7 @@ vi.mock("../api/backups", async (importOriginal) => {
   return { ...original, backupsApi: { ...original.backupsApi, restoreSystem: vi.fn(), importSystemUrl: vi.fn(original.backupsApi.importSystemUrl) } };
 });
 vi.mock("../api/updates", () => ({ updatesApi: { installAssets: vi.fn() } }));
-vi.mock("../api/server", () => ({ serverApi: { reloadConsole: vi.fn() } }));
+vi.mock("../api/server", () => ({ serverApi: { reloadConsole: vi.fn(), start: vi.fn() } }));
 vi.mock("../api/client", async (importOriginal) => {
   const original = await importOriginal<typeof import("../api/client")>();
   return { ...original, apiUpload: vi.fn() };
@@ -66,6 +66,7 @@ describe("setup wizard restore path", () => {
     vi.mocked(updatesApi.installAssets).mockResolvedValue({ task: done("assets") } as never);
     vi.mocked(backupsApi.restoreSystem).mockResolvedValue({ task: done("restore") } as never);
     vi.mocked(serverApi.reloadConsole).mockResolvedValue({ task: done("reload") } as never);
+    vi.mocked(serverApi.start).mockResolvedValue({ task: done("start") } as never);
     window.localStorage.clear();
   });
 
@@ -144,6 +145,7 @@ describe("setup wizard restore path", () => {
       order.push(options.apply ? "apply" : "dry-run");
       return { task: done("restore") } as never;
     });
+    vi.mocked(serverApi.start).mockImplementation(async () => { order.push("start"); return { task: done("start") } as never; });
     vi.mocked(serverApi.reloadConsole).mockImplementation(async () => { order.push("reload"); return { task: done("reload") } as never; });
 
     window.localStorage.setItem("arrakis.setupRestore", JSON.stringify({ archive: "dune-system-x.tar.gz.enc", stage: "uploaded" }));
@@ -156,7 +158,7 @@ describe("setup wizard restore path", () => {
     // The reload is deliberately not in this list: it is held behind the finish
     // screen's countdown, because restarting the console takes the page away
     // and that screen is the only confirmation the operator ever gets.
-    await waitFor(() => expect(order).toEqual(["install", "dry-run", "apply"]));
+    await waitFor(() => expect(order).toEqual(["install", "dry-run", "apply", "start"]));
     expect(await screen.findByText("Congratulations")).toBeTruthy();
     expect(screen.getByText(/Restarting the console in/)).toBeTruthy();
     expect(serverApi.reloadConsole).not.toHaveBeenCalled();
@@ -189,6 +191,21 @@ describe("setup wizard restore path", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("reports a Battlegroup that will not start without failing the restore", async () => {
+    // The restore is already applied by then. Failing the whole thing over the
+    // start would misdescribe what happened and hide that the data is in place.
+    vi.mocked(serverApi.start).mockRejectedValue(new Error("Docker refused to start dune-director."));
+    window.localStorage.setItem("arrakis.setupRestore", JSON.stringify({ archive: "dune-system-x.tar.gz.enc", stage: "uploaded" }));
+    renderWizard();
+    const field = await screen.findByLabelText("Archive passphrase");
+    fireEvent.change(field, { target: { value: "correct-horse-battery" } });
+    fireEvent.click(screen.getByText("Next"));
+    fireEvent.click(await screen.findByText("Start Restore"));
+
+    expect(await screen.findByText("Congratulations")).toBeTruthy();
+    expect(screen.getByText(/Docker refused to start dune-director/)).toBeTruthy();
   });
 
   it("comes back to the restore step after a reload mid-restore", async () => {
