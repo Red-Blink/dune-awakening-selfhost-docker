@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Task } from "../api/setup";
 import { TaskProgress } from "./TaskProgress";
 
@@ -109,5 +109,78 @@ describe("TaskProgress queued-write warnings", () => {
     expect(details?.className).not.toContain("technical-details ");
     expect(details?.hasAttribute("open")).toBe(false);
     expect(screen.getByText("Technical details")).toBeInTheDocument();
+  });
+});
+
+// jsdom has no EventSource, and a running task opens one for live updates --
+// the tests above only render terminal tasks, so this never came up before.
+class FakeEventSource {
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: (() => void) | null = null;
+  close() {}
+}
+vi.stubGlobal("EventSource", FakeEventSource);
+
+describe("game-file install progress", () => {
+  const ESC = String.fromCharCode(27);
+  function installTask(progressMessage: string, lines: string[]): Task {
+    return {
+      id: "assets-1",
+      type: "updates",
+      operation: "updateInstallAssets",
+      status: "running",
+      currentStep: "Running",
+      progressMessage,
+      logLines: lines.map((line) => ({ timestamp: "", stream: "stdout", line })),
+      warnings: [],
+      startedAt: "",
+      finishedAt: null,
+      exitCode: null,
+      errorMessage: null
+    } as Task;
+  }
+
+  it("names the operation instead of printing its identifier", () => {
+    render(<TaskProgress task={installTask("", [])} />);
+    // "UpdateInstallAssets" reached a real operator: an identifier is not a title.
+    expect(screen.queryByText(/UpdateInstallAssets/i)).toBeNull();
+    expect(screen.getByText(/Installing Game Files/i)).toBeTruthy();
+  });
+
+  it("shows the newest line that says something, not a bare colour reset", () => {
+    // SteamCMD ends each progress line with a reset, so the newest line is
+    // regularly nothing but an escape sequence.
+    const task = installTask(`${ESC}[0m`, [
+      "Update state (0x61) downloading, progress: 77.51 (4036245855 / 5207185480)",
+      `${ESC}[0m`
+    ]);
+    render(<TaskProgress task={task} />);
+    // It appears in the log too; what matters is that the status line itself
+    // carries it rather than being blank.
+    const matches = screen.getAllByText(/downloading, progress: 77\.51/);
+    expect(matches.some((element) => element.tagName !== "PRE")).toBe(true);
+  });
+
+  it("keeps escape sequences out of the visible text entirely", () => {
+    const task = installTask(`${ESC}[0m`, [`${ESC}[0m`, `${ESC}[0mConnecting anonymously to Steam Public...${ESC}[0m`]);
+    render(<TaskProgress task={task} />);
+    expect(document.body.textContent).not.toContain(ESC);
+    expect(document.body.textContent).not.toContain("[0m");
+  });
+
+  it("spaces out an operation nobody has named yet", () => {
+    // The two operations above have titles of their own, so they cannot prove
+    // the fallback. Any future operation lands here, and an identifier printed
+    // as a heading is what put "UpdateInstallAssets" in front of an operator.
+    const task = { ...installTask("", []), operation: "somethingNobodyNamedYet" } as Task;
+    render(<TaskProgress task={task} />);
+    expect(screen.queryByText(/somethingNobodyNamedYet/)).toBeNull();
+    expect(screen.getByText(/Something nobody named yet/i)).toBeTruthy();
+  });
+
+  it("titles a system restore too, since the wizard renders one", () => {
+    const task = { ...installTask("", []), operation: "backupSystemRestore" } as Task;
+    render(<TaskProgress task={task} />);
+    expect(screen.getByText(/Restoring System Backup/i)).toBeTruthy();
   });
 });
