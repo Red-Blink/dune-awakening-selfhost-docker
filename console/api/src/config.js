@@ -283,6 +283,12 @@ function repairRootOwnedHostState(repoRoot) {
     updateEnvFileValue(envPath, "DUNE_HOST_GID", String(owner.gid));
   }
 
+  // This list is hand-maintained and covers the paths a root-run console must
+  // hand back to the host user. It is deliberately NOT shared with any other
+  // enumeration of these trees: it must include the addon download/staging
+  // caches (which a backup would skip) and needs only two of the secrets. Note
+  // runtime/backups/system/ is included: backup_system creates and chmods it,
+  // but a root-run console creating it first would leave it root-owned.
   for (const path of [
     repoRoot,
     envPath,
@@ -326,7 +332,9 @@ function repairRootOwnedHostState(repoRoot) {
     resolve(repoRoot, "runtime/addons/staging"),
     resolve(repoRoot, "runtime/addons/state.json"),
     resolve(repoRoot, "runtime/secrets/funcom-token.txt"),
-    resolve(repoRoot, "runtime/secrets/public-directory.json")
+    resolve(repoRoot, "runtime/secrets/public-directory.json"),
+    resolve(repoRoot, "runtime/backups"),
+    resolve(repoRoot, "runtime/backups/system")
   ]) {
     try {
       if (existsSync(path)) chownSync(path, owner.uid, owner.gid);

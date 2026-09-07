@@ -1,4 +1,4 @@
-FROM node:20-bookworm AS web-build
+FROM node:20-trixie AS web-build
 WORKDIR /app/web
 COPY console/web/package.json ./
 COPY console/web/package-lock.json ./
@@ -7,7 +7,7 @@ COPY runtime/data/augment-compatibility.json /runtime/data/augment-compatibility
 COPY console/web ./
 RUN npm run build
 
-FROM node:20-bookworm
+FROM node:20-trixie
 LABEL io.github.red-blink.dune-selfhost.component="console"
 WORKDIR /app
 ENV NODE_ENV=production
@@ -17,9 +17,14 @@ ENV NODE_ENV=production
 # as standalone binaries to avoid pulling the heavy docker.io Debian package.
 # gnupg (gpg) is required by `dune db backup-system`'s authenticated
 # (AEAD/OCB) archive encryption when the backup is triggered from the
-# Web Console rather than a host shell -- confirmed this was NOT already
-# present in this image, which would make that command fail here even
-# though it worked on a real host with gnupg installed via install.sh.
+# Web Console rather than a host shell. The VERSION is what matters, not
+# just the package: --aead-algo landed in GnuPG 2.3, and bookworm caps at
+# 2.2.40, which rejects the flag outright -- so this image could install
+# gnupg and still fail every system backup, after dumping the whole
+# database. bookworm-backports carries the same 2.2.40, so the base is
+# trixie (Debian 13), whose gnupg 2.4.7 supports it. db.sh preflights the
+# capability and refuses to downgrade to an unauthenticated cipher, so an
+# older base fails loudly rather than silently weakening the archive.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         iproute2 \

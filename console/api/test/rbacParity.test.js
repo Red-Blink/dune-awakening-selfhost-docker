@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { actionForRoute, ROUTE_ACTIONS, REGEX_ACTIONS, REGEX_ACTIONS_BY_METHOD, REGEX_ACTIONS_BY_METHOD_PATTERN } from "../src/actions.js";
+import { EXTRA_READ_ACTIONS, isReadAction } from "../src/apiKeyScopes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const serverSrc = readFileSync(join(__dirname, "../src/server.js"), "utf8");
@@ -82,13 +83,13 @@ function methodsToCheck(route) {
   return ALL_METHODS;
 }
 
-function isCovered(route) {
-  // Discord adapter routes are handled separately, outside the IAM model
-  const DISCORD_PREFIX = "/api/integrations/discord/";
-  if (route.path.startsWith(DISCORD_PREFIX)) return true;
+// Discord adapter routes are handled separately, outside the IAM model.
+const DISCORD_PREFIX = "/api/integrations/discord/";
+// Public routes return null from actionForRoute — those are expected.
+const PUBLIC_EXACT = ["/api/health", "/api/auth/state", "/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/auth/characters", "/api/auth/discord/start", "/api/auth/discord/callback", "/api/auth/discord/exchange"];
 
-  // Public routes return null from actionForRoute — those are expected
-  const PUBLIC_EXACT = ["/api/health", "/api/auth/state", "/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/auth/characters", "/api/auth/discord/start", "/api/auth/discord/callback", "/api/auth/discord/exchange"];
+function isCovered(route) {
+  if (route.path.startsWith(DISCORD_PREFIX)) return true;
   if (PUBLIC_EXACT.includes(route.path)) return true;
 
   for (const method of methodsToCheck(route)) {
@@ -248,4 +249,40 @@ test("parity: vehicle cargo deletes resolve to their own actions, not the read-o
 
 test("parity: GET vehicle pending-deletes resolves to vehicles:read", () => {
   assert.equal(actionForRoute("/api/vehicles/pending-deletes", "GET"), "vehicles:read");
+});
+
+// The generalization of the bespoke "not the read-only fallback" guards above.
+// Each of those was written after a mutating route silently landed on a read
+// action -- vehicles:read for an ownership transfer, backups:read for a route
+// that writes .env and runtime/secrets. Asserting a route resolves to a
+// NON-NULL action, which is all the parity test above does, cannot catch that:
+// the wrong action is still an action. This asserts the shape.
+const MUTATING_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
+
+// POST-shaped but genuinely read-only. Keep this tiny and justify every entry.
+//   POST /api/settings/iam/policy/test -- a policy simulator: it calls
+//   evaluate() and returns a boolean. It writes nothing. It is not in
+//   EXTRA_READ_ACTIONS because `settings` is denied to API keys outright, so
+//   it never appears in the key scope catalog that set describes.
+const READ_SHAPED_MUTATIONS = new Set(["POST /api/settings/iam/policy/test"]);
+
+test("parity: no mutating route resolves to a read-shaped action", () => {
+  const routes = extractRoutes(serverSrc).filter((route) => MUTATING_METHODS.includes(route.method));
+  assert.ok(routes.length > 50, `Expected >50 mutating routes, found ${routes.length}`);
+
+  const offenders = [];
+  for (const route of routes) {
+    if (route.path.startsWith(DISCORD_PREFIX)) continue;
+    if (PUBLIC_EXACT.includes(route.path)) continue;
+    if (READ_SHAPED_MUTATIONS.has(`${route.method} ${route.path}`)) continue;
+
+    const action = actionForRoute(route.path, route.method);
+    // A null action is the parity test's business, not this one.
+    if (!action) continue;
+    if (isReadAction(action) && !EXTRA_READ_ACTIONS.has(action)) {
+      offenders.push(`${route.method} ${route.path} -> ${action}`);
+    }
+  }
+
+  assert.deepEqual(offenders, [], `mutating route(s) authorizing under a read action: ${offenders.join(", ")}`);
 });

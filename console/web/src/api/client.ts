@@ -38,6 +38,52 @@ export async function apiDownload(path: string, options: RequestInit = {}, csrfR
   return response;
 }
 
+// Uploads with progress. fetch cannot report upload progress at all, so this is
+// XHR -- but it lives here rather than in a panel so it inherits the same CSRF
+// header, cookie handling and session-expiry behaviour as every other mutating
+// request. Doing it by hand in the panel is what made the first attempt fail
+// with "login session expired": a raw XHR sends neither.
+export async function apiUpload(
+  path: string,
+  body: Blob,
+  options: { onProgress?: (percent: number) => void; contentType?: string } = {},
+  csrfRetried = false
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  const result = await new Promise<{ status: number; body: Record<string, unknown> }>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", path);
+    request.withCredentials = true;
+    request.setRequestHeader("content-type", options.contentType || "application/octet-stream");
+    if (csrfToken) request.setRequestHeader("x-csrf-token", csrfToken);
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) options.onProgress?.(Math.round((event.loaded / event.total) * 100));
+    };
+    request.onload = () => {
+      let parsed: Record<string, unknown> = {};
+      try {
+        const data = JSON.parse(request.responseText || "{}");
+        parsed = data && typeof data === "object" ? data as Record<string, unknown> : {};
+      } catch {
+        parsed = { error: request.responseText ? friendlyApiError(request.responseText.replace(/<[^>]+>/g, " ").trim().slice(0, 240)) : INVALID_RESPONSE_MESSAGE };
+      }
+      resolve({ status: request.status, body: parsed });
+    };
+    request.onerror = () => reject(new Error("The upload failed before it reached the server."));
+    request.send(body);
+  });
+
+  if (isSessionAuthFailure(result.status, String(result.body.error || ""))) {
+    // A stale CSRF token is recoverable and worth retrying once, exactly as the
+    // fetch paths do -- otherwise a long-idle tab loses the whole upload.
+    if (result.status === 403 && !csrfRetried && await refreshCsrfToken()) {
+      return apiUpload(path, body, options, true);
+    }
+    announceSessionExpired();
+    throw new Error(AUTH_SESSION_EXPIRED_MESSAGE);
+  }
+  return result;
+}
+
 async function apiRequest<T>(path: string, options: RequestInit = {}, csrfRetried = false): ApiResult<T> {
   const headers = new Headers(options.headers);
   if (options.body && !(options.body instanceof FormData) && !headers.has("content-type")) headers.set("content-type", "application/json");
