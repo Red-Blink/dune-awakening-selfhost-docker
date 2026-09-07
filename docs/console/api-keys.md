@@ -105,7 +105,7 @@ namespace" rule, so Create stays disabled until something is selected.
 | `sietches` | `sietches:read` | `write` |
 | `deepdesert` | `deepdesert:read` | `write` |
 | `landsraad` | `landsraad:read` | `write` |
-| `server` | `server:read` | `network-fix`, `restart`, `restart-service`, `start`, `stop`, `storage-cleanup`, `write-config` |
+| `server` | `server:read` | `console-reload`, `network-fix`, `restart`, `restart-service`, `start`, `stop`, `storage-cleanup`, `write-config` |
 | `logs` | `logs:read` | *nothing — no write action exists* |
 | `backups` | `backups:read` | `create`, `create-system`, `delete`, `delete-system`, `download-system`, `import`, `import-system`, `restore`, `restore-system`, `write-config` |
 | `updates` | `updates:check`, `updates:read` | *nothing — write actions are denied to keys* |

@@ -38,6 +38,7 @@ const simpleOperations = {
   updateApply: ["update", "--yes"],
   updateFixSteamcmd: ["update", "fix-steamcmd"],
   updateInstallAssets: ["update", "install-assets"],
+  consoleReload: ["console", "reload"],
   updateAutoStatus: ["update", "auto", "status"],
   updateAutoDisable: ["update", "auto", "disable"],
   selfUpdateCheck: ["self-update", "check"],

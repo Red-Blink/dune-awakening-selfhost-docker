@@ -214,7 +214,8 @@ the Web UI's Updates panel — do not confuse them:
 
 - **`dune update`** — updates the **game server** itself (the SteamCMD
   content Funcom ships). Subcommands: `check`, `install`,
-  `fix-steamcmd`, `fix-install-dir`, and an unattended option,
+  `install-assets`, `fix-steamcmd`, `fix-install-dir`, and an unattended
+  option,
   `dune update auto enable [interval-minutes] ...` / `disable` /
   `status`, backed by a systemd timer that runs 5 minutes after boot and
   then repeats on a rolling interval (default: every 60 minutes,

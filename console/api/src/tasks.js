@@ -116,6 +116,11 @@ export class TaskManager {
         return;
       }
 
+      if (task.operation === "consoleReload") {
+        await this.runConsoleReloadTask(task);
+        return;
+      }
+
       const operations = taskOperations(task.operation, payload);
       let lastCode = 0;
       for (const operation of operations) {
@@ -152,6 +157,38 @@ export class TaskManager {
       task.finishedAt = new Date().toISOString();
       this.emit(task, error.message);
     }
+  }
+
+  // The console cannot recreate its own container from inside it: the recreate
+  // kills this process, so an ordinary task would die before reporting
+  // anything. A detached helper outlives it, exactly as a console self-update
+  // already does -- the difference is that this one only recreates the
+  // container, never rebuilds the image, because a restored .env is a
+  // configuration change and not a code change.
+  async runConsoleReloadTask(task) {
+    const composeProjectName = process.env.DUNE_COMPOSE_PROJECT_NAME || process.env.COMPOSE_PROJECT_NAME;
+    if (!composeProjectName) throw new Error("Main Dune Compose project name was not provided to the Console.");
+    const helperImage = process.env.DUNE_SYSTEMD_HELPER_IMAGE || "redblink-dune-docker-console:dev";
+    const hostRepoRoot = process.env.DUNE_HOST_REPO_ROOT || this.config.hostRepoRoot || this.config.repoRoot;
+
+    this.append(task, "Starting a detached helper to recreate the Console container.", "stdout");
+    await this.runDockerCommand(buildSelfUpdateHelperDockerArgs({
+      helperName: `dune-console-reload-${Date.now()}`,
+      hostRepoRoot,
+      composeProjectName,
+      helperImage,
+      hostUid: process.env.DUNE_HOST_UID || String(process.getuid?.() ?? 0),
+      hostGid: process.env.DUNE_HOST_GID || String(process.getgid?.() ?? 0),
+      dockerSocketGid: process.env.DOCKER_SOCKET_GID || detectDockerSocketGid(),
+      command: "runtime/scripts/dune console reload"
+    }), this.config.repoRoot);
+
+    // Deliberately reported as succeeded here rather than after the recreate:
+    // this process is about to be killed by the helper, so this is the last
+    // thing it can truthfully say. The browser watches for the Console coming
+    // back rather than for this task finishing.
+    this.append(task, "The Console is restarting to load the restored configuration.", "stdout");
+    this.completeTaskSucceeded(task, 0);
   }
 
   async runSelfUpdateHelperTask(task, payload) {

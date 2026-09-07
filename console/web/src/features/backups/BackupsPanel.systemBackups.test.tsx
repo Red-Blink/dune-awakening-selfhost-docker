@@ -334,6 +334,51 @@ describe("restoring a system backup", () => {
     }
   });
 
+  it("adopts the archive's identity when this host has none", async () => {
+    // A fresh host receiving a migration has no Battlegroup ID, so the two do
+    // not "differ" and no dialog is shown -- but keep-current is refused by
+    // import_db, which cannot verify continuity against an ID that is absent.
+    vi.mocked(backupsApi.list).mockResolvedValue({ stdout: "", currentBattlegroupId: "Unknown", rows: [] });
+    const field = await preview();
+    await waitFor(async () => expect(await screen.findByText("Apply Restore")).not.toBeDisabled());
+    fireEvent.click(await screen.findByText("Apply Restore"));
+    await waitFor(() => expect(backupsApi.restoreSystem).toHaveBeenCalledWith(ARCHIVE, expect.objectContaining({
+      apply: true,
+      identityMode: "adopt-backup"
+    })));
+    expect(field).toBeTruthy();
+  });
+
+  it("counts down to a console restart after a restore applies", async () => {
+    // The Console reads .env at startup, so after a restore it is running the
+    // configuration the restore just replaced.
+    const field = await preview();
+    await waitFor(async () => expect(await screen.findByText("Apply Restore")).not.toBeDisabled());
+    fireEvent.click(await screen.findByText("Apply Restore"));
+    await waitFor(() => expect(screen.getByText(/Restarting The Console In 5s/i)).toBeTruthy());
+    expect(screen.getByText(/sign in again/i)).toBeTruthy();
+    expect(field).toBeTruthy();
+  });
+
+  it("lets the restart be cancelled before it fires", async () => {
+    await preview();
+    await waitFor(async () => expect(await screen.findByText("Apply Restore")).not.toBeDisabled());
+    fireEvent.click(await screen.findByText("Apply Restore"));
+    const cancel = await screen.findByLabelText("Cancel the console restart");
+    fireEvent.click(cancel);
+    await waitFor(() => expect(screen.queryByText(/Restarting The Console/i)).toBeNull());
+  });
+
+  it("does not arm the restart when the restore failed", async () => {
+    // Nothing was replaced, so the running configuration is still correct.
+    renderPanel({ waitForTask: vi.fn(async (task) => ({ ...task, status: "failed", errorMessage: "failed with exit 1" })) as never });
+    const field = await openRestore();
+    fireEvent.change(field, { target: { value: RESTORE_PASSPHRASE } });
+    fireEvent.click(await screen.findByText("Preview Restore"));
+    await waitFor(() => expect(screen.getByText(/failed with exit 1/i)).toBeTruthy());
+    expect(screen.queryByText(/Restarting The Console/i)).toBeNull();
+  });
+
   it("keeps the preview card on screen instead of letting it fade itself out", async () => {
     await preview();
     await screen.findByText(/Preview Only - Nothing Changed/);
