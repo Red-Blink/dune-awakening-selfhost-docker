@@ -49,6 +49,7 @@ function renderPanel(overrides: Partial<Parameters<typeof BackupsPanel>[0]> = {}
     confirmAction={vi.fn(async () => true)}
     chooseBackupIdentity={vi.fn(async () => "keep-current" as const)}
     chooseAuditLogAction={vi.fn(async () => "keep-current" as const)}
+    onInstallGameFiles={() => {}}
     chooseImportConflict={vi.fn(async () => "rename" as const)}
     waitForTask={vi.fn(async (task) => ({ ...task, status: "succeeded" }))}
     waitForTaskWithUpdates={vi.fn(async (task) => task)}
@@ -348,6 +349,50 @@ describe("restoring a system backup", () => {
     await waitFor(() => expect(screen.getByText(/could not be decrypted/i)).toBeTruthy());
     const card = document.querySelector("section.backup-result");
     expect(card?.classList.contains("result-persistent")).toBe(true);
+  });
+
+  it("offers Install Game Files when a restore failed for want of them", async () => {
+    // The restore cannot proceed until the images exist, and the page that
+    // installs them is a different tab. The failure itself should carry the fix.
+    const onInstallGameFiles = vi.fn();
+    vi.mocked(backupsApi.restoreSystem).mockResolvedValue(
+      { task: { id: "r7", status: "queued", logLines: [
+        { line: "Restoring database..." },
+        { line: "DUNE_GAME_ASSETS_MISSING" },
+        { line: "Cannot start Postgres: the Funcom database image is not installed on this host." }
+      ] } } as never
+    );
+    renderPanel({
+      onInstallGameFiles,
+      waitForTask: vi.fn(async (task) => ({ ...task, status: "failed", errorMessage: "failed with exit 1" })) as never
+    });
+    const field = await openRestore();
+    fireEvent.change(field, { target: { value: RESTORE_PASSPHRASE } });
+    fireEvent.click(await screen.findByText("Preview Restore"));
+
+    const button = await screen.findByText("Install Game Files");
+    fireEvent.click(button);
+    expect(onInstallGameFiles).toHaveBeenCalled();
+  });
+
+  it("does not offer it for an unrelated restore failure", async () => {
+    const onInstallGameFiles = vi.fn();
+    vi.mocked(backupsApi.restoreSystem).mockResolvedValue(
+      { task: { id: "r8", status: "queued", logLines: [
+        { line: "The archive could not be decrypted: wrong passphrase." }
+      ] } } as never
+    );
+    renderPanel({
+      onInstallGameFiles,
+      waitForTask: vi.fn(async (task) => ({ ...task, status: "failed", errorMessage: "failed with exit 1" })) as never
+    });
+    const field = await openRestore();
+    fireEvent.change(field, { target: { value: RESTORE_PASSPHRASE } });
+    fireEvent.click(await screen.findByText("Preview Restore"));
+
+    await waitFor(() => expect(screen.getByText(/failed with exit 1/i)).toBeTruthy());
+    expect(screen.queryByText("Install Game Files")).toBeNull();
+    expect(onInstallGameFiles).not.toHaveBeenCalled();
   });
 
   it("shows a failed restore's log, where the actual reason is", async () => {

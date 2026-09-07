@@ -27,6 +27,16 @@ export function mapWriteFlushTimeoutMs() {
   return clampInt(process.env.ADMIN_MAP_WRITE_FLUSH_TIMEOUT_MS, 300000, 1000, 1800000);
 }
 
+// The operations that download the game depot -- roughly 5 GB over SteamCMD --
+// rather than restart something. The 30-minute floor below was sized for
+// restarts and dumps; a depot download on a slow link exceeds it, and the
+// timeout is enforced by killing the process group, which lands mid-SteamCMD
+// and leaves exactly the manifest state `dune update fix-steamcmd` exists to
+// repair.
+export function assetDownloadTimeoutMs() {
+  return clampInt(process.env.ADMIN_ASSET_DOWNLOAD_TIMEOUT_MS, 4 * 60 * 60 * 1000, 30 * 60 * 1000, 24 * 60 * 60 * 1000);
+}
+
 export class TaskManager {
   constructor(config, options = {}) {
     this.config = config;
@@ -130,7 +140,7 @@ export class TaskManager {
         lastCode = result.code;
         if (MAP_DOWN_OPERATIONS.has(operation)) await this.flushPendingMapWrites(task, operation, payload);
       }
-      if (["updateApply", "updateFixSteamcmd"].includes(task.operation)) {
+      if (["updateApply", "updateFixSteamcmd", "updateInstallAssets"].includes(task.operation)) {
         this.updateCheckCache.invalidate();
       }
       this.completeTaskSucceeded(task, lastCode);
@@ -379,6 +389,11 @@ function shellQuote(value) {
 }
 
 export function taskTimeoutMs(config, operation) {
+  // Depot downloads first: these are not restarts and must not inherit a floor
+  // sized for one.
+  if (["init", "updateApply", "updateInstallAssets"].includes(operation)) {
+    return Math.max(config.commandTimeoutMs, assetDownloadTimeoutMs());
+  }
   if (["backupSystemCreate", "backupSystemRestore", "start", "stop", "restartAll", "stopGameServersForDbWrites", "restartService", "restartServiceStop", "restartServiceStart", "serverTitle", "serverConfig", "init", "updateApply", "updateFixSteamcmd", "selfUpdateApply", "backupRestore", "storageCleanupImages", "storageCleanupBuildCache", "userSettingsSaveAndRestart", "userSettingsResetAndRestart", "userSettingsRawAndRestart", "mapsApplySettings", "mapsRespawn", "sietchesSetActive", "sietchesRestart", "sietchesRestartStop", "sietchesRestartStart", "sietchesReconcile", "deepdesertAction"].includes(operation)) {
     return Math.max(config.commandTimeoutMs, 30 * 60 * 1000);
   }

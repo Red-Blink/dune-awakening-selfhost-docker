@@ -201,11 +201,19 @@ the Web UI's Updates panel — do not confuse them:
 
 - **`dune update`** — updates the **game server** itself (the SteamCMD
   content Funcom ships). Subcommands: `check`, `install`,
-  `fix-steamcmd`, `fix-install-dir`, and an unattended option,
+  `install-assets`, `fix-steamcmd`, `fix-install-dir`, and an unattended
+  option,
   `dune update auto enable [interval-minutes] ...` / `disable` /
   `status`, backed by a systemd timer that runs 5 minutes after boot and
   then repeats on a rolling interval (default: every 60 minutes,
   configurable via the first argument to `auto enable`).
+  `dune update install-assets` is the same download without any database
+  work: it installs the game files and images and stops there. That is what
+  a brand-new host needs before it can restore a system backup, since the
+  Funcom database image is not pullable and only exists once the game files
+  are installed. The Updates page's **Install Game Files** button runs the
+  same thing. Plain `dune update install`, by contrast, also migrates the
+  database and reseeds world partitions.
 - **`dune self-update`** (alias `dune stack-update`) — updates **this
   repository/stack itself** (fetching a new GitHub release of
   `dune-awakening-selfhost-docker`). Subcommands: `check`, `list`,

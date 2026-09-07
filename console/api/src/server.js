@@ -768,6 +768,7 @@ async function handleApi(req, res) {
   }
   if (path === "/api/updates/apply-game" && req.method === "POST") return task(req, res, "updates", "updateApply", {});
   if (path === "/api/updates/fix-steamcmd" && req.method === "POST") return task(req, res, "updates", "updateFixSteamcmd", {});
+  if (path === "/api/updates/install-assets" && req.method === "POST") return task(req, res, "updates", "updateInstallAssets", {});
   if (path === "/api/updates/check-stack" && req.method === "POST") return task(req, res, "updates", "selfUpdateCheck", {});
   if (path === "/api/updates/apply-stack" && req.method === "POST") return task(req, res, "updates", "selfUpdateApply", {});
   if (path === "/api/updates/qa/status") {

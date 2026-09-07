@@ -10,6 +10,21 @@ cd "$(dirname "$0")/../.."
 source runtime/scripts/host-paths.sh
 source runtime/scripts/runtime-env.sh
 source runtime/scripts/image-tags.sh
+# Refuse before building an image reference nothing can fetch. This registry is
+# never logged into by this repo -- the images exist only once SteamCMD has
+# downloaded the depot and update.sh has loaded its image tarballs -- so a
+# missing image makes `docker run` attempt a pull that always fails, with an
+# error that reads like a network problem. Matches the repository only: the tag
+# resolver falls back to a hardcoded value that no shipped image carries.
+if ! docker images --format '{{.Repository}}' 2>/dev/null \
+    | grep -qx registry.funcom.com/funcom/self-hosting/igw-postgres; then
+  echo "DUNE_GAME_ASSETS_MISSING" >&2
+  echo "The Funcom database image is not installed on this host." >&2
+  echo "Install the game files first:  dune update install-assets" >&2
+  echo "(or Console -> Updates -> Install Game Files)" >&2
+  exit 1
+fi
+
 POSTGRES_IMAGE_TAG="$(resolve_postgres_image_tag)"
 IMAGE="registry.funcom.com/funcom/self-hosting/igw-postgres:${POSTGRES_IMAGE_TAG}"
 POSTGRES_PORT="$(resolve_postgres_port)"

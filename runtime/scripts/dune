@@ -515,7 +515,8 @@ Usage:
   dune restart <service>
   dune console restart
   dune metrics [start|stop|restart|status|logs|config|pull]
-  dune update [check|auto enable|auto disable|auto status|--yes]
+  dune update [check|--yes|install|install-assets [--force]|fix-steamcmd|fix-install-dir]
+  dune update auto [enable|disable|status]
   dune self-update [check|list|install [latest|<tag>]]
   dune restart-schedule [enable <HH:MM> [notify-minutes]|disable|status]
   dune ip-change-restart [enable [interval-minutes] [notify-minutes]|disable|status|check-now]

@@ -36,6 +36,13 @@ case "${1:-} ${2:-}" in
       printf '%s\n' dune-postgres
     fi
     ;;
+  "images --format")
+    # Defaults to present so every case written before the image pre-check
+    # existed keeps exercising what it was written for.
+    if [ "${MOCK_POSTGRES_IMAGE_PRESENT:-1}" = "1" ]; then
+      printf '%s\n' registry.funcom.com/funcom/self-hosting/igw-postgres
+    fi
+    ;;
   "start dune-postgres")
     [ -z "${MOCK_POSTGRES_STATE_FILE:-}" ] || printf 1 > "${MOCK_POSTGRES_STATE_FILE}"
     ;;
@@ -1876,3 +1883,125 @@ if find "$case36_root/work/runtime/backups" -maxdepth 1 -type d -name 'restore-*
 fi
 assert_no_plaintext_leak restore-refuses-before-safety-copy-when-postgres-will-not-start "$case36_root/tmp"
 echo "PASS restore-refuses-before-safety-copy-when-postgres-will-not-start"
+
+# --- Case 37: no local Postgres image refuses BEFORE attempting to start --
+# start-postgres.sh builds a registry.funcom.com reference and docker run then
+# attempts a pull that cannot succeed on any host -- this repo never logs into
+# that registry. The refusal has to land before that, or the operator gets a
+# network-shaped error for a missing-game-files problem.
+
+case37_root="$test_root/case37"
+mkdir -p "$case37_root/work"
+seed_repo_tree "$case37_root/work"
+case37_marker="$case37_root/start-invoked"
+case37_state="$case37_root/pg-state"
+printf 0 > "$case37_state"
+seed_start_postgres_stub "$case37_root/work" "$case37_marker" "$case37_state"
+
+set +e
+(
+  cd "$case37_root/work"
+  PATH="$bin_dir:$PATH" MOCK_POSTGRES_STATE_FILE="$case37_state" \
+    MOCK_POSTGRES_IMAGE_PRESENT=0 DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" \
+    bash runtime/scripts/db.sh backup-system
+) > "$case37_root/output.log" 2>&1
+case37_exit=$?
+set -e
+
+if [ "$case37_exit" -eq 0 ]; then
+  echo "FAIL postgres-image-missing-refuses: expected a non-zero exit with no image installed"
+  cat "$case37_root/output.log"
+  exit 1
+fi
+if [ -f "$case37_marker" ]; then
+  echo "FAIL postgres-image-missing-refuses: start-postgres.sh ran, so docker would have attempted an impossible pull"
+  cat "$case37_root/output.log"
+  exit 1
+fi
+if ! grep -q "DUNE_GAME_ASSETS_MISSING" "$case37_root/output.log"; then
+  echo "FAIL postgres-image-missing-refuses: the machine-readable marker was not emitted"
+  cat "$case37_root/output.log"
+  exit 1
+fi
+if ! grep -q "dune update install-assets" "$case37_root/output.log"; then
+  echo "FAIL postgres-image-missing-refuses: the message does not name the fix"
+  cat "$case37_root/output.log"
+  exit 1
+fi
+echo "PASS postgres-image-missing-refuses"
+
+# --- Case 38: same refusal on a restore, before any safety copy exists ----
+
+case38_root="$test_root/case38"
+mkdir -p "$case38_root"
+case38_archive="$(make_restorable_archive "$case38_root")"
+if [ -z "$case38_archive" ]; then
+  echo "FAIL restore-refuses-when-image-missing: could not build an archive"
+  exit 1
+fi
+mkdir -p "$case38_root/tmp"
+case38_marker="$case38_root/start-invoked"
+case38_state="$case38_root/pg-state"
+printf 0 > "$case38_state"
+seed_start_postgres_stub "$case38_root/work" "$case38_marker" "$case38_state"
+
+set +e
+(
+  cd "$case38_root/work"
+  PATH="$bin_dir:$PATH" TMPDIR="$case38_root/tmp" MOCK_POSTGRES_STATE_FILE="$case38_state" \
+    MOCK_POSTGRES_IMAGE_PRESENT=0 DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" \
+    DUNE_DB_ASSUME_YES=1 \
+    bash runtime/scripts/db.sh restore-system "$(basename "$case38_archive")"
+) > "$case38_root/restore.log" 2>&1
+case38_exit=$?
+set -e
+
+if [ "$case38_exit" -eq 0 ]; then
+  echo "FAIL restore-refuses-when-image-missing: expected a non-zero exit"
+  cat "$case38_root/restore.log"
+  exit 1
+fi
+if find "$case38_root/work/runtime/backups" -maxdepth 1 -type d -name 'restore-*' | grep -q .; then
+  echo "FAIL restore-refuses-when-image-missing: a safety copy was written for a restore that could not run"
+  exit 1
+fi
+if ! grep -q "DUNE_GAME_ASSETS_MISSING" "$case38_root/restore.log"; then
+  echo "FAIL restore-refuses-when-image-missing: the marker was not emitted"
+  cat "$case38_root/restore.log"
+  exit 1
+fi
+assert_no_plaintext_leak restore-refuses-when-image-missing "$case38_root/tmp"
+echo "PASS restore-refuses-when-image-missing"
+
+# --- Case 39: the new check must not weaken the running-database guard ----
+# Case 32 pins "never hand a live database to start-postgres.sh". Inserting an
+# image check at the wrong depth could bypass that early return.
+
+case39_root="$test_root/case39"
+mkdir -p "$case39_root/work"
+seed_repo_tree "$case39_root/work"
+case39_marker="$case39_root/start-invoked"
+case39_state="$case39_root/pg-state"
+printf 1 > "$case39_state"
+seed_start_postgres_stub "$case39_root/work" "$case39_marker" "$case39_state"
+
+set +e
+(
+  cd "$case39_root/work"
+  PATH="$bin_dir:$PATH" MOCK_POSTGRES_STATE_FILE="$case39_state" \
+    MOCK_POSTGRES_IMAGE_PRESENT=1 DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" \
+    bash runtime/scripts/db.sh backup-system
+) > "$case39_root/output.log" 2>&1
+case39_exit=$?
+set -e
+
+if [ "$case39_exit" -ne 0 ]; then
+  echo "FAIL image-check-keeps-running-database-guard: expected exit 0, got $case39_exit"
+  cat "$case39_root/output.log"
+  exit 1
+fi
+if [ -f "$case39_marker" ]; then
+  echo "FAIL image-check-keeps-running-database-guard: start-postgres.sh ran against a LIVE database"
+  exit 1
+fi
+echo "PASS image-check-keeps-running-database-guard"

@@ -166,6 +166,16 @@ postgres_is_running() {
   docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dune-postgres
 }
 
+# Matches the REPOSITORY only, never the tag. image-tags.sh's fallback is a
+# hardcoded "17.4" while the tag that actually ships is "17.4-alpine-fc-13", so
+# a tag comparison could never match a real image. The question here is only
+# whether any local Funcom Postgres image exists; resolve_postgres_image_tag
+# picks the tag once one does.
+postgres_image_present() {
+  docker images --format '{{.Repository}}' 2>/dev/null \
+    | grep -qx registry.funcom.com/funcom/self-hosting/igw-postgres
+}
+
 # Brings dune-postgres up for the operations that genuinely need it: backup and
 # restore. Stopping the battlegroup does not stop Postgres, it REMOVES it
 # (every teardown in this repo is `docker rm -f`, never `docker stop`), so on a
@@ -207,6 +217,25 @@ ensure_postgres_running() {
     echo "Starting the existing dune-postgres container..."
     docker start dune-postgres >/dev/null 2>&1 || true
   else
+    # Checked BEFORE start-postgres.sh runs. Without this, that script builds a
+    # registry.funcom.com/... reference and `docker run` attempts a pull that
+    # cannot succeed for anyone: this repo never logs into that registry, and
+    # the images only ever exist locally after SteamCMD downloads the depot and
+    # its image tarballs are loaded. The pull failure that produced was reported
+    # as "dune-postgres did not come up", which sent the operator to start the
+    # stack -- which fails identically.
+    if ! postgres_image_present; then
+      echo "DUNE_GAME_ASSETS_MISSING" >&2
+      echo "Cannot start Postgres: the Funcom database image is not installed on this host." >&2
+      echo >&2
+      echo "No local registry.funcom.com/funcom/self-hosting/igw-postgres image was found." >&2
+      echo "That image is not pullable -- it exists only after the game files are installed." >&2
+      echo >&2
+      echo "Install the game files first, then retry:" >&2
+      echo "  dune update install-assets" >&2
+      echo "  (or Console -> Updates -> Install Game Files)" >&2
+      return 1
+    fi
     echo "dune-postgres is not running. Starting it..."
     if [ ! -f runtime/scripts/start-postgres.sh ]; then
       echo "Cannot start Postgres: runtime/scripts/start-postgres.sh is missing." >&2

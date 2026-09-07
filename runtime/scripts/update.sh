@@ -78,6 +78,37 @@ dune_stack_has_running_services() {
     | grep -Eq '^dune-(postgres|rmq-admin|rmq-game|text-router|director|server-gateway|server-|autoscaler)$'
 }
 
+# Narrower than dune_stack_has_running_services on purpose: that one matches
+# dune-postgres, which is legitimately running on a host part-way through a
+# restore. Only a live world server makes swapping game files and image tags
+# unsafe.
+world_game_servers_running() {
+  docker ps --format '{{.Names}}' 2>/dev/null \
+    | grep -Eq '^dune-server-(overmap|survival-[0-9]+)$'
+}
+
+# The tail of the asset phase: map catalogs and obsolete-image cleanup. Neither
+# touches the database -- the catalog scripts read world-template.yaml through
+# the orchestrator, storage.sh is pure docker -- so both belong with the assets,
+# and install-assets runs them by calling this rather than duplicating the block.
+finish_asset_phase() {
+  echo
+  echo "=== Refresh generated map catalogs ==="
+  runtime/scripts/extract-partition-catalog.sh
+  runtime/scripts/extract-server-catalog.sh
+  echo "Generated map catalogs refreshed."
+
+  if [ "${DUNE_STORAGE_AUTO_CLEANUP:-1}" = "1" ]; then
+    echo
+    echo "=== Remove obsolete Dune game images ==="
+    local storage_args=(cleanup)
+    if [ "${DUNE_STORAGE_PRUNE_BUILD_CACHE:-0}" = "1" ]; then
+      storage_args+=(--build-cache)
+    fi
+    runtime/scripts/storage.sh "${storage_args[@]}" || echo "WARN Obsolete image cleanup did not complete; the update itself remains valid."
+  fi
+}
+
 stop_temporary_postgres() {
   if [ "${update_started_postgres:-0}" = "1" ] && [ "${postgres_was_running:-0}" != "1" ]; then
     echo
@@ -943,6 +974,8 @@ exit 100
 fi
 
 skip_preflight=0
+assets_only=0
+assets_force=0
 
 if [ "$cmd" = "--yes" ] || [ "$cmd" = "-y" ]; then
   assume_yes=1
@@ -951,6 +984,21 @@ elif [ "$cmd" = "install" ] || [ "$cmd" = "bootstrap" ]; then
   assume_yes=1
   skip_preflight=1
   cmd="install"
+elif [ "$cmd" = "install-assets" ]; then
+  # Game files and images only: everything from the SteamCMD download through
+  # detect-image-tags, and nothing that touches the database. This is what a
+  # host needs before a system restore, which brings its own database and must
+  # not have one migrated or reseeded underneath it first.
+  #
+  # cmd="install" deliberately: it reuses the existing `$cmd != install` guard
+  # that skips the pre-update database backup, so assets-only does not run
+  # db.sh either. assets_only then subtracts the remaining database phases.
+  assume_yes=1
+  skip_preflight=1
+  assets_only=1
+  cmd="install"
+  [ "${2:-}" != "--force" ] || assets_force=1
+  [ "${DUNE_ASSETS_ALLOW_RUNNING:-0}" != "1" ] || assets_force=1
 else
   assume_yes=0
 fi
@@ -962,6 +1010,7 @@ if [ "$cmd" != "run" ] && [ "$cmd" != "apply" ] && [ "$cmd" != "install" ]; then
   echo "  dune update check"
   echo "  dune update --yes"
   echo "  dune update install"
+  echo "  dune update install-assets [--force]"
   echo "  dune update fix-steamcmd"
   echo "  dune update fix-install-dir"
   echo "  dune update auto enable"
@@ -1025,6 +1074,19 @@ if [ -f "$MANUAL_STOP_FILE" ] || ! dune_stack_has_running_services; then
   stack_was_stopped=1
 fi
 
+if [ "$assets_only" = "1" ] && [ "$assets_force" != "1" ] && world_game_servers_running; then
+  echo
+  echo "Game servers are running."
+  echo "install-assets downloads new game files and loads new image tags without stopping"
+  echo "them, which leaves the autoscaler spawning from a tag the running world does not"
+  echo "match. It skips the stop/pause steps precisely because it must not touch the"
+  echo "database, so it cannot stop them for you."
+  echo
+  echo "Use the full update instead:  dune update --yes"
+  echo "Or override deliberately:     dune update install-assets --force"
+  exit 3
+fi
+
 echo
 echo "=== Check Docker volume free space ==="
 docker compose exec -T \
@@ -1045,13 +1107,21 @@ if [ "$cmd" != "install" ]; then
   DB_BACKUP_ORIGIN=pre-update runtime/scripts/db.sh backup
 fi
 
-echo
-echo "=== Pause autoscaler before update ==="
-runtime/scripts/autoscaler-control.sh stop || true
+# Skipped for assets-only. recycle-world-game-servers.sh stop-all is a database
+# write -- it runs `update dune.world_partition set server_id = null` and
+# `delete from dune.farm_state` for each container it removes, guarded only by
+# "is dune-postgres running", which it is on a host part-way through a restore.
+# The autoscaler pause writes no SQL, but it is a stack mutation nobody asked
+# for, and the guard above means there is nothing to pause anyway.
+if [ "$assets_only" != "1" ]; then
+  echo
+  echo "=== Pause autoscaler before update ==="
+  runtime/scripts/autoscaler-control.sh stop || true
 
-echo
-echo "=== Stop game servers before update ==="
-runtime/scripts/recycle-world-game-servers.sh stop-all
+  echo
+  echo "=== Stop game servers before update ==="
+  runtime/scripts/recycle-world-game-servers.sh stop-all
+fi
 
 echo
 echo "=== Download/update server files with SteamCMD ==="
@@ -1234,6 +1304,19 @@ echo
 echo "=== Current tags ==="
 cat runtime/generated/image-tags.env
 
+# Assets-only stops here, by leaving rather than by a condition wrapped around
+# everything below. Every database phase -- the Postgres start, update-db.sh,
+# spice-field overrides, and the world-partition wipe and reseed -- is then
+# unreachable as a fact of control flow, not as a predicate a later edit can
+# get subtly wrong.
+if [ "$assets_only" = "1" ]; then
+  finish_asset_phase
+  echo
+  echo "Game files and images are installed. No database work was performed."
+  echo "Restore a system backup now, or run 'dune init' to set this host up fresh."
+  exit 0
+fi
+
 echo
 if [ "$cmd" = "install" ]; then
   echo "=== Start fresh Postgres for install/bootstrap ==="
@@ -1286,21 +1369,7 @@ select count(*) as world_partition_rows from world_partition;
   echo "World partitions ready: $actual_count rows"
 fi
 
-echo
-echo "=== Refresh generated map catalogs ==="
-runtime/scripts/extract-partition-catalog.sh
-runtime/scripts/extract-server-catalog.sh
-echo "Generated map catalogs refreshed."
-
-if [ "${DUNE_STORAGE_AUTO_CLEANUP:-1}" = "1" ]; then
-  echo
-  echo "=== Remove obsolete Dune game images ==="
-  storage_args=(cleanup)
-  if [ "${DUNE_STORAGE_PRUNE_BUILD_CACHE:-0}" = "1" ]; then
-    storage_args+=(--build-cache)
-  fi
-  runtime/scripts/storage.sh "${storage_args[@]}" || echo "WARN Obsolete image cleanup did not complete; the update itself remains valid."
-fi
+finish_asset_phase
 
 echo
 if [ "$cmd" = "install" ]; then

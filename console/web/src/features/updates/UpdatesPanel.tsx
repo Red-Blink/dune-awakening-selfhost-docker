@@ -8,6 +8,7 @@ import { formatUiSentence, stripAnsi } from "../../lib/display";
 import { conciseTaskError } from "../../lib/taskDisplay";
 import {
   canApplyUpdateStatus,
+  gameAssetsMissing,
   firstVersionMatch,
   formatStackVersionLabel,
   GAME_UPDATE_TASK_KEY,
@@ -26,6 +27,9 @@ const STACK_UPDATE_REFRESH_SECONDS = 5;
 const STACK_UPDATE_EXPECTED_VERSION_KEY = "arrakis.stackUpdateExpectedVersion";
 
 type UpdatesPanelProps = {
+  // Incremented by a failure elsewhere that needs the game files installed.
+  // 0 means nothing has asked, so a fresh mount never auto-starts a download.
+  installGameFilesRequest?: number;
   confirmAction: (message: string) => Promise<boolean>;
   waitForTask: (task: Task) => Promise<Task>;
   parseKeyValueText: (text: string) => Record<string, string>;
@@ -37,6 +41,7 @@ type UpdatesPanelProps = {
 };
 
 export function UpdatesPanel({
+  installGameFilesRequest = 0,
   confirmAction,
   waitForTask,
   parseKeyValueText,
@@ -115,6 +120,17 @@ export function UpdatesPanel({
     setGameUpdateTask(response.task);
     persistUpdateTask(GAME_UPDATE_TASK_KEY, response.task);
     setGameStatus((current) => ({ ...current, status: "Updating", reason: "Game update is running." }));
+  }
+
+  async function installGameAssets() {
+    if (!(await confirmAction(
+      "Download and install the game files now? This is several GB and can take a long time. It installs game files and images only -- the database is not touched."
+    ))) return;
+    setGameSteamcmdFixTask(null);
+    const response = await updatesApi.installAssets();
+    setGameUpdateTask(response.task);
+    persistUpdateTask(GAME_UPDATE_TASK_KEY, response.task);
+    setGameStatus((current) => ({ ...current, status: "Installing", reason: "Installing game files." }));
   }
 
   async function fixSteamcmd() {
@@ -272,6 +288,14 @@ export function UpdatesPanel({
     loadAutoGame().catch((error) => setAutoGame({ stdout: "", stderr: error instanceof Error ? error.message : String(error), exitCode: 1 }));
     loadQaStatus().catch((error) => setQaError(error instanceof Error ? error.message : String(error)));
   }, []);
+
+  // Another panel sent the operator here to install the game files. It still
+  // raises its own confirm dialog -- arriving on this tab must not start a
+  // multi-gigabyte download on its own. Skips 0 so a plain mount does nothing.
+  useEffect(() => {
+    if (!installGameFilesRequest) return;
+    void installGameAssets();
+  }, [installGameFilesRequest]);
 
   useEffect(() => {
     if (!gameUpdateTask || isTerminalTask(gameUpdateTask.status)) {
@@ -435,6 +459,7 @@ export function UpdatesPanel({
 
   const gameUpdateRunning = Boolean(gameUpdateTask && !isTerminalTask(gameUpdateTask.status));
   const gameCanApply = canApplyUpdateStatus(gameStatus) && !gameUpdateRunning;
+  const assetsMissing = gameAssetsMissing(gameStatus);
   const stackUpdateRunning = Boolean(stackUpdateTask && stackUpdateTask.status !== "failed" && (!isTerminalTask(stackUpdateTask.status) || isDetachedStackUpdateTask(stackUpdateTask)));
   const stackCanApply = canApplyUpdateStatus(stackStatus) && !stackUpdateRunning;
   const stackReleaseNotes = stackReleaseNotesUrl(stackStatus);
@@ -454,11 +479,18 @@ export function UpdatesPanel({
         <KeyValueGrid items={[["Current Build", updateDisplayValue(gameStatus, "current")], ["Latest Build", updateDisplayValue(gameStatus, "latest")], ["Status", gameStatus.status]]} />
         {gameStatus.status === "Check Failed" && gameStatus.reason && <p className="danger-note">{gameStatus.reason}</p>}
         {gameStatus.status === "Version details unavailable" && <p className="muted">{gameStatus.reason}</p>}
+        {assetsMissing && <p className="danger-note">The game files are not installed on this host, so nothing that needs the database or the game images can run. Install them to continue.</p>}
         <div className="action-line">
           <button disabled={gameUpdateRunning} onClick={() => checkGame({ fresh: true })}>Refresh Game Check</button>
           {gameCanApply && <button className="update-action" onClick={applyGameUpdate}>Apply Game Update</button>}
+          {/* Never gated on an update being available: the case this exists for
+              is a host with no game files at all, where the Steam check itself
+              fails and every "Update Available" condition is false. */}
+          <button className={assetsMissing ? "update-action" : ""} disabled={gameUpdateRunning} onClick={installGameAssets}>
+            {assetsMissing ? "Install Game Files" : "Reinstall Game Files"}
+          </button>
         </div>
-        {gameUpdateTask && <GameUpdateProgress task={gameUpdateTask} repairTask={gameSteamcmdFixTask} onRetry={applyGameUpdate} onFixSteamcmd={fixSteamcmd} formatResultTitle={formatResultTitle} formatResultMessage={formatResultMessage} />}
+        {gameUpdateTask && <GameUpdateProgress task={gameUpdateTask} repairTask={gameSteamcmdFixTask} onRetry={gameUpdateTask.operation === "updateInstallAssets" ? installGameAssets : applyGameUpdate} onFixSteamcmd={fixSteamcmd} formatResultTitle={formatResultTitle} formatResultMessage={formatResultMessage} />}
       </section>
       <section className="action-section">
         <div className="panel-title"><h4>Console Update</h4><StatusPill value={stackStatus.status} /></div>
@@ -590,6 +622,11 @@ function summarizeGameUpdateProgress(task: Task) {
   const text = task.logLines.map((line) => line.line).join("\n");
   const latestLine = [...task.logLines].reverse().map((line) => line.line.trim()).find(Boolean) || task.progressMessage || task.currentStep || "";
   if (task.status === "succeeded") {
+    // install-assets deliberately starts nothing and touches no database, so
+    // the game-update wording ("coming back up now") would be wrong twice.
+    if (task.operation === "updateInstallAssets") {
+      return { title: "Game Files Installed", percent: 100, message: "Game files and images are installed. The database was not touched." };
+    }
     return { title: "Update Complete", percent: 100, message: "The game server update is complete. The server is coming back up now." };
   }
   if (task.status === "failed") {
