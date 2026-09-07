@@ -5,6 +5,8 @@ export type SystemImportConflict = "overwrite" | "rename";
 
 export type BackupIdentityMode = "adopt-backup" | "keep-current";
 
+export type AuditLogMode = "adopt-backup" | "keep-current";
+
 export type SystemBackupRow = {
   name: string;
   createdAt: string;
@@ -15,6 +17,7 @@ export type SystemBackupRow = {
   serverTitle: string;
   battlegroupId: string;
   hasSidecar: boolean;
+  includesAuditLog: boolean;
   sizeBytes: number;
   size: string;
 };
@@ -39,7 +42,7 @@ export const backupsApi = {
   systemDownloadUrl: (name: string) => `/api/backups/system/${encodeURIComponent(name)}/download`,
   // Body for the same reason as createSystem. Defaults to a dry run: a call
   // that loses its apply flag must preview, never replace the host.
-  restoreSystem: (name: string, body: { passphrase: string; apply: boolean; identityMode?: BackupIdentityMode }) =>
+  restoreSystem: (name: string, body: { passphrase: string; apply: boolean; identityMode?: BackupIdentityMode; auditLogMode?: AuditLogMode }) =>
     post<{ task: Task }>(`/api/backups/system/${encodeURIComponent(name)}/restore`, body),
   // The file itself is the body, not a multipart form: one file travels now
   // that the archive and its sidecar are bundled, and XHR (see importSystem in

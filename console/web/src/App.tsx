@@ -158,6 +158,36 @@ function chooseBackupIdentity(meta: { backup: string; currentBattlegroupId: stri
   });
 }
 
+type AuditLogChoice = "adopt-backup" | "keep-current" | "cancel";
+
+// Only ever asked when the archive and this host BOTH have their own admin
+// audit history -- restore_system() auto-adopts when only the archive has
+// one, and does nothing when neither does. Same shape as
+// chooseBackupIdentity: adopt is the primary action for a genuine migration,
+// keep-current is the safer default for a same-host rollback or an
+// intentional import into a different server.
+function chooseAuditLogAction(meta: { backup: string }): Promise<AuditLogChoice> {
+  return new Promise((resolve) => {
+    if (!openConfirmDialog) {
+      resolve("cancel");
+      return;
+    }
+    openConfirmDialog({
+      title: "Choose Admin Audit History",
+      message: "This archive and this host each have their own admin audit history. Adopt the backup's history when moving the same server to new hardware. Keep this host's own history when restoring into a different server or rolling back a mistake.",
+      confirmLabel: "Adopt Backup History",
+      tertiaryLabel: "Keep Current History",
+      cancelLabel: "Cancel Restore",
+      danger: true,
+      warning: "Whichever history is not kept is still saved to the pre-restore safety copy, not deleted -- but it stops being the live record.",
+      details: [
+        { label: "Backup", value: meta.backup, tone: "accent" }
+      ],
+      resolve: (outcome) => resolve(outcome === "confirm" ? "adopt-backup" : outcome === "tertiary" ? "keep-current" : "cancel")
+    });
+  });
+}
+
 type SystemImportConflictChoice = "overwrite" | "rename" | "cancel";
 
 // Rename is the confirm (primary) action and overwrite the tertiary: the safe
@@ -863,6 +893,7 @@ export function App() {
             onError={setError}
             confirmAction={confirmDialog}
             chooseBackupIdentity={chooseBackupIdentity}
+            chooseAuditLogAction={chooseAuditLogAction}
             chooseImportConflict={chooseImportConflict}
             waitForTask={waitForTaskSilently}
             waitForTaskWithUpdates={waitForTaskWithUpdates}

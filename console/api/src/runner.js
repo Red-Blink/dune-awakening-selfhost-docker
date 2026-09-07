@@ -139,6 +139,8 @@ export function buildDuneArgs(operation, payload = {}) {
       if (!payload.apply) args.push("--dry-run");
       if (payload.identityMode === "adopt-backup") args.push("--adopt-backup-battlegroup");
       if (payload.identityMode === "keep-current") args.push("--keep-current-battlegroup");
+      if (payload.auditLogMode === "adopt-backup") args.push("--adopt-backup-audit-log");
+      if (payload.auditLogMode === "keep-current") args.push("--keep-current-audit-log");
       return args;
     }
     case "backupAutoEnable":

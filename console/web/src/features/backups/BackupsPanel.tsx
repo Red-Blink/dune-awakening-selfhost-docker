@@ -9,9 +9,10 @@ import { KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/com
 import { formatUiSentence } from "../../lib/display";
 import { conciseTaskError, funcomTokenMismatchDetected } from "../../lib/taskDisplay";
 
-type BackupResult = { status: "running" | "succeeded" | "failed"; title: string; message?: string; details?: string; tone?: "danger" | "attention" };
+type BackupResult = { status: "running" | "succeeded" | "failed"; title: string; message?: string; details?: string; detailsOpen?: boolean; detailsTitle?: string; tone?: "danger" | "attention" };
 type ConfirmAction = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
 type BackupIdentityChoice = "adopt-backup" | "keep-current" | "cancel";
+type AuditLogChoice = "adopt-backup" | "keep-current" | "cancel";
 type CommandStatus = { status: string; reason?: string };
 
 type BackupsPanelProps = {
@@ -20,6 +21,7 @@ type BackupsPanelProps = {
   onError: (text: string) => void;
   confirmAction: ConfirmAction;
   chooseBackupIdentity: (meta: { backup: string; currentBattlegroupId: string; backupBattlegroupId: string }) => Promise<BackupIdentityChoice>;
+  chooseAuditLogAction: (meta: { backup: string }) => Promise<AuditLogChoice>;
   chooseImportConflict: (existing: string) => Promise<SystemImportConflict | "cancel">;
   waitForTask: (task: Task) => Promise<Task>;
   waitForTaskWithUpdates: (task: Task, onUpdate: (task: Task) => void) => Promise<Task>;
@@ -40,7 +42,7 @@ function formatResultMessage(value: unknown) {
   return formatUiSentence(value, false);
 }
 
-export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError, confirmAction, chooseBackupIdentity, chooseImportConflict, waitForTask, waitForTaskWithUpdates, withTimeout, toHourMinuteTime, sanitizeTimeInput, isValidHourMinuteTime, commandStatusSummary, taskTechnicalDetails, isTerminalTask }: BackupsPanelProps) {
+export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError, confirmAction, chooseBackupIdentity, chooseAuditLogAction, chooseImportConflict, waitForTask, waitForTaskWithUpdates, withTimeout, toHourMinuteTime, sanitizeTimeInput, isValidHourMinuteTime, commandStatusSummary, taskTechnicalDetails, isTerminalTask }: BackupsPanelProps) {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [selectedBackups, setSelectedBackups] = useState<Set<string>>(new Set());
   const [currentBattlegroupId, setCurrentBattlegroupId] = useState("Unknown");
@@ -55,6 +57,7 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
   const [importResult, setImportResult] = useState<BackupResult | null>(null);
   const [systemRows, setSystemRows] = useState<SystemBackupRow[]>([]);
   const [systemResult, setSystemResult] = useState<BackupResult | null>(null);
+  const systemResultRef = useRef<HTMLElement | null>(null);
   const [systemPassphrase, setSystemPassphrase] = useState("");
   const [systemPassphraseConfirm, setSystemPassphraseConfirm] = useState("");
   const [selectedSystemBackups, setSelectedSystemBackups] = useState<Set<string>>(new Set());
@@ -301,7 +304,9 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
         status: "succeeded",
         title: "Preview Only - Nothing Changed",
         message: "The passphrase opened the archive. Review what it would replace below, then apply.",
-        details
+        details,
+        detailsOpen: true,
+        detailsTitle: "What this would replace"
       })
     );
     // Only a successful decrypt unlocks apply, so a wrong passphrase cannot
@@ -331,9 +336,17 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
       identityMode = await chooseBackupIdentity({ backup, currentBattlegroupId, backupBattlegroupId });
       if (identityMode === "cancel") return;
     }
+    // Only ever asked when the sidecar says the archive carries one: restore_system()
+    // auto-adopts if only the archive has one, and does nothing if neither does, so
+    // there is no real choice to surface in either of those cases.
+    let auditLogMode: AuditLogChoice = "keep-current";
+    if (restoreTarget.includesAuditLog) {
+      auditLogMode = await chooseAuditLogAction({ backup });
+      if (auditLogMode === "cancel") return;
+    }
     const final = await runSystemRestoreTask(
       "restoreSystemApply",
-      () => backupsApi.restoreSystem(backup, { passphrase: restorePassphrase, apply: true, identityMode }),
+      () => backupsApi.restoreSystem(backup, { passphrase: restorePassphrase, apply: true, identityMode, auditLogMode }),
       "Restoring System Backup...",
       "System Backup Restore Failed",
       (details) => ({
@@ -342,7 +355,7 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
         // "attention", not plain success: the restore is only half-applied from
         // the operator's point of view until the stack is restarted.
         tone: "attention",
-        message: "Configuration, credentials and the database were replaced. The stack is still running the previous configuration - restart it from Server Controls to pick this up. The admin password and database credentials may now differ from the ones this session is using.",
+        message: "Configuration, credentials and the database were replaced. Dune services are stopped - start them from Server Controls to bring the restored configuration up. The admin password and database credentials may now differ from the ones this session is using.",
         details
       })
     );
@@ -502,6 +515,27 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
     const id = window.setTimeout(() => setImportResult(null), 5400);
     return () => window.clearTimeout(id);
   }, [importResult?.status, importResult?.title]);
+  // Bring a system-backup result into view when it lands. The restore preview
+  // in particular renders the list of what would be replaced, and the buttons
+  // that produce it sit above a table tall enough to push that card off screen
+  // -- an operator told to "review what it would replace below" should not have
+  // to go looking for it.
+  //
+  // Fires on the status/title change rather than on the object, so a task's
+  // polling updates do not re-scroll on every tick. block:"nearest" leaves an
+  // already-visible card alone. No behavior:"smooth" -- it is compositor-driven
+  // and does not settle reliably in a backgrounded tab (same reasoning as
+  // BasesPanel's expanded-row scroll).
+  //
+  // Focus moves only once the result is terminal: while it still reads
+  // "Checking System Backup..." there is nothing to read yet, and taking focus
+  // off the button the operator just used would be premature.
+  useEffect(() => {
+    const card = systemResultRef.current;
+    if (!systemResult || !card) return;
+    if (systemResult.status !== "running") card.focus?.({ preventScroll: true });
+    card.scrollIntoView?.({ block: "nearest" });
+  }, [systemResult?.status, systemResult?.title]);
   const backupNames = rows.map((row) => String(row.name || row.backupName || "")).filter(Boolean);
   const allSelected = backupNames.length > 0 && backupNames.every((name) => selectedBackups.has(name));
   function toggleBackup(name: string, checked: boolean) {
@@ -653,7 +687,7 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
             <button className="danger" disabled={Boolean(busyAction) || !restorePreviewed} onClick={() => run(applySystemRestore)}>Apply Restore</button>
           </div>
         </div>}
-        {systemResult && <BackupResultCard result={systemResult} />}
+        {systemResult && <BackupResultCard result={systemResult} cardRef={systemResultRef} />}
         {systemRows.length === 0 ? <p className="muted">No system backups have been created yet.</p> : <DataTable
           columns={["name", "battlegroupId", "createdAt", "size", "type", "source", "encryption"]}
           columnLabels={{ name: "Backup Name", battlegroupId: "Battlegroup ID", createdAt: "Created", size: "Size", type: "Type", source: "Source", encryption: "Encryption" }}
@@ -679,10 +713,22 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
   );
 }
 
-function BackupResultCard({ result }: { result: BackupResult }) {
+function BackupResultCard({ result, cardRef }: { result: BackupResult; cardRef?: React.Ref<HTMLElement> }) {
   const danger = result.tone === "danger";
   const attention = result.tone === "attention";
-  return <section className={`result-panel backup-result ${attention ? "warning-panel result-attention" : danger ? "result-danger" : result.status === "failed" ? "warning-panel result-fail" : result.status === "succeeded" ? "result-ok" : "result-running"}`}>
+  // result-ok/result-fail/result-danger fade themselves out after 5s. Fine for
+  // "Backup Created"; not for a failure, or for a card whose own message sends
+  // the operator to output rendered inside it.
+  const persistent = result.status === "failed" || result.detailsOpen;
+  // A failure's message is the exit line ("... failed with exit 1"); the reason
+  // it failed is in the log below it. Leaving that behind the debug gate showed
+  // an operator that a restore failed while hiding "dune-postgres is not
+  // running" and the fact that nothing had been changed.
+  const failed = result.status === "failed";
+  const showDetails = Boolean(result.detailsOpen) || failed;
+  // tabIndex -1 so the panel can take focus programmatically when a result
+  // lands, without joining the tab order.
+  return <section ref={cardRef} tabIndex={cardRef ? -1 : undefined} className={`result-panel backup-result ${persistent ? "result-persistent " : ""}${attention ? "warning-panel result-attention" : danger ? "result-danger" : result.status === "failed" ? "warning-panel result-fail" : result.status === "succeeded" ? "result-ok" : "result-running"}`}>
     <div className="panel-title backup-result-title">
       <div className="backup-result-copy">
         <h4 className={result.status === "running" ? "loading-dots" : ""}>{formatResultTitle(result.title, result.status === "running")}</h4>
@@ -690,7 +736,15 @@ function BackupResultCard({ result }: { result: BackupResult }) {
       </div>
       <StatusPill value={attention ? "Action Required" : danger ? "Deleted" : result.status === "failed" ? "Failed" : result.status === "running" ? "Running" : "Succeeded"} />
     </div>
-    {result.details && <TechnicalDetails title="Technical details" text={result.details} />}
+    {/* .technical-details is display:none outside body.debug -- it is a debug
+        disclosure. A card that tells the operator to read something inside it
+        needs backup-result-details, which overrides that. */}
+    {result.details && <TechnicalDetails
+      title={result.detailsTitle || (failed ? "What went wrong" : "Technical details")}
+      text={result.details}
+      open={showDetails}
+      className={showDetails ? "backup-result-details" : ""}
+    />}
   </section>;
 }
 

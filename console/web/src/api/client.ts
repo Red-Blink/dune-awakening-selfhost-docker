@@ -69,6 +69,13 @@ export async function apiUpload(
       resolve({ status: request.status, body: parsed });
     };
     request.onerror = () => reject(new Error("The upload failed before it reached the server."));
+    // Without these, an aborted or timed-out upload never settles this promise
+    // at all: the caller's busy state (and Cancel, which is disabled while busy)
+    // stays stuck forever. No .timeout is set here -- a large archive over a slow
+    // line can legitimately take a long time -- so ontimeout only matters if a
+    // future caller sets one; onabort matters the moment anything calls .abort().
+    request.onabort = () => reject(new Error("The upload was cancelled."));
+    request.ontimeout = () => reject(new Error("The upload timed out before it reached the server."));
     request.send(body);
   });
 

@@ -68,6 +68,8 @@ a positive integer to keep only that many newest archives; `0` (the default)
 keeps every one. Pruning is opt-in because each archive is the only copy of the
 credentials inside it — the console's Delete controls are the deliberate path.
 
+A restore also leaves a plaintext safety copy of what it replaced -- `.env` and every secret -- under `runtime/backups/restore-<timestamp>/`. That copy is not the only one of anything, since the archive it came from is still there, so it is pruned automatically: `DUNE_RESTORE_SAFETY_KEEP` (default `5`) keeps that many newest, removing older ones each time a restore succeeds. Set it to `0` to keep every one.
+
 ### Getting the archive onto the new host
 
 Download the backup from the old host's Backups page. On the new host, open
@@ -139,16 +141,34 @@ database restore fails, configuration and secrets are left untouched.
 
 Nothing is restarted. Restoring `.env` can change the admin console password and
 the database credentials, so the console may be describing a restore that has
-already invalidated its own session. Restart the stack yourself once the report
-looks right:
+already invalidated its own session. The restore stops the game services and
+leaves them stopped; start them yourself once the report looks right:
 
 ```bash
-dune restart
+dune start
 ```
 
 If the archive's Battlegroup ID differs from the current one, you are asked
 whether to adopt the backup's identity or keep the current one — the same
 choice, and the same handling, as a database restore.
+
+A system backup also carries this console's own admin audit log --
+deliberately: it is part of what should move with a server. If the archive
+and this host **both** already have one, you are asked whether to adopt the
+backup's history or keep this host's own:
+
+- **Adopt the backup's history** when moving the same server to new
+  hardware -- the migration case this whole feature exists for.
+- **Keep this host's own history** when rolling back a mistake on the same
+  host (an old audit log would erase every admin action recorded since the
+  backup), or when intentionally restoring into a different server.
+
+Whichever you don't keep still ends up in the pre-restore safety copy, not
+deleted -- it just stops being the live record. If only the archive has an
+audit log (a fresh host, say), it is adopted automatically; if neither does,
+nothing is asked. From a shell, the same choice is
+`--adopt-backup-audit-log` / `--keep-current-audit-log`, and a dry run
+reports the conflict even though it changes nothing.
 
 ### Inspecting an archive by hand
 
