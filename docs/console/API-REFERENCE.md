@@ -102,7 +102,6 @@ When the Restart Queue is enabled, the restart routes above (`/api/server/restar
 | POST | `/api/updates/check-game` | Check for game updates | `fresh?` (boolean) |
 | POST | `/api/updates/apply-game` | Apply game updates | None |
 | POST | `/api/updates/fix-steamcmd` | Fix SteamCMD issues | None |
-| POST | `/api/updates/install-assets` | Install game files and images only, without touching the database | None |
 | POST | `/api/updates/check-stack` | Check for stack updates | None |
 | POST | `/api/updates/apply-stack` | Apply stack updates | None |
 | GET | `/api/updates/auto-game` | Get auto-update status | None |
