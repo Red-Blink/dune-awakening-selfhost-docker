@@ -178,6 +178,49 @@ dune_schema_table_count() {
   docker exec dune-postgres psql -U dune -d dune -tAc     "select count(*) from information_schema.tables where table_schema = 'dune'" 2>/dev/null     | tr -d '[:space:]'
 }
 
+# The .env keys that describe THIS machine rather than the server the archive
+# came from. A system restore replaces .env wholesale, which is right for the
+# server's own settings and wrong for these: they decide whether the console can
+# run and be reached at all.
+#
+#   DUNE_HOST_REPO_ROOT / DUNE_HOST_UID / DUNE_HOST_GID / DOCKER_SOCKET_GID
+#     host_path() translates /repo to a real host path for every bind mount, and
+#     the socket gid is what gives the orchestrator docker access.
+#   ADMIN_BIND_PORT
+#     the port the console answers on. Take the archive's and the operator is
+#     left with no console and no URL to find it on.
+#   DUNE_COMPOSE_PROJECT_NAME / COMPOSE_PROJECT_NAME
+#     which Compose project owns the volumes. Take the archive's and the depot
+#     just downloaded into this host's volumes becomes invisible.
+#   DUNE_DB_PASSWORD
+#     looks like a credential, but the dune role was created in THIS host's
+#     cluster with THIS host's password, and start-postgres.sh only creates that
+#     role IF NOT EXISTS -- nothing ever resets it. Taking the archive's value
+#     leaves every client authenticating with a password the role does not have,
+#     and it never self-heals.
+#
+# The console's own admin password is deliberately NOT here: it is the server's
+# credential and moves with it, and the operator knows it because they ran the
+# server the archive came from.
+HOST_SHAPED_ENV_KEYS="DUNE_HOST_REPO_ROOT DUNE_HOST_UID DUNE_HOST_GID DOCKER_SOCKET_GID ADMIN_BIND_PORT DUNE_COMPOSE_PROJECT_NAME COMPOSE_PROJECT_NAME DUNE_DB_PASSWORD"
+
+# Re-applies this host's values over a just-restored .env. Reads them from the
+# pre-restore copy the safety directory already holds, so nothing extra has to
+# be captured earlier.
+restore_host_shaped_env_values() {
+  local previous_env="$1"
+  local key value restored=""
+
+  [ -f "$previous_env" ] || return 0
+  for key in $HOST_SHAPED_ENV_KEYS; do
+    value="$(config_value "$previous_env" "$key" || true)"
+    [ -n "$value" ] || continue
+    set_env_file_value .env "$key" "$value" 644
+    restored="$restored $key"
+  done
+  [ -z "$restored" ] || echo "Kept this host's own values for:$restored"
+}
+
 postgres_image_present() {
   docker images --format '{{.Repository}}' 2>/dev/null \
     | grep -qx registry.funcom.com/funcom/self-hosting/igw-postgres
@@ -1685,11 +1728,25 @@ restore_system() {
     restore_system_cleanup
     return 1
   fi
+  restore_host_shaped_env_values "$safety_dir/env"
   mkdir -p runtime/generated runtime/secrets
   if ! tar -C "$stage_dir/tree/generated" -cf - . | tar -C runtime/generated -xf -; then
     echo "Could not restore runtime/generated/. Previous state is in: $safety_dir" >&2
     restore_system_cleanup
     return 1
+  fi
+
+  # image-tags.env is the one file in generated/ that describes THIS host's
+  # loaded images rather than the server. The archive's copy can name tags that
+  # were never downloaded here, and resolve_postgres_image_tag prefers that file
+  # over scanning what is actually present -- so start-postgres.sh would then
+  # ask docker for an image that does not exist. Re-derive it from local images.
+  if [ -x runtime/scripts/detect-image-tags.sh ] || [ -f runtime/scripts/detect-image-tags.sh ]; then
+    if bash runtime/scripts/detect-image-tags.sh >/dev/null 2>&1; then
+      echo "Re-detected image tags from the images installed on this host."
+    else
+      echo "WARN Could not re-detect image tags; runtime/generated/image-tags.env still names the archive's." >&2
+    fi
   fi
   # --keep-current-battlegroup told import_db to remap the imported rows to
   # THIS host's identity. The archive's generated/battlegroup.env still names
