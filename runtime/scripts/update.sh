@@ -87,6 +87,26 @@ world_game_servers_running() {
     | grep -Eq '^dune-server-(overmap|survival-[0-9]+)$'
 }
 
+# Every orchestrator call below goes through `docker compose exec`, which needs
+# the container already up. The only thing in this repo that starts it is
+# init.sh, and init.sh exits before that point on a host with no Funcom token --
+# so on a machine that has never deployed, install-assets could not run at all,
+# which is exactly the machine a system restore is for. Verified on a fresh
+# host: the console is the only container, and `docker compose exec -T
+# orchestrator true` answers `service "orchestrator" is not running`.
+#
+# Only started, never rebuilt or replaced: if it is already up, this is a no-op.
+ensure_orchestrator() {
+  if docker compose ps --status running --services 2>/dev/null | grep -qx orchestrator; then
+    return 0
+  fi
+  echo "Starting the orchestrator container..."
+  if ! docker compose up -d orchestrator; then
+    echo "Could not start the orchestrator container, which the game-file install runs through." >&2
+    return 1
+  fi
+}
+
 # The tail of the asset phase: map catalogs and obsolete-image cleanup. Neither
 # touches the database -- the catalog scripts read world-template.yaml through
 # the orchestrator, storage.sh is pure docker -- so both belong with the assets,
@@ -1088,6 +1108,10 @@ if [ "$assets_only" = "1" ] && [ "$assets_force" != "1" ] && world_game_servers_
 fi
 
 echo
+if [ "$assets_only" = "1" ]; then
+  ensure_orchestrator || exit 1
+fi
+
 echo "=== Check Docker volume free space ==="
 docker compose exec -T \
   -e DUNE_MIN_FREE_GB="${DUNE_MIN_FREE_GB:-25}" \
