@@ -1392,6 +1392,10 @@ main { padding: 22px; min-width: 0; }
 .setup-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 14px; }
 .check-grid { margin-top: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
 .requirements { color: #d9c8aa; }
+/* This stylesheet sets no global anchor colour, so an inline link would render
+   in the browser's default blue -- unreadable on the dark panel. */
+.wizard .panel a { color: var(--accent-strong); text-decoration: underline; text-underline-offset: 2px; }
+.wizard .panel a:hover { color: var(--title); }
 .setup-path-choice { margin-top: 18px; }
 .setup-path-choice h4 { margin: 0 0 10px; }
 .setup-path-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
@@ -1402,6 +1406,24 @@ main { padding: 22px; min-width: 0; }
 .setup-path-option strong { color: #f1dfc1; }
 .setup-path-option span { color: #cbbb9c; font-size: 13px; line-height: 1.5; }
 .setup-path-option.selected { border-color: var(--accent); }
+/* The running row borrows badge-info's blue, already this palette's "in
+   progress" hue; another warm step would disappear into the panel. */
+.restore-checklist { margin-top: 16px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 8px; background: rgba(0,0,0,.12); }
+.restore-checklist h3 { margin: 0 0 12px; font-size: 16px; color: var(--text-strong); }
+.restore-checklist ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+/* The icon column is a fixed 16px rather than auto: a rotating square's
+   bounding box is wider than the square, so an auto column let the spinner
+   drag its own row's icon out of line with the other three. */
+.restore-step { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 10px; font-size: 14px; }
+.restore-step-icon { justify-self: center; }
+.restore-step-detail { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.restore-step-done { color: var(--success-text); }
+.restore-step-active { color: #b6d5ff; }
+.restore-step-failed { color: var(--danger-text); }
+.restore-step-pending { color: var(--text-faint); }
+.restore-step-spin { animation: spin 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .restore-step-spin { animation: none; } }
+.restore-note { margin: 14px 0 0; padding: 10px 12px; border: 1px solid var(--warning); border-radius: 6px; background: rgba(169,121,50,.14); color: var(--muted-warm); font-size: 13px; line-height: 1.5; }
 .mini-output, .log-box, .command-preview {
   display: block;
   width: 100%;
