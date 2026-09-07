@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   api,
   apiDownload,
+  apiUpload,
   AUTH_SESSION_EXPIRED_EVENT,
   AUTH_SESSION_EXPIRED_MESSAGE,
   setCsrfToken
@@ -64,5 +65,55 @@ describe("API authentication handling", () => {
 
     await expect(apiDownload("/api/backups/download")).rejects.toThrow(AUTH_SESSION_EXPIRED_MESSAGE);
     expect(expired).toHaveBeenCalledOnce();
+  });
+});
+
+describe("apiUpload settlement on abort and timeout", () => {
+  // A stub faithful enough to drive apiUpload's own event wiring, not a mock
+  // of apiUpload itself -- this is asserting the real XHR event handlers exist
+  // and reject, not that some substitute behaves the way we want.
+  class FakeXhr {
+    status = 0;
+    responseText = "";
+    upload = { onprogress: null as ((event: unknown) => void) | null };
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    onabort: (() => void) | null = null;
+    ontimeout: (() => void) | null = null;
+    open() {}
+    setRequestHeader() {}
+    // Neither fires onload/onerror -- exactly what a real aborted or timed-out
+    // request does, and exactly the case that used to leave the promise
+    // pending forever.
+    send() {}
+  }
+
+  it("rejects instead of hanging forever when the request is aborted", async () => {
+    let instance!: FakeXhr;
+    // A plain function, not an arrow function: vi.fn() only supports `new`
+    // through its mock implementation when that implementation is itself a
+    // function/class -- an arrow function throws "is not a constructor".
+    vi.stubGlobal("XMLHttpRequest", vi.fn().mockImplementation(function XHRCtor(this: unknown) {
+      instance = new FakeXhr();
+      return instance;
+    }));
+
+    const pending = apiUpload("/api/backups/system/import", new Blob(["x"]));
+    instance.onabort?.();
+
+    await expect(pending).rejects.toThrow("The upload was cancelled.");
+  });
+
+  it("rejects instead of hanging forever when the request times out", async () => {
+    let instance!: FakeXhr;
+    vi.stubGlobal("XMLHttpRequest", vi.fn().mockImplementation(function XHRCtor(this: unknown) {
+      instance = new FakeXhr();
+      return instance;
+    }));
+
+    const pending = apiUpload("/api/backups/system/import", new Blob(["x"]));
+    instance.ontimeout?.();
+
+    await expect(pending).rejects.toThrow("The upload timed out before it reached the server.");
   });
 });

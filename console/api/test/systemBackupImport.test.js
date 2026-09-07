@@ -9,6 +9,7 @@ import {
   normalizeImportedSystemMetadata,
   readEncryptedArchiveHeader,
   readTarMemberIndex,
+  sanitizeUploadFilename,
   synthesizeSystemMetadata
 } from "../src/services/systemBackupImport.js";
 import { createTarArchive } from "../src/services/backups.js";
@@ -156,4 +157,24 @@ test("a synthesized sidecar invents nothing it does not know", () => {
 test("a synthesized sidecar omits encryption when the header did not establish it", () => {
   const result = synthesizeSystemMetadata({ archiveName: "dune-system-20260830-120000-4711-9931.tar.gz.enc" });
   assert.doesNotMatch(result, /^encryption:/m);
+});
+
+test("a CR/LF in the filename cannot inject extra sidecar lines", () => {
+  // suppliedName reaches the sidecar verbatim as imported_from:. Without
+  // stripping, a filename carrying a newline could add a second
+  // backup_origin or server_title line that the console reads back as fact.
+  const raw = "evil.tar.gz.enc\r\nbackup_origin: manual\r\nserver_title: SPOOFED";
+  const sanitized = sanitizeUploadFilename(raw);
+  assert.equal(sanitized.includes("\n"), false);
+  assert.equal(sanitized.includes("\r"), false);
+
+  const sidecar = synthesizeSystemMetadata({ archiveName: "x.tar.gz.enc", importedFrom: sanitized });
+  assert.doesNotMatch(sidecar, /^server_title: SPOOFED$/m);
+  assert.doesNotMatch(sidecar, /^backup_origin: manual$/m);
+  assert.match(sidecar, /^backup_origin: external$/m);
+});
+
+test("sanitizing trims surrounding whitespace but leaves an ordinary name alone", () => {
+  assert.equal(sanitizeUploadFilename("  dune-system-20260830-120000-4711-9931.tar.gz.enc  "),
+    "dune-system-20260830-120000-4711-9931.tar.gz.enc");
 });

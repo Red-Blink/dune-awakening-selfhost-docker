@@ -84,6 +84,12 @@ export function listSystemBackups(config) {
       serverTitle: metadata.server_title || "Unknown",
       battlegroupId: metadata.battlegroup_id || "Unknown",
       hasSidecar: existsSync(resolve(directory, `${entry.name}.yaml`)),
+      // Read from the sidecar rather than inferred, so the console can offer
+      // the adopt/keep choice before ever spending a passphrase to find out --
+      // same reasoning as battlegroupId above. A missing field (an archive from
+      // before this existed, or the earlier exclude-then-refuse design) reads
+      // as false, which is correct: those archives genuinely carry none.
+      includesAuditLog: String(metadata.includes_audit_log || "").trim() === "true",
       sizeBytes,
       size: formatBackupSize(sizeBytes)
     });

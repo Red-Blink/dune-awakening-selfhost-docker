@@ -35,7 +35,7 @@ import { createHardwareStatusProvider, performanceSnapshot as collectPerformance
 import { serveStatic, contentTypeForPath } from "./http/staticFiles.js";
 import { discoverServices } from "./services/serviceDiscovery.js";
 import { listSystemBackups, systemBackupBundleMembers, systemBackupDir, validSystemArchiveName, validSystemBackupName } from "./services/systemBackups.js";
-import { looksLikeTar, mintSystemBackupName, normalizeImportedSystemMetadata, readEncryptedArchiveHeader, readTarMemberIndex, synthesizeSystemMetadata } from "./services/systemBackupImport.js";
+import { looksLikeTar, mintSystemBackupName, normalizeImportedSystemMetadata, readEncryptedArchiveHeader, readTarMemberIndex, sanitizeUploadFilename, synthesizeSystemMetadata } from "./services/systemBackupImport.js";
 import { createTarHeader, tarArchiveLength, tarPadding, TAR_TRAILER_BYTES, createBackupDownloadArchive, enrichBackupRows, nextImportedBackupName, normalizeImportedBackupMetadata, readCurrentBattlegroupId, validBackupDownloadName } from "./services/backups.js";
 import { createMemoryBalancer } from "./services/memoryBalancer.js";
 import { collectContainerHealth } from "./services/containerHealth.js";
@@ -1803,14 +1803,20 @@ async function systemBackupRestoreRoute(req, res, name) {
   const identityMode = body?.identityMode === "adopt-backup" || body?.identityMode === "keep-current"
     ? body.identityMode
     : "";
+  // Same shape as identityMode: an unrecognized value becomes no flag rather
+  // than a guess, and restore_system() only requires an explicit answer when
+  // the archive and this host both genuinely have their own audit log.
+  const auditLogMode = body?.auditLogMode === "adopt-backup" || body?.auditLogMode === "keep-current"
+    ? body.auditLogMode
+    : "";
   // Dry run unless apply is explicitly set: the UI previews first, and a
   // request that loses its flag must not replace the host.
   const apply = body?.apply === true || String(body?.apply || "") === "1";
 
-  audit(config, req, "backup.restore-system", { backup: name, apply, identityMode });
+  audit(config, req, "backup.restore-system", { backup: name, apply, identityMode, auditLogMode });
   // The passphrase rides in options.env, never the payload above, which is what
   // audit() records.
-  return task(req, res, "backup", "backupSystemRestore", { backup: name, apply, identityMode }, {
+  return task(req, res, "backup", "backupSystemRestore", { backup: name, apply, identityMode, auditLogMode }, {
     env: { DUNE_SYSTEM_BACKUP_PASSPHRASE: passphrase }
   });
 }
@@ -1845,11 +1851,19 @@ async function systemBackupCreateRoute(req, res) {
 async function systemBackupImportRoute(req, res) {
   if (!applyMutationRateLimit(req, res, "backups.system.import")) return;
   const query = new URL(req.url || "/", "http://localhost").searchParams;
-  const suppliedName = basename(String(query.get("filename") || "")).replace(/\.tar$/i, "");
+  // Stripped of control characters, not just basename()'d: this reaches the
+  // sidecar verbatim as `imported_from:`, and a CR/LF there would let an
+  // uploader inject extra YAML lines (a second backup_origin/server_title)
+  // that the console would read back as fact.
+  const suppliedName = sanitizeUploadFilename(basename(String(query.get("filename") || ""))).replace(/\.tar$/i, "");
   const onConflict = query.get("onConflict") || "";
 
   const directory = systemBackupDir(config);
   mkdirSync(directory, { recursive: true });
+  // backup_system chmods this directory 700; mkdirSync alone leaves it at
+  // umask default (often 0755) the first time anything writes here, and an
+  // import can be that first write on a fresh host.
+  chmodSync(directory, 0o700);
   const staging = resolve(directory, `import-${Date.now()}-${Math.floor(Math.random() * 1e9)}.partial`);
   const discard = () => { try { rmSync(staging, { force: true }); } catch { /* nothing to clean up */ } };
 

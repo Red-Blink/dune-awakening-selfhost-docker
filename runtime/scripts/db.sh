@@ -97,7 +97,8 @@ If gpg reports a checksum error, restore.tar.gz is untrustworthy however
 complete it looks -- delete it rather than extracting it.
 
 To restore one: dune db restore-system <archive> [--dry-run]
-[--adopt-backup-battlegroup|--keep-current-battlegroup]. It restores the
+[--adopt-backup-battlegroup|--keep-current-battlegroup]
+[--adopt-backup-audit-log|--keep-current-audit-log]. It restores the
 database first (while .env still describes the database it can reach), then
 .env, runtime/generated/ and runtime/secrets/, copying whatever it replaces
 to runtime/backups/restore-<timestamp>/ first. It does NOT restart the
@@ -767,6 +768,12 @@ SYSTEM_BACKUP_DIR_DEFAULT="runtime/backups/system"
 SYSTEM_BACKUP_S2K_COUNT=65011712
 # Opt-in only. 0 keeps every system backup, matching DB_AUTO_BACKUP_RETENTION_DAYS.
 SYSTEM_BACKUP_KEEP_DEFAULT="${DUNE_SYSTEM_BACKUP_KEEP:-0}"
+# Unlike SYSTEM_BACKUP_KEEP_DEFAULT above, a restore safety copy is NOT the
+# only copy of anything -- the archive it was restored from still exists, and
+# the live host now IS the restored state. It exists purely so a bad restore
+# can be undone in the minutes right after it, so pruning it defaults to ON
+# with a small keep count rather than requiring opt-in.
+RESTORE_SAFETY_KEEP_DEFAULT="${DUNE_RESTORE_SAFETY_KEEP:-5}"
 # Isolated, disposable GNUPGHOME per invocation -- never the operator's
 # own ~/.gnupg. This is symmetric passphrase encryption only (no keys
 # ever created, imported, or retained), but gpg still writes a keybox/
@@ -804,10 +811,20 @@ system_backup_encryption_available() {
 
 # Resolves the passphrase used to encrypt/decrypt a system backup.
 # DUNE_SYSTEM_BACKUP_PASSPHRASE lets automation (cron, CI, systemd timers)
-# supply it non-interactively; an interactive operator is prompted twice
-# (entry + confirmation) so a typo does not silently produce an archive
-# nobody can ever decrypt. Never echoes the passphrase, never logs it.
+# supply it non-interactively.
+#
+# mode="create" (the default, for backup_system): prompted twice (entry +
+# confirmation) so a typo does not silently produce an archive nobody can
+# ever decrypt -- there is no way to notice a create-time typo later.
+# mode="restore": prompted once. A typo here has no silent failure mode --
+# gpg simply refuses to decrypt and restore_system reports that immediately
+# -- so a second entry only adds friction. This also fixes create's own
+# wording ("Set a passphrase to encrypt...") from being shown, confusingly,
+# while restoring.
+#
+# Never echoes the passphrase, never logs it.
 resolve_system_backup_passphrase() {
+  local mode="${1:-create}"
   local first=""
   local second=""
 
@@ -819,6 +836,14 @@ resolve_system_backup_passphrase() {
   if [ ! -t 0 ]; then
     echo "No passphrase available: not running interactively and DUNE_SYSTEM_BACKUP_PASSPHRASE is not set." >&2
     return 1
+  fi
+
+  if [ "$mode" = "restore" ]; then
+    read -r -s -p "Enter the passphrase for this system backup: " first
+    echo >&2
+    [ -n "$first" ] || { echo "Passphrase cannot be empty." >&2; return 1; }
+    printf '%s' "$first"
+    return 0
   fi
 
   read -r -s -p "Set a passphrase to encrypt this system backup: " first
@@ -1012,6 +1037,16 @@ backup_system() {
     # archive), so a tar-to-tar pipe reuses a tool this feature already
     # requires instead of adding a new one. `--exclude` preserves the
     # same ephemeral-directory exclusion rsync's flag provided.
+    #
+    # web-admin-audit.jsonl (this console's own audit log) is included
+    # deliberately, same as .env and battlegroup.env: a system backup is a
+    # migration artifact, and the audit trail is part of what moves with a
+    # server. restore_system() decides what to do with it at RESTORE time
+    # (adopt vs keep-current, same shape as Battlegroup identity), not here --
+    # see [[system-backup-audit-log-choice]]. An earlier version of this
+    # function excluded it outright, which broke restore for every host that
+    # had ever logged an admin action; do not reintroduce that exclusion
+    # without also updating restore_system()'s audit-log handling below.
     if ! tar -C runtime/generated --exclude='dune-fake-k8s-serviceaccount-*' -cf - . \
         | tar -C "$stage_dir/generated" -xf -; then
       backup_system_cleanup_on_failure
@@ -1122,6 +1157,7 @@ backup_system() {
     echo "s2k_digest: sha256"
     echo "s2k_count: $SYSTEM_BACKUP_S2K_COUNT"
     echo "includes_secrets: true"
+    echo "includes_audit_log: true"
     echo "db_backup_file: $(basename "$db_dump_file")"
     echo "server_title: $(config_value .env SERVER_TITLE || echo unknown)"
     echo "server_region: $(config_value .env SERVER_REGION || echo unknown)"
@@ -1203,6 +1239,60 @@ backup_system() {
   echo "  unset p; rm -f restore.tar.gz"
 }
 
+# Mirrors choose_import_battlegroup_action()'s shape for a different axis: an
+# archive and the current host can each carry their own admin audit history, and
+# only a real conflict (both have one) needs an actual decision. Sets
+# RESTORE_SYSTEM_AUDIT_LOG_ACTION to "none" (archive has none), "adopt-backup"
+# (the extracted copy stands as-is -- the default, and the auto-resolved outcome
+# when only the archive has one), or "keep-current" (the caller restores this
+# host's own copy from the safety copy afterward).
+choose_system_restore_audit_log_action() {
+  local archive_has="$1"
+  local host_has="$2"
+  local requested="${3:-}"
+  local answer=""
+
+  RESTORE_SYSTEM_AUDIT_LOG_ACTION="adopt-backup"
+  if [ "$archive_has" != "1" ]; then
+    RESTORE_SYSTEM_AUDIT_LOG_ACTION="none"
+    return 0
+  fi
+  if [ "$host_has" != "1" ]; then
+    echo "Admin audit history: this host has none yet; the archive's own history will be adopted."
+    return 0
+  fi
+
+  if [ -z "$requested" ]; then
+    if [ "${DUNE_DB_ASSUME_YES:-0}" = "1" ]; then
+      echo "Restore stopped before making changes: choose --adopt-backup-audit-log or --keep-current-audit-log." >&2
+      return 1
+    fi
+    echo "Adopt the backup's audit history when moving the same server to new hardware."
+    echo "Keep this host's own audit history when intentionally restoring into a different server."
+    read -r -p "Audit log choice: [a]dopt backup / [k]eep current / [c]ancel: " answer
+    case "$answer" in
+      a|A|adopt|ADOPT) requested="adopt-backup" ;;
+      k|K|keep|KEEP) requested="keep-current" ;;
+      *) echo "Restore cancelled."; return 1 ;;
+    esac
+  fi
+
+  case "$requested" in
+    adopt-backup)
+      RESTORE_SYSTEM_AUDIT_LOG_ACTION="adopt-backup"
+      echo "Admin audit history: the archive's own history will be adopted."
+      ;;
+    keep-current)
+      RESTORE_SYSTEM_AUDIT_LOG_ACTION="keep-current"
+      echo "Admin audit history: this host's own history will be kept."
+      ;;
+    *)
+      echo "Unknown audit log choice: $requested" >&2
+      return 1
+      ;;
+  esac
+}
+
 # Restores an encrypted system backup produced by backup_system(): the database
 # dump plus .env, runtime/generated/ and runtime/secrets/.
 #
@@ -1221,6 +1311,7 @@ restore_system() {
   local passphrase
   local dry_run=0
   local battlegroup_args=()
+  local audit_log_requested=""
   local safety_dir=""
   local arg
 
@@ -1231,6 +1322,8 @@ restore_system() {
       --dry-run) dry_run=1; shift ;;
       --adopt-backup-battlegroup|--keep-current-battlegroup)
         battlegroup_args+=("$arg"); shift ;;
+      --adopt-backup-audit-log) audit_log_requested="adopt-backup"; shift ;;
+      --keep-current-audit-log) audit_log_requested="keep-current"; shift ;;
       *) echo "Unknown restore-system option: $arg" >&2; exit 2 ;;
     esac
   done
@@ -1246,7 +1339,7 @@ restore_system() {
   trap 'restore_system_cleanup; exit 143' INT TERM HUP
 
   if [ -z "$archive" ]; then
-    echo "Usage: dune db restore-system <archive.tar.gz.enc> [--dry-run] [--adopt-backup-battlegroup|--keep-current-battlegroup]" >&2
+    echo "Usage: dune db restore-system <archive.tar.gz.enc> [--dry-run] [--adopt-backup-battlegroup|--keep-current-battlegroup] [--adopt-backup-audit-log|--keep-current-audit-log]" >&2
     restore_system_cleanup
     exit 2
   fi
@@ -1267,7 +1360,7 @@ restore_system() {
     return 1
   fi
 
-  passphrase="$(resolve_system_backup_passphrase)" || { restore_system_cleanup; return 1; }
+  passphrase="$(resolve_system_backup_passphrase restore)" || { restore_system_cleanup; return 1; }
 
   if ! stage_dir="$(mktemp -d)"; then
     echo "Could not create a staging directory for the restore." >&2
@@ -1314,12 +1407,10 @@ restore_system() {
   local entry
   while IFS= read -r entry; do
     [ -n "$entry" ] || continue
-    case "$entry" in
-      ./generated/web-admin-audit.jsonl)
-        echo "Refusing archive: it carries an audit log, which is never restorable." >&2
-        restore_system_cleanup
-        return 1 ;;
-    esac
+    # An audit log member is not refused: see [[system-backup-audit-log-choice]] --
+    # backup_system() includes it deliberately, and restore_system() resolves
+    # what to do with it below, once its own copy exists on disk (host_has_*) to
+    # compare against. Still subject to the /* and *..* traversal guard below.
     case "$entry" in
       /*|*..*)
         echo "Refusing archive: unsafe member: $entry" >&2
@@ -1356,12 +1447,24 @@ restore_system() {
   generated_count="$(find "$stage_dir/tree/generated" -type f 2>/dev/null | wc -l | tr -d '[:space:]')"
   secrets_count="$(find "$stage_dir/tree/secrets" -type f 2>/dev/null | wc -l | tr -d '[:space:]')"
 
+  # Checked here, before anything is touched, so a dry run can report the
+  # conflict too -- unlike Battlegroup identity, which import_db only resolves
+  # mid-apply and a dry run never reaches.
+  local archive_has_audit_log=0 host_has_audit_log=0
+  [ -f "$stage_dir/tree/generated/web-admin-audit.jsonl" ] && archive_has_audit_log=1
+  [ -f runtime/generated/web-admin-audit.jsonl ] && host_has_audit_log=1
+
   echo
   echo "This archive will replace:"
   echo "  .env"
   echo "  runtime/generated/   ($generated_count files)"
   echo "  runtime/secrets/     ($secrets_count files)"
   echo "  the dune database    ($(basename "$dump"))"
+  if [ "$archive_has_audit_log" = "1" ] && [ "$host_has_audit_log" = "1" ]; then
+    echo
+    echo "This archive and this host each have their own admin audit history."
+    echo "Choose --adopt-backup-audit-log or --keep-current-audit-log when applying."
+  fi
 
   if [ "$dry_run" = "1" ]; then
     echo
@@ -1382,6 +1485,15 @@ restore_system() {
     fi
   fi
 
+  # Resolved here, before the database is touched, so a cancel bails the whole
+  # restore rather than leaving the database replaced but the audit log not yet
+  # decided -- a stricter placement than Battlegroup identity gets, which only
+  # resolves once already inside import_db.
+  if ! choose_system_restore_audit_log_action "$archive_has_audit_log" "$host_has_audit_log" "$audit_log_requested"; then
+    restore_system_cleanup
+    return 1
+  fi
+
   safety_dir="runtime/backups/restore-$(date +%Y%m%d-%H%M%S)"
   if ! mkdir -p "$safety_dir"; then
     echo "Could not create a safety copy directory; refusing to restore." >&2
@@ -1394,12 +1506,26 @@ restore_system() {
   [ -d runtime/secrets ] && cp -a runtime/secrets "$safety_dir/secrets"
   echo "Copied what is about to be replaced to: $safety_dir"
 
-  # Database FIRST, while .env still describes the database this process can
-  # reach. Swapping credentials before the restore would cut the connection the
-  # restore itself depends on.
+  # Database first. import_db reaches Postgres through docker exec, not through
+  # .env, so the order is not about credentials: it is so a failed database
+  # restore leaves the configuration untouched rather than half a host swapped.
+  #
+  # import_db runs in its own subshell and NOT as an `if` condition. Bash turns
+  # errexit off inside anything evaluated as a condition, so a failing
+  # pg_restore would let import_db run to its end and return 0 -- and this
+  # function would then replace .env and every secret on top of a broken
+  # database. The subshell also contains import_db's own `exit` calls, which
+  # would otherwise end the whole script before cleanup and strand the
+  # plaintext staging tree. DUNE_DB_SKIP_RESTART keeps import_db from starting
+  # the stack on the configuration that is about to be replaced.
   echo "Restoring database..."
-  if ! import_db "$dump" "${battlegroup_args[@]}"; then
-    echo "Database restore failed. Configuration and secrets were NOT changed." >&2
+  local import_status=0
+  set +e
+  ( set -e; DUNE_DB_SKIP_RESTART=1 import_db "$dump" "${battlegroup_args[@]}" )
+  import_status=$?
+  set -e
+  if [ "$import_status" -ne 0 ]; then
+    echo "Database restore failed (exit $import_status). Configuration and secrets were NOT changed." >&2
     echo "The previous state is still in: $safety_dir" >&2
     restore_system_cleanup
     return 1
@@ -1417,6 +1543,25 @@ restore_system() {
     restore_system_cleanup
     return 1
   fi
+  # --keep-current-battlegroup told import_db to remap the imported rows to
+  # THIS host's identity. The archive's generated/battlegroup.env still names
+  # the backup's, and has just overwritten ours, so the database and the
+  # identity file would disagree. Put the current one back.
+  local keep_current=0
+  for arg in "${battlegroup_args[@]}"; do
+    [ "$arg" = "--keep-current-battlegroup" ] && keep_current=1
+  done
+  if [ "$keep_current" = "1" ] && [ -f "$safety_dir/generated/battlegroup.env" ]; then
+    cp -a -- "$safety_dir/generated/battlegroup.env" runtime/generated/battlegroup.env
+    echo "Kept this host's Battlegroup identity in runtime/generated/battlegroup.env."
+  fi
+  # Same reasoning, for the audit log: the wholesale generated/ extract just
+  # landed the archive's copy (the "adopt" outcome), so "keep current" means
+  # actively putting this host's own back from the safety copy taken above.
+  if [ "$RESTORE_SYSTEM_AUDIT_LOG_ACTION" = "keep-current" ] && [ -f "$safety_dir/generated/web-admin-audit.jsonl" ]; then
+    cp -a -- "$safety_dir/generated/web-admin-audit.jsonl" runtime/generated/web-admin-audit.jsonl
+    echo "Kept this host's own admin audit history in runtime/generated/web-admin-audit.jsonl."
+  fi
   if ! tar -C "$stage_dir/tree/secrets" -cf - . | tar -C runtime/secrets -xf -; then
     echo "Could not restore runtime/secrets/. Previous state is in: $safety_dir" >&2
     restore_system_cleanup
@@ -1426,13 +1571,14 @@ restore_system() {
   find runtime/secrets -type f -exec chmod 600 {} + 2>/dev/null || true
 
   restore_system_cleanup
+  prune_restore_safety_copies
 
   echo
   echo "System backup restored."
   echo "  replaced state saved in: $safety_dir"
   echo
-  echo "The stack is still running the PREVIOUS configuration. Restart it to pick this up:"
-  echo "  dune restart"
+  echo "Dune services are stopped. Start them to bring the restored configuration up:"
+  echo "  dune start"
   echo
   echo "Note: .env may now carry a different admin console password and different"
   echo "database credentials than the ones this session has been using."
@@ -1495,6 +1641,31 @@ delete_system_backup_files_for_name() {
 # Keeps the newest $keep archives and removes the rest. Never called unless
 # DUNE_SYSTEM_BACKUP_KEEP is set to a positive integer -- an archive is the only
 # copy of the credentials inside it, so silent pruning is opt-in, not default.
+# Keeps the newest $keep restore-<timestamp>/ safety copies under
+# runtime/backups/ and removes the rest. Each one is a plaintext .env plus
+# every secret, made right before a restore overwrote them, so letting them
+# accumulate forever is a slow credential leak with no offsetting benefit
+# once the restore it backs up is confirmed good.
+prune_restore_safety_copies() {
+  local base_dir="${1:-runtime/backups}"
+  local keep="${2:-$RESTORE_SAFETY_KEEP_DEFAULT}"
+  local removed=0
+  local index=0
+  local dir
+
+  validate_positive_integer "$keep" || return 0
+  [ -d "$base_dir" ] || return 0
+
+  while IFS= read -r dir; do
+    [ -n "$dir" ] || continue
+    index=$((index + 1))
+    [ "$index" -gt "$keep" ] || continue
+    rm -rf -- "$dir" && removed=$((removed + 1))
+  done < <(find "$base_dir" -maxdepth 1 -type d -name 'restore-*' 2>/dev/null | sort -r)
+
+  [ "$removed" -eq 0 ] || echo "Removed $removed old restore safety cop$([ "$removed" -eq 1 ] && echo y || echo ies), keeping the newest $keep."
+}
+
 prune_system_backups() {
   local out_dir="${1:-$SYSTEM_BACKUP_DIR_DEFAULT}"
   local keep="${2:-$SYSTEM_BACKUP_KEEP_DEFAULT}"
@@ -2448,7 +2619,12 @@ import_db() {
     }
   fi
 
-  if [ "${DUNE_DB_ASSUME_YES:-0}" = "1" ]; then
+  if [ "${DUNE_DB_SKIP_RESTART:-0}" = "1" ]; then
+    # restore-system replaces .env and the secrets after this returns and then
+    # hands the start to the operator. Starting here would bring the stack up
+    # on the configuration that is about to be replaced.
+    echo "Services remain stopped for the caller to start."
+  elif [ "${DUNE_DB_ASSUME_YES:-0}" = "1" ]; then
     echo "Restarting Dune stack..."
     runtime/scripts/start-all.sh
     echo "Dune stack restart completed."

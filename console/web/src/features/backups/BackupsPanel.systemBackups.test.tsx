@@ -3,6 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { backupsApi } from "../../api/backups";
 import { setCsrfToken } from "../../api/client";
 import { BackupsPanel } from "./BackupsPanel";
+// The real stylesheet, so the preview's own output can be asserted to be
+// visible rather than merely present: .technical-details is display:none
+// outside body.debug, which hid the restore preview's replace list on a live
+// host while every DOM-only assertion still passed.
+import "../../styles.css";
 
 const assert_eq = (actual: unknown, expected: unknown) => expect(actual).toEqual(expected);
 
@@ -43,6 +48,7 @@ function renderPanel(overrides: Partial<Parameters<typeof BackupsPanel>[0]> = {}
     onError={() => {}}
     confirmAction={vi.fn(async () => true)}
     chooseBackupIdentity={vi.fn(async () => "keep-current" as const)}
+    chooseAuditLogAction={vi.fn(async () => "keep-current" as const)}
     chooseImportConflict={vi.fn(async () => "rename" as const)}
     waitForTask={vi.fn(async (task) => ({ ...task, status: "succeeded" }))}
     waitForTaskWithUpdates={vi.fn(async (task) => task)}
@@ -93,7 +99,7 @@ describe("system backups", () => {
     vi.mocked(backupsApi.listSystem).mockResolvedValue({ rows: [{
       name: ARCHIVE, createdAt: "2026-08-30T12:00:00-04:00", origin: "manual",
       encryption: "aes-256-ocb-gpg-aead", serverTitle: "Kovalt", battlegroupId: "sh-abc-def",
-      type: "Manual Backup", source: "Local", hasSidecar: true, sizeBytes: 2048, size: "2 KB"
+      type: "Manual Backup", source: "Local", hasSidecar: true, includesAuditLog: false, sizeBytes: 2048, size: "2 KB"
     }] });
     renderPanel();
     const section = await systemSection();
@@ -180,7 +186,7 @@ describe("system backups", () => {
         name: ARCHIVE, createdAt: "2026-08-30T12:00:00-04:00", origin: "manual",
         encryption: "aes-256-ocb-gpg-aead", serverTitle: "Kovalt", battlegroupId: "sh-abc-def",
         type: "Manual Backup", source: "Local",
-        hasSidecar: true, sizeBytes: 2048, size: "2 KB"
+        hasSidecar: true, includesAuditLog: false, sizeBytes: 2048, size: "2 KB"
       }]
     });
     renderPanel();
@@ -200,7 +206,7 @@ describe("deleting system backups", () => {
         name: ARCHIVE, createdAt: "2026-08-30T12:00:00-04:00", origin: "manual",
         encryption: "aes-256-ocb-gpg-aead", serverTitle: "Kovalt", battlegroupId: "sh-abc-def",
         type: "Manual Backup", source: "Local",
-        hasSidecar: true, sizeBytes: 2048, size: "2 KB"
+        hasSidecar: true, includesAuditLog: false, sizeBytes: 2048, size: "2 KB"
     }] });
     vi.mocked(backupsApi.deleteSystem).mockResolvedValue({ task: { id: "d1", status: "queued" } as never });
     vi.mocked(backupsApi.deleteSystemAll).mockResolvedValue({ task: { id: "d2", status: "queued" } as never });
@@ -244,7 +250,7 @@ describe("restoring a system backup", () => {
   const ROW = {
     name: ARCHIVE, createdAt: "2026-08-30T12:00:00-04:00", origin: "manual",
     encryption: "aes-256-ocb-gpg-aead", serverTitle: "Kovalt", battlegroupId: "sh-abc-def",
-    type: "Manual Backup", source: "Local", hasSidecar: true, sizeBytes: 2048, size: "2 KB"
+    type: "Manual Backup", source: "Local", hasSidecar: true, includesAuditLog: false, sizeBytes: 2048, size: "2 KB"
   };
   const RESTORE_PASSPHRASE = "correct-horse-battery-staple";
 
@@ -306,13 +312,133 @@ describe("restoring a system backup", () => {
     expect(await screen.findByText("Apply Restore")).toBeDisabled();
   });
 
+  it("brings the preview result into view and focuses it once it is readable", async () => {
+    // jsdom implements neither, so they are installed as spies rather than
+    // stubbed out -- which is also the only way to observe the call.
+    const scrollIntoView = vi.fn();
+    const focus = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const originalFocus = HTMLElement.prototype.focus;
+    HTMLElement.prototype.focus = focus;
+    try {
+      await preview();
+      await screen.findByText(/Preview Only - Nothing Changed/);
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+      // nearest, so a card already on screen does not make the page jump.
+      expect(scrollIntoView).toHaveBeenLastCalledWith({ block: "nearest" });
+      expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    } finally {
+      HTMLElement.prototype.focus = originalFocus;
+      delete (Element.prototype as unknown as { scrollIntoView?: unknown }).scrollIntoView;
+    }
+  });
+
+  it("keeps the preview card on screen instead of letting it fade itself out", async () => {
+    await preview();
+    await screen.findByText(/Preview Only - Nothing Changed/);
+    // .backup-result.result-ok animates to opacity 0 after 5s. A preview that
+    // erases itself takes the replace list with it.
+    const card = document.querySelector("section.backup-result");
+    expect(card?.classList.contains("result-persistent")).toBe(true);
+  });
+
+  it("keeps a failed preview card on screen too, so the reason stays readable", async () => {
+    vi.mocked(backupsApi.restoreSystem).mockRejectedValue(new Error("could not be decrypted"));
+    await preview("wrong-passphrase-here");
+    await waitFor(() => expect(screen.getByText(/could not be decrypted/i)).toBeTruthy());
+    const card = document.querySelector("section.backup-result");
+    expect(card?.classList.contains("result-persistent")).toBe(true);
+  });
+
+  it("shows a failed restore's log, where the actual reason is", async () => {
+    // The card's own message is only the exit line. "dune-postgres is not
+    // running", and the fact that nothing was changed, live in the log --
+    // which is useless behind a display:none debug gate.
+    vi.mocked(backupsApi.restoreSystem).mockResolvedValue(
+      { task: { id: "r9", status: "queued", logLines: [
+        { line: "Restoring database..." },
+        { line: "dune-postgres is not running." },
+        { line: "Database restore failed (exit 1). Configuration and secrets were NOT changed." }
+      ] } } as never
+    );
+    renderPanel({ waitForTask: vi.fn(async (task) => ({ ...task, status: "failed", errorMessage: "dune db restore-system ... failed with exit 1" })) as never });
+    const field = await openRestore();
+    fireEvent.change(field, { target: { value: RESTORE_PASSPHRASE } });
+    fireEvent.click(await screen.findByText("Preview Restore"));
+
+    const details = await waitFor(() => {
+      const found = document.querySelector("details.technical-details");
+      if (!found) throw new Error("no details element");
+      return found as HTMLDetailsElement;
+    });
+    expect(details.open).toBe(true);
+    expect(getComputedStyle(details).display).not.toBe("none");
+    expect(details.textContent).toContain("dune-postgres is not running.");
+    expect(details.textContent).toContain("were NOT changed");
+  });
+
+  it("opens the technical details on a successful preview, since its message promises the replace list is shown below", async () => {
+    await preview();
+    await screen.findByText(/Preview Only - Nothing Changed/);
+    // TechnicalDetails renders a native <details>, collapsed by default -- a
+    // preview result must override that or "Review what it would replace
+    // below" points at content the operator cannot see without an extra click.
+    const detailsElement = document.querySelector("details.technical-details");
+    expect(detailsElement).not.toBeNull();
+    expect((detailsElement as HTMLDetailsElement).open).toBe(true);
+    expect(within(detailsElement as HTMLElement).getByText("Dry run: nothing was changed")).toBeTruthy();
+    // Present in the DOM is not the same as on screen: styles.css hides every
+    // .technical-details outside body.debug, so this needs the real
+    // stylesheet's computed value, not just the element.
+    expect(getComputedStyle(detailsElement as HTMLElement).display).not.toBe("none");
+  });
+
   it("applies only after confirmation, carrying the identity choice", async () => {
     await preview();
     await waitFor(() => expect(screen.getByText("Apply Restore")).not.toBeDisabled());
     fireEvent.click(screen.getByText("Apply Restore"));
+    // ROW.includesAuditLog is false, so chooseAuditLogAction is never asked and
+    // auditLogMode carries its unused default -- restore_system() ignores it
+    // entirely when the archive has no audit log to make a choice about.
     await waitFor(() => expect(backupsApi.restoreSystem).toHaveBeenLastCalledWith(ARCHIVE, {
-      passphrase: RESTORE_PASSPHRASE, apply: true, identityMode: "keep-current"
+      passphrase: RESTORE_PASSPHRASE, apply: true, identityMode: "keep-current", auditLogMode: "keep-current"
     }));
+  });
+
+  it("asks about the audit log only when the sidecar says the archive carries one", async () => {
+    const chooseAuditLogAction = vi.fn(async () => "adopt-backup" as const);
+    renderPanel({ chooseAuditLogAction });
+    await preview();
+    await waitFor(() => expect(screen.getByText("Apply Restore")).not.toBeDisabled());
+    fireEvent.click(screen.getByText("Apply Restore"));
+    // The default fixture row has includesAuditLog: false, so nothing should
+    // have been asked -- this is the negative half of the pairing below.
+    await waitFor(() => expect(backupsApi.restoreSystem).toHaveBeenCalled());
+    expect(chooseAuditLogAction).not.toHaveBeenCalled();
+  });
+
+  it("carries the audit-log choice through when the archive includes one", async () => {
+    vi.mocked(backupsApi.listSystem).mockResolvedValue({ rows: [{ ...ROW, includesAuditLog: true }] });
+    const chooseAuditLogAction = vi.fn(async () => "adopt-backup" as const);
+    renderPanel({ chooseAuditLogAction });
+    await preview();
+    await waitFor(() => expect(screen.getByText("Apply Restore")).not.toBeDisabled());
+    fireEvent.click(screen.getByText("Apply Restore"));
+    await waitFor(() => expect(chooseAuditLogAction).toHaveBeenCalledWith({ backup: ARCHIVE }));
+    await waitFor(() => expect(backupsApi.restoreSystem).toHaveBeenLastCalledWith(ARCHIVE, {
+      passphrase: RESTORE_PASSPHRASE, apply: true, identityMode: "keep-current", auditLogMode: "adopt-backup"
+    }));
+  });
+
+  it("cancels the whole restore if the audit-log choice is cancelled", async () => {
+    vi.mocked(backupsApi.listSystem).mockResolvedValue({ rows: [{ ...ROW, includesAuditLog: true }] });
+    const chooseAuditLogAction = vi.fn(async () => "cancel" as const);
+    renderPanel({ chooseAuditLogAction });
+    await preview();
+    await waitFor(() => expect(screen.getByText("Apply Restore")).not.toBeDisabled());
+    fireEvent.click(screen.getByText("Apply Restore"));
+    await waitFor(() => expect(chooseAuditLogAction).toHaveBeenCalled());
+    expect(backupsApi.restoreSystem).not.toHaveBeenCalledWith(ARCHIVE, expect.objectContaining({ apply: true }));
   });
 
   it("does not apply when the confirmation is declined", async () => {
@@ -327,13 +453,13 @@ describe("restoring a system backup", () => {
     expect(vi.mocked(backupsApi.restoreSystem).mock.calls.every(([, body]) => body.apply === false)).toBe(true);
   });
 
-  it("says a restart is required once the restore succeeds", async () => {
+  it("says the services are stopped and need starting once the restore succeeds", async () => {
     await preview();
     await waitFor(() => expect(screen.getByText("Apply Restore")).not.toBeDisabled());
     fireEvent.click(screen.getByText("Apply Restore"));
     // The database is restored but the running stack still holds the old
     // configuration -- saying so is the whole point of the card.
-    await waitFor(() => expect(screen.getByText(/restart it from Server Controls/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/start them from Server Controls/i)).toBeTruthy());
   });
 
   it("clears the passphrase from the DOM once the restore finishes", async () => {
@@ -348,7 +474,7 @@ describe("importing a system backup", () => {
   const ROW = {
     name: ARCHIVE, createdAt: "2026-08-30T12:00:00-04:00", origin: "manual",
     encryption: "aes-256-ocb-gpg-aead", serverTitle: "Kovalt", battlegroupId: "sh-abc-def",
-    type: "Manual Backup", source: "Local", hasSidecar: true, sizeBytes: 2048, size: "2 KB"
+    type: "Manual Backup", source: "Local", hasSidecar: true, includesAuditLog: false, sizeBytes: 2048, size: "2 KB"
   };
   let sent: { url: string; body: unknown; headers: Record<string, string>; withCredentials: boolean }[] = [];
   let responses: { status: number; body: unknown }[] = [];

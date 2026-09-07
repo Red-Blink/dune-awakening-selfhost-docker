@@ -53,6 +53,7 @@ test("listSystemBackups reads sidecars and ignores staging files", () => {
     "encryption: aes-256-ocb-gpg-aead",
     "server_title: Kovalt",
     "battlegroup_id: sh-abc-def",
+    "includes_audit_log: true",
     ""
   ].join("\n"));
   writeFileSync(join(directory, "dune-system-20260901-000000-1-1.tar.gz.enc.partial.77"), "staging");
@@ -65,7 +66,25 @@ test("listSystemBackups reads sidecars and ignores staging files", () => {
   assert.equal(rows[0].battlegroupId, "sh-abc-def");
   assert.equal(rows[0].encryption, "aes-256-ocb-gpg-aead");
   assert.equal(rows[0].hasSidecar, true);
+  assert.equal(rows[0].includesAuditLog, true);
   assert.equal(rows[0].size, "2 KB");
+});
+
+// A missing field must read as false, not throw or read as truthy-string --
+// this is the state of every archive from before includes_audit_log existed,
+// and those archives genuinely carry no audit log.
+test("listSystemBackups reads includesAuditLog as false when the sidecar predates the field", () => {
+  const { directory, config } = makeHost();
+  writeFileSync(join(directory, ARCHIVE), Buffer.alloc(1024));
+  writeFileSync(join(directory, `${ARCHIVE}.yaml`), [
+    "artifact_id: dune-system-20260830-120000-4711-9931",
+    "battlegroup_id: sh-abc-def",
+    ""
+  ].join("\n"));
+
+  const rows = listSystemBackups(config);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].includesAuditLog, false);
 });
 
 // Regression: sorting once fell back to the filename when created_at was absent,
@@ -249,6 +268,28 @@ test("restore passes the Battlegroup identity choice through to import_db", () =
   assert.deepEqual(
     buildDuneArgs("backupSystemRestore", { backup: ARCHIVE, apply: true, identityMode: "nonsense" }),
     ["db", "restore-system", ARCHIVE]
+  );
+});
+
+test("restore passes the audit-log choice through, independent of identity", () => {
+  assert.deepEqual(
+    buildDuneArgs("backupSystemRestore", { backup: ARCHIVE, apply: true, auditLogMode: "adopt-backup" }),
+    ["db", "restore-system", ARCHIVE, "--adopt-backup-audit-log"]
+  );
+  assert.deepEqual(
+    buildDuneArgs("backupSystemRestore", { backup: ARCHIVE, apply: true, auditLogMode: "keep-current" }),
+    ["db", "restore-system", ARCHIVE, "--keep-current-audit-log"]
+  );
+  // An unrecognised value must not become a flag.
+  assert.deepEqual(
+    buildDuneArgs("backupSystemRestore", { backup: ARCHIVE, apply: true, auditLogMode: "nonsense" }),
+    ["db", "restore-system", ARCHIVE]
+  );
+  // Both axes can be answered on the same restore -- a migration adopting
+  // both the Battlegroup identity and the audit history at once.
+  assert.deepEqual(
+    buildDuneArgs("backupSystemRestore", { backup: ARCHIVE, apply: true, identityMode: "adopt-backup", auditLogMode: "adopt-backup" }),
+    ["db", "restore-system", ARCHIVE, "--adopt-backup-battlegroup", "--adopt-backup-audit-log"]
   );
 });
 

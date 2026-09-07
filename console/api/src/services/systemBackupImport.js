@@ -86,6 +86,15 @@ export function readTarMemberIndex(filePath) {
   return members;
 }
 
+// The query filename is basename()d before it reaches here, but a CR/LF
+// survives basename() and this value is later written verbatim into the
+// sidecar as `imported_from:`. Without stripping it, an uploader could inject
+// extra YAML lines -- a second backup_origin or server_title -- that the
+// console would then read back as fact.
+export function sanitizeUploadFilename(value) {
+  return String(value || "").replace(/[\r\n]+/g, " ").trim();
+}
+
 export function mintSystemBackupName(now = new Date(), pid = process.pid) {
   const pad = (value, width = 2) => String(value).padStart(width, "0");
   const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`

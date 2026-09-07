@@ -1442,6 +1442,10 @@ main { padding: 22px; min-width: 0; }
 .task-warning-count svg { flex: 0 0 auto; }
 .task-technical-details { display: block; }
 body.debug .technical-details { display: block; }
+/* .technical-details is a debug-only disclosure, hidden above unless
+   body.debug is set. A backup result card that tells the operator to read
+   what is inside it (the restore preview's replace list) opts out. */
+.technical-details.backup-result-details { display: block; }
 .update-log-details { margin-top: 6px; }
 .technical-details summary, .task-technical-details summary {
   cursor: pointer;
@@ -6197,6 +6201,12 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 .backup-result-copy { display: grid; gap: 6px; }
 .backup-result-copy h4, .backup-result-copy p { margin: 0; }
 .backup-result.result-ok, .backup-result.result-fail, .backup-result.result-danger { animation: backupResultFadeOut .4s ease 5s forwards; }
+/* The fade above suits a short confirmation nobody needs to re-read. A card
+   carrying output the operator is told to read -- the restore preview's own
+   message says "review what it would replace below" -- or any failure must
+   stay put instead of erasing itself after five seconds. Same 0-2-0
+   specificity as the rule above, so it has to stay below it to win. */
+.backup-result.result-persistent { animation: none; opacity: 1; transform: none; }
 .backup-result.result-attention { border-color: #c68b4a; color: #ffd08a; }
 .backup-result.result-attention .badge { border-color: #c68b4a; color: #ffd08a; }
 .backup-result.result-attention h4, .backup-result.result-attention p { color: #ffd08a; }
@@ -6221,7 +6231,8 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
    Automatic Backups, which previously had none at all. */
 .backups-panel > .action-section { margin-top: 18px; }
 .backup-group-title { margin-top: 0; }
-.backup-group-note { margin: 0 0 4px; color: #ad9f89; }
+/* margin intentionally omitted: .action-section p { margin: 0 } (0-1-1) always wins over this (0-1-0), and the parent grid's 10px gap already spaces this from what follows. */
+.backup-group-note { color: #ad9f89; }
 .backup-note-warning strong { color: var(--danger-text); }
 .backup-note-warning code {
   color: #f1dfc1;
