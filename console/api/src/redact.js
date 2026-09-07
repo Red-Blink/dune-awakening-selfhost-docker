@@ -36,7 +36,7 @@ export function redactValue(value) {
   if (value && typeof value === "object") {
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [
       key,
-      /password|token|secret|credential/i.test(key) ? "<redacted>" : redactValue(item)
+      /password|passphrase|token|secret|credential/i.test(key) ? "<redacted>" : redactValue(item)
     ]));
   }
   if (typeof value === "string") return redact(value);
