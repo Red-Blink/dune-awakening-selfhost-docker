@@ -1431,7 +1431,7 @@ function summarizeHomeStatus(status: string, readiness: string, readinessWarning
     ? restartStartObserved ? "Starting" : "Restarting Battlegroup"
     : runningAction === "stop" ? "Stopping" : isStarting ? "Starting" : "";
   const warmingOverall = /^Warming$/i.test(rawGames.label) ? "Warming" : "";
-  const overall = readinessReady && !runningAction ? "OK" : isStarting ? transitionOverall : runningAction ? transitionOverall : serverState.stopped || actionStopped ? "Stopped" : coreReadyWithReview ? "Needs Review" : warmingOverall || liveOverall;
+  const overall = readinessReady && !runningAction ? "OK" : isStarting ? transitionOverall : runningAction ? transitionOverall : serverState.databaseOnly && !actionStopped ? "Database Only" : serverState.stopped || actionStopped ? "Stopped" : coreReadyWithReview ? "Needs Review" : warmingOverall || liveOverall;
   const attentionHealth = !isStarting && !restartSuccessAwaitingFreshStatus && (serverState.stopped || actionStopped || actionFailed) ? attentionHomeHealthCards() : null;
   const transitionAction: "start" | "stop" | "restart" | "" = restartStartObserved
     ? "start"
@@ -1692,6 +1692,29 @@ function isHomeStartComplete(status: string, readiness: string) {
   return containersReady && listenersReady && databaseReady && flsReady && rabbitReady;
 }
 
+// dune-postgres, dune-orchestrator and dune-coriolis-coordinator all run
+// without a Battlegroup -- the console starts Postgres by itself for backups
+// and restores -- so none of them says whether the Battlegroup is up. Only the
+// game stack does.
+const gameStackContainers = [
+  "dune-rmq-admin",
+  "dune-rmq-game",
+  "dune-text-router",
+  "dune-director",
+  "dune-server-gateway",
+  "dune-server-survival-1",
+  "dune-server-overmap"
+];
+
+export function isGameStackDown(status: string) {
+  const containerLines = sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
+  const reported = gameStackContainers.filter((name) => containerLines.some((line) => containerStatusLineHas(name, line, /.*/)));
+  // A partial container list is not evidence of anything.
+  if (reported.length < gameStackContainers.length) return false;
+  return gameStackContainers.every((name) => containerLines.some((line) =>
+    containerStatusLineHas(name, line, /\b(missing|stopped|exited|dead|not running)\b/i)));
+}
+
 export function containerStatusLineHas(containerName: string, line: string, statusPattern: RegExp) {
   const trimmed = line.trim();
   const firstSpace = trimmed.search(/\s/);
@@ -1733,7 +1756,7 @@ function preferKnownHomeHealth(primary: { label: string; status: string; detail:
   return /^Unknown$/i.test(primary.label) && !/^Unknown$/i.test(fallback.label) ? fallback : primary;
 }
 
-function getHomeServerState(status: string, readiness: string) {
+export function getHomeServerState(status: string, readiness: string) {
   const text = `${status}\n${readiness}`;
   const overall = findLineValue(status, ["overall"]);
   const containerLines = sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
@@ -1758,12 +1781,19 @@ function getHomeServerState(status: string, readiness: string) {
     /\bNo\s+(running\s+)?containers\b/i.test(text),
     /\b(all|dune)\s+containers\s+(are\s+)?(stopped|down)\b/i.test(text),
     allContainersMissing,
-    publishOnlyPartialState
+    publishOnlyPartialState,
+    isGameStackDown(status)
   ];
+  // A state the console creates on purpose: it starts Postgres by itself for
+  // backups and restores, and leaves it up. Calling that plainly "stopped"
+  // hides a running database, and calling it "starting" was the bug this
+  // replaces -- nothing is starting.
+  const databaseUp = containerLines.some((line) => containerStatusLineHas("dune-postgres", line, /^Up\b/i));
+  const databaseOnly = databaseUp && isGameStackDown(status);
   const stopped = !bootStarting && stoppedSignals.some(Boolean);
   const running = !stopped && runningSignals.some(Boolean);
   const starting = bootStarting || (!stopped && !running && coreRuntimeContainerUp && (/\bUp\s+\d+/i.test(text) || /\b(WARMING|WAIT|STARTING)\b/i.test(text)));
-  return { running, stopped, starting };
+  return { running, stopped, starting, databaseOnly };
 }
 
 function isHomeBootStarting(status: string, readiness: string) {
@@ -1771,6 +1801,7 @@ function isHomeBootStarting(status: string, readiness: string) {
   if (!text.trim()) return false;
   if (/\b(server|stack)\s+(is\s+)?(stopped|offline)\b/i.test(text) || /\bNo\s+(running\s+)?containers\b/i.test(text)) return false;
   if (/Overall:\s*(READY|STOPPED|OFFLINE)/i.test(status) || /^READY:/m.test(readiness)) return false;
+  if (isGameStackDown(status)) return false;
   const containerLines = sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
   const anyContainerUp = containerLines.some((line) => /\bUp\b/i.test(line));
   const coreStartupContainerUp = containerLines.some((line) =>
@@ -1795,6 +1826,7 @@ function homeOverallBadge(value: string) {
   const normalized = String(value || "").trim().toLowerCase();
   if (/\b(restarting|restart|stopping|starting)\b/.test(normalized)) return "WARN";
   if (/^stopped$/i.test(value)) return "WARN";
+  if (/^database only$/i.test(value)) return "WARN";
   if (/^issue(?: detected)?$/i.test(value)) return "WARN";
   if (/warming/i.test(value)) return "Info";
   if (/stopped|not running|offline/i.test(value)) return "WARN";
