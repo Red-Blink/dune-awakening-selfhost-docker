@@ -50,7 +50,14 @@ case "${1:-} ${2:-}" in
     shift 2
     case "${1:-}" in
       psql)
-        printf '%s\n' "${MOCK_PARTITION_COUNT:-30}"
+        # The dune-schema table count and the partition count are different
+        # questions with different answers on a fresh host: the database
+        # exists and is empty.
+        if printf '%s ' "$@" | grep -q information_schema; then
+          printf '%s\n' "${MOCK_DUNE_TABLE_COUNT:-42}"
+        else
+          printf '%s\n' "${MOCK_PARTITION_COUNT:-30}"
+        fi
         ;;
       pg_dump)
         ;;
@@ -495,7 +502,14 @@ case "${1:-} ${2:-}" in
     shift 2
     case "${1:-}" in
       psql)
-        printf '%s\n' "${MOCK_PARTITION_COUNT:-30}"
+        # The dune-schema table count and the partition count are different
+        # questions with different answers on a fresh host: the database
+        # exists and is empty.
+        if printf '%s ' "$@" | grep -q information_schema; then
+          printf '%s\n' "${MOCK_DUNE_TABLE_COUNT:-42}"
+        else
+          printf '%s\n' "${MOCK_PARTITION_COUNT:-30}"
+        fi
         ;;
       pg_dump) ;;
       pg_restore)
@@ -2005,3 +2019,303 @@ if [ -f "$case39_marker" ]; then
   exit 1
 fi
 echo "PASS image-check-keeps-running-database-guard"
+
+# --- Case 40: a host with no Battlegroup identity can still restore --------
+# choose_import_battlegroup_action refuses when the CURRENT id is unavailable,
+# and it refuses before reading --adopt-backup-battlegroup, so that flag cannot
+# answer it. The identity it wants is the one the archive is delivering: a
+# brand-new host, which is what system backups exist for.
+
+case40_root="$test_root/case40"
+mkdir -p "$case40_root"
+case40_archive="$(make_restorable_archive "$case40_root")"
+if [ -z "$case40_archive" ]; then
+  echo "FAIL restore-works-without-a-current-identity: could not build an archive"
+  exit 1
+fi
+mkdir -p "$case40_root/tmp"
+diverge_host_state "$case40_root/work"
+# The defining condition: this host has never had an identity.
+rm -f "$case40_root/work/runtime/generated/battlegroup.env"
+
+case40_status=0
+run_restore "$case40_root" "$case40_root/tmp" "$TEST_PASSPHRASE" "$(basename "$case40_archive")" || case40_status=$?
+
+if [ "$case40_status" -ne 0 ]; then
+  echo "FAIL restore-works-without-a-current-identity: expected exit 0, got $case40_status"
+  cat "$case40_root/restore.log"
+  exit 1
+fi
+if grep -q "identity continuity cannot be verified" "$case40_root/restore.log"; then
+  echo "FAIL restore-works-without-a-current-identity: refused over an identity the archive itself supplies"
+  cat "$case40_root/restore.log"
+  exit 1
+fi
+if ! grep -q "BATTLEGROUP_ID=sh-test-1234" "$case40_root/work/runtime/generated/battlegroup.env"; then
+  echo "FAIL restore-works-without-a-current-identity: the archive's identity was not restored"
+  exit 1
+fi
+if ! grep -q "$SECRET_ADMIN_PASSWORD" "$case40_root/work/.env"; then
+  echo "FAIL restore-works-without-a-current-identity: the restore did not complete"
+  exit 1
+fi
+echo "PASS restore-works-without-a-current-identity"
+
+# --- Case 41: seeding is undone when the database restore fails -----------
+# Otherwise a failed restore leaves an identity behind that a later run would
+# read as pre-existing, quietly changing which branch it takes.
+
+case41_root="$test_root/case41"
+mkdir -p "$case41_root/altbin"
+case41_archive="$(make_restorable_archive "$case41_root")"
+mkdir -p "$case41_root/tmp"
+rm -f "$case41_root/work/runtime/generated/battlegroup.env"
+
+# Same shim as case 17: fail the real restore, leave the TOC check working.
+cat > "$case41_root/altbin/docker" <<STUB
+#!/usr/bin/env bash
+if [ "\${1:-}" = "exec" ] && printf '%s\\n' "\$@" | grep -qx pg_restore && printf '%s\\n' "\$@" | grep -qx -- -d; then
+  echo "pg_restore: error: simulated restore failure" >&2
+  exit 1
+fi
+exec "$bin_dir/docker" "\$@"
+STUB
+chmod +x "$case41_root/altbin/docker"
+
+case41_status=0
+(
+  cd "$case41_root/work"
+  PATH="$case41_root/altbin:$bin_dir:$PATH" TMPDIR="$case41_root/tmp" \
+    DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" DUNE_DB_ASSUME_YES=1 \
+    bash runtime/scripts/db.sh restore-system "$(basename "$case41_archive")"
+) > "$case41_root/restore.log" 2>&1 || case41_status=$?
+
+if [ "$case41_status" -eq 0 ]; then
+  echo "FAIL restore-identity-seed-rolled-back: expected a non-zero exit"
+  cat "$case41_root/restore.log"
+  exit 1
+fi
+if [ -f "$case41_root/work/runtime/generated/battlegroup.env" ]; then
+  echo "FAIL restore-identity-seed-rolled-back: a failed restore left an identity behind"
+  cat "$case41_root/work/runtime/generated/battlegroup.env"
+  exit 1
+fi
+echo "PASS restore-identity-seed-rolled-back"
+
+# --- Case 42: an empty database skips the pre-import safety backup --------
+# The safety backup protects data the import replaces. A host that has never
+# restored has none, and backup_db cannot produce one anyway: its validation
+# requires dune.world_partition, which does not exist yet. Without this the
+# restore fails on its own safety net rather than on anything being wrong.
+
+case42_root="$test_root/case42"
+mkdir -p "$case42_root"
+case42_archive="$(make_restorable_archive "$case42_root")"
+if [ -z "$case42_archive" ]; then
+  echo "FAIL restore-skips-safety-backup-on-empty-database: could not build an archive"
+  exit 1
+fi
+mkdir -p "$case42_root/tmp"
+diverge_host_state "$case42_root/work"
+
+case42_status=0
+(
+  cd "$case42_root/work"
+  PATH="$bin_dir:$PATH" TMPDIR="$case42_root/tmp" MOCK_DUNE_TABLE_COUNT=0 \
+    DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" DUNE_DB_ASSUME_YES=1 \
+    bash runtime/scripts/db.sh restore-system "$(basename "$case42_archive")"
+) > "$case42_root/restore.log" 2>&1 || case42_status=$?
+
+if [ "$case42_status" -ne 0 ]; then
+  echo "FAIL restore-skips-safety-backup-on-empty-database: expected exit 0, got $case42_status"
+  cat "$case42_root/restore.log"
+  exit 1
+fi
+if ! grep -q "nothing to protect" "$case42_root/restore.log"; then
+  echo "FAIL restore-skips-safety-backup-on-empty-database: the skip was not reported"
+  cat "$case42_root/restore.log"
+  exit 1
+fi
+if ! grep -q "$SECRET_ADMIN_PASSWORD" "$case42_root/work/.env"; then
+  echo "FAIL restore-skips-safety-backup-on-empty-database: the restore did not complete"
+  exit 1
+fi
+echo "PASS restore-skips-safety-backup-on-empty-database"
+
+# --- Case 43: a populated database still gets its safety backup -----------
+# The skip is gated on the database being empty, not on the backup failing, so
+# a populated one that fails validation must still stop the import.
+
+case43_root="$test_root/case43"
+mkdir -p "$case43_root"
+case43_archive="$(make_restorable_archive "$case43_root")"
+mkdir -p "$case43_root/tmp"
+diverge_host_state "$case43_root/work"
+
+case43_status=0
+(
+  cd "$case43_root/work"
+  PATH="$bin_dir:$PATH" TMPDIR="$case43_root/tmp" \
+    DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" DUNE_DB_ASSUME_YES=1 \
+    bash runtime/scripts/db.sh restore-system "$(basename "$case43_archive")"
+) > "$case43_root/restore.log" 2>&1 || case43_status=$?
+
+if [ "$case43_status" -ne 0 ]; then
+  echo "FAIL restore-keeps-safety-backup-on-populated-database: expected exit 0, got $case43_status"
+  cat "$case43_root/restore.log"
+  exit 1
+fi
+if grep -q "nothing to protect" "$case43_root/restore.log"; then
+  echo "FAIL restore-keeps-safety-backup-on-populated-database: skipped the safety backup on a populated database"
+  cat "$case43_root/restore.log"
+  exit 1
+fi
+echo "PASS restore-keeps-safety-backup-on-populated-database"
+
+# --- Case 44: the sidecar must not claim an audit log the archive lacks ----
+# The tar stages whatever runtime/generated/ contains, so a host that has never
+# logged an admin action produces an archive with no audit log. A sidecar that
+# says otherwise makes the console offer an adopt/keep choice over history that
+# is not there, and restore_system then discards the answer -- it checks the
+# extracted tree, not the sidecar.
+
+case44_root="$test_root/case44"
+mkdir -p "$case44_root/work"
+seed_repo_tree "$case44_root/work"
+rm -f "$case44_root/work/runtime/generated/web-admin-audit.jsonl"
+
+(
+  cd "$case44_root/work"
+  PATH="$bin_dir:$PATH" DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" \
+    bash runtime/scripts/db.sh backup-system
+) > "$case44_root/backup.log" 2>&1
+
+case44_sidecar="$(find "$case44_root/work/runtime/backups/system" -maxdepth 1 -name '*.tar.gz.enc.yaml' | head -n1)"
+if [ -z "$case44_sidecar" ]; then
+  echo "FAIL sidecar-does-not-claim-a-missing-audit-log: no sidecar was written"
+  cat "$case44_root/backup.log"
+  exit 1
+fi
+if grep -qx "includes_audit_log: true" "$case44_sidecar"; then
+  echo "FAIL sidecar-does-not-claim-a-missing-audit-log: claims an audit log this host never had"
+  cat "$case44_sidecar"
+  exit 1
+fi
+echo "PASS sidecar-does-not-claim-a-missing-audit-log"
+
+# --- Case 45: the whole fresh-host sequence, end to end -------------------
+# Every bug this feature produced had one shape: code that is correct on a host
+# which has been running, and impossible on one that has not. Six of them, none
+# reachable by a fixture that mocked a single condition, all found only by
+# restoring onto a real new machine.
+#
+# This is that machine. It has a .env (the console configured it) and nothing
+# else: no game images, no Battlegroup identity, no Funcom token, no admin
+# audit history, no Postgres container, and an empty database. It then walks
+# the actual operator sequence -- refused for want of game files, install, then
+# restore -- and asserts the end state. Any future guard that a new host cannot
+# satisfy fails here rather than on someone's server.
+
+case45_root="$test_root/case45"
+mkdir -p "$case45_root"
+case45_archive="$(make_restorable_archive "$case45_root")"
+if [ -z "$case45_archive" ]; then
+  echo "FAIL fresh-host-end-to-end: could not build an archive to restore"
+  cat "$case45_root/backup.log"
+  exit 1
+fi
+
+# The bare host, assembled by removing everything a host earns by running.
+case45_host="$case45_root/fresh"
+mkdir -p "$case45_host/work" "$case45_host/tmp"
+seed_repo_tree "$case45_host/work"
+rm -f "$case45_host/work/runtime/generated/battlegroup.env"
+rm -f "$case45_host/work/runtime/generated/web-admin-audit.jsonl"
+rm -f "$case45_host/work/runtime/secrets/funcom-token.txt"
+cp "$case45_archive" "$case45_host/work/runtime/backups/system/"
+case45_name="$(basename "$case45_archive")"
+
+case45_marker="$case45_host/start-invoked"
+case45_state="$case45_host/pg-state"
+printf 0 > "$case45_state"
+seed_start_postgres_stub "$case45_host/work" "$case45_marker" "$case45_state"
+
+# 1. No game files yet: refused, and nothing written.
+set +e
+(
+  cd "$case45_host/work"
+  PATH="$bin_dir:$PATH" TMPDIR="$case45_host/tmp" \
+    MOCK_POSTGRES_STATE_FILE="$case45_state" MOCK_POSTGRES_IMAGE_PRESENT=0 \
+    MOCK_DUNE_TABLE_COUNT=0 DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" \
+    DUNE_DB_ASSUME_YES=1 \
+    bash runtime/scripts/db.sh restore-system "$case45_name"
+) > "$case45_host/refused.log" 2>&1
+case45_refused=$?
+set -e
+
+if [ "$case45_refused" -eq 0 ]; then
+  echo "FAIL fresh-host-end-to-end: restored with no game images installed"
+  cat "$case45_host/refused.log"
+  exit 1
+fi
+if ! grep -q "DUNE_GAME_ASSETS_MISSING" "$case45_host/refused.log"; then
+  echo "FAIL fresh-host-end-to-end: the refusal did not name the missing game files"
+  cat "$case45_host/refused.log"
+  exit 1
+fi
+if find "$case45_host/work/runtime/backups" -maxdepth 1 -type d -name 'restore-*' | grep -q .; then
+  echo "FAIL fresh-host-end-to-end: wrote a safety copy for a restore it then refused"
+  exit 1
+fi
+
+# 2. Game files installed. Everything else about the host is still bare.
+set +e
+(
+  cd "$case45_host/work"
+  PATH="$bin_dir:$PATH" TMPDIR="$case45_host/tmp" \
+    MOCK_POSTGRES_STATE_FILE="$case45_state" MOCK_POSTGRES_IMAGE_PRESENT=1 \
+    MOCK_DUNE_TABLE_COUNT=0 DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" \
+    DUNE_DB_ASSUME_YES=1 \
+    bash runtime/scripts/db.sh restore-system "$case45_name"
+) > "$case45_host/restore.log" 2>&1
+case45_status=$?
+set -e
+
+if [ "$case45_status" -ne 0 ]; then
+  echo "FAIL fresh-host-end-to-end: expected exit 0 on the fresh host, got $case45_status"
+  cat "$case45_host/restore.log"
+  exit 1
+fi
+
+# The end state, checked the way an operator would check it.
+if [ ! -f "$case45_marker" ]; then
+  echo "FAIL fresh-host-end-to-end: Postgres was never started for the restore"
+  exit 1
+fi
+if grep -q "Creating database backup" "$case45_host/restore.log"; then
+  echo "FAIL fresh-host-end-to-end: tried to back up an empty database it cannot validate"
+  cat "$case45_host/restore.log"
+  exit 1
+fi
+if ! grep -q "BATTLEGROUP_ID=sh-test-1234" "$case45_host/work/runtime/generated/battlegroup.env"; then
+  echo "FAIL fresh-host-end-to-end: the archive's Battlegroup identity did not land"
+  exit 1
+fi
+if ! grep -q "$SECRET_FUNCOM_TOKEN" "$case45_host/work/runtime/secrets/funcom-token.txt"; then
+  echo "FAIL fresh-host-end-to-end: the Funcom token did not land"
+  exit 1
+fi
+if ! grep -q "$SECRET_ADMIN_PASSWORD" "$case45_host/work/.env"; then
+  echo "FAIL fresh-host-end-to-end: .env was not restored"
+  exit 1
+fi
+if ! grep -q "$SECRET_SIETCH_PASSWORD" "$case45_host/work/runtime/generated/sietch-config.json"; then
+  echo "FAIL fresh-host-end-to-end: runtime/generated was not restored"
+  exit 1
+fi
+if ! find "$case45_host/work/runtime/backups" -maxdepth 1 -type d -name 'restore-*' | grep -q .; then
+  echo "FAIL fresh-host-end-to-end: no safety copy was written for the restore that applied"
+  exit 1
+fi
+assert_no_plaintext_leak fresh-host-end-to-end "$case45_host/tmp"
+echo "PASS fresh-host-end-to-end"

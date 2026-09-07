@@ -538,6 +538,12 @@ async function isInitializedStackPresent() {
   ) return true;
   try {
     const names = await dockerPsNames();
+    // Every container here is evidence that this host has actually been
+    // deployed. dune-orchestrator is deliberately NOT: it is the console's own
+    // helper, it runs on a host that has never deployed anything, and counting
+    // it made a machine with no game files, no Funcom token and no Battlegroup
+    // identity report itself as fully set up -- hiding the wizard that is the
+    // only way to deploy one.
     return names.some((name) => [
       "dune-postgres",
       "dune-rmq-admin",
@@ -546,8 +552,7 @@ async function isInitializedStackPresent() {
       "dune-director",
       "dune-server-gateway",
       "dune-server-survival-1",
-      "dune-server-overmap",
-      "dune-orchestrator"
+      "dune-server-overmap"
     ].includes(name));
   } catch {
     return false;
@@ -769,6 +774,7 @@ async function handleApi(req, res) {
   if (path === "/api/updates/apply-game" && req.method === "POST") return task(req, res, "updates", "updateApply", {});
   if (path === "/api/updates/fix-steamcmd" && req.method === "POST") return task(req, res, "updates", "updateFixSteamcmd", {});
   if (path === "/api/updates/install-assets" && req.method === "POST") return task(req, res, "updates", "updateInstallAssets", {});
+  if (path === "/api/console/reload" && req.method === "POST") return task(req, res, "console", "consoleReload", {});
   if (path === "/api/updates/check-stack" && req.method === "POST") return task(req, res, "updates", "selfUpdateCheck", {});
   if (path === "/api/updates/apply-stack" && req.method === "POST") return task(req, res, "updates", "selfUpdateApply", {});
   if (path === "/api/updates/qa/status") {

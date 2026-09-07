@@ -28,6 +28,21 @@ export function backupIdentityDiffers(currentBattlegroupId: unknown, backupBattl
   return current !== "Unknown" && backup !== "Unknown" && current !== backup;
 }
 
+// What to send when the two identities do NOT differ, which covers two very
+// different situations. On a configured host they match, and keeping the
+// current one is right. On a host that has no identity at all -- a fresh
+// machine receiving a migration, the case system backups exist for -- there is
+// nothing to keep, and import_db refuses "keep-current" outright because it
+// cannot verify continuity against an ID that does not exist. Adopting the
+// archive's is the only coherent answer there, and it mirrors how the audit log
+// is already handled when only the archive has one.
+export function defaultBackupIdentityMode(currentBattlegroupId: unknown, backupBattlegroupId: unknown) {
+  const current = String(currentBattlegroupId || "Unknown");
+  const backup = String(backupBattlegroupId || "Unknown");
+  if (current === "Unknown" && backup !== "Unknown") return "adopt-backup" as const;
+  return "keep-current" as const;
+}
+
 export const backupsApi = {
   list: () => api<{ stdout: string; currentBattlegroupId?: string; rows?: Record<string, unknown>[] }>("/api/backups"),
   create: () => post<{ task: Task }>("/api/backups/create"),

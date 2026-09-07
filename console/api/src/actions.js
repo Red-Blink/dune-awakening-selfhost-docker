@@ -141,6 +141,7 @@ export const ROUTE_ACTIONS = {
   "POST /api/updates/apply-game":              "updates:apply",
   "POST /api/updates/fix-steamcmd":            "updates:fix",
   "POST /api/updates/install-assets":          "updates:install-assets",
+  "POST /api/console/reload":                  "server:console-reload",
   // Its own action, deliberately NOT updates:check. updates:check is in
   // EXTRA_READ_ACTIONS so a monitoring key can ask "is a game update
   // available" -- that route is absorbed by updateCheckCache. This one runs

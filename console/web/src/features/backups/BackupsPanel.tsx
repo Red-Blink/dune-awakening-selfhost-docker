@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { backupIdentityDiffers, backupsApi } from "../../api/backups";
+import { backupIdentityDiffers, backupsApi, defaultBackupIdentityMode } from "../../api/backups";
 import type { SystemImportConflict } from "../../api/backups";
 import { apiUpload } from "../../api/client";
+import { serverApi } from "../../api/server";
 import type { SystemBackupRow } from "../../api/backups";
 import type { Task } from "../../api/setup";
 import { DataTable } from "../../components/common/DataTable";
@@ -59,6 +60,12 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
   const [importResult, setImportResult] = useState<BackupResult | null>(null);
   const [systemRows, setSystemRows] = useState<SystemBackupRow[]>([]);
   const [systemResult, setSystemResult] = useState<BackupResult | null>(null);
+  // Seconds left before the Console reloads itself after a restore, or null
+  // when no reload is pending. The restored .env is only read at startup, so
+  // without this the operator is looking at a console running the old
+  // configuration with no indication of it.
+  const [consoleReloadIn, setConsoleReloadIn] = useState<number | null>(null);
+  const [consoleReloading, setConsoleReloading] = useState(false);
   const systemResultRef = useRef<HTMLElement | null>(null);
   const [systemPassphrase, setSystemPassphrase] = useState("");
   const [systemPassphraseConfirm, setSystemPassphraseConfirm] = useState("");
@@ -341,7 +348,7 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
         { label: "After", value: "A stack restart is required; the admin password may change", tone: "danger" }
       ]
     }))) return;
-    let identityMode: BackupIdentityChoice = "keep-current";
+    let identityMode: BackupIdentityChoice = defaultBackupIdentityMode(currentBattlegroupId, backupBattlegroupId);
     if (backupIdentityDiffers(currentBattlegroupId, backupBattlegroupId)) {
       identityMode = await chooseBackupIdentity({ backup, currentBattlegroupId, backupBattlegroupId });
       if (identityMode === "cancel") return;
@@ -369,6 +376,9 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
         details
       })
     );
+    // Only after a restore that actually applied: the Console is still running
+    // the pre-restore .env until its container is recreated.
+    if (final?.status === "succeeded") setConsoleReloadIn(5);
     closeSystemRestore();
     if (final?.status === "succeeded") await refreshSystemBackups();
   }
@@ -546,6 +556,45 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
     if (systemResult.status !== "running") card.focus?.({ preventScroll: true });
     card.scrollIntoView?.({ block: "nearest" });
   }, [systemResult?.status, systemResult?.title]);
+  // Ticks the post-restore reload down and then fires it. Separate from the
+  // request itself so a cancel is possible right up to the last second, and so
+  // an already-running reload cannot be started twice.
+  useEffect(() => {
+    if (consoleReloadIn === null || consoleReloading) return;
+    if (consoleReloadIn > 0) {
+      const id = window.setTimeout(() => setConsoleReloadIn((current) => (current === null ? null : current - 1)), 1000);
+      return () => window.clearTimeout(id);
+    }
+    setConsoleReloading(true);
+    void (async () => {
+      try {
+        await serverApi.reloadConsole();
+      } catch (error) {
+        // The container can be gone before the response arrives, which is a
+        // successful reload rather than a failure. Only report something that
+        // is clearly not that.
+        const reason = error instanceof Error ? error.message : String(error);
+        if (!/fetch|network|load failed|aborted/i.test(reason)) onError(reason);
+      }
+      // Wait for the Console to answer again, then reload the page so the
+      // restored configuration is what the browser is talking to. The session
+      // may be invalid on the other side if the archive carried a different
+      // admin password -- landing on the login screen is the correct outcome.
+      const deadline = Date.now() + 120000;
+      const settle = async () => {
+        if (Date.now() > deadline) { window.location.reload(); return; }
+        try {
+          const response = await fetch("/api/health", { cache: "no-store" });
+          if (response.ok) { window.location.reload(); return; }
+        } catch {
+          // Still down; that is expected while the container is recreated.
+        }
+        window.setTimeout(settle, 1000);
+      };
+      window.setTimeout(settle, 2000);
+    })();
+  }, [consoleReloadIn, consoleReloading]);
+
   const backupNames = rows.map((row) => String(row.name || row.backupName || "")).filter(Boolean);
   const allSelected = backupNames.length > 0 && backupNames.every((name) => selectedBackups.has(name));
   function toggleBackup(name: string, checked: boolean) {
@@ -579,7 +628,7 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
             const backup = String(row.backupName || row.name || "Selected backup");
             const backupBattlegroupId = String(row.battlegroupId || "Unknown");
             const identityMismatch = backupIdentityDiffers(currentBattlegroupId, backupBattlegroupId);
-            let identityMode: BackupIdentityChoice = "keep-current";
+            let identityMode: BackupIdentityChoice = defaultBackupIdentityMode(currentBattlegroupId, backupBattlegroupId);
             if (identityMismatch) {
               identityMode = await chooseBackupIdentity({ backup, currentBattlegroupId, backupBattlegroupId });
               if (identityMode === "cancel") return;
@@ -695,6 +744,18 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
             <button disabled={Boolean(busyAction)} onClick={closeSystemRestore}>Cancel</button>
             <button disabled={Boolean(busyAction) || restorePassphrase.length < 12} onClick={() => run(previewSystemRestore)}>Preview Restore</button>
             <button className="danger" disabled={Boolean(busyAction) || !restorePreviewed} onClick={() => run(applySystemRestore)}>Apply Restore</button>
+          </div>
+        </div>}
+        {consoleReloadIn !== null && <div className="result-panel backup-result result-persistent result-attention">
+          <div className="panel-title backup-result-title">
+            <div className="backup-result-copy">
+              <h4>{consoleReloading ? "Restarting The Console" : `Restarting The Console In ${consoleReloadIn}s`}</h4>
+              <p>
+                The Console is still running the configuration from before the restore. Restarting it loads the
+                restored one. If the archive carried a different admin password you will be asked to sign in again.
+              </p>
+            </div>
+            {!consoleReloading && <button aria-label="Cancel the console restart" onClick={() => setConsoleReloadIn(null)}>Cancel</button>}
           </div>
         </div>}
         {systemResult && <BackupResultCard result={systemResult} cardRef={systemResultRef} />}

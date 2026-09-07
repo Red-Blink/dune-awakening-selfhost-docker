@@ -171,6 +171,13 @@ postgres_is_running() {
 # a tag comparison could never match a real image. The question here is only
 # whether any local Funcom Postgres image exists; resolve_postgres_image_tag
 # picks the tag once one does.
+# Counts tables in the dune schema. start-postgres.sh creates the database, but
+# on a host that has never restored or migrated it is empty -- which is a
+# different thing from "unavailable" and needs a different answer.
+dune_schema_table_count() {
+  docker exec dune-postgres psql -U dune -d dune -tAc     "select count(*) from information_schema.tables where table_schema = 'dune'" 2>/dev/null     | tr -d '[:space:]'
+}
+
 postgres_image_present() {
   docker images --format '{{.Repository}}' 2>/dev/null \
     | grep -qx registry.funcom.com/funcom/self-hosting/igw-postgres
@@ -1251,7 +1258,16 @@ backup_system() {
     echo "s2k_digest: sha256"
     echo "s2k_count: $SYSTEM_BACKUP_S2K_COUNT"
     echo "includes_secrets: true"
-    echo "includes_audit_log: true"
+    # Mirrors what the staging tar actually captured, which copies only files
+    # that exist. A host that has never logged an admin action has no audit
+    # log, and claiming one makes the console offer an adopt/keep choice over
+    # history that is not in the archive -- restore_system then discards the
+    # answer, because it checks the extracted tree rather than the sidecar.
+    if [ -f runtime/generated/web-admin-audit.jsonl ]; then
+      echo "includes_audit_log: true"
+    else
+      echo "includes_audit_log: false"
+    fi
     echo "db_backup_file: $(basename "$db_dump_file")"
     echo "server_title: $(config_value .env SERVER_TITLE || echo unknown)"
     echo "server_region: $(config_value .env SERVER_REGION || echo unknown)"
@@ -1623,12 +1639,39 @@ restore_system() {
   # would otherwise end the whole script before cleanup and strand the
   # plaintext staging tree. DUNE_DB_SKIP_RESTART keeps import_db from starting
   # the stack on the configuration that is about to be replaced.
+  # A host that has never run the game has no runtime/generated/battlegroup.env,
+  # so current_battlegroup_id() is empty and choose_import_battlegroup_action
+  # refuses outright -- before it looks at --adopt-backup-battlegroup, so that
+  # flag cannot answer it. The identity it wants to verify against is the one
+  # this archive is delivering, which is a genuine chicken-and-egg on the exact
+  # host system backups exist for.
+  #
+  # Installing the archive's identity file first resolves it honestly: the
+  # backup then matches the host, import_db reports "already matches" and asks
+  # nothing. This only ever runs when the host has no identity of its own --
+  # never overwriting one, so a real mismatch still goes through the adopt/keep
+  # choice. It is a file this restore is about to write anyway; if the database
+  # restore fails below, it is removed again so the host is left as it was.
+  local seeded_identity=0
+  if [ ! -f runtime/generated/battlegroup.env ] && [ -f "$stage_dir/tree/generated/battlegroup.env" ]; then
+    mkdir -p runtime/generated
+    if cp -a -- "$stage_dir/tree/generated/battlegroup.env" runtime/generated/battlegroup.env; then
+      seeded_identity=1
+      echo "This host had no Battlegroup identity; adopting the archive's for the restore."
+    fi
+  fi
+
   echo "Restoring database..."
   local import_status=0
   set +e
   ( set -e; DUNE_DB_SKIP_RESTART=1 import_db "$dump" "${battlegroup_args[@]}" )
   import_status=$?
   set -e
+  if [ "$import_status" -ne 0 ] && [ "$seeded_identity" = "1" ]; then
+    # Put the host back to having no identity, so a failed restore leaves
+    # nothing behind that a later run would read as pre-existing.
+    rm -f runtime/generated/battlegroup.env
+  fi
   if [ "$import_status" -ne 0 ]; then
     echo "Database restore failed (exit $import_status). Configuration and secrets were NOT changed." >&2
     echo "The previous state is still in: $safety_dir" >&2
@@ -2647,6 +2690,17 @@ import_db() {
   choose_import_battlegroup_action "$backup_file" "$battlegroup_action" || exit 1
 
   identity_snapshot="$(capture_current_account_identities)"
+
+  # A pre-import backup protects data this import is about to replace. On a host
+  # whose database is still empty there is none, and backup_db cannot even
+  # produce one: its validation requires dune.world_partition, which does not
+  # exist yet, so the import would fail on the safety net rather than on
+  # anything being wrong. Gated on zero tables, not on the validation failing,
+  # so a populated database that fails validation still stops the import.
+  if [ "$create_safety_backup" = "1" ] && [ "$(dune_schema_table_count)" = "0" ]; then
+    echo "No pre-import safety backup: this database has no tables yet, so there is nothing to protect."
+    create_safety_backup=0
+  fi
 
   echo "WARNING: importing a database backup replaces current battlegroup database state."
   if [ "$create_safety_backup" = "1" ]; then

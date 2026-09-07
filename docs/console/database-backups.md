@@ -170,6 +170,50 @@ nothing is asked. From a shell, the same choice is
 `--adopt-backup-audit-log` / `--keep-current-audit-log`, and a dry run
 reports the conflict even though it changes nothing.
 
+### The Console restarts itself afterwards
+
+The Console reads `.env` once, at startup, so immediately after a restore it
+is still running the configuration the restore replaced. It now says so and
+recreates its own container after a five-second countdown, which you can
+cancel.
+
+The recreate runs in a detached helper, because the Console cannot destroy
+and replace the container it is running inside and still report the result.
+It recreates only -- the image is not rebuilt, since a restore changes
+configuration rather than Console code.
+
+If the archive carried a different admin password, the session ends with it
+and the login screen wants the **restored** server's password. That is the
+correct outcome, not a failure. From a shell the same operation is
+`dune console reload`.
+
+### Restoring onto a brand-new host
+
+A restore needs the Funcom database image, and that image is not pullable:
+it exists only after SteamCMD has downloaded the game files and their image
+tarballs have been loaded. A host that has never run the game has neither, so
+the restore stops before it changes anything and says so.
+
+Install the game files first. From a shell:
+
+```bash
+dune update install-assets
+```
+
+or press **Install Game Files** on the console's Updates page -- the same
+operation either way. It downloads the depot, loads the images, and stops
+there: no database is created, migrated or reseeded, which matters because the
+restore is about to supply one. (`dune update install`, by contrast, does all
+of that and would wipe world partitions the restore then replaces.)
+
+It refuses while a world server is running, since it deliberately cannot stop
+one; `--force` overrides that.
+
+The download is several GB. From the console it runs as a task with its own
+timeout, `ADMIN_ASSET_DOWNLOAD_TIMEOUT_MS` (4 hours by default); if a very
+slow link exceeds it the task is killed mid-download and needs
+`dune update fix-steamcmd` before retrying.
+
 ### A stopped battlegroup starts Postgres by itself
 
 Stopping the battlegroup does not stop the database, it removes the
