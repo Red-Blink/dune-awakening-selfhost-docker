@@ -130,12 +130,31 @@ test("a running game container still counts as a deployed stack", { timeout: 300
   }
 });
 
-test("installed game files count as a deployed stack with nothing running", { timeout: 30000 }, async () => {
+test("game files alone do not end first-run setup, so a restore keeps the wizard", { timeout: 30000 }, async () => {
+  // install-assets writes image-tags.env precisely so a host that has never
+  // deployed can receive a system restore. Counting it on its own declared
+  // setup complete midway through that restore and took the operator to the
+  // console, away from the wizard driving it.
   const repoRoot = makeRepoRoot();
   writeFileSync(join(repoRoot, "runtime/generated/image-tags.env"), "DUNE_WORLD_IMAGE_TAG=test\n");
   try {
     const files = await readSetupState(repoRoot, ["dune-orchestrator"]);
-    assert.equal(files.initialized, true, "image-tags.env means the game files were installed here");
+    assert.equal(files.initialized, false, "installed game files are not proof this host was deployed");
+    assert.equal(files.complete, false, "the wizard must stay up until the restore supplies a token and identity");
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("game files plus a Funcom token still count as a deployed stack", { timeout: 30000 }, async () => {
+  // The case the file evidence exists for: a configured host that has lost a
+  // generated file must not be sent back through first-run setup.
+  const repoRoot = makeRepoRoot();
+  writeFileSync(join(repoRoot, "runtime/generated/image-tags.env"), "DUNE_WORLD_IMAGE_TAG=test\n");
+  writeFileSync(join(repoRoot, "runtime/secrets/funcom-token.txt"), "token\n");
+  try {
+    const files = await readSetupState(repoRoot, ["dune-orchestrator"]);
+    assert.equal(files.initialized, true, "a configured host keeps its escape hatch");
     assert.equal(files.complete, true);
   } finally {
     rmSync(repoRoot, { recursive: true, force: true });

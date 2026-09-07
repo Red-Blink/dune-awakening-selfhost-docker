@@ -531,10 +531,20 @@ function isSetupComplete() {
 
 async function isInitializedStackPresent() {
   if (isSetupComplete()) return true;
+  // These files say game files are installed, which is no longer the same as
+  // "this host was deployed": install-assets writes them precisely so a host
+  // that has never deployed can receive a system restore. Paired with a Funcom
+  // token they still cover the case they exist for -- a configured host that
+  // has lost a generated file -- but on their own they were enough to declare
+  // setup complete mid-restore and take the operator to the console, away from
+  // the wizard driving it.
   if (
-    existsSync(resolve(config.generatedDir, "image-tags.env")) ||
-    existsSync(resolve(config.generatedDir, "server-catalog.json")) ||
-    existsSync(resolve(config.generatedDir, "partition-catalog.json"))
+    existsSync(resolve(config.secretsDir, "funcom-token.txt")) &&
+    (
+      existsSync(resolve(config.generatedDir, "image-tags.env")) ||
+      existsSync(resolve(config.generatedDir, "server-catalog.json")) ||
+      existsSync(resolve(config.generatedDir, "partition-catalog.json"))
+    )
   ) return true;
   try {
     const names = await dockerPsNames();
