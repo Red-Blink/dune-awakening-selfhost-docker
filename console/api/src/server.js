@@ -531,13 +531,10 @@ function isSetupComplete() {
 
 async function isInitializedStackPresent() {
   if (isSetupComplete()) return true;
-  // These files say game files are installed, which is no longer the same as
-  // "this host was deployed": install-assets writes them precisely so a host
-  // that has never deployed can receive a system restore. Paired with a Funcom
-  // token they still cover the case they exist for -- a configured host that
-  // has lost a generated file -- but on their own they were enough to declare
-  // setup complete mid-restore and take the operator to the console, away from
-  // the wizard driving it.
+  // Game files installed is not the same as this host was deployed:
+  // install-assets writes them so a host that never deployed can receive a
+  // restore. The token is what still covers the case these exist for -- a
+  // configured host that lost a generated file.
   if (
     existsSync(resolve(config.secretsDir, "funcom-token.txt")) &&
     (

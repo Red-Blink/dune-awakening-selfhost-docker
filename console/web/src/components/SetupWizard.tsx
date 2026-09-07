@@ -3,6 +3,7 @@ import { setupApi, type Check, type Task } from "../api/setup";
 import { PreflightCheckCard } from "./PreflightCheckCard";
 import { SecretInput } from "./SecretInput";
 import { TaskProgress } from "./TaskProgress";
+import { RestoreChecklist, buildRestoreRows, imageLoadProgress, installedAssetsSize, type RestoreStepId } from "./RestoreChecklist";
 import { getServerPorts, getAdminPort } from "../api/serverPorts";
 import { backupsApi } from "../api/backups";
 import { serverApi } from "../api/server";
@@ -48,10 +49,36 @@ const restoreSteps: { id: StepId; label: string }[] = [
 // passphrase: that is asked for again if the sequence has not reached apply.
 const RESTORE_PROGRESS_KEY = "arrakis.setupRestore";
 const restoreOperations = new Set(["updateInstallAssets", "backupSystemRestore"]);
+const restoreStageLabels: Record<RestoreStepId, string> = {
+  assets: "Installing game files",
+  verify: "Checking the archive",
+  apply: "Restoring",
+  reload: "Restarting the console"
+};
+
+function restoreStageLabel(stage: RestoreStepId) {
+  return restoreStageLabels[stage];
+}
+
+function stepForOperation(operation: string): RestoreStepId | null {
+  return operation === "updateInstallAssets" ? "assets" : null;
+}
+
+function storedRestoreStep(stage: string | undefined): RestoreStepId | null {
+  return stage && stage in restoreStageLabels ? stage as RestoreStepId : null;
+}
+
+function restoreChecklistTitle(step: RestoreStepId | null, done: boolean, failed: boolean) {
+  if (done) return "Restore complete";
+  if (failed) return "Restore stopped";
+  return step ? "Restoring" : "Restore steps";
+}
 const regions = ["Europe", "North America", "South America", "Asia", "Oceania", "Africa"];
 type SetupConfig = { SERVER_TITLE: string; SERVER_REGION: string; SERVER_IP: string; SERVER_IP_MODE: string; HOST_DATACENTER_ID: string; STEAM_APP_ID: string };
 const terminalStatuses = new Set(["succeeded", "failed", "cancelled"]);
-const completionRedirectSeconds = 10;
+// The restore ends by restarting the console, which takes the page away, so
+// this is the window the operator has to read the result at all.
+const completionRedirectSeconds = 15;
 const deploymentSuccessHoldMs = 3000;
 const defaultSetupConfig: SetupConfig = { SERVER_TITLE: "My Dune Server", SERVER_REGION: "Europe", SERVER_IP: "auto", SERVER_IP_MODE: "public", HOST_DATACENTER_ID: "dune-docker", STEAM_APP_ID: "4754530" };
 const datacenterIdPattern = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
@@ -78,9 +105,10 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
   const [archiveError, setArchiveError] = useState("");
   const [uploadPercent, setUploadPercent] = useState(-1);
   const [passphrase, setPassphrase] = useState("");
-  const [restoreStage, setRestoreStage] = useState("");
+  const [restoreStep, setRestoreStep] = useState<RestoreStepId | null>(null);
   const [restoreError, setRestoreError] = useState("");
   const [restoreDone, setRestoreDone] = useState(false);
+  const [assetsSize, setAssetsSize] = useState("");
   const onSetupCompleteRef = useRef(onSetupComplete);
   // Set once a restore has been resumed, so the step clamp above stops steering.
   const resumedRef = useRef(false);
@@ -115,9 +143,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
     let cancelled = false;
     setupApi.tasks().then(({ tasks }) => {
       if (cancelled) return;
-      // install-assets writes image-tags.env, which is enough for the server to
-      // call setup "complete" -- so a refresh mid-restore would otherwise land
-      // on the full console instead of back here. Resume the restore first.
+      // A refresh mid-restore must come back here, not to the full console.
       const latestRestore = tasks.find((item) => restoreOperations.has(item.operation) && !terminalStatuses.has(item.status));
       let storedRestore: { archive?: string; stage?: string } | null = null;
       try {
@@ -136,7 +162,9 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
         }
         if (latestRestore) {
           setTask(latestRestore);
-          setRestoreStage(storedRestore?.stage || "Restoring");
+          // Dry run and apply share an operation, so only the stored stage
+          // can tell them apart.
+          setRestoreStep(stepForOperation(latestRestore.operation) || storedRestoreStep(storedRestore?.stage) || "apply");
           void watchTaskToEnd(latestRestore.id);
         }
         return;
@@ -153,17 +181,23 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
   }, [mode]);
 
   useEffect(() => {
+    // The restore starts its own countdown and its final task is not an init,
+    // so the branch below would otherwise cancel it.
+    if (restoreDone) return;
     if (task?.operation !== "init" || task.status !== "succeeded" || mode !== "first-run") {
       setRedirectCountdown(null);
       return;
     }
     setRedirectCountdown(completionRedirectSeconds);
-  }, [mode, task?.id, task?.operation, task?.status]);
+  }, [mode, restoreDone, task?.id, task?.operation, task?.status]);
 
   useEffect(() => {
     if (redirectCountdown === null) return;
     if (redirectCountdown <= 0) {
-      onSetupCompleteRef.current?.();
+      // A restore restarts the console instead of opening it: the restored
+      // .env is only read at startup.
+      if (restoreDone) void serverApi.reloadConsole().catch(() => undefined);
+      else onSetupCompleteRef.current?.();
       return;
     }
     const id = window.setTimeout(() => setRedirectCountdown((current) => current === null ? null : current - 1), 1000);
@@ -187,11 +221,8 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
     void watchInitTask(result.task.id);
   }
 
-  // A Funcom database backup restores game data onto a server that already
-  // exists. It carries no .env, no credentials and no Battlegroup identity, so
-  // it cannot set a host up. The server refuses it by reading the archive's
-  // leading OpenPGP packet; this check exists only to say why, before a
-  // possibly large upload rather than after it.
+  // The server is the real gate, reading the archive's OpenPGP packet. This
+  // only explains the refusal before a possibly large upload rather than after.
   function rejectReasonForArchive(file: File) {
     if (/\.(backup|dump|sql)$/i.test(file.name)) {
       return "That is a Funcom database backup, not a system backup. It restores game data onto a server that already exists, so it cannot set this host up. Look for dune-system-*.tar on the old server's Backups page, under System Backups (Encrypted).";
@@ -256,42 +287,43 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
     }
   }
 
-  async function runRestoreTask(stage: string, start: () => Promise<{ task: Task }>) {
-    setRestoreStage(stage);
+  async function runRestoreTask(stage: RestoreStepId, start: () => Promise<{ task: Task }>) {
+    setRestoreStep(stage);
     persistRestoreProgress(archiveName, stage);
     const started = (await start()).task;
     setTask(started);
     const final = await watchTaskToEnd(started.id);
     if (final.status !== "succeeded") {
-      throw new Error(final.errorMessage || `${stage} did not finish.`);
+      throw new Error(final.errorMessage || `${restoreStageLabel(stage)} did not finish.`);
     }
     return final;
   }
 
-  // Install game files, prove the passphrase, apply, then reload the console.
   // The dry run is a step rather than an implementation detail: it is what
   // stops a wrong passphrase reaching anything destructive.
   async function runRestoreSequence() {
     setRestoreError("");
     try {
-      await runRestoreTask("Installing game files", () => updatesApi.installAssets());
-      await runRestoreTask("Checking the archive", () => backupsApi.restoreSystem(archiveName, { passphrase, apply: false }));
-      await runRestoreTask("Restoring", () => backupsApi.restoreSystem(archiveName, {
+      const assets = await runRestoreTask("assets", () => updatesApi.installAssets());
+      setAssetsSize(installedAssetsSize((assets.logLines || []).map((row) => row.line)));
+      await runRestoreTask("verify", () => backupsApi.restoreSystem(archiveName, { passphrase, apply: false }));
+      await runRestoreTask("apply", () => backupsApi.restoreSystem(archiveName, {
         passphrase,
         apply: true,
         identityMode: "adopt-backup",
         auditLogMode: "adopt-backup"
       }));
+      setRestoreStep("reload");
       setRestoreDone(true);
-      setRestoreStage("Restarting the console");
       clearRestoreProgress();
-      await serverApi.reloadConsole().catch(() => undefined);
       const finishStep = stepIndex("finish");
       setMaxUnlockedStep((value) => Math.max(value, finishStep));
       setStep(finishStep);
+      // Deferred to the countdown so the finish screen is readable.
+      setRedirectCountdown(completionRedirectSeconds);
     } catch (error) {
+      // Keep the failed step: the checklist row is what says where it stopped.
       setRestoreError(error instanceof Error ? error.message : String(error));
-      setRestoreStage("");
     }
   }
 
@@ -331,7 +363,8 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
   // Mirrors the route's own rule, so a passphrase that cannot work never
   // starts a multi-gigabyte install.
   const passphraseReady = passphrase.length >= 12 && new Set(passphrase).size >= 5;
-  const restoreRunning = Boolean(restoreStage) && !restoreError;
+  const restoreRunning = Boolean(restoreStep) && !restoreError;
+  const taskLogLines = (task?.logLines || []).map((row) => row.line);
   const stepReadyById: Record<StepId, boolean> = {
     welcome: true,
     host: checksReady,
@@ -373,7 +406,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
           <ul className="requirements">
             <li>Best experience: run it directly on a Linux server.</li>
             <li>Also possible: Docker Desktop on Windows/WSL2 or a virtual machine.</li>
-            <li>You will need your Funcom self-host token and a server with enough CPU, memory, disk, and open game ports.</li>
+            <li>You will need your <a href="https://account.duneawakening.com/" target="_blank" rel="noreferrer noopener">Funcom self-host token</a> and a server with enough CPU, memory, disk, and open game ports.</li>
           </ul>
           {mode === "first-run" && <div className="setup-path-choice">
             <h4>What should this host do?</h4>
@@ -410,9 +443,20 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
         {activeStep === "restore" && <>
           <h2>Restore</h2>
           <p className="muted">Installs the game files this host is missing, checks the passphrase, then replaces this host's configuration, credentials and database with the archive's.</p>
-          <p className="danger-note">The archive's admin password replaces this one, so you may be asked to sign in again when the console restarts.</p>
-          {!restoreStage && !restoreDone && <button className="update-action" disabled={!archiveName || !passphraseReady} onClick={() => void runRestoreSequence()}>Start Restore</button>}
-          {restoreStage && <p>{restoreStage}...</p>}
+          {!restoreStep && !restoreDone && <button className="update-action" disabled={!archiveName || !passphraseReady} onClick={() => void runRestoreSequence()}>Start Restore</button>}
+          {/* Rendered before the run too, so the four tasks and their order are
+              known going in rather than revealed one line at a time. */}
+          <RestoreChecklist
+            title={restoreChecklistTitle(restoreStep, restoreDone, Boolean(restoreError))}
+            rows={buildRestoreRows({
+              current: restoreStep,
+              finished: restoreDone,
+              failed: Boolean(restoreError),
+              // Counting while it runs, total size once it is done.
+              details: { assets: restoreStep === "assets" ? imageLoadProgress(taskLogLines) : assetsSize }
+            })}
+            note="The archive's admin password replaces this one. You may need to sign in again."
+          />
           {restoreError && <p className="danger-note">{restoreError}</p>}
           {task && <TaskProgress task={task} />}
         </>}
@@ -447,6 +491,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
         {activeStep === "token" && <>
           <h2>Funcom Token</h2>
           <p>Paste your Funcom self-host token here. When you continue, the console saves it securely on this server and keeps it out of logs.</p>
+          <p className="muted">Create or copy one at <a href="https://account.duneawakening.com/" target="_blank" rel="noreferrer noopener">account.duneawakening.com</a>.</p>
           {existingToken && !token && <p className="muted">An existing token is already saved. Paste a new one only if you want to replace it.</p>}
           <SecretInput value={token} onChange={(event) => setToken(event.target.value)} placeholder="Paste token" />
           {!hasToken && <p className="theme-note">Paste your Funcom self-host token to continue to deployment.</p>}
@@ -551,8 +596,11 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
         {activeStep === "finish" && <>
           <div className="setup-finish-celebration" aria-hidden="true"><span /><span /><span /><span /><span /></div>
           <h2>Congratulations</h2>
-          <p>{mode === "first-run" ? "The server was installed successfully. The full console is ready to open." : "Setup completed successfully. The server has been redeployed and the full console is still available."}</p>
-          {mode === "first-run" && <p className="success-note setup-success-countdown">Opening the full console in <strong>{redirectCountdown ?? completionRedirectSeconds}</strong> seconds.</p>}
+          <p>{restoreDone
+            ? "The system backup was restored. This host now carries the archive's configuration, credentials and database."
+            : mode === "first-run" ? "The server was installed successfully. The full console is ready to open." : "Setup completed successfully. The server has been redeployed and the full console is still available."}</p>
+          {mode === "first-run" && <p className="success-note setup-success-countdown">{restoreDone ? "Restarting the console in " : "Opening the full console in "}<strong>{redirectCountdown ?? completionRedirectSeconds}</strong> seconds.</p>}
+          {restoreDone && <p className="muted">The archive's admin password is now this host's, so you may be asked to sign in again.</p>}
           <p className="muted">Game services can take several minutes to warm up, and the in-game browser can take a little longer to show the server.</p>
         </>}
         <div className="wizard-controls">

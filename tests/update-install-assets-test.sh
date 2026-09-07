@@ -69,8 +69,12 @@ case "${1:-} ${2:-}" in
 ' "$*" >> "${MOCK_COMPOSE_UP_LOG:-/dev/null}"
     ;;
   "compose exec")
-    # preflight, the SteamCMD download, and the image-tarball load loop all
-    # arrive here. Succeeding is what lets the asset phase run to completion.
+    # preflight, the SteamCMD download, the image-tarball load loop and the
+    # installed-size measurement all arrive here. Succeeding is what lets the
+    # asset phase run to completion.
+    case "$*" in
+      *"du -sh"*) [ -n "${MOCK_ASSET_SIZE-unset}" ] && printf '%s\n' "${MOCK_ASSET_SIZE-4.9G}" ;;
+    esac
     exit 0
     ;;
 esac
@@ -173,10 +177,8 @@ echo "PASS install-still-runs-the-database-phase"
 
 
 # --- Case 6: the orchestrator is started when it is not already running ----
-# install-assets runs every step through `docker compose exec orchestrator`, and
-# the only thing that starts that container is init.sh -- which never runs on a
-# host that has not deployed. Without this, the one command a fresh host needs
-# fails before it begins.
+# Nothing but init.sh starts that container, and init.sh never runs on a host
+# that has not deployed -- the one a system restore is for.
 
 MOCK_RUNNING_SERVICES="" run_update fresh install-assets || fail "install-assets on a host with no orchestrator: expected exit 0" "$test_root/fresh.log"
 grep -q orchestrator "$compose_up_log" \
@@ -190,3 +192,61 @@ if grep -q orchestrator "$compose_up_log"; then
   fail "install-assets recreated an orchestrator that was already running" "$compose_up_log"
 fi
 echo "PASS install-assets-leaves-a-running-orchestrator-alone"
+
+# --- Case 8: it reports how much was installed -----------------------------
+# The console shows this against the install step.
+
+run_update sized install-assets || fail "install-assets: expected exit 0" "$test_root/sized.log"
+grep -q "^DUNE_GAME_ASSETS_SIZE=4.9G$" "$test_root/sized.log" \
+  || fail "install-assets: did not report the installed size" "$test_root/sized.log"
+echo "PASS install-assets-reports-the-installed-size"
+
+# --- Case 9: an unmeasurable install reports no size at all ----------------
+# A marker with an empty value would render as a size of nothing beside a step
+# that did install something.
+
+MOCK_ASSET_SIZE="" run_update unsized install-assets || fail "install-assets: expected exit 0 with no size available" "$test_root/unsized.log"
+if grep -q "DUNE_GAME_ASSETS_SIZE" "$test_root/unsized.log"; then
+  fail "install-assets: emitted a size marker with nothing to report" "$test_root/unsized.log"
+fi
+grep -q "No database work was performed" "$test_root/unsized.log" \
+  || fail "install-assets: did not finish when the size could not be measured" "$test_root/unsized.log"
+echo "PASS install-assets-omits-an-unmeasurable-size"
+
+# --- Case 10: the image-load loop counts what it is loading ----------------
+# Run for real, not asserted as a string: the loop is a single-quoted script, so
+# `bash -n update.sh` never parses it and the docker mock stubs the exec away.
+# A syntax error or a miscount in there would otherwise ship unseen.
+
+load_script="$test_root/load-loop.sh"
+awk '/^docker compose exec -T orchestrator bash -lc .$/{flag=1;next} flag&&/^.$/{exit} flag' \
+  "$repo_root/runtime/scripts/update.sh" > "$load_script"
+grep -q "DUNE_GAME_ASSETS_LOAD" "$load_script" \
+  || fail "could not extract the image-load loop from update.sh" "$load_script"
+
+images_fixture="$test_root/images"
+mkdir -p "$images_fixture/battlegroup"
+for name in alpha.tar bravo.tar.gz charlie.tgz; do
+  : > "$images_fixture/battlegroup/$name"
+done
+
+load_out="$test_root/load.out"
+DUNE_ASSET_IMAGES_DIR="$images_fixture" MOCK_DOCKER_LOG="$test_root/load-docker.log" PATH="$bin_dir:$PATH" bash "$load_script" > "$load_out" 2>&1 \
+  || fail "the image-load loop failed to run" "$load_out"
+
+for expected in "DUNE_GAME_ASSETS_LOAD=1/3 alpha.tar" "DUNE_GAME_ASSETS_LOAD=2/3 bravo.tar.gz" "DUNE_GAME_ASSETS_LOAD=3/3 charlie.tgz"; do
+  grep -qF "$expected" "$load_out" || fail "image-load loop did not report '$expected'" "$load_out"
+done
+echo "PASS install-assets-counts-the-images-it-loads"
+
+# --- Case 11: an empty image directory loads nothing and still succeeds ----
+# `mapfile` on no matches leaves an empty array, and `for x in "${a[@]}"` under
+# `set -u` is the classic place that turns into an unbound-variable crash.
+
+empty_out="$test_root/load-empty.out"
+DUNE_ASSET_IMAGES_DIR="$test_root/no-images" MOCK_DOCKER_LOG="$test_root/load-docker.log" PATH="$bin_dir:$PATH" bash "$load_script" > "$empty_out" 2>&1 \
+  || fail "the image-load loop failed on an empty directory" "$empty_out"
+if grep -q "DUNE_GAME_ASSETS_LOAD" "$empty_out"; then
+  fail "image-load loop reported loading an image when there were none" "$empty_out"
+fi
+echo "PASS install-assets-load-loop-handles-no-images"

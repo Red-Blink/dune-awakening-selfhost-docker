@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SetupWizard } from "./SetupWizard";
 import { setupApi } from "../api/setup";
@@ -80,6 +80,15 @@ describe("setup wizard restore path", () => {
     expect(screen.getByText("7. Restore")).toBeTruthy();
   });
 
+  it("links the Funcom token requirement to the account site", async () => {
+    // The welcome step names the token as a prerequisite without saying where
+    // to get one, which is the first thing a new operator has to go and find.
+    renderWizard();
+    const link = await screen.findByRole("link", { name: "Funcom self-host token" });
+    expect(link.getAttribute("href")).toBe("https://account.duneawakening.com/");
+    expect(link.getAttribute("rel")).toContain("noopener");
+  });
+
   it("refuses a Funcom database backup in the browser, before uploading", async () => {
     const picker = await walkToArchive();
     fireEvent.change(picker, { target: { files: [new File(["x"], "steelheart-20260907.backup")] } });
@@ -144,7 +153,42 @@ describe("setup wizard restore path", () => {
     fireEvent.click(screen.getByText("Next"));
     fireEvent.click(await screen.findByText("Start Restore"));
 
-    await waitFor(() => expect(order).toEqual(["install", "dry-run", "apply", "reload"]));
+    // The reload is deliberately not in this list: it is held behind the finish
+    // screen's countdown, because restarting the console takes the page away
+    // and that screen is the only confirmation the operator ever gets.
+    await waitFor(() => expect(order).toEqual(["install", "dry-run", "apply"]));
+    expect(await screen.findByText("Congratulations")).toBeTruthy();
+    expect(screen.getByText(/Restarting the console in/)).toBeTruthy();
+    expect(serverApi.reloadConsole).not.toHaveBeenCalled();
+  });
+
+  it("restarts the console only once the countdown has run down", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      window.localStorage.setItem("arrakis.setupRestore", JSON.stringify({ archive: "dune-system-x.tar.gz.enc", stage: "uploaded" }));
+      renderWizard();
+      const field = await screen.findByLabelText("Archive passphrase");
+      fireEvent.change(field, { target: { value: "correct-horse-battery" } });
+      fireEvent.click(screen.getByText("Next"));
+      fireEvent.click(await screen.findByText("Start Restore"));
+      await waitFor(() => expect(backupsApi.restoreSystem).toHaveBeenCalledTimes(2));
+
+      // One second at a time: each tick schedules the next from a React effect,
+      // so a single large advance only ever processes one of them.
+      const tick = async (times: number) => {
+        for (let i = 0; i < times; i += 1) await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      };
+
+      // Well short of the hold: still on screen, console untouched.
+      await tick(10);
+      expect(screen.getByText(/Restarting the console in/)).toBeTruthy();
+      expect(serverApi.reloadConsole).not.toHaveBeenCalled();
+
+      await tick(6);
+      await waitFor(() => expect(serverApi.reloadConsole).toHaveBeenCalled());
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("comes back to the restore step after a reload mid-restore", async () => {
@@ -153,10 +197,14 @@ describe("setup wizard restore path", () => {
     vi.mocked(setupApi.tasks).mockResolvedValue({
       tasks: [{ ...done("running"), operation: "backupSystemRestore", status: "running" }]
     } as never);
-    window.localStorage.setItem("arrakis.setupRestore", JSON.stringify({ archive: "dune-system-x.tar.gz.enc", stage: "Restoring" }));
+    window.localStorage.setItem("arrakis.setupRestore", JSON.stringify({ archive: "dune-system-x.tar.gz.enc", stage: "apply" }));
 
     renderWizard();
     expect(await screen.findByText("Restore")).toBeTruthy();
-    expect(screen.getByText(/Restoring/)).toBeTruthy();
+    // The checklist has to come back mid-sequence, not restart at the top:
+    // the install already ran, and re-running it is a multi-gigabyte download.
+    expect(screen.getByText("Game files installed").closest("li")?.className).toContain("restore-step-done");
+    expect(screen.getByText("Restoring database, config and secrets").closest("li")?.className).toContain("restore-step-active");
+    expect(screen.getByText("Restart the console").closest("li")?.className).toContain("restore-step-pending");
   });
 });

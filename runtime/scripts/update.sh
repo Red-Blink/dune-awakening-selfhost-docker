@@ -87,15 +87,10 @@ world_game_servers_running() {
     | grep -Eq '^dune-server-(overmap|survival-[0-9]+)$'
 }
 
-# Every orchestrator call below goes through `docker compose exec`, which needs
-# the container already up. The only thing in this repo that starts it is
-# init.sh, and init.sh exits before that point on a host with no Funcom token --
-# so on a machine that has never deployed, install-assets could not run at all,
-# which is exactly the machine a system restore is for. Verified on a fresh
-# host: the console is the only container, and `docker compose exec -T
-# orchestrator true` answers `service "orchestrator" is not running`.
-#
-# Only started, never rebuilt or replaced: if it is already up, this is a no-op.
+# Every orchestrator call below goes through `docker compose exec`, and the only
+# thing that starts that container is init.sh -- which exits early on a host with
+# no Funcom token, i.e. exactly the host a system restore is for. A no-op if it
+# is already up.
 ensure_orchestrator() {
   if docker compose ps --status running --services 2>/dev/null | grep -qx orchestrator; then
     return 0
@@ -1312,13 +1307,31 @@ fi
 
 echo
 echo "=== Load updated Funcom image tarballs ==="
+# `docker load` redraws its progress with carriage returns, which strips to
+# nothing, and this is the longest phase of an install. Count the tarballs so
+# the console has something to show.
 docker compose exec -T orchestrator bash -lc '
 set -euo pipefail
-find /srv/dune/server/images -type f \( -name "*.tar" -o -name "*.tar.gz" -o -name "*.tgz" \) | sort | while read -r tar; do
+# A variable purely so tests/update-install-assets-test.sh can run this loop for
+# real; the orchestrator never sets it.
+images_dir="${DUNE_ASSET_IMAGES_DIR:-/srv/dune/server/images}"
+mapfile -t tarballs < <(find "$images_dir" -type f \( -name "*.tar" -o -name "*.tar.gz" -o -name "*.tgz" \) | sort)
+loaded=0
+for tar in "${tarballs[@]}"; do
+  loaded=$((loaded + 1))
+  echo "DUNE_GAME_ASSETS_LOAD=${loaded}/${#tarballs[@]} $(basename "$tar")"
   echo ">>> docker load -i $tar"
   docker load -i "$tar"
 done
 '
+
+# The images live only inside the orchestrator and SteamCMD's content log carries
+# no totals, so this is the one place that can measure them. A marker rather than
+# prose, matching DUNE_GAME_ASSETS_MISSING, so the console is not parsing English.
+asset_size="$(docker compose exec -T orchestrator sh -lc 'du -sh /srv/dune/server/images 2>/dev/null | cut -f1' 2>/dev/null | tr -d '[:space:]' || true)"
+if [ -n "$asset_size" ]; then
+  echo "DUNE_GAME_ASSETS_SIZE=${asset_size}"
+fi
 
 echo
 echo "=== Detect loaded image tags ==="
