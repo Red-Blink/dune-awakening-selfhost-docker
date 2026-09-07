@@ -45,6 +45,8 @@ STUB
   chmod +x "$project/runtime/scripts/$script"
 done
 
+compose_up_log="$test_root/compose-up.log"
+: > "$compose_up_log"
 docker_log="$test_root/docker.log"
 : > "$docker_log"
 cat > "$bin_dir/docker" <<'EOF'
@@ -55,6 +57,16 @@ case "${1:-} ${2:-}" in
     # Only what MOCK_RUNNING_CONTAINERS names, so a case can put a live world
     # server in front of the guard.
     [ -z "${MOCK_RUNNING_CONTAINERS:-}" ] || printf '%s\n' ${MOCK_RUNNING_CONTAINERS}
+    ;;
+  "compose ps")
+    # Only what MOCK_RUNNING_SERVICES names, so a case can start from a host
+    # where the orchestrator has never been started.
+    [ -z "${MOCK_RUNNING_SERVICES:-}" ] || printf '%s
+' ${MOCK_RUNNING_SERVICES}
+    ;;
+  "compose up")
+    printf '%s
+' "$*" >> "${MOCK_COMPOSE_UP_LOG:-/dev/null}"
     ;;
   "compose exec")
     # preflight, the SteamCMD download, and the image-tarball load loop all
@@ -72,9 +84,12 @@ run_update() {
   : > "$calls_log"
   : > "$docker_log"
   local status=0
+  : > "$compose_up_log"
   (
     cd "$project"
     PATH="$bin_dir:$PATH" MOCK_DOCKER_LOG="$docker_log" \
+      MOCK_COMPOSE_UP_LOG="$compose_up_log" \
+      MOCK_RUNNING_SERVICES="${MOCK_RUNNING_SERVICES:-}" \
       MOCK_RUNNING_CONTAINERS="${MOCK_RUNNING_CONTAINERS:-}" \
       bash runtime/scripts/update.sh "$@"
   ) > "$test_root/$label.log" 2>&1 || status=$?
@@ -155,3 +170,23 @@ for expected in update-db.sh start-postgres.sh generate-world-partitions-sql.sh;
     || fail "install: no longer runs $expected -- the database phase was lost" "$calls_log" "$test_root/install.log"
 done
 echo "PASS install-still-runs-the-database-phase"
+
+
+# --- Case 6: the orchestrator is started when it is not already running ----
+# install-assets runs every step through `docker compose exec orchestrator`, and
+# the only thing that starts that container is init.sh -- which never runs on a
+# host that has not deployed. Without this, the one command a fresh host needs
+# fails before it begins.
+
+MOCK_RUNNING_SERVICES="" run_update fresh install-assets || fail "install-assets on a host with no orchestrator: expected exit 0" "$test_root/fresh.log"
+grep -q orchestrator "$compose_up_log" \
+  || fail "install-assets did not start the orchestrator on a host where it was not running" "$compose_up_log" "$test_root/fresh.log"
+echo "PASS install-assets-starts-the-orchestrator"
+
+# --- Case 7: an already-running orchestrator is left alone -----------------
+
+MOCK_RUNNING_SERVICES="orchestrator" run_update running-orch install-assets || fail "install-assets with the orchestrator up: expected exit 0" "$test_root/running-orch.log"
+if grep -q orchestrator "$compose_up_log"; then
+  fail "install-assets recreated an orchestrator that was already running" "$compose_up_log"
+fi
+echo "PASS install-assets-leaves-a-running-orchestrator-alone"
