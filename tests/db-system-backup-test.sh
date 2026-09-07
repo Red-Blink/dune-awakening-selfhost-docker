@@ -17,9 +17,27 @@ printf '%s\n' "$*" >> "${MOCK_DOCKER_LOG:-/dev/null}"
 
 case "${1:-} ${2:-}" in
   "ps --format")
-    if [ "${MOCK_POSTGRES_RUNNING:-1}" = "1" ]; then
+    # A state FILE, not just the env var, so a stub start-postgres.sh can flip
+    # this mid-run the way the real one does -- a child process cannot change
+    # its parent's environment, and "Postgres came up because we started it"
+    # is the whole point of the autostart cases.
+    running="${MOCK_POSTGRES_RUNNING:-1}"
+    if [ -n "${MOCK_POSTGRES_STATE_FILE:-}" ] && [ -r "${MOCK_POSTGRES_STATE_FILE}" ]; then
+      running="$(cat "${MOCK_POSTGRES_STATE_FILE}")"
+    fi
+    if [ "$running" = "1" ]; then
       printf '%s\n' dune-postgres
     fi
+    ;;
+  "ps -a")
+    # `docker ps -a` -- the exists-but-stopped probe. Nothing in this repo
+    # produces that state (every teardown is rm -f), so it defaults to absent.
+    if [ "${MOCK_POSTGRES_EXISTS:-0}" = "1" ]; then
+      printf '%s\n' dune-postgres
+    fi
+    ;;
+  "start dune-postgres")
+    [ -z "${MOCK_POSTGRES_STATE_FILE:-}" ] || printf 1 > "${MOCK_POSTGRES_STATE_FILE}"
     ;;
   "exec dune-postgres")
     shift 2
@@ -1124,13 +1142,18 @@ case18_root="$test_root/case18"
 mkdir -p "$case18_root"
 case18_archive="$(make_restorable_archive "$case18_root")"
 diverge_host_state "$case18_root/work"
+# An identity this host does not share with the archive, and no
+# --adopt/--keep flag to resolve it: import_db stops rather than guess.
+printf 'BATTLEGROUP_ID=sh-current-9999\nSERVER_IP=203.0.113.5\nSERVER_IP_MODE=public\n' \
+  > "$case18_root/work/runtime/generated/battlegroup.env"
 
 mkdir -p "$case18_root/tmp"
 case18_status=0
 (
   cd "$case18_root/work"
-  # No postgres container: require_postgres exits before any restore work.
-  PATH="$bin_dir:$PATH" TMPDIR="$case18_root/tmp" MOCK_POSTGRES_RUNNING=0 \
+  # Postgres is up and healthy here. import_db exits over the unresolved
+  # identity instead, which is the exit path this case exists to hold.
+  PATH="$bin_dir:$PATH" TMPDIR="$case18_root/tmp" \
     DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" DUNE_DB_ASSUME_YES=1 \
     bash runtime/scripts/db.sh restore-system "$case18_archive"
 ) > "$case18_root/restore.log" 2>&1 || case18_status=$?
@@ -1596,3 +1619,260 @@ if grep -qi "Confirm passphrase" "$case30_root/output.log"; then
   exit 1
 fi
 echo "PASS restore-passphrase-prompt-wording"
+
+# --- Postgres autostart ---------------------------------------------------
+# Stopping the battlegroup removes the dune-postgres container, so backup and
+# restore had nothing to talk to and failed outright. These cases cover the
+# autostart that fixes that, and -- more importantly -- the guard that keeps it
+# from touching a database that is already up.
+
+# Installs a stub start-postgres.sh that reports itself and (unless told to
+# fail) marks Postgres as running, the way the real script's docker run does.
+seed_start_postgres_stub() {
+  local work="$1" marker="$2" state_file="$3" succeed="${4:-1}"
+  cat > "$work/runtime/scripts/start-postgres.sh" <<STUB
+#!/usr/bin/env bash
+printf 'invoked\n' >> "$marker"
+[ "$succeed" = "1" ] || exit 1
+printf 1 > "$state_file"
+STUB
+  chmod +x "$work/runtime/scripts/start-postgres.sh"
+}
+
+# --- Case 31: a stopped Postgres is started, and the backup then succeeds --
+
+case31_root="$test_root/case31"
+mkdir -p "$case31_root/work"
+seed_repo_tree "$case31_root/work"
+case31_marker="$case31_root/start-invoked"
+case31_state="$case31_root/pg-state"
+printf 0 > "$case31_state"
+seed_start_postgres_stub "$case31_root/work" "$case31_marker" "$case31_state"
+
+set +e
+(
+  cd "$case31_root/work"
+  PATH="$bin_dir:$PATH" MOCK_POSTGRES_STATE_FILE="$case31_state" \
+    DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" \
+    bash runtime/scripts/db.sh backup-system
+) > "$case31_root/output.log" 2>&1
+case31_exit=$?
+set -e
+
+if [ "$case31_exit" -ne 0 ]; then
+  echo "FAIL postgres-autostart-starts-stopped-database: expected exit 0, got $case31_exit"
+  cat "$case31_root/output.log"
+  exit 1
+fi
+if [ ! -f "$case31_marker" ]; then
+  echo "FAIL postgres-autostart-starts-stopped-database: start-postgres.sh was never invoked"
+  cat "$case31_root/output.log"
+  exit 1
+fi
+if ! find "$case31_root/work/runtime/backups/system" -maxdepth 1 -name '*.tar.gz.enc' | grep -q .; then
+  echo "FAIL postgres-autostart-starts-stopped-database: no archive was produced"
+  cat "$case31_root/output.log"
+  exit 1
+fi
+echo "PASS postgres-autostart-starts-stopped-database"
+
+# --- Case 32: a RUNNING Postgres is never handed to start-postgres.sh -----
+# The decisive one. start-postgres.sh opens with `docker rm -f dune-postgres`,
+# so invoking it against a live database destroys it -- here, in the middle of
+# the dump it was called to enable. The early return is a safety property, not
+# an optimization, and this is the case that holds it in place.
+
+case32_root="$test_root/case32"
+mkdir -p "$case32_root/work"
+seed_repo_tree "$case32_root/work"
+case32_marker="$case32_root/start-invoked"
+case32_state="$case32_root/pg-state"
+printf 1 > "$case32_state"
+seed_start_postgres_stub "$case32_root/work" "$case32_marker" "$case32_state"
+
+set +e
+(
+  cd "$case32_root/work"
+  PATH="$bin_dir:$PATH" MOCK_POSTGRES_STATE_FILE="$case32_state" \
+    DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" \
+    bash runtime/scripts/db.sh backup-system
+) > "$case32_root/output.log" 2>&1
+case32_exit=$?
+set -e
+
+if [ "$case32_exit" -ne 0 ]; then
+  echo "FAIL postgres-autostart-never-touches-a-running-database: expected exit 0, got $case32_exit"
+  cat "$case32_root/output.log"
+  exit 1
+fi
+if [ -f "$case32_marker" ]; then
+  echo "FAIL postgres-autostart-never-touches-a-running-database: start-postgres.sh ran against a LIVE database (its rm -f would have destroyed it)"
+  cat "$case32_root/output.log"
+  exit 1
+fi
+echo "PASS postgres-autostart-never-touches-a-running-database"
+
+# --- Case 33: DUNE_DB_AUTOSTART_POSTGRES=0 restores the old behavior ------
+
+case33_root="$test_root/case33"
+mkdir -p "$case33_root/work"
+seed_repo_tree "$case33_root/work"
+case33_marker="$case33_root/start-invoked"
+case33_state="$case33_root/pg-state"
+printf 0 > "$case33_state"
+seed_start_postgres_stub "$case33_root/work" "$case33_marker" "$case33_state"
+
+set +e
+(
+  cd "$case33_root/work"
+  PATH="$bin_dir:$PATH" MOCK_POSTGRES_STATE_FILE="$case33_state" \
+    DUNE_DB_AUTOSTART_POSTGRES=0 DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" \
+    bash runtime/scripts/db.sh backup-system
+) > "$case33_root/output.log" 2>&1
+case33_exit=$?
+set -e
+
+if [ "$case33_exit" -eq 0 ]; then
+  echo "FAIL postgres-autostart-opt-out: expected a non-zero exit with autostart off"
+  cat "$case33_root/output.log"
+  exit 1
+fi
+if [ -f "$case33_marker" ]; then
+  echo "FAIL postgres-autostart-opt-out: start-postgres.sh ran despite DUNE_DB_AUTOSTART_POSTGRES=0"
+  exit 1
+fi
+if find "$case33_root/work/runtime/backups/system" -maxdepth 1 -type f | grep -q .; then
+  echo "FAIL postgres-autostart-opt-out: an artifact was left behind"
+  exit 1
+fi
+echo "PASS postgres-autostart-opt-out"
+
+# --- Case 34: a restore autostarts Postgres and completes -----------------
+
+case34_root="$test_root/case34"
+mkdir -p "$case34_root"
+case34_archive="$(make_restorable_archive "$case34_root")"
+if [ -z "$case34_archive" ]; then
+  echo "FAIL restore-autostarts-postgres: could not build an archive to restore"
+  cat "$case34_root/backup.log"
+  exit 1
+fi
+diverge_host_state "$case34_root/work"
+mkdir -p "$case34_root/tmp"
+case34_marker="$case34_root/start-invoked"
+case34_state="$case34_root/pg-state"
+printf 0 > "$case34_state"
+seed_start_postgres_stub "$case34_root/work" "$case34_marker" "$case34_state"
+
+set +e
+(
+  cd "$case34_root/work"
+  PATH="$bin_dir:$PATH" TMPDIR="$case34_root/tmp" MOCK_POSTGRES_STATE_FILE="$case34_state" \
+    DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" DUNE_DB_ASSUME_YES=1 \
+    bash runtime/scripts/db.sh restore-system "$(basename "$case34_archive")"
+) > "$case34_root/restore.log" 2>&1
+case34_exit=$?
+set -e
+
+if [ "$case34_exit" -ne 0 ]; then
+  echo "FAIL restore-autostarts-postgres: expected exit 0, got $case34_exit"
+  cat "$case34_root/restore.log"
+  exit 1
+fi
+if [ ! -f "$case34_marker" ]; then
+  echo "FAIL restore-autostarts-postgres: start-postgres.sh was never invoked"
+  cat "$case34_root/restore.log"
+  exit 1
+fi
+if ! grep -q "$SECRET_ADMIN_PASSWORD" "$case34_root/work/.env"; then
+  echo "FAIL restore-autostarts-postgres: the restore did not complete"
+  cat "$case34_root/restore.log"
+  exit 1
+fi
+echo "PASS restore-autostarts-postgres"
+
+# --- Case 35: a dry run needs no database at all --------------------------
+# Preview decrypts and reports; it never reaches import_db. Starting Postgres
+# to answer "what would this replace" would be a side effect of asking.
+
+case35_root="$test_root/case35"
+mkdir -p "$case35_root"
+case35_archive="$(make_restorable_archive "$case35_root")"
+if [ -z "$case35_archive" ]; then
+  echo "FAIL restore-dry-run-needs-no-database: could not build an archive to restore"
+  exit 1
+fi
+mkdir -p "$case35_root/tmp"
+case35_marker="$case35_root/start-invoked"
+case35_state="$case35_root/pg-state"
+printf 0 > "$case35_state"
+seed_start_postgres_stub "$case35_root/work" "$case35_marker" "$case35_state"
+
+set +e
+(
+  cd "$case35_root/work"
+  PATH="$bin_dir:$PATH" TMPDIR="$case35_root/tmp" MOCK_POSTGRES_STATE_FILE="$case35_state" \
+    DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" DUNE_DB_ASSUME_YES=1 \
+    bash runtime/scripts/db.sh restore-system "$(basename "$case35_archive")" --dry-run
+) > "$case35_root/restore.log" 2>&1
+case35_exit=$?
+set -e
+
+if [ "$case35_exit" -ne 0 ]; then
+  echo "FAIL restore-dry-run-needs-no-database: expected exit 0 with Postgres down, got $case35_exit"
+  cat "$case35_root/restore.log"
+  exit 1
+fi
+if [ -f "$case35_marker" ]; then
+  echo "FAIL restore-dry-run-needs-no-database: a preview started Postgres"
+  cat "$case35_root/restore.log"
+  exit 1
+fi
+echo "PASS restore-dry-run-needs-no-database"
+
+# --- Case 36: Postgres that will not come up stops the restore BEFORE -----
+# --- a safety copy exists -------------------------------------------------
+# import_db checks too, and that check is what actually gates the restore, but
+# reaching it means runtime/backups/restore-* has already been written for a
+# restore that cannot proceed -- which is what a stopped battlegroup produced
+# live. The check belongs ahead of the safety copy.
+
+case36_root="$test_root/case36"
+mkdir -p "$case36_root"
+case36_archive="$(make_restorable_archive "$case36_root")"
+if [ -z "$case36_archive" ]; then
+  echo "FAIL restore-refuses-before-safety-copy-when-postgres-will-not-start: could not build an archive"
+  exit 1
+fi
+mkdir -p "$case36_root/tmp"
+case36_marker="$case36_root/start-invoked"
+case36_state="$case36_root/pg-state"
+printf 0 > "$case36_state"
+seed_start_postgres_stub "$case36_root/work" "$case36_marker" "$case36_state" 0
+
+set +e
+(
+  cd "$case36_root/work"
+  PATH="$bin_dir:$PATH" TMPDIR="$case36_root/tmp" MOCK_POSTGRES_STATE_FILE="$case36_state" \
+    DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" DUNE_DB_ASSUME_YES=1 \
+    bash runtime/scripts/db.sh restore-system "$(basename "$case36_archive")"
+) > "$case36_root/restore.log" 2>&1
+case36_exit=$?
+set -e
+
+if [ "$case36_exit" -eq 0 ]; then
+  echo "FAIL restore-refuses-before-safety-copy-when-postgres-will-not-start: expected a non-zero exit"
+  cat "$case36_root/restore.log"
+  exit 1
+fi
+if [ ! -f "$case36_marker" ]; then
+  echo "FAIL restore-refuses-before-safety-copy-when-postgres-will-not-start: start-postgres.sh was never attempted"
+  exit 1
+fi
+if find "$case36_root/work/runtime/backups" -maxdepth 1 -type d -name 'restore-*' | grep -q .; then
+  echo "FAIL restore-refuses-before-safety-copy-when-postgres-will-not-start: a safety copy was written for a restore that could not run"
+  find "$case36_root/work/runtime/backups" -maxdepth 1 -type d -name 'restore-*' -print
+  exit 1
+fi
+assert_no_plaintext_leak restore-refuses-before-safety-copy-when-postgres-will-not-start "$case36_root/tmp"
+echo "PASS restore-refuses-before-safety-copy-when-postgres-will-not-start"

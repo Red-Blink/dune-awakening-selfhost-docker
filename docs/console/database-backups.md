@@ -170,6 +170,25 @@ nothing is asked. From a shell, the same choice is
 `--adopt-backup-audit-log` / `--keep-current-audit-log`, and a dry run
 reports the conflict even though it changes nothing.
 
+### A stopped battlegroup starts Postgres by itself
+
+Stopping the battlegroup does not stop the database, it removes the
+`dune-postgres` container outright, leaving only its data volume. Backups
+and restores need that database, so they start it themselves and leave it
+running -- the next step after a restore is `dune start`, which needs it
+anyway.
+
+Two things this deliberately does not do. It never touches a database that
+is already up (`start-postgres.sh` recreates the container, which would
+destroy a live one mid-dump), and it never stops Postgres again afterward,
+which would race an operator starting the stack while a backup ran.
+
+A preview (`--dry-run`) never needs a database at all: it decrypts, reports
+and stops, so asking what an archive would replace has no side effects.
+
+To turn the behaviour off and have these operations fail on a stopped stack
+instead, set `DUNE_DB_AUTOSTART_POSTGRES=0` in `.env`.
+
 ### Inspecting an archive by hand
 
 The automated path above is the supported one. To look inside an archive
