@@ -8,8 +8,9 @@ import { DataTable } from "../../components/common/DataTable";
 import { KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/common/DisplayPrimitives";
 import { formatUiSentence } from "../../lib/display";
 import { conciseTaskError, funcomTokenMismatchDetected } from "../../lib/taskDisplay";
+import { gameAssetsMissingInText } from "../updates/updateUtils";
 
-type BackupResult = { status: "running" | "succeeded" | "failed"; title: string; message?: string; details?: string; detailsOpen?: boolean; detailsTitle?: string; tone?: "danger" | "attention" };
+type BackupResult = { status: "running" | "succeeded" | "failed"; title: string; message?: string; details?: string; detailsOpen?: boolean; detailsTitle?: string; tone?: "danger" | "attention"; action?: { label: string; onClick: () => void } };
 type ConfirmAction = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
 type BackupIdentityChoice = "adopt-backup" | "keep-current" | "cancel";
 type AuditLogChoice = "adopt-backup" | "keep-current" | "cancel";
@@ -22,6 +23,7 @@ type BackupsPanelProps = {
   confirmAction: ConfirmAction;
   chooseBackupIdentity: (meta: { backup: string; currentBattlegroupId: string; backupBattlegroupId: string }) => Promise<BackupIdentityChoice>;
   chooseAuditLogAction: (meta: { backup: string }) => Promise<AuditLogChoice>;
+  onInstallGameFiles: () => void;
   chooseImportConflict: (existing: string) => Promise<SystemImportConflict | "cancel">;
   waitForTask: (task: Task) => Promise<Task>;
   waitForTaskWithUpdates: (task: Task, onUpdate: (task: Task) => void) => Promise<Task>;
@@ -42,7 +44,7 @@ function formatResultMessage(value: unknown) {
   return formatUiSentence(value, false);
 }
 
-export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError, confirmAction, chooseBackupIdentity, chooseAuditLogAction, chooseImportConflict, waitForTask, waitForTaskWithUpdates, withTimeout, toHourMinuteTime, sanitizeTimeInput, isValidHourMinuteTime, commandStatusSummary, taskTechnicalDetails, isTerminalTask }: BackupsPanelProps) {
+export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError, confirmAction, chooseBackupIdentity, chooseAuditLogAction, onInstallGameFiles, chooseImportConflict, waitForTask, waitForTaskWithUpdates, withTimeout, toHourMinuteTime, sanitizeTimeInput, isValidHourMinuteTime, commandStatusSummary, taskTechnicalDetails, isTerminalTask }: BackupsPanelProps) {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [selectedBackups, setSelectedBackups] = useState<Set<string>>(new Set());
   const [currentBattlegroupId, setCurrentBattlegroupId] = useState("Unknown");
@@ -281,7 +283,15 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
       const final = await waitForTask(response.task);
       const details = final.logLines.map((line) => line.line).join("\n");
       if (final.status === "succeeded") setSystemResult(onSuccess(details));
-      else setSystemResult({ status: "failed", title: failureTitle, message: final.errorMessage || conciseTaskError(final), details });
+      else setSystemResult({
+        status: "failed",
+        title: failureTitle,
+        message: final.errorMessage || conciseTaskError(final),
+        details,
+        // The restore cannot proceed without the game images, and the operator
+        // should not have to go find the page that installs them.
+        action: gameAssetsMissingInText(details) ? { label: "Install Game Files", onClick: onInstallGameFiles } : undefined
+      });
       return final;
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
@@ -733,6 +743,7 @@ function BackupResultCard({ result, cardRef }: { result: BackupResult; cardRef?:
       <div className="backup-result-copy">
         <h4 className={result.status === "running" ? "loading-dots" : ""}>{formatResultTitle(result.title, result.status === "running")}</h4>
         {result.message && <p>{formatResultMessage(result.message)}</p>}
+        {result.action && <div className="action-line"><button className="update-action" onClick={result.action.onClick}>{result.action.label}</button></div>}
       </div>
       <StatusPill value={attention ? "Action Required" : danger ? "Deleted" : result.status === "failed" ? "Failed" : result.status === "running" ? "Running" : "Succeeded"} />
     </div>

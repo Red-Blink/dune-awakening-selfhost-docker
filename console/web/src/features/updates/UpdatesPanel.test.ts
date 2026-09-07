@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../../api/setup";
 import { gameUpdateTerminalStatus, isDetachedStackUpdateTask, isUpdatedConsoleReady, summarizeStackUpdateProgress } from "./UpdatesPanel";
+import { gameAssetsMissing, gameAssetsMissingInText } from "./updateUtils";
 
 function detachedTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -93,5 +94,35 @@ describe("game update terminal status", () => {
       latest: "25351779",
       reason: "Database update exited with status 1."
     });
+  });
+});
+
+describe("missing game files", () => {
+  // A host with no game files fails the Steam check outright, so every
+  // "is an update available" condition is false exactly when the operator most
+  // needs the install control. The marker is what distinguishes that state from
+  // an ordinary check failure.
+  it("recognizes the marker in a check failure's reason", () => {
+    expect(gameAssetsMissing({
+      status: "Check Failed",
+      current: "",
+      latest: "",
+      reason: "DUNE_GAME_ASSETS_MISSING\nCannot start Postgres: the Funcom database image is not installed on this host."
+    })).toBe(true);
+  });
+
+  it("does not fire on an ordinary check failure", () => {
+    expect(gameAssetsMissing({
+      status: "Check Failed",
+      current: "",
+      latest: "",
+      reason: "SteamCMD could not retrieve the current app information."
+    })).toBe(false);
+  });
+
+  it("reads a task log as well as a status reason", () => {
+    expect(gameAssetsMissingInText("Restoring database...\nDUNE_GAME_ASSETS_MISSING\n")).toBe(true);
+    expect(gameAssetsMissingInText("Database restore failed (exit 1).")).toBe(false);
+    expect(gameAssetsMissingInText(undefined)).toBe(false);
   });
 });

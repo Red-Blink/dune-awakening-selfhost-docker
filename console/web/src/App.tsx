@@ -417,6 +417,10 @@ export function App() {
   const [auth, setAuth] = useState(false);
   const [password, setPassword] = useState("");
   const [tab, setTab] = useActiveTab();
+  // Bumped when a failure elsewhere (a restore that needs the game images)
+  // sends the operator to Updates to install them. A nonce rather than a
+  // boolean so a second failure re-triggers it after the first was handled.
+  const [installGameFilesRequest, setInstallGameFilesRequest] = useState(0);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [pinnedAddons, setPinnedAddons] = useState<PinnedAddon[]>(() => loadPinnedAddons());
   const [selectedPinnedAddonId, setSelectedPinnedAddonId] = useState("");
@@ -894,6 +898,7 @@ export function App() {
             confirmAction={confirmDialog}
             chooseBackupIdentity={chooseBackupIdentity}
             chooseAuditLogAction={chooseAuditLogAction}
+            onInstallGameFiles={() => { setInstallGameFilesRequest((current) => current + 1); setTab("Updates"); }}
             chooseImportConflict={chooseImportConflict}
             waitForTask={waitForTaskSilently}
             waitForTaskWithUpdates={waitForTaskWithUpdates}
@@ -907,6 +912,7 @@ export function App() {
           /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Logs" && <LazyTabBoundary label="Loading Logs"><LogsPanel selectedService={selectedLogService} setSelectedService={setSelectedLogService} text={logs} setText={setLogs} onError={setError} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Updates" && <LazyTabBoundary label="Loading Updates"><UpdatesPanel
+            installGameFilesRequest={installGameFilesRequest}
             confirmAction={confirmDialog}
             waitForTask={waitForTaskSilently}
             parseKeyValueText={parseKeyValueText}
