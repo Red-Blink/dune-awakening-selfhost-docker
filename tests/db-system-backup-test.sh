@@ -2319,3 +2319,77 @@ if ! find "$case45_host/work/runtime/backups" -maxdepth 1 -type d -name 'restore
 fi
 assert_no_plaintext_leak fresh-host-end-to-end "$case45_host/tmp"
 echo "PASS fresh-host-end-to-end"
+
+# --- Case 46: a restore keeps this host's own machine-shaped .env values ---
+# .env mixes two kinds of value. The server's own settings should move with the
+# archive; the ones describing THIS machine must not, because taking the source
+# host's leaves the console unreachable (wrong port), unable to mount anything
+# (wrong repo root), or pointed at a Compose project whose volumes are empty.
+
+case46_root="$test_root/case46"
+mkdir -p "$case46_root"
+case46_archive="$(make_restorable_archive "$case46_root")"
+if [ -z "$case46_archive" ]; then
+  echo "FAIL restore-keeps-host-shaped-env: could not build an archive"
+  exit 1
+fi
+mkdir -p "$case46_root/tmp"
+
+# The archive was taken on a host with different machine values.
+cat >> "$case46_root/work/.env" <<'HOSTENV'
+DUNE_HOST_REPO_ROOT=/srv/this-host/dune
+ADMIN_BIND_PORT=9099
+DUNE_COMPOSE_PROJECT_NAME=thishost
+DOCKER_SOCKET_GID=4242
+DUNE_DB_PASSWORD=this-host-db-password
+HOSTENV
+
+case46_status=0
+run_restore "$case46_root" "$case46_root/tmp" "$TEST_PASSPHRASE" "$(basename "$case46_archive")" || case46_status=$?
+
+if [ "$case46_status" -ne 0 ]; then
+  echo "FAIL restore-keeps-host-shaped-env: expected exit 0, got $case46_status"
+  cat "$case46_root/restore.log"
+  exit 1
+fi
+for pair in "DUNE_HOST_REPO_ROOT=/srv/this-host/dune" "ADMIN_BIND_PORT=9099" \
+  "DUNE_COMPOSE_PROJECT_NAME=thishost" "DOCKER_SOCKET_GID=4242"; do
+  if ! grep -qx "$pair" "$case46_root/work/.env"; then
+    echo "FAIL restore-keeps-host-shaped-env: lost this host's $pair"
+    cat "$case46_root/work/.env"
+    exit 1
+  fi
+done
+# The server's own settings must still come from the archive.
+if ! grep -q "$SECRET_ADMIN_PASSWORD" "$case46_root/work/.env"; then
+  echo "FAIL restore-keeps-host-shaped-env: the archive's own settings were not restored"
+  exit 1
+fi
+echo "PASS restore-keeps-host-shaped-env"
+
+# --- Case 47: the database password stays the one the role actually has ----
+# start-postgres.sh creates the dune role IF NOT EXISTS, so its password is
+# fixed at creation and nothing ever resets it. Taking the archive's value
+# leaves every client -- console/api/src/db.js reads exactly this key --
+# authenticating with a password the role does not have, and it never recovers.
+
+case47_root="$test_root/case47"
+mkdir -p "$case47_root"
+case47_archive="$(make_restorable_archive "$case47_root")"
+mkdir -p "$case47_root/tmp"
+printf 'DUNE_DB_PASSWORD=%s\n' "this-host-db-password" >> "$case47_root/work/.env"
+
+case47_status=0
+run_restore "$case47_root" "$case47_root/tmp" "$TEST_PASSPHRASE" "$(basename "$case47_archive")" || case47_status=$?
+
+if [ "$case47_status" -ne 0 ]; then
+  echo "FAIL restore-keeps-database-password: expected exit 0, got $case47_status"
+  cat "$case47_root/restore.log"
+  exit 1
+fi
+if ! grep -qx "DUNE_DB_PASSWORD=this-host-db-password" "$case47_root/work/.env"; then
+  echo "FAIL restore-keeps-database-password: the console would authenticate with a password the dune role does not have"
+  grep DUNE_DB_PASSWORD "$case47_root/work/.env" || echo "(key absent entirely)"
+  exit 1
+fi
+echo "PASS restore-keeps-database-password"
