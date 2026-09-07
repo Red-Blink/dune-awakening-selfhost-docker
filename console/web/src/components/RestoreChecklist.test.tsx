@@ -5,25 +5,25 @@ import { RestoreChecklist, buildRestoreRows, imageLoadProgress, installedAssetsS
 describe("buildRestoreRows", () => {
   it("splits the list into done, running and waiting around the current step", () => {
     const rows = buildRestoreRows({ current: "apply" });
-    expect(rows.map((row) => row.state)).toEqual(["done", "done", "active", "pending"]);
+    expect(rows.map((row) => row.state)).toEqual(["done", "done", "active", "pending", "pending"]);
   });
 
   it("shows every step waiting before the restore starts", () => {
     const rows = buildRestoreRows({ current: null });
-    expect(rows.map((row) => row.state)).toEqual(["pending", "pending", "pending", "pending"]);
-    expect(rows[3].label).toBe("Restart the console");
+    expect(rows.map((row) => row.state)).toEqual(["pending", "pending", "pending", "pending", "pending"]);
+    expect(rows[4].label).toBe("Restart the console");
   });
 
   it("marks only the step that failed, leaving the earlier ones done", () => {
     const rows = buildRestoreRows({ current: "verify", failed: true });
-    expect(rows.map((row) => row.state)).toEqual(["done", "failed", "pending", "pending"]);
+    expect(rows.map((row) => row.state)).toEqual(["done", "failed", "pending", "pending", "pending"]);
     // A failed step says what it was attempting, not what it achieved.
     expect(rows[1].label).toBe("Verifying the passphrase — preview only");
   });
 
   it("reports every step done once the sequence finishes", () => {
     const rows = buildRestoreRows({ current: "reload", finished: true });
-    expect(rows.map((row) => row.state)).toEqual(["done", "done", "done", "done"]);
+    expect(rows.map((row) => row.state)).toEqual(["done", "done", "done", "done", "done"]);
     expect(rows[0].label).toBe("Game files installed");
   });
 
@@ -79,7 +79,7 @@ describe("RestoreChecklist", () => {
 
     expect(screen.getByLabelText("In progress")).toBeTruthy();
     expect(screen.getAllByLabelText("Done")).toHaveLength(2);
-    expect(screen.getByLabelText("Waiting")).toBeTruthy();
+    expect(screen.getAllByLabelText("Waiting")).toHaveLength(2);
     expect(screen.getByText("4.9 GB")).toBeTruthy();
     expect(screen.getByText("Sign in again.")).toBeTruthy();
   });
