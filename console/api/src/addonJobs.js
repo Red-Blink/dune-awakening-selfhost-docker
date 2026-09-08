@@ -242,6 +242,15 @@ const BUYBACK_STACK_SQL = "GREATEST(COALESCE(i.stack_size, 0), COALESCE(s.initia
 
 const BUYBACK_ELIGIBLE_PREDICATE = `o.item_price > 0 AND ${BUYBACK_STACK_SQL} > 0 AND o.item_price <= p.max_unit_price`;
 
+// Defense in depth: exchangeId is validated upstream, but re-assert here so a
+// value interpolated into raw SQL template literals can never be anything
+// other than a plain BIGINT digit string, closing off SQL injection via this
+// dynamic input.
+function toSafeExchangeId(exchangeId) {
+  if (!/^\d+$/.test(String(exchangeId))) throw new Error("Invalid exchangeId for SQL interpolation.");
+  return String(exchangeId);
+}
+
 // Prefer the exact seeded grade. When a template does not seed every grade,
 // use the closest seeded grade below the listing so the cap stays
 // conservative; only listings below every seeded grade fall up to the lowest
@@ -250,8 +259,8 @@ const BUYBACK_PLAN_LATERAL = `LEFT JOIN LATERAL (
         SELECT pp.template_id, pp.quality_level, pp.max_unit_price
         FROM market_buy_plan pp
         WHERE pp.template_id = o.template_id
-        ORDER BY (pp.quality_level <= ${BUYBACK_ORDER_GRADE_SQL}) DESC,
-                 CASE WHEN pp.quality_level <= ${BUYBACK_ORDER_GRADE_SQL} THEN -pp.quality_level ELSE pp.quality_level END
+        ORDER BY (pp.quality_level <= ` + BUYBACK_ORDER_GRADE_SQL + `) DESC,
+                 CASE WHEN pp.quality_level <= ` + BUYBACK_ORDER_GRADE_SQL + ` THEN -pp.quality_level ELSE pp.quality_level END
         LIMIT 1
     ) p ON TRUE`;
 
@@ -365,7 +374,7 @@ live_buy_basis AS (
            ${aggregate} AS basis_price
     FROM ${BUYBACK_ORDERS_BASE_JOIN_SQL}
     LEFT JOIN (SELECT id AS owner_id FROM dune.actors WHERE class = 'Revy' LIMIT 1) b ON TRUE
-    WHERE o.exchange_id = ${exchangeId}
+    WHERE o.exchange_id = ${toSafeExchangeId(exchangeId)}
       AND ${BUYBACK_PLAYER_SELL_SQL}
       AND o.item_price > 0
       AND ${BUYBACK_STACK_SQL} > 0
