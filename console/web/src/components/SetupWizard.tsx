@@ -3,7 +3,7 @@ import { setupApi, type Check, type Task } from "../api/setup";
 import { PreflightCheckCard } from "./PreflightCheckCard";
 import { SecretInput } from "./SecretInput";
 import { TaskProgress } from "./TaskProgress";
-import { RestoreChecklist, buildRestoreRows, imageLoadProgress, installedAssetsSize, type RestoreStepId } from "./RestoreChecklist";
+import { RestoreChecklist, buildRestoreRows, installProgressDetail, installedAssetsSummary, type RestoreStepId } from "./RestoreChecklist";
 import { getServerPorts, getAdminPort } from "../api/serverPorts";
 import { backupsApi } from "../api/backups";
 import { serverApi } from "../api/server";
@@ -109,7 +109,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
   const [restoreStep, setRestoreStep] = useState<RestoreStepId | null>(null);
   const [restoreError, setRestoreError] = useState("");
   const [restoreDone, setRestoreDone] = useState(false);
-  const [assetsSize, setAssetsSize] = useState("");
+  const [assetsSummary, setAssetsSummary] = useState("");
   const [startWarning, setStartWarning] = useState("");
   const onSetupCompleteRef = useRef(onSetupComplete);
   // Set once a restore has been resumed, so the step clamp above stops steering.
@@ -339,7 +339,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
     setRestoreError("");
     try {
       const assets = await runRestoreTask("assets", () => updatesApi.installAssets());
-      setAssetsSize(installedAssetsSize((assets.logLines || []).map((row) => row.line)));
+      setAssetsSummary(installedAssetsSummary((assets.logLines || []).map((row) => row.line)));
       await runRestoreTask("verify", () => backupsApi.restoreSystem(archiveName, { passphrase, apply: false }));
       await runRestoreTask("apply", () => backupsApi.restoreSystem(archiveName, {
         passphrase,
@@ -509,7 +509,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
               finished: restoreDone,
               failed: Boolean(restoreError),
               // Counting while it runs, total size once it is done.
-              details: { assets: restoreStep === "assets" ? imageLoadProgress(taskLogLines) : assetsSize }
+              details: { assets: restoreStep === "assets" ? installProgressDetail(taskLogLines) : assetsSummary }
             })}
             note="The archive's admin password replaces this one. You may need to sign in again."
           />

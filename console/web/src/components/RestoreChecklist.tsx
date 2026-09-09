@@ -69,6 +69,32 @@ function rowState(index: number, activeIndex: number, finished: boolean, failed:
 const ASSET_SIZE_MARKER = /DUNE_GAME_ASSETS_SIZE=([0-9]+(?:\.[0-9]+)?)([KMGT])?/;
 const sizeUnits: Record<string, string> = { K: "KB", M: "MB", G: "GB", T: "TB" };
 
+// install-assets prints the loaded tags, so the log already says which game
+// build landed. That is the fact an operator is actually after -- "4.9 GB"
+// confirms bytes moved, not that the right thing arrived.
+const WORLD_TAG_MARKER = /^DUNE_WORLD_IMAGE_TAG=(\S+)/;
+
+function lastMatch(lines: string[], pattern: RegExp, group = 1): string {
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const match = pattern.exec((lines[index] || "").trim());
+    if (match) return match[group] || "";
+  }
+  return "";
+}
+
+// Each part is dropped when the install did not report it, so an older
+// install-assets degrades to what it does say rather than to a wrong answer.
+export function installedAssetsSummary(lines: string[]): string {
+  const parts: string[] = [];
+  const build = lastMatch(lines, WORLD_TAG_MARKER);
+  if (build) parts.push(`build ${build}`);
+  const total = lastMatch(lines, ASSET_LOAD_MARKER, 2);
+  if (total) parts.push(`${total} image${total === "1" ? "" : "s"}`);
+  const size = installedAssetsSize(lines);
+  if (size) parts.push(size);
+  return parts.join(" · ");
+}
+
 export function installedAssetsSize(lines: string[]): string {
   for (let index = lines.length - 1; index >= 0; index -= 1) {
     const match = ASSET_SIZE_MARKER.exec(lines[index] || "");
@@ -78,13 +104,21 @@ export function installedAssetsSize(lines: string[]): string {
 }
 
 // docker load redraws its progress with carriage returns, which strips to
-// nothing, so install-assets counts the tarballs instead.
+// nothing, so install-assets counts the tarballs instead. It also names the
+// phase it is in, because the SteamCMD download reports nothing at all for as
+// long as it runs -- minutes, on a host that has to fetch the depot.
 const ASSET_LOAD_MARKER = /DUNE_GAME_ASSETS_LOAD=([0-9]+)\/([0-9]+)/;
+const ASSET_PHASE_MARKER = /DUNE_GAME_ASSETS_PHASE=(.+)$/;
 
-export function imageLoadProgress(lines: string[]): string {
+// Whichever marker is newest wins, so the count takes over from the phase name
+// once loading starts and neither has to know about the other.
+export function installProgressDetail(lines: string[]): string {
   for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const match = ASSET_LOAD_MARKER.exec(lines[index] || "");
-    if (match) return `Loading images ${match[1]} of ${match[2]}`;
+    const line = lines[index] || "";
+    const loading = ASSET_LOAD_MARKER.exec(line);
+    if (loading) return `Loading images ${loading[1]} of ${loading[2]}`;
+    const phase = ASSET_PHASE_MARKER.exec(line);
+    if (phase) return phase[1].trim();
   }
   return "";
 }
