@@ -250,6 +250,9 @@ const BUYBACK_ELIGIBLE_PREDICATE = `o.item_price > 0 AND ${BUYBACK_STACK_SQL} > 
 // use the closest seeded grade below the listing so the cap stays
 // conservative; only listings below every seeded grade fall up to the lowest
 // available row.
+// nosemgrep: utils.custom.sql-injection-template-literal -- BUYBACK_ORDER_GRADE_SQL
+// (both interpolations below) is the fixed constant defined above, not user
+// input; there is nothing here for an attacker to control.
 const BUYBACK_PLAN_LATERAL = `LEFT JOIN LATERAL (
         SELECT pp.template_id, pp.quality_level, pp.max_unit_price
         FROM market_buy_plan pp
@@ -359,6 +362,11 @@ ${valuesSql}
   }
   const threshold = schedule.buybackPercent;
   const aggregate = buybackLiveBasisAggregateSql(priceBasis);
+  // nosemgrep: utils.custom.sql-injection-template-literal -- exchangeId (the
+  // o.exchange_id filter below) is already validated by
+  // requireScheduleExchangeId()/normalizeExchangeId() above this function,
+  // which enforces /^[1-9][0-9]*$/ plus a BIGINT upper bound; see the comment
+  // on requireScheduleExchangeId for why direct interpolation here is safe.
   return `seed_buy_caps(template_id, quality_level, max_unit_price) AS (
     VALUES
 ${valuesSql}
@@ -369,11 +377,6 @@ live_buy_basis AS (
            ${aggregate} AS basis_price
     FROM ${BUYBACK_ORDERS_BASE_JOIN_SQL}
     LEFT JOIN (SELECT id AS owner_id FROM dune.actors WHERE class = 'Revy' LIMIT 1) b ON TRUE
-    -- nosemgrep: utils.custom.sql-injection-template-literal -- exchangeId is
-    -- already validated by requireScheduleExchangeId()/normalizeExchangeId()
-    -- above, which enforces /^[1-9][0-9]*$/ plus a BIGINT upper bound before
-    -- this function ever runs; scanner false positive, see the comment on
-    -- requireScheduleExchangeId.
     WHERE o.exchange_id = ${exchangeId}
       AND ${BUYBACK_PLAYER_SELL_SQL}
       AND o.item_price > 0
@@ -412,6 +415,8 @@ ${valuesSql};`;
   const seedValues = valuesSql || "(NULL::text,NULL::bigint,NULL::bigint)";
   const threshold = schedule.buybackPercent;
   const aggregate = buybackLiveBasisAggregateSql(priceBasis);
+  // nosemgrep: utils.custom.sql-injection-template-literal -- exchangeId is
+  // already validated by requireScheduleExchangeId() above this function.
   return `INSERT INTO market_buy_plan (template_id, quality_level, max_unit_price)
 SELECT template_id, quality_level, max_unit_price FROM (
     WITH seed_buy_caps(template_id, quality_level, max_unit_price) AS (
@@ -424,8 +429,6 @@ ${seedValues}
                ${aggregate} AS basis_price
         FROM ${BUYBACK_ORDERS_BASE_JOIN_SQL}
         LEFT JOIN (SELECT id AS owner_id FROM dune.actors WHERE class = 'Revy' LIMIT 1) b ON TRUE
-        -- nosemgrep: utils.custom.sql-injection-template-literal -- exchangeId
-        -- is already validated by requireScheduleExchangeId() above.
         WHERE o.exchange_id = ${exchangeId}
           AND ${BUYBACK_PLAYER_SELL_SQL}
           AND o.item_price > 0
@@ -456,6 +459,8 @@ ${seedValues}
 // player listing at or below the threshold.
 export function buildBuybackEligibilitySql(plan, schedule) {
   const exchangeId = requireScheduleExchangeId(schedule);
+  // nosemgrep: utils.custom.sql-injection-template-literal -- exchangeId is
+  // already validated by requireScheduleExchangeId() above this function.
   return `WITH ${buybackMarketPlanCteSql(plan, schedule)},
 bot AS (
     SELECT id AS owner_id FROM dune.actors WHERE class = 'Revy' LIMIT 1
@@ -469,8 +474,6 @@ SELECT
   COUNT(*) FILTER (WHERE p.template_id IS NOT NULL AND (COALESCE(o.item_price, 0) <= 0 OR ${BUYBACK_STACK_SQL} <= 0))::text AS invalid_price_or_stack_sell_orders
 FROM ${BUYBACK_ORDERS_JOIN_SQL}
 LEFT JOIN bot b ON TRUE
--- nosemgrep: utils.custom.sql-injection-template-literal -- exchangeId is
--- already validated by requireScheduleExchangeId() above.
 WHERE o.exchange_id = ${exchangeId}
   AND ${BUYBACK_PLAYER_SELL_SQL};`;
 }
@@ -490,10 +493,10 @@ function buybackClassifySelectSql() {
 
 // exchangeId here is always the return value of requireScheduleExchangeId()
 // (see buildBuybackClassifySql, the only caller), never raw user input.
+// nosemgrep: utils.custom.sql-injection-template-literal
 function buybackClassifyFromSql(exchangeId) {
   return `FROM ${BUYBACK_ORDERS_JOIN_SQL}
 LEFT JOIN bot b ON TRUE
--- nosemgrep: utils.custom.sql-injection-template-literal
 WHERE o.exchange_id = ${exchangeId}
   AND ${BUYBACK_PLAYER_SELL_SQL}`;
 }
@@ -544,6 +547,8 @@ ORDER BY result_code::int ASC, item_price::bigint ASC, order_id::bigint ASC;`;
 // available when the other feature encounters a database compatibility issue.
 export function buildPlayerPortalExchangeOverviewSql(schedule) {
   const exchangeId = requireScheduleExchangeId(schedule);
+  // nosemgrep: utils.custom.sql-injection-template-literal -- exchangeId is
+  // already validated by requireScheduleExchangeId() above this function.
   return `SELECT COALESCE(o.template_id, '') AS template_id,
        (${BUYBACK_ORDER_GRADE_SQL})::text AS quality_level,
        COUNT(*)::text AS listing_count,
@@ -551,8 +556,6 @@ export function buildPlayerPortalExchangeOverviewSql(schedule) {
        MIN(o.item_price)::text AS lowest_price,
        MAX(o.item_price)::text AS highest_price
 FROM ${BUYBACK_ORDERS_BASE_JOIN_SQL}
--- nosemgrep: utils.custom.sql-injection-template-literal -- exchangeId is
--- already validated by requireScheduleExchangeId() above.
 WHERE o.exchange_id = ${exchangeId}
   AND o.item_price >= 0
 GROUP BY o.template_id, ${BUYBACK_ORDER_GRADE_SQL}
@@ -581,6 +584,9 @@ export function buildBuybackSql(plan, schedule) {
   const threshold = schedule.buybackPercent;
   const maxBuys = schedule.maxBuys;
   const planInsert = buybackPlanPopulateSql(plan, schedule);
+  // nosemgrep: utils.custom.sql-injection-template-literal -- every
+  // o.exchange_id = ${exchangeId} interpolation below reuses this same
+  // exchangeId, already validated by requireScheduleExchangeId() above.
   return `CREATE TEMP TABLE market_buy_plan (template_id TEXT NOT NULL, quality_level BIGINT NOT NULL, max_unit_price BIGINT NOT NULL, PRIMARY KEY (template_id, quality_level)) ON COMMIT DROP;
 CREATE TEMP TABLE market_buy_result (purchased INTEGER NOT NULL, total_units BIGINT NOT NULL, total_solari BIGINT NOT NULL, threshold_percent INTEGER NOT NULL, max_buys INTEGER NOT NULL) ON COMMIT DROP;
 CREATE TEMP TABLE market_buy_claim_snapshot (order_id BIGINT NOT NULL PRIMARY KEY) ON COMMIT DROP;
@@ -620,9 +626,6 @@ BEGIN
     INSERT INTO market_buy_claim_snapshot (order_id)
     SELECT o.id
     FROM ${BUYBACK_ORDERS_JOIN_SQL}
-    -- nosemgrep: utils.custom.sql-injection-template-literal -- exchangeId is
-    -- already validated by requireScheduleExchangeId() above (same value
-    -- reused at every o.exchange_id site in this function).
     WHERE o.exchange_id = ${exchangeId} AND ${BUYBACK_SWEEP_PLAYER_SQL} AND ${BUYBACK_ELIGIBLE_PREDICATE}
     ORDER BY o.item_price ASC, o.id ASC
     LIMIT ${maxBuys + MAX_BUYBACK_LOG_ENTRIES};
@@ -634,7 +637,6 @@ BEGIN
         SELECT o.id AS order_id, o.exchange_id, o.access_point_id, o.owner_id AS seller_actor_id, o.template_id, o.item_price, o.item_id,
                ${BUYBACK_ORDER_GRADE_SQL} AS quality_level, ${BUYBACK_STACK_SQL} AS actual_stack, p.max_unit_price
         FROM ${BUYBACK_ORDERS_JOIN_SQL}
-        -- nosemgrep: utils.custom.sql-injection-template-literal
         WHERE o.exchange_id = ${exchangeId} AND ${BUYBACK_SWEEP_PLAYER_SQL} AND ${BUYBACK_ELIGIBLE_PREDICATE}
         ORDER BY o.item_price ASC, o.id ASC
         LIMIT ${maxBuys} FOR UPDATE OF o, s SKIP LOCKED
@@ -660,7 +662,6 @@ BEGIN
     INSERT INTO market_buy_log (order_id, seller_actor_id, template_id, quality_level, item_price, stack_size, max_unit_price, result_code, result_label, detail)
     SELECT o.id, o.owner_id, COALESCE(o.template_id, ''), ${BUYBACK_ORDER_GRADE_SQL}, COALESCE(o.item_price, 0), ${BUYBACK_STACK_SQL}, p.max_unit_price, 0, 'eligible', ${BUYBACK_RESULT_DETAIL_SQL}
     FROM ${BUYBACK_ORDERS_JOIN_SQL}
-    -- nosemgrep: utils.custom.sql-injection-template-literal
     WHERE o.exchange_id = ${exchangeId}
       AND ${BUYBACK_SWEEP_PLAYER_SQL}
       AND ${BUYBACK_ELIGIBLE_PREDICATE}
