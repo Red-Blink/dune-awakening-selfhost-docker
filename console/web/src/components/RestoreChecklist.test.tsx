@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { RestoreChecklist, buildRestoreRows, imageLoadProgress, installedAssetsSize } from "./RestoreChecklist";
+import { RestoreChecklist, buildRestoreRows, installProgressDetail, installedAssetsSize, installedAssetsSummary } from "./RestoreChecklist";
 
 describe("buildRestoreRows", () => {
   it("splits the list into done, running and waiting around the current step", () => {
@@ -54,9 +54,41 @@ describe("installedAssetsSize", () => {
   });
 });
 
-describe("imageLoadProgress", () => {
+describe("installedAssetsSummary", () => {
+  // What an operator wants after an install is which build landed, not how
+  // many bytes moved. The tags are printed by the "=== Current tags ===" step.
+  const fullLog = [
+    "DUNE_GAME_ASSETS_LOAD=11/11 gateway.tar",
+    "=== Current tags ===",
+    "DUNE_WORLD_IMAGE_TAG=2064155-0-shipping",
+    "DUNE_POSTGRES_IMAGE_TAG=17.4-alpine-fc-13",
+    "DUNE_GAME_ASSETS_SIZE=4.9G"
+  ];
+
+  it("leads with the build, then the count and size", () => {
+    expect(installedAssetsSummary(fullLog)).toBe("build 2064155-0-shipping · 11 images · 4.9 GB");
+  });
+
+  it("takes the world tag, not the Postgres one", () => {
+    // Both are printed together, and the Postgres tag is not the game build.
+    expect(installedAssetsSummary(fullLog)).not.toContain("17.4-alpine");
+  });
+
+  it("drops the parts an older install never reported", () => {
+    // Degrades to what it does know rather than to a wrong answer.
+    expect(installedAssetsSummary(["DUNE_GAME_ASSETS_SIZE=812M"])).toBe("812 MB");
+    expect(installedAssetsSummary(["DUNE_WORLD_IMAGE_TAG=2064155-0-shipping"])).toBe("build 2064155-0-shipping");
+    expect(installedAssetsSummary(["=== Detect loaded image tags ==="])).toBe("");
+  });
+
+  it("says image, not images, for a single one", () => {
+    expect(installedAssetsSummary(["DUNE_GAME_ASSETS_LOAD=1/1 only.tar"])).toBe("1 image");
+  });
+});
+
+describe("installProgressDetail", () => {
   it("counts the newest image the install reported", () => {
-    expect(imageLoadProgress([
+    expect(installProgressDetail([
       "DUNE_GAME_ASSETS_LOAD=1/11 seabass-server.tar",
       ">>> docker load -i /srv/dune/server/images/seabass-server.tar",
       "DUNE_GAME_ASSETS_LOAD=4/11 gateway.tar"
@@ -65,11 +97,36 @@ describe("imageLoadProgress", () => {
 
   it("ignores the redraw noise docker load surrounds it with", () => {
     // Everything else on these lines strips down to nothing.
-    expect(imageLoadProgress(["DUNE_GAME_ASSETS_LOAD=2/3 x.tar", "[1A[2K", ""])).toBe("Loading images 2 of 3");
+    expect(installProgressDetail(["DUNE_GAME_ASSETS_LOAD=2/3 x.tar", "[1A[2K", ""])).toBe("Loading images 2 of 3");
+  });
+
+  it("names the phase while nothing is counting yet", () => {
+    // The SteamCMD download reports nothing for as long as it runs, which on a
+    // host that has to fetch the depot is minutes of an apparently dead step.
+    expect(installProgressDetail([
+      "DUNE_GAME_ASSETS_PHASE=Downloading game files",
+      "=== Download/update server files with SteamCMD ==="
+    ])).toBe("Downloading game files");
+  });
+
+  it("lets the image count take over from the phase once loading starts", () => {
+    // Newest marker wins, so neither has to know about the other.
+    expect(installProgressDetail([
+      "DUNE_GAME_ASSETS_PHASE=Downloading game files",
+      "DUNE_GAME_ASSETS_PHASE=Loading images",
+      "DUNE_GAME_ASSETS_LOAD=3/11 gateway.tar"
+    ])).toBe("Loading images 3 of 11");
+  });
+
+  it("falls back to a later phase after the last image loads", () => {
+    expect(installProgressDetail([
+      "DUNE_GAME_ASSETS_LOAD=11/11 last.tar",
+      "DUNE_GAME_ASSETS_PHASE=Detecting image tags"
+    ])).toBe("Detecting image tags");
   });
 
   it("shows nothing before the first image starts loading", () => {
-    expect(imageLoadProgress(["=== Load updated Funcom image tarballs ==="])).toBe("");
+    expect(installProgressDetail(["=== Load updated Funcom image tarballs ==="])).toBe("");
   });
 });
 

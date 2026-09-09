@@ -129,6 +129,7 @@ ensure_orchestrator() {
 # and install-assets runs them by calling this rather than duplicating the block.
 finish_asset_phase() {
   echo
+  echo "DUNE_GAME_ASSETS_PHASE=Refreshing map catalogs"
   echo "=== Refresh generated map catalogs ==="
   runtime/scripts/extract-partition-catalog.sh
   runtime/scripts/extract-server-catalog.sh
@@ -1164,6 +1165,10 @@ if [ "$assets_only" != "1" ]; then
 fi
 
 echo
+# Phase markers, same convention as DUNE_GAME_ASSETS_LOAD/_SIZE: the console
+# shows the install as one step, and without these the SteamCMD phase reports
+# nothing for as long as it runs -- which reads as a hang.
+echo "DUNE_GAME_ASSETS_PHASE=Downloading game files"
 echo "=== Download/update server files with SteamCMD ==="
 
 steam_attempt=1
@@ -1187,13 +1192,22 @@ while [ "$steam_attempt" -le "$steam_attempt_limit" ]; do
   steam_attempt_dns=0
   steam_attempt_content_host=0
   steam_content_lines="$(steamcmd_content_log_line_count)"
+  steam_started="$(date +%s)"
   set +e
   docker compose exec -T -e APP_ID="$APP_ID" orchestrator dune download 2>&1 | tee "$steam_log"
   steam_rc=$?
   set -e
+  echo "SteamCMD attempt $steam_attempt finished in $(( $(date +%s) - steam_started ))s (exit $steam_rc)."
 
   if [ "$steam_rc" -eq 0 ]; then
     steam_ok=1
+    # Kept on success too, not just on failure. SteamCMD writes its logs under
+    # $HOME inside the orchestrator, which is not a volume, so a container
+    # recreate destroys them -- and the orchestrator is recreated routinely.
+    # Without this, a slow or stalled download cannot be diagnosed afterwards:
+    # its timestamps are the only record of when the work actually finished.
+    : > runtime/generated/steamcmd-last-download.log 2>/dev/null || true
+    append_new_steamcmd_content_log "$steam_content_lines" runtime/generated/steamcmd-last-download.log
     rm -f "$steam_log"
     break
   fi
@@ -1327,6 +1341,7 @@ if [ "$steam_ok" != "1" ]; then
 fi
 
 echo
+echo "DUNE_GAME_ASSETS_PHASE=Loading images"
 echo "=== Load updated Funcom image tarballs ==="
 # `docker load` redraws its progress with carriage returns, which strips to
 # nothing, and this is the longest phase of an install. Count the tarballs so
@@ -1355,6 +1370,7 @@ if [ -n "$asset_size" ]; then
 fi
 
 echo
+echo "DUNE_GAME_ASSETS_PHASE=Detecting image tags"
 echo "=== Detect loaded image tags ==="
 runtime/scripts/detect-image-tags.sh
 
