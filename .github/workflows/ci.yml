@@ -147,6 +147,7 @@ jobs:
           tests/runtime-permission-helper-rebuild-test.sh
           tests/update-systemd-timer-health-test.sh
           tests/update-install-assets-test.sh
+          tests/deferred-reconcile-test.sh
           tests/memory-status-effective-defaults-test.sh
           tests/status-bounded-log-read-test.sh
           tests/always-on-memory-safety-test.sh

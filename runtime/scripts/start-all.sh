@@ -224,10 +224,7 @@ if [ "${DUNE_START_FOREGROUND_DEFERRED_RECONCILE:-0}" = "1" ]; then
   run_timed_step "Running Deferred Dimension Reconcile" runtime/scripts/deferred-reconcile.sh
 else
   echo "=== Scheduling Deferred Dimension Reconcile ==="
-  mkdir -p runtime/generated
-  (
-    exec runtime/scripts/deferred-reconcile.sh
-  ) >runtime/generated/deferred-reconcile.log 2>&1 &
+  runtime/scripts/schedule-deferred-reconcile.sh
 fi
 
 
