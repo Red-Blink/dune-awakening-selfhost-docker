@@ -143,7 +143,8 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
 
   useEffect(() => {
     let cancelled = false;
-    setupApi.tasks().then(({ tasks }) => {
+    (async () => {
+      const { tasks } = await setupApi.tasks();
       if (cancelled) return;
       // A refresh mid-restore must come back here, not to the full console.
       const latestRestore = tasks.find((item) => restoreOperations.has(item.operation) && !terminalStatuses.has(item.status));
@@ -153,7 +154,22 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
       } catch {
         storedRestore = null;
       }
-      if (latestRestore || storedRestore?.archive) {
+      // The hint lives in the browser, so it outlives the host it describes:
+      // a rebuilt server, or one whose archive was deleted, still had it and
+      // dropped the operator onto the passphrase step of a restore that could
+      // not happen -- past the welcome step where the path is chosen. A running
+      // task is proof on its own; a bare hint has to name an archive that is
+      // still there.
+      if (!latestRestore && storedRestore?.archive && !(await archiveStillExists(storedRestore.archive))) {
+        clearRestoreProgress();
+        storedRestore = null;
+      }
+      if (cancelled) return;
+      // Only first-run setup has a restore path. A redeploy renders a shorter,
+      // different step list, so resuming into restoreSteps there sets a step
+      // index past its end: no stepper entry is active and Next is inert, which
+      // reads as a broken wizard rather than a stale hint.
+      if (mode === "first-run" && (latestRestore || storedRestore?.archive)) {
         resumedRef.current = true;
         setPath("restore");
         if (storedRestore?.archive) setArchiveName(storedRestore.archive);
@@ -167,7 +183,12 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
           // Dry run and apply share an operation, so only the stored stage
           // can tell them apart.
           setRestoreStep(stepForOperation(latestRestore.operation) || storedRestoreStep(storedRestore?.stage) || "apply");
-          void watchTaskToEnd(latestRestore.id);
+          // A rejected poll would otherwise kill this loop silently, leaving the
+          // step spinning with no error and no further updates. The sequence's
+          // own call is inside a try/catch; this one is not.
+          void watchTaskToEnd(latestRestore.id).catch((error) => {
+            setRestoreError(error instanceof Error ? error.message : String(error));
+          });
         }
         return;
       }
@@ -178,7 +199,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
       setStep(installStep);
       setMaxUnlockedStep((current) => Math.max(current, installStep));
       if (!terminalStatuses.has(latestInit.status)) void watchInitTask(latestInit.id);
-    }).catch(() => undefined);
+    })().catch(() => undefined);
     return () => { cancelled = true; };
   }, [mode]);
 
@@ -270,6 +291,17 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
       setArchiveName("");
     } finally {
       setUploadPercent(-1);
+    }
+  }
+
+  // Unreachable listing (no session yet, the API down) returns true: refusing
+  // to resume because the check itself failed would be worse than resuming.
+  async function archiveStillExists(archive: string) {
+    try {
+      const { rows } = await backupsApi.listSystem();
+      return rows.some((row) => row.name === archive);
+    } catch {
+      return true;
     }
   }
 
@@ -374,7 +406,6 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
   // Mirrors the route's own rule, so a passphrase that cannot work never
   // starts a multi-gigabyte install.
   const passphraseReady = passphrase.length >= 12 && new Set(passphrase).size >= 5;
-  const restoreRunning = Boolean(restoreStep) && !restoreError;
   const taskLogLines = (task?.logLines || []).map((row) => row.line);
   const stepReadyById: Record<StepId, boolean> = {
     welcome: true,
@@ -393,6 +424,17 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
   };
   const activeStep = steps[step]?.id || steps[0].id;
   const activeStepReady = stepReadyById[activeStep];
+
+  // The two paths are different step lists, so progress through one says
+  // nothing about the other: without re-locking, walking the restore path and
+  // then switching unlocked a deploy step that was never satisfied.
+  function choosePath(next: SetupPath) {
+    if (next !== path) setMaxUnlockedStep(step);
+    setPath(next);
+    // Choosing to deploy is the operator saying what they want; the stored
+    // restore hint must not drag them back here after a reload.
+    if (next === "deploy") clearRestoreProgress();
+  }
 
   function stepIndex(id: StepId) {
     return Math.max(0, steps.findIndex((item) => item.id === id));
@@ -422,11 +464,11 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
           {mode === "first-run" && <div className="setup-path-choice">
             <h4>What should this host do?</h4>
             <div className="setup-path-options">
-              <button type="button" className={`setup-path-option${path === "deploy" ? " selected" : ""}`} aria-pressed={path === "deploy"} onClick={() => setPath("deploy")}>
+              <button type="button" className={`setup-path-option${path === "deploy" ? " selected" : ""}`} aria-pressed={path === "deploy"} onClick={() => choosePath("deploy")}>
                 <strong>Deploy a new server</strong>
                 <span>Creates a fresh world and a new Battlegroup identity.</span>
               </button>
-              <button type="button" className={`setup-path-option${path === "restore" ? " selected" : ""}`} aria-pressed={path === "restore"} onClick={() => setPath("restore")}>
+              <button type="button" className={`setup-path-option${path === "restore" ? " selected" : ""}`} aria-pressed={path === "restore"} onClick={() => choosePath("restore")}>
                 <strong>Restore a Dune Docker system backup</strong>
                 <span>Moves an existing server here with its configuration, secrets and database. Encrypted archive named dune-system-*.tar.</span>
               </button>
@@ -439,6 +481,9 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
           <p className="danger-note">A Funcom database backup (.backup) is a different thing and cannot be restored here: it holds the game database only, with no configuration and no credentials. Import one from Backups after setup finishes.</p>
           <input type="file" accept=".tar,.enc,.gz" aria-label="System backup archive" disabled={uploadPercent >= 0} onChange={(event) => {
             const file = event.target.files?.[0];
+            // Clear the input, or picking the same file again after a rejection
+            // fires no change event at all and the step looks frozen.
+            event.target.value = "";
             if (file) void uploadArchive(file);
           }} />
           {uploadPercent >= 0 && <p className="muted">Uploading... {uploadPercent}%</p>}

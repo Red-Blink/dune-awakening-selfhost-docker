@@ -200,6 +200,28 @@ jobs:
         run: npm audit --audit-level=high
         working-directory: console/api
 
+  console-image:
+    name: Console image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # Nothing else here builds this image, so a base bump, a dropped package
+      # or a package too old to carry the flags the code passes it reaches
+      # production unverified. That is how the console shipped with gnupg
+      # 2.2.40 while db.sh required 2.3 for --aead-algo: every check was green.
+      - name: Build the console image
+        run: docker build -f console/api/Dockerfile -t dune-console:ci .
+      - name: Check the runtime it actually ships
+        run: |
+          set -euo pipefail
+          # --entrypoint, because the image's own entrypoint refuses to start
+          # without a writable /repo bind mount, which CI has no reason to make.
+          docker run --rm --entrypoint node dune-console:ci --version
+          docker run --rm --entrypoint sh dune-console:ci -lc '
+            gpg --version | head -1
+            gpg --dump-options | grep -qx -- --aead-algo
+          '
+
   release-validation:
     name: Release validation (${{ matrix.os }})
     strategy:
@@ -228,6 +250,7 @@ jobs:
       - security-checks
       - api-dependency-audit
       - release-validation
+      - console-image
     runs-on: ubuntu-latest
     steps:
       - name: Require every release check to pass
@@ -240,6 +263,7 @@ jobs:
           SECURITY_CHECKS: ${{ needs.security-checks.result }}
           API_DEPENDENCY_AUDIT: ${{ needs.api-dependency-audit.result }}
           RELEASE_VALIDATION: ${{ needs.release-validation.result }}
+          CONSOLE_IMAGE: ${{ needs.console-image.result }}
         run: |
           set -euo pipefail
           failed=0
@@ -251,7 +275,8 @@ jobs:
             "$CONTAINER_LIFECYCLE" \
             "$SECURITY_CHECKS" \
             "$API_DEPENDENCY_AUDIT" \
-            "$RELEASE_VALIDATION"
+            "$RELEASE_VALIDATION" \
+            "$CONSOLE_IMAGE"
           do
             if [ "$result" != "success" ]; then
               failed=1

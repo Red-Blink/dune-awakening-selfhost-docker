@@ -3,7 +3,7 @@ import { pipeline } from "node:stream/promises";
 import { createServer as createNetServer } from "node:net";
 import { totalmem } from "node:os";
 import { spawn } from "node:child_process";
-import { existsSync, writeFileSync, chmodSync, mkdirSync, createReadStream, createWriteStream, readFileSync, renameSync, rmSync, statSync } from "node:fs";
+import { existsSync, writeFileSync, chmodSync, mkdirSync, createReadStream, createWriteStream, readFileSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { loadConfig, publicConfig, parseAllowedIps, resolvePorts } from "./config.js";
 import { createAuth, setSessionCookie, clearSessionCookie, json, withSecurityHeaders } from "./auth.js";
@@ -887,7 +887,11 @@ async function handleApi(req, res) {
     const backup = decodeURIComponent(path.split("/").at(-2));
     return backupDownloadRoute(req, res, backup);
   }
-  if (path.startsWith("/api/backups/") && !path.startsWith("/api/backups/system/") && req.method === "DELETE") {
+  // The system exclusion has to cover the collection path itself, not just what
+  // is under it: "/api/backups/system" with no trailing segment slipped through
+  // and dispatched as a database-backup delete named "system", authorized under
+  // backups:delete rather than backups:delete-system.
+  if (path.startsWith("/api/backups/") && path !== "/api/backups/system" && !path.startsWith("/api/backups/system/") && req.method === "DELETE") {
     const backup = decodeURIComponent(path.split("/").pop());
     return task(req, res, "backup", "backupDelete", { backup });
   }
@@ -1862,6 +1866,23 @@ async function systemBackupCreateRoute(req, res) {
 // multipart form: there is only one file to send now that the pair travels
 // together, and a raw body streams to disk without a boundary parser standing
 // between a gigabyte of upload and the filesystem.
+const IMPORT_STAGING_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function sweepStaleImportStaging(directory) {
+  try {
+    for (const entry of readdirSync(directory)) {
+      if (!/^import-\d+-\d+\.partial$/.test(entry)) continue;
+      const full = resolve(directory, entry);
+      // mtime rather than the timestamp in the name: the name records when the
+      // upload started, mtime when it last wrote, so a slow upload stays young.
+      if (Date.now() - statSync(full).mtimeMs < IMPORT_STAGING_MAX_AGE_MS) continue;
+      rmSync(full, { force: true });
+    }
+  } catch {
+    // A sweep that cannot run must not stop the upload it was tidying up for.
+  }
+}
+
 async function systemBackupImportRoute(req, res) {
   if (!applyMutationRateLimit(req, res, "backups.system.import")) return;
   const query = new URL(req.url || "/", "http://localhost").searchParams;
@@ -1878,6 +1899,11 @@ async function systemBackupImportRoute(req, res) {
   // umask default (often 0755) the first time anything writes here, and an
   // import can be that first write on a fresh host.
   chmodSync(directory, 0o700);
+  // A process kill or container restart mid-upload strands the staging file,
+  // and nothing else reclaims it: pruning walks valid archive names only. Sweep
+  // stale ones here, where the directory is already open and a concurrent
+  // upload's own file is far too young to match.
+  sweepStaleImportStaging(directory);
   const staging = resolve(directory, `import-${Date.now()}-${Math.floor(Math.random() * 1e9)}.partial`);
   const discard = () => { try { rmSync(staging, { force: true }); } catch { /* nothing to clean up */ } };
 
@@ -1945,7 +1971,7 @@ async function systemBackupImportRoute(req, res) {
     chmodSync(target, 0o600);
 
     const metadata = sidecarText
-      ? normalizeImportedSystemMetadata(sidecarText, { importedFrom: originalName })
+      ? normalizeImportedSystemMetadata(sidecarText, { importedFrom: originalName, encryption })
       : synthesizeSystemMetadata({ archiveName: name, importedFrom: originalName, encryption });
     writeFileSync(`${target}.yaml`, metadata, { mode: 0o600 });
     chmodSync(`${target}.yaml`, 0o600);

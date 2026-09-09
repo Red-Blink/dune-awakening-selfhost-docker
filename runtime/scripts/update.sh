@@ -82,9 +82,30 @@ dune_stack_has_running_services() {
 # dune-postgres, which is legitimately running on a host part-way through a
 # restore. Only a live world server makes swapping game files and image tags
 # unsafe.
+# Mirrors is_world_game_container() in recycle-world-game-servers.sh, which is
+# this repo's authority on the name shape. Besides the two fixed servers the
+# autoscaler spawns dune-server-<map>-<partition> -- dune-server-sh-arrakeen-23
+# and the like -- so matching only overmap and survival-N let install-assets
+# swap game files and image tags under a live world, which is the one thing the
+# refusal below exists to prevent. The gateway is not a world server.
 world_game_servers_running() {
-  docker ps --format '{{.Names}}' 2>/dev/null \
-    | grep -Eq '^dune-server-(overmap|survival-[0-9]+)$'
+  local name
+  while IFS= read -r name; do
+    case "$name" in
+      dune-server-gateway)
+        continue
+        ;;
+      dune-server-overmap|dune-server-survival-1)
+        return 0
+        ;;
+      dune-server-*-*)
+        if [[ "$name" =~ -[0-9]+$ ]]; then
+          return 0
+        fi
+        ;;
+    esac
+  done < <(docker ps --format '{{.Names}}' 2>/dev/null)
+  return 1
 }
 
 # Every orchestrator call below goes through `docker compose exec`, and the only

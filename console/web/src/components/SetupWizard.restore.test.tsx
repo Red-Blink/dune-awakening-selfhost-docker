@@ -13,7 +13,7 @@ vi.mock("../api/setup", async (importOriginal) => {
 });
 vi.mock("../api/backups", async (importOriginal) => {
   const original = await importOriginal<typeof import("../api/backups")>();
-  return { ...original, backupsApi: { ...original.backupsApi, restoreSystem: vi.fn(), importSystemUrl: vi.fn(original.backupsApi.importSystemUrl) } };
+  return { ...original, backupsApi: { ...original.backupsApi, restoreSystem: vi.fn(), listSystem: vi.fn(), importSystemUrl: vi.fn(original.backupsApi.importSystemUrl) } };
 });
 vi.mock("../api/updates", () => ({ updatesApi: { installAssets: vi.fn() } }));
 vi.mock("../api/server", () => ({ serverApi: { reloadConsole: vi.fn(), start: vi.fn() } }));
@@ -67,6 +67,7 @@ describe("setup wizard restore path", () => {
     vi.mocked(backupsApi.restoreSystem).mockResolvedValue({ task: done("restore") } as never);
     vi.mocked(serverApi.reloadConsole).mockResolvedValue({ task: done("reload") } as never);
     vi.mocked(serverApi.start).mockResolvedValue({ task: done("start") } as never);
+    vi.mocked(backupsApi.listSystem).mockResolvedValue({ rows: [{ name: "dune-system-x.tar.gz.enc" }] } as never);
     window.localStorage.clear();
   });
 
@@ -88,6 +89,19 @@ describe("setup wizard restore path", () => {
     const link = await screen.findByRole("link", { name: "Funcom self-host token" });
     expect(link.getAttribute("href")).toBe("https://account.duneawakening.com/");
     expect(link.getAttribute("rel")).toContain("noopener");
+  });
+
+  it("re-locks the stepper when the operator switches path", async () => {
+    // The two paths are different step lists, so progress through one says
+    // nothing about the other. Walking the restore path and switching back
+    // unlocked a deploy step that was never satisfied.
+    await walkToArchive();
+
+    fireEvent.click(screen.getByText("1. Welcome"));
+    fireEvent.click(await screen.findByText("Deploy a new server"));
+
+    const identity = await screen.findByText("5. Server Identity");
+    expect(identity).toBeDisabled();
   });
 
   it("refuses a Funcom database backup in the browser, before uploading", async () => {
@@ -206,6 +220,80 @@ describe("setup wizard restore path", () => {
 
     expect(await screen.findByText("Congratulations")).toBeTruthy();
     expect(screen.getByText(/Docker refused to start dune-director/)).toBeTruthy();
+  });
+
+  it("starts at the welcome step when the stored archive is gone", async () => {
+    // The hint lives in the browser, so it outlives the host: a rebuilt server
+    // still had it and opened on the passphrase step of a restore that could not
+    // happen, past the step where deploy-or-restore is chosen.
+    vi.mocked(backupsApi.listSystem).mockResolvedValue({ rows: [] } as never);
+    window.localStorage.setItem("arrakis.setupRestore", JSON.stringify({ archive: "dune-system-gone.tar.gz.enc", stage: "uploaded" }));
+
+    renderWizard();
+    expect(await screen.findByText("Welcome to Dune Docker Console")).toBeTruthy();
+    expect(screen.queryByLabelText("Archive passphrase")).toBeNull();
+    // and the dead hint is not left to do the same thing again next time.
+    await waitFor(() => expect(window.localStorage.getItem("arrakis.setupRestore")).toBeNull());
+  });
+
+  it("still resumes when the stored archive is really there", async () => {
+    window.localStorage.setItem("arrakis.setupRestore", JSON.stringify({ archive: "dune-system-x.tar.gz.enc", stage: "uploaded" }));
+
+    renderWizard();
+    expect(await screen.findByLabelText("Archive passphrase")).toBeTruthy();
+  });
+
+  it("resumes rather than discarding progress when the listing cannot be read", async () => {
+    // Refusing to resume because the check itself failed would be the worse of
+    // the two mistakes: it strands a restore that is genuinely in progress.
+    vi.mocked(backupsApi.listSystem).mockRejectedValue(new Error("Postgres is not running."));
+    window.localStorage.setItem("arrakis.setupRestore", JSON.stringify({ archive: "dune-system-x.tar.gz.enc", stage: "uploaded" }));
+
+    renderWizard();
+    expect(await screen.findByLabelText("Archive passphrase")).toBeTruthy();
+  });
+
+  it("does not resume a restore in the redeploy wizard, which has no restore path", async () => {
+    // redeploySteps is a different, shorter list. Resuming into restoreSteps
+    // there sets a step index past its end, so no stepper entry is active and
+    // Next is inert -- the wizard reads as broken rather than as a stale hint.
+    window.localStorage.setItem("arrakis.setupRestore", JSON.stringify({ archive: "dune-system-x.tar.gz.enc", stage: "uploaded" }));
+    render(<SetupWizard mode="redeploy" />);
+
+    expect(await screen.findByText("Server Identity")).toBeTruthy();
+    expect(screen.queryByLabelText("Archive passphrase")).toBeNull();
+    await waitFor(() => expect(document.querySelector(".stepper button.active")).not.toBeNull());
+    expect(screen.getByText("Next")).not.toBeDisabled();
+  });
+
+  it("surfaces a failed poll on the resumed restore instead of stalling", async () => {
+    // The sequence's own watch is inside a try/catch; the one started on
+    // resume was not, so a rejected poll killed the loop with no error shown
+    // and no further updates -- indistinguishable from a very slow restore.
+    vi.mocked(setupApi.tasks).mockResolvedValue({
+      tasks: [{ ...done("running"), operation: "backupSystemRestore", status: "running" }]
+    } as never);
+    vi.mocked(setupApi.task).mockRejectedValue(new Error("The console lost the task."));
+    window.localStorage.setItem("arrakis.setupRestore", JSON.stringify({ archive: "dune-system-x.tar.gz.enc", stage: "apply" }));
+
+    renderWizard();
+
+    expect(await screen.findByText(/The console lost the task/)).toBeTruthy();
+  });
+
+  it("forgets the stored restore once the operator chooses to deploy instead", async () => {
+    // A failed or abandoned restore leaves the hint behind, and it lives in the
+    // browser, so every later load returned to the restore path. The stepper
+    // always allows walking back to Welcome; choosing deploy there is the
+    // operator saying what they want, and it has to survive a reload.
+    window.localStorage.setItem("arrakis.setupRestore", JSON.stringify({ archive: "dune-system-x.tar.gz.enc", stage: "uploaded" }));
+    renderWizard();
+    expect(await screen.findByLabelText("Archive passphrase")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("1. Welcome"));
+    fireEvent.click(await screen.findByText("Deploy a new server"));
+
+    expect(window.localStorage.getItem("arrakis.setupRestore")).toBeNull();
   });
 
   it("comes back to the restore step after a reload mid-restore", async () => {

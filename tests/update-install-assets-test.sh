@@ -151,6 +151,27 @@ grep -q -- "--force" "$test_root/running.log" \
   || fail "install-assets: the refusal does not mention the override" "$test_root/running.log"
 echo "PASS install-assets-refuses-while-a-world-server-runs"
 
+# --- Case 3b: an autoscaled shard counts as a running world ---------------
+# The autoscaler spawns dune-server-<map>-<partition>, not just the two fixed
+# names. A guard that matches only overmap and survival-N leaves the common
+# case -- a busy world with shards up -- completely unprotected.
+
+status=0
+MOCK_RUNNING_CONTAINERS="dune-server-sh-arrakeen-23" run_update shard install-assets || status=$?
+[ "$status" -eq 3 ] || fail "install-assets: expected exit 3 with an autoscaled shard running, got $status" "$test_root/shard.log"
+if grep -q "compose exec" "$docker_log"; then
+  fail "install-assets: loaded images while an autoscaled shard was running" "$docker_log"
+fi
+echo "PASS install-assets-refuses-while-an-autoscaled-shard-runs"
+
+# --- Case 3c: the gateway alone is not a world server ---------------------
+# It runs whenever the stack is up, so refusing on it would block
+# install-assets on a host with no world running at all.
+
+MOCK_RUNNING_CONTAINERS="dune-server-gateway" run_update gateway install-assets \
+  || fail "install-assets: refused with only the gateway running" "$test_root/gateway.log"
+echo "PASS install-assets-allows-a-lone-gateway"
+
 # --- Case 4: --force overrides that refusal --------------------------------
 
 status=0

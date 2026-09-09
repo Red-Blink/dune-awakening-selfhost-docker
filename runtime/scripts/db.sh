@@ -174,8 +174,15 @@ postgres_is_running() {
 # Counts tables in the dune schema. start-postgres.sh creates the database, but
 # on a host that has never restored or migrated it is empty -- which is a
 # different thing from "unavailable" and needs a different answer.
+#
+# Must connect as postgres, not dune. information_schema.tables only lists
+# objects the connecting role holds a privilege on, so as dune this returns 0
+# for a fully populated database whenever the tables are owned by postgres --
+# which is what a `pg_restore --no-owner` leaves behind. The caller reads a 0
+# as "empty" and skips the pre-import safety backup immediately before
+# recreate_dune_database drops the database.
 dune_schema_table_count() {
-  docker exec dune-postgres psql -U dune -d dune -tAc     "select count(*) from information_schema.tables where table_schema = 'dune'" 2>/dev/null     | tr -d '[:space:]'
+  docker exec dune-postgres psql -U postgres -d dune -tAc     "select count(*) from information_schema.tables where table_schema = 'dune'" 2>/dev/null     | tr -d '[:space:]'
 }
 
 # The .env keys that describe THIS machine rather than the server the archive
@@ -194,31 +201,60 @@ dune_schema_table_count() {
 #     just downloaded into this host's volumes becomes invisible.
 #   DUNE_DB_PASSWORD
 #     looks like a credential, but the dune role was created in THIS host's
-#     cluster with THIS host's password, and start-postgres.sh only creates that
-#     role IF NOT EXISTS -- nothing ever resets it. Taking the archive's value
-#     leaves every client authenticating with a password the role does not have,
-#     and it never self-heals.
+#     cluster with THIS host's password. The role is created IF NOT EXISTS by an
+#     initdb script the Postgres entrypoint runs only on an empty PGDATA, so on
+#     any host that has run Postgres before it never runs again. Taking the
+#     archive's value leaves every client authenticating with a password the role
+#     does not have. (The console can reset it, from Settings -- but that writes
+#     .env and the role together, so it never produces this mismatch.)
+#
+#   DUNE_MEMORY_* / DUNE_ALWAYS_ON_* / SERVER_IP
+#     how much memory each map gets on THIS machine, and the address THIS
+#     machine answers on. Matched by prefix because the memory keys are named
+#     per map, so no fixed list can cover a host's own sietches.
 #
 # The console's own admin password is deliberately NOT here: it is the server's
 # credential and moves with it, and the operator knows it because they ran the
 # server the archive came from.
-HOST_SHAPED_ENV_KEYS="DUNE_HOST_REPO_ROOT DUNE_HOST_UID DUNE_HOST_GID DOCKER_SOCKET_GID ADMIN_BIND_PORT DUNE_COMPOSE_PROJECT_NAME COMPOSE_PROJECT_NAME DUNE_DB_PASSWORD"
+HOST_SHAPED_ENV_KEYS="DUNE_HOST_REPO_ROOT DUNE_HOST_UID DUNE_HOST_GID DOCKER_SOCKET_GID ADMIN_BIND_PORT DUNE_COMPOSE_PROJECT_NAME COMPOSE_PROJECT_NAME DUNE_DB_PASSWORD SERVER_IP"
+HOST_SHAPED_ENV_PREFIXES="DUNE_MEMORY_ DUNE_ALWAYS_ON_"
 
 # Re-applies this host's values over a just-restored .env. Reads them from the
 # pre-restore copy the safety directory already holds, so nothing extra has to
 # be captured earlier.
 restore_host_shaped_env_values() {
   local previous_env="$1"
-  local key value restored=""
+  local key value restored="" cleared="" env_mode
 
   [ -f "$previous_env" ] || return 0
-  for key in $HOST_SHAPED_ENV_KEYS; do
+  # cp -a has already put the archive's .env in place with its own mode, which
+  # is 0600 on a live host because the file carries DUNE_DB_PASSWORD and the
+  # console's admin password. Passing a literal 644 here would widen it.
+  env_mode="$(stat -c '%a' .env 2>/dev/null || echo 600)"
+  # The memory keys are named per map, so the set differs by host and no fixed
+  # list can cover it. Take the union of both files: a key only this host sets
+  # must be kept, and one only the archive sets must be dropped.
+  local prefix extra_keys=""
+  for prefix in $HOST_SHAPED_ENV_PREFIXES; do
+    extra_keys="$extra_keys $(sed -n "s/^\\(${prefix}[A-Za-z0-9_]*\\)=.*/\\1/p" "$previous_env" .env 2>/dev/null | sort -u)"
+  done
+  for key in $HOST_SHAPED_ENV_KEYS $extra_keys; do
     value="$(config_value "$previous_env" "$key" || true)"
-    [ -n "$value" ] || continue
-    set_env_file_value .env "$key" "$value" 644
-    restored="$restored $key"
+    if [ -n "$value" ]; then
+      set_env_file_value .env "$key" "$value" "$env_mode"
+      restored="$restored $key"
+    elif [ -n "$(config_value .env "$key" || true)" ]; then
+      # This host does not set the key, so it runs on the built-in default --
+      # and .env.example ships DUNE_DB_PASSWORD commented out, so that is the
+      # ordinary case, not an edge one. Keeping the archive's value here would
+      # apply the source host's setting to this machine just as surely as not
+      # preserving anything at all.
+      unset_env_file_value .env "$key"
+      cleared="$cleared $key"
+    fi
   done
   [ -z "$restored" ] || echo "Kept this host's own values for:$restored"
+  [ -z "$cleared" ] || echo "Dropped the archive's values, so this host keeps its defaults for:$cleared"
 }
 
 postgres_image_present() {
@@ -1596,6 +1632,17 @@ restore_system() {
     return 1
   fi
 
+  # Checked here rather than at the point of use: the database is restored
+  # first, so discovering a missing .env when it is copied would leave this
+  # host with the archive's database and its own configuration.
+  if [ ! -f "$stage_dir/tree/env" ]; then
+    echo "Refusing archive: it contains no .env." >&2
+    echo "backup-system stages .env only when the source host had one, so this archive" >&2
+    echo "was built before that host was configured. It cannot set this one up." >&2
+    restore_system_cleanup
+    return 1
+  fi
+
   local generated_count secrets_count
   generated_count="$(find "$stage_dir/tree/generated" -type f 2>/dev/null | wc -l | tr -d '[:space:]')"
   secrets_count="$(find "$stage_dir/tree/secrets" -type f 2>/dev/null | wc -l | tr -d '[:space:]')"
@@ -1748,10 +1795,14 @@ restore_system() {
       echo "WARN Could not re-detect image tags; runtime/generated/image-tags.env still names the archive's." >&2
     fi
   fi
-  # --keep-current-battlegroup told import_db to remap the imported rows to
-  # THIS host's identity. The archive's generated/battlegroup.env still names
-  # the backup's, and has just overwritten ours, so the database and the
-  # identity file would disagree. Put the current one back.
+  # --keep-current-battlegroup asked import_db to keep THIS host's identity.
+  # The archive's generated/battlegroup.env names the backup's and has just
+  # overwritten ours, so the identity file would disagree with what was asked
+  # for. Put the current one back.
+  #
+  # The database half is a no-op on a real dump: adapt_imported_battlegroup
+  # rewrites occurrences of the old id across schema dune, and a real dune dump
+  # contains none -- the identity lives in this file, not in a table.
   local keep_current=0
   for arg in "${battlegroup_args[@]}"; do
     [ "$arg" = "--keep-current-battlegroup" ] && keep_current=1

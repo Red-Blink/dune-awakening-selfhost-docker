@@ -1402,7 +1402,10 @@ main { padding: 22px; min-width: 0; }
 /* A choice, not a submit: these read as cards and the selected one is the only
    thing the stepper acts on, so the border carries the state rather than a
    filled background that would compete with the panel's own. */
-.setup-path-option { display: grid; gap: 6px; text-align: left; padding: 14px; height: auto; border: 1px solid #39332c; border-radius: 8px; background: rgba(0,0,0,.12); }
+/* justify-content is reset because the base `button` rule centres it for a
+   flex row; left as centre, this grid centres its auto track and the shorter
+   card's text sits indented from its own padding edge. */
+.setup-path-option { display: grid; justify-content: start; gap: 6px; text-align: left; padding: 14px; height: auto; border: 1px solid #39332c; border-radius: 8px; background: rgba(0,0,0,.12); }
 .setup-path-option strong { color: #f1dfc1; }
 .setup-path-option span { color: #cbbb9c; font-size: 13px; line-height: 1.5; }
 .setup-path-option.selected { border-color: var(--accent); }

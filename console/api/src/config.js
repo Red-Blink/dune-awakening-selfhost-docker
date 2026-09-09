@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync, statSync
 import { dirname, resolve } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import { networkInterfaces } from "node:os";
+import { clampInt } from "./jsonStore.js";
 
 export const APP_NAME = "Dune Docker Console";
 
@@ -249,7 +250,13 @@ export function loadConfig() {
     landsraadMilestonePresetFile: resolve(generatedDir, "landsraad-milestones.json"),
     taskRetention: Number(process.env.ADMIN_TASK_RETENTION || 200),
     maxJsonBytes: Number(process.env.ADMIN_MAX_JSON_BYTES || 2 * 1024 * 1024),
-    maxUploadBytes: Number(process.env.ADMIN_MAX_UPLOAD_BYTES || 1024 * 1024 * 1024),
+    // Clamped, not a bare Number(): this is the only cap on a streamed upload
+    // that writes straight to disk, and a non-numeric value makes Number()
+    // return NaN, which turns every `received > maxUploadBytes` comparison
+    // false and removes the limit entirely. The `|| NaN` keeps an empty value
+    // meaning "unset", as the previous `|| default` did -- without it an empty
+    // ADMIN_MAX_UPLOAD_BYTES= reads as 0 and clamps to the 1MiB floor.
+    maxUploadBytes: clampInt(process.env.ADMIN_MAX_UPLOAD_BYTES || NaN, 1024 * 1024 * 1024, 1024 * 1024, 64 * 1024 * 1024 * 1024),
     commandTimeoutMs: Number(process.env.ADMIN_COMMAND_TIMEOUT_MS || 120000),
     updateCheckCacheMs: Number(process.env.ADMIN_UPDATE_CHECK_CACHE_MS || 5 * 60 * 1000),
     staticDir: process.env.ADMIN_STATIC_DIR || resolve(repoRoot, "console/web/dist"),

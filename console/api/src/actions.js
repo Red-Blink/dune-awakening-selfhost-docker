@@ -503,7 +503,11 @@ export const REGEX_ACTIONS_BY_METHOD_PATTERN = [
   // DELETE /api/backups/system/{name}. Its own action rather than the database
   // backups' backups:delete -- these archives are the only copy of the
   // credentials they contain, so the two should be grantable separately.
-  { method: "DELETE", pattern: /^\/api\/backups\/system\/[^/]+$/, action: "backups:delete-system" },
+  // The optional trailing segment matters: without it "/api/backups/system"
+  // fell through to the /api/backups/ prefix bucket and authorized a system
+  // path under the database-backup action. The route itself does not exist --
+  // this is so the authorization matches the resource family either way.
+  { method: "DELETE", pattern: /^\/api\/backups\/system(?:\/[^/]+)?$/, action: "backups:delete-system" },
   // POST /api/backups/system/{name}/restore -- replaces .env, runtime/generated,
   // runtime/secrets and the database from an archive. Its own action: this is a
   // whole-host takeover, not a variation on restoring a database dump.
