@@ -1659,6 +1659,7 @@ PY
 
     if [ "$assigned_count" -lt "$target" ] && [ "$map" != "Survival_1" ] && [ -z "$base_server_id" ]; then
       runtime/scripts/spawn-server.sh "$base_partition"
+      log_sietch_lifecycle "reconcile_spawn" "{\"map\":\"$map\",\"partition\":$base_partition,\"role\":\"base\"}"
       assigned_count=$((assigned_count + 1))
       topology_changed=1
     fi
@@ -1679,6 +1680,7 @@ PY
         continue
       fi
       runtime/scripts/spawn-server.sh "$next_partition"
+      log_sietch_lifecycle "reconcile_spawn" "{\"map\":\"$map\",\"partition\":$next_partition,\"role\":\"dimension\"}"
       assigned_count=$((assigned_count + 1))
       topology_changed=1
     done
@@ -1717,6 +1719,7 @@ where previous_server_partition_id = $remove_partition
 " >/dev/null
       fi
       runtime/scripts/despawn-server.sh "$remove_partition"
+      log_sietch_lifecycle "reconcile_despawn" "{\"map\":\"$map\",\"partition\":$remove_partition}"
       assigned_count=$((assigned_count - 1))
       topology_changed=1
     done
@@ -1782,6 +1785,8 @@ where wp.partition_id = ranked.partition_id;
 
   sync_partition_catalog_from_db
   sync_sietch_config_from_db "reconcile-$map" >/dev/null || true
+  log_sietch_lifecycle "reconcile" "{\"map\":\"$map\",\"target\":$target,\"assigned_before\":$initial_assigned_count,\"assigned_after\":$assigned_count}"
+
   if [ "$map" = "Survival_1" ] && [ "$topology_changed" -eq 1 ] && [ "$target" -gt "$initial_assigned_count" ] 2>/dev/null; then
     wait_for_survival_topology_settle "$target" 90 || true
     sync_sietch_config_from_db "reconcile-$map-settled" >/dev/null || true
