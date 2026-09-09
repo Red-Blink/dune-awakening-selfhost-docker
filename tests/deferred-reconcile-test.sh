@@ -165,3 +165,17 @@ echo "PASS deferred-reconcile-reports-a-failing-step"
 grep -q "sietch override publish ok" "$test_root/deferred.log" \
   || fail "a failure earlier in the sequence stopped the later steps" "$test_root/deferred.log"
 echo "PASS deferred-reconcile-continues-past-a-failure"
+
+# --- Case 8: nothing backgrounds the reconcile directly any more ----------
+# start-all.sh was not the only launch site -- `dune restart survival` had its
+# own copy of the same background job, so fixing one left the other exposed.
+# Any new caller has to go through the scheduler or it inherits the bug.
+
+stray="$(grep -rln "exec runtime/scripts/deferred-reconcile.sh" "$repo_root/runtime/scripts" \
+  | grep -v "schedule-deferred-reconcile.sh" || true)"
+if [ -n "$stray" ]; then
+  echo "FAIL a script still backgrounds the reconcile instead of scheduling it:"
+  printf '%s\n' "$stray"
+  exit 1
+fi
+echo "PASS deferred-reconcile-has-a-single-launch-path"

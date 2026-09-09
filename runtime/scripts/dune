@@ -322,11 +322,10 @@ EOF
         runtime/scripts/spicefield-overrides.sh apply || true
         runtime/scripts/publish-sietch-overrides.sh restart || true
         runtime/scripts/publish-sietch-overrides.sh once || true
-        mkdir -p runtime/generated
-        (
-          export DUNE_SKIP_SURVIVAL_DIRECTOR_REFRESH=1
-          exec runtime/scripts/deferred-reconcile.sh
-        ) >runtime/generated/deferred-reconcile.log 2>&1 &
+        # Scheduled, not backgrounded: a background child of this process dies
+        # with the console container that ran it, and the reconcile is a wait
+        # that can outlast a console reload by minutes.
+        DUNE_SKIP_SURVIVAL_DIRECTOR_REFRESH=1 runtime/scripts/schedule-deferred-reconcile.sh
         ;;
       overmap)
         set -a; [ -f .env ] && . ./.env; set +a
