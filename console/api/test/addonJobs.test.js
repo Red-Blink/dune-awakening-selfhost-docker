@@ -318,6 +318,57 @@ test("builds buyback SQL server-side from the bundled seed plan", () => {
   }
 });
 
+// Regression for the SQL-builder exchangeId boundary: every exported builder
+// must reject a malicious exchangeId before any SQL is generated, across the
+// whole set of builders (not just buildBuybackSql), so a future change to one
+// builder's validation cannot silently let injected text reach raw SQL.
+test("malicious exchangeId never reaches generated SQL in any buyback SQL builder", () => {
+  const repoRoot = makeRepoRoot();
+  const config = { repoRoot, mockMode: false };
+  try {
+    const plan = loadBuybackSeedPlan(config);
+    const schedule = normalizeBuybackSchedule({ enabled: true, exchangeId: "77", priceMultiplier: 5, buybackPercent: 60, maxBuys: 250 });
+
+    const maliciousExchangeIds = [
+      "77; DROP TABLE dune.items",
+      "77 OR 1=1",
+      "'; SELECT pg_sleep(5); --",
+      "77--",
+      "",
+      "0",
+      "-1",
+      "007",
+      "9223372036854775808" // one past PG_BIGINT_MAX
+    ];
+
+    const builders = [
+      { name: "buildBuybackEligibilitySql", call: (s) => buildBuybackEligibilitySql(plan, s) },
+      { name: "buildBuybackClassifySql", call: (s) => buildBuybackClassifySql(plan, s) },
+      { name: "buildPlayerPortalExchangeOverviewSql", call: (s) => buildPlayerPortalExchangeOverviewSql(s) },
+      { name: "buildBuybackSql", call: (s) => buildBuybackSql(plan, s) }
+    ];
+
+    for (const { name, call } of builders) {
+      for (const exchangeId of maliciousExchangeIds) {
+        assert.throws(
+          () => call({ ...schedule, exchangeId }),
+          /exchangeId is invalid/,
+          `${name} must reject exchangeId ${JSON.stringify(exchangeId)} before building SQL`
+        );
+      }
+    }
+
+    // A valid id still flows through untouched: exactly "o.exchange_id = 77",
+    // with no extra characters an injection attempt could have appended.
+    for (const { name, call } of builders) {
+      const sql = call(schedule);
+      assert.match(sql, /o\.exchange_id = 77(?![\d;'])/, `${name} must embed the validated exchangeId verbatim`);
+    }
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
 test("player portal market overview stays available when Buyback classification fails", async () => {
   const repoRoot = makeRepoRoot();
   const config = { repoRoot, mockMode: false };
