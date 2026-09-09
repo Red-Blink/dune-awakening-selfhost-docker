@@ -30,6 +30,7 @@ type UpdatesPanelProps = {
   // Incremented by a failure elsewhere that needs the game files installed.
   // 0 means nothing has asked, so a fresh mount never auto-starts a download.
   installGameFilesRequest?: number;
+  onInstallGameFilesHandled?: () => void;
   confirmAction: (message: string) => Promise<boolean>;
   waitForTask: (task: Task) => Promise<Task>;
   parseKeyValueText: (text: string) => Record<string, string>;
@@ -42,6 +43,7 @@ type UpdatesPanelProps = {
 
 export function UpdatesPanel({
   installGameFilesRequest = 0,
+  onInstallGameFilesHandled,
   confirmAction,
   waitForTask,
   parseKeyValueText,
@@ -294,6 +296,10 @@ export function UpdatesPanel({
   // multi-gigabyte download on its own. Skips 0 so a plain mount does nothing.
   useEffect(() => {
     if (!installGameFilesRequest) return;
+    // Report it handled before doing the work. This panel is rendered only
+    // while its tab is open, so it unmounts on every tab change; a request left
+    // standing re-ran on each return and offered another download.
+    onInstallGameFilesHandled?.();
     void installGameAssets();
   }, [installGameFilesRequest]);
 

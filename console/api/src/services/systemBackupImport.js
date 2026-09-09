@@ -112,10 +112,11 @@ const SCALAR_LINE = /^([A-Za-z0-9_.-]+):(.*)$/;
 // continuation lines are not `key: value`, and a rebuild from parsed keys drops
 // them -- taking the decrypt instructions with them, which are the most useful
 // thing in the file on a host that has no console yet.
-export function normalizeImportedSystemMetadata(content, { importedFrom = "", now = new Date() } = {}) {
+export function normalizeImportedSystemMetadata(content, { importedFrom = "", encryption = "", now = new Date() } = {}) {
   const lines = String(content || "").split(/\r?\n/);
   const kept = [];
   let sawOrigin = false;
+  let sawEncryption = false;
   for (const line of lines) {
     const match = line.match(SCALAR_LINE);
     const key = match?.[1];
@@ -124,11 +125,20 @@ export function normalizeImportedSystemMetadata(content, { importedFrom = "", no
       sawOrigin = true;
       continue;
     }
+    // The console shows this column as fact, so it must be what the archive
+    // actually is -- read from its own SKESK packet -- not what the uploader
+    // wrote in a file they control.
+    if (key === "encryption" && encryption) {
+      kept.push(`encryption: ${encryption}`);
+      sawEncryption = true;
+      continue;
+    }
     if (key === "imported_at" || key === "imported_from") continue;
     kept.push(line);
   }
   while (kept.length && kept[kept.length - 1].trim() === "") kept.pop();
   if (!sawOrigin) kept.push("backup_origin: external");
+  if (encryption && !sawEncryption) kept.push(`encryption: ${encryption}`);
   kept.push(`imported_at: ${now.toISOString()}`);
   if (importedFrom) kept.push(`imported_from: ${importedFrom}`);
   return `${kept.join("\n")}\n`;

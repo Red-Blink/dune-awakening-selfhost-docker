@@ -53,6 +53,8 @@ case "${1:-} ${2:-}" in
         # The dune-schema table count and the partition count are different
         # questions with different answers on a fresh host: the database
         # exists and is empty.
+        printf '%s' "$*" >> "${MOCK_PSQL_ARGV_LOG:-/dev/null}"
+        printf '\n' >> "${MOCK_PSQL_ARGV_LOG:-/dev/null}"
         if printf '%s ' "$@" | grep -q information_schema; then
           printf '%s\n' "${MOCK_DUNE_TABLE_COUNT:-42}"
         else
@@ -505,6 +507,8 @@ case "${1:-} ${2:-}" in
         # The dune-schema table count and the partition count are different
         # questions with different answers on a fresh host: the database
         # exists and is empty.
+        printf '%s' "$*" >> "${MOCK_PSQL_ARGV_LOG:-/dev/null}"
+        printf '\n' >> "${MOCK_PSQL_ARGV_LOG:-/dev/null}"
         if printf '%s ' "$@" | grep -q information_schema; then
           printf '%s\n' "${MOCK_DUNE_TABLE_COUNT:-42}"
         else
@@ -2172,6 +2176,46 @@ if grep -q "nothing to protect" "$case43_root/restore.log"; then
 fi
 echo "PASS restore-keeps-safety-backup-on-populated-database"
 
+# --- Case 48: the emptiness check must be asked as the superuser ----------
+# information_schema.tables only lists objects the connecting role holds a
+# privilege on. Asked as dune, a fully populated database reports 0 tables
+# whenever they are owned by postgres -- what pg_restore --no-owner leaves --
+# and a 0 disables the pre-import safety backup immediately before
+# recreate_dune_database drops the database. The mock cannot model privileges,
+# so this asserts the connection the question is asked on.
+
+case48_root="$test_root/case48"
+mkdir -p "$case48_root/tmp"
+case48_archive="$(make_restorable_archive "$case48_root")"
+diverge_host_state "$case48_root/work"
+case48_argv="$case48_root/psql-argv.log"
+: > "$case48_argv"
+
+case48_status=0
+(
+  cd "$case48_root/work"
+  PATH="$bin_dir:$PATH" TMPDIR="$case48_root/tmp" MOCK_PSQL_ARGV_LOG="$case48_argv" \
+    DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" DUNE_DB_ASSUME_YES=1 \
+    bash runtime/scripts/db.sh restore-system "$(basename "$case48_archive")"
+) > "$case48_root/restore.log" 2>&1 || case48_status=$?
+
+if [ "$case48_status" -ne 0 ]; then
+  echo "FAIL table-count-asked-as-superuser: expected exit 0, got $case48_status"
+  cat "$case48_root/restore.log"
+  exit 1
+fi
+if ! grep -q information_schema "$case48_argv"; then
+  echo "FAIL table-count-asked-as-superuser: the emptiness check never ran"
+  cat "$case48_argv"
+  exit 1
+fi
+if grep information_schema "$case48_argv" | grep -qv -- "-U postgres"; then
+  echo "FAIL table-count-asked-as-superuser: asked on a non-superuser connection"
+  grep information_schema "$case48_argv"
+  exit 1
+fi
+echo "PASS table-count-asked-as-superuser"
+
 # --- Case 44: the sidecar must not claim an audit log the archive lacks ----
 # The tar stages whatever runtime/generated/ contains, so a host that has never
 # logged an admin action produces an archive with no audit log. A sidecar that
@@ -2393,3 +2437,172 @@ if ! grep -qx "DUNE_DB_PASSWORD=this-host-db-password" "$case47_root/work/.env";
   exit 1
 fi
 echo "PASS restore-keeps-database-password"
+
+# --- Case 49: a host that sets no password must not inherit the archive's --
+# The shipped default: .env.example carries DUNE_DB_PASSWORD commented out, so
+# most hosts have no value and run on the built-in default. Case 47 covers the
+# host that does set one; this covers the ordinary host that does not, where
+# keeping the archive's value applies the source host's password to a role that
+# was created with a different one.
+#
+# Built inline rather than via make_restorable_archive because the archive has
+# to CARRY a password for this to test anything -- the seeded .env has none, and
+# an archive without one makes the assertion below pass for the wrong reason.
+
+case49_root="$test_root/case49"
+mkdir -p "$case49_root/work" "$case49_root/tmp"
+seed_repo_tree "$case49_root/work"
+printf 'DUNE_DB_PASSWORD=%s\n' "archive-db-password" >> "$case49_root/work/.env"
+(
+  cd "$case49_root/work"
+  PATH="$bin_dir:$PATH" DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" \
+    bash runtime/scripts/db.sh backup-system
+) > "$case49_root/backup.log" 2>&1
+case49_archive="$(find "$case49_root/work/runtime/backups/system" -maxdepth 1 -name '*.tar.gz.enc' | head -n1)"
+if [ -z "$case49_archive" ]; then
+  echo "FAIL restore-drops-archive-database-password: could not build an archive"
+  cat "$case49_root/backup.log"
+  exit 1
+fi
+
+# This host sets no password of its own -- the shipped default.
+diverge_host_state "$case49_root/work"
+if grep -q "^DUNE_DB_PASSWORD=" "$case49_root/work/.env"; then
+  echo "FAIL restore-drops-archive-database-password: fixture host already sets the key"
+  exit 1
+fi
+
+case49_status=0
+run_restore "$case49_root" "$case49_root/tmp" "$TEST_PASSPHRASE" "$(basename "$case49_archive")" || case49_status=$?
+
+if [ "$case49_status" -ne 0 ]; then
+  echo "FAIL restore-drops-archive-database-password: expected exit 0, got $case49_status"
+  cat "$case49_root/restore.log"
+  exit 1
+fi
+# The archive's .env must have been applied -- otherwise the check below is vacuous.
+if ! grep -q "$SECRET_ADMIN_PASSWORD" "$case49_root/work/.env"; then
+  echo "FAIL restore-drops-archive-database-password: the archive's .env was not restored at all"
+  cat "$case49_root/work/.env"
+  exit 1
+fi
+if grep -q "^DUNE_DB_PASSWORD=" "$case49_root/work/.env"; then
+  echo "FAIL restore-drops-archive-database-password: took the archive's password onto a host whose role has a different one"
+  grep DUNE_DB_PASSWORD "$case49_root/work/.env"
+  exit 1
+fi
+echo "PASS restore-drops-archive-database-password"
+
+# --- Case 50: a restore must not widen .env's permissions ----------------
+# .env carries DUNE_DB_PASSWORD and the console's admin password, and is 0600
+# on a live host. cp -a brings the archive's mode across correctly; the
+# host-shaped key rewrite that runs straight afterwards is what can widen it.
+
+case50_root="$test_root/case50"
+mkdir -p "$case50_root/work" "$case50_root/tmp"
+seed_repo_tree "$case50_root/work"
+chmod 600 "$case50_root/work/.env"
+(
+  cd "$case50_root/work"
+  PATH="$bin_dir:$PATH" DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" \
+    bash runtime/scripts/db.sh backup-system
+) > "$case50_root/backup.log" 2>&1
+case50_archive="$(find "$case50_root/work/runtime/backups/system" -maxdepth 1 -name '*.tar.gz.enc' | head -n1)"
+if [ -z "$case50_archive" ]; then
+  echo "FAIL restore-keeps-env-private: could not build an archive"
+  cat "$case50_root/backup.log"
+  exit 1
+fi
+diverge_host_state "$case50_root/work"
+# At least one host-shaped key must be present, or the rewrite that can widen
+# the mode never runs and this case passes without testing anything.
+printf 'ADMIN_BIND_PORT=8088\n' >> "$case50_root/work/.env"
+chmod 600 "$case50_root/work/.env"
+
+case50_status=0
+run_restore "$case50_root" "$case50_root/tmp" "$TEST_PASSPHRASE" "$(basename "$case50_archive")" || case50_status=$?
+if [ "$case50_status" -ne 0 ]; then
+  echo "FAIL restore-keeps-env-private: expected exit 0, got $case50_status"
+  cat "$case50_root/restore.log"
+  exit 1
+fi
+case50_mode="$(stat -c '%a' "$case50_root/work/.env")"
+if [ "$case50_mode" != "600" ]; then
+  echo "FAIL restore-keeps-env-private: .env ended up mode $case50_mode, readable beyond its owner"
+  exit 1
+fi
+echo "PASS restore-keeps-env-private"
+
+# --- Case 51: per-host memory sizing stays with the host ------------------
+# DUNE_MEMORY_* is how much this machine gives each map, and the set of keys
+# differs per host, so they are matched by prefix rather than named. A key the
+# archive sets and this host does not must be dropped, not inherited.
+
+case51_root="$test_root/case51"
+mkdir -p "$case51_root/work" "$case51_root/tmp"
+seed_repo_tree "$case51_root/work"
+{
+  printf 'DUNE_MEMORY_OVERMAP=%s\n' "24G"
+  printf 'DUNE_MEMORY_SH_ARRAKEEN=%s\n' "8G"
+} >> "$case51_root/work/.env"
+(
+  cd "$case51_root/work"
+  PATH="$bin_dir:$PATH" DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" \
+    bash runtime/scripts/db.sh backup-system
+) > "$case51_root/backup.log" 2>&1
+case51_archive="$(find "$case51_root/work/runtime/backups/system" -maxdepth 1 -name '*.tar.gz.enc' | head -n1)"
+[ -n "$case51_archive" ] || { echo "FAIL restore-keeps-host-memory-sizing: no archive"; cat "$case51_root/backup.log"; exit 1; }
+
+# This host is smaller, and has never heard of the archive's extra sietch.
+diverge_host_state "$case51_root/work"
+printf 'DUNE_MEMORY_OVERMAP=%s\n' "6G" >> "$case51_root/work/.env"
+
+case51_status=0
+run_restore "$case51_root" "$case51_root/tmp" "$TEST_PASSPHRASE" "$(basename "$case51_archive")" || case51_status=$?
+[ "$case51_status" -eq 0 ] || { echo "FAIL restore-keeps-host-memory-sizing: expected exit 0, got $case51_status"; cat "$case51_root/restore.log"; exit 1; }
+
+if ! grep -qx "DUNE_MEMORY_OVERMAP=6G" "$case51_root/work/.env"; then
+  echo "FAIL restore-keeps-host-memory-sizing: took the source host's memory sizing"
+  grep DUNE_MEMORY "$case51_root/work/.env"
+  exit 1
+fi
+if grep -q "^DUNE_MEMORY_SH_ARRAKEEN=" "$case51_root/work/.env"; then
+  echo "FAIL restore-keeps-host-memory-sizing: inherited a sizing key this host never set"
+  grep DUNE_MEMORY "$case51_root/work/.env"
+  exit 1
+fi
+echo "PASS restore-keeps-host-memory-sizing"
+
+# --- Case 52: an archive with no .env is refused before the database -------
+# backup_system stages .env only when the source host had one. The database is
+# restored first, so discovering this at the copy would leave the host with the
+# archive's database and its own configuration.
+
+case52_root="$test_root/case52"
+mkdir -p "$case52_root/work" "$case52_root/tmp"
+seed_repo_tree "$case52_root/work"
+rm -f "$case52_root/work/.env"
+(
+  cd "$case52_root/work"
+  PATH="$bin_dir:$PATH" DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" \
+    bash runtime/scripts/db.sh backup-system
+) > "$case52_root/backup.log" 2>&1
+case52_archive="$(find "$case52_root/work/runtime/backups/system" -maxdepth 1 -name '*.tar.gz.enc' | head -n1)"
+[ -n "$case52_archive" ] || { echo "FAIL restore-refuses-archive-without-env: no archive"; cat "$case52_root/backup.log"; exit 1; }
+
+seed_repo_tree "$case52_root/work"
+case52_status=0
+run_restore "$case52_root" "$case52_root/tmp" "$TEST_PASSPHRASE" "$(basename "$case52_archive")" || case52_status=$?
+[ "$case52_status" -ne 0 ] || { echo "FAIL restore-refuses-archive-without-env: accepted an archive with no .env"; cat "$case52_root/restore.log"; exit 1; }
+if ! grep -q "contains no .env" "$case52_root/restore.log"; then
+  echo "FAIL restore-refuses-archive-without-env: refused for the wrong reason"
+  cat "$case52_root/restore.log"
+  exit 1
+fi
+# Refused before anything was replaced.
+if grep -q "Restoring configuration and secrets" "$case52_root/restore.log"; then
+  echo "FAIL restore-refuses-archive-without-env: reached the apply stage first"
+  cat "$case52_root/restore.log"
+  exit 1
+fi
+echo "PASS restore-refuses-archive-without-env"

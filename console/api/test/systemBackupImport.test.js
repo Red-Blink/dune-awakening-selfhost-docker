@@ -178,3 +178,26 @@ test("sanitizing trims surrounding whitespace but leaves an ordinary name alone"
   assert.equal(sanitizeUploadFilename("  dune-system-20260830-120000-4711-9931.tar.gz.enc  "),
     "dune-system-20260830-120000-4711-9931.tar.gz.enc");
 });
+
+// The console renders the Encryption column as fact, so it must describe the
+// archive rather than repeat what the uploader wrote in a file they control.
+test("an uploaded sidecar cannot claim an encryption the archive does not have", () => {
+  const claimed = [
+    "server_title: Someone Elses Server",
+    "encryption: totally-legit-aes-999",
+    "decrypt_command: |-",
+    "  gpg --decrypt archive.enc"
+  ].join("\n");
+  const out = normalizeImportedSystemMetadata(claimed, { importedFrom: "x.tar", encryption: "aes-256-ocb-gpg-aead" });
+
+  assert.match(out, /^encryption: aes-256-ocb-gpg-aead$/m);
+  assert.ok(!out.includes("totally-legit-aes-999"));
+  // The block scalar this normalizer exists to protect still survives.
+  assert.match(out, /decrypt_command: \|-/);
+  assert.match(out, /  gpg --decrypt archive.enc/);
+});
+
+test("a sidecar with no encryption line gains the verified one", () => {
+  const out = normalizeImportedSystemMetadata("server_title: Old Host", { encryption: "aes-256-ocb-gpg-aead" });
+  assert.match(out, /^encryption: aes-256-ocb-gpg-aead$/m);
+});

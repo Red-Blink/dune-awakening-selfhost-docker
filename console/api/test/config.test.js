@@ -405,3 +405,33 @@ test("resolvePorts() accepts a Port/IGWPort base whose +33 partition range exact
     rmSync(repoRoot, { recursive: true, force: true });
   }
 });
+
+// The upload cap is the only limit on a request body streamed straight to
+// disk, so a value that silently disables it is worse than a wrong one.
+test("the upload cap survives a non-numeric ADMIN_MAX_UPLOAD_BYTES", () => {
+  const previous = process.env.ADMIN_MAX_UPLOAD_BYTES;
+  try {
+    process.env.ADMIN_MAX_UPLOAD_BYTES = "1GB";
+    // Number("1GB") is NaN, and `received > NaN` is false for every size, so
+    // an unclamped read removes the limit instead of falling back to it.
+    assert.equal(loadConfig().maxUploadBytes, 1024 * 1024 * 1024);
+    process.env.ADMIN_MAX_UPLOAD_BYTES = "";
+    assert.equal(loadConfig().maxUploadBytes, 1024 * 1024 * 1024);
+  } finally {
+    if (previous === undefined) delete process.env.ADMIN_MAX_UPLOAD_BYTES;
+    else process.env.ADMIN_MAX_UPLOAD_BYTES = previous;
+  }
+});
+
+test("the upload cap is held inside sane bounds", () => {
+  const previous = process.env.ADMIN_MAX_UPLOAD_BYTES;
+  try {
+    process.env.ADMIN_MAX_UPLOAD_BYTES = "0";
+    assert.equal(loadConfig().maxUploadBytes, 1024 * 1024);
+    process.env.ADMIN_MAX_UPLOAD_BYTES = String(512 * 1024 * 1024);
+    assert.equal(loadConfig().maxUploadBytes, 512 * 1024 * 1024);
+  } finally {
+    if (previous === undefined) delete process.env.ADMIN_MAX_UPLOAD_BYTES;
+    else process.env.ADMIN_MAX_UPLOAD_BYTES = previous;
+  }
+});
