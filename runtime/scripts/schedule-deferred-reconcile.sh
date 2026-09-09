@@ -61,6 +61,7 @@ if ! docker run -d --rm --name "$HELPER_NAME" \
   -e HOME=/tmp/dune-deferred-home \
   -e DUNE_HOST_REPO_ROOT="$host_root" \
   -e DUNE_CONTAINER_REPO_ROOT=/repo \
+  -e DUNE_SKIP_SURVIVAL_DIRECTOR_REFRESH="${DUNE_SKIP_SURVIVAL_DIRECTOR_REFRESH:-}" \
   -e DUNE_DOCKER_DIR=/repo \
   -e DUNE_HOST_UID="${DUNE_HOST_UID:-0}" \
   -e DUNE_HOST_GID="${DUNE_HOST_GID:-0}" \
