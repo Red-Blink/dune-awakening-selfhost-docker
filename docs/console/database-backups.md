@@ -126,6 +126,16 @@ Restore** is refused until a preview has succeeded, so a wrong passphrase can
 never reach the destructive step. Editing the passphrase after a preview locks
 Apply again.
 
+That rule is enforced by the API, not only by the page. An apply is refused with
+409 unless the same session or API key previewed that same archive, successfully,
+within `ADMIN_RESTORE_PREVIEW_TTL_MS` (default 15 minutes) — and it is refused
+again if the archive's bytes changed after the preview. Scripting a restore means
+sending the preview, waiting for it to succeed, then sending the apply. See
+[API-REFERENCE.md](API-REFERENCE.md) for the exact responses.
+
+The shell path below is not gated that way: it asks for typed confirmation
+instead, which the API path cannot use.
+
 The same operation from a shell:
 
 ```bash

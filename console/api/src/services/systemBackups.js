@@ -1,4 +1,5 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { formatBackupSize, parseBackupMetadata } from "./backups.js";
 
@@ -24,6 +25,29 @@ export function validSystemArchiveName(name) {
 
 export function systemBackupDir(config) {
   return resolve(config.repoRoot, SYSTEM_BACKUP_DIR);
+}
+
+// The identity a restore preview is bound to, so an apply can prove it is about
+// to replace the host with the same bytes that were previewed. sha256 of the
+// whole file: real archives are a couple of MB, so there is no reason to accept
+// a weaker identity like size and mtime, which a swap can reproduce.
+//
+// Streamed rather than readFileSync because the database dump inside is the one
+// part of this whose size the console does not control.
+//
+// An unreadable archive resolves to "", which never equals a recorded hash --
+// so a missing or unreadable file refuses the apply instead of matching it.
+export function systemArchiveHash(config, archiveName) {
+  if (!validSystemArchiveName(archiveName)) return Promise.resolve("");
+  const path = resolve(systemBackupDir(config), archiveName);
+  return new Promise((resolveHash) => {
+    if (!existsSync(path)) return resolveHash("");
+    const hash = createHash("sha256");
+    const stream = createReadStream(path);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("error", () => resolveHash(""));
+    stream.on("end", () => resolveHash(hash.digest("hex")));
+  });
 }
 
 // The archive and its sidecar are one backup in two files, so the download

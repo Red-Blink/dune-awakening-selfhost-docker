@@ -2606,3 +2606,216 @@ if grep -q "Restoring configuration and secrets" "$case52_root/restore.log"; the
   exit 1
 fi
 echo "PASS restore-refuses-archive-without-env"
+
+# --- Case 53: a quoted host-shaped value survives the restore -------------
+# config_value strips the surrounding quotes to read a value, so writing it
+# back without them turns KEY="two words" into KEY=two words. Every consumer
+# sources .env, so that key reads as EMPTY and the remainder of the line runs
+# as a command -- DUNE_DB_PASSWORD then falls back to its ${...:-dune} default
+# and every client authenticates with a password the role does not have. The
+# quoted form is not exotic: container-lifecycle-test.sh and
+# test-compose-project-resolution.sh both seed exactly this shape and assert it
+# survives.
+
+case53_root="$test_root/case53"
+mkdir -p "$case53_root"
+case53_archive="$(make_restorable_archive "$case53_root")"
+if [ -z "$case53_archive" ]; then
+  echo "FAIL restore-keeps-quoted-host-values: could not build an archive"
+  exit 1
+fi
+mkdir -p "$case53_root/tmp"
+
+cat >> "$case53_root/work/.env" <<'QUOTEDENV'
+DUNE_DB_PASSWORD="quoted value with spaces"
+DUNE_HOST_REPO_ROOT="/srv/dune server"
+ADMIN_BIND_PORT=9099
+QUOTEDENV
+
+case53_status=0
+run_restore "$case53_root" "$case53_root/tmp" "$TEST_PASSPHRASE" "$(basename "$case53_archive")" || case53_status=$?
+
+if [ "$case53_status" -ne 0 ]; then
+  echo "FAIL restore-keeps-quoted-host-values: expected exit 0, got $case53_status"
+  cat "$case53_root/restore.log"
+  exit 1
+fi
+
+# What actually matters is what a consumer sees after sourcing, not the text.
+case53_read="$(
+  set +u
+  . "$case53_root/work/.env" >/dev/null 2>&1
+  printf '%s|%s|%s' "${DUNE_DB_PASSWORD:-}" "${DUNE_HOST_REPO_ROOT:-}" "${ADMIN_BIND_PORT:-}"
+)"
+if [ "$case53_read" != "quoted value with spaces|/srv/dune server|9099" ]; then
+  echo "FAIL restore-keeps-quoted-host-values: sourcing .env gave [$case53_read]"
+  grep -E '^(DUNE_DB_PASSWORD|DUNE_HOST_REPO_ROOT|ADMIN_BIND_PORT)=' "$case53_root/work/.env"
+  exit 1
+fi
+# An unquoted value must not gain quotes on the way back either.
+if ! grep -qx 'ADMIN_BIND_PORT=9099' "$case53_root/work/.env"; then
+  echo "FAIL restore-keeps-quoted-host-values: an unquoted value was rewritten quoted"
+  grep -E '^ADMIN_BIND_PORT=' "$case53_root/work/.env"
+  exit 1
+fi
+echo "PASS restore-keeps-quoted-host-values"
+
+# --- Case 54: the archive is pinned to the digest the console approved -----
+# The console hashes the archive in the apply request, but this script opens the
+# file seconds later -- and POST /api/backups/system/import can rename a
+# different archive onto that name in between. A principal holding only
+# import-system, with no restore grant, could therefore have its own .env,
+# secrets and database applied by someone else's authorized restore.
+#
+# The digest is re-checked here, against a private copy this restore makes
+# itself and then decrypts, so nothing outside this process can reach the bytes
+# between the check and the use.
+
+case54_root="$test_root/case54"
+mkdir -p "$case54_root"
+case54_archive="$(make_restorable_archive "$case54_root")"
+if [ -z "$case54_archive" ]; then
+  echo "FAIL restore-pins-approved-digest: could not build an archive"
+  exit 1
+fi
+mkdir -p "$case54_root/tmp"
+case54_real_sha="$(sha256sum "$case54_archive" | awk '{print $1}')"
+
+# A digest that does not describe this archive -- what a swapped file looks like.
+case54_status=0
+DUNE_SYSTEM_RESTORE_EXPECTED_SHA256="$(printf 'f%.0s' $(seq 64))" \
+  run_restore "$case54_root" "$case54_root/tmp" "$TEST_PASSPHRASE" "$(basename "$case54_archive")" || case54_status=$?
+
+if [ "$case54_status" -eq 0 ]; then
+  echo "FAIL restore-pins-approved-digest: a mismatched digest was restored anyway"
+  cat "$case54_root/restore.log"
+  exit 1
+fi
+if ! grep -q "changed after it was previewed" "$case54_root/restore.log"; then
+  echo "FAIL restore-pins-approved-digest: refused for the wrong reason"
+  cat "$case54_root/restore.log"
+  exit 1
+fi
+# Refused before anything was replaced.
+if grep -q "Restoring configuration and secrets" "$case54_root/restore.log"; then
+  echo "FAIL restore-pins-approved-digest: reached the apply stage first"
+  cat "$case54_root/restore.log"
+  exit 1
+fi
+
+# The matching digest still restores, so the check is a gate and not a wall.
+case54b_root="$test_root/case54b"
+mkdir -p "$case54b_root"
+case54b_archive="$(make_restorable_archive "$case54b_root")"
+mkdir -p "$case54b_root/tmp"
+case54b_sha="$(sha256sum "$case54b_archive" | awk '{print $1}')"
+case54b_status=0
+DUNE_SYSTEM_RESTORE_EXPECTED_SHA256="$case54b_sha" \
+  run_restore "$case54b_root" "$case54b_root/tmp" "$TEST_PASSPHRASE" "$(basename "$case54b_archive")" || case54b_status=$?
+if [ "$case54b_status" -ne 0 ]; then
+  echo "FAIL restore-pins-approved-digest: the matching digest was refused"
+  cat "$case54b_root/restore.log"
+  exit 1
+fi
+
+# A CLI restore sets no digest and must behave exactly as before.
+case54c_root="$test_root/case54c"
+mkdir -p "$case54c_root"
+case54c_archive="$(make_restorable_archive "$case54c_root")"
+mkdir -p "$case54c_root/tmp"
+case54c_status=0
+run_restore "$case54c_root" "$case54c_root/tmp" "$TEST_PASSPHRASE" "$(basename "$case54c_archive")" || case54c_status=$?
+if [ "$case54c_status" -ne 0 ]; then
+  echo "FAIL restore-pins-approved-digest: an unpinned CLI restore stopped working"
+  cat "$case54c_root/restore.log"
+  exit 1
+fi
+echo "PASS restore-pins-approved-digest"
+
+# --- Case 55: host-shaped state in generated/ survives the extract ---------
+# runtime/generated/ is restored wholesale, which is right for the server's own
+# state and wrong for the two files that describe THIS machine:
+#
+#   battlegroup-restore-point.env  names the id this host had before the
+#     restore. The extract lands the archive's copy over it, so the rollback
+#     point ends up describing the SOURCE host -- and publicDirectory's
+#     `adoptedKey === currentKey` guard passes with it, migrating
+#     public-directory state from an installation this host never was.
+#
+#   battlegroup.env's SERVER_IP/SERVER_IP_MODE are preserved in .env and then
+#     overruled here, because every consumer sources .env first and
+#     battlegroup.env second. It only looked like it worked because
+#     ensure-public-ip.sh rewrites the file on the next start -- and it returns
+#     early unless SERVER_IP_MODE is "public", so a local-mode host advertised
+#     the old machine's address.
+#
+# The archive is built inline rather than via make_restorable_archive so the
+# SOURCE tree can carry a rollback point of its own: without one in the archive
+# there is nothing to clobber the host's, and the case would pass either way.
+
+case55_root="$test_root/case55"
+mkdir -p "$case55_root/work"
+seed_repo_tree "$case55_root/work"
+printf 'PREVIOUS_BATTLEGROUP_ID=%s
+' "archive-side-rollback"   > "$case55_root/work/runtime/generated/battlegroup-restore-point.env"
+(
+  cd "$case55_root/work"
+  PATH="$bin_dir:$PATH" DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE"     bash runtime/scripts/db.sh backup-system
+) > "$case55_root/backup.log" 2>&1
+case55_archive="$(find "$case55_root/work/runtime/backups/system" -maxdepth 1 -name '*.tar.gz.enc' | head -n1)"
+if [ -z "$case55_archive" ]; then
+  echo "FAIL restore-keeps-host-shaped-generated: could not build an archive"
+  cat "$case55_root/backup.log"
+  exit 1
+fi
+mkdir -p "$case55_root/tmp"
+
+# Now this host's own values. The Battlegroup id deliberately MATCHES the
+# archive's: an identity mismatch is a different code path with its own prompt,
+# and what is under test here is the wholesale extract, not identity handling.
+printf 'PREVIOUS_BATTLEGROUP_ID=%s
+' "this-host-rollback"   > "$case55_root/work/runtime/generated/battlegroup-restore-point.env"
+cat > "$case55_root/work/runtime/generated/battlegroup.env" <<'HOSTBG'
+BATTLEGROUP_ID=sh-test-1234
+SERVER_IP=203.0.113.7
+SERVER_IP_MODE=local
+HOSTBG
+
+case55_status=0
+run_restore "$case55_root" "$case55_root/tmp" "$TEST_PASSPHRASE" "$(basename "$case55_archive")" || case55_status=$?
+if [ "$case55_status" -ne 0 ]; then
+  echo "FAIL restore-keeps-host-shaped-generated: expected exit 0, got $case55_status"
+  cat "$case55_root/restore.log"
+  exit 1
+fi
+
+case55_generated="$case55_root/work/runtime/generated"
+if grep -q "archive-side-rollback" "$case55_generated/battlegroup-restore-point.env" 2>/dev/null; then
+  echo "FAIL restore-keeps-host-shaped-generated: the rollback point now names the ARCHIVE's previous Battlegroup"
+  cat "$case55_generated/battlegroup-restore-point.env"
+  exit 1
+fi
+if ! grep -q "this-host-rollback" "$case55_generated/battlegroup-restore-point.env" 2>/dev/null; then
+  echo "FAIL restore-keeps-host-shaped-generated: this host's rollback point was lost"
+  cat "$case55_generated/battlegroup-restore-point.env" 2>/dev/null || echo "(file absent)"
+  exit 1
+fi
+# The address this machine answers on must stay this machine's.
+case55_ip="$(sed -n 's/^SERVER_IP=//p' "$case55_generated/battlegroup.env" | head -1)"
+if [ "$case55_ip" != "203.0.113.7" ]; then
+  echo "FAIL restore-keeps-host-shaped-generated: SERVER_IP became [$case55_ip], not this host's"
+  cat "$case55_generated/battlegroup.env"
+  exit 1
+fi
+case55_mode="$(sed -n 's/^SERVER_IP_MODE=//p' "$case55_generated/battlegroup.env" | head -1)"
+if [ "$case55_mode" != "local" ]; then
+  echo "FAIL restore-keeps-host-shaped-generated: SERVER_IP_MODE became [$case55_mode], not this host's"
+  exit 1
+fi
+# The server's own identity still comes from the archive.
+if ! grep -qx "BATTLEGROUP_ID=sh-test-1234" "$case55_generated/battlegroup.env"; then
+  echo "FAIL restore-keeps-host-shaped-generated: the archive's Battlegroup identity was not restored"
+  cat "$case55_generated/battlegroup.env"
+  exit 1
+fi
+echo "PASS restore-keeps-host-shaped-generated"
