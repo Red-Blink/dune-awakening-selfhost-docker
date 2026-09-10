@@ -257,6 +257,13 @@ export function loadConfig() {
     // meaning "unset", as the previous `|| default` did -- without it an empty
     // ADMIN_MAX_UPLOAD_BYTES= reads as 0 and clamps to the 1MiB floor.
     maxUploadBytes: clampInt(process.env.ADMIN_MAX_UPLOAD_BYTES || NaN, 1024 * 1024 * 1024, 1024 * 1024, 64 * 1024 * 1024 * 1024),
+    // How long a successful restore preview authorizes an apply. Clamped for
+    // the same reason as maxUploadBytes -- a NaN here would compare false in
+    // the expiry check and turn a short-lived receipt into a permanent one.
+    // The floor keeps it long enough to answer the identity and audit-log
+    // prompts the preview raises; the ceiling keeps it from becoming a
+    // standing authorization to overwrite the host.
+    restorePreviewTtlMs: clampInt(process.env.ADMIN_RESTORE_PREVIEW_TTL_MS || NaN, 15 * 60 * 1000, 60 * 1000, 2 * 60 * 60 * 1000),
     commandTimeoutMs: Number(process.env.ADMIN_COMMAND_TIMEOUT_MS || 120000),
     updateCheckCacheMs: Number(process.env.ADMIN_UPDATE_CHECK_CACHE_MS || 5 * 60 * 1000),
     staticDir: process.env.ADMIN_STATIC_DIR || resolve(repoRoot, "console/web/dist"),

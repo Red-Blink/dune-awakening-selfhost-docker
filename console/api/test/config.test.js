@@ -1,8 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// The checked-out repo, not a temp fixture: the forwarding test below reads the
+// real compose file and .env.example.
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 import { loadConfig, publicConfig, readConsoleBuildId, resolvePorts } from "../src/config.js";
 
 test("frontend build ID changes when the built entry file changes", () => {
@@ -434,4 +439,46 @@ test("the upload cap is held inside sane bounds", () => {
     if (previous === undefined) delete process.env.ADMIN_MAX_UPLOAD_BYTES;
     else process.env.ADMIN_MAX_UPLOAD_BYTES = previous;
   }
+});
+
+// The window in which a successful restore preview authorizes an apply. A NaN
+// here compares false in the expiry check, which turns a short-lived receipt
+// into a permanent authorization to overwrite the host.
+test("the restore preview window survives a non-numeric ADMIN_RESTORE_PREVIEW_TTL_MS", () => {
+  const previous = process.env.ADMIN_RESTORE_PREVIEW_TTL_MS;
+  try {
+    process.env.ADMIN_RESTORE_PREVIEW_TTL_MS = "15 minutes";
+    assert.equal(loadConfig().restorePreviewTtlMs, 15 * 60 * 1000);
+    process.env.ADMIN_RESTORE_PREVIEW_TTL_MS = "";
+    assert.equal(loadConfig().restorePreviewTtlMs, 15 * 60 * 1000);
+  } finally {
+    if (previous === undefined) delete process.env.ADMIN_RESTORE_PREVIEW_TTL_MS;
+    else process.env.ADMIN_RESTORE_PREVIEW_TTL_MS = previous;
+  }
+});
+
+test("the restore preview window is held inside sane bounds", () => {
+  const previous = process.env.ADMIN_RESTORE_PREVIEW_TTL_MS;
+  try {
+    // Zero would refuse every apply the instant its preview finished.
+    process.env.ADMIN_RESTORE_PREVIEW_TTL_MS = "0";
+    assert.equal(loadConfig().restorePreviewTtlMs, 60 * 1000);
+    // A day would make the receipt a standing authorization.
+    process.env.ADMIN_RESTORE_PREVIEW_TTL_MS = String(24 * 60 * 60 * 1000);
+    assert.equal(loadConfig().restorePreviewTtlMs, 2 * 60 * 60 * 1000);
+    process.env.ADMIN_RESTORE_PREVIEW_TTL_MS = String(5 * 60 * 1000);
+    assert.equal(loadConfig().restorePreviewTtlMs, 5 * 60 * 1000);
+  } finally {
+    if (previous === undefined) delete process.env.ADMIN_RESTORE_PREVIEW_TTL_MS;
+    else process.env.ADMIN_RESTORE_PREVIEW_TTL_MS = previous;
+  }
+});
+
+// Documented but not forwarded is the same as not configurable: the console
+// runs in a container that only sees what the compose file passes through.
+test("the documented restore preview window is forwarded into the console container", () => {
+  const compose = readFileSync(resolve(REPO_ROOT, "docker-compose.web.yml"), "utf8");
+  const envExample = readFileSync(resolve(REPO_ROOT, ".env.example"), "utf8");
+  assert.match(compose, /^\s+ADMIN_RESTORE_PREVIEW_TTL_MS:\s+"\$\{ADMIN_RESTORE_PREVIEW_TTL_MS:-900000\}"$/m);
+  assert.match(envExample, /^ADMIN_RESTORE_PREVIEW_TTL_MS=900000$/m);
 });

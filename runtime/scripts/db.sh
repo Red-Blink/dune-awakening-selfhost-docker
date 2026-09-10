@@ -224,7 +224,7 @@ HOST_SHAPED_ENV_PREFIXES="DUNE_MEMORY_ DUNE_ALWAYS_ON_"
 # be captured earlier.
 restore_host_shaped_env_values() {
   local previous_env="$1"
-  local key value restored="" cleared="" env_mode
+  local key value style restored="" cleared="" env_mode
 
   [ -f "$previous_env" ] || return 0
   # cp -a has already put the archive's .env in place with its own mode, which
@@ -241,7 +241,12 @@ restore_host_shaped_env_values() {
   for key in $HOST_SHAPED_ENV_KEYS $extra_keys; do
     value="$(config_value "$previous_env" "$key" || true)"
     if [ -n "$value" ]; then
-      set_env_file_value .env "$key" "$value" "$env_mode"
+      # Written back in the form the host's own .env used. Without this a
+      # quoted value -- DUNE_DB_PASSWORD="two words", or a repo root with a
+      # space in it -- comes back unquoted and every consumer that sources
+      # .env sees an empty key and runs the remainder as a command.
+      style="$(config_value_style "$previous_env" "$key" || echo plain)"
+      set_env_file_value .env "$key" "$value" "$env_mode" "$style"
       restored="$restored $key"
     elif [ -n "$(config_value .env "$key" || true)" ]; then
       # This host does not set the key, so it runs on the built-in default --
@@ -353,6 +358,25 @@ config_value() {
       gsub(/^"/, "", value)
       gsub(/"$/, "", value)
       print value
+      exit
+    }
+  ' "$file"
+}
+
+# config_value strips the surrounding quotes, so a caller that reads a value
+# and writes it back without them turns KEY="two words" into KEY=two words --
+# which every `. ./.env` consumer reads as an empty KEY followed by a stray
+# command. This reports which form the file actually uses so the value can be
+# round-tripped in the same one.
+config_value_style() {
+  local file="$1"
+  local key="$2"
+
+  [ -f "$file" ] || return 1
+  awk -F= -v key="$key" '
+    $1 == key {
+      value = substr($0, length(key) + 2)
+      if (value ~ /^".*"$/) print "quoted"; else print "plain"
       exit
     }
   ' "$file"
@@ -1557,6 +1581,45 @@ restore_system() {
     return 1
   fi
   chmod 700 "$stage_dir"
+
+  # The console records a digest when it previews an archive and refuses an
+  # apply that does not match it. That check runs in the API process, seconds
+  # before this script opens the file -- and an upload can rename a different
+  # archive onto this name in between, so the digest the console approved need
+  # not describe the bytes about to replace the host.
+  #
+  # Closing it here rather than there: the archive is copied into this restore's
+  # own private staging directory, and the digest is taken from THAT copy, which
+  # is also what gets decrypted below. Nothing outside this process can reach it
+  # between the check and the use, so there is no window left to win.
+  #
+  # Unset for a CLI restore, which is a local operator acting directly and has
+  # its own typed confirmation.
+  if [ -n "${DUNE_SYSTEM_RESTORE_EXPECTED_SHA256:-}" ]; then
+    local pinned_archive="$stage_dir/archive.tar.gz.enc" actual_sha=""
+    if ! cp -- "$archive" "$pinned_archive"; then
+      echo "Could not stage the archive for verification." >&2
+      restore_system_cleanup
+      return 1
+    fi
+    chmod 600 "$pinned_archive"
+    actual_sha="$(sha256sum "$pinned_archive" 2>/dev/null | awk '{print $1}')"
+    if [ -z "$actual_sha" ]; then
+      echo "Could not compute the archive's checksum; refusing to restore." >&2
+      restore_system_cleanup
+      return 1
+    fi
+    if [ "$actual_sha" != "$DUNE_SYSTEM_RESTORE_EXPECTED_SHA256" ]; then
+      echo "This archive changed after it was previewed; refusing to restore." >&2
+      echo "  expected: $DUNE_SYSTEM_RESTORE_EXPECTED_SHA256" >&2
+      echo "  found:    $actual_sha" >&2
+      restore_system_cleanup
+      return 1
+    fi
+    # Everything below reads the pinned copy, not the shared path.
+    archive="$pinned_archive"
+  fi
+
   if ! plain_tgz="$(mktemp)"; then
     echo "Could not create a temporary file for the restore." >&2
     restore_system_cleanup
@@ -1777,10 +1840,60 @@ restore_system() {
   fi
   restore_host_shaped_env_values "$safety_dir/env"
   mkdir -p runtime/generated runtime/secrets
+
+  # The rollback point is host-shaped, like image-tags.env below: it names the
+  # Battlegroup id THIS host had before the restore, which import_db wrote a
+  # few steps ago. The wholesale extract that follows lands the archive's copy
+  # over it, leaving a file that describes the SOURCE host's history --
+  # and readPreviousDirectoryInstallationKey's `adoptedKey === currentKey`
+  # guard passes with it, so public-directory state migrates from an
+  # installation this host never was. Carried across the extract, or removed
+  # when this host has no rollback point of its own.
+  local restore_point_saved=""
+  if [ -f "$BATTLEGROUP_RESTORE_FILE" ]; then
+    restore_point_saved="$stage_dir/battlegroup-restore-point.env"
+    cp -a -- "$BATTLEGROUP_RESTORE_FILE" "$restore_point_saved"
+  fi
+
   if ! tar -C "$stage_dir/tree/generated" -cf - . | tar -C runtime/generated -xf -; then
     echo "Could not restore runtime/generated/. Previous state is in: $safety_dir" >&2
     restore_system_cleanup
     return 1
+  fi
+
+  if [ -n "$restore_point_saved" ]; then
+    cp -a -- "$restore_point_saved" "$BATTLEGROUP_RESTORE_FILE"
+  else
+    # This host had none, so the archive's is the source host's and describes a
+    # rollback that cannot be performed here.
+    rm -f -- "$BATTLEGROUP_RESTORE_FILE"
+  fi
+
+  # SERVER_IP and SERVER_IP_MODE are preserved in .env by
+  # restore_host_shaped_env_values, and then quietly overruled: the archive's
+  # generated/battlegroup.env carries them too, and every consumer sources
+  # .env first and battlegroup.env second, so the archive's address wins. The
+  # preservation only appeared to work because ensure-public-ip.sh rewrites the
+  # file on the next start -- and it returns early unless SERVER_IP_MODE is
+  # "public", so a local-mode host advertised the old machine's address while
+  # .env showed the right one.
+  #
+  # Same rule as .env: this host's value if it has one, otherwise remove the
+  # archive's so the .env value is the only answer.
+  local address_key address_value address_style address_mode
+  if [ -f runtime/generated/battlegroup.env ]; then
+    # Preserved rather than assumed: cp -a has just put the archive's file in
+    # place with its own mode, and a literal 644 here could widen it.
+    address_mode="$(stat -c '%a' runtime/generated/battlegroup.env 2>/dev/null || echo 644)"
+    for address_key in SERVER_IP SERVER_IP_MODE; do
+      address_value="$(config_value "$safety_dir/generated/battlegroup.env" "$address_key" 2>/dev/null || true)"
+      if [ -n "$address_value" ]; then
+        address_style="$(config_value_style "$safety_dir/generated/battlegroup.env" "$address_key" || echo plain)"
+        set_env_file_value runtime/generated/battlegroup.env "$address_key" "$address_value" "$address_mode" "$address_style"
+      elif [ -n "$(config_value runtime/generated/battlegroup.env "$address_key" || true)" ]; then
+        unset_env_file_value runtime/generated/battlegroup.env "$address_key"
+      fi
+    done
   fi
 
   # image-tags.env is the one file in generated/ that describes THIS host's

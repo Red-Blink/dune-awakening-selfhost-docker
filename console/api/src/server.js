@@ -34,7 +34,8 @@ import { assertInstalledAddonPermission, fetchCommunityAddons, installCommunityA
 import { createHardwareStatusProvider, performanceSnapshot as collectPerformanceSnapshot } from "./services/performance.js";
 import { serveStatic, contentTypeForPath } from "./http/staticFiles.js";
 import { discoverServices } from "./services/serviceDiscovery.js";
-import { listSystemBackups, systemBackupBundleMembers, systemBackupDir, validSystemArchiveName, validSystemBackupName } from "./services/systemBackups.js";
+import { listSystemBackups, systemArchiveHash, systemBackupBundleMembers, systemBackupDir, validSystemArchiveName, validSystemBackupName } from "./services/systemBackups.js";
+import { createRestorePreviewReceipts, restorePreviewRejectionMessage } from "./services/restorePreviewReceipts.js";
 import { looksLikeTar, mintSystemBackupName, normalizeImportedSystemMetadata, readEncryptedArchiveHeader, readTarMemberIndex, sanitizeUploadFilename, synthesizeSystemMetadata } from "./services/systemBackupImport.js";
 import { createTarHeader, tarArchiveLength, tarPadding, TAR_TRAILER_BYTES, createBackupDownloadArchive, enrichBackupRows, nextImportedBackupName, normalizeImportedBackupMetadata, readCurrentBattlegroupId, validBackupDownloadName } from "./services/backups.js";
 import { createMemoryBalancer } from "./services/memoryBalancer.js";
@@ -154,6 +155,10 @@ function shouldNoteApiKeyAuthThrottle(failureKey, at = Date.now()) {
   return true;
 }
 const apiKeys = createApiKeyStore({ file: config.apiKeysFile });
+// Proof that a restore was previewed, for the apply that follows it. In memory
+// beside the sessions it is keyed by -- see the module header for why it is not
+// persisted.
+const restorePreviewReceipts = createRestorePreviewReceipts({ ttlMs: config.restorePreviewTtlMs });
 const bridgeRateLimiter = createBridgeRateLimiter();
 
 async function trustedPartitionsForCompletedStop(operation, payload = {}) {
@@ -1827,16 +1832,72 @@ async function systemBackupRestoreRoute(req, res, name) {
   const auditLogMode = body?.auditLogMode === "adopt-backup" || body?.auditLogMode === "keep-current"
     ? body.auditLogMode
     : "";
-  // Dry run unless apply is explicitly set: the UI previews first, and a
-  // request that loses its flag must not replace the host.
-  const apply = body?.apply === true || String(body?.apply || "") === "1";
+  // Dry run unless apply is explicitly set: a request that loses its flag must
+  // not replace the host.
+  //
+  // Refused rather than coerced when it is neither: `apply: "true"` used to
+  // fall through to a dry run and return 202 with a task, so a client that
+  // sent a string reported a successful restore while nothing had been
+  // applied. Failing safe is right; failing safe SILENTLY is not.
+  const applyRaw = body?.apply;
+  const applyRecognized = applyRaw === undefined || applyRaw === null
+    || applyRaw === true || applyRaw === false
+    || applyRaw === 1 || applyRaw === 0
+    || applyRaw === "1" || applyRaw === "0" || applyRaw === "";
+  if (!applyRecognized) {
+    return json(res, 400, { error: 'The "apply" field must be true or false.' });
+  }
+  const apply = applyRaw === true || applyRaw === 1 || String(applyRaw || "") === "1";
+
+  // Hashed BEFORE the dry run rather than after it. Hashing on completion would
+  // record whatever the file is by then, so an archive swapped after the dry run
+  // read it would be the one the apply is authorized against -- bytes nobody
+  // previewed. Taking it first means any later change disagrees at apply time.
+  const archiveHash = await systemArchiveHash(config, name);
+  const principal = restorePrincipalOf(req);
+
+  if (apply) {
+    // The gate that used to live only in the browser. Checked before audit()
+    // and before any task exists, so a refused apply leaves nothing behind.
+    const verdict = restorePreviewReceipts.verify({ principal, archiveName: name, archiveHash, identityMode, auditLogMode });
+    if (!verdict.ok) {
+      audit(config, req, "backup.restore-system-refused", { backup: name, reason: verdict.reason });
+      return json(res, 409, { error: restorePreviewRejectionMessage(verdict.reason) });
+    }
+  }
 
   audit(config, req, "backup.restore-system", { backup: name, apply, identityMode, auditLogMode });
   // The passphrase rides in options.env, never the payload above, which is what
   // audit() records.
   return task(req, res, "backup", "backupSystemRestore", { backup: name, apply, identityMode, auditLogMode }, {
-    env: { DUNE_SYSTEM_BACKUP_PASSPHRASE: passphrase }
+    env: {
+      DUNE_SYSTEM_BACKUP_PASSPHRASE: passphrase,
+      // Re-checked inside db.sh against a private copy it makes itself. The
+      // verify() above runs here, seconds before the shell opens the file, and
+      // an upload can rename a different archive onto this name in between --
+      // so this digest, not that check, is what actually binds the bytes.
+      // Sent on a preview too: a dry run that reports on one archive must not
+      // mint a receipt describing another.
+      ...(archiveHash ? { DUNE_SYSTEM_RESTORE_EXPECTED_SHA256: archiveHash } : {})
+    },
+    // Recorded on success only: a preview that failed -- a wrong passphrase, a
+    // corrupt archive -- must not authorize an apply. Consumed on a successful
+    // apply, but deliberately NOT on a failed one, so Postgres being down does
+    // not also cost the operator their preview.
+    onSuccess: () => {
+      if (apply) restorePreviewReceipts.consume({ principal, archiveName: name });
+      else restorePreviewReceipts.record({ principal, archiveName: name, archiveHash, identityMode, auditLogMode });
+    }
   });
+}
+
+// One operator's preview must not authorize another's apply, and an API key
+// must not be able to ride a browser session's preview. authDisabled dev mode
+// yields a fixed session id, which is correct -- there is one principal.
+function restorePrincipalOf(req) {
+  const session = req.authSession;
+  if (session?.apiKeyId) return `key:${session.apiKeyId}`;
+  return `session:${session?.id || "unknown"}`;
 }
 
 async function systemBackupCreateRoute(req, res) {
@@ -1999,6 +2060,12 @@ function writeSlice(filePath, start, length, destination) {
 }
 
 async function sendSystemBackupArchive(req, res, name) {
+  // Limited like create, import, restore and delete-all, though it is a GET:
+  // this is the route that streams an encrypted copy of .env, every file in
+  // runtime/secrets and the IAM policies. It was the only system-backup route
+  // with no ceiling at all, so a browser session could pull the host's whole
+  // credential set as fast as the disk allows.
+  if (!applyMutationRateLimit(req, res, "backups.system.download")) return;
   if (!validSystemBackupName(name)) return json(res, 400, { error: "Invalid system backup name." });
   const directory = systemBackupDir(config);
   const archivePath = resolve(directory, name);

@@ -42,6 +42,11 @@ export class TaskManager {
     this.config = config;
     this.onMapDown = options.onMapDown || null;
     this.tasks = new Map();
+    // Keyed by task id and held here rather than on the task: publicTask()
+    // allowlists what it serializes, and a callback has no business anywhere
+    // near that. Consumed on the first terminal state, either way, so a failed
+    // task does not leave one behind.
+    this.successHooks = new Map();
     this.runDockerCommand = options.runDockerCommand || runDockerCommand;
     this.updateCheckCache = options.updateCheckCache || createUpdateCheckCache(config, {
       collect: () => runDune(config, buildDuneArgs("updateCheck"), {
@@ -64,6 +69,9 @@ export class TaskManager {
   // so a secret placed there would leak. It lives only in this closure.
   create(type, operation, payload = {}, options = {}) {
     const id = randomUUID();
+    // Registered before the cached-hit branch below, which can complete a task
+    // synchronously inside this same call.
+    if (typeof options.onSuccess === "function") this.successHooks.set(id, options.onSuccess);
     const task = {
       id,
       type,
@@ -155,6 +163,8 @@ export class TaskManager {
       task.errorMessage = error.message;
       task.currentStep = "Failed";
       task.finishedAt = new Date().toISOString();
+      // Dropped, not run: a preview that failed must not authorize an apply.
+      this.successHooks.delete(task.id);
       this.emit(task, error.message);
     }
   }
@@ -313,7 +323,23 @@ export class TaskManager {
     task.exitCode = exitCode;
     task.currentStep = "Finished";
     task.finishedAt = new Date().toISOString();
+    this.runSuccessHook(task);
     this.emit(task, "Task succeeded");
+  }
+
+  // The task has already succeeded by the time this runs, so a throwing hook
+  // must not turn it into a failure. The restore-preview receipt is the caller
+  // here and fails closed: a receipt that was never recorded refuses the apply
+  // rather than allowing it.
+  runSuccessHook(task) {
+    const hook = this.successHooks.get(task.id);
+    if (!hook) return;
+    this.successHooks.delete(task.id);
+    try {
+      hook(task);
+    } catch (error) {
+      console.error(`Task success hook failed for ${task.operation}: ${error?.message || "Unexpected error."}`);
+    }
   }
 
   trim() {
