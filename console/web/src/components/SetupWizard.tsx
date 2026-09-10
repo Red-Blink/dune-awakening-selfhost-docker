@@ -182,11 +182,29 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
           setTask(latestRestore);
           // Dry run and apply share an operation, so only the stored stage
           // can tell them apart.
-          setRestoreStep(stepForOperation(latestRestore.operation) || storedRestoreStep(storedRestore?.stage) || "apply");
-          // A rejected poll would otherwise kill this loop silently, leaving the
-          // step spinning with no error and no further updates. The sequence's
-          // own call is inside a try/catch; this one is not.
-          void watchTaskToEnd(latestRestore.id).catch((error) => {
+          const storedStage = storedRestoreStep(storedRestore?.stage);
+          const resumedStep = stepForOperation(latestRestore.operation) || storedStage || "apply";
+          setRestoreStep(resumedStep);
+          // Watching is not enough: without a terminal handler the row stays
+          // spinning forever once the task ends, and the rest of the sequence
+          // never runs. A rejected poll would kill the loop just as silently --
+          // the sequence's own call is inside a try/catch, this one is not.
+          void watchTaskToEnd(latestRestore.id).then(async (final) => {
+            if (final.status !== "succeeded") {
+              setRestoreError(final.errorMessage || `${restoreStageLabel(resumedStep)} did not finish.`);
+              return;
+            }
+            // Only a run that had already reached apply can finish by itself:
+            // the passphrase is never persisted, so an earlier stage cannot
+            // issue the calls that remain. Gated on the STORED stage, not on
+            // resumedStep, whose "apply" fallback is a guess -- acting on that
+            // would report a restore complete when only the dry run had run.
+            if (storedStage === "apply") {
+              await completeRestoreAfterApply();
+              return;
+            }
+            setRestoreError("This restore was interrupted before it finished. Enter the passphrase again to start it over.");
+          }).catch((error) => {
             setRestoreError(error instanceof Error ? error.message : String(error));
           });
         }
@@ -348,26 +366,34 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
         auditLogMode: "adopt-backup"
       }));
 
-      // The restore is already done at this point, so a Battlegroup that will
-      // not come up is reported rather than thrown: it is recoverable from Home,
-      // and failing the whole restore over it would misdescribe what happened.
-      try {
-        await runRestoreTask("start", () => serverApi.start());
-      } catch (error) {
-        setStartWarning(error instanceof Error ? error.message : String(error));
-      }
-      setRestoreStep("reload");
-      setRestoreDone(true);
-      clearRestoreProgress();
-      const finishStep = stepIndex("finish");
-      setMaxUnlockedStep((value) => Math.max(value, finishStep));
-      setStep(finishStep);
-      // Deferred to the countdown so the finish screen is readable.
-      setRedirectCountdown(completionRedirectSeconds);
+      await completeRestoreAfterApply();
     } catch (error) {
       // Keep the failed step: the checklist row is what says where it stopped.
       setRestoreError(error instanceof Error ? error.message : String(error));
     }
+  }
+
+  // Everything after the archive has been applied. Split out because a restore
+  // resumed after a page reload rejoins the flow here: the destructive step is
+  // already done, and neither of these needs the passphrase -- which is
+  // deliberately never persisted.
+  async function completeRestoreAfterApply() {
+    // The restore is already done at this point, so a Battlegroup that will not
+    // come up is reported rather than thrown: it is recoverable from Home, and
+    // failing the whole restore over it would misdescribe what happened.
+    try {
+      await runRestoreTask("start", () => serverApi.start());
+    } catch (error) {
+      setStartWarning(error instanceof Error ? error.message : String(error));
+    }
+    setRestoreStep("reload");
+    setRestoreDone(true);
+    clearRestoreProgress();
+    const finishStep = stepIndex("finish");
+    setMaxUnlockedStep((value) => Math.max(value, finishStep));
+    setStep(finishStep);
+    // Deferred to the countdown so the finish screen is readable.
+    setRedirectCountdown(completionRedirectSeconds);
   }
 
   async function watchTaskToEnd(taskId: string) {
@@ -499,7 +525,12 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
         {activeStep === "restore" && <>
           <h2>Restore</h2>
           <p className="muted">Installs the game files this host is missing, checks the passphrase, then replaces this host's configuration, credentials and database with the archive's.</p>
-          {!restoreStep && !restoreDone && <button className="update-action" disabled={!archiveName || !passphraseReady} onClick={() => void runRestoreSequence()}>Start Restore</button>}
+          {/* Offered again after a failure. The failed step stays on the
+              checklist, so without this the button is gone, Next is still
+              disabled on restoreDone, and the wizard is a dead end that only a
+              page reload escapes -- which restarts at the passphrase and
+              re-runs the whole asset install. */}
+          {(!restoreStep || restoreError) && !restoreDone && <button className="update-action" disabled={!archiveName || !passphraseReady} onClick={() => void runRestoreSequence()}>{restoreError ? "Retry Restore" : "Start Restore"}</button>}
           {/* Rendered before the run too, so the four tasks and their order are
               known going in rather than revealed one line at a time. */}
           <RestoreChecklist
