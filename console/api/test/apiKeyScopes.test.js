@@ -11,6 +11,7 @@ import { allKnownActions } from "../src/policy.js";
 import {
   EXTRA_READ_ACTIONS,
   KEY_DENIED_NAMESPACES,
+  LEVEL_EXCLUDED_ACTIONS,
   KEY_WRITE_DENIED_NAMESPACES,
   actionsByNamespace,
   grantableActions,
@@ -18,6 +19,7 @@ import {
   namespaceHasWriteActions,
   namespaceOf,
   normalizeScopes,
+  scopeAllowsAction,
   scopeCatalog,
   selectableNamespaces
 } from "../src/apiKeyScopes.js";
@@ -448,5 +450,42 @@ test("every action in the catalog is grantable by name", () => {
       assert.ok(grantable.includes(action), `${action} is in the catalog but not grantable`);
       assert.equal(keyAllows({ scopes: { [entry.namespace]: [action] } }, action), true, action);
     }
+  }
+});
+
+// Levels deliberately auto-cover actions added later. That is right for a
+// namespace whose blast radius is stable, and wrong for `backups`, which grew
+// from "database dumps" to include an archive of runtime/secrets and
+// iam-policies.json. Without LEVEL_EXCLUDED_ACTIONS, every key already stored
+// as { "backups": "write" } gained whole-host takeover on upgrade, with no
+// re-save and nothing for the operator to review.
+test("a stored write level does not reach the whole-host backup actions", () => {
+  for (const action of ["backups:download-system", "backups:import-system", "backups:restore-system"]) {
+    assert.equal(scopeAllowsAction("backups", "write", action), false, `write must not cover ${action}`);
+    assert.equal(scopeAllowsAction("backups", "read", action), false, `read must not cover ${action}`);
+  }
+});
+
+test("the excluded actions can still be granted by naming them", () => {
+  // The point is that the operator has to choose them, not that they are
+  // unreachable -- an explicit action list is a deliberate act.
+  for (const action of ["backups:download-system", "backups:import-system", "backups:restore-system"]) {
+    assert.equal(scopeAllowsAction("backups", [action], action), true, `an explicit grant of ${action} must work`);
+  }
+});
+
+test("the rest of the backups namespace is untouched by the exclusion", () => {
+  for (const action of ["backups:create", "backups:create-system", "backups:delete-system"]) {
+    assert.equal(scopeAllowsAction("backups", "write", action), true, `write should still cover ${action}`);
+  }
+  assert.equal(scopeAllowsAction("backups", "read", "backups:read"), true);
+});
+
+// Every excluded action must be a real one, or the exclusion is decorative --
+// the same trap policy.js guards with unknownActions().
+test("every level-excluded action is a real action", () => {
+  const known = allKnownActions();
+  for (const action of LEVEL_EXCLUDED_ACTIONS) {
+    assert.ok(known.has(action), `${action} is not in the action catalog`);
   }
 });

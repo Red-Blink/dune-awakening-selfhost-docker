@@ -107,7 +107,7 @@ namespace" rule, so Create stays disabled until something is selected.
 | `landsraad` | `landsraad:read` | `write` |
 | `server` | `server:read` | `console-reload`, `network-fix`, `restart`, `restart-service`, `start`, `stop`, `storage-cleanup`, `write-config` |
 | `logs` | `logs:read` | *nothing — no write action exists* |
-| `backups` | `backups:read` | `create`, `create-system`, `delete`, `delete-system`, `download-system`, `import`, `import-system`, `restore`, `restore-system`, `write-config` |
+| `backups` | `backups:read` | `create`, `create-system`, `delete`, `delete-system`, `import`, `restore`, `write-config` — **not** `download-system`, `import-system` or `restore-system`, which no level grants (see below) |
 | `updates` | `updates:check`, `updates:read` | *nothing — write actions are denied to keys* |
 | `carepackage` | `carepackage:read` | `clear-history`, `grant`, `scan`, `write-config` |
 | `addons` | `addons:read` | *nothing — write actions are denied to keys* |
@@ -136,6 +136,26 @@ Two actions are POST-shaped but read-only in effect, and are reachable by a **Re
 runs a grant cycle. The verb-shaped name is not the test; what the route does is.
 
 ### The two system-backup scopes
+
+### Three actions no level ever grants
+
+`backups:download-system`, `backups:import-system` and `backups:restore-system` are
+reachable **only** by naming them in a key's explicit action list. A key stored as
+`{"backups": "write"}` does not get them.
+
+Levels otherwise auto-cover actions added later, so a key keeps working as routes are
+added. That is right for a namespace whose blast radius is stable, and wrong for this
+one: `backups` used to mean database dumps, and now also means an archive of `.env`,
+every file in `runtime/secrets` (the console's own admin password, the session secret,
+`api-keys.json`) and `runtime/generated/iam-policies.json`. Without the exclusion, every
+key minted back when `backups: write` meant `pg_dump` would have silently gained
+whole-host takeover and full credential exfiltration on upgrade, with no re-save and
+nothing for the operator to review.
+
+`create-system` and `delete-system` are not excluded: neither reads an archive back nor
+writes one into the host.
+
+The `admin` tier is denied the same three for the same reason — see `policy.js`.
 
 `backups:create-system` and `backups:download-system` are write-classified and
 deliberately separate from the rest of the namespace, because neither is really about

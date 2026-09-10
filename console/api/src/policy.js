@@ -277,7 +277,10 @@ function validPolicyStore(value) {
 
 // ---- Default policies (mirror the CAPABILITY_BY_TIER ladder) ----
 
-const DEFAULT_POLICIES = {
+// Exported so a test can assert what the tier ladder SHIPS, independently of
+// whatever a previous test left in the mutable store -- setPolicies(null) is
+// rejected rather than a reset, so an assertion that relies on it is vacuous.
+export const DEFAULT_POLICIES = {
   owner: {
     version: 1,
     tier: "owner",
@@ -327,6 +330,24 @@ const DEFAULT_POLICIES = {
         // would otherwise hand the write half back. Pinned by "the deny
         // survives a widened allow list" in databaseQueryAuthz.test.js.
         "database:execute",
+        // A system backup is not a bigger database backup. The archive holds
+        // runtime/secrets (the console's own admin password, the session
+        // secret, api-keys.json) and runtime/generated/iam-policies.json, and
+        // a restore overwrites both wholesale. Without these three, "backups:*"
+        // above quietly hands admin every credential owner has:
+        //   download-system  -- create with a passphrase you chose, download,
+        //                       decrypt at leisure.
+        //   import-system    -- upload an archive with a rewritten
+        //   restore-system      iam-policies.json, then apply it.
+        // That defeats the settings:* and database:* denials in this very
+        // list, so it has to be denied here rather than left to the wildcard.
+        //
+        // create-system and delete-system stay with admin: taking and pruning
+        // archives is ordinary custodial work, and neither reads an archive
+        // back nor writes one into the host.
+        "backups:download-system",
+        "backups:import-system",
+        "backups:restore-system",
       ]}
     ]
   },
