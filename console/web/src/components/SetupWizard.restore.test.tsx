@@ -304,6 +304,12 @@ describe("setup wizard restore path", () => {
     } as never);
     window.localStorage.setItem("arrakis.setupRestore", JSON.stringify({ archive: "dune-system-x.tar.gz.enc", stage: "apply" }));
 
+    // Still running: that is what "mid-restore" means. With a task that has
+    // already finished the wizard now completes it instead (see below), so
+    // leaving this succeeded would assert a state that only existed while the
+    // resumed watch had no terminal handler.
+    vi.mocked(setupApi.task).mockImplementation(async (id: string) => ({ task: { ...done(id), status: "running" } }) as never);
+
     renderWizard();
     expect(await screen.findByText("Restore")).toBeTruthy();
     // The checklist has to come back mid-sequence, not restart at the top:
@@ -311,5 +317,71 @@ describe("setup wizard restore path", () => {
     expect(screen.getByText("Game files installed").closest("li")?.className).toContain("restore-step-done");
     expect(screen.getByText("Restoring database, config and secrets").closest("li")?.className).toContain("restore-step-active");
     expect(screen.getByText("Restart the console").closest("li")?.className).toContain("restore-step-pending");
+  });
+
+  it("finishes a restore that was applying when the page reloaded", async () => {
+    // The resumed watch used to have no success handler, so when the task ended
+    // the row stayed spinning and start/reload never ran -- the wizard was stuck
+    // until another manual reload.
+    vi.mocked(setupApi.tasks).mockResolvedValue({
+      tasks: [{ ...done("running"), operation: "backupSystemRestore", status: "running" }]
+    } as never);
+    window.localStorage.setItem("arrakis.setupRestore", JSON.stringify({ archive: "dune-system-x.tar.gz.enc", stage: "apply" }));
+
+    renderWizard();
+
+    // It reaches the end on its own: the Battlegroup is started and the finish
+    // step is shown, without the operator touching anything.
+    await waitFor(() => expect(serverApi.start).toHaveBeenCalled());
+    expect(await screen.findByText(/This host now carries the archive/i)).toBeTruthy();
+    // The resume hint is spent, so a later load does not return here.
+    expect(window.localStorage.getItem("arrakis.setupRestore")).toBeNull();
+  });
+
+  it("asks for the passphrase again when the reload interrupted an earlier step", async () => {
+    // The passphrase is deliberately never persisted, so a run interrupted
+    // before apply cannot issue the calls that remain. It must say so rather
+    // than silently stop -- and must NOT report a restore that never applied
+    // as complete.
+    vi.mocked(setupApi.tasks).mockResolvedValue({
+      tasks: [{ ...done("running"), operation: "backupSystemRestore", status: "running" }]
+    } as never);
+    window.localStorage.setItem("arrakis.setupRestore", JSON.stringify({ archive: "dune-system-x.tar.gz.enc", stage: "verify" }));
+
+    renderWizard();
+
+    expect(await screen.findByText(/interrupted before it finished/i)).toBeTruthy();
+    expect(serverApi.start).not.toHaveBeenCalled();
+    expect(screen.queryByText("Restore complete")).toBeNull();
+  });
+
+  it("lets the operator retry a restore that failed", async () => {
+    // The failed step stays on the checklist, which used to hide Start Restore
+    // for good while Next stayed disabled -- a dead end escapable only by a
+    // page reload, which restarts at the passphrase and re-runs the whole
+    // multi-gigabyte asset install.
+    vi.mocked(setupApi.task).mockImplementation(async (id: string) => (
+      id === "assets"
+        ? { task: { ...done(id), status: "failed", errorMessage: "Steam ran out of disk." } }
+        : { task: done(id) }
+    ) as never);
+
+    await walkToArchive();
+    fireEvent.change(screen.getByLabelText("System backup archive"), { target: { files: [new File(["x"], "dune-system-x.tar.gz.enc")] } });
+    await waitFor(() => expect(screen.getByText("Next")).not.toBeDisabled());
+    fireEvent.click(screen.getByText("Next"));
+    fireEvent.change(screen.getByLabelText("Archive passphrase"), { target: { value: "passphrase-1234" } });
+    fireEvent.click(screen.getByText("Next"));
+
+    fireEvent.click(await screen.findByText("Start Restore"));
+    // Scoped: the task panel echoes the same text, and what matters is that the
+    // restore step itself reports the failure.
+    expect(await screen.findByText(/Steam ran out of disk/, { selector: ".danger-note" })).toBeTruthy();
+
+    // The way forward is on screen, and it runs the sequence again.
+    const retry = await screen.findByText("Retry Restore");
+    vi.mocked(setupApi.task).mockImplementation(async (id: string) => ({ task: done(id) }) as never);
+    fireEvent.click(retry);
+    await waitFor(() => expect(backupsApi.restoreSystem).toHaveBeenCalled());
   });
 });
