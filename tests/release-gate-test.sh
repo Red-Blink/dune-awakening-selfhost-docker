@@ -101,8 +101,11 @@ pass "fresh extraction contains every required install and update file"
 self_update_script="runtime/scripts/self-update.sh"
 grep -Fq 'if [ "$repo" = "$DEFAULT_SELF_UPDATE_REPO" ]; then' "$self_update_script" \
   || fail "self-update does not force the public project through its anonymous HTTPS remote"
-[ "$(grep -Fc 'GIT_TERMINAL_PROMPT=0 git fetch' "$self_update_script")" -eq 2 ] \
-  || fail "every self-update git fetch must disable interactive credential prompts"
+git_fetch_count="$(grep -Ec '(^|[[:space:]])git fetch([[:space:]]|$)' "$self_update_script")"
+noninteractive_git_fetch_count="$(grep -Ec '(^|[[:space:]])(env[[:space:]]+)?GIT_TERMINAL_PROMPT=0[[:space:]]+git fetch([[:space:]]|$)' "$self_update_script")"
+if [ "$git_fetch_count" -eq 0 ] || [ "$noninteractive_git_fetch_count" -ne "$git_fetch_count" ]; then
+  fail "every self-update git fetch must disable interactive credential prompts"
+fi
 pass "self-update uses anonymous public release fetches without credential prompts"
 
 (
