@@ -43,13 +43,21 @@ fi
 
 if [ "${1:-}" = "ps" ]; then
   case "$*" in
-    *"label=com.docker.compose.project=${FAKE_GENERATED_ORCHESTRATOR_PROJECT:-__unset__}"*"label=com.docker.compose.service=orchestrator"*"{{.Names}}"*)
+    *"label=com.docker.compose.project=${FAKE_GENERATED_ORCHESTRATOR_PROJECT:-__unset__}"*"label=com.docker.compose.service=orchestrator"*"label=com.docker.compose.container-number"*"label=com.docker.compose.oneoff=False"*"{{.Names}}"*)
       [ -n "${FAKE_GENERATED_ORCHESTRATOR_NAME:-}" ] \
         && printf '%s\n' "$FAKE_GENERATED_ORCHESTRATOR_NAME"
       ;;
-    *"label=com.docker.compose.service=orchestrator"*"{{.ID}}"*)
+    *"label=com.docker.compose.project=${FAKE_GENERATED_ORCHESTRATOR_PROJECT:-__unset__}"*"label=com.docker.compose.service=orchestrator"*"{{.Names}}"*)
+      [ -n "${FAKE_GENERATED_ORCHESTRATOR_NAME:-}" ] \
+        && printf '%s\n%s\n' "$FAKE_GENERATED_ORCHESTRATOR_NAME" inherited-image-helper
+      ;;
+    *"label=com.docker.compose.service=orchestrator"*"label=com.docker.compose.container-number"*"label=com.docker.compose.oneoff=False"*"{{.ID}}"*)
       [ -n "${FAKE_GENERATED_ORCHESTRATOR_PROJECT:-}" ] \
         && printf '%s\n' generated-orchestrator-id
+      ;;
+    *"label=com.docker.compose.service=orchestrator"*"{{.ID}}"*)
+      [ -n "${FAKE_GENERATED_ORCHESTRATOR_PROJECT:-}" ] \
+        && printf '%s\n%s\n' generated-orchestrator-id inherited-image-helper-id
       ;;
   esac
   exit 0
