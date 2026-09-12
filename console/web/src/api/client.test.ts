@@ -4,6 +4,7 @@ import {
   apiDownload,
   AUTH_SESSION_EXPIRED_EVENT,
   AUTH_SESSION_EXPIRED_MESSAGE,
+  loginRequest,
   setCsrfToken
 } from "./client";
 
@@ -64,5 +65,31 @@ describe("API authentication handling", () => {
 
     await expect(apiDownload("/api/backups/download")).rejects.toThrow(AUTH_SESSION_EXPIRED_MESSAGE);
     expect(expired).toHaveBeenCalledOnce();
+  });
+});
+
+// #598: loginRequest() used to always replace a non-JSON body with the
+// generic "invalid data" message, unlike apiRequest()'s own fallback (a
+// reverse proxy's HTML error page, stripped of markup, surfaced via
+// friendlyApiError) -- so a Cloudflare/nginx 502/504 at sign-in read as a
+// client-side data error instead of the upstream outage it actually was.
+describe("loginRequest non-JSON response handling", () => {
+  it("surfaces a stripped proxy error page instead of the generic invalid-data message", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
+      "<html><body><h1>502 Bad Gateway</h1><p>nginx</p></body></html>",
+      { status: 502, headers: { "content-type": "text/html" } }
+    )));
+
+    const result = await loginRequest({ password: "x" });
+    expect(result.status).toBe(502);
+    expect(result.body.error).toBe("502 Bad Gateway nginx");
+  });
+
+  it("keeps the generic message for a genuinely invalid 200 response, with no proxy text to surface", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("not json", { status: 200 })));
+
+    const result = await loginRequest({ password: "x" });
+    expect(result.status).toBe(200);
+    expect(result.body.error).toBe("The console received invalid data for this page. Refresh the page and try again.");
   });
 });

@@ -7171,3 +7171,35 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
 }
+
+/* ---- Tier 3 second-factor UI (login code entry, TOTP setup, recovery codes) ---- */
+.login-password-toggle { background: none; border: none; color: #817763; cursor: pointer; font-size: .78rem; padding: 4px; justify-self: center; }
+.login-password-toggle:hover { color: #c6a56e; }
+.login-password-fields { display: grid; gap: 10px; margin-top: 8px; }
+.totp-setup-qr { width: 200px; height: 200px; justify-self: center; border-radius: 6px; background: #fff; padding: 8px; }
+.totp-setup-secret-label { margin: 0; font-size: .78rem; color: #817763; }
+.totp-setup-secret { justify-self: center; padding: 6px 10px; border-radius: 4px; background: rgba(0, 0, 0, .35); font-size: .95rem; letter-spacing: .06em; word-break: break-all; }
+.totp-recovery-codes-panel { width: min(480px, calc(100vw - 32px)); }
+.totp-recovery-codes-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.totp-recovery-codes-list code { display: block; padding: 6px 8px; border-radius: 4px; background: rgba(0, 0, 0, .35); font-size: .85rem; }
+.totp-ack-checkbox { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: .85rem; margin-top: 4px; }
+/* The recovery-codes block is rendered in two places with different chrome
+   On the login screen .login-panel supplies the grid, gap and centring;
+   the settings section had none of that -- .totp-recovery-codes-panel set only
+   a width, so children collapsed with no gap, prose sat left-aligned while the
+   acknowledgment checkbox stayed centred above a left-aligned button, and a
+   100vw-derived login-screen width was applied inside a sidebar-offset
+   container. These rules give the settings copy its own layout, and give
+   .recovery-codes-heading a definition -- it previously matched no rule at all
+   and fell through to the global h1 size (up to 32px) inside a section whose
+   own headers are ~16px. */
+.settings-recovery-codes { display: grid; gap: 12px; width: 100%; max-width: 520px; text-align: left; }
+.settings-recovery-codes .recovery-codes-heading { font-size: 1rem; margin: 0; }
+.settings-recovery-codes .totp-ack-checkbox { justify-content: flex-start; }
+.settings-recovery-codes > button { justify-self: start; }
+.login-panel .recovery-codes-heading { margin: 0; }
+
+/* Auth surfaces: a consistent primary action (Tier 3). */
+.login-primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 260px; justify-self: center; padding: 12px 18px; border: none; border-radius: 6px; background: #c6a56e; color: #1b1712; font: inherit; font-weight: 600; font-size: 1rem; cursor: pointer; }
+.login-primary-button:hover:not(:disabled) { background: #d4b57e; }
+.login-primary-button:disabled { opacity: .5; cursor: default; }

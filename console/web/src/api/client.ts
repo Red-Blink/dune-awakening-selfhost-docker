@@ -8,6 +8,21 @@ export const AUTH_SESSION_EXPIRED_MESSAGE = "Your browser login session expired.
 const POSTGRES_UNAVAILABLE_MESSAGE = "Postgres is not running or is restarting. Wait for the database service to come back online, then refresh.";
 const INVALID_RESPONSE_MESSAGE = "The console received invalid data for this page. Refresh the page and try again.";
 
+// Shared by apiRequest() and loginRequest() for a non-JSON response body --
+// most commonly a reverse proxy's own error page (a Cloudflare/nginx 502/504)
+// standing in for the console's real JSON response. Strips markup so the
+// proxy's own message (however plain) surfaces instead of being replaced
+// wholesale by the generic fallback, which reads as a client-side data
+// problem rather than the actual upstream outage it is. `response.ok` with
+// invalid JSON is a different, console-side bug (a success response that
+// isn't JSON) and keeps the generic message -- there is no useful upstream
+// text to surface in that case.
+function nonJsonResponseMessage(text: string, ok: boolean) {
+  if (ok) return INVALID_RESPONSE_MESSAGE;
+  const fallback = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 240);
+  return friendlyApiError(fallback || INVALID_RESPONSE_MESSAGE);
+}
+
 export function setCsrfToken(value: string | null) {
   csrfToken = value;
 }
@@ -51,12 +66,11 @@ async function apiRequest<T>(path: string, options: RequestInit = {}, csrfRetrie
       data = JSON.parse(text);
     } catch {
       invalidJsonResponse = true;
-      const fallback = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 240);
-      data = { error: response.ok ? INVALID_RESPONSE_MESSAGE : friendlyApiError(fallback || INVALID_RESPONSE_MESSAGE) };
+      data = { error: nonJsonResponseMessage(text, response.ok) };
     }
   }
   const record = data && typeof data === "object" ? data as Record<string, unknown> : {};
-  if (isSessionAuthFailure(response.status, String(record.error || ""))) {
+  if (isSessionAuthFailure(response.status, String(record.error || ""), path)) {
     if (response.status === 403 && !csrfRetried && await refreshCsrfToken()) {
       return apiRequest<T>(path, options, true);
     }
@@ -68,8 +82,16 @@ async function apiRequest<T>(path: string, options: RequestInit = {}, csrfRetrie
   return data as T;
 }
 
-function isSessionAuthFailure(status: number, message: string) {
-  return status === 401 || (status === 403 && /authentication required|csrf token|session expired|login session/i.test(message));
+// The two enrollment routes answer a REJECTED CODE with 401 ("That code was
+// not accepted..."), not a lost session -- their session loss is a 403 with a
+// "sign in again" message. Treating that 401 as expiry tore the setup screen
+// down on the first mistyped code, regenerated the secret on the next login,
+// and made the 3-strike clock-skew hint unreachable.
+const ENROLLMENT_ROUTES = new Set(["/api/auth/2fa/setup", "/api/auth/2fa/confirm"]);
+
+function isSessionAuthFailure(status: number, message: string, path = "") {
+  if (status === 401) return !ENROLLMENT_ROUTES.has(path);
+  return status === 403 && /authentication required|csrf token|session expired|login session|sign in to begin/i.test(message);
 }
 
 function announceSessionExpired() {
@@ -108,6 +130,41 @@ async function refreshCsrfToken() {
 
 export function post<T>(path: string, body: unknown = {}) {
   return api<T>(path, { method: "POST", body: JSON.stringify(body) });
+}
+
+export interface LoginResponse {
+  status: number;
+  body: Record<string, unknown>;
+}
+
+// Dedicated entry point for /api/auth/login. Every status code this route
+// returns (200 authenticated/enrollmentRequired/resetupRequired, 401 wrong
+// password/totpRequired/recoveryFailed, 429 rate-limited, 503 second-factor
+// store unavailable) carries a real body the caller must branch on -- there
+// is no session yet at login time, so api()/apiRequest()'s blanket "401 =
+// session expired" interception (correct for every OTHER authenticated
+// route) would misrepresent all of those as a stale-session error instead.
+export async function loginRequest(body: unknown): Promise<LoginResponse> {
+  const response = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body)
+  });
+  const text = await response.text();
+  let data: Record<string, unknown> = {};
+  if (text) {
+    try {
+      data = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      // #598: used to always substitute the generic INVALID_RESPONSE_MESSAGE
+      // here, unlike apiRequest()'s fallback (below) -- so a reverse proxy's
+      // own 502/504 error page at sign-in read as a client-side data problem
+      // instead of surfacing the proxy's actual text.
+      data = { error: nonJsonResponseMessage(text, response.ok) };
+    }
+  }
+  return { status: response.status, body: data };
 }
 
 export function friendlyApiError(value: unknown) {

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createLoginRateLimiter, createMutationRateLimiter, createApiKeyRateLimiter } from "../src/rateLimit.js";
+import { createLoginRateLimiter, createMutationRateLimiter, resolveClientIp, createApiKeyRateLimiter, normalizeIp } from "../src/rateLimit.js";
 
 test("login rate limiter blocks repeated failures and resets after success", () => {
   let currentTime = 1000;
@@ -48,6 +48,24 @@ test("login rate limiter blocks aggregate failures across rotating clients", () 
   assert.equal(limiter.check("client-e").allowed, true);
 });
 
+test("login rate limiter: a completing success relieves the shared __global__ bucket so ordinary traffic never ratchets into a console-wide lockout", () => {
+  let t = 1000;
+  const limiter = createLoginRateLimiter({ maxAttempts: 99, globalMaxAttempts: 3, windowMs: 60000, blockMs: 5000, now: () => t });
+  // Regression for the code-review finding: recordFailure fed __global__ but
+  // recordSuccess never relieved it, so metered-but-legitimate steps (the 2FA
+  // two-step first POST, OAuth denials) accumulated to a 15-minute lockout of
+  // ALL sign-in that nothing cleared. Now each success decrements the bucket.
+  assert.equal(limiter.recordFailure("a").allowed, true); // __global__ 1
+  assert.equal(limiter.recordFailure("b").allowed, true); // __global__ 2
+  limiter.recordSuccess("a");                             // 2 -> 1 (relieved)
+  limiter.recordFailure("d");                             // 1 -> 2
+  limiter.recordSuccess("d");                             // 2 -> 1 (relieved)
+  limiter.recordFailure("e");                             // 1 -> 2
+  assert.equal(limiter.check("z").allowed, true, "interleaved successes keep __global__ under the cap");
+  limiter.recordFailure("f");                             // 2 -> 3 => blocks at the cap
+  assert.equal(limiter.check("z").allowed, false, "the block still trips once genuine failures actually reach the cap");
+});
+
 test("mutation rate limiter blocks repeated authenticated writes and resets after the window", () => {
   let currentTime = 1000;
   const limiter = createMutationRateLimiter({
@@ -87,6 +105,92 @@ test("mutation rate limiter applies a global cap across rotating write scopes", 
 
   currentTime += 1001;
   assert.equal(limiter.check("session-a:players.give-item").allowed, true);
+});
+
+// ---- resolveClientIp: X-Forwarded-For handling (review finding) ----
+
+function fakeReq(remoteAddress, forwardedFor) {
+  const headers = {};
+  if (forwardedFor !== undefined) headers["x-forwarded-for"] = forwardedFor;
+  return { socket: { remoteAddress }, headers };
+}
+
+test("resolveClientIp: no trusted proxies -> always the socket peer, header ignored", () => {
+  assert.equal(resolveClientIp(fakeReq("203.0.113.5", "1.2.3.4"), []), "203.0.113.5");
+});
+
+test("resolveClientIp: peer NOT in the trusted list -> header ignored (negative test)", () => {
+  assert.equal(resolveClientIp(fakeReq("203.0.113.5", "1.2.3.4"), ["10.0.0.1"]), "203.0.113.5");
+});
+
+test("resolveClientIp: trusted appending proxy -> the RIGHTMOST entry, never the client-controlled leftmost", () => {
+  // nginx's proxy_add_x_forwarded_for turns a spoofed leftmost into
+  // "evil, <realpeer>": trusting [0] would key the limiter on the attacker's
+  // chosen value (bypass) or a victim's IP (lockout). The rightmost is the one
+  // the trusted proxy itself appended.
+  assert.equal(resolveClientIp(fakeReq("10.0.0.1", "1.1.1.1, 203.0.113.9"), ["10.0.0.1"]), "203.0.113.9");
+});
+
+test("resolveClientIp: trusted proxy, single forwarded entry -> that entry", () => {
+  assert.equal(resolveClientIp(fakeReq("10.0.0.1", "203.0.113.9"), ["10.0.0.1"]), "203.0.113.9");
+});
+
+test("resolveClientIp: trusted proxy, no forwarded header -> falls back to the socket peer", () => {
+  assert.equal(resolveClientIp(fakeReq("10.0.0.1", undefined), ["10.0.0.1"]), "10.0.0.1");
+});
+
+// #599: trustedProxyIps used to only be trimmed (config.js), never
+// canonicalized the same way the socket/forwarded address is -- so a dual-
+// stack bind (ADMIN_BIND_HOST=::) reporting an IPv4 peer as
+// "::ffff:10.0.0.1" never matched an operator's plain "10.0.0.1" entry once
+// resolveClientIp's own normalizeIp stripped ITS side of the comparison.
+test("resolveClientIp: an IPv4-mapped socket peer matches a plain IPv4 trusted-proxy entry", () => {
+  assert.equal(resolveClientIp(fakeReq("::ffff:10.0.0.1", "203.0.113.9"), ["10.0.0.1"]), "203.0.113.9");
+});
+
+// The reverse direction of the same gap: an operator who copied the exact
+// dual-stack-bind form they saw in their own logs into
+// CONSOLE_TRUSTED_PROXY_IPS, while the real socket peer normalizes to plain
+// IPv4 either way.
+test("resolveClientIp: a plain IPv4 socket peer matches an IPv4-mapped trusted-proxy entry", () => {
+  assert.equal(resolveClientIp(fakeReq("10.0.0.1", "203.0.113.9"), ["::ffff:10.0.0.1"]), "203.0.113.9");
+});
+
+// IPv6 textual variants that name the same address (expanded-vs-compressed
+// form, mixed case) must match too -- neither side was canonicalized before.
+test("resolveClientIp: an expanded IPv6 socket peer matches a compressed trusted-proxy entry", () => {
+  assert.equal(resolveClientIp(fakeReq("0:0:0:0:0:0:0:1", "203.0.113.9"), ["::1"]), "203.0.113.9");
+});
+
+test("resolveClientIp: an uppercase-hex IPv6 trusted-proxy entry matches Node's lowercase canonical socket peer", () => {
+  assert.equal(resolveClientIp(fakeReq("fe80::1", "203.0.113.9"), ["FE80:0:0:0:0:0:0:1"]), "203.0.113.9");
+});
+
+test("normalizeIp: canonicalizes IPv6 without corrupting an IPv4-mapped address's dotted-decimal suffix", () => {
+  // Guards the ordering inside normalizeIp itself: canonicalizing an IPv6
+  // literal FIRST (before stripping the v4-mapped prefix) would rewrite the
+  // embedded dotted-decimal suffix into hex groups
+  // (::ffff:10.0.0.1 -> ::ffff:a00:1), which would then never match a plain
+  // "10.0.0.1" entry -- the opposite of what this function exists to fix.
+  assert.equal(normalizeIp("::ffff:10.0.0.1"), "10.0.0.1");
+  assert.equal(normalizeIp("0:0:0:0:0:0:0:1"), "::1");
+  assert.equal(normalizeIp("FE80:0:0:0:0:0:0:1"), "fe80::1");
+  assert.equal(normalizeIp("203.0.113.9"), "203.0.113.9");
+  assert.equal(normalizeIp(""), "");
+  assert.equal(normalizeIp(null), "");
+});
+
+// #578 review finding: a bracketed IPv6 literal ("[::1]", the form an
+// operator commonly copies from nginx/URL configs) made net.isIP() return 0
+// and fell through unchanged, never matching the unbracketed socket-address
+// form Node actually reports.
+test("normalizeIp: strips brackets from a bracketed IPv6 literal before canonicalizing", () => {
+  assert.equal(normalizeIp("[::1]"), "::1");
+  assert.equal(normalizeIp("[FE80:0:0:0:0:0:0:1]"), "fe80::1");
+});
+
+test("resolveClientIp: a bracketed IPv6 trusted-proxy entry matches Node's unbracketed socket peer", () => {
+  assert.equal(resolveClientIp(fakeReq("::1", "203.0.113.9"), ["[::1]"]), "203.0.113.9");
 });
 
 test("api key rate limiter grants exactly the configured number of requests", () => {

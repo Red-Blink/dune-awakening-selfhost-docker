@@ -26,6 +26,20 @@ export function parseCookies(header = "") {
 export function createAuth(config) {
   const now = config.now || (() => Date.now());
 
+  // Integrity tag over an opaque session id -- NOT password storage.
+  //
+  // CodeQL flags this as js/insufficient-password-hash, which fires when a
+  // credential is hashed with a fast hash instead of a slow KDF. There is no
+  // password here and no stored digest for anyone to crack: `value` is a
+  // server-generated random id, `config.sessionSecret` is an HMAC KEY, and the
+  // output authenticates the cookie rather than standing in for a secret. A KDF
+  // would be the wrong primitive -- it is not a verifier for a low-entropy,
+  // human-chosen input.
+  //
+  // The id's unguessability comes from randomBytes(32), and the server-side
+  // store is the real authority regardless of the signature -- both proven in
+  // test/sessionFixation.test.js.
+  // codeql[js/insufficient-password-hash]
   function sign(value) {
     return createHmac("sha256", config.sessionSecret).update(value).digest("base64url");
   }
@@ -36,17 +50,29 @@ export function createAuth(config) {
     return a.length > 0 && a.length === b.length && timingSafeEqual(a, b);
   }
 
-  function makeSession({ tier = "owner", userId = "", username = "", guildId = "" } = {}) {
+  const DEFAULT_TTL_MS = 12 * 60 * 60 * 1000;
+
+  // scope: null for a normal session; "enroll" for the short-lived, non-renewable
+  // second-factor enrollment session (RFC §4) that the route gate restricts to
+  // the enrollment endpoints only. renewable:false keeps the enrollment window
+  // fixed so it can't be extended by activity.
+  // expectedFactorVersion: only set on a recovery-login resetup session
+  // (scope:"resetup") -- the second-factor store's factorVersion (see
+  // secondFactorStore.js) as of the recovery code that minted this session,
+  // re-checked by commit() at confirm time so a stale/concurrent resetup
+  // session can't overwrite an authenticator a different session already
+  // replaced (review finding, upstream PR #201, 2026-09-06).
+  function makeSession({ tier = "owner", userId = "", username = "", guildId = "", scope = null, ttlMs = DEFAULT_TTL_MS, renewable = true, expectedFactorVersion = null } = {}) {
     const id = randomBytes(32).toString("base64url");
     const csrf = randomBytes(24).toString("base64url");
-    const expiresAt = now() + 12 * 60 * 60 * 1000;
-    const session = { id, csrf, expiresAt, tier, userId, username, guildId };
+    const expiresAt = now() + ttlMs;
+    const session = { id, csrf, expiresAt, tier, userId, username, guildId, scope, renewable, expectedFactorVersion };
     sessions.set(id, session);
     return { ...session, cookie: `${id}.${sign(id)}` };
   }
 
   function readSession(req) {
-    if (config.authDisabled) return { id: "dev", csrf: "dev", expiresAt: Number.MAX_SAFE_INTEGER, tier: "owner" };
+    if (config.authDisabled) return { id: "dev", csrf: "dev", expiresAt: Number.MAX_SAFE_INTEGER, tier: "owner", scope: null, renewable: true };
     const raw = parseCookies(req.headers.cookie || "").get("asc_session");
     if (!raw) return null;
     const [id, sig] = raw.split(".");
@@ -56,8 +82,61 @@ export function createAuth(config) {
       sessions.delete(id);
       return null;
     }
-    session.expiresAt = now() + 12 * 60 * 60 * 1000;
+    if (session.renewable !== false) session.expiresAt = now() + DEFAULT_TTL_MS;
     return session;
+  }
+
+  function invalidateSession(id) {
+    return sessions.delete(id);
+  }
+
+  // Invalidate every OTHER password/TOTP-authenticated session (RFC §2.3/§5:
+  // credential rotation clears sessions of the rotated credential type only).
+  // Discord- (and future passkey-) authenticated sessions always carry a
+  // non-empty userId and are left untouched; this fork has not yet adopted
+  // upstream's explicit `local-owner` principal for the password/TOTP tier
+  // (deferred, meta), so an empty userId is what currently marks
+  // this credential type.
+  //
+  // `session.scope` must ALSO be excluded (review finding, upstream PR #201,
+  // 2026-09-08): an enroll/resetup-scope session (RFC §4) carries no userId
+  // either -- the same marker a normal password/TOTP session uses -- so
+  // without this check, calling this from inside the 2FA confirm route to
+  // fix the finding above would kill a DIFFERENT, still-legitimate concurrent
+  // enrollment session's cookie before it ever gets to make its own request,
+  // turning its expected 409 (already_configured) into an opaque 403
+  // (session/CSRF invalid). Caught by the existing
+  // "a second enrollment that loses the race gets 409" test going red on the
+  // very first version of that fix. Returns the number of sessions
+  // invalidated.
+  function invalidatePasswordSessions(exceptId) {
+    let count = 0;
+    for (const [id, session] of sessions) {
+      if (id === exceptId || session.userId || session.scope) continue;
+      sessions.delete(id);
+      count++;
+    }
+    return count;
+  }
+
+  // Invalidate every OTHER outstanding recovery (resetup-scope) session --
+  // called when one resetup session successfully replaces the authenticator
+  // (review finding, upstream PR #201, 2026-09-06). commit()'s
+  // expectedFactorVersion check already stops a stale sibling from
+  // overwriting the newly-committed factor; this additionally ends the
+  // sibling's session outright so returning to it surfaces an immediate,
+  // unambiguous "your session expired, sign in again" via the normal
+  // readSession() expiry path, rather than a confusing generation-mismatch
+  // error at the very end of a full re-enrollment flow. Returns the number of
+  // sessions invalidated.
+  function invalidateResetupSessions(exceptId) {
+    let count = 0;
+    for (const [id, session] of sessions) {
+      if (id === exceptId || session.scope !== "resetup") continue;
+      sessions.delete(id);
+      count++;
+    }
+    return count;
   }
 
   function passwordMatches(value) {
@@ -82,12 +161,12 @@ export function createAuth(config) {
     return session;
   }
 
-  return { makeSession, readSession, passwordMatches, requireAuth };
+  return { makeSession, readSession, passwordMatches, requireAuth, invalidateSession, invalidatePasswordSessions, invalidateResetupSessions };
 }
 
-export function setSessionCookie(res, session, config = {}) {
+export function setSessionCookie(res, session, config = {}, { maxAgeSeconds = 43200 } = {}) {
   const secure = config.secureCookies ? "; Secure" : "";
-  res.setHeader("Set-Cookie", `asc_session=${encodeURIComponent(session.cookie)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200${secure}`);
+  res.setHeader("Set-Cookie", `asc_session=${encodeURIComponent(session.cookie)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAgeSeconds}${secure}`);
 }
 
 export function clearSessionCookie(res, config = {}) {

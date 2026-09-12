@@ -1,6 +1,7 @@
 import { Fragment, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { Archive, Bug, Building2, Car, CircleHelp, Database, Download, ExternalLink, FileText, Gift, Heart, Home, Landmark, Map as MapIcon, Menu, MessageCircle, PackagePlus, RefreshCw, Server, Settings, Shield, Sparkles, Store, Users, X } from "lucide-react";
-import { api, AUTH_SESSION_EXPIRED_EVENT, AUTH_SESSION_EXPIRED_MESSAGE, post, setCsrfToken } from "./api/client";
+import { api, AUTH_SESSION_EXPIRED_EVENT, AUTH_SESSION_EXPIRED_MESSAGE, loginRequest, post, setCsrfToken } from "./api/client";
+import { TotpSetupScreen } from "./features/auth/TotpSetupScreen";
 import { setServerPorts, setAdminPort, type ServerPorts } from "./api/serverPorts";
 import { serverApi, type RestartQueueTarget } from "./api/server";
 import { updatesApi } from "./api/updates";
@@ -361,6 +362,15 @@ function AppFooter() {
 export function App() {
   const [auth, setAuth] = useState(false);
   const [password, setPassword] = useState("");
+  // Tier 3 second factor (RFC §2.3/§4). All inert unless the server actually
+  // asks for a code, so a console with CONSOLE_TOTP_ENABLED unset renders the
+  // same single password field it always has.
+  const [totpCode, setTotpCode] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [totpRequired, setTotpRequired] = useState(false);
+  const [recoveryAvailable, setRecoveryAvailable] = useState(false);
+  const [useRecoveryCode, setUseRecoveryCode] = useState(false);
+  const [setupMode, setSetupMode] = useState<"enroll" | "resetup" | null>(null);
   const [tab, setTab] = useActiveTab();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [pinnedAddons, setPinnedAddons] = useState<PinnedAddon[]>(() => loadPinnedAddons());
@@ -418,6 +428,16 @@ export function App() {
       setRedeploySetupOpen(false);
       setConfirmRequest(null);
       setError(AUTH_SESSION_EXPIRED_MESSAGE);
+      // Without this, an expiry landing while totpRequired/setupMode is set
+      // leaves the login screen stuck -- no password field (totpRequired keeps
+      // rendering the code/recovery field), or a dead-end setup screen with no
+      // way back to plain login.
+      setTotpRequired(false);
+      setTotpCode("");
+      setRecoveryCode("");
+      setUseRecoveryCode(false);
+      setRecoveryAvailable(false);
+      setSetupMode(null);
     };
     window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
     return () => window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
@@ -428,7 +448,18 @@ export function App() {
   }, [pinnedAddons]);
 
   useEffect(() => {
-    api<{ authenticated: boolean; csrfToken: string | null; config?: { ports?: Partial<ServerPorts>; port?: number } }>("/api/auth/state").then((state) => {
+    api<{ authenticated: boolean; csrfToken: string | null; scope?: string | null; config?: { ports?: Partial<ServerPorts>; port?: number } }>("/api/auth/state").then((state) => {
+      // A reload or second tab during two-factor setup: the enrollment-scope
+      // session is "authenticated" but can reach nothing except the setup
+      // routes, so resume the setup screen instead of rendering a console
+      // where every call is refused.
+      if (state.authenticated && (state.scope === "enroll" || state.scope === "resetup")) {
+        setCsrfToken(state.csrfToken);
+        setSetupMode(state.scope);
+        setServerPorts(state.config?.ports);
+        setAdminPort(state.config?.port);
+        return;
+      }
       setAuth(state.authenticated);
       setCsrfToken(state.csrfToken);
       setServerPorts(state.config?.ports);
@@ -535,10 +566,67 @@ export function App() {
     request?.resolve(outcome);
   }
 
+  // Uses loginRequest, not post(), because every status this route returns
+  // (200 authenticated/enrollmentRequired/resetupRequired, 401 wrong-password/
+  // totpRequired/recoveryFailed, 429 rate-limited) is a real outcome to branch
+  // on -- there is no session yet at login time, so the shared
+  // session-expiry-on-401 handling used elsewhere would misrepresent all of them.
   async function login() {
-    const result = await post<{ authenticated: boolean; csrfToken: string }>("/api/auth/login", { password });
-    setCsrfToken(result.csrfToken);
-    setAuth(result.authenticated);
+    const body: Record<string, string> = { password };
+    if (useRecoveryCode && recoveryCode) body.recoveryCode = recoveryCode;
+    else if (totpRequired && totpCode) body.totpCode = totpCode;
+    const { status, body: result } = await loginRequest(body);
+
+    if (status === 200 && result.authenticated) {
+      setCsrfToken(String(result.csrfToken || ""));
+      setAuth(true);
+      setTotpRequired(false);
+      setTotpCode("");
+      setRecoveryCode("");
+      setUseRecoveryCode(false);
+      setRecoveryAvailable(false);
+      return;
+    }
+    if (status === 200 && (result.enrollmentRequired || result.resetupRequired)) {
+      setCsrfToken(String(result.csrfToken || ""));
+      setSetupMode(result.enrollmentRequired ? "enroll" : "resetup");
+      return;
+    }
+    if (status === 401 && result.totpRequired) {
+      setTotpRequired(true);
+      setRecoveryAvailable(Boolean(result.recoveryAvailable));
+      throw new Error(String(result.error || "Enter your authenticator code."));
+    }
+    if (status === 401 && result.recoveryFailed) {
+      throw new Error(String(result.error || "That recovery code was not accepted."));
+    }
+    throw new Error(String(result.error || "Sign-in failed."));
+  }
+
+  // After enrollment/re-setup the server invalidates that session and requires a
+  // fresh, normal password+TOTP login (RFC §4) -- return to the plain login form
+  // rather than assuming success.
+  function afterTotpSetup() {
+    // Also used as onCancel ("Back to sign in"): every OTHER terminal branch
+    // of this flow (a confirmed enrollment, a 409 already-configured) ends the
+    // server-side enrollment session; leaving via Cancel used to skip that,
+    // so the session (and any pending secret on it) stayed live for the rest
+    // of its TTL (review finding).
+    void post("/api/auth/logout").catch(() => { /* best effort -- proceed to login either way */ });
+    setSetupMode(null);
+    setPassword("");
+    setTotpCode("");
+    setRecoveryCode("");
+    setTotpRequired(false);
+    setUseRecoveryCode(false);
+    setCsrfToken(null);
+    // Owner-initiated enrollment (Settings -> Two-Factor Authentication, issue
+    // #665) reaches this function while `auth` is still true from the normal
+    // session it started in -- forced first-login enrollment never had this
+    // problem (auth was always false at this point). Without this, cancelling
+    // or completing setup left the app trying to render the authenticated
+    // shell against a session the server just invalidated above.
+    setAuth(false);
   }
 
   async function logoutAfterPasswordChange() {
@@ -668,15 +756,63 @@ export function App() {
     return () => { cancelled = true; };
   }, [auth, setupComplete]);
 
+  if (setupMode) {
+    return <TotpSetupScreen mode={setupMode} onComplete={afterTotpSetup} onCancel={afterTotpSetup} />;
+  }
+
   if (!auth) {
+    const passwordFields = totpRequired ? (
+      <div className="login-password-fields">
+        {useRecoveryCode ? (
+          <input
+            type="text"
+            id="login-recovery-code"
+            name="login-recovery-code"
+            aria-label="Recovery code"
+            autoComplete="one-time-code"
+            value={recoveryCode}
+            onChange={(event) => setRecoveryCode(event.target.value)}
+            placeholder="Recovery code"
+            autoFocus
+          />
+        ) : (
+          <input
+            type="text"
+            id="login-totp-code"
+            name="login-totp-code"
+            aria-label="Authenticator code"
+            autoComplete="one-time-code"
+            inputMode="numeric"
+            value={totpCode}
+            onChange={(event) => setTotpCode(event.target.value)}
+            placeholder="Authenticator code"
+            autoFocus
+          />
+        )}
+        <button type="submit" className="login-primary-button">Sign In</button>
+        {recoveryAvailable && (
+          <button
+            type="button"
+            className="login-password-toggle"
+            onClick={() => { setUseRecoveryCode(!useRecoveryCode); setTotpCode(""); setRecoveryCode(""); }}
+          >
+            {useRecoveryCode ? "Use your authenticator instead" : "Lost access to your authenticator?"}
+          </button>
+        )}
+      </div>
+    ) : (
+      <div className="login-password-fields">
+        <input type="password" id="login-admin-password" name="login-admin-password" aria-label="Admin password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Admin Password" />
+        <button type="submit" className="login-primary-button">Sign In</button>
+      </div>
+    );
     return (
       <main className="login-screen">
         <form className="login-panel" onSubmit={(event) => { event.preventDefault(); void safe(login); }}>
           <h1>Dune Docker Console</h1>
           <img className="login-logo" src="/dune-docker-logo.png" alt="Dune Docker Console logo" />
           <p>Beyond the Dunes, Every Choice Shapes the Future</p>
-          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Admin Password" />
-          <button type="submit">Sign In</button>
+          {passwordFields}
           {error && <p className="error">{error === AUTH_SESSION_EXPIRED_MESSAGE
             ? <>Your browser login session expired.<br />Sign in again to continue.</>
             : error}</p>}
@@ -863,6 +999,7 @@ export function App() {
           onPasswordChanged={logoutAfterPasswordChange}
           publicListingUrl={publicDirectoryStatus?.serverId ? publicServerListingUrl(publicDirectoryStatus.serverId) : undefined}
           confirmAction={confirmDialog}
+          onTotpEnrollmentStarted={() => setSetupMode("enroll")}
         /></LazyTabBoundary>}
         {!redeploySetupOpen && tab !== "Maps" && <TaskProgress task={task} onDismiss={() => setTask(null)} />}
         <AppFooter />

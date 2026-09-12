@@ -37,9 +37,13 @@ Complete reference for all HTTP API endpoints in the Dune Docker Console. All en
 
 | Method | Route | Description | Parameters |
 |--------|-------|-------------|------------|
-| GET | `/api/auth/state` | Get authentication state and CSRF token | None |
-| POST | `/api/auth/login` | Login with password | `password` (string) |
+| GET | `/api/auth/state` | Authentication state, CSRF token and — for a two-factor enrollment or re-setup session — `scope` (`enroll`/`resetup`), so a reloaded page resumes the setup screen instead of the console | None |
+| POST | `/api/auth/login` | Login with password; also carries the second factor when one is enrolled | `password` (string), optionally `totpCode` or `recoveryCode` |
 | POST | `/api/auth/logout` | Logout current session | None |
+| GET | `/api/auth/me` | The signed-in principal — `user{id,username,tier,guildId}`, `scope`, `allowedActions` (what the policy engine will allow this session) — plus second-factor state (`secondFactorEnrolled`, `secondFactorUnavailable`) | None |
+| POST | `/api/auth/2fa/setup` | Begin TOTP enrollment; returns secret, otpauth URI and QR | None (enrollment-scope session) |
+| POST | `/api/auth/2fa/confirm` | Confirm enrollment; returns the one-time recovery codes | `code` (string) |
+| POST | `/api/auth/2fa/recovery-codes/regenerate` | Issue a fresh recovery-code set, invalidating the old one | `currentPassword`, `totpCode` |
 | GET | `/api/health` | Health check | None |
 | GET | `/api/setup/state` | Get setup completion state | None |
 | POST | `/api/setup/preflight` | Run preflight checks | None |
@@ -864,7 +868,7 @@ semantics.
 
 | Method | Route | Description | Parameters |
 |--------|-------|-------------|------------|
-| POST | `/api/settings/admin-password` | Change admin password | `currentPassword`, `newPassword` |
+| POST | `/api/settings/admin-password` | Change admin password | `currentPassword`, `newPassword`, plus `totpCode` when a second factor is enrolled |
 | POST | `/api/settings/web-port` | Change web console port | `port` (number 1-65535) |
 | POST | `/api/settings` | Write config | Config object |
 | GET | `/api/settings` | Get setup state | None |
@@ -1048,7 +1052,14 @@ Poll status with `GET /api/setup/tasks/{id}` or stream with `GET /api/setup/task
 - Write operations do not create automatic backups; responses always report `backupCreated: false`. Take a manual backup first if you want a rollback point before a destructive query.
 
 ### Authentication
-- All endpoints except `/api/health`, `/api/auth/login`, and `/api/auth/state` require:
+- `/api/auth/2fa/setup` and `/api/auth/2fa/confirm` are reachable only with the
+  short-lived enrollment-scope session issued by `/api/auth/login` — when a
+  second factor is required but not yet enrolled, or after a recovery-code
+  sign-in (re-setup). Besides those two routes that session can reach only
+  `/api/auth/me` and `/api/auth/logout`.
+- All endpoints except `/api/health`, `/api/auth/login`, and `/api/auth/state`
+  require either a bearer API key (`Authorization: Bearer …`, no cookie and no
+  CSRF token — see [api-keys.md](api-keys.md)) or:
   - Session cookie: `asc_session`
   - CSRF token header: `x-csrf-token`
 - Obtain CSRF token from `GET /api/auth/state`

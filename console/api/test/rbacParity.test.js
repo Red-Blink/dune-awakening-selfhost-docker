@@ -88,7 +88,14 @@ function isCovered(route) {
   if (route.path.startsWith(DISCORD_PREFIX)) return true;
 
   // Public routes return null from actionForRoute — those are expected
-  const PUBLIC_EXACT = ["/api/health", "/api/auth/state", "/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/auth/characters", "/api/auth/discord/start", "/api/auth/discord/callback", "/api/auth/discord/exchange"];
+  // Genuinely unauthenticated, or authenticated by a mechanism other than the
+  // IAM gate. NOT all equal: the two /2fa/* entries are not public at all --
+  // they require an enrollment-scope session AND membership in server.js's
+  // ENROLL_ALLOWED. They sit here only because the central gate does not cover
+  // them, and the separate test below pins that distinction so "add it to
+  // PUBLIC_EXACT to make the parity test green" -- the remedy actions.js itself
+  // suggests -- cannot silently ship an ungated route.
+  const PUBLIC_EXACT = ["/api/health", "/api/auth/state", "/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/auth/characters", "/api/auth/discord/start", "/api/auth/discord/callback", "/api/auth/discord/exchange", "/api/auth/2fa/setup", "/api/auth/2fa/confirm"];
   if (PUBLIC_EXACT.includes(route.path)) return true;
 
   for (const method of methodsToCheck(route)) {
@@ -248,4 +255,34 @@ test("parity: vehicle cargo deletes resolve to their own actions, not the read-o
 
 test("parity: GET vehicle pending-deletes resolves to vehicles:read", () => {
   assert.equal(actionForRoute("/api/vehicles/pending-deletes", "GET"), "vehicles:read");
+});
+
+// Third category. The parity check above models exactly two states -- "in
+// PUBLIC_EXACT" or "has an IAM action" -- so an enrollment-scoped route is
+// indistinguishable from a genuinely unauthenticated one. This pins the real
+// classification: every /api/auth/2fa/* path listed as public must actually be
+// confined by ENROLL_ALLOWED, and any that is not must carry an IAM action.
+test("every /api/auth/2fa/* route is either enrollment-confined or IAM-gated, never merely 'public'", () => {
+  const server = serverSrc;
+  const block = server.slice(server.indexOf("const ENROLL_ALLOWED"), server.indexOf("]);", server.indexOf("const ENROLL_ALLOWED")));
+  const enrollAllowed = [...block.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(enrollAllowed.length > 0, "ENROLL_ALLOWED was not parseable -- this guard would silently pass");
+
+  const twoFactorRoutes = [...server.matchAll(/path === "(\/api\/auth\/2fa\/[^"]+)"/g)].map((m) => m[1]);
+  assert.ok(twoFactorRoutes.length >= 3, "expected at least setup, confirm and regenerate");
+
+  const iamMapped = new Set(Object.keys(ROUTE_ACTIONS).map((k) => k.split(" ").slice(1).join(" ")));
+  for (const path of new Set(twoFactorRoutes)) {
+    const confined = enrollAllowed.includes(path);
+    const gated = iamMapped.has(path);
+    assert.ok(
+      confined || gated,
+      `${path} is neither in ENROLL_ALLOWED nor mapped to an IAM action -- it would ship with no gate at all. ` +
+      "Adding it to rbacParity's PUBLIC_EXACT would hide that, which is exactly what this test exists to prevent."
+    );
+    assert.ok(
+      !(confined && gated),
+      `${path} is BOTH enrollment-confined and IAM-gated. Those are different trust models; pick one deliberately.`
+    );
+  }
 });
