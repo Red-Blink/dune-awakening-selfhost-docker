@@ -33,6 +33,7 @@ const deploymentSuccessHoldMs = 3000;
 const defaultSetupConfig: SetupConfig = { SERVER_TITLE: "My Dune Server", SERVER_REGION: "Europe", SERVER_IP: "auto", SERVER_IP_MODE: "public", HOST_DATACENTER_ID: "dune-docker", STEAM_APP_ID: "4754530" };
 const datacenterIdPattern = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
 export const DATACENTER_ID_GUIDANCE = "Recommended for server-browser ping: enter a hostname whose IPv4 A record points directly to the Server IP. Enter only the hostname—without https://, a port, or a path. Short IDs remain supported, but may not give Funcom a resolvable ping target. A Battlegroup restart applies this change; Funcom may still display ping intermittently.";
+export const DIRECT_LISTING_PING_GUIDANCE = "To let DuneDocker.app measure your server directly, allow or forward UDP 32000–32015 to this Docker host through the host firewall and any internet-to-DMZ firewall or router. This is optional: if the range is closed, the public listing automatically uses the ping relay instead.";
 
 export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy", onSetupComplete }: { initialStep?: number; jumpNonce?: number; mode?: "first-run" | "redeploy"; onSetupComplete?: () => void }) {
   const steps = mode === "first-run" ? firstRunSteps : redeploySteps;
@@ -241,6 +242,10 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
               <p>Game UDP ports start at {wizardPorts.clientBase} and increase as maps are started. Overmap commonly uses {wizardPorts.clientBase} and Survival_1 commonly uses {wizardPorts.clientBaseSecondary}. The {wizardPorts.clientBase}-{wizardPorts.clientBase + 33} range covers normal map growth.</p>
             </section>
             <section className="action-section">
+              <h4>Optional Direct Listing Ping</h4>
+              <p>{DIRECT_LISTING_PING_GUIDANCE}</p>
+            </section>
+            <section className="action-section">
               <h4>Internal Map Traffic</h4>
               <p>IGW/S2S UDP ports start at {wizardPorts.igwBase} for map-to-map traffic inside the console. Do not forward these publicly for a normal single-host Docker setup.</p>
             </section>
@@ -270,6 +275,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
                 ["Public Game UDP", `${wizardPorts.clientBase}-${wizardPorts.clientBase + 33}/udp`],
                 ["Public RabbitMQ Game", `${wizardPorts.rmqGame}/tcp`],
                 ["Public RabbitMQ Game HTTP", `${wizardPorts.rmqGameHttp}/tcp`],
+                ["Optional Direct Listing Ping", "32000–32015/udp"],
                 ["Admin Panel", `${adminPort}/tcp private only`],
                 ["Internal Services", "Do not expose publicly"]
               ]} />

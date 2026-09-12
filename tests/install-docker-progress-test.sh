@@ -63,4 +63,9 @@ grep -Fq '&& command -v gpg >/dev/null 2>&1' install.sh \
 grep -Fq 'for required_tool in curl bash tar openssl gpg; do' install.sh \
   || fail "installer post-install validation does not verify gpg"
 
+grep -Fq 'Optional direct listing pings: allow or forward UDP 32000-32015 through the host firewall and any internet-to-DMZ firewall or router.' install.sh \
+  || fail "installer completion does not explain the optional direct listing ping firewall path"
+grep -Fq 'DuneDocker.app automatically uses its ping relay instead.' install.sh \
+  || fail "installer completion does not explain the relay fallback"
+
 echo "PASS: installer rejects root safely and Docker installation progress remains visible"

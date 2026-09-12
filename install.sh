@@ -631,6 +631,8 @@ show_finish() {
   echo
   echo "If you are on the same local network as this server, use the same-network address."
   echo "If you are connecting over the internet, use the public address and make sure TCP $WEB_PORT is allowed by the server firewall or VPS firewall."
+  echo "Optional direct listing pings: allow or forward UDP 32000-32015 through the host firewall and any internet-to-DMZ firewall or router."
+  echo "If this optional UDP range remains closed, DuneDocker.app automatically uses its ping relay instead."
   if [ "$DOCKER_GROUP_UPDATED" = "1" ]; then
     echo
     echo "Docker is ready. Setup can continue."
