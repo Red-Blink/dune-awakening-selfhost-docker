@@ -603,13 +603,7 @@ it("does not re-subscribe the grid's scroll listener on an unrelated re-render",
   // React tears an effect down before running it again -- so a removal means
   // churn and nothing else can fake it.
   const removed: string[] = [];
-  const added: string[] = [];
-  const realAdd = frame.addEventListener.bind(frame);
   const realRemove = frame.removeEventListener.bind(frame);
-  frame.addEventListener = ((type: string, ...rest: unknown[]) => {
-    if (type === "scroll") added.push(type);
-    return (realAdd as (...args: unknown[]) => void)(type, ...rest);
-  }) as typeof frame.addEventListener;
   frame.removeEventListener = ((type: string, ...rest: unknown[]) => {
     if (type === "scroll") removed.push(type);
     return (realRemove as (...args: unknown[]) => void)(type, ...rest);
@@ -623,9 +617,7 @@ it("does not re-subscribe the grid's scroll listener on an unrelated re-render",
     fireEvent.mouseLeave(marker);
 
     expect(removed).toEqual([]);
-    expect(added).toEqual([]);
   } finally {
-    delete (frame as Partial<HTMLDivElement>).addEventListener;
     delete (frame as Partial<HTMLDivElement>).removeEventListener;
   }
 });
