@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync, statSync, chownSync } from "node:fs";
+import { parseRoleIdList, parseTierList, roleTierConflicts } from "./integrations/discord/roleTiers.js";
 import { dirname, resolve } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import { networkInterfaces } from "node:os";
@@ -37,6 +38,16 @@ export const APP_NAME = "Dune Docker Console";
 // field in this function, which genuinely are env-var-only with no
 // other source of truth -- confirmed those fields have no equivalent
 // in ENGINE_FIELDS/usersettings.json).
+// Reads a secret from an env value when set, else from a 0600 file (empty when neither).
+function readInlineOrFile(inline, file) {
+  if (inline) return String(inline).trim();
+  try {
+    return readFileSync(file, "utf8").trim();
+  } catch {
+    return "";
+  }
+}
+
 export function resolvePorts(env = process.env, repoRoot = process.cwd()) {
   const enginePorts = readEnginePortsFromProfile(repoRoot);
   const legacyEnginePorts = enginePorts.port === null || enginePorts.igwPort === null
@@ -201,6 +212,33 @@ export function loadConfig() {
 
   const adminPasswordFile = resolve(secretsDir, "admin-web-password.txt");
   const adminPasswordEnvManaged = Boolean(process.env.ADMIN_PASSWORD);
+  // Same "env managed = read-only from Settings" contract as
+  // adminPasswordEnvManaged above (review finding, upstream PR #202,
+  // 2026-09-08): readInlineOrFile() below gives DISCORD_OAUTH_CLIENT_SECRET
+  // precedence over runtime/secrets/discord-oauth-client-secret.txt, but
+  // Settings' rotate/forget routes used to only ever touch the file --
+  // reporting success while the inline value stayed authoritative after a
+  // restart, and Forget leaving it fully live. Both routes now refuse
+  // outright when this is true, matching adminPasswordEnvManaged's own
+  // precedent exactly rather than inventing a second convention.
+  const discordOAuthClientSecretEnvManaged = Boolean(process.env.DISCORD_OAUTH_CLIENT_SECRET);
+  // #627 (Requirement 24): DISCORD_BOT_HANDOFF_SECRET has no Settings-UI
+  // rotate/forget route to guard the way the two flags above do -- it is
+  // read-only, `readInlineOrFile()`-sourced config -- so this flag exists
+  // purely to drive the boot-time warning below (env-var secrets are visible
+  // via `ps`/`/proc/<pid>/environ`; `_FILE`/runtime/secrets/ is preferred).
+  const discordBotHandoffSecretEnvManaged = Boolean(process.env.DISCORD_BOT_HANDOFF_SECRET);
+  const oauthHomeGuildId = /^\d{17,19}$/.test(process.env.DISCORD_HOME_GUILD_ID || "") ? process.env.DISCORD_HOME_GUILD_ID : "";
+  // Console-native role -> tier mapping (rfc-console-auth.md §2.1.1). Each key is
+  // a comma-separated list of Discord role IDs; malformed entries are dropped,
+  // never fatal. "player" maps to the console's player tier (the companion bot's
+  // form calls the same field "Player Role").
+  // No "owner" key: Owner is the Discord server's owner, derived at sign-in.
+  const discordConsoleRoleTiers = {
+    admin: parseRoleIdList(process.env.DISCORD_CONSOLE_ADMIN_ROLE_IDS),
+    moderator: parseRoleIdList(process.env.DISCORD_CONSOLE_MODERATOR_ROLE_IDS),
+    player: parseRoleIdList(process.env.DISCORD_CONSOLE_PLAYER_ROLE_IDS),
+  };
   return {
     appName: APP_NAME,
     version: readConsoleVersion(repoRoot),
@@ -231,7 +269,153 @@ export function loadConfig() {
     sessionSecret: getOrCreateSecret(resolve(secretsDir, "admin-web-session-secret.txt"), 48),
     adminPassword: process.env.ADMIN_PASSWORD || getOrCreateSecret(adminPasswordFile, 18),
     adminPasswordFile,
+    // Tier 3 password + mandatory TOTP (RFC docs/rfc-console-auth.md §2.3/§4).
+    // Off by default (Requirement 0): with the flag unset, password login is
+    // byte-identical to today (single factor), and the Settings UI doesn't
+    // even offer the feature. When set, TOTP is available but opt-in --
+    // enrollment is owner-initiated via POST /api/auth/2fa/enable (Settings ->
+    // Two-Factor Authentication), never forced on login (issue #665).
+    consoleTotpEnabled: process.env.CONSOLE_TOTP_ENABLED === "1",
+    // Real-client-IP rate-limit key. Empty by
+    // default -- every operator who never sets this sees byte-identical
+    // behavior (the raw socket address). Only exact IPs, not CIDRs: an
+    // operator's reverse proxy/tunnel daemon has one fixed address (loopback,
+    // or a docker network gateway/service IP), and getting IP-range matching
+    // wrong is itself a security bug, so this deliberately does not attempt it.
+    trustedProxyIps: String(process.env.CONSOLE_TRUSTED_PROXY_IPS || "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean),
+    secondFactorFile: resolve(generatedDir, "console-second-factor.json"),
+    // #690: the STATIC fallback only. The real, live issuer (SERVER_TITLE
+    // when an operator has set one) is computed per-request in the
+    // /api/auth/2fa/setup route handler (server.js) via
+    // readSetupConfigValues(), which reads .env directly -- baking it in
+    // here via process.env silently never worked, since
+    // docker-compose.web.yml's environment: passthrough doesn't (and
+    // shouldn't) carry every operator-set game-server value.
+    totpIssuer: APP_NAME,
+    enrollmentSessionTtlMs: 10 * 60 * 1000, // §4: short-lived, non-renewable enrollment session
     adminPasswordEnvManaged,
+    discordOAuthClientSecretEnvManaged,
+    discordBotHandoffSecretEnvManaged,
+    // ---- Discord OAuth sign-in (Tier 1, rfc-console-auth.md §2.1 / §2.1.1) ----
+    // "App configured" = the console can start an OAuth round-trip (setup mode
+    // uses this); "configured" additionally has a home guild, i.e. sign-in can
+    // actually decide a tier. Checked by the actual trimmed secret VALUE, not
+    // existsSync -- an empty or whitespace-only secret file (a botched write,
+    // a stray `touch`) used to still read as "configured" here while every
+    // real token exchange with Discord sent client_secret="" and silently
+    // failed (review finding).
+    //
+    // discordOAuthDisabled (#676 §6.2): an operator's own explicit soft-disable
+    // (Settings -> Discord OAuth -> Disable), distinct from "never configured."
+    // Gates BOTH booleans below -- a Layer 1 audit finding on the first draft
+    // of this feature found that gating discordOAuthConfigured alone left
+    // discordOAuthAppConfigured (and therefore the OAuth callback route and
+    // the setup-mode start route, which gate on THAT flag, not the other one)
+    // still reachable after "disable," which is not what "disabled" should
+    // mean at the API layer. All Discord OAuth config VALUES are deliberately
+    // preserved on disk when this is set (soft-disable, not a wipe -- see the
+    // disable route below); only reachability is gated here.
+    discordOAuthDisabled: process.env.DISCORD_OAUTH_DISABLED === "1",
+    discordOAuthAppConfigured: Boolean(
+      process.env.DISCORD_OAUTH_DISABLED !== "1" &&
+      process.env.DISCORD_OAUTH_CLIENT_ID &&
+      readInlineOrFile(process.env.DISCORD_OAUTH_CLIENT_SECRET, resolve(secretsDir, "discord-oauth-client-secret.txt")) &&
+      process.env.DISCORD_OAUTH_REDIRECT_URI
+    ),
+    discordOAuthConfigured: Boolean(
+      process.env.DISCORD_OAUTH_DISABLED !== "1" &&
+      process.env.DISCORD_OAUTH_CLIENT_ID &&
+      readInlineOrFile(process.env.DISCORD_OAUTH_CLIENT_SECRET, resolve(secretsDir, "discord-oauth-client-secret.txt")) &&
+      process.env.DISCORD_OAUTH_REDIRECT_URI &&
+      oauthHomeGuildId
+    ),
+    discordOAuthClientId: process.env.DISCORD_OAUTH_CLIENT_ID || "",
+    discordOAuthClientSecret: readInlineOrFile(process.env.DISCORD_OAUTH_CLIENT_SECRET, resolve(secretsDir, "discord-oauth-client-secret.txt")),
+    discordOAuthRedirectUri: process.env.DISCORD_OAUTH_REDIRECT_URI || "",
+    // Real UAT finding (2026-09-09): "Connect to hosted bot" originally
+    // reused discordOAuthClientId/discordOAuthClientSecret above (the
+    // console-sign-in app), on a second registered redirect URI -- the
+    // operator objected directly: console sign-in and the hosted-bot
+    // connection are unrelated capabilities and must each work without the
+    // other configured at all ("we have OAuth without bot and bot without
+    // OAuth"). These are now a fully independent Discord Application's
+    // credentials -- an operator can configure hosted-bot-connect without
+    // ever touching console sign-in, and vice versa. Same
+    // readInlineOrFile()/secrets-file convention as the sign-in secret
+    // above, just its own file so the two secrets are never conflated.
+    discordHostedBotOAuthClientId: process.env.DISCORD_HOSTED_BOT_OAUTH_CLIENT_ID || "",
+    discordHostedBotOAuthClientSecret: readInlineOrFile(process.env.DISCORD_HOSTED_BOT_OAUTH_CLIENT_SECRET, resolve(secretsDir, "discord-hosted-bot-oauth-client-secret.txt")),
+    discordHostedBotOAuthRedirectUri: process.env.DISCORD_HOSTED_BOT_OAUTH_REDIRECT_URI || "",
+    // The hosted mentat bot's console-registration endpoint. Overridable
+    // ONLY so an integration test can point this at a local fake listener
+    // instead of the real host -- found necessary during this task's own
+    // fix round 1 (Important #5): mentat-backend.darkdante.org is a real,
+    // live, internal-only production hostname that IS reachable from this
+    // dev/CI environment (confirmed directly with curl), so a test that
+    // needs to prove "no outbound call was made" cannot safely assert that
+    // against the real hardcoded URL -- an accidental regression could
+    // otherwise send a real POST to the live hosted-bot service. No
+    // operator ever needs to set this in a real deployment; it is not
+    // documented in .env.example for that reason.
+    mentatBackendRegisterUrl: process.env.MENTAT_BACKEND_REGISTER_URL || "https://mentat-backend.darkdante.org/api/consoles/register",
+    // mentat#343+/dune-awakening-selfhost-docker#832 Phase 6: the
+    // fully-automated auto-invite flow's own two endpoints, deliberately
+    // separate config values from mentatBackendRegisterUrl above (that one
+    // is the OLD flow's direct-to-mentat-backend call; this flow calls
+    // mentat-LINK's proxy instead, so mentat-link's requireProxySecret
+    // hop-auth header gets attached automatically -- Core itself never
+    // needs to hold MENTAT_PROXY_SHARED_SECRET). Same test-only override
+    // reasoning as mentatBackendRegisterUrl: mentat-link.darkdante.org is a
+    // real, live, reachable hostname this dev/CI environment could
+    // otherwise accidentally hit.
+    mentatLinkAutoInviteStartUrl: process.env.MENTAT_LINK_AUTO_INVITE_START_URL || "https://mentat-link.darkdante.org/api/consoles/auto-invite/start",
+    // Round 4 (dune-awakening-selfhost-docker#876, design doc §13): the
+    // completion-signal poll target -- same "Core never holds
+    // MENTAT_PROXY_SHARED_SECRET" reasoning as mentatLinkAutoInviteStartUrl
+    // above, and the same test-only override need (mentat-link.darkdante.org
+    // is a real, live, reachable hostname).
+    mentatLinkConfirmationStatusUrl: process.env.MENTAT_LINK_CONFIRMATION_STATUS_URL || "https://mentat-link.darkdante.org/api/consoles/auto-invite/confirmation-status",
+    // The redirect_uri embedded in the Discord authorize URL this flow
+    // builds -- a FIXED value (mentat-link's own callback route), unlike
+    // the OLD flow's operator-configured discordHostedBotOAuthRedirectUri.
+    // There is exactly one correct value in every real deployment (design
+    // doc goal G2: the operator never configures anything Discord-related
+    // for this path), so this is env-overridable for tests only, not
+    // documented in .env.example as an operator-facing setting.
+    autoInviteDiscordRedirectUri: process.env.AUTO_INVITE_DISCORD_REDIRECT_URI || "https://mentat-link.darkdante.org/api/consoles/auto-invite/callback",
+    // dune-awakening-selfhost-docker#903: the Discord Application ID the
+    // one-click consent screen (autoInvite.js's buildAutoInviteAuthorizeUrl())
+    // authorizes against -- previously a bare, non-overridable literal in
+    // autoInvite.js itself. Sahir Venn's client_id remains the correct
+    // default for every real deployment of this fork (design doc goal G2:
+    // the operator never configures anything Discord-related for the
+    // hosted path), but making it env-overridable (matching every other
+    // hosted-bot config value's own pattern) lets a self-hoster running
+    // their own hosted-bot backend point this flow at their own Discord
+    // Application instead -- the one thing an upstream reviewer would
+    // otherwise flag as hardcoded to a single organization.
+    autoInviteDiscordClientId: process.env.AUTO_INVITE_DISCORD_CLIENT_ID || "1546203607807041697",
+    discordOAuthApiBaseUrl: process.env.DISCORD_OAUTH_BASE_URL || "https://discord.com/api/v10",
+    discordOAuthAllowOwnerBootstrap: process.env.DISCORD_OAUTH_ALLOW_OWNER_BOOTSTRAP === "1",
+    discordOAuthOwnerAllowlist: String(process.env.DISCORD_OAUTH_OWNER_ALLOWLIST || "").split(",").map((item) => item.trim()).filter((item) => /^\d{17,19}$/.test(item)),
+    discordHomeGuildId: oauthHomeGuildId,
+    discordConsoleRoleTiers,
+    // Separation of duties (rfc-console-auth.md §2.1.1): non-empty means the
+    // mapping is unsound and Discord sign-in is refused until it is fixed.
+    discordConsoleRoleTierConflicts: roleTierConflicts(discordConsoleRoleTiers),
+    // Tiers that require the Discord ACCOUNT to have 2FA enabled (§2.1.1 item 4).
+    // Unset or empty -> gate off (opt-in). A value like "owner,admin" enables it.
+    // Opt-in: an existing operator whose Discord account has no
+    // 2FA must not lose sign-in on upgrade. The settings form suggests
+    // "owner,admin"; nothing is enforced until the operator saves a value.
+    discordOAuthRequireMfaTiers: parseTierList(process.env.DISCORD_OAUTH_REQUIRE_MFA_TIERS),
+    // Optional signed handoff to a companion bot (§2.1). When configured it is
+    // the authoritative tier source and the role mapping above is not used.
+    discordBotHandoffSecret: readInlineOrFile(process.env.DISCORD_BOT_HANDOFF_SECRET, resolve(secretsDir, "discord-bot-handoff-secret.txt")),
+    discordBotHandoffUrl: (process.env.DISCORD_BOT_HANDOFF_URL || "").replace(/\/+$/, ""),
     generatedDir,
     secretsDir,
     apiKeysFile: resolve(secretsDir, "api-keys.json"),
@@ -437,8 +621,19 @@ export function publicConfig(config) {
     ports: config.ports,
     authDisabled: config.authDisabled,
     adminPasswordEnvManaged: config.adminPasswordEnvManaged,
+    discordOAuthClientSecretEnvManaged: config.discordOAuthClientSecretEnvManaged,
     secureCookies: config.secureCookies,
     allowHostBootstrap: config.allowHostBootstrap,
-    mockMode: config.mockMode
+    mockMode: config.mockMode,
+    consoleTotpEnabled: config.consoleTotpEnabled,
+    discordOAuthConfigured: config.discordOAuthConfigured,
+    discordOAuthAppConfigured: config.discordOAuthAppConfigured,
+    // #676 §6.2: lets the client tell "soft-disabled, previously fully
+    // configured" apart from "never configured" -- without this the wizard's
+    // own step derivation (identical for both, since it only reads the two
+    // booleans above) would jump a re-opened, soft-disabled wizard straight
+    // into re-choosing a guild and re-mapping roles that are already correctly
+    // saved and untouched on disk.
+    discordOAuthDisabled: config.discordOAuthDisabled
   };
 }

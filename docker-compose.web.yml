@@ -38,6 +38,38 @@ services:
       ADMIN_AUTH_DISABLED: "${ADMIN_AUTH_DISABLED:-0}"
       ADMIN_SECURE_COOKIES: "${ADMIN_SECURE_COOKIES:-0}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
+      # Tier 3 second factor (docs/rfc-console-auth.md §2.3/§4). Off unless the
+      # operator sets it in .env. Must be passed through here explicitly: the
+      # console reads process.env inside the container, so a value that only
+      # exists in .env on the host is invisible to it.
+      CONSOLE_TOTP_ENABLED: "${CONSOLE_TOTP_ENABLED:-0}"
+      CONSOLE_TRUSTED_PROXY_IPS: "${CONSOLE_TRUSTED_PROXY_IPS:-}"
+      # Discord OAuth sign-in (docs/rfc-console-auth.md §2.1 / §2.1.1). All optional;
+      # unset keeps password-only sign-in. Every key .env.example documents must
+      # be passed through here: the console reads process.env inside the
+      # container and never parses .env itself, so a value set only in .env is
+      # invisible to it. The two secrets may instead live in runtime/secrets/
+      # files (preferred; Settings -> Discord OAuth writes the client secret
+      # there); the inline form is passed through too so .env.example's "or set
+      # it in .env" is true.
+      DISCORD_OAUTH_CLIENT_ID: "${DISCORD_OAUTH_CLIENT_ID:-}"
+      DISCORD_OAUTH_CLIENT_SECRET: "${DISCORD_OAUTH_CLIENT_SECRET:-}"
+      # Settings -> Discord OAuth "Disable"/"Enable" (docs/design/auth-settings-consolidation-l1-design-2026-09-03.md).
+      # Same passthrough requirement as every other Discord OAuth key below:
+      # console/api/src/config.js reads this from process.env, so a value that
+      # only exists in .env on the host is invisible to it without this line.
+      DISCORD_OAUTH_DISABLED: "${DISCORD_OAUTH_DISABLED:-0}"
+      DISCORD_OAUTH_BASE_URL: "${DISCORD_OAUTH_BASE_URL:-https://discord.com/api/v10}"
+      DISCORD_OAUTH_REDIRECT_URI: "${DISCORD_OAUTH_REDIRECT_URI:-}"
+      DISCORD_HOME_GUILD_ID: "${DISCORD_HOME_GUILD_ID:-}"
+      DISCORD_OAUTH_ALLOW_OWNER_BOOTSTRAP: "${DISCORD_OAUTH_ALLOW_OWNER_BOOTSTRAP:-0}"
+      DISCORD_OAUTH_OWNER_ALLOWLIST: "${DISCORD_OAUTH_OWNER_ALLOWLIST:-}"
+      DISCORD_CONSOLE_ADMIN_ROLE_IDS: "${DISCORD_CONSOLE_ADMIN_ROLE_IDS:-}"
+      DISCORD_CONSOLE_MODERATOR_ROLE_IDS: "${DISCORD_CONSOLE_MODERATOR_ROLE_IDS:-}"
+      DISCORD_CONSOLE_PLAYER_ROLE_IDS: "${DISCORD_CONSOLE_PLAYER_ROLE_IDS:-}"
+      DISCORD_OAUTH_REQUIRE_MFA_TIERS: "${DISCORD_OAUTH_REQUIRE_MFA_TIERS:-}"
+      DISCORD_BOT_HANDOFF_URL: "${DISCORD_BOT_HANDOFF_URL:-}"
+      DISCORD_BOT_HANDOFF_SECRET: "${DISCORD_BOT_HANDOFF_SECRET:-}"
       ADMIN_TASK_RETENTION: "${ADMIN_TASK_RETENTION:-200}"
       # Seed values for the Bases auto-refill settings. The console settings
       # overlay writes runtime/generated/auto-refill-settings.json, which wins
@@ -83,7 +115,99 @@ services:
       DUNE_DISCORD_ADAPTER_ENABLED: "${DUNE_DISCORD_ADAPTER_ENABLED:-false}"
       DUNE_DISCORD_ADAPTER_TOKEN: "${DUNE_DISCORD_ADAPTER_TOKEN:-}"
       DUNE_BOT_API_TOKEN_FILE: "${DUNE_BOT_API_TOKEN_FILE:-}"
-      DISCORD_OBSERVER_ROLE_IDS: "${DISCORD_OBSERVER_ROLE_IDS:-}"
+      DUNE_DISCORD_ADAPTER_TOKEN_FILE: "${DUNE_DISCORD_ADAPTER_TOKEN_FILE:-}"
+      # Hosted-bot console-initiated OAuth registration (Tasks 2/3/6, #739):
+      # found missing from this allowlist during the final-review re-review
+      # pass -- the exact same bug class this file's own CONSOLE_TOTP_ENABLED
+      # comment below already documents ("never wired through here despite
+      # six merged implementation phases"). Without these, every one of
+      # these values reads as unset/null inside any real docker-compose
+      # deployment, no matter what .env says: /oauth/start's deploymentChoice
+      # gate fails closed permanently, the hosted-bot redirect URI (no
+      # secrets-file fallback, unlike DISCORD_OAUTH_CLIENT_SECRET, so it's
+      # env-only) never reaches buildAuthorizeUrl(), and a successful
+      # registration's persisted "Connected to hosted bot for X" status
+      # never survives the very container recreate that "Save Role IDs"
+      # itself triggers. `:-` (not `-`) is correct for all 4: unlike
+      # DISCORD_PLAYER_ROLE_IDS above, none of these values distinguish
+      # "explicitly cleared to empty" from "genuinely unset" -- both
+      # normalizeDeploymentChoice() (adapterSettings.js) and
+      # readDiscordBotSettingsState()'s `|| null` reads treat an empty
+      # string exactly the same as unset, so there is no legacy-fallback/
+      # revocation-bypass hazard here to guard against.
+      DUNE_DISCORD_ADAPTER_DEPLOYMENT_CHOICE: "${DUNE_DISCORD_ADAPTER_DEPLOYMENT_CHOICE:-}"
+      DUNE_DISCORD_HOSTED_BOT_CONNECTED_GUILD_ID: "${DUNE_DISCORD_HOSTED_BOT_CONNECTED_GUILD_ID:-}"
+      DUNE_DISCORD_HOSTED_BOT_CONNECTED_GUILD_NAME: "${DUNE_DISCORD_HOSTED_BOT_CONNECTED_GUILD_NAME:-}"
+      # Redirect URI for the hosted-bot "Advanced: use my own Discord
+      # Application" fallback flow -- a FULLY INDEPENDENT Discord
+      # Application from the one used for console sign-in, not a second
+      # redirect URI on the same one. dune-awakening-selfhost-docker#870/
+      # #871: this comment previously said "SAME Discord application, no
+      # new app needed" -- corrected here to match the fix already applied
+      # to .env.example and setup-guide.md's own copies of this same
+      # stale claim (an automated review on #871 caught this exact
+      # instance being missed the first time).
+      DISCORD_HOSTED_BOT_OAUTH_REDIRECT_URI: "${DISCORD_HOSTED_BOT_OAUTH_REDIRECT_URI:-}"
+      # dune-awakening-selfhost-docker#870: this key's own sibling
+      # (REDIRECT_URI, above) was added when the hosted-bot OAuth flow
+      # shipped, but this one -- the independent Discord Application's
+      # Client ID config.js actually reads (discordHostedBotOAuthClientId)
+      # -- was missed, leaving hostedBotOAuthConfigured permanently false
+      # (and the whole "Connect to hosted bot" flow permanently
+      # unreachable) in any real docker-compose deployment, even after an
+      # operator saves it via Settings -> Discord Bot.
+      DISCORD_HOSTED_BOT_OAUTH_CLIENT_ID: "${DISCORD_HOSTED_BOT_OAUTH_CLIENT_ID:-}"
+      # dune-awakening-selfhost-docker#901: this key's own sibling
+      # (CLIENT_ID, above) has always been read from here, but the
+      # secret itself never needed an entry -- config.js's
+      # readInlineOrFile() falls back to reading the bind-mounted
+      # runtime/secrets/discord-hosted-bot-oauth-client-secret.txt file
+      # directly when this env var is unset, which is all a plaintext
+      # install ever needed. Added so runtime/scripts/console.sh's new
+      # prepare_discord_hosted_bot_oauth_secret() (Stage 3 age-secrets
+      # wiring) has somewhere to hand off the *decrypted* value once
+      # an operator migrates this secret -- the container can never
+      # reach the age identity itself (deliberately outside the repo,
+      # never bind-mounted), so the host must decrypt and pass the
+      # plaintext value through here instead. `:-` (empty string) is
+      # correct, not `-`: readInlineOrFile() treats "" exactly like
+      # unset, so an operator who never configures this secret at all,
+      # or who never migrates it, sees zero behavior change.
+      DISCORD_HOSTED_BOT_OAUTH_CLIENT_SECRET: "${DISCORD_HOSTED_BOT_OAUTH_CLIENT_SECRET:-}"
+      # Finding 1 (CRITICAL, final review): a bare map-form interpolated
+      # entry here (the previous "${DISCORD_PLAYER_ROLE_IDS:-}") ALWAYS sets
+      # this var in the container -- as an empty string when unset in .env,
+      # never actually omitted. That means process.env.DISCORD_PLAYER_ROLE_IDS
+      # is never `undefined` inside a real deployed container, so
+      # discordRoleMappingFromEnv()'s `!== undefined` legacy-fallback branch
+      # (adapter.js) can never fire there -- only in a bare Node test
+      # process. An existing operator with DISCORD_OBSERVER_ROLE_IDS set (and
+      # no DISCORD_PLAYER_ROLE_IDS, since it didn't exist before this
+      # feature) would silently lose that role mapping's bot access on their
+      # next `docker compose up`, with no warning (Requirement 0 violation).
+      # Nested `${VAR-${OTHER-default}}` interpolation is valid per the
+      # Compose Specification and supported by Compose V2 (compose-go, what
+      # `docker compose` uses) -- verified against Compose's own
+      # interpolation docs; NOT verified against a live `docker compose
+      # config` run in this environment (Docker is unavailable here), so
+      # confirm with `docker compose -f docker-compose.web.yml config` (only
+      # DISCORD_OBSERVER_ROLE_IDS set in .env) before relying on this alone.
+      # runtime/scripts/self-update.sh's migrate_discord_role_ids_env() is a
+      # second, independently-testable layer for the same gap -- it copies
+      # the legacy value into .env's own DISCORD_PLAYER_ROLE_IDS key
+      # directly, so the correct value reaches the container even if this
+      # nested-interpolation fallback were ever unsupported by some Compose
+      # version.
+      #
+      # Deliberately `-` (substitute only when the var is genuinely UNSET),
+      # never `:-` (which also substitutes on an explicitly-cleared empty
+      # string). `:-` here would resurrect a stale legacy role mapping the
+      # moment an operator clears Player role IDs via the Settings UI to
+      # revoke access -- reopening the exact revocation-bypass this branch's
+      # own JS-side `!== undefined` fix (adapter.js) and its regression test
+      # (selfUpdateScript.test.js) already close. Found and fixed during the
+      # final-review re-review pass on this same finding.
+      DISCORD_PLAYER_ROLE_IDS: "${DISCORD_PLAYER_ROLE_IDS-${DISCORD_OBSERVER_ROLE_IDS-}}"
       DISCORD_MODERATOR_ROLE_IDS: "${DISCORD_MODERATOR_ROLE_IDS:-}"
       DISCORD_ADMIN_ROLE_IDS: "${DISCORD_ADMIN_ROLE_IDS:-}"
       DISCORD_OWNER_ROLE_IDS: "${DISCORD_OWNER_ROLE_IDS:-}"

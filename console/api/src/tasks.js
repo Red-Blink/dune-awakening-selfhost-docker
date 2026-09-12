@@ -157,10 +157,24 @@ export class TaskManager {
       ...(process.env.DUNE_SELF_UPDATE_TOKEN ? ["DUNE_SELF_UPDATE_TOKEN"] : [])
     ];
     const logFile = "runtime/generated/web-self-update.log";
+    // The "Starting" and "finished" lines must share one timestamp
+    // source/format so an operator reading this log can compute elapsed
+    // time between them. Both use a live shell $(date -Is), evaluated at
+    // actual execution time inside the helper container -- NOT a
+    // JS-precomputed value, which would show queue time, not real
+    // start/finish time, and would use a different format besides (JS
+    // toISOString() vs. shell date -Is). The security-load-bearing part of
+    // the earlier shell-injection-adjacent fix is preserved here: the
+    // args-inclusive message is still exactly ONE shellQuote()-wrapped
+    // (single-quoted) literal, passed to `echo` as a SEPARATE argument from
+    // the live, unquoted "[$(date -Is)]" prefix -- never nested inside an
+    // outer double-quoted string the way the original vulnerable version
+    // was.
+    const startMessage = `Starting Web UI stack update: runtime/scripts/dune ${args.join(" ")}`;
     const command = [
       "set -eu",
       "mkdir -p runtime/generated",
-      `echo "[$(date -Is)] Starting Web UI stack update: runtime/scripts/dune ${args.map(shellQuote).join(" ")}" > ${shellQuote(logFile)}`,
+      `echo "[$(date -Is)]" ${shellQuote(startMessage)} > ${shellQuote(logFile)}`,
       `DUNE_WEB_SELF_UPDATE_HELPER=1 runtime/scripts/dune ${args.map(shellQuote).join(" ")} >> ${shellQuote(logFile)} 2>&1`,
       `echo "[$(date -Is)] Web UI stack update finished" >> ${shellQuote(logFile)}`
     ].join("\n");
@@ -349,7 +363,7 @@ export async function cleanupStaleSelfUpdateHelpers(cwd, runCommand) {
   const helpers = listed.stdout.split(/\r?\n/).map((line) => {
     const [name = "", state = ""] = line.trim().split(/\s+/, 2);
     return { name, state };
-  }).filter(({ name }) => /^(?:dune-web-self-update-\d+|dune-console-self-update-\d+)$/.test(name));
+  }).filter(({ name }) => /^(?:dune-web-self-update-\d+|dune-console-self-update-\d+|dune-discord-adapter-apply-\d+)$/.test(name));
   const staleAfterMs = (boundedBuildTimeoutSeconds(process.env.DUNE_SELF_UPDATE_BUILD_TIMEOUT_SECONDS) + 300) * 1000;
   const now = Date.now();
   const stale = helpers.filter(({ name, state }) => state !== "running" || selfUpdateHelperAgeMs(name, now) > staleAfterMs);
@@ -359,7 +373,7 @@ export async function cleanupStaleSelfUpdateHelpers(cwd, runCommand) {
 }
 
 export function selfUpdateHelperAgeMs(name, now = Date.now()) {
-  const milliseconds = String(name || "").match(/^dune-web-self-update-(\d{13})$/)?.[1];
+  const milliseconds = String(name || "").match(/^(?:dune-web-self-update|dune-discord-adapter-apply)-(\d{13})$/)?.[1];
   if (milliseconds) return Math.max(0, now - Number(milliseconds));
   const seconds = String(name || "").match(/^dune-console-self-update-(\d{10})$/)?.[1];
   if (seconds) return Math.max(0, now - Number(seconds) * 1000);

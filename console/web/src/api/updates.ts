@@ -10,6 +10,10 @@ export type StackUpdateProgress = {
   startedAt?: string | null;
   updatedAt?: string | null;
   finishedAt?: string | null;
+  // dune-awakening-selfhost-docker#748+: written by self-update.sh's
+  // verify_discord_adapter_health() after a Discord Bot Settings enable/
+  // role-ID-change container recreate -- see that function's own comment.
+  discordHealthOk?: boolean | null;
   recovered?: boolean;
   consoleStartedAt?: string | null;
   consoleReplaced?: boolean;

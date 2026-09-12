@@ -41,6 +41,23 @@ const simpleOperations = {
   updateAutoDisable: ["update", "auto", "disable"],
   selfUpdateCheck: ["self-update", "check"],
   selfUpdateApply: ["self-update", "install", "latest"],
+  // Layer 3 audit finding (CRITICAL): the Discord Bot settings routes
+  // (enable/role-ids/restart, server.js) queue this exact operation via
+  // tasks.create("settings", "discordAdapterApply", {}) to make a saved
+  // .env change (already written synchronously by adapterSettings.js)
+  // take effect in a freshly-recreated console container -- but this case
+  // never existed here, so every single one of those tasks unconditionally
+  // failed with "Unsupported operation: discordAdapterApply" (confirmed
+  // directly: buildDuneArgs("discordAdapterApply", {}) threw before this
+  // fix). The .env write and the in-process mirror still succeeded, which
+  // is why this went unnoticed live (the same already-running process
+  // reflects the change immediately) -- only a real container recreate, or
+  // a fresh install reading the same .env, would ever have exposed the gap.
+  // `dune self-update apply-discord-adapter-env` forwards straight to
+  // self-update.sh's own `apply-discord-adapter-env)` case entry (added
+  // earlier this same port, 6a0889e4), which is the actual, already-correct
+  // implementation this operation was always meant to reach.
+  discordAdapterApply: ["self-update", "apply-discord-adapter-env"],
   backupCreate: ["db", "backup"],
   backupList: ["db", "list"],
   backupDeleteAll: ["db", "delete", "--all"],

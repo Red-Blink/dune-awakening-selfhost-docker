@@ -18,6 +18,20 @@
     "Nu6VmPWUMvdPMeB7qErr",
   ]
 
+# Synthetic, sequential-digit placeholder Discord snowflake
+# (123456789012345678) used as a fake role/user/guild ID across this
+# console API test suite's Discord fixtures (envFile.test.js,
+# discordOAuthDisable.integration.test.js, oauthRoutes.integration.test.js,
+# hostedBotRegistrationRoutes.integration.test.js, qaUpdates.test.js,
+# oauth.test.js, selfUpdateScript.test.js) -- a widely-used, pre-existing
+# test convention, not a real credential. Flagged by the built-in
+# discord-client-id rule purely on its numeric shape.
+[[allowlists]]
+  description = "Synthetic placeholder Discord snowflake used across the test suite"
+  regexes = [
+    "123456789012345678",
+  ]
+
 # NOTE: tests/db-system-backup-test.sh's synthetic secret fixtures
 # (admin-pw-8f2a-real, etc.) do NOT need an allowlist entry here --
 # confirmed directly: `gitleaks detect --source

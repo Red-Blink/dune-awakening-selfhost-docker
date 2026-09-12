@@ -79,7 +79,7 @@ Every bot request must include a Discord actor context object.
 | Tier | Intended Use |
 | --- | --- |
 | public | Basic non-sensitive status only. |
-| observer | Low-risk status/readiness visibility. |
+| player | Low-risk status/readiness visibility. |
 | moderator | Population, map state, backup metadata, and limited operational visibility. |
 | admin | Logs and diagnostic read-only visibility. |
 | owner | Reserved for future review; no owner-only write routes in experimental scope. |
@@ -89,8 +89,8 @@ Every bot request must include a Discord actor context object.
 | Capability | Description | Minimum Tier |
 | --- | --- | --- |
 | `status:read` | Basic health/status visibility | public |
-| `readiness:read` | Readiness checks | observer |
-| `services:read` | Service list/status | observer |
+| `readiness:read` | Readiness checks | player |
+| `services:read` | Service list/status | player |
 | `population:read` | Population summary and online count | moderator |
 | `logs:read` | Capped, redacted service logs | admin |
 | `maps:read` | Map, sietch, and deep desert read-only status | moderator |

@@ -66,7 +66,11 @@ jobs:
         # Several integration suites create and remove isolated PostgreSQL
         # databases. Keep test files serial in CI so one suite cannot terminate
         # another suite's connection during database cleanup.
-        run: node --test --test-concurrency=1 test/*.test.js
+        # --experimental-test-module-mocks (Node >=22.3, matching this job's
+        # pinned node-version: "22" above): needed to mock node:fs's chmodSync
+        # in envFile.test.js's #713 regression test -- see that test for why
+        # a plain local `npm test` skips it instead of requiring the flag too.
+        run: node --experimental-test-module-mocks --test --test-concurrency=1 test/*.test.js
         working-directory: console/api
 
   metrics-unit:
@@ -159,12 +163,23 @@ jobs:
         run: |
           runtime/tests/test-compose-project-name-portability.sh
           runtime/tests/test-compose-project-resolution.sh
+          runtime/tests/test-compose-web-totp-env-passthrough.sh
+      - name: Test Discord adapter env recreate (no build/pull, real docker compose config)
+        run: |
+          runtime/tests/test-discord-adapter-env-recreate.sh
+      - name: Test Discord adapter recreate failure handling, atomic health status, and token argv safety
+        run: |
+          runtime/tests/test-discord-adapter-recreate-failure.sh
+          runtime/tests/test-discord-adapter-health-atomic-status.sh
+          runtime/tests/test-discord-adapter-health-token-argv.sh
+          runtime/tests/test-discord-adapter-lock-contention.sh
       - name: Test age-based secrets library (AEAD primitive, shell seam, cross-language round-trip)
         run: |
           python3 runtime/scripts/lib/test_secrets_aead.py -v
           runtime/tests/test-secrets-lib.sh
           runtime/tests/test-secrets-aead-cross-language.sh
           runtime/tests/test-secrets-stage2.sh
+          runtime/tests/test-secrets-stage3.sh
 
   container-lifecycle:
     runs-on: ubuntu-latest

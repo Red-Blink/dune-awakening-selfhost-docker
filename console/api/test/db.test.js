@@ -1650,6 +1650,41 @@ test("players query uses parameterized search input", async () => {
   assert.equal(result.rows[0].action_player_id, "RedBlink#75570");
 });
 
+// Own-record scoping for the console's `player` IAM tier (Red-Blink PR #202
+// review) -- listPlayers()'s new onlyPlayerControllerId param.
+test("listPlayers with onlyPlayerControllerId scopes the WHERE clause to that exact player, parameterized", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [] };
+      return { rows: [{ actor_id: 82, total_count: 1 }] };
+    }
+  };
+  await listPlayers(db, { onlyPlayerControllerId: "9001" });
+  const playerQuery = calls.find((call) => call.text.includes("from dune.actors"));
+  assert.ok(playerQuery);
+  assert.match(playerQuery.text, /ps\.player_controller_id::text = \$2/);
+  assert.equal(playerQuery.values[1], "9001");
+});
+
+test("listPlayers without onlyPlayerControllerId adds no own-record filter (owner/admin/moderator sessions)", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [] };
+      return { rows: [{ actor_id: 82, total_count: 1 }] };
+    }
+  };
+  await listPlayers(db, {});
+  const playerQuery = calls.find((call) => call.text.includes("from dune.actors"));
+  assert.ok(playerQuery);
+  assert.doesNotMatch(playerQuery.text, /player_controller_id::text = \$/);
+});
+
 test("players sorted by last online rank current players ahead of stored timestamps", async () => {
   const calls = [];
   const db = {
@@ -2497,6 +2532,91 @@ test("list guilds filters by name when a search query is given", async () => {
   assert.ok(guildQuery);
   assert.match(guildQuery.text, /ilike \$1/);
   assert.equal(guildQuery.values[0], "%Water%");
+});
+
+// Own-guild scoping for the console's `player` IAM tier (Red-Blink PR #202
+// review) -- listGuilds()'s new onlyGuildId param.
+test("listGuilds with onlyGuildId scopes the WHERE clause to that exact guild, parameterized", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: ["dune.guilds", "dune.guild_members"].includes(name) }] };
+      }
+      if (text.includes("information_schema.columns")) {
+        const table = String(values[1] || "");
+        if (table === "guilds") return { rows: ["guild_id", "guild_name"].map((column_name) => ({ column_name })) };
+        if (table === "guild_members") return { rows: ["player_id", "guild_id"].map((column_name) => ({ column_name })) };
+        return { rows: [] };
+      }
+      return { rows: [] };
+    }
+  };
+  await listGuilds(db, { onlyGuildId: "42" });
+  const guildQuery = calls.find((call) => call.text.includes("from dune.guilds g"));
+  assert.ok(guildQuery);
+  assert.match(guildQuery.text, /g\."guild_id"::text = \$1/);
+  assert.equal(guildQuery.values[0], "42");
+});
+
+test("listGuilds without onlyGuildId adds no own-guild filter (owner/admin/moderator sessions)", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: ["dune.guilds", "dune.guild_members"].includes(name) }] };
+      }
+      if (text.includes("information_schema.columns")) {
+        const table = String(values[1] || "");
+        if (table === "guilds") return { rows: ["guild_id", "guild_name"].map((column_name) => ({ column_name })) };
+        if (table === "guild_members") return { rows: ["player_id", "guild_id"].map((column_name) => ({ column_name })) };
+        return { rows: [] };
+      }
+      return { rows: [] };
+    }
+  };
+  await listGuilds(db, {});
+  const guildQuery = calls.find((call) => call.text.includes("from dune.guilds g"));
+  assert.ok(guildQuery);
+  assert.doesNotMatch(guildQuery.text, /guild_id"::text = \$/);
+});
+
+// getPlayerGuildId() -- resolves which guild an actor/pawn id belongs to, used
+// to derive a `player`-tier session's own guild scope.
+test("getPlayerGuildId returns the guild id for a real actor, and null when unguilded or the table is missing", async () => {
+  const { getPlayerGuildId } = await import("../src/duneDb.js");
+  const guildedDb = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("from dune.guild_members")) {
+        assert.equal(values[0], 82);
+        return { rows: [{ guild_id: "7" }] };
+      }
+      return { rows: [] };
+    }
+  };
+  assert.equal(await getPlayerGuildId(guildedDb, 82), "7");
+
+  const unguildedDb = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      return { rows: [] };
+    }
+  };
+  assert.equal(await getPlayerGuildId(unguildedDb, 82), null);
+
+  const missingTableDb = { query: async (text) => (text.includes("to_regclass") ? { rows: [{ exists: false }] } : { rows: [] }) };
+  assert.equal(await getPlayerGuildId(missingTableDb, 82), null);
+
+  // Fails closed on a garbage id rather than passing it to the query as a
+  // bigint cast that could throw or, worse, coerce unexpectedly.
+  assert.equal(await getPlayerGuildId(guildedDb, "not-a-number"), null);
+  assert.equal(await getPlayerGuildId(guildedDb, 0), null);
+  assert.equal(await getPlayerGuildId(guildedDb, -1), null);
 });
 
 test("guild members returns capability response when required tables are missing", async () => {

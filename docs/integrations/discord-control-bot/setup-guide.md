@@ -13,6 +13,31 @@ This setup path validates the read-only Discord companion bot command layer and 
 
 The actual network Discord client is still deferred. Use the smoke runner to validate command behavior before connecting to Discord.
 
+### Production Discord Adapter Setup
+
+**As of this version, the Discord adapter token and settings can be generated and managed from the console's Settings → Discord Bot section.** This replaces the previous fully-manual `.env`-edit-and-container-recreate process for both hosted and self-hosted bot deployments. The manual steps documented below remain available as a fallback for troubleshooting or if the UI path is unavailable.
+
+## Connecting to the Hosted Bot (Recommended)
+
+**As of the Phase 6 auto-invite redesign (dune-awakening-selfhost-docker#832), the primary path is a single "Add & Connect Bot" button** in **Settings → Discord Bot**, wizard step 1 (or the equivalent action in the enabled-management view once the adapter is already configured). Click it, approve the single Discord consent screen (bot install + ownership verification in one screen), and the console handles the rest — no Discord Application of your own to create or configure at all. This is the flow most operators should use.
+
+### Advanced: using your own Discord Application (fallback, not required)
+
+The console also keeps the older, independent-Discord-Application flow available, reachable via an **"Advanced: use my own Discord Application instead"** disclosure on the same screen. Unlike the auto-invite flow above, this path requires you to register and configure your own Discord Application, **fully independent of the one used for console sign-in** (Settings → Discord OAuth) — the two are deliberately separate, correcting an earlier version of this doc that incorrectly said they could be the same application. This flow:
+
+1. Requires its own Discord Application's Client ID + Client Secret, entered via Settings → Discord Bot's own OAuth config fields — **not** `DISCORD_OAUTH_CLIENT_ID`/`DISCORD_OAUTH_CLIENT_SECRET` (console sign-in's own credentials)
+2. Initiates a separate Discord OAuth round-trip using those independent credentials
+3. Lets you select a Discord guild you own
+4. Registers that guild with the hosted Mentat bot automatically in-console
+
+**One-time setup requirement for this fallback path:** register a redirect URI on **your own, independent** Discord Application:
+
+1. Go to your Discord Developer Portal, on the independent application you created for this purpose (not the one used for console sign-in)
+2. Add a redirect URI: `https://<your-console-domain>/api/integrations/discord/hosted-bot/oauth/callback`
+3. Enter that same value in Settings → Discord Bot's Redirect URI field (pre-filled from this console's own address by default — only change it if this console is reachable at a different public address, e.g. behind a reverse proxy)
+
+The hosted bot's old setup-portal flow (via DM + mentat-link) remains available as a fallback, documented in the Mentat bot's own setup guide.
+
 ## Prerequisites
 
 - Dune Docker Console repository checked out.
@@ -76,7 +101,7 @@ From `console/api`:
 ```bash
 DUNE_DOCKER_DIR="$HOME/dune-awakening-selfhost-docker-WSL" \
 DUNE_BOT_API_TOKEN_FILE="$HOME/.config/dune-console/dune-bot-api-token.txt" \
-DISCORD_OBSERVER_ROLE_IDS=role-observer \
+DISCORD_PLAYER_ROLE_IDS=role-player \
 DISCORD_ADMIN_ROLE_IDS=role-admin \
 DISCORD_OWNER_ROLE_IDS=role-owner \
 npm run start:discord-adapter
@@ -90,7 +115,7 @@ sudo env \
   HOME="$HOME" \
   DUNE_DOCKER_DIR="$HOME/dune-awakening-selfhost-docker-WSL" \
   DUNE_BOT_API_TOKEN_FILE="$HOME/.config/dune-console/dune-bot-api-token.txt" \
-  DISCORD_OBSERVER_ROLE_IDS=role-observer \
+  DISCORD_PLAYER_ROLE_IDS=role-player \
   DISCORD_ADMIN_ROLE_IDS=role-admin \
   DISCORD_OWNER_ROLE_IDS=role-owner \
   npm run start:discord-adapter
@@ -106,7 +131,7 @@ npm ci --ignore-scripts
 export DUNE_CONSOLE_API_URL=http://127.0.0.1:8088
 export DUNE_BOT_API_TOKEN_FILE="$HOME/.config/dune-console/dune-bot-api-token.txt"
 export DISCORD_GUILD_ID=local-guild
-export DISCORD_OBSERVER_ROLE_IDS=role-observer
+export DISCORD_PLAYER_ROLE_IDS=role-player
 export DISCORD_ADMIN_ROLE_IDS=role-admin
 export DISCORD_OWNER_ROLE_IDS=role-owner
 
@@ -185,13 +210,13 @@ artifacts/security/vulnerability-report.json
 
 ### 403 on Readiness or Services
 
-The observer role is not aligned.
+The player role is not aligned.
 
 Check:
 
-- `actorRoleIdsSent` includes `role-observer`.
-- `consoleRolePolicy.observerConfigured` is `true`.
-- The Console adapter was started with `DISCORD_OBSERVER_ROLE_IDS=role-observer`.
+- `actorRoleIdsSent` includes `role-player`.
+- `consoleRolePolicy.playerConfigured` is `true`.
+- The Console adapter was started with `DISCORD_PLAYER_ROLE_IDS=role-player`.
 
 ### 403 on Detailed Status
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { linkPlayerProvider, verifyPlayerLinkProvider } from "../src/integrations/discord/linkProvider.js";
+import { linkPlayerProvider, verifyPlayerLinkProvider, whoamiProvider, requireLinkedPlayer } from "../src/integrations/discord/linkProvider.js";
 import { discordPlayerLink } from "../src/duneDb.js";
 
 function createLinkDb(playerOverrides = {}) {
@@ -140,4 +140,43 @@ test("linking never removes a character's existing Discord owner", async () => {
     (error) => error.code === "character_already_linked" && error.statusCode === 409
   );
   assert.deepEqual(db.state.link, { discordUserId: "discord-owner", playerControllerId: "42" });
+});
+
+// Regression: every user-facing message here previously said "/dune data
+// ..." -- the actually-registered slash command is "player", not "data"
+// (mentat/src/commands.js registers link/verify/unlink/whoami under the
+// "player" subcommand group, moved out of "data" 2026-07-26 per that file's
+// own comment). A player following the old text verbatim hit an unknown
+// command. Pin the real command name everywhere it's surfaced so this can't
+// silently drift again.
+test("every user-facing message names the real /dune player subcommand, not the stale /dune data one", async () => {
+  const db = createLinkDb();
+  let whisper = null;
+  const linkResult = await linkPlayerProvider(db, {}, { discordUserId: "discord-1", characterName: "Chani" }, {
+    ensurePersona: async () => persona,
+    publishWhisper: async (_config, fields) => { whisper = fields; }
+  });
+  assert.match(whisper.message, /\/dune player verify/);
+  assert.doesNotMatch(whisper.message, /\/dune data/);
+  assert.match(linkResult.message, /\/dune player verify/);
+  assert.doesNotMatch(linkResult.message, /\/dune data/);
+
+  const code = db.state.pending.code;
+  const badVerify = await verifyPlayerLinkProvider(db, { discordUserId: "discord-1", code: "wrong-code" });
+  assert.match(badVerify.error, /\/dune player link/);
+  assert.doesNotMatch(badVerify.error, /\/dune data/);
+
+  const verifyResult = await verifyPlayerLinkProvider(db, { discordUserId: "discord-1", code });
+  assert.match(verifyResult.message, /\/dune player inventory/);
+  assert.doesNotMatch(verifyResult.message, /\/dune data/);
+
+  const unlinkedDb = createLinkDb();
+  const whoami = await whoamiProvider(unlinkedDb, { discordUserId: "discord-2" });
+  assert.match(whoami.message, /\/dune player link/);
+  assert.doesNotMatch(whoami.message, /\/dune data/);
+
+  await assert.rejects(
+    () => requireLinkedPlayer(unlinkedDb, "discord-2"),
+    (error) => /\/dune player link/.test(error.message) && !/\/dune data/.test(error.message)
+  );
 });
