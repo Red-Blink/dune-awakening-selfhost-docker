@@ -40,6 +40,42 @@ dune_compose_container_label() {
     "$dune_compose_container" 2>/dev/null | head -n 1
 }
 
+dune_compose_service_projects() {
+  dune_compose_service="$1"
+  command -v docker >/dev/null 2>&1 || return 1
+
+  docker ps -a \
+    --filter "label=com.docker.compose.service=$dune_compose_service" \
+    --filter "label=com.docker.compose.container-number" \
+    --filter "label=com.docker.compose.oneoff=False" \
+    --format '{{.ID}}' 2>/dev/null \
+    | while IFS= read -r dune_compose_container_id; do
+        [ -n "$dune_compose_container_id" ] || continue
+        dune_compose_project="$(dune_compose_container_label "$dune_compose_container_id" 2>/dev/null || true)"
+        dune_compose_project_is_valid "$dune_compose_project" \
+          && printf '%s\n' "$dune_compose_project"
+      done \
+    | sort -u
+}
+
+dune_compose_running_service_container() {
+  dune_compose_project="$1"
+  dune_compose_service="$2"
+  dune_compose_project_is_valid "$dune_compose_project" || return 1
+  [ -n "$dune_compose_service" ] || return 1
+  command -v docker >/dev/null 2>&1 || return 1
+
+  dune_compose_containers="$(docker ps \
+    --filter "label=com.docker.compose.project=$dune_compose_project" \
+    --filter "label=com.docker.compose.service=$dune_compose_service" \
+    --filter "label=com.docker.compose.container-number" \
+    --filter "label=com.docker.compose.oneoff=False" \
+    --format '{{.Names}}' 2>/dev/null || true)"
+  [ "$(printf '%s\n' "$dune_compose_containers" | awk 'NF { count++ } END { print count + 0 }')" = "1" ] \
+    || return 1
+  printf '%s\n' "$dune_compose_containers" | awk 'NF { print; exit }'
+}
+
 dune_compose_console_main_project() {
   command -v docker >/dev/null 2>&1 || return 1
   docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' \
@@ -117,6 +153,18 @@ dune_resolve_compose_project_name() {
   dune_compose_candidate_count="$(printf '%s\n' "$dune_compose_candidates" | awk 'NF { count++ } END { print count + 0 }')"
 
   dune_compose_value="$(dune_compose_container_label dune-orchestrator 2>/dev/null || true)"
+  if ! dune_compose_project_is_valid "$dune_compose_value"; then
+    dune_compose_service_candidates="$(dune_compose_service_projects orchestrator 2>/dev/null || true)"
+    dune_compose_service_candidate_count="$(printf '%s\n' "$dune_compose_service_candidates" | awk 'NF { count++ } END { print count + 0 }')"
+    if [ "$dune_compose_service_candidate_count" = "1" ]; then
+      dune_compose_value="$(printf '%s\n' "$dune_compose_service_candidates" | awk 'NF { print; exit }')"
+    elif [ "$dune_compose_service_candidate_count" -gt 1 ]; then
+      echo "Multiple Docker Compose projects contain an orchestrator service:" >&2
+      printf '%s\n' "$dune_compose_service_candidates" | awk 'NF { print "  - " $0 }' >&2
+      echo "Set DUNE_COMPOSE_PROJECT_NAME in .env to the project that owns the intended server before continuing." >&2
+      return 2
+    fi
+  fi
   if ! dune_compose_project_is_valid "$dune_compose_value"; then
     dune_compose_value="$(dune_compose_console_main_project 2>/dev/null || true)"
   fi

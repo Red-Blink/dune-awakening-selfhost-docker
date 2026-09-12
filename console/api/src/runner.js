@@ -437,8 +437,12 @@ function killProcessTree(child) {
 }
 
 export function runDockerLogs(service, options = {}) {
-  const container = dockerContainerForLogService(service);
-  const args = ["logs", "--tail", String(options.tail || 400)];
+  const normalizedService = validateServiceName(service);
+  const useComposeService = normalizedService === "orchestrator";
+  const container = useComposeService ? "orchestrator" : dockerContainerForLogService(normalizedService);
+  const args = useComposeService
+    ? ["compose", "logs", "--tail", String(options.tail || 400)]
+    : ["logs", "--tail", String(options.tail || 400)];
   if (options.since) args.push("--since", String(options.since));
   if (options.follow) args.push("-f");
   args.push(container);
@@ -447,7 +451,8 @@ export function runDockerLogs(service, options = {}) {
     const spawnImpl = options.spawnImpl || spawn;
     const child = spawnImpl("docker", args, {
       shell: false,
-      env: { ...process.env }
+      env: { ...process.env },
+      cwd: useComposeService ? (process.env.DUNE_DOCKER_DIR || process.cwd()) : undefined
     });
     const stop = () => child.kill("SIGTERM");
     const timeout = setTimeout(stop, options.timeoutMs || 30000);

@@ -8,6 +8,8 @@ cd "$(dirname "$0")/../.."
 [ -r runtime/generated/image-tags.env ] && . runtime/generated/image-tags.env
 
 source runtime/scripts/image-tags.sh
+# shellcheck source=runtime/scripts/landsraad-instance-cleanup.sh
+source runtime/scripts/landsraad-instance-cleanup.sh
 
 ACTION="${1:-remove-stale}"
 TARGET_IMAGE="$(resolve_game_server_image)"
@@ -49,10 +51,11 @@ remove_server_id_map() {
 
 cleanup_partition_assignment() {
   local partition_id="$1"
-  local server_id
+  local server_id map_name
 
   [ -n "$partition_id" ] || return 0
   server_id="$(psql_value "select coalesce(server_id, '') from dune.world_partition where partition_id = $partition_id limit 1;")"
+  map_name="$(psql_value "select coalesce(map, '') from dune.world_partition where partition_id = $partition_id limit 1;")"
 
   docker exec dune-postgres psql -U postgres -d dune -v ON_ERROR_STOP=1 -c "
 begin;
@@ -73,6 +76,7 @@ commit;
 " >/dev/null
 
   remove_server_id_map "$server_id"
+  cleanup_landsraad_instance_after_shutdown "$map_name" "$partition_id"
 }
 
 remove_container() {

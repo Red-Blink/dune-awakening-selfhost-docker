@@ -60,6 +60,7 @@ For public/internet hosting, forward these ports:
 | `31982` | TCP | RabbitMQ Game Messaging Endpoint |
 | `31983` | TCP | RabbitMQ Game HTTP Endpoint |
 | `7777-7810` | UDP | Game Traffic |
+| `32000-32015` | UDP | Optional direct public-directory latency probes; relay remains available when closed |
 
 Keep database and internal admin ports private. Do not expose the Web UI to untrusted users.
 
@@ -82,6 +83,8 @@ On Alpine Linux, the installer uses the distribution's Docker and Docker Compose
 [DuneDocker.app](https://dunedocker.app/) helps public server owners showcase their communities and helps players find the right server. Each listing provides a live server page with status, player count, region, Sietches, personalized latency, and an optional Discord community link.
 
 Owners can claim their listing directly from the Console Settings page to verify ownership, manage their public profile and Discord invite, and promote their server through the directory. Public listings can be enabled or disabled at any time.
+
+Personalized latency uses UDP `32000-32015` for the fastest direct measurement. Allow this range through both the host firewall and any internet-to-DMZ firewall or NAT forwarding. Servers that do not expose the range remain compatible and automatically use the Dune Docker relay instead.
 
 Local and LAN-only servers are never listed. For transparency, installations contribute only an anonymous server count by default—never server names, addresses, players, or settings—and this can be disabled separately in Settings.
 

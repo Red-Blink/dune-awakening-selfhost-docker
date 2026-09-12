@@ -832,6 +832,17 @@ Successful and partially delivered grants are preserved as compact eligibility r
 
 `players.identity.list` requires an approved `players:read` addon permission. It returns the minimal player identity data needed to correlate addon events: `name`, `actorId`, `controllerId`, `accountId`, `funcomId`, `flsId`, `platformId`, `platformName`, `status`, and `map`. Addons do not need direct access to the Console player REST endpoints.
 
+### Addon Runtime Bridge
+
+`players.summary.list` and `players.progression.get` provide typed player and
+supported progression data under `players:read`. `addon.storage.*` provides
+versioned addon-scoped JSON storage under `files:addon-data`.
+`rewards.deliver`, `rewards.status`, and `rewards.list` provide persistent,
+idempotent reward delivery under `rewards:grant`. `players.message.*` provides
+queued private messages under `players:message`. See
+[Addon Runtime API](../addons/addon-runtime-api.md) for payloads and delivery
+semantics.
+
 ### Hardware Status Bridge
 
 `server.hardware.status` requires approved `server:status` addon permission and returns the core-owned hardware snapshot documented in [Addon Hardware Status Bridge](../addons/hardware-status.md). Addon packages are never permitted to execute their own telemetry scripts.

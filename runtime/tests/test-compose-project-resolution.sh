@@ -32,7 +32,33 @@ if [ "${1:-}" = "inspect" ]; then
       printf 'DUNE_COMPOSE_PROJECT_NAME=%s\nCOMPOSE_PROJECT_NAME=%s\n' \
         "$FAKE_CONSOLE_PROJECT" "$FAKE_CONSOLE_PROJECT"
       ;;
+    generated-orchestrator-id)
+      [ -n "${FAKE_GENERATED_ORCHESTRATOR_PROJECT:-}" ] || exit 1
+      printf '%s\n' "$FAKE_GENERATED_ORCHESTRATOR_PROJECT"
+      ;;
     *) exit 1 ;;
+  esac
+  exit 0
+fi
+
+if [ "${1:-}" = "ps" ]; then
+  case "$*" in
+    *"label=com.docker.compose.project=${FAKE_GENERATED_ORCHESTRATOR_PROJECT:-__unset__}"*"label=com.docker.compose.service=orchestrator"*"label=com.docker.compose.container-number"*"label=com.docker.compose.oneoff=False"*"{{.Names}}"*)
+      [ -n "${FAKE_GENERATED_ORCHESTRATOR_NAME:-}" ] \
+        && printf '%s\n' "$FAKE_GENERATED_ORCHESTRATOR_NAME"
+      ;;
+    *"label=com.docker.compose.project=${FAKE_GENERATED_ORCHESTRATOR_PROJECT:-__unset__}"*"label=com.docker.compose.service=orchestrator"*"{{.Names}}"*)
+      [ -n "${FAKE_GENERATED_ORCHESTRATOR_NAME:-}" ] \
+        && printf '%s\n%s\n' "$FAKE_GENERATED_ORCHESTRATOR_NAME" inherited-image-helper
+      ;;
+    *"label=com.docker.compose.service=orchestrator"*"label=com.docker.compose.container-number"*"label=com.docker.compose.oneoff=False"*"{{.ID}}"*)
+      [ -n "${FAKE_GENERATED_ORCHESTRATOR_PROJECT:-}" ] \
+        && printf '%s\n' generated-orchestrator-id
+      ;;
+    *"label=com.docker.compose.service=orchestrator"*"{{.ID}}"*)
+      [ -n "${FAKE_GENERATED_ORCHESTRATOR_PROJECT:-}" ] \
+        && printf '%s\n%s\n' generated-orchestrator-id inherited-image-helper-id
+      ;;
   esac
   exit 0
 fi
@@ -104,6 +130,18 @@ container_root="$test_root/container"
 mkdir -p "$container_root"
 actual="$(resolve_project "$container_root" env FAKE_ORCHESTRATOR_PROJECT=legacy-stack)"
 [ "$actual" = "legacy-stack" ] || fail "orchestrator label was not discovered: $actual"
+
+generated_root="$test_root/generated-container-name"
+mkdir -p "$generated_root"
+actual="$(resolve_project "$generated_root" env FAKE_GENERATED_ORCHESTRATOR_PROJECT=numbers)"
+[ "$actual" = "numbers" ] || fail "generated-name orchestrator project was not discovered: $actual"
+
+actual="$(PATH="$fake_bin:$PATH" FAKE_GENERATED_ORCHESTRATOR_PROJECT=numbers \
+  FAKE_GENERATED_ORCHESTRATOR_NAME=numbers_orchestrator_1 sh -c \
+  '. "$1/runtime/scripts/compose-project.sh"; dune_compose_running_service_container numbers orchestrator' \
+  sh "$repo_root")"
+[ "$actual" = "numbers_orchestrator_1" ] \
+  || fail "generated orchestrator container name was not resolved: $actual"
 
 console_root="$test_root/console"
 mkdir -p "$console_root"

@@ -338,6 +338,69 @@ exit 0
   }
 });
 
+test("archive self-update times out a stalled download before changing installed files", async () => {
+  const root = mkdtempSync(join(tmpdir(), "arrakis-self-update-download-timeout-"));
+  const fakeBin = join(root, "bin");
+  const runId = "123e4567-e89b-42d3-a456-426614174004";
+  mkdirSync(join(root, "runtime", "scripts"), { recursive: true });
+  mkdirSync(fakeBin);
+  copyFileSync(join(repoRoot, "runtime", "scripts", "self-update.sh"), join(root, "runtime", "scripts", "self-update.sh"));
+  copyFileSync(join(repoRoot, "runtime", "scripts", "compose-project.sh"), join(root, "runtime", "scripts", "compose-project.sh"));
+  chmodSync(join(root, "runtime", "scripts", "self-update.sh"), 0o700);
+  writeFileSync(join(root, "VERSION"), "v1.4.12\n");
+  writeFileSync(join(fakeBin, "docker"), "#!/usr/bin/env bash\nexit 0\n", { mode: 0o700 });
+
+  const server = createServer((req, res) => {
+    if (req.url === "/repos/Red-Blink/dune-awakening-selfhost-docker/releases/tags/v1.4.16") {
+      const address = server.address();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ tag_name: "v1.4.16", tarball_url: `http://127.0.0.1:${address.port}/stalled.tar.gz` }));
+      return;
+    }
+    if (req.url === "/stalled.tar.gz") {
+      res.writeHead(200, { "content-type": "application/gzip" });
+      res.write("partial archive data");
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+  await new Promise((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+
+  try {
+    const address = server.address();
+    const result = await runProcess("bash", ["runtime/scripts/self-update.sh", "install", "v1.4.16"], {
+      cwd: root,
+      timeout: 10000,
+      env: {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        DUNE_SELF_UPDATE_API_BASE: `http://127.0.0.1:${address.port}`,
+        DUNE_SELF_UPDATE_REPO: "Red-Blink/dune-awakening-selfhost-docker",
+        DUNE_SELF_UPDATE_RUN_ID: runId,
+        DUNE_SELF_UPDATE_DOWNLOAD_TIMEOUT_SECONDS: "2",
+        DUNE_SELF_UPDATE_PROGRESS_INTERVAL_SECONDS: "1",
+        NO_PROXY: "127.0.0.1,localhost",
+        no_proxy: "127.0.0.1,localhost"
+      }
+    });
+
+    assert.equal(result.status, 124, result.stderr || result.stdout);
+    assert.match(result.stderr, /Downloading console release v1\.4\.16 timed out after 2 seconds/);
+    assert.equal(readFileSync(join(root, "VERSION"), "utf8"), "v1.4.12\n");
+    assert.deepEqual(readdirSync(join(root, "runtime", "backups", "self-update")), []);
+    const status = readFileSync(join(root, "runtime", "generated", "self-update-status", `${runId}.env`), "utf8");
+    assert.match(status, /^state=failed$/m);
+    assert.match(status, /^stage=downloading$/m);
+    assert.match(status, /^percent=20$/m);
+    assert.match(status, /^message=Downloading console release v1\.4\.16 timed out after 2 seconds\. Check the server's connection to GitHub, then retry\.$/m);
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolveClose) => server.close(resolveClose));
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("self-update refuses a concurrent install and records a durable busy result", async () => {
   const root = mkdtempSync(join(tmpdir(), "arrakis-self-update-lock-"));
   const runId = "123e4567-e89b-42d3-a456-426614174001";

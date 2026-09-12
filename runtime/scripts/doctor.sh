@@ -446,7 +446,8 @@ echo
 echo "=== Steam server files ==="
 app_id="$(config_value .env STEAM_APP_ID || true)"
 app_id="${app_id:-${STEAM_APP_ID:-4754530}}"
-if is_running dune-orchestrator; then
+orchestrator_container="$(dune_compose_running_service_container "$DUNE_COMPOSE_PROJECT_NAME" orchestrator 2>/dev/null || true)"
+if [ -n "$orchestrator_container" ] && is_running "$orchestrator_container"; then
   if docker compose exec -T orchestrator test -f "/srv/dune/server/steamapps/appmanifest_${app_id}.acf" 2>/dev/null; then
     ok "Steam appmanifest found for app $app_id"
   else
@@ -454,7 +455,7 @@ if is_running dune-orchestrator; then
     echo "     Run first-time setup: dune init"
   fi
 else
-  warn_msg "dune-orchestrator is not running; cannot inspect Steam appmanifest"
+  warn_msg "The orchestrator service is not running; cannot inspect Steam appmanifest"
 fi
 
 echo

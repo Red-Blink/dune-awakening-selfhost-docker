@@ -10,9 +10,9 @@ source runtime/scripts/host-file-ownership.sh
 # shellcheck source=runtime/scripts/lib/secrets.sh
 source runtime/scripts/lib/secrets.sh
 
+# shellcheck disable=SC1091
+source runtime/scripts/compose-project.sh
 if [ -z "${DUNE_COMPOSE_PROJECT_NAME:-}" ]; then
-  # shellcheck disable=SC1091
-  source runtime/scripts/compose-project.sh
   DUNE_COMPOSE_PROJECT_NAME="$(dune_resolve_compose_project_name "$(pwd -P)")"
   export DUNE_COMPOSE_PROJECT_NAME
 fi
@@ -298,7 +298,7 @@ detect_docker_desktop_host_bind_ip() {
   command -v docker >/dev/null 2>&1 || return 1
   docker info --format '{{.OperatingSystem}}' 2>/dev/null | grep -qi 'docker desktop' || return 1
 
-  container="$(docker ps --filter name='^/dune-orchestrator$' --format '{{.Names}}' 2>/dev/null | head -n1 || true)"
+  container="$(dune_compose_running_service_container "$DUNE_COMPOSE_PROJECT_NAME" orchestrator 2>/dev/null || true)"
   if [ -n "$container" ]; then
     ip="$(docker exec "$container" sh -c "ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if(\$i==\"src\"){print \$(i+1); exit}}'" 2>/dev/null | tr -d '[:space:]' || true)"
     if is_ipv4 "$ip"; then

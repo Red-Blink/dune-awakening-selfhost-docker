@@ -24,6 +24,8 @@ const ALLOWED_ADDON_PERMISSIONS = new Set([
   "database:read",
   "database:write",
   "admin:grant-items",
+  "rewards:grant",
+  "players:message",
   "server:status",
   "server:restart",
   "files:addon-data",
@@ -508,11 +510,23 @@ export function removeInstalledAddon(config, addonId) {
   const addonDir = resolve(addonsInstalledRoot(config), id);
   if (!existsSync(addonDir)) throw new Error(`Installed addon not found: ${id}`);
   removeAddonJobState(config, id);
+  removeAddonOwnedState(config, id);
   rmSync(addonDir, { recursive: true, force: true });
   const state = readAddonState(config);
   delete state[id];
   writeAddonState(config, state);
   return { ok: true, id };
+}
+
+function removeAddonOwnedState(config, addonId) {
+  for (const relativePath of [
+    `runtime/addons/data/${addonId}`,
+    `runtime/addons/deliveries/${addonId}`,
+    `runtime/addons/grant-receipts/${addonId}.json`
+  ]) {
+    const target = resolve(config.repoRoot, relativePath);
+    if (existsSync(target)) rmSync(target, { recursive: true, force: true });
+  }
 }
 
 function removeAddonJobState(config, addonId) {

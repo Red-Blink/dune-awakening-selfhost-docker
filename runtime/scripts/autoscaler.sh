@@ -251,11 +251,35 @@ print("0")
 PY
 }
 
+director_map_max_parties() {
+  local map="$1"
+  local config_path="${DUNE_DIRECTOR_CONFIG_FILE:-runtime/director/config/director_config.ini}"
+
+  [ -r "$config_path" ] || return 1
+  awk -v target="$map" '
+    /^[[:space:]]*\[[^]]+\][[:space:]]*$/ {
+      section = $0
+      sub(/^[[:space:]]*\[/, "", section)
+      sub(/\][[:space:]]*$/, "", section)
+      next
+    }
+    section == target && /^[[:space:]]*MaxParties[[:space:]]*=/ {
+      value = $0
+      sub(/^[^=]*=[[:space:]]*/, "", value)
+      sub(/[[:space:]]*[;#].*$/, "", value)
+      sub(/[[:space:]]*$/, "", value)
+      print value
+      found = 1
+      exit
+    }
+    END { if (!found) exit 1 }
+  ' "$config_path"
+}
+
 map_requires_isolated_party_dimension() {
-  case "$1" in
-    CB_Overland_S_07|CB_Overland_S_08) return 0 ;;
-    *) return 1 ;;
-  esac
+  local max_parties
+  max_parties="$(director_map_max_parties "$1" 2>/dev/null)" || return 1
+  [ "$max_parties" = "1" ]
 }
 
 map_exists() {
@@ -1640,6 +1664,7 @@ handle_demand() {
   local num="$2"
   local event_id="${3:-}"
   local demand_source="${4:-request}"
+  local instancing_mode="${5:-}"
   local dedicated_scaling
   local now
 
@@ -1691,18 +1716,21 @@ handle_demand() {
   dedicated_scaling="$(map_uses_dedicated_scaling "$map")"
 
   if [ "$dedicated_scaling" = "1" ]; then
-    if map_requires_isolated_party_dimension "$map"; then
+    # ClassicalInstancing is the Director's authoritative indication that
+    # each queued party needs separate capacity. Keep the configured policy
+    # fallback for recovery paths that do not originate from a travel event.
+    if [ "$instancing_mode" = "ClassicalInstancing" ] || map_requires_isolated_party_dimension "$map"; then
       local occupied max_dimensions desired capacity
       occupied="$(occupied_dimensions_for_map "$map")"
       max_dimensions="$(max_dimensions_for_map "$map")"
       [[ "$occupied" =~ ^[0-9]+$ ]] || occupied=0
       [[ "$max_dimensions" =~ ^[1-9][0-9]*$ ]] || max_dimensions=1
 
-      # These Landsraad activity maps admit one party per dimension. A new
+      # Party-isolated activity maps admit one party per dimension. A new
       # request needs one dimension in addition to those already occupied;
-      # a queue summary reports every solo player still waiting. Count
-      # warming containers as capacity so repeated summaries cannot fill all
-      # configured dimensions while the requested server is starting.
+      # a queue summary reports every solo player still waiting. Count warming
+      # containers as capacity so repeated summaries cannot fill every
+      # configured dimension while the requested server is starting.
       desired=$((occupied + num))
       [ "$desired" -le "$max_dimensions" ] || desired="$max_dimensions"
       capacity="$assigned"
@@ -2269,7 +2297,7 @@ classical_pattern = re.compile(
 )
 request_pattern = re.compile(
     r"Received travel request for ([0-9]+) player\(s\) to ([A-Za-z0-9_]+) "
-    r"\(instancingMode=(?:ClassicalInstancing|Dimension)\)"
+    r"\(instancingMode=(ClassicalInstancing|Dimension)\)"
 )
 
 seen = set()
@@ -2279,6 +2307,7 @@ for line in sys.stdin:
     if match:
         map_name = match.group(1)
         num = int(match.group(2))
+        instancing_mode = "ClassicalInstancing"
         if map_name == "DeepDesert_1":
             continue
         # Smugglers Run is handled from its original request below. Repeated
@@ -2292,6 +2321,7 @@ for line in sys.stdin:
             continue
         num = int(match.group(1))
         map_name = match.group(2)
+        instancing_mode = match.group(3)
 
     if num <= 0:
         continue
@@ -2303,13 +2333,13 @@ for line in sys.stdin:
 
     seen.add(key)
     source = "queue" if classical_pattern.search(line) else "request"
-    print(f"{event_id}|{map_name}|{num}|{source}")
+    print(f"{event_id}|{map_name}|{num}|{source}|{instancing_mode}")
 '
   )"
 
-  while IFS='|' read -r event_id map num demand_source; do
+  while IFS='|' read -r event_id map num demand_source instancing_mode; do
     [ -n "${map:-}" ] || continue
-    handle_demand "$map" "$num" "$event_id" "$demand_source"
+    handle_demand "$map" "$num" "$event_id" "$demand_source" "$instancing_mode"
   done <<< "$demand_rows"
 }
 

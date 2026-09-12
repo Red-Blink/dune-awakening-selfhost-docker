@@ -61,8 +61,10 @@ first_known_value() {
 steam_build_id() {
   local app_id="$1"
   local manifest="/tmp/dune-appmanifest-${app_id}.acf"
+  local orchestrator_container=""
 
-  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dune-orchestrator; then
+  orchestrator_container="$(dune_compose_running_service_container "$DUNE_COMPOSE_PROJECT_NAME" orchestrator 2>/dev/null || true)"
+  if [ -n "$orchestrator_container" ]; then
     docker compose exec -T orchestrator sh -lc "cat /srv/dune/server/steamapps/appmanifest_${app_id}.acf 2>/dev/null" > "$manifest" 2>/dev/null || true
     if [ -s "$manifest" ]; then
       awk '/"buildid"/ { gsub(/"/, "", $2); print $2; exit }' "$manifest"

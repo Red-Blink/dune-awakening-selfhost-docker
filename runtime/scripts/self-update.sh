@@ -165,6 +165,16 @@ self_update_finish_success() {
   SELF_UPDATE_STATUS_FINALIZED=1
 }
 
+self_update_finish_failure() {
+  local stage="$1"
+  local percent="$2"
+  local message="$3"
+  local now
+  now="$(date -Is)"
+  self_update_write_status failed "$stage" "$percent" "$message" "$now"
+  SELF_UPDATE_STATUS_FINALIZED=1
+}
+
 self_update_on_exit() {
   local rc=$?
   trap - EXIT
@@ -224,13 +234,110 @@ detect_host_repo_root() {
 HOST_ROOT_DIR="$(detect_host_repo_root)"
 export DUNE_HOST_REPO_ROOT="$HOST_ROOT_DIR"
 
-api_curl_common_args() {
+github_curl_headers() {
   printf '%s\n' \
     -H "Accept: application/vnd.github+json" \
     -H "X-GitHub-Api-Version: 2022-11-28"
   if [ -n "$GITHUB_TOKEN" ]; then
     printf '%s\n' -H "Authorization: Bearer $GITHUB_TOKEN"
   fi
+}
+
+api_curl_common_args() {
+  printf '%s\n' \
+    --connect-timeout 15 \
+    --max-time 60 \
+    --retry 2 \
+    --retry-delay 2 \
+    --retry-all-errors
+  github_curl_headers
+}
+
+self_update_download_timeout_seconds() {
+  local value="${DUNE_SELF_UPDATE_DOWNLOAD_TIMEOUT_SECONDS:-7200}"
+  if [[ "$value" =~ ^[0-9]+$ ]] && [ "$value" -ge 2 ] && [ "$value" -le 14400 ]; then
+    printf '%s\n' "$value"
+  else
+    printf '%s\n' 7200
+  fi
+}
+
+self_update_progress_interval_seconds() {
+  local value="${DUNE_SELF_UPDATE_PROGRESS_INTERVAL_SECONDS:-5}"
+  if [[ "$value" =~ ^[0-9]+$ ]] && [ "$value" -ge 1 ] && [ "$value" -le 30 ]; then
+    printf '%s\n' "$value"
+  else
+    printf '%s\n' 5
+  fi
+}
+
+download_archive_with_progress() {
+  local url="$1"
+  local out="$2"
+  local label="$3"
+  local timeout_seconds interval_seconds error_file curl_pid curl_rc bytes megabytes ticks=0
+  local -a curl_args
+
+  timeout_seconds="$(self_update_download_timeout_seconds)"
+  interval_seconds="$(self_update_progress_interval_seconds)"
+  error_file="$(mktemp)"
+  mapfile -t curl_args < <(github_curl_headers)
+
+  self_update_running downloading 20 "$label (starting download)."
+  set +e
+  timeout --signal=TERM --kill-after=10 "${timeout_seconds}s" \
+    curl -fsSL \
+      "${curl_args[@]}" \
+      --connect-timeout 15 \
+      --retry 3 \
+      --retry-delay 3 \
+      --retry-all-errors \
+      --speed-limit 1024 \
+      --speed-time 120 \
+      -L "$url" -o "$out" 2>"$error_file" &
+  curl_pid=$!
+  set -e
+
+  while kill -0 "$curl_pid" 2>/dev/null; do
+    sleep 1
+    kill -0 "$curl_pid" 2>/dev/null || break
+    ticks=$((ticks + 1))
+    [ "$ticks" -ge "$interval_seconds" ] || continue
+    ticks=0
+    bytes="$(stat -c '%s' "$out" 2>/dev/null || printf '0')"
+    [[ "$bytes" =~ ^[0-9]+$ ]] || bytes=0
+    megabytes=$((bytes / 1048576))
+    self_update_running downloading 20 "$label (${megabytes} MB received)."
+  done
+
+  set +e
+  wait "$curl_pid"
+  curl_rc=$?
+  set -e
+  if [ "$curl_rc" -ne 0 ]; then
+    if [ "$curl_rc" -eq 124 ]; then
+      self_update_finish_failure downloading 20 "$label timed out after ${timeout_seconds} seconds. Check the server's connection to GitHub, then retry."
+      echo "$label timed out after ${timeout_seconds} seconds." >&2
+    elif [ -s "$error_file" ]; then
+      self_update_finish_failure downloading 20 "$label failed after retrying. Check the server's connection to GitHub, then retry."
+      cat "$error_file" >&2
+    else
+      self_update_finish_failure downloading 20 "$label failed after retrying. Check the server's connection to GitHub, then retry."
+    fi
+    rm -f "$error_file"
+    return "$curl_rc"
+  fi
+
+  rm -f "$error_file"
+  bytes="$(stat -c '%s' "$out" 2>/dev/null || printf '0')"
+  [[ "$bytes" =~ ^[0-9]+$ ]] || bytes=0
+  if [ "$bytes" -le 0 ]; then
+    self_update_finish_failure downloading 20 "$label completed without an archive. Retry the update."
+    echo "Release download completed without an archive." >&2
+    return 22
+  fi
+  megabytes=$((bytes / 1048576))
+  self_update_running downloading 35 "$label (${megabytes} MB received; validating archive)."
 }
 
 api_get() {
@@ -548,18 +655,7 @@ download_release_archive() {
     exit 2
   fi
 
-  if [ -n "$GITHUB_TOKEN" ]; then
-    curl -fsSL \
-      -H "Accept: application/vnd.github+json" \
-      -H "Authorization: Bearer $GITHUB_TOKEN" \
-      -H "X-GitHub-Api-Version: 2022-11-28" \
-      -L "$tarball_url" -o "$out"
-  else
-    curl -fsSL \
-      -H "Accept: application/vnd.github+json" \
-      -H "X-GitHub-Api-Version: 2022-11-28" \
-      -L "$tarball_url" -o "$out"
-  fi
+  download_archive_with_progress "$tarball_url" "$out" "Downloading console release $tag"
 }
 
 backup_current_stack() {
@@ -938,12 +1034,12 @@ validate_commit_sha() {
 download_commit_archive() {
   local sha="$1"
   local out="$2"
-  local -a curl_args
 
   self_update_running downloading 20 "Downloading QA build ${sha:0:8}."
-  mapfile -t curl_args < <(api_curl_common_args)
-  curl -fsSL "${curl_args[@]}" -L \
-    "${GITHUB_API_BASE}/repos/${GITHUB_REPO}/tarball/${sha}" -o "$out"
+  download_archive_with_progress \
+    "${GITHUB_API_BASE}/repos/${GITHUB_REPO}/tarball/${sha}" \
+    "$out" \
+    "Downloading QA build ${sha:0:8}"
 }
 
 install_qa_commit() {
@@ -1273,7 +1369,7 @@ install_cli_command_after_update() {
 
 install_release_tag_with_git() {
   local tag="$1"
-  local backup_dir target remote
+  local backup_dir target remote timeout_seconds fetch_rc
 
   validate_release_tag_for_git "$tag" || {
     echo "Invalid release tag for Git checkout: $tag"
@@ -1284,9 +1380,23 @@ install_release_tag_with_git() {
   echo "Updating stack Git checkout from:"
   echo "  $remote"
   echo "Fetching release tag: $tag"
-  GIT_TERMINAL_PROMPT=0 git fetch --force --tags "$remote"
-  GIT_TERMINAL_PROMPT=0 git fetch --force "$remote" "refs/tags/${tag}:refs/tags/${tag}" >/dev/null 2>&1 || true
-
+  timeout_seconds="$(self_update_download_timeout_seconds)"
+  self_update_running downloading 20 "Fetching console release $tag."
+  set +e
+  timeout --signal=TERM --kill-after=10 "${timeout_seconds}s" \
+    env GIT_TERMINAL_PROMPT=0 git fetch --force --tags "$remote"
+  fetch_rc=$?
+  set -e
+  if [ "$fetch_rc" -ne 0 ]; then
+    if [ "$fetch_rc" -eq 124 ]; then
+      self_update_finish_failure downloading 20 "Fetching console release $tag timed out after ${timeout_seconds} seconds. Check the server's connection to GitHub, then retry."
+      echo "Git release download timed out after ${timeout_seconds} seconds." >&2
+    else
+      self_update_finish_failure downloading 20 "Fetching console release $tag failed. Check the server's connection to GitHub, then retry."
+      echo "Git release download failed." >&2
+    fi
+    return "$fetch_rc"
+  fi
   target="$(git rev-parse -q --verify "refs/tags/${tag}^{commit}" 2>/dev/null || true)"
   if [ -z "$target" ]; then
     echo "Could not resolve release tag in Git after fetch: $tag"

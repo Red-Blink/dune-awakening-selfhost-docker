@@ -367,11 +367,12 @@ for c in \
   dune-server-gateway \
   dune-server-survival-1 \
   dune-server-overmap \
-  dune-coriolis-coordinator \
-  dune-orchestrator
+  dune-coriolis-coordinator
 do
   container_rows="${container_rows}$(printf "%-26s %s" "$c" "$(container_status "$c")")"$'\n'
 done
+orchestrator_container="$(dune_compose_running_service_container "$DUNE_COMPOSE_PROJECT_NAME" orchestrator 2>/dev/null || true)"
+container_rows="${container_rows}$(printf "%-26s %s" "dune-orchestrator" "$(container_status "${orchestrator_container:-dune-orchestrator}")")"$'\n'
 
 postgres_port="$(resolve_postgres_port)"
 rmq_admin_port="$(resolve_rmq_admin_port)"

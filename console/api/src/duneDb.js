@@ -1903,10 +1903,17 @@ export async function addonLeadershipPlayers(db) {
       const controllerId = String(row.player_controller_id || "");
       const actorId = String(row.actor_id || "");
       const accountId = String(row.account_id || "");
+      const flsId = String(row.fls_id || "");
+      const funcomId = String(row.funcom_id || "");
+      const actionPlayerId = String(row.action_player_id || flsId || funcomId || actorId);
       return {
+        playerId: actionPlayerId,
+        actionPlayerId,
         actorId,
         controllerId,
         accountId,
+        flsId,
+        funcomId,
         name: row.character_name || `Player ${actorId}`,
         level: levels.get(controllerId) || levels.get(actorId) || 0,
         faction: factions.get(controllerId) || factions.get(actorId) || "Unassigned",
@@ -1916,6 +1923,53 @@ export async function addonLeadershipPlayers(db) {
         lastSeen: row.last_seen || ""
       };
     })
+  };
+}
+
+// Stable, typed progression surface for addons. Keep unsupported categories
+// explicit instead of inviting third-party SQL to guess at a changing Funcom
+// schema or treating Codex discovery as achievement/exploration progress.
+export async function addonPlayerProgression(db, id, journeyTagsData = {}) {
+  const resolvedPlayer = await resolvePlayerTargetCached(db, id);
+  const actorId = resolvedPlayer.actorId;
+  const safe = (promise, capability, reason) => promise.catch((error) => ({
+    capabilities: { [capability]: false },
+    reason: String(error?.message || reason)
+  }));
+  const [progression, factions, journey] = await Promise.all([
+    safe(playerProgression(db, actorId), "progression", "Player progression is unavailable."),
+    safe(playerFactions(db, actorId, journeyTagsData), "factions", "Faction progression is unavailable."),
+    safe(playerJourney(db, actorId, journeyTagsData), "journey", "Story and side-quest progression is unavailable.")
+  ]);
+  const player = progression.player || factions.player || journey.player || resolvedPlayer;
+  return {
+    player,
+    capabilities: {
+      level: Boolean(progression.capabilities?.progression),
+      faction: Boolean(factions.capabilities?.factions),
+      story: Boolean(journey.capabilities?.journey),
+      sideQuests: Boolean(journey.capabilities?.journey),
+      exploration: false,
+      achievements: false
+    },
+    level: progression.capabilities?.progression ? {
+      level: Number(progression.level || 0),
+      xp: Number(progression.xp || 0),
+      totalSkillPoints: Number(progression.totalSkillPoints || 0),
+      unspentSkillPoints: Number(progression.unspentSkillPoints || 0)
+    } : null,
+    faction: factions.capabilities?.factions ? factions.rows || [] : [],
+    story: journey.capabilities?.journey ? journey.rows?.story || [] : [],
+    sideQuests: journey.capabilities?.journey ? journey.rows?.contract || [] : [],
+    unsupported: {
+      exploration: "The current game database has no verified exploration-progress source.",
+      achievements: "The current game database has no verified achievement-progress source."
+    },
+    reasons: {
+      level: progression.reason || "",
+      faction: factions.reason || "",
+      story: journey.reason || ""
+    }
   };
 }
 

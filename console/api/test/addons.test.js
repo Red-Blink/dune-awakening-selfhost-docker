@@ -320,6 +320,7 @@ test("normalizes addon permission arrays and structured permissions", () => {
   assert.deepEqual(normalizeAddonPermissions(["players:read", "players:read"]), ["players:read"]);
   assert.deepEqual(normalizeAddonPermissions({ database: ["read", "write"], server: ["status"], scheduler: ["server"] }), ["database:read", "database:write", "scheduler:server", "server:status"]);
   assert.deepEqual(normalizeAddonPermissions({ admin: ["grant-items"] }), ["admin:grant-items"]);
+  assert.deepEqual(normalizeAddonPermissions({ rewards: ["grant"], players: ["message"], files: ["addon-data"] }), ["files:addon-data", "players:message", "rewards:grant"]);
   assert.throws(() => normalizeAddonPermissions(["database:drop"]), /not supported/);
   assert.throws(() => normalizeAddonPermissions({ database: "read" }), /must be an array/);
 });
@@ -496,6 +497,15 @@ test("tracks installed addon enable disable and removal state", () => {
     writeFileSync(addonJob, "{}");
     writeFileSync(addonJobTemp, "{}");
     writeFileSync(otherAddonJob, "{}");
+    const dataDir = join(repoRoot, "runtime/addons/data/leadership-board-demo");
+    const deliveriesDir = join(repoRoot, "runtime/addons/deliveries/leadership-board-demo");
+    const receiptPath = join(repoRoot, "runtime/addons/grant-receipts/leadership-board-demo.json");
+    mkdirSync(dataDir, { recursive: true });
+    mkdirSync(deliveriesDir, { recursive: true });
+    mkdirSync(join(repoRoot, "runtime/addons/grant-receipts"), { recursive: true });
+    writeFileSync(join(dataDir, "store.json"), "{}");
+    writeFileSync(join(deliveriesDir, "reward.json"), "{}");
+    writeFileSync(receiptPath, "[]");
     assert.equal(listInstalledAddons(config).addons[0].status, "Disabled");
     assert.throws(() => setInstalledAddonEnabled(config, "leadership-board-demo", true), /must be approved/);
     writeFileSync(join(repoRoot, "runtime/addons/state.json"), JSON.stringify({
@@ -528,6 +538,9 @@ test("tracks installed addon enable disable and removal state", () => {
     assert.equal(existsSync(addonJob), false, "uninstall removes persisted addon jobs");
     assert.equal(existsSync(addonJobTemp), false, "uninstall removes interrupted atomic-write files for addon jobs");
     assert.equal(existsSync(otherAddonJob), true, "uninstall preserves other addons' jobs");
+    assert.equal(existsSync(dataDir), false, "uninstall removes addon-owned data");
+    assert.equal(existsSync(deliveriesDir), false, "uninstall removes addon delivery state");
+    assert.equal(existsSync(receiptPath), false, "uninstall removes legacy grant receipts");
   } finally {
     rmSync(repoRoot, { recursive: true, force: true });
   }

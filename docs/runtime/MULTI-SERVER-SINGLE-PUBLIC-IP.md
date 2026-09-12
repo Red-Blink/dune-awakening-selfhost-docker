@@ -176,6 +176,7 @@ The following inventory represents the audited single-instance host-facing confi
 | Player/Game pool | `7777-7810` | UDP | Dynamic game-server allocation |
 | IGW base | `7888` | UDP | UserEngine `IGWPort`; runtime allocates through base `+33` |
 | IGW pool | `7888-7921` | UDP | Server-to-server/game topology |
+| Public probe direct ICE | `32000-32015` | UDP | Optional direct DuneDocker.app latency; relay fallback when closed |
 | Text Router | `5059` | TCP | Host loopback publish |
 | Admin Web | `8088` | TCP | Web Console host-network listener |
 | Prometheus | `9090` | TCP | Optional metrics host loopback publish |
@@ -186,7 +187,7 @@ The following inventory represents the audited single-instance host-facing confi
 | RMQ Game HTTP | `31983` | TCP | Host-published game RabbitMQ HTTP/management endpoint |
 | RMQ Admin | `32573` | TCP | Host loopback publish to admin RMQ `5672` |
 
-See the "Source-of-Truth Reference" table near the end of this document for exactly which file governs each behavior above. The public-probe Compose configuration was also reviewed; it does not add a fixed host-published port in the audited baseline.
+See the "Source-of-Truth Reference" table near the end of this document for exactly which file governs each behavior above. The public probe uses host networking on native Linux and confines direct ICE listeners to UDP `32000-32015`.
 
 ---
 
@@ -197,6 +198,7 @@ See the "Source-of-Truth Reference" table near the end of this document for exac
 | Function | VM1 / Instance 1 | VM2 / Instance 2 | VM3 / Instance 3 |
 |---|---:|---:|---:|
 | Player/Game UDP | `7777-7810` | `8777-8810` | `9777-9810` |
+| Public probe direct ICE UDP | `32000-32015` | `32000-32015` | `32000-32015` |
 | IGW UDP | `7888-7921` | `8888-8921` | `9888-9921` |
 | Text Router TCP | `5059` | `6059` | `7059` |
 | Admin Web TCP | `8088` | `9088` | `10088` |
@@ -535,7 +537,7 @@ Use the project's normal stop workflow, then inspect:
 docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 ```
 
-The helper refuses to apply while Dune game/database containers are running unless `--allow-running` is supplied. The console, orchestrator, and public-probe containers are excluded from this check -- but for a different reason for each. The orchestrator and public-probe genuinely hold no host-facing port this tool rewrites, so leaving them running is never unsafe. **The console is different: it runs with `network_mode: host` and does listen directly on `ADMIN_BIND_PORT`/`ADMIN_WEB_PORT`, a port this tool's `apply` step does rewrite in `.env`.** It's excluded from the running-container check purely because you are almost always using the console itself to reach this tool in the first place, and `apply` only writes files -- it never touches already-running containers -- so leaving the console running during `apply` is safe in the sense that nothing crashes or corrupts. It is **not** safe in the sense of "already using the new port": the running console process keeps listening on its old `ADMIN_BIND_PORT` until it is explicitly restarted, exactly like every other Dune service this tool reconfigures. Restart the console (along with the rest of the stack) after `apply`, per the final step of this phase, before assuming the new Admin Web port is live.
+The helper refuses to apply while Dune game/database containers are running unless `--allow-running` is supplied. The console, orchestrator, and public-probe containers are excluded from this check -- but for a different reason for each. The orchestrator has no host-facing listener this tool rewrites. The public probe's dedicated UDP `32000-32015` range is fixed and is not rewritten by the profile tool, so leaving it running is safe during profile generation. **The console is different: it runs with `network_mode: host` and does listen directly on `ADMIN_BIND_PORT`/`ADMIN_WEB_PORT`, a port this tool's `apply` step does rewrite in `.env`.** It's excluded from the running-container check purely because you are almost always using the console itself to reach this tool in the first place, and `apply` only writes files -- it never touches already-running containers -- so leaving the console running during `apply` is safe in the sense that nothing crashes or corrupts. It is **not** safe in the sense of "already using the new port": the running console process keeps listening on its old `ADMIN_BIND_PORT` until it is explicitly restarted, exactly like every other Dune service this tool reconfigures. Restart the console (along with the rest of the stack) after `apply`, per the final step of this phase, before assuming the new Admin Web port is live.
 
 > **In practice, `--allow-running` is required for this documented flow to work at all, not an edge case.** `docker ps` shown above will still list the console container itself after a normal `dune stop` (it's management tooling, not part of "the stack" this phase means) -- since you are almost always using the console (or a shell on the same host it's running on) to reach this tool in the first place, plan on passing `--allow-running` every time you follow this phase, immediately after stopping the game/database containers, not only when you hit the refusal message.
 
@@ -649,15 +651,17 @@ sudo ufw allow 31982/tcp
 sudo ufw allow 31983/tcp
 sudo ufw allow 7777:7810/udp
 sudo ufw allow 7888:7921/udp
+sudo ufw allow 32000:32015/udp
 
 # VM2 (same pattern, VM2's own port values)
 sudo ufw allow 32982/tcp
 sudo ufw allow 32983/tcp
 sudo ufw allow 8777:8810/udp
 sudo ufw allow 8888:8921/udp
+sudo ufw allow 32000:32015/udp
 ```
 
-Every additional VM follows the identical pattern with that instance's own values.
+Every additional VM follows the identical pattern with that instance's own values. Permit or forward UDP `32000-32015` at the internet-to-DMZ boundary as well as on the VM itself when direct public probe results are desired.
 
 For Admin Web, prefer management-subnet restrictions rather than unrestricted WAN rules:
 
@@ -921,7 +925,7 @@ VM3 Prometheus 11090
 
 Prometheus should normally remain private. If an operator intentionally exposes it, apply the same site-wide forwarding and security review used for every other externally reachable service.
 
-The current public-probe Compose configuration does not add a fixed host-published port in the audited baseline.
+The public probe uses host networking and direct ICE UDP `32000-32015`; relay remains available when the range is closed.
 
 ---
 

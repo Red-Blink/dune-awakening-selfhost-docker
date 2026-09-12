@@ -2300,6 +2300,7 @@ test("addon leadership players include level and faction summaries", async () =>
     ["Test Two", 7, "Harkonnen"]
   ]);
   assert.deepEqual(result.rows.map((row) => row.guild), ["Water Sellers", "Spice Guild"]);
+  assert.deepEqual(result.rows.map((row) => row.playerId), ["101", "102"]);
 });
 
 test("addon player identities expose the narrow identity shape in one platform lookup", async () => {

@@ -4,6 +4,8 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 PORT_RESERVATION_FILE="runtime/generated/spawn-port-reservations.tsv"
 PORT_LOCK_FILE="runtime/generated/spawn-port-reservations.lock"
+# shellcheck source=runtime/scripts/landsraad-instance-cleanup.sh
+source runtime/scripts/landsraad-instance-cleanup.sh
 
 usage() {
   cat <<'EOF'
@@ -254,6 +256,8 @@ where server_id = '$server_id';
 commit;
 "
   fi
+
+  cleanup_landsraad_instance_after_shutdown "$container_map" "$partition_id"
 
   if [ "$container_map" = "Survival_1" ]; then
     runtime/scripts/sietches.sh sync >/dev/null 2>&1 || true

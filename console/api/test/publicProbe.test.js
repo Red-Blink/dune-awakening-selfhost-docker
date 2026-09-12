@@ -13,12 +13,16 @@ test("public probe implements a bounded WebRTC data-channel echo", () => {
   assert.match(source, /messages >= 20/);
   assert.match(source, /maxSessions\s+=\s+4/);
   assert.match(source, /sessionLifetime\s+=\s+20 \* time\.Second/);
+  assert.match(source, /probeUDPPortMin\s+=\s+32000/);
+  assert.match(source, /probeUDPPortMax\s+=\s+32015/);
+  assert.match(source, /SetEphemeralUDPPortRange\(probeUDPPortMin, probeUDPPortMax\)/);
+  assert.match(source, /a\.webrtc\.NewPeerConnection\(configuration\)/);
   assert.match(source, /slots:\s+make\(chan struct\{\}, maxSessions\)/);
   assert.match(source, /DUNE_PUBLIC_PROBE_SIGNAL_URL/);
   assert.match(source, /https:\/\/dunedocker\.app\//);
 });
 
-test("public probe does not publish ports and runs with restricted privileges", () => {
+test("public probe uses host ICE listeners without Docker port publishing and runs with restricted privileges", () => {
   const compose = readFileSync(resolve(repoRoot, "docker-compose.public-probe.yml"), "utf8");
   const hostCompose = readFileSync(resolve(repoRoot, "docker-compose.public-probe-host.yml"), "utf8");
   assert.doesNotMatch(compose, /^\s+ports:/m);
@@ -39,6 +43,7 @@ test("public probe image runs as an unprivileged dedicated user", () => {
   assert.match(dockerfile, /FROM golang:1\.25-alpine AS build/);
   assert.match(dockerfile, /USER probe/);
   assert.match(dockerfile, /CGO_ENABLED=0/);
+  assert.match(dockerfile, /RUN go test \.\/\.\.\./);
   assert.match(dockerfile, /HEALTHCHECK .*kill -0 1/);
 });
 
@@ -53,6 +58,7 @@ test("public probe lifecycle script is executable and supports clean shutdown", 
   assert.match(script, /use_host_network/);
   assert.match(script, /microsoft\|wsl/);
   assert.match(script, /native Linux LAN discovery/);
+  assert.match(script, /Direct UDP: 32000-32015/);
   assert.match(script, /outbound-only WebRTC compatibility mode/);
   assert.match(script, /DUNE_PUBLIC_PROBE_FORCE_BRIDGE=true compose up -d/);
 });

@@ -18,7 +18,8 @@ Usage:
   public-probe.sh status
 
 The public latency probe uses authenticated signaling through dunedocker.app.
-It does not publish a fixed host port or require port forwarding.
+Direct measurements use UDP 32000-32015. Permit or forward that range through
+the host and upstream firewall for direct results; relay remains available.
 EOF
 }
 
@@ -105,6 +106,7 @@ status_probe() {
     network_mode="$(docker inspect "$CONTAINER" --format '{{.HostConfig.NetworkMode}}' 2>/dev/null || true)"
     if [ "$network_mode" = "host" ]; then
       echo "Network: WebRTC with native Linux LAN discovery"
+      echo "Direct UDP: 32000-32015 (optional; relay fallback remains available)"
     else
       echo "Network: outbound-only WebRTC compatibility mode"
     fi

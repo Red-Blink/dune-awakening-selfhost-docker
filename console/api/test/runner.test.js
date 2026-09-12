@@ -51,6 +51,33 @@ test("live Docker logs do not buffer output and stop when the client aborts", as
   assert.equal(result.stderr, "");
 });
 
+test("orchestrator logs use the Compose service instead of a fixed container name", async () => {
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.kill = () => {};
+  let command = null;
+  let args = null;
+  let spawnOptions = null;
+  const resultPromise = runDockerLogs("orchestrator", {
+    tail: 25,
+    timeoutMs: 1000,
+    spawnImpl: (nextCommand, nextArgs, nextOptions) => {
+      command = nextCommand;
+      args = nextArgs;
+      spawnOptions = nextOptions;
+      return child;
+    }
+  });
+  child.emit("close", 0, null);
+  await resultPromise;
+
+  assert.equal(command, "docker");
+  assert.deepEqual(args, ["compose", "logs", "--tail", "25", "orchestrator"]);
+  assert.equal(spawnOptions.shell, false);
+  assert.ok(!args.includes("dune-orchestrator"));
+});
+
 test("current game logs are read from the allowlisted container without interpolating service input", async () => {
   const child = new EventEmitter();
   child.stdout = new EventEmitter();
