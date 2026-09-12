@@ -93,7 +93,10 @@ Defined in `docker-compose.public-probe.yml` (a small Go program,
 that switches it to `network_mode: host`. Requires three mandatory env vars
 (`DUNE_PUBLIC_PROBE_SERVER_ID`, `_SECRET`, `_SIGNAL_URL`). This is the
 mechanism backing the DuneDocker.app public server directory heartbeat —
-see the root [`README.md`](../../README.md), "Public Server Directory."
+see the root [`README.md`](../../README.md), "Public Server Directory." On
+native Linux it confines direct ICE candidates to UDP `32000-32015`; when that
+range is not permitted through the host and upstream network, the website's
+relay path remains available.
 
 ### 1.5 The gameplay containers (raw `docker run`, not Compose)
 

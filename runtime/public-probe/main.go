@@ -24,6 +24,8 @@ const (
 	maxMessageBytes  = 256
 	maxSessions      = 4
 	sessionLifetime  = 20 * time.Second
+	probeUDPPortMin  = 32000
+	probeUDPPortMax  = 32015
 )
 
 type config struct {
@@ -51,6 +53,7 @@ type answerPayload struct {
 type agent struct {
 	config config
 	client *http.Client
+	webrtc *webrtc.API
 	wg     sync.WaitGroup
 	slots  chan struct{}
 }
@@ -63,9 +66,14 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
+	rtcAPI, err := newWebRTCAPI()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	a := &agent{
 		config: cfg,
+		webrtc: rtcAPI,
 		client: &http.Client{
 			Timeout: 35 * time.Second,
 			Transport: &http.Transport{
@@ -77,9 +85,17 @@ func main() {
 		},
 		slots: make(chan struct{}, maxSessions),
 	}
-	log.Printf("WebRTC probe agent starting for server %s", cfg.serverID)
+	log.Printf("WebRTC probe agent starting for server %s with direct UDP ports %d-%d", cfg.serverID, probeUDPPortMin, probeUDPPortMax)
 	a.run(ctx)
 	a.wg.Wait()
+}
+
+func newWebRTCAPI() (*webrtc.API, error) {
+	settingEngine := webrtc.SettingEngine{}
+	if err := settingEngine.SetEphemeralUDPPortRange(probeUDPPortMin, probeUDPPortMax); err != nil {
+		return nil, fmt.Errorf("configure direct UDP port range: %w", err)
+	}
+	return webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine)), nil
 }
 
 func loadConfig() (config, error) {
@@ -180,7 +196,7 @@ func (a *agent) handleJob(parent context.Context, job probeJob) error {
 		})
 	}
 
-	peer, err := webrtc.NewPeerConnection(configuration)
+	peer, err := a.webrtc.NewPeerConnection(configuration)
 	if err != nil {
 		return err
 	}
