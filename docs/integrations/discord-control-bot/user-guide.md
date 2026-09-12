@@ -13,8 +13,8 @@ It does not perform server mutations, player actions, database writes, backup re
 | `/dune health` | Public | Whether the Console adapter is online and read-only. |
 | `/dune status` | Public | Public Status summary for the server. |
 | `/dune status detail` | Admin/Owner | Detailed Status with additional redacted diagnostics. |
-| `/dune readiness` | Observer+ | Whether server components appear ready. |
-| `/dune services` | Observer+ | Friendly service status summary. |
+| `/dune readiness` | Player+ | Whether server components appear ready. |
+| `/dune services` | Player+ | Friendly service status summary. |
 
 ## Public Status
 

@@ -44,7 +44,7 @@ Session tier and identity stay in the in-memory session store; they are not plac
 
 ## Policies
 
-The default policies preserve full owner access and provide conservative defaults for future admin, moderator, player, and observer sessions. Password logins and `ADMIN_AUTH_DISABLED=1` create owner sessions, so existing Console installations keep their current behavior.
+The default policies preserve full owner access and apply a deliberately **over-restrictive** default to the lower tiers (see *Tier model* below). Password logins and `ADMIN_AUTH_DISABLED=1` create owner sessions, so existing Console installations keep their current behavior.
 
 Policy documents use this shape:
 
@@ -60,7 +60,7 @@ Policy documents use this shape:
 }
 ```
 
-`Action` may be one string or an array. Exact actions, namespace wildcards such as `players:*`, and `*` are supported. Explicit Deny statements override Allow statements for every tier, including owner.
+`Action` may be one string or an array. Exact actions, namespace wildcards such as `players:*`, and `*` are supported. Explicit Deny statements override Allow statements for every tier, including owner. An action pattern may contain only lowercase letters, digits, `:`, `-` and `*` (the only wildcard); a save containing anything else is refused and names the offending pattern, so a typo can never be persisted and break every request for that tier.
 
 ### Every action must exist
 
@@ -74,7 +74,7 @@ This exists because the failure is asymmetric. A misspelled action in an **Allow
 
 No route resolves to `players:reset-progression` — the route resolves to `players:reset` — so that statement denies nothing at all. It was this document's own example.
 
-`GET /api/settings/iam/policies` returns an `actions` array alongside the policies: the full catalog, sorted. Policies are hand-authored JSON with no editor UI, so that response is the vocabulary to author against.
+`GET /api/settings/iam/policies` returns an `actions` array alongside the policies: the full catalog, sorted (also duplicated under `allActions`, for the Access Control editor -- see below). Policies are hand-authored JSON with no editor UI otherwise, so that response is the vocabulary to author against.
 
 A file at `runtime/generated/iam-policies.json` that already names a dead action is **loaded, not discarded** — the Console logs one warning per pattern at startup and keeps the operator's policy in force. Rejecting the document would silently revert their whole policy to defaults, a bigger surprise than the dead pattern.
 
@@ -82,7 +82,7 @@ A file at `runtime/generated/iam-policies.json` that already names a dead action
 
 The policy API is owner-only under the default policy:
 
-- `GET /api/settings/iam/policies` returns the active policy store plus `actions`, the full catalog of valid action names.
+- `GET /api/settings/iam/policies` returns the active policy store plus `actions`, the full catalog of valid action names (also `actionMap`/`allActions`/`namespaces`, which the Access Control editor uses for its route-centric view).
 - `PUT /api/settings/iam/policy` validates and atomically saves the complete policy store to `runtime/generated/iam-policies.json`.
 - `POST /api/settings/iam/policy/test` evaluates an action for a tier without changing policy, and reports whether the action exists (`known`).
 
@@ -104,7 +104,7 @@ Updates that remove the owner's `settings:write` access are rejected so the loca
 | `players:repair` | gear, faction reputation, landsraad quests, login queue, vehicle decay, refuel, refill water |
 | `players:recover` | character recovery |
 
-**`players:mutate` is no longer in the catalog, but it still means what it meant.** See [Upgrading a policy that names a removed action](#upgrading-a-policy-that-names-a-removed-action) below. Shipped defaults are unchanged — `owner` (`*`) and `admin` (`players:*`) still reach everything, and `moderator`/`player`/`observer` are untouched.
+**`players:mutate` is no longer in the catalog, but it still means what it meant.** See [Upgrading a policy that names a removed action](#upgrading-a-policy-that-names-a-removed-action) below. `owner` (`*`) still reaches everything. **Fork-specific note:** unlike upstream's default (`admin`: `players:*`, reaching everything), this fork's Tier 1 `admin` is deliberately narrowed to an explicit allow list plus a crown-jewel `Deny` -- see the Tier model below for exactly what `admin`/`moderator`/`player` reach.
 
 `guilds:mutate` was split for the same reason. `DELETE /api/guilds/{guildId}` is **disband** — it destroys the guild — and it shared one action with promoting a member, so a roster fix and a deletion were the same grant.
 
@@ -175,6 +175,66 @@ The asymmetry is the point:
 - **On save**, `PUT /api/settings/iam/policy` refuses it, with an error naming the successors so the edit is mechanical.
 
 That way an upgrade never silently re-interprets a policy and never refuses to start, while the next edit forces migration. Aliases are not in the catalog: they cannot be granted to an API key, and `GET /api/settings/iam/policies` does not offer them.
+
+## Tier model (default policy)
+
+The shipped defaults follow a **governance vs. operation** split, biased
+over-restrictive by design: anything that could compromise, re-deploy, or
+destroy the deployment is owner-only, and a capability added to the catalog
+later defaults to owner-only until an operator grants it. Operators loosen the
+lower tiers per-deployment via the Access Control editor (owner, admin,
+moderator and player; the observer tier is editable only through
+`PUT /api/settings/iam/policy` or the policy file).
+
+- **owner** — everything (`Allow: "*"`). The single root of trust: the only
+  tier that can edit IAM policies, rotate credentials (the Funcom game-server
+  token, the DB/admin passwords), change the server IP, deploy code
+  (updates/addons), run destructive SQL, restore/import backups, and set the
+  economy. Password / `ADMIN_AUTH_DISABLED` sessions are owner.
+- **admin** — *operate the live server and moderate players; change nothing
+  persistent.* Explicit allow-list: server lifecycle (start/stop/restart, map
+  shards), player moderation (kick/ban/teleport + mass kick), communications
+  (broadcast/MOTD/announcements), read-only visibility, read-only SQL, taking
+  (not restoring) backups. A Deny block keeps the crown jewels
+  `execute`/`export`, `admin:transfer-settings:write`,
+  `updates:apply/fix/repair`, `backups:restore/import`, `addons:install/update`,
+  `setup:write`, and the `players:mutate` economy successors (`give-item`,
+  `grant`, `reset`, `delete-item`, `edit-item`, `repair`, `recover` -- not the
+  bare alias itself, which would also catch `players:moderate`/`teleport`)
+  unreachable even if a future edit widens the allow-list.
+- **moderator** — live moderation only: read the live game world (server
+  status, players, guilds, bases, storage, blueprints, vehicles, exchange,
+  landsraad, sietches, deep desert, maps, logs), broadcast/map-chat, and act on
+  individual griefers (kick/ban/teleport, mass kick). No database, backups,
+  updates, addons, setup, care-package or `admin:*` reads; no config, no
+  economy, no server lifecycle, nothing destructive.
+- **player** — a tight read-only self-service view: Home health, Players, Guilds, and the Live Map only (not the broad game-world reads). Own-player/guild scoping is tracked separately (ownership-based access).
+- **observer** — minimal server-status viewer (`server:read`) — "is the server
+  up?" A richer read-only ops/audit definition is tracked for revision.
+
+Two catalog details make the admin/moderator line enforceable rather than
+all-or-nothing:
+
+- **`players:moderate` / `players:teleport`** are split out of the
+  `players:mutate` economy bucket (`REGEX_ACTIONS_BY_METHOD_PATTERN`), so a
+  moderator/admin can act on an individual player without gaining give-item /
+  add-currency / reset-progression.
+- **`server:write-credentials`** carries the Funcom token and the server IP
+  change (and the setup-time `save-token`), split from the operational
+  `server:write-config`, so those trust-anchor writes are owner-only on every
+  path.
+- **API keys run as a synthesized `owner` tier**, so the policy engine is a no-op for them
+  and their per-namespace scope map (plus three deny sets) is the sole control. Beyond the
+  denied namespaces (`settings`/`database`/`setup`) and write-denied namespaces
+  (`updates`/`addons`), specific **actions** are denied to keys regardless of scope:
+  `server:write-credentials` (Funcom token + IP) and `backups:restore`/`import`/`delete`
+  (whole-DB overwrite / identity adoption / recovery destruction). See
+  [console/api-keys.md](console/api-keys.md).
+- **Destructive SQL via `POST /api/database/query`** is gated in-handler on
+  `database:execute` (owner-only, `admin` denied): admin holds `database:query`
+  for read-only SQL, but a non-read-only statement is refused unless the
+  session is owner. See [databaseQueryAuthz.test.js](../console/api/test/databaseQueryAuthz.test.js)
+  and the read-only-enforcement details above.
 
 ## Route maintenance
 

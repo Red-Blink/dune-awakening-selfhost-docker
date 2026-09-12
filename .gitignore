@@ -24,6 +24,12 @@ work/
 console/api/node_modules/
 console/web/node_modules/
 console/web/dist/
+# A stray top-level node_modules/ (e.g. from running a test command at the
+# repo root instead of console/api or console/web) is not covered by the two
+# scoped rules above -- this closes that gap (review finding, upstream PR
+# #202, 2026-09-08: a Vitest cache file, node_modules/.vite/vitest/.../
+# results.json, had been committed this way).
+/node_modules/
 *.tsbuildinfo
 **/bin/
 **/obj/

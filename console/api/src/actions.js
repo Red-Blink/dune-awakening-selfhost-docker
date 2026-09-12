@@ -65,9 +65,15 @@ export const ROUTE_ACTIONS = {
   "GET /api/setup/tasks":                      "setup:read",
   "POST /api/setup/preflight":                 "setup:write",
   "POST /api/setup/write-config":              "setup:write",
-  "POST /api/setup/write-oauth-config":        "setup:write",
-  "POST /api/setup/save-oauth-secret":         "setup:write",
-  "POST /api/setup/save-token":                "setup:write",
+  // Owner-only (settings:*, which the admin tier is explicitly denied): these
+  // routes rewrite the console's own authentication trust anchor. Gating them
+  // on setup:write let an admin-tier Discord session escalate to owner.
+  "POST /api/setup/write-oauth-config":        "settings:write",
+  "POST /api/setup/save-oauth-secret":         "settings:write",
+  "GET /api/setup/discord-identity":           "settings:read",
+  "POST /api/setup/discord-finalize":          "settings:write",
+  "POST /api/setup/discord-restart":           "settings:write",
+  "POST /api/setup/save-token":                "server:write-credentials",
   "POST /api/setup/init":                      "setup:write",
   "GET /api/public-directory/status":          "setup:read",
 
@@ -92,12 +98,12 @@ export const ROUTE_ACTIONS = {
   "POST /api/server/network-bind/fix":         "server:network-fix",
   "POST /api/server/storage/cleanup-images":   "server:storage-cleanup",
   "POST /api/server/storage/cleanup-build-cache":"server:storage-cleanup",
-  "POST /api/server/funcom-token":             "server:write-config",
+  "POST /api/server/funcom-token":             "server:write-credentials",
   "POST /api/server/title":                    "server:write-config",
   "POST /api/server/config":                   "server:write-config",
   "POST /api/server/restart-schedule":         "server:write-config",
-  "POST /api/server/ip-change-restart":        "server:write-config",
-  "POST /api/server/ip-change-restart/check":  "server:write-config",
+  "POST /api/server/ip-change-restart":        "server:write-credentials",
+  "POST /api/server/ip-change-restart/check":  "server:write-credentials",
   "POST /api/server/shutdown-protection":      "server:write-config",
   "POST /api/server/shutdown-protection/remove":"server:write-config",
   "POST /api/server/restart-queue":            "server:write-config",
@@ -152,6 +158,12 @@ export const ROUTE_ACTIONS = {
   "GET /api/settings":                         "settings:read",
   "POST /api/settings":                        "settings:write",
   "POST /api/settings/admin-password":         "settings:change-password",
+  "POST /api/auth/2fa/recovery-codes/regenerate": "settings:regenerate-recovery-codes",
+  "POST /api/auth/2fa/enable":                    "settings:enable-totp",
+  "POST /api/auth/2fa/disable":                   "settings:disable-totp",
+  "POST /api/settings/discord-oauth/disable":     "settings:disable-discord-oauth",
+  "POST /api/settings/discord-oauth/enable":      "settings:enable-discord-oauth",
+  "POST /api/settings/discord-oauth/forget":      "settings:forget-discord-oauth",
   "POST /api/settings/web-port":               "settings:change-port",
   "GET /api/settings/iam/policies":            "settings:read",
   "PUT /api/settings/iam/policy":              "settings:write",
@@ -422,6 +434,15 @@ export const REGEX_ACTIONS_BY_METHOD = {
   "PUT /api/settings/api-keys/":    "settings:write",
   "DELETE /api/settings/api-keys/": "settings:write",
 
+  // PUT included for parity with the /api/bases/ bucket: without it a future
+  // PUT /api/players/* route with no explicit entry would fall through to the
+  // method-agnostic REGEX_ACTIONS "/api/players/" -> players:read fallback and
+  // be authorized for every read-holding tier instead of failing closed.
+  // Upstream has no PUT /api/players/* route today and carries no equivalent
+  // entry; kept here as this fork's own defense-in-depth, pointed at the same
+  // players:unclassified sentinel the other three methods use below.
+  "PUT /api/players/":     "players:unclassified",
+
   // ---- *:unclassified sentinels ----
   //
   // DO NOT DELETE THESE, even though every route that exists today is named in
@@ -431,7 +452,7 @@ export const REGEX_ACTIONS_BY_METHOD = {
   // DELETE with no sentinel here resolves to a READ action and runs under a
   // read-only grant. Same trap the vehicles:system-custodian entry documents.
   //
-  // Coverage is per method and currently uneven: players has POST/DELETE/PATCH,
+  // Coverage is per method and currently uneven: players has POST/DELETE/PATCH/PUT,
   // guilds/addons/blueprints have POST/DELETE, and no namespace has PUT.
   "POST /api/players/":    "players:unclassified",
   "DELETE /api/players/":  "players:unclassified",
@@ -566,9 +587,11 @@ export const REGEX_ACTIONS_BY_METHOD_PATTERN = [
   // panel shipped without any way to destroy items, so an operator whose
   // hand-authored policy grants vehicles:mutate (roster edits, refuel, repair)
   // cannot have agreed to item destruction -- folding this in would silently
-  // widen every existing narrow policy. Default tiers are unaffected: owner
-  // ("*") and admin ("vehicles:*") still match, moderator/player/observer hold
-  // only vehicles:read.
+  // widen every existing narrow policy. Under the default policy owner
+  // ("*") still matches; admin/moderator/player hold only vehicles:read,
+  // so the delete-item action is owner-only by default (admin's default was
+  // narrowed from vehicles:* to vehicles:read -- see the tier-model notes in
+  // console-iam.md).
   //
   // The bulk action is "vehicles:bulk-delete-items", NOT "vehicles:delete-items"
   // (issue #351's lesson, mirrored from bases): policy.js's `-*` wildcard means
