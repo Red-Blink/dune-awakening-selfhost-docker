@@ -363,6 +363,7 @@ test("malicious exchangeId never reaches generated SQL in any buyback SQL builde
     for (const { name, call } of builders) {
       const sql = call(schedule);
       assert.match(sql, /o\.exchange_id = 77(?![\d;'])/, `${name} must embed the validated exchangeId verbatim`);
+      assert.doesNotMatch(sql, /nosemgrep/i, `${name} must not send scanner directives to PostgreSQL`);
     }
   } finally {
     rmSync(repoRoot, { recursive: true, force: true });
