@@ -102,6 +102,8 @@ When the Restart Queue is enabled, the restart routes above (`/api/server/restar
 | POST | `/api/updates/check-game` | Check for game updates | `fresh?` (boolean) |
 | POST | `/api/updates/apply-game` | Apply game updates | None |
 | POST | `/api/updates/fix-steamcmd` | Fix SteamCMD issues | None |
+| POST | `/api/updates/install-assets` | Install game files and images only, without touching the database | None |
+| POST | `/api/console/reload` | Recreate the Console container so it reads a changed `.env` (no image rebuild) | None |
 | POST | `/api/updates/check-stack` | Check for stack updates | None |
 | POST | `/api/updates/apply-stack` | Apply stack updates | None |
 | GET | `/api/updates/auto-game` | Get auto-update status | None |
@@ -117,12 +119,50 @@ When the Restart Queue is enabled, the restart routes above (`/api/server/restar
 | GET | `/api/backups` | List all backups | None |
 | POST | `/api/backups/create` | Create new backup | None |
 | POST | `/api/backups/restore` | Restore from backup | `backup` (string, filename) |
-| GET | `/api/backups/{backup}/download` | Download backup archive | `backup` (string) |
+| GET | `/api/backups/{backup}/download` | Download backup archive (dump + metadata) | `backup` (string) |
 | DELETE | `/api/backups/{backup}` | Delete backup | `backup` (string) |
 | POST | `/api/backups/delete-all` | Delete all backups | None |
 | POST | `/api/backups/import-external` | Import external backup | multipart form: `backup`, `metadata` |
+| GET | `/api/backups/system` | List encrypted system backups (archive + non-secret sidecar fields) | None |
+| POST | `/api/backups/system/create` | Create an encrypted system backup (database + `.env` + `runtime/generated` + `runtime/secrets`). Requires `backups:create-system` | `passphrase` (string, 12-1024 chars, at least 5 different characters) |
+| POST | `/api/backups/system/import` | Upload a system backup: the `.tar` the download produces, or a bare `.tar.gz.enc`. Body is the file itself, streamed to disk. Requires `backups:import-system` | `filename` (query), `onConflict` (query: `overwrite` or `rename`) |
+| GET | `/api/backups/system/{name}/download` | Download a system backup as one uncompressed `.tar` holding the encrypted archive and its `.yaml` sidecar. Add `?raw=1` for the bare archive, or name the sidecar directly to fetch it alone. Streamed, never buffered. Requires `backups:download-system` | `name` (string), `raw` (optional) |
+| DELETE | `/api/backups/system/{name}` | Delete a system backup and its `.yaml` sidecar. Requires `backups:delete-system` | `name` (string) |
+| POST | `/api/backups/system/delete-selected` | Delete the named system backups. Requires `backups:delete-system` | `backups` (string array) |
+| POST | `/api/backups/system/delete-all` | Delete every system backup. Requires `backups:delete-system` | None |
+| POST | `/api/backups/system/{name}/restore` | Restore a system backup: database, `.env`, `runtime/generated`, `runtime/secrets`. Dry run unless `apply` is set. **An apply is refused with 409 unless the same caller has successfully previewed this archive** (see below). Does not restart the stack. Requires `backups:restore-system` | `name` (string), `passphrase` (12-1024 chars), `apply` (optional), `identityMode` (optional: `adopt-backup` or `keep-current`), `auditLogMode` (optional: `adopt-backup` or `keep-current`) |
 | GET | `/api/backups/auto` | Get auto-backup status | None |
 | POST | `/api/backups/auto` | Save auto-backup config | `enabled`, `time`, `retentionDays`, `intervalHours` |
+
+See [database-backups.md](database-backups.md) for the difference between a plain
+backup and a system backup, the passphrase and Battlegroup-identity rules the
+`system/*` and `restore` routes above enforce, and how to move an archive to a
+new host.
+
+### Preview before apply is enforced by the API
+
+A system restore replaces `.env`, `runtime/secrets/`, `runtime/generated/` and the
+database. `apply` is therefore refused with **409** unless the *same* caller has
+already run a preview of that archive that **succeeded**:
+
+- Send the restore with `apply` omitted (or false) and wait for the task to
+  finish. A preview that fails authorizes nothing.
+- Then send it again with `apply: true`.
+
+The preview is remembered against the calling session or API key, the archive's
+name, and a hash of the archive's bytes. An apply is refused when the archive
+changed after the preview (409, "changed after it was previewed"), when the
+preview has expired (409, "expired"), or when it was another caller who
+previewed. A successful restore consumes the preview, so a repeated apply needs
+a fresh one; a *failed* restore does not, so a retry does not need one.
+
+`identityMode` and `auditLogMode` may be chosen at apply time even when the
+preview did not carry them — the preview is what reveals that a choice is
+needed. Changing an answer the preview already carried is refused.
+
+The window is `ADMIN_RESTORE_PREVIEW_TTL_MS` (default 15 minutes, floor 1 minute,
+ceiling 2 hours). Previews are held in memory, so restarting the console clears
+them.
 
 ---
 

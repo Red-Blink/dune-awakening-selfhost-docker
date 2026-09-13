@@ -43,6 +43,7 @@ export const updatesApi = {
   checkGame: (options: { fresh?: boolean } = {}) => post<{ task: Task }>("/api/updates/check-game", options.fresh ? { fresh: true } : {}),
   applyGame: () => post<{ task: Task }>("/api/updates/apply-game"),
   fixSteamcmd: () => post<{ task: Task }>("/api/updates/fix-steamcmd"),
+  installAssets: () => post<{ task: Task }>("/api/updates/install-assets"),
   checkStack: () => post<{ task: Task }>("/api/updates/check-stack"),
   applyStack: () => post<{ task: Task }>("/api/updates/apply-stack"),
   qaStatus: (refresh = false) => api<QaStatus>(`/api/updates/qa/status${refresh ? "?refresh=1" : ""}`, { cache: "no-store" }),

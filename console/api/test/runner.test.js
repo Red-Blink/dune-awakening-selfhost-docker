@@ -133,6 +133,7 @@ test("builds allowlisted command arguments without shell interpolation", () => {
   assert.deepEqual(buildDuneArgs("stopGameServersForDbWrites"), ["stop-game-servers-for-db-writes"]);
   assert.deepEqual(buildDuneArgs("adminAddXp", { playerId: "FLS_TEST", amount: 1000 }), ["admin", "award-xp", "FLS_TEST", "1000"]);
   assert.deepEqual(buildDuneArgs("updateApply"), ["update", "--yes"]);
+  assert.deepEqual(buildDuneArgs("updateInstallAssets"), ["update", "install-assets"]);
   assert.deepEqual(buildDuneArgs("updateAutoStatus"), ["update", "auto", "status"]);
   assert.deepEqual(buildDuneArgs("updateAutoEnable"), ["update", "auto", "enable", "60", "1", "1", "15,10,5,1", "0", "360"]);
   assert.deepEqual(buildDuneArgs("updateAutoEnable", {

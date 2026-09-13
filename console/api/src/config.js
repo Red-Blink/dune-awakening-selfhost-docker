@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync, statSync
 import { dirname, resolve } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import { networkInterfaces } from "node:os";
+import { clampInt } from "./jsonStore.js";
 
 export const APP_NAME = "Dune Docker Console";
 
@@ -249,7 +250,20 @@ export function loadConfig() {
     landsraadMilestonePresetFile: resolve(generatedDir, "landsraad-milestones.json"),
     taskRetention: Number(process.env.ADMIN_TASK_RETENTION || 200),
     maxJsonBytes: Number(process.env.ADMIN_MAX_JSON_BYTES || 2 * 1024 * 1024),
-    maxUploadBytes: Number(process.env.ADMIN_MAX_UPLOAD_BYTES || 1024 * 1024 * 1024),
+    // Clamped, not a bare Number(): this is the only cap on a streamed upload
+    // that writes straight to disk, and a non-numeric value makes Number()
+    // return NaN, which turns every `received > maxUploadBytes` comparison
+    // false and removes the limit entirely. The `|| NaN` keeps an empty value
+    // meaning "unset", as the previous `|| default` did -- without it an empty
+    // ADMIN_MAX_UPLOAD_BYTES= reads as 0 and clamps to the 1MiB floor.
+    maxUploadBytes: clampInt(process.env.ADMIN_MAX_UPLOAD_BYTES || NaN, 1024 * 1024 * 1024, 1024 * 1024, 64 * 1024 * 1024 * 1024),
+    // How long a successful restore preview authorizes an apply. Clamped for
+    // the same reason as maxUploadBytes -- a NaN here would compare false in
+    // the expiry check and turn a short-lived receipt into a permanent one.
+    // The floor keeps it long enough to answer the identity and audit-log
+    // prompts the preview raises; the ceiling keeps it from becoming a
+    // standing authorization to overwrite the host.
+    restorePreviewTtlMs: clampInt(process.env.ADMIN_RESTORE_PREVIEW_TTL_MS || NaN, 15 * 60 * 1000, 60 * 1000, 2 * 60 * 60 * 1000),
     commandTimeoutMs: Number(process.env.ADMIN_COMMAND_TIMEOUT_MS || 120000),
     updateCheckCacheMs: Number(process.env.ADMIN_UPDATE_CHECK_CACHE_MS || 5 * 60 * 1000),
     staticDir: process.env.ADMIN_STATIC_DIR || resolve(repoRoot, "console/web/dist"),
@@ -283,6 +297,12 @@ function repairRootOwnedHostState(repoRoot) {
     updateEnvFileValue(envPath, "DUNE_HOST_GID", String(owner.gid));
   }
 
+  // This list is hand-maintained and covers the paths a root-run console must
+  // hand back to the host user. It is deliberately NOT shared with any other
+  // enumeration of these trees: it must include the addon download/staging
+  // caches (which a backup would skip) and needs only two of the secrets. Note
+  // runtime/backups/system/ is included: backup_system creates and chmods it,
+  // but a root-run console creating it first would leave it root-owned.
   for (const path of [
     repoRoot,
     envPath,
@@ -326,7 +346,9 @@ function repairRootOwnedHostState(repoRoot) {
     resolve(repoRoot, "runtime/addons/staging"),
     resolve(repoRoot, "runtime/addons/state.json"),
     resolve(repoRoot, "runtime/secrets/funcom-token.txt"),
-    resolve(repoRoot, "runtime/secrets/public-directory.json")
+    resolve(repoRoot, "runtime/secrets/public-directory.json"),
+    resolve(repoRoot, "runtime/backups"),
+    resolve(repoRoot, "runtime/backups/system")
   ]) {
     try {
       if (existsSync(path)) chownSync(path, owner.uid, owner.gid);

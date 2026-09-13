@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { backupIdentityDiffers, backupsApi } from "../../api/backups";
+import { backupIdentityDiffers, backupsApi, defaultBackupIdentityMode } from "../../api/backups";
+import type { SystemImportConflict } from "../../api/backups";
+import { apiUpload } from "../../api/client";
+import { serverApi } from "../../api/server";
+import type { SystemBackupRow } from "../../api/backups";
 import type { Task } from "../../api/setup";
 import { DataTable } from "../../components/common/DataTable";
 import { KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/common/DisplayPrimitives";
 import { formatUiSentence } from "../../lib/display";
 import { conciseTaskError, funcomTokenMismatchDetected } from "../../lib/taskDisplay";
+import { gameAssetsMissingInText } from "../updates/updateUtils";
 
-type BackupResult = { status: "running" | "succeeded" | "failed"; title: string; message?: string; details?: string; tone?: "danger" | "attention" };
+type BackupResult = { status: "running" | "succeeded" | "failed"; title: string; message?: string; details?: string; detailsOpen?: boolean; detailsTitle?: string; tone?: "danger" | "attention"; action?: { label: string; onClick: () => void } };
 type ConfirmAction = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
 type BackupIdentityChoice = "adopt-backup" | "keep-current" | "cancel";
+type AuditLogChoice = "adopt-backup" | "keep-current" | "cancel";
 type CommandStatus = { status: string; reason?: string };
 
 type BackupsPanelProps = {
@@ -17,6 +23,9 @@ type BackupsPanelProps = {
   onError: (text: string) => void;
   confirmAction: ConfirmAction;
   chooseBackupIdentity: (meta: { backup: string; currentBattlegroupId: string; backupBattlegroupId: string }) => Promise<BackupIdentityChoice>;
+  chooseAuditLogAction: (meta: { backup: string }) => Promise<AuditLogChoice>;
+  onInstallGameFiles: () => void;
+  chooseImportConflict: (existing: string) => Promise<SystemImportConflict | "cancel">;
   waitForTask: (task: Task) => Promise<Task>;
   waitForTaskWithUpdates: (task: Task, onUpdate: (task: Task) => void) => Promise<Task>;
   withTimeout: <T>(promise: Promise<T>, timeoutMs: number, message: string) => Promise<T>;
@@ -36,7 +45,7 @@ function formatResultMessage(value: unknown) {
   return formatUiSentence(value, false);
 }
 
-export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError, confirmAction, chooseBackupIdentity, waitForTask, waitForTaskWithUpdates, withTimeout, toHourMinuteTime, sanitizeTimeInput, isValidHourMinuteTime, commandStatusSummary, taskTechnicalDetails, isTerminalTask }: BackupsPanelProps) {
+export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError, confirmAction, chooseBackupIdentity, chooseAuditLogAction, onInstallGameFiles, chooseImportConflict, waitForTask, waitForTaskWithUpdates, withTimeout, toHourMinuteTime, sanitizeTimeInput, isValidHourMinuteTime, commandStatusSummary, taskTechnicalDetails, isTerminalTask }: BackupsPanelProps) {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [selectedBackups, setSelectedBackups] = useState<Set<string>>(new Set());
   const [currentBattlegroupId, setCurrentBattlegroupId] = useState("Unknown");
@@ -49,6 +58,32 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
   const [backupResult, setBackupResult] = useState<BackupResult | null>(null);
   const [autoResult, setAutoResult] = useState<BackupResult | null>(null);
   const [importResult, setImportResult] = useState<BackupResult | null>(null);
+  const [systemRows, setSystemRows] = useState<SystemBackupRow[]>([]);
+  const [systemResult, setSystemResult] = useState<BackupResult | null>(null);
+  // Seconds left before the Console reloads itself after a restore, or null
+  // when no reload is pending. The restored .env is only read at startup, so
+  // without this the operator is looking at a console running the old
+  // configuration with no indication of it.
+  const [consoleReloadIn, setConsoleReloadIn] = useState<number | null>(null);
+  const [consoleReloading, setConsoleReloading] = useState(false);
+  const systemResultRef = useRef<HTMLElement | null>(null);
+  const [systemPassphrase, setSystemPassphrase] = useState("");
+  const [systemPassphraseConfirm, setSystemPassphraseConfirm] = useState("");
+  const [selectedSystemBackups, setSelectedSystemBackups] = useState<Set<string>>(new Set());
+  // The restore passphrase has to survive from preview to apply, so it stays in
+  // state between the two calls -- cleared as soon as either finishes, and
+  // invalidated the moment it is edited so an apply can never run under a
+  // passphrase the preview did not prove.
+  // Import and restore share one panel slot: both act on a single archive and
+  // are mutually exclusive in practice, so opening either closes the other
+  // rather than leaving two forms competing above the table.
+  const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importProgress, setImportProgress] = useState(-1);
+  const [restoreTarget, setRestoreTarget] = useState<SystemBackupRow | null>(null);
+  const [restorePassphrase, setRestorePassphrase] = useState("");
+  const [restorePreviewed, setRestorePreviewed] = useState(false);
   const [importBackupFile, setImportBackupFile] = useState<File | null>(null);
   const [importMetadataFile, setImportMetadataFile] = useState<File | null>(null);
   const importBackupInputRef = useRef<HTMLInputElement | null>(null);
@@ -98,6 +133,281 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
     });
     return backupsRefreshRef.current;
   }
+  async function refreshSystemBackups() {
+    const result = await backupsApi.listSystem();
+    setSystemRows(result.rows || []);
+  }
+
+  async function createSystemBackup() {
+    // Double entry mirrors the CLI prompt: a mistyped passphrase produces an
+    // archive nobody can ever decrypt, and the archive is the only copy.
+    if (systemPassphrase.length < 12) {
+      setSystemResult({ status: "failed", title: "System Backup Failed", message: "The passphrase must be at least 12 characters." });
+      return;
+    }
+    // Mirrors the server's floor so this fails before a round trip.
+    if (new Set(systemPassphrase).size < 5) {
+      setSystemResult({ status: "failed", title: "System Backup Failed", message: "The passphrase must use at least 5 different characters." });
+      return;
+    }
+    if (systemPassphrase !== systemPassphraseConfirm) {
+      setSystemResult({ status: "failed", title: "System Backup Failed", message: "The two passphrases do not match." });
+      return;
+    }
+    setBusyAction("createSystem");
+    setSystemResult({ status: "running", title: "Creating System Backup" });
+    try {
+      const response = await backupsApi.createSystem(systemPassphrase);
+      const final = await waitForTask(response.task);
+      setSystemResult(summarizeBackupTask(final, "System Backup Created", "System Backup Failed"));
+      if (final.status === "succeeded") {
+        setCreateOpen(false);
+        await refreshSystemBackups();
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      setSystemResult({ status: "failed", title: "System Backup Failed", message: reason });
+    } finally {
+      // Cleared on failure too -- never leave a passphrase sitting in the DOM.
+      setSystemPassphrase("");
+      setSystemPassphraseConfirm("");
+      setBusyAction("");
+    }
+  }
+
+  function toggleSystemBackup(name: string, checked: boolean) {
+    setSelectedSystemBackups((current) => {
+      const next = new Set(current);
+      if (checked) next.add(name); else next.delete(name);
+      return next;
+    });
+  }
+
+  function openSystemCreate() {
+    setCreateOpen(true);
+    setSystemPassphrase("");
+    setSystemPassphraseConfirm("");
+    setImportOpen(false);
+    setRestoreTarget(null);
+    setSystemResult(null);
+  }
+
+  function closeSystemCreate() {
+    setCreateOpen(false);
+    setSystemPassphrase("");
+    setSystemPassphraseConfirm("");
+  }
+
+  function openSystemImport() {
+    setImportOpen(true);
+    setCreateOpen(false);
+    setImportFile(null);
+    setImportProgress(-1);
+    setRestoreTarget(null);
+    setSystemResult(null);
+  }
+
+  function closeSystemImport() {
+    setImportOpen(false);
+    setImportFile(null);
+    setImportProgress(-1);
+  }
+
+  // Upload goes through the shared client so it carries the CSRF header and
+  // cookies every other mutating request does. Building an XHR here instead is
+  // what made the first version fail with "login session expired".
+  function uploadSystemBackup(file: File, onConflict?: SystemImportConflict) {
+    return apiUpload(backupsApi.importSystemUrl(file.name, onConflict), file, { onProgress: setImportProgress });
+  }
+
+  async function importSystemBackup() {
+    if (!importFile) return;
+    setBusyAction("importSystem");
+    setImportProgress(0);
+    setSystemResult({ status: "running", title: "Uploading System Backup" });
+    try {
+      let result = await uploadSystemBackup(importFile);
+      // 409 is the server refusing to guess. Ask, then send the answer back --
+      // overwriting destroys the only copy of the credentials already stored.
+      if (result.status === 409) {
+        const existing = String(result.body.conflict || importFile.name);
+        const choice = await chooseImportConflict(existing);
+        if (choice === "cancel") {
+          setSystemResult(null);
+          return;
+        }
+        setImportProgress(0);
+        result = await uploadSystemBackup(importFile, choice);
+      }
+      if (result.status !== 200) {
+        setSystemResult({ status: "failed", title: "Import Failed", message: String(result.body.error || `Upload failed (${result.status}).`) });
+        return;
+      }
+      const stored = String(result.body.backup || "");
+      const renamedFrom = String(result.body.renamedFrom || "");
+      const noSidecar = result.body.hadSidecar === false;
+      const notes = [
+        renamedFrom ? `Stored as ${stored} to avoid overwriting ${renamedFrom}.` : `Stored as ${stored}.`,
+        noSidecar ? "No .yaml sidecar was included, so Created, Server Title and Battlegroup ID read Unknown." : "",
+        "Nothing has been applied. Restore it when you are ready."
+      ].filter(Boolean);
+      setSystemResult({ status: "succeeded", title: "System Backup Imported", message: notes.join(" ") });
+      closeSystemImport();
+      await refreshSystemBackups();
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      setSystemResult({ status: "failed", title: "Import Failed", message: reason });
+    } finally {
+      setImportProgress(-1);
+      setBusyAction("");
+    }
+  }
+
+  function openSystemRestore(row: SystemBackupRow) {
+    setImportOpen(false);
+    setCreateOpen(false);
+    setRestoreTarget(row);
+    setRestorePassphrase("");
+    setRestorePreviewed(false);
+    setSystemResult(null);
+  }
+
+  function closeSystemRestore() {
+    setRestoreTarget(null);
+    setRestorePassphrase("");
+    setRestorePreviewed(false);
+  }
+
+  // Restore gets its own runner. summarizeBackupTask is shaped around "a backup
+  // file was written", and runSystemBackupTask stamps success with the delete
+  // card's tone; neither describes a preview or a restore that leaves the stack
+  // running the previous configuration.
+  async function runSystemRestoreTask(action: string, taskFactory: () => Promise<{ task: Task }>, runningTitle: string, failureTitle: string, onSuccess: (details: string) => BackupResult) {
+    setBusyAction(action);
+    setSystemResult({ status: "running", title: runningTitle });
+    try {
+      const response = await taskFactory();
+      const final = await waitForTask(response.task);
+      const details = final.logLines.map((line) => line.line).join("\n");
+      if (final.status === "succeeded") setSystemResult(onSuccess(details));
+      else setSystemResult({
+        status: "failed",
+        title: failureTitle,
+        message: final.errorMessage || conciseTaskError(final),
+        details,
+        // The restore cannot proceed without the game images, and the operator
+        // should not have to go find the page that installs them.
+        action: gameAssetsMissingInText(details) ? { label: "Install Game Files", onClick: onInstallGameFiles } : undefined
+      });
+      return final;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      setSystemResult({ status: "failed", title: failureTitle, message: reason });
+      onError(reason);
+      return null;
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function previewSystemRestore() {
+    if (!restoreTarget) return;
+    const final = await runSystemRestoreTask(
+      "restoreSystemPreview",
+      () => backupsApi.restoreSystem(restoreTarget.name, { passphrase: restorePassphrase, apply: false }),
+      "Checking System Backup...",
+      "Restore Preview Failed",
+      (details) => ({
+        status: "succeeded",
+        title: "Preview Only - Nothing Changed",
+        message: "The passphrase opened the archive. Review what it would replace below, then apply.",
+        details,
+        detailsOpen: true,
+        detailsTitle: "What this would replace"
+      })
+    );
+    // Only a successful decrypt unlocks apply, so a wrong passphrase cannot
+    // reach the destructive call at all.
+    setRestorePreviewed(final?.status === "succeeded");
+  }
+
+  async function applySystemRestore() {
+    if (!restoreTarget || !restorePreviewed) return;
+    const backup = restoreTarget.name;
+    const backupBattlegroupId = String(restoreTarget.battlegroupId || "Unknown");
+    // Unlike the database restore, this always confirms before asking about
+    // identity: the archive replaces credentials and configuration too, so the
+    // identity question alone is not an informed confirmation of it.
+    if (!(await confirmAction("This replaces this server's configuration, credentials and database with the contents of the archive.", {
+      title: "Restore System Backup",
+      confirmLabel: "Restore",
+      danger: true,
+      details: [
+        { label: "Backup", value: backup, tone: "accent" },
+        { label: "Replaces", value: ".env, runtime/generated, runtime/secrets and the entire database", tone: "danger" },
+        { label: "After", value: "A stack restart is required; the admin password may change", tone: "danger" }
+      ]
+    }))) return;
+    let identityMode: BackupIdentityChoice = defaultBackupIdentityMode(currentBattlegroupId, backupBattlegroupId);
+    if (backupIdentityDiffers(currentBattlegroupId, backupBattlegroupId)) {
+      identityMode = await chooseBackupIdentity({ backup, currentBattlegroupId, backupBattlegroupId });
+      if (identityMode === "cancel") return;
+    }
+    // Only ever asked when the sidecar says the archive carries one: restore_system()
+    // auto-adopts if only the archive has one, and does nothing if neither does, so
+    // there is no real choice to surface in either of those cases.
+    let auditLogMode: AuditLogChoice = "keep-current";
+    if (restoreTarget.includesAuditLog) {
+      auditLogMode = await chooseAuditLogAction({ backup });
+      if (auditLogMode === "cancel") return;
+    }
+    const final = await runSystemRestoreTask(
+      "restoreSystemApply",
+      () => backupsApi.restoreSystem(backup, { passphrase: restorePassphrase, apply: true, identityMode, auditLogMode }),
+      "Restoring System Backup...",
+      "System Backup Restore Failed",
+      (details) => ({
+        status: "succeeded",
+        title: "System Backup Restored",
+        // "attention", not plain success: the restore is only half-applied from
+        // the operator's point of view until the stack is restarted.
+        tone: "attention",
+        message: "Configuration, credentials and the database were replaced. Dune services are stopped - start them from Server Controls to bring the restored configuration up. The admin password and database credentials may now differ from the ones this session is using.",
+        details
+      })
+    );
+    // Only after a restore that actually applied: the Console is still running
+    // the pre-restore .env until its container is recreated.
+    if (final?.status === "succeeded") setConsoleReloadIn(5);
+    closeSystemRestore();
+    if (final?.status === "succeeded") await refreshSystemBackups();
+  }
+
+  // The system section keeps its own result card and busy labels so a delete
+  // here never overwrites the database backup card beside it.
+  async function runSystemBackupTask(action: string, taskFactory: () => Promise<{ task: Task }>, runningTitle: string, successTitle: string, failureTitle: string) {
+    setBusyAction(action);
+    setSystemResult({ status: "running", title: runningTitle });
+    try {
+      const response = await taskFactory();
+      const final = await waitForTask(response.task);
+      const result = summarizeBackupTask(final, successTitle, failureTitle);
+      setSystemResult(final.status === "succeeded" ? { ...result, tone: "danger" } : result);
+      if (final.status === "succeeded") {
+        setSelectedSystemBackups(new Set());
+        await refreshSystemBackups();
+      }
+      return final;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      setSystemResult({ status: "failed", title: failureTitle, message: reason });
+      onError(reason);
+      return null;
+    } finally {
+      setBusyAction("");
+    }
+  }
+
   async function runBackupTask(action: "create" | "delete" | "deleteSelected" | "deleteAll" | "restore" | "auto", taskFactory: () => Promise<{ task: Task }>, successTitle: string, failureTitle: string) {
     setBusyAction(action);
     const setter = action === "auto" ? setAutoResult : setBackupResult;
@@ -192,6 +502,9 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
     }
   }
   useEffect(() => {
+    refreshSystemBackups().catch(() => setSystemRows([]));
+  }, []);
+  useEffect(() => {
     refresh().catch((error) => {
       setBackupResult({
         status: "failed",
@@ -222,6 +535,66 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
     const id = window.setTimeout(() => setImportResult(null), 5400);
     return () => window.clearTimeout(id);
   }, [importResult?.status, importResult?.title]);
+  // Bring a system-backup result into view when it lands. The restore preview
+  // in particular renders the list of what would be replaced, and the buttons
+  // that produce it sit above a table tall enough to push that card off screen
+  // -- an operator told to "review what it would replace below" should not have
+  // to go looking for it.
+  //
+  // Fires on the status/title change rather than on the object, so a task's
+  // polling updates do not re-scroll on every tick. block:"nearest" leaves an
+  // already-visible card alone. No behavior:"smooth" -- it is compositor-driven
+  // and does not settle reliably in a backgrounded tab (same reasoning as
+  // BasesPanel's expanded-row scroll).
+  //
+  // Focus moves only once the result is terminal: while it still reads
+  // "Checking System Backup..." there is nothing to read yet, and taking focus
+  // off the button the operator just used would be premature.
+  useEffect(() => {
+    const card = systemResultRef.current;
+    if (!systemResult || !card) return;
+    if (systemResult.status !== "running") card.focus?.({ preventScroll: true });
+    card.scrollIntoView?.({ block: "nearest" });
+  }, [systemResult?.status, systemResult?.title]);
+  // Ticks the post-restore reload down and then fires it. Separate from the
+  // request itself so a cancel is possible right up to the last second, and so
+  // an already-running reload cannot be started twice.
+  useEffect(() => {
+    if (consoleReloadIn === null || consoleReloading) return;
+    if (consoleReloadIn > 0) {
+      const id = window.setTimeout(() => setConsoleReloadIn((current) => (current === null ? null : current - 1)), 1000);
+      return () => window.clearTimeout(id);
+    }
+    setConsoleReloading(true);
+    void (async () => {
+      try {
+        await serverApi.reloadConsole();
+      } catch (error) {
+        // The container can be gone before the response arrives, which is a
+        // successful reload rather than a failure. Only report something that
+        // is clearly not that.
+        const reason = error instanceof Error ? error.message : String(error);
+        if (!/fetch|network|load failed|aborted/i.test(reason)) onError(reason);
+      }
+      // Wait for the Console to answer again, then reload the page so the
+      // restored configuration is what the browser is talking to. The session
+      // may be invalid on the other side if the archive carried a different
+      // admin password -- landing on the login screen is the correct outcome.
+      const deadline = Date.now() + 120000;
+      const settle = async () => {
+        if (Date.now() > deadline) { window.location.reload(); return; }
+        try {
+          const response = await fetch("/api/health", { cache: "no-store" });
+          if (response.ok) { window.location.reload(); return; }
+        } catch {
+          // Still down; that is expected while the container is recreated.
+        }
+        window.setTimeout(settle, 1000);
+      };
+      window.setTimeout(settle, 2000);
+    })();
+  }, [consoleReloadIn, consoleReloading]);
+
   const backupNames = rows.map((row) => String(row.name || row.backupName || "")).filter(Boolean);
   const allSelected = backupNames.length > 0 && backupNames.every((name) => selectedBackups.has(name));
   function toggleBackup(name: string, checked: boolean) {
@@ -232,46 +605,64 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
     });
   }
   return (
-    <section className="panel">
-      <div className="panel-title"><h2>Backups</h2><div className="action-row"><button disabled={Boolean(busyAction)} onClick={() => run(refresh)}>Refresh Backups</button><button disabled={Boolean(busyAction)} onClick={() => run(() => runBackupTask("create", backupsApi.create, "Backup Created Successfully", "Backup failed"))}>Create Backup</button><button className="danger" disabled={Boolean(busyAction) || !selectedBackups.size} onClick={() => run(async () => {
-        const names = [...selectedBackups];
-        if (!(await confirmAction(`Delete ${names.length} selected backup${names.length === 1 ? "" : "s"}? This cannot be undone.`))) return;
-        const final = await runBackupTask("deleteSelected", () => backupsApi.deleteSelected(names), "Selected Backups Deleted", "Backup Delete Failed");
-        if (final?.status === "succeeded") setSelectedBackups(new Set());
-      })}>Delete Selected ({selectedBackups.size})</button><button className="danger" disabled={Boolean(busyAction) || !rows.length} onClick={() => run(async () => {
-        if (!(await confirmAction("Delete all backup files? This cannot be undone."))) return;
-        await runBackupTask("deleteAll", backupsApi.deleteAll, "Backup Deleted", "Backup Delete Failed");
-      })}>Delete All Backups</button></div></div>
+    <section className="panel backups-panel">
+      <div className="panel-title"><h2>Backups</h2></div>
       {backupRestoreTask ? <BackupResultCard result={backupRestoreTaskResult(backupRestoreTask)} /> : backupResult && <BackupResultCard result={backupResult} />}
-      {rows.length ? <DataTable rows={rows} columns={["backupName", "battlegroupId", "created", "size", "type", "source"]} secondaryActionPosition="start" secondaryActionClassName="backup-select-column" secondaryActionLabel={<label className="backup-select-checkbox" title="Select all backups"><input type="checkbox" aria-label="Select all backups" disabled={Boolean(busyAction)} checked={allSelected} onChange={(event) => setSelectedBackups(event.target.checked ? new Set(backupNames) : new Set())} /><span className="sr-only">Select All</span></label>} secondaryAction={(row) => {
-        const name = String(row.name || row.backupName || "");
-        return <label className="backup-select-checkbox"><input type="checkbox" aria-label={`Select backup ${name}`} disabled={Boolean(busyAction)} checked={selectedBackups.has(name)} onChange={(event) => toggleBackup(name, event.target.checked)} onClick={(event) => event.stopPropagation()} /><span className="sr-only">Select</span></label>;
-      }} action={(row) => <div className="service-actions">
-        <button className="icon-action restore-action" title="Restore" aria-label="Restore backup" disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); run(async () => {
-          const backup = String(row.backupName || row.name || "Selected backup");
-          const backupBattlegroupId = String(row.battlegroupId || "Unknown");
-          const identityMismatch = backupIdentityDiffers(currentBattlegroupId, backupBattlegroupId);
-          let identityMode: BackupIdentityChoice = "keep-current";
-          if (identityMismatch) {
-            identityMode = await chooseBackupIdentity({ backup, currentBattlegroupId, backupBattlegroupId });
-            if (identityMode === "cancel") return;
-          } else if (!(await confirmAction("The current Battlegroup database will be replaced.", {
-            title: "Restore Backup",
-            confirmLabel: "Restore",
-            danger: true,
-            details: [
-              { label: "Backup", value: backup, tone: "accent" },
-              { label: "Battlegroup", value: backupBattlegroupId === "Unknown" ? "Identity unavailable; current ID will be kept" : backupBattlegroupId, tone: backupBattlegroupId === "Unknown" ? "danger" : "success" }
-            ]
-          }))) return;
-          await runBackupTask("restore", () => backupsApi.restore(String(row.name), identityMode), "Restore Completed", "Backup Restore Failed");
-        }); }}><img src="/images/icons/backup-restore.png" alt="" /></button>
-        <a className="button-link icon-action download-action" title="Download" aria-label="Download backup" href={backupsApi.downloadUrl(String(row.name))} onClick={(event) => event.stopPropagation()}><img src="/images/icons/backup-download.png" alt="" /></a>
-        <button className="icon-action danger" title="Delete" aria-label="Delete backup" disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); run(async () => {
-          if (!(await confirmAction(`Delete backup ${String(row.name)}? This cannot be undone.`))) return;
-          await runBackupTask("delete", () => backupsApi.delete(String(row.name)), "Backup Deleted", "Backup Delete Failed");
-        }); }}><img src="/images/icons/backup-delete.png" alt="" /></button>
-      </div>} actionClassName="backup-table-actions" tableClassName="backup-table" /> : backupsLoading ? <div className="empty backups-loading">Loading Backups...</div> : <div className="empty backups-empty">No database backups have been created yet.</div>}
+      <section className="action-section backup-funcom-backups">
+        <div className="panel-title backup-group-title"><h4>Funcom Backups</h4></div>
+        <p className="backup-group-note">A snapshot of the game database only &mdash; characters, bases, vehicles, inventories and world state. These contain no console configuration and no credentials, so restoring one onto a fresh host still leaves every setting to re-enter by hand. Use a System Backup below to move a server to new hardware.</p>
+        <div className="action-row backup-group-actions"><button disabled={Boolean(busyAction)} onClick={() => run(refresh)}>Refresh Backups</button><button disabled={Boolean(busyAction)} onClick={() => run(() => runBackupTask("create", backupsApi.create, "Backup Created Successfully", "Backup failed"))}>Create Backup</button><button className="danger" disabled={Boolean(busyAction) || !selectedBackups.size} onClick={() => run(async () => {
+          const names = [...selectedBackups];
+          if (!(await confirmAction(`Delete ${names.length} selected backup${names.length === 1 ? "" : "s"}? This cannot be undone.`))) return;
+          const final = await runBackupTask("deleteSelected", () => backupsApi.deleteSelected(names), "Selected Backups Deleted", "Backup Delete Failed");
+          if (final?.status === "succeeded") setSelectedBackups(new Set());
+        })}>Delete Selected ({selectedBackups.size})</button><button className="danger" disabled={Boolean(busyAction) || !rows.length} onClick={() => run(async () => {
+          if (!(await confirmAction("Delete all backup files? This cannot be undone."))) return;
+          await runBackupTask("deleteAll", backupsApi.deleteAll, "Backup Deleted", "Backup Delete Failed");
+        })}>Delete All Backups</button></div>
+        {rows.length ? <DataTable rows={rows} columns={["backupName", "battlegroupId", "created", "size", "type", "source"]} secondaryActionPosition="start" secondaryActionClassName="backup-select-column" secondaryActionLabel={<label className="backup-select-checkbox" title="Select all backups"><input type="checkbox" aria-label="Select all backups" disabled={Boolean(busyAction)} checked={allSelected} onChange={(event) => setSelectedBackups(event.target.checked ? new Set(backupNames) : new Set())} /><span className="sr-only">Select All</span></label>} secondaryAction={(row) => {
+          const name = String(row.name || row.backupName || "");
+          return <label className="backup-select-checkbox"><input type="checkbox" aria-label={`Select backup ${name}`} disabled={Boolean(busyAction)} checked={selectedBackups.has(name)} onChange={(event) => toggleBackup(name, event.target.checked)} onClick={(event) => event.stopPropagation()} /><span className="sr-only">Select</span></label>;
+        }} action={(row) => <div className="service-actions">
+          <button className="icon-action restore-action" title="Restore" aria-label="Restore backup" disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); run(async () => {
+            const backup = String(row.backupName || row.name || "Selected backup");
+            const backupBattlegroupId = String(row.battlegroupId || "Unknown");
+            const identityMismatch = backupIdentityDiffers(currentBattlegroupId, backupBattlegroupId);
+            let identityMode: BackupIdentityChoice = defaultBackupIdentityMode(currentBattlegroupId, backupBattlegroupId);
+            if (identityMismatch) {
+              identityMode = await chooseBackupIdentity({ backup, currentBattlegroupId, backupBattlegroupId });
+              if (identityMode === "cancel") return;
+            } else if (!(await confirmAction("The current Battlegroup database will be replaced.", {
+              title: "Restore Backup",
+              confirmLabel: "Restore",
+              danger: true,
+              details: [
+                { label: "Backup", value: backup, tone: "accent" },
+                { label: "Battlegroup", value: backupBattlegroupId === "Unknown" ? "Identity unavailable; current ID will be kept" : backupBattlegroupId, tone: backupBattlegroupId === "Unknown" ? "danger" : "success" }
+              ]
+            }))) return;
+            await runBackupTask("restore", () => backupsApi.restore(String(row.name), identityMode), "Restore Completed", "Backup Restore Failed");
+          }); }}><img src="/images/icons/backup-restore.png" alt="" /></button>
+          <a className="button-link icon-action download-action" title="Download" aria-label="Download backup" href={backupsApi.downloadUrl(String(row.name))} onClick={(event) => event.stopPropagation()}><img src="/images/icons/backup-download.png" alt="" /></a>
+          <button className="icon-action danger" title="Delete" aria-label="Delete backup" disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); run(async () => {
+            if (!(await confirmAction(`Delete backup ${String(row.name)}? This cannot be undone.`))) return;
+            await runBackupTask("delete", () => backupsApi.delete(String(row.name)), "Backup Deleted", "Backup Delete Failed");
+          }); }}><img src="/images/icons/backup-delete.png" alt="" /></button>
+        </div>} actionClassName="backup-table-actions" tableClassName="backup-table" /> : backupsLoading ? <div className="empty backups-loading">Loading Backups...</div> : <div className="empty backups-empty">No database backups have been created yet.</div>}
+      </section>
+      <section className="action-section backup-external-import">
+        <div className="panel-title"><h4>Import Funcom External Backup</h4></div>
+        <div className="action-line backup-import-controls">
+          <label className="wide-field">Backup File (.backup)<input ref={importBackupInputRef} type="file" accept=".backup" onChange={(event) => setImportBackupFile(event.target.files?.[0] || null)} /></label>
+          <label className="wide-field">Metadata File (.yaml)<input ref={importMetadataInputRef} type="file" accept=".yaml,.yml" onChange={(event) => setImportMetadataFile(event.target.files?.[0] || null)} /></label>
+          <div className="backup-import-actions">
+            <button disabled={Boolean(busyAction)} onClick={() => run(importExternalBackup)}>Import</button>
+            {importResult && <span className={`inline-task-result result-${importResult.status === "succeeded" ? "ok" : importResult.status === "failed" ? "fail" : "running"}`}>
+              <strong className={importResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(importResult.title, importResult.status === "running")}</strong>
+            </span>}
+          </div>
+        </div>
+      </section>
       <section className="action-section">
         <div className="panel-title"><h4>Automatic Backups</h4><label className={`switch-checkbox ${autoEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={Boolean(busyAction)} checked={autoEnabled} onChange={(event) => run(() => saveAutomaticBackups(event.target.checked))} /><span className="switch-label">Automatic Backups</span><strong className="switch-state">{autoEnabled ? "ON" : "OFF"}</strong></label></div>
         <KeyValueGrid items={[
@@ -296,35 +687,136 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
           </span>}
         </div>
       </section>
-      <section className="action-section backup-external-import">
-        <div className="panel-title"><h4>Import External Backup</h4></div>
+      <section className="action-section backup-system-backups">
+        <div className="panel-title"><h4>System Backups (Encrypted)</h4></div>
+        <p className="backup-group-note backup-note-warning">A system backup bundles the database together with <code>.env</code>, <code>runtime/generated</code> and every file in <code>runtime/secrets</code> &mdash; the Funcom token, admin console password, RMQ credentials, sietch join password and IAM policies. It is encrypted with the passphrase you set here, and <strong>there is no way to recover it without that passphrase</strong>. Store the passphrase somewhere durable and separate from the archive.</p>
         <div className="action-line backup-import-controls">
-          <label className="wide-field">Backup File (.backup)<input ref={importBackupInputRef} type="file" accept=".backup" onChange={(event) => setImportBackupFile(event.target.files?.[0] || null)} /></label>
-          <label className="wide-field">Metadata File (.yaml)<input ref={importMetadataInputRef} type="file" accept=".yaml,.yml" onChange={(event) => setImportMetadataFile(event.target.files?.[0] || null)} /></label>
           <div className="backup-import-actions">
-            <button disabled={Boolean(busyAction)} onClick={() => run(importExternalBackup)}>Import</button>
-            {importResult && <span className={`inline-task-result result-${importResult.status === "succeeded" ? "ok" : importResult.status === "failed" ? "fail" : "running"}`}>
-              <strong className={importResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(importResult.title, importResult.status === "running")}</strong>
-            </span>}
+            <button disabled={Boolean(busyAction)} onClick={openSystemCreate}>Create System Backup</button>
+            <button disabled={Boolean(busyAction)} onClick={openSystemImport}>Import Backup</button>
+            <button className="danger" disabled={Boolean(busyAction) || !selectedSystemBackups.size} onClick={() => run(async () => {
+            const names = [...selectedSystemBackups];
+            if (!(await confirmAction(`Delete ${names.length} selected system backup${names.length === 1 ? "" : "s"}? Each one is the only copy of the credentials it contains, and this cannot be undone.`, { title: "Delete System Backups", confirmLabel: "Delete", danger: true }))) return;
+            await runSystemBackupTask("deleteSystemSelected", () => backupsApi.deleteSystemSelected(names), "Deleting System Backups...", "System Backups Deleted", "System Backup Delete Failed");
+          })}>Delete Selected ({selectedSystemBackups.size})</button>
+          <button className="danger" disabled={Boolean(busyAction) || !systemRows.length} onClick={() => run(async () => {
+            if (!(await confirmAction("Delete every system backup? These archives are the only copy of the credentials they contain, and this cannot be undone.", { title: "Delete All System Backups", confirmLabel: "Delete All", danger: true }))) return;
+            await runSystemBackupTask("deleteSystemAll", backupsApi.deleteSystemAll, "Deleting System Backups...", "System Backups Deleted", "System Backup Delete Failed");
+          })}>Delete All</button>
           </div>
         </div>
+        {createOpen && <div className="action-section backup-system-restore">
+          <div className="panel-title"><h4>Create System Backup</h4></div>
+          <p className="backup-group-note backup-note-warning">
+            Set a passphrase for the new archive. It is entered twice because a typo produces an archive <strong>nobody can ever decrypt</strong>, and this is the only copy of what is inside it.
+          </p>
+          <label className="wide-field">Passphrase<input type="password" autoComplete="new-password" value={systemPassphrase} onChange={(event) => setSystemPassphrase(event.target.value)} /></label>
+          <label className="wide-field">Confirm Passphrase<input type="password" autoComplete="new-password" value={systemPassphraseConfirm} onChange={(event) => setSystemPassphraseConfirm(event.target.value)} /></label>
+          <div className="action-row backup-group-actions">
+            <button disabled={Boolean(busyAction)} onClick={closeSystemCreate}>Cancel</button>
+            <button aria-label="Create the system backup" disabled={Boolean(busyAction) || !systemPassphrase || !systemPassphraseConfirm} onClick={() => run(createSystemBackup)}>Create</button>
+          </div>
+        </div>}
+        {importOpen && <div className="action-section backup-system-restore">
+          <div className="panel-title"><h4>Import System Backup</h4></div>
+          <p className="backup-group-note backup-note-warning">
+            Upload the <code>.tar</code> a download produced, or a bare <code>.tar.gz.enc</code>. It is <strong>stored, not applied</strong> — restore it afterwards, with its passphrase.
+          </p>
+          <label className="wide-field">Backup file
+            <input type="file" accept=".tar,.enc,application/x-tar,application/octet-stream" disabled={Boolean(busyAction)} onChange={(event) => setImportFile(event.target.files?.[0] || null)} />
+          </label>
+          {importProgress >= 0 && <div className="backup-import-progress" role="status" aria-label={`Upload ${importProgress}% complete`}>
+            <div className="backup-import-progress-bar" style={{ width: `${importProgress}%` }} />
+            <span>{importProgress}%</span>
+          </div>}
+          <div className="action-row backup-group-actions">
+            <button disabled={Boolean(busyAction)} onClick={closeSystemImport}>Cancel</button>
+            <button aria-label="Import system backup" disabled={Boolean(busyAction) || !importFile} onClick={() => run(importSystemBackup)}>Import</button>
+          </div>
+        </div>}
+        {restoreTarget && <div className="action-section backup-system-restore">
+          <div className="panel-title"><h4>Restore System Backup</h4></div>
+          <p className="backup-group-note backup-note-warning">
+            Restoring <code>{restoreTarget.name}</code> replaces this server's <code>.env</code>, <code>runtime/generated</code>, <code>runtime/secrets</code> and <strong>the entire database</strong>. What is replaced is copied to <code>runtime/backups/</code> first. <strong>Nothing changes until you apply.</strong>
+          </p>
+          <label className="wide-field">Passphrase<input type="password" autoComplete="off" aria-label="Restore passphrase" value={restorePassphrase} onChange={(event) => { setRestorePassphrase(event.target.value); setRestorePreviewed(false); }} /></label>
+          <div className="action-row backup-group-actions">
+            <button disabled={Boolean(busyAction)} onClick={closeSystemRestore}>Cancel</button>
+            <button disabled={Boolean(busyAction) || restorePassphrase.length < 12} onClick={() => run(previewSystemRestore)}>Preview Restore</button>
+            <button className="danger" disabled={Boolean(busyAction) || !restorePreviewed} onClick={() => run(applySystemRestore)}>Apply Restore</button>
+          </div>
+        </div>}
+        {consoleReloadIn !== null && <div className="result-panel backup-result result-persistent result-attention">
+          <div className="panel-title backup-result-title">
+            <div className="backup-result-copy">
+              <h4>{consoleReloading ? "Restarting The Console" : `Restarting The Console In ${consoleReloadIn}s`}</h4>
+              <p>
+                The Console is still running the configuration from before the restore. Restarting it loads the
+                restored one. If the archive carried a different admin password you will be asked to sign in again.
+              </p>
+            </div>
+            {!consoleReloading && <button aria-label="Cancel the console restart" onClick={() => setConsoleReloadIn(null)}>Cancel</button>}
+          </div>
+        </div>}
+        {systemResult && <BackupResultCard result={systemResult} cardRef={systemResultRef} />}
+        {systemRows.length === 0 ? <p className="muted">No system backups have been created yet.</p> : <DataTable
+          columns={["name", "battlegroupId", "createdAt", "size", "type", "source", "encryption"]}
+          columnLabels={{ name: "Backup Name", battlegroupId: "Battlegroup ID", createdAt: "Created", size: "Size", type: "Type", source: "Source", encryption: "Encryption" }}
+          rows={systemRows as unknown as Record<string, unknown>[]}
+          rowKey={(row) => String(row.name)}
+          secondaryActionPosition="start"
+          secondaryActionClassName="backup-select-column"
+          secondaryActionLabel={<label className="backup-select-checkbox" title="Select all system backups"><input type="checkbox" aria-label="Select all system backups" disabled={Boolean(busyAction)} checked={systemRows.length > 0 && selectedSystemBackups.size === systemRows.length} onChange={(event) => setSelectedSystemBackups(event.target.checked ? new Set(systemRows.map((row) => row.name)) : new Set())} /><span className="sr-only">Select All</span></label>}
+          secondaryAction={(row) => <label className="backup-select-checkbox"><input type="checkbox" aria-label={`Select system backup ${String(row.name)}`} disabled={Boolean(busyAction)} checked={selectedSystemBackups.has(String(row.name))} onChange={(event) => toggleSystemBackup(String(row.name), event.target.checked)} onClick={(event) => event.stopPropagation()} /><span className="sr-only">Select</span></label>}
+          action={(row) => <div className="service-actions">
+            <button className="icon-action restore-action" title="Restore" aria-label={`Restore system backup ${String(row.name)}`} disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); openSystemRestore(row as unknown as SystemBackupRow); }}><img src="/images/icons/backup-restore.png" alt="" /></button>
+            <a className="button-link icon-action download-action" title="Download archive and metadata (.tar)" aria-label={`Download system backup ${String(row.name)}`} href={backupsApi.systemDownloadUrl(String(row.name))} onClick={(event) => event.stopPropagation()}><img src="/images/icons/backup-download.png" alt="" /></a>
+            <button className="icon-action danger" title="Delete" aria-label={`Delete system backup ${String(row.name)}`} disabled={Boolean(busyAction)} onClick={(event) => { event.stopPropagation(); run(async () => {
+              const name = String(row.name);
+              if (!(await confirmAction(`Delete system backup ${name}? It is the only copy of the credentials it contains, and this cannot be undone.`, { title: "Delete System Backup", confirmLabel: "Delete", danger: true }))) return;
+              await runSystemBackupTask("deleteSystem", () => backupsApi.deleteSystem(name), "Deleting System Backup...", "System Backup Deleted", "System Backup Delete Failed");
+            }); }}><img src="/images/icons/backup-delete.png" alt="" /></button>
+          </div>}
+          actionClassName="backup-table-actions"
+        />}
       </section>
     </section>
   );
 }
 
-function BackupResultCard({ result }: { result: BackupResult }) {
+function BackupResultCard({ result, cardRef }: { result: BackupResult; cardRef?: React.Ref<HTMLElement> }) {
   const danger = result.tone === "danger";
   const attention = result.tone === "attention";
-  return <section className={`result-panel backup-result ${attention ? "warning-panel result-attention" : danger ? "result-danger" : result.status === "failed" ? "warning-panel result-fail" : result.status === "succeeded" ? "result-ok" : "result-running"}`}>
+  // result-ok/result-fail/result-danger fade themselves out after 5s. Fine for
+  // "Backup Created"; not for a failure, or for a card whose own message sends
+  // the operator to output rendered inside it.
+  const persistent = result.status === "failed" || result.detailsOpen;
+  // A failure's message is the exit line ("... failed with exit 1"); the reason
+  // it failed is in the log below it. Leaving that behind the debug gate showed
+  // an operator that a restore failed while hiding "dune-postgres is not
+  // running" and the fact that nothing had been changed.
+  const failed = result.status === "failed";
+  const showDetails = Boolean(result.detailsOpen) || failed;
+  // tabIndex -1 so the panel can take focus programmatically when a result
+  // lands, without joining the tab order.
+  return <section ref={cardRef} tabIndex={cardRef ? -1 : undefined} className={`result-panel backup-result ${persistent ? "result-persistent " : ""}${attention ? "warning-panel result-attention" : danger ? "result-danger" : result.status === "failed" ? "warning-panel result-fail" : result.status === "succeeded" ? "result-ok" : "result-running"}`}>
     <div className="panel-title backup-result-title">
       <div className="backup-result-copy">
         <h4 className={result.status === "running" ? "loading-dots" : ""}>{formatResultTitle(result.title, result.status === "running")}</h4>
         {result.message && <p>{formatResultMessage(result.message)}</p>}
+        {result.action && <div className="action-line"><button className="update-action" onClick={result.action.onClick}>{result.action.label}</button></div>}
       </div>
       <StatusPill value={attention ? "Action Required" : danger ? "Deleted" : result.status === "failed" ? "Failed" : result.status === "running" ? "Running" : "Succeeded"} />
     </div>
-    {result.details && <TechnicalDetails title="Technical details" text={result.details} />}
+    {/* .technical-details is display:none outside body.debug -- it is a debug
+        disclosure. A card that tells the operator to read something inside it
+        needs backup-result-details, which overrides that. */}
+    {result.details && <TechnicalDetails
+      title={result.detailsTitle || (failed ? "What went wrong" : "Technical details")}
+      text={result.details}
+      open={showDetails}
+      className={showDetails ? "backup-result-details" : ""}
+    />}
   </section>;
 }
 

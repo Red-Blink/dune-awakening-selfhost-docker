@@ -17,10 +17,13 @@ usage() {
   cat <<'EOF'
 Usage:
   dune console restart
+  dune console reload
   dune console status
 
 Commands:
   restart   Rebuild and restart the Dune Docker Console safely.
+  reload    Recreate the Console container without rebuilding the image, so it
+            picks up a changed .env. Seconds rather than minutes.
   status    Show the Dune Docker Console container and URL.
 EOF
 }
@@ -124,6 +127,23 @@ restart_console() {
   print_url
 }
 
+# Recreates the container without rebuilding the image. The console reads .env
+# at startup and Docker fixes a container's environment at creation, so a
+# restored configuration needs a new container -- but not a new image, which is
+# what restart_console spends minutes producing. Nothing here touches the image.
+reload_console() {
+  require_compose
+  prepare_docker_socket_gid
+  prepare_host_user_ids
+  export ADMIN_BIND_PORT="${ADMIN_WEB_PORT:-${ADMIN_BIND_PORT:-}}"
+  mkdir -p runtime/generated
+  echo "Recreating the Dune Docker Console container..."
+  docker rm -f "$WEB_SERVICE" >/dev/null 2>&1 || true
+  COMPOSE_PROJECT_NAME="$PROJECT_NAME" DUNE_COMPOSE_PROJECT_NAME="$MAIN_PROJECT_NAME" DUNE_HOST_REPO_ROOT="$HOST_ROOT" docker compose -f "$WEB_COMPOSE" up -d "$WEB_SERVICE"
+  echo "Dune Docker Console reloaded."
+  print_url
+}
+
 status_console() {
   require_compose
   prepare_docker_socket_gid
@@ -137,6 +157,9 @@ cmd="${1:-help}"
 case "$cmd" in
   restart|rebuild)
     restart_console
+    ;;
+  reload|recreate)
+    reload_console
     ;;
   status|url)
     status_console

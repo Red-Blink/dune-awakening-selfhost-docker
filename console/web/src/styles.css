@@ -1392,6 +1392,41 @@ main { padding: 22px; min-width: 0; }
 .setup-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 14px; }
 .check-grid { margin-top: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
 .requirements { color: #d9c8aa; }
+/* This stylesheet sets no global anchor colour, so an inline link would render
+   in the browser's default blue -- unreadable on the dark panel. */
+.wizard .panel a { color: var(--accent-strong); text-decoration: underline; text-underline-offset: 2px; }
+.wizard .panel a:hover { color: var(--title); }
+.setup-path-choice { margin-top: 18px; }
+.setup-path-choice h4 { margin: 0 0 10px; }
+.setup-path-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+/* A choice, not a submit: these read as cards and the selected one is the only
+   thing the stepper acts on, so the border carries the state rather than a
+   filled background that would compete with the panel's own. */
+/* justify-content is reset because the base `button` rule centres it for a
+   flex row; left as centre, this grid centres its auto track and the shorter
+   card's text sits indented from its own padding edge. */
+.setup-path-option { display: grid; justify-content: start; gap: 6px; text-align: left; padding: 14px; height: auto; border: 1px solid #39332c; border-radius: 8px; background: rgba(0,0,0,.12); }
+.setup-path-option strong { color: #f1dfc1; }
+.setup-path-option span { color: #cbbb9c; font-size: 13px; line-height: 1.5; }
+.setup-path-option.selected { border-color: var(--accent); }
+/* The running row borrows badge-info's blue, already this palette's "in
+   progress" hue; another warm step would disappear into the panel. */
+.restore-checklist { margin-top: 16px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 8px; background: rgba(0,0,0,.12); }
+.restore-checklist h3 { margin: 0 0 12px; font-size: 16px; color: var(--text-strong); }
+.restore-checklist ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+/* The icon column is a fixed 16px rather than auto: a rotating square's
+   bounding box is wider than the square, so an auto column let the spinner
+   drag its own row's icon out of line with the other three. */
+.restore-step { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 10px; font-size: 14px; }
+.restore-step-icon { justify-self: center; }
+.restore-step-detail { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.restore-step-done { color: var(--success-text); }
+.restore-step-active { color: #b6d5ff; }
+.restore-step-failed { color: var(--danger-text); }
+.restore-step-pending { color: var(--text-faint); }
+.restore-step-spin { animation: spin 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .restore-step-spin { animation: none; } }
+.restore-note { margin: 14px 0 0; padding: 10px 12px; border: 1px solid var(--warning); border-radius: 6px; background: rgba(169,121,50,.14); color: var(--muted-warm); font-size: 13px; line-height: 1.5; }
 .mini-output, .log-box, .command-preview {
   display: block;
   width: 100%;
@@ -1442,6 +1477,10 @@ main { padding: 22px; min-width: 0; }
 .task-warning-count svg { flex: 0 0 auto; }
 .task-technical-details { display: block; }
 body.debug .technical-details { display: block; }
+/* .technical-details is a debug-only disclosure, hidden above unless
+   body.debug is set. A backup result card that tells the operator to read
+   what is inside it (the restore preview's replace list) opts out. */
+.technical-details.backup-result-details { display: block; }
 .update-log-details { margin-top: 6px; }
 .technical-details summary, .task-technical-details summary {
   cursor: pointer;
@@ -1483,6 +1522,13 @@ body.debug .technical-details { display: block; }
 .setup-finish-celebration span:nth-child(4) { background: #d9a7e2; animation-delay: .36s; }
 .setup-finish-celebration span:nth-child(5) { background: #fff1d4; animation-delay: .48s; }
 .danger-note, .error, .error-banner { color: var(--danger-text); overflow-wrap: anywhere; }
+/* `.action-section p { color: #ad9f89; }` (class+element, 0-1-1) otherwise beats
+   the plain-class rule above (0-1-0) regardless of source order, so every
+   danger note inside an .action-section rendered in ordinary body colour --
+   including the system-backup passphrase warning, which is the most important
+   sentence on the Backups page. Same specificity trap already documented for
+   the live-map popover further down this file. */
+.action-section p.danger-note { color: var(--danger-text); }
 .success-note { color: #9be6bd; }
 .error-banner { background: #351b1b; border: 1px solid var(--danger-strong); padding: 12px; border-radius: 6px; margin-bottom: 14px; }
 .inline-filter-label { display: inline-flex; align-items: center; gap: 8px; color: var(--muted-warm); font-weight: 400; }
@@ -2515,6 +2561,7 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 .bot-item-picker-row em { font-style: normal; font-size: 11px; color: var(--muted); }
 .bot-item-picker-row button { width: auto; min-width: 64px; }
 @media (max-width: 720px) {
+  .backup-import-actions > button { flex: 1 1 160px; min-height: 44px; }
   .updates-page-title { align-items: center; flex-direction: row; }
   .updates-page-title .qa-login-actions { width: auto; }
   .qa-build-row { align-items: flex-start; flex-direction: column; }
@@ -6189,6 +6236,12 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 .backup-result-copy { display: grid; gap: 6px; }
 .backup-result-copy h4, .backup-result-copy p { margin: 0; }
 .backup-result.result-ok, .backup-result.result-fail, .backup-result.result-danger { animation: backupResultFadeOut .4s ease 5s forwards; }
+/* The fade above suits a short confirmation nobody needs to re-read. A card
+   carrying output the operator is told to read -- the restore preview's own
+   message says "review what it would replace below" -- or any failure must
+   stay put instead of erasing itself after five seconds. Same 0-2-0
+   specificity as the rule above, so it has to stay below it to win. */
+.backup-result.result-persistent { animation: none; opacity: 1; transform: none; }
 .backup-result.result-attention { border-color: #c68b4a; color: #ffd08a; }
 .backup-result.result-attention .badge { border-color: #c68b4a; color: #ffd08a; }
 .backup-result.result-attention h4, .backup-result.result-attention p { color: #ffd08a; }
@@ -6208,10 +6261,25 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 .backup-auto-controls .checkbox-row { flex: 0 0 auto; min-height: 40px; align-items: center; }
 .backup-auto-controls .compact-select { flex: 0 1 210px; }
 .backup-auto-controls .inline-task-result { margin-left: 4px; }
-.backup-external-import { margin-top: 18px; }
+/* This panel's sections are direct children of .panel, so they get none of the
+   .action-sections grid gap -- each needs its own separation, including
+   Automatic Backups, which previously had none at all. */
+.backups-panel > .action-section { margin-top: 18px; }
+.backup-group-title { margin-top: 0; }
+/* margin intentionally omitted: .action-section p { margin: 0 } (0-1-1) always wins over this (0-1-0), and the parent grid's 10px gap already spaces this from what follows. */
+.backup-group-note { color: #ad9f89; }
+.backup-note-warning strong { color: var(--danger-text); }
+.backup-note-warning code {
+  color: #f1dfc1;
+  background: rgba(0, 0, 0, .25);
+  border: 1px solid #39332c;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.backup-group-actions { justify-content: flex-end; gap: 14px; margin: 4px 0 8px; }
 .backup-import-controls { align-items: flex-end; }
 .backup-import-controls .wide-field { flex-basis: 300px; min-width: min(300px, 100%); }
-.backup-import-actions { display: flex; align-items: center; justify-content: flex-start; gap: 12px; flex: 0 0 100%; min-height: 42px; }
+.backup-import-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 14px; flex: 0 0 100%; min-height: 42px; margin: 6px 0 4px; }
 @keyframes backupResultFadeOut {
   to { opacity: 0; transform: translateY(-4px); }
 }
@@ -7171,3 +7239,8 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
 }
+
+.backup-import-progress { display: flex; align-items: center; gap: 10px; }
+.backup-import-progress > div { flex: 1; height: 6px; background: var(--panel-muted); border-radius: 3px; overflow: hidden; }
+.backup-import-progress-bar { height: 100%; background: var(--accent); transition: width .2s linear; }
+.backup-import-progress > span { color: var(--muted-warm); font-size: 12px; min-width: 36px; text-align: right; }

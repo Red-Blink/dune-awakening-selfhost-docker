@@ -27,11 +27,26 @@ export function mapWriteFlushTimeoutMs() {
   return clampInt(process.env.ADMIN_MAP_WRITE_FLUSH_TIMEOUT_MS, 300000, 1000, 1800000);
 }
 
+// The operations that download the game depot -- roughly 5 GB over SteamCMD --
+// rather than restart something. The 30-minute floor below was sized for
+// restarts and dumps; a depot download on a slow link exceeds it, and the
+// timeout is enforced by killing the process group, which lands mid-SteamCMD
+// and leaves exactly the manifest state `dune update fix-steamcmd` exists to
+// repair.
+export function assetDownloadTimeoutMs() {
+  return clampInt(process.env.ADMIN_ASSET_DOWNLOAD_TIMEOUT_MS, 4 * 60 * 60 * 1000, 30 * 60 * 1000, 24 * 60 * 60 * 1000);
+}
+
 export class TaskManager {
   constructor(config, options = {}) {
     this.config = config;
     this.onMapDown = options.onMapDown || null;
     this.tasks = new Map();
+    // Keyed by task id and held here rather than on the task: publicTask()
+    // allowlists what it serializes, and a callback has no business anywhere
+    // near that. Consumed on the first terminal state, either way, so a failed
+    // task does not leave one behind.
+    this.successHooks = new Map();
     this.runDockerCommand = options.runDockerCommand || runDockerCommand;
     this.updateCheckCache = options.updateCheckCache || createUpdateCheckCache(config, {
       collect: () => runDune(config, buildDuneArgs("updateCheck"), {
@@ -49,8 +64,14 @@ export class TaskManager {
     return this.tasks.get(id) || null;
   }
 
-  create(type, operation, payload = {}) {
+  // `options.env` is deliberately NOT stored on the task: this.tasks retains
+  // tasks for config.taskRetention and publicTask() serializes them to callers,
+  // so a secret placed there would leak. It lives only in this closure.
+  create(type, operation, payload = {}, options = {}) {
     const id = randomUUID();
+    // Registered before the cached-hit branch below, which can complete a task
+    // synchronously inside this same call.
+    if (typeof options.onSuccess === "function") this.successHooks.set(id, options.onSuccess);
     const task = {
       id,
       type,
@@ -81,7 +102,7 @@ export class TaskManager {
     this.trim();
 
     if (!cachedHit) {
-      queueMicrotask(() => this.run(task, payload));
+      queueMicrotask(() => this.run(task, payload, options.env));
     }
     return publicTask(task);
   }
@@ -93,13 +114,18 @@ export class TaskManager {
     return () => task.subscribers.delete(write);
   }
 
-  async run(task, payload) {
+  async run(task, payload, env) {
     task.status = "running";
     task.currentStep = "Running";
     this.emit(task, "Task started");
     try {
       if (isSelfUpdateApplyOperation(task.operation)) {
         await this.runSelfUpdateHelperTask(task, payload);
+        return;
+      }
+
+      if (task.operation === "consoleReload") {
+        await this.runConsoleReloadTask(task);
         return;
       }
 
@@ -116,7 +142,7 @@ export class TaskManager {
           const args = buildDuneArgs(operation, payload);
           result = await runDune(this.config, args, {
             allowedExitCodes: operation === "selfUpdateCheck" ? [0, 100] : [0],
-            env: operation === "init" ? { DUNE_INIT_ASSUME_YES: "1" } : {},
+            env: { ...(operation === "init" ? { DUNE_INIT_ASSUME_YES: "1" } : {}), ...(env || {}) },
             timeoutMs: taskTimeoutMs(this.config, operation),
             onLine: (text, stream) => this.append(task, text, stream)
           });
@@ -127,7 +153,7 @@ export class TaskManager {
         lastCode = result.code;
         if (MAP_DOWN_OPERATIONS.has(operation)) await this.flushPendingMapWrites(task, operation, payload);
       }
-      if (["updateApply", "updateFixSteamcmd"].includes(task.operation)) {
+      if (["updateApply", "updateFixSteamcmd", "updateInstallAssets"].includes(task.operation)) {
         this.updateCheckCache.invalidate();
       }
       this.completeTaskSucceeded(task, lastCode);
@@ -137,8 +163,42 @@ export class TaskManager {
       task.errorMessage = error.message;
       task.currentStep = "Failed";
       task.finishedAt = new Date().toISOString();
+      // Dropped, not run: a preview that failed must not authorize an apply.
+      this.successHooks.delete(task.id);
       this.emit(task, error.message);
     }
+  }
+
+  // The console cannot recreate its own container from inside it: the recreate
+  // kills this process, so an ordinary task would die before reporting
+  // anything. A detached helper outlives it, exactly as a console self-update
+  // already does -- the difference is that this one only recreates the
+  // container, never rebuilds the image, because a restored .env is a
+  // configuration change and not a code change.
+  async runConsoleReloadTask(task) {
+    const composeProjectName = process.env.DUNE_COMPOSE_PROJECT_NAME || process.env.COMPOSE_PROJECT_NAME;
+    if (!composeProjectName) throw new Error("Main Dune Compose project name was not provided to the Console.");
+    const helperImage = process.env.DUNE_SYSTEMD_HELPER_IMAGE || "redblink-dune-docker-console:dev";
+    const hostRepoRoot = process.env.DUNE_HOST_REPO_ROOT || this.config.hostRepoRoot || this.config.repoRoot;
+
+    this.append(task, "Starting a detached helper to recreate the Console container.", "stdout");
+    await this.runDockerCommand(buildSelfUpdateHelperDockerArgs({
+      helperName: `dune-console-reload-${Date.now()}`,
+      hostRepoRoot,
+      composeProjectName,
+      helperImage,
+      hostUid: process.env.DUNE_HOST_UID || String(process.getuid?.() ?? 0),
+      hostGid: process.env.DUNE_HOST_GID || String(process.getgid?.() ?? 0),
+      dockerSocketGid: process.env.DOCKER_SOCKET_GID || detectDockerSocketGid(),
+      command: "runtime/scripts/dune console reload"
+    }), this.config.repoRoot);
+
+    // Deliberately reported as succeeded here rather than after the recreate:
+    // this process is about to be killed by the helper, so this is the last
+    // thing it can truthfully say. The browser watches for the Console coming
+    // back rather than for this task finishing.
+    this.append(task, "The Console is restarting to load the restored configuration.", "stdout");
+    this.completeTaskSucceeded(task, 0);
   }
 
   async runSelfUpdateHelperTask(task, payload) {
@@ -263,7 +323,23 @@ export class TaskManager {
     task.exitCode = exitCode;
     task.currentStep = "Finished";
     task.finishedAt = new Date().toISOString();
+    this.runSuccessHook(task);
     this.emit(task, "Task succeeded");
+  }
+
+  // The task has already succeeded by the time this runs, so a throwing hook
+  // must not turn it into a failure. The restore-preview receipt is the caller
+  // here and fails closed: a receipt that was never recorded refuses the apply
+  // rather than allowing it.
+  runSuccessHook(task) {
+    const hook = this.successHooks.get(task.id);
+    if (!hook) return;
+    this.successHooks.delete(task.id);
+    try {
+      hook(task);
+    } catch (error) {
+      console.error(`Task success hook failed for ${task.operation}: ${error?.message || "Unexpected error."}`);
+    }
   }
 
   trim() {
@@ -376,7 +452,12 @@ function shellQuote(value) {
 }
 
 export function taskTimeoutMs(config, operation) {
-  if (["start", "stop", "restartAll", "stopGameServersForDbWrites", "restartService", "restartServiceStop", "restartServiceStart", "serverTitle", "serverConfig", "init", "updateApply", "updateFixSteamcmd", "selfUpdateApply", "backupRestore", "storageCleanupImages", "storageCleanupBuildCache", "userSettingsSaveAndRestart", "userSettingsResetAndRestart", "userSettingsRawAndRestart", "mapsApplySettings", "mapsRespawn", "sietchesSetActive", "sietchesRestart", "sietchesRestartStop", "sietchesRestartStart", "sietchesReconcile", "deepdesertAction"].includes(operation)) {
+  // Depot downloads first: these are not restarts and must not inherit a floor
+  // sized for one.
+  if (["init", "updateApply", "updateInstallAssets"].includes(operation)) {
+    return Math.max(config.commandTimeoutMs, assetDownloadTimeoutMs());
+  }
+  if (["backupSystemCreate", "backupSystemRestore", "start", "stop", "restartAll", "stopGameServersForDbWrites", "restartService", "restartServiceStop", "restartServiceStart", "serverTitle", "serverConfig", "updateFixSteamcmd", "selfUpdateApply", "backupRestore", "storageCleanupImages", "storageCleanupBuildCache", "userSettingsSaveAndRestart", "userSettingsResetAndRestart", "userSettingsRawAndRestart", "mapsApplySettings", "mapsRespawn", "sietchesSetActive", "sietchesRestart", "sietchesRestartStop", "sietchesRestartStart", "sietchesReconcile", "deepdesertAction"].includes(operation)) {
     return Math.max(config.commandTimeoutMs, 30 * 60 * 1000);
   }
   return config.commandTimeoutMs;

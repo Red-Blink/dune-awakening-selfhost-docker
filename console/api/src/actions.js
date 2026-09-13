@@ -114,6 +114,16 @@ export const ROUTE_ACTIONS = {
   "POST /api/backups/delete-all":              "backups:delete",
   "POST /api/backups/delete-selected":         "backups:delete",
   "POST /api/backups/import-external":         "backups:import",
+  // Its own action, not backups:import: that one takes a database dump, this
+  // one takes .env, every secret and the Funcom token, to be applied by a later
+  // restore. An operator should be able to grant one without the other.
+  "POST /api/backups/system/import":           "backups:import-system",
+  "GET /api/backups/system":                   "backups:read",
+  // Runs pg_dump and writes an encrypted archive holding .env and every file in
+  // runtime/secrets. Write-shaped, so a key scoped `backups: read` cannot reach it.
+  "POST /api/backups/system/create":           "backups:create-system",
+  "POST /api/backups/system/delete-selected":  "backups:delete-system",
+  "POST /api/backups/system/delete-all":       "backups:delete-system",
 
   // --- Database ---
   "GET /api/database/status":                  "database:read",
@@ -130,6 +140,8 @@ export const ROUTE_ACTIONS = {
   "POST /api/updates/check-game":              "updates:check",
   "POST /api/updates/apply-game":              "updates:apply",
   "POST /api/updates/fix-steamcmd":            "updates:fix",
+  "POST /api/updates/install-assets":          "updates:install-assets",
+  "POST /api/console/reload":                  "server:console-reload",
   // Its own action, deliberately NOT updates:check. updates:check is in
   // EXTRA_READ_ACTIONS so a monitoring key can ask "is a game update
   // available" -- that route is absorbed by updateCheckCache. This one runs
@@ -482,6 +494,24 @@ export const REGEX_ACTIONS_BY_METHOD_PATTERN = [
   // delete — all cancellations) still falls through to the
   // "DELETE /api/bases/" prefix rule above, unaffected.
   { method: "DELETE", pattern: /^\/api\/bases\/[^/]+$/, action: "bases:delete" },
+  // GET /api/backups/system/{name}/download -- hands over an archive containing
+  // every credential on the host, gated only by the operator's passphrase. Its
+  // own write-shaped action, NOT the "/api/backups/" prefix bucket's
+  // backups:read. A GET is invisible to the mutating-route parity test, so this
+  // entry is the only thing keeping it off a read-only grant.
+  { method: "GET", pattern: /^\/api\/backups\/system\/[^/]+\/download$/, action: "backups:download-system" },
+  // DELETE /api/backups/system/{name}. Its own action rather than the database
+  // backups' backups:delete -- these archives are the only copy of the
+  // credentials they contain, so the two should be grantable separately.
+  // The optional trailing segment matters: without it "/api/backups/system"
+  // fell through to the /api/backups/ prefix bucket and authorized a system
+  // path under the database-backup action. The route itself does not exist --
+  // this is so the authorization matches the resource family either way.
+  { method: "DELETE", pattern: /^\/api\/backups\/system(?:\/[^/]+)?$/, action: "backups:delete-system" },
+  // POST /api/backups/system/{name}/restore -- replaces .env, runtime/generated,
+  // runtime/secrets and the database from an archive. Its own action: this is a
+  // whole-host takeover, not a variation on restoring a database dump.
+  { method: "POST", pattern: /^\/api\/backups\/system\/[^/]+\/restore$/, action: "backups:restore-system" },
   // DELETE /api/bases/{baseId}/containers/{placeableId}/items/{itemId} —
   // destroying one stored item. Its own action for a different reason than
   // bases:delete above: not blast radius, but consent. Base inventory shipped

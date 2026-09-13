@@ -54,7 +54,8 @@ choice to adopt the backup identity or keep the current identity. Adopting is
 the normal choice when moving the same server to new hardware; keeping the
 current identity is for intentionally importing data into a different server.
 
-dune db backup-system bundles a fresh database dump together with .env,
+dune db backup-system requires GnuPG 2.3 or newer, for authenticated
+(AEAD/OCB) encryption. It bundles a fresh database dump together with .env,
 runtime/generated/, and runtime/secrets/ into one encrypted
 dune-system-*.tar.gz.enc archive under runtime/backups/system/ (with a
 matching .yaml sidecar containing no secrets, safe to read/share on its
@@ -81,15 +82,28 @@ To decrypt and extract (also printed in the archive's own .yaml sidecar
 and on stdout when the backup is created). Enter the passphrase at the
 prompt -- do not put it directly on the command line, which would expose
 it to any other process on this host via `ps`/`/proc/<pid>/cmdline` for
-as long as gpg is running:
+as long as gpg is running.
+
+Decrypt to a file FIRST and let gpg's exit status gate the extract. The
+authentication tag is verified at the END of the stream, so piping
+`gpg -d | tar -x` directly extracts almost the whole archive before the
+tamper is detected, and tar exiting 0 hides gpg's failure:
   read -r -s -p "Passphrase: " p; echo
   printf '%s' "$p" | gpg --batch --yes --pinentry-mode loopback \
-    --passphrase-fd 0 -d <archive> | gunzip | tar -xf -
-  unset p
+    --passphrase-fd 0 -d <archive> > restore.tar.gz \
+    && tar -xzf restore.tar.gz
+  unset p; rm -f restore.tar.gz
+If gpg reports a checksum error, restore.tar.gz is untrustworthy however
+complete it looks -- delete it rather than extracting it.
 
-There is no automated restore for system backups yet: decrypt/extract as
-above, restore .env / runtime/generated/ / runtime/secrets/ manually, then
-use `dune db restore` for the db/ dump inside it.
+To restore one: dune db restore-system <archive> [--dry-run]
+[--adopt-backup-battlegroup|--keep-current-battlegroup]
+[--adopt-backup-audit-log|--keep-current-audit-log]. It restores the
+database first (while .env still describes the database it can reach), then
+.env, runtime/generated/ and runtime/secrets/, copying whatever it replaces
+to runtime/backups/restore-<timestamp>/ first. It does NOT restart the
+stack: .env may carry different database credentials and a different admin
+console password, so you choose when that takes effect.
 EOF
 }
 
@@ -148,6 +162,191 @@ require_postgres() {
   fi
 }
 
+postgres_is_running() {
+  docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dune-postgres
+}
+
+# Matches the REPOSITORY only, never the tag. image-tags.sh's fallback is a
+# hardcoded "17.4" while the tag that actually ships is "17.4-alpine-fc-13", so
+# a tag comparison could never match a real image. The question here is only
+# whether any local Funcom Postgres image exists; resolve_postgres_image_tag
+# picks the tag once one does.
+# Counts tables in the dune schema. start-postgres.sh creates the database, but
+# on a host that has never restored or migrated it is empty -- which is a
+# different thing from "unavailable" and needs a different answer.
+#
+# Must connect as postgres, not dune. information_schema.tables only lists
+# objects the connecting role holds a privilege on, so as dune this returns 0
+# for a fully populated database whenever the tables are owned by postgres --
+# which is what a `pg_restore --no-owner` leaves behind. The caller reads a 0
+# as "empty" and skips the pre-import safety backup immediately before
+# recreate_dune_database drops the database.
+dune_schema_table_count() {
+  docker exec dune-postgres psql -U postgres -d dune -tAc     "select count(*) from information_schema.tables where table_schema = 'dune'" 2>/dev/null     | tr -d '[:space:]'
+}
+
+# The .env keys that describe THIS machine rather than the server the archive
+# came from. A system restore replaces .env wholesale, which is right for the
+# server's own settings and wrong for these: they decide whether the console can
+# run and be reached at all.
+#
+#   DUNE_HOST_REPO_ROOT / DUNE_HOST_UID / DUNE_HOST_GID / DOCKER_SOCKET_GID
+#     host_path() translates /repo to a real host path for every bind mount, and
+#     the socket gid is what gives the orchestrator docker access.
+#   ADMIN_BIND_PORT
+#     the port the console answers on. Take the archive's and the operator is
+#     left with no console and no URL to find it on.
+#   DUNE_COMPOSE_PROJECT_NAME / COMPOSE_PROJECT_NAME
+#     which Compose project owns the volumes. Take the archive's and the depot
+#     just downloaded into this host's volumes becomes invisible.
+#   DUNE_DB_PASSWORD
+#     looks like a credential, but the dune role was created in THIS host's
+#     cluster with THIS host's password. The role is created IF NOT EXISTS by an
+#     initdb script the Postgres entrypoint runs only on an empty PGDATA, so on
+#     any host that has run Postgres before it never runs again. Taking the
+#     archive's value leaves every client authenticating with a password the role
+#     does not have. (The console can reset it, from Settings -- but that writes
+#     .env and the role together, so it never produces this mismatch.)
+#
+#   DUNE_MEMORY_* / DUNE_ALWAYS_ON_* / SERVER_IP
+#     how much memory each map gets on THIS machine, and the address THIS
+#     machine answers on. Matched by prefix because the memory keys are named
+#     per map, so no fixed list can cover a host's own sietches.
+#
+# The console's own admin password is deliberately NOT here: it is the server's
+# credential and moves with it, and the operator knows it because they ran the
+# server the archive came from.
+HOST_SHAPED_ENV_KEYS="DUNE_HOST_REPO_ROOT DUNE_HOST_UID DUNE_HOST_GID DOCKER_SOCKET_GID ADMIN_BIND_PORT DUNE_COMPOSE_PROJECT_NAME COMPOSE_PROJECT_NAME DUNE_DB_PASSWORD SERVER_IP"
+HOST_SHAPED_ENV_PREFIXES="DUNE_MEMORY_ DUNE_ALWAYS_ON_"
+
+# Re-applies this host's values over a just-restored .env. Reads them from the
+# pre-restore copy the safety directory already holds, so nothing extra has to
+# be captured earlier.
+restore_host_shaped_env_values() {
+  local previous_env="$1"
+  local key value style restored="" cleared="" env_mode
+
+  [ -f "$previous_env" ] || return 0
+  # cp -a has already put the archive's .env in place with its own mode, which
+  # is 0600 on a live host because the file carries DUNE_DB_PASSWORD and the
+  # console's admin password. Passing a literal 644 here would widen it.
+  env_mode="$(stat -c '%a' .env 2>/dev/null || echo 600)"
+  # The memory keys are named per map, so the set differs by host and no fixed
+  # list can cover it. Take the union of both files: a key only this host sets
+  # must be kept, and one only the archive sets must be dropped.
+  local prefix extra_keys=""
+  for prefix in $HOST_SHAPED_ENV_PREFIXES; do
+    extra_keys="$extra_keys $(sed -n "s/^\\(${prefix}[A-Za-z0-9_]*\\)=.*/\\1/p" "$previous_env" .env 2>/dev/null | sort -u)"
+  done
+  for key in $HOST_SHAPED_ENV_KEYS $extra_keys; do
+    value="$(config_value "$previous_env" "$key" || true)"
+    if [ -n "$value" ]; then
+      # Written back in the form the host's own .env used. Without this a
+      # quoted value -- DUNE_DB_PASSWORD="two words", or a repo root with a
+      # space in it -- comes back unquoted and every consumer that sources
+      # .env sees an empty key and runs the remainder as a command.
+      style="$(config_value_style "$previous_env" "$key" || echo plain)"
+      set_env_file_value .env "$key" "$value" "$env_mode" "$style"
+      restored="$restored $key"
+    elif [ -n "$(config_value .env "$key" || true)" ]; then
+      # This host does not set the key, so it runs on the built-in default --
+      # and .env.example ships DUNE_DB_PASSWORD commented out, so that is the
+      # ordinary case, not an edge one. Keeping the archive's value here would
+      # apply the source host's setting to this machine just as surely as not
+      # preserving anything at all.
+      unset_env_file_value .env "$key"
+      cleared="$cleared $key"
+    fi
+  done
+  [ -z "$restored" ] || echo "Kept this host's own values for:$restored"
+  [ -z "$cleared" ] || echo "Dropped the archive's values, so this host keeps its defaults for:$cleared"
+}
+
+postgres_image_present() {
+  docker images --format '{{.Repository}}' 2>/dev/null \
+    | grep -qx registry.funcom.com/funcom/self-hosting/igw-postgres
+}
+
+# Brings dune-postgres up for the operations that genuinely need it: backup and
+# restore. Stopping the battlegroup does not stop Postgres, it REMOVES it
+# (every teardown in this repo is `docker rm -f`, never `docker stop`), so on a
+# stopped stack there is no container at all -- only the dune-postgres-data
+# volume -- and `dune db backup`, `backup-system` and `restore-system` all
+# failed outright, including from the console's own buttons.
+#
+# Deliberately separate from require_postgres(), which stays a pure check:
+# status_db/health_db must report reality, not change it by being asked.
+#
+# The already-running early return is a SAFETY requirement, not an
+# optimization. start-postgres.sh opens with `docker rm -f dune-postgres`, so
+# calling it against a live database destroys it -- in backup_db's case, in the
+# middle of the dump it was called to enable.
+#
+# Never stops Postgres again afterward. A backup that tidied up behind itself
+# would race an operator starting the stack while it ran and `rm -f` the
+# database out from under them; the operator's own `dune stop` is the thing
+# that stops Postgres.
+#
+# manual-stop.env is deliberately not consulted: that lock exists to stop an
+# UNATTENDED respawn of the game stack (start-all.sh, update.sh,
+# coriolis-coordinator.sh, restart-game-farm.sh all honour it), not to veto a
+# single operation an operator explicitly asked for. start-postgres.sh does not
+# consult it either.
+ensure_postgres_running() {
+  postgres_is_running && return 0
+
+  if [ "${DUNE_DB_AUTOSTART_POSTGRES:-1}" != "1" ]; then
+    echo "dune-postgres is not running, and DUNE_DB_AUTOSTART_POSTGRES is off." >&2
+    return 1
+  fi
+
+  # An existing-but-stopped container is a state nothing in this repo currently
+  # produces, but `docker start` is the cheap correct answer if one appears --
+  # and it must be tried before start-postgres.sh, whose `rm -f` would discard
+  # a container that only needed starting.
+  if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx dune-postgres; then
+    echo "Starting the existing dune-postgres container..."
+    docker start dune-postgres >/dev/null 2>&1 || true
+  else
+    # Checked BEFORE start-postgres.sh runs. Without this, that script builds a
+    # registry.funcom.com/... reference and `docker run` attempts a pull that
+    # cannot succeed for anyone: this repo never logs into that registry, and
+    # the images only ever exist locally after SteamCMD downloads the depot and
+    # its image tarballs are loaded. The pull failure that produced was reported
+    # as "dune-postgres did not come up", which sent the operator to start the
+    # stack -- which fails identically.
+    if ! postgres_image_present; then
+      echo "DUNE_GAME_ASSETS_MISSING" >&2
+      echo "Cannot start Postgres: the Funcom database image is not installed on this host." >&2
+      echo >&2
+      echo "No local registry.funcom.com/funcom/self-hosting/igw-postgres image was found." >&2
+      echo "That image is not pullable -- it exists only after the game files are installed." >&2
+      echo >&2
+      echo "Install the game files first, then retry:" >&2
+      echo "  dune update install-assets" >&2
+      echo "  (or Console -> Updates -> Install Game Files)" >&2
+      return 1
+    fi
+    echo "dune-postgres is not running. Starting it..."
+    if [ ! -f runtime/scripts/start-postgres.sh ]; then
+      echo "Cannot start Postgres: runtime/scripts/start-postgres.sh is missing." >&2
+      return 1
+    fi
+    bash runtime/scripts/start-postgres.sh || true
+  fi
+
+  # Confirmed, not assumed: start-postgres.sh waits on pg_isready itself, but
+  # the caller is about to dump or restore a database and a wrong answer here
+  # is the difference between a clear message and a confusing mid-operation
+  # failure.
+  if ! postgres_is_running; then
+    echo "dune-postgres did not come up. Start the stack and try again." >&2
+    return 1
+  fi
+  echo "Postgres is running. It is left running after this operation."
+  return 0
+}
+
 config_value() {
   local file="$1"
   local key="$2"
@@ -159,6 +358,25 @@ config_value() {
       gsub(/^"/, "", value)
       gsub(/"$/, "", value)
       print value
+      exit
+    }
+  ' "$file"
+}
+
+# config_value strips the surrounding quotes, so a caller that reads a value
+# and writes it back without them turns KEY="two words" into KEY=two words --
+# which every `. ./.env` consumer reads as an empty KEY followed by a stray
+# command. This reports which form the file actually uses so the value can be
+# round-tripped in the same one.
+config_value_style() {
+  local file="$1"
+  local key="$2"
+
+  [ -f "$file" ] || return 1
+  awk -F= -v key="$key" '
+    $1 == key {
+      value = substr($0, length(key) + 2)
+      if (value ~ /^".*"$/) print "quoted"; else print "plain"
       exit
     }
   ' "$file"
@@ -616,7 +834,7 @@ backup_db() {
   else
     echo "WARNING: Battlegroup identity validation is unavailable; backup metadata may record an unknown ID." >&2
   fi
-  require_postgres
+  ensure_postgres_running || exit 1
   mkdir -p "$out_dir"
 
   ts="$(date +%Y%m%d-%H%M%S)"
@@ -752,6 +970,14 @@ SYSTEM_BACKUP_DIR_DEFAULT="runtime/backups/system"
 # allowed value, giving comparable KDF work factor to this backup
 # format's previous PBKDF2 iteration count.
 SYSTEM_BACKUP_S2K_COUNT=65011712
+# Opt-in only. 0 keeps every system backup, matching DB_AUTO_BACKUP_RETENTION_DAYS.
+SYSTEM_BACKUP_KEEP_DEFAULT="${DUNE_SYSTEM_BACKUP_KEEP:-0}"
+# Unlike SYSTEM_BACKUP_KEEP_DEFAULT above, a restore safety copy is NOT the
+# only copy of anything -- the archive it was restored from still exists, and
+# the live host now IS the restored state. It exists purely so a bad restore
+# can be undone in the minutes right after it, so pruning it defaults to ON
+# with a small keep count rather than requiring opt-in.
+RESTORE_SAFETY_KEEP_DEFAULT="${DUNE_RESTORE_SAFETY_KEEP:-5}"
 # Isolated, disposable GNUPGHOME per invocation -- never the operator's
 # own ~/.gnupg. This is symmetric passphrase encryption only (no keys
 # ever created, imported, or retained), but gpg still writes a keybox/
@@ -775,12 +1001,34 @@ dune-fake-k8s-serviceaccount-*
 EOF
 }
 
+# Whether this gpg can do authenticated (AEAD/OCB) encryption, which the
+# archive format below requires. AEAD landed in GnuPG 2.3; 2.2 rejects
+# --aead-algo outright. Probed as a capability rather than parsed from a
+# version string, because distributions backport freely -- and checked at
+# all because the console's own container ships 2.2.40, where this used to
+# fail with a bare `invalid option "--aead-algo"` only AFTER dumping the
+# whole database.
+system_backup_encryption_available() {
+  command -v gpg >/dev/null 2>&1 || return 1
+  gpg --dump-options 2>/dev/null | grep -qx -- '--aead-algo'
+}
+
 # Resolves the passphrase used to encrypt/decrypt a system backup.
 # DUNE_SYSTEM_BACKUP_PASSPHRASE lets automation (cron, CI, systemd timers)
-# supply it non-interactively; an interactive operator is prompted twice
-# (entry + confirmation) so a typo does not silently produce an archive
-# nobody can ever decrypt. Never echoes the passphrase, never logs it.
+# supply it non-interactively.
+#
+# mode="create" (the default, for backup_system): prompted twice (entry +
+# confirmation) so a typo does not silently produce an archive nobody can
+# ever decrypt -- there is no way to notice a create-time typo later.
+# mode="restore": prompted once. A typo here has no silent failure mode --
+# gpg simply refuses to decrypt and restore_system reports that immediately
+# -- so a second entry only adds friction. This also fixes create's own
+# wording ("Set a passphrase to encrypt...") from being shown, confusingly,
+# while restoring.
+#
+# Never echoes the passphrase, never logs it.
 resolve_system_backup_passphrase() {
+  local mode="${1:-create}"
   local first=""
   local second=""
 
@@ -792,6 +1040,14 @@ resolve_system_backup_passphrase() {
   if [ ! -t 0 ]; then
     echo "No passphrase available: not running interactively and DUNE_SYSTEM_BACKUP_PASSPHRASE is not set." >&2
     return 1
+  fi
+
+  if [ "$mode" = "restore" ]; then
+    read -r -s -p "Enter the passphrase for this system backup: " first
+    echo >&2
+    [ -n "$first" ] || { echo "Passphrase cannot be empty." >&2; return 1; }
+    printf '%s' "$first"
+    return 0
   fi
 
   read -r -s -p "Set a passphrase to encrypt this system backup: " first
@@ -813,11 +1069,12 @@ resolve_system_backup_passphrase() {
 #   - .env, runtime/generated/, and runtime/secrets/ -- retained verbatim,
 #     including every credential. Nothing is redacted or excluded on the
 #     basis of being a secret; the archive's confidentiality comes
-#     entirely from AES-256-CBC encryption below, gated on the passphrase
-#     the operator supplies.
+#     entirely from the AES-256-OCB (AEAD) encryption below, gated on the
+#     passphrase the operator supplies.
 # The plaintext tar is never written to disk unencrypted outside a
 # private (mktemp -d, mode 700) staging directory that is removed by an
-# explicit, unconditional cleanup at every single exit path -- this
+# explicit cleanup on every return path, plus a signal trap for INT/TERM/HUP
+# so an external kill (the console's task timeout) cannot orphan it -- this
 # function does not rely on a RETURN/EXIT trap, because `set -e` aborting
 # out of a function does not reliably fire one (verified: an unguarded
 # failing command inside a function called as a plain statement, not as
@@ -855,11 +1112,40 @@ backup_system() {
     [ -z "$staged_sidecar" ] || rm -f -- "$staged_sidecar"
     [ -z "$db_dump_dir" ] || rm -rf -- "$db_dump_dir"
     [ -z "$gnupg_home" ] || rm -rf -- "$gnupg_home"
+    trap - INT TERM HUP
   }
+
+  # The explicit-cleanup-on-every-path design above covers every RETURN, but
+  # nothing covers being killed from outside. The console runs this as a task
+  # with a 30-minute timeout that ends in killProcessTree -> SIGTERM, and
+  # without this trap that leaves $plain_tar behind -- the UNENCRYPTED tar of
+  # .env, runtime/generated/ and every file in runtime/secrets/ -- sitting in
+  # the container's /tmp. Signals only: a RETURN/EXIT trap would run into the
+  # set -e caveat described above, which is why this complements that design
+  # rather than replacing it. 143 = 128 + SIGTERM.
+  trap 'backup_system_cleanup_on_failure; exit 143' INT TERM HUP
+
+  # Checked before the passphrase prompt and long before the database dump:
+  # there is no point asking anyone to type a passphrase twice, or spending a
+  # full pg_dump, for an archive that cannot be encrypted.
+  if ! command -v gpg >/dev/null 2>&1; then
+    echo "System backup was not created because gpg is not installed." >&2
+    echo "Install gnupg (2.3 or newer) and try again." >&2
+    return 1
+  fi
+  if ! system_backup_encryption_available; then
+    echo "System backup was not created because this gpg cannot do authenticated (AEAD/OCB) encryption." >&2
+    echo "  found:    $(gpg --version 2>/dev/null | head -1)" >&2
+    echo "  required: GnuPG 2.3 or newer (--aead-algo support)" >&2
+    echo "The archive format deliberately uses an authenticated cipher so a corrupted or" >&2
+    echo "tampered archive is rejected at decrypt time instead of silently producing" >&2
+    echo "wrong plaintext, so it is not downgraded automatically." >&2
+    return 1
+  fi
 
   passphrase="$(resolve_system_backup_passphrase)" || return 1
 
-  require_postgres
+  ensure_postgres_running || exit 1
   mkdir -p "$out_dir"
   chmod 700 "$out_dir" 2>/dev/null || true
 
@@ -955,6 +1241,16 @@ backup_system() {
     # archive), so a tar-to-tar pipe reuses a tool this feature already
     # requires instead of adding a new one. `--exclude` preserves the
     # same ephemeral-directory exclusion rsync's flag provided.
+    #
+    # web-admin-audit.jsonl (this console's own audit log) is included
+    # deliberately, same as .env and battlegroup.env: a system backup is a
+    # migration artifact, and the audit trail is part of what moves with a
+    # server. restore_system() decides what to do with it at RESTORE time
+    # (adopt vs keep-current, same shape as Battlegroup identity), not here --
+    # see [[system-backup-audit-log-choice]]. An earlier version of this
+    # function excluded it outright, which broke restore for every host that
+    # had ever logged an admin action; do not reintroduce that exclusion
+    # without also updating restore_system()'s audit-log handling below.
     if ! tar -C runtime/generated --exclude='dune-fake-k8s-serviceaccount-*' -cf - . \
         | tar -C "$stage_dir/generated" -xf -; then
       backup_system_cleanup_on_failure
@@ -1045,7 +1341,7 @@ backup_system() {
       --s2k-digest-algo SHA256 --s2k-count "$SYSTEM_BACKUP_S2K_COUNT" \
       --symmetric --cipher-algo AES256 --aead-algo OCB --force-aead \
       -o "$staged_archive"; then
-    exec {passphrase_fd}<&- 2>/dev/null || true
+    exec {passphrase_fd}<&- || true
     backup_system_cleanup_on_failure
     echo "System backup was not created because encryption failed." >&2
     return 1
@@ -1065,6 +1361,16 @@ backup_system() {
     echo "s2k_digest: sha256"
     echo "s2k_count: $SYSTEM_BACKUP_S2K_COUNT"
     echo "includes_secrets: true"
+    # Mirrors what the staging tar actually captured, which copies only files
+    # that exist. A host that has never logged an admin action has no audit
+    # log, and claiming one makes the console offer an adopt/keep choice over
+    # history that is not in the archive -- restore_system then discards the
+    # answer, because it checks the extracted tree rather than the sidecar.
+    if [ -f runtime/generated/web-admin-audit.jsonl ]; then
+      echo "includes_audit_log: true"
+    else
+      echo "includes_audit_log: false"
+    fi
     echo "db_backup_file: $(basename "$db_dump_file")"
     echo "server_title: $(config_value .env SERVER_TITLE || echo unknown)"
     echo "server_region: $(config_value .env SERVER_REGION || echo unknown)"
@@ -1072,15 +1378,18 @@ backup_system() {
     echo "decrypt_note: >-"
     echo "  Do not pass the passphrase on the command line -- it would be"
     echo "  visible to other processes via ps/proc for as long as gpg runs."
-    echo "  Enter it at a prompt instead. gpg will reject this archive"
-    echo "  outright (nonzero exit, no output written) if it has been"
-    echo "  corrupted or tampered with -- this format is authenticated,"
-    echo "  not just encrypted."
+    echo "  Enter it at a prompt instead. This format is authenticated, so"
+    echo "  gpg exits nonzero if the archive was corrupted or tampered with,"
+    echo "  but it verifies the tag at the END of the stream and has already"
+    echo "  written nearly all of the plaintext by then. Decrypt to a file and"
+    echo "  let that exit status gate the extract; never pipe gpg into tar,"
+    echo "  which hides the failure behind tar exiting 0."
     echo "decrypt_command: |-"
     echo "  read -r -s -p \"Passphrase: \" p; echo"
     echo "  printf '%s' \"\$p\" | gpg --batch --yes --pinentry-mode loopback \\"
-    echo "    --passphrase-fd 0 -d $(basename "$archive_file") | gunzip | tar -xf -"
-    echo "  unset p"
+    echo "    --passphrase-fd 0 -d $(basename "$archive_file") > restore.tar.gz \\"
+    echo "    && tar -xzf restore.tar.gz"
+    echo "  unset p; rm -f restore.tar.gz"
   } > "$staged_sidecar"; then
     backup_system_cleanup_on_failure
     echo "System backup was not created because its metadata could not be written." >&2
@@ -1114,24 +1423,534 @@ backup_system() {
   db_dump_file=""
   db_dump_sidecar=""
 
+  # Nothing temporary is left to clean up from here on.
+  trap - INT TERM HUP
+
+  prune_system_backups "$out_dir" "$SYSTEM_BACKUP_KEEP_DEFAULT"
+
   echo "Encrypted system backup written:"
   echo "  $archive_file"
   echo "Sidecar (no secrets, safe to read):"
   echo "  $sidecar_file"
   echo
-  echo "This archive includes runtime/secrets/ (Funcom token, admin password, RMQ"
-  echo "admin credentials, etc.) and .env, encrypted with the passphrase you just set."
+  echo "This archive includes .env, runtime/generated/ and runtime/secrets/ (Funcom"
+  echo "token, admin password, RMQ admin credentials, IAM policies, etc.), encrypted"
+  echo "with the passphrase you just set."
   echo "There is no way to recover this archive's contents without that passphrase --"
   echo "store it somewhere durable (a password manager), separately from the archive."
   echo
   echo "To decrypt and extract, enter the passphrase at the prompt -- do not put it"
   echo "on the command line, which would expose it to other processes on this host."
-  echo "gpg will reject this archive outright (nonzero exit, no output written) if"
-  echo "it has been corrupted or tampered with -- this format is authenticated:"
+  echo "This format is authenticated, so gpg exits nonzero on a corrupted or tampered"
+  echo "archive -- but it verifies the tag at the END, after writing nearly all of the"
+  echo "plaintext. Decrypt to a file and let that exit status gate the extract; piping"
+  echo "gpg straight into tar extracts almost everything before the failure is seen:"
   echo "  read -r -s -p \"Passphrase: \" p; echo"
   echo "  printf '%s' \"\$p\" | gpg --batch --yes --pinentry-mode loopback \\"
-  echo "    --passphrase-fd 0 -d $(basename "$archive_file") | gunzip | tar -xf -"
-  echo "  unset p"
+  echo "    --passphrase-fd 0 -d $(basename "$archive_file") > restore.tar.gz \\"
+  echo "    && tar -xzf restore.tar.gz"
+  echo "  unset p; rm -f restore.tar.gz"
+}
+
+# Mirrors choose_import_battlegroup_action()'s shape for a different axis: an
+# archive and the current host can each carry their own admin audit history, and
+# only a real conflict (both have one) needs an actual decision. Sets
+# RESTORE_SYSTEM_AUDIT_LOG_ACTION to "none" (archive has none), "adopt-backup"
+# (the extracted copy stands as-is -- the default, and the auto-resolved outcome
+# when only the archive has one), or "keep-current" (the caller restores this
+# host's own copy from the safety copy afterward).
+choose_system_restore_audit_log_action() {
+  local archive_has="$1"
+  local host_has="$2"
+  local requested="${3:-}"
+  local answer=""
+
+  RESTORE_SYSTEM_AUDIT_LOG_ACTION="adopt-backup"
+  if [ "$archive_has" != "1" ]; then
+    RESTORE_SYSTEM_AUDIT_LOG_ACTION="none"
+    return 0
+  fi
+  if [ "$host_has" != "1" ]; then
+    echo "Admin audit history: this host has none yet; the archive's own history will be adopted."
+    return 0
+  fi
+
+  if [ -z "$requested" ]; then
+    if [ "${DUNE_DB_ASSUME_YES:-0}" = "1" ]; then
+      echo "Restore stopped before making changes: choose --adopt-backup-audit-log or --keep-current-audit-log." >&2
+      return 1
+    fi
+    echo "Adopt the backup's audit history when moving the same server to new hardware."
+    echo "Keep this host's own audit history when intentionally restoring into a different server."
+    read -r -p "Audit log choice: [a]dopt backup / [k]eep current / [c]ancel: " answer
+    case "$answer" in
+      a|A|adopt|ADOPT) requested="adopt-backup" ;;
+      k|K|keep|KEEP) requested="keep-current" ;;
+      *) echo "Restore cancelled."; return 1 ;;
+    esac
+  fi
+
+  case "$requested" in
+    adopt-backup)
+      RESTORE_SYSTEM_AUDIT_LOG_ACTION="adopt-backup"
+      echo "Admin audit history: the archive's own history will be adopted."
+      ;;
+    keep-current)
+      RESTORE_SYSTEM_AUDIT_LOG_ACTION="keep-current"
+      echo "Admin audit history: this host's own history will be kept."
+      ;;
+    *)
+      echo "Unknown audit log choice: $requested" >&2
+      return 1
+      ;;
+  esac
+}
+
+# Restores an encrypted system backup produced by backup_system(): the database
+# dump plus .env, runtime/generated/ and runtime/secrets/.
+#
+# Lives here rather than in the console because it has to work on a host whose
+# console is not configured yet, and because the gpg/passphrase/cleanup
+# discipline this needs is the same discipline backup_system() already has.
+#
+# Deliberately does NOT restart anything. Restoring .env can change the database
+# credentials and the admin console password, so the caller decides when the
+# stack comes back -- see the closing message.
+restore_system() {
+  local archive="${1:-}"
+  local stage_dir=""
+  local plain_tgz=""
+  local gnupg_home=""
+  local passphrase
+  local dry_run=0
+  local battlegroup_args=()
+  local audit_log_requested=""
+  local safety_dir=""
+  local arg
+
+  shift || true
+  while [ "$#" -gt 0 ]; do
+    arg="$1"
+    case "$arg" in
+      --dry-run) dry_run=1; shift ;;
+      --adopt-backup-battlegroup|--keep-current-battlegroup)
+        battlegroup_args+=("$arg"); shift ;;
+      --adopt-backup-audit-log) audit_log_requested="adopt-backup"; shift ;;
+      --keep-current-audit-log) audit_log_requested="keep-current"; shift ;;
+      *) echo "Unknown restore-system option: $arg" >&2; exit 2 ;;
+    esac
+  done
+
+  # The staging tree holds the plaintext .env and every secret, so it must not
+  # survive a failure OR an external kill -- same reasoning as backup_system().
+  restore_system_cleanup() {
+    [ -z "$stage_dir" ] || rm -rf -- "$stage_dir"
+    [ -z "$plain_tgz" ] || rm -f -- "$plain_tgz"
+    [ -z "$gnupg_home" ] || rm -rf -- "$gnupg_home"
+    trap - INT TERM HUP
+  }
+  trap 'restore_system_cleanup; exit 143' INT TERM HUP
+
+  if [ -z "$archive" ]; then
+    echo "Usage: dune db restore-system <archive.tar.gz.enc> [--dry-run] [--adopt-backup-battlegroup|--keep-current-battlegroup] [--adopt-backup-audit-log|--keep-current-audit-log]" >&2
+    restore_system_cleanup
+    exit 2
+  fi
+  case "$archive" in
+    */*) ;;
+    *) archive="$SYSTEM_BACKUP_DIR_DEFAULT/$archive" ;;
+  esac
+  if [ ! -f "$archive" ]; then
+    echo "System backup not found: $archive" >&2
+    restore_system_cleanup
+    return 1
+  fi
+  if ! system_backup_encryption_available; then
+    echo "This gpg cannot decrypt authenticated (AEAD/OCB) archives." >&2
+    echo "  found:    $(gpg --version 2>/dev/null | head -1)" >&2
+    echo "  required: GnuPG 2.3 or newer" >&2
+    restore_system_cleanup
+    return 1
+  fi
+
+  passphrase="$(resolve_system_backup_passphrase restore)" || { restore_system_cleanup; return 1; }
+
+  if ! stage_dir="$(mktemp -d)"; then
+    echo "Could not create a staging directory for the restore." >&2
+    restore_system_cleanup
+    return 1
+  fi
+  chmod 700 "$stage_dir"
+
+  # The console records a digest when it previews an archive and refuses an
+  # apply that does not match it. That check runs in the API process, seconds
+  # before this script opens the file -- and an upload can rename a different
+  # archive onto this name in between, so the digest the console approved need
+  # not describe the bytes about to replace the host.
+  #
+  # Closing it here rather than there: the archive is copied into this restore's
+  # own private staging directory, and the digest is taken from THAT copy, which
+  # is also what gets decrypted below. Nothing outside this process can reach it
+  # between the check and the use, so there is no window left to win.
+  #
+  # Unset for a CLI restore, which is a local operator acting directly and has
+  # its own typed confirmation.
+  if [ -n "${DUNE_SYSTEM_RESTORE_EXPECTED_SHA256:-}" ]; then
+    local pinned_archive="$stage_dir/archive.tar.gz.enc" actual_sha=""
+    if ! cp -- "$archive" "$pinned_archive"; then
+      echo "Could not stage the archive for verification." >&2
+      restore_system_cleanup
+      return 1
+    fi
+    chmod 600 "$pinned_archive"
+    actual_sha="$(sha256sum "$pinned_archive" 2>/dev/null | awk '{print $1}')"
+    if [ -z "$actual_sha" ]; then
+      echo "Could not compute the archive's checksum; refusing to restore." >&2
+      restore_system_cleanup
+      return 1
+    fi
+    if [ "$actual_sha" != "$DUNE_SYSTEM_RESTORE_EXPECTED_SHA256" ]; then
+      echo "This archive changed after it was previewed; refusing to restore." >&2
+      echo "  expected: $DUNE_SYSTEM_RESTORE_EXPECTED_SHA256" >&2
+      echo "  found:    $actual_sha" >&2
+      restore_system_cleanup
+      return 1
+    fi
+    # Everything below reads the pinned copy, not the shared path.
+    archive="$pinned_archive"
+  fi
+
+  if ! plain_tgz="$(mktemp)"; then
+    echo "Could not create a temporary file for the restore." >&2
+    restore_system_cleanup
+    return 1
+  fi
+  chmod 600 "$plain_tgz"
+  if ! gnupg_home="$(mktemp -d)"; then
+    echo "Could not create a private GNUPGHOME." >&2
+    restore_system_cleanup
+    return 1
+  fi
+  chmod 700 "$gnupg_home"
+
+  echo "Decrypting system backup..."
+  local passphrase_fd
+  if ! exec {passphrase_fd}<<< "$passphrase"; then
+    echo "Could not stage the passphrase for decryption." >&2
+    restore_system_cleanup
+    return 1
+  fi
+  # Decrypt to a FILE and let gpg's exit status gate the extract. Piping gpg
+  # into tar would write out almost the whole archive before the AEAD tag is
+  # verified at the end of the stream, and tar exiting 0 would hide the failure.
+  if ! GNUPGHOME="$gnupg_home" gpg --batch --yes --pinentry-mode loopback \
+      --passphrase-fd "$passphrase_fd" -d "$archive" > "$plain_tgz" 2>/dev/null; then
+    exec {passphrase_fd}<&- || true
+    echo "The archive could not be decrypted: wrong passphrase, or it is corrupted or tampered with." >&2
+    restore_system_cleanup
+    return 1
+  fi
+  exec {passphrase_fd}<&-
+  rm -rf -- "$gnupg_home"
+  gnupg_home=""
+
+  # Validate the listing BEFORE extracting: only the members backup_system()
+  # writes, no absolute paths, no traversal, and never an audit log.
+  local entry
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    # An audit log member is not refused: see [[system-backup-audit-log-choice]] --
+    # backup_system() includes it deliberately, and restore_system() resolves
+    # what to do with it below, once its own copy exists on disk (host_has_*) to
+    # compare against. Still subject to the /* and *..* traversal guard below.
+    case "$entry" in
+      /*|*..*)
+        echo "Refusing archive: unsafe member: $entry" >&2
+        restore_system_cleanup
+        return 1 ;;
+    esac
+    case "$entry" in
+      ./|./env|./db/*|./generated/*|./secrets/*) ;;
+      *)
+        echo "Refusing archive: unexpected member: $entry" >&2
+        restore_system_cleanup
+        return 1 ;;
+    esac
+  done < <(tar -tzf "$plain_tgz")
+
+  mkdir -p "$stage_dir/tree"
+  if ! tar -xzf "$plain_tgz" -C "$stage_dir/tree" --no-same-owner; then
+    echo "The decrypted archive could not be extracted." >&2
+    restore_system_cleanup
+    return 1
+  fi
+  rm -f -- "$plain_tgz"
+  plain_tgz=""
+
+  local dump
+  dump="$(find "$stage_dir/tree/db" -maxdepth 1 -type f -name '*.backup' 2>/dev/null | head -1)"
+  if [ -z "$dump" ]; then
+    echo "Refusing archive: it contains no database dump." >&2
+    restore_system_cleanup
+    return 1
+  fi
+
+  # Checked here rather than at the point of use: the database is restored
+  # first, so discovering a missing .env when it is copied would leave this
+  # host with the archive's database and its own configuration.
+  if [ ! -f "$stage_dir/tree/env" ]; then
+    echo "Refusing archive: it contains no .env." >&2
+    echo "backup-system stages .env only when the source host had one, so this archive" >&2
+    echo "was built before that host was configured. It cannot set this one up." >&2
+    restore_system_cleanup
+    return 1
+  fi
+
+  local generated_count secrets_count
+  generated_count="$(find "$stage_dir/tree/generated" -type f 2>/dev/null | wc -l | tr -d '[:space:]')"
+  secrets_count="$(find "$stage_dir/tree/secrets" -type f 2>/dev/null | wc -l | tr -d '[:space:]')"
+
+  # Checked here, before anything is touched, so a dry run can report the
+  # conflict too -- unlike Battlegroup identity, which import_db only resolves
+  # mid-apply and a dry run never reaches.
+  local archive_has_audit_log=0 host_has_audit_log=0
+  [ -f "$stage_dir/tree/generated/web-admin-audit.jsonl" ] && archive_has_audit_log=1
+  [ -f runtime/generated/web-admin-audit.jsonl ] && host_has_audit_log=1
+
+  echo
+  echo "This archive will replace:"
+  echo "  .env"
+  echo "  runtime/generated/   ($generated_count files)"
+  echo "  runtime/secrets/     ($secrets_count files)"
+  echo "  the dune database    ($(basename "$dump"))"
+  if [ "$archive_has_audit_log" = "1" ] && [ "$host_has_audit_log" = "1" ]; then
+    echo
+    echo "This archive and this host each have their own admin audit history."
+    echo "Choose --adopt-backup-audit-log or --keep-current-audit-log when applying."
+  fi
+
+  if [ "$dry_run" = "1" ]; then
+    echo
+    echo "Dry run: nothing was changed."
+    restore_system_cleanup
+    return 0
+  fi
+
+  if [ "${DUNE_DB_ASSUME_YES:-0}" != "1" ]; then
+    local answer
+    echo
+    echo "This overwrites this host's configuration and credentials, and replaces the database."
+    read -r -p "Type RESTORE to confirm: " answer
+    if [ "$answer" != "RESTORE" ]; then
+      echo "Restore cancelled."
+      restore_system_cleanup
+      return 1
+    fi
+  fi
+
+  # Resolved here, before the database is touched, so a cancel bails the whole
+  # restore rather than leaving the database replaced but the audit log not yet
+  # decided -- a stricter placement than Battlegroup identity gets, which only
+  # resolves once already inside import_db.
+  if ! choose_system_restore_audit_log_action "$archive_has_audit_log" "$host_has_audit_log" "$audit_log_requested"; then
+    restore_system_cleanup
+    return 1
+  fi
+
+  # Before the safety copy, not inside import_db. import_db checks too, and
+  # that check is what actually gates the restore, but reaching it means a
+  # safety copy has already been written for a restore that cannot proceed --
+  # which is exactly what a stopped battlegroup produced: "dune-postgres is not
+  # running" arriving after runtime/backups/restore-* existed. A dry run never
+  # gets here, so previewing an archive still needs no database at all.
+  if ! ensure_postgres_running; then
+    restore_system_cleanup
+    return 1
+  fi
+
+  safety_dir="runtime/backups/restore-$(date +%Y%m%d-%H%M%S)"
+  if ! mkdir -p "$safety_dir"; then
+    echo "Could not create a safety copy directory; refusing to restore." >&2
+    restore_system_cleanup
+    return 1
+  fi
+  chmod 700 "$safety_dir"
+  [ -f .env ] && cp -a .env "$safety_dir/env"
+  [ -d runtime/generated ] && cp -a runtime/generated "$safety_dir/generated"
+  [ -d runtime/secrets ] && cp -a runtime/secrets "$safety_dir/secrets"
+  echo "Copied what is about to be replaced to: $safety_dir"
+
+  # Database first. import_db reaches Postgres through docker exec, not through
+  # .env, so the order is not about credentials: it is so a failed database
+  # restore leaves the configuration untouched rather than half a host swapped.
+  #
+  # import_db runs in its own subshell and NOT as an `if` condition. Bash turns
+  # errexit off inside anything evaluated as a condition, so a failing
+  # pg_restore would let import_db run to its end and return 0 -- and this
+  # function would then replace .env and every secret on top of a broken
+  # database. The subshell also contains import_db's own `exit` calls, which
+  # would otherwise end the whole script before cleanup and strand the
+  # plaintext staging tree. DUNE_DB_SKIP_RESTART keeps import_db from starting
+  # the stack on the configuration that is about to be replaced.
+  # A host that has never run the game has no runtime/generated/battlegroup.env,
+  # so current_battlegroup_id() is empty and choose_import_battlegroup_action
+  # refuses outright -- before it looks at --adopt-backup-battlegroup, so that
+  # flag cannot answer it. The identity it wants to verify against is the one
+  # this archive is delivering, which is a genuine chicken-and-egg on the exact
+  # host system backups exist for.
+  #
+  # Installing the archive's identity file first resolves it honestly: the
+  # backup then matches the host, import_db reports "already matches" and asks
+  # nothing. This only ever runs when the host has no identity of its own --
+  # never overwriting one, so a real mismatch still goes through the adopt/keep
+  # choice. It is a file this restore is about to write anyway; if the database
+  # restore fails below, it is removed again so the host is left as it was.
+  local seeded_identity=0
+  if [ ! -f runtime/generated/battlegroup.env ] && [ -f "$stage_dir/tree/generated/battlegroup.env" ]; then
+    mkdir -p runtime/generated
+    if cp -a -- "$stage_dir/tree/generated/battlegroup.env" runtime/generated/battlegroup.env; then
+      seeded_identity=1
+      echo "This host had no Battlegroup identity; adopting the archive's for the restore."
+    fi
+  fi
+
+  echo "Restoring database..."
+  local import_status=0
+  set +e
+  ( set -e; DUNE_DB_SKIP_RESTART=1 import_db "$dump" "${battlegroup_args[@]}" )
+  import_status=$?
+  set -e
+  if [ "$import_status" -ne 0 ] && [ "$seeded_identity" = "1" ]; then
+    # Put the host back to having no identity, so a failed restore leaves
+    # nothing behind that a later run would read as pre-existing.
+    rm -f runtime/generated/battlegroup.env
+  fi
+  if [ "$import_status" -ne 0 ]; then
+    echo "Database restore failed (exit $import_status). Configuration and secrets were NOT changed." >&2
+    echo "The previous state is still in: $safety_dir" >&2
+    restore_system_cleanup
+    return 1
+  fi
+
+  echo "Restoring configuration and secrets..."
+  if ! cp -a -- "$stage_dir/tree/env" .env; then
+    echo "Could not restore .env. Previous state is in: $safety_dir" >&2
+    restore_system_cleanup
+    return 1
+  fi
+  restore_host_shaped_env_values "$safety_dir/env"
+  mkdir -p runtime/generated runtime/secrets
+
+  # The rollback point is host-shaped, like image-tags.env below: it names the
+  # Battlegroup id THIS host had before the restore, which import_db wrote a
+  # few steps ago. The wholesale extract that follows lands the archive's copy
+  # over it, leaving a file that describes the SOURCE host's history --
+  # and readPreviousDirectoryInstallationKey's `adoptedKey === currentKey`
+  # guard passes with it, so public-directory state migrates from an
+  # installation this host never was. Carried across the extract, or removed
+  # when this host has no rollback point of its own.
+  local restore_point_saved=""
+  if [ -f "$BATTLEGROUP_RESTORE_FILE" ]; then
+    restore_point_saved="$stage_dir/battlegroup-restore-point.env"
+    cp -a -- "$BATTLEGROUP_RESTORE_FILE" "$restore_point_saved"
+  fi
+
+  if ! tar -C "$stage_dir/tree/generated" -cf - . | tar -C runtime/generated -xf -; then
+    echo "Could not restore runtime/generated/. Previous state is in: $safety_dir" >&2
+    restore_system_cleanup
+    return 1
+  fi
+
+  if [ -n "$restore_point_saved" ]; then
+    cp -a -- "$restore_point_saved" "$BATTLEGROUP_RESTORE_FILE"
+  else
+    # This host had none, so the archive's is the source host's and describes a
+    # rollback that cannot be performed here.
+    rm -f -- "$BATTLEGROUP_RESTORE_FILE"
+  fi
+
+  # SERVER_IP and SERVER_IP_MODE are preserved in .env by
+  # restore_host_shaped_env_values, and then quietly overruled: the archive's
+  # generated/battlegroup.env carries them too, and every consumer sources
+  # .env first and battlegroup.env second, so the archive's address wins. The
+  # preservation only appeared to work because ensure-public-ip.sh rewrites the
+  # file on the next start -- and it returns early unless SERVER_IP_MODE is
+  # "public", so a local-mode host advertised the old machine's address while
+  # .env showed the right one.
+  #
+  # Same rule as .env: this host's value if it has one, otherwise remove the
+  # archive's so the .env value is the only answer.
+  local address_key address_value address_style address_mode
+  if [ -f runtime/generated/battlegroup.env ]; then
+    # Preserved rather than assumed: cp -a has just put the archive's file in
+    # place with its own mode, and a literal 644 here could widen it.
+    address_mode="$(stat -c '%a' runtime/generated/battlegroup.env 2>/dev/null || echo 644)"
+    for address_key in SERVER_IP SERVER_IP_MODE; do
+      address_value="$(config_value "$safety_dir/generated/battlegroup.env" "$address_key" 2>/dev/null || true)"
+      if [ -n "$address_value" ]; then
+        address_style="$(config_value_style "$safety_dir/generated/battlegroup.env" "$address_key" || echo plain)"
+        set_env_file_value runtime/generated/battlegroup.env "$address_key" "$address_value" "$address_mode" "$address_style"
+      elif [ -n "$(config_value runtime/generated/battlegroup.env "$address_key" || true)" ]; then
+        unset_env_file_value runtime/generated/battlegroup.env "$address_key"
+      fi
+    done
+  fi
+
+  # image-tags.env is the one file in generated/ that describes THIS host's
+  # loaded images rather than the server. The archive's copy can name tags that
+  # were never downloaded here, and resolve_postgres_image_tag prefers that file
+  # over scanning what is actually present -- so start-postgres.sh would then
+  # ask docker for an image that does not exist. Re-derive it from local images.
+  if [ -x runtime/scripts/detect-image-tags.sh ] || [ -f runtime/scripts/detect-image-tags.sh ]; then
+    if bash runtime/scripts/detect-image-tags.sh >/dev/null 2>&1; then
+      echo "Re-detected image tags from the images installed on this host."
+    else
+      echo "WARN Could not re-detect image tags; runtime/generated/image-tags.env still names the archive's." >&2
+    fi
+  fi
+  # --keep-current-battlegroup asked import_db to keep THIS host's identity.
+  # The archive's generated/battlegroup.env names the backup's and has just
+  # overwritten ours, so the identity file would disagree with what was asked
+  # for. Put the current one back.
+  #
+  # The database half is a no-op on a real dump: adapt_imported_battlegroup
+  # rewrites occurrences of the old id across schema dune, and a real dune dump
+  # contains none -- the identity lives in this file, not in a table.
+  local keep_current=0
+  for arg in "${battlegroup_args[@]}"; do
+    [ "$arg" = "--keep-current-battlegroup" ] && keep_current=1
+  done
+  if [ "$keep_current" = "1" ] && [ -f "$safety_dir/generated/battlegroup.env" ]; then
+    cp -a -- "$safety_dir/generated/battlegroup.env" runtime/generated/battlegroup.env
+    echo "Kept this host's Battlegroup identity in runtime/generated/battlegroup.env."
+  fi
+  # Same reasoning, for the audit log: the wholesale generated/ extract just
+  # landed the archive's copy (the "adopt" outcome), so "keep current" means
+  # actively putting this host's own back from the safety copy taken above.
+  if [ "$RESTORE_SYSTEM_AUDIT_LOG_ACTION" = "keep-current" ] && [ -f "$safety_dir/generated/web-admin-audit.jsonl" ]; then
+    cp -a -- "$safety_dir/generated/web-admin-audit.jsonl" runtime/generated/web-admin-audit.jsonl
+    echo "Kept this host's own admin audit history in runtime/generated/web-admin-audit.jsonl."
+  fi
+  if ! tar -C "$stage_dir/tree/secrets" -cf - . | tar -C runtime/secrets -xf -; then
+    echo "Could not restore runtime/secrets/. Previous state is in: $safety_dir" >&2
+    restore_system_cleanup
+    return 1
+  fi
+  chmod 700 runtime/secrets 2>/dev/null || true
+  find runtime/secrets -type f -exec chmod 600 {} + 2>/dev/null || true
+
+  restore_system_cleanup
+  prune_restore_safety_copies
+
+  echo
+  echo "System backup restored."
+  echo "  replaced state saved in: $safety_dir"
+  echo
+  echo "Dune services are stopped. Start them to bring the restored configuration up:"
+  echo "  dune start"
+  echo
+  echo "Note: .env may now carry a different admin console password and different"
+  echo "database credentials than the ones this session has been using."
 }
 
 list_system_backups() {
@@ -1142,6 +1961,187 @@ list_system_backups() {
     find "$out_dir" -maxdepth 1 -type f -name '*.tar.gz.enc' -printf '%TY-%Tm-%Td %TH:%TM:%TS  %p\n' 2>/dev/null | sed -E 's/([0-9]{2}:[0-9]{2}:[0-9]{2})\.[0-9]+/\1/' | sort || true
   else
     echo "No system backup directory found: $out_dir"
+  fi
+}
+
+# Mirrors valid_backup_basename for encrypted system archives. Anchored, and
+# deliberately rejects the *.partial.* staging names a run in flight uses.
+valid_system_backup_basename() {
+  # Bash's own =~ rather than grep -Eq: grep is line-oriented, so a multi-line
+  # argument matched if ANY of its lines did. =~ anchors the whole string.
+  [[ "${1:-}" =~ ^dune-system-[0-9]{8}-[0-9]{6}-[0-9]+-[0-9]+\.tar\.gz\.enc$ ]]
+}
+
+iter_valid_system_backup_names() {
+  local out_dir="${1:-$SYSTEM_BACKUP_DIR_DEFAULT}"
+  [ -d "$out_dir" ] || return 0
+  local path name
+  # NUL-delimited: a filename containing a newline would otherwise split into
+  # two candidates, one of which could pass validation and be deleted.
+  while IFS= read -r -d '' path; do
+    name="$(basename "$path")"
+    valid_system_backup_basename "$name" || continue
+    printf '%s
+' "$name"
+  done < <(find "$out_dir" -maxdepth 1 -type f -name '*.tar.gz.enc' -print0 2>/dev/null)
+}
+
+# The ONLY place system-backup files are removed, so the set of files that
+# belong to one archive is defined once. An archive is the .tar.gz.enc plus its
+# .yaml sidecar; leaving the sidecar behind would strand metadata describing an
+# archive that no longer exists.
+delete_system_backup_files_for_name() {
+  local name="$1"
+  local out_dir="${2:-$SYSTEM_BACKUP_DIR_DEFAULT}"
+  valid_system_backup_basename "$name" || { echo "Not a valid system backup name: $name" >&2; return 1; }
+  local file="$out_dir/$name"
+  command rm -f -- "$file"
+  [ -f "$file.yaml" ] && command rm -f -- "$file.yaml"
+  # Check the postcondition rather than rm's exit status: a read-only mount or
+  # an immutable attribute leaves the file in place, and reporting a delete
+  # that did not happen is worse than reporting the failure.
+  if [ -e "$file" ] || [ -e "$file.yaml" ]; then
+    echo "System backup could not be removed: $file" >&2
+    return 1
+  fi
+  return 0
+}
+
+# Keeps the newest $keep archives and removes the rest. Never called unless
+# DUNE_SYSTEM_BACKUP_KEEP is set to a positive integer -- an archive is the only
+# copy of the credentials inside it, so silent pruning is opt-in, not default.
+# Keeps the newest $keep restore-<timestamp>/ safety copies under
+# runtime/backups/ and removes the rest. Each one is a plaintext .env plus
+# every secret, made right before a restore overwrote them, so letting them
+# accumulate forever is a slow credential leak with no offsetting benefit
+# once the restore it backs up is confirmed good.
+prune_restore_safety_copies() {
+  local base_dir="${1:-runtime/backups}"
+  local keep="${2:-$RESTORE_SAFETY_KEEP_DEFAULT}"
+  local removed=0
+  local index=0
+  local dir
+
+  validate_positive_integer "$keep" || return 0
+  [ -d "$base_dir" ] || return 0
+
+  while IFS= read -r dir; do
+    [ -n "$dir" ] || continue
+    index=$((index + 1))
+    [ "$index" -gt "$keep" ] || continue
+    rm -rf -- "$dir" && removed=$((removed + 1))
+  done < <(find "$base_dir" -maxdepth 1 -type d -name 'restore-*' 2>/dev/null | sort -r)
+
+  [ "$removed" -eq 0 ] || echo "Removed $removed old restore safety cop$([ "$removed" -eq 1 ] && echo y || echo ies), keeping the newest $keep."
+}
+
+prune_system_backups() {
+  local out_dir="${1:-$SYSTEM_BACKUP_DIR_DEFAULT}"
+  local keep="${2:-$SYSTEM_BACKUP_KEEP_DEFAULT}"
+  local removed=0
+  local index=0
+  local name
+
+  validate_positive_integer "$keep" || return 0
+  [ -d "$out_dir" ] || return 0
+
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    index=$((index + 1))
+    [ "$index" -gt "$keep" ] || continue
+    if delete_system_backup_files_for_name "$name" "$out_dir" >/dev/null 2>&1; then
+      removed=$((removed + 1))
+    fi
+  done < <(iter_valid_system_backup_names "$out_dir" | sort -r)
+
+  [ "$removed" -eq 0 ] || echo "Pruned $removed old system backup(s), keeping the newest $keep."
+}
+
+delete_all_system_backups() {
+  local out_dir="${1:-$SYSTEM_BACKUP_DIR_DEFAULT}"
+  local names count answer
+  local deleted=0
+
+  if [ ! -d "$out_dir" ]; then
+    echo "No system backup directory found: $out_dir"
+    return 0
+  fi
+
+  names="$(iter_valid_system_backup_names "$out_dir" | sort || true)"
+  count="$(printf '%s
+' "$names" | sed '/^$/d' | wc -l | tr -d '[:space:]')"
+
+  if [ "${count:-0}" -eq 0 ]; then
+    echo "No system backups found in: $out_dir"
+    return 0
+  fi
+
+  echo "System backup directory: $out_dir"
+  echo "System backups found: $count"
+  echo "These archives are the only copy of the credentials they contain."
+  if [ "${DUNE_DB_ASSUME_YES:-0}" != "1" ]; then
+    read -r -p "Delete ALL system backups? Type DELETE to confirm: " answer
+    if [ "$answer" != "DELETE" ]; then
+      echo "Delete cancelled."
+      exit 1
+    fi
+  fi
+
+  local failed=0
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    if delete_system_backup_files_for_name "$name" "$out_dir"; then
+      deleted=$((deleted + 1))
+    else
+      failed=$((failed + 1))
+    fi
+  done <<< "$names"
+
+  echo "Deleted $deleted system backups."
+  if [ "$failed" -gt 0 ]; then
+    echo "$failed system backup(s) could not be removed." >&2
+    return 1
+  fi
+}
+
+delete_system_backup() {
+  local target="${1:-}"
+  local out_dir="$SYSTEM_BACKUP_DIR_DEFAULT"
+  local name answer
+  local -a names=()
+
+  if [ "$target" = "--all" ]; then
+    delete_all_system_backups "$out_dir"
+    return
+  fi
+
+  [ "$#" -gt 0 ] || { echo "Missing system backup name." >&2; exit 2; }
+  for target in "$@"; do
+    name="$(basename "$target")"
+    valid_system_backup_basename "$name" || { echo "Not a valid system backup file: $target" >&2; exit 1; }
+    [ -f "$out_dir/$name" ] || { echo "System backup does not exist: $out_dir/$name" >&2; exit 1; }
+    if [[ " ${names[*]} " != *" $name "* ]]; then names+=("$name"); fi
+  done
+
+  if [ "${DUNE_DB_ASSUME_YES:-0}" != "1" ]; then
+    read -r -p "Delete ${#names[@]} selected system backup(s)? [y/N]: " answer
+    case "$answer" in
+      y|Y|yes|YES) ;;
+      *) echo "Delete cancelled."; exit 1 ;;
+    esac
+  fi
+
+  local removed=0
+  for name in "${names[@]}"; do
+    if delete_system_backup_files_for_name "$name" "$out_dir"; then
+      removed=$((removed + 1))
+      echo "Deleted system backup: $name"
+    fi
+  done
+  echo "Deleted $removed selected system backup(s)."
+  if [ "$removed" -ne "${#names[@]}" ]; then
+    echo "$(( ${#names[@]} - removed )) system backup(s) could not be removed." >&2
+    return 1
   fi
 }
 
@@ -1896,7 +2896,7 @@ import_db() {
       ;;
   esac
 
-  require_postgres
+  ensure_postgres_running || exit 1
 
   case "$backup_file" in
     *.backup|*.dump)
@@ -1911,6 +2911,17 @@ import_db() {
   choose_import_battlegroup_action "$backup_file" "$battlegroup_action" || exit 1
 
   identity_snapshot="$(capture_current_account_identities)"
+
+  # A pre-import backup protects data this import is about to replace. On a host
+  # whose database is still empty there is none, and backup_db cannot even
+  # produce one: its validation requires dune.world_partition, which does not
+  # exist yet, so the import would fail on the safety net rather than on
+  # anything being wrong. Gated on zero tables, not on the validation failing,
+  # so a populated database that fails validation still stops the import.
+  if [ "$create_safety_backup" = "1" ] && [ "$(dune_schema_table_count)" = "0" ]; then
+    echo "No pre-import safety backup: this database has no tables yet, so there is nothing to protect."
+    create_safety_backup=0
+  fi
 
   echo "WARNING: importing a database backup replaces current battlegroup database state."
   if [ "$create_safety_backup" = "1" ]; then
@@ -1988,7 +2999,12 @@ import_db() {
     }
   fi
 
-  if [ "${DUNE_DB_ASSUME_YES:-0}" = "1" ]; then
+  if [ "${DUNE_DB_SKIP_RESTART:-0}" = "1" ]; then
+    # restore-system replaces .env and the secrets after this returns and then
+    # hands the start to the operator. Starting here would bring the stack up
+    # on the configuration that is about to be replaced.
+    echo "Services remain stopped for the caller to start."
+  elif [ "${DUNE_DB_ASSUME_YES:-0}" = "1" ]; then
     echo "Restarting Dune stack..."
     runtime/scripts/start-all.sh
     echo "Dune stack restart completed."
@@ -2758,6 +3774,13 @@ case "$cmd" in
     ;;
   list-system)
     list_system_backups "${2:-$SYSTEM_BACKUP_DIR_DEFAULT}"
+    ;;
+  restore-system)
+    restore_system "${2:-}" "${@:3}"
+    ;;
+  delete-system)
+    shift || true
+    delete_system_backup "$@"
     ;;
   status)
     status_db

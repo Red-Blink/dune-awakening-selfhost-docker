@@ -17,8 +17,8 @@ export function StatusPill({ value }: { value: unknown }) {
   return <span className={`badge badge-${normalized}`}>{text}</span>;
 }
 
-export function TechnicalDetails({ text, title = "Technical details", className = "" }: { text: string; title?: string; className?: string }) {
-  return <details className={`technical-details ${className}`.trim()}><summary>{title}</summary><pre className="mini-output">{text}</pre></details>;
+export function TechnicalDetails({ text, title = "Technical details", className = "", open = false }: { text: string; title?: string; className?: string; open?: boolean }) {
+  return <details className={`technical-details ${className}`.trim()} open={open}><summary>{title}</summary><pre className="mini-output">{text}</pre></details>;
 }
 
 export function OutputPanel({ title, text, action, onAction }: { title: string; text: string; action: string; onAction: () => void }) {
