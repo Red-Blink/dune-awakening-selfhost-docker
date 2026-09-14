@@ -12,6 +12,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { readMarketItemOverrides, mergeMarketSeedPlanWithOverrides, readUnsafeTemplateIds } from "./services/marketItemOverrides.js";
+import { applyExchangeCategoryToSeedRow } from "./services/exchangeCategoryMask.js";
 import { resolveActiveMarketSeedPlanPath, resolveShippedMarketSeedPlanPath } from "./services/marketSeedPlans.js";
 
 // Keep identity helpers local so this module does not circular-import addonJobs.js.
@@ -295,8 +296,13 @@ export function loadMarketSeedPlan(config, addonId = EDA_EXCHANGE_BOT_ADDON_ID) 
     const kind = String(row?.kind || "equippable").slice(0, 40);
     const stackSize = Math.max(1, Math.trunc(Number(row?.stack_size) || 1));
     const listings = Math.max(1, Math.trunc(Number(row?.listings) || 1));
-    const categoryMask = Math.trunc(Number(row?.category_mask) || 0);
-    const categoryDepth = clampInteger(row?.category_depth, 1, 0, 4);
+    const categorized = applyExchangeCategoryToSeedRow({
+      category_mask: Math.trunc(Number(row?.category_mask) || 0),
+      category_depth: clampInteger(row?.category_depth, 1, 0, 4),
+      kind
+    });
+    const categoryMask = categorized.category_mask;
+    const categoryDepth = categorized.category_depth;
     const qualityLevel = clampInteger(row?.quality_level, 0, 0, 5);
     const durMax = clampInteger(row?.durability_max ?? row?.durability_cur ?? 100, 100, 100, 200);
     const durCur = Math.min(clampInteger(row?.durability_cur ?? durMax, durMax, 100, 200), durMax);

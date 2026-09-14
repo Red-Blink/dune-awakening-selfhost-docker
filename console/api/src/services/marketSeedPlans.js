@@ -14,6 +14,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { writeJsonAtomic } from "../jsonStore.js";
+import { applyExchangeCategoryToSeedRow } from "./exchangeCategoryMask.js";
 import { readUnsafeTemplateIds } from "./marketItemOverrides.js";
 
 export const BUNDLED_SEED_PLAN_ID = "bundled";
@@ -535,6 +536,25 @@ function mergeImportedRow(record, base, rowNumber) {
     fallback: 1
   });
   const kind = parseKind(firstDefined(record.kind, base?.kind), rowNumber, templateId);
+  const categorized = applyExchangeCategoryToSeedRow({
+    category_mask: parseOptionalInt(firstDefined(record.category_mask, base?.category_mask), {
+      min: 0,
+      max: 2147483647,
+      field: "category_mask",
+      rowNumber,
+      templateId,
+      fallback: 0
+    }),
+    category_depth: parseOptionalInt(firstDefined(record.category_depth, base?.category_depth), {
+      min: 0,
+      max: 4,
+      field: "category_depth",
+      rowNumber,
+      templateId,
+      fallback: 1
+    }),
+    kind
+  });
   const displayName = parseDisplayName(firstDefined(record.display_name, base?.display_name), templateId, rowNumber);
   const durabilityMax = parseDurability(firstDefined(record.durability_max, base?.durability_max, base?.durability_cur), {
     field: "durability_max",
@@ -557,22 +577,8 @@ function mergeImportedRow(record, base, rowNumber) {
     kind,
     stack_size: stackSize,
     price,
-    category_mask: parseOptionalInt(firstDefined(record.category_mask, base?.category_mask), {
-      min: 0,
-      max: 2147483647,
-      field: "category_mask",
-      rowNumber,
-      templateId,
-      fallback: 0
-    }),
-    category_depth: parseOptionalInt(firstDefined(record.category_depth, base?.category_depth), {
-      min: 0,
-      max: 4,
-      field: "category_depth",
-      rowNumber,
-      templateId,
-      fallback: 1
-    }),
+    category_mask: categorized.category_mask,
+    category_depth: categorized.category_depth,
     quality_level: qualityLevel,
     special_boost: parseSpecialBoost(firstDefined(record.special_boost, base?.special_boost), rowNumber, templateId),
     listings,
@@ -733,8 +739,11 @@ function csvCellValue(row, column) {
   if (column === "kind") return row.kind ?? "";
   if (column === "stack_size") return row.stack_size ?? row.stackSize ?? 1;
   if (column === "price") return row.price ?? "";
-  if (column === "category_mask") return row.category_mask ?? row.categoryMask ?? 0;
-  if (column === "category_depth") return row.category_depth ?? row.categoryDepth ?? 1;
+  if (column === "category_mask" || column === "category_depth") {
+    const categorized = applyExchangeCategoryToSeedRow(row);
+    if (column === "category_mask") return categorized.category_mask ?? categorized.categoryMask ?? 0;
+    return categorized.category_depth ?? categorized.categoryDepth ?? 1;
+  }
   if (column === "quality_level") return row.quality_level ?? row.qualityLevel ?? 0;
   if (column === "special_boost") return row.special_boost === true || row.specialBoost === true ? "true" : "false";
   if (column === "listings") return row.listings ?? 1;

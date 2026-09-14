@@ -1,6 +1,6 @@
 # Market Board (Exchange)
 
-**Status:** Current | **Last Updated:** August 2026
+**Status:** Current | **Last Updated:** September 2026
 
 The Market Board is a **read-only** view of the in-game CHOAM exchange. It reads the
 game's own exchange tables (the game writes them; the console never mutates them) so
@@ -234,6 +234,29 @@ Exchange Bot addon drives through the scheduler bridge, now first-class):
   to stay open) and survive restarts. They are console-owned and authorized by RBAC
   at save time. Seed and buyback share one running lock, so they can never write the
   exchange concurrently.
+
+### In-game weapon categories
+
+The CHOAM client filters listings with Funcom's
+`dune.get_exchange_orders_by_mask(mask, depth)`, which is a **prefix** match
+on `category_mask` at the selected folder depth. The Weapons tab's depth-2
+folders are Melee (0), Ranged (1), Ammunition (2), and Unique Schematics (3)
+— the same tree Icehunter/dune-admin documented from in-game screenshots and
+DASH derived from GUI category assets.
+
+Icehunter/EDA `CategoryMask()` remaps melee under folder 0 at depth 3, but
+left each ranged type as a depth-2 sibling (`pistol=2` … `lasgun=13`,
+`ammunition=14`). Seeded Maula pistols therefore sat at `0x01020000` depth 2
+— the Ammunition folder — and were the only items that folder showed, while
+Ranged Weapons (`0x0101xxxx`) was empty. Unique schematics already used
+folder 3 correctly (Maula patterns at `0x01030200`).
+
+The bundled seed plan, plus seed/buyback/CSV load, now nest those guessed
+gun types under Ranged Weapons at depth 3 (Maula `0x01010200`) and move
+ammunition to `0x01020000`. Icehunter's later market bot learns true masks
+from player listings instead of trusting the static map; this console seeds
+from a frozen plan, so it has to correct the map itself. A reseed is required
+for already-listed NPC orders to pick up the new masks.
 
 ### Bot items (catalog overrides)
 

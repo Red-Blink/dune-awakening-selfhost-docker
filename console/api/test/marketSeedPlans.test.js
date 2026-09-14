@@ -214,6 +214,20 @@ test("CSV import rejects extra columns, SQL payloads, formulas, and non-numeric 
   );
 });
 
+test("CSV import remaps Icehunter depth-2 ranged weapon masks", () => {
+  const rows = csvToPlanRows(
+    "template_id,kind,price,category_mask,category_depth\nChoamSda2,equippable,6500,16908288,2\nAmmo,ammunition,50,17694720,2\n",
+    SAMPLE_PLAN,
+    []
+  );
+  const maula = rows.find((row) => row.template_id === "ChoamSda2");
+  const ammo = rows.find((row) => row.template_id === "Ammo");
+  assert.equal(maula.category_mask, 0x01010200);
+  assert.equal(maula.category_depth, 3);
+  assert.equal(ammo.category_mask, 0x01020000);
+  assert.equal(ammo.category_depth, 2);
+});
+
 test("CSV import accepts apostrophes, durability tenths, and the bundled catalog round-trip", () => {
   const named = csvToPlanRows("template_id,display_name,price\nWaterBottle,Abulurd's Rapture,10\n", SAMPLE_PLAN, []);
   assert.equal(named[0].display_name, "Abulurd's Rapture");

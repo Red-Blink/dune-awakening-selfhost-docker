@@ -552,6 +552,24 @@ test("admin buyback rules set exchange, caps, basis, and Max Buys as intended", 
   }
 });
 
+test("loadBuybackSeedPlan remaps Icehunter depth-2 ranged masks", () => {
+  const repoRoot = makeRepoRoot({
+    price_multiplier: 5,
+    rows: [
+      { template_id: "ChoamSda2", kind: "equippable", price: 6500, category_mask: 0x01020000, category_depth: 2, quality_level: 0 },
+      { template_id: "Ammo", kind: "ammunition", price: 50, category_mask: 0x010e0000, category_depth: 2, quality_level: 0 }
+    ]
+  });
+  try {
+    const plan = loadBuybackSeedPlan({ repoRoot });
+    const byId = Object.fromEntries(plan.rows.map((row) => [row.templateId, row]));
+    assert.equal(byId.ChoamSda2.categoryMask, 0x01010200);
+    assert.equal(byId.Ammo.categoryMask, 0x01020000);
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
 test("buyback caps reprice ranked categories the same way the seed run does", () => {
   // Realistic masks: high byte 0 = armor, 1 = weapons, 4 = augments.
   const plan = {

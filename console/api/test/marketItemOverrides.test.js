@@ -117,6 +117,26 @@ test("saveMarketItemOverrides only accepts new items that resolve in admin-items
   });
 });
 
+test("saveMarketItemOverrides remaps Icehunter depth-2 ranged masks on new items", () => {
+  withRepo((repo) => {
+    seedPlanFile(repo);
+    seedAdminItems(repo, [{ id: "ChoamSda9", name: "Maula Pistol Mk9", category: "weapons", source: "Weapons" }]);
+    const saved = saveMarketItemOverrides(repo, {
+      newItems: {
+        ChoamSda9: {
+          price: 100,
+          listings: 1,
+          categoryMask: 0x01020000,
+          categoryDepth: 2,
+          kind: "equippable"
+        }
+      }
+    });
+    assert.equal(saved.newItems.ChoamSda9.categoryMask, 0x01010200);
+    assert.equal(saved.newItems.ChoamSda9.categoryDepth, 3);
+  });
+});
+
 test("saveMarketItemOverrides rejects a base-plan item even when it has no existing override", () => {
   withRepo((repo) => {
     seedPlanFile(repo);

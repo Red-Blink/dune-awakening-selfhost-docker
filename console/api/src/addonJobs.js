@@ -24,6 +24,7 @@ import { runSql } from "./duneDb.js";
 import { writeJsonAtomic } from "./jsonStore.js";
 import { audit } from "./audit.js";
 import { redact } from "./redact.js";
+import { applyExchangeCategoryToSeedRow } from "./services/exchangeCategoryMask.js";
 import {
   readSeedSchedule,
   saveSeedSchedule,
@@ -222,13 +223,19 @@ export function loadBuybackSeedPlan(config, addonId = EDA_EXCHANGE_BOT_ADDON_ID)
     if (!templateId || templateId.length > 200) throw new Error(`Addon market seed plan row ${index + 1} has an invalid template_id.`);
     const price = Number(row?.price);
     if (!Number.isFinite(price) || price <= 0) throw new Error(`Addon market seed plan row ${index + 1} has an invalid price.`);
+    const kind = String(row?.kind || "equippable").slice(0, 40);
+    const categorized = applyExchangeCategoryToSeedRow({
+      category_mask: Math.trunc(Number(row?.category_mask) || 0),
+      category_depth: clampInteger(row?.category_depth, 1, 0, 4),
+      kind
+    });
     return {
       templateId,
       displayName: String(row?.display_name || "").trim(),
       price,
       qualityLevel: clampInteger(row?.quality_level, 0, 0, 5),
-      categoryMask: Math.trunc(Number(row?.category_mask) || 0),
-      kind: String(row?.kind || "equippable").slice(0, 40)
+      categoryMask: categorized.category_mask,
+      kind
     };
   });
   return { sourceMultiplier, rows };

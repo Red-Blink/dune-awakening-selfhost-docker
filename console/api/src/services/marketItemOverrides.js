@@ -14,6 +14,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { writeJsonAtomic, clampInt } from "../jsonStore.js";
+import { applyExchangeCategoryToSeedRow } from "./exchangeCategoryMask.js";
 import { validateTemplateId } from "../duneDb/presentation.js";
 import { listCatalogItems } from "../adminCatalog.js";
 
@@ -144,13 +145,19 @@ function normalizeNewItemRow(raw, templateId, catalogEntry) {
     throw new Error(`New item ${templateId} listings must be an integer from ${LISTINGS_MIN} to ${LISTINGS_MAX}.`);
   }
   const durabilityMax = clampInt(raw?.durabilityMax, 100, 100, 200);
+  const kind = String(raw?.kind || "equippable").slice(0, 40);
+  const categorized = applyExchangeCategoryToSeedRow({
+    categoryMask: Math.trunc(Number(raw?.categoryMask) || 0),
+    categoryDepth: clampInt(raw?.categoryDepth, 1, 0, 4),
+    kind
+  });
   return {
     name: String(raw?.name || catalogEntry.name || templateId).slice(0, 200),
     category: String(catalogEntry.category || "misc").toLowerCase(),
     qualityLevel: clampInt(raw?.qualityLevel, 0, 0, 5),
-    categoryDepth: clampInt(raw?.categoryDepth, 1, 0, 4),
-    categoryMask: Math.trunc(Number(raw?.categoryMask) || 0),
-    kind: String(raw?.kind || "equippable").slice(0, 40),
+    categoryDepth: categorized.categoryDepth,
+    categoryMask: categorized.categoryMask,
+    kind,
     stackSize: Math.max(1, Math.trunc(Number(raw?.stackSize) || 1)),
     price: Math.trunc(price),
     listings,
@@ -248,7 +255,7 @@ export function mergeMarketSeedPlanWithOverrides(plan, overrides, unsafeIds = []
     });
   for (const [templateId, item] of Object.entries(newItems)) {
     if (unsafeSet.has(templateId) || item.enabled === false) continue;
-    rows.push({
+    const categorized = applyExchangeCategoryToSeedRow({
       templateId,
       stackSize: item.stackSize,
       price: item.price,
@@ -259,6 +266,7 @@ export function mergeMarketSeedPlanWithOverrides(plan, overrides, unsafeIds = []
       listings: item.listings,
       itemStats: newItemStatsJson(item.durabilityCur, item.durabilityMax)
     });
+    rows.push(categorized);
   }
   return { ...plan, rows };
 }
@@ -286,7 +294,11 @@ export function mergeBuybackSeedPlanWithOverrides(plan, overrides, unsafeIds = [
       displayName: item.name,
       price: item.price,
       qualityLevel: item.qualityLevel,
-      categoryMask: item.categoryMask,
+      categoryMask: applyExchangeCategoryToSeedRow({
+        categoryMask: item.categoryMask,
+        categoryDepth: item.categoryDepth,
+        kind: item.kind
+      }).categoryMask,
       kind: item.kind
     });
   }

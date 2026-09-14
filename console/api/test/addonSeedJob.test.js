@@ -280,6 +280,33 @@ test("seed schedule normalizes category multipliers within 1-5x", () => {
   assert.throws(() => normalizeSeedSchedule({ rankedWeaponMultiplier: "big" }), /rankedWeaponMultiplier must be a number from 1 to 5/);
 });
 
+test("loadMarketSeedPlan remaps Icehunter depth-2 ranged masks before seeding", () => {
+  const repoRoot = makeRepoRoot({
+    plan: {
+      panel_version: "test",
+      price_multiplier: 5,
+      rows: [
+        { template_id: "ChoamSda2", display_name: "Maula Pistol", kind: "equippable", stack_size: 1, price: 6500, category_mask: 0x01020000, category_depth: 2, quality_level: 0, listings: 2, durability_cur: 100, durability_max: 100 },
+        { template_id: "HarkAr2", display_name: "Karpov 38", kind: "equippable", stack_size: 1, price: 8000, category_mask: 0x01080000, category_depth: 2, quality_level: 0, listings: 2, durability_cur: 100, durability_max: 100 },
+        { template_id: "Ammo", display_name: "Light Darts", kind: "ammunition", stack_size: 100, price: 50, category_mask: 0x010e0000, category_depth: 2, quality_level: 0, listings: 2, durability_cur: 100, durability_max: 100 },
+        { template_id: "Schematic_UniqueMaulaPistol", display_name: "Way of the Fallen", kind: "schematic", stack_size: 1, price: 4000, category_mask: 0x01030200, category_depth: 3, quality_level: 0, listings: 2, durability_cur: 100, durability_max: 100 }
+      ]
+    }
+  });
+  try {
+    const plan = loadMarketSeedPlan({ repoRoot });
+    const byId = Object.fromEntries(plan.rows.map((row) => [row.templateId, row]));
+    assert.equal(byId.ChoamSda2.categoryMask, 0x01010200);
+    assert.equal(byId.ChoamSda2.categoryDepth, 3);
+    assert.equal(byId.HarkAr2.categoryMask, 0x01010800);
+    assert.equal(byId.Ammo.categoryMask, 0x01020000);
+    assert.equal(byId.Ammo.categoryDepth, 2);
+    assert.equal(byId.Schematic_UniqueMaulaPistol.categoryMask, 0x01030200);
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
 test("bundled plan: the three categories cover exactly the ranked rows", () => {
   const plan = JSON.parse(readFileSync(resolve(REPO_ROOT, "runtime/data/market-seed-plan.json"), "utf8"));
   // Distinct primes make the resolved category unambiguous.
