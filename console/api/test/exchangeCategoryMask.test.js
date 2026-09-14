@@ -79,6 +79,40 @@ test("leaves melee, unique schematics, and already-nested ranged rows alone", ()
   );
 });
 
+test("does not nest depth-2 schematic or other non-equippable rows under Ranged Weapons", () => {
+  const uniqueFolder = { categoryMask: WEAPONS_UNIQUE_SCHEMATICS_MASK, categoryDepth: 2 };
+  const schematic = normalizeExchangeCategory({ ...uniqueFolder, kind: "schematic" });
+  assert.deepEqual(schematic, uniqueFolder);
+  assert.equal(
+    exchangeMaskMatches(schematic.categoryMask, schematic.categoryDepth, WEAPONS_UNIQUE_SCHEMATICS_MASK, 2),
+    true
+  );
+  assert.equal(
+    exchangeMaskMatches(schematic.categoryMask, schematic.categoryDepth, WEAPONS_RANGED_FOLDER_MASK, 2),
+    false
+  );
+
+  for (const kind of ["schematic", "resource", "utility", "consumable", "cartography"]) {
+    assert.deepEqual(
+      normalizeExchangeCategory({ categoryMask: 0x01080000, categoryDepth: 2, kind }),
+      { categoryMask: 0x01080000, categoryDepth: 2 }
+    );
+  }
+
+  assert.deepEqual(
+    normalizeExchangeCategory({ categoryMask: 0x01030000, categoryDepth: 2 }),
+    { categoryMask: 0x01030000, categoryDepth: 2 }
+  );
+  assert.deepEqual(
+    applyExchangeCategoryToSeedRow({
+      category_mask: 0x01030000,
+      category_depth: 2,
+      kind: "schematic"
+    }),
+    { category_mask: 0x01030000, category_depth: 2, kind: "schematic" }
+  );
+});
+
 test("normalization is idempotent", () => {
   const first = normalizeExchangeCategory({ categoryMask: 0x01020000, categoryDepth: 2, kind: "equippable" });
   const second = normalizeExchangeCategory({ ...first, kind: "equippable" });

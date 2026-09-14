@@ -93,8 +93,12 @@ export function normalizeExchangeCategory({ categoryMask, categoryDepth, kind } 
   // Unique schematics and already-nested melee/ranged rows stay put.
   if (depth >= 3) return { categoryMask: mask, categoryDepth: depth };
 
+  // Physical guns only. Unique Schematics is Weapons depth-2 code 3
+  // (0x01030000); remapping every code 2–13 would pull a custom schematic
+  // out of that folder into Ranged Weapons subtype 3.
   if (
-    depth === 2
+    itemKind === "equippable"
+    && depth === 2
     && decoded.depth3 === 0
     && decoded.depth2 >= RANGED_TYPE_PISTOL
     && decoded.depth2 <= RANGED_TYPE_LAST
