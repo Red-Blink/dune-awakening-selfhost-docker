@@ -216,16 +216,19 @@ test("CSV import rejects extra columns, SQL payloads, formulas, and non-numeric 
 
 test("CSV import remaps Icehunter depth-2 ranged weapon masks", () => {
   const rows = csvToPlanRows(
-    "template_id,kind,price,category_mask,category_depth\nChoamSda2,equippable,6500,16908288,2\nAmmo,ammunition,50,17694720,2\n",
+    "template_id,kind,price,category_mask,category_depth\nChoamSda2,equippable,6500,16908288,2\nAmmo,ammunition,50,17694720,2\nCustomUniqueSchematic,schematic,4000,16973824,2\n",
     SAMPLE_PLAN,
     []
   );
   const maula = rows.find((row) => row.template_id === "ChoamSda2");
   const ammo = rows.find((row) => row.template_id === "Ammo");
+  const schematic = rows.find((row) => row.template_id === "CustomUniqueSchematic");
   assert.equal(maula.category_mask, 0x01010200);
   assert.equal(maula.category_depth, 3);
   assert.equal(ammo.category_mask, 0x01020000);
   assert.equal(ammo.category_depth, 2);
+  assert.equal(schematic.category_mask, 0x01030000);
+  assert.equal(schematic.category_depth, 2);
 });
 
 test("CSV import accepts apostrophes, durability tenths, and the bundled catalog round-trip", () => {

@@ -253,7 +253,9 @@ folder 3 correctly (Maula patterns at `0x01030200`).
 
 The bundled seed plan, plus seed/buyback/CSV load, now nest those guessed
 gun types under Ranged Weapons at depth 3 (Maula `0x01010200`) and move
-ammunition to `0x01020000`. Icehunter's later market bot learns true masks
+ammunition to `0x01020000`. The gun remap applies only to `equippable`
+rows, so a custom schematic sitting in Unique Schematics (`0x01030000`
+depth 2) is not pulled into Ranged Weapons subtype 3. Icehunter's later market bot learns true masks
 from player listings instead of trusting the static map; this console seeds
 from a frozen plan, so it has to correct the map itself. A reseed is required
 for already-listed NPC orders to pick up the new masks.
