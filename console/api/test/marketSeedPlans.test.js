@@ -216,7 +216,7 @@ test("CSV import rejects extra columns, SQL payloads, formulas, and non-numeric 
 
 test("CSV import remaps Treadwheel vehicle masks by template_id", () => {
   const rows = csvToPlanRows(
-    "template_id,kind,price,category_mask,category_depth\nTreadwheelChassis_4,equippable,6500,33587200,3\nTreadwheelEngine_Unique_Speed_4_Schematic,schematic,4000,33883136,3\nSandcrawlerChassis_6,equippable,8000,33587200,3\n",
+    "template_id,display_name,kind,price,category_mask,category_depth\nTreadwheelChassis_4,Treadwheel Chassis Mk4,equippable,6500,33882112,3\nTreadwheelEngine_Unique_Speed_4_Schematic,Swift Treadwheel Engine Mk4,schematic,4000,33948928,3\nSandcrawlerChassis_6,Sandcrawler Chassis Mk6,equippable,8000,33882112,3\n",
     SAMPLE_PLAN,
     []
   );
