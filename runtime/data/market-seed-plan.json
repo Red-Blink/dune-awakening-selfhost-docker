@@ -164,6 +164,10 @@
       "listings": 23
     },
     {
+      "category": "33555712 / depth 3",
+      "listings": 23
+    },
+    {
       "category": "66560 / depth 3",
       "listings": 21
     },
@@ -186,6 +190,14 @@
     {
       "category": "50462976 / depth 3",
       "listings": 19
+    },
+    {
+      "category": "33947648 / depth 3",
+      "listings": 18
+    },
+    {
+      "category": "33554944 / depth 3",
+      "listings": 18
     },
     {
       "category": "16976128 / depth 3",
@@ -224,10 +236,6 @@
       "listings": 15
     },
     {
-      "category": "33555712 / depth 3",
-      "listings": 14
-    },
-    {
       "category": "50528256 / depth 3",
       "listings": 13
     },
@@ -240,15 +248,7 @@
       "listings": 12
     },
     {
-      "category": "33947648 / depth 3",
-      "listings": 12
-    },
-    {
       "category": "16976640 / depth 3",
-      "listings": 12
-    },
-    {
-      "category": "33554944 / depth 3",
       "listings": 12
     },
     {
@@ -276,10 +276,6 @@
       "listings": 10
     },
     {
-      "category": "33948928 / depth 3",
-      "listings": 9
-    },
-    {
       "category": "16845568 / depth 3",
       "listings": 9
     },
@@ -288,7 +284,15 @@
       "listings": 9
     },
     {
-      "category": "33883392 / depth 3",
+      "category": "33554432 / depth 3",
+      "listings": 9
+    },
+    {
+      "category": "33555200 / depth 3",
+      "listings": 9
+    },
+    {
+      "category": "33555456 / depth 3",
       "listings": 9
     },
     {
@@ -313,10 +317,6 @@
     },
     {
       "category": "50792192 / depth 3",
-      "listings": 8
-    },
-    {
-      "category": "33882624 / depth 3",
       "listings": 8
     },
     {
@@ -352,24 +352,8 @@
       "listings": 6
     },
     {
-      "category": "33554432 / depth 3",
-      "listings": 6
-    },
-    {
       "category": "33554688 / depth 3",
       "listings": 6
-    },
-    {
-      "category": "33555200 / depth 3",
-      "listings": 6
-    },
-    {
-      "category": "33555456 / depth 3",
-      "listings": 6
-    },
-    {
-      "category": "33883136 / depth 3",
-      "listings": 5
     },
     {
       "category": "16976384 / depth 3",
@@ -400,19 +384,15 @@
       "listings": 4
     },
     {
-      "category": "33882112 / depth 3",
-      "listings": 4
-    },
-    {
-      "category": "33882880 / depth 3",
-      "listings": 4
-    },
-    {
       "category": "33817856 / depth 3",
       "listings": 3
     },
     {
       "category": "33816832 / depth 3",
+      "listings": 3
+    },
+    {
+      "category": "33948928 / depth 3",
       "listings": 3
     },
     {
@@ -476,7 +456,15 @@
       "listings": 2
     },
     {
+      "category": "33883136 / depth 3",
+      "listings": 2
+    },
+    {
       "category": "50791680 / depth 3",
+      "listings": 2
+    },
+    {
+      "category": "33882624 / depth 3",
       "listings": 2
     },
     {
@@ -509,6 +497,14 @@
     },
     {
       "category": "33882368 / depth 3",
+      "listings": 1
+    },
+    {
+      "category": "33882112 / depth 3",
+      "listings": 1
+    },
+    {
+      "category": "33882880 / depth 3",
       "listings": 1
     },
     {
@@ -33717,7 +33713,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 3500000,
-      "category_mask": 33883392,
+      "category_mask": 33555712,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -33731,7 +33727,7 @@
       "kind": "schematic",
       "stack_size": 1,
       "price": 300000,
-      "category_mask": 33948928,
+      "category_mask": 33947648,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -33745,7 +33741,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 6000000,
-      "category_mask": 33883392,
+      "category_mask": 33555712,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -33759,7 +33755,7 @@
       "kind": "schematic",
       "stack_size": 1,
       "price": 750000,
-      "category_mask": 33948928,
+      "category_mask": 33947648,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -33773,7 +33769,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 3500000,
-      "category_mask": 33883392,
+      "category_mask": 33555712,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -33787,7 +33783,7 @@
       "kind": "schematic",
       "stack_size": 1,
       "price": 1900000,
-      "category_mask": 33948928,
+      "category_mask": 33947648,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -33997,7 +33993,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 3200000,
-      "category_mask": 33882624,
+      "category_mask": 33554944,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -34011,7 +34007,7 @@
       "kind": "schematic",
       "stack_size": 1,
       "price": 300000,
-      "category_mask": 33948928,
+      "category_mask": 33947648,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -34025,7 +34021,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 6000000,
-      "category_mask": 33882624,
+      "category_mask": 33554944,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -34039,7 +34035,7 @@
       "kind": "schematic",
       "stack_size": 1,
       "price": 750000,
-      "category_mask": 33948928,
+      "category_mask": 33947648,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -34053,7 +34049,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 9000000,
-      "category_mask": 33882624,
+      "category_mask": 33554944,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -34067,7 +34063,7 @@
       "kind": "schematic",
       "stack_size": 1,
       "price": 1900000,
-      "category_mask": 33948928,
+      "category_mask": 33947648,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36405,7 +36401,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 220000,
-      "category_mask": 33883392,
+      "category_mask": 33555712,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36419,7 +36415,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 360000,
-      "category_mask": 33883392,
+      "category_mask": 33555712,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36433,7 +36429,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 600000,
-      "category_mask": 33883392,
+      "category_mask": 33555712,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36447,7 +36443,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 130000,
-      "category_mask": 33882112,
+      "category_mask": 33554432,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36461,7 +36457,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 240000,
-      "category_mask": 33882112,
+      "category_mask": 33554432,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36475,7 +36471,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 430000,
-      "category_mask": 33882112,
+      "category_mask": 33554432,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36489,7 +36485,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 70000,
-      "category_mask": 33882624,
+      "category_mask": 33554944,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36503,7 +36499,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 150000,
-      "category_mask": 33882624,
+      "category_mask": 33554944,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36517,7 +36513,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 260000,
-      "category_mask": 33882624,
+      "category_mask": 33554944,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36531,7 +36527,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 14000,
-      "category_mask": 33883392,
+      "category_mask": 33555712,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36545,7 +36541,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 65000,
-      "category_mask": 33882880,
+      "category_mask": 33555200,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36559,7 +36555,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 140000,
-      "category_mask": 33882880,
+      "category_mask": 33555200,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36573,7 +36569,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 240000,
-      "category_mask": 33882880,
+      "category_mask": 33555200,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36587,7 +36583,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 7500,
-      "category_mask": 33883392,
+      "category_mask": 33555712,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36601,7 +36597,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 28000,
-      "category_mask": 33883392,
+      "category_mask": 33555712,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36615,7 +36611,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 55000,
-      "category_mask": 33883136,
+      "category_mask": 33555456,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36629,7 +36625,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 100000,
-      "category_mask": 33883136,
+      "category_mask": 33555456,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -36643,7 +36639,7 @@
       "kind": "equippable",
       "stack_size": 1,
       "price": 180000,
-      "category_mask": 33883136,
+      "category_mask": 33555456,
       "category_depth": 3,
       "quality_level": 0,
       "special_boost": false,
@@ -38886,7 +38882,8 @@
     "Vehicle locomotion stocks deeper than the default 2: sandbike treads 3, buggy treads 4, scout wings 4, assault wings 6, carrier wings 8 (per existing rank/template). Unique locomotion modules under those families use the same counts; schematics stay at 2.",
     "Excluded: non-tradeable, contracts, customization/construction, emotes, mementos, plot/story/NPC items, templates with no string-table name, unreleased resources (Water, Corpse), social wearables, unusable set packs.",
     "Write actions run through RedBlink's permissioned database:write addon bridge.",
-    "Ranged weapon category_mask values were remapped from Icehunter/EDA depth-2 type codes (pistol=2 \u2026 lasgun=13, ammo=14) onto the in-game Weapons tab: Melee(0), Ranged(1), Ammunition(2), Unique Schematics(3). Physical guns now nest at depth 3 under Ranged Weapons so the CHOAM prefix filter no longer lists only Maula pistols in the ammunition/ranged slot."
+    "Ranged weapon category_mask values were remapped from Icehunter/EDA depth-2 type codes (pistol=2 \u2026 lasgun=13, ammo=14) onto the in-game Weapons tab: Melee(0), Ranged(1), Ammunition(2), Unique Schematics(3). Physical guns now nest at depth 3 under Ranged Weapons so the CHOAM prefix filter no longer lists only Maula pistols in the ammunition/ranged slot.",
+    "Treadwheel category_mask values were remapped off Icehunter's sandcrawler folder (d2=5; unique schematics d3=5) onto Funcom's One-Man Groundcar folder (d2=0, same depth-3 slots as Sandbike; unique schematics d3=0). Icehunter has no items/vehicles/treadwheel path, so CHOAM listed Treadwheel parts under Sandcrawler. Real Sandcrawler* rows are unchanged."
   ],
   "unsafe_template_ids": [
     "AtreLMGRadiationNPC",

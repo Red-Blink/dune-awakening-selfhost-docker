@@ -297,6 +297,7 @@ export function loadMarketSeedPlan(config, addonId = EDA_EXCHANGE_BOT_ADDON_ID) 
     const stackSize = Math.max(1, Math.trunc(Number(row?.stack_size) || 1));
     const listings = Math.max(1, Math.trunc(Number(row?.listings) || 1));
     const categorized = applyExchangeCategoryToSeedRow({
+      template_id: templateId,
       category_mask: Math.trunc(Number(row?.category_mask) || 0),
       category_depth: clampInteger(row?.category_depth, 1, 0, 4),
       kind

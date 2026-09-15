@@ -147,6 +147,7 @@ function normalizeNewItemRow(raw, templateId, catalogEntry) {
   const durabilityMax = clampInt(raw?.durabilityMax, 100, 100, 200);
   const kind = String(raw?.kind || "equippable").slice(0, 40);
   const categorized = applyExchangeCategoryToSeedRow({
+    templateId,
     categoryMask: Math.trunc(Number(raw?.categoryMask) || 0),
     categoryDepth: clampInt(raw?.categoryDepth, 1, 0, 4),
     kind
@@ -295,6 +296,7 @@ export function mergeBuybackSeedPlanWithOverrides(plan, overrides, unsafeIds = [
       price: item.price,
       qualityLevel: item.qualityLevel,
       categoryMask: applyExchangeCategoryToSeedRow({
+        templateId,
         categoryMask: item.categoryMask,
         categoryDepth: item.categoryDepth,
         kind: item.kind

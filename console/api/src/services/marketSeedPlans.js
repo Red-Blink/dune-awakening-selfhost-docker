@@ -537,6 +537,7 @@ function mergeImportedRow(record, base, rowNumber) {
   });
   const kind = parseKind(firstDefined(record.kind, base?.kind), rowNumber, templateId);
   const categorized = applyExchangeCategoryToSeedRow({
+    template_id: templateId,
     category_mask: parseOptionalInt(firstDefined(record.category_mask, base?.category_mask), {
       min: 0,
       max: 2147483647,

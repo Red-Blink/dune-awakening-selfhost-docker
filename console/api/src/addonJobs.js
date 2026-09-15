@@ -225,6 +225,7 @@ export function loadBuybackSeedPlan(config, addonId = EDA_EXCHANGE_BOT_ADDON_ID)
     if (!Number.isFinite(price) || price <= 0) throw new Error(`Addon market seed plan row ${index + 1} has an invalid price.`);
     const kind = String(row?.kind || "equippable").slice(0, 40);
     const categorized = applyExchangeCategoryToSeedRow({
+      template_id: templateId,
       category_mask: Math.trunc(Number(row?.category_mask) || 0),
       category_depth: clampInteger(row?.category_depth, 1, 0, 4),
       kind

@@ -552,6 +552,26 @@ test("admin buyback rules set exchange, caps, basis, and Max Buys as intended", 
   }
 });
 
+test("loadBuybackSeedPlan remaps Treadwheel vehicle masks", () => {
+  const repoRoot = makeRepoRoot({
+    price_multiplier: 5,
+    rows: [
+      { template_id: "TreadwheelChassis_4", kind: "equippable", price: 6500, category_mask: 0x02050000, category_depth: 3, quality_level: 0 },
+      { template_id: "TreadwheelEngine_Unique_Speed_4_Schematic", kind: "schematic", price: 4000, category_mask: 0x02060500, category_depth: 3, quality_level: 0 },
+      { template_id: "SandcrawlerChassis_6", kind: "equippable", price: 8000, category_mask: 0x02050000, category_depth: 3, quality_level: 0 }
+    ]
+  });
+  try {
+    const plan = loadBuybackSeedPlan({ repoRoot });
+    const byId = Object.fromEntries(plan.rows.map((row) => [row.templateId, row]));
+    assert.equal(byId.TreadwheelChassis_4.categoryMask, 0x02000000);
+    assert.equal(byId.TreadwheelEngine_Unique_Speed_4_Schematic.categoryMask, 0x02060000);
+    assert.equal(byId.SandcrawlerChassis_6.categoryMask, 0x02050000);
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
 test("loadBuybackSeedPlan remaps Icehunter depth-2 ranged masks", () => {
   const repoRoot = makeRepoRoot({
     price_multiplier: 5,

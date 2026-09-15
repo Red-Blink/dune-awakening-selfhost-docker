@@ -36,6 +36,24 @@
 // Nested ranged weapons reuse those unique-schematic type codes as depth-3
 // indexes under Ranged Weapons (DASH observed weapons/ranged as 0x01010700).
 // Ammunition guessed at code 14 moves to folder 2.
+//
+// Vehicles tab depth-2 folders, same Icehunter/DASH sources:
+//   0 One-Man Groundcar (Sandbike and Treadwheel)
+//   1 Buggy
+//   2 Light Ornithopter
+//   3 Medium Ornithopter
+//   4 Carry-all
+//   5 Sandcrawler
+//   6 Unique Schematics
+//
+// Icehunter item-data has no items/vehicles/treadwheel path, so Lost Harvest
+// Treadwheel parts were filed under sandcrawler (d2=5) using the same depth-3
+// slots sandbike uses (chassis=0, hull=1, engine=2, psu=3, locomotion=4,
+// utility=5). Unique Treadwheel schematics used sandcrawler's unique slot
+// (d3=5 under folder 6). Funcom's CHOAM Vehicles tab puts Treadwheel with
+// Sandbike under One-Man Groundcar, so those parts currently appear in
+// Sandcrawler. Remap by template_id prefix Treadwheel only: physical
+// equippables d2 5→0; unique schematics d3 5→0. Real Sandcrawler* rows stay.
 
 export const WEAPONS_TOP_LEVEL = 1;
 export const WEAPONS_MELEE = 0;
@@ -50,6 +68,19 @@ export const GUESSED_AMMUNITION_CODE = 14;
 export const WEAPONS_RANGED_FOLDER_MASK = (WEAPONS_TOP_LEVEL << 24) | (WEAPONS_RANGED << 16);
 export const WEAPONS_AMMUNITION_MASK = (WEAPONS_TOP_LEVEL << 24) | (WEAPONS_AMMUNITION << 16);
 export const WEAPONS_UNIQUE_SCHEMATICS_MASK = (WEAPONS_TOP_LEVEL << 24) | (WEAPONS_UNIQUE_SCHEMATICS << 16);
+
+export const VEHICLES_TOP_LEVEL = 2;
+export const VEHICLES_ONE_MAN = 0;
+export const VEHICLES_SANDCRAWLER = 5;
+export const VEHICLES_UNIQUE_SCHEMATICS = 6;
+
+export const VEHICLES_ONE_MAN_FOLDER_MASK = (VEHICLES_TOP_LEVEL << 24) | (VEHICLES_ONE_MAN << 16);
+export const VEHICLES_SANDCRAWLER_FOLDER_MASK = (VEHICLES_TOP_LEVEL << 24) | (VEHICLES_SANDCRAWLER << 16);
+export const VEHICLES_UNIQUE_SCHEMATICS_MASK = (VEHICLES_TOP_LEVEL << 24) | (VEHICLES_UNIQUE_SCHEMATICS << 16);
+
+export function isTreadwheelTemplate(templateId) {
+  return /^Treadwheel/i.test(String(templateId || "").trim());
+}
 
 function toUnsignedMask(value) {
   return Math.trunc(Number(value) || 0) >>> 0;
@@ -77,15 +108,48 @@ export function exchangeMaskMatches(orderMask, orderDepth, filterMask, filterDep
   return (toUnsignedMask(orderMask) >>> shift) === (toUnsignedMask(filterMask) >>> shift);
 }
 
-export function normalizeExchangeCategory({ categoryMask, categoryDepth, kind } = {}) {
+function normalizeTreadwheelVehicleCategory(decoded, mask, depth, itemKind, templateId) {
+  if (!isTreadwheelTemplate(templateId)) {
+    return { categoryMask: mask, categoryDepth: depth };
+  }
+
+  // Physical parts were filed under Sandcrawler. Keep the depth-3 slot.
+  if (itemKind === "equippable" && decoded.depth2 === VEHICLES_SANDCRAWLER) {
+    return {
+      categoryMask: packExchangeCategoryMask(VEHICLES_TOP_LEVEL, VEHICLES_ONE_MAN, decoded.depth3, decoded.depth4),
+      categoryDepth: depth
+    };
+  }
+
+  // Unique schematics use Vehicles d2=6; Icehunter used sandcrawler's d3=5.
+  if (
+    itemKind === "schematic"
+    && decoded.depth2 === VEHICLES_UNIQUE_SCHEMATICS
+    && decoded.depth3 === VEHICLES_SANDCRAWLER
+  ) {
+    return {
+      categoryMask: packExchangeCategoryMask(VEHICLES_TOP_LEVEL, VEHICLES_UNIQUE_SCHEMATICS, VEHICLES_ONE_MAN),
+      categoryDepth: depth
+    };
+  }
+
+  return { categoryMask: mask, categoryDepth: depth };
+}
+
+export function normalizeExchangeCategory({ categoryMask, categoryDepth, kind, templateId } = {}) {
   const mask = toUnsignedMask(categoryMask);
   const depth = Math.trunc(Number(categoryDepth) || 0);
   const decoded = decodeExchangeCategoryMask(mask);
+  const itemKind = String(kind || "").toLowerCase();
+
+  if (decoded.depth1 === VEHICLES_TOP_LEVEL) {
+    return normalizeTreadwheelVehicleCategory(decoded, mask, depth, itemKind, templateId);
+  }
+
   if (decoded.depth1 !== WEAPONS_TOP_LEVEL) {
     return { categoryMask: mask, categoryDepth: depth };
   }
 
-  const itemKind = String(kind || "").toLowerCase();
   if (itemKind === "ammunition" || (depth === 2 && decoded.depth2 === GUESSED_AMMUNITION_CODE && decoded.depth3 === 0)) {
     return { categoryMask: WEAPONS_AMMUNITION_MASK, categoryDepth: 2 };
   }
@@ -119,7 +183,8 @@ export function applyExchangeCategoryToSeedRow(row) {
   const normalized = normalizeExchangeCategory({
     categoryMask: row.category_mask ?? row.categoryMask,
     categoryDepth: row.category_depth ?? row.categoryDepth,
-    kind: row.kind
+    kind: row.kind,
+    templateId: row.template_id ?? row.templateId
   });
   if (hasSnake) {
     return { ...row, category_mask: normalized.categoryMask, category_depth: normalized.categoryDepth };
