@@ -117,6 +117,26 @@ test("saveMarketItemOverrides only accepts new items that resolve in admin-items
   });
 });
 
+test("saveMarketItemOverrides remaps Treadwheel vehicle masks on new items", () => {
+  withRepo((repo) => {
+    seedPlanFile(repo);
+    seedAdminItems(repo, [{ id: "TreadwheelChassis_9", name: "Treadwheel Chassis Mk9", category: "vehicles", source: "Vehicles" }]);
+    const saved = saveMarketItemOverrides(repo, {
+      newItems: {
+        TreadwheelChassis_9: {
+          price: 100,
+          listings: 1,
+          categoryMask: 0x02050000,
+          categoryDepth: 3,
+          kind: "equippable"
+        }
+      }
+    });
+    assert.equal(saved.newItems.TreadwheelChassis_9.categoryMask, 0x02000000);
+    assert.equal(saved.newItems.TreadwheelChassis_9.categoryDepth, 3);
+  });
+});
+
 test("saveMarketItemOverrides remaps Icehunter depth-2 ranged masks on new items", () => {
   withRepo((repo) => {
     seedPlanFile(repo);

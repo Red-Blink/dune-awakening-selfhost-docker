@@ -5,6 +5,11 @@ import { resolve } from "node:path";
 import {
   GUESSED_AMMUNITION_CODE,
   RANGED_TYPE_PISTOL,
+  VEHICLES_ONE_MAN,
+  VEHICLES_ONE_MAN_FOLDER_MASK,
+  VEHICLES_SANDCRAWLER_FOLDER_MASK,
+  VEHICLES_UNIQUE_SCHEMATICS,
+  VEHICLES_UNIQUE_SCHEMATICS_MASK,
   WEAPONS_AMMUNITION_MASK,
   WEAPONS_RANGED,
   WEAPONS_RANGED_FOLDER_MASK,
@@ -13,6 +18,7 @@ import {
   applyExchangeCategoryToSeedRow,
   decodeExchangeCategoryMask,
   exchangeMaskMatches,
+  isTreadwheelTemplate,
   normalizeExchangeCategory,
   packExchangeCategoryMask
 } from "../src/services/exchangeCategoryMask.js";
@@ -164,4 +170,191 @@ test("bundled seed plan: ranged weapons nest under Ranged Weapons and Maula is n
 
   const decodedMaula = decodeExchangeCategoryMask(maula.category_mask);
   assert.equal(decodedMaula.depth2, WEAPONS_RANGED);
+});
+
+test("moves Treadwheel equippables from Sandcrawler into One-Man Groundcar", () => {
+  const chassis = normalizeExchangeCategory({
+    categoryMask: 0x02050000,
+    categoryDepth: 3,
+    kind: "equippable",
+    templateId: "TreadwheelChassis_4"
+  });
+  assert.deepEqual(chassis, { categoryMask: 0x02000000, categoryDepth: 3 });
+  assert.equal(exchangeMaskMatches(chassis.categoryMask, chassis.categoryDepth, VEHICLES_ONE_MAN_FOLDER_MASK, 2), true);
+  assert.equal(exchangeMaskMatches(chassis.categoryMask, chassis.categoryDepth, VEHICLES_SANDCRAWLER_FOLDER_MASK, 2), false);
+
+  const engine = normalizeExchangeCategory({
+    categoryMask: 0x02050200,
+    categoryDepth: 3,
+    kind: "equippable",
+    templateId: "TreadwheelEngine_4"
+  });
+  assert.equal(engine.categoryMask, 0x02000200);
+
+  const boost = normalizeExchangeCategory({
+    categoryMask: 0x02050500,
+    categoryDepth: 3,
+    kind: "equippable",
+    templateId: "TreadwheelBoost_Unique_LessHeat_4"
+  });
+  assert.equal(boost.categoryMask, 0x02000500);
+  assert.equal(isTreadwheelTemplate("TreadwheelChassis_4"), true);
+  assert.equal(isTreadwheelTemplate("SandcrawlerChassis_6"), false);
+});
+
+test("moves Treadwheel unique schematics to the One-Man unique slot", () => {
+  const schematic = normalizeExchangeCategory({
+    categoryMask: 0x02060500,
+    categoryDepth: 3,
+    kind: "schematic",
+    templateId: "TreadwheelEngine_Unique_Speed_4_Schematic"
+  });
+  assert.deepEqual(schematic, { categoryMask: 0x02060000, categoryDepth: 3 });
+  assert.equal(exchangeMaskMatches(schematic.categoryMask, schematic.categoryDepth, VEHICLES_UNIQUE_SCHEMATICS_MASK, 2), true);
+  assert.equal(exchangeMaskMatches(schematic.categoryMask, schematic.categoryDepth, VEHICLES_SANDCRAWLER_FOLDER_MASK, 2), false);
+  const decoded = decodeExchangeCategoryMask(schematic.categoryMask);
+  assert.equal(decoded.depth2, VEHICLES_UNIQUE_SCHEMATICS);
+  assert.equal(decoded.depth3, VEHICLES_ONE_MAN);
+});
+
+test("leaves real Sandcrawler parts and unique schematics alone", () => {
+  assert.deepEqual(
+    normalizeExchangeCategory({
+      categoryMask: 0x02050000,
+      categoryDepth: 3,
+      kind: "equippable",
+      templateId: "SandcrawlerChassis_6"
+    }),
+    { categoryMask: 0x02050000, categoryDepth: 3 }
+  );
+  assert.deepEqual(
+    normalizeExchangeCategory({
+      categoryMask: 0x02060500,
+      categoryDepth: 3,
+      kind: "schematic",
+      templateId: "SandcrawlerEngine_Unique_Speed_06_Schematic"
+    }),
+    { categoryMask: 0x02060500, categoryDepth: 3 }
+  );
+});
+
+test("does not remap Treadwheel without kind, or with the wrong kind", () => {
+  assert.deepEqual(
+    normalizeExchangeCategory({ categoryMask: 0x02050000, categoryDepth: 3, templateId: "TreadwheelChassis_4" }),
+    { categoryMask: 0x02050000, categoryDepth: 3 }
+  );
+  assert.deepEqual(
+    normalizeExchangeCategory({
+      categoryMask: 0x02050000,
+      categoryDepth: 3,
+      kind: "schematic",
+      templateId: "TreadwheelChassis_4"
+    }),
+    { categoryMask: 0x02050000, categoryDepth: 3 }
+  );
+  assert.deepEqual(
+    normalizeExchangeCategory({
+      categoryMask: 0x02060500,
+      categoryDepth: 3,
+      kind: "equippable",
+      templateId: "TreadwheelBoost_Unique_LessHeat_4_Schematic"
+    }),
+    { categoryMask: 0x02060500, categoryDepth: 3 }
+  );
+});
+
+test("Treadwheel vehicle remap is idempotent", () => {
+  const first = normalizeExchangeCategory({
+    categoryMask: 0x02050000,
+    categoryDepth: 3,
+    kind: "equippable",
+    templateId: "TreadwheelChassis_4"
+  });
+  assert.deepEqual(
+    normalizeExchangeCategory({ ...first, kind: "equippable", templateId: "TreadwheelChassis_4" }),
+    first
+  );
+  const schematic = normalizeExchangeCategory({
+    categoryMask: 0x02060500,
+    categoryDepth: 3,
+    kind: "schematic",
+    templateId: "TreadwheelEngine_Unique_Speed_4_Schematic"
+  });
+  assert.deepEqual(
+    normalizeExchangeCategory({ ...schematic, kind: "schematic", templateId: "TreadwheelEngine_Unique_Speed_4_Schematic" }),
+    schematic
+  );
+});
+
+test("applyExchangeCategoryToSeedRow remaps Treadwheel from template_id", () => {
+  assert.equal(
+    applyExchangeCategoryToSeedRow({
+      template_id: "TreadwheelChassis_4",
+      category_mask: 0x02050000,
+      category_depth: 3,
+      kind: "equippable"
+    }).category_mask,
+    0x02000000
+  );
+  assert.equal(
+    applyExchangeCategoryToSeedRow({
+      templateId: "TreadwheelEngine_Unique_Speed_4_Schematic",
+      categoryMask: 0x02060500,
+      categoryDepth: 3,
+      kind: "schematic"
+    }).categoryMask,
+    0x02060000
+  );
+});
+
+test("bundled seed plan: Treadwheel is under One-Man Groundcar, not Sandcrawler", () => {
+  const plan = JSON.parse(readFileSync(BUNDLED_PLAN, "utf8"));
+  const chassis = plan.rows.find((row) => row.template_id === "TreadwheelChassis_4" && row.kind === "equippable");
+  const engine = plan.rows.find((row) => row.template_id === "TreadwheelEngine_4" && row.kind === "equippable");
+  const schematic = plan.rows.find((row) => row.template_id === "TreadwheelEngine_Unique_Speed_4_Schematic");
+  const sandcrawler = plan.rows.find((row) => row.template_id === "SandcrawlerChassis_6" && row.kind === "equippable");
+  const sandcrawlerSchematic = plan.rows.find((row) => row.template_id === "SandcrawlerEngine_Unique_Speed_06_Schematic");
+  const sandbike = plan.rows.find((row) => row.template_id === "SandbikeChassis_1" && row.kind === "equippable");
+
+  assert.equal(chassis.category_mask, 0x02000000);
+  assert.equal(chassis.category_depth, 3);
+  assert.equal(engine.category_mask, 0x02000200);
+  assert.equal(schematic.category_mask, 0x02060000);
+  assert.equal(schematic.category_depth, 3);
+  assert.equal(sandcrawler.category_mask, 0x02050000);
+  assert.equal(sandcrawlerSchematic.category_mask, 0x02060500);
+  assert.equal(sandbike.category_mask, 0x02000000);
+
+  const treadwheelEquippables = plan.rows.filter((row) => (
+    row.kind === "equippable" && isTreadwheelTemplate(row.template_id)
+  ));
+  assert.ok(treadwheelEquippables.length > 0);
+  for (const row of treadwheelEquippables) {
+    assert.equal(
+      exchangeMaskMatches(row.category_mask, row.category_depth, VEHICLES_ONE_MAN_FOLDER_MASK, 2),
+      true,
+      `${row.template_id} must list under One-Man Groundcar`
+    );
+    assert.equal(
+      exchangeMaskMatches(row.category_mask, row.category_depth, VEHICLES_SANDCRAWLER_FOLDER_MASK, 2),
+      false,
+      `${row.template_id} must not list under Sandcrawler`
+    );
+  }
+
+  const sandcrawlerEquippables = plan.rows.filter((row) => (
+    row.kind === "equippable"
+    && exchangeMaskMatches(row.category_mask, row.category_depth, VEHICLES_SANDCRAWLER_FOLDER_MASK, 2)
+  ));
+  assert.ok(sandcrawlerEquippables.some((row) => row.template_id.startsWith("Sandcrawler")));
+  assert.equal(sandcrawlerEquippables.filter((row) => isTreadwheelTemplate(row.template_id)).length, 0);
+
+  const uniqueTreadwheel = plan.rows.filter((row) => (
+    row.kind === "schematic" && isTreadwheelTemplate(row.template_id)
+  ));
+  for (const row of uniqueTreadwheel) {
+    const decoded = decodeExchangeCategoryMask(row.category_mask);
+    assert.equal(decoded.depth2, VEHICLES_UNIQUE_SCHEMATICS);
+    assert.equal(decoded.depth3, VEHICLES_ONE_MAN);
+  }
 });

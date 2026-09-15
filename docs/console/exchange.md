@@ -260,6 +260,26 @@ from player listings instead of trusting the static map; this console seeds
 from a frozen plan, so it has to correct the map itself. A reseed is required
 for already-listed NPC orders to pick up the new masks.
 
+### In-game vehicle categories
+
+The Vehicles tab's depth-2 folders are One-Man Groundcar (0), Buggy (1), Light
+Ornithopter (2), Medium Ornithopter (3), Carry-all (4), Sandcrawler (5), and
+Unique Schematics (6). Icehunter/EDA has no `items/vehicles/treadwheel` path,
+so Lost Harvest Treadwheel parts were filed under Sandcrawler (`0x0205xxxx`)
+with the same depth-3 slots Sandbike uses (chassis, hull, engine, PSU, treads,
+utility). Unique Treadwheel schematics used Sandcrawler's unique slot
+(`0x02060500`). Funcom's CHOAM UI treats Treadwheel as a One-Man Groundcar
+alongside Sandbike, so those parts showed up in Sandcrawler.
+
+The bundled seed plan, plus seed/buyback/CSV load, now move `Treadwheel*`
+equippables to One-Man Groundcar (`0x0200xxxx`, same depth-3 slot) and
+`Treadwheel*` unique schematics to the One-Man unique slot (`0x02060000`).
+The remap keys off the `Treadwheel` template-id prefix and kind, so real
+`Sandcrawler*` parts and unique schematics stay in folder 5. Other CHOAM
+tabs (Garments, Utility, Augmentations, Misc) already match their Icehunter
+folder families; ranged weapons were corrected separately. A reseed is
+required for already-listed NPC orders to pick up the new masks.
+
 ### Bot items (catalog overrides)
 
 The **Bot items** tab, alongside the read-only **Exchange** tab, lets an admin
