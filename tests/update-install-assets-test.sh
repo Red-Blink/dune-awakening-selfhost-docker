@@ -271,3 +271,16 @@ if grep -q "DUNE_GAME_ASSETS_LOAD" "$empty_out"; then
   fail "image-load loop reported loading an image when there were none" "$empty_out"
 fi
 echo "PASS install-assets-load-loop-handles-no-images"
+# --- Case 12: a CLI install-assets drops the console's cached update check --
+# The Web Console keeps its last Steam check in runtime/generated for 30
+# minutes, across restarts. install-assets can change the installed build and
+# leaves the script before the cache clear the full install reaches, so without
+# its own clear a CLI run left the console reporting the pre-install result.
+
+mkdir -p "$project/runtime/generated"
+cache_file="$project/runtime/generated/game-update-check.json"
+printf '{"stale":true}\n' > "$cache_file"
+run_update cached install-assets || fail "install-assets: expected exit 0" "$test_root/cached.log"
+[ ! -e "$cache_file" ] \
+  || fail "install-assets: left the console's pre-install update check cached" "$test_root/cached.log"
+echo "PASS install-assets-clears-the-cached-update-check"

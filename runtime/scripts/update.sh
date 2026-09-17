@@ -1398,6 +1398,11 @@ cat runtime/generated/image-tags.env
 # get subtly wrong.
 if [ "$assets_only" = "1" ]; then
   finish_asset_phase
+  # The installed build may have changed, and this exit is taken before the
+  # cache clear at the end of the script -- so without it a CLI install-assets
+  # would leave the Web Console showing the pre-install check result for the
+  # life of the durable cache. The console's own task path invalidates it too.
+  rm -f "$UPDATE_CHECK_CACHE_FILE"
   echo
   echo "Game files and images are installed. No database work was performed."
   echo "Restore a system backup now, or run 'dune init' to set this host up fresh."
