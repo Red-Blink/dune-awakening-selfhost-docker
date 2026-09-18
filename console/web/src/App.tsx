@@ -158,6 +158,61 @@ function chooseBackupIdentity(meta: { backup: string; currentBattlegroupId: stri
   });
 }
 
+type AuditLogChoice = "adopt-backup" | "keep-current" | "cancel";
+
+// Only ever asked when the archive and this host BOTH have their own admin
+// audit history -- restore_system() auto-adopts when only the archive has
+// one, and does nothing when neither does. Same shape as
+// chooseBackupIdentity: adopt is the primary action for a genuine migration,
+// keep-current is the safer default for a same-host rollback or an
+// intentional import into a different server.
+function chooseAuditLogAction(meta: { backup: string }): Promise<AuditLogChoice> {
+  return new Promise((resolve) => {
+    if (!openConfirmDialog) {
+      resolve("cancel");
+      return;
+    }
+    openConfirmDialog({
+      title: "Choose Admin Audit History",
+      message: "This archive and this host each have their own admin audit history. Adopt the backup's history when moving the same server to new hardware. Keep this host's own history when restoring into a different server or rolling back a mistake.",
+      confirmLabel: "Adopt Backup History",
+      tertiaryLabel: "Keep Current History",
+      cancelLabel: "Cancel Restore",
+      danger: true,
+      warning: "Whichever history is not kept is still saved to the pre-restore safety copy, not deleted -- but it stops being the live record.",
+      details: [
+        { label: "Backup", value: meta.backup, tone: "accent" }
+      ],
+      resolve: (outcome) => resolve(outcome === "confirm" ? "adopt-backup" : outcome === "tertiary" ? "keep-current" : "cancel")
+    });
+  });
+}
+
+type SystemImportConflictChoice = "overwrite" | "rename" | "cancel";
+
+// Rename is the confirm (primary) action and overwrite the tertiary: the safe
+// answer should be the one an operator reaches for without reading, because the
+// dangerous one destroys the only copy of the credentials already stored.
+function chooseImportConflict(existing: string): Promise<SystemImportConflictChoice> {
+  return new Promise((resolve) => {
+    if (!openConfirmDialog) {
+      resolve("cancel");
+      return;
+    }
+    openConfirmDialog({
+      title: "Backup Already Exists",
+      message: "A system backup with that name is already stored on this host. Keep both by storing the upload under a new name, or replace the stored one.",
+      confirmLabel: "Keep Both",
+      tertiaryLabel: "Overwrite",
+      cancelLabel: "Cancel Import",
+      danger: true,
+      warning: "Overwriting destroys the only copy of the credentials inside the stored archive. There is no undo and no other copy on this host.",
+      details: [{ label: "Already stored", value: existing, tone: "accent" }],
+      resolve: (outcome) => resolve(outcome === "confirm" ? "rename" : outcome === "tertiary" ? "overwrite" : "cancel")
+    });
+  });
+}
+
 // The single confirmation dialog for a gated restart. Always shown (it is the
 // sole confirm for the action): when the queue is off, or on with nobody
 // online, it is a plain confirm that the restart runs now; when the queue is on
@@ -362,6 +417,10 @@ export function App() {
   const [auth, setAuth] = useState(false);
   const [password, setPassword] = useState("");
   const [tab, setTab] = useActiveTab();
+  // Bumped when a failure elsewhere (a restore that needs the game images)
+  // sends the operator to Updates to install them. A nonce rather than a
+  // boolean so a second failure re-triggers it after the first was handled.
+  const [installGameFilesRequest, setInstallGameFilesRequest] = useState(0);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [pinnedAddons, setPinnedAddons] = useState<PinnedAddon[]>(() => loadPinnedAddons());
   const [selectedPinnedAddonId, setSelectedPinnedAddonId] = useState("");
@@ -838,6 +897,9 @@ export function App() {
             onError={setError}
             confirmAction={confirmDialog}
             chooseBackupIdentity={chooseBackupIdentity}
+            chooseAuditLogAction={chooseAuditLogAction}
+            onInstallGameFiles={() => { setInstallGameFilesRequest((current) => current + 1); setTab("Updates"); }}
+            chooseImportConflict={chooseImportConflict}
             waitForTask={waitForTaskSilently}
             waitForTaskWithUpdates={waitForTaskWithUpdates}
             withTimeout={withTimeout}
@@ -850,6 +912,8 @@ export function App() {
           /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Logs" && <LazyTabBoundary label="Loading Logs"><LogsPanel selectedService={selectedLogService} setSelectedService={setSelectedLogService} text={logs} setText={setLogs} onError={setError} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Updates" && <LazyTabBoundary label="Loading Updates"><UpdatesPanel
+            installGameFilesRequest={installGameFilesRequest}
+            onInstallGameFilesHandled={() => setInstallGameFilesRequest(0)}
             confirmAction={confirmDialog}
             waitForTask={waitForTaskSilently}
             parseKeyValueText={parseKeyValueText}

@@ -82,6 +82,20 @@ export function canApplyUpdateStatus(status: Record<string, string>) {
   return status.status === "Update Available" && !sameUpdateVersion(status.current, status.latest);
 }
 
+// The shell emits this token on its own line when an operation needs the game
+// files and they are not installed. A token rather than a phrase: the wording
+// around it is operator-facing prose that will be reworded, and this is read by
+// two different panels off two different sources (a check's reason, a task log).
+export const GAME_ASSETS_MISSING_MARKER = "DUNE_GAME_ASSETS_MISSING";
+
+export function gameAssetsMissingInText(text: unknown) {
+  return String(text ?? "").includes(GAME_ASSETS_MISSING_MARKER);
+}
+
+export function gameAssetsMissing(status: Record<string, string>) {
+  return gameAssetsMissingInText(status.reason);
+}
+
 export function stackReleaseNotesUrl(status: Record<string, string>) {
   const repository = String(status.repository || "").trim();
   const tag = String(status.latest || status.current || "").trim();

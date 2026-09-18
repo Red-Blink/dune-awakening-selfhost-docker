@@ -322,11 +322,10 @@ EOF
         runtime/scripts/spicefield-overrides.sh apply || true
         runtime/scripts/publish-sietch-overrides.sh restart || true
         runtime/scripts/publish-sietch-overrides.sh once || true
-        mkdir -p runtime/generated
-        (
-          export DUNE_SKIP_SURVIVAL_DIRECTOR_REFRESH=1
-          exec runtime/scripts/deferred-reconcile.sh
-        ) >runtime/generated/deferred-reconcile.log 2>&1 &
+        # Scheduled, not backgrounded: a background child of this process dies
+        # with the console container that ran it, and the reconcile is a wait
+        # that can outlast a console reload by minutes.
+        DUNE_SKIP_SURVIVAL_DIRECTOR_REFRESH=1 runtime/scripts/schedule-deferred-reconcile.sh
         ;;
       overmap)
         set -a; [ -f .env ] && . ./.env; set +a
@@ -513,9 +512,10 @@ Usage:
   dune ready
   dune logs <service> [--raw]
   dune restart <service>
-  dune console restart
+  dune console [restart|reload|status]
   dune metrics [start|stop|restart|status|logs|config|pull]
-  dune update [check|auto enable|auto disable|auto status|--yes]
+  dune update [check|--yes|install|install-assets [--force]|fix-steamcmd|fix-install-dir]
+  dune update auto [enable|disable|status]
   dune self-update [check|list|install [latest|<tag>]]
   dune restart-schedule [enable <HH:MM> [notify-minutes]|disable|status]
   dune ip-change-restart [enable [interval-minutes] [notify-minutes]|disable|status|check-now]

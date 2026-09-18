@@ -1,5 +1,57 @@
 #!/usr/bin/env bash
 
+# Atomically remove one key from a shell-style environment file, so the reader
+# falls back to its built-in default. Shares the lock and the replace-by-mv
+# discipline with set_env_file_value; a key that is not present is not an error.
+unset_env_file_value() {
+  local file="$1"
+  local key="$2"
+  local dir base lock tmp lock_fd existing_owner mode
+
+  [ -f "$file" ] || return 0
+  dir="$(dirname "$file")"
+  base="$(basename "$file")"
+  lock="${file}.lock"
+
+  touch "$lock"
+  chmod 666 "$lock" 2>/dev/null || true
+  if command -v flock >/dev/null 2>&1; then
+    exec {lock_fd}>>"$lock"
+    flock -x "$lock_fd"
+  fi
+
+  if [ ! -w "$file" ]; then
+    echo "Cannot update $file because it is not writable by $(id -un)." >&2
+    if [ -n "${lock_fd:-}" ]; then
+      flock -u "$lock_fd"
+      exec {lock_fd}>&-
+    fi
+    return 13
+  fi
+
+  mode="$(stat -c '%a' "$file" 2>/dev/null || echo 644)"
+  existing_owner="$(stat -c '%u:%g' "$file" 2>/dev/null || true)"
+  tmp="$(mktemp "$dir/.${base}.XXXXXX")"
+  if ! awk -F= -v key="$key" '$1 != key' "$file" > "$tmp"; then
+    rm -f "$tmp"
+    if [ -n "${lock_fd:-}" ]; then
+      flock -u "$lock_fd"
+      exec {lock_fd}>&-
+    fi
+    return 1
+  fi
+
+  chmod "$mode" "$tmp" 2>/dev/null || true
+  if [ "$(id -u)" -eq 0 ] && [ -n "$existing_owner" ]; then
+    chown "$existing_owner" "$tmp" 2>/dev/null || true
+  fi
+  mv -f "$tmp" "$file"
+  if [ -n "${lock_fd:-}" ]; then
+    flock -u "$lock_fd"
+    exec {lock_fd}>&-
+  fi
+}
+
 # Atomically update one key in a shell-style environment file. A separate,
 # stable lock file protects the read/modify/write sequence even though the
 # destination itself is replaced with mv(1).

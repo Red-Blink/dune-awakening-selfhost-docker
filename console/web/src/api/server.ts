@@ -88,6 +88,10 @@ export const serverApi = {
   services: () => api<{ stdout: string }>("/api/server/services"),
   doctor: () => api<{ stdout: string; stderr?: string; exitCode?: number }>("/api/server/doctor"),
   fixNetworkBinding: () => post<{ task: Task }>("/api/server/network-bind/fix"),
+  // Recreates the Console container so it reads a changed .env. The request
+  // is answered before the container goes away; the caller then waits for the
+  // Console to answer again rather than for a task result.
+  reloadConsole: () => post<{ task: Task }>("/api/console/reload"),
   cleanupDockerImages: () => post<{ task: Task }>("/api/server/storage/cleanup-images", { confirmation: "CLEAN OBSOLETE DUNE IMAGES" }),
   cleanupDockerBuildCache: () => post<{ task: Task }>("/api/server/storage/cleanup-build-cache", { confirmation: "CLEAN DOCKER BUILD CACHE" }),
   start: () => post<{ task: Task }>("/api/server/start"),

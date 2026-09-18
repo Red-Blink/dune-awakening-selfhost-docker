@@ -105,9 +105,9 @@ namespace" rule, so Create stays disabled until something is selected.
 | `sietches` | `sietches:read` | `write` |
 | `deepdesert` | `deepdesert:read` | `write` |
 | `landsraad` | `landsraad:read` | `write` |
-| `server` | `server:read` | `network-fix`, `restart`, `restart-service`, `start`, `stop`, `storage-cleanup`, `write-config` |
+| `server` | `server:read` | `console-reload`, `network-fix`, `restart`, `restart-service`, `start`, `stop`, `storage-cleanup`, `write-config` |
 | `logs` | `logs:read` | *nothing — no write action exists* |
-| `backups` | `backups:read` | `create`, `delete`, `import`, `restore`, `write-config` |
+| `backups` | `backups:read` | `create`, `create-system`, `delete`, `delete-system`, `import`, `restore`, `write-config` — **not** `download-system`, `import-system` or `restore-system`, which no level grants (see below) |
 | `updates` | `updates:check`, `updates:read` | *nothing — write actions are denied to keys* |
 | `carepackage` | `carepackage:read` | `clear-history`, `grant`, `scan`, `write-config` |
 | `addons` | `addons:read` | *nothing — write actions are denied to keys* |
@@ -134,6 +134,59 @@ Two actions are POST-shaped but read-only in effect, and are reachable by a **Re
 
 `carepackage:scan` is deliberately *not* one of these: `POST /api/care-package/run` actually
 runs a grant cycle. The verb-shaped name is not the test; what the route does is.
+
+### The two system-backup scopes
+
+### Three actions no level ever grants
+
+`backups:download-system`, `backups:import-system` and `backups:restore-system` are
+reachable **only** by naming them in a key's explicit action list. A key stored as
+`{"backups": "write"}` does not get them.
+
+Levels otherwise auto-cover actions added later, so a key keeps working as routes are
+added. That is right for a namespace whose blast radius is stable, and wrong for this
+one: `backups` used to mean database dumps, and now also means an archive of `.env`,
+every file in `runtime/secrets` (the console's own admin password, the session secret,
+`api-keys.json`) and `runtime/generated/iam-policies.json`. Without the exclusion, every
+key minted back when `backups: write` meant `pg_dump` would have silently gained
+whole-host takeover and full credential exfiltration on upgrade, with no re-save and
+nothing for the operator to review.
+
+`create-system` and `delete-system` are not excluded: neither reads an archive back nor
+writes one into the host.
+
+The `admin` tier is denied the same three for the same reason — see `policy.js`.
+
+`backups:create-system` and `backups:download-system` are write-classified and
+deliberately separate from the rest of the namespace, because neither is really about
+database backups:
+
+- **`backups:create-system`** — `POST /api/backups/system/create`. Runs a database dump and
+  writes an encrypted archive that also contains `.env` and every file in `runtime/secrets`.
+- **`backups:download-system`** — `GET /api/backups/system/{name}/download`. Hands over that
+  archive. Its only protection is the passphrase chosen when it was created, so granting this
+  is equivalent to handing over the server to anyone who can guess or obtain that passphrase.
+  It is deliberately **not** `backups:read`: a `GET` is invisible to the mutating-route parity
+  test, so this route's own action assignment is the only thing keeping the archive off a
+  read-only grant.
+
+- **`backups:restore-system`** — `POST /api/backups/system/{name}/restore`. Replaces
+  `.env`, `runtime/generated`, `runtime/secrets` and the database on this host from an
+  archive. The most destructive action in the namespace: it can change the admin console
+  password and the database credentials out from under the running stack. Defaults to a
+  dry run; only `apply` actually writes.
+- **`backups:import-system`** — `POST /api/backups/system/import`. Uploads an archive
+  created on another host. Separate from `backups:import`, which takes a database dump:
+  this one accepts `.env`, every secret and the Funcom token, staged for a later restore
+  to apply. Anyone holding it can put credentials of their choosing on the host.
+
+- **`backups:delete-system`** — `DELETE /api/backups/system/{name}` and the bulk
+  delete routes. Separate from `backups:delete` on purpose: a system archive is the
+  only copy of the credentials inside it, so destroying one should be grantable
+  independently of pruning database backups.
+
+Listing system backups (`GET /api/backups/system`) is a genuine read and stays on
+`backups:read` — the listing exposes only the non-secret sidecar fields.
 
 ### What a key can never reach
 
