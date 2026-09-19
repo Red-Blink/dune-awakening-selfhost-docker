@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DISCORD_ADAPTER_ROUTES, DISCORD_CATALOG_PROTOCOL_VERSION, discordAdapterErrorResponse, discordAdapterHealth, discordAdapterPopulation, discordAdapterReadiness, discordAdapterServices, discordAdapterStatus, discordWritesEnabled } from "../src/integrations/discord/adapter.js";
+import { DISCORD_ADAPTER_ROUTES, DISCORD_CATALOG_PROTOCOL_VERSION, discordAdapterErrorResponse, discordAdapterHealth, discordAdapterPopulation, discordAdapterReadiness, discordAdapterServices, discordAdapterStatus, discordRoleMappingFromEnv, discordWritesEnabled } from "../src/integrations/discord/adapter.js";
 
 const OLD_ENV = { ...process.env };
 
 function resetEnv() {
-  process.env.DISCORD_OBSERVER_ROLE_IDS = "role-observer";
+  delete process.env.DISCORD_OBSERVER_ROLE_IDS;
+  process.env.DISCORD_PLAYER_ROLE_IDS = "role-player";
   process.env.DISCORD_MODERATOR_ROLE_IDS = "role-moderator";
   process.env.DISCORD_ADMIN_ROLE_IDS = "role-admin";
   process.env.DISCORD_OWNER_ROLE_IDS = "role-owner";
@@ -93,6 +94,41 @@ test("reports adapter health with isolated link-state writes", async () => {
   assert.ok(!result.plannedRoutes.includes("/api/integrations/discord/logs"));
   assert.ok(!result.plannedRoutes.includes("/api/integrations/discord/ops/activity"));
   assert.ok(result.plannedRoutes.includes("/api/integrations/discord/ops/location"));
+});
+
+// Audit finding #3 (HIGH): an operator who explicitly clears
+// DISCORD_PLAYER_ROLE_IDS (writes "") via the new Settings UI must see
+// access actually revoked -- not silently fall back to a stale, non-empty
+// legacy DISCORD_OBSERVER_ROLE_IDS just because "" is falsy under `||`.
+test("discordRoleMappingFromEnv does NOT fall back to the legacy var when DISCORD_PLAYER_ROLE_IDS is explicitly set to empty -- clearing role IDs must actually revoke access", () => {
+  process.env.DISCORD_PLAYER_ROLE_IDS = "";
+  process.env.DISCORD_OBSERVER_ROLE_IDS = "111111111111111111";
+  const mapping = discordRoleMappingFromEnv();
+  assert.deepEqual(mapping.playerRoleIds, [], "an explicitly-cleared DISCORD_PLAYER_ROLE_IDS must not fall back to the legacy var");
+  delete process.env.DISCORD_PLAYER_ROLE_IDS;
+  delete process.env.DISCORD_OBSERVER_ROLE_IDS;
+});
+
+// DISCORD_OBSERVER_ROLE_IDS -> DISCORD_PLAYER_ROLE_IDS rename: the new name
+// takes precedence, but the old name still works standalone so an operator
+// who already set it doesn't silently lose their role mapping on update.
+//
+// The dual-emit test that used to live here (discordRolePolicyHealth
+// emitting both observerConfigured and playerConfigured) was dropped along
+// with the observerConfigured field itself -- superseded by tier1-upstream's
+// own full observer->player rename (2026-09-11), which updated
+// docs/integrations/discord-control-bot/admin-guide.md's documented
+// "Expected role policy shape" example to playerConfigured too, so no
+// documented external consumer still expects the old field name.
+test("discordRoleMappingFromEnv prefers DISCORD_PLAYER_ROLE_IDS but still reads the legacy DISCORD_OBSERVER_ROLE_IDS as a fallback", () => {
+  assert.deepEqual(discordRoleMappingFromEnv({ DISCORD_PLAYER_ROLE_IDS: "role-a,role-b" }).playerRoleIds, ["role-a", "role-b"]);
+  assert.deepEqual(discordRoleMappingFromEnv({ DISCORD_OBSERVER_ROLE_IDS: "role-legacy" }).playerRoleIds, ["role-legacy"]);
+  assert.deepEqual(
+    discordRoleMappingFromEnv({ DISCORD_PLAYER_ROLE_IDS: "role-new", DISCORD_OBSERVER_ROLE_IDS: "role-legacy" }).playerRoleIds,
+    ["role-new"],
+    "the new env var must take precedence when both are set"
+  );
+  assert.deepEqual(discordRoleMappingFromEnv({}).playerRoleIds, []);
 });
 
 test("keeps writes disabled by default and accepts explicit opt-in values", () => {
@@ -195,10 +231,10 @@ test("requires admin capability before diagnostic status provider runs", async (
   assert.equal(response.result.ssh_host, undefined);
 });
 
-test("allows observer readiness and services", async () => {
+test("allows player readiness and services", async () => {
   const readiness = await discordAdapterReadiness({
     config,
-    actorPayload: actor(["role-observer"]),
+    actorPayload: actor(["role-player"]),
     readinessProvider: async () => ({ ready: true, overall: "READY", issues: [] })
   });
   assert.equal(readiness.ok, true);
@@ -206,7 +242,7 @@ test("allows observer readiness and services", async () => {
 
   const services = await discordAdapterServices({
     config,
-    actorPayload: actor(["role-observer"]),
+    actorPayload: actor(["role-player"]),
     servicesProvider: async () => ({ overall: "OK", services: [{ name: "Database", status: "up" }], issues: [] })
   });
   assert.equal(services.ok, true);
@@ -328,15 +364,15 @@ test("adapter routes respond through mounted HTTP server path", async () => {
           assert.equal(health.enabled, true);
 
           // Status
-          const status = await (await fetch(`${base}/api/integrations/discord/status`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ actor: actor(["role-observer"]) }) })).json();
+          const status = await (await fetch(`${base}/api/integrations/discord/status`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ actor: actor(["role-player"]) }) })).json();
           assert.equal(status.ok, true);
 
           // Readiness
-          const readiness = await (await fetch(`${base}/api/integrations/discord/readiness`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ actor: actor(["role-observer"]) }) })).json();
+          const readiness = await (await fetch(`${base}/api/integrations/discord/readiness`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ actor: actor(["role-player"]) }) })).json();
           assert.equal(readiness.ok, true);
 
           // Services
-          const services = await (await fetch(`${base}/api/integrations/discord/services`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ actor: actor(["role-observer"]) }) })).json();
+          const services = await (await fetch(`${base}/api/integrations/discord/services`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ actor: actor(["role-player"]) }) })).json();
           assert.equal(services.ok, true);
           assert.ok(Array.isArray(services.result.services));
 
@@ -344,7 +380,7 @@ test("adapter routes respond through mounted HTTP server path", async () => {
           const pop = await (await fetch(`${base}/api/integrations/discord/population`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ actor: actor(["role-moderator"]) }) })).json();
           assert.equal(pop.ok, true);
 
-          const maintenance = await (await fetch(`${base}/api/integrations/discord/maintenance`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ actor: actor(["role-observer"]) }) })).json();
+          const maintenance = await (await fetch(`${base}/api/integrations/discord/maintenance`, { method: "POST", headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify({ actor: actor(["role-player"]) }) })).json();
           assert.equal(maintenance.ok, true);
           assert.match(maintenance.output, /READY/);
 

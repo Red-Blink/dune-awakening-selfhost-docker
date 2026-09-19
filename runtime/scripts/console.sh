@@ -3,6 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
+# shellcheck disable=SC1091
 . runtime/scripts/compose-project.sh
 MAIN_PROJECT_NAME="$(dune_resolve_compose_project_name "$(pwd -P)")"
 export DUNE_COMPOSE_PROJECT_NAME="$MAIN_PROJECT_NAME"
@@ -103,6 +104,15 @@ restart_console() {
   require_compose
   prepare_docker_socket_gid
   prepare_host_user_ids
+  # dune-awakening-selfhost-docker#901: resolves the hosted-bot
+  # wizard's Discord OAuth client secret on the HOST, before docker
+  # compose starts the console -- see console-secrets-env.sh's own
+  # comment on export_discord_hosted_bot_oauth_client_secret() for why
+  # this can't happen container-side, and why self-update.sh's own
+  # console-recreation paths need the identical call.
+  # shellcheck disable=SC1091
+  . runtime/scripts/lib/console-secrets-env.sh
+  export_discord_hosted_bot_oauth_client_secret
   export ADMIN_BIND_PORT="${ADMIN_WEB_PORT:-${ADMIN_BIND_PORT:-}}"
   mkdir -p runtime/generated
   previous_image_id="$(docker image inspect --format '{{.Id}}' redblink-dune-docker-console:dev 2>/dev/null || true)"

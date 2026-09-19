@@ -4,6 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 ROOT_DIR="$(pwd)"
 
+# shellcheck disable=SC1091
 . runtime/scripts/compose-project.sh
 DUNE_COMPOSE_PROJECT_NAME="$(dune_resolve_compose_project_name "$ROOT_DIR")"
 export DUNE_COMPOSE_PROJECT_NAME
@@ -128,6 +129,12 @@ self_update_write_status() {
   local percent="$3"
   local message="$4"
   local finished_at="${5:-}"
+  # Optional extra "key=value" line(s), written into the SAME atomic
+  # tmp-file+mv as every other field below -- e.g. Discord adapter health's
+  # discord_health_ok=<0|1> must land in the exact write that also sets
+  # state=succeeded, not a separate later append, or a poller can observe
+  # state=succeeded with no discord_health_ok yet (audit finding #2, HIGH).
+  local extra_line="${6:-}"
   local status_file tmp_file updated_at
 
   self_update_status_enabled || return 0
@@ -149,6 +156,7 @@ self_update_write_status() {
     printf 'started_at=%s\n' "$SELF_UPDATE_STATUS_STARTED_AT"
     printf 'updated_at=%s\n' "$updated_at"
     printf 'finished_at=%s\n' "$finished_at"
+    [ -z "$extra_line" ] || printf '%s\n' "$extra_line"
   } > "$tmp_file"
   chmod 600 "$tmp_file"
   mv -f "$tmp_file" "$status_file"
@@ -1124,6 +1132,40 @@ persist_env_file_value() {
   fi
 }
 
+# migrate_discord_role_ids_env: one-time .env migration for Finding 1
+# (CRITICAL, final review). DISCORD_PLAYER_ROLE_IDS superseded the legacy
+# DISCORD_OBSERVER_ROLE_IDS var when this feature shipped, and
+# discordRoleMappingFromEnv() (console/api/src/integrations/discord/adapter.js)
+# correctly falls back to the legacy var ONLY when DISCORD_PLAYER_ROLE_IDS
+# is genuinely `undefined` in process.env -- but docker-compose.web.yml's
+# own interpolated map-form `environment:` entry for DISCORD_PLAYER_ROLE_IDS
+# ALWAYS sets it in the container (empty string when unset in .env, never
+# actually omitted), so that JS fallback could never fire inside a real
+# deployed container. An existing operator who has DISCORD_OBSERVER_ROLE_IDS
+# set (and no DISCORD_PLAYER_ROLE_IDS, since it didn't exist before this
+# feature) would silently lose that role mapping's bot access on their next
+# `docker compose up`/self-update, with no warning (Requirement 0
+# violation). Copy the legacy value into the new key, once, directly in
+# .env -- a durable, testable-without-Docker belt-and-braces layer
+# alongside docker-compose.web.yml's own nested-default fix
+# ("${DISCORD_PLAYER_ROLE_IDS:-${DISCORD_OBSERVER_ROLE_IDS:-}}"), which
+# closes the same gap at the Compose-interpolation layer.
+#
+# Deliberately conservative: only acts when DISCORD_PLAYER_ROLE_IDS is
+# genuinely ABSENT from .env (never overwrites an operator's explicit,
+# already-migrated value -- including a deliberately-cleared empty string,
+# which must stay empty per adapter.js's own `!== undefined` distinction)
+# and DISCORD_OBSERVER_ROLE_IDS has a real, non-empty value to migrate.
+migrate_discord_role_ids_env() {
+  [ -f .env ] || return 0
+  grep -q '^DISCORD_PLAYER_ROLE_IDS=' .env && return 0
+  local legacy_value
+  legacy_value="$(read_env_file_value DISCORD_OBSERVER_ROLE_IDS || true)"
+  [ -n "$legacy_value" ] || return 0
+  persist_env_file_value DISCORD_PLAYER_ROLE_IDS "$legacy_value"
+  echo "Migrated legacy DISCORD_OBSERVER_ROLE_IDS into DISCORD_PLAYER_ROLE_IDS in .env."
+}
+
 running_console_env_value() {
   local key="$1"
   command -v docker >/dev/null 2>&1 || return 1
@@ -1247,6 +1289,23 @@ prepare_web_console_rebuild_env() {
   persist_env_file_value DUNE_HOST_UID "$DUNE_HOST_UID"
   persist_env_file_value DUNE_HOST_GID "$DUNE_HOST_GID"
   restore_local_state_ownership
+  # dune-awakening-selfhost-docker#901 (Layer 2 audit finding on PR
+  # #902): the only other place besides console.sh's own
+  # restart_console() that force-recreates the web console -- both
+  # rebuild_web_console_now() (the real self-update apply flow) and
+  # recreate_discord_adapter_env() (Settings -> Discord Bot enable/
+  # role-ID changes) call this shared prep function immediately before
+  # `docker compose ... up --force-recreate`. Without this, an operator
+  # who migrated discord-hosted-bot-oauth-client-secret and ran
+  # cleanup-legacy (deleting the plaintext .txt) would have hosted-bot
+  # OAuth silently break on the very next self-update or role-ID save,
+  # since the container's env var would go unset and config.js's
+  # readInlineOrFile() falls back to a now-deleted file. Hooking it
+  # into this ONE shared function, rather than each call site
+  # separately, covers both paths without duplicating the call.
+  # shellcheck disable=SC1091
+  . runtime/scripts/lib/console-secrets-env.sh
+  export_discord_hosted_bot_oauth_client_secret
 }
 
 rebuild_web_console_now() {
@@ -1282,6 +1341,125 @@ reconcile_coriolis_coordinator_after_deploy() {
   runtime/scripts/start-coriolis-coordinator.sh --replace-if-stack-running || {
     echo "Warning: the Coriolis Coordinator could not be started after the Console deployment." >&2
   }
+}
+
+# recreate_discord_adapter_env: recreates the web console container with its
+# CURRENT image and CURRENT .env -- no build, no pull. Used by the Discord
+# Bot Settings "Enable"/role-ID-change flow, which only needs new
+# environment variables to take effect, never a version change. Deliberately
+# a separate function from rebuild_web_console_now() (which always builds
+# first) rather than a conditional branch inside it -- self-update.sh's own
+# install/apply flow must never be able to accidentally skip its build step.
+recreate_discord_adapter_env() {
+  local service="$1"
+  local web_compose_project="${DUNE_WEB_COMPOSE_PROJECT_NAME:-dune-awakening-selfhost-docker}"
+  local up_rc=0
+  prepare_web_console_rebuild_env
+  self_update_running restarting 60 "Applying Discord adapter settings and restarting the console."
+  docker rm -f "$service" >/dev/null 2>&1 || true
+  if COMPOSE_PROJECT_NAME="$web_compose_project" DUNE_COMPOSE_PROJECT_NAME="$DUNE_COMPOSE_PROJECT_NAME" DUNE_HOST_REPO_ROOT="$HOST_ROOT_DIR" docker compose -f docker-compose.web.yml up -d --force-recreate "$service"; then
+    verify_discord_adapter_health "$service"
+  else
+    up_rc=$?
+    self_update_write_status failed restarting 60 "Container recreation failed (exit ${up_rc}). Review runtime/generated/web-self-update.log for details." "$(date -Is)"
+    SELF_UPDATE_STATUS_FINALIZED=1
+    return "$up_rc"
+  fi
+}
+
+# verify_discord_adapter_health: after the recreate above, waits briefly for
+# the new container to accept connections, then calls its own
+# /api/integrations/discord/health with the freshly-written bearer token --
+# proving the adapter actually came up working, not just that the container
+# process exists. Both initializeDiscordAdapterSchema()'s promise rejection
+# and a missing/corrupt token file are fail-soft at the container level
+# (Layer 1 DBA audit finding), so "the container is up" alone cannot answer
+# this question -- only a real request through the same bearer-token check a
+# real bot would use can. Records the result in the run's own status file
+# (discord_health_ok=1/0) rather than failing the script outright: a health
+# check failure here is a genuinely new, actionable state ("Enabled, but
+# the adapter isn't responding") the frontend surfaces distinctly (§4 of the
+# design doc), not a reason to make the whole recreate report as failed --
+# the container recreate itself did succeed.
+# resolve_discord_adapter_token: direct-env-var FIRST, token-file fallback --
+# must match readDiscordBotApiToken()'s real, current precedence exactly
+# (console/api/src/integrations/discord/routes.js), since that function is
+# the one actually authenticating the live adapter this health check probes.
+#
+# Layer 3 audit finding (HIGH): a prior revision of this comment claimed
+# routes.js had ALSO been fixed to prefer the file first, and reordered this
+# function to match that assumption -- but readDiscordBotApiToken() was
+# never changed; it still checks the direct var first, confirmed directly
+# by reading it (`if (directToken) return ...`, before the file branch is
+# even reached). That made this shell-side check diverge FROM the real
+# server, not converge with it: an operator who minted a fresh token via the
+# Settings UI (writing the file) while a stale direct DUNE_DISCORD_ADAPTER_TOKEN
+# still lingered in .env would have the live adapter authenticate with the
+# stale direct value (routes.js's real precedence) while this health check
+# sent the fresh file token instead -- a 401 reporting the adapter unhealthy
+# even though it was genuinely fine under the credential actually in use.
+# Reverted to match routes.js's real precedence; the file's own only-when-
+# direct-is-empty role is unchanged.
+resolve_discord_adapter_token() {
+  local token="" token_file
+  token="$(read_env_file_value DUNE_DISCORD_ADAPTER_TOKEN || true)"
+  if [ -n "$token" ]; then
+    printf '%s' "$token"
+    return
+  fi
+  token_file="$(read_env_file_value DUNE_DISCORD_ADAPTER_TOKEN_FILE || true)"
+  # Finding 3 (IMPORTANT, final review): readDiscordBotApiToken() (routes.js)
+  # falls back to the legacy DUNE_BOT_API_TOKEN_FILE var when
+  # DUNE_DISCORD_ADAPTER_TOKEN_FILE is not set. This shell-side resolver was
+  # missing that same fallback -- an operator using only DUNE_BOT_API_TOKEN_FILE
+  # had both checked vars come back empty here, so this health check sent an
+  # empty bearer token, got a real 401, and reported discord_health_ok=0 even
+  # though the adapter was actually fine.
+  if [ -z "$token_file" ]; then
+    token_file="$(read_env_file_value DUNE_BOT_API_TOKEN_FILE || true)"
+  fi
+  if [ -n "$token_file" ] && [ -f "$token_file" ]; then
+    token="$(tr -d '[:space:]' < "$token_file")"
+  fi
+  printf '%s' "$token"
+}
+
+verify_discord_adapter_health() {
+  local service="$1"
+  local port token health_ok=0 curl_config
+
+  port="$(read_env_file_value ADMIN_WEB_PORT || true)"
+  [ -n "$port" ] || port="$(read_env_file_value ADMIN_BIND_PORT || true)"
+  [ -n "$port" ] || port="8088"
+
+  token="$(resolve_discord_adapter_token)"
+
+  # Pass the bearer token via a short-lived curl config file (-K) instead of
+  # a literal -H argument -- an argv value is visible to any other process
+  # on the host for the duration of the request via `ps aux`/
+  # /proc/<pid>/cmdline, which is exactly what Requirement 24 (secrets must
+  # not appear in process listings) exists to prevent (audit finding #3,
+  # LOW). curl's config-file format takes `header = "..."` on its own line;
+  # written 0600 and removed immediately after the health-check loop.
+  curl_config="$(mktemp)"
+  chmod 600 "$curl_config"
+  printf 'header = "Authorization: Bearer %s"\n' "$token" > "$curl_config"
+
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if curl -fsS -m 5 -K "$curl_config" "http://127.0.0.1:${port}/api/integrations/discord/health" >/dev/null 2>&1; then
+      health_ok=1
+      break
+    fi
+    sleep 2
+  done
+  rm -f "$curl_config"
+
+  # discord_health_ok must land in the SAME atomic write as state=succeeded
+  # (audit finding #2, HIGH) -- a poller that ever observes state:
+  # "succeeded" must already be able to read this field in that same
+  # response, never in a subsequent, separately-timed write.
+  self_update_write_status succeeded complete 100 "Discord adapter settings applied." "$(date -Is)" "discord_health_ok=${health_ok}"
+  SELF_UPDATE_STATUS_FINALIZED=1
 }
 
 rebuild_web_console_with_helper() {
@@ -1479,6 +1657,21 @@ cmd="${1:-check}"
 tag="${2:-}"
 
 case "$cmd" in
+  apply-discord-adapter-env)
+    acquire_self_update_lock
+    dune_persist_compose_project_name "$ROOT_DIR" "$DUNE_COMPOSE_PROJECT_NAME"
+    service="${tag:-}"
+    if [ -z "$service" ]; then
+      service="$(web_console_service_name 2>/dev/null || true)"
+    fi
+    if [ -z "$service" ]; then
+      echo "Dune Docker Console service was not found in docker-compose.web.yml."
+      exit 2
+    fi
+    ensure_docker_access_for_console_rebuild
+    recreate_discord_adapter_env "$service"
+    ;;
+
   rebuild-web-console)
     dune_persist_compose_project_name "$ROOT_DIR" "$DUNE_COMPOSE_PROJECT_NAME"
     service="${tag:-}"
@@ -1557,6 +1750,11 @@ case "$cmd" in
     ensure_self_update_preflight
     install_release_tag "$tag"
     install_cli_command_after_update
+    # Finding 1 (CRITICAL, final review): run before the console recreate
+    # below, so a legacy-only DISCORD_OBSERVER_ROLE_IDS config is already
+    # migrated into DISCORD_PLAYER_ROLE_IDS in .env by the time the new
+    # container reads it.
+    migrate_discord_role_ids_env
     rebuild_web_console_after_update
     self_update_finish_success
     ;;
