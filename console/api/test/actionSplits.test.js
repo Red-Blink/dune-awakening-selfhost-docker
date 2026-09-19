@@ -182,22 +182,40 @@ test("players: no action is a string prefix of another", () => {
 
 // ---- Default policies are unchanged in effect ----
 
-test("players: owner and admin still reach every action", () => {
+// Fork-specific note: unlike upstream's default (permissive, players:*)
+// admin policy, this fork's Tier 1 admin is deliberately narrowed (see
+// docs/console-iam.md's "governance vs. operation split") -- the economy
+// successors of players:mutate and the players:unclassified sentinel are
+// crown jewels denied to admin by design, not an oversight this test should
+// paper over.
+// Kept in sync by hand with policy.js's CROWN_JEWEL_DENY_ACTIONS (not
+// imported, since that constant isn't exported) -- if this list and that one
+// diverge, this test can pass while a real crown-jewel gap goes undetected.
+const PLAYERS_ADMIN_DENIED = new Set([
+  "players:give-item", "players:grant", "players:reset",
+  "players:delete-item", "players:edit-item", "players:repair", "players:recover",
+  "players:unclassified",
+]);
+test("players: owner reaches every action; admin reaches every action this fork's hardened policy doesn't deny", () => {
   for (const action of [...allKnownActions()].filter((a) => a.startsWith("players:"))) {
     assert.equal(evaluate({ tier: "owner" }, action), true, `owner ${action}`);
-    assert.equal(evaluate({ tier: "admin" }, action), true, `admin ${action}`);
+    assert.equal(evaluate({ tier: "admin" }, action), !PLAYERS_ADMIN_DENIED.has(action), `admin ${action}`);
   }
 });
 
 test("players: the split did not widen any tier below admin", () => {
-  // moderator/player/observer held players:read (+ players:kick-all for
-  // moderator) before the split and must hold exactly that after it. A refactor
-  // of the vocabulary must not hand anyone a new capability.
+  // player held players:read before the split and must hold exactly that
+  // after it. Moderator is a fork-specific (Tier 1) exception: it is
+  // deliberately granted individual-player moderation (players:moderate,
+  // players:teleport) alongside its pre-existing players:kick-all -- see
+  // docs/console-iam.md's Tier model -- so a refactor of the vocabulary must
+  // preserve exactly that widened set, not upstream's narrower default.
+  // "observer" is no longer a recognized tier at all (folded into player,
+  // see tierHardening.test.js) -- there is nothing to assert for it here.
   const playerActions = [...allKnownActions()].filter((a) => a.startsWith("players:"));
   const reachable = (tier) => playerActions.filter((a) => evaluate({ tier }, a)).sort();
-  assert.deepEqual(reachable("moderator"), ["players:kick-all", "players:read"]);
+  assert.deepEqual(reachable("moderator"), ["players:kick-all", "players:moderate", "players:read", "players:teleport"]);
   assert.deepEqual(reachable("player"), ["players:read"]);
-  assert.deepEqual(reachable("observer"), ["players:read"]);
 });
 
 test("players: the narrow actions are independently grantable", () => {
@@ -301,14 +319,21 @@ test("guilds: no action is a string prefix of another", () => {
 });
 
 test("guilds: the split did not widen any tier below admin", () => {
+  // "observer" is no longer a recognized tier at all (folded into player,
+  // see tierHardening.test.js) -- there is nothing to assert for it here.
+  //
+  // Fork-specific note: unlike upstream's default (permissive, guilds:*)
+  // admin policy, this fork's Tier 1 admin only holds guilds:read -- roster
+  // management (disband/membership/rank) and the unclassified sentinel are
+  // owner-only by design (see docs/console-iam.md).
   const guildActions = [...allKnownActions()].filter((a) => a.startsWith("guilds:"));
   const reachable = (tier) => guildActions.filter((a) => evaluate({ tier }, a)).sort();
-  for (const tier of ["moderator", "player", "observer"]) {
+  for (const tier of ["moderator", "player"]) {
     assert.deepEqual(reachable(tier), ["guilds:read"], tier);
   }
+  assert.deepEqual(reachable("admin"), ["guilds:read"], "admin");
   for (const action of guildActions) {
     assert.equal(evaluate({ tier: "owner" }, action), true, `owner ${action}`);
-    assert.equal(evaluate({ tier: "admin" }, action), true, `admin ${action}`);
   }
 });
 
