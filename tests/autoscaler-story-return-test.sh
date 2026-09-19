@@ -203,6 +203,7 @@ rejected_output="$(REJECTED_LOG="$rejected_log" REJECTED_SQL="$rejected_sql" REJ
 docker() { cat \"\$REJECTED_LOG\"; }
 hub_travel_seen() { grep -qx \"\$1\" \"\$REJECTED_SEEN\"; }
 remember_hub_travel() { printf '%s\\n' \"\$1\" >> \"\$REJECTED_SEEN\"; }
+director_heal_due() { return 0; }
 psql_value() {
   printf '%s\\n' \"\$1\" >> \"\$REJECTED_SQL\"
   case \"\$1\" in
@@ -212,6 +213,7 @@ psql_value() {
   esac
 }
 NAMED_DESTINATION_SINCE=10m
+NAMED_DESTINATION_SCAN_SECONDS=60
 scan_rejected_story_returns
 scan_rejected_story_returns")"
 
