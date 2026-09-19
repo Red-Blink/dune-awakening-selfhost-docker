@@ -38,6 +38,12 @@ services:
       ADMIN_AUTH_DISABLED: "${ADMIN_AUTH_DISABLED:-0}"
       ADMIN_SECURE_COOKIES: "${ADMIN_SECURE_COOKIES:-0}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
+      # Tier 3 second factor (docs/rfc-console-auth.md §2.3/§4). Off unless the
+      # operator sets it in .env. Must be passed through here explicitly: the
+      # console reads process.env inside the container, so a value that only
+      # exists in .env on the host is invisible to it.
+      CONSOLE_TOTP_ENABLED: "${CONSOLE_TOTP_ENABLED:-0}"
+      CONSOLE_TRUSTED_PROXY_IPS: "${CONSOLE_TRUSTED_PROXY_IPS:-}"
       ADMIN_TASK_RETENTION: "${ADMIN_TASK_RETENTION:-200}"
       # Seed values for the Bases auto-refill settings. The console settings
       # overlay writes runtime/generated/auto-refill-settings.json, which wins
