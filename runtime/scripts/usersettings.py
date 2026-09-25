@@ -176,6 +176,10 @@ RETIRED_USERGAME_FIELDS = {
     "cutteray_hem_multiplier_per_node_tier_table": ("/Script/DuneSandbox.DuneGameMode", "CutterayHemMultiplierPerNodeTierTable", "1.0"),
     "global_damage_to_npcs_multiplier": ("/Script/DuneSandbox.DuneGameMode", "m_GlobalDamageToNpcsMultiplier", "1.0"),
     "building_restriction_limits_enabled": (BUILDING_SETTINGS_SECTION, "m_bBuildingRestrictionLimitsEnabled", "True"),
+    # Patch 1.5 replaced this seconds-based UserGame control with the
+    # hours-based ServerCustomSettings field below. When both are present the
+    # game displays the new value but enforces this legacy one.
+    "base_backup_tool_time_restriction_seconds": (BUILDING_SETTINGS_SECTION, "m_BaseBackupToolTimeRestrictionInSeconds", "604800"),
     # Patch 1.5 moved this server setting to ServerCustomSettings.ini. Reserve
     # the former key so saved profiles from older releases cannot leak it back
     # into the server's UserGame.ini after migration.
@@ -283,6 +287,8 @@ SERVER_CUSTOM_NUMERIC_BOUNDS = {
     )},
     "crafting_time_multiplier": (0.0, 5.0),
     "fiefdom_limit": (0, 10),
+    # Field observation: values below 0.2 are clamped to 0.2 by the game.
+    "base_backup_tool_time_restriction": (0.2, None),
     # Funcom documents 10 as the normal upper range, but the server accepts
     # larger values and operators use them for large bases. Keep the real
     # lower bound while exposing the documented range separately as guidance.
@@ -485,7 +491,7 @@ FIELD_DESCRIPTIONS = {
     "water_consumption_in_storm_multiplier": "Additional water drain during sandstorms.",
     "players_drop_loot_on_defeat": "Whether a player drops loot when downed/defeated (not a full death).",
     "players_drop_loot_on_death": "Whether a player drops their inventory as loot when killed (PvP looting).",
-    "base_backup_tool_time_restriction_seconds": "Cooldown before the Base Backup tool can be used again on the same base, in seconds. Funcom's default is 604800 (7 days).",
+    "base_backup_tool_time_restriction": "Cooldown in hours before the Base Reconstruction Tool can pack the same base again. The game-enforced minimum is 0.2 hours (12 minutes).",
     "deathstill_conversion_time_override": "Overrides how long it takes to process a body in a Deathstill. Value is the length of the cycle in seconds.",
     "double_difficulty_loot_enabled": "Gives double loot when the encounter difficulty is above 0. Field-confirmed with dungeon loot.",
     "regenerate_per_player_loot_enabled": "Whether per-player loot is regenerated each time a player interacts with a loot container. Field-confirmed. Enabling this can make a single container farmable indefinitely.",
@@ -531,6 +537,7 @@ FIELD_LABELS = {
     "guild_settings_max_guild_members_allowed": "Max Guild Members Allowed",
     "guild_settings_max_pending_invites": "Max Pending Guild Invites",
     "augment_jackpot_roll_percentage": "Augment Jackpot Roll Threshold",
+    "base_backup_tool_time_restriction": "Base Reconstruction Cooldown (Hours)",
 }
 
 # Maps a field id to the client-side ini filename it also must be applied to
@@ -553,7 +560,6 @@ CLIENT_FILE_REQUIRED = {
     "water_consumption_in_storm_multiplier": "Game.ini",
     "players_drop_loot_on_defeat": "Game.ini",
     "players_drop_loot_on_death": "Game.ini",
-    "base_backup_tool_time_restriction_seconds": "Game.ini",
     "player_inventory_starting_size": "Game.ini",
     "player_inventory_starting_volume_capacity": "Game.ini",
 }
@@ -622,7 +628,6 @@ MAP_FIELDS = {
     "max_landclaim_segments": (BUILDING_SETTINGS_SECTION, "m_MaxNumLandclaimSegments", "6"),
     "building_blueprint_max_extensions": (BUILDING_SETTINGS_SECTION, "m_BuildingBlueprintMaxExtensions", "4"),
     "base_backup_max_extensions": (BUILDING_SETTINGS_SECTION, "m_BaseBackupMaxExtensions", "8"),
-    "base_backup_tool_time_restriction_seconds": (BUILDING_SETTINGS_SECTION, "m_BaseBackupToolTimeRestrictionInSeconds", "604800"),
     "mitigate_all_sandstorm_damage": (BUILDING_SETTINGS_SECTION, "m_bMitigateAllSandstormDamage", "False"),
     "fallback_default_building_health": (BUILDING_SETTINGS_SECTION, "m_FallbackDefaultBuildingHealth", "5000.000000"),
     "fallback_default_placeable_health": (BUILDING_SETTINGS_SECTION, "m_FallbackDefaultPlaceableHealth", "1000.000000"),
@@ -1036,14 +1041,21 @@ def parse_profile_text(text: str) -> dict:
 
 def read_profile() -> dict:
     if not PROFILE_PATH.exists():
-        return seed_profile_from_legacy_config()
-    return parse_profile_text(PROFILE_PATH.read_text(encoding="utf-8", errors="replace"))
+        profile = seed_profile_from_legacy_config()
+    else:
+        profile = parse_profile_text(PROFILE_PATH.read_text(encoding="utf-8", errors="replace"))
+    migrate_legacy_base_backup_cooldown(profile)
+    return profile
 
 
 def read_profile_text() -> str:
     if PROFILE_PATH.exists():
-        return PROFILE_PATH.read_text(encoding="utf-8", errors="replace")
-    return serialize_profile(seed_profile_from_legacy_config())
+        profile = parse_profile_text(PROFILE_PATH.read_text(encoding="utf-8", errors="replace"))
+    else:
+        profile = seed_profile_from_legacy_config()
+    migrate_legacy_base_backup_cooldown(profile)
+    strip_retired_usergame_profile_lines(profile)
+    return serialize_profile(profile)
 
 
 def preflight_persisted_settings() -> int:
@@ -1079,6 +1091,7 @@ def preflight_persisted_settings() -> int:
 
 
 def write_profile(profile: dict) -> None:
+    migrate_legacy_base_backup_cooldown(profile)
     strip_retired_usergame_profile_lines(profile)
     normalize_profile_blank_lines(profile)
     prune_empty_profile_sections(profile)
@@ -1086,9 +1099,7 @@ def write_profile(profile: dict) -> None:
 
 
 def write_profile_text(content: str) -> None:
-    PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    parse_profile_text(content)
-    atomic_write_text(PROFILE_PATH, content if content.endswith("\n") else content + "\n")
+    write_profile(parse_profile_text(content))
 
 
 def serialize_profile(profile: dict) -> str:
@@ -1159,6 +1170,60 @@ def strip_retired_usergame_profile_lines(profile: dict) -> None:
             raw for raw in block.get("lines", [])
             if not ((parsed := split_ini_assignment(raw)) and parsed[1] in keys)
         ]
+
+
+def migrate_legacy_base_backup_cooldown(profile: dict) -> None:
+    """Move explicit seconds-based cooldowns to native hours-based scopes.
+
+    When both keys are present, the game reports the new value in its settings
+    screen while enforcing the old UserGame value. Preserve each old scoped
+    override once, clamp it to the game's confirmed 0.2-hour minimum, then let
+    retired-key cleanup remove the conflicting line. A new value explicitly
+    saved at the same scope always wins.
+    """
+    legacy_section, legacy_key, _legacy_default = RETIRED_USERGAME_FIELDS[
+        "base_backup_tool_time_restriction_seconds"
+    ]
+    new_section, new_key, _new_default = SERVER_CUSTOM_FIELDS[
+        "base_backup_tool_time_restriction"
+    ]
+    scope_map = {
+        "Global": "server_custom_global",
+        "Map": "server_custom_map",
+        "Partition": "server_custom_partition",
+    }
+    migrations: list[tuple[str, str, str, str]] = []
+    for block in list(profile.get("sections", [])):
+        target_scope = scope_map.get(str(block.get("scope", "")))
+        if target_scope is None or str(block.get("ini_section", "")) != legacy_section:
+            continue
+        for raw in block.get("lines", []):
+            parsed = split_ini_assignment(raw)
+            if not parsed or parsed[1] != legacy_key:
+                continue
+            try:
+                seconds = float(parsed[2].strip())
+            except ValueError:
+                continue
+            if not math.isfinite(seconds) or seconds < 0:
+                continue
+            target_map = str(block.get("map", ""))
+            target_partition = str(block.get("partition", ""))
+            if profile_get_key(profile, target_scope, new_section, new_key, target_map, target_partition) is not None:
+                continue
+            hours = max(0.2, seconds / 3600.0)
+            migrations.append((target_scope, target_map, target_partition, f"{hours:.12g}"))
+            break
+    for target_scope, target_map, target_partition, serialized in migrations:
+        profile_set_key(
+            profile,
+            target_scope,
+            new_section,
+            new_key,
+            serialized,
+            target_map,
+            target_partition,
+        )
 
 
 def sorted_profile_sections(sections: list[dict]) -> list[dict]:
@@ -3600,15 +3665,14 @@ Dune.GlobalVehicleMiningOutputMultiplier=10
     profile_set_key(reparsed, "global", "/Script/DuneSandbox.DuneGameMode", "m_DefaultReconnectGracePeriodSeconds", "900")
     if "UnknownGlobal=abc" not in serialize_profile(reparsed):
         raise SystemExit("Interactive profile update dropped unknown keys.")
-    profile_set_key(reparsed, "global", "/Script/DuneSandbox.BuildingSettings", "m_BaseBackupToolTimeRestrictionInSeconds", "60")
-    if profile_map_values(reparsed, "Survival_1")["base_backup_tool_time_restriction_seconds"] != "60":
-        raise SystemExit("Base backup tool time restriction did not feed interactive map values.")
-    if "m_BaseBackupToolTimeRestrictionInSeconds=60" not in compiled_usergame_ini(reparsed, "Survival_1", "3"):
-        raise SystemExit("Base backup tool time restriction did not compile from interactive profile update.")
-    if "m_BaseBackupToolTimeRestrictionInSeconds=60" not in client_game_ini(reparsed, "Survival_1", "3"):
-        raise SystemExit("Base backup tool time restriction did not carry into the client Game.ini export.")
-    if CLIENT_FILE_REQUIRED.get("base_backup_tool_time_restriction_seconds") != "Game.ini":
-        raise SystemExit("Base backup tool time restriction is not flagged as requiring a client Game.ini update.")
+    profile_set_key(reparsed, "global", BUILDING_SETTINGS_SECTION, "m_BaseBackupToolTimeRestrictionInSeconds", "7200")
+    migrate_legacy_base_backup_cooldown(reparsed)
+    if server_custom_values(reparsed, "Survival_1", include_materialized=False)["base_backup_tool_time_restriction"] != "2":
+        raise SystemExit("Legacy base backup cooldown did not migrate from seconds to native hours.")
+    if "m_BaseBackupToolTimeRestrictionInSeconds" in compiled_usergame_ini(reparsed, "Survival_1", "3"):
+        raise SystemExit("Legacy base backup cooldown leaked into compiled UserGame.ini.")
+    if "m_BaseBackupToolTimeRestrictionInSeconds" in client_game_ini(reparsed, "Survival_1", "3"):
+        raise SystemExit("Legacy base backup cooldown leaked into the client Game.ini export.")
     if server_custom_values(reparsed, "Survival_1", include_materialized=False)["building_restriction_limits_enabled"] != "True":
         raise SystemExit("Building restriction limits did not default to enabled when unset.")
     profile_set_key(reparsed, "server_custom_global", SERVER_CUSTOM_SETTINGS_SECTION, "bIsBuildingRestrictionsEnabled", "False")
@@ -3673,7 +3737,6 @@ Dune.GlobalVehicleMiningOutputMultiplier=10
         "free_rotate_max": "90.000000",
         "default_repair_cost_multiplier": "0.25",
         "pickup_total_durability_reduction": "0.0",
-        "base_backup_tool_time_restriction_seconds": "604800",
         "fallback_default_building_health": "5000.000000",
         "fallback_default_placeable_health": "1000.000000",
         "building_destabilization_system_enabled": "False",

@@ -315,6 +315,7 @@ class RetiredModifierAndCoriolisMetadataTests(ProfilePathTestCase):
         "global_harvest_health_multiplier",
         "cutteray_hem_multiplier_per_node_tier_table",
         "global_damage_to_npcs_multiplier",
+        "base_backup_tool_time_restriction_seconds",
     }
 
     def test_retired_controls_are_absent_from_schema_and_generated_ini(self):
@@ -343,6 +344,67 @@ class RetiredModifierAndCoriolisMetadataTests(ProfilePathTestCase):
         saved = usersettings.PROFILE_PATH.read_text(encoding="utf-8")
         self.assertNotIn("m_GlobalFameMultiplier", saved)
         self.assertIn("m_DefaultReconnectGracePeriodSeconds=600", saved)
+
+    def test_legacy_base_backup_cooldown_is_migrated_to_native_hours(self):
+        profile = usersettings.parse_profile_text(
+            f"[Global:{usersettings.BUILDING_SETTINGS_SECTION}]\n"
+            "m_BaseBackupToolTimeRestrictionInSeconds=7200\n"
+        )
+
+        usersettings.migrate_legacy_base_backup_cooldown(profile)
+        values = usersettings.server_custom_values(profile, MAP_NAME, include_materialized=False)
+        self.assertEqual(values["base_backup_tool_time_restriction"], "2")
+        self.assertNotIn("m_BaseBackupToolTimeRestrictionInSeconds", usersettings.compiled_usergame_ini(profile, MAP_NAME))
+
+        usersettings.write_profile(profile)
+        saved = usersettings.PROFILE_PATH.read_text(encoding="utf-8")
+        self.assertNotIn("m_BaseBackupToolTimeRestrictionInSeconds", saved)
+        self.assertIn("BaseBackupToolTimeRestriction=2", saved)
+
+    def test_legacy_base_backup_cooldown_is_clamped_to_the_game_minimum(self):
+        profile = usersettings.parse_profile_text(
+            f"[Global:{usersettings.BUILDING_SETTINGS_SECTION}]\n"
+            "m_BaseBackupToolTimeRestrictionInSeconds=60\n"
+        )
+
+        usersettings.migrate_legacy_base_backup_cooldown(profile)
+        values = usersettings.server_custom_values(profile, MAP_NAME, include_materialized=False)
+        self.assertEqual(values["base_backup_tool_time_restriction"], "0.2")
+
+    def test_explicit_native_base_backup_cooldown_wins_over_legacy_value(self):
+        profile = usersettings.parse_profile_text(
+            f"[Global:{usersettings.BUILDING_SETTINGS_SECTION}]\n"
+            "m_BaseBackupToolTimeRestrictionInSeconds=7200\n"
+            f"\n[ServerCustomGlobal:{usersettings.SERVER_CUSTOM_SETTINGS_SECTION}]\n"
+            "BaseBackupToolTimeRestriction=3\n"
+        )
+
+        usersettings.migrate_legacy_base_backup_cooldown(profile)
+        values = usersettings.server_custom_values(profile, MAP_NAME, include_materialized=False)
+        self.assertEqual(values["base_backup_tool_time_restriction"], "3")
+
+    def test_native_base_backup_cooldown_metadata_exposes_hours_and_minimum(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(usersettings.metadata(), 0)
+        payload = json.loads(output.getvalue())
+        game_ids = {row["id"] for row in payload["game"]}
+        field = next(row for row in payload["serverCustom"] if row["id"] == "base_backup_tool_time_restriction")
+
+        self.assertNotIn("base_backup_tool_time_restriction_seconds", game_ids)
+        self.assertEqual(field["label"], "Base Reconstruction Cooldown (Hours)")
+        self.assertEqual((field["minimum"], field["maximum"]), (0.2, None))
+        self.assertIn("12 minutes", field["description"])
+
+    def test_native_base_backup_cooldown_rejects_values_below_game_minimum(self):
+        with self.assertRaises(SystemExit):
+            usersettings.bulk_save(
+                "serverCustomGlobal",
+                "",
+                "",
+                _encode_bulk_save_payload({"base_backup_tool_time_restriction": "0"}),
+            )
+        self.assertFalse(usersettings.PROFILE_PATH.exists())
 
     def test_coriolis_restart_metadata_names_its_map_process_scope(self):
         output = io.StringIO()
@@ -665,7 +727,7 @@ class ClientGameIniAllowlistTests(ProfilePathTestCase):
         self.assertIn("m_WaterConsumptionRate=2.0", rendered)
         self.assertIn("m_MaxNumLandclaimSegments=20", rendered)
         self.assertIn("m_bBuildingRestrictionLimitsEnabled=False", rendered)
-        self.assertIn("m_BaseBackupToolTimeRestrictionInSeconds=60", rendered)
+        self.assertNotIn("m_BaseBackupToolTimeRestrictionInSeconds", rendered)
         self.assertNotIn("m_DefaultReconnectGracePeriodSeconds", rendered)
         self.assertNotIn("UnknownCommunitySetting", rendered)
         self.assertNotIn(usersettings.LANDSRAAD_SETTINGS_SECTION, rendered)

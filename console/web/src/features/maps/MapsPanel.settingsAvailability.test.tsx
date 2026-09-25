@@ -162,9 +162,14 @@ describe("MapsPanel modifier availability", () => {
         scope: "serverCustom", id: "building_piece_limit_multiplier", section: "/Script/DuneSandbox.UserServerCustomSettings",
         key: "BuildingPieceLimitMultiplier", default: "1.000000", type: "number", minimum: 0.1, maximum: null,
         recommendedMinimum: 0.1, recommendedMaximum: 10, clientFile: "", category: "Building", description: ""
+      }, {
+        scope: "serverCustom", id: "base_backup_tool_time_restriction", section: "/Script/DuneSandbox.UserServerCustomSettings",
+        key: "BaseBackupToolTimeRestriction", label: "Base Reconstruction Cooldown (Hours)", default: "16.000000",
+        type: "number", minimum: 0.2, maximum: null, clientFile: "", category: "Building",
+        description: "Cooldown in hours before the Base Reconstruction Tool can pack the same base again."
       }]
     });
-    api.userSettingsValues.mockResolvedValue({ stdout: "pvp_mode\tLimited\ngathering_amount\t2.000000\nbuilding_piece_limit_multiplier\t1.000000\n" });
+    api.userSettingsValues.mockResolvedValue({ stdout: "pvp_mode\tLimited\ngathering_amount\t2.000000\nbuilding_piece_limit_multiplier\t1.000000\nbase_backup_tool_time_restriction\t16.000000\n" });
 
     renderMapsPanel();
     const modifiers = await screen.findByRole("button", { name: "Expand Interactive Modifiers" });
@@ -201,6 +206,10 @@ describe("MapsPanel modifier availability", () => {
     fireEvent.change(buildingLimit, { target: { value: "20" } });
     expect(screen.getByText(/above Funcom's recommended range/i)).toBeVisible();
     expect(screen.getByRole("button", { name: "Save Custom Settings" })).toBeEnabled();
+
+    const backupCooldown = screen.getByLabelText("Base Reconstruction Cooldown (Hours)");
+    expect(backupCooldown).toHaveAttribute("min", "0.2");
+    expect(backupCooldown).not.toHaveAttribute("max");
   });
 
   it("shows global settings below the Spice Fields table and saves them at Global scope", async () => {
