@@ -1613,6 +1613,11 @@ export function MapsPanel({ onError, confirmAction, restartGate, confirmSettings
     if (selectedMapName) void loadSelectedSettings(selectedMapName, next || undefined).catch((error) => onError(error instanceof Error ? error.message : String(error)));
   }
   function selectUserGameTarget(next: string) {
+    // A Target change invalidates every request issued for the previous
+    // Target, even when an unsaved draft deliberately prevents us from
+    // starting a replacement load below. Otherwise that older response can
+    // still resolve afterward and overwrite the draft we are preserving.
+    spiceFieldRequestSeqRef.current += 1;
     const target = userGameTargets.find((item) => item.key === next);
     if (!target) {
       setUserGameMapName("");

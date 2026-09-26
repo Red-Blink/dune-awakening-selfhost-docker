@@ -505,6 +505,62 @@ describe("MapsPanel modifier availability", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
   });
 
+  it("does not let an in-flight previous-target response overwrite an unsaved draft after the next Target change blocks reloading", async () => {
+    const api = mapsApi as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    api.status.mockResolvedValue({
+      maps: { stdout: "" },
+      services: { stdout: "8 | DeepDesert_1 | 0 | | server1 | 33001 | 33101 | true | true\n9 | DeepDesert_1 | 1 | | server1 | 33002 | 33102 | true | true" },
+      readiness: { stdout: "" }
+    });
+    const spiceField = {
+      scope: "game", id: "spice_prime_rate_seconds", section: "/Script/DuneSandbox.SpiceHarvestingSystem",
+      key: "m_PrimeRateInSeconds", default: "30.000000", type: "number", clientFile: "", category: "Spice Fields",
+      description: "Seconds a spice field spends priming before becoming harvestable."
+    };
+    api.userSettingsSchema.mockResolvedValue({
+      engine: [], mapEngine: [], partitionEngine: [], partition: [spiceField],
+      game: [spiceField],
+      serverCustom: []
+    });
+
+    const pending = new Map<string, { resolve: (value: { stdout: string }) => void }>();
+    api.userGame.mockImplementation((map: string, partitionId?: string) => {
+      const key = `${map}::${partitionId || ""}`;
+      return new Promise((resolve) => { pending.set(key, { resolve }); });
+    });
+
+    renderMapsPanel();
+    const modifiers = await screen.findByRole("button", { name: "Expand Interactive Modifiers" });
+    await waitFor(() => expect(pending.has("__global__::")).toBe(true));
+    pending.get("__global__::")!.resolve({ stdout: "spice_prime_rate_seconds\t30.000000\n" });
+    pending.delete("__global__::");
+    await waitFor(() => expect(modifiers).toBeEnabled());
+    fireEvent.click(modifiers);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Spice Fields" }));
+    expect(await screen.findByDisplayValue("30.000000")).toBeVisible();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Custom Settings" }));
+    fireEvent.change(screen.getByLabelText("Target"), { target: { value: "DeepDesert_1::8" } });
+    await waitFor(() => expect(pending.has("DeepDesert_1::8")).toBe(true));
+
+    fireEvent.click(screen.getByRole("tab", { name: "Spice Fields" }));
+    fireEvent.change(screen.getByDisplayValue("30.000000"), { target: { value: "999.000000" } });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Custom Settings" }));
+    fireEvent.change(screen.getByLabelText("Target"), { target: { value: "DeepDesert_1::9" } });
+    expect(pending.has("DeepDesert_1::9")).toBe(false);
+
+    pending.get("DeepDesert_1::8")!.resolve({ stdout: "spice_prime_rate_seconds\t808.000000\n" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    fireEvent.click(screen.getByRole("tab", { name: "Spice Fields" }));
+    expect(screen.getByDisplayValue("999.000000")).toBeVisible();
+    expect(screen.queryByDisplayValue("808.000000")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.getByText(/target changed on another tab/i)).toBeVisible();
+  });
+
   it("shows a distinct explanatory notice instead of the Spice Fields grid when Overmap is selected, and disables its action row", async () => {
     const api = mapsApi as unknown as Record<string, ReturnType<typeof vi.fn>>;
     api.status.mockResolvedValue({
