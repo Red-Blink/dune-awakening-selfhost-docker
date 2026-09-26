@@ -511,7 +511,7 @@ FIELD_DESCRIPTIONS = {
     "coriolis_cycle_start_hour": "UTC hour (0-23). Regional master schedules: Europe 05, North America 10, South America 08, Asia 09, and Oceania 19.",
     "coriolis_cycle_start_minute": "UTC minute (0-59) for the Coriolis cycle start.",
     "coriolis_cycle_start_seed_index": "Funcom's seed index for the base Coriolis cycle. Leave at 0 unless intentionally coordinating a different cycle seed.",
-    "spice_spawning_active": "Master on/off for the entire spice spawning system. False stops all new spice fields from spawning anywhere; existing fields are unaffected until consumed.",
+    "spice_spawning_active": "Intended as a master on/off for the spice spawning system, but observed on a live server to NOT reliably stop new spice fields from spawning when set to False -- new fields continued to appear during testing. Treat this field as unreliable until further investigated; do not rely on it to fully halt spawning.",
     "spice_prime_rate_seconds": "Seconds a spice field spends 'priming' (visible but not yet harvestable) before becoming active. Lower = fields become harvestable sooner after appearing.",
     "spice_manager_tick_rate_seconds": "How often (seconds) the spice manager re-evaluates spawn/despawn state. Lower = more responsive but more frequent server work.",
     "spice_manager_refresh_rate_seconds": "How often (seconds) the spice manager does a full refresh pass. Distinct from the tick rate above -- this is the slower, heavier pass.",
