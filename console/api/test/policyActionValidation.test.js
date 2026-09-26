@@ -250,7 +250,16 @@ const escalationDoc = () => ({
     version: 1,
     tier: "moderator",
     statements: [
-      { Effect: "Deny", Action: ["players:mutate", "guilds:mutate", "addons:mutate", "blueprints:mutate"] },
+      // addons:install/addons:update are crown-jewel (#711) but are NOT
+      // among addons:mutate's successors (addons:remove/toggle/bridge/
+      // unclassified -- see REMOVED_ACTION_ALIASES) -- without denying them
+      // explicitly too, "Allow addons:*" would genuinely hand moderator
+      // third-party-code-install, which loadPolicies()'s crown-jewel
+      // backstop correctly refuses to load. Every OTHER namespace here
+      // (players/guilds/blueprints) has no such gap: either its crown-jewel
+      // actions are fully covered by its own alias's successors (players),
+      // or it carries no crown-jewel action at all (guilds, blueprints).
+      { Effect: "Deny", Action: ["players:mutate", "guilds:mutate", "addons:mutate", "blueprints:mutate", "addons:install", "addons:update"] },
       { Effect: "Allow", Action: ["players:*", "guilds:*", "addons:*", "blueprints:*"] }
     ]
   }
