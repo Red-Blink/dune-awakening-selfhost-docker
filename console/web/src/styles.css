@@ -6482,6 +6482,18 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 .spicefield-settings-heading h3 { margin: 0 0 6px; color: var(--title); font-size: 14px; }
 .spicefield-settings-heading p { margin: 0; color: var(--muted); font-size: 12px; }
 .spicefield-settings-tools { width: 100%; }
+.spicefield-settings-scope { margin: 0 0 8px !important; color: var(--accent) !important; font-size: 12px; font-weight: 600; }
+.spicefield-settings-scope strong { font-weight: 700; color: var(--title); }
+.spicefield-settings-scope-hint { color: var(--muted); font-weight: 400; }
+/* Distinct from the plain .empty placeholder other grids use for "select a
+   Target" -- this is a deliberate exclusion (Overmap has no spice fields),
+   not an unfilled state, so it gets its own icon/border rather than reusing
+   the generic empty look an operator could mistake for a bug. */
+.spicefield-overmap-notice { display: flex; align-items: center; gap: 8px; border: 1px solid rgba(214, 185, 140, .3); border-radius: 6px; padding: 10px 12px; background: var(--panel-muted); }
+/* Same warning-adjacent treatment as .spicefield-overmap-notice, but for the
+   cross-tab stale-draft case: Save is disabled and the operator needs to
+   understand why before Discard Changes' re-load makes sense to click. */
+.spicefield-settings-stale-notice { margin: 0; border: 1px solid rgba(214, 185, 140, .3); border-radius: 6px; padding: 10px 12px; background: var(--panel-muted); color: var(--muted-warm); font-size: 12px; }
 .spicefields-toolbar { align-items: end; }
 .spicefields-toolbar .wide-field { flex: 1 1 420px; }
 .spicefields-refresh-button { flex: 0 0 auto; margin-bottom: 0; min-height: 42px; }
