@@ -86,6 +86,12 @@ class SpiceFieldSchemaTests(unittest.TestCase):
         ]
         self.assertFalse(mistagged, f"unexpected field(s) tagged {EXPECTED_CATEGORY!r}: {mistagged}")
 
+    def test_spawning_active_description_warns_that_the_setting_is_unreliable(self):
+        by_id = {field["id"]: field for field in self.schema["game"]}
+        description = by_id["spice_spawning_active"]["description"].lower()
+        self.assertIn("did not reliably stop", description)
+        self.assertIn("do not rely", description)
+
 
 if __name__ == "__main__":
     unittest.main()
