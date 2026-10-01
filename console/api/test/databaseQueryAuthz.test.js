@@ -107,11 +107,15 @@ test("owner may run write SQL, admin may not", () => {
   assert.equal(evaluate({ tier: "admin" }, "database:execute"), false);
 });
 
-test("admin keeps read SQL and export", () => {
+test("admin keeps read SQL, but not the full-DB export", () => {
   // The split must not cost admin the read half it legitimately had.
+  // Fork-specific note: unlike upstream's default (which grants
+  // database:export to admin), this fork's Tier 1 admin is deliberately
+  // denied it as a crown jewel -- a full DB dump is whole-database
+  // exfiltration (see policy.js's CROWN_JEWEL_DENY_ACTIONS).
   assert.equal(evaluate({ tier: "admin" }, "database:query"), true);
   assert.equal(evaluate({ tier: "admin" }, "database:read"), true);
-  assert.equal(evaluate({ tier: "admin" }, "database:export"), true);
+  assert.equal(evaluate({ tier: "admin" }, "database:export"), false);
 });
 
 test("the deny survives a widened allow list", () => {
