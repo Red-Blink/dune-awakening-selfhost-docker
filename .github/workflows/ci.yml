@@ -109,7 +109,9 @@ jobs:
       - name: Test readiness with configured service ports
         run: bash tests/ready-configured-ports-test.sh
       - name: Test the encrypted API access script
-        run: bash tests/tls-front-script-test.sh
+        run: |
+          bash tests/tls-front-script-test.sh
+          python3 runtime/scripts/test_tls_front_config.py
       - name: Test stable farm readiness gating
         run: bash tests/farm-readiness-test.sh
       - name: Test current-start readiness and login queue safety

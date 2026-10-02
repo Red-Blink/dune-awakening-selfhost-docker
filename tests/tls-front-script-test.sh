@@ -13,6 +13,7 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/runtime/scripts" "$work/runtime/tls-front" "$work/bin"
 cp "$repo_root/runtime/scripts/tls-front.sh" "$work/runtime/scripts/"
+cp "$repo_root/runtime/scripts/tls-front-config.py" "$work/runtime/scripts/"
 cp "$repo_root/docker-compose.tls-front.yml" "$work/"
 cp "$repo_root/runtime/tls-front/Dockerfile" "$repo_root/runtime/tls-front/go.mod" "$repo_root/runtime/tls-front/main.go" "$work/runtime/tls-front/"
 
@@ -28,6 +29,7 @@ running="$work/container-running"
 cat >"$work/bin/docker" <<'MOCK'
 #!/bin/sh
 echo "docker $*" >>"$MOCK_CALLS"
+echo "upstream=${DUNE_TLS_FRONT_UPSTREAM:-}" >>"$MOCK_CALLS"
 case "$1" in
   ps)
     if [ -e "$MOCK_RUNNING" ]; then echo dune-tls-front; fi
@@ -66,11 +68,23 @@ fp="$(run fingerprint)"
 [ -d "$work/runtime/generated/tls-front" ] || fail "state directory missing"
 
 # reconcile keeps the operator's choice
+printf 'DUNE_TLS_FRONT_ENABLED=true\nDUNE_TLS_FRONT_PORT=8797\nDUNE_TLS_FRONT_NAMES="one.example two.example"\nDUNE_TLS_FRONT_ALLOW="192.168.1.0/24 10.0.0.0/8"\n' >"$work/runtime/generated/tls-front.env"
+run enable >/dev/null
+# Re-reading persisted values with spaces must not try to execute them.
 : >"$calls"
 run reconcile
 grep -Fq ' up -d' "$calls" || fail "reconcile did not start an enabled front door"
 
 # disable: persists, stops
+# A custom binding/port is used, and changing it is reconciled without BG operations.
+printf 'ADMIN_BIND_HOST="192.168.1.20"\nADMIN_BIND_PORT=8099\n' >"$work/.env"
+: >"$calls"
+run reconcile
+grep -Fq 'upstream=http://192.168.1.20:8099' "$calls" || fail "custom Console endpoint was not used"
+printf 'ADMIN_BIND_HOST="192.168.1.20"\nADMIN_BIND_PORT=8100\n' >"$work/.env"
+: >"$calls"
+run reconcile
+grep -Fq 'upstream=http://192.168.1.20:8100' "$calls" || fail "changed Console port was not used"
 : >"$calls"
 run disable >/dev/null
 grep -Fq 'DUNE_TLS_FRONT_ENABLED=false' "$work/runtime/generated/tls-front.env" || fail "disable did not persist the choice"

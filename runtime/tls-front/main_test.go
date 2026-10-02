@@ -2,11 +2,17 @@ package main
 
 import (
 	"bufio"
+	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +21,52 @@ import (
 )
 
 const key = "Bearer dak_test_0123456789"
+
+func TestForwardingIdentity(t *testing.T) {
+	dir := t.TempDir()
+	secret, err := loadOrCreateProxyKey(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := loadOrCreateProxyKey(dir)
+	if err != nil || !hmac.Equal(secret, again) {
+		t.Fatal("forwarding identity changed")
+	}
+	stat, _ := os.Stat(filepath.Join(dir, "proxy-key"))
+	if stat.Mode().Perm() != 0o600 {
+		t.Fatal("forwarding key permissions")
+	}
+	req := httptest.NewRequest("GET", "http://console/api/server/status?view=1", nil)
+	req.RemoteAddr = "203.0.113.9:12345"
+	proxy := &httputil.ProxyRequest{In: req, Out: req.Clone(req.Context())}
+	signClient(proxy, secret)
+	h := proxy.Out.Header
+	if h.Get("X-Dune-Tls-Client") != "203.0.113.9" {
+		t.Fatal("client IP missing")
+	}
+	mac := hmac.New(sha256.New, secret)
+	fmt.Fprintf(mac, "%s\n203.0.113.9\nGET\n/api/server/status?view=1", h.Get("X-Dune-Tls-Time"))
+	if h.Get("X-Dune-Tls-Signature") != hex.EncodeToString(mac.Sum(nil)) {
+		t.Fatal("request signature mismatch")
+	}
+}
+
+func TestHealthCheckRequiresReachableConsole(t *testing.T) {
+	base, _, _ := start(t, nil)
+	front, _ := url.Parse(base)
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden) // restrictive Console allowlist
+	}))
+	upstream, _ := url.Parse(backend.URL)
+	cfg := config{Addr: front.Host, Upstream: upstream}
+	if healthcheck(cfg) != 0 {
+		t.Fatal("reachable restricted Console was unhealthy")
+	}
+	backend.Close()
+	if healthcheck(cfg) == 0 {
+		t.Fatal("unreachable Console was reported healthy")
+	}
+}
 
 // console is a stand-in for the Dune Docker Console: it records what reached it.
 func console(t *testing.T, seen chan<- *http.Request) *httptest.Server {
@@ -57,6 +109,10 @@ func start(t *testing.T, env map[string]string) (base string, pin string, seen c
 		t.Fatal(err)
 	}
 	id, err := loadOrCreateIdentity(cfg.State, cfg.Names)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.ProxyKey, err = loadOrCreateProxyKey(cfg.State)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,11 +203,14 @@ func TestAPIDoorOnlyForwardsKeyedReads(t *testing.T) {
 	auth := map[string]string{"Authorization": key}
 
 	// forwarded, cookie of the console never passes, only the headers the API needs
-	resp := get(t, c, base+"/api/map/status", map[string]string{"Authorization": key, "Cookie": "session=admin", "X-Forwarded-For": "1.2.3.4"})
+	resp := get(t, c, base+"/api/map/status", map[string]string{"Authorization": key, "Cookie": "session=admin", "X-Forwarded-For": "1.2.3.4", "X-Dune-Tls-Client": "1.2.3.4", "X-Dune-Tls-Signature": "forged"})
 	if resp.StatusCode != 200 || resp.Header.Get("Set-Cookie") != "" {
 		t.Fatalf("status %d, cookie %q", resp.StatusCode, resp.Header.Get("Set-Cookie"))
 	}
 	r := <-seen
+	if r.Header.Get("X-Dune-Tls-Client") != "127.0.0.1" || len(r.Header.Get("X-Dune-Tls-Signature")) != 64 {
+		t.Fatal("forwarded identity was not signed from the real client")
+	}
 	if r.Header.Get("Cookie") != "" || r.Header.Get("X-Forwarded-For") != "" || r.Header.Get("Authorization") != key {
 		t.Fatalf("headers: %v", r.Header)
 	}

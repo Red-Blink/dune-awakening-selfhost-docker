@@ -28,12 +28,14 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -62,6 +64,7 @@ type config struct {
 	Names    []string
 	Allow    []*net.IPNet
 	Full     bool
+	ProxyKey []byte
 }
 
 func main() {
@@ -84,6 +87,10 @@ func main() {
 	}
 	if *health {
 		os.Exit(healthcheck(cfg))
+	}
+	cfg.ProxyKey, err = loadOrCreateProxyKey(cfg.State)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	inner, err := net.Listen("tcp", cfg.Addr)
@@ -303,6 +310,26 @@ func writeFile(path string, b []byte, mode os.FileMode) error {
 	return os.Rename(tmp, path)
 }
 
+func loadOrCreateProxyKey(dir string) ([]byte, error) {
+	path := filepath.Join(dir, "proxy-key")
+	if key, err := os.ReadFile(path); err == nil {
+		if len(key) != 32 {
+			return nil, errors.New("invalid TLS forwarding key")
+		}
+		return key, nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return nil, err
+	}
+	if err := writeFile(path, key, 0o600); err != nil {
+		return nil, err
+	}
+	return key, nil
+}
+
 // ---------------------------------------------------------------- listener
 
 // allowListener closes connections of addresses outside the allow list before
@@ -343,8 +370,12 @@ func newHandler(cfg config) http.Handler {
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(r *httputil.ProxyRequest) {
 			r.SetURL(cfg.Upstream)
+			for _, name := range []string{"X-Dune-Tls-Client", "X-Dune-Tls-Time", "X-Dune-Tls-Signature"} {
+				r.Out.Header.Del(name)
+			}
 			if cfg.Full {
 				r.Out.Header["X-Forwarded-For"] = nil
+				signClient(r, cfg.ProxyKey)
 				return
 			}
 			// API door: nothing but the key and what the API needs
@@ -355,6 +386,7 @@ func newHandler(cfg config) http.Handler {
 				}
 			}
 			r.Out.Header = h
+			signClient(r, cfg.ProxyKey)
 		},
 		FlushInterval: -1, // server-sent events: pass every write on at once
 		ModifyResponse: func(resp *http.Response) error {
@@ -405,6 +437,19 @@ func newHandler(cfg config) http.Handler {
 }
 
 type clientKey struct{}
+
+func signClient(r *httputil.ProxyRequest, key []byte) {
+	if len(key) != 32 {
+		return
+	}
+	ip := peerIP(addrOf(r.In)).String()
+	timestamp := fmt.Sprint(time.Now().Unix())
+	mac := hmac.New(sha256.New, key)
+	fmt.Fprintf(mac, "%s\n%s\n%s\n%s", timestamp, ip, r.Out.Method, r.Out.URL.RequestURI())
+	r.Out.Header.Set("X-Dune-Tls-Client", ip)
+	r.Out.Header.Set("X-Dune-Tls-Time", timestamp)
+	r.Out.Header.Set("X-Dune-Tls-Signature", hex.EncodeToString(mac.Sum(nil)))
+}
 
 func addrOf(r *http.Request) net.Addr {
 	a, err := net.ResolveTCPAddr("tcp", r.RemoteAddr)
@@ -522,6 +567,20 @@ func healthcheck(cfg config) int {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		fmt.Fprintln(os.Stderr, "mvtls:", resp.Status)
+		return 1
+	}
+	// A healthy listener alone does not prove the configured Console endpoint
+	// is reachable. A 403 is valid here when the Console restricts client IPs;
+	// normal forwarded requests carry their independently signed client IP.
+	endpoint := cfg.Upstream.ResolveReference(&url.URL{Path: "/api/health"})
+	backend, err := c.Get(endpoint.String())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "console unreachable")
+		return 1
+	}
+	backend.Body.Close()
+	if backend.StatusCode != http.StatusOK && backend.StatusCode != http.StatusForbidden {
+		fmt.Fprintln(os.Stderr, "console unavailable:", backend.Status)
 		return 1
 	}
 	return 0

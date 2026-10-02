@@ -51,12 +51,19 @@ So it adds no new way into the admin console. API keys keep exactly the scopes, 
 
 ## Turning it on and off
 
-On a **new install** the installer starts it (set `DUNE_ENCRYPTED_API=0` to skip). Later:
+On a **new install** it is disabled unless you set `DUNE_ENCRYPTED_API=1`. Later:
 
 - **Settings → Encrypted API Access** has a switch; the first start builds the image and can take a minute.
 - `dune encrypted-api enable | disable | status | fingerprint`.
 
 The choice is kept in `runtime/generated/tls-front.env` and survives re-running the installer.
+
+The front door follows the Console's configured bind address and port. Console
+port changes and self-updates reconcile the enabled front door without restarting
+the Battlegroup. The Console still applies `ADMIN_ALLOWED_IPS` to the original
+client address, verified using a private per-install forwarding key; ordinary
+forwarding headers are never trusted. `DUNE_TLS_FRONT_ALLOW` can restrict access
+further. The forwarding key stays alongside the TLS key and is not an API key.
 
 | Variable (`runtime/generated/tls-front.env`) | Default | Meaning |
 |---|---|---|
