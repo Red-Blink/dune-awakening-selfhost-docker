@@ -40,6 +40,7 @@ import { looksLikeTar, mintSystemBackupName, normalizeImportedSystemMetadata, re
 import { createTarHeader, tarArchiveLength, tarPadding, TAR_TRAILER_BYTES, createBackupDownloadArchive, enrichBackupRows, nextImportedBackupName, normalizeImportedBackupMetadata, readCurrentBattlegroupId, validBackupDownloadName } from "./services/backups.js";
 import { createMemoryBalancer } from "./services/memoryBalancer.js";
 import { collectContainerHealth } from "./services/containerHealth.js";
+import { createEncryptedApi, EncryptedApiError } from "./services/encryptedApi.js";
 import { parseMemorySwapStatus } from "./services/memorySwap.js";
 import { createDeathPoller } from "./deathPoller.js";
 import { updateEnvFileValue as updateEnvValue } from "./services/envFile.js";
@@ -167,6 +168,7 @@ function shouldNoteApiKeyAuthThrottle(failureKey, at = Date.now()) {
   return true;
 }
 const apiKeys = createApiKeyStore({ file: config.apiKeysFile });
+const encryptedApi = createEncryptedApi({ repoRoot: config.repoRoot });
 // Proof that a restore was previewed, for the apply that follows it. In memory
 // beside the sessions it is keyed by -- see the module header for why it is not
 // persisted.
@@ -956,6 +958,8 @@ async function handleApi(req, res) {
     return json(res, 200, { keys: apiKeys.list() });
   }
   if (path === "/api/settings/api-keys" && req.method === "POST") return apiKeyCreateRoute(req, res);
+  if (path === "/api/settings/encrypted-api" && req.method === "GET") return encryptedApiRoute(res, () => encryptedApi.status());
+  if (path === "/api/settings/encrypted-api" && req.method === "POST") return encryptedApiToggleRoute(req, res);
   if (path.startsWith("/api/settings/api-keys/")) return apiKeyItemRoute(req, res, path);
   if (path === "/api/settings/iam/policy/test" && req.method === "POST") {
     const body = await readJson(req);
@@ -2710,6 +2714,24 @@ async function adminPasswordRoute(req, res) {
   config.adminPassword = password;
   audit(config, req, "settings.change-admin-password", { password: "<redacted>" });
   return json(res, 200, { ok: true });
+}
+
+async function encryptedApiRoute(res, action) {
+  try {
+    return json(res, 200, await action(), { "cache-control": "no-store" });
+  } catch (error) {
+    if (error instanceof EncryptedApiError) return json(res, error.status, { error: error.message });
+    throw error;
+  }
+}
+
+async function encryptedApiToggleRoute(req, res) {
+  const body = await readJson(req);
+  return encryptedApiRoute(res, async () => {
+    const status = await encryptedApi.setEnabled(body?.enabled);
+    audit(config, req, body.enabled ? "settings.encrypted-api-enable" : "settings.encrypted-api-disable", { port: status.port });
+    return status;
+  });
 }
 
 async function apiKeyCreateRoute(req, res) {

@@ -423,6 +423,11 @@ EOF
     runtime/scripts/ip-change-restart.sh "$@"
     ;;
 
+  encrypted-api)
+    shift || true
+    runtime/scripts/tls-front.sh "$@"
+    ;;
+
   shutdown-protection)
     shift || true
     runtime/scripts/shutdown-protection.sh "$@"
@@ -524,6 +529,7 @@ Usage:
   dune self-update [check|list|install [latest|<tag>]]
   dune restart-schedule [enable <HH:MM> [notify-minutes]|disable|status]
   dune ip-change-restart [enable [interval-minutes] [notify-minutes]|disable|status|check-now]
+  dune encrypted-api [enable|disable|status|fingerprint]
   dune shutdown-protection [enable|disable|remove|status]
   dune network [status|fix]
   dune db backup [output-dir]
