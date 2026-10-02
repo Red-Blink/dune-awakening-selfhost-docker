@@ -1315,6 +1315,7 @@ rebuild_web_console_now() {
   self_update_running restarting 94 "Restarting the updated web console."
   docker rm -f "$service" >/dev/null 2>&1 || true
   COMPOSE_PROJECT_NAME="$web_compose_project" DUNE_COMPOSE_PROJECT_NAME="$DUNE_COMPOSE_PROJECT_NAME" DUNE_HOST_REPO_ROOT="$HOST_ROOT_DIR" docker compose -f docker-compose.web.yml up -d --force-recreate "$service"
+  if [ -x runtime/scripts/tls-front.sh ]; then runtime/scripts/tls-front.sh reconcile; fi
 }
 
 reconcile_coriolis_coordinator_after_deploy() {

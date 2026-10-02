@@ -50,23 +50,24 @@ write_env() {
   {
     echo "DUNE_TLS_FRONT_ENABLED=$enabled"
     echo "DUNE_TLS_FRONT_PORT=$DUNE_TLS_FRONT_PORT"
-    echo "DUNE_TLS_FRONT_BIND=$DUNE_TLS_FRONT_BIND"
-    echo "DUNE_TLS_FRONT_NAMES=$DUNE_TLS_FRONT_NAMES"
-    echo "DUNE_TLS_FRONT_ALLOW=$DUNE_TLS_FRONT_ALLOW"
+    printf 'DUNE_TLS_FRONT_BIND=%q\n' "$DUNE_TLS_FRONT_BIND"
+    printf 'DUNE_TLS_FRONT_NAMES=%q\n' "$DUNE_TLS_FRONT_NAMES"
+    printf 'DUNE_TLS_FRONT_ALLOW=%q\n' "$DUNE_TLS_FRONT_ALLOW"
   } >"$tmp"
   chmod 600 "$tmp" 2>/dev/null || true
   mv "$tmp" "$ENV_FILE"
+  preserve_host_owner "$ENV_FILE"
 }
 
-console_port() {
-  local port="${ADMIN_WEB_PORT:-${ADMIN_BIND_PORT:-}}"
-  if [ -z "$port" ] && [ -f .env ]; then
-    port="$(awk -F= '/^(ADMIN_BIND_PORT|ADMIN_WEB_PORT)=/ {print $2; exit}' .env | tr -d '[:space:]"'\''' || true)"
+preserve_host_owner() {
+  if [ "$(id -u)" = "0" ] && [[ "${DUNE_HOST_UID:-}" =~ ^[0-9]+$ ]] && [[ "${DUNE_HOST_GID:-}" =~ ^[0-9]+$ ]]; then
+    chown "$DUNE_HOST_UID:$DUNE_HOST_GID" "$1"
   fi
-  printf '%s' "${port:-8088}"
 }
 
 compose() {
+  local upstream
+  upstream="$(python3 runtime/scripts/tls-front-config.py)"
   DUNE_HOST_REPO_ROOT="${DUNE_HOST_REPO_ROOT:-$(pwd -P)}" \
     DUNE_HOST_UID="${DUNE_HOST_UID:-$(id -u)}" \
     DUNE_HOST_GID="${DUNE_HOST_GID:-$(id -g)}" \
@@ -74,7 +75,7 @@ compose() {
     DUNE_TLS_FRONT_BIND="$DUNE_TLS_FRONT_BIND" \
     DUNE_TLS_FRONT_NAMES="$DUNE_TLS_FRONT_NAMES" \
     DUNE_TLS_FRONT_ALLOW="$DUNE_TLS_FRONT_ALLOW" \
-    DUNE_TLS_FRONT_CONSOLE_PORT="$(console_port)" \
+    DUNE_TLS_FRONT_UPSTREAM="$upstream" \
     COMPOSE_PROJECT_NAME="$PROJECT" \
     docker compose -f "$COMPOSE_FILE" "$@"
 }
@@ -82,6 +83,7 @@ compose() {
 start_front() {
   local current_hash saved_hash=""
   mkdir -p "$STATE_DIR"
+  preserve_host_owner "$STATE_DIR"
   chmod 700 "$STATE_DIR" 2>/dev/null || true
   current_hash="$(
     sha256sum \
@@ -96,6 +98,7 @@ start_front() {
     compose build dune-tls-front
     printf '%s\n' "$current_hash" >"$BUILD_STATE"
     chmod 600 "$BUILD_STATE" 2>/dev/null || true
+    preserve_host_owner "$BUILD_STATE"
   fi
   compose up -d --force-recreate
 }

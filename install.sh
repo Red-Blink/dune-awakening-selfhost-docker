@@ -614,19 +614,20 @@ read_admin_password() {
 }
 
 # Encrypted API access (optional): HTTPS with its own long-lived key in front of the
-# Console (docs/console/encrypted-api.md). On by
-# default for a new install; DUNE_ENCRYPTED_API=0 skips it. A choice made later in
+# Console (docs/console/encrypted-api.md). Off by
+# default for a new install; DUNE_ENCRYPTED_API=1 enables it. A choice made later in
 # Settings (runtime/generated/tls-front.env) is kept when the installer runs again.
 start_tls_front() {
   TLS_FRONT_FINGERPRINT=""
   TLS_FRONT_PORT="${DUNE_TLS_FRONT_PORT:-8797}"
-  [ "${DUNE_ENCRYPTED_API:-1}" != "0" ] || return 0
   [ -f docker-compose.tls-front.yml ] && [ -x runtime/scripts/tls-front.sh ] || return 0
   if [ -r runtime/generated/tls-front.env ]; then
     # shellcheck disable=SC1091
     . runtime/generated/tls-front.env
     [ "${DUNE_TLS_FRONT_ENABLED:-false}" = "true" ] || return 0
     TLS_FRONT_PORT="${DUNE_TLS_FRONT_PORT:-8797}"
+  else
+    [ "${DUNE_ENCRYPTED_API:-0}" = "1" ] || return 0
   fi
 
   step "Starting the encrypted API access."
