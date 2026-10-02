@@ -120,6 +120,30 @@ test("stream without players:read drops player objects and their positions", asy
   }
 });
 
+test("removing only players:read ends a stream without waiting for another snapshot", async () => {
+  const agent = await fakeAgent();
+  const realtime = createRealtime({ agentUrl: agent.url, recheckMs: 20 });
+  let players = true;
+  const { front, events, done } = await openStream(realtime, {
+    principal: "apikey:downgrade", allowPlayers: () => players, stillAllowed: () => true
+  });
+  try {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.ok(events.some(e => e.name === "pos" && e.data.d.some(d => d[0] === 3)));
+    players = false;
+    await Promise.race([done, new Promise((_, reject) => {
+      const timer = setTimeout(() => reject(new Error("scope downgrade did not end the stream")), 1000);
+      timer.unref();
+    })]);
+    const count = events.length;
+    await new Promise(resolve => setTimeout(resolve, 60));
+    assert.equal(events.length, count);
+    assert.equal(realtime.openStreams(), 0);
+  } finally {
+    front.closeAllConnections(); front.close(); agent.server.close();
+  }
+});
+
 test("stream with players:read keeps players", async () => {
   const agent = await fakeAgent();
   const realtime = createRealtime({ agentUrl: agent.url });
