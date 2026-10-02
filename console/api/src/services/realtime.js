@@ -142,7 +142,12 @@ export function createRealtime({
       const upstream = http.get(new URL("/stream", base), { headers: { accept: "text/event-stream" } });
       const recheck = setInterval(() => {
         if (!stillAllowed()) return finish();
-        players = Boolean(allowPlayers());
+        const nextPlayers = Boolean(allowPlayers());
+        // Previously admitted player IDs remain in the delta cache until the
+        // next snapshot. End this stream on a downgrade rather than leaking
+        // their positions in the meantime; reconnect applies the new scope.
+        if (players && !nextPlayers) return finish();
+        players = nextPlayers;
       }, recheckMs);
 
       function finish() {
