@@ -613,6 +613,40 @@ read_admin_password() {
   done
 }
 
+# Encrypted API access (optional): HTTPS with its own long-lived key in front of the
+# Console (docs/console/encrypted-api.md). On by
+# default for a new install; DUNE_ENCRYPTED_API=0 skips it. A choice made later in
+# Settings (runtime/generated/tls-front.env) is kept when the installer runs again.
+start_tls_front() {
+  TLS_FRONT_FINGERPRINT=""
+  TLS_FRONT_PORT="${DUNE_TLS_FRONT_PORT:-8797}"
+  [ "${DUNE_ENCRYPTED_API:-1}" != "0" ] || return 0
+  [ -f docker-compose.tls-front.yml ] && [ -x runtime/scripts/tls-front.sh ] || return 0
+  if [ -r runtime/generated/tls-front.env ]; then
+    # shellcheck disable=SC1091
+    . runtime/generated/tls-front.env
+    [ "${DUNE_TLS_FRONT_ENABLED:-false}" = "true" ] || return 0
+    TLS_FRONT_PORT="${DUNE_TLS_FRONT_PORT:-8797}"
+  fi
+
+  step "Starting the encrypted API access."
+  export DUNE_HOST_REPO_ROOT="${DUNE_HOST_REPO_ROOT:-$(pwd -P)}"
+  export DUNE_HOST_UID="${DUNE_HOST_UID:-$(default_host_uid)}"
+  export DUNE_HOST_GID="${DUNE_HOST_GID:-$(default_host_gid)}"
+  export ADMIN_BIND_PORT="$WEB_PORT"
+  if [ "$DOCKER_NEEDS_SUDO" = "1" ]; then
+    need_sudo env \
+      "ADMIN_BIND_PORT=$ADMIN_BIND_PORT" \
+      "DUNE_HOST_REPO_ROOT=$DUNE_HOST_REPO_ROOT" \
+      "DUNE_HOST_UID=$DUNE_HOST_UID" \
+      "DUNE_HOST_GID=$DUNE_HOST_GID" \
+      runtime/scripts/tls-front.sh enable >/dev/null 2>&1 || true
+  else
+    runtime/scripts/tls-front.sh enable >/dev/null 2>&1 || true
+  fi
+  TLS_FRONT_FINGERPRINT="$(runtime/scripts/tls-front.sh fingerprint 2>/dev/null || true)"
+}
+
 show_finish() {
   finish_host_ip="$(host_ip)"
   finish_public_ip="$(public_ip)"
@@ -645,6 +679,19 @@ show_finish() {
   else
     echo "The password was not ready yet. Wait a few seconds and run ./install.sh again to show it."
   fi
+  if [ -n "${TLS_FRONT_FINGERPRINT:-}" ]; then
+    echo
+    echo "Encrypted API access (HTTPS):"
+    if [ -n "$finish_public_ip" ] && [ "$finish_public_ip" != "$finish_host_ip" ]; then
+      echo "  https://$finish_public_ip:$TLS_FRONT_PORT"
+    else
+      echo "  https://$finish_host_ip:$TLS_FRONT_PORT"
+    fi
+    echo "  Key fingerprint:"
+    echo "  $TLS_FRONT_FINGERPRINT"
+    echo "Allow TCP $TLS_FRONT_PORT in the server firewall to use it from other computers."
+    echo "Show it again any time: Settings > Encrypted API Access, or run: dune encrypted-api fingerprint"
+  fi
   echo
   echo "After signing in, the setup wizard will check the server and finish everything from the browser."
   echo "If you prefer the terminal, you can also run: dune --help"
@@ -667,4 +714,5 @@ install_cli_command
 migrate_existing_ownership
 choose_web_port
 start_console
+start_tls_front
 show_finish

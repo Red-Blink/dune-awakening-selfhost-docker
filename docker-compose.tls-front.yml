@@ -1,0 +1,38 @@
+name: dune-tls-front
+
+# Optional encrypted front door for the Console API: HTTPS with its own long-lived
+# key in front of the unchanged Console (docs/console/encrypted-api.md). Started and
+# stopped by runtime/scripts/tls-front.sh, the installer and Settings -> Encrypted API Access.
+services:
+  dune-tls-front:
+    build:
+      context: ./runtime/tls-front
+    image: dune-tls-front:dev
+    container_name: dune-tls-front
+    restart: unless-stopped
+    # Host networking: reaches the Console on the host's loopback and listens on
+    # DUNE_TLS_FRONT_BIND:DUNE_TLS_FRONT_PORT.
+    network_mode: host
+    user: "${DUNE_HOST_UID:-0}:${DUNE_HOST_GID:-0}"
+    environment:
+      MV_TLS_ADDR: "${DUNE_TLS_FRONT_BIND:-0.0.0.0}:${DUNE_TLS_FRONT_PORT:-8797}"
+      MV_TLS_UPSTREAM: "http://127.0.0.1:${DUNE_TLS_FRONT_CONSOLE_PORT:-8088}"
+      MV_TLS_NAMES: "${DUNE_TLS_FRONT_NAMES:-}"
+      MV_TLS_ALLOW: "${DUNE_TLS_FRONT_ALLOW:-}"
+      MV_TLS_STATE: /data
+    volumes:
+      # key and certificate; the Console reads only the certificate to show the fingerprint
+      - "${DUNE_HOST_REPO_ROOT:?DUNE_HOST_REPO_ROOT is required}/runtime/generated/tls-front:/data"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cpus: "0.50"
+    mem_limit: 64m
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options:
+        max-size: "${DUNE_DOCKER_LOG_MAX_SIZE:-20m}"
+        max-file: "${DUNE_DOCKER_LOG_MAX_FILES:-3}"
