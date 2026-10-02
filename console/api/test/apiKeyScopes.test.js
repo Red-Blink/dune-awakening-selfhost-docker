@@ -73,11 +73,11 @@ test("carepackage:scan is a write despite its verb-shaped name", () => {
   assert.equal(keyAllows({ scopes: { carepackage: "write" } }, "carepackage:scan"), true);
 });
 
-test("logs, updates and addons are the only namespaces offering no write level", () => {
-  // logs has no write action at all; updates has several but they are denied.
-  // Both render a two-segment None/Read control.
+test("logs, realtime, updates and addons are the only namespaces offering no write level", () => {
+  // logs and realtime have no write action at all; updates has several but
+  // they are denied. All render a two-segment None/Read control.
   const namespaces = selectableNamespaces();
-  const readOnly = new Set(["logs", ...KEY_WRITE_DENIED_NAMESPACES]);
+  const readOnly = new Set(["logs", "realtime", ...KEY_WRITE_DENIED_NAMESPACES]);
   for (const namespace of readOnly) {
     assert.ok(namespaces.includes(namespace), `${namespace} should still be selectable, just not writable`);
     assert.equal(namespaceHasWriteActions(namespace), false, `${namespace} offers a write level it should not`);
@@ -116,7 +116,7 @@ test("denied namespaces are absent from the selectable catalog entirely", () => 
     assert.ok(!namespaces.includes(denied), `${denied} must never be offered as a key scope`);
     assert.ok(!actionsByNamespace().has(denied));
   }
-  assert.equal(namespaces.length, 18);
+  assert.equal(namespaces.length, 19);
 });
 
 test("scopeCatalog reports write support for the UI", () => {
