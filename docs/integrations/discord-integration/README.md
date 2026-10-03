@@ -31,7 +31,7 @@ Add these to the console's `docker-compose.web.yml`:
 environment:
   DUNE_DISCORD_ADAPTER_ENABLED: "true"
   DUNE_BOT_API_TOKEN_FILE: /repo/runtime/secrets/bot-api-token.txt
-  DISCORD_OBSERVER_ROLE_IDS: "role-id-1,role-id-2"
+  DISCORD_PLAYER_ROLE_IDS: "role-id-1,role-id-2"
   DISCORD_ADMIN_ROLE_IDS: "role-id-1"
 ```
 
@@ -72,14 +72,14 @@ Expected response:
 | Route | Method | Description | Access |
 |-------|--------|-------------|--------|
 | `/api/integrations/discord/health` | GET | Adapter health and route listing | Public |
-| `/api/integrations/discord/status` | POST | Server status with maps, containers, listeners | Observer |
-| `/api/integrations/discord/readiness` | POST | Readiness checks (containers, ports, DB) | Observer |
-| `/api/integrations/discord/services` | POST | Service container state | Observer |
-| `/api/integrations/discord/population` | POST | Player count (aggregate only) | Observer |
-| `/api/integrations/discord/version` | GET | Dune stack version | Observer |
-| `/api/integrations/discord/servers` | POST | Game server partitions | Observer |
-| `/api/integrations/discord/ports` | POST | Network port status | Observer |
-| `/api/integrations/discord/db` | POST | Database health | Observer |
+| `/api/integrations/discord/status` | POST | Server status with maps, containers, listeners | Player |
+| `/api/integrations/discord/readiness` | POST | Readiness checks (containers, ports, DB) | Player |
+| `/api/integrations/discord/services` | POST | Service container state | Player |
+| `/api/integrations/discord/population` | POST | Player count (aggregate only) | Player |
+| `/api/integrations/discord/version` | GET | Dune stack version | Player |
+| `/api/integrations/discord/servers` | POST | Game server partitions | Player |
+| `/api/integrations/discord/ports` | POST | Network port status | Player |
+| `/api/integrations/discord/db` | POST | Database health | Player |
 
 ## RBAC Configuration
 
@@ -87,7 +87,7 @@ The adapter supports tiered role-based access. Configure these env vars:
 
 | Variable | Description |
 |----------|-------------|
-| `DISCORD_OBSERVER_ROLE_IDS` | Can access all read-only routes |
+| `DISCORD_PLAYER_ROLE_IDS` | Can access all read-only routes |
 | `DISCORD_ADMIN_ROLE_IDS` | Can access diagnostic mode on status/readiness |
 | `DISCORD_MODERATOR_ROLE_IDS` | Can access population and map data |
 

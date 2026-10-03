@@ -340,18 +340,19 @@ test("steam build id is read from the appmanifest and fails soft to null", async
   assert.equal(await readSteamBuildId({ spawnImpl: () => { throw new Error("no docker"); }, useCache: false }), null);
 });
 
-test("base backup routes resolve to their own actions, and import is admin-only by default", () => {
+test("base backup routes resolve to their own actions, and import is owner-only by default", () => {
   assert.equal(actionForRoute("/api/base-backups", "GET"), "bases:read");
   assert.equal(actionForRoute("/api/base-backups/7/export", "GET"), "bases:export-backup");
   assert.equal(actionForRoute("/api/base-backups/import", "POST"), "bases:import-backup");
   // Nothing else under the path resolves, so it fails closed.
   assert.equal(actionForRoute("/api/base-backups/7/items", "DELETE"), null);
   assert.equal(actionForRoute("/api/base-backups/7/export", "POST"), null);
-  for (const tier of ["owner", "admin"]) assert.equal(evaluate({ tier }, "bases:import-backup"), true);
-  for (const tier of ["moderator", "player", "observer"]) {
+  assert.equal(evaluate({ tier: "owner" }, "bases:import-backup"), true);
+  for (const tier of ["admin", "moderator", "player", "observer"]) {
     assert.equal(evaluate({ tier }, "bases:import-backup"), false);
-    assert.equal(evaluate({ tier }, "bases:read"), true);
   }
+  for (const tier of ["admin", "moderator"]) assert.equal(evaluate({ tier }, "bases:read"), true);
+  for (const tier of ["player", "observer"]) assert.equal(evaluate({ tier }, "bases:read"), false);
   // A hand-authored policy granting bases:mutate must not gain import.
   const policies = { moderator: { version: 1, tier: "moderator", statements: [{ Effect: "Allow", Action: ["bases:read", "bases:mutate"] }] } };
   assert.equal(evaluate({ tier: "moderator" }, "bases:import-backup", policies), false);
@@ -429,11 +430,11 @@ test("updateBaseBackup needs a real change", async () => {
   });
 });
 
-test("base backup editing is admin-only and not carried by a bases write key", () => {
+test("base backup editing is owner-only and not carried by a bases write key", () => {
   assert.equal(actionForRoute("/api/base-backups/7", "PUT"), "bases:edit-backup");
   assert.equal(actionForRoute("/api/base-backups/import", "PUT"), null);
-  for (const tier of ["owner", "admin"]) assert.equal(evaluate({ tier }, "bases:edit-backup"), true);
-  for (const tier of ["moderator", "player", "observer"]) assert.equal(evaluate({ tier }, "bases:edit-backup"), false);
+  assert.equal(evaluate({ tier: "owner" }, "bases:edit-backup"), true);
+  for (const tier of ["admin", "moderator", "player", "observer"]) assert.equal(evaluate({ tier }, "bases:edit-backup"), false);
   assert.equal(scopeAllowsAction("bases", "write", "bases:edit-backup"), false);
   assert.equal(scopeAllowsAction("bases", ["bases:edit-backup"], "bases:edit-backup"), true);
 });
@@ -519,11 +520,11 @@ test("deleting needs the game's base_backup_delete function", async () => {
   });
 });
 
-test("deleting a backup is its own admin-only action", () => {
+test("deleting a backup is its own owner-only action", () => {
   assert.equal(actionForRoute("/api/base-backups/7", "DELETE"), "bases:delete-backup");
   assert.equal(actionForRoute("/api/base-backups/import", "DELETE"), null);
-  for (const tier of ["owner", "admin"]) assert.equal(evaluate({ tier }, "bases:delete-backup"), true);
-  for (const tier of ["moderator", "player", "observer"]) assert.equal(evaluate({ tier }, "bases:delete-backup"), false);
+  assert.equal(evaluate({ tier: "owner" }, "bases:delete-backup"), true);
+  for (const tier of ["admin", "moderator", "player", "observer"]) assert.equal(evaluate({ tier }, "bases:delete-backup"), false);
   assert.equal(scopeAllowsAction("bases", "write", "bases:delete-backup"), false);
   assert.equal(scopeAllowsAction("bases", ["bases:delete-backup"], "bases:delete-backup"), true);
 });
@@ -593,14 +594,14 @@ test("exportLiveBase refuses a base that was picked up after the pre-check, with
   assert.equal(db.calls.txSql.some((sql) => sql.includes("create temporary table live_base_actors")), false);
 });
 
-test("downloading a base backup file, live or picked up, is its own admin-only action", () => {
+test("downloading a base backup file, live or picked up, is its own owner-only action", () => {
   assert.equal(actionForRoute("/api/bases/201/export-backup", "GET"), "bases:export-backup");
   assert.equal(actionForRoute("/api/bases/abc/export-backup", "GET"), "bases:export-backup");
   assert.equal(actionForRoute("/api/base-backups/7/export", "GET"), "bases:export-backup");
   // The blueprint download stays a read.
   assert.equal(actionForRoute("/api/bases/201/export", "GET"), "bases:read");
-  for (const tier of ["owner", "admin"]) assert.equal(evaluate({ tier }, "bases:export-backup"), true);
-  for (const tier of ["moderator", "player", "observer"]) {
+  assert.equal(evaluate({ tier: "owner" }, "bases:export-backup"), true);
+  for (const tier of ["admin", "moderator", "player", "observer"]) {
     assert.equal(evaluate({ tier }, "bases:export-backup"), false, `${tier} must not download base backups`);
   }
   // A hand-authored policy granting bases:read is not consent to it.

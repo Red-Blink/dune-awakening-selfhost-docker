@@ -255,7 +255,7 @@ exported in about 1.6 s and imported in about 0.8 s.
   every item stored in the base and imports as a whole base on any server, so no
   `bases:read` grant covers it. The blueprint download stays `bases:read`.
 - Import is its own action, `bases:import-backup`.
-- Owner and admin reach both through `bases:*`; lower tiers don't.
+- Owner reaches both by default; lower tiers require explicit grants.
 - Both actions are in `LEVEL_EXCLUDED_ACTIONS`, so a key stored as
   `{"bases":"write"}` doesn't get them; they must be named explicitly.
 - Both downloads are rate limited (as admin changes are) and audited as
@@ -305,7 +305,7 @@ new owner, as an import does. A rename or reassign does not touch the base itsel
   (`base_backup_finish_placing`). Only maps where a claim totem has actually been placed on
   this server are offered (400 `invalid_map` otherwise), since social hubs and dungeons
   never allow building. The list response carries them as `maps`.
-- Permission: `bases:edit-backup` (owner/admin via `bases:*`), excluded from API-key
+- Permission: `bases:edit-backup` (owner-only by default), excluded from API-key
   levels like import. Every change is audit-logged as `base-backups.edit` with the before
   and after values.
 
@@ -323,7 +323,7 @@ totem, land claim, storage and items with them), then the backup row.
 - In one transaction, the delete verifies that the backup row and all its links are gone;
   otherwise it rolls back. A backup redeployed meanwhile is a 404.
 - An imported copy is independent: deleting the original leaves it intact.
-- Permission: `bases:delete-backup` (owner/admin via `bases:*`), audit-logged as
+- Permission: `bases:delete-backup` (owner-only by default), audit-logged as
   `base-backups.delete`.
 
 **CI coverage:** `console/api/test/baseBackups.test.js` (mocked) and

@@ -18,6 +18,29 @@
     "Nu6VmPWUMvdPMeB7qErr",
   ]
 
+# Real finding, upstream PR #202 maintainer review: gitleaks' discord-client-id
+# rule matches the synthetic Discord snowflake ("123456789012345678" -- an
+# obviously-fake, sequential-digit placeholder, not a real credential) used
+# across several test fixtures (console/api/test/envFile.test.js,
+# console/api/test/discordOAuthDisable.integration.test.js,
+# console/web/src/features/auth/DiscordSetupWizard.test.tsx). Confirmed via
+# `gitleaks detect --source . --no-git`, then confirming these test files
+# use it purely as fixture data, never a real client ID.
+[[allowlists]]
+  description = "Synthetic Discord client ID used as test fixture data"
+  regexes = [
+    "123456789012345678",
+  ]
+
+# Pre-existing documentation example, not a real credential -- the literal
+# string "local-dev-bot-api" in a curl example showing the Authorization
+# header's shape for a local dev deployment.
+[[allowlists]]
+  description = "Documentation example bearer token, not a real credential"
+  regexes = [
+    "local-dev-bot-api",
+  ]
+
 # NOTE: tests/db-system-backup-test.sh's synthetic secret fixtures
 # (admin-pw-8f2a-real, etc.) do NOT need an allowlist entry here --
 # confirmed directly: `gitleaks detect --source

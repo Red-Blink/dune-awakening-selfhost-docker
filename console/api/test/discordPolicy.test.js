@@ -9,7 +9,7 @@ import {
 } from "../src/integrations/discord/policy.js";
 
 const mapping = {
-  observerRoleIds: ["role-observer"],
+  playerRoleIds: ["role-player"],
   moderatorRoleIds: ["role-moderator"],
   adminRoleIds: ["role-admin"],
   ownerRoleIds: ["role-owner"]
@@ -26,7 +26,7 @@ test("OPS capabilities are granted only to admin and owner tiers", () => {
 
   assert.equal(opsCapabilities.length, 7);
   for (const capability of opsCapabilities) {
-    assert.equal(discordActorCan(actor("role-observer"), mapping, capability), false);
+    assert.equal(discordActorCan(actor("role-player"), mapping, capability), false);
     assert.equal(discordActorCan(actor("role-moderator"), mapping, capability), false);
     assert.equal(discordActorCan(actor("role-admin"), mapping, capability), true);
     assert.equal(discordActorCan(actor("role-owner"), mapping, capability), true);
@@ -51,7 +51,7 @@ test("minTierForCapability returns the lowest tier that actually grants each cap
   // Cross-check against discordActorCan() directly, rather than re-reading
   // CAPABILITY_BY_TIER's shape a second time -- this is an independent
   // verification path, not a restatement of the same table.
-  const roleIdForTier = { public: null, observer: "role-observer", moderator: "role-moderator", admin: "role-admin", owner: "role-owner" };
+  const roleIdForTier = { public: null, player: "role-player", moderator: "role-moderator", admin: "role-admin", owner: "role-owner" };
   for (const capability of Object.values(DISCORD_CAPABILITIES)) {
     const claimedMinTier = minTierForCapability(capability);
     assert.ok(DISCORD_ROLE_TIERS.includes(claimedMinTier), `${capability}'s minTierForCapability() result "${claimedMinTier}" is not a real tier`);
