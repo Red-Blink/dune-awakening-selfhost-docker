@@ -5,6 +5,7 @@ import { SecretInput } from "../../components/SecretInput";
 import { InfoTooltip, KeyValueGrid, StatusPill } from "../../components/common/DisplayPrimitives";
 import { firstDefined, formatUiSentence, friendlyColumnName } from "../../lib/display";
 import { ApiKeysSection } from "./ApiKeysSection";
+import { EncryptedApiSection } from "./EncryptedApiSection";
 
 type SettingsTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
 type PublicDirectorySettings = {
@@ -57,6 +58,7 @@ export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmActi
   const [webPortRedirectUrl, setWebPortRedirectUrl] = useState("");
   const [webPortRedirectCountdown, setWebPortRedirectCountdown] = useState<number | null>(null);
   const [apiKeysOpen, setApiKeysOpen] = useState(false);
+  const [encryptedApiOpen, setEncryptedApiOpen] = useState(false);
   const [serverStartupOpen, setServerStartupOpen] = useState(false);
   const [serverStartupSaving, setServerStartupSaving] = useState(false);
   const [serverStartupResult, setServerStartupResult] = useState<SettingsTaskResult | null>(null);
@@ -363,6 +365,10 @@ export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmActi
             </span>}
           </div>
         </div>}
+      </div>
+      <div className={`playerAdmin_toggle settings-encrypted-api-toggle ${encryptedApiOpen ? "open" : ""}`}>
+        <button className="playerAdmin_toggleHeader" aria-label={encryptedApiOpen ? "Collapse Encrypted API Access" : "Expand Encrypted API Access"} onClick={() => setEncryptedApiOpen(!encryptedApiOpen)}>{encryptedApiOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Encrypted API Access</span></button>
+        {encryptedApiOpen && <div className="playerAdmin_toggleBody"><EncryptedApiSection /></div>}
       </div>
       <div className={`playerAdmin_toggle settings-api-keys-toggle ${apiKeysOpen ? "open" : ""}`}>
         <button className="playerAdmin_toggleHeader" aria-label={apiKeysOpen ? "Collapse API Keys" : "Expand API Keys"} onClick={() => setApiKeysOpen(!apiKeysOpen)}>{apiKeysOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>API Keys</span></button>

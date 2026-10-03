@@ -40,6 +40,8 @@ import { looksLikeTar, mintSystemBackupName, normalizeImportedSystemMetadata, re
 import { createTarHeader, tarArchiveLength, tarPadding, TAR_TRAILER_BYTES, createBackupDownloadArchive, enrichBackupRows, nextImportedBackupName, normalizeImportedBackupMetadata, readCurrentBattlegroupId, validBackupDownloadName } from "./services/backups.js";
 import { createMemoryBalancer } from "./services/memoryBalancer.js";
 import { collectContainerHealth } from "./services/containerHealth.js";
+import { createEncryptedApi, EncryptedApiError } from "./services/encryptedApi.js";
+import { tlsClientAddress } from "./services/tlsClientAddress.js";
 import { parseMemorySwapStatus } from "./services/memorySwap.js";
 import { createDeathPoller } from "./deathPoller.js";
 import { updateEnvFileValue as updateEnvValue } from "./services/envFile.js";
@@ -167,6 +169,7 @@ function shouldNoteApiKeyAuthThrottle(failureKey, at = Date.now()) {
   return true;
 }
 const apiKeys = createApiKeyStore({ file: config.apiKeysFile });
+const encryptedApi = createEncryptedApi({ repoRoot: config.repoRoot });
 // Proof that a restore was previewed, for the apply that follows it. In memory
 // beside the sessions it is keyed by -- see the module header for why it is not
 // persisted.
@@ -298,8 +301,14 @@ process.on("unhandledRejection", (error) => {
 });
 
 createServer(async (req, res) => {
+  req.trustedClientAddress = tlsClientAddress(req, config.repoRoot);
+  if (req.trustedClientAddress === null) {
+    res.writeHead(403, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: "Invalid encrypted API forwarding identity." }));
+    return;
+  }
   if (config.allowedIps.length) {
-    const remoteIp = (req.socket.remoteAddress || "").replace(/^::ffff:/, "");
+    const remoteIp = req.trustedClientAddress;
     if (!config.allowedIps.includes(remoteIp)) {
       res.writeHead(403, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "Access denied: IP not in ADMIN_ALLOWED_IPS" }));
@@ -956,6 +965,8 @@ async function handleApi(req, res) {
     return json(res, 200, { keys: apiKeys.list() });
   }
   if (path === "/api/settings/api-keys" && req.method === "POST") return apiKeyCreateRoute(req, res);
+  if (path === "/api/settings/encrypted-api" && req.method === "GET") return encryptedApiRoute(res, () => encryptedApi.status());
+  if (path === "/api/settings/encrypted-api" && req.method === "POST") return encryptedApiToggleRoute(req, res);
   if (path.startsWith("/api/settings/api-keys/")) return apiKeyItemRoute(req, res, path);
   if (path === "/api/settings/iam/policy/test" && req.method === "POST") {
     const body = await readJson(req);
@@ -2712,6 +2723,24 @@ async function adminPasswordRoute(req, res) {
   return json(res, 200, { ok: true });
 }
 
+async function encryptedApiRoute(res, action) {
+  try {
+    return json(res, 200, await action(), { "cache-control": "no-store" });
+  } catch (error) {
+    if (error instanceof EncryptedApiError) return json(res, error.status, { error: error.message });
+    throw error;
+  }
+}
+
+async function encryptedApiToggleRoute(req, res) {
+  const body = await readJson(req);
+  return encryptedApiRoute(res, async () => {
+    const status = await encryptedApi.setEnabled(body?.enabled);
+    audit(config, req, body.enabled ? "settings.encrypted-api-enable" : "settings.encrypted-api-disable", { port: status.port });
+    return status;
+  });
+}
+
 async function apiKeyCreateRoute(req, res) {
   const body = await readJson(req);
   const created = await apiKeys.create({
@@ -2825,6 +2854,7 @@ function scheduleConsoleRestart(port) {
       "docker compose -f docker-compose.web.yml build redblink-dune-docker-console >> runtime/generated/console-restart.log 2>&1",
       "docker rm -f redblink-dune-docker-console >> runtime/generated/console-restart.log 2>&1 || true",
       "docker compose -f docker-compose.web.yml up -d redblink-dune-docker-console >> runtime/generated/console-restart.log 2>&1",
+      "if [ -x runtime/scripts/tls-front.sh ]; then runtime/scripts/tls-front.sh reconcile >> runtime/generated/console-restart.log 2>&1; fi",
       `echo "[$(date -Is)] Dune Docker Console restart command finished" >> runtime/generated/console-restart.log`
     ].join("\n");
     const child = spawn("docker", buildSelfUpdateHelperDockerArgs({
@@ -6716,9 +6746,11 @@ function mockCommand(operation) {
 
 // Best-effort client address, IPv4-mapped IPv6 unwrapped. No X-Forwarded-For
 // handling, matching every other limiter here -- behind a reverse proxy this
-// records the proxy, not the caller. Per-key limits are unaffected: they key
+// records the proxy, not the caller, unless the project TLS front supplies a
+// verified forwarding identity. Per-key limits are unaffected: they key
 // on the key id, not on this.
 function remoteIpOf(req) {
+  if (req.trustedClientAddress !== undefined) return req.trustedClientAddress || "";
   return (req?.socket?.remoteAddress || "").replace(/^::ffff:/, "") || null;
 }
 
