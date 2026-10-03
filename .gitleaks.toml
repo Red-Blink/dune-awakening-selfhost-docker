@@ -18,6 +18,15 @@
     "Nu6VmPWUMvdPMeB7qErr",
   ]
 
+# Pre-existing documentation example, not a real credential -- the literal
+# string "local-dev-bot-api" in a curl example showing the Authorization
+# header's shape for a local dev deployment.
+[[allowlists]]
+  description = "Documentation example bearer token, not a real credential"
+  regexes = [
+    "local-dev-bot-api",
+  ]
+
 # NOTE: tests/db-system-backup-test.sh's synthetic secret fixtures
 # (admin-pw-8f2a-real, etc.) do NOT need an allowlist entry here --
 # confirmed directly: `gitleaks detect --source
