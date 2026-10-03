@@ -100,6 +100,7 @@ test("self-update check prefers the official upstream release repo in fork check
   mkdirSync(join(dir, "runtime", "scripts"), { recursive: true });
   copyFileSync(join(repoRoot, "runtime", "scripts", "self-update.sh"), join(dir, "runtime", "scripts", "self-update.sh"));
   copyFileSync(join(repoRoot, "runtime", "scripts", "compose-project.sh"), join(dir, "runtime", "scripts", "compose-project.sh"));
+  copyFileSync(join(repoRoot, "runtime", "scripts", "http-rate-limit.py"), join(dir, "runtime", "scripts", "http-rate-limit.py"));
   chmodSync(join(dir, "runtime", "scripts", "self-update.sh"), 0o700);
   writeFileSync(join(dir, "VERSION"), "v1.3.37\n");
 
@@ -144,6 +145,7 @@ test("self-update check falls back to the public release redirect when the GitHu
   mkdirSync(join(dir, "runtime", "scripts"), { recursive: true });
   copyFileSync(join(repoRoot, "runtime", "scripts", "self-update.sh"), join(dir, "runtime", "scripts", "self-update.sh"));
   copyFileSync(join(repoRoot, "runtime", "scripts", "compose-project.sh"), join(dir, "runtime", "scripts", "compose-project.sh"));
+  copyFileSync(join(repoRoot, "runtime", "scripts", "http-rate-limit.py"), join(dir, "runtime", "scripts", "http-rate-limit.py"));
   chmodSync(join(dir, "runtime", "scripts", "self-update.sh"), 0o700);
   writeFileSync(join(dir, "VERSION"), "v1.3.97\n");
 
@@ -217,6 +219,7 @@ test("archive self-update replaces project files and preserves local state", asy
     join(stagingDir, "candidate", "runtime", "scripts", "compose-project.sh")
   );
   copyFileSync(join(repoRoot, "VERSION"), join(stagingDir, "candidate", "VERSION"));
+  copyFileSync(join(repoRoot, "runtime/scripts/http-rate-limit.py"), join(stagingDir, "candidate/runtime/scripts/http-rate-limit.py"));
   const repackResult = spawnSync("tar", ["-czf", archive, "-C", stagingDir, "candidate"]);
   assert.equal(repackResult.status, 0, repackResult.stderr?.toString());
   cpSync(join(stagingDir, "candidate"), installDir, { recursive: true });
@@ -366,6 +369,40 @@ exit 0
   }
 });
 
+test("self-update preserves a confirmed GitHub limit across the parent exit trap", async () => {
+  const root = mkdtempSync(join(tmpdir(), "arrakis-self-update-http-limit-"));
+  const runId = "123e4567-e89b-42d3-a456-426614174005";
+  mkdirSync(join(root, "runtime/scripts"), { recursive: true });
+  for (const file of ["self-update.sh", "compose-project.sh", "http-rate-limit.py"]) {
+    copyFileSync(join(repoRoot, "runtime/scripts", file), join(root, "runtime/scripts", file));
+  }
+  writeFileSync(join(root, "VERSION"), "v1.4.12\n");
+  const server = createServer((_req, res) => {
+    res.writeHead(403, { "content-type": "application/json", "x-ratelimit-remaining": "0", "x-ratelimit-reset": "4102444800" });
+    res.end(JSON.stringify({ message: "API rate limit exceeded", secret: "never-display-this" }));
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const result = await runProcess("bash", ["runtime/scripts/self-update.sh", "check"], {
+      cwd: root,
+      env: { ...process.env, DUNE_SELF_UPDATE_API_BASE: base, DUNE_SELF_UPDATE_WEB_BASE: base,
+        DUNE_SELF_UPDATE_RUN_ID: runId, NO_PROXY: "127.0.0.1,localhost", no_proxy: "127.0.0.1,localhost" }
+    });
+    assert.equal(result.status, 2, result.stderr || result.stdout);
+    assert.match(result.stderr, /GitHub request limit reached\. Try again after 2100-01-01 00:00:00 UTC\./);
+    const status = readFileSync(join(root, "runtime/generated/self-update-status", `${runId}.env`), "utf8");
+    assert.match(status, /^state=failed$/m);
+    assert.match(status, /^message=GitHub request limit reached\. Try again after 2100-01-01 00:00:00 UTC\.$/m);
+    assert.doesNotMatch(result.stdout + result.stderr + status, /never-display-this/);
+    assert.equal(readFileSync(join(root, "VERSION"), "utf8"), "v1.4.12\n");
+  } finally {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("archive self-update times out a stalled download before changing installed files", async () => {
   const root = mkdtempSync(join(tmpdir(), "arrakis-self-update-download-timeout-"));
   const fakeBin = join(root, "bin");
@@ -374,6 +411,7 @@ test("archive self-update times out a stalled download before changing installed
   mkdirSync(fakeBin);
   copyFileSync(join(repoRoot, "runtime", "scripts", "self-update.sh"), join(root, "runtime", "scripts", "self-update.sh"));
   copyFileSync(join(repoRoot, "runtime", "scripts", "compose-project.sh"), join(root, "runtime", "scripts", "compose-project.sh"));
+  copyFileSync(join(repoRoot, "runtime", "scripts", "http-rate-limit.py"), join(root, "runtime", "scripts", "http-rate-limit.py"));
   chmodSync(join(root, "runtime", "scripts", "self-update.sh"), 0o700);
   writeFileSync(join(root, "VERSION"), "v1.4.12\n");
   writeFileSync(join(fakeBin, "docker"), "#!/usr/bin/env bash\nexit 0\n", { mode: 0o700 });
@@ -436,6 +474,7 @@ test("self-update refuses a concurrent install and records a durable busy result
   mkdirSync(join(root, "runtime", "generated"), { recursive: true });
   copyFileSync(join(repoRoot, "runtime", "scripts", "self-update.sh"), join(root, "runtime", "scripts", "self-update.sh"));
   copyFileSync(join(repoRoot, "runtime", "scripts", "compose-project.sh"), join(root, "runtime", "scripts", "compose-project.sh"));
+  copyFileSync(join(repoRoot, "runtime", "scripts", "http-rate-limit.py"), join(root, "runtime", "scripts", "http-rate-limit.py"));
   writeFileSync(join(root, "VERSION"), "v0.0.1\n");
 
   const holder = spawn("flock", [join(root, "runtime", "generated", "self-update.lock"), "sleep", "10"], { stdio: "ignore" });
@@ -466,6 +505,7 @@ test("web console rebuild stops at the configured build timeout", async () => {
   mkdirSync(fakeBin);
   copyFileSync(join(repoRoot, "runtime", "scripts", "self-update.sh"), join(root, "runtime", "scripts", "self-update.sh"));
   copyFileSync(join(repoRoot, "runtime", "scripts", "compose-project.sh"), join(root, "runtime", "scripts", "compose-project.sh"));
+  copyFileSync(join(repoRoot, "runtime", "scripts", "http-rate-limit.py"), join(root, "runtime", "scripts", "http-rate-limit.py"));
   writeFileSync(join(root, "VERSION"), "v0.0.1\n");
   writeFileSync(join(root, "docker-compose.web.yml"), "services: {}\n");
   writeFileSync(join(fakeBin, "docker"), "#!/usr/bin/env bash\nexit 0\n", { mode: 0o700 });

@@ -1,5 +1,6 @@
-import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync, openSync, closeSync, readSync, fstatSync } from "node:fs";
 import { join } from "node:path";
+import { downloadFailureMessage } from "./downloadFailure.js";
 
 const RUN_ID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
 const STATES = new Set(["running", "succeeded", "failed"]);
@@ -55,6 +56,10 @@ export function readSelfUpdateStatus(repoRoot, runId, options = {}) {
     finishedAt: safeTimestamp(fields.finished_at)
   };
   const now = Number.isFinite(options.now) ? options.now : Date.now();
+  if (result.state === "failed") {
+    const failure = failureFromRunLog(repoRoot, cleanRunId, now);
+    if (failure) result.message = failure;
+  }
   const updatedAt = Date.parse(result.updatedAt || result.startedAt || "");
   const consoleStartedAt = Number(options.consoleStartedAt);
   const helperStartedAt = Date.parse(result.startedAt || "");
@@ -80,6 +85,26 @@ export function readSelfUpdateStatus(repoRoot, runId, options = {}) {
     };
   }
   return result;
+}
+
+function failureFromRunLog(repoRoot, runId, now) {
+  let fd;
+  try {
+    fd = openSync(join(repoRoot, "runtime", "generated", "web-self-update.log"), "r");
+    const size = fstatSync(fd).size;
+    const head = Buffer.alloc(Math.min(size, 4096));
+    readSync(fd, head, 0, head.length, 0);
+    // The shared log can belong to a newer attempt. Never relabel an old task
+    // using another run's errors, and bound reads even for huge build logs.
+    if (!head.toString().split(/\r?\n/).includes(`Console update run: ${runId}`)) return "";
+    const tail = Buffer.alloc(Math.min(size, 64 * 1024));
+    readSync(fd, tail, 0, tail.length, size - tail.length);
+    return downloadFailureMessage(tail.toString(), now);
+  } catch {
+    return "";
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
 }
 
 function validateRunId(runId) {

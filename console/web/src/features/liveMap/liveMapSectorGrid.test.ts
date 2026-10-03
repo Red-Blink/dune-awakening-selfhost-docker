@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { LiveMapConfig } from "../../api/liveMap";
-import { labelAnchorInView, sectorForWorldPoint, sectorGridFor } from "./liveMapSectorGrid";
+import { labelAnchorInView, projectSectorLabels, SECTOR_GRID, sectorForWorldPoint, sectorGridFor } from "./liveMapSectorGrid";
+import { liveMapCamera, terrainViewport } from "./liveMapGeometry";
+import { projectToScreen, screenToWorldAtZ } from "./terrain/terrainCamera";
 
 const DEEP_DESERT: LiveMapConfig = {
   key: "DeepDesert", label: "The Deep Desert", actorMap: "DeepDesert",
@@ -168,5 +170,61 @@ describe("labels survive being zoomed out", () => {
     const cell = grid.labels.find((l) => l.text === "E5")!;
     const view = { left: cell.x1 - 4, top: cell.y0, right: cell.x1 + 500, bottom: cell.y1 };
     expect(labelAnchorInView(cell, view, 20)).toBeNull();
+  });
+});
+
+describe("SECTOR_GRID", () => {
+  it("is the grid the sector lookup uses: its lines are where the sector changes", () => {
+    const { x0, y0, cell, divisions } = SECTOR_GRID;
+    expect(divisions).toBe(9);
+    for (let k = 0; k < divisions; k++) {
+      const mid = (v0: number) => v0 + (k + 0.5) * cell;
+      // Either side of a vertical line, one column apart; either side of a horizontal one, one row.
+      const left = sectorForWorldPoint(x0 + (k + 1) * cell - 1, mid(y0))!;
+      const right = sectorForWorldPoint(x0 + (k + 1) * cell + 1, mid(y0));
+      if (k < divisions - 1) expect(Number(right!.slice(1))).toBe(Number(left.slice(1)) + 1);
+      else expect(right).toBeNull();
+      const above = sectorForWorldPoint(mid(x0), y0 + (k + 1) * cell - 1)!;
+      const below = sectorForWorldPoint(mid(x0), y0 + (k + 1) * cell + 1);
+      if (k < divisions - 1) expect(below![0].charCodeAt(0)).toBe(above[0].charCodeAt(0) - 1);
+      else expect(below).toBeNull();
+    }
+    expect(sectorForWorldPoint(x0 - 1, y0 + 1)).toBeNull();
+    expect(sectorForWorldPoint(x0 + 1, y0 + 1)).toBe("I1");
+  });
+});
+
+describe("projectSectorLabels", () => {
+  const deg = (d: number) => (d * Math.PI) / 180;
+  const W = 900;
+  const H = 700;
+  const PIVOT = 5000;
+  /** The panel's camera for a zoom, centred on a map pixel. */
+  function cameraAt(zoom: number, px: number, py: number, tiltDeg: number, yawDeg: number) {
+    const viewport = terrainViewport(DEEP_DESERT, zoom, px * zoom - W / 2, py * zoom - H / 2, W, H);
+    return liveMapCamera(DEEP_DESERT, zoom, viewport, deg(tiltDeg), deg(yawDeg), PIVOT)!;
+  }
+
+  it("labels each sector with the sector that is actually under the label", () => {
+    for (const [zoom, tilt, yaw] of [[0.2, 0, 35], [0.2, 45, 0], [0.5, 60, 130], [2, 55, -70], [8, 60, 20]]) {
+      const camera = cameraAt(zoom, 2048, 2048, tilt, yaw);
+      const labels = projectSectorLabels(camera, 20, 900);
+      expect(labels.length).toBeGreaterThan(0);
+      for (const label of labels) {
+        const ground = screenToWorldAtZ(camera, label.sx, label.sy, PIVOT);
+        expect(sectorForWorldPoint(ground.x, ground.y)).toBe(label.text);
+        // ...and it is inside the viewport, clear of its edge.
+        expect(label.sx).toBeGreaterThanOrEqual(20);
+        expect(label.sx).toBeLessThanOrEqual(W - 20);
+        expect(label.sy).toBeGreaterThanOrEqual(20);
+        expect(label.sy).toBeLessThanOrEqual(H - 20);
+      }
+    }
+  });
+
+  it("still labels the sector in view when one cell is larger than the viewport", () => {
+    // Zoom 8, centred in E5's middle: the cell's edges are all off-screen.
+    const labels = projectSectorLabels(cameraAt(8, 2048, 2048, 50, 25), 20, 900);
+    expect(labels.map((label) => label.text)).toEqual(["E5"]);
   });
 });

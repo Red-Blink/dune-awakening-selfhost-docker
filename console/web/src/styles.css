@@ -2933,6 +2933,34 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 }
 .live-map-sidebar { display: grid; gap: 12px; }
 .live-map-main { min-width: 0; display: grid; gap: 10px; }
+.live-map-stage { position: relative; min-width: 0; }
+.live-map-compass {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 6;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.live-map-compass svg { display: block; width: 100%; height: 100%; }
+.live-map-compass .dial { fill: rgba(16, 19, 22, .82); stroke: var(--border-strong); stroke-width: 1.5; }
+.live-map-compass:hover .dial, .live-map-compass:focus-visible .dial { stroke: var(--accent); }
+.live-map-compass .needle-north { fill: var(--accent-strong); }
+.live-map-compass .needle-south { fill: var(--muted); opacity: .55; }
+.live-map-compass text {
+  fill: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.live-map-compass text.north { fill: var(--text-strong); font-size: 11px; }
 .live-map-search-section { display: grid; gap: 7px; }
 .live-map-search-control { display: flex; align-items: stretch; gap: 7px; }
 .live-map-search-control input { min-width: 0; }
@@ -3089,7 +3117,28 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   flex: 0 0 24px;
 }
 .live-map-legend-dot-spacer { flex: 0 0 auto; width: 28px; height: 24px; }
-.live-map-sector-grid-layer { border-bottom: 1px solid rgba(198, 139, 74, .2); margin-bottom: 4px; padding-bottom: 8px; }
+/* The terrain overlays are their own group above the marker legend; the divider
+   sits under the whole group. */
+.live-map-overlay-group {
+  display: grid;
+  gap: 4px;
+  border-bottom: 1px solid rgba(198, 139, 74, .2);
+  margin-bottom: 4px;
+  padding-bottom: 8px;
+}
+.live-map-elevation-swatch {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  border: 1px solid rgba(198, 139, 74, .75);
+  border-radius: 4px;
+  /* stacked contours, to read as elevation rather than as a grid */
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 4px,
+    rgba(198, 139, 74, .75) 4px 5px);
+  flex: 0 0 24px;
+}
 .live-map-sector-grid-swatch {
   width: 24px;
   min-width: 24px;
@@ -3103,19 +3152,17 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 }
 .live-map-frame {
   position: relative;
-  /* Both maps are square (4096x4096) -- keeping the box itself square
-     (rather than width:100%; height:82vh independently) is what makes
-     "contain" fit actually fill it with no blank top/bottom margin.
-     width:min(100%, 82vh) picks whichever of the column's width or the
-     82vh height budget is tighter, and aspect-ratio derives the other
-     dimension from that, so it still grows with available space (the
-     original ask) without reintroducing letterboxing (found live on
-     dune2 after the 920px cap was dropped: the frame got taller than
-     wide, so the square map no longer reached the frame's edges). */
+  /* Both maps are square (4096x4096), so the box is square at the column's
+     full width -- never taller than wide, which left the map short of the
+     frame's edges -- but capped at the window's height less the toolbar
+     above it, so the whole map fits without scrolling the page. A wide window
+     then centres the flat map at fit; tilted, the extra width shows past the edge. */
   width: 100%;
   aspect-ratio: 1 / 1;
   min-width: 560px;
   min-height: 560px;
+  max-height: calc(100vh - 110px);
+  max-height: calc(100dvh - 110px);
   overflow: hidden;
   overscroll-behavior: contain;
   touch-action: none;
@@ -3126,7 +3173,13 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 }
 .live-map-frame.dragging { cursor: grabbing; user-select: none; }
 .live-map-frame.dragging-player { cursor: grabbing; user-select: none; }
-.live-map-canvas { position: relative; background: #101316; }
+/* Centred when narrower than the frame (fit zoom in a wide window); no effect once wider. */
+.live-map-canvas { position: relative; margin-inline: auto; background: #101316; }
+/* A marker at the viewport's edge must not stretch the scroll area. `clip`, so
+   this never becomes a scroller. The layer, not the map, so markers still show
+   where the tilted view runs past a map narrower than the frame. */
+.live-map-canvas.is-3d .live-map-marker-layer { overflow: clip; }
+.live-map-toolbar input[type="range"].live-map-tilt-range { width: 110px; }
 .live-map-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; user-select: none; pointer-events: none; z-index: 0; }
 /* The terrain canvas covers the frame's viewport, not the scaled map: at
    maximum zoom the map is 16384px, beyond MAX_TEXTURE_SIZE on many GPUs. It is
@@ -3140,6 +3193,8 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   display: block;
   pointer-events: none;
   will-change: transform;
+  /* Tilted, it can be wider than the map (see terrainViewport's fill). */
+  max-width: none;
 }
 .live-map-placeholder { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(circle at center, #251d14, #07090b 72%); color: #ffd08a; border: 1px dashed #514232; }
 /* Sits between the map and the markers. Drawn in map-pixel space via viewBox,
@@ -3149,8 +3204,10 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
    so the grid stays the same weight at every zoom rather than thickening as you
    zoom in. Kept hairline-thin and dark: it is a reference overlay, and terrain
    detail has to stay readable through it. */
-.live-map-sector-grid .lines line { stroke: rgba(16, 11, 4, .8); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.live-map-sector-grid .lines line { stroke: rgba(16, 11, 4, .8); stroke-width: 1; vector-effect: non-scaling-stroke; fill: none; }
 .live-map-sector-grid .lines line.edge { stroke: rgba(16, 11, 4, .95); stroke-width: 2; }
+/* Tilted, only the labels are here, in viewport pixels: the terrain draws the lines. */
+.live-map-sector-grid.is-3d { overflow: hidden; max-width: none; }
 /* font-size is set inline as viewBox units divided by zoom, so the label stays
    a constant size on screen. Sizing it in viewBox units alone would scale it
    with the map -- at maximum zoom a cell label would render ~368px tall. */

@@ -8,6 +8,11 @@ function failedTask(lines: string[]): Task {
 }
 
 describe("update failure summary", () => {
+  it("keeps provider rate-limit guidance ahead of earlier Steam errors", () => {
+    const task = failedTask(["Error! App '4754530' state is 0x6 after update job."]);
+    task.errorMessage = "Docker Hub request limit reached. Try again later; no retry time was provided.";
+    expect(conciseTaskError(task)).toBe(task.errorMessage);
+  });
   it("shows the lifecycle refusal instead of a successful SteamCMD invocation", () => {
     const reason = "Another Battlegroup operation is running. Wait for it to finish, then retry the game update. No update files were changed.";
     expect(conciseTaskError(failedTask([command, reason]))).toBe(reason);

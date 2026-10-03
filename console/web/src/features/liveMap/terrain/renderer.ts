@@ -1,7 +1,12 @@
-import { BFS, BVS, CFS, FS, RFS, RVS, VS } from "./shaders";
-import { buildDrawCalls, depthRange, orthoFromWorldRect, applyCanvasSize } from "./terrainGeometry";
+import { BFS, BVS, CFS, DFS, FS, RFS, RVS, VS } from "./shaders";
+import { invert4, isOccluded } from "./terrainOcclusion";
+import type { DepthGrid } from "./terrainOcclusion";
+import { buildDrawCalls, interpolateHeightField, markHoveringRock, cullInstances, depthRange, instanceCircles, INSTANCE_FLOATS, orthoFromWorldRect, applyCanvasSize, withOutside } from "./terrainGeometry";
+import type { CulledDraw } from "./terrainGeometry";
+import { cameraClipMatrix, cullRectForCamera, scaleAt, screenToWorldAtZ } from "./terrainCamera";
+import type { TerrainCamera } from "./terrainCamera";
 import type { LayoutAssets, SharedAssets } from "./terrainAssets";
-import type { TerrainDrawCall, TerrainView } from "./types";
+import type { SectorGridSpec, TerrainDrawCall, TerrainView } from "./types";
 
 /**
  * The Deep Desert terrain renderer: framework-free WebGL2. Ported from the
@@ -9,8 +14,8 @@ import type { TerrainDrawCall, TerrainView } from "./types";
  *
  * Two rules it is built on, because the Live Map panel owns pan and zoom:
  *
- * - **No camera.** It is handed the world rect currently in view and projects
- *   onto exactly that, so terrain and markers share one mapping.
+ * - **No camera of its own.** Top-down it is handed the world rect in view;
+ *   tilted, a camera the panel built from the same scroll and zoom.
  * - **No render loop.** `draw()` is synchronous and runs only when something
  *   changed; this console sits open for hours and must not pin a GPU.
  */
@@ -39,15 +44,60 @@ const SUN: [number, number, number] = [-0.4, -0.5, 0.77];
 const VOID_COLOUR: [number, number, number] = [0.3, 0.26, 0.22];
 const INSTANCE_STRIDE = 56; // 14 float32: mat3, translation, iMat, lift
 const INSTANCE_OFFSETS = [0, 12, 24, 36, 48, 52];
+const UV_LOCATION = 8;
+// Instances under this radius, in framebuffer pixels, are skipped. Not 1.0:
+// POI hulls are built from sub-pixel pieces and would vanish from the overview.
+const CULL_MIN_RADIUS_PX = 0.5;
+// How far past the mapped square the tilted view draws, world uu. The outside
+// rock that ships is limited to the same distance, so none is sliced by the clip.
+const EDGE_APRON = 375000;
+// CSS pixels per texel of the depth copy markers are tested against.
+const OCCLUSION_DIV = 4;
+// Tilt by which rock has fully eased over to the tilted lighting.
+const SIDE_LIT_TILT = (25 * Math.PI) / 180;
+// How far above a marker (world uu) the terrain in front must stand to hide it.
+// The slack keeps a marker visible on or in the coarse mesh it belongs to.
+const OCCLUSION_TOLERANCE = 3000;
+const ATTRIBS = 9; // locations 0..8, cleared around every pass
 
 export type DeepDesertRenderer = {
   readonly ready: boolean;
   setAssets(shared: SharedAssets, layout: LayoutAssets): void;
   resize(cssWidth: number, cssHeight: number, dpr: number): void;
   setView(view: TerrainView): void;
+  /** Draw through a 3D camera instead of a world rect; `setView` returns to the rect. */
+  setCamera(camera: TerrainCamera): void;
+  /**
+   * The world point drawn at a viewport pixel (CSS px), read back from the GPU.
+   * Null where nothing is drawn or the GPU cannot render to float (`canPick`).
+   */
+  pick(sx: number, sy: number): { x: number; y: number; z: number } | null;
+  /**
+   * Whether terrain stands between a world point and the eye, from a recent
+   * frame's depth (`onOcclusion` fires when it is renewed). Tilted views only.
+   */
+  occluded(x: number, y: number, z: number): boolean;
+  readonly canPick: boolean;
+  /** Faint elevation banding on rock and sand. Off by default. */
+  setElevationLines(on: boolean): void;
+  /** The sector grid, drawn on the terrain through the 3D camera only; null for none. */
+  setSectorGrid(grid: SectorGridSpec | null): void;
   draw(): void;
   dispose(): void;
 };
+
+/**
+ * Banding intervals in world uu for a given scale, as `[rock, sand]`: a fixed
+ * base that coarsens as you zoom out, snapped to a 1-2-5 sequence. Sand is
+ * eight times coarser, capped so it never exceeds the dune relief.
+ */
+export function elevationIntervals(uuPerPixel: number): [number, number] {
+  const target = Math.max(250, uuPerPixel * 1.5);
+  const p = Math.pow(10, Math.floor(Math.log10(Math.max(target, 1e-6))));
+  const r = target / p;
+  const rock = p * (r < 1.5 ? 1 : r < 3.5 ? 2 : r < 7.5 ? 5 : 10);
+  return [rock, Math.min(rock * 8, 2500)];
+}
 
 export type RendererOptions = {
   /**
@@ -56,6 +106,8 @@ export type RendererOptions = {
    * image rather than leave a blank canvas.
    */
   onContextLost?: () => void;
+  /** Fired when what the terrain hides has been re-measured. */
+  onOcclusion?: () => void;
 };
 
 function compile(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
@@ -94,6 +146,8 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
   const compressedFormats = gl.getExtension("EXT_texture_compression_bptc");
   if (!compressedFormats) throw new Error("EXT_texture_compression_bptc is not available");
   const bptc: EXT_texture_compression_bptc = compressedFormats;
+  // Optional: without it the rock draws untextured.
+  const s3tc = gl.getExtension("WEBGL_compressed_texture_s3tc");
   // Order-independent weighted blending wants a float accumulator. Without it
   // the blend still works, just flatter -- not a reason to refuse to draw.
   const floatBuffer = !!gl.getExtension("EXT_color_buffer_float");
@@ -103,6 +157,7 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
   const resolve = link(gl, RVS, RFS);
   const backdrop = link(gl, BVS, BFS);
   const decode = link(gl, RVS, CFS);
+  const depthCopy = link(gl, RVS, DFS);
 
   const u = (program: WebGLProgram, name: string) => gl.getUniformLocation(program, name);
   const t = {
@@ -111,16 +166,21 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
     feather: u(terrain, "uFeather"), hf: u(terrain, "uHF"), hfMode: u(terrain, "uHFMode"),
     hn: u(terrain, "uHN"), hStep: u(terrain, "uHStep"), hx0: u(terrain, "uHX0"), hy0: u(terrain, "uHY0"),
     hzlo: u(terrain, "uHZlo"), hzhi: u(terrain, "uHZhi"), wScale: u(terrain, "uWScale"),
-    bias: u(terrain, "uBias"), lift: u(terrain, "uLift"), patchCut: u(terrain, "uPatchCut"),
+    bias: u(terrain, "uBias"), lift: u(terrain, "uLift"), skirtFrom: u(terrain, "uSkirtFrom"), footZ: u(terrain, "uFootZ"), patchCut: u(terrain, "uPatchCut"),
     patchFeather: u(terrain, "uPatchFeather"), patchCol: u(terrain, "uPatchCol"), poiCol: u(terrain, "uPoiCol"),
     brk: u(terrain, "uBrk"), brkTile: u(terrain, "uBrkTile"), brkAmp: u(terrain, "uBrkAmp"),
     clipRaise: u(terrain, "uClipRaise"), prepass: u(terrain, "uPrepass"), view: u(terrain, "uV"),
     d1: u(terrain, "uD1"), d2: u(terrain, "uD2"), tile: u(terrain, "uTile"),
-    detStr: u(terrain, "uDetStr"), detail: u(terrain, "uDetail")
+    detStr: u(terrain, "uDetStr"), detail: u(terrain, "uDetail"),
+    con: u(terrain, "uCon"), conStep: u(terrain, "uConStep"), conStepS: u(terrain, "uConStepS"),
+    rock: u(terrain, "uRock"), texOn: u(terrain, "uTexOn"), texLayer: u(terrain, "uTexLayer"), pick: u(terrain, "uPick"),
+    texGain: u(terrain, "uTexGain"), apron: u(terrain, "uApron"),
+    sideLit: u(terrain, "uSideLit"), grid: u(terrain, "uGrid"), gridPx: u(terrain, "uGridPx")
   };
   const r = { tex: u(resolve, "uT"), texel: u(resolve, "uTexel"), ss: u(resolve, "uSS") };
   const b = { vp: u(backdrop, "uVP"), c: u(backdrop, "uC"), half: u(backdrop, "uHalf"), z: u(backdrop, "uZ") };
   const decodeTex = u(decode, "uT");
+  const depthCopyTex = u(depthCopy, "uD");
 
   const quad = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, quad);
@@ -135,12 +195,6 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
    * once on the GPU into an RGBA8 copy that can carry a real mip chain.
    */
   function decodeToMipped(raw: Uint8Array, size: number): WebGLTexture {
-    const compressed = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, compressed);
-    gl.compressedTexImage2D(gl.TEXTURE_2D, 0, bptc.COMPRESSED_RGBA_BPTC_UNORM_EXT, size, size, 0, raw);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
     const decoded = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, decoded);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -150,6 +204,58 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
     const fb = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, decoded, 0);
+    blitCompressed(raw, size, bptc.COMPRESSED_RGBA_BPTC_UNORM_EXT);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.deleteFramebuffer(fb);
+
+    gl.bindTexture(gl.TEXTURE_2D, decoded);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    return decoded;
+  }
+
+  /**
+   * The rock diffuse as an RGBA8 texture array, one layer per family. A 1x1
+   * placeholder without S3TC: the sampler must always have something bound.
+   */
+  function decodeRockArray(raw: Uint8Array, size: number, layers: number): { texture: WebGLTexture; real: boolean } {
+    const texture = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
+    // Mirrored, not clamped: a cliff textured from the side runs its height past
+    // the texture's edge. Inside 0..1 the two sample alike.
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    if (!s3tc || !layers || !size) {
+      gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, 1, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      return { texture, real: false };
+    }
+    gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, size, size, layers, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    const layerBytes = (size / 4) * (size / 4) * 8;
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    for (let layer = 0; layer < layers; layer++) {
+      gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, texture, 0, layer);
+      blitCompressed(raw.subarray(layer * layerBytes, (layer + 1) * layerBytes), size, s3tc.COMPRESSED_RGB_S3TC_DXT1_EXT);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.deleteFramebuffer(fb);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
+    gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    return { texture, real: true };
+  }
+
+  /** Draw one compressed image into whatever colour target is bound. */
+  function blitCompressed(raw: Uint8Array, size: number, format: number) {
+    const compressed = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, compressed);
+    gl.compressedTexImage2D(gl.TEXTURE_2D, 0, format, size, size, 0, raw);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.viewport(0, 0, size, size);
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
@@ -163,42 +269,68 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 8, 0);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.disableVertexAttribArray(0);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.deleteFramebuffer(fb);
     gl.deleteTexture(compressed);
-
-    gl.bindTexture(gl.TEXTURE_2D, decoded);
-    gl.generateMipmap(gl.TEXTURE_2D);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
     gl.enable(gl.DEPTH_TEST);
-    return decoded;
   }
 
   // ---- mutable state --------------------------------------------------------
   let sharedRef: SharedAssets | null = null;
   let layoutRef: LayoutAssets | null = null;
   let calls: TerrainDrawCall[] = [];
+  // Per-instance culling: see cullInstances.
+  let instFloats: Float32Array | null = null;
+  let circles: Float32Array | null = null;
+  let packed: Float32Array | null = null;
+  let culled: CulledDraw[] = [];
+  let bCull: WebGLBuffer | null = null;
   let zRange = 1;
+  // Top of everything drawn, outside rock included: the tilted camera's depth
+  // has to span it. `meta.zmax` stays the top of what is inside the square.
+  let zTop = 0;
   let view: TerrainView | null = null;
+  // Set by setCamera, cleared by setView. Null means the flat rect path.
+  let camera: TerrainCamera | null = null;
+  let cssWidth = 0;
+  let cssHeight = 0;
+  // The last frame's matrix and culled draws, which the pick pass reuses.
+  let lastMatrix: Float32Array | null = null;
+  let pickFbo: WebGLFramebuffer | null = null;
+  let pickTex: WebGLTexture | null = null;
+  let pickDepth: WebGLRenderbuffer | null = null;
   let lost = false;
   let pixelRatio = 1;
+  let elevationLines = false;
+  let sectorGrid: SectorGridSpec | null = null;
 
   let bPos: WebGLBuffer | null = null;
   let bNrm: WebGLBuffer | null = null;
   let bIdx: WebGLBuffer | null = null;
-  let bIns: WebGLBuffer | null = null;
   let bHfIdx: WebGLBuffer | null = null;
   let hfIndexCount = 0;
   let texHf: WebGLTexture | null = null;
   let det1: WebGLTexture | null = null;
   let det2: WebGLTexture | null = null;
   let texBrk: WebGLTexture | null = null;
+  let bUV: WebGLBuffer | null = null;
+  let rockTex: WebGLTexture | null = null;
+  let rockTextured = false;
 
   let fbo: WebGLFramebuffer | null = null;
   let accTex: WebGLTexture | null = null;
-  let accDepth: WebGLRenderbuffer | null = null;
+  // A texture, not a renderbuffer, so the tilted view can read it back.
+  let accDepth: WebGLTexture | null = null;
+  let occFbo: WebGLFramebuffer | null = null;
+  let occTex: WebGLTexture | null = null;
+  let occW = 0;
+  let occH = 0;
+  let occPbo: WebGLBuffer | null = null;
+  let occSync: WebGLSync | null = null;
+  let occPending: { matrix: Float32Array; inverse: Float64Array } | null = null;
+  // A frame was drawn while a read was still in flight, so that read is already old.
+  let occStale = false;
+  let occPoll = 0;
+  // The depth of the last tilted frame, for testing markers against; null otherwise.
+  let occlusion: DepthGrid | null = null;
   let fbW = 0;
   let fbH = 0;
 
@@ -223,7 +355,7 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
     if (fbo) {
       gl.deleteFramebuffer(fbo);
       gl.deleteTexture(accTex);
-      gl.deleteRenderbuffer(accDepth);
+      gl.deleteTexture(accDepth);
     }
     fbo = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -236,10 +368,14 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, accTex, 0);
-    accDepth = gl.createRenderbuffer();
-    gl.bindRenderbuffer(gl.RENDERBUFFER, accDepth);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, width, height);
-    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, accDepth);
+    accDepth = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, accDepth);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT24, width, height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, accDepth, 0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     fbW = width;
     fbH = height;
@@ -248,8 +384,7 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
   function setAssets(shared: SharedAssets, layout: LayoutAssets) {
     if (lost) return;
     // Geometry and the sand textures are shared by all 12 layouts: only re-upload
-    // them when the shared set itself changes, so a Coriolis reset costs one
-    // instance buffer and one height field rather than 6 MB of re-upload.
+    // them when the shared set itself changes.
     if (sharedRef !== shared) {
       const { library, geometry } = shared;
       const nrmAt = library.posBytes;
@@ -266,13 +401,16 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
       det1 = decodeToMipped(shared.detail1, 1024);
       det2 = decodeToMipped(shared.detail2, 1024);
       texBrk = decodeToMipped(shared.breakup, 128);
+      if (bUV) gl.deleteBuffer(bUV);
+      bUV = shared.rockUV.byteLength ? upload(gl.ARRAY_BUFFER, shared.rockUV) : null;
+      if (rockTex) gl.deleteTexture(rockTex);
+      const rock = decodeRockArray(shared.rockTex, library.texSize ?? 0, library.texLayers ?? 0);
+      rockTex = rock.texture;
+      rockTextured = rock.real && !!bUV;
       sharedRef = shared;
     }
 
     if (layoutRef !== layout) {
-      if (bIns) gl.deleteBuffer(bIns);
-      bIns = upload(gl.ARRAY_BUFFER, layout.instances);
-
       const meta = layout.meta;
       if (texHf) gl.deleteTexture(texHf);
       texHf = gl.createTexture();
@@ -305,7 +443,21 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
       layoutRef = layout;
     }
 
-    calls = buildDrawCalls(shared.library, layout.meta);
+    const floats = (bytes: Uint8Array) => bytes.byteOffset % 4 === 0
+      ? new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4)
+      : new Float32Array(bytes.slice().buffer);
+    // The layout's own instances, then the rock outside the square, which is the
+    // same for every layout. Top-down it is culled or clipped away.
+    const merged = withOutside(buildDrawCalls(shared.library, layout.meta), floats(layout.instances),
+      shared.library, shared.outside, floats(shared.outsideInstances));
+    calls = merged.calls;
+    instFloats = merged.instances;
+    const sand = new Uint16Array(layout.heightField.buffer, layout.heightField.byteOffset, layout.heightField.byteLength / 2);
+    markHoveringRock(calls, instFloats, (x, y) => interpolateHeightField(sand, layout.meta, x, y));
+    zTop = Math.max(layout.meta.zmax, shared.outside.zmax);
+    circles = instanceCircles(calls, instFloats);
+    packed = new Float32Array(instFloats.length);
+    if (!bCull) bCull = gl.createBuffer();
     zRange = depthRange(layout.meta);
   }
 
@@ -314,11 +466,13 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
     // enough: location 0 is an integer attribute, and a disabled integer
     // attribute whose generic value was never set with vertexAttribI4ui makes
     // the whole draw INVALID_OPERATION under ANGLE.
-    for (let k = 0; k < 8; k++) {
+    for (let k = 0; k < ATTRIBS; k++) {
       gl.disableVertexAttribArray(k);
       gl.vertexAttribDivisor(k, 0);
     }
     gl.vertexAttribI4ui(0, 0, 0, 0, 0);
+    gl.vertexAttrib2f(UV_LOCATION, 0, 0);
+    gl.uniform1f(t.texOn, 0);
     gl.uniform1f(t.hfMode, 1);
     gl.uniform1f(t.feather, 0);
     gl.uniform1f(t.wScale, 1);
@@ -331,13 +485,17 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
 
   function drawGeometry() {
     drawHeightField();
-    for (const call of calls) {
+    for (let c = 0; c < calls.length; c++) {
+      const call = calls[c];
+      const kept = culled[c];
+      if (!kept || kept.n === 0) continue;
       gl.uniform3f(t.lo, call.lo[0], call.lo[1], call.lo[2]);
       gl.uniform3f(t.ext, call.ext[0], call.ext[1], call.ext[2]);
       gl.uniform1f(t.feather, call.land ? FEATHER : 0);
       gl.uniform1f(t.wScale, call.land ? 1 : call.overlay ? 64 : rockWeight);
       gl.uniform1f(t.lift, LIFTON);
       gl.uniform1f(t.bias, call.overlay ? -OVERLAY / zRange : 0);
+      gl.uniform1i(t.skirtFrom, call.skirt ?? 0x7fffffff);
 
       gl.bindBuffer(gl.ARRAY_BUFFER, bPos);
       gl.enableVertexAttribArray(0);
@@ -348,8 +506,8 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
       gl.vertexAttribDivisor(1, 0);
       gl.vertexAttribPointer(1, 2, gl.BYTE, true, 2, call.vo * 2);
 
-      gl.bindBuffer(gl.ARRAY_BUFFER, bIns);
-      const base = call.instOff * INSTANCE_STRIDE;
+      gl.bindBuffer(gl.ARRAY_BUFFER, bCull);
+      const base = kept.off * INSTANCE_STRIDE;
       for (let k = 0; k < 6; k++) {
         const location = k < 5 ? 2 + k : 7;
         const size = k >= 4 ? 1 : 3;
@@ -358,17 +516,206 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
         gl.vertexAttribDivisor(location, 1);
       }
 
+      // The game's diffuse, for the meshes that carry one.
+      if (rockTextured && call.texLayer !== undefined && call.uvo !== undefined) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, bUV);
+        gl.enableVertexAttribArray(UV_LOCATION);
+        gl.vertexAttribDivisor(UV_LOCATION, 0);
+        gl.vertexAttribPointer(UV_LOCATION, 2, gl.UNSIGNED_SHORT, true, 4, call.uvo * 4);
+        gl.uniform1f(t.texOn, 1);
+        gl.uniform1f(t.texLayer, call.texLayer);
+        gl.uniform1f(t.texGain, call.texGain ?? 1);
+      } else {
+        gl.disableVertexAttribArray(UV_LOCATION);
+        gl.vertexAttrib2f(UV_LOCATION, 0, 0);
+        gl.uniform1f(t.texOn, 0);
+      }
+
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bIdx);
-      gl.drawElementsInstanced(gl.TRIANGLES, call.ic, gl.UNSIGNED_SHORT, call.io * 2, call.instN);
+      gl.drawElementsInstanced(gl.TRIANGLES, call.ic, gl.UNSIGNED_SHORT, call.io * 2, kept.n);
+    }
+  }
+
+  /**
+   * Render the pixel under (sx, sy) into a 1x1 float target, writing world
+   * height, and turn it back into a world point. The clip matrix is scaled
+   * about that pixel (x' = W*x - c*W*w), which keeps perspective intact.
+   */
+  function pickAt(sx: number, sy: number): { x: number; y: number; z: number } | null {
+    if (lost || !floatBuffer || !lastMatrix || !layoutRef || !cssWidth || !cssHeight) return null;
+    if (!pickFbo) {
+      pickFbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, pickFbo);
+      pickTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, pickTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 1, 1, 0, gl.RGBA, gl.FLOAT, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, pickTex, 0);
+      pickDepth = gl.createRenderbuffer();
+      gl.bindRenderbuffer(gl.RENDERBUFFER, pickDepth);
+      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, 1, 1);
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, pickDepth);
+    }
+    const m = lastMatrix;
+    const ncx = (2 * sx) / cssWidth - 1;
+    const ncy = 1 - (2 * sy) / cssHeight;
+    const p = new Float32Array(16);
+    for (let col = 0; col < 4; col++) {
+      const x = m[col * 4], y = m[col * 4 + 1], z = m[col * 4 + 2], w = m[col * 4 + 3];
+      p[col * 4] = cssWidth * x - ncx * cssWidth * w;
+      p[col * 4 + 1] = cssHeight * y - ncy * cssHeight * w;
+      p[col * 4 + 2] = z;
+      p[col * 4 + 3] = w;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, pickFbo);
+    gl.viewport(0, 0, 1, 1);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.useProgram(terrain);
+    gl.uniformMatrix4fv(t.vp, false, p);
+    gl.uniform1f(t.prepass, 1);
+    gl.uniform1f(t.pick, 1);
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthMask(true);
+    gl.depthFunc(gl.LESS);
+    gl.disable(gl.BLEND);
+    gl.colorMask(true, true, true, true);
+    drawGeometry();
+    const out = new Float32Array(4);
+    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.FLOAT, out);
+    gl.uniform1f(t.pick, 0);
+    for (let k = 0; k < ATTRIBS; k++) {
+      gl.disableVertexAttribArray(k);
+      gl.vertexAttribDivisor(k, 0);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (out[1] < 0.5) return null;
+    const z = out[0];
+    if (camera) {
+      const w = screenToWorldAtZ(camera, sx, sy, z);
+      return { x: w.x, y: w.y, z };
+    }
+    // Flat: the rect spans the viewport exactly, axis by axis.
+    if (!view) return null;
+    return {
+      x: view.minX + (sx / cssWidth) * (view.maxX - view.minX),
+      y: view.minY + (sy / cssHeight) * (view.maxY - view.minY),
+      z
+    };
+  }
+
+  /** Drop a depth read that is still in flight, and anything waiting on it. */
+  function cancelDepthRead() {
+    if (occSync) gl.deleteSync(occSync);
+    occSync = null;
+    if (occPoll) cancelAnimationFrame(occPoll);
+    occPoll = 0;
+    occStale = false;
+  }
+
+  /**
+   * Copy the frame's depth into a small float target and start reading it back.
+   * Asynchronous (pixel buffer + fence): a synchronous read blocks the page
+   * until the GPU finishes the frame.
+   */
+  function startDepthRead(matrix: Float32Array) {
+    const inverse = invert4(matrix);
+    const w = Math.max(1, Math.ceil(cssWidth / OCCLUSION_DIV));
+    const h = Math.max(1, Math.ceil(cssHeight / OCCLUSION_DIV));
+    if (!inverse || !accDepth) {
+      occlusion = null;
+      return;
+    }
+    if (!occFbo || occW !== w || occH !== h) {
+      if (occFbo) gl.deleteFramebuffer(occFbo);
+      if (occTex) gl.deleteTexture(occTex);
+      if (occPbo) gl.deleteBuffer(occPbo);
+      occFbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, occFbo);
+      occTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, occTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, occTex, 0);
+      occPbo = gl.createBuffer();
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, occPbo);
+      gl.bufferData(gl.PIXEL_PACK_BUFFER, w * h * 16, gl.STREAM_READ);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      occW = w;
+      occH = h;
+      // The grid in use was read at the old size; it is no longer this one's.
+      occlusion = null;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, occFbo);
+    gl.viewport(0, 0, w, h);
+    gl.disable(gl.DEPTH_TEST);
+    gl.useProgram(depthCopy);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, accDepth);
+    gl.uniform1i(depthCopyTex, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribDivisor(0, 0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 8, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, occPbo);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.FLOAT, 0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    occSync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    gl.flush();
+    gl.disableVertexAttribArray(0);
+    gl.enable(gl.DEPTH_TEST);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    occPending = { matrix, inverse };
+    if (!occPoll) occPoll = requestAnimationFrame(collectDepth);
+  }
+
+  /** Collect a depth read once the GPU has got to it, and say so. */
+  function collectDepth() {
+    occPoll = 0;
+    if (lost || !occSync || !occPending) return;
+    const status = gl.clientWaitSync(occSync, 0, 0);
+    if (status === gl.TIMEOUT_EXPIRED) {
+      occPoll = requestAnimationFrame(collectDepth);
+      return;
+    }
+    gl.deleteSync(occSync);
+    occSync = null;
+    if (status !== gl.WAIT_FAILED) {
+      const pixels = new Float32Array(occW * occH * 4);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, occPbo);
+      gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, pixels);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      // Depth and its matrix are swapped together, so a test is self-consistent.
+      occlusion = { depth: pixels, stride: 4, width: occW, height: occH, matrix: occPending.matrix, inverse: occPending.inverse };
+      options.onOcclusion?.();
+    }
+    // A frame was drawn meanwhile; the depth buffer still holds it.
+    if (occStale) {
+      occStale = false;
+      if (camera && camera.tilt > 0 && lastMatrix) startDepthRead(lastMatrix);
     }
   }
 
   function draw() {
-    if (lost || !view || !layoutRef || !sharedRef || !calls.length) return;
+    if (lost || !layoutRef || !sharedRef || !calls.length) return;
     const meta = layoutRef.meta;
     const width = canvas.width;
     const height = canvas.height;
     if (!width || !height) return;
+    if (camera) {
+      // What the camera can see, capped to the map square and its apron.
+      const r = cullRectForCamera(camera, meta.zmin, zTop);
+      const cap = meta.half + EDGE_APRON;
+      view = {
+        minX: Math.max(r.minX, meta.cx - cap), maxX: Math.min(r.maxX, meta.cx + cap),
+        minY: Math.max(r.minY, meta.cy - cap), maxY: Math.min(r.maxY, meta.cy + cap),
+        flipY: false
+      };
+    }
+    if (!view) return;
 
     const maxTexture = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
     // Supersample when the device pixel ratio is low, so effective sampling
@@ -380,7 +727,21 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
     const fh = height * ss;
     ensureFramebuffer(fw, fh);
 
-    const m = orthoFromWorldRect(view, zRange);
+    // Cull once per frame; both passes draw the same survivors. bufferData (not
+    // bufferSubData) orphans the old storage, avoiding a stall under ANGLE.
+    if (instFloats && circles && packed && bCull) {
+      const cam = camera;
+      const threshold = cam
+        ? (x: number, y: number) => CULL_MIN_RADIUS_PX * scaleAt(cam, x, y, cam.cz) * (cssWidth / fw)
+        : CULL_MIN_RADIUS_PX * ((view.maxX - view.minX) / fw);
+      const result = cullInstances(calls, instFloats, circles, view, threshold, packed);
+      culled = result.draws;
+      gl.bindBuffer(gl.ARRAY_BUFFER, bCull);
+      gl.bufferData(gl.ARRAY_BUFFER, packed.subarray(0, result.total * INSTANCE_FLOATS), gl.DYNAMIC_DRAW);
+    }
+
+    const m = camera ? cameraClipMatrix(camera, meta.zmin, zTop, zRange) : orthoFromWorldRect(view, zRange);
+    lastMatrix = m;
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.viewport(0, 0, fw, fh);
@@ -388,11 +749,19 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(terrain);
     gl.uniformMatrix4fv(t.vp, false, m);
-    gl.uniform3f(t.light, SUN[0], SUN[1], SUN[2]);
+    // The sun is fixed to the screen, so it turns with the view.
+    const yaw = camera ? camera.yaw : 0;
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    gl.uniform3f(t.light, SUN[0] * cy - SUN[1] * sy, SUN[0] * sy + SUN[1] * cy, SUN[2]);
+    gl.uniform1f(t.pick, 0);
     gl.uniform1f(t.zlo, meta.zmin);
+    gl.uniform1f(t.footZ, meta.zmin);
     gl.uniform1f(t.zhi, meta.zmin + (meta.zmax - meta.zmin) * 0.35);
     gl.uniform2f(t.c, meta.cx, meta.cy);
-    gl.uniform1f(t.half, meta.half);
+    // Tilted, the clip moves out to take in the rock that stands past the edge.
+    const apron = camera ? EDGE_APRON : 0;
+    gl.uniform1f(t.half, meta.half + apron);
+    gl.uniform1f(t.apron, apron);
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, det1);
     gl.uniform1i(t.d1, 1);
@@ -401,9 +770,27 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
     gl.uniform1i(t.d2, 2);
     gl.uniform1f(t.tile, TILE);
     gl.uniform1f(t.detStr, DETSTR);
-    // Straight down: the Live Map is not tiltable.
-    gl.uniform3f(t.view, 0, 0, 1);
+    {
+      const k = camera ? Math.min(1, Math.max(0, camera.tilt / SIDE_LIT_TILT)) : 0;
+      gl.uniform1f(t.sideLit, k * k * (3 - 2 * k));
+    }
+    // Toward the eye: straight up for the flat map, leaning with the tilt.
+    if (camera) {
+      const st = Math.sin(camera.tilt);
+      gl.uniform3f(t.view, -Math.sin(camera.yaw) * st, Math.cos(camera.yaw) * st, Math.cos(camera.tilt));
+    } else {
+      gl.uniform3f(t.view, 0, 0, 1);
+    }
     gl.uniform1f(t.detail, det1 && det2 ? 1 : 0);
+    // Intervals track the scale in view.
+    const [rockStep, sandStep] = elevationIntervals(camera ? camera.scale * (cssWidth / width) : (view.maxX - view.minX) / width);
+    gl.uniform1f(t.con, elevationLines ? 1 : 0);
+    gl.uniform1f(t.conStep, rockStep);
+    gl.uniform1f(t.conStepS, sandStep);
+    // Flat, the panel draws the grid itself.
+    if (camera && sectorGrid) gl.uniform4f(t.grid, sectorGrid.x0, sectorGrid.y0, sectorGrid.cell, sectorGrid.divisions);
+    else gl.uniform4f(t.grid, 0, 0, 1, 0);
+    gl.uniform1f(t.gridPx, fw / Math.max(cssWidth, 1));
     gl.activeTexture(gl.TEXTURE6);
     gl.bindTexture(gl.TEXTURE_2D, texHf);
     gl.uniform1i(t.hf, 6);
@@ -418,6 +805,9 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
     gl.activeTexture(gl.TEXTURE7);
     gl.bindTexture(gl.TEXTURE_2D, texBrk);
     gl.uniform1i(t.brk, 7);
+    gl.activeTexture(gl.TEXTURE8);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, rockTex);
+    gl.uniform1i(t.rock, 8);
     gl.uniform1f(t.brkTile, BRKTILE);
     gl.uniform1f(t.brkAmp, texBrk ? BRKAMP : 0);
     gl.uniform1f(t.clipRaise, CLIPRAISE);
@@ -447,9 +837,19 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
     gl.disable(gl.BLEND);
     gl.depthMask(true);
     gl.depthFunc(gl.LESS);
-    for (let k = 0; k < 8; k++) {
+    for (let k = 0; k < ATTRIBS; k++) {
       gl.disableVertexAttribArray(k);
       gl.vertexAttribDivisor(k, 0);
+    }
+
+    // Tilted: keep the frame's depth so markers behind terrain can be hidden.
+    if (camera && camera.tilt > 0 && floatBuffer) {
+      // One read at a time.
+      if (occSync) occStale = true;
+      else startDepthRead(m);
+    } else {
+      cancelDepthRead();
+      occlusion = null;
     }
 
     // Backdrop to the screen, then the resolved terrain composited over it.
@@ -466,7 +866,7 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
     gl.useProgram(backdrop);
     gl.uniformMatrix4fv(b.vp, false, m);
     gl.uniform2f(b.c, meta.cx, meta.cy);
-    gl.uniform1f(b.half, meta.half);
+    gl.uniform1f(b.half, meta.half + apron);
     gl.uniform1f(b.z, meta.floorZ);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
@@ -486,21 +886,47 @@ export function createDeepDesertRenderer(canvas: HTMLCanvasElement, options: Ren
       return !lost && calls.length > 0;
     },
     setAssets,
-    resize(cssWidth: number, cssHeight: number, dpr: number) {
+    resize(nextWidth: number, nextHeight: number, dpr: number) {
       pixelRatio = Math.min(dpr || 1, 2);
-      applyCanvasSize(canvas, cssWidth, cssHeight, dpr);
+      cssWidth = nextWidth;
+      cssHeight = nextHeight;
+      applyCanvasSize(canvas, nextWidth, nextHeight, dpr);
     },
     setView(next: TerrainView) {
       view = next;
+      camera = null;
+    },
+    setCamera(next: TerrainCamera) {
+      camera = next;
+    },
+    get canPick() {
+      return floatBuffer;
+    },
+    pick(sx: number, sy: number) {
+      return pickAt(sx, sy);
+    },
+    occluded(x: number, y: number, z: number) {
+      return !lost && occlusion ? isOccluded(occlusion, x, y, z, OCCLUSION_TOLERANCE) : false;
+    },
+    setElevationLines(on: boolean) {
+      elevationLines = on;
+    },
+    setSectorGrid(grid: SectorGridSpec | null) {
+      sectorGrid = grid;
     },
     draw,
     dispose() {
       canvas.removeEventListener("webglcontextlost", onLost as EventListener);
-      for (const buffer of [bPos, bNrm, bIdx, bIns, bHfIdx, quad]) if (buffer) gl.deleteBuffer(buffer);
-      for (const texture of [texHf, det1, det2, texBrk, accTex]) if (texture) gl.deleteTexture(texture);
-      if (accDepth) gl.deleteRenderbuffer(accDepth);
+      for (const buffer of [bPos, bNrm, bIdx, bHfIdx, bUV, bCull, quad]) if (buffer) gl.deleteBuffer(buffer);
+      for (const texture of [texHf, det1, det2, texBrk, rockTex, accTex, accDepth, occTex, pickTex]) if (texture) gl.deleteTexture(texture);
+      if (pickDepth) gl.deleteRenderbuffer(pickDepth);
+      if (pickFbo) gl.deleteFramebuffer(pickFbo);
+      cancelDepthRead();
+      if (occPbo) gl.deleteBuffer(occPbo);
+      if (occFbo) gl.deleteFramebuffer(occFbo);
       if (fbo) gl.deleteFramebuffer(fbo);
-      for (const program of [terrain, resolve, backdrop, decode]) gl.deleteProgram(program);
+      for (const program of [terrain, resolve, backdrop, decode, depthCopy]) gl.deleteProgram(program);
+      occlusion = null;
       calls = [];
       sharedRef = null;
       layoutRef = null;

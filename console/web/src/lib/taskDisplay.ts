@@ -14,6 +14,7 @@ export function funcomTokenMismatchDetected(text: string) {
 }
 
 export function conciseTaskError(task: Task) {
+  if (/^(GitHub|Docker Hub|Funcom registry|Container registry|Download service) request limit reached\. /.test(task.errorMessage || "")) return task.errorMessage!;
   const text = task.logLines.map((line) => line.line).join("\n");
   const steamState = stripAnsi(text).match(/Error!\s+App\s+'[^']+'\s+state is\s+[^.]+(?:\s+after update job)?/i)?.[0];
   const steamAttempts = stripAnsi(text).match(/SteamCMD failed after \d+ attempts\./i)?.[0];

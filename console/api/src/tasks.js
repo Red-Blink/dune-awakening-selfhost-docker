@@ -10,6 +10,7 @@ import { withTimeout } from "./services/withTimeout.js";
 import { clampInt } from "./jsonStore.js";
 import { redactDbError } from "./db.js";
 import { recordTaskRestart } from "./services/restartHistory.js";
+import { downloadFailureMessage } from "./services/downloadFailure.js";
 
 // Operations that leave a map down with the database still reachable, so
 // anything queued for that map can be applied before it comes back up. "stop"
@@ -164,12 +165,15 @@ export class TaskManager {
     } catch (error) {
       task.status = "failed";
       task.exitCode = Number.isInteger(error.code) ? error.code : null;
+      const downloadFailure = downloadFailureMessage([
+        ...task.logLines.map(line => line.line), error.stdout || "", error.stderr || ""
+      ].join("\n"));
       if (task.operation === "updateCheck") {
         if (error.stdout) this.append(task, error.stdout, "stdout");
         if (error.stderr) this.append(task, error.stderr, "stderr");
-        task.errorMessage = updateCheckFailureMessage(error);
+        task.errorMessage = downloadFailure || updateCheckFailureMessage(error);
       } else {
-        task.errorMessage = error.message;
+        task.errorMessage = downloadFailure || error.message;
       }
       task.currentStep = "Failed";
       task.finishedAt = new Date().toISOString();

@@ -3,12 +3,23 @@ import { createRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LiveMapConfig } from "../../../api/liveMap";
 import DeepDesertTerrain from "./DeepDesertTerrain";
+import { SECTOR_GRID } from "../liveMapSectorGrid";
 
 // The assets are 15 MB of binary behind fetch; the component's job is lifecycle,
 // not loading, so the loader is stubbed out.
 vi.mock("./terrainAssets", () => ({
   loadSharedAssets: vi.fn(async () => ({ library: { meshes: [] } })),
-  loadLayoutAssets: vi.fn(async (layout: number) => ({ meta: { layout } }))
+  // A 2x2 height field: 0, 1000, 2000 and 3000 uu -- enough for the pivot and the sampler.
+  loadLayoutAssets: vi.fn(async (layout: number) => ({
+    meta: { layout, zmax: 90000, hfN: 2, hfZlo: 0, hfZhi: 65535, hfStep: 1000, hfX0: 0, hfY0: 0 },
+    heightField: new Uint8Array(new Uint16Array([0, 1000, 2000, 3000]).buffer)
+  })),
+  // The same field with a ring of 500 uu sand one texel deep round it.
+  joinShared: vi.fn((_shared: unknown, layout: { meta: object }) => ({
+    ...layout,
+    meta: { ...layout.meta, hfN: 4, hfX0: -1000, hfY0: -1000 },
+    heightField: new Uint8Array(new Uint16Array([500, 500, 500, 500, 500, 0, 1000, 500, 500, 2000, 3000, 500, 500, 500, 500, 500]).buffer)
+  }))
 }));
 
 const CONFIG: LiveMapConfig = {
@@ -24,6 +35,11 @@ function fakeRenderer() {
     setAssets: vi.fn(),
     resize: vi.fn(),
     setView: vi.fn(),
+    setCamera: vi.fn(),
+    pick: vi.fn(() => ({ x: 1, y: 2, z: 3 })),
+    occluded: vi.fn((_x: number, _y: number, z: number) => z < 100),
+    setElevationLines: vi.fn(),
+    setSectorGrid: vi.fn(),
     draw: vi.fn(),
     dispose: vi.fn()
   };
@@ -33,8 +49,10 @@ function mount(overrides: Record<string, unknown> = {}) {
   const renderer = fakeRenderer();
   const onUnavailable = vi.fn();
   const lost: Array<() => void> = [];
+  const occlusion: Array<() => void> = [];
   const createRenderer = vi.fn((_canvas, options) => {
     if (options?.onContextLost) lost.push(options.onContextLost);
+    if (options?.onOcclusion) occlusion.push(options.onOcclusion);
     return renderer as never;
   });
   const frame = document.createElement("div");
@@ -55,7 +73,7 @@ function mount(overrides: Record<string, unknown> = {}) {
       {...overrides}
     />
   );
-  return { renderer, onUnavailable, createRenderer, frame, frameRef, view, lost };
+  return { renderer, onUnavailable, createRenderer, frame, frameRef, view, lost, occlusion };
 }
 
 beforeEach(() => {
@@ -73,6 +91,30 @@ describe("DeepDesertTerrain", () => {
     const { createRenderer, renderer } = mount();
     expect(createRenderer).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(renderer.setAssets).toHaveBeenCalledTimes(1));
+    // The renderer is given the layout with the outside sand joined on, not the bare one.
+    expect(renderer.setAssets.mock.calls[0][1].meta.hfN).toBe(4);
+  });
+
+  it("passes the elevation-lines toggle through to the renderer", async () => {
+    const off = mount();
+    await waitFor(() => expect(off.renderer.setElevationLines).toHaveBeenCalled());
+    expect(off.renderer.setElevationLines.mock.calls.at(-1)![0]).toBe(false);
+    document.body.innerHTML = "";
+
+    const on = mount({ elevationLines: true });
+    await waitFor(() => expect(on.renderer.setElevationLines).toHaveBeenCalled());
+    expect(on.renderer.setElevationLines.mock.calls.at(-1)![0]).toBe(true);
+  });
+
+  it("hands the renderer the sector grid only when asked for it", async () => {
+    const off = mount();
+    await waitFor(() => expect(off.renderer.setSectorGrid).toHaveBeenCalled());
+    expect(off.renderer.setSectorGrid.mock.calls.at(-1)![0]).toBeNull();
+    document.body.innerHTML = "";
+
+    const on = mount({ sectorGrid: true });
+    await waitFor(() => expect(on.renderer.setSectorGrid).toHaveBeenCalled());
+    expect(on.renderer.setSectorGrid.mock.calls.at(-1)![0]).toEqual(SECTOR_GRID);
   });
 
   it("draws the world rect the panel is showing, not the whole map", async () => {
@@ -218,4 +260,61 @@ describe("scroll-area integrity", () => {
       expect(canvas.style.transform).toBe("translate(0px, 0px)");
     });
   });
+});
+
+describe("3D", () => {
+  it("draws through the camera when tilted, and the flat rect otherwise", async () => {
+    const flat = mount();
+    await waitFor(() => expect(flat.renderer.setView).toHaveBeenCalled());
+    expect(flat.renderer.setCamera).not.toHaveBeenCalled();
+    document.body.innerHTML = "";
+    const tilted = mount({ tilt: 0.5, yaw: 0.25 });
+    await waitFor(() => expect(tilted.renderer.setCamera).toHaveBeenCalled());
+    const camera = tilted.renderer.setCamera.mock.calls.at(-1)![0];
+    expect(camera.tilt).toBe(0.5);
+    expect(camera.yaw).toBe(0.25);
+    expect(camera.fov).toBeGreaterThan(0);
+    // pivots about the layout's mean sand height
+    expect(camera.cz).toBeCloseTo(1500, 6);
+  });
+
+  it("keeps the camera's eye above the layout's tallest point when zoomed right in", async () => {
+    // Steep and at full zoom: left alone, the eye would sit below 90,000.
+    const { renderer } = mount({ tilt: Math.PI / 3, zoom: 8 });
+    await waitFor(() => expect(renderer.setCamera).toHaveBeenCalled());
+    const camera = renderer.setCamera.mock.calls.at(-1)![0];
+    const eyeHeight = camera.cz + (camera.scale * camera.height) / (2 * Math.tan(camera.fov / 2)) * Math.cos(camera.tilt);
+    expect(eyeHeight).toBeGreaterThan(90000);
+    expect(camera.fov).toBeGreaterThan(0);
+  });
+
+  it("hands the panel a terrain API for the layout, and withdraws it on unmount", async () => {
+    const onTerrainApi = vi.fn();
+    const { view } = mount({ onTerrainApi });
+    await waitFor(() => expect(onTerrainApi).toHaveBeenCalledWith(expect.objectContaining({ pivotZ: 1500 })));
+    const api = onTerrainApi.mock.calls.at(-1)![0];
+    expect(api.topZ).toBe(90000);
+    expect(api.heightAt(1000, 1000)).toBe(3000);
+    expect(api.heightAt(0, 0)).toBe(0);
+    // Past the layout's own field the height is the ring's, and the pivot above ignored it.
+    expect(api.heightAt(-1000, -1000)).toBe(500);
+    expect(api.pick(10, 20)).toEqual({ x: 1, y: 2, z: 3 });
+    // what the last frame hides is the renderer's answer, passed straight through
+    expect(api.occluded(5, 6, 50)).toBe(true);
+    expect(api.occluded(5, 6, 500)).toBe(false);
+    view.unmount();
+    expect(onTerrainApi).toHaveBeenLastCalledWith(null);
+  });
+
+  it("tells the panel when the renderer has measured afresh what the terrain hides", async () => {
+    const onOcclusion = vi.fn();
+    const { renderer, occlusion } = mount({ tilt: 0.5, onOcclusion });
+    await waitFor(() => expect(renderer.draw).toHaveBeenCalled());
+    // Drawing a frame is not it: the measurement lands later, from the renderer.
+    expect(onOcclusion).not.toHaveBeenCalled();
+    expect(occlusion).toHaveLength(1);
+    occlusion[0]();
+    expect(onOcclusion).toHaveBeenCalledTimes(1);
+  });
+
 });

@@ -7,6 +7,21 @@ import { initializeSelfUpdateStatus, readSelfUpdateStatus } from "../src/service
 
 const RUN_ID = "123e4567-e89b-42d3-a456-426614174000";
 
+test("failed detached updates expose provider limits only from the matching run", () => {
+  const root = mkdtempSync(join(tmpdir(), "dune-self-update-limit-"));
+  try {
+    const path = initializeSelfUpdateStatus(root, RUN_ID);
+    writeFileSync(path, readFileSync(path, "utf8").replace("state=running", "state=failed"));
+    const log = join(root, "runtime/generated/web-self-update.log");
+    writeFileSync(log, `Console update run: ${RUN_ID}\n${"build output\n".repeat(10000)}docker: Error response from daemon: toomanyrequests: You have reached your unauthenticated pull rate limit.\n`);
+    assert.equal(readSelfUpdateStatus(root, RUN_ID).message, "Docker Hub request limit reached. Try again later; no retry time was provided.");
+    writeFileSync(log, "Console update run: another-run\ndocker: Error response from daemon: toomanyrequests\n");
+    assert.equal(readSelfUpdateStatus(root, RUN_ID).message, "Starting the update helper.");
+    writeFileSync(log, `Console update run: ${RUN_ID}\nregistry.funcom.com HTTP response 403 Forbidden\n`);
+    assert.equal(readSelfUpdateStatus(root, RUN_ID).message, "Starting the update helper.");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("self-update status returns a bounded pending result before the helper writes", () => {
   const root = mkdtempSync(join(tmpdir(), "dune-self-update-status-"));
   try {

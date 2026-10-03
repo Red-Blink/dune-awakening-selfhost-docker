@@ -47,6 +47,17 @@ test("game update check exit 100 is treated as update-available success", async 
   assert.match(task.logLines.map((line) => line.line).join("\n"), /Update available/);
 });
 
+test("failed startup surfaces a registry limit instead of a generic exit code", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "arrakis-task-registry-limit-"));
+  const duneScript = join(dir, "dune");
+  writeFileSync(duneScript, "#!/usr/bin/env bash\necho 'Image: registry.funcom.com/funcom/self-hosting/db-utils:123'\necho 'docker: Error response from daemon: toomanyrequests' >&2\nexit 1\n", { mode: 0o700 });
+  const manager = new TaskManager({ duneScript, repoRoot: dir, taskRetention: 20, commandTimeoutMs: 5000 });
+  const created = manager.create("server", "start", {});
+  const task = await waitForTask(manager, created.id);
+  assert.equal(task.status, "failed");
+  assert.equal(task.errorMessage, "Funcom registry request limit reached. Try again later; no retry time was provided.");
+});
+
 test("game update check failure keeps Steam diagnostics and gives retry guidance", async () => {
   const dir = mkdtempSync(join(tmpdir(), "arrakis-task-update-failure-"));
   const duneScript = join(dir, "dune");

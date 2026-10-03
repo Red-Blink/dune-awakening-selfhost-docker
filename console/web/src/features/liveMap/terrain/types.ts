@@ -16,13 +16,62 @@ export type TerrainMesh = {
   io: number;
   /** Index count. */
   ic: number;
+  /** Rock only: the layer of the rock texture array holding this family's diffuse. */
+  texLayer?: number;
+  /** Brings that diffuse to the shared mean brightness. */
+  texGain?: number;
+  /** First vertex of this mesh's UVs in the rock UV buffer, in vertices. */
+  uvo?: number;
+  /** Index of the first lowered skirt vertex the seal appended; absent on an unsealed mesh. */
+  skirt?: number;
 };
 
 export type TerrainLibrary = {
   posBytes: number;
   nrmBytes: number;
   idxBytes: number;
+  /** Normalized u16 UV pairs for the textured meshes only, indexed by `uvo`. */
+  uvBytes?: number;
+  /** Layers in the rock texture array, each `texSize` square, BC1. */
+  texLayers?: number;
+  texSize?: number;
+  /** How the index section is stored; absent means plain u16. See `decodeIndices`. */
+  idxCoding?: string;
   meshes: TerrainMesh[];
+};
+
+/**
+ * Rock standing wholly outside the mapped square: the same in every layout, so
+ * it ships once. Draws index the shared instance block, not a layout's.
+ */
+export type TerrainOutside = {
+  nInst: number;
+  /** Top of the tallest piece, world uu. */
+  zmax: number;
+  draws: { m: number; off: number; n: number }[];
+};
+
+/**
+ * The rock and POI placements every layout has, shipped once. Draws are keyed
+ * by mesh and overlay flag, and index the shared instance block.
+ */
+export type TerrainCommonRock = {
+  nInst: number;
+  draws: { m: number; overlay: number; off: number; n: number }[];
+};
+
+/**
+ * The game's sand past a layout's height field, also shared. A frame of heights
+ * on the layout's grid extended `pad` texels each way: everything outside the
+ * layout's field, plus that field's own outermost ring.
+ */
+export type TerrainSandRing = {
+  pad: number;
+  /** The `hfN` this frame fits round. */
+  n: number;
+  /** Height is `zlo + value * zstep`, world uu. */
+  zlo: number;
+  zstep: number;
 };
 
 /** One mesh placed by one layout. */
@@ -44,6 +93,12 @@ export type TerrainDraw = {
 export type TerrainLayoutMeta = {
   layout: number;
   nInst: number;
+  /**
+   * Set once a layout's placements have been split from those every layout
+   * shares: how many shared ones it expects. Its own `draws` then cover only
+   * its own placements. See `withCommonRock`.
+   */
+  common?: number;
   tris: number;
   /** Vertical range of everything in this layout, for the depth mapping. */
   zmin: number;
@@ -89,3 +144,6 @@ export type TerrainView = {
   maxY: number;
   flipY: boolean;
 };
+
+/** A square lettered grid on the world plane: min corner, cell size in uu, cells per side. */
+export type SectorGridSpec = { x0: number; y0: number; cell: number; divisions: number };
