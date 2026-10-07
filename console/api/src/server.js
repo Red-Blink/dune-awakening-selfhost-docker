@@ -2731,15 +2731,6 @@ async function adminPasswordRoute(req, res) {
   return json(res, 200, { ok: true });
 }
 
-// Whether the principal of this request may perform `action`, by the same two
-// gates handleApi applies (policy engine, then the key's own scope map) --
-// without writing a response. Used for the optional parts of a reply, such as
-// player positions in Realtime Data.
-function principalMay(req, action) {
-  if (!req.authSession || !evaluate(req.authSession, action)) return false;
-  return !req.authApiKey || apiKeys.allows(req.authApiKey, action);
-}
-
 async function realtimeRoute(res, action) {
   try {
     return json(res, 200, await action(), { "cache-control": "no-store" });
