@@ -11,6 +11,13 @@ test("the stock Console deployment passes its configured IP allowlist", () => {
   assert.match(compose, /^\s+ADMIN_ALLOWED_IPS: "\$\{ADMIN_ALLOWED_IPS:-\}"$/m);
 });
 
+test("the encrypted API image and Compose default to a non-root user", () => {
+  const dockerfile = readFileSync(new URL("../../../runtime/tls-front/Dockerfile", import.meta.url), "utf8");
+  const compose = readFileSync(new URL("../../../docker-compose.tls-front.yml", import.meta.url), "utf8");
+  assert.match(dockerfile, /^USER 1000:1000$/m);
+  assert.match(compose, /user: "\$\{DUNE_HOST_UID:-1000\}:\$\{DUNE_HOST_GID:-1000\}"/);
+});
+
 test("only signed local TLS forwarding identities can affect the IP allowlist", () => {
   const root = mkdtempSync(join(tmpdir(), "tls-client-address-"));
   const key = randomBytes(32);

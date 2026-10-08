@@ -12,6 +12,8 @@ FROM alpine:3.22
 
 # Runs as the host user chosen in docker-compose.tls-front.yml (DUNE_HOST_UID/GID).
 COPY --from=build /out/dune-tls-front /usr/local/bin/dune-tls-front
+RUN mkdir -p /data && chown 1000:1000 /data
+USER 1000:1000
 
 HEALTHCHECK --interval=30s --timeout=8s --start-period=10s --retries=3 CMD ["/usr/local/bin/dune-tls-front", "-healthcheck"]
 ENTRYPOINT ["/usr/local/bin/dune-tls-front"]
