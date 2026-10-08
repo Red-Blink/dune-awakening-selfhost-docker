@@ -172,6 +172,11 @@ export const ROUTE_ACTIONS = {
   "GET /api/settings/api-keys":                "settings:read",
   "GET /api/settings/api-keys/catalog":        "settings:read",
   "POST /api/settings/api-keys":               "settings:write",
+  // Encrypted API access (services/encryptedApi.js): the optional HTTPS front door. Shows its state and
+  // key fingerprint and turns it on or off. Settings, so never reachable with an API key.
+  "GET /api/settings/encrypted-api":           "settings:read",
+  "POST /api/settings/encrypted-api":          "settings:write",
+  "POST /api/settings/console-access/confirm": "settings:write",
   "POST /api/settings/public-directory":       "settings:write",
   "POST /api/settings/public-directory/claim": "settings:write",
   "POST /api/settings/server-startup":          "settings:write",

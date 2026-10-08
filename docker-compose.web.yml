@@ -35,6 +35,9 @@ services:
       DUNE_COMPOSE_PROJECT_NAME: "${DUNE_COMPOSE_PROJECT_NAME:-dune-awakening-selfhost-docker}"
       ADMIN_BIND_HOST: "${ADMIN_BIND_HOST:-0.0.0.0}"
       ADMIN_BIND_PORT: "${ADMIN_WEB_PORT:-${ADMIN_BIND_PORT:-8088}}"
+      # Transport the existing setting without silently activating a previously
+      # ignored allowlist on upgrade. Settings requires a safe, explicit review.
+      DUNE_CONFIGURED_ADMIN_ALLOWED_IPS: "${ADMIN_ALLOWED_IPS:-}"
       ADMIN_AUTH_DISABLED: "${ADMIN_AUTH_DISABLED:-0}"
       ADMIN_SECURE_COOKIES: "${ADMIN_SECURE_COOKIES:-0}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"

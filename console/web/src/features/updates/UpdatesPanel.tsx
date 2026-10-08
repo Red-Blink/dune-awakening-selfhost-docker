@@ -149,8 +149,21 @@ export function UpdatesPanel({
     await waitForTaskWithUpdates(response.task, setGameSteamcmdFixTask);
   }
 
+  async function confirmConsoleUpdate(message: string) {
+    try {
+      const state = await fetchConsoleAuthState();
+      const warning = state?.config?.consoleAccessReviewRequired
+        ? "\n\nConsole IP restrictions await confirmation. This update preserves current access; review the restrictions in Settings before activating them. Keep SSH access available for recovery."
+        : "";
+      return await confirmAction(message + warning);
+    } catch (error) {
+      setStackStatus((current) => ({ ...current, status: "Check Failed", reason: error instanceof Error ? error.message : String(error) }));
+      return false;
+    }
+  }
+
   async function applyStackUpdate() {
-    if (!(await confirmAction("Apply the latest console update now?"))) return;
+    if (!(await confirmConsoleUpdate("Apply the latest console update now?"))) return;
     const expectedVersion = String(stackStatus.latest || "").trim();
     saveStackUpdateExpectedVersion(expectedVersion);
     setStackUpdateExpectedVersion(expectedVersion);
@@ -207,7 +220,7 @@ export function UpdatesPanel({
   }
 
   async function applyQaUpdate() {
-    if (!(await confirmAction(`Apply QA pre-release ${qaBuild?.shortSha || "build"} and rebuild the Console?`))) return;
+    if (!(await confirmConsoleUpdate(`Apply QA pre-release ${qaBuild?.shortSha || "build"} and rebuild the Console?`))) return;
     saveStackUpdateExpectedVersion(String(stackStatus.current || ""));
     setStackUpdateExpectedVersion(String(stackStatus.current || ""));
     setStackUpdateReadyAt(null);
@@ -219,7 +232,7 @@ export function UpdatesPanel({
   }
 
   async function reinstallPublicRelease() {
-    if (!(await confirmAction("Replace the QA pre-release with the latest published Console release? Your server configuration and data will be preserved."))) return;
+    if (!(await confirmConsoleUpdate("Replace the QA pre-release with the latest published Console release? Your server configuration and data will be preserved."))) return;
     const expectedVersion = String(stackStatus.latest || "").trim();
     saveStackUpdateExpectedVersion(expectedVersion);
     setStackUpdateExpectedVersion(expectedVersion);

@@ -108,6 +108,10 @@ jobs:
           python3 -c 'from cryptography.hazmat.primitives.ciphers.aead import AESGCM'
       - name: Test readiness with configured service ports
         run: bash tests/ready-configured-ports-test.sh
+      - name: Test the encrypted API access script
+        run: |
+          bash tests/tls-front-script-test.sh
+          python3 runtime/scripts/test_tls_front_config.py
       - name: Test stable farm readiness gating
         run: bash tests/farm-readiness-test.sh
       - name: Test current-start readiness and login queue safety
@@ -269,6 +273,8 @@ jobs:
       # 2.2.40 while db.sh required 2.3 for --aead-algo: every check was green.
       - name: Build the console image
         run: docker build -f console/api/Dockerfile -t dune-console:ci .
+      - name: Build the encrypted front door image (go vet and its tests run in the build)
+        run: docker build -t dune-tls-front:ci runtime/tls-front
       - name: Check the runtime it actually ships
         run: |
           set -euo pipefail

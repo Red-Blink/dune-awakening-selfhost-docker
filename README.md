@@ -61,6 +61,7 @@ For public/internet hosting, forward these ports:
 | `31983` | TCP | RabbitMQ Game HTTP Endpoint |
 | `7777-7810` | UDP | Game Traffic |
 | `32000-32015` | UDP | Optional direct public-directory latency probes; relay remains available when closed |
+| `8797` | TCP | Optional encrypted API access (HTTPS); see [Encrypted API access](docs/console/encrypted-api.md) |
 
 Keep database and internal admin ports private. Do not expose the Web UI to untrusted users.
 

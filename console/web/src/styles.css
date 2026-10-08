@@ -7841,3 +7841,8 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
 .deleted-character-unattributed > .playerAdmin_toggleHeader { border-radius: 0; background: var(--panel-muted); }
 .deleted-character-unattributed > .playerAdmin_toggleBody { display: flex; flex-direction: column; gap: 12px; }
 .deleted-character-unattributed-count { margin-left: auto; color: var(--text-faint); font-weight: 500 !important; }
+
+/* Settings: Encrypted API Access */
+.encrypted-api-section { display: grid; gap: 12px; }
+.encrypted-api-section code { overflow-wrap: anywhere; }
+.encrypted-api-fingerprint input { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

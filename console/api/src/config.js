@@ -463,6 +463,7 @@ export function publicConfig(config) {
     adminPasswordEnvManaged: config.adminPasswordEnvManaged,
     secureCookies: config.secureCookies,
     allowHostBootstrap: config.allowHostBootstrap,
-    mockMode: config.mockMode
+    mockMode: config.mockMode,
+    consoleAccessReviewRequired: Boolean(config.consoleAccessReviewRequired)
   };
 }
