@@ -2,6 +2,28 @@
 
 **Status:** Optional | **Last Updated:** October 2026
 
+## Safe Upgrade and Console Access
+
+An empty `ADMIN_ALLOWED_IPS` keeps existing Console access unchanged. Older stock
+Docker installations did not pass this setting into the Console. Updates do not
+silently activate a previously ignored setting: Settings shows **Review Console
+IP Restrictions** until an administrator confirms it. Activation is refused if
+the list contains invalid addresses or excludes the current connection. No
+browser or proxy address is added automatically.
+
+Restrictions already enforced through a direct environment or Compose override
+remain active. Confirmed restrictions survive updates; changing a non-empty
+list requires another review while retaining the last confirmed restrictions.
+Console update confirmations warn when a review is pending.
+
+For recovery, use SSH to correct or clear `ADMIN_ALLOWED_IPS` in the project's
+`.env`, then run `runtime/scripts/dune console reload`. Clearing it restores
+normal authenticated Console access. This reload does not restart the
+Battlegroup. If a Compose override sets `ADMIN_ALLOWED_IPS` directly, correct
+that override too.
+
+## Overview
+
 The Console listens on plain HTTP (`http://<host>:8088`). That is fine on a trusted network, but over the internet the
 admin password, API keys and every answer cross the network in clear text. **Encrypted API access** is a small container
 in front of the unchanged Console that serves the Console **API** over HTTPS, for everything that uses API keys. Nothing

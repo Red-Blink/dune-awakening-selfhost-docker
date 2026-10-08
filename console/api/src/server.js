@@ -43,6 +43,7 @@ import { createMemoryBalancer } from "./services/memoryBalancer.js";
 import { collectContainerHealth } from "./services/containerHealth.js";
 import { createEncryptedApi, EncryptedApiError } from "./services/encryptedApi.js";
 import { tlsClientAddress } from "./services/tlsClientAddress.js";
+import { createConsoleAccess } from "./services/consoleAccess.js";
 import { parseMemorySwapStatus } from "./services/memorySwap.js";
 import { createDeathPoller } from "./deathPoller.js";
 import { updateEnvFileValue as updateEnvValue } from "./services/envFile.js";
@@ -103,6 +104,14 @@ import { playerListSettingsView, resolvePlayerInactiveWeeks, savePlayerListSetti
 import { resolveAutoStartBattlegroup, saveServerStartupSettings, serverStartupSettingsView } from "./services/serverStartupSettings.js";
 
 const config = loadConfig();
+const consoleAccess = createConsoleAccess({
+  repoRoot: config.repoRoot,
+  configured: process.env.DUNE_CONFIGURED_ADMIN_ALLOWED_IPS,
+  legacy: process.env.ADMIN_ALLOWED_IPS
+});
+config.allowedIps = consoleAccess.activeIps();
+Object.defineProperty(config, "consoleAccessReviewRequired", { get: () => consoleAccess.status().pending });
+if (config.consoleAccessReviewRequired) console.warn("Console IP restrictions await confirmation in Settings; existing access is preserved.");
 const hardwareStatus = createHardwareStatusProvider({ filesystemPath: config.repoRoot });
 const readCommandCache = createReadCommandCache();
 // Status commands walk Docker, PostgreSQL, RabbitMQ, and logs. Keep a fresh
@@ -967,6 +976,17 @@ async function handleApi(req, res) {
   }
   if (path === "/api/settings/api-keys" && req.method === "POST") return apiKeyCreateRoute(req, res);
   if (path === "/api/settings/encrypted-api" && req.method === "GET") return encryptedApiRoute(res, () => encryptedApi.status());
+  if (path === "/api/settings/console-access/confirm" && req.method === "POST") {
+    const body = await readJson(req);
+    try {
+      const result = consoleAccess.confirm(body, remoteIpOf(req));
+      config.allowedIps = consoleAccess.activeIps();
+      audit(config, req, "settings.console-access-confirm", { activeCount: result.activeCount });
+      return json(res, 200, result);
+    } catch (error) {
+      return json(res, 409, { error: error.message });
+    }
+  }
   if (path === "/api/settings/encrypted-api" && req.method === "POST") return encryptedApiToggleRoute(req, res);
   if (path.startsWith("/api/settings/api-keys/")) return apiKeyItemRoute(req, res, path);
   if (path === "/api/settings/iam/policy/test" && req.method === "POST") {
@@ -1400,7 +1420,7 @@ async function handleApi(req, res) {
     return task(req, res, "settings", "experimentalTanksApply", await readJson(req));
   }
   if (path === "/api/settings" && req.method === "POST") return writeConfig(req, res);
-  if (path === "/api/settings") return json(res, 200, await setupState());
+  if (path === "/api/settings") return json(res, 200, await setupState(remoteIpOf(req)));
 
   return json(res, 404, { error: "Not found" });
 }
@@ -6403,7 +6423,7 @@ function readLogs(service, options) {
   return runDockerLogs(service, options);
 }
 
-async function setupState() {
+async function setupState(clientIp) {
   const env = existsSync(resolve(config.repoRoot, ".env"));
   const token = existsSync(resolve(config.secretsDir, "funcom-token.txt"));
   const battlegroup = existsSync(resolve(config.generatedDir, "battlegroup.env"));
@@ -6413,6 +6433,7 @@ async function setupState() {
     serverConfig: readSetupConfigValues(),
     publicDirectory: publicDirectorySettings(),
     serverStartup: serverStartupSettingsView(config.repoRoot),
+    consoleAccess: consoleAccess.status(clientIp),
     files: {
       env,
       token,

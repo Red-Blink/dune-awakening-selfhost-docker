@@ -172,7 +172,7 @@ export async function fetchConsoleAuthState() {
     headers: { accept: "application/json" }
   });
   if (!response.ok) throw new Error(`Console state check failed: ${response.status}`);
-  return await response.json() as { config?: { version?: string; buildId?: string } };
+  return await response.json() as { config?: { version?: string; buildId?: string; consoleAccessReviewRequired?: boolean } };
 }
 
 async function refreshCsrfToken() {

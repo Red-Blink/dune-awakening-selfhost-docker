@@ -7,6 +7,7 @@ import { firstDefined, formatUiSentence, friendlyColumnName } from "../../lib/di
 import { ApiKeysSection } from "./ApiKeysSection";
 import { ExperimentalFeatures } from "./ExperimentalFeatures";
 import { EncryptedApiSection } from "./EncryptedApiSection";
+import { ConsoleAccessNotice, type ConsoleAccessStatus } from "./ConsoleAccessNotice";
 
 type SettingsTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
 type PublicDirectorySettings = {
@@ -325,6 +326,7 @@ export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmActi
         </div>}
       </div>
       <RuntimeSettingsSummary settings={settings} />
+      <ConsoleAccessNotice status={settings?.consoleAccess as ConsoleAccessStatus | undefined} confirmAction={confirmAction} onConfirmed={refresh} />
       <ExperimentalFeatures confirmAction={confirmAction} />
       <div className={`playerAdmin_toggle settings-web-port-toggle ${webPortOpen ? "open" : ""}`}>
         <button className="playerAdmin_toggleHeader" aria-label={webPortOpen ? "Collapse Web Console Port" : "Expand Web Console Port"} onClick={() => setWebPortOpen(!webPortOpen)}>{webPortOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Web Console Port</span></button>

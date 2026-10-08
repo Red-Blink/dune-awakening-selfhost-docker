@@ -6,9 +6,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { tlsClientAddress } from "../src/services/tlsClientAddress.js";
 
-test("the stock Console deployment passes its configured IP allowlist", () => {
+test("the stock Console deployment transports its allowlist for explicit review", () => {
   const compose = readFileSync(new URL("../../../docker-compose.web.yml", import.meta.url), "utf8");
-  assert.match(compose, /^\s+ADMIN_ALLOWED_IPS: "\$\{ADMIN_ALLOWED_IPS:-\}"$/m);
+  assert.match(compose, /^\s+DUNE_CONFIGURED_ADMIN_ALLOWED_IPS: "\$\{ADMIN_ALLOWED_IPS:-\}"$/m);
+  assert.doesNotMatch(compose, /^\s+ADMIN_ALLOWED_IPS:/m);
 });
 
 test("the encrypted API image and Compose default to a non-root user", () => {

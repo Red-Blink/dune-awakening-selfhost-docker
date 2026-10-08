@@ -176,6 +176,7 @@ export const ROUTE_ACTIONS = {
   // key fingerprint and turns it on or off. Settings, so never reachable with an API key.
   "GET /api/settings/encrypted-api":           "settings:read",
   "POST /api/settings/encrypted-api":          "settings:write",
+  "POST /api/settings/console-access/confirm": "settings:write",
   "POST /api/settings/public-directory":       "settings:write",
   "POST /api/settings/public-directory/claim": "settings:write",
   "POST /api/settings/server-startup":          "settings:write",
