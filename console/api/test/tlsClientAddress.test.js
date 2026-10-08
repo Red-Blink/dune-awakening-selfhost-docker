@@ -6,6 +6,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { tlsClientAddress } from "../src/services/tlsClientAddress.js";
 
+test("the stock Console deployment passes its configured IP allowlist", () => {
+  const compose = readFileSync(new URL("../../../docker-compose.web.yml", import.meta.url), "utf8");
+  assert.match(compose, /^\s+ADMIN_ALLOWED_IPS: "\$\{ADMIN_ALLOWED_IPS:-\}"$/m);
+});
+
 test("only signed local TLS forwarding identities can affect the IP allowlist", () => {
   const root = mkdtempSync(join(tmpdir(), "tls-client-address-"));
   const key = randomBytes(32);
