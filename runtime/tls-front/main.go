@@ -550,7 +550,7 @@ func (l *failLimiter) fail(ip net.IP) bool {
 // ---------------------------------------------------------------- health check
 
 func healthcheck(cfg config) int {
-	_, port, err := net.SplitHostPort(cfg.Addr)
+	host, port, err := net.SplitHostPort(cfg.Addr)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -559,7 +559,15 @@ func healthcheck(cfg config) int {
 		// the certificate is not for 127.0.0.1; this only asks the front door itself
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
-	resp, err := c.Get("https://127.0.0.1:" + port + "/mvtls")
+	// Probe the configured listener, not an unrelated IPv4 loopback socket.
+	// Wildcard listeners have no connectable address of their own.
+	switch host {
+	case "", "0.0.0.0":
+		host = "127.0.0.1"
+	case "::":
+		host = "::1"
+	}
+	resp, err := c.Get("https://" + net.JoinHostPort(host, port) + "/mvtls")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1

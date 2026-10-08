@@ -68,6 +68,28 @@ func TestHealthCheckRequiresReachableConsole(t *testing.T) {
 	}
 }
 
+func TestHealthCheckUsesConfiguredFrontAddress(t *testing.T) {
+	front := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	front.Listener.Close()
+	listener, err := net.Listen("tcp", "127.0.0.2:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	front.Listener = listener
+	front.StartTLS()
+	defer front.Close()
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer backend.Close()
+	upstream, _ := url.Parse(backend.URL)
+	if healthcheck(config{Addr: listener.Addr().String(), Upstream: upstream}) != 0 {
+		t.Fatal("healthy front bound to a specific address was reported unhealthy")
+	}
+}
+
 // console is a stand-in for the Dune Docker Console: it records what reached it.
 func console(t *testing.T, seen chan<- *http.Request) *httptest.Server {
 	t.Helper()
