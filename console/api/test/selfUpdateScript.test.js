@@ -545,12 +545,21 @@ test("web console rebuild stops at the configured build timeout", async () => {
   const root = mkdtempSync(join(tmpdir(), "arrakis-self-update-timeout-"));
   const fakeBin = join(root, "bin");
   const runId = "123e4567-e89b-42d3-a456-426614174002";
-  mkdirSync(join(root, "runtime", "scripts"), { recursive: true });
+  mkdirSync(join(root, "runtime", "scripts", "lib"), { recursive: true });
   mkdirSync(join(root, "runtime", "generated"), { recursive: true });
   mkdirSync(fakeBin);
   copyFileSync(join(repoRoot, "runtime", "scripts", "self-update.sh"), join(root, "runtime", "scripts", "self-update.sh"));
   copyFileSync(join(repoRoot, "runtime", "scripts", "compose-project.sh"), join(root, "runtime", "scripts", "compose-project.sh"));
   copyFileSync(join(repoRoot, "runtime", "scripts", "http-rate-limit.py"), join(root, "runtime", "scripts", "http-rate-limit.py"));
+  // dune-awakening-selfhost-docker#901: prepare_web_console_rebuild_env()
+  // (called by rebuild_web_console_now(), exercised below) now sources
+  // console-secrets-env.sh, a new real dependency of self-update.sh this
+  // isolated fixture didn't carry before -- without it, self-update.sh
+  // fails on the missing file before ever reaching the `timeout` command
+  // this test is actually exercising.
+  copyFileSync(join(repoRoot, "runtime", "scripts", "lib", "console-secrets-env.sh"), join(root, "runtime", "scripts", "lib", "console-secrets-env.sh"));
+  copyFileSync(join(repoRoot, "runtime", "scripts", "lib", "secrets.sh"), join(root, "runtime", "scripts", "lib", "secrets.sh"));
+  copyFileSync(join(repoRoot, "runtime", "scripts", "lib", "secrets_aead.py"), join(root, "runtime", "scripts", "lib", "secrets_aead.py"));
   writeFileSync(join(root, "VERSION"), "v0.0.1\n");
   writeFileSync(join(root, "docker-compose.web.yml"), "services: {}\n");
   writeFileSync(join(fakeBin, "docker"), "#!/usr/bin/env bash\nexit 0\n", { mode: 0o700 });
@@ -572,6 +581,101 @@ test("web console rebuild stops at the configured build timeout", async () => {
     assert.match(status, /^state=failed$/m);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// self-update.sh is an entrypoint that runs its full case-statement
+// dispatch on execution/sourcing (no `[ "${BASH_SOURCE[0]}" = "$0" ]`
+// guard), so following baseContainerMutationRoutes.test.js's precedent for
+// entrypoint-only files, this extracts a REAL shipped shell function body
+// verbatim from the script and executes it for real in an isolated bash
+// process -- proving the actual shipped behavior, not a reimplemented copy
+// of it. Used below by the migrate_discord_role_ids_env tests.
+function extractShellFunction(source, name) {
+  const startMarker = `${name}() {`;
+  const start = source.indexOf(startMarker);
+  assert.notEqual(start, -1, `${name}() not found in self-update.sh`);
+  const end = source.indexOf("\n}\n", start);
+  assert.notEqual(end, -1, `could not find the end of ${name}()`);
+  return source.slice(start, end + 2);
+}
+
+function runShellFunction(functionsSource, callExpression, cwd) {
+  const script = `#!/usr/bin/env bash\nset -euo pipefail\ncd ${JSON.stringify(cwd)}\n${functionsSource}\n${callExpression}\n`;
+  const result = spawnSync("bash", ["-c", script]);
+  assert.equal(result.status, 0, result.stderr?.toString());
+  return result.stdout.toString();
+}
+
+// Finding 1 (CRITICAL, final review): migrate_discord_role_ids_env() must
+// copy a legacy-only DISCORD_OBSERVER_ROLE_IDS value into the new
+// DISCORD_PLAYER_ROLE_IDS key in .env, once, so an existing operator who
+// upgrades does not silently lose that role mapping (docker-compose.web.yml's
+// own interpolated environment: entry always sets DISCORD_PLAYER_ROLE_IDS in
+// the container -- even as an empty string -- so the JS-side
+// `!== undefined` legacy fallback in discordRoleMappingFromEnv() can never
+// fire inside a real deployed container without this migration).
+test("migrate_discord_role_ids_env copies a legacy-only DISCORD_OBSERVER_ROLE_IDS value into DISCORD_PLAYER_ROLE_IDS (Finding 1)", () => {
+  const source = readFileSync(join(repoRoot, "runtime", "scripts", "self-update.sh"), "utf8");
+  const functionsSource = [
+    extractShellFunction(source, "read_env_file_value"),
+    extractShellFunction(source, "persist_env_file_value"),
+    extractShellFunction(source, "migrate_discord_role_ids_env")
+  ].join("\n");
+
+  const dir = mkdtempSync(join(tmpdir(), "arrakis-discord-role-migration-"));
+  try {
+    writeFileSync(join(dir, ".env"), "DISCORD_OBSERVER_ROLE_IDS=123456789012345678\n");
+
+    runShellFunction(functionsSource, "migrate_discord_role_ids_env", dir);
+
+    const envContent = readFileSync(join(dir, ".env"), "utf8");
+    assert.match(envContent, /^DISCORD_PLAYER_ROLE_IDS=123456789012345678$/m, "the legacy role IDs must be copied into the new key so the container sees them regardless of Compose interpolation behavior");
+    assert.match(envContent, /^DISCORD_OBSERVER_ROLE_IDS=123456789012345678$/m, "the legacy key itself must be left untouched, not deleted");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("migrate_discord_role_ids_env never overwrites an already-present DISCORD_PLAYER_ROLE_IDS -- including a deliberately-cleared empty value (Finding 1)", () => {
+  const source = readFileSync(join(repoRoot, "runtime", "scripts", "self-update.sh"), "utf8");
+  const functionsSource = [
+    extractShellFunction(source, "read_env_file_value"),
+    extractShellFunction(source, "persist_env_file_value"),
+    extractShellFunction(source, "migrate_discord_role_ids_env")
+  ].join("\n");
+
+  const dir = mkdtempSync(join(tmpdir(), "arrakis-discord-role-migration-noop-"));
+  try {
+    writeFileSync(join(dir, ".env"), "DISCORD_OBSERVER_ROLE_IDS=999999999999999999\nDISCORD_PLAYER_ROLE_IDS=\n");
+
+    runShellFunction(functionsSource, "migrate_discord_role_ids_env", dir);
+
+    const envContent = readFileSync(join(dir, ".env"), "utf8");
+    assert.match(envContent, /^DISCORD_PLAYER_ROLE_IDS=$/m, "an operator who deliberately cleared DISCORD_PLAYER_ROLE_IDS to revoke access must not have it silently repopulated from the stale legacy value");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("migrate_discord_role_ids_env is a no-op when there is no legacy value to migrate (Finding 1)", () => {
+  const source = readFileSync(join(repoRoot, "runtime", "scripts", "self-update.sh"), "utf8");
+  const functionsSource = [
+    extractShellFunction(source, "read_env_file_value"),
+    extractShellFunction(source, "persist_env_file_value"),
+    extractShellFunction(source, "migrate_discord_role_ids_env")
+  ].join("\n");
+
+  const dir = mkdtempSync(join(tmpdir(), "arrakis-discord-role-migration-nothing-"));
+  try {
+    writeFileSync(join(dir, ".env"), "SOME_OTHER_KEY=untouched\n");
+
+    runShellFunction(functionsSource, "migrate_discord_role_ids_env", dir);
+
+    const envContent = readFileSync(join(dir, ".env"), "utf8");
+    assert.doesNotMatch(envContent, /DISCORD_PLAYER_ROLE_IDS/, "nothing to migrate means no new key should be written at all");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

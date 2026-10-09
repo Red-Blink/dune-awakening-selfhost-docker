@@ -4,6 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 ROOT_DIR="$(pwd)"
 
+# shellcheck disable=SC1091
 . runtime/scripts/compose-project.sh
 DUNE_COMPOSE_PROJECT_NAME="$(dune_resolve_compose_project_name "$ROOT_DIR")"
 export DUNE_COMPOSE_PROJECT_NAME
@@ -131,6 +132,12 @@ self_update_write_status() {
   local percent="$3"
   local message="$4"
   local finished_at="${5:-}"
+  # Optional extra "key=value" line(s), written into the SAME atomic
+  # tmp-file+mv as every other field below -- e.g. Discord adapter health's
+  # discord_health_ok=<0|1> must land in the exact write that also sets
+  # state=succeeded, not a separate later append, or a poller can observe
+  # state=succeeded with no discord_health_ok yet (audit finding #2, HIGH).
+  local extra_line="${6:-}"
   local status_file tmp_file updated_at
 
   self_update_status_enabled || return 0
@@ -152,6 +159,7 @@ self_update_write_status() {
     printf 'started_at=%s\n' "$SELF_UPDATE_STATUS_STARTED_AT"
     printf 'updated_at=%s\n' "$updated_at"
     printf 'finished_at=%s\n' "$finished_at"
+    [ -z "$extra_line" ] || printf '%s\n' "$extra_line"
   } > "$tmp_file"
   chmod 600 "$tmp_file"
   mv -f "$tmp_file" "$status_file"
@@ -1203,6 +1211,40 @@ persist_env_file_value() {
   fi
 }
 
+# migrate_discord_role_ids_env: one-time .env migration for Finding 1
+# (CRITICAL, final review). DISCORD_PLAYER_ROLE_IDS superseded the legacy
+# DISCORD_OBSERVER_ROLE_IDS var when this feature shipped, and
+# discordRoleMappingFromEnv() (console/api/src/integrations/discord/adapter.js)
+# correctly falls back to the legacy var ONLY when DISCORD_PLAYER_ROLE_IDS
+# is genuinely `undefined` in process.env -- but docker-compose.web.yml's
+# own interpolated map-form `environment:` entry for DISCORD_PLAYER_ROLE_IDS
+# ALWAYS sets it in the container (empty string when unset in .env, never
+# actually omitted), so that JS fallback could never fire inside a real
+# deployed container. An existing operator who has DISCORD_OBSERVER_ROLE_IDS
+# set (and no DISCORD_PLAYER_ROLE_IDS, since it didn't exist before this
+# feature) would silently lose that role mapping's bot access on their next
+# `docker compose up`/self-update, with no warning (Requirement 0
+# violation). Copy the legacy value into the new key, once, directly in
+# .env -- a durable, testable-without-Docker belt-and-braces layer
+# alongside docker-compose.web.yml's own nested-default fix
+# ("${DISCORD_PLAYER_ROLE_IDS:-${DISCORD_OBSERVER_ROLE_IDS:-}}"), which
+# closes the same gap at the Compose-interpolation layer.
+#
+# Deliberately conservative: only acts when DISCORD_PLAYER_ROLE_IDS is
+# genuinely ABSENT from .env (never overwrites an operator's explicit,
+# already-migrated value -- including a deliberately-cleared empty string,
+# which must stay empty per adapter.js's own `!== undefined` distinction)
+# and DISCORD_OBSERVER_ROLE_IDS has a real, non-empty value to migrate.
+migrate_discord_role_ids_env() {
+  [ -f .env ] || return 0
+  grep -q '^DISCORD_PLAYER_ROLE_IDS=' .env && return 0
+  local legacy_value
+  legacy_value="$(read_env_file_value DISCORD_OBSERVER_ROLE_IDS || true)"
+  [ -n "$legacy_value" ] || return 0
+  persist_env_file_value DISCORD_PLAYER_ROLE_IDS "$legacy_value"
+  echo "Migrated legacy DISCORD_OBSERVER_ROLE_IDS into DISCORD_PLAYER_ROLE_IDS in .env."
+}
+
 running_console_env_value() {
   local key="$1"
   command -v docker >/dev/null 2>&1 || return 1
@@ -1326,6 +1368,20 @@ prepare_web_console_rebuild_env() {
   persist_env_file_value DUNE_HOST_UID "$DUNE_HOST_UID"
   persist_env_file_value DUNE_HOST_GID "$DUNE_HOST_GID"
   restore_local_state_ownership
+  # dune-awakening-selfhost-docker#901 (Layer 2 audit finding on PR
+  # #902): the only other place besides console.sh's own
+  # restart_console() that force-recreates the web console --
+  # rebuild_web_console_now() (the real self-update apply flow) calls
+  # this shared prep function immediately before
+  # `docker compose ... up --force-recreate`. Without this, an operator
+  # who migrated discord-hosted-bot-oauth-client-secret and ran
+  # cleanup-legacy (deleting the plaintext .txt) would have hosted-bot
+  # OAuth silently break on the very next self-update, since the
+  # container's env var would go unset and config.js's
+  # readInlineOrFile() falls back to a now-deleted file.
+  # shellcheck disable=SC1091
+  . runtime/scripts/lib/console-secrets-env.sh
+  export_discord_hosted_bot_oauth_client_secret
 }
 
 rebuild_web_console_now() {
@@ -1636,6 +1692,11 @@ case "$cmd" in
     ensure_self_update_preflight
     install_release_tag "$tag"
     install_cli_command_after_update
+    # Finding 1 (CRITICAL, final review): run before the console recreate
+    # below, so a legacy-only DISCORD_OBSERVER_ROLE_IDS config is already
+    # migrated into DISCORD_PLAYER_ROLE_IDS in .env by the time the new
+    # container reads it.
+    migrate_discord_role_ids_env
     rebuild_web_console_after_update
     self_update_finish_success
     ;;

@@ -65,9 +65,15 @@ export const ROUTE_ACTIONS = {
   "GET /api/setup/tasks":                      "setup:read",
   "POST /api/setup/preflight":                 "setup:write",
   "POST /api/setup/write-config":              "setup:write",
-  "POST /api/setup/write-oauth-config":        "setup:write",
-  "POST /api/setup/save-oauth-secret":         "setup:write",
-  "POST /api/setup/save-token":                "setup:write",
+  // Owner-only (settings:*, which the admin tier is explicitly denied): these
+  // routes rewrite the console's own authentication trust anchor. Gating them
+  // on setup:write let an admin-tier Discord session escalate to owner.
+  "POST /api/setup/write-oauth-config":        "settings:write",
+  "POST /api/setup/save-oauth-secret":         "settings:write",
+  "GET /api/setup/discord-identity":           "settings:read",
+  "POST /api/setup/discord-finalize":          "settings:write",
+  "POST /api/setup/discord-restart":           "settings:write",
+  "POST /api/setup/save-token":                "server:write-credentials",
   "POST /api/setup/init":                      "setup:write",
   "GET /api/public-directory/status":          "setup:read",
 
@@ -93,12 +99,12 @@ export const ROUTE_ACTIONS = {
   "POST /api/server/network-bind/fix":         "server:network-fix",
   "POST /api/server/storage/cleanup-images":   "server:storage-cleanup",
   "POST /api/server/storage/cleanup-build-cache":"server:storage-cleanup",
-  "POST /api/server/funcom-token":             "server:write-config",
+  "POST /api/server/funcom-token":             "server:write-credentials",
   "POST /api/server/title":                    "server:write-config",
   "POST /api/server/config":                   "server:write-config",
   "POST /api/server/restart-schedule":         "server:write-config",
-  "POST /api/server/ip-change-restart":        "server:write-config",
-  "POST /api/server/ip-change-restart/check":  "server:write-config",
+  "POST /api/server/ip-change-restart":        "server:write-credentials",
+  "POST /api/server/ip-change-restart/check":  "server:write-credentials",
   "POST /api/server/shutdown-protection":      "server:write-config",
   "POST /api/server/shutdown-protection/remove":"server:write-config",
   "POST /api/server/restart-queue":            "server:write-config",
@@ -165,6 +171,12 @@ export const ROUTE_ACTIONS = {
   "GET /api/settings":                         "settings:read",
   "POST /api/settings":                        "settings:write",
   "POST /api/settings/admin-password":         "settings:change-password",
+  "POST /api/auth/2fa/recovery-codes/regenerate": "settings:regenerate-recovery-codes",
+  "POST /api/auth/2fa/enable":                    "settings:enable-totp",
+  "POST /api/auth/2fa/disable":                   "settings:disable-totp",
+  "POST /api/settings/discord-oauth/disable":     "settings:disable-discord-oauth",
+  "POST /api/settings/discord-oauth/enable":      "settings:enable-discord-oauth",
+  "POST /api/settings/discord-oauth/forget":      "settings:forget-discord-oauth",
   "POST /api/settings/web-port":               "settings:change-port",
   "GET /api/settings/iam/policies":            "settings:read",
   "PUT /api/settings/iam/policy":              "settings:write",
@@ -177,6 +189,122 @@ export const ROUTE_ACTIONS = {
   "POST /api/settings/server-startup":          "settings:write",
   "GET /api/settings/experimental-tanks":      "settings:read",
   "POST /api/settings/experimental-tanks":     "settings:write",
+
+  // --- Discord Bot Adapter Settings ---
+  // GET uses updates:read, not settings:read -- audit finding #6 (LOW):
+  // admin is denied settings:* (see the Deny wildcard in policy.js) but IS
+  // allowed updates:read (self-update already reaches this class of
+  // capability), so admin at least gets read-only visibility into this
+  // feature's state. updates:read requires zero DEFAULT_POLICIES changes,
+  // matching this feature's existing pattern of reusing an existing
+  // wildcard rather than editing policies.
+  //
+  // Upstream-port correction (tier1-upstream base, confirmed directly via
+  // `evaluate({tier:"admin"}, "updates:apply")` -> false): this comment
+  // previously went on to claim admin can also reach the POST routes below
+  // ("an admin who can mutate this feature's state must also be able to
+  // read it back first") on the premise that updates:apply is admin-
+  // reachable the same way updates:read/check/self-check are. That premise
+  // holds on fork main, but tier1-upstream's own policy.js lists
+  // updates:apply/fix/repair in CROWN_JEWEL_DENY_ACTIONS ("deploying /
+  // altering the running code" -- a real, deliberate, stricter posture
+  // already established there, not something this port should weaken --
+  // see oauthRoutes.integration.test.js's "admin-tier session gets a real
+  // 403..." test for the same conclusion reached independently). The net
+  // effect: on this branch, admin can see this feature's state (GET) but
+  // cannot change it (every POST route below is owner-only in practice,
+  // same as regenerate-token/disable/oauth-config/oauth-secret further
+  // down) -- there is currently no route in this file where a non-owner
+  // session can mutate Discord Bot settings. Reusing updates:apply here
+  // instead of a dedicated action name was still the right call: adding a
+  // new admin-reachable action would be widening a currently owner-only
+  // surface, which needs its own explicit design decision, not a side
+  // effect of a doc-accuracy fix.
+  "GET /api/settings/discord-bot":              "updates:read",
+  // Real UAT finding (2026-09-10): the 3-step wizard's early choice-persist
+  // -- no restart, so same tier as enable/role-ids (see the correction
+  // above: that tier is owner-only on this branch, not admin-reachable).
+  "POST /api/settings/discord-bot/choice":      "updates:apply",
+  "POST /api/settings/discord-bot/enable":      "updates:apply",
+  "POST /api/settings/discord-bot/role-ids":    "updates:apply",
+  "POST /api/settings/discord-bot/regenerate-token": "settings:discord-bot-regenerate-token",
+  // Real UAT finding (2026-09-09): the explicit restart trigger split out
+  // of /enable and /role-ids above -- same action as both, since it's the
+  // second half of the exact same "apply this pending settings change"
+  // capability those two routes already require.
+  "POST /api/settings/discord-bot/restart":     "updates:apply",
+  // Real UAT finding (2026-09-09, "I see no path to remove the bot"): a
+  // destructive, hard-to-reverse action (invalidates the live token, wipes
+  // role-ID mappings including admin-tier ones) -- owner-only, same tier
+  // restriction as settings:discord-bot-regenerate-token above, via its own
+  // distinct action name (falls under the settings:* Deny-for-admin
+  // wildcard already in policy.js, same as regenerate-token, with no new
+  // policy.js entry needed).
+  "POST /api/settings/discord-bot/disable":     "settings:discord-bot-disable",
+  // Real UAT finding (2026-09-09): the hosted-bot connection's own,
+  // independent Discord Application config -- see server.js's own comment
+  // on these 2 routes for why they're separate from Settings -> Discord
+  // OAuth. Originally mapped to updates:apply, same as enable/role-ids/
+  // restart above (this was "not owner-only: prerequisite setup, not a
+  // destructive/credential-invalidating action" on fork main, at the time
+  // #859 was found) -- but #859 itself is exactly why that no longer
+  // applies: substituting the Discord Application's own credentials IS a
+  // credential-invalidating action once you account for what an attacker
+  // does with it, so it was moved to its own owner-only settings:* action
+  // below rather than staying grouped with enable/role-ids/restart. (On
+  // this tier1-upstream-based branch, enable/role-ids/restart are now
+  // ALSO owner-only via CROWN_JEWEL_DENY_ACTIONS -- see the GET route's
+  // comment above -- so this pair is no longer the odd one out tier-wise
+  // either; #859's fix stands regardless of that separate fact.)
+  // dune-awakening-selfhost-docker#859: these two routes replace the
+  // hosted-bot Discord Application's Client ID/Secret/Redirect URI --
+  // exactly the class of credential-replacement action every OTHER route
+  // in this flow (regenerate-token, disable, /register) already maps to a
+  // dedicated, owner-only settings:* action, per the Deny list below. This
+  // pair was the one place that convention wasn't applied: `updates:apply`
+  // let an admin (not owner) substitute their own Discord Application and
+  // an attacker-controlled redirectUri, then harvest the real owner's
+  // Discord identity/access token the next time the owner completed the
+  // (now-hijacked) OAuth consent flow.
+  "POST /api/settings/discord-bot/oauth-config": "settings:discord-bot-oauth-config",
+  "POST /api/settings/discord-bot/oauth-secret": "settings:discord-bot-oauth-secret",
+
+  // --- Hosted Bot Registration ---
+  // start/callback use updates:read (the same real precedent as
+  // GET /api/settings/discord-bot -- NOT settings:read, which does not
+  // exist as a mapped action for this section and would strand every
+  // admin-tier operator; verified against the sibling feature's own
+  // ROUTE_ACTIONS entries during this plan's own research).
+  // dune-awakening-selfhost-docker#861: previously updates:read
+  // (admin-reachable). Only the owner can ever complete the downstream
+  // /register call this OAuth round trip exists for -- letting a non-owner
+  // admin start it anyway served no purpose but let them hold a live
+  // Discord access token in the pending-registration store under the
+  // guise of the shared hosted-bot flow. Gated to owner-only, matching
+  // /register itself.
+  "GET /api/integrations/discord/hosted-bot/oauth/start":    "settings:discord-bot-hosted-oauth",
+  "GET /api/integrations/discord/hosted-bot/oauth/callback": "settings:discord-bot-hosted-oauth",
+  // register is a new, dedicated, owner-only action -- this route forwards
+  // a live external OAuth credential and the local adapter secret across
+  // an organizational trust boundary, at least as sensitive as this
+  // codebase's own existing settings:discord-bot-regenerate-token
+  // precedent (also owner-only via the same settings:* Deny wildcard).
+  "POST /api/integrations/discord/hosted-bot/register":      "settings:discord-bot-hosted-register",
+
+  // mentat#343+/dune-awakening-selfhost-docker#832 Phase 6: the new,
+  // fully-automated auto-invite flow -- same owner-only trust tier as the
+  // OLD hosted-bot routes immediately above (this flow mints/uses the
+  // same adapter token and forwards it across the same organizational
+  // trust boundary), reusing the existing settings:discord-bot-hosted-oauth
+  // action name since both are steps of conceptually the same "start a
+  // Discord round trip for the hosted bot connection" capability, not a
+  // newly-invented trust tier.
+  "POST /api/integrations/discord/hosted-bot/auto-invite/start":    "settings:discord-bot-hosted-oauth",
+  "GET /api/integrations/discord/hosted-bot/auto-invite/complete":  "settings:discord-bot-hosted-oauth",
+  // Round 4 (dune-awakening-selfhost-docker#876, design doc §13): the
+  // completion-signal poll -- same trust tier as the two routes above,
+  // it's a read of this same in-flight connection's own status.
+  "GET /api/integrations/discord/hosted-bot/auto-invite/confirmation-status": "settings:discord-bot-hosted-oauth",
 
   // --- Players (read) ---
   "GET /api/players":                          "players:read",
@@ -244,7 +372,7 @@ export const ROUTE_ACTIONS = {
   // scoped to one base, whereas this retunes every enrolled base at once, so a
   // bases:mutate grant cannot be read as consent to it. Named for the
   // per-feature settings convention (exchange:write-config, maps:write-config);
-  // owner/admin grant bases:*, so default access is unchanged.
+  // The shipped owner policy reaches it; lower tiers require an explicit grant.
   //
   // This entry is also what keeps the route off the "POST /api/bases/" →
   // bases:mutate prefix rule, where it would resolve silently rather than
@@ -254,7 +382,7 @@ export const ROUTE_ACTIONS = {
   // reads, matching GET /api/bases/{id}/export. Import creates a whole base
   // (actors, pieces, storage items) for a player, so it is its own action:
   // no bases:read or bases:mutate grant should be read as consent to it.
-  // owner/admin grant bases:*, so they reach it; lower tiers do not.
+  // The shipped owner policy reaches it; lower tiers require an explicit grant.
   "GET /api/base-backups":                     "bases:read",
   "POST /api/base-backups/import":             "bases:import-backup",
 
@@ -455,6 +583,15 @@ export const REGEX_ACTIONS_BY_METHOD = {
   "PUT /api/settings/api-keys/":    "settings:write",
   "DELETE /api/settings/api-keys/": "settings:write",
 
+  // PUT included for parity with the /api/bases/ bucket: without it a future
+  // PUT /api/players/* route with no explicit entry would fall through to the
+  // method-agnostic REGEX_ACTIONS "/api/players/" -> players:read fallback and
+  // be authorized for every read-holding tier instead of failing closed.
+  // Upstream has no PUT /api/players/* route today and carries no equivalent
+  // entry; kept here as this fork's own defense-in-depth, pointed at the same
+  // players:unclassified sentinel the other three methods use below.
+  "PUT /api/players/":     "players:unclassified",
+
   // ---- *:unclassified sentinels ----
   //
   // DO NOT DELETE THESE, even though every route that exists today is named in
@@ -464,7 +601,7 @@ export const REGEX_ACTIONS_BY_METHOD = {
   // DELETE with no sentinel here resolves to a READ action and runs under a
   // read-only grant. Same trap the vehicles:system-custodian entry documents.
   //
-  // Coverage is per method and currently uneven: players has POST/DELETE/PATCH,
+  // Coverage is per method and currently uneven: players has POST/DELETE/PATCH/PUT,
   // guilds/addons/blueprints have POST/DELETE, and no namespace has PUT.
   "POST /api/players/":    "players:unclassified",
   "DELETE /api/players/":  "players:unclassified",
@@ -560,8 +697,8 @@ export const REGEX_ACTIONS_BY_METHOD_PATTERN = [
   // read-only, so an operator whose hand-authored policy grants bases:mutate
   // agreed to refills and permission edits and could not have agreed to item
   // destruction — folding this into that bucket would silently widen every
-  // existing narrow policy. The shipped owner/admin policies grant bases:*,
-  // so default access is unchanged.
+  // existing narrow policy. The shipped owner policy reaches it; lower tiers
+  // require an explicit grant.
   { method: "DELETE", pattern: /^\/api\/bases\/[^/]+\/containers\/[^/]+\/items\/[^/]+$/, action: "bases:delete-item" },
   // POST /api/bases/{baseId}/containers/{placeableId}/items — creating one
   // stored item. Own action for the same consent reason as bases:delete-item
@@ -643,9 +780,11 @@ export const REGEX_ACTIONS_BY_METHOD_PATTERN = [
   // panel shipped without any way to destroy items, so an operator whose
   // hand-authored policy grants vehicles:mutate (roster edits, refuel, repair)
   // cannot have agreed to item destruction -- folding this in would silently
-  // widen every existing narrow policy. Default tiers are unaffected: owner
-  // ("*") and admin ("vehicles:*") still match, moderator/player/observer hold
-  // only vehicles:read.
+  // widen every existing narrow policy. Under the default policy owner
+  // ("*") still matches; admin/moderator/player hold only vehicles:read,
+  // so the delete-item action is owner-only by default (admin's default was
+  // narrowed from vehicles:* to vehicles:read -- see the tier-model notes in
+  // console-iam.md).
   //
   // The bulk action is "vehicles:bulk-delete-items", NOT "vehicles:delete-items"
   // (issue #351's lesson, mirrored from bases): policy.js's `-*` wildcard means
