@@ -76,7 +76,7 @@ From `console/api`:
 ```bash
 DUNE_DOCKER_DIR="$HOME/dune-awakening-selfhost-docker-WSL" \
 DUNE_BOT_API_TOKEN_FILE="$HOME/.config/dune-console/dune-bot-api-token.txt" \
-DISCORD_OBSERVER_ROLE_IDS=role-observer \
+DISCORD_PLAYER_ROLE_IDS=role-player \
 DISCORD_ADMIN_ROLE_IDS=role-admin \
 DISCORD_OWNER_ROLE_IDS=role-owner \
 npm run start:discord-adapter
@@ -90,7 +90,7 @@ sudo env \
   HOME="$HOME" \
   DUNE_DOCKER_DIR="$HOME/dune-awakening-selfhost-docker-WSL" \
   DUNE_BOT_API_TOKEN_FILE="$HOME/.config/dune-console/dune-bot-api-token.txt" \
-  DISCORD_OBSERVER_ROLE_IDS=role-observer \
+  DISCORD_PLAYER_ROLE_IDS=role-player \
   DISCORD_ADMIN_ROLE_IDS=role-admin \
   DISCORD_OWNER_ROLE_IDS=role-owner \
   npm run start:discord-adapter
@@ -106,7 +106,7 @@ npm ci --ignore-scripts
 export DUNE_CONSOLE_API_URL=http://127.0.0.1:8088
 export DUNE_BOT_API_TOKEN_FILE="$HOME/.config/dune-console/dune-bot-api-token.txt"
 export DISCORD_GUILD_ID=local-guild
-export DISCORD_OBSERVER_ROLE_IDS=role-observer
+export DISCORD_PLAYER_ROLE_IDS=role-player
 export DISCORD_ADMIN_ROLE_IDS=role-admin
 export DISCORD_OWNER_ROLE_IDS=role-owner
 
@@ -185,13 +185,13 @@ artifacts/security/vulnerability-report.json
 
 ### 403 on Readiness or Services
 
-The observer role is not aligned.
+The player role is not aligned.
 
 Check:
 
-- `actorRoleIdsSent` includes `role-observer`.
-- `consoleRolePolicy.observerConfigured` is `true`.
-- The Console adapter was started with `DISCORD_OBSERVER_ROLE_IDS=role-observer`.
+- `actorRoleIdsSent` includes `role-player`.
+- `consoleRolePolicy.playerConfigured` is `true`.
+- The Console adapter was started with `DISCORD_PLAYER_ROLE_IDS=role-player`.
 
 ### 403 on Detailed Status
 
