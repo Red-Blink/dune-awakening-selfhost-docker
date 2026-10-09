@@ -104,6 +104,7 @@ namespace" rule, so Create stays disabled until something is selected.
 | `blueprints` | `blueprints:read` | `delete`, `export`, `import`, `unclassified` |
 | `exchange` | `exchange:market`, `exchange:read` | `market-write`, `write-config` |
 | `maps` | `maps:read` | `despawn`, `reconcile`, `restart`, `spawn`, `teleport`, `write-config` |
+| `realtime` | `realtime:read` | *nothing — Realtime Data is read-only* |
 | `sietches` | `sietches:read` | `write` |
 | `deepdesert` | `deepdesert:read` | `write` |
 | `landsraad` | `landsraad:read` | `write` |
@@ -115,9 +116,9 @@ namespace" rule, so Create stays disabled until something is selected.
 | `addons` | `addons:read` | *nothing — write actions are denied to keys* |
 | `admin` | `admin:announcements:read`, `admin:history:read`, `admin:items:read`, `admin:motd:read`, `admin:skills:read`, `admin:transfer-settings:read`, `admin:vehicles:read` | `announcements:write`, `broadcast`, `broadcast-shutdown`, `history:clear`, `map-chat`, `motd:write`, `transfer-settings:write` |
 
-`logs`, `updates` and `addons` render a two-segment control (None / Read), not three. `logs`
-has no write action at all; the other two have several, but they are denied to keys — see
-below. All three are read from the action catalog rather than hardcoded, so a future `logs`
+`logs`, `realtime`, `updates` and `addons` render a two-segment control (None / Read), not
+three. `logs` and `realtime` have no write action at all; the other two have several, but they
+are denied to keys — see below. All three are read from the action catalog rather than hardcoded, so a future `logs`
 write action makes the third segment appear on its own.
 
 ### Two read exceptions

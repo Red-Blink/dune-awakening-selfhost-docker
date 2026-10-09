@@ -41,6 +41,7 @@ import { looksLikeTar, mintSystemBackupName, normalizeImportedSystemMetadata, re
 import { createTarHeader, tarArchiveLength, tarPadding, TAR_TRAILER_BYTES, createBackupDownloadArchive, enrichBackupRows, nextImportedBackupName, normalizeImportedBackupMetadata, readCurrentBattlegroupId, validBackupDownloadName } from "./services/backups.js";
 import { createMemoryBalancer } from "./services/memoryBalancer.js";
 import { collectContainerHealth } from "./services/containerHealth.js";
+import { createRealtime, RealtimeError } from "./services/realtime.js";
 import { parseMemorySwapStatus } from "./services/memorySwap.js";
 import { createDeathPoller } from "./deathPoller.js";
 import { updateEnvFileValue as updateEnvValue } from "./services/envFile.js";
@@ -168,6 +169,7 @@ function shouldNoteApiKeyAuthThrottle(failureKey, at = Date.now()) {
   return true;
 }
 const apiKeys = createApiKeyStore({ file: config.apiKeysFile });
+const realtime = createRealtime();
 // Proof that a restore was previewed, for the apply that follows it. In memory
 // beside the sessions it is keyed by -- see the module header for why it is not
 // persisted.
@@ -957,6 +959,9 @@ async function handleApi(req, res) {
     return json(res, 200, { keys: apiKeys.list() });
   }
   if (path === "/api/settings/api-keys" && req.method === "POST") return apiKeyCreateRoute(req, res);
+  if (path === "/api/realtime/healthz" && req.method === "GET") return realtimeRoute(res, () => realtime.health());
+  if (path === "/api/realtime/objects" && req.method === "GET") return realtimeRoute(res, () => realtime.objects({ allowPlayers: principalMay(req, "players:read") }));
+  if (path === "/api/realtime/stream" && req.method === "GET") return realtimeStreamRoute(req, res);
   if (path.startsWith("/api/settings/api-keys/")) return apiKeyItemRoute(req, res, path);
   if (path === "/api/settings/iam/policy/test" && req.method === "POST") {
     const body = await readJson(req);
@@ -2724,6 +2729,42 @@ async function adminPasswordRoute(req, res) {
   config.adminPassword = password;
   audit(config, req, "settings.change-admin-password", { password: "<redacted>" });
   return json(res, 200, { ok: true });
+}
+
+async function realtimeRoute(res, action) {
+  try {
+    return json(res, 200, await action(), { "cache-control": "no-store" });
+  } catch (error) {
+    if (error instanceof RealtimeError) return json(res, error.status, { available: false, error: error.message });
+    throw error;
+  }
+}
+
+// A stream outlives the request that authorized it, so the key (or browser
+// session) is checked again every few seconds: disabling, expiring or revoking
+// the key, or removing its Realtime Data / Players scope, takes effect on the
+// open stream too.
+function realtimeStreamRoute(req, res) {
+  const principal = req.authApiKey ? `apikey:${req.authApiKey.id}` : `session:${req.authSession?.id || "unknown"}`;
+  const current = () => {
+    if (!req.authApiKey) {
+      const session = auth.readSession(req);
+      return session ? { session, key: null } : null;
+    }
+    const bearer = apiKeys.authenticate(req);
+    return bearer && !bearer.error ? { session: bearer.session, key: bearer.key } : null;
+  };
+  const may = (action) => {
+    const now = current();
+    if (!now || !evaluate(now.session, action)) return false;
+    return !now.key || apiKeys.allows(now.key, action);
+  };
+  audit(config, req, "realtime.stream-open", { principal });
+  realtime.stream(req, res, {
+    principal,
+    allowPlayers: () => may("players:read"),
+    stillAllowed: () => may("realtime:read")
+  });
 }
 
 async function apiKeyCreateRoute(req, res) {

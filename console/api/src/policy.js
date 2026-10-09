@@ -315,6 +315,7 @@ export const DEFAULT_POLICIES = {
         "landsraad:*",
         "addons:*",
         "carepackage:*",
+        "realtime:*",
       ]},
       { Effect: "Deny", Action: [
         "settings:*",
