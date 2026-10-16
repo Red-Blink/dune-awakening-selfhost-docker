@@ -23,7 +23,7 @@ bot with Discord so it can connect to your server.
 
 1. Go to **[discord.com/developers/applications](https://discord.com/developers/applications)**
 2. Click the **New Application** button (top right)
-3. Name your bot (e.g., "Arrakis Control Plane" or "Dune Server Status")
+3. Name your bot (e.g., "Dune Server Status" or your server's name)
 4. Click **Create**
 
 ![New Application](https://cdn.discordapp.com/attachments/1207782128457228348/1524202981606690916/content.png?ex=6a4ee425&is=6a4d92a5&hm=3f9f844d477990536c3ae4f19abfd45a55a351ed965ea67128355c6ae301686e&width=600)
@@ -91,7 +91,7 @@ The bot uses Discord roles to control who can use which commands.
 
 | Role | Purpose | Who Gets It |
 |------|---------|-------------|
-| **Dune Observer** | Can use all read-only commands | Trusted members |
+| **Dune Player** | Can use all read-only commands | Trusted members |
 | **Dune Admin** | Can use admin commands + diagnostics | Server admins |
 
 3. Assign roles to yourself and your trusted members.
@@ -180,7 +180,7 @@ DUNE_DISCORD_ADAPTER_TOKEN=PASTE_YOUR_ADAPTER_TOKEN_HERE
 
 # === Roles (use your actual role IDs from Step 5) ===
 DISCORD_RBAC_MODE=restricted
-DISCORD_OBSERVER_ROLE_IDS=PASTE_OBSERVER_ROLE_ID
+DISCORD_PLAYER_ROLE_IDS=PASTE_PLAYER_ROLE_ID
 DISCORD_ADMIN_ROLE_IDS=PASTE_ADMIN_ROLE_ID
 
 # === Guild (for instant command registration) ===
