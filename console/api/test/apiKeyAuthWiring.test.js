@@ -33,6 +33,18 @@ const rawSource = readFileSync(join(__dirname, "../src/server.js"), "utf8");
 // matched. String-aware on purpose: handleApi contains
 // `new URL(req.url, "http://localhost")`, and a naive //-stripper truncates
 // that line mid-body and shifts every index after it.
+// Merge-conflict finding (upstream-main-base sync): a bare quote-open on
+// `"`/`'`/`` ` `` alone is not enough once server.js contains a regex
+// character class with a quote literal inside it (the filename sanitizer's
+// `/[\x00-\x1f\x7f<>:"/\\|?*]/g`). Without regex awareness, that embedded
+// `"` opens a fake "string" that swallows everything -- including real
+// comments -- until some later, unrelated `"` happens to close it. Confirmed
+// against both real regressions: this exact desync silently un-strips the
+// `/* best effort */` comment in the Discord-setup marker cleanup later in
+// the file, which is what caught it.
+const REGEX_OK_PREV = new Set([..."([{,;:=&|!?+-*%^~<>".split(""), "\n"]);
+const REGEX_OK_KEYWORD = /\b(return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/;
+
 function stripComments(text) {
   let out = "";
   let quote = null;
@@ -52,6 +64,30 @@ function stripComments(text) {
       while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++;
       i++;
       continue;
+    }
+    if (ch === "/") {
+      const trimmed = out.replace(/\s+$/, "");
+      const lastChar = trimmed.slice(-1);
+      const looksLikeRegex = trimmed === "" || REGEX_OK_PREV.has(lastChar) || REGEX_OK_KEYWORD.test(trimmed);
+      if (looksLikeRegex) {
+        let j = i + 1;
+        let inClass = false;
+        while (j < text.length) {
+          const c = text[j];
+          if (c === "\\") { j += 2; continue; }
+          if (c === "\n") break; // not actually a regex -- fall through below
+          if (c === "[") { inClass = true; j++; continue; }
+          if (c === "]") { inClass = false; j++; continue; }
+          if (c === "/" && !inClass) { j++; break; }
+          j++;
+        }
+        if (j <= text.length && text[j - 1] === "/") {
+          while (j < text.length && /[a-z]/i.test(text[j])) j++;
+          out += text.slice(i, j);
+          i = j - 1;
+          continue;
+        }
+      }
     }
     out += ch;
   }

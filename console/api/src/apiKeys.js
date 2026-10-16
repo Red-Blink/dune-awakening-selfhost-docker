@@ -15,8 +15,10 @@ import {
   namespaceOf,
   normalizeScopes,
   scopeAllowsAction,
-  scopesGrantAnything
+  scopesGrantAnything,
+  KEY_DENIED_ACTIONS,
 } from "./apiKeyScopes.js";
+import { isCrownJewelAction } from "./policy.js";
 
 export const KEY_PREFIX = "dak_";
 const KEY_ID_LENGTH = 8;
@@ -87,6 +89,14 @@ export function keyAllows(key, action) {
   if (!key || typeof action !== "string" || !action) return false;
   const namespace = namespaceOf(action);
   if (!namespace) return false;
+  // Credential/identity actions are never key-reachable, mirroring their
+  // owner-only status for tiered sessions.
+  if (KEY_DENIED_ACTIONS.has(action)) return false;
+  // #710: the crown-jewel backstop (policy.js's CROWN_JEWEL_DENY_ACTIONS,
+  // owner-only for every tiered/Discord session) applies to keys too -- a
+  // key scoped e.g. players:"write" must not reach players:give-item/reset/
+  // recover just because KEY_DENIED_ACTIONS never independently listed them.
+  if (isCrownJewelAction(action)) return false;
   // Checked before the scope lookup on purpose: a hand-edited api-keys.json
   // granting `settings: write` still cannot mint keys.
   if (KEY_DENIED_NAMESPACES.has(namespace)) return false;
