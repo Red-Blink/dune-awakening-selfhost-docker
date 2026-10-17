@@ -551,3 +551,18 @@ test("surfaces a load failure instead of rendering an empty list as success", as
   render(<ApiKeysSection confirmAction={vi.fn()} />);
   expect(await screen.findByText(/Postgres is not running/i)).toBeVisible();
 });
+
+test("Realtime Data is its own read-only row in the scope grid", async () => {
+  mocked.list.mockResolvedValue({ keys: [] });
+  mocked.catalog.mockResolvedValue({ namespaces: [
+    ...CATALOG,
+    { namespace: "realtime", readActions: ["realtime:read"], writeActions: [], supportsWrite: false }
+  ] });
+  render(<ApiKeysSection confirmAction={vi.fn().mockResolvedValue(true)} />);
+  await openCreateForm();
+  expect(screen.getByText("Realtime Data")).toBeVisible();
+  const group = screen.getByLabelText("Access level for realtime");
+  expect(within(group).getByRole("radio", { name: /^None/ })).toBeInTheDocument();
+  expect(within(group).getByRole("radio", { name: /^Read realtime/ })).toBeInTheDocument();
+  expect(within(group).queryByRole("radio", { name: /Read\+Write/ })).toBeNull();
+});

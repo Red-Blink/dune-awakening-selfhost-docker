@@ -104,3 +104,17 @@ function fakeResponse() {
     }
   };
 }
+
+test("peekSession checks a session without renewing its idle expiry", () => {
+  let currentTime = 1_700_000_000_000;
+  const auth = createAuth({ sessionSecret: "secret", adminPassword: "admin", authDisabled: false, now: () => currentTime });
+  const session = auth.makeSession();
+  const req = { headers: { cookie: `asc_session=${encodeURIComponent(session.cookie)}` } };
+  const first = auth.peekSession(req).expiresAt;
+  currentTime += 60 * 60 * 1000;
+  assert.equal(auth.peekSession(req).expiresAt, first, "peek must not slide the expiry");
+  assert.ok(auth.readSession(req).expiresAt > first, "readSession still renews");
+  currentTime += 13 * 60 * 60 * 1000;
+  assert.equal(auth.peekSession(req), null);
+  assert.equal(auth.peekSession({ headers: { cookie: "asc_session=forged.value" } }), null);
+});

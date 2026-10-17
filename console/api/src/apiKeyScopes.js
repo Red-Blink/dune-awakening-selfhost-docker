@@ -82,7 +82,7 @@ export const SCOPE_LEVELS = Object.freeze(["read", "write"]);
 // shows up in the UI on its own rather than silently disappearing.
 const PREFERRED_ORDER = [
   "players", "bases", "vehicles", "guilds", "storage", "blueprints",
-  "exchange", "maps", "sietches", "deepdesert", "landsraad",
+  "exchange", "maps", "realtime", "sietches", "deepdesert", "landsraad",
   "server", "logs", "backups", "updates", "carepackage", "addons",
   "admin"
 ];

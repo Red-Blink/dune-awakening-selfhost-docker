@@ -50,6 +50,7 @@ export const NAMESPACES = {
   BLUEPRINTS:  "blueprints",
   VEHICLES:    "vehicles",
   EXCHANGE:    "exchange",
+  REALTIME:    "realtime",
 };
 
 // ---- Actions: route → action mapping ----
@@ -172,6 +173,18 @@ export const ROUTE_ACTIONS = {
   "GET /api/settings/api-keys":                "settings:read",
   "GET /api/settings/api-keys/catalog":        "settings:read",
   "POST /api/settings/api-keys":               "settings:write",
+  // Realtime Data (services/realtime.js): live sandworms, NPCs, vehicles and
+  // storms from the optional MapViewer3D position agent. Read-only, its own
+  // namespace so an API key gets it only when "Realtime Data" is granted;
+  // player positions additionally need players:read.
+  "GET /api/realtime/healthz":                 "realtime:read",
+  "GET /api/realtime/objects":                 "realtime:read",
+  "GET /api/realtime/stream":                  "realtime:read",
+  // Encrypted API access (services/encryptedApi.js): the optional HTTPS front door. Shows its state and
+  // key fingerprint and turns it on or off. Settings, so never reachable with an API key.
+  "GET /api/settings/encrypted-api":           "settings:read",
+  "POST /api/settings/encrypted-api":          "settings:write",
+  "POST /api/settings/console-access/confirm": "settings:write",
   "POST /api/settings/public-directory":       "settings:write",
   "POST /api/settings/public-directory/claim": "settings:write",
   "POST /api/settings/server-startup":          "settings:write",
