@@ -61,6 +61,18 @@ export function createAuth(config) {
     return session;
   }
 
+  // Like readSession, but for long-lived checks (open streams): it never
+  // renews the idle expiry and never deletes anything.
+  function peekSession(req) {
+    if (config.authDisabled) return { id: "dev", csrf: "dev", expiresAt: Number.MAX_SAFE_INTEGER, tier: "owner" };
+    const raw = parseCookies(req.headers.cookie || "").get("asc_session");
+    if (!raw) return null;
+    const [id, sig] = raw.split(".");
+    if (!id || !sig || !constantTimeStringEqual(sign(id), sig)) return null;
+    const session = sessions.get(id);
+    return session && session.expiresAt >= now() ? session : null;
+  }
+
   async function passwordMatches(value) {
     // ADMIN_PASSWORD is an operator-supplied literal. Password files may be
     // either the legacy plaintext format or the scrypt format written by a
@@ -85,7 +97,7 @@ export function createAuth(config) {
     return session;
   }
 
-  return { makeSession, readSession, passwordMatches, requireAuth };
+  return { makeSession, readSession, peekSession, passwordMatches, requireAuth };
 }
 
 export function setSessionCookie(res, session, config = {}) {

@@ -150,6 +150,7 @@ const SCOPE_LABELS: Record<string, string> = {
   landsraad: "Landsraad",
   logs: "Logs",
   maps: "Maps",
+  realtime: "Realtime Data",
   players: "Players",
   server: "Server",
   sietches: "Sietches",

@@ -41,6 +41,9 @@ services:
       ADMIN_BIND_HOST: "${ADMIN_BIND_HOST:-0.0.0.0}"
       ADMIN_BIND_PORT: "${ADMIN_WEB_PORT:-${ADMIN_BIND_PORT:-8088}}"
       ADMIN_AUTH_DISABLED: "${ADMIN_AUTH_DISABLED:-0}"
+      # Realtime Data: where the optional MapViewer3D position agent listens
+      # (plain HTTP on loopback only). Empty = http://127.0.0.1:8796.
+      DUNE_REALTIME_AGENT_URL: "${DUNE_REALTIME_AGENT_URL:-}"
       ADMIN_SECURE_COOKIES: "${ADMIN_SECURE_COOKIES:-0}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
       ADMIN_TASK_RETENTION: "${ADMIN_TASK_RETENTION:-200}"
