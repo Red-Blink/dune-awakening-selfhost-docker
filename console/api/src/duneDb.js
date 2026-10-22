@@ -1474,16 +1474,25 @@ async function syncChangedMnemonicLessons(db, before, after) {
 }
 
 export async function tableExists(db, name, schema = "dune") {
-  const result = await db.query("select to_regclass($1) is not null as exists", [`${schema}.${name}`]);
-  return Boolean(result.rows[0]?.exists);
+  const load = async () => {
+    const result = await db.query("select to_regclass($1) is not null as exists", [`${schema}.${name}`]);
+    return Boolean(result.rows[0]?.exists);
+  };
+  if (!db?.schemaCache) return load();
+  return db.schemaCache.get(`t:${schema}.${name}`, load, (exists) => !exists);
 }
 
 export async function columnsFor(db, table, schema = "dune") {
-  const result = await db.query(`
-    select column_name
-    from information_schema.columns
-    where table_schema = $1 and table_name = $2`, [schema, table]);
-  return new Set(result.rows.map((row) => row.column_name));
+  const load = async () => {
+    const result = await db.query(`
+      select column_name
+      from information_schema.columns
+      where table_schema = $1 and table_name = $2`, [schema, table]);
+    return new Set(result.rows.map((row) => row.column_name));
+  };
+  if (!db?.schemaCache) return load();
+  const columns = await db.schemaCache.get(`c:${schema}.${table}`, load, (set) => set.size === 0);
+  return new Set(columns);
 }
 
 const PLAYER_SORT_COLUMNS = {

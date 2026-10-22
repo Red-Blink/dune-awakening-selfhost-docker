@@ -45,6 +45,106 @@ export function discoverDbConfig(env = process.env, repoRoot = process.cwd()) {
   };
 }
 
+// Table/column existence lookups (tableExists/columnsFor in duneDb.js) run on
+// nearly every request and only change on DDL, a Funcom update or a restore.
+// Entries are dropped when a statement that looks like DDL runs through this
+// pool, while and right after a database restore, and after a TTL. DDL that
+// bypasses this process (a function that creates tables, psql, a Funcom
+// update) is only picked up when the TTL runs out. Negative results live only
+// briefly so a table an addon just created becomes visible quickly. Only the
+// pool-backed db object carries a cache; transaction handles do not, so a table
+// created inside a transaction is always seen by that transaction.
+// DUNE_SCHEMA_CACHE_TTL_MS=0 turns the cache off.
+const DDL_PATTERN = /\b(create|alter|drop|truncate|rename)\b/i;
+const DEFAULT_SCHEMA_CACHE_TTL_MS = 60000;
+const RESTORE_WATCH_INTERVAL_MS = 1000;
+
+export function isDdlStatement(text) {
+  return DDL_PATTERN.test(String(text?.text ?? text ?? ""));
+}
+
+// An unset, empty or non-numeric value falls back to the default; only an
+// explicit 0 disables the cache.
+export function parseSchemaCacheTtl(value) {
+  if (value === undefined || value === null || String(value).trim() === "") return DEFAULT_SCHEMA_CACHE_TTL_MS;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_SCHEMA_CACHE_TTL_MS;
+}
+
+export function createSchemaCache({ ttlMs = DEFAULT_SCHEMA_CACHE_TTL_MS, negativeTtlMs = 5000, isPaused = () => false, now = () => Date.now() } = {}) {
+  const entries = new Map();
+  let generation = 0;
+  let wasPaused = false;
+  const cache = {
+    enabled: ttlMs > 0,
+    // Samples the restore flag. Called by createDb's watcher (not per lookup, so
+    // a cache hit costs no syscall) and by db.query when it refuses a statement.
+    // Clears the cache while a restore runs and once more after it ended, so a
+    // restore that finished between two samples still drops the old schema.
+    refresh() {
+      const paused = isPaused();
+      if (paused || wasPaused) cache.invalidate();
+      wasPaused = paused;
+      return paused;
+    },
+    async get(key, load, isNegative = () => false) {
+      if (ttlMs <= 0) return load();
+      if (wasPaused) return load();
+      const hit = entries.get(key);
+      if (hit && hit.expires > now()) return hit.value;
+      const started = generation;
+      const value = await load();
+      // A DDL statement that ran while this lookup was in flight may have made
+      // the loaded value stale; do not store it.
+      if (generation === started) {
+        entries.set(key, { value, expires: now() + (isNegative(value) ? Math.min(negativeTtlMs, ttlMs) : ttlMs) });
+      }
+      return value;
+    },
+    invalidate() {
+      generation += 1;
+      entries.clear();
+    },
+    noteStatement(text) {
+      if (isDdlStatement(text)) cache.invalidate();
+    }
+  };
+  return cache;
+}
+
+// One timer samples the restore flag for every live schema cache, so the cost
+// does not grow with the number of createDb() calls. Caches are held weakly: a
+// db that is dropped without close() is collected, and the timer stops once no
+// cache is left.
+const watchedCaches = new Set();
+let restoreWatchTimer = null;
+
+function watchRestoreFlag(cache) {
+  const ref = new WeakRef(cache);
+  watchedCaches.add(ref);
+  if (!restoreWatchTimer) {
+    restoreWatchTimer = setInterval(() => {
+      for (const watched of [...watchedCaches]) {
+        const live = watched.deref();
+        if (live) live.refresh();
+        else watchedCaches.delete(watched);
+      }
+      if (!watchedCaches.size) {
+        clearInterval(restoreWatchTimer);
+        restoreWatchTimer = null;
+      }
+    }, RESTORE_WATCH_INTERVAL_MS);
+    restoreWatchTimer.unref?.();
+  }
+  return () => {
+    watchedCaches.delete(ref);
+    if (!watchedCaches.size && restoreWatchTimer) {
+      clearInterval(restoreWatchTimer);
+      restoreWatchTimer = null;
+    }
+  };
+}
+
 export function createDb(config) {
   const dbConfig = discoverDbConfig(process.env, config?.repoRoot);
   const repoRoot = config?.repoRoot || process.cwd();
@@ -56,16 +156,28 @@ export function createDb(config) {
     query_timeout: Number(process.env.ADMIN_DB_QUERY_TIMEOUT_MS || 15000),
     statement_timeout: Number(process.env.ADMIN_DB_STATEMENT_TIMEOUT_MS || 15000)
   });
+  const schemaCache = createSchemaCache({
+    ttlMs: parseSchemaCacheTtl(process.env.DUNE_SCHEMA_CACHE_TTL_MS),
+    isPaused: () => databaseRestoreMaintenanceActive(repoRoot)
+  });
+  // Notices the end of a restore even when nothing queries the database in the
+  // meantime.
+  const stopRestoreWatch = schemaCache.enabled ? watchRestoreFlag(schemaCache) : null;
   pool.on("error", (error) => {
     console.warn(`Database connection interrupted: ${redactDbError(error)}`);
   });
 
   async function query(text, values = []) {
-    if (databaseRestoreMaintenanceActive(repoRoot)) throw new Error(DATABASE_RESTORE_MAINTENANCE_MESSAGE);
+    if (databaseRestoreMaintenanceActive(repoRoot)) {
+      schemaCache.refresh();
+      throw new Error(DATABASE_RESTORE_MAINTENANCE_MESSAGE);
+    }
     try {
       return await pool.query(text, values);
     } catch (error) {
       throw new Error(redactDbError(error));
+    } finally {
+      schemaCache.noteStatement(text);
     }
   }
 
@@ -77,19 +189,26 @@ export function createDb(config) {
     if (databaseRestoreMaintenanceActive(repoRoot)) throw new Error(DATABASE_RESTORE_MAINTENANCE_MESSAGE);
     const queryTimeoutMs = Number(options?.queryTimeoutMs);
     const client = await pool.connect();
+    let ranDdl = false;
     try {
       await client.query("begin");
+      const runQuery = Number.isFinite(queryTimeoutMs) && queryTimeoutMs > 0
+        ? (text, values = []) => client.query({ text, values, query_timeout: queryTimeoutMs })
+        : (text, values = []) => client.query(text, values);
       const tx = {
         config: publicDbConfig(dbConfig),
-        query: Number.isFinite(queryTimeoutMs) && queryTimeoutMs > 0
-          ? (text, values = []) => client.query({ text, values, query_timeout: queryTimeoutMs })
-          : (text, values = []) => client.query(text, values)
+        query: (text, values = []) => {
+          if (isDdlStatement(text)) ranDdl = true;
+          return runQuery(text, values);
+        }
       };
       const result = await fn(tx);
       await client.query("commit");
+      if (ranDdl) schemaCache.invalidate();
       return result;
     } catch (error) {
       try { await client.query("rollback"); } catch {}
+      if (ranDdl) schemaCache.invalidate();
       throw new Error(redactDbError(error));
     } finally {
       client.release();
@@ -98,9 +217,13 @@ export function createDb(config) {
 
   return {
     config: publicDbConfig(dbConfig),
+    schemaCache,
     query,
     transaction,
-    close: () => pool.end()
+    close: () => {
+      stopRestoreWatch?.();
+      return pool.end();
+    }
   };
 }
 

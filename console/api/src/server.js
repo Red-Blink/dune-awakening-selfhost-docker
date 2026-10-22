@@ -207,6 +207,9 @@ async function trustedPartitionsForCompletedStop(operation, payload = {}) {
 // Both flush paths go through flushQueuedGeneratorRefills/flushQueuedWaterRefills
 // so a write lands in the audit log no matter which one applied it.
 const tasks = new TaskManager(config, {
+  // A restore replaces the schema; drop cached table/column lookups even when
+  // it finished faster than the cache's maintenance-flag watcher can notice.
+  onSettled: (task) => { if (/restore/i.test(task.operation)) db.schemaCache?.invalidate(); },
   // forceFresh on every leg: the tick's in-flight pass, if there is one, was
   // started before the map stopped and so observed it as still live. Reusing
   // that result here would report "nothing to flush" for the one window in

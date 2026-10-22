@@ -43,6 +43,7 @@ export class TaskManager {
   constructor(config, options = {}) {
     this.config = config;
     this.onMapDown = options.onMapDown || null;
+    this.onSettled = options.onSettled || null;
     this.tasks = new Map();
     // Keyed by task id and held here rather than on the task: publicTask()
     // allowlists what it serializes, and a callback has no business anywhere
@@ -190,6 +191,7 @@ export class TaskManager {
       task.finishedAt = new Date().toISOString();
       // Dropped, not run: a preview that failed must not authorize an apply.
       this.successHooks.delete(task.id);
+      this.notifySettled(task);
       this.emit(task, task.errorMessage);
       try { recordTaskRestart(this.config, task, payload); } catch (historyError) {
         console.error(`Restart history write failed: ${historyError?.message || "Unexpected error."}`);
@@ -353,7 +355,19 @@ export class TaskManager {
     task.currentStep = "Finished";
     task.finishedAt = new Date().toISOString();
     this.runSuccessHook(task);
+    this.notifySettled(task);
     this.emit(task, "Task succeeded");
+  }
+
+  // Runs for every terminal state, success or failure. Observers only: a
+  // throwing hook must not change the outcome of the task.
+  notifySettled(task) {
+    if (!this.onSettled) return;
+    try {
+      this.onSettled(task);
+    } catch (error) {
+      console.error(`Task settled hook failed for ${task.operation}: ${error?.message || "Unexpected error."}`);
+    }
   }
 
   // The task has already succeeded by the time this runs, so a throwing hook
