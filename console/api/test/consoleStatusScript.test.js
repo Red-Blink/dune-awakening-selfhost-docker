@@ -15,7 +15,8 @@ function fixture() {
   const bin = join(scratch, "bin");
   mkdirSync(scripts, { recursive: true });
   mkdirSync(bin);
-  for (const name of ["dune", "console.sh", "compose-project.sh"]) {
+  for (const name of ["dune", "console.sh", "compose-project.sh", "lib/console-secrets-env.sh", "lib/secrets.sh", "lib/secrets_aead.py"]) {
+    mkdirSync(dirname(join(scripts, name)), { recursive: true });
     copyFileSync(join(repoRoot, "runtime/scripts", name), join(scripts, name));
     chmodSync(join(scripts, name), 0o755);
   }
