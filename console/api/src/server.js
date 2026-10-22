@@ -24,7 +24,7 @@ import { buildDuneArgs, isDynamicServerService, parseVehicleList, runDockerLogs,
 // execution decision from diverging.
 import { createDb, hasExecutableStatement, isReadOnlySql, quoteIdentifier } from "./db.js";
 import * as duneDb from "./duneDb.js";
-import { audit, recordAdminHistory } from "./audit.js";
+import { audit, installAuditShutdownHooks, recordAdminHistory } from "./audit.js";
 import { redact } from "./redact.js";
 import { buildingUnlockStatus, customizationGrantGroups, customizationGrantStatus, isBuildingUnlockItem, isCustomizationGrantItem, itemIsRankedSchematic, itemIsSchematic, itemRequiresDatabaseGrant, listBuildingUnlockItems, listCatalogItems, listCustomizationGrantItems, resolveCatalogItem, resolveFillableCatalogItem, resolveItemVolume } from "./adminCatalog.js";
 import { buildBroadcastCommand, buildShutdownBroadcastCommand, publishCarePackageWhisper, publishServerCommand } from "./rmq.js";
@@ -235,6 +235,7 @@ const tasks = new TaskManager(config, {
     });
   }
 });
+installAuditShutdownHooks();
 let db = createDb(config);
 const addonDeliveryService = createAddonDeliveryService(config, {
   canRun: (addonId, permission) => {

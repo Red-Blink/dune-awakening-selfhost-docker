@@ -1,5 +1,6 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { READ_ONLY_BRIDGE_ACTIONS } from "./bridgeReadActions.js";
 import { redact, redactValue } from "./redact.js";
 
 // In-memory rolling window of addon-bridge request outcomes, used by
@@ -50,8 +51,135 @@ export function principalOf(session) {
   return principal;
 }
 
+// High-volume, read-only bridge polls are batched and written every
+// AUDIT_FLUSH_MS (and on shutdown, see installAuditShutdownHooks). Everything
+// else -- every non-bridge action, every failed or denied bridge call, and every
+// bridge action that can change state (database.execute, rewards.deliver,
+// admin.items.grant, ...) -- is written synchronously, because the audit log is
+// the durable record for incident investigation and must not lose a mutation to
+// a crash. A synchronous write first flushes the pending batch so the file keeps
+// the order the requests happened in. While the file is unwritable (see the
+// backoff in flushAuditLog) queued polls stay behind and are appended after
+// later synchronous rows; every row carries its own timestamp.
+const AUDIT_FLUSH_MS = 200;
+const AUDIT_FLUSH_MAX_BACKOFF_MS = 10000;
+const AUDIT_MAX_PENDING_LINES = 5000;
+const pendingAuditLines = new Map();
+let pendingAuditCount = 0;
+let auditFlushTimer = null;
+let auditFlushDelay = AUDIT_FLUSH_MS;
+let auditRetryNotBefore = 0;
+let auditFailureReported = false;
+let auditDroppedRows = 0;
+
+function bufferableBridgeRow(action, detail) {
+  if (action !== "addons.bridge" || detail?.ok !== true) return false;
+  return READ_ONLY_BRIDGE_ACTIONS.has(String(detail.action || ""));
+}
+
+export function pendingAuditRowCount() {
+  return pendingAuditCount;
+}
+
+// A file's lines leave the queue only after they were appended, so a failed
+// flush keeps them for the next attempt. The first error is rethrown after
+// every file was tried. After a failure the next attempt is not due for a
+// growing delay (up to AUDIT_FLUSH_MAX_BACKOFF_MS); a caller on a request path
+// passes respectBackoff so an unwritable file is not retried on every request.
+// Shutdown and explicit calls always try.
+export function flushAuditLog({ respectBackoff = false } = {}) {
+  if (respectBackoff && Date.now() < auditRetryNotBefore) return;
+  if (auditFlushTimer) {
+    clearTimeout(auditFlushTimer);
+    auditFlushTimer = null;
+  }
+  let failure = null;
+  for (const [file, lines] of [...pendingAuditLines]) {
+    try {
+      mkdirSync(dirname(file), { recursive: true });
+      appendFileSync(file, lines.join(""), { mode: 0o600 });
+      pendingAuditLines.delete(file);
+      pendingAuditCount -= lines.length;
+    } catch (error) {
+      failure ||= error;
+    }
+  }
+  if (failure) {
+    auditRetryNotBefore = Date.now() + auditFlushDelay;
+    auditFlushDelay = Math.min(auditFlushDelay * 2, AUDIT_FLUSH_MAX_BACKOFF_MS);
+    if (pendingAuditCount > 0) armAuditFlush();
+    throw failure;
+  }
+  auditFlushDelay = AUDIT_FLUSH_MS;
+  auditRetryNotBefore = 0;
+  auditFailureReported = false;
+  if (auditDroppedRows > 0) {
+    console.warn(`Audit log recovered; ${auditDroppedRows} queued bridge poll row(s) were dropped while it was unwritable.`);
+    auditDroppedRows = 0;
+  }
+  if (pendingAuditCount > 0) armAuditFlush();
+}
+
+// One console line per failure streak, so an unwritable file does not flood the log.
+function reportAuditFlushFailure(error) {
+  if (auditFailureReported) return;
+  auditFailureReported = true;
+  console.warn(`Audit log flush failed: ${redact(String(error?.message || "Unexpected error."))}`);
+}
+
+function armAuditFlush() {
+  if (auditFlushTimer) return;
+  const wait = Math.max(AUDIT_FLUSH_MS, auditRetryNotBefore - Date.now());
+  auditFlushTimer = setTimeout(() => {
+    auditFlushTimer = null;
+    try {
+      flushAuditLog();
+    } catch (error) {
+      reportAuditFlushFailure(error);
+    }
+  }, wait);
+  auditFlushTimer.unref?.();
+}
+
+function queueAuditLine(file, line) {
+  const lines = pendingAuditLines.get(file);
+  if (lines) lines.push(line);
+  else pendingAuditLines.set(file, [line]);
+  pendingAuditCount += 1;
+  if (pendingAuditCount > AUDIT_MAX_PENDING_LINES) {
+    // The file stays unwritable; bound memory by dropping the oldest polls.
+    const [firstFile, firstLines] = pendingAuditLines.entries().next().value;
+    firstLines.shift();
+    pendingAuditCount -= 1;
+    auditDroppedRows += 1;
+    if (auditDroppedRows === 1) {
+      console.warn(`Audit log queue is full (${AUDIT_MAX_PENDING_LINES} rows); dropping the oldest bridge poll rows until it is writable again.`);
+    }
+    if (!firstLines.length) pendingAuditLines.delete(firstFile);
+  }
+  armAuditFlush();
+}
+
+// Called once from the server entry point. The default SIGTERM/SIGINT action
+// ends the process before "exit" fires, which would lose the pending batch.
+export function installAuditShutdownHooks(proc = process) {
+  let flushed = false;
+  const flushQuietly = () => {
+    if (flushed) return;
+    flushed = true;
+    try { flushAuditLog(); } catch {}
+    if (pendingAuditCount > 0) console.error(`${pendingAuditCount} audit log row(s) could not be written before shutdown.`);
+  };
+  proc.once("exit", flushQuietly);
+  for (const [signal, code] of [["SIGTERM", 143], ["SIGINT", 130]]) {
+    proc.once(signal, () => {
+      flushQuietly();
+      proc.exit(code);
+    });
+  }
+}
+
 export function audit(config, req, action, detail = {}) {
-  mkdirSync(dirname(config.auditLog), { recursive: true });
   const row = {
     timestamp: new Date().toISOString(),
     action,
@@ -64,7 +192,15 @@ export function audit(config, req, action, detail = {}) {
     principal: principalOf(req?.authSession),
     detail: redactValue(detail)
   };
-  appendFileSync(config.auditLog, `${JSON.stringify(row)}\n`, { mode: 0o600 });
+  const line = `${JSON.stringify(row)}\n`;
+  if (bufferableBridgeRow(action, detail)) {
+    queueAuditLine(config.auditLog, line);
+  } else {
+    // A failure flushing earlier polls must not stop this row from being written.
+    try { flushAuditLog({ respectBackoff: true }); } catch (error) { reportAuditFlushFailure(error); }
+    mkdirSync(dirname(config.auditLog), { recursive: true });
+    appendFileSync(config.auditLog, line, { mode: 0o600 });
+  }
 
   if (action === "addons.bridge") {
     const now = Date.now();
