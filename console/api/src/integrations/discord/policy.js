@@ -1,4 +1,4 @@
-export const DISCORD_ROLE_TIERS = ["public", "observer", "moderator", "admin", "owner"];
+export const DISCORD_ROLE_TIERS = ["public", "player", "moderator", "admin", "owner"];
 
 export const DISCORD_CAPABILITIES = Object.freeze({
   STATUS_READ: "status:read",
@@ -33,7 +33,14 @@ export const EXPERIMENTAL_READ_ONLY_CAPABILITIES = Object.freeze(
 
 const CAPABILITY_BY_TIER = Object.freeze({
   public: new Set([DISCORD_CAPABILITIES.STATUS_READ]),
-  observer: new Set([
+  // Renamed from "observer" -- terminology consistency with the console's own
+  // session tier naming (policy.js's OBSOLETE_TIERS folded its own, separate
+  // "observer" console tier into "player" earlier; this is the Discord
+  // adapter's independent tier space adopting the same name for its lowest
+  // real tier). Capability set is UNCHANGED -- this remains a zero-write
+  // tier, per docs/rw-architecture.md Section 0's permanent invariant that
+  // covers "any future Discord-side equivalent" of the console's player tier.
+  player: new Set([
     DISCORD_CAPABILITIES.STATUS_READ,
     DISCORD_CAPABILITIES.READINESS_READ,
     DISCORD_CAPABILITIES.SERVICES_READ
@@ -56,7 +63,7 @@ const CAPABILITY_BY_TIER = Object.freeze({
 
 export function normalizeRoleMapping(value = {}) {
   return {
-    observerRoleIds: normalizeStringList(value.observerRoleIds),
+    playerRoleIds: normalizeStringList(value.playerRoleIds),
     moderatorRoleIds: normalizeStringList(value.moderatorRoleIds),
     adminRoleIds: normalizeStringList(value.adminRoleIds),
     ownerRoleIds: normalizeStringList(value.ownerRoleIds)
@@ -83,7 +90,7 @@ export function discordActorTier(actor, mapping) {
   if (normalized.ownerRoleIds.some((roleId) => roleIds.has(roleId))) return "owner";
   if (normalized.adminRoleIds.some((roleId) => roleIds.has(roleId))) return "admin";
   if (normalized.moderatorRoleIds.some((roleId) => roleIds.has(roleId))) return "moderator";
-  if (normalized.observerRoleIds.some((roleId) => roleIds.has(roleId))) return "observer";
+  if (normalized.playerRoleIds.some((roleId) => roleIds.has(roleId))) return "player";
   return "public";
 }
 
