@@ -11,6 +11,8 @@ import { createLoginRateLimiter, createMutationRateLimiter, createApiKeyRateLimi
 import { createApiKeyStore, GLOBAL_RATE_LIMIT_PER_MINUTE } from "./apiKeys.js";
 import { scopeCatalog } from "./apiKeyScopes.js";
 import { createBridgeRateLimiter } from "./bridgeRateLimit.js";
+import { createInFlightShare } from "./inFlightShare.js";
+import { bridgeActionStartsNewGeneration } from "./bridgeReadActions.js";
 import { buildSelfUpdateHelperDockerArgs, detectDockerSocketGid, mapWriteFlushTimeoutMs, TaskManager, publicTask } from "./tasks.js";
 import { preflight } from "./preflight.js";
 import { playerAccessParam } from "./playerAccessParam.js";
@@ -24,7 +26,7 @@ import { buildDuneArgs, isDynamicServerService, parseVehicleList, runDockerLogs,
 // execution decision from diverging.
 import { createDb, hasExecutableStatement, isReadOnlySql, quoteIdentifier } from "./db.js";
 import * as duneDb from "./duneDb.js";
-import { audit, recordAdminHistory } from "./audit.js";
+import { audit, installAuditShutdownHooks, recordAdminHistory } from "./audit.js";
 import { redact } from "./redact.js";
 import { buildingUnlockStatus, customizationGrantGroups, customizationGrantStatus, isBuildingUnlockItem, isCustomizationGrantItem, itemIsRankedSchematic, itemIsSchematic, itemRequiresDatabaseGrant, listBuildingUnlockItems, listCatalogItems, listCustomizationGrantItems, resolveCatalogItem, resolveFillableCatalogItem, resolveItemVolume } from "./adminCatalog.js";
 import { buildBroadcastCommand, buildShutdownBroadcastCommand, publishCarePackageWhisper, publishServerCommand } from "./rmq.js";
@@ -235,6 +237,7 @@ const tasks = new TaskManager(config, {
     });
   }
 });
+installAuditShutdownHooks();
 let db = createDb(config);
 const addonDeliveryService = createAddonDeliveryService(config, {
   canRun: (addonId, permission) => {
@@ -1430,6 +1433,12 @@ async function handleApi(req, res) {
   return json(res, 404, { error: "Not found" });
 }
 
+// Several addons or tabs polling the same summary share one database round
+// trip; bridge calls that can change state start a new generation (see
+// inFlightShare.js) so no request is answered with data older than its own write.
+const bridgeReads = createInFlightShare();
+const shareInFlight = (key, load) => bridgeReads.share(key, load);
+
 async function addonBridgeRoute(req, res, path) {
   // The bridge authorizes against the installed addon's manifest, not the
   // caller, so a key could install an addon declaring `database: write` and
@@ -1453,21 +1462,25 @@ async function addonBridgeRoute(req, res, path) {
   bridgeRateLimiter.record(key);
   const body = await readJson(req);
   const action = String(body.action || "").trim();
+  if (bridgeActionStartsNewGeneration(action)) {
+    bridgeReads.bump();
+    res.once("close", () => bridgeReads.bump());
+  }
   if (action === "leadership.players.list") {
     const addon = assertInstalledAddonPermission(config, id, "players:read");
-    const result = await duneDb.addonLeadershipPlayers(db);
+    const result = await shareInFlight("addonLeadershipPlayers", () => duneDb.addonLeadershipPlayers(db));
     audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: true });
     return json(res, 200, { ok: true, result });
   }
   if (action === "players.summary.list") {
     const addon = assertInstalledAddonPermission(config, id, "players:read");
-    const result = await duneDb.addonLeadershipPlayers(db);
+    const result = await shareInFlight("addonLeadershipPlayers", () => duneDb.addonLeadershipPlayers(db));
     audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: true });
     return json(res, 200, { ok: true, result });
   }
   if (action === "players.identity.list") {
     const addon = assertInstalledAddonPermission(config, id, "players:read");
-    const result = await duneDb.addonPlayerIdentities(db);
+    const result = await shareInFlight("addonPlayerIdentities", () => duneDb.addonPlayerIdentities(db));
     audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: true });
     return json(res, 200, { ok: true, result });
   }
@@ -1520,34 +1533,34 @@ async function addonBridgeRoute(req, res, path) {
   if (action === "ops.health.summary" || action === "ops.health.players" || action === "ops.health.farms" || action === "ops.health.summary.v2") {
     const addon = assertInstalledAddonPermission(config, id, "ops:read");
     const result = action === "ops.health.players"
-      ? await duneDb.addonOpsHealthPlayers(db)
+      ? await shareInFlight("addonOpsHealthPlayers", () => duneDb.addonOpsHealthPlayers(db))
       : action === "ops.health.farms"
-        ? await duneDb.addonOpsHealthFarms(db)
-        : await duneDb.addonOpsHealthSummary(db);
+        ? await shareInFlight("addonOpsHealthFarms", () => duneDb.addonOpsHealthFarms(db))
+        : await shareInFlight("addonOpsHealthSummary", () => duneDb.addonOpsHealthSummary(db));
     audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: true });
     return json(res, 200, { ok: true, result });
   }
   if (action === "ops.activity.summary") {
     const addon = assertInstalledAddonPermission(config, id, "ops:read");
-    const result = await duneDb.addonOpsActivitySummary(db);
+    const result = await shareInFlight("addonOpsActivitySummary", () => duneDb.addonOpsActivitySummary(db));
     audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: true });
     return json(res, 200, { ok: true, result });
   }
   if (action === "ops.resources.summary") {
     const addon = assertInstalledAddonPermission(config, id, "ops:read");
-    const result = await duneDb.addonOpsResourcesSummary(db);
+    const result = await shareInFlight("addonOpsResourcesSummary", () => duneDb.addonOpsResourcesSummary(db));
     audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: true });
     return json(res, 200, { ok: true, result });
   }
   if (action === "ops.combat.deaths") {
     const addon = assertInstalledAddonPermission(config, id, "ops:read");
-    const result = await duneDb.addonOpsCombatDeaths(db);
+    const result = await shareInFlight("addonOpsCombatDeaths", () => duneDb.addonOpsCombatDeaths(db));
     audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: true });
     return json(res, 200, { ok: true, result });
   }
   if (action === "ops.economy.summary") {
     const addon = assertInstalledAddonPermission(config, id, "ops:read");
-    const result = await duneDb.addonOpsEconomySummary(db);
+    const result = await shareInFlight("addonOpsEconomySummary", () => duneDb.addonOpsEconomySummary(db));
     audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: true });
     return json(res, 200, { ok: true, result });
   }
