@@ -238,6 +238,17 @@ the Web UI's Updates panel — do not confuse them:
   are installed. The Updates page's **Install Game Files** button runs the
   same thing. Plain `dune update install`, by contrast, also migrates the
   database and reseeds world partitions.
+  The two last arguments of `auto enable` are `update-console` and
+  `manage-regis-tanks` (`0` or `1`, both default to `0`):
+  `dune update auto enable 60 1 1 15,10,5,1 0 360 1 1`. With
+  `manage-regis-tanks`, an automatic game update first switches Experimental
+  Tanks off and waits until that is confirmed, and only then updates the game
+  files; without it, an update is blocked while Tanks are enabled. With
+  `update-console`, the updater then looks for a newer Dune Docker release from
+  RedBlink and installs it. Tanks are switched on again only once a newer
+  release is installed and supports the new game build (or once the game build
+  turns out to be unchanged); until then they stay off, and `dune update auto
+  status` shows the pending restore.
 - **`dune self-update`** (alias `dune stack-update`) — updates **this
   repository/stack itself** (fetching a new GitHub release of
   `dune-awakening-selfhost-docker`). Subcommands: `check`, `list`,

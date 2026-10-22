@@ -176,6 +176,7 @@ jobs:
           tests/runtime-permission-helper-rebuild-test.sh
           tests/update-systemd-timer-health-test.sh
           python3 runtime/tests/test-update-auto-timer.py
+          tests/update-auto-tanks-test.sh
           tests/update-install-assets-test.sh
           python3 runtime/tests/test-game-image-verification.py
           python3 runtime/tests/test-update-restart-history.py

@@ -75,6 +75,8 @@ export function UpdatesPanel({
   const [autoGameNotifyMinutes, setAutoGameNotifyMinutes] = useState("15, 10, 5, 1");
   const [autoGameWaitUntilEmpty, setAutoGameWaitUntilEmpty] = useState(false);
   const [autoGameMaxWaitMinutes, setAutoGameMaxWaitMinutes] = useState("360");
+  const [autoGameUpdateConsole, setAutoGameUpdateConsole] = useState(false);
+  const [autoGameManageTanks, setAutoGameManageTanks] = useState(false);
   const [autoGameResult, setAutoGameResult] = useState<HomeTaskResult | null>(null);
   const [stackUpdateNow, setStackUpdateNow] = useState(() => Date.now());
   const [stackUpdateExpectedVersion, setStackUpdateExpectedVersion] = useState(() => loadStackUpdateExpectedVersion());
@@ -259,6 +261,8 @@ export function UpdatesPanel({
       if (values.notify_minutes) setAutoGameNotifyMinutes(formatAutoGameCheckpoints(values.notify_minutes));
       if (values.wait_until_empty) setAutoGameWaitUntilEmpty(/^(1|true|yes|enabled)$/i.test(values.wait_until_empty));
       if (values.max_wait_minutes) setAutoGameMaxWaitMinutes(values.max_wait_minutes);
+      if (values.update_console) setAutoGameUpdateConsole(/^(1|true|yes|enabled)$/i.test(values.update_console));
+      if (values.manage_regis_tanks) setAutoGameManageTanks(/^(1|true|yes|enabled)$/i.test(values.manage_regis_tanks));
     } finally {
       setAutoGameLoading(false);
     }
@@ -287,6 +291,8 @@ export function UpdatesPanel({
         notifyMinutes: notifyMinutes.length ? notifyMinutes.join(",") : "15,10,5,1",
         waitUntilEmpty: autoGameWaitUntilEmpty,
         maxWaitMinutes: maxWaitMinutes ?? 360,
+        updateConsole: autoGameUpdateConsole,
+        manageTanks: autoGameManageTanks,
         confirmation: "SAVE AUTO GAME UPDATES"
       })).task);
       const details = taskTechnicalDetails(final);
@@ -549,6 +555,8 @@ export function UpdatesPanel({
           ["Apply Updates", enabledLabel(autoGameValues.apply_updates, autoGameApplyEnabled)],
           ["Player Notice", enabledLabel(autoGameValues.notify_players, autoGameNotifyEnabled, `${formatAutoGameCheckpoints(autoGameValues.notify_minutes || autoGameNotifyMinutes)} Min`)],
           ["Empty Server Policy", enabledLabel(autoGameValues.wait_until_empty, autoGameWaitUntilEmpty, `max ${autoGameValues.max_wait_minutes || autoGameMaxWaitMinutes} minutes`)],
+          ["Console Updates", enabledLabel(autoGameValues.update_console, autoGameUpdateConsole)],
+          ["Regis Tanks", enabledLabel(autoGameValues.manage_regis_tanks, autoGameManageTanks, "disable, then restore")],
           ["Timer", autoGameDisplayTimerLabel]
         ]} />
         {commandStatusSummary(autoGame).reason && <p className="danger-note">{commandStatusSummary(autoGame).reason}</p>}
@@ -571,6 +579,17 @@ export function UpdatesPanel({
             <h5>Empty Server Policy</h5>
             <label className="auto-update-settings-row auto-update-settings-boolean-row"><span>Wait until server is empty</span><strong>{autoGameWaitUntilEmpty ? "Enabled" : "Disabled"}</strong><input type="checkbox" disabled={autoGameSaving} checked={autoGameWaitUntilEmpty} onChange={(event) => setAutoGameWaitUntilEmpty(event.target.checked)} /></label>
             <label className={`auto-update-settings-row ${autoGameWaitUntilEmpty ? "" : "is-disabled"}`}><span>Maximum wait</span><span className="number-unit-field"><input type="number" min="0" max="10080" step="1" disabled={autoGameSaving || !autoGameWaitUntilEmpty} value={autoGameMaxWaitMinutes} onChange={(event) => setAutoGameMaxWaitMinutes(event.target.value)} /><em>min</em></span><span className="auto-update-settings-spacer" /></label>
+          </section>
+          <section className="auto-update-policy-group">
+            <h5>Dune Docker Console</h5>
+            <label className="auto-update-settings-row auto-update-settings-boolean-row"><span>Update the Console after a game update</span><strong>{autoGameUpdateConsole ? "Enabled" : "Disabled"}</strong><input type="checkbox" aria-label="Update the Console after a game update" disabled={autoGameSaving} checked={autoGameUpdateConsole} onChange={(event) => setAutoGameUpdateConsole(event.target.checked)} /></label>
+            <p className="muted auto-update-setting-help">After the game files are updated, check RedBlink for a newer Dune Docker release and install it. Without this, the Console is never updated automatically.</p>
+          </section>
+          <section className="auto-update-policy-group">
+            <h5>Regis Tanks</h5>
+            <label className="auto-update-settings-row auto-update-settings-boolean-row"><span>Disable before, restore after the update</span><strong>{autoGameManageTanks ? "Enabled" : "Disabled"}</strong><input type="checkbox" aria-label="Disable Regis Tanks before the update and restore them afterwards" disabled={autoGameSaving} checked={autoGameManageTanks} onChange={(event) => setAutoGameManageTanks(event.target.checked)} /></label>
+            <p className="muted auto-update-setting-help">If Regis Tanks are enabled, they are switched off and confirmed off before the game files are updated. They are switched on again only after a newer Dune Docker release from RedBlink has been installed and supports the new game build. Without a new release they stay off. Without this option, an update is blocked while Regis Tanks are enabled.</p>
+            {autoGameValues.regis_tanks_restore && <p className="danger-note auto-update-setting-help">Regis Tanks restore: {autoGameValues.regis_tanks_restore}</p>}
           </section>
         </div>
         <div className="auto-update-settings-divider" />

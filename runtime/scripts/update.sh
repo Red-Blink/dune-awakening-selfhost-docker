@@ -28,6 +28,7 @@ AUTO_TIMER_FILE="/etc/systemd/system/$AUTO_TIMER_NAME"
 AUTO_DEFAULT_TIME="${DUNE_AUTO_UPDATE_TIME:-05:00}"
 AUTO_DEFAULT_INTERVAL_MINUTES="${DUNE_AUTO_UPDATE_INTERVAL_MINUTES:-60}"
 AUTO_PENDING_FILE="${DUNE_AUTO_UPDATE_PENDING_FILE:-runtime/generated/update-auto-pending.env}"
+AUTO_TANKS_FILE="${DUNE_AUTO_UPDATE_TANKS_FILE:-runtime/generated/update-auto-tanks.env}"
 UPDATE_CHECK_CACHE_FILE="runtime/generated/game-update-check.json"
 
 positive_integer_or_default() {
@@ -175,6 +176,8 @@ write_auto_state() {
   local wait_empty="${6:-${DUNE_AUTO_UPDATE_WAIT_EMPTY:-0}}"
   local max_wait_minutes="${7:-${DUNE_AUTO_UPDATE_MAX_WAIT_MINUTES:-360}}"
   local timer_installed="${8:-${DUNE_AUTO_UPDATE_TIMER_INSTALLED:-0}}"
+  local update_console="${9:-${DUNE_AUTO_UPDATE_CONSOLE_ENABLED:-0}}"
+  local manage_tanks="${10:-${DUNE_AUTO_UPDATE_MANAGE_TANKS:-0}}"
   local tmp
 
   mkdir -p runtime/generated
@@ -189,6 +192,8 @@ DUNE_AUTO_UPDATE_NOTIFY_MINUTES=$notify_minutes
 DUNE_AUTO_UPDATE_WAIT_EMPTY=$wait_empty
 DUNE_AUTO_UPDATE_MAX_WAIT_MINUTES=$max_wait_minutes
 DUNE_AUTO_UPDATE_TIMER_INSTALLED=$timer_installed
+DUNE_AUTO_UPDATE_CONSOLE_ENABLED=$update_console
+DUNE_AUTO_UPDATE_MANAGE_TANKS=$manage_tanks
 EOF
   chmod 644 "$tmp" 2>/dev/null || true
   mv -f "$tmp" "$AUTO_STATE_FILE"
@@ -230,6 +235,8 @@ read_auto_state() {
   DUNE_AUTO_UPDATE_WAIT_EMPTY=0
   DUNE_AUTO_UPDATE_MAX_WAIT_MINUTES=360
   DUNE_AUTO_UPDATE_TIMER_INSTALLED=""
+  DUNE_AUTO_UPDATE_CONSOLE_ENABLED=0
+  DUNE_AUTO_UPDATE_MANAGE_TANKS=0
   if [ -f "$AUTO_STATE_FILE" ]; then
     # shellcheck disable=SC1090
     . "$AUTO_STATE_FILE"
@@ -524,6 +531,8 @@ handle_auto_update() {
   notify_minutes="${5:-15,10,5,1}"
   wait_empty="${6:-0}"
   max_wait_minutes="${7:-360}"
+  update_console="${8:-0}"
+  manage_tanks="${9:-0}"
 
   case "$sub" in
     enable|on)
@@ -537,38 +546,40 @@ handle_auto_update() {
       notify_minutes="$(normalize_auto_notify_minutes "$notify_minutes")"
       require_bool_flag "$wait_empty" "Wait until empty"
       require_auto_max_wait_minutes "$max_wait_minutes"
+      require_bool_flag "$update_console" "Update Dune Docker Console"
+      require_bool_flag "$manage_tanks" "Manage Regis Tanks"
       ensure_auto_state_writable
 
       if ! command -v systemctl >/dev/null 2>&1; then
         if install_auto_units_via_docker_host "$interval_minutes"; then
-          write_auto_state 1 "$interval_minutes" "$apply_enabled" "$notify_enabled" "$notify_minutes" "$wait_empty" "$max_wait_minutes" 1
+          write_auto_state 1 "$interval_minutes" "$apply_enabled" "$notify_enabled" "$notify_minutes" "$wait_empty" "$max_wait_minutes" 1 "$update_console" "$manage_tanks"
           echo "Auto updates enabled."
           echo "Check interval: every $interval_minutes minutes"
           echo "Timer: $AUTO_TIMER_NAME"
           return 0
         else
-          write_auto_state 1 "$interval_minutes" "$apply_enabled" "$notify_enabled" "$notify_minutes" "$wait_empty" "$max_wait_minutes" 0
+          write_auto_state 1 "$interval_minutes" "$apply_enabled" "$notify_enabled" "$notify_minutes" "$wait_empty" "$max_wait_minutes" 0 "$update_console" "$manage_tanks"
           echo "Auto-update preference saved, but systemctl was not found and the host timer could not be installed through Docker."
           echo "Saved: $AUTO_STATE_FILE"
           echo "To install the timer, run this command with sudo/root:"
-          echo "  runtime/scripts/update.sh auto enable $interval_minutes $apply_enabled $notify_enabled $notify_minutes $wait_empty $max_wait_minutes"
+          echo "  runtime/scripts/update.sh auto enable $interval_minutes $apply_enabled $notify_enabled $notify_minutes $wait_empty $max_wait_minutes $update_console $manage_tanks"
           return 1
         fi
       fi
 
       if ! can_manage_systemd_units; then
         if install_auto_units_via_docker_host "$interval_minutes"; then
-          write_auto_state 1 "$interval_minutes" "$apply_enabled" "$notify_enabled" "$notify_minutes" "$wait_empty" "$max_wait_minutes" 1
+          write_auto_state 1 "$interval_minutes" "$apply_enabled" "$notify_enabled" "$notify_minutes" "$wait_empty" "$max_wait_minutes" 1 "$update_console" "$manage_tanks"
           echo "Auto updates enabled."
           echo "Check interval: every $interval_minutes minutes"
           echo "Timer: $AUTO_TIMER_NAME"
           return 0
         else
-          write_auto_state 1 "$interval_minutes" "$apply_enabled" "$notify_enabled" "$notify_minutes" "$wait_empty" "$max_wait_minutes" 0
+          write_auto_state 1 "$interval_minutes" "$apply_enabled" "$notify_enabled" "$notify_minutes" "$wait_empty" "$max_wait_minutes" 0 "$update_console" "$manage_tanks"
           echo "Auto-update preference saved, but this user cannot install systemd units."
           echo "Saved: $AUTO_STATE_FILE"
           echo "To install the timer, run this command with sudo/root:"
-          echo "  runtime/scripts/update.sh auto enable $interval_minutes $apply_enabled $notify_enabled $notify_minutes $wait_empty $max_wait_minutes"
+          echo "  runtime/scripts/update.sh auto enable $interval_minutes $apply_enabled $notify_enabled $notify_minutes $wait_empty $max_wait_minutes $update_console $manage_tanks"
           return 1
         fi
       fi
@@ -576,7 +587,7 @@ handle_auto_update() {
       write_auto_units_to "$interval_minutes" "/etc/systemd/system" "$HOST_ROOT_DIR"
       systemctl daemon-reload
       systemctl enable --now "$AUTO_TIMER_NAME"
-      write_auto_state 1 "$interval_minutes" "$apply_enabled" "$notify_enabled" "$notify_minutes" "$wait_empty" "$max_wait_minutes" 1
+      write_auto_state 1 "$interval_minutes" "$apply_enabled" "$notify_enabled" "$notify_minutes" "$wait_empty" "$max_wait_minutes" 1 "$update_console" "$manage_tanks"
       # enable --now does not re-arm an already-active elapsed timer. Restart
       # only the timer: a countdown or installation already running is kept.
       systemctl restart "$AUTO_TIMER_NAME"
@@ -617,6 +628,13 @@ handle_auto_update() {
       echo "Notify minutes:       ${DUNE_AUTO_UPDATE_NOTIFY_MINUTES:-15,10,5,1}"
       echo "Wait until empty:     ${DUNE_AUTO_UPDATE_WAIT_EMPTY:-0}"
       echo "Max wait minutes:     ${DUNE_AUTO_UPDATE_MAX_WAIT_MINUTES:-360}"
+      echo "Update Console:       ${DUNE_AUTO_UPDATE_CONSOLE_ENABLED:-0}"
+      echo "Manage Regis Tanks:   ${DUNE_AUTO_UPDATE_MANAGE_TANKS:-0}"
+      if [ -f "$AUTO_TANKS_FILE" ]; then
+        # shellcheck disable=SC1090
+        . "$AUTO_TANKS_FILE"
+        echo "Regis Tanks restore:  pending (disabled for game build ${DUNE_AUTO_TANKS_BUILD:-unknown}, waiting for a Dune Docker update after ${DUNE_AUTO_TANKS_BASE_VERSION:-unknown})"
+      fi
       if [ -f "$AUTO_PENDING_FILE" ]; then
         # shellcheck disable=SC1090
         . "$AUTO_PENDING_FILE"
@@ -645,7 +663,7 @@ handle_auto_update() {
     *)
       echo "Unknown auto-update command: $sub"
       echo "Usage:"
-      echo "  dune update auto enable [interval-minutes] [apply 0|1] [notify 0|1] [warning-times-csv] [wait-empty 0|1] [max-wait-minutes]"
+      echo "  dune update auto enable [interval-minutes] [apply 0|1] [notify 0|1] [warning-times-csv] [wait-empty 0|1] [max-wait-minutes] [update-console 0|1] [manage-regis-tanks 0|1]"
       echo "  dune update auto disable"
       echo "  dune update auto status"
       echo "  dune update auto run"
@@ -745,6 +763,155 @@ run_auto_update_notification_countdown() {
   AUTO_UPDATE_SENT_CHECKPOINTS="$sent_checkpoints"
 }
 
+# --- Regis Tanks and Dune Docker Console steps of the automatic update ---------
+#
+# The Tank patch is verified per game build and shipped with the Dune Docker
+# release, so a game update can only be applied with Tanks off, and Tanks can
+# only come back once the installed Dune Docker release supports the new build.
+# AUTO_TANKS_FILE records that Tanks were switched off by the updater and which
+# Console version was installed at that moment; Tanks are switched on again only
+# after a different (newer) version is installed. The file survives restarts of
+# the updater and of the Console, so each timer run can continue where the last
+# one stopped.
+
+auto_console_version() {
+  [ -f VERSION ] && tr -d '[:space:]' < VERSION || echo unknown
+}
+
+auto_tanks_json_field() {
+  python3 -c 'import json, sys
+try:
+    value = json.loads(sys.argv[1]).get(sys.argv[2])
+except Exception:
+    sys.exit(3)
+print("" if value is None else str(value).lower() if isinstance(value, bool) else value)' "$1" "$2"
+}
+
+# 0 = enabled, 1 = disabled, 2 = unknown
+auto_tanks_state() {
+  local json value
+  json="$(runtime/scripts/experimental-tanks.sh status 2>/dev/null)" || return 2
+  value="$(auto_tanks_json_field "$json" enabled)" || return 2
+  case "$value" in
+    true) return 0 ;;
+    false) return 1 ;;
+    *) return 2 ;;
+  esac
+}
+
+# Switches Tanks off and only reports success once the settings say so.
+auto_tanks_disable_confirmed() {
+  local json
+  runtime/scripts/experimental-tanks.sh apply false || return 1
+  json="$(runtime/scripts/experimental-tanks.sh status 2>/dev/null)" || return 1
+  [ "$(auto_tanks_json_field "$json" enabled)" = "false" ] \
+    && [ "$(auto_tanks_json_field "$json" applying)" != "true" ] \
+    && [ -z "$(auto_tanks_json_field "$json" error)" ]
+}
+
+auto_tanks_write_pending() {
+  local build="$1" base_version="$2" tmp
+  tmp="${AUTO_TANKS_FILE}.$$"
+  mkdir -p "$(dirname "$AUTO_TANKS_FILE")"
+  {
+    echo "DUNE_AUTO_TANKS_BUILD=$build"
+    echo "DUNE_AUTO_TANKS_BASE_VERSION=$base_version"
+    echo "DUNE_AUTO_TANKS_SINCE=$(date +%s)"
+  } > "$tmp"
+  chmod 644 "$tmp" 2>/dev/null || true
+  mv -f "$tmp" "$AUTO_TANKS_FILE"
+}
+
+# 0 = Console was updated, 1 = nothing to do, 2 = check or install failed
+auto_console_update_step() {
+  [ "${DUNE_AUTO_UPDATE_CONSOLE_ENABLED:-0}" = "1" ] || return 1
+  local rc
+  set +e
+  runtime/scripts/self-update.sh check
+  rc=$?
+  set -e
+  case "$rc" in
+    100) ;;
+    0) echo "Dune Docker Console is up to date."; return 1 ;;
+    *) echo "Dune Docker Console update check failed with exit code: $rc"; return 2 ;;
+  esac
+  echo "A Dune Docker Console update from RedBlink is available. Installing it."
+  set +e
+  runtime/scripts/self-update.sh install latest
+  rc=$?
+  set -e
+  if [ "$rc" -ne 0 ]; then
+    echo "Dune Docker Console update failed with exit code: $rc"
+    return 2
+  fi
+  return 0
+}
+
+# Continues an update that switched Tanks off. Safe to call on every run.
+# "no-game-update" means the caller just saw that no game update is waiting; if
+# the game build is still the one Tanks were switched off for, nothing changed
+# (the update failed or was undone) and Tanks can simply be switched on again.
+auto_tanks_followup() {
+  local no_game_update="${1:-}"
+  [ -f "$AUTO_TANKS_FILE" ] || return 0
+  [ "${DUNE_AUTO_UPDATE_MANAGE_TANKS:-0}" = "1" ] || return 0
+
+  local DUNE_AUTO_TANKS_BUILD="" DUNE_AUTO_TANKS_BASE_VERSION="" DUNE_AUTO_TANKS_SINCE="" state_rc=0 current_version json
+  # shellcheck disable=SC1090
+  . "$AUTO_TANKS_FILE"
+
+  auto_tanks_state || state_rc=$?
+  if [ "$state_rc" -eq 0 ]; then
+    echo "Regis Tanks were enabled again by an operator; nothing left to restore."
+    rm -f "$AUTO_TANKS_FILE"
+    return 0
+  fi
+  [ "$state_rc" -eq 1 ] || {
+    echo "Regis Tanks state could not be read; trying again on the next run."
+    return 0
+  }
+
+  json="$(runtime/scripts/experimental-tanks.sh status 2>/dev/null)" || json=""
+  current_version="$(auto_console_version)"
+  if [ "$no_game_update" = "no-game-update" ] \
+    && [ -n "$DUNE_AUTO_TANKS_BUILD" ] \
+    && [ "$(auto_tanks_json_field "$json" build 2>/dev/null)" = "$DUNE_AUTO_TANKS_BUILD" ]; then
+    echo "The game build did not change since Regis Tanks were switched off; switching them on again."
+    auto_tanks_restore
+    return 0
+  fi
+  if [ "$current_version" = "$DUNE_AUTO_TANKS_BASE_VERSION" ]; then
+    auto_console_update_step || true
+    current_version="$(auto_console_version)"
+  fi
+  if [ "$current_version" = "$DUNE_AUTO_TANKS_BASE_VERSION" ]; then
+    echo "Regis Tanks stay disabled: no Dune Docker update from RedBlink is installed since the game update."
+    return 0
+  fi
+
+  json="$(runtime/scripts/experimental-tanks.sh status 2>/dev/null)" || json=""
+  if [ "$(auto_tanks_json_field "$json" supported 2>/dev/null)" != "true" ]; then
+    echo "Regis Tanks stay disabled: Dune Docker $current_version has no Tank patch for game build $(auto_tanks_json_field "$json" build 2>/dev/null || echo unknown) yet."
+    # Wait for the next release rather than re-checking the same one.
+    auto_tanks_write_pending "$(auto_tanks_json_field "$json" build 2>/dev/null || echo "${DUNE_AUTO_TANKS_BUILD:-unknown}")" "$current_version"
+    return 0
+  fi
+
+  echo "Dune Docker $current_version supports the new game build. Enabling Regis Tanks again."
+  auto_tanks_restore
+  return 0
+}
+
+auto_tanks_restore() {
+  if runtime/scripts/experimental-tanks.sh apply true && auto_tanks_state; then
+    rm -f "$AUTO_TANKS_FILE"
+    echo "Regis Tanks are enabled again."
+    return 0
+  fi
+  echo "Regis Tanks could not be enabled again; trying on the next run."
+  return 0
+}
+
 run_auto_update_policy() {
   read_auto_state
   [ "${DUNE_AUTO_UPDATE_ENABLED:-0}" = "1" ] || {
@@ -752,10 +919,10 @@ run_auto_update_policy() {
     return 0
   }
 
-  local check_log check_rc remote_build now first_seen sent_checkpoints players age_seconds max_wait_seconds
+  local check_log check_rc remote_build now first_seen sent_checkpoints players age_seconds max_wait_seconds tanks_rc
   check_log="$(mktemp)"
   set +e
-  "$0" check >"$check_log" 2>&1
+  "${DUNE_AUTO_UPDATE_SELF:-$0}" check >"$check_log" 2>&1
   check_rc=$?
   set -e
   cat "$check_log"
@@ -764,6 +931,8 @@ run_auto_update_policy() {
     0)
       rm -f "$AUTO_PENDING_FILE" "$check_log"
       echo "No auto-update action needed."
+      # No game update waits: finish a previous update's Tank restore, if any.
+      auto_tanks_followup no-game-update
       return 0
       ;;
     100)
@@ -784,7 +953,9 @@ run_auto_update_policy() {
   remote_build="$(awk -F: '/Remote build:/ { gsub(/^[[:space:]]+/, "", $2); print $2; exit }' "$check_log")"
   remote_build="${remote_build:-unknown}"
   rm -f "$check_log"
-  if [ -f runtime/generated/experimental-tanks.json ]; then
+  # Without Tank management the update cannot run while Tanks are enabled, so
+  # stop before players are warned about a restart that would not happen.
+  if [ -f runtime/generated/experimental-tanks.json ] && [ "${DUNE_AUTO_UPDATE_MANAGE_TANKS:-0}" != "1" ]; then
     runtime/scripts/experimental-tanks.sh update-guard
   fi
 
@@ -829,12 +1000,35 @@ run_auto_update_policy() {
     fi
   fi
 
-  "$0" --yes
+  if [ -f runtime/generated/experimental-tanks.json ]; then
+    if [ "${DUNE_AUTO_UPDATE_MANAGE_TANKS:-0}" = "1" ]; then
+      tanks_rc=0
+      auto_tanks_state || tanks_rc=$?
+      if [ "$tanks_rc" -eq 0 ]; then
+        echo "Regis Tanks are enabled. Disabling them before the game update."
+        auto_tanks_write_pending "$(auto_tanks_json_field "$(runtime/scripts/experimental-tanks.sh status 2>/dev/null)" build 2>/dev/null || echo unknown)" "$(auto_console_version)"
+        if ! auto_tanks_disable_confirmed; then
+          if auto_tanks_state; then rm -f "$AUTO_TANKS_FILE"; fi
+          echo "Regis Tanks could not be disabled. The game update was not started."
+          return 1
+        fi
+        echo "Regis Tanks are disabled."
+      elif [ "$tanks_rc" -ne 1 ]; then
+        echo "Regis Tanks state could not be read. The game update was not started."
+        return 1
+      fi
+    fi
+  fi
+
+  "${DUNE_AUTO_UPDATE_SELF:-$0}" --yes
   rm -f "$AUTO_PENDING_FILE"
+
+  auto_console_update_step || true
+  auto_tanks_followup
 }
 
 if [ "$cmd" = "auto" ]; then
-  handle_auto_update "${2:-status}" "${3:-$AUTO_DEFAULT_INTERVAL_MINUTES}" "${4:-1}" "${5:-1}" "${6:-15,10,5,1}" "${7:-0}" "${8:-360}"
+  handle_auto_update "${2:-status}" "${3:-$AUTO_DEFAULT_INTERVAL_MINUTES}" "${4:-1}" "${5:-1}" "${6:-15,10,5,1}" "${7:-0}" "${8:-360}" "${9:-0}" "${10:-0}"
   exit $?
 fi
 

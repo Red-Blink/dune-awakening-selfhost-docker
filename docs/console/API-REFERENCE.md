@@ -138,7 +138,7 @@ Unavailable numeric and boolean values are `null`, and unavailable collections a
 | POST | `/api/updates/check-stack` | Check for stack updates | None |
 | POST | `/api/updates/apply-stack` | Apply stack updates | None |
 | GET | `/api/updates/auto-game` | Get auto-update status | None |
-| POST | `/api/updates/auto-game` | Save auto-update config | `enabled`, `intervalMinutes`, `applyEnabled`, `notifyEnabled`, `notifyMinutes`, `waitUntilEmpty`, `maxWaitMinutes`, `confirmation` |
+| POST | `/api/updates/auto-game` | Save auto-update config | `enabled`, `intervalMinutes`, `applyEnabled`, `notifyEnabled`, `notifyMinutes`, `waitUntilEmpty`, `maxWaitMinutes`, `updateConsole`, `manageTanks`, `confirmation` |
 | POST | `/api/updates/repair-runtime` | Repair runtime installation | None |
 
 Successful game checks are cached for 30 minutes in

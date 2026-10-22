@@ -99,7 +99,7 @@ handle_auto_update enable 30 1 1 30,15,10,5,1 1 30
         self.run_bash(code)
         self.assert_schedule()
         self.assertEqual((self.units / "policy").read_text().strip(),
-                         "1 30 1 1 30,15,10,5,1 1 30 1")
+                         "1 30 1 1 30,15,10,5,1 1 30 1 0 0")
         calls = self.log.read_text().splitlines()
         self.assertEqual(calls.count("restart dune-awakening-auto-update.timer"), 2)
         self.assertFalse(any("stop" in call or "restart dune-awakening-auto-update.service" in call
