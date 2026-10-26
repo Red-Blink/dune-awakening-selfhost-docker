@@ -44,6 +44,8 @@ source runtime/scripts/runtime-env.sh
 source runtime/scripts/image-tags.sh
 source runtime/scripts/sietch-login-password-args.sh
 source runtime/scripts/fake-k8s-serviceaccount.sh
+# shellcheck source=runtime/scripts/lib/game-container.sh
+source runtime/scripts/lib/game-container.sh
 
 
 TOKEN_FILE="runtime/secrets/funcom-token.txt"
@@ -558,15 +560,15 @@ runtime/scripts/repair-map-settings-permissions.sh "$safe_name"
 python3 runtime/scripts/usersettings.py materialize "$MAP_NAME" "$PWD/runtime/game/$safe_name/Saved" "$PARTITION_ID"
 ensure_host_latency_tuned
 mapfile -t MEMORY_SWAP_ARGS < <(memory_swap_docker_args "$MEMORY")
+mapfile -t GAME_CONTAINER_SECURITY_ARGS < <(game_container_security_args)
+GAME_SECRET_ENV_FILE="$(prepare_game_container_secret_file "$safe_name")"
 
 docker run -d \
   "${DUNE_DOCKER_LOG_ARGS[@]}" \
   --name "$CONTAINER_NAME" \
   --network host \
   --restart unless-stopped \
-  --privileged \
-  --cap-add SYS_ADMIN \
-  --security-opt seccomp=unconfined \
+  "${GAME_CONTAINER_SECURITY_ARGS[@]}" \
   --memory "$MEMORY" \
   "${MEMORY_SWAP_ARGS[@]}" \
   --memory-reservation "$MEMORY" \
@@ -574,6 +576,7 @@ docker run -d \
   -v "$(host_path "$PWD/runtime/game/artifacts"):/home/dune/artifacts" \
   -v "$(host_path "$PWD/runtime/container"):/opt/dune-local:ro" \
   -v "$(host_path "$FAKE_K8S_SERVICEACCOUNT_DIR"):/run/secrets/kubernetes.io/serviceaccount:ro" \
+  -v "$(host_path "$GAME_SECRET_ENV_FILE"):/run/secrets/dune-game-env:ro" \
   -e "POD_UID=docker-$safe_name" \
   -e "POD_NAME=${BATTLEGROUP_ID}-sg-${safe_name}-pod-${PARTITION_ID}" \
   -e "POD_IP=$MULTIHOME_IP" \
@@ -586,40 +589,7 @@ docker run -d \
   -e "BATTLEGROUP_DISPLAY_NAME=$BATTLEGROUP_ID" \
   -e "BATTLEGROUP_TITLE=$SERVER_TITLE" \
   -e "FC_CRASHREPORTER_LOGS=/home/dune/server/DuneSandbox/Saved/CrashReporterLogs" \
-  -e "FuncomLiveServices__ServiceAuthToken=$FUNCOM_TOKEN" \
   -e "FuncomLiveServices__RmqTlsEnabled=true" \
-  -e "RMQ_HTTP_TOKEN_AUTH_SECRET=$RMQ_HTTP_TOKEN_AUTH_SECRET" \
-  -e "DUNE_SERVER_LOGIN_PASSWORD_SECRET=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "DUNE_USERNAME_SERVER_LOGIN_SECRET=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "DUNE_LOGIN_PASSWORD_SKEW_SECONDS=$LOGIN_PASSWORD_SKEW_SECONDS" \
-  -e "ServerLoginPasswordSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "UsernameServerLoginSecret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "LoginPasswordSkew=$LOGIN_PASSWORD_SKEW_SECONDS" \
-  -e "BackendLoginConfiguration__ServerLoginPasswordSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "BackendLoginConfiguration__UsernameServerLoginSecret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "BackendLoginConfiguration__LoginPasswordSkew=$LOGIN_PASSWORD_SKEW_SECONDS" \
-  -e "BackendLoginConfiguration__ServerLoginPasswordSecretEnvironmentVariable=DUNE_SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "BackendLoginConfiguration__UsernameServerLoginSecretEnvironmentVariable=DUNE_USERNAME_SERVER_LOGIN_SECRET" \
-  -e "BackendLoginConfiguration__LoginPasswordSkewEnvironmentVariable=DUNE_LOGIN_PASSWORD_SKEW_SECONDS" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__ServerLoginPasswordSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__UsernameServerLoginSecret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__LoginPasswordSkew=$LOGIN_PASSWORD_SKEW_SECONDS" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__ServerLoginPasswordSecretEnvironmentVariable=DUNE_SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__UsernameServerLoginSecretEnvironmentVariable=DUNE_USERNAME_SERVER_LOGIN_SECRET" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__LoginPasswordSkewEnvironmentVariable=DUNE_LOGIN_PASSWORD_SKEW_SECONDS" \
-  -e "Secret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "UsernameSecret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "ServerLoginSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "ChecksumSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "BackendLoginConfiguration__Secret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "BackendLoginConfiguration__UsernameSecret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "BackendLoginConfiguration__ServerLoginSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "BackendLoginConfiguration__ChecksumSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__Secret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__UsernameSecret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__ServerLoginSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__ChecksumSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "fls-apikey=$FLS_APIKEY" \
   "${SIETCH_LOGIN_PASSWORD_ARGS[@]}" \
   "$IMAGE" \
   /opt/dune-local/run-server.sh \

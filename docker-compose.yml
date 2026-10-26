@@ -27,6 +27,12 @@ services:
     stdin_open: true
     tty: true
     command: ["dune", "daemon"]
+    healthcheck:
+      test: ["CMD-SHELL", "docker info >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     logging:
       driver: json-file
       options:

@@ -33,10 +33,18 @@ POSTGRES_PORT="$(resolve_postgres_port)"
 
 POSTGRES_BOOTSTRAP_DIR="runtime/postgres/bootstrap"
 POSTGRES_BOOTSTRAP_SQL="$POSTGRES_BOOTSTRAP_DIR/ensure-dune.sql"
-mkdir -p "$POSTGRES_BOOTSTRAP_DIR"
+mkdir -p "$POSTGRES_BOOTSTRAP_DIR" runtime/secrets
+
+PG_SUPERUSER_SECRET_FILE="${DUNE_PG_SUPERUSER_PASSWORD_FILE:-runtime/secrets/postgres-superuser-password.txt}"
+if [ -r "$PG_SUPERUSER_SECRET_FILE" ]; then
+  file_super_pw="$(tr -d '\r\n' < "$PG_SUPERUSER_SECRET_FILE" 2>/dev/null || true)"
+  if [ -n "$file_super_pw" ]; then
+    DUNE_PG_SUPERUSER_PASSWORD="$file_super_pw"
+  fi
+fi
 
 dune_db_password="${DUNE_DB_PASSWORD:-dune}"
-DUNE_DB_PASSWORD="$dune_db_password" runtime/scripts/postgres-bootstrap-sql.sh \
+DUNE_DB_PASSWORD="$dune_db_password" DUNE_PG_SUPERUSER_PASSWORD="$DUNE_PG_SUPERUSER_PASSWORD" runtime/scripts/postgres-bootstrap-sql.sh \
   > "$POSTGRES_BOOTSTRAP_SQL"
 chmod 600 "$POSTGRES_BOOTSTRAP_SQL"
 
@@ -51,12 +59,21 @@ docker run -d \
   --name dune-postgres \
   --network dune-net \
   --restart unless-stopped \
+  --health-cmd "pg_isready -h 127.0.0.1 -p 5432 -U postgres -d postgres" \
+  --health-interval 15s \
+  --health-timeout 5s \
+  --health-retries 5 \
   -p "127.0.0.1:${POSTGRES_PORT}:5432" \
   -e "POSTGRES_USER=$DUNE_PG_SUPERUSER" \
   -e "POSTGRES_PASSWORD=$DUNE_PG_SUPERUSER_PASSWORD" \
   -e "POSTGRES_DB=$DUNE_PG_DATABASE" \
   -v dune-postgres-data:/var/lib/postgresql/data \
-  "$IMAGE"
+  "$IMAGE" \
+  postgres \
+  -c shared_buffers="${DUNE_PG_SHARED_BUFFERS:-256MB}" \
+  -c effective_cache_size="${DUNE_PG_EFFECTIVE_CACHE_SIZE:-1GB}" \
+  -c work_mem="${DUNE_PG_WORK_MEM:-16MB}" \
+  -c synchronous_commit="${DUNE_PG_SYNCHRONOUS_COMMIT:-local}"
 
 echo "Waiting for Postgres..."
 ready=0

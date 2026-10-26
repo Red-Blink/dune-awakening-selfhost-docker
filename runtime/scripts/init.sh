@@ -485,8 +485,16 @@ set_env_file_value runtime/generated/battlegroup.env BATTLEGROUP_ID "$BATTLEGROU
 
 printf '%s' "$FUNCOM_TOKEN" > runtime/secrets/funcom-token.txt
 
+if [ ! -s runtime/secrets/postgres-superuser-password.txt ]; then
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 32 | tr -d '\r\n' > runtime/secrets/postgres-superuser-password.txt
+  else
+    head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \r\n' > runtime/secrets/postgres-superuser-password.txt
+  fi
+fi
+
 chmod 644 .env
-chmod 600 runtime/secrets/funcom-token.txt
+chmod 600 runtime/secrets/funcom-token.txt runtime/secrets/postgres-superuser-password.txt
 
 export SERVER_IP SERVER_IP_MODE SERVER_TITLE SERVER_REGION STEAM_APP_ID BATTLEGROUP_ID
 

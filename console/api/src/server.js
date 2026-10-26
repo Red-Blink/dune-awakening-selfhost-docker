@@ -26,6 +26,8 @@ import { buildDuneArgs, isDynamicServerService, parseVehicleList, runDockerLogs,
 // execution decision from diverging.
 import { createDb, hasExecutableStatement, isReadOnlySql, quoteIdentifier } from "./db.js";
 import * as duneDb from "./duneDb.js";
+import { duneDbDomains } from "./duneDb/domains.js";
+import { API_ROUTE_DOMAINS, createExactRouteIndex } from "./http/routeTable.js";
 import { audit, installAuditShutdownHooks, recordAdminHistory } from "./audit.js";
 import { redact } from "./redact.js";
 import { buildingUnlockStatus, customizationGrantGroups, customizationGrantStatus, isBuildingUnlockItem, isCustomizationGrantItem, itemIsRankedSchematic, itemIsSchematic, itemRequiresDatabaseGrant, listBuildingUnlockItems, listCatalogItems, listCustomizationGrantItems, resolveCatalogItem, resolveFillableCatalogItem, resolveItemVolume } from "./adminCatalog.js";
@@ -319,6 +321,7 @@ process.on("unhandledRejection", (error) => {
 });
 
 createServer(async (req, res) => {
+  res.req = req;
   req.trustedClientAddress = tlsClientAddress(req, config.repoRoot);
   if (req.trustedClientAddress === null) {
     res.writeHead(403, { "content-type": "application/json" });
@@ -522,9 +525,17 @@ function scheduleBootAutoStart() {
   }, 5000).unref?.();
 }
 
+let journeyTagsDataCache = null;
 function loadJourneyTagsData() {
+  const file = join(config.repoRoot, "runtime", "data", "journey-tags.json");
   try {
-    return JSON.parse(readFileSync(join(config.repoRoot, "runtime", "data", "journey-tags.json"), "utf8"));
+    const mtimeMs = statSync(file).mtimeMs;
+    if (journeyTagsDataCache && journeyTagsDataCache.file === file && journeyTagsDataCache.mtimeMs === mtimeMs) {
+      return journeyTagsDataCache.data;
+    }
+    const data = JSON.parse(readFileSync(file, "utf8"));
+    journeyTagsDataCache = { file, mtimeMs, data };
+    return data;
   } catch {
     return { journey_node_tags: {} };
   }
@@ -691,6 +702,7 @@ async function handleApi(req, res) {
   if (path === "/api/auth/logout" && req.method === "POST") {
     const session = auth.requireAuth(req, res);
     if (!session) return;
+    auth.revokeSession?.(req);
     clearSessionCookie(res, config);
     audit(config, req, "auth.logout");
     return json(res, 200, { ok: true });
@@ -948,7 +960,7 @@ async function handleApi(req, res) {
   if (path === "/api/database/schemas") return dbJson(res, () => duneDb.listSchemas(db));
   if (path === "/api/database/routines") return dbJson(res, () => duneDb.listRoutines(db, url.searchParams.get("schema") || "dune", url.searchParams.get("q") || ""));
   if (path.match(/^\/api\/database\/routines\/[^/]+$/)) return dbJson(res, () => duneDb.routineDefinition(db, decodeURIComponent(path.split("/").pop())));
-  if (path === "/api/database/tables") return dbJson(res, () => duneDb.listTables(db, url.searchParams.get("schema") || "dune"));
+  if (path === "/api/database/tables") return dbJson(res, () => duneDb.listTables(db, url.searchParams.get("schema") || "dune", { approximate: url.searchParams.get("approximate") === "1" }));
   if (path.match(/^\/api\/database\/tables\/[^/]+\/[^/]+\/columns$/)) return databaseTableRoute(req, res, path, "columns", url);
   if (path.match(/^\/api\/database\/tables\/[^/]+\/[^/]+\/preview$/)) return databaseTableRoute(req, res, path, "preview", url);
   if (path.match(/^\/api\/database\/tables\/[^/]+\/[^/]+\/count$/)) return databaseTableRoute(req, res, path, "count", url);
@@ -1754,7 +1766,8 @@ function addonContentRoute(req, res, path) {
   if (!existsSync(target)) return json(res, 404, { error: "Addon content file not found." });
   res.writeHead(200, withSecurityHeaders({
     "content-type": contentTypeForPath(target),
-    "x-frame-options": "SAMEORIGIN"
+    "x-frame-options": "SAMEORIGIN",
+    "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; frame-ancestors 'self'; sandbox allow-scripts"
   }));
   createReadStream(target).pipe(res);
 }

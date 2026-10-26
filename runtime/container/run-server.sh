@@ -2,6 +2,21 @@
 set -euo pipefail
 
 main() {
+    if [ -r /run/secrets/dune-game-env ]; then
+        while IFS='=' read -r secret_key secret_val; do
+            [ -n "${secret_key:-}" ] || continue
+            case "$secret_key" in
+                \#*) continue ;;
+                fls-apikey)
+                    export "fls-apikey=$secret_val" 2>/dev/null || true
+                    ;;
+                *)
+                    export "${secret_key}=${secret_val}"
+                    ;;
+            esac
+        done < /run/secrets/dune-game-env
+    fi
+
     install_cert
 
     mkdir -p /home/dune/server/DuneSandbox/Saved/UserSettings
@@ -78,8 +93,10 @@ main() {
     ssh=$((${ports[0]}-1111))
     echo "$ssh" > /home/dune/ssh_port
 
-    sed -i "s/#Port 22/Port ${ssh}/g" /etc/ssh/sshd_config
-    service ssh start >/dev/null
+    if [ "${DUNE_ENABLE_CONTAINER_SSH:-0}" = "1" ]; then
+        sed -i "s/#Port 22/Port ${ssh}/g" /etc/ssh/sshd_config
+        service ssh start >/dev/null
+    fi
 
     amend_kubernetes_metadata "$pid" "${ports[0]}" "${ports[1]}" "$ssh"
 

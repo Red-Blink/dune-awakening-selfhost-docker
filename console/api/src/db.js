@@ -151,7 +151,7 @@ export function createDb(config) {
   const repoRoot = config?.repoRoot || process.cwd();
   const pool = new Pool({
     ...dbConfig,
-    max: Number(process.env.ADMIN_DB_POOL_SIZE || 5),
+    max: Number(process.env.ADMIN_DB_POOL_SIZE || 12),
     connectionTimeoutMillis: Number(process.env.ADMIN_DB_CONNECT_TIMEOUT_MS || 3000),
     idleTimeoutMillis: Number(process.env.ADMIN_DB_IDLE_TIMEOUT_MS || 10000),
     query_timeout: Number(process.env.ADMIN_DB_QUERY_TIMEOUT_MS || 15000),

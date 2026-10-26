@@ -23,6 +23,8 @@ services:
     # confinement only for this trusted management container, not for the host.
     security_opt:
       - label=disable
+    cap_drop:
+      - ALL
     group_add:
       - "${DOCKER_SOCKET_GID:-0}"
     environment:
@@ -30,6 +32,7 @@ services:
       # Keep Docker CLI state out of / so deployment works for every host UID.
       HOME: /tmp/dune-console-home
       DOCKER_CONFIG: /tmp/dune-console-home/.docker
+      DOCKER_HOST: "${DUNE_DOCKER_SOCKET_PROXY_URL:-}"
       DUNE_HOST_UID: "${DUNE_HOST_UID:-0}"
       DUNE_HOST_GID: "${DUNE_HOST_GID:-0}"
       DUNE_DOCKER_DIR: /repo
@@ -122,3 +125,9 @@ services:
       # WARNING: mounting the Docker socket gives this container broad control
       # over the host Docker daemon. Expose the web admin only to trusted admins.
       - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${ADMIN_WEB_PORT:-${ADMIN_BIND_PORT:-8088}}/api/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

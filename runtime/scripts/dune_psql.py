@@ -79,6 +79,21 @@ def resolved_transport():
     return _resolve()[0]
 
 
+def _superuser_password():
+    secret_file = (
+        os.environ.get("DUNE_PG_SUPERUSER_PASSWORD_FILE")
+        or "runtime/secrets/postgres-superuser-password.txt"
+    )
+    try:
+        with open(secret_file, "r", encoding="utf-8") as fh:
+            value = fh.read().strip()
+            if value:
+                return value
+    except OSError:
+        pass
+    return SUPERUSER_PASSWORD
+
+
 def query_tsv(sql):
     """Run one statement and return its rows unaligned and tab-separated.
 
@@ -99,7 +114,7 @@ def query_tsv(sql):
             "-d", DATABASE,
             *tail,
         ]
-        env["PGPASSWORD"] = SUPERUSER_PASSWORD
+        env["PGPASSWORD"] = _superuser_password()
     else:
         argv = [
             "docker", "exec", CONTAINER,

@@ -7,8 +7,12 @@ set -euo pipefail
 # data volume is reused.
 dune_db_password="${DUNE_DB_PASSWORD:-dune}"
 dune_db_password_sql="$(printf '%s' "$dune_db_password" | sed "s/'/''/g")"
+superuser_password="${DUNE_PG_SUPERUSER_PASSWORD:-postgres}"
+superuser_password_sql="$(printf '%s' "$superuser_password" | sed "s/'/''/g")"
 
 cat <<SQL
+ALTER ROLE postgres WITH PASSWORD '$superuser_password_sql';
+
 DO
 \$\$
 BEGIN

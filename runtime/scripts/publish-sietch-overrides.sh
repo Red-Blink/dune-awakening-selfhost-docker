@@ -589,9 +589,9 @@ import dune_psql  # noqa: E402
 
 messages = json.loads(os.environ["FILTER_MESSAGES"])
 survival_log_ready = os.environ.get("SURVIVAL_LOG_READY", "").lower() in ("1", "true", "t", "yes")
-label_rows_raw = dune_psql.query_tsv("select partition_id, coalesce(label, '') from dune.world_partition where lower(map)=lower('Survival_1');")
-endpoint_rows_raw = dune_psql.query_tsv("""
+partition_rows_raw = dune_psql.query_tsv("""
       select wp.partition_id,
+             coalesce(wp.label, ''),
              coalesce(host(fs.game_addr), ''),
              coalesce(fs.game_port, 0)
       from dune.world_partition wp
@@ -599,16 +599,12 @@ endpoint_rows_raw = dune_psql.query_tsv("""
       where lower(wp.map)=lower('Survival_1');
     """)
 label_by_partition = {}
-for line in label_rows_raw.splitlines():
-    if not line.strip():
-        continue
-    partition_id, label = line.split("\t", 1)
-    label_by_partition[partition_id] = label
 endpoint_by_partition = {}
-for line in endpoint_rows_raw.splitlines():
+for line in partition_rows_raw.splitlines():
     if not line.strip():
         continue
-    partition_id, game_addr, game_port = line.split("\t", 2)
+    partition_id, label, game_addr, game_port = line.split("\t", 3)
+    label_by_partition[partition_id] = label
     endpoint_by_partition[partition_id] = (game_addr, game_port)
 
 usersettings_config = usersettings.load_config()

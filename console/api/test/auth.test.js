@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { scryptSync } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createAuth, clearSessionCookie, setSessionCookie, json, serializeJsonResponse } from "../src/auth.js";
 
 test("auth creates readable signed sessions", async () => {
@@ -80,6 +83,23 @@ test("json responses include defensive browser headers", () => {
   assert.equal(res.headers["x-frame-options"], "DENY");
   assert.equal(res.headers["referrer-policy"], "no-referrer");
   assert.match(res.headers["permissions-policy"], /camera=\(\)/);
+  assert.match(res.headers["content-security-policy"], /default-src 'self'/);
+});
+
+test("auth persists and restores HMAC-authenticated sessions across restarts when sessionStoreFile is configured", () => {
+  const dir = mkdtempSync(join(tmpdir(), "auth-sessions-"));
+  try {
+    const sessionStoreFile = join(dir, "sessions.json");
+    const firstAuth = createAuth({ sessionSecret: "persist-secret", adminPassword: "admin", authDisabled: false, sessionStoreFile });
+    const session = firstAuth.makeSession({ tier: "owner", username: "Paul" });
+    const restartedAuth = createAuth({ sessionSecret: "persist-secret", adminPassword: "admin", authDisabled: false, sessionStoreFile });
+    const restored = restartedAuth.readSession({ headers: { cookie: `asc_session=${encodeURIComponent(session.cookie)}` } });
+    assert.equal(restored?.id, session.id);
+    assert.equal(restored?.csrf, session.csrf);
+    assert.equal(restored?.username, "Paul");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("json response serialization preserves ordinary public payloads", () => {
