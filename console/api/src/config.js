@@ -268,6 +268,8 @@ export function loadConfig() {
     commandTimeoutMs: Number(process.env.ADMIN_COMMAND_TIMEOUT_MS || 120000),
     updateCheckCacheMs: Number(process.env.ADMIN_UPDATE_CHECK_CACHE_MS || 30 * 60 * 1000),
     updateCheckCacheFile: resolve(generatedDir, "game-update-check.json"),
+    // How long a status/readiness snapshot counts as fresh; 0 disables the cache.
+    statusCacheMs: clampInt(process.env.ADMIN_STATUS_CACHE_MS, 5000, 0, 120000),
     staticDir: process.env.ADMIN_STATIC_DIR || resolve(repoRoot, "console/web/dist"),
     allowedIps: parseAllowedIps(process.env.ADMIN_ALLOWED_IPS)
   };

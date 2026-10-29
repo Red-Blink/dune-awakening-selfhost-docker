@@ -96,6 +96,7 @@ import { createSharedDeleteBackup, flushBaseRefillQueues } from "./services/base
 import { verifyBaseBackupState } from "./services/baseBackupSafety.js";
 import { createSingleFlight } from "./services/singleFlight.js";
 import { createReadCommandCache } from "./services/readCommandCache.js";
+import { createStatusReads } from "./services/statusReads.js";
 import { banPlayer, bannedFlsIds, createPlayerBanEnforcer, playerBanFor, unbanPlayer } from "./services/playerBans.js";
 import { findPlayerForLiveAction, playerIsOnlineForLiveAction } from "./playerLiveActions.js";
 import { retireLegacyEdaExchangeBot } from "./services/marketBotRetirement.js";
@@ -121,8 +122,14 @@ const readCommandCache = createReadCommandCache();
 // Status commands walk Docker, PostgreSQL, RabbitMQ, and logs. Keep a fresh
 // snapshot briefly, then serve that bounded snapshot while one shared refresh
 // runs in the background. This avoids repeating several seconds of identical
-// host work for every integration poll.
-const statusCommandCache = createReadCommandCache({ ttlMs: 5000, staleMs: 30000 });
+// host work for every integration poll. ADMIN_STATUS_CACHE_MS=0 turns it off.
+const statusCommandCache = createReadCommandCache({ ttlMs: config.statusCacheMs, staleMs: config.statusCacheMs > 0 ? 30000 : 0 });
+const statusReads = createStatusReads({
+  statusCache: statusCommandCache,
+  readinessCache: readCommandCache,
+  argsFor: (operation) => buildDuneArgs(operation, {}),
+  runArgs: (args) => runDune(config, args)
+});
 const CONSOLE_PROCESS_STARTED_AT = Date.now();
 let edaRetirement = { retired: false, addonRemoved: false, migrated: false, changed: false, backupDir: "", cleanupError: "" };
 try {
@@ -772,7 +779,7 @@ async function handleApi(req, res) {
   if (path === "/api/server/status") return serverStatusRoute(res, url);
   if (path === "/api/server/performance") return json(res, 200, await collectPerformanceSnapshot(config.repoRoot));
   if (path === "/api/server/restart-history") return json(res, 200, readRestartHistory(config));
-  if (path === "/api/server/readiness") return safeCommandJson(res, "readiness");
+  if (path === "/api/server/readiness") return readinessRoute(res, url);
   if (path === "/api/server/ports") return commandJson(res, "ports");
   if (path === "/api/server/services") return commandJson(res, "services");
   if (path === "/api/server/doctor") return safeCommandJson(res, "doctor");
@@ -2283,8 +2290,13 @@ function includeRawStatus(url) {
 }
 
 async function serverStatusRoute(res, url) {
-  const result = config.mockMode ? mockCommand("status") : await safeCommand("status", {}, statusCommandCache);
-  return json(res, 200, buildServerStatusResponse(result, { includeRaw: includeRawStatus(url) }));
+  if (config.mockMode) return json(res, 200, buildServerStatusResponse(mockCommand("status"), { includeRaw: includeRawStatus(url) }));
+  return json(res, 200, await statusReads.status(url, { includeRaw: includeRawStatus(url) }));
+}
+
+async function readinessRoute(res, url) {
+  if (config.mockMode) return json(res, 200, mockCommand("readiness"));
+  return json(res, 200, await statusReads.readiness(url));
 }
 
 async function structuredVehiclesRoute(res) {
@@ -3134,6 +3146,8 @@ async function task(req, res, type, operation, payload, options = {}) {
     return json(res, 400, { error: redact(error?.message || "Unexpected error.") });
   }
   if (await maybeQueueRestart(req, res, type, operation, payload)) return;
+  // A server task changes what status/readiness report; don't serve the old answer.
+  if (type === "server") statusReads.invalidate();
   // Only `payload` is audited. Secrets travel in options.env, which is never
   // written to the audit log nor stored on the task -- keep it that way.
   audit(config, req, `task.${operation}`, payload);
