@@ -89,7 +89,7 @@ STAGE_DIR=$(mktemp -d "$PARENT_DIR/.dune-install.XXXXXX") \
 printf '%s\n' "==> Downloading $PROJECT $VERSION..."
 fetch "https://github.com/$REPOSITORY/archive/refs/tags/$VERSION.tar.gz" "$ARCHIVE" \
   || fail "the release download failed. Check free space and internet access, then retry."
-EXPECTED_SHA256="${DUNE_RELEASE_SHA256:-$(printf '%s\n' "$RELEASE_JSON" | sed -n 's/.*"digest":[[:space:]]*"sha256:\([0-9a-fA-F]\{64\}\)".*/\1/p' | head -n 1)}"
+EXPECTED_SHA256="${DUNE_RELEASE_SHA256:-}"
 verify_archive_sha256 "$EXPECTED_SHA256" "$ARCHIVE"
 if tar -tzf "$ARCHIVE" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
   fail "the release archive contains unsafe path entries."

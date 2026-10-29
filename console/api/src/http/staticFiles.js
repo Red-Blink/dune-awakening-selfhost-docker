@@ -2,6 +2,8 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { extname } from "node:path";
 import { createBrotliCompress, createGzip } from "node:zlib";
+import { pipeline } from "node:stream";
+import { preferredContentEncoding } from "./contentEncoding.js";
 import { json, withSecurityHeaders } from "../auth.js";
 import { safeStaticTarget } from "../httpSafety.js";
 
@@ -23,11 +25,7 @@ export function contentTypeForPath(target) {
 
 function negotiateStaticEncoding(acceptEncoding = "", ext = "", size = 0) {
   if (!COMPRESSIBLE_EXTENSIONS.has(ext) || size < MIN_COMPRESSION_BYTES) return null;
-  const header = String(acceptEncoding || "").toLowerCase();
-  if (!header) return null;
-  if (/\bbr\b/.test(header)) return "br";
-  if (/\bgzip\b/.test(header)) return "gzip";
-  return null;
+  return preferredContentEncoding(acceptEncoding);
 }
 
 // Vite fingerprints every file under its default assetsDir ("/assets") with a
@@ -62,6 +60,7 @@ export function serveStatic(config, req, res) {
       const ext = extname(target).toLowerCase();
       const encoding = negotiateStaticEncoding(req?.headers?.["accept-encoding"], ext, stats.size);
       const headers = {
+        vary: "Accept-Encoding",
         "content-type": contentTypeForPath(target),
         "cache-control": servedRequestedAsset ? cacheControlForPath(path) : "no-cache"
       };
@@ -75,11 +74,11 @@ export function serveStatic(config, req, res) {
         if (!res.destroyed) res.destroy();
       });
       if (encoding === "br") {
-        stream.pipe(createBrotliCompress()).pipe(res);
+        pipeline(stream, createBrotliCompress(), res, () => {});
       } else if (encoding === "gzip") {
-        stream.pipe(createGzip()).pipe(res);
+        pipeline(stream, createGzip(), res, () => {});
       } else {
-        stream.pipe(res);
+        pipeline(stream, res, () => {});
       }
     })
     .catch(() => {

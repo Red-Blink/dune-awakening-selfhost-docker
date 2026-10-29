@@ -3,6 +3,12 @@
 #   DUNE_DOCKER_SOCKET_PROXY_URL=tcp://127.0.0.1:2375 \
 #     docker compose -f docker-compose.web.yml -f docker-compose.socket-proxy.yml up -d
 services:
+  redblink-dune-docker-console:
+    environment:
+      DOCKER_HOST: tcp://127.0.0.1:2375
+    volumes: !override
+      - "${DUNE_HOST_REPO_ROOT:-.}:/repo:z"
+      - /etc/localtime:/etc/localtime:ro
   dune-docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:0.3.0
     container_name: dune-docker-socket-proxy

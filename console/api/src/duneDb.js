@@ -73,12 +73,12 @@ let mapRegionNamesCache = null;
 let augmentCompatibilityCache = null;
 const PLAYER_TARGET_CACHE_TTL_MS = 3000;
 const playerTargetCache = new Map(); // id -> { promise, expiresAt }
-const queueFileCache = new Map(); // path -> { mtimeMs, size, parsed }
+const queueFileCache = new Map(); // path -> { stats, parsed }
 
 function readCachedQueueJson(file) {
   let stats;
   try {
-    stats = statSync(file);
+    stats = statSync(file, { bigint: true });
   } catch (error) {
     if (error && error.code === "ENOENT") {
       queueFileCache.delete(file);
@@ -87,11 +87,11 @@ function readCachedQueueJson(file) {
     throw error;
   }
   const cached = queueFileCache.get(file);
-  if (cached && cached.mtimeMs === stats.mtimeMs && cached.size === stats.size) {
+  if (cached && ["dev", "ino", "mtimeNs", "ctimeNs", "size"].every(key => cached.stats[key] === stats[key])) {
     return cached.parsed;
   }
   const parsed = JSON.parse(readFileSync(file, "utf8"));
-  queueFileCache.set(file, { mtimeMs: stats.mtimeMs, size: stats.size, parsed });
+  queueFileCache.set(file, { stats, parsed });
   return parsed;
 }
 

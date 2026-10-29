@@ -35,16 +35,8 @@ POSTGRES_BOOTSTRAP_DIR="runtime/postgres/bootstrap"
 POSTGRES_BOOTSTRAP_SQL="$POSTGRES_BOOTSTRAP_DIR/ensure-dune.sql"
 mkdir -p "$POSTGRES_BOOTSTRAP_DIR" runtime/secrets
 
-PG_SUPERUSER_SECRET_FILE="${DUNE_PG_SUPERUSER_PASSWORD_FILE:-runtime/secrets/postgres-superuser-password.txt}"
-if [ -r "$PG_SUPERUSER_SECRET_FILE" ]; then
-  file_super_pw="$(tr -d '\r\n' < "$PG_SUPERUSER_SECRET_FILE" 2>/dev/null || true)"
-  if [ -n "$file_super_pw" ]; then
-    DUNE_PG_SUPERUSER_PASSWORD="$file_super_pw"
-  fi
-fi
-
 dune_db_password="${DUNE_DB_PASSWORD:-dune}"
-DUNE_DB_PASSWORD="$dune_db_password" DUNE_PG_SUPERUSER_PASSWORD="$DUNE_PG_SUPERUSER_PASSWORD" runtime/scripts/postgres-bootstrap-sql.sh \
+DUNE_DB_PASSWORD="$dune_db_password" runtime/scripts/postgres-bootstrap-sql.sh \
   > "$POSTGRES_BOOTSTRAP_SQL"
 chmod 600 "$POSTGRES_BOOTSTRAP_SQL"
 

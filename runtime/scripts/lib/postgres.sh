@@ -96,15 +96,6 @@ dune_psql_init() {
   # postgres-bootstrap-sql.sh sets the role's password to.
   DUNE_PG_APP_PASSWORD="${DUNE_DB_PASSWORD:-dune}"
 
-  local pg_superuser_secret_file="${DUNE_PG_SUPERUSER_PASSWORD_FILE:-runtime/secrets/postgres-superuser-password.txt}"
-  if [ -r "$pg_superuser_secret_file" ]; then
-    local file_super_pw
-    file_super_pw="$(tr -d '\r\n' < "$pg_superuser_secret_file" 2>/dev/null || true)"
-    if [ -n "$file_super_pw" ]; then
-      DUNE_PG_SUPERUSER_PASSWORD="$file_super_pw"
-    fi
-  fi
-
   DUNE_PSQL_INITIALIZED=1
 }
 

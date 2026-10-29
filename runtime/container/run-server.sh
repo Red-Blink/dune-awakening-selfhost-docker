@@ -2,19 +2,23 @@
 set -euo pipefail
 
 main() {
-    if [ -r /run/secrets/dune-game-env ]; then
+    if [ "${DUNE_GAME_ENV_LOADED:-0}" != "1" ] && [ -r /run/secrets/dune-game-env ]; then
+        local fls_key=""
         while IFS='=' read -r secret_key secret_val; do
             [ -n "${secret_key:-}" ] || continue
             case "$secret_key" in
                 \#*) continue ;;
                 fls-apikey)
-                    export "fls-apikey=$secret_val" 2>/dev/null || true
+                    fls_key="$secret_val"
                     ;;
                 *)
                     export "${secret_key}=${secret_val}"
                     ;;
             esac
         done < /run/secrets/dune-game-env
+        # Bash preserves inherited hyphenated names but cannot export them.
+        # Re-exec without changing the PID or writing credentials to a script.
+        exec env "fls-apikey=$fls_key" DUNE_GAME_ENV_LOADED=1 "$BASH" "$0" "$@"
     fi
 
     install_cert
@@ -93,7 +97,7 @@ main() {
     ssh=$((${ports[0]}-1111))
     echo "$ssh" > /home/dune/ssh_port
 
-    if [ "${DUNE_ENABLE_CONTAINER_SSH:-0}" = "1" ]; then
+    if [ "${DUNE_ENABLE_CONTAINER_SSH:-1}" = "1" ]; then
         sed -i "s/#Port 22/Port ${ssh}/g" /etc/ssh/sshd_config
         service ssh start >/dev/null
     fi

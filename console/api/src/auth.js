@@ -3,8 +3,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:zlib";
 import { writeJsonAtomic } from "./jsonStore.js";
 import { verifyPassword } from "./passwordHash.js";
+import { preferredContentEncoding } from "./http/contentEncoding.js";
 
-const sessions = new Map();
 const MIN_JSON_COMPRESSION_BYTES = 1024;
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const SESSION_PERSIST_MIN_INTERVAL_MS = 30 * 1000;
@@ -32,12 +32,17 @@ export function parseCookies(header = "") {
 }
 
 export function createAuth(config) {
+  const sessions = new Map();
   const now = config.now || (() => Date.now());
   const sessionStoreFile = config.sessionStoreFile ? String(config.sessionStoreFile) : "";
   let lastPersistAt = 0;
 
   function sign(value) {
     return createHmac("sha256", config.sessionSecret).update(value).digest("base64url");
+  }
+
+  function sessionMac(entry) {
+    return sign(JSON.stringify([entry.id, entry.csrf, entry.expiresAt, entry.tier || "owner", entry.userId || "", entry.username || "", entry.guildId || "", config.adminPassword, Boolean(config.adminPasswordEnvManaged)]));
   }
 
   function constantTimeStringEqual(left, right) {
@@ -56,8 +61,7 @@ export function createAuth(config) {
         if (!entry || typeof entry.id !== "string" || typeof entry.csrf !== "string") continue;
         const expiresAt = Number(entry.expiresAt);
         if (!Number.isFinite(expiresAt) || expiresAt < currentNow) continue;
-        const macPayload = `${entry.id}:${entry.csrf}:${expiresAt}:${entry.tier || "owner"}:${entry.userId || ""}:${entry.username || ""}:${entry.guildId || ""}`;
-        if (!entry.mac || !constantTimeStringEqual(sign(macPayload), entry.mac)) continue;
+        if (!entry.mac || !constantTimeStringEqual(sessionMac(entry), entry.mac)) continue;
         sessions.set(entry.id, {
           id: entry.id,
           csrf: entry.csrf,
@@ -85,7 +89,6 @@ export function createAuth(config) {
           sessions.delete(id);
           continue;
         }
-        const macPayload = `${session.id}:${session.csrf}:${session.expiresAt}:${session.tier || "owner"}:${session.userId || ""}:${session.username || ""}:${session.guildId || ""}`;
         active.push({
           id: session.id,
           csrf: session.csrf,
@@ -94,10 +97,10 @@ export function createAuth(config) {
           userId: session.userId || "",
           username: session.username || "",
           guildId: session.guildId || "",
-          mac: sign(macPayload)
+          mac: sessionMac(session)
         });
       }
-      writeJsonAtomic(sessionStoreFile, { version: 1, sessions: active }, { mode: 0o600 });
+      writeJsonAtomic(sessionStoreFile, { version: 1, sessions: active }, 0o600);
     } catch {
       // Best-effort persistence: in-memory sessions continue working if disk is read-only.
     }
@@ -192,8 +195,10 @@ export function json(res, status, body, headers = {}) {
   const payload = serializeJsonResponse(body);
   const acceptEncoding = String(res?.req?.headers?.["accept-encoding"] || "").toLowerCase();
   const rawBuffer = acceptEncoding ? Buffer.from(payload, "utf8") : null;
+  const encoding = preferredContentEncoding(acceptEncoding);
+  if (Buffer.byteLength(payload) >= MIN_JSON_COMPRESSION_BYTES) headers = { vary: "Accept-Encoding", ...headers };
   if (rawBuffer && rawBuffer.length >= MIN_JSON_COMPRESSION_BYTES && !headers["content-encoding"]) {
-    if (/\bbr\b/.test(acceptEncoding)) {
+    if (encoding === "br") {
       const compressed = brotliCompressSync(rawBuffer, {
         params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 4 }
       });
@@ -206,7 +211,7 @@ export function json(res, status, body, headers = {}) {
       res.end(compressed);
       return;
     }
-    if (/\bgzip\b/.test(acceptEncoding)) {
+    if (encoding === "gzip") {
       const compressed = gzipSync(rawBuffer, { level: 6 });
       res.writeHead(status, withSecurityHeaders({
         "content-type": "application/json; charset=utf-8",

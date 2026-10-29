@@ -172,6 +172,7 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
     if (!openAddon) return undefined;
     const activeAddon = openAddon;
     function onMessage(event: MessageEvent) {
+      if (!addonFrameRef.current || event.source !== addonFrameRef.current.contentWindow) return;
       const fromSameOrigin = event.origin === window.location.origin;
       const fromSandboxedFrame = event.origin === "null" && Boolean(addonFrameRef.current && event.source === addonFrameRef.current.contentWindow);
       if (!fromSameOrigin && !fromSandboxedFrame) return;
@@ -223,7 +224,7 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
       {openAddon
         ? <>
           <div className="panel-title"><h2>{openAddon.name}</h2></div>
-          <iframe ref={addonFrameRef} className="addon-frame" title={openAddon.name} src={addonContentUrl(openAddon)} sandbox="allow-scripts" />
+          <iframe ref={addonFrameRef} className="addon-frame" title={openAddon.name} src={addonContentUrl(openAddon)} sandbox="allow-scripts" referrerPolicy="no-referrer" />
         </>
         : <div className="result-panel result-fail"><strong>Addon unavailable.</strong><p>This pinned addon is not installed, enabled, or fully loaded yet.</p></div>}
     </section>;
@@ -260,7 +261,7 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
     />
     {openAddon && <section className="action-section">
       <div className="panel-title"><h4>{openAddon.name}</h4></div>
-      <iframe ref={addonFrameRef} className="addon-frame" title={openAddon.name} src={addonContentUrl(openAddon)} sandbox="allow-scripts" />
+      <iframe ref={addonFrameRef} className="addon-frame" title={openAddon.name} src={addonContentUrl(openAddon)} sandbox="allow-scripts" referrerPolicy="no-referrer" />
     </section>}
   </section>;
 }

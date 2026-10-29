@@ -1,10 +1,28 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { scryptSync } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAuth, clearSessionCookie, setSessionCookie, json, serializeJsonResponse } from "../src/auth.js";
+
+test("persisted sessions reject tampering, password changes and cross-instance contamination", t => {
+  const dir = mkdtempSync(join(tmpdir(), "auth-persistence-test-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const config = { sessionSecret: "synthetic-secret", adminPassword: "synthetic-password", sessionStoreFile: join(dir, "sessions.json") };
+  const first = createAuth(config);
+  const session = first.makeSession({ tier: "player", username: "Name:with:colons" });
+  const req = { headers: { cookie: `asc_session=${session.cookie}` } };
+  assert.equal(createAuth(config).readSession(req)?.tier, "player");
+  assert.equal(createAuth({ ...config, adminPassword: "changed-password" }).readSession(req), null);
+  const tampered = JSON.parse(readFileSync(config.sessionStoreFile, "utf8"));
+  tampered.sessions[0].tier = "owner";
+  writeFileSync(config.sessionStoreFile, JSON.stringify(tampered));
+  assert.equal(createAuth(config).readSession(req), null);
+  assert.equal(createAuth({ ...config, sessionStoreFile: undefined }).readSession(req), null);
+  first.revokeSession(req);
+  assert.equal(createAuth(config).readSession(req), null);
+});
 
 test("auth creates readable signed sessions", async () => {
   const auth = createAuth({ sessionSecret: "secret", adminPassword: "admin", authDisabled: false });

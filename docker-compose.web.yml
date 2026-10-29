@@ -23,8 +23,6 @@ services:
     # confinement only for this trusted management container, not for the host.
     security_opt:
       - label=disable
-    cap_drop:
-      - ALL
     group_add:
       - "${DOCKER_SOCKET_GID:-0}"
     environment:
@@ -126,7 +124,7 @@ services:
       # over the host Docker daemon. Expose the web admin only to trusted admins.
       - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${ADMIN_WEB_PORT:-${ADMIN_BIND_PORT:-8088}}/api/health >/dev/null || exit 1"]
+      test: ["CMD", "node", "src/healthcheck.js"]
       interval: 30s
       timeout: 5s
       retries: 3

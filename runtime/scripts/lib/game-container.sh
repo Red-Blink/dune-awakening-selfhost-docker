@@ -5,7 +5,7 @@
 # start-server-overmap.sh, and spawn-server.sh (S-02, S-06, E-02).
 
 game_container_security_args() {
-  if [ "${DUNE_GAME_CONTAINER_PRIVILEGED:-0}" = "1" ]; then
+  if [ "${DUNE_GAME_CONTAINER_PRIVILEGED:-1}" = "1" ]; then
     printf '%s\n' \
       "--privileged" \
       "--cap-add" "SYS_ADMIN" \
@@ -17,8 +17,13 @@ game_container_security_args() {
   fi
 }
 
-prepare_game_container_secret_file() {
+prepare_game_container_secret_file() (
   local safe_name="$1"
+  [[ "$safe_name" =~ ^[a-zA-Z0-9_-]+$ ]] || return 1
+  local secret_value
+  for secret_value in "$FUNCOM_TOKEN" "$RMQ_HTTP_TOKEN_AUTH_SECRET" "$SERVER_LOGIN_PASSWORD_SECRET" "$USERNAME_SERVER_LOGIN_SECRET" "$LOGIN_PASSWORD_SKEW_SECONDS" "$FLS_APIKEY"; do
+    [[ "$secret_value" != *$'\n'* && "$secret_value" != *$'\r'* ]] || { printf '%s\n' 'Invalid multiline game credential.' >&2; return 1; }
+  done
   local secret_file="runtime/secrets/game-container-${safe_name}.env"
   mkdir -p runtime/secrets
   umask 077
@@ -60,7 +65,7 @@ fls-apikey=${FLS_APIKEY}
 EOF
   chmod 600 "$secret_file"
   printf '%s\n' "$PWD/$secret_file"
-}
+)
 
 bind_core_partition_to_live_server() {
   local partition_id="$1"

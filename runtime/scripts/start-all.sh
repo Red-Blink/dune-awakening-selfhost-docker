@@ -102,8 +102,10 @@ runtime/scripts/extract-server-catalog.sh &
 pid_server=$!
 runtime/scripts/extract-partition-catalog.sh &
 pid_partition=$!
-wait "$pid_server"
-wait "$pid_partition"
+catalog_status=0
+wait "$pid_server" || catalog_status=$?
+wait "$pid_partition" || catalog_status=$?
+exit "$catalog_status"
 '
 
 run_timed_step "Reconciling Official World Partitions" runtime/scripts/reconcile-world-partitions.sh
@@ -143,7 +145,7 @@ fi
 
 run_timed_step "Starting Director" runtime/scripts/start-director.sh
 
-if [ "${DUNE_PARALLEL_CORE_MAP_STARTUP:-1}" = "1" ]; then
+if [ "${DUNE_PARALLEL_CORE_MAP_STARTUP:-0}" = "1" ]; then
   echo
   echo "=== Starting Core Maps (Survival_1 + Overmap in parallel) ==="
   core_start="$(date +%s)"
