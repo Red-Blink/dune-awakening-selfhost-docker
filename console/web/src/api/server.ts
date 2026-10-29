@@ -136,11 +136,23 @@ function immediateQuery(immediate?: boolean) {
   return immediate ? "?restartQueue=immediate" : "";
 }
 
+// sampledAt is when the command actually ran, which is what Home dates its
+// freshness line from -- a cache hit must not claim to be current.
+export type StatusStamp = { sampledAt?: string; fromCache?: boolean };
+export type StatusRead = { stdout: string; stderr?: string; exitCode?: number } & StatusStamp;
+
+function freshQuery(fresh?: boolean) {
+  return fresh ? "?fresh=1" : "";
+}
+
 export const serverApi = {
-  status: () => api<ServerStatusResponse>("/api/server/status"),
+  // `fresh` bypasses the API's status cache. Required whenever the answer
+  // drives the restart lifecycle: a cached pre-restart snapshot would let
+  // isHomeActionComplete call a restart finished before it had started.
+  status: (opts?: { fresh?: boolean }) => api<ServerStatusResponse & StatusStamp>(`/api/server/status${freshQuery(opts?.fresh)}`),
   performance: () => api<PerformanceSnapshot>("/api/server/performance"),
   restartHistory: () => api<RestartHistoryResponse>("/api/server/restart-history"),
-  readiness: () => api<{ stdout: string; stderr?: string; exitCode?: number }>("/api/server/readiness"),
+  readiness: (opts?: { fresh?: boolean }) => api<StatusRead>(`/api/server/readiness${freshQuery(opts?.fresh)}`),
   ports: () => api<{ stdout: string }>("/api/server/ports"),
   services: () => api<{ stdout: string }>("/api/server/services"),
   doctor: () => api<{ stdout: string; stderr?: string; exitCode?: number }>("/api/server/doctor"),
