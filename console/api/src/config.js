@@ -405,7 +405,7 @@ export function readConsoleBuildId(staticDir, fallback = "dev") {
   }
 }
 
-function resolveAdminBindHost(value) {
+export function resolveAdminBindHost(value) {
   const raw = String(value || "0.0.0.0").trim();
   if (raw && raw !== "auto") return raw;
   return detectPrivateIpv4() || "127.0.0.1";
