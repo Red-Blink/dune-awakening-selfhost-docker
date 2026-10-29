@@ -3,6 +3,12 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { readFileSync } from "node:fs";
+
+test("Compose resolves the image healthcheck independently of its /repo working directory", () => {
+  const compose = readFileSync(new URL("../../../docker-compose.web.yml", import.meta.url), "utf8");
+  assert.match(compose, /test: \["CMD", "node", "\/app\/src\/healthcheck.js"\]/);
+});
 
 test("Console healthcheck follows the configured bind address and port", async t => {
   const server = createServer((req, res) => { assert.equal(req.url, "/api/health"); res.end("ok"); });

@@ -124,7 +124,7 @@ services:
       # over the host Docker daemon. Expose the web admin only to trusted admins.
       - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
-      test: ["CMD", "node", "src/healthcheck.js"]
+      test: ["CMD", "node", "/app/src/healthcheck.js"]
       interval: 30s
       timeout: 5s
       retries: 3
