@@ -1,0 +1,34 @@
+{
+  "oldBuild": "2162777-0-shipping",
+  "newBuild": "2168446-0-shipping",
+  "cleanSha256": "b48cc2e51249f53d6d1ddfafc039c979a9d0d3c0900934a8fc609b17d93b1b9b",
+  "moduleIdSites": [
+    "0xf396090",
+    "0xf79002e",
+    "0xf795984"
+  ],
+  "initializationBranches": [
+    {
+      "address": "0xf3a8330",
+      "target": "0xf3a8448",
+      "vehicleField": "0xed0"
+    },
+    {
+      "address": "0xf78f9f1",
+      "target": "0xf78fb94"
+    }
+  ],
+  "overlayLoaderRegistration": "0xd79307a",
+  "overlayLoaderCallback": "0xd78c340",
+  "fnameDecoder": "0xfa71194",
+  "fnameDecoderBytes": "4489f0c1e810488d0d1f992707488b44c168410fb7ce0fb73c48",
+  "fnamePool": "0x16ceaac0",
+  "fnamePoolReady": "0x16ceaa91",
+  "executablePadding": {
+    "address": "0x14497819",
+    "size": 231,
+    "precededByReturn": true
+  },
+  "instructionGeneratorUnchanged": true,
+  "review": "Independent old/new native disassembly confirms module-record registers, initialization field and branch targets, overlay callback and FName layout. Module/initialization/decoder code moved by -0x400; loader registration/callback by +0x60; FName globals and executable padding did not move. Detours are regenerated from reviewed sites using the unchanged Tank-only instruction generator; ordinary vehicle IDs remain native."
+}

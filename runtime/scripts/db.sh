@@ -3652,11 +3652,11 @@ auto_backup_enable() {
   load_auto_state
 
   if [ -n "$retention_days" ]; then
-    if ! validate_positive_integer "$retention_days"; then
+    if [ "$retention_days" != "0" ] && ! validate_positive_integer "$retention_days"; then
       echo "Invalid retention days: $retention_days"
       echo "Use a positive integer number of days, for example:"
       echo "  dune db auto enable 05:00 14"
-      echo "Use 0 to disable retention when setting an interval:"
+      echo "Use 0 to disable retention:"
       echo "  dune db auto enable 05:00 0 12"
       exit 1
     fi

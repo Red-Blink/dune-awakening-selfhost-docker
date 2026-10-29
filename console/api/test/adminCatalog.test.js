@@ -137,6 +137,39 @@ test("real catalog exposes the verified Ixian Icon patent through building unloc
   assert.equal(buildingUnlockStatus(id, { pending: [id] }), "Pending");
 });
 
+test("real catalog exposes all seven native Halloween event building unlocks", () => {
+  // Verified against build 2162777 CDT_BaseItems/DT_ItemTableBuildables
+  // and ST_Localization_Buildings. Keep the native VacumBodies spelling.
+  const expected = {
+    MTX_HalloweenEvent_Crucifixion_Patent: "Decussate Cross",
+    MTX_HalloweenEvent_Fleshtube_Patent: "Flesh Sculpting Displays",
+    MTX_HalloweenEvent_LightPole_Patent: "Jury-Rigged Light Stand",
+    MTX_HalloweenEvent_RadiationCrate_Patent: "Sealed Radiation Containment Chest",
+    MTX_HalloweenEvent_RottingCorpse_Patent: "Cadaverous Decorations",
+    MTX_HalloweenEvent_Skeleton_Patent: "Osseous Decorations",
+    MTX_HalloweenEvent_VacumBodies_Patent: "Vacuum-Sealed Body Display"
+  };
+  const raw = JSON.parse(readFileSync(join(REAL_REPO_ROOT, "runtime/data/admin-items.json"), "utf8"));
+  const unlocks = listBuildingUnlockItems(REAL_REPO_ROOT);
+  for (const [id, name] of Object.entries(expected)) {
+    assert.equal(raw.filter((item) => item.id === id).length, 1, id);
+    const item = unlocks.find((row) => row.itemId === id);
+    assert.ok(item, id);
+    assert.equal(item.name, name);
+    assert.equal(item.category, "buildings");
+    assert.equal(item.source, "BuildingSets");
+    assert.equal(item.group, "Special & Promotional");
+    assert.equal(item.experimental, false);
+    assert.equal(item.entitlementControlled, true);
+    assert.equal(item.requiredDlc, undefined);
+    assert.equal(item.requiredSteamDlc, undefined);
+    assert.equal(resolveCatalogItem(REAL_REPO_ROOT, { itemName: name }).itemId, id);
+    assert.equal(listCatalogItems(REAL_REPO_ROOT, { q: id }).length, 0);
+    assert.equal(buildingUnlockStatus(id, { owned: [id.replace(/_Patent$/, "")] }), "Owned");
+    assert.equal(buildingUnlockStatus(id, { pending: [id] }), "Pending");
+  }
+});
+
 test("building patent tokens are isolated while Developer Storage remains available to shared item selectors", () => {
   const root = fixtureRepo();
   assert.equal(listCatalogItems(root, { q: "lighting" }).length, 0);

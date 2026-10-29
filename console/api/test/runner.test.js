@@ -165,8 +165,8 @@ test("builds allowlisted command arguments without shell interpolation", () => {
   assert.deepEqual(buildDuneArgs("selfUpdateQaApply", { sha: "a".repeat(40) }), ["self-update", "install-qa", "a".repeat(40)]);
   assert.throws(() => buildDuneArgs("selfUpdateQaApply", { sha: "main; touch /tmp/nope" }), /Invalid QA build/);
   assert.deepEqual(buildDuneArgs("backupAutoStatus"), ["db", "auto", "status"]);
-  assert.deepEqual(buildDuneArgs("backupAutoEnable", { time: "05:30", retentionDays: 14 }), ["db", "auto", "enable", "05:30", "14"]);
-  assert.deepEqual(buildDuneArgs("backupAutoEnable", { time: "05:30", retentionDays: 0 }), ["db", "auto", "enable", "05:30"]);
+  assert.deepEqual(buildDuneArgs("backupAutoEnable", { time: "05:30", retentionDays: 14 }), ["db", "auto", "enable", "05:30", "14", "24"]);
+  assert.deepEqual(buildDuneArgs("backupAutoEnable", { time: "05:30", retentionDays: 0 }), ["db", "auto", "enable", "05:30", "0", "24"]);
   assert.deepEqual(buildDuneArgs("backupAutoEnable", { time: "05:30", retentionDays: 0, intervalHours: 12 }), ["db", "auto", "enable", "05:30", "0", "12"]);
   assert.deepEqual(buildDuneArgs("backupAutoDisable"), ["db", "auto", "disable"]);
   assert.deepEqual(buildDuneArgs("restartScheduleStatus"), ["restart-schedule", "status"]);

@@ -156,8 +156,9 @@ export function buildDuneArgs(operation, payload = {}) {
         const args = ["db", "auto", "enable", validateUpdateTime(payload.time || "05:00")];
         const retentionDays = validateInteger(payload.retentionDays ?? 0, 0, 3650);
         const intervalHours = validateInteger(payload.intervalHours ?? 24, 1, 168);
-        if (retentionDays > 0 || intervalHours !== 24) args.push(String(retentionDays));
-        if (intervalHours !== 24) args.push(String(intervalHours));
+        // Omitted CLI arguments preserve the saved policy, so even the default
+        // values must be explicit when the Console replaces that policy.
+        args.push(String(retentionDays), String(intervalHours));
         return args;
       }
     case "backupAutoRetention":

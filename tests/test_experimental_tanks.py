@@ -34,7 +34,7 @@ class TankTests(unittest.TestCase):
                 tanks.manifest('2141883-0-shipping')
 
     def test_new_build_assets_and_build_context_are_versioned(self):
-        for tag in ('2141883-0-shipping', '2147284-0-shipping', '2156652-0-shipping', '2160922-0-shipping', '2162777-0-shipping'):
+        for tag in ('2141883-0-shipping', '2147284-0-shipping', '2156652-0-shipping', '2160922-0-shipping', '2162777-0-shipping', '2168446-0-shipping'):
             with self.subTest(tag=tag):
                 self.check_versioned_build(tag)
 
