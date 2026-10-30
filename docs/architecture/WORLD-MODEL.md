@@ -90,6 +90,28 @@ docker exec dune-postgres psql -U dune -d dune -c \
   "select map, dimension_index, label, server_id from dune.world_partition order by map, dimension_index"
 ```
 
+### Stopgap partitions
+
+A game build can ship an instanced map before Funcom's `world-template.yaml`
+lists it. Without a partition the map never gets a server, so players cannot
+travel into it. `runtime/scripts/partition_stopgaps.py` adds the catalog entry
+for such maps, and the normal additive reconcile then inserts the row. The
+catalog ID is the next one after the template's highest ID; the reconcile falls
+back to the sequence if that ID is already taken.
+
+| Map | Label | Why |
+|---|---|---|
+| `CB_Halloween_Event_Shipwreck_01` | Halloween2026Shipwreck_0 | "Wreck of the Hieronymus", Halloween 2026 event dungeon (issue #268) |
+
+Each entry retires itself. It is skipped once the template lists the map and
+dimension, and it is skipped when the installed game image does not ship the
+map's `.umap`. The extraction step checks for the `.umap` by searching the
+image's `.utoc` indexes with `docker run --pull=never`, and only when the image
+is already present locally; if it cannot read the image, it adds no stopgaps.
+A row that has already been inserted stays when its entry retires: the reconcile
+never deletes rows. Remove an entry from `STOPGAP_PARTITIONS` once Funcom's
+template carries the map.
+
 ### Live worlds (a game server is attached)
 
 | Map | Dim | Label | Notes |

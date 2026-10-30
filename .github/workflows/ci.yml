@@ -134,6 +134,8 @@ jobs:
           tests/install-docker-progress-test.sh
       - name: Test partition combat-state resolver
         run: python3 runtime/scripts/test_partition_combat_state.py
+      - name: Test stopgap world partitions
+        run: python3 runtime/scripts/test_partition_stopgaps.py
       - name: Test UserEngine.ini comment placement
         run: python3 runtime/scripts/test_userengine_ini_comments.py
       - name: Test Global/Map/Partition override precedence

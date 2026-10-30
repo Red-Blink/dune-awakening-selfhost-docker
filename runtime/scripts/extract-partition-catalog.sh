@@ -7,7 +7,9 @@ mkdir -p runtime/generated
 
 [ -f .env ] && . ./.env
 [ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
+[ -r runtime/generated/image-tags.env ] && . runtime/generated/image-tags.env
 source runtime/scripts/runtime-env.sh
+source runtime/scripts/image-tags.sh
 
 SERVER_REGION="$(resolve_server_region)"
 SERVER_IP="$(resolve_server_ip)"
@@ -87,6 +89,35 @@ if [ ! -s "$catalog_tmp" ]; then
   echo "Generated partition catalog is empty." >&2
   exit 1
 fi
+
+# A game build can ship an instanced map before Funcom's template lists it (see
+# partition_stopgaps.py). A stopgap applies only while the game image ships its map.
+mapfile -t stopgap_umaps < <(python3 runtime/scripts/partition_stopgaps.py umaps)
+shipped_umaps=()
+if [ "${#stopgap_umaps[@]}" -gt 0 ]; then
+  game_image="$(resolve_game_server_image)"
+  pak_grep_args=()
+  for umap in "${stopgap_umaps[@]}"; do
+    pak_grep_args+=(-e "$umap")
+  done
+  pak_rc=0
+  pak_hits=""
+  # Never let this check pull the multi-GB game image.
+  if docker image inspect "$game_image" >/dev/null 2>&1; then
+    pak_hits="$(timeout --kill-after=2s "${catalog_extract_timeout_seconds}s" \
+      docker run --rm --network=none --pull=never --entrypoint grep "$game_image" \
+        -rahoF --include='*.utoc' "${pak_grep_args[@]}" /home/dune/server/DuneSandbox/Content/Paks)" || pak_rc=$?
+  else
+    pak_rc=2
+  fi
+  # grep exits 1 for "no match"; anything above that means the image could not be read.
+  if [ "$pak_rc" -le 1 ]; then
+    mapfile -t shipped_umaps < <(printf '%s\n' "$pak_hits" | sed '/^$/d' | sort -u)
+  else
+    echo "Could not read the game image paks ($game_image); skipping stopgap partitions." >&2
+  fi
+fi
+python3 runtime/scripts/partition_stopgaps.py apply "$catalog_tmp" "${shipped_umaps[@]}"
 
 chmod 0644 "$catalog_tmp"
 mv -f -- "$catalog_tmp" "$catalog_output"
