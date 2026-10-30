@@ -45,7 +45,7 @@ export const DISCORD_COMMAND_CATALOG = {
           description: "Check the console Discord adapter.",
           route: "HEALTH",
           method: "GET",
-          tier: "observer",
+          tier: "player",
           params: [],
           discordReady: true
         },
@@ -54,7 +54,7 @@ export const DISCORD_COMMAND_CATALOG = {
           description: "Show high-level server status.",
           route: "STATUS",
           method: "POST",
-          tier: "observer",
+          tier: "player",
           params: [
             {
               name: "diagnostic",

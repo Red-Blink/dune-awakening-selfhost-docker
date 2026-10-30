@@ -1,8 +1,9 @@
 # Age-encrypted runtime secrets
 
 This optional backend encrypts the server-login password and username
-secrets at rest. Existing installations remain on plaintext until an
-operator explicitly migrates them.
+secrets (Stage 2), and the hosted-bot wizard's Discord OAuth client
+secret (Stage 3), at rest. Existing installations remain on plaintext
+until an operator explicitly migrates them.
 
 ## Prerequisites
 
@@ -61,12 +62,33 @@ runtime/scripts/dune secrets migrate username-server-login-secret
 runtime/scripts/dune secrets verify username-server-login-secret
 ```
 
+`discord-hosted-bot-oauth-client-secret` (Stage 3) is optional and
+operator-supplied -- the hosted-bot wizard's "Advanced: connect
+manually instead" fallback (Settings -> Discord Bot). If you have not
+configured a Client Secret there, there is nothing to migrate yet;
+`migrate` will correctly refuse with "nothing to migrate" rather than
+fabricate one, unlike the two secrets above (which are auto-generated
+if absent). If you have configured it:
+
+```bash
+runtime/scripts/dune secrets migrate discord-hosted-bot-oauth-client-secret --dry-run
+runtime/scripts/dune secrets migrate discord-hosted-bot-oauth-client-secret
+runtime/scripts/dune secrets verify discord-hosted-bot-oauth-client-secret
+```
+
+This secret is resolved on the host by `runtime/scripts/console.sh`
+(not `runtime-env.sh`, which only game-server startup scripts use) the
+next time the console is restarted (`dune console restart`) -- restart
+the console after migrating for the encrypted form to actually take
+effect.
+
 After verifying services can start with the encrypted values, remove each
 legacy plaintext through the guarded command:
 
 ```bash
 runtime/scripts/dune secrets cleanup-legacy server-login-password-secret
 runtime/scripts/dune secrets cleanup-legacy username-server-login-secret
+runtime/scripts/dune secrets cleanup-legacy discord-hosted-bot-oauth-client-secret
 ```
 
 After migration, the `.enc` file or migration marker is permanent migration
