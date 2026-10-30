@@ -89,6 +89,42 @@ test("canceling confirmation makes no changes", async () => {
   await waitFor(() => expect(post).not.toHaveBeenCalled());
 });
 
+test("keeps a queued disable visible and polls until the countdown is cancelled", async () => {
+  const saved = { enabled: true, supported: true, applying: false, error: "" };
+  vi.mocked(api).mockResolvedValue(saved);
+  vi.mocked(post).mockResolvedValue({ queued: true, entryId: "tank-countdown" });
+  render(<ExperimentalFeatures confirmAction={vi.fn().mockResolvedValue(true)} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Disable Regis Tanks" }));
+  expect(await screen.findByText("Restart Queued")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Disabling..." })).toBeDisabled();
+  expect(await screen.findByRole("button", { name: "Disable Regis Tanks" }, { timeout: 5000 })).toBeEnabled();
+  expect(api).toHaveBeenCalledWith("/api/settings/experimental-tanks");
+});
+
+test("restores a queued disable when the settings page is opened again", async () => {
+  vi.mocked(api).mockResolvedValue({ enabled: true, supported: true, applying: false,
+    error: "", queuedEntryId: "tank-countdown", queuedEnabled: false });
+  render(<ExperimentalFeatures confirmAction={vi.fn()} />);
+  expect(await screen.findByText("Restart Queued")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Disabling..." })).toBeDisabled();
+  expect(screen.getByRole("article")).toHaveClass("disabled");
+});
+
+test("follows a queued disable into the applying state and then the saved policy", async () => {
+  let applying = false;
+  let enabled = true;
+  vi.mocked(api).mockImplementation(async () => ({ enabled, supported: true, applying, error: "" }));
+  vi.mocked(post).mockResolvedValue({ queued: true, entryId: "tank-countdown" });
+  render(<ExperimentalFeatures confirmAction={vi.fn().mockResolvedValue(true)} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Disable Regis Tanks" }));
+  expect(await screen.findByText("Restart Queued")).toBeVisible();
+  applying = true;
+  enabled = false;
+  expect(await screen.findByText("Applying Changes", {}, { timeout: 5000 })).toBeVisible();
+  applying = false;
+  expect(await screen.findByText("Disabled", {}, { timeout: 5000 })).toBeVisible();
+});
+
 test("all six Tank presets describe the actual utility and weapon, without changing stock template names", () => {
   expect(friendlyVehicleName("Tank")).toBe("Regis Tank");
   const templates = ["T0", "T6_CombatDart", "T6_CombatFire", "T6_DartInventory", "T6_RocketInventory", "T6_FireInventory"];

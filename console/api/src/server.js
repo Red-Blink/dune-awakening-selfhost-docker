@@ -1425,7 +1425,9 @@ async function handleApi(req, res) {
   if (path === "/api/settings/experimental-tanks" && req.method === "GET") {
     const result = await runDune(config, buildDuneArgs("experimentalTanksStatus"));
     if (result.code !== 0) return json(res, 503, { error: result.stderr || "Experimental Tank settings could not be read." });
-    return json(res, 200, JSON.parse(result.stdout));
+    const queued = restartQueue.readState(config).entries.find((entry) => entry.operation === "experimentalTanksApply");
+    return json(res, 200, { ...JSON.parse(result.stdout), queuedEntryId: queued?.id || null,
+      queuedEnabled: typeof queued?.payload?.enabled === "boolean" ? queued.payload.enabled : null });
   }
   if (path === "/api/settings/experimental-tanks" && req.method === "POST") {
     return task(req, res, "settings", "experimentalTanksApply", await readJson(req));
