@@ -31,3 +31,12 @@ does not claim full gameplay verification.
 
 Known pink Dart firing effects and missing firing audio remain unresolved.
 No client patch is included.
+
+Steam build 26324834 republishes the same world tag with a different image and
+config digest. Both reviewed image variants are supported. The clean executable,
+global metadata, and both pakchunk0 and pakchunk170 container pairs are byte-identical
+to the previous build, so the instruction sites and accepted overlay are unchanged.
+See `source/steam-26324834-review.json`. Unknown image digests still fail closed.
+`experimental-tanks.sh prepare <reviewed-image-reference>` can prepare an isolated
+staged image without changing the installed official tag or enabling Tanks.
+The optional reference must resolve to one of the exact reviewed image/config IDs.

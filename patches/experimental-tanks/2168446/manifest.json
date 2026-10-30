@@ -5,6 +5,13 @@
   "worldTag": "2168446-0-shipping",
   "baseImage": "registry.funcom.com/funcom/self-hosting/seabass-server@sha256:3a546cb20af6c33c7a1b26a10ee6e0154d8cee3886c81afa8471e2631273a26a",
   "baseConfigId": "sha256:e310b173725bf1857c00b79825d28d2218997dee8ba5863a43cbf6fbfd2d2975",
+  "additionalBaseImages": [
+    {
+      "steamBuild": "26324834",
+      "imageId": "sha256:e48a5fc2655e74b275ddaa0514460b15d403b8a0a814134acdb4fff20bb314e1",
+      "configId": "sha256:8c1721f4ea7df881c797257bc05d6b00bb1d510d2a4650dae2298716c773458d"
+    }
+  ],
   "cleanSha256": "b48cc2e51249f53d6d1ddfafc039c979a9d0d3c0900934a8fc609b17d93b1b9b",
   "patchedSha256": "1f08ba91a33dbc05e78027e19b0bff48d01f86aa9252b891c4ec5bffca62b23f",
   "assets": {
