@@ -66,7 +66,11 @@ jobs:
         # Several integration suites create and remove isolated PostgreSQL
         # databases. Keep test files serial in CI so one suite cannot terminate
         # another suite's connection during database cleanup.
-        run: node --test --test-concurrency=1 test/*.test.js
+        # --experimental-test-module-mocks (Node >=22.3, matching this job's
+        # pinned node-version: "22" above): needed to mock node:fs's chmodSync
+        # in envFile.test.js's #713 regression test -- see that test for why
+        # a plain local `npm test` skips it instead of requiring the flag too.
+        run: node --experimental-test-module-mocks --test --test-concurrency=1 test/*.test.js
         working-directory: console/api
 
   metrics-unit:
