@@ -56,6 +56,7 @@ import { updateEnvFileValue as updateEnvValue } from "./services/envFile.js";
 import { funcomAuthMismatchDetected, matchingFuncomAuthLines, saveFuncomTokenValue as writeFuncomToken, validDockerSince } from "./services/funcomAuth.js";
 import { readCharacterTransferSettingsStatus, saveAndApplyCharacterTransferSettings } from "./services/characterTransferSettings.js";
 import { handleDiscordAdapterRoute, isDiscordAdapterRoute } from "./integrations/discord/routes.js";
+import { handleI18nRoute, isPublicOrMeshI18nRoute } from "./services/i18nService.js";
 import { discordAdapterEnabled } from "./integrations/discord/adapter.js";
 import { initializeDiscordAdapterSchema } from "./integrations/discord/schema.js";
 import { actionForRoute, ROUTE_ACTIONS } from "./actions.js";
@@ -717,6 +718,9 @@ async function handleApi(req, res) {
   }
   if (isDiscordAdapterRoute(path)) {
     return handleDiscordAdapterRoute({ req, res, path, config, readJson, json, db });
+  }
+  if (isPublicOrMeshI18nRoute(path, req.method)) {
+    return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
   }
 
   // Runs BEFORE requireAuth: that couples session lookup with a CSRF check,
@@ -1454,6 +1458,11 @@ async function handleApi(req, res) {
   }
   if (path === "/api/settings" && req.method === "POST") return writeConfig(req, res);
   if (path === "/api/settings") return json(res, 200, await setupState(remoteIpOf(req)));
+  if (path === "/api/i18n/translate" && req.method === "POST") return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+  if (path === "/api/i18n/key" && req.method === "POST") return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+  if (path === "/api/i18n/key" && req.method === "DELETE") return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+  if (path === "/api/i18n/settings" && req.method === "POST") return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+  if (path === "/api/i18n/sync-all" && req.method === "POST") return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
 
   return json(res, 404, { error: "Not found" });
 }

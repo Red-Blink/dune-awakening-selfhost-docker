@@ -190,6 +190,11 @@ export const ROUTE_ACTIONS = {
   "POST /api/settings/server-startup":          "settings:write",
   "GET /api/settings/experimental-tanks":      "settings:read",
   "POST /api/settings/experimental-tanks":     "settings:write",
+  "POST /api/i18n/translate":                  "settings:write",
+  "POST /api/i18n/key":                        "settings:write",
+  "DELETE /api/i18n/key":                      "settings:write",
+  "POST /api/i18n/settings":                   "settings:write",
+  "POST /api/i18n/sync-all":                   "settings:write",
 
   // --- Players (read) ---
   "GET /api/players":                          "players:read",

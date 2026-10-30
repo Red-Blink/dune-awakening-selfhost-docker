@@ -1,5 +1,5 @@
 import { Fragment, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { Archive, Bug, Building2, Car, CircleHelp, Database, Download, ExternalLink, FileText, Gift, Heart, Home, Landmark, Map as MapIcon, Menu, MessageCircle, PackagePlus, RefreshCw, Server, Settings, Shield, Sparkles, Store, Users, X } from "lucide-react";
+import { Archive, Bug, Building2, Car, CircleHelp, Database, Download, ExternalLink, FileText, Gift, Globe, Heart, Home, Landmark, Map as MapIcon, Menu, MessageCircle, PackagePlus, RefreshCw, Server, Settings, Shield, Sparkles, Store, Users, X } from "lucide-react";
 import { api, AUTH_SESSION_EXPIRED_EVENT, AUTH_SESSION_EXPIRED_MESSAGE, post, setCsrfToken } from "./api/client";
 import { setServerPorts, setAdminPort, type ServerPorts } from "./api/serverPorts";
 import { serverApi, type RestartQueueTarget } from "./api/server";
@@ -35,11 +35,12 @@ import {
 import { parseUpdateTask, stackVersionButtonLabel, preferKnownVersions, stackVersionButtonTitle, withInstalledVersion } from "./features/updates/updateUtils";
 import { formatUiSentence, stripAnsi, summarizeCommandText, titleCase } from "./lib/display";
 import { useStaleBuildWatcher } from "./lib/staleBuildWatcher";
+import { ConsoleLanguageObserver } from "./features/language/ConsoleLanguageObserver";
 
 // The array is the source of truth (not just a type-level union) so restoring
 // a persisted tab (see loadPersistedTab below) can validate against the real,
 // current list at runtime instead of a hand-duplicated copy that could drift.
-export const ALL_TABS = ["Home", "Server Control", "Services", "Players", "Guilds", "Bases", "Vehicles", "Exchange", "Landsraad", "Admin Tools", "Live Map", "Maps", "Care Package", "Addons", "Database", "Storage", "Backups", "Logs", "Updates", "Settings"] as const;
+export const ALL_TABS = ["Home", "Server Control", "Services", "Players", "Guilds", "Bases", "Vehicles", "Exchange", "Landsraad", "Admin Tools", "Live Map", "Maps", "Care Package", "Addons", "Language", "Database", "Storage", "Backups", "Logs", "Updates", "Settings"] as const;
 // Exported so a panel routing to another tab types its destination against the
 // real list rather than `string`. Type-only, so a panel importing it back does
 // not create a runtime cycle.
@@ -96,6 +97,7 @@ type PublicDirectoryStatus = {
 let openConfirmDialog: ((request: ConfirmDialogRequest) => void) | null = null;
 
 const AddonsPanel = lazy(() => import("./features/addons/AddonsPanel").then((module) => ({ default: module.AddonsPanel })));
+const LanguagePanel = lazy(() => import("./features/language/LanguagePanel").then((module) => ({ default: module.LanguagePanel })));
 const AdminToolsPanel = lazy(() => import("./features/adminTools/AdminToolsPanel").then((module) => ({ default: module.AdminToolsPanel })));
 const BasesPage = lazy(() => import("./features/bases/BasesPage").then((module) => ({ default: module.BasesPage })));
 const BackupsPanel = lazy(() => import("./features/backups/BackupsPanel").then((module) => ({ default: module.BackupsPanel })));
@@ -355,7 +357,8 @@ const navGroups: { title: string; items: { tab: Tab; icon: React.ReactNode }[] }
   {
     title: "Community",
     items: [
-      { tab: "Addons", icon: <Sparkles size={18} /> }
+      { tab: "Addons", icon: <Sparkles size={18} /> },
+      { tab: "Language", icon: <Globe size={18} /> }
     ]
   }
 ];
@@ -782,6 +785,7 @@ export function App() {
   if (!auth) {
     return (
       <main className="login-screen">
+        <ConsoleLanguageObserver />
         <form className="login-panel" onSubmit={(event) => { event.preventDefault(); void safe(login); }}>
           <h1>Dune Docker Console</h1>
           <img className="login-logo" src="/dune-docker-logo.png" alt="Dune Docker Console logo" />
@@ -847,6 +851,7 @@ export function App() {
 
   return (
     <div className="app-shell">
+      <ConsoleLanguageObserver />
       <aside className="sidebar">
         <div className="sidebar-brand">
           <button className="sidebar-home-button" type="button" onClick={() => { setRedeploySetupOpen(false); setTab("Home"); closeMobileNav(); }} title="Open Home">
@@ -941,6 +946,7 @@ export function App() {
         {!redeploySetupOpen && tab === "Maps" && <LazyTabBoundary label="Loading Maps"><MapsPanel onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} confirmSettingsRestart={confirmSettingsRestart} waitForTaskWithUpdates={waitForTaskWithUpdates} taskTechnicalDetails={taskTechnicalDetails} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Care Package" && <LazyTabBoundary label="Loading Care Package"><CarePackagePanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Addons" && <LazyTabBoundary label="Loading Addons"><AddonsPanel pinnedAddons={pinnedAddons} setPinnedAddons={setPinnedAddons} selectedAddonId={selectedPinnedAddonId} clearSelectedAddon={() => setSelectedPinnedAddonId("")} setAddonUpdateAvailable={setAddonUpdatesAvailable} confirmAction={confirmDialog} /></LazyTabBoundary>}
+        {!redeploySetupOpen && tab === "Language" && <LazyTabBoundary label="Loading Language"><LanguagePanel /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Database" && <LazyTabBoundary label="Loading Database"><DatabasePanel /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Storage" && <LazyTabBoundary label="Loading Storage"><StoragePanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Backups" && <LazyTabBoundary label="Loading Backups"><BackupsPanel
