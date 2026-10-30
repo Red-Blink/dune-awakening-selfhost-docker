@@ -251,6 +251,17 @@ Player rows include `total_playtime_seconds`. The console samples `player_state.
 | POST | `/api/players/{playerId}/set-skill-points` | Set skill points | `points` (number) |
 | POST | `/api/players/{playerId}/set-skill-module` | Set skill module | `module` (string), `level` (number) |
 | POST | `/api/players/{playerId}/refill-water` | Refill hydration | `amount?` (number) |
+| GET | `/api/players/{playerId}/customizations` | Cosmetic catalog and current status | `playerId` |
+| POST | `/api/players/{playerId}/customizations/grant` | Grant a cosmetic or set | `itemId` or `groupId`, `confirmation: "GRANT CUSTOMIZATIONS"` |
+
+The Halloween 2026 set contains the Derelict Recovery Suit, both plague doctor
+mask variants, and the Halloween swatch. These four entries unlock directly in
+the character's customization list and require the player to be fully offline.
+They report `Unlocked`; repeated requests preserve the existing list and skip
+duplicates. Other sets retain their inventory-token delivery and entitlement
+requirements. The response separates `unlocked` from `delivered` and
+`requested`; per-entry `ownershipVerified` applies only to direct event unlocks.
+These customization IDs are excluded from the general inventory catalog.
 
 ### Player Actions (Kick/Teleport/Vehicles)
 

@@ -10,7 +10,8 @@ type CustomizationRow = {
   name: string;
   groupId: string;
   group: string;
-  status: "Available" | "Pending" | "Delivered" | "Processing";
+  status: "Available" | "Pending" | "Delivered" | "Processing" | "Unlocked";
+  directUnlock?: boolean;
   image?: string;
   requiredDlc?: string;
   entitlementControlled?: boolean;
@@ -60,7 +61,8 @@ export function CustomizationsTab({ dbPlayerId, playerName, confirmAction, onAct
         status: String(row.status || "Available") as CustomizationRow["status"],
         image: String(row.image || ""),
         requiredDlc: String(row.requiredDlc || ""),
-        entitlementControlled: Boolean(row.entitlementControlled)
+        entitlementControlled: Boolean(row.entitlementControlled),
+        directUnlock: Boolean(row.directUnlock)
       })).filter((row) => row.itemId && row.groupId));
     } catch (loadError) {
       setRows([]);
@@ -76,7 +78,9 @@ export function CustomizationsTab({ dbPlayerId, playerName, confirmAction, onAct
   async function grant(selection: { itemId?: string; groupId?: string; label: string; count: number }) {
     const selectedRows = rows.filter((row) => selection.itemId ? row.itemId === selection.itemId : selection.groupId === "all" || row.groupId === selection.groupId);
     const pending = selectedRows.filter((row) => row.status === "Pending").length;
-    const deliverable = Math.max(0, selection.count - pending);
+    const owned = selectedRows.filter((row) => row.status === "Unlocked").length;
+    const direct = selectedRows.filter((row) => row.directUnlock && row.status !== "Unlocked").length;
+    const deliverable = Math.max(0, selection.count - pending - owned - direct);
     const requiredDlcs = [...new Set(selectedRows.map((row) => row.requiredDlc).filter(Boolean))];
     const entitlementControlled = selectedRows.some((row) => row.entitlementControlled);
     const dlcWarning = requiredDlcs.length
@@ -84,13 +88,14 @@ export function CustomizationsTab({ dbPlayerId, playerName, confirmAction, onAct
       : entitlementControlled
         ? " These cosmetics are entitlement-controlled. Delivering their tokens does not grant or verify the required account entitlement."
         : "";
-    if (!(await confirmAction(`Grant ${selection.label} to ${playerName}?\n\n${deliverable} token${deliverable === 1 ? "" : "s"} will be delivered. ${pending ? `${pending} already pending ${pending === 1 ? "token will" : "tokens will"} be skipped.` : ""}${dlcWarning}`, {
+    if (!(await confirmAction(`Grant ${selection.label} to ${playerName}?\n\n${deliverable} token${deliverable === 1 ? "" : "s"} will be delivered. ${direct ? `${direct} event cosmetics will be unlocked directly. The player must be fully offline. ` : ""}${pending ? `${pending} already pending ${pending === 1 ? "token will" : "tokens will"} be skipped.` : ""}${owned ? ` ${owned} already unlocked will be skipped.` : ""}${dlcWarning}`, {
       title: selection.itemId ? "Grant Customization" : "Grant Customization Set",
       confirmLabel: "Grant",
       details: [
         { label: "Player", value: playerName, tone: "accent" },
         { label: selection.itemId ? "Customization" : "Set", value: selection.label },
         { label: "Tokens", value: String(deliverable) },
+        ...(direct ? [{ label: "Direct Unlocks", value: String(direct) }] : []),
         ...(requiredDlcs.length
           ? [{ label: "Requires", value: requiredDlcs.join(", ") }]
           : entitlementControlled
@@ -113,21 +118,25 @@ export function CustomizationsTab({ dbPlayerId, playerName, confirmAction, onAct
       const delivered = response.delivered ?? response.granted;
       const parts: string[] = [];
       if (delivered) parts.push(`${delivered} delivered`);
+      if (response.unlocked) parts.push(`${response.unlocked} unlocked`);
       if (response.requested) parts.push(`${response.requested} delivery requested`);
-      if (response.skipped) parts.push(`${response.skipped} already pending`);
+      if (response.skipped) parts.push(`${response.skipped} already pending or unlocked`);
       if (response.failed) parts.push(`${response.failed} failed`);
       if (!parts.length) parts.push("No changes");
+      const firstFailure = response.results?.find((entry) => entry.ok === false && entry.error);
       const detail = response.failed
-        ? "Some requests could not be delivered."
+        ? String(firstFailure?.error || "Some requests could not be delivered.")
+        : response.unlocked
+          ? "Event cosmetics were unlocked for the character. They will be available at the next login."
         : response.requested
           ? "Dune accepted the delivery request, but persistent ownership cannot be verified. The player may need to relog."
           : delivered
             ? entitlementControlled
               ? "Token delivery was verified, but persistent ownership requires the player's account entitlement and cannot be verified by the Console."
               : "Token delivery was verified. Dune will process it for the character."
-            : "All selected tokens are already pending. No duplicate tokens were added.";
+            : "All selected cosmetics are already pending or unlocked. No duplicates were added.";
       setResult({ key: "customizations", tone: response.failed ? "danger" : "success", text: `${parts.join(" · ")}. ${detail}` });
-      onActionLog?.("Grant Customizations", selection.label, String(delivered + (response.requested || 0)), response.failed ? `${response.failed} Failed` : response.requested ? `${response.requested} Delivery Requested` : response.skipped ? `${response.skipped} Already Pending` : `${delivered} Delivered`);
+      onActionLog?.("Grant Customizations", selection.label, String(delivered + (response.requested || 0) + (response.unlocked || 0)), response.failed ? `${response.failed} Failed` : response.unlocked ? `${response.unlocked} Unlocked` : response.requested ? `${response.requested} Delivery Requested` : response.skipped ? `${response.skipped} Already Pending Or Unlocked` : `${delivered} Delivered`);
     } catch (grantError) {
       const message = friendlyInlineError(grantError);
       setResult({ key: "customizations", tone: "danger", text: message });
@@ -156,7 +165,7 @@ export function CustomizationsTab({ dbPlayerId, playerName, confirmAction, onAct
         </div>
         <button disabled={!dbPlayerId || loading || Boolean(busyKey)} onClick={() => void grant({ groupId: "all", label: "all customization sets", count: rows.length })}>Grant All Sets</button>
       </div>
-      <p className="playerAdmin_note">Dune removes cosmetic tokens after processing them. Token delivery does not grant or verify DLC and other account entitlements, so the Console cannot confirm persistent cosmetic ownership. Available means no matching token is currently pending.</p>
+      <p className="playerAdmin_note">Halloween 2026 cosmetics unlock directly while the player is offline. Other cosmetics use tokens; token delivery does not grant or verify DLC or account entitlements. Available means no matching token is currently pending.</p>
       <div className="playerAdmin_customizationCards">
         {groups.map((group) => {
           const groupRows = rows.filter((row) => row.groupId === group.id);
@@ -205,7 +214,7 @@ export function CustomizationsTab({ dbPlayerId, playerName, confirmAction, onAct
         action={(item) => {
           const row = item as unknown as CustomizationRow;
           const disabled = row.status !== "Available" || Boolean(busyKey);
-          const label = busyKey === `item:${row.itemId}` ? "Granting..." : row.status === "Available" ? "Grant" : row.status === "Pending" ? "Pending" : "Delivered";
+          const label = busyKey === `item:${row.itemId}` ? "Granting..." : row.status === "Available" ? "Grant" : row.status === "Pending" ? "Pending" : row.status === "Unlocked" ? "Unlocked" : "Delivered";
           return <button className="playerAdmin_stateActionButton" disabled={disabled} onClick={() => void grant({ itemId: row.itemId, label: row.name, count: 1 })}>{label}</button>;
         }}
       />}

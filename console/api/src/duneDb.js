@@ -5,7 +5,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { redact } from "./redact.js";
-import { itemImagePath } from "./adminCatalog.js";
+import { itemImagePath, isDirectCustomizationUnlock } from "./adminCatalog.js";
 import { clampInt, writeJsonAtomic } from "./jsonStore.js";
 import { isFiefClaimPlaceable } from "./blueprintSafety.js";
 import { withLiveMapSector } from "./liveMapSector.js";
@@ -7735,11 +7735,40 @@ export async function playerCustomizationGrantState(db, id) {
         and i.template_id is not null`, [player.actorId]);
     pending = result.rows.map((item) => String(item.template_id || "")).filter(Boolean);
   }
+  const ownership = await db.query(`
+    select properties->'CustomizationLibraryActorComponent'->'m_UnlockedCustomizationSerializableList'->'m_UnlockedCustomizationIds' as customizations
+    from dune.actors where id = $1`, [player.actorId]);
+  const customizations = ownership.rows[0]?.customizations;
+  const owned = Array.isArray(customizations)
+    ? customizations.map((entry) => entry?.m_CustomizationId).filter((itemId) => isDirectCustomizationUnlock({ itemId })) : [];
   return {
     capabilities: { customizationOwnership: false, customizationPending: pendingSupported },
     player,
+    owned,
     pending
   };
+}
+
+export async function unlockPlayerCustomization(db, id, { itemId }) {
+  if (!isDirectCustomizationUnlock({ itemId })) throw new Error("Select a verified event customization.");
+  return db.transaction(async (tx) => {
+    // Lock the actor before resolving live status and reading the current list.
+    const current = await tx.query(`
+      select properties->'CustomizationLibraryActorComponent'->'m_UnlockedCustomizationSerializableList'->'m_UnlockedCustomizationIds' as customizations
+      from dune.actors where id = $1 for update`, [intParam(id, "player id", 1)]);
+    const player = await resolvePlayerMutationTarget(tx, id);
+    requireOfflinePlayer(player, "Event customization unlocks");
+    const customizations = current.rows[0]?.customizations;
+    if (!Array.isArray(customizations)) throw new UnsupportedCapabilityError("This character has no supported customization unlock list.");
+    if (customizations.some((entry) => entry?.m_CustomizationId === itemId)) {
+      return { ok: true, alreadyUnlocked: true, itemId };
+    }
+    await tx.query(`
+      update dune.actors set properties = jsonb_set(properties,
+        '{CustomizationLibraryActorComponent,m_UnlockedCustomizationSerializableList,m_UnlockedCustomizationIds}', $2::jsonb, false)
+      where id = $1`, [player.actorId, JSON.stringify([...customizations, { m_CustomizationId: itemId }])]);
+    return { ok: true, alreadyUnlocked: false, itemId };
+  });
 }
 
 export async function unlockResearchItem(db, id, { itemKey }) {
@@ -14123,6 +14152,7 @@ export async function flushWaterRefills(db, repoRoot, { now = Date.now, ignoreRe
 }
 
 export async function giveItemToPlayer(db, playerId, { itemName = "", itemId = "", templateId = "", quantity = 1, quality = 1, augments = [], augmentQuality = 1, allowOnlinePreAugmented = false }) {
+  if (isDirectCustomizationUnlock({ itemId: templateId || itemId || itemName })) throw new Error("Event cosmetics must be unlocked from Customizations.");
   await requireCapability(await supportsPlayerGiveItem(db), "Player give-item requires compatible dune.inventories and dune.items insert columns.");
   const target = intParam(playerId, "player id", 1);
   const resolvedTemplate = validateTemplateId(templateId || itemId || itemName);

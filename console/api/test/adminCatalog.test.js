@@ -49,6 +49,7 @@ test("customization grants use the four curated sets and report pending tokens",
   const items = listCustomizationGrantItems(root);
   assert.equal(items.length, 7);
   assert.deepEqual(customizationGrantGroups(root), [
+    { id: "halloween-2026", name: "Halloween 2026", count: 0 },
     { id: "atreides", name: "Atreides", count: 1 },
     { id: "harkonnen", name: "Harkonnen", count: 1 },
     { id: "smuggler", name: "Smuggler", count: 1 },
@@ -57,6 +58,18 @@ test("customization grants use the four curated sets and report pending tokens",
   ]);
   assert.equal(customizationGrantStatus("B1C3_Atre_Maula_Pistol", { pending: ["B1C3_Atre_Maula_Pistol"] }), "Pending");
   assert.equal(customizationGrantStatus("B1C3_Atre_Maula_Pistol", { pending: [] }), "Available");
+});
+
+test("Halloween cosmetics are direct unlocks and never appear as inventory templates", () => {
+  const event = listCustomizationGrantItems(REAL_REPO_ROOT).filter((item) => item.groupId === "halloween-2026");
+  assert.deepEqual(event.map((item) => item.itemId).sort(), [
+    "Halloween2026_PlagueDoctorMask_Hood", "Halloween2026_PlagueDoctorMask_NoHood",
+    "Halloween2026_Radsuit_Variant", "Swatch_Halloween2026"
+  ]);
+  assert.ok(event.every((item) => item.directUnlock));
+  const inventory = listCatalogItems(REAL_REPO_ROOT, { q: "Halloween", limit: 10000 });
+  assert.ok(!inventory.some((item) => event.some((cosmetic) => cosmetic.itemId === item.itemId)));
+  assert.equal(customizationGrantStatus(event[0].itemId, { owned: [event[0].itemId] }), "Unlocked");
 });
 
 test("catalog preserves DLC ownership metadata for grant warnings", () => {

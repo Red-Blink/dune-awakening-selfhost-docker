@@ -26,6 +26,25 @@ beforeEach(() => {
   vi.mocked(playersApi.customizations).mockResolvedValue({ groups, rows, capabilities: { customizationOwnership: false, customizationPending: true } });
 });
 
+it("unlocks Halloween cosmetics directly with an offline confirmation and ownership status", async () => {
+  const itemId = "Halloween2026_Radsuit_Variant";
+  vi.mocked(playersApi.customizations).mockResolvedValue({
+    groups: [{ id: "halloween-2026", name: "Halloween 2026", count: 1 }],
+    rows: [{ itemId, name: "Derelict Recovery Suit", groupId: "halloween-2026", group: "Halloween 2026", directUnlock: true, status: "Available" }],
+    capabilities: {}
+  });
+  vi.mocked(playersApi.grantCustomizations).mockResolvedValue({
+    ok: true, delivered: 0, unlocked: 1, granted: 1, requested: 0, skipped: 0, failed: 0,
+    results: [{ itemId, status: "Unlocked", ok: true, ownershipVerified: true }]
+  });
+  const confirmAction = vi.fn().mockResolvedValue(true);
+  render(<CustomizationsTab dbPlayerId="123" playerName="Chani" confirmAction={confirmAction} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Grant" }));
+  await waitFor(() => expect(confirmAction).toHaveBeenCalledWith(expect.stringMatching(/1 event cosmetics.*fully offline/is), expect.anything()));
+  expect(await screen.findByText(/1 unlocked/)).toBeVisible();
+  expect(screen.getByRole("button", { name: "Unlocked" })).toBeDisabled();
+});
+
 describe("CustomizationsTab", () => {
   it("shows grouped sets and marks tokens already waiting for login", async () => {
     render(<CustomizationsTab dbPlayerId="123" playerName="Chani" confirmAction={vi.fn().mockResolvedValue(true)} />);

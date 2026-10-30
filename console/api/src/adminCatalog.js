@@ -3,7 +3,17 @@ import { resolve } from "node:path";
 
 const FILLABLE_GROUPS = new Set(["refined_resource", "component", "raw_resource"]);
 
+// These are actor customization IDs, not inventory token templates (#270).
+const DIRECT_CUSTOMIZATION_IDS = new Set([
+  "Halloween2026_Radsuit_Variant", "Halloween2026_PlagueDoctorMask_Hood",
+  "Halloween2026_PlagueDoctorMask_NoHood", "Swatch_Halloween2026"
+]);
+export function isDirectCustomizationUnlock(item = {}) {
+  return DIRECT_CUSTOMIZATION_IDS.has(String(item.itemId || item.id || ""));
+}
+
 const CUSTOMIZATION_GROUPS = Object.freeze([
+  { id: "halloween-2026", name: "Halloween 2026", matches: (itemId) => DIRECT_CUSTOMIZATION_IDS.has(itemId) },
   { id: "atreides", name: "Atreides", matches: (itemId) => /^B1C3_Atre/i.test(itemId) },
   { id: "harkonnen", name: "Harkonnen", matches: (itemId) => /^B1C3_Hark/i.test(itemId) },
   { id: "smuggler", name: "Smuggler", matches: (itemId) => /^(?:MTX_)?B1C3_Smug/i.test(itemId) },
@@ -119,6 +129,7 @@ export function listCatalogItems(repoRoot, { q = "", limit = 500 } = {}) {
     // Developer Storage Container is the exception: admins also use its token
     // as a grantable utility item in Give Items and Care Packages.
     .filter((item) => !isBuildingUnlockItem(item) || isSharedCatalogBuildingItem(item))
+    .filter((item) => !isDirectCustomizationUnlock(item))
     .filter((item) => {
       if (!term) return true;
       return String(item.id || "").toLowerCase().includes(term) ||
@@ -173,7 +184,8 @@ export function customizationGrantGroups(repoRoot) {
   }));
 }
 
-export function customizationGrantStatus(itemId, { pending = [] } = {}) {
+export function customizationGrantStatus(itemId, { pending = [], owned = [] } = {}) {
+  if (isDirectCustomizationUnlock({ itemId }) && owned.includes(itemId)) return "Unlocked";
   const pendingIds = new Set((pending || []).map((value) => String(value).toLowerCase()));
   return pendingIds.has(String(itemId || "").toLowerCase()) ? "Pending" : "Available";
 }
@@ -255,6 +267,7 @@ function normalizeItem(item, repoRoot = "") {
     image
   };
   if (item.group) result.group = String(item.group);
+  if (isDirectCustomizationUnlock(item)) result.directUnlock = true;
   if (item.volume !== undefined && item.volume !== null) result.volume = Number(item.volume);
   if (isValidStackSize(item.stackSize)) result.stackSize = item.stackSize;
   const knownRequirement = KNOWN_DLC_REQUIREMENTS.find((entry) => entry.matches(id));

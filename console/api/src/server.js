@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { isDirectCustomizationUnlock } from "./adminCatalog.js";
 import { pipeline } from "node:stream/promises";
 import { createServer as createNetServer } from "node:net";
 import { totalmem } from "node:os";
@@ -6116,6 +6117,18 @@ async function customizationGrantRoute(req, res, path) {
       : { capabilities: { customizationPending: false }, pending: [] };
     const results = [];
     for (const item of selected) {
+      if (isDirectCustomizationUnlock(item)) {
+        try {
+          const result = await duneDb.unlockPlayerCustomization(db, target.actorId, { itemId: item.itemId });
+          results.push({ itemId: item.itemId, name: item.name, groupId: item.groupId,
+            ok: true, status: "Unlocked", unlocked: !result.alreadyUnlocked,
+            skipped: result.alreadyUnlocked, ownershipVerified: true });
+        } catch (error) {
+          results.push({ itemId: item.itemId, name: item.name, groupId: item.groupId,
+            ok: false, status: customizationGrantStatus(item.itemId, state), error: redact(error?.message || "Unexpected error.") });
+        }
+        continue;
+      }
       if (customizationGrantStatus(item.itemId, state) === "Pending") {
         results.push({ itemId: item.itemId, name: item.name, groupId: item.groupId, ok: true, status: "Pending", skipped: true });
         continue;
@@ -6141,9 +6154,10 @@ async function customizationGrantRoute(req, res, path) {
       }
     }
     const { ok, granted, requested, skipped, failed } = summarizeCustomizationGrantResults(results);
-    const delivered = granted;
-    audit(config, req, "players.customizations.grant", { playerId, itemId: body.itemId || null, groupId: body.groupId || null, delivered, requested, skipped, failed, ok, results });
-    return json(res, ok ? 200 : 207, { ok, delivered, granted, requested, skipped, failed, ownershipVerified: false, results });
+    const unlocked = results.filter((result) => result.unlocked).length;
+    const delivered = granted - unlocked;
+    audit(config, req, "players.customizations.grant", { playerId, itemId: body.itemId || null, groupId: body.groupId || null, delivered, unlocked, requested, skipped, failed, ok, results });
+    return json(res, ok ? 200 : 207, { ok, delivered, unlocked, granted, requested, skipped, failed, ownershipVerified: false, results });
   } catch (error) {
     audit(config, req, "players.customizations.grant", { playerId, itemId: body.itemId || null, groupId: body.groupId || null, ok: false, error: redact(error?.message || "Unexpected error.") });
     return json(res, 400, { ok: false, error: redact(error?.message || "Unexpected error.") });
@@ -6152,6 +6166,7 @@ async function customizationGrantRoute(req, res, path) {
 
 async function grantPlayerItem(playerId, item, target) {
   const resolved = item.itemId ? resolveCatalogItem(config.repoRoot, { itemId: item.itemId }) : resolveCatalogItem(config.repoRoot, item);
+  if (isDirectCustomizationUnlock(resolved)) throw new Error("Event cosmetics must be unlocked from Customizations while the player is offline.");
   const operation = resolved.itemId ? "adminGiveItemId" : "adminGiveItem";
   const hasExplicitGrade = item.quality !== undefined || item.grade !== undefined;
   const selectedGrade = hasExplicitGrade ? validateGrantGrade(item.quality ?? item.grade) : undefined;
