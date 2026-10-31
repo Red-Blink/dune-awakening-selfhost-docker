@@ -81,6 +81,7 @@ cat >> runtime/director/config/director_config.ini <<'EOF'
 Overmap=SingleServer
 Survival_1=Dimension
 DeepDesert_1=Dimension
+CB_Halloween_Event_Shipwreck_01=ClassicalInstancing
 
 [Server]
 PlayerHardCap=40
@@ -153,6 +154,12 @@ NumExtraServers=0
 
 [CB_Dungeon_OldCarthag]
 NumExtraServers=0
+
+; Preserve the native event contract: one party of up to four players.
+[CB_Halloween_Event_Shipwreck_01]
+PlayerHardCap=4
+MaxParties=1
+QueueFailMap=Overmap
 
 [CB_Ecolab_Bronze_Green_024]
 NumExtraServers=0

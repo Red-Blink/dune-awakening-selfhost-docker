@@ -39,6 +39,22 @@ for map_name in solo_maps:
     assert config.getboolean(map_name, "KeepPartiesTogether") is False, map_name
     assert config.getint(map_name, "NumExtraServers") == 0, map_name
 
+# Funcom's Steam 26324834 Director defines Halloween as one four-player
+# party per classical instance, matching the client FirstOfGroup contract.
+event_map = "CB_Halloween_Event_Shipwreck_01"
+assert config.get("InstancingModes", event_map, fallback=None) == "ClassicalInstancing", \
+    "Halloween must retain the native classical-instancing mode"
+assert config.getint(event_map, "PlayerHardCap", fallback=config.getint("Server", "PlayerHardCap")) == 4, \
+    "Halloween must admit four players, not inherit the global hard cap"
+assert config.getint(event_map, "MaxParties", fallback=0) == 1, \
+    "Halloween must isolate parties, not individual party members"
+assert config.get(event_map, "QueueFailMap", fallback=None) == "Overmap"
+# Neither flag is overridden by the native event section. In particular,
+# the global AllowGroupTravel=false also exists in Funcom's co-op config.
+assert not config.has_option(event_map, "KeepPartiesTogether")
+assert not config.has_option(event_map, "AllowGroupTravel")
+assert config.getboolean("Server", "AllowGroupTravel") is False
+
 # Shared maps keep their existing limits and instancing modes.
 assert config.getint("Server", "PlayerHardCap") == 40
 assert config.getint("Survival_1", "PlayerHardCap") == 60
@@ -49,5 +65,5 @@ for map_name in ["CB_Dungeon_Hephaestus", "CB_Dungeon_OldCarthag", "CB_Dungeon_T
     assert not config.has_option(map_name, "PlayerHardCap"), map_name
 assert config.get("InstancingModes", "Survival_1") == "Dimension"
 assert config.get("InstancingModes", "DeepDesert_1") == "Dimension"
-print("PASS: eight solo story maps retain stock admission limits; shared maps are unchanged")
+print("PASS: solo story limits, four-player single-party Halloween admission, and shared maps retain their contracts")
 PY
