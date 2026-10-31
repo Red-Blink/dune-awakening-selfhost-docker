@@ -51,6 +51,11 @@ describe("CustomizationsTab", () => {
     expect((await screen.findAllByText("Available"))[0]).toHaveClass("ok");
     expect(screen.getByText("Pending Login")).toHaveClass("warn");
   });
+  it("keeps the complete customization ID available when the column truncates it", async () => {
+    render(<CustomizationsTab dbPlayerId="123" playerName="Chani" confirmAction={vi.fn()} />);
+    const itemId=rows[0].itemId;
+    expect(await screen.findByText(itemId)).toHaveAttribute('title',itemId);
+  });
   it("shows grouped sets and marks tokens already waiting for login", async () => {
     render(<CustomizationsTab dbPlayerId="123" playerName="Chani" confirmAction={vi.fn().mockResolvedValue(true)} />);
     expect(await screen.findByText("Atreides Pistol")).toBeInTheDocument();
