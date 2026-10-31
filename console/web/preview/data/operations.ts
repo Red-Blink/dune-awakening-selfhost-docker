@@ -16,7 +16,13 @@ export const mapMemoryRows=mapCatalog.map((entry,index)=>{
 const out=(stdout:string)=>({stdout,stderr:'',exitCode:0});
 const mapsText=JSON.stringify({maps:mapNames.map((map,index)=>({map,status:'READY',mode:'Always On',memory:mapCatalog[index].limitGiB+'G',partitionId:String(partitionRows[index].partitionId)}))});
 const serviceText=partitionRows.map(row=>`${row.partitionId} | ${row.map} | 0 | ${row.label} | ${row.serverId} | ${row.gamePort} | ${row.igwPort} | true | true`).join('\n');
-export const settingsFields=settingsSchema;
+// These are public INI setting names, not API keys or credentials.
+const nativeFields = <T extends {iniSetting:string}>(fields:T[])=>fields.map(({iniSetting,...field})=>({...field,key:iniSetting}));
+export const settingsFields={
+ engine:nativeFields(settingsSchema.engine),mapEngine:nativeFields(settingsSchema.mapEngine),
+ partitionEngine:nativeFields(settingsSchema.partitionEngine),game:nativeFields(settingsSchema.game),
+ partition:nativeFields(settingsSchema.partition),serverCustom:nativeFields(settingsSchema.serverCustom)
+};
 export function operationsData(url:URL):unknown|undefined {
  const path=url.pathname;
  if(path==='/api/public-directory/status')return {available:true,enabled:true,claimed:true,serverId:'sample-server',title:'Docker Community',status:'online',lastHeartbeatAt:ago(0.01)};

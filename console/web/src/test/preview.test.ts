@@ -4,6 +4,7 @@ import { sampleResponse } from '../../preview/sampleData';
 import { mapNames, mapMemoryRows, partitionRows } from '../../preview/data/operations';
 import { itemRows, people, inventoryForPlayer } from '../../preview/data/shared';
 import catalog from '../../../../runtime/data/admin-items.json';
+import settingsMetadata from '../../preview/data/settingsSchema.json';
 describe('public Console preview isolation',()=>{
  it('shows v1.4.59 in the Console and sample update checks',()=>{
   expect(sampleResponse(new URL('https://try.example/api/auth/state'))).toMatchObject({config:{version:'1.4.59'}});
@@ -75,6 +76,12 @@ describe('public Console preview isolation',()=>{
   expect(schema.partition.some(field=>field.category==='Spice Fields')).toBe(true);
   const values=sampleResponse(new URL('https://try.example/api/maps/user-settings/values')) as {stdout:string};
   for(const field of Object.values(schema).flat())expect(values.stdout).toContain(field.id+'\t');
+ });
+ it('preserves public INI setting names in the native settings response',()=>{
+  const schema=sampleResponse(new URL('https://try.example/api/maps/user-settings/schema')) as Record<string,{id:string;key:string}[]>;
+  for(const [scope,fields] of Object.entries(settingsMetadata))for(const field of fields){
+   expect(schema[scope].find(row=>row.id===field.id)?.key).toBe(field.iniSetting);
+  }
  });
  it('provides valid milestone and community blueprint contracts',()=>{
   const preset=sampleResponse(new URL('https://try.example/api/admin/landsraad/milestone-preset')) as {preset:{thresholds:number[]}};
