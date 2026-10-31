@@ -1,11 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="260" height="88" viewBox="0 0 260 88" role="img" aria-labelledby="title">
-  <title id="title">Dune Awakening Community — #1 Repository of the Month — 31 October 2026</title>
-  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#252033"/><stop offset="1" stop-color="#101719"/></linearGradient></defs>
-  <rect x=".5" y=".5" width="259" height="87" rx="10" fill="url(#bg)" stroke="#ae96cb"/>
-  <path d="M14 28h232" stroke="#ae96cb" opacity=".25"/>
-  <text x="130" y="18" text-anchor="middle" fill="#e5dcef" font-family="Segoe UI,Arial,sans-serif" font-size="9.2" font-weight="600" letter-spacing=".65">DUNE AWAKENING COMMUNITY</text>
-  <g transform="translate(17 37)" fill="none" stroke="#c7afe1" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 0h14v8a7 7 0 0 1-14 0V0ZM6 2H1v3a6 6 0 0 0 6 6M20 2h5v3a6 6 0 0 1-6 6M13 15v7M7 24h12M9 22h8"/></g>
-  <text x="57" y="48" fill="#f7f1ff" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700">#1 REPOSITORY</text>
-  <text x="57" y="64" fill="#c7afe1" font-family="Segoe UI,Arial,sans-serif" font-size="10.5" font-weight="600" letter-spacing="1.5">OF THE MONTH</text>
-  <text x="57" y="78" fill="#b0a6bc" font-family="Segoe UI,Arial,sans-serif" font-size="8">31 OCT 2026</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="79" viewBox="0 0 280 79" role="img" aria-labelledby="title">
+  <title id="title">Dune Awakening Community — #1 Repository Of The Month</title>
+  <rect x="15.5" y="12.5" width="249" height="54" rx="10" fill="#fff" stroke="#4a0e99"/>
+  <g transform="translate(26 20)" fill="#49278e">
+    <path d="M21 36C9 34 4 25 7 13L8 13C6 24 11 32 21 34ZM23 36C35 34 40 25 37 13L36 13C38 24 33 32 23 34Z"/>
+    <path id="leaves" d="M7 19C1 18 1 12 1 12C7 12 9 15 7 19ZM7 24C1 25 0 19 0 19C5 18 8 20 7 24ZM10 29C4 32 2 26 2 26C7 23 10 25 10 29ZM14 33C10 38 6 33 6 33C9 29 13 29 14 33ZM19 35C18 41 12 38 12 38C13 33 17 32 19 35ZM8 16C5 11 9 7 9 7C13 11 13 14 8 16ZM8 23C8 17 13 16 13 16C15 21 13 24 8 23ZM11 29C10 23 16 22 16 22C18 27 16 30 11 29ZM16 33C15 28 20 27 20 27C23 32 21 34 16 33Z"/>
+    <use href="#leaves" transform="translate(44 0) scale(-1 1)"/>
+    <text x="22" y="27" text-anchor="middle" font-family="Arial,sans-serif" font-size="22">1</text>
+  </g>
+  <text x="79" y="32" fill="#432787" font-family="Arial,sans-serif" font-size="9">DUNE AWAKENING COMMUNITY</text>
+  <text x="79" y="51" fill="#432787" font-family="Arial,sans-serif" font-size="14" font-weight="700" textLength="176" lengthAdjust="spacingAndGlyphs">#1 Repository Of The Month</text>
 </svg>
