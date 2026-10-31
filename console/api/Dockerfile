@@ -6,12 +6,14 @@ RUN npm ci
 COPY runtime/data/augment-compatibility.json /runtime/data/augment-compatibility.json
 COPY runtime/data/admin-skill-modules.json /runtime/data/admin-skill-modules.json
 COPY console/web ./
-RUN npm run build
+RUN npm run build \
+    && node -e 'const fs=require("fs"),path=require("path"),zlib=require("zlib");const dir="/app/web/dist/assets";if(fs.existsSync(dir)){for(const f of fs.readdirSync(dir)){if(/\.(js|css|svg|json)$/i.test(f)){const p=path.join(dir,f),b=fs.readFileSync(p);if(b.length>=1024){fs.writeFileSync(p+".br",zlib.brotliCompressSync(b,{params:{[zlib.constants.BROTLI_PARAM_QUALITY]:11}}));fs.writeFileSync(p+".gz",zlib.gzipSync(b,{level:9}));}}}}'
 
 FROM node:20-trixie
 LABEL io.github.red-blink.dune-selfhost.component="console"
 WORKDIR /app
 ENV NODE_ENV=production
+ENV NODE_OPTIONS="--max-old-space-size=384"
 
 # Runtime tools required by RedBlink dune scripts when the web admin runs in a container.
 # We install small OS tools through apt, then install Docker CLI + Compose plugin

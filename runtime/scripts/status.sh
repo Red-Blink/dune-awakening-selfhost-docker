@@ -79,11 +79,15 @@ container_status() {
   fi
 }
 
+tcp_sockets_snapshot="__unset__"
+udp_sockets_snapshot="__unset__"
+
 check_tcp() {
   local port="$1"
-  local sockets
-  sockets="$(ss -lntp 2>/dev/null || true)"
-  if grep -q ":$port " <<<"$sockets"; then
+  if [ "$tcp_sockets_snapshot" = "__unset__" ]; then
+    tcp_sockets_snapshot="$(ss -lntp 2>/dev/null || true)"
+  fi
+  if grep -q ":$port " <<<"$tcp_sockets_snapshot"; then
     echo "OK"
   else
     issue=1
@@ -104,9 +108,15 @@ container_logs_have_udp_listener() {
 
 udp_socket_listening() {
   local port="$1"
-  local sockets
-  sockets="$(ss -lnup 2>/dev/null || true)"
-  grep -q ":$port " <<<"$sockets"
+  if [ "$udp_sockets_snapshot" = "__unset__" ]; then
+    udp_sockets_snapshot="$(ss -lnup 2>/dev/null || true)"
+  fi
+  if grep -q ":$port " <<<"$udp_sockets_snapshot"; then
+    return 0
+  fi
+  # Refresh once on miss so retry loops observe newly bound sockets.
+  udp_sockets_snapshot="$(ss -lnup 2>/dev/null || true)"
+  grep -q ":$port " <<<"$udp_sockets_snapshot"
 }
 
 check_udp() {
@@ -132,11 +142,25 @@ check_udp() {
 }
 
 dynamic_listener_rows() {
-  local containers container partition_id row map_name game_port igw_port fallback
+  local containers container partition_id row map_name game_port igw_port fallback all_partition_rows=""
 
   containers="$(docker ps --filter 'name=^dune-server-' --format '{{.Names}}' 2>/dev/null \
     | grep -Ev '^dune-server-(gateway|survival-1|overmap)$' || true)"
   [ -n "$containers" ] || return 0
+
+  if is_running dune-postgres; then
+    all_partition_rows="$(
+      dune_psql_app -At -F '|' -c "
+        select
+          wp.partition_id::text,
+          coalesce(nullif(fs.map, ''), nullif(wp.map, ''), 'Partition ' || wp.partition_id::text),
+          coalesce(fs.game_port::text, ''),
+          coalesce(fs.igw_port::text, '')
+        from dune.world_partition wp
+        left join dune.farm_state fs on fs.server_id = wp.server_id;
+      " 2>/dev/null || true
+    )"
+  fi
 
   while IFS= read -r container; do
     [ -n "$container" ] || continue
@@ -146,19 +170,8 @@ dynamic_listener_rows() {
     game_port=""
     igw_port=""
 
-    if is_running dune-postgres; then
-      row="$(
-        dune_psql_app -At -F '|' -c "
-          select
-            coalesce(nullif(fs.map, ''), nullif(wp.map, ''), 'Partition ${partition_id}'),
-            coalesce(fs.game_port::text, ''),
-            coalesce(fs.igw_port::text, '')
-          from dune.world_partition wp
-          left join dune.farm_state fs on fs.server_id = wp.server_id
-          where wp.partition_id = ${partition_id}
-          limit 1;
-        " 2>/dev/null || true
-      )"
+    if [ -n "$all_partition_rows" ]; then
+      row="$(printf '%s\n' "$all_partition_rows" | awk -F '|' -v pid="$partition_id" '$1 == pid { print $2 "|" $3 "|" $4; exit }')"
       IFS='|' read -r map_name game_port igw_port <<< "$row"
     fi
 

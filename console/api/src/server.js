@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { isDirectCustomizationUnlock } from "./adminCatalog.js";
 import { pipeline } from "node:stream/promises";
+import { createGzip } from "node:zlib";
 import { createServer as createNetServer } from "node:net";
 import { totalmem } from "node:os";
 import { spawn } from "node:child_process";
@@ -1459,11 +1460,36 @@ async function handleApi(req, res) {
   if (path === "/api/settings" && req.method === "POST") return writeConfig(req, res);
   if (path === "/api/settings") return json(res, 200, await setupState(remoteIpOf(req)));
   if (path === "/api/i18n/translate" && req.method === "POST") return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
-  if (path === "/api/i18n/key" && req.method === "POST") return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
-  if (path === "/api/i18n/key" && req.method === "DELETE") return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
-  if (path === "/api/i18n/settings" && req.method === "POST") return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
-  if (path === "/api/i18n/sync-all" && req.method === "POST") return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
-  if (path === "/api/i18n/suggestions" && req.method === "POST") return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+  if (path === "/api/i18n/key" && req.method === "POST") {
+    if (!applyMutationRateLimit(req, res, "i18n.key")) return;
+    await handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+    audit(config, req, "i18n.save-key", { ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode });
+    return;
+  }
+  if (path === "/api/i18n/key" && req.method === "DELETE") {
+    if (!applyMutationRateLimit(req, res, "i18n.key")) return;
+    await handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+    audit(config, req, "i18n.delete-key", { ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode });
+    return;
+  }
+  if (path === "/api/i18n/settings" && req.method === "POST") {
+    if (!applyMutationRateLimit(req, res, "i18n.settings")) return;
+    await handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+    audit(config, req, "i18n.settings", { ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode });
+    return;
+  }
+  if (path === "/api/i18n/sync-all" && req.method === "POST") {
+    if (!applyMutationRateLimit(req, res, "i18n.sync-all")) return;
+    await handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+    audit(config, req, "i18n.sync-all", { ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode });
+    return;
+  }
+  if (path === "/api/i18n/suggestions" && req.method === "POST") {
+    if (!applyMutationRateLimit(req, res, "i18n.suggestions")) return;
+    await handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+    audit(config, req, "i18n.suggestion", { ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode });
+    return;
+  }
 
   return json(res, 404, { error: "Not found" });
 }
@@ -2289,16 +2315,35 @@ async function backupDownloadRoute(req, res, backupName) {
   if (!existsSync(metadataPath)) return json(res, 404, { error: "Backup metadata .yaml file was not found." });
 
   const archiveName = `${backupName}.tar.gz`;
-  const archive = createBackupDownloadArchive([
-    { name: backupName, content: readFileSync(backupPath) },
-    { name: `${backupName}.yaml`, content: readFileSync(metadataPath) }
-  ]);
+  const members = [
+    { name: backupName, path: backupPath, size: statSync(backupPath).size },
+    { name: `${backupName}.yaml`, path: metadataPath, size: statSync(metadataPath).size }
+  ];
   res.writeHead(200, withSecurityHeaders({
     "content-type": "application/gzip",
-    "content-length": archive.length,
     "content-disposition": `attachment; filename="${archiveName.replace(/"/g, "")}"`
   }));
-  res.end(archive);
+  const gzip = createGzip({ level: 1 });
+  const outPromise = pipeline(gzip, res);
+  try {
+    for (const member of members) {
+      gzip.write(createTarHeader(member.name, member.size));
+      let written = 0;
+      const source = createReadStream(member.path);
+      source.on("data", (chunk) => { written += chunk.length; });
+      await pipeline(source, gzip, { end: false });
+      if (written !== member.size) {
+        gzip.destroy(new Error("Backup file size changed during download."));
+        return res.destroy();
+      }
+      const padding = tarPadding(member.size);
+      if (padding) gzip.write(Buffer.alloc(padding, 0));
+    }
+    gzip.end(Buffer.alloc(TAR_TRAILER_BYTES, 0));
+    await outPromise;
+  } catch {
+    if (!res.destroyed) res.destroy();
+  }
 }
 
 async function backupAutoStatusRoute(res) {
@@ -6770,7 +6815,7 @@ async function messageOfTheDayAutoTick() {
   messageOfTheDayAutoRunning = true;
   messageOfTheDayAutoLastRun = now;
   try {
-    const players = await duneDb.listAllPlayers(db, { status: "online" });
+    const players = await shareInFlight("online-players-10s", () => duneDb.listAllPlayers(db, { status: "online" }));
     if (players.capabilities?.players === false) return;
     const result = await runMessageOfTheDayScan(config, players.rows || [], { db });
     if (result.sent || result.failed) {
@@ -6808,7 +6853,7 @@ async function playerAnnouncementsAutoTick() {
   playerAnnouncementsAutoRunning = true;
   playerAnnouncementsAutoLastRun = now;
   try {
-    const players = await duneDb.listAllPlayers(db, { status: "online" });
+    const players = await shareInFlight("online-players-10s", () => duneDb.listAllPlayers(db, { status: "online" }));
     if (players.capabilities?.players === false) return;
     const result = await runPlayerAnnouncementScan(config, players.rows || [], { db });
     if (result.joined || result.left || result.sent || result.failed) {

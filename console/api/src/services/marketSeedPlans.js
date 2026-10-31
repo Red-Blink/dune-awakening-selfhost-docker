@@ -105,6 +105,23 @@ const SEED_PLAN_ROW_KEYS = new Set(SEED_PLAN_CSV_COLUMNS);
 const AUGMENT_TEMPLATE_PATTERN = /^T\d+_Augment_/i;
 
 let planSummaryCache = null;
+const parsedPlanJsonCache = new Map();
+
+function readPlanJsonCached(path) {
+  let stat;
+  try {
+    stat = statSync(path, { bigint: true });
+  } catch {
+    return parsePlanJson(readFileSync(path, "utf8"), path);
+  }
+  const stamp = `${stat.mtimeNs}:${stat.ctimeNs}:${stat.size}`;
+  const cached = parsedPlanJsonCache.get(path);
+  if (cached && cached.stamp === stamp) return cached.plan;
+  const plan = parsePlanJson(readFileSync(path, "utf8"), path);
+  if (parsedPlanJsonCache.size > 32) parsedPlanJsonCache.clear();
+  parsedPlanJsonCache.set(path, { stamp, plan });
+  return plan;
+}
 
 export function resolveShippedMarketSeedPlanPath(config, addonId = EDA_EXCHANGE_BOT_ADDON_ID) {
   const bundledPath = resolve(config.repoRoot, "runtime/data/market-seed-plan.json");
@@ -148,7 +165,7 @@ export function marketSeedPlanSummary(config) {
   if (planSummaryCache && planSummaryCache.cacheKey === cacheKey) return planSummaryCache.summary;
   let summary;
   try {
-    const plan = parsePlanJson(readFileSync(path, "utf8"), path);
+    const plan = readPlanJsonCached(path);
     const source = path.includes(`${PLANS_DIR}/`)
       ? "custom"
       : path.includes("runtime/addons/installed")
@@ -229,9 +246,10 @@ export function renameMarketSeedPlan(config, planId, name) {
   if (!entry) throw new Error("Unknown seed plan.");
   const path = customPlanFilePath(config, id);
   if (!existsSync(path)) throw new Error("That seed plan file is missing. Choose another plan or re-upload the CSV.");
-  const plan = parsePlanJson(readFileSync(path, "utf8"), path);
+  const plan = readPlanJsonCached(path);
   const updatedAt = new Date().toISOString();
   writeJsonAtomic(path, { ...plan, id, name: nextName }, 0o600, { pretty: false });
+  parsedPlanJsonCache.delete(path);
   writePlanIndex(config, {
     ...index,
     plans: index.plans.map((planEntry) => (
@@ -285,7 +303,7 @@ export function importMarketSeedPlanFromCsv(config, { csvText, name, planId, fil
   if (Buffer.byteLength(text, "utf8") > MAX_SEED_PLAN_BYTES) throw new Error("Seed plan CSV is too large.");
 
   const shippedPath = resolveShippedMarketSeedPlanPath(config);
-  const shipped = shippedPath ? parsePlanJson(readFileSync(shippedPath, "utf8"), shippedPath) : { rows: [] };
+  const shipped = shippedPath ? readPlanJsonCached(shippedPath) : { rows: [] };
   const unsafeIds = readUnsafeTemplateIds(config.repoRoot);
   const rows = csvToPlanRows(text, shipped, unsafeIds);
   if (!rows.length) throw new Error("The uploaded CSV has no seed rows.");
@@ -607,7 +625,7 @@ function addMissingAugmentItems(rows, bundledByKey) {
 function summarizeShippedPlan(path) {
   const source = path.includes("runtime/addons/installed") ? "addon" : "bundled";
   try {
-    const plan = parsePlanJson(readFileSync(path, "utf8"), path);
+    const plan = readPlanJsonCached(path);
     return {
       id: BUNDLED_SEED_PLAN_ID,
       name: source === "addon" ? "Addon" : "Bundled",

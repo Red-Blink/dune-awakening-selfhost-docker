@@ -1,7 +1,7 @@
-import { createReadStream } from "node:fs";
+import { createReadStream, existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { extname } from "node:path";
-import { createBrotliCompress, createGzip } from "node:zlib";
+import { constants as zlibConstants, createBrotliCompress, createGzip } from "node:zlib";
 import { pipeline } from "node:stream";
 import { preferredContentEncoding } from "./contentEncoding.js";
 import { json, withSecurityHeaders } from "../auth.js";
@@ -69,14 +69,29 @@ export function serveStatic(config, req, res) {
         headers.vary = "Accept-Encoding";
       }
       res.writeHead(200, withSecurityHeaders(headers));
-      const stream = createReadStream(target);
+      const precompressedTarget =
+        encoding === "br" && existsSync(`${target}.br`)
+          ? `${target}.br`
+          : encoding === "gzip" && existsSync(`${target}.gz`)
+            ? `${target}.gz`
+            : null;
+      const stream = createReadStream(precompressedTarget || target);
       stream.on("error", () => {
         if (!res.destroyed) res.destroy();
       });
-      if (encoding === "br") {
-        pipeline(stream, createBrotliCompress(), res, () => {});
+      if (precompressedTarget) {
+        pipeline(stream, res, () => {});
+      } else if (encoding === "br") {
+        pipeline(
+          stream,
+          createBrotliCompress({
+            params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 4 }
+          }),
+          res,
+          () => {}
+        );
       } else if (encoding === "gzip") {
-        pipeline(stream, createGzip(), res, () => {});
+        pipeline(stream, createGzip({ level: 6 }), res, () => {});
       } else {
         pipeline(stream, res, () => {});
       }

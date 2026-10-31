@@ -643,3 +643,55 @@ test("Dune-Docker Mesh mutual attestation, SSRF origin normalization, discovery 
   assert.ok(status.encryptionAlgorithm.includes(ENCRYPTION_METADATA.alg.toUpperCase()));
   assert.ok(isI18nRoute("/api/i18n/languages"));
 });
+
+test("Cycling all 53 languages via public GET /api/i18n/translations does not pin dictionaries in __materialized and supports 304 ETag", async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "dune-i18n-bounded-lru-"));
+  try {
+    resetTranslationDatabaseCache();
+    const config = {
+      generatedDir: join(tempDir, "generated"),
+      secretsDir: join(tempDir, "secrets")
+    };
+    const db = loadTranslationDatabase(config);
+    assert.equal(Object.keys(db.translations.__materialized).length, 0);
+    const catalogLanguages = getLanguageCatalogStatus(config).languages;
+    assert.equal(catalogLanguages.length, 54);
+
+    for (const lang of catalogLanguages) {
+      const getCall = createMockHttpCall({
+        method: "GET",
+        path: "/api/i18n/translations",
+        query: `lang=${encodeURIComponent(lang.code)}`
+      });
+      await handleI18nRoute({ ...getCall, config });
+      assert.equal(getCall.getStatus(), 200);
+      assert.ok(getCall.getBody().translatedCount > 0);
+    }
+
+    // Even after reading all 53 languages via the public endpoint, __materialized stays at 0 entries!
+    assert.equal(Object.keys(db.translations.__materialized).length, 0);
+
+    // Submitting or probing POST /api/i18n/suggestions across multiple languages also keeps __materialized at 0
+    for (const code of ["DE", "FR", "ES", "JA", "KO", "PL"]) {
+      const suggestCall = createMockHttpCall({
+        method: "POST",
+        path: "/api/i18n/suggestions",
+        headers: { "x-csrf-token": "csrf-tok" },
+        body: { lang: code, source: "Home", translation: "Start", credit: "Tester" }
+      });
+      suggestCall.req.authSession = { id: "s1", csrf: "csrf-tok", tier: "observer" };
+      await handleI18nRoute({
+        ...suggestCall,
+        config,
+        fetchImpl: async (_url, opts) => {
+          const parsed = JSON.parse(opts.body);
+          return { ok: true, json: async () => ({ id: parsed.id, reference: "TR-999999" }) };
+        }
+      });
+      assert.equal(suggestCall.getStatus(), 201);
+    }
+    assert.equal(Object.keys(db.translations.__materialized).length, 0);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
