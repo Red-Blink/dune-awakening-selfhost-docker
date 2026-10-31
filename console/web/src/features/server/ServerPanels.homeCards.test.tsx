@@ -180,8 +180,8 @@ describe("performanceCardStatus", () => {
     expect(performanceCardStatus(74.9, true)).toBe("OK");
     expect(performanceCardStatus(75, true)).toBe("WARN");
     expect(performanceCardStatus(90, true)).toBe("WARN");
-    expect(performanceCardStatus(90.1, true)).toBe("FAILED");
-    expect(performanceCardStatus(96.7, true)).toBe("FAILED");
+    expect(performanceCardStatus(90.1, true)).toBe("CRIT");
+    expect(performanceCardStatus(96.7, true)).toBe("CRIT");
   });
 
   // The API returns null routinely, not exceptionally -- cpuPercent is null on
@@ -339,7 +339,8 @@ describe("HomePanel performance block", () => {
     renderHome();
     await waitFor(() => expect(within(card("CPU Usage")).getByText("OK")).toBeTruthy());
     expect(within(card("Memory")).getByText("WARN")).toBeTruthy();
-    expect(within(card("Disk")).getByText("FAILED")).toBeTruthy();
+    expect(within(card("Disk")).getByText("CRIT").className).toContain("badge-fail");
+    expect(within(card("Disk")).queryByText("FAILED")).toBeNull();
   });
 
   it("tones the meter bar to match", async () => {
@@ -481,7 +482,7 @@ describe("HomePanel server identity", () => {
 });
 
 describe("HomePanel subsystem rows", () => {
-  const SUBSYSTEMS = ["Database", "Messaging", "Battlegroup services", "Game servers", "Funcom/FLS"];
+  const SUBSYSTEMS = ["Database", "Messaging", "Battlegroup Services", "Game Servers", "Funcom/FLS"];
 
   it("lists every readiness subsystem", async () => {
     const { container } = renderHome();
@@ -501,7 +502,7 @@ describe("HomePanel subsystem rows", () => {
     // Every row lands on Server Control: these report health, and that is where
     // health is diagnosed. Database deliberately included -- the Database tab is
     // for data, not for whether Postgres is up.
-    for (const label of ["Database", "Messaging", "Battlegroup services", "Game servers", "Funcom/FLS"]) {
+    for (const label of ["Database", "Messaging", "Battlegroup Services", "Game Servers", "Funcom/FLS"]) {
       onNavigate.mockClear();
       rowFor(label).click();
       expect(onNavigate, `${label} should route to Server Control`).toHaveBeenCalledWith("Server Control");
@@ -821,7 +822,7 @@ describe("HomePanel readiness counts", () => {
       rows.find((row) => row.querySelector(".home-subsystem-label")?.textContent === label);
 
     expect(rowFor("Messaging")?.querySelector(".home-subsystem-count")?.textContent).toBe("3 of 3");
-    expect(rowFor("Game servers")?.querySelector(".home-subsystem-count")?.textContent).toBe("1 of 2");
+    expect(rowFor("Game Servers")?.querySelector(".home-subsystem-count")?.textContent).toBe("1 of 2");
   });
 
   // A row with nothing countable must not render an empty element, which would

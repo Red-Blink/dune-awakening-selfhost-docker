@@ -113,7 +113,7 @@ describe("Home rows on a host where only Postgres is up", () => {
   });
 
   it("still reports the rest of the battlegroup stopped", () => {
-    for (const label of ["Messaging", "Battlegroup services", "Game servers", "Funcom/FLS"]) {
+    for (const label of ["Messaging", "Battlegroup Services", "Game Servers", "Funcom/FLS"]) {
       expect(row(label)).toMatchObject({ value: "Stopped", status: "FAILED" });
     }
   });

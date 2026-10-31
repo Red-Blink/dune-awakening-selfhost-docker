@@ -105,10 +105,10 @@ const OWNER: Record<string, string> = {
   "dune-rmq-admin": "Messaging",
   "dune-rmq-game": "Messaging",
   "dune-text-router": "Messaging",
-  "dune-director": "Battlegroup services",
-  "dune-server-gateway": "Battlegroup services",
-  "dune-server-survival-1": "Game servers",
-  "dune-server-overmap": "Game servers"
+  "dune-director": "Battlegroup Services",
+  "dune-server-gateway": "Battlegroup Services",
+  "dune-server-survival-1": "Game Servers",
+  "dune-server-overmap": "Game Servers"
 };
 
 // Rows that legitimately also react, for a DIFFERENT reason. This is cascade,
@@ -170,7 +170,7 @@ describe("rows own their ports and containers even when the obvious signal is fi
       "$1 MISSING"
     );
     expect(status).toMatch(/Overmap clients\s+\S+\s+MISSING/);
-    expect(flagged(status)).toEqual(["Game servers"]);
+    expect(flagged(status)).toEqual(["Game Servers"]);
   });
 
   // Database owns dune-postgres outright, so a stale partition count must not

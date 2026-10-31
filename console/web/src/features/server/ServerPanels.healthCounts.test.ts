@@ -19,8 +19,8 @@ describe("Readiness & Health rows carry an x-of-y count", () => {
   it("counts a fully healthy battlegroup", () => {
     expect(counts(statusText())).toMatchObject({
       Messaging: "3 of 3",
-      "Battlegroup services": "2 of 2",
-      "Game servers": "7 of 7",
+      "Battlegroup Services": "2 of 2",
+      "Game Servers": "7 of 7",
       "Funcom/FLS": "4 of 4"
     });
   });
@@ -64,7 +64,7 @@ describe("Readiness & Health rows carry an x-of-y count", () => {
       ["DeepDesert_1", "WARMING"],
       ["DeepDesert_1#59", "WARMING"]
     ];
-    expect(counts(statusText({ maps: warming }))["Game servers"]).toBe("3 of 7");
+    expect(counts(statusText({ maps: warming }))["Game Servers"]).toBe("3 of 7");
   });
 
   // Database counts its one service, like every other row. The partition
@@ -96,8 +96,8 @@ describe("Readiness & Health rows carry an x-of-y count", () => {
 describe("counts survive the display overrides", () => {
   it("survives readyOverride on a healthy battlegroup", () => {
     // readyOverride is what rewrites every row to a bare "OK".
-    expect(values(statusText())["Game servers"]).toBe("OK");
-    expect(counts(statusText())["Game servers"]).toBe("7 of 7");
+    expect(values(statusText())["Game Servers"]).toBe("OK");
+    expect(counts(statusText())["Game Servers"]).toBe("7 of 7");
   });
 
   it("survives the transitional override mid-start", () => {
@@ -111,7 +111,7 @@ describe("counts survive the display overrides", () => {
     expect(values(status, readiness, "start").Messaging).toBe("Getting Ready");
     expect(counts(status, readiness, "start")).toMatchObject({
       Messaging: "2 of 3",
-      "Game servers": "3 of 7"
+      "Game Servers": "3 of 7"
     });
   });
 
@@ -121,8 +121,8 @@ describe("counts survive the display overrides", () => {
     expect(counts(stopped, "")).toMatchObject({
       Database: "0 of 1",
       Messaging: "0 of 3",
-      "Battlegroup services": "0 of 2",
-      "Game servers": "0 of 7"
+      "Battlegroup Services": "0 of 2",
+      "Game Servers": "0 of 7"
     });
   });
 });
@@ -270,8 +270,8 @@ describe("a readiness all-clear does not override an incomplete roster", () => {
   });
 
   it("still shows the real reading on the row rather than a blanket OK", () => {
-    expect(values(partlyWarm, READY_READINESS)["Game servers"]).toBe("Warming");
-    expect(counts(partlyWarm, READY_READINESS)["Game servers"]).toBe("3 of 7");
+    expect(values(partlyWarm, READY_READINESS)["Game Servers"]).toBe("Warming");
+    expect(counts(partlyWarm, READY_READINESS)["Game Servers"]).toBe("3 of 7");
   });
 
   // The rows that ARE fine must not be dragged down with it.
@@ -297,12 +297,12 @@ describe("maps that have not started yet read differently from maps that are loa
   });
 
   it("reads Waiting when nothing has been spawned yet", () => {
-    expect(values(allWaiting, "")["Game servers"]).toBe("Waiting");
-    expect(counts(allWaiting, "")["Game servers"]).toBe("0 of 7");
+    expect(values(allWaiting, "")["Game Servers"]).toBe("Waiting");
+    expect(counts(allWaiting, "")["Game Servers"]).toBe("0 of 7");
   });
 
   it("reads Warming once a map is actually loading", () => {
-    expect(values(someWarming, "")["Game servers"]).toBe("Warming");
+    expect(values(someWarming, "")["Game Servers"]).toBe("Warming");
   });
 
   it("badges both as Starting rather than Info", () => {

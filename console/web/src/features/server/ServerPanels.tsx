@@ -128,14 +128,14 @@ export function performanceCardStatus(percent: number | null, sampled: boolean) 
   if (!sampled || percent === null || !Number.isFinite(percent)) return "INFO";
   // Nonsense rather than healthy -- must not fall through to OK.
   if (percent < 0) return "INFO";
-  if (percent > PERFORMANCE_FAIL_PERCENT) return "FAILED";
+  if (percent > PERFORMANCE_FAIL_PERCENT) return "CRIT";
   if (percent >= PERFORMANCE_WARN_PERCENT) return "WARN";
   return "OK";
 }
 
 export function performanceTrackTone(percent: number | null, sampled: boolean) {
   const status = performanceCardStatus(percent, sampled);
-  if (status === "FAILED") return "metric-track-fail";
+  if (status === "CRIT") return "metric-track-fail";
   if (status === "WARN") return "metric-track-warn";
   return "";
 }
@@ -174,8 +174,8 @@ export type HomeHealthRow = { id: string; label: string; value: string; status: 
 const HOME_HEALTH_ROWS: Array<{ id: string; label: string }> = [
   { id: "database", label: "Database" },
   { id: "messaging", label: "Messaging" },
-  { id: "battlegroup", label: "Battlegroup services" },
-  { id: "games", label: "Game servers" },
+  { id: "battlegroup", label: "Battlegroup Services" },
+  { id: "games", label: "Game Servers" },
   { id: "fls", label: "Funcom/FLS" }
 ];
 
@@ -531,7 +531,7 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
       <article className="hero-panel wide loading-panel">
         <span className="spinner" aria-hidden="true" />
         <div>
-          <h2>Verifying server status...</h2>
+          <h2>Verifying Server Status...</h2>
           <p>Checking system readiness...</p>
           <p>This may take a few seconds while Docker and Dune complete their health checks.</p>
         </div>
@@ -542,7 +542,7 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   if (localError && !hasLoaded) {
     return <section className="grid">
       <article className="hero-panel wide">
-        <h2>Server status unavailable</h2>
+        <h2>Server Status Unavailable</h2>
         <p className="error">{localError}</p>
         <button onClick={() => refresh(undefined, { fresh: true })}>Retry Status Check</button>
       </article>
@@ -566,7 +566,7 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
       {/* The h2 is visually hidden but structurally real: without it the page
           jumps h1 -> h3 and this region has no accessible name. Each block's
           h3 (Battlegroup Status, Readiness & Health, Performance) sits under it. */}
-      <h2 id="home-overview-heading" className="sr-only">Server overview</h2>
+      <h2 id="home-overview-heading" className="sr-only">Server Overview</h2>
       <article className="hero-panel home-block home-status-block" aria-labelledby="home-status-heading">
         {/* An h3, not a styled span: it is the peer of the "Readiness &
             Health" and "Performance" headings, so matching them by using
