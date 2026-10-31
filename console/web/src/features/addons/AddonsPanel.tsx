@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Trash2 } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import { addonsApi, type AddonLifecycle, type CommunityAddonSummary, type InstalledAddon } from "../../api/addons";
 import { addonUpdateAvailable, hasAddonUpdates } from "./addonVersions";
@@ -269,7 +270,6 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
 }
 
 type AddonTableRow = CommunityAddonSummary & { status: string; installedOnly: boolean };
-const ADDON_DESCRIPTION_EXPAND_THRESHOLD = 48;
 
 function AddonsTable({ rows, loading, installedById, pinnedAddons, installingId, busyAddonId, openAddonId, expandedDescriptions, setExpandedDescriptions, installAddon, updateAddon, setAddonEnabled, removeAddon, setOpenAddonId, toggleAddonPin }: {
   rows: AddonTableRow[];
@@ -289,17 +289,15 @@ function AddonsTable({ rows, loading, installedById, pinnedAddons, installingId,
   toggleAddonPin: (addon: InstalledAddon, pinned: boolean) => void;
 }) {
   if (!rows.length) return <div className="empty addons-empty-state">{loading ? "Loading community addons..." : "No community addons are listed yet."}</div>;
-  return <div className="table-wrap addons-table-wrap"><table className="addons-table">
+  return <div className="table-wrap addons-table-wrap"><table className="addons-table" aria-label="Addons">
     <colgroup>
       <col className="addon-col-identity" />
-      <col className="addon-col-author" />
       <col className="addon-col-version" />
       <col className="addon-col-permissions" />
       <col className="addon-col-status" />
       <col className="addon-col-actions" />
-      <col className="addon-col-submenu" />
     </colgroup>
-    <thead><tr><th>Addon</th><th>Author</th><th>Version</th><th>Permissions</th><th>Status</th><th className="backup-table-actions">Actions</th><th className="addon-pin-column">Sub-Menu</th></tr></thead><tbody>{rows.map((row) => {
+    <thead><tr><th scope="col">Addon</th><th scope="col">Version</th><th scope="col">Permissions</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead><tbody>{rows.map((row) => {
     const installedAddon = installedById.get(row.id);
     const busy = busyAddonId === row.id;
     const pinned = Boolean(installedAddon && pinnedAddons.some((addon) => addon.id === installedAddon.id));
@@ -308,24 +306,23 @@ function AddonsTable({ rows, loading, installedById, pinnedAddons, installingId,
       <td data-label="Addon" className="addon-identity-cell">
         <div className="addon-identity-content">
           <div className="addon-name-line"><AddonNameCell addon={row} />{row.lifecycle !== "active" && <LifecyclePill lifecycle={installedAddon?.lifecycle || row.lifecycle} />}</div>
+          <small className="addon-author-cell">{row.author}</small>
           <AddonDescriptionCell addon={row} expanded={Boolean(expandedDescriptions[row.id])} onToggle={() => setExpandedDescriptions((current) => ({ ...current, [row.id]: !current[row.id] }))} />
         </div>
       </td>
-      <td data-label="Author" className="addon-author-cell">{row.author}</td>
-      <td data-label="Version"><AddonVersionCell catalogVersion={row.version} installedAddon={installedAddon} updateAvailable={updateAvailable} /></td>
+      <td data-label="Version" className="addon-version-column"><AddonVersionCell catalogVersion={row.version} installedAddon={installedAddon} updateAvailable={updateAvailable} /></td>
       <td data-label="Permissions" className="addon-permissions-cell"><PermissionList permissions={updateAvailable ? row.permissions || [] : installedAddon?.permissions || row.permissions || []} approvedPermissions={installedAddon?.approvedPermissions || []} /></td>
-      <td data-label="Status">
-        {installedAddon ? <div className="addon-status-cell"><label className={`switch-checkbox addon-status-toggle ${installedAddon.enabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={busy || installedAddon.lifecycle === "blocked"} checked={installedAddon.enabled} onChange={(event) => void setAddonEnabled(installedAddon, event.target.checked)} /><span className="switch-label">{busy ? "Working" : installedAddon.enabled ? "Enabled" : "Disabled"}</span><strong className="switch-state">{installedAddon.enabled ? "ON" : "OFF"}</strong></label></div> : <div className="addon-status-cell"><StatusPill value="Available" /></div>}
+      <td data-label="Status" className="addon-status-column">
+        {installedAddon ? <div className="addon-status-cell"><label className={`switch-checkbox addon-status-toggle ${installedAddon.enabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={busy || installedAddon.lifecycle === "blocked"} checked={installedAddon.enabled} onChange={(event) => void setAddonEnabled(installedAddon, event.target.checked)} /><span className="switch-label">{busy ? "Working" : installedAddon.enabled ? "Enabled" : "Disabled"}</span><strong className="switch-state" aria-hidden="true" /></label></div> : <div className="addon-status-cell"><StatusPill value="Available" /></div>}
       </td>
-      <td data-label="Actions" className="backup-table-actions"><div className="service-actions">
+      <td data-label="Actions" className="addon-actions-column"><div className="addon-actions-cell"><div className="service-actions">
         {!installedAddon && <button disabled={installingId === row.id || isInstallBlocked(row.lifecycle)} title={isInstallBlocked(row.lifecycle) ? lifecycleInstallMessage(row) : undefined} onClick={() => void installAddon(row)}>{installingId === row.id ? "Installing..." : "Install"}</button>}
         {installedAddon && updateAvailable && <button disabled={busy || isInstallBlocked(row.lifecycle)} title={isInstallBlocked(row.lifecycle) ? lifecycleInstallMessage(row) : `Update ${installedAddon.version} to ${row.version}`} onClick={() => void updateAddon(row, installedAddon)}>{busy ? "Updating..." : "Update"}</button>}
         {installedAddon?.enabled && <button disabled={busy} onClick={() => setOpenAddonId(openAddonId === installedAddon.id ? "" : installedAddon.id)}>{openAddonId === installedAddon.id ? "Close" : "Open"}</button>}
-        {installedAddon && <button className="danger" disabled={busy} onClick={() => void removeAddon(installedAddon)}>Uninstall</button>}
+        {installedAddon && <button className="danger addon-uninstall-button" aria-label="Uninstall" title="Uninstall" disabled={busy} onClick={() => void removeAddon(installedAddon)}><Trash2 size={16} aria-hidden="true" /></button>}
+      </div>
+      {installedAddon?.enabled && <label className={`switch-checkbox addon-pin-toggle ${pinned ? "enabled" : "disabled"}`}><input type="checkbox" checked={pinned} onChange={(event) => toggleAddonPin(installedAddon, event.target.checked)} /><span className="switch-label">Sub-Menu</span><strong className="switch-state">{pinned ? "ON" : "OFF"}</strong></label>}
       </div></td>
-      <td data-label="Sub-Menu" className="addon-pin-column">{installedAddon?.enabled
-        ? <label className={`switch-checkbox addon-pin-toggle ${pinned ? "enabled" : "disabled"}`}><input type="checkbox" checked={pinned} onChange={(event) => toggleAddonPin(installedAddon, event.target.checked)} /><strong className="switch-state">{pinned ? "ON" : "OFF"}</strong></label>
-        : <span className="muted">-</span>}</td>
     </tr>;
   })}</tbody></table></div>;
 }
@@ -409,12 +406,24 @@ function AddonDescriptionCell({ addon, expanded, onToggle }: { addon: Pick<Addon
   const text = String(addon.description ?? "").trim();
   const lifecycleText = addonLifecycleMessage(addon);
   const fullText = [text, lifecycleText].filter(Boolean).join(" ");
+  const measureRef = useRef<HTMLSpanElement>(null);
+  const [overflows, setOverflows] = useState(false);
+  useEffect(() => {
+    const element = measureRef.current;
+    if (!element) return;
+    const measure = () => setOverflows(element.scrollWidth > element.clientWidth + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    let active = true;
+    void document.fonts?.ready.then(() => { if (active) measure(); });
+    return () => { active = false; observer.disconnect(); };
+  }, [fullText]);
   if (!fullText) return "";
-  const canExpand = fullText.length > ADDON_DESCRIPTION_EXPAND_THRESHOLD;
-  const preview = canExpand && !expanded ? `${fullText.slice(0, ADDON_DESCRIPTION_EXPAND_THRESHOLD).replace(/\s+\S*$/, "")}.....` : fullText;
   return <div className={`addon-description-field ${expanded ? "expanded" : ""} ${addon.lifecycle !== "active" ? "addon-lifecycle-description" : ""}`}>
-    {canExpand ? <button className="playerAdmin_expanderButton addon-description-toggle" type="button" onClick={onToggle}>{expanded ? "-" : "+"}</button> : <span className="playerAdmin_expanderSpacer addon-description-spacer" />}
-    <span>{preview}{addon.lifecycleUrl && expanded ? <> <a href={addon.lifecycleUrl} target="_blank" rel="noreferrer">Details</a></> : null}</span>
+    <span className="addon-description-measure" ref={measureRef} aria-hidden="true">{fullText}</span>
+    <span className="addon-description-text" title={fullText}>{fullText}{addon.lifecycleUrl && expanded ? <> <a href={addon.lifecycleUrl} target="_blank" rel="noreferrer">Details</a></> : null}</span>
+    {overflows ? <button className="addon-description-more" type="button" aria-expanded={expanded} onClick={onToggle}>{expanded ? "Less" : "More"}</button> : null}
   </div>;
 }
 

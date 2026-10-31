@@ -1388,6 +1388,7 @@
     "Leadership Board Demo",
     "Leave Message",
     "Leave empty for now.",
+    "Less",
     "Less than 1m",
     "Let external tools read the Console API over HTTPS using an API key. Your Console login stays at its current address.",
     "Level",
@@ -1581,6 +1582,7 @@
     "Modifier settings are loading independently of live map status.",
     "Modifier view",
     "Modules",
+    "More",
     "Most Downloaded",
     "Most Liked",
     "Movement / Vehicles",
@@ -3929,7 +3931,7 @@
     "(Online)": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 448,
+        "line": 449,
         "nearby": [
           "Select player",
           "No players are online",
@@ -4053,7 +4055,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2649,
+        "line": 2653,
         "nearby": [
           "Needs Review",
           "Unknown",
@@ -4062,7 +4064,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2677,
+        "line": 2681,
         "nearby": [
           "Needs Review",
           "Unknown"
@@ -4139,7 +4141,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1506,
+        "line": 1510,
         "nearby": [
           "Partition",
           "Unknown",
@@ -4444,7 +4446,7 @@
     "A First Online rule already exists.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 235,
+        "line": 236,
         "nearby": [
           "Package",
           "Auto Grant Rule Already Exists.",
@@ -4813,8 +4815,8 @@
         "nearby": [
           "Tags",
           "Result",
-          "Unknown",
-          "Complete"
+          "Collapse",
+          "Expand"
         ]
       },
       {
@@ -4870,7 +4872,7 @@
     "Action failed.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 480,
+        "line": 489,
         "nearby": [
           "This addon was removed from the community catalog.",
           "This addon was blocked for safety and cannot be installed or opened."
@@ -4890,12 +4892,12 @@
     "Actions": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 302,
+        "line": 300,
         "nearby": [
           "Permissions",
           "Status",
-          "Sub-Menu",
-          "Working"
+          "Working",
+          "Enabled"
         ]
       },
       {
@@ -4910,7 +4912,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 368,
+        "line": 369,
         "nearby": [
           "Item ID",
           "Quantity",
@@ -5301,7 +5303,7 @@
     "Add community-built tools into your Dune Docker Console. Discover addons created by the community, see what each one adds, review what it can access, and enable new features whenever you're ready to expand your console.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 240,
+        "line": 241,
         "nearby": [
           "Refresh Addons",
           "Community Addons",
@@ -5323,7 +5325,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 361,
+        "line": 362,
         "nearby": [
           "Selected Item",
           "Quantity",
@@ -5412,7 +5414,7 @@
     "Add Package": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 339,
+        "line": 340,
         "nearby": [
           "New Package Name",
           "New package",
@@ -5550,19 +5552,19 @@
     "Addon": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 302,
+        "line": 300,
         "nearby": [
-          "Loading community addons...",
           "No community addons are listed yet.",
-          "Author",
-          "Version"
+          "Addons",
+          "Version",
+          "Permissions"
         ]
       }
     ],
     "Addon catalog lifecycle summary": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 242,
+        "line": 243,
         "nearby": [
           "Community Addons",
           "Add community-built tools into your Dune Docker Console. Discover addons created by the community, see what each one adds, review what it can access, and enable new features whenever you're ready to expand your console.",
@@ -5574,7 +5576,7 @@
     "Addon Disabled": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 107,
+        "line": 108,
         "nearby": [
           "Update Failed",
           "Addon Enabled",
@@ -5586,7 +5588,7 @@
     "Addon Enabled": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 107,
+        "line": 108,
         "nearby": [
           "Addon Updated",
           "Update Failed",
@@ -5598,7 +5600,7 @@
     "Addon Installed": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 66,
+        "line": 67,
         "nearby": [
           "Addons Unavailable",
           "Install Blocked",
@@ -5610,7 +5612,7 @@
     "Addon unavailable.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 231,
+        "line": 232,
         "nearby": [
           "Uninstall Failed",
           "Loading...",
@@ -5622,7 +5624,7 @@
     "Addon Uninstalled": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 126,
+        "line": 127,
         "nearby": [
           "Disable Failed",
           "Uninstall",
@@ -5645,7 +5647,7 @@
     "Addon Updated": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 92,
+        "line": 93,
         "nearby": [
           "Update Blocked",
           "Update Addon",
@@ -5666,19 +5668,29 @@
       },
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 236,
+        "line": 237,
         "nearby": [
           "Addon unavailable.",
           "This pinned addon is not installed, enabled, or fully loaded yet.",
           "Experimental: Permissioned",
           "For Developers"
         ]
+      },
+      {
+        "file": "console/web/src/features/addons/AddonsPanel.tsx",
+        "line": 292,
+        "nearby": [
+          "Loading community addons...",
+          "No community addons are listed yet.",
+          "Addon",
+          "Version"
+        ]
       }
     ],
     "Addons Unavailable": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 41,
+        "line": 42,
         "nearby": [
           "Install Blocked",
           "Addon Installed"
@@ -5712,7 +5724,7 @@
     "Admin action ID": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 478,
+        "line": 479,
         "nearby": [
           "Selected player has no Admin action ID, so CLI-backed grants are disabled.",
           "Advanced manual player ID override",
@@ -5840,7 +5852,7 @@
     "Advanced manual player ID override": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 477,
+        "line": 478,
         "nearby": [
           "Grant Package",
           "Selected player has no Admin action ID, so CLI-backed grants are disabled.",
@@ -5876,7 +5888,7 @@
     "Advertised IP Warning": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1753,
+        "line": 1757,
         "nearby": [
           "Gateway DB monitoring not recently observed",
           "Check Gateway logs if readiness is unhealthy.",
@@ -6145,9 +6157,9 @@
     "All Restarts": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1470,
+        "line": 1474,
         "nearby": [
-          "Tracking begins after this update",
+          "Last Battlegroup Restart",
           "Show",
           "Battlegroup",
           "Maps"
@@ -7045,7 +7057,7 @@
     "Attention Needed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2788,
+        "line": 2792,
         "nearby": [
           "Unknown",
           "Failed",
@@ -7276,22 +7288,10 @@
         ]
       }
     ],
-    "Author": [
-      {
-        "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 302,
-        "nearby": [
-          "No community addons are listed yet.",
-          "Addon",
-          "Version",
-          "Permissions"
-        ]
-      }
-    ],
     "Authorization Failed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1613,
+        "line": 1617,
         "nearby": [
           "Funcom Token Change Needs Review",
           "The token was saved, but the server did not become fully ready. Check Server Control status and logs.",
@@ -7300,7 +7300,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1622,
+        "line": 1626,
         "nearby": [
           "Please make sure the Funcom token belongs to the current Battlegroup ID, then save it again.",
           "Unset"
@@ -7310,7 +7310,7 @@
     "Auto Grant": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 407,
+        "line": 408,
         "nearby": [
           "Save Package",
           "Care Package grants",
@@ -7322,7 +7322,7 @@
     "Auto Grant rule": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 590,
+        "line": 591,
         "nearby": [
           "Care Package save failed.",
           "Unknown Package",
@@ -7334,7 +7334,7 @@
     "Auto Grant Rule Already Exists.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 232,
+        "line": 233,
         "nearby": [
           "Delete",
           "Package",
@@ -7346,7 +7346,7 @@
     "Auto grant rule was saved.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 249,
+        "line": 250,
         "nearby": [
           "Auto Grant Rule Already Exists.",
           "A First Online rule already exists.",
@@ -7358,7 +7358,7 @@
     "Auto Grant Save Failed.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 150,
+        "line": 151,
         "nearby": [
           "Creating Package...",
           "Saving Package...",
@@ -8450,7 +8450,7 @@
     "based on": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 434,
+        "line": 435,
         "nearby": [
           "OFF",
           "Grants",
@@ -8621,7 +8621,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1471,
+        "line": 1475,
         "nearby": [
           "Show",
           "All Restarts",
@@ -8631,7 +8631,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1926,
+        "line": 1930,
         "nearby": [
           "Mode",
           "Server IP",
@@ -9593,7 +9593,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 370,
+        "line": 371,
         "nearby": [
           "Actions",
           "Save",
@@ -9900,7 +9900,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 319,
+        "line": 320,
         "nearby": [
           "A First Online rule already exists.",
           "Auto grant rule was saved.",
@@ -9909,7 +9909,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 327,
+        "line": 328,
         "nearby": [
           "Care Package Configuration",
           "ON",
@@ -9920,7 +9920,7 @@
     "Care Package Configuration": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 323,
+        "line": 324,
         "nearby": [
           "Auto grant rule was saved.",
           "Care Package",
@@ -9931,7 +9931,7 @@
     "Care Package grants": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 406,
+        "line": 407,
         "nearby": [
           "Package Save Failed.",
           "Save Package",
@@ -9943,7 +9943,7 @@
     "Care Package items are granted as live-safe Grade 0 rewards. Use Give Items for graded or augmented gear.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 364,
+        "line": 365,
         "nearby": [
           "Quantity",
           "Add Item",
@@ -9966,7 +9966,7 @@
     "Care Package save failed.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 567,
+        "line": 568,
         "nearby": [
           "No Care Package grants have been recorded yet.",
           "Raw Care Package JSON",
@@ -9978,7 +9978,7 @@
     "Care Package setup": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 329,
+        "line": 330,
         "nearby": [
           "ON",
           "OFF",
@@ -10462,7 +10462,7 @@
     "Check Director logs if readiness is unhealthy.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1742,
+        "line": 1746,
         "nearby": [
           "Public IP bind detected",
           "Director heartbeat not recently observed",
@@ -10505,7 +10505,7 @@
     "Check Every (s)": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 420,
+        "line": 421,
         "nearby": [
           "Auto Grant",
           "Manual Grant",
@@ -10529,7 +10529,7 @@
     "Check Gateway logs if readiness is unhealthy.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1748,
+        "line": 1752,
         "nearby": [
           "Check Director logs if readiness is unhealthy.",
           "Gateway DB monitoring not recently observed",
@@ -10708,7 +10708,7 @@
     "Checking diagnostics": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1701,
+        "line": 1705,
         "nearby": [
           "Unset",
           "Doctor Diagnostics",
@@ -10720,7 +10720,7 @@
     "Checking Funcom Token": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1557,
+        "line": 1561,
         "nearby": [
           "Funcom Token Change Failed",
           "The token was saved, but the server restart failed. Check the task details and try again.",
@@ -10729,7 +10729,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1580,
+        "line": 1584,
         "nearby": [
           "Restarting Server",
           "Funcom Token Changed Successfully",
@@ -11192,7 +11192,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1719,
+        "line": 1723,
         "nearby": [
           "Clean Images",
           "Cleaning...",
@@ -11226,7 +11226,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1716,
+        "line": 1720,
         "nearby": [
           "Fix Binding",
           "Cleaning...",
@@ -11285,7 +11285,7 @@
     "Cleaning...": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1716,
+        "line": 1720,
         "nearby": [
           "Fixing...",
           "Fix Binding",
@@ -11294,7 +11294,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1719,
+        "line": 1723,
         "nearby": [
           "Clean Images",
           "Clean Build Cache",
@@ -11402,7 +11402,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 494,
+        "line": 495,
         "nearby": [
           "RedBlink#75570",
           "Grant History",
@@ -11538,7 +11538,7 @@
     "Close": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 323,
+        "line": 321,
         "nearby": [
           "Updating...",
           "Update",
@@ -11676,6 +11676,16 @@
     ],
     "Close dialog": [
       {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 76,
+        "nearby": [
+          "Details",
+          "Grant History",
+          "Player",
+          "Package"
+        ]
+      },
+      {
         "file": "console/web/src/components/common/ConfirmDialog.tsx",
         "line": 49,
         "nearby": []
@@ -11771,8 +11781,18 @@
     ],
     "Collapse": [
       {
+        "file": "console/web/src/features/players/CharacterAdminUI.tsx",
+        "line": 1115,
+        "nearby": [
+          "Result",
+          "Action",
+          "Expand",
+          "Unknown"
+        ]
+      },
+      {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 436,
+        "line": 437,
         "nearby": [
           "Collapse Eligibility",
           "Expand Eligibility",
@@ -11885,7 +11905,7 @@
     "Collapse Eligibility": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 436,
+        "line": 437,
         "nearby": [
           "Delete Auto Grant rule",
           "Delete",
@@ -11981,7 +12001,7 @@
     "Collapse Select Items": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 353,
+        "line": 354,
         "nearby": [
           "XP",
           "Send Message",
@@ -12140,7 +12160,7 @@
     "Community Addons": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 238,
+        "line": 239,
         "nearby": [
           "Refreshing...",
           "Refresh Addons",
@@ -12233,7 +12253,7 @@
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
         "line": 1125,
         "nearby": [
-          "Action",
+          "Expand",
           "Unknown",
           "Reset",
           "The game manages related rewards, schematics, and tags."
@@ -12255,12 +12275,32 @@
     "Completed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1480,
+        "line": 1484,
         "nearby": [
           "No Matching Restarts",
           "No matching restarts have been recorded yet.",
           "Type",
           "Target"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 40,
+        "nearby": [
+          "Failed",
+          "Unknown",
+          "Player",
+          "Package"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 81,
+        "nearby": [
+          "Player",
+          "Package",
+          "Source",
+          "Succeeded"
         ]
       }
     ],
@@ -12314,7 +12354,7 @@
     "Configure": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 331,
+        "line": 332,
         "nearby": [
           "Care Package setup",
           "Create",
@@ -13248,7 +13288,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 330,
+        "line": 331,
         "nearby": [
           "OFF",
           "Care Package setup",
@@ -13354,7 +13394,7 @@
     "Create Rule": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 424,
+        "line": 425,
         "nearby": [
           "Last Seen",
           "Days Ago",
@@ -13466,7 +13506,7 @@
     "Creating Package...": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 134,
+        "line": 135,
         "nearby": [
           "Saving Auto Grant...",
           "Saving Package...",
@@ -14183,7 +14223,7 @@
     "Days Ago": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 423,
+        "line": 424,
         "nearby": [
           "First Online",
           "Last Seen",
@@ -14521,7 +14561,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 194,
+        "line": 195,
         "nearby": [
           "Delete the Auto Grant rule first.",
           "Delete Package",
@@ -14531,7 +14571,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 435,
+        "line": 436,
         "nearby": [
           "based on",
           "Delete Auto Grant rule",
@@ -14672,7 +14712,7 @@
     "Delete Auto Grant rule": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 435,
+        "line": 436,
         "nearby": [
           "Grants",
           "based on",
@@ -14789,7 +14829,7 @@
     "Delete Package": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 193,
+        "line": 194,
         "nearby": [
           "Package Delete Failed.",
           "Delete the Auto Grant rule first.",
@@ -14799,7 +14839,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 343,
+        "line": 344,
         "nearby": [
           "Select Package",
           "Name Required",
@@ -15010,7 +15050,7 @@
     "Delete the Auto Grant rule first.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 189,
+        "line": 190,
         "nearby": [
           "Package name is required.",
           "Package Delete Failed.",
@@ -15490,12 +15530,12 @@
     "Details": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 417,
+        "line": 425,
         "nearby": [
           "None",
           "Unknown",
-          "This addon is installed locally but is no longer listed in the community catalog.",
-          "This addon is deprecated and may stop receiving updates."
+          "Less",
+          "More"
         ]
       },
       {
@@ -15516,6 +15556,24 @@
           "Status",
           "Run port checks to see listener status.",
           "Open"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 40,
+        "nearby": [
+          "Package",
+          "Result",
+          "Grant History"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 44,
+        "nearby": [
+          "Result",
+          "Grant History",
+          "Close dialog"
         ]
       }
     ],
@@ -15601,7 +15659,7 @@
     "Developer raw package item textarea": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 377,
+        "line": 378,
         "nearby": [
           "Edit",
           "Remove",
@@ -15613,7 +15671,7 @@
     "Diagnostic Note": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1727,
+        "line": 1731,
         "nearby": [
           "Cleaning...",
           "Clean Build Cache",
@@ -15625,7 +15683,7 @@
     "Diagnostic Warning": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1771,
+        "line": 1775,
         "nearby": [
           "Obsolete Docker images can be cleaned",
           "Unused Docker build cache can be cleaned",
@@ -15684,7 +15742,7 @@
     "Director heartbeat not recently observed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1741,
+        "line": 1745,
         "nearby": [
           "Diagnostic Note",
           "Public IP bind detected",
@@ -15732,7 +15790,7 @@
     "Disable Failed": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 112,
+        "line": 113,
         "nearby": [
           "Addon Disabled",
           "Enable Failed",
@@ -15821,12 +15879,12 @@
     "Disabled": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 318,
+        "line": 316,
         "nearby": [
           "Working",
           "Enabled",
-          "ON",
-          "OFF"
+          "Installing...",
+          "Install"
         ]
       },
       {
@@ -16390,7 +16448,7 @@
     "Docker status is unavailable. Check that Docker is running and the web admin has access.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2490,
+        "line": 2494,
         "nearby": [
           "Warming",
           "Stopped",
@@ -16402,7 +16460,7 @@
     "Doctor Diagnostics": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1700,
+        "line": 1704,
         "nearby": [
           "Please make sure the Funcom token belongs to the current Battlegroup ID, then save it again.",
           "Unset",
@@ -16414,7 +16472,7 @@
     "Doctor diagnostics have not loaded yet.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1701,
+        "line": 1705,
         "nearby": [
           "Checking diagnostics",
           "Doctor diagnostics look healthy.",
@@ -16426,7 +16484,7 @@
     "Doctor diagnostics look healthy.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1701,
+        "line": 1705,
         "nearby": [
           "Doctor Diagnostics",
           "Checking diagnostics",
@@ -16950,7 +17008,7 @@
     "Duration": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1480,
+        "line": 1484,
         "nearby": [
           "Source",
           "Reason",
@@ -17075,7 +17133,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 370,
+        "line": 371,
         "nearby": [
           "Save",
           "Cancel",
@@ -17329,7 +17387,7 @@
     "Eligibility": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 437,
+        "line": 438,
         "nearby": [
           "Collapse",
           "Expand",
@@ -17459,7 +17517,7 @@
     "Enable Failed": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 112,
+        "line": 113,
         "nearby": [
           "Addon Enabled",
           "Addon Disabled",
@@ -17572,12 +17630,12 @@
     "Enabled": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 318,
+        "line": 316,
         "nearby": [
-          "Sub-Menu",
+          "Actions",
           "Working",
           "Disabled",
-          "ON"
+          "Installing..."
         ]
       },
       {
@@ -17891,7 +17949,7 @@
     "Enter package name": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 345,
+        "line": 346,
         "nearby": [
           "Delete Package",
           "Package Name",
@@ -18275,8 +18333,18 @@
     ],
     "Expand": [
       {
+        "file": "console/web/src/features/players/CharacterAdminUI.tsx",
+        "line": 1115,
+        "nearby": [
+          "Action",
+          "Collapse",
+          "Unknown",
+          "Complete"
+        ]
+      },
+      {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 436,
+        "line": 437,
         "nearby": [
           "Expand Eligibility",
           "Collapse",
@@ -18409,7 +18477,7 @@
     "Expand Eligibility": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 436,
+        "line": 437,
         "nearby": [
           "Delete",
           "Collapse Eligibility",
@@ -18505,7 +18573,7 @@
     "Expand Select Items": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 353,
+        "line": 354,
         "nearby": [
           "Send Message",
           "Collapse Select Items",
@@ -18589,7 +18657,7 @@
     "Experimental: Permissioned": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 236,
+        "line": 237,
         "nearby": [
           "This pinned addon is not installed, enabled, or fully loaded yet.",
           "Addons",
@@ -18819,7 +18887,7 @@
     "Failed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2449,
+        "line": 2453,
         "nearby": [
           "Getting Ready",
           "Info",
@@ -18829,7 +18897,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2787,
+        "line": 2791,
         "nearby": [
           "Unavailable",
           "Unknown",
@@ -18845,6 +18913,39 @@
           "Unknown",
           "Attention Needed",
           "Ready"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 24,
+        "nearby": [
+          "Succeeded"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 27,
+        "nearby": [
+          "Succeeded"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 28,
+        "nearby": [
+          "Succeeded",
+          "Unknown",
+          "Completed"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 89,
+        "nearby": [
+          "Source",
+          "Succeeded",
+          "Close",
+          "Retry"
         ]
       },
       {
@@ -19627,7 +19728,7 @@
     "First Online": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 422,
+        "line": 423,
         "nearby": [
           "Name Required",
           "Grant When",
@@ -19637,7 +19738,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 595,
+        "line": 596,
         "nearby": [
           "Unknown Package",
           "Auto Grant rule",
@@ -19695,7 +19796,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1713,
+        "line": 1717,
         "nearby": [
           "Doctor diagnostics have not loaded yet.",
           "Fixing...",
@@ -19775,7 +19876,7 @@
     "Fixing...": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1713,
+        "line": 1717,
         "nearby": [
           "Doctor diagnostics look healthy.",
           "Doctor diagnostics have not loaded yet.",
@@ -19811,7 +19912,7 @@
     "For Developers": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 236,
+        "line": 237,
         "nearby": [
           "Addons",
           "Experimental: Permissioned",
@@ -20206,7 +20307,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1549,
+        "line": 1553,
         "nearby": [
           "Unknown",
           "{count0}m",
@@ -20218,7 +20319,7 @@
     "Funcom Token Change Needs Review": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1604,
+        "line": 1608,
         "nearby": [
           "The Funcom token was changed successfully and the server is up and running.",
           "Restarting Server",
@@ -20230,7 +20331,7 @@
     "Funcom Token Changed Successfully": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1586,
+        "line": 1590,
         "nearby": [
           "Restarting Server",
           "Checking Funcom Token",
@@ -20477,7 +20578,7 @@
     "Gateway DB monitoring not recently observed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1747,
+        "line": 1751,
         "nearby": [
           "Director heartbeat not recently observed",
           "Check Director logs if readiness is unhealthy.",
@@ -20680,7 +20781,7 @@
     "Getting Ready": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2343,
+        "line": 2347,
         "nearby": [
           "Stopped",
           "Needs Review",
@@ -21086,7 +21187,7 @@
     "Grant": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 347,
+        "line": 348,
         "nearby": [
           "Package Name",
           "Enter package name",
@@ -21096,7 +21197,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 455,
+        "line": 456,
         "nearby": [
           "(Online)",
           "Grant Package",
@@ -21265,12 +21366,21 @@
     "Grant History": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 486,
+        "line": 487,
         "nearby": [
           "Admin action ID",
           "RedBlink#75570",
           "Clear",
           "Retry Grant"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 76,
+        "nearby": [
+          "Details",
+          "Close dialog",
+          "Player"
         ]
       }
     ],
@@ -21311,7 +21421,7 @@
     "Grant Package": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 454,
+        "line": 455,
         "nearby": [
           "No players are online",
           "(Online)",
@@ -21321,7 +21431,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 473,
+        "line": 474,
         "nearby": [
           "Package",
           "Player",
@@ -21345,7 +21455,7 @@
     "Grant When": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 422,
+        "line": 423,
         "nearby": [
           "Package",
           "Name Required",
@@ -21400,7 +21510,7 @@
     "Grants": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 434,
+        "line": 435,
         "nearby": [
           "ON",
           "OFF",
@@ -22521,7 +22631,7 @@
     "Info": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2437,
+        "line": 2441,
         "nearby": [
           "Needs Review",
           "Getting Ready",
@@ -22555,9 +22665,9 @@
     "Install": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 321,
+        "line": 319,
         "nearby": [
-          "OFF",
+          "Disabled",
           "Installing...",
           "Updating...",
           "Update"
@@ -22617,7 +22727,7 @@
     "Install Blocked": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 53,
+        "line": 54,
         "nearby": [
           "Addons Unavailable",
           "Addon Installed",
@@ -22639,7 +22749,7 @@
     "Install Failed": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 68,
+        "line": 69,
         "nearby": [
           "Install Blocked",
           "Addon Installed",
@@ -22767,10 +22877,10 @@
     "Installing...": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 321,
+        "line": 319,
         "nearby": [
-          "ON",
-          "OFF",
+          "Enabled",
+          "Disabled",
           "Install",
           "Updating..."
         ]
@@ -23183,7 +23293,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 368,
+        "line": 369,
         "nearby": [
           "Preview",
           "Item Name",
@@ -23266,7 +23376,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 368,
+        "line": 369,
         "nearby": [
           "Care Package items are granted as live-safe Grade 0 rewards. Use Give Items for graded or augmented gear.",
           "Preview",
@@ -23961,6 +24071,16 @@
           "Not Recorded Yet",
           "Refresh Status"
         ]
+      },
+      {
+        "file": "console/web/src/features/server/ServerPanels.tsx",
+        "line": 1468,
+        "nearby": [
+          "Restart History",
+          "Tracking begins after this update",
+          "Show",
+          "All Restarts"
+        ]
       }
     ],
     "Last delivery attempt:": [
@@ -24012,7 +24132,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 422,
+        "line": 423,
         "nearby": [
           "Grant When",
           "First Online",
@@ -24098,6 +24218,18 @@
           "Enable Leave Announcements",
           "Save",
           "Restore Defaults"
+        ]
+      }
+    ],
+    "Less": [
+      {
+        "file": "console/web/src/features/addons/AddonsPanel.tsx",
+        "line": 426,
+        "nearby": [
+          "Unknown",
+          "Details",
+          "More",
+          "This addon is installed locally but is no longer listed in the community catalog."
         ]
       }
     ],
@@ -24603,7 +24735,7 @@
           "Addon catalog lifecycle summary",
           "Loading...",
           "No community addons are listed yet.",
-          "Addon"
+          "Addons"
         ]
       }
     ],
@@ -25130,7 +25262,7 @@
     "Loading...": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 229,
+        "line": 230,
         "nearby": [
           "Addon Uninstalled",
           "Uninstall Failed",
@@ -25140,7 +25272,7 @@
       },
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 266,
+        "line": 267,
         "nearby": [
           "Add community-built tools into your Dune Docker Console. Discover addons created by the community, see what each one adds, review what it can access, and enable new features whenever you're ready to expand your console.",
           "Addon catalog lifecycle summary",
@@ -25574,7 +25706,7 @@
     "Manual Grant": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 408,
+        "line": 409,
         "nearby": [
           "Care Package grants",
           "Auto Grant",
@@ -25871,7 +26003,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1472,
+        "line": 1476,
         "nearby": [
           "All Restarts",
           "Battlegroup",
@@ -26583,7 +26715,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1924,
+        "line": 1928,
         "nearby": [
           "Title",
           "Region",
@@ -26711,6 +26843,18 @@
           "Restore",
           "Unlocking...",
           "Unlocked"
+        ]
+      }
+    ],
+    "More": [
+      {
+        "file": "console/web/src/features/addons/AddonsPanel.tsx",
+        "line": 426,
+        "nearby": [
+          "Details",
+          "Less",
+          "This addon is installed locally but is no longer listed in the community catalog.",
+          "This addon is deprecated and may stop receiving updates."
         ]
       }
     ],
@@ -26875,7 +27019,7 @@
     "Name Required": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 342,
+        "line": 343,
         "nearby": [
           "Add Package",
           "Select Package",
@@ -26885,7 +27029,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 421,
+        "line": 422,
         "nearby": [
           "Check Every (s)",
           "Package",
@@ -26895,7 +27039,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 443,
+        "line": 444,
         "nearby": [
           "No eligible players were found for this rule.",
           "Package",
@@ -26931,7 +27075,7 @@
     "Needs Review": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2336,
+        "line": 2340,
         "nearby": [
           "Starting",
           "Stopped",
@@ -26941,7 +27085,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2513,
+        "line": 2517,
         "nearby": [
           "Server status is unavailable.",
           "Unknown"
@@ -26949,35 +27093,35 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2580,
+        "line": 2584,
         "nearby": [
           "Unknown"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2581,
+        "line": 2585,
         "nearby": [
           "Unknown"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2592,
+        "line": 2596,
         "nearby": [
           "Unknown"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2597,
+        "line": 2601,
         "nearby": [
           "Unknown"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2619,
+        "line": 2623,
         "nearby": [
           "Unknown",
           "{count0} of {count1}"
@@ -26985,7 +27129,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2650,
+        "line": 2654,
         "nearby": [
           "Unknown",
           "{count0} of {count1}",
@@ -26995,7 +27139,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2659,
+        "line": 2663,
         "nearby": [
           "Warming",
           "Waiting",
@@ -27005,7 +27149,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2678,
+        "line": 2682,
         "nearby": [
           "Unknown",
           "{count0} of {count1}"
@@ -27013,14 +27157,14 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2687,
+        "line": 2691,
         "nearby": [
           "Unknown"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2695,
+        "line": 2699,
         "nearby": [
           "Unknown"
         ]
@@ -27165,7 +27309,7 @@
     "New package": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 338,
+        "line": 339,
         "nearby": [
           "Configure",
           "New Package Name",
@@ -27177,7 +27321,7 @@
     "New Package Name": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 338,
+        "line": 339,
         "nearby": [
           "Create",
           "Configure",
@@ -27535,10 +27679,10 @@
     "No Care Package grants have been recorded yet.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 509,
+        "line": 510,
         "nearby": [
+          "Package",
           "Player",
-          "Retry",
           "Raw Care Package JSON",
           "Care Package save failed."
         ]
@@ -27610,8 +27754,8 @@
         "nearby": [
           "Loading...",
           "Loading community addons...",
-          "Addon",
-          "Author"
+          "Addons",
+          "Addon"
         ]
       }
     ],
@@ -27701,7 +27845,7 @@
     "No eligible players were found for this rule.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 437,
+        "line": 438,
         "nearby": [
           "Expand",
           "Eligibility",
@@ -27890,7 +28034,7 @@
     "No Matching Restarts": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1478,
+        "line": 1482,
         "nearby": [
           "Refreshing",
           "Refresh",
@@ -27902,7 +28046,7 @@
     "No matching restarts have been recorded yet.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1478,
+        "line": 1482,
         "nearby": [
           "Refresh",
           "No Matching Restarts",
@@ -28111,7 +28255,7 @@
     "No players are online": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 445,
+        "line": 446,
         "nearby": [
           "Player",
           "Select player",
@@ -28482,7 +28626,7 @@
     "None": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 351,
+        "line": 348,
         "nearby": [
           "OFF",
           "Open addon source on GitHub",
@@ -28704,7 +28848,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1983,
+        "line": 1987,
         "nearby": [
           "Battlegroup",
           "Population",
@@ -28926,7 +29070,7 @@
     "Obsolete Docker images can be cleaned": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1759,
+        "line": 1763,
         "nearby": [
           "Check Gateway logs if readiness is unhealthy.",
           "Advertised IP Warning",
@@ -29082,19 +29226,9 @@
     "OFF": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 318,
+        "line": 324,
         "nearby": [
-          "Disabled",
-          "ON",
-          "Installing...",
-          "Install"
-        ]
-      },
-      {
-        "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 327,
-        "nearby": [
-          "Uninstall",
+          "Sub-Menu",
           "ON",
           "Open addon source on GitHub",
           "None"
@@ -29172,7 +29306,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 327,
+        "line": 328,
         "nearby": [
           "Care Package",
           "ON",
@@ -29182,7 +29316,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 433,
+        "line": 434,
         "nearby": [
           "Rule",
           "ON",
@@ -29198,6 +29332,16 @@
           "ON",
           "Schedule",
           "Check for updates every"
+        ]
+      },
+      {
+        "file": "console/web/src/features/landsraad/LandsraadPanel.tsx",
+        "line": 395,
+        "nearby": [
+          "Apply Automatically Each Cycle",
+          "ON",
+          "Save And Apply",
+          "Reward levels will appear after the current Landsraad term generates its milestones."
         ]
       }
     ],
@@ -29337,20 +29481,10 @@
     "ON": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 318,
+        "line": 324,
         "nearby": [
-          "Enabled",
-          "Disabled",
-          "OFF",
-          "Installing..."
-        ]
-      },
-      {
-        "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 327,
-        "nearby": [
-          "Open",
           "Uninstall",
+          "Sub-Menu",
           "OFF",
           "Open addon source on GitHub"
         ]
@@ -29426,7 +29560,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 327,
+        "line": 328,
         "nearby": [
           "Care Package Configuration",
           "Care Package",
@@ -29436,7 +29570,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 433,
+        "line": 434,
         "nearby": [
           "Create Rule",
           "Rule",
@@ -29452,6 +29586,16 @@
           "Auto Updates",
           "OFF",
           "Schedule"
+        ]
+      },
+      {
+        "file": "console/web/src/features/landsraad/LandsraadPanel.tsx",
+        "line": 395,
+        "nearby": [
+          "Reward Threshold",
+          "Apply Automatically Each Cycle",
+          "OFF",
+          "Save And Apply"
         ]
       }
     ],
@@ -29506,7 +29650,7 @@
     "One item per line: item name or raw item ID, quantity. Extra legacy grade or augment columns are ignored for Care Packages.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 377,
+        "line": 378,
         "nearby": [
           "Remove",
           "Developer raw package item textarea",
@@ -29574,12 +29718,11 @@
     "Open": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 323,
+        "line": 321,
         "nearby": [
           "Update",
           "Close",
-          "Uninstall",
-          "ON"
+          "Uninstall"
         ]
       },
       {
@@ -29603,7 +29746,7 @@
     "Open addon source on GitHub": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 347,
+        "line": 344,
         "nearby": [
           "ON",
           "OFF",
@@ -29883,7 +30026,7 @@
     "Overall": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1921,
+        "line": 1925,
         "nearby": [
           "Diagnostic Warning",
           "Token Mismatch Detected",
@@ -30141,7 +30284,7 @@
     "Package": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 196,
+        "line": 197,
         "nearby": [
           "Delete Package",
           "Delete",
@@ -30151,7 +30294,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 383,
+        "line": 384,
         "nearby": [
           "Save Package",
           "Save",
@@ -30161,7 +30304,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 421,
+        "line": 422,
         "nearby": [
           "Manual Grant",
           "Check Every (s)",
@@ -30171,7 +30314,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 443,
+        "line": 444,
         "nearby": [
           "Eligibility",
           "No eligible players were found for this rule.",
@@ -30181,7 +30324,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 457,
+        "line": 458,
         "nearby": [
           "Grant Package",
           "Grant",
@@ -30190,18 +30333,39 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 503,
+        "line": 504,
         "nearby": [
           "Retry Grant",
           "Retry",
-          "Player"
+          "Player",
+          "No Care Package grants have been recorded yet."
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 40,
+        "nearby": [
+          "Completed",
+          "Player",
+          "Result",
+          "Details"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 80,
+        "nearby": [
+          "Close dialog",
+          "Player",
+          "Completed",
+          "Source"
         ]
       }
     ],
     "Package Create Failed.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 150,
+        "line": 151,
         "nearby": [
           "Saving Package...",
           "Auto Grant Save Failed.",
@@ -30210,7 +30374,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 170,
+        "line": 171,
         "nearby": [
           "Package Save Failed.",
           "Package name is required.",
@@ -30221,7 +30385,7 @@
     "Package Delete Failed.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 189,
+        "line": 190,
         "nearby": [
           "Package Create Failed.",
           "Package name is required.",
@@ -30233,7 +30397,7 @@
     "Package Items": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 377,
+        "line": 378,
         "nearby": [
           "Developer raw package item textarea",
           "One item per line: item name or raw item ID, quantity. Extra legacy grade or augment columns are ignored for Care Packages.",
@@ -30245,7 +30409,7 @@
     "Package Name": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 345,
+        "line": 346,
         "nearby": [
           "Name Required",
           "Delete Package",
@@ -30257,7 +30421,7 @@
     "Package name is required.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 170,
+        "line": 171,
         "nearby": [
           "Package Save Failed.",
           "Package Create Failed.",
@@ -30269,7 +30433,7 @@
     "Package Save Failed.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 150,
+        "line": 151,
         "nearby": [
           "Auto Grant Save Failed.",
           "Package Create Failed.",
@@ -30278,7 +30442,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 393,
+        "line": 394,
         "nearby": [
           "Saving Package...",
           "Package was saved successfully.",
@@ -30290,7 +30454,7 @@
     "Package was saved successfully.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 391,
+        "line": 392,
         "nearby": [
           "Package",
           "Saving Package...",
@@ -30442,7 +30606,7 @@
     "Partition": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1484,
+        "line": 1488,
         "nearby": [
           "Duration",
           "Result",
@@ -30983,9 +31147,9 @@
     "Permissions": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 302,
+        "line": 300,
         "nearby": [
-          "Author",
+          "Addon",
           "Version",
           "Status",
           "Actions"
@@ -31284,7 +31448,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 444,
+        "line": 445,
         "nearby": [
           "Package",
           "Name Required",
@@ -31294,7 +31458,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 458,
+        "line": 459,
         "nearby": [
           "Grant",
           "Package",
@@ -31304,11 +31468,12 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 504,
+        "line": 505,
         "nearby": [
           "Retry",
           "Package",
-          "No Care Package grants have been recorded yet."
+          "No Care Package grants have been recorded yet.",
+          "Raw Care Package JSON"
         ]
       },
       {
@@ -31675,7 +31840,7 @@
     "Please make sure the Funcom token belongs to the current Battlegroup ID, then save it again.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1614,
+        "line": 1618,
         "nearby": [
           "The token was saved, but the server did not become fully ready. Check Server Control status and logs.",
           "Authorization Failed"
@@ -31683,7 +31848,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1623,
+        "line": 1627,
         "nearby": [
           "Authorization Failed",
           "Unset",
@@ -31694,7 +31859,7 @@
     "Population": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1927,
+        "line": 1931,
         "nearby": [
           "Server IP",
           "Battlegroup",
@@ -32059,7 +32224,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 368,
+        "line": 369,
         "nearby": [
           "Add Item",
           "Care Package items are granted as live-safe Grade 0 rewards. Use Give Items for graded or augmented gear.",
@@ -32493,7 +32658,7 @@
     "Public IP bind detected": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1735,
+        "line": 1739,
         "nearby": [
           "Clean Build Cache",
           "Diagnostic Note",
@@ -32757,7 +32922,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 359,
+        "line": 360,
         "nearby": [
           "Select Items",
           "Selected Item",
@@ -32767,7 +32932,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 368,
+        "line": 369,
         "nearby": [
           "Item Name",
           "Item ID",
@@ -33116,9 +33281,9 @@
     "Raw Care Package JSON": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 514,
+        "line": 515,
         "nearby": [
-          "Retry",
+          "Player",
           "No Care Package grants have been recorded yet.",
           "Care Package save failed.",
           "Unknown Package"
@@ -33235,7 +33400,7 @@
     "Readiness is unavailable right now. The server may be starting, stopping, or stopped.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2491,
+        "line": 2495,
         "nearby": [
           "Stopped",
           "Docker status is unavailable. Check that Docker is running and the web admin has access.",
@@ -33269,7 +33434,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2789,
+        "line": 2793,
         "nearby": [
           "Failed",
           "Attention Needed",
@@ -33310,7 +33475,7 @@
     "Reason": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1480,
+        "line": 1484,
         "nearby": [
           "Target",
           "Source",
@@ -33559,7 +33724,7 @@
     "RedBlink#75570": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 478,
+        "line": 479,
         "nearby": [
           "Advanced manual player ID override",
           "Admin action ID",
@@ -33906,7 +34071,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1475,
+        "line": 1479,
         "nearby": [
           "Services",
           "Refreshing",
@@ -33998,7 +34163,7 @@
     "Refresh Addons": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 236,
+        "line": 237,
         "nearby": [
           "For Developers",
           "Refreshing...",
@@ -34176,7 +34341,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1475,
+        "line": 1479,
         "nearby": [
           "Maps",
           "Services",
@@ -34220,7 +34385,7 @@
     "Refreshing...": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 236,
+        "line": 237,
         "nearby": [
           "Experimental: Permissioned",
           "For Developers",
@@ -34254,7 +34419,7 @@
     "Region": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1923,
+        "line": 1927,
         "nearby": [
           "Overall",
           "Title",
@@ -34519,7 +34684,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 375,
+        "line": 376,
         "nearby": [
           "Cancel",
           "Edit",
@@ -35648,12 +35813,12 @@
     "Restart History": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1466,
+        "line": 1468,
         "nearby": [
           "Paste new token",
           "Save Token",
           "Tracking begins after this update",
-          "Show"
+          "Last Battlegroup Restart"
         ]
       }
     ],
@@ -36074,7 +36239,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1563,
+        "line": 1567,
         "nearby": [
           "The token was saved, but the server restart failed. Check the task details and try again.",
           "Checking Funcom Token",
@@ -36083,7 +36248,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1594,
+        "line": 1598,
         "nearby": [
           "Funcom Token Changed Successfully",
           "The Funcom token was changed successfully and the server is up and running.",
@@ -36731,12 +36896,12 @@
           "Status",
           "Tags",
           "Action",
-          "Unknown"
+          "Collapse"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1480,
+        "line": 1484,
         "nearby": [
           "Reason",
           "Duration",
@@ -36752,6 +36917,15 @@
           "Code",
           "Item",
           "Grade"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 40,
+        "nearby": [
+          "Player",
+          "Package",
+          "Details"
         ]
       },
       {
@@ -36801,22 +36975,12 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 501,
+        "line": 502,
         "nearby": [
           "Clear",
           "Retry Grant",
           "Package",
           "Player"
-        ]
-      },
-      {
-        "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 509,
-        "nearby": [
-          "Package",
-          "Player",
-          "No Care Package grants have been recorded yet.",
-          "Raw Care Package JSON"
         ]
       },
       {
@@ -36837,6 +37001,14 @@
           "Loading Contents…",
           "Cargo contents are unsupported by the detected schema.",
           "That vehicle has no cargo hold."
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 96,
+        "nearby": [
+          "Failed",
+          "Close"
         ]
       },
       {
@@ -36932,7 +37104,7 @@
     "Retry Grant": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 500,
+        "line": 501,
         "nearby": [
           "Grant History",
           "Clear",
@@ -37357,7 +37529,7 @@
     "Rule": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 433,
+        "line": 434,
         "nearby": [
           "Days Ago",
           "Create Rule",
@@ -37908,7 +38080,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 370,
+        "line": 371,
         "nearby": [
           "Quantity",
           "Actions",
@@ -37918,7 +38090,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 382,
+        "line": 383,
         "nearby": [
           "Package Items",
           "Save Package",
@@ -38225,7 +38397,7 @@
     "Save Package": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 381,
+        "line": 382,
         "nearby": [
           "One item per line: item name or raw item ID, quantity. Extra legacy grade or augment columns are ignored for Care Packages.",
           "Package Items",
@@ -38235,7 +38407,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 395,
+        "line": 396,
         "nearby": [
           "Package was saved successfully.",
           "Package Save Failed.",
@@ -38484,7 +38656,7 @@
     "Saving Auto Grant...": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 134,
+        "line": 135,
         "nearby": [
           "Creating Package...",
           "Saving Package..."
@@ -38553,7 +38725,7 @@
     "Saving Package...": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 134,
+        "line": 135,
         "nearby": [
           "Saving Auto Grant...",
           "Creating Package...",
@@ -38563,7 +38735,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 385,
+        "line": 386,
         "nearby": [
           "Save",
           "Package",
@@ -39907,7 +40079,7 @@
     "Select Items": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 353,
+        "line": 354,
         "nearby": [
           "Collapse Select Items",
           "Expand Select Items",
@@ -39965,7 +40137,7 @@
     "Select Package": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 342,
+        "line": 343,
         "nearby": [
           "New package",
           "Add Package",
@@ -39977,7 +40149,7 @@
     "Select player": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 445,
+        "line": 446,
         "nearby": [
           "Name Required",
           "Player",
@@ -40053,7 +40225,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 358,
+        "line": 359,
         "nearby": [
           "Expand Select Items",
           "Select Items",
@@ -40065,7 +40237,7 @@
     "Selected player has no Admin action ID, so CLI-backed grants are disabled.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 475,
+        "line": 476,
         "nearby": [
           "Player",
           "Grant Package",
@@ -40123,7 +40295,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 351,
+        "line": 352,
         "nearby": [
           "Grant",
           "XP",
@@ -40337,7 +40509,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1925,
+        "line": 1929,
         "nearby": [
           "Region",
           "Mode",
@@ -40454,7 +40626,7 @@
     "Server status is unavailable.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2493,
+        "line": 2497,
         "nearby": [
           "Readiness is unavailable right now. The server may be starting, stopping, or stopped.",
           "Server status is unavailable. Refresh again or check Services and Logs if it persists.",
@@ -40466,7 +40638,7 @@
     "Server status is unavailable. Refresh again or check Services and Logs if it persists.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2492,
+        "line": 2496,
         "nearby": [
           "Docker status is unavailable. Check that Docker is running and the web admin has access.",
           "Readiness is unavailable right now. The server may be starting, stopping, or stopped.",
@@ -40566,7 +40738,7 @@
     "Services": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1473,
+        "line": 1477,
         "nearby": [
           "Battlegroup",
           "Maps",
@@ -41002,10 +41174,10 @@
     "Show": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1469,
+        "line": 1473,
         "nearby": [
-          "Restart History",
           "Tracking begins after this update",
+          "Last Battlegroup Restart",
           "All Restarts",
           "Battlegroup"
         ]
@@ -41792,12 +41964,22 @@
     "Source": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1480,
+        "line": 1484,
         "nearby": [
           "Type",
           "Target",
           "Reason",
           "Duration"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 82,
+        "nearby": [
+          "Package",
+          "Completed",
+          "Succeeded",
+          "Failed"
         ]
       },
       {
@@ -42156,7 +42338,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2328,
+        "line": 2332,
         "nearby": [
           "Population",
           "Not Installed",
@@ -42328,12 +42510,12 @@
     "Status": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 302,
+        "line": 300,
         "nearby": [
           "Version",
           "Permissions",
           "Actions",
-          "Sub-Menu"
+          "Working"
         ]
       },
       {
@@ -42513,7 +42695,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2335,
+        "line": 2339,
         "nearby": [
           "Not Installed",
           "Starting",
@@ -42523,7 +42705,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2456,
+        "line": 2460,
         "nearby": [
           "Failed",
           "Warming",
@@ -42773,12 +42955,11 @@
     "Sub-Menu": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 302,
+        "line": 324,
         "nearby": [
-          "Status",
-          "Actions",
-          "Working",
-          "Enabled"
+          "Uninstall",
+          "ON",
+          "OFF"
         ]
       }
     ],
@@ -42803,6 +42984,40 @@
           "Only this phrase, your correction, and the optional credit name will be sent to DuneDocker for review.",
           "Submit Correction",
           "Choose the language for this browser. Translations are included with project updates."
+        ]
+      }
+    ],
+    "Succeeded": [
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 23,
+        "nearby": [
+          "Failed"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 27,
+        "nearby": [
+          "Failed"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 28,
+        "nearby": [
+          "Failed",
+          "Unknown"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 89,
+        "nearby": [
+          "Completed",
+          "Source",
+          "Failed",
+          "Close"
         ]
       }
     ],
@@ -43154,7 +43369,7 @@
     "Target": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1480,
+        "line": 1484,
         "nearby": [
           "Completed",
           "Type",
@@ -44133,7 +44348,7 @@
     "The Funcom token was changed successfully and the server is up and running.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1587,
+        "line": 1591,
         "nearby": [
           "Checking Funcom Token",
           "Funcom Token Changed Successfully",
@@ -44618,7 +44833,7 @@
     "The token was saved, but the server did not become fully ready. Check Server Control status and logs.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1605,
+        "line": 1609,
         "nearby": [
           "Restarting Server",
           "Funcom Token Change Needs Review",
@@ -44639,7 +44854,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1550,
+        "line": 1554,
         "nearby": [
           "{count0}m",
           "Funcom Token Change Failed",
@@ -44836,9 +45051,9 @@
     "This addon is deprecated and may stop receiving updates.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 451,
+        "line": 460,
         "nearby": [
-          "Details",
+          "More",
           "This addon is installed locally but is no longer listed in the community catalog.",
           "This addon is no longer supported by its maintainer.",
           "This addon was removed from the community catalog."
@@ -44848,10 +45063,10 @@
     "This addon is installed locally but is no longer listed in the community catalog.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 450,
+        "line": 459,
         "nearby": [
-          "Unknown",
-          "Details",
+          "Less",
+          "More",
           "This addon is deprecated and may stop receiving updates.",
           "This addon is no longer supported by its maintainer."
         ]
@@ -44860,7 +45075,7 @@
     "This addon is no longer supported by its maintainer.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 452,
+        "line": 461,
         "nearby": [
           "This addon is installed locally but is no longer listed in the community catalog.",
           "This addon is deprecated and may stop receiving updates.",
@@ -44872,7 +45087,7 @@
     "This addon was blocked for safety and cannot be installed or opened.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 454,
+        "line": 463,
         "nearby": [
           "This addon is no longer supported by its maintainer.",
           "This addon was removed from the community catalog.",
@@ -44883,7 +45098,7 @@
     "This addon was removed from the community catalog.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 453,
+        "line": 462,
         "nearby": [
           "This addon is deprecated and may stop receiving updates.",
           "This addon is no longer supported by its maintainer.",
@@ -45181,7 +45396,7 @@
     "This pinned addon is not installed, enabled, or fully loaded yet.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 231,
+        "line": 232,
         "nearby": [
           "Loading...",
           "Addon unavailable.",
@@ -45473,7 +45688,7 @@
     "Title": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1922,
+        "line": 1926,
         "nearby": [
           "Token Mismatch Detected",
           "Overall",
@@ -45591,7 +45806,7 @@
     "Token Mismatch Detected": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1899,
+        "line": 1903,
         "nearby": [
           "Unused Docker build cache can be cleaned",
           "Diagnostic Warning",
@@ -45771,12 +45986,12 @@
     "Tracking begins after this update": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1466,
+        "line": 1468,
         "nearby": [
           "Save Token",
           "Restart History",
-          "Show",
-          "All Restarts"
+          "Last Battlegroup Restart",
+          "Show"
         ]
       }
     ],
@@ -46062,7 +46277,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1480,
+        "line": 1484,
         "nearby": [
           "No matching restarts have been recorded yet.",
           "Completed",
@@ -46224,7 +46439,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2752,
+        "line": 2756,
         "nearby": [
           "Unknown",
           "Needs Review"
@@ -46232,7 +46447,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2753,
+        "line": 2757,
         "nearby": [
           "Needs Review",
           "Unknown",
@@ -46327,7 +46542,7 @@
     "Uninstall": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 119,
+        "line": 120,
         "nearby": [
           "Enable Failed",
           "Disable Failed",
@@ -46337,19 +46552,18 @@
       },
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 324,
+        "line": 322,
         "nearby": [
           "Close",
           "Open",
-          "ON",
-          "OFF"
+          "Sub-Menu"
         ]
       }
     ],
     "Uninstall Failed": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 129,
+        "line": 130,
         "nearby": [
           "Uninstall",
           "Addon Uninstalled",
@@ -46431,12 +46645,12 @@
     "Unknown": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 393,
+        "line": 390,
         "nearby": [
           "Open addon source on GitHub",
           "None",
           "Details",
-          "This addon is installed locally but is no longer listed in the community catalog."
+          "Less"
         ]
       },
       {
@@ -46479,8 +46693,8 @@
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
         "line": 1118,
         "nearby": [
-          "Result",
-          "Action",
+          "Collapse",
+          "Expand",
           "Complete",
           "Reset"
         ]
@@ -46512,7 +46726,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1497,
+        "line": 1501,
         "nearby": [
           "Result",
           "Partition",
@@ -46522,7 +46736,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2507,
+        "line": 2511,
         "nearby": [
           "Server status is unavailable. Refresh again or check Services and Logs if it persists.",
           "Server status is unavailable.",
@@ -46531,7 +46745,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2578,
+        "line": 2582,
         "nearby": [
           "Needs Review"
         ]
@@ -46600,7 +46814,7 @@
     "Unknown Package": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 575,
+        "line": 576,
         "nearby": [
           "Raw Care Package JSON",
           "Care Package save failed.",
@@ -46882,7 +47096,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1664,
+        "line": 1668,
         "nearby": [
           "Authorization Failed",
           "Please make sure the Funcom token belongs to the current Battlegroup ID, then save it again.",
@@ -46894,7 +47108,7 @@
     "Unused Docker build cache can be cleaned": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1765,
+        "line": 1769,
         "nearby": [
           "Advertised IP Warning",
           "Obsolete Docker images can be cleaned",
@@ -46971,7 +47185,7 @@
     "Update": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 322,
+        "line": 320,
         "nearby": [
           "Install",
           "Updating...",
@@ -46995,7 +47209,7 @@
     "Update Addon": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 85,
+        "line": 86,
         "nearby": [
           "Install Failed",
           "Update Blocked",
@@ -47027,7 +47241,7 @@
     "Update Blocked": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 76,
+        "line": 77,
         "nearby": [
           "Addon Installed",
           "Install Failed",
@@ -47063,7 +47277,7 @@
     "Update Failed": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 94,
+        "line": 95,
         "nearby": [
           "Update Addon",
           "Addon Updated",
@@ -47274,7 +47488,7 @@
     "Updating...": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 322,
+        "line": 320,
         "nearby": [
           "Installing...",
           "Install",
@@ -47997,10 +48211,10 @@
     "Version": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 302,
+        "line": 300,
         "nearby": [
+          "Addons",
           "Addon",
-          "Author",
           "Permissions",
           "Status"
         ]
@@ -48234,7 +48448,7 @@
     "Waiting": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2655,
+        "line": 2659,
         "nearby": [
           "Needs Review",
           "Warming",
@@ -48367,7 +48581,7 @@
     "Warming": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2455,
+        "line": 2459,
         "nearby": [
           "Info",
           "Failed",
@@ -48377,7 +48591,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2654,
+        "line": 2658,
         "nearby": [
           "{count0} of {count1}",
           "Needs Review",
@@ -48806,10 +49020,10 @@
     "Working": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 318,
+        "line": 316,
         "nearby": [
+          "Status",
           "Actions",
-          "Sub-Menu",
           "Enabled",
           "Disabled"
         ]
@@ -48891,7 +49105,7 @@
     "XP": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 349,
+        "line": 350,
         "nearby": [
           "Enter package name",
           "Grant",

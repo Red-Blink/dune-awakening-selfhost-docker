@@ -29,6 +29,7 @@ describe("BuildingUnlocksTab", () => {
     render(<BuildingUnlocksTab dbPlayerId="123" playerName="Chani" confirmAction={vi.fn().mockResolvedValue(true)} />);
 
     expect(await screen.findByText("Basic Lighting")).toBeInTheDocument();
+    expect(screen.getByText("BasicLighting_Patent")).toHaveAttribute("title", "BasicLighting_Patent");
     expect(screen.getByText("Windtrap")).toBeInTheDocument();
     expect(screen.getByText("Developer Storage Container")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Show Experimental" })).toBeChecked();

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { HomeHighlights } from "./HomeHighlights";
 import type { Dispatch, SetStateAction } from "react";
 import type { Tab } from "../../App";
-import { Play, Trash2 } from "lucide-react";
+import { ChevronDown, History, Play, Trash2 } from "lucide-react";
 import { serverApi, type PerformanceSnapshot, type RestartHistoryResponse, type RestartHistoryRow } from "../../api/server";
 import { ServerHostnameSetting, useServerHostname } from "./ServerHostnameSetting";
 import { getServerPorts } from "../../api/serverPorts";
@@ -1463,7 +1463,11 @@ export function RestartHistoryPanel({ refreshKey }: { refreshKey: string }) {
   const rows = (history?.rows || []).filter((row) => filter === "all" || row.scope === filter);
 
   return <details className="restart-history-panel">
-    <summary><span><strong>Restart History</strong><small>{history?.lastBattlegroupRestart ? `Last Battlegroup restart ${formatRestartTime(history.lastBattlegroupRestart.finishedAt)}` : "Tracking begins after this update"}</small></span></summary>
+    <summary>
+      <History size={18} aria-hidden="true" />
+      <span><strong>Restart History</strong><small>{history?.lastBattlegroupRestart ? <><span>Last Battlegroup Restart</span> {formatRestartTime(history.lastBattlegroupRestart.finishedAt)}</> : "Tracking begins after this update"}</small></span>
+      <ChevronDown className="restart-history-chevron" size={18} aria-hidden="true" />
+    </summary>
     <div className="restart-history-content">
       <div className="restart-history-toolbar">
         <label>Show<select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}>

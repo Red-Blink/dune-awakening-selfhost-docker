@@ -484,6 +484,33 @@ describe("HomePanel server identity", () => {
 describe("HomePanel subsystem rows", () => {
   const SUBSYSTEMS = ["Database", "Messaging", "Battlegroup Services", "Game Servers", "Funcom/FLS"];
 
+  it("updates both the header and FLS count for a transient token mismatch despite a cached all-ready snapshot", async () => {
+    vi.useFakeTimers();
+    const snapshot = statusText();
+    checkFuncomTokenMock.mockResolvedValue({ ok: false, mismatch: true, details: "Invalid Authorization to manage SelfHosted Battlegroup", checkedSince: "10m" });
+    const props = {
+      status: snapshot, readiness: READY_READINESS, taskResult: null, setTaskResult: vi.fn(),
+      runningAction: "" as const, restartStartObserved: false, setRunningAction: vi.fn(),
+      onLoad: vi.fn().mockResolvedValue(loadResult({ statusText: snapshot, readinessText: READY_READINESS })),
+      confirmAction: vi.fn(), restartGate: vi.fn()
+    };
+    function TokenProbeHome() {
+      const [result, setResult] = useState<Parameters<typeof HomePanel>[0]["funcomTokenResult"]>(null);
+      return <HomePanel {...props} funcomTokenResult={result} setFuncomTokenResult={setResult} />;
+    }
+    const view = await act(async () => render(<TokenProbeHome />));
+    const fls = screen.getByText("Funcom/FLS").closest(".home-subsystem-row") as HTMLElement;
+    expect(view.container.querySelector(".home-hero-state-value")).toHaveTextContent("Token Mismatch Detected");
+    expect(within(fls).getByText("3 of 4")).toBeVisible();
+    expect(within(fls).queryByText("4 of 4")).toBeNull();
+
+    checkFuncomTokenMock.mockResolvedValue({ ok: true, mismatch: false, checkedSince: "10m" });
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+    expect(view.container.querySelector(".home-hero-state-value")).toHaveTextContent("Ready");
+    expect(within(fls).getByText("4 of 4")).toBeVisible();
+    expect(within(fls).queryByText("3 of 4")).toBeNull();
+  });
+
   it("lists every readiness subsystem", async () => {
     const { container } = renderHome();
     await waitFor(() => expect(container.querySelectorAll(".home-subsystems .home-subsystem-row").length).toBe(5));

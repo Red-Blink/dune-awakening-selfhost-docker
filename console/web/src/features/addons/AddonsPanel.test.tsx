@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { addonsApi, type CommunityAddonSummary, type InstalledAddon } from "../../api/addons";
 import { AddonsPanel } from "./AddonsPanel";
 import { addonUpdateAvailable, hasAddonUpdates } from "./addonVersions";
@@ -56,6 +56,7 @@ const installedAddon: InstalledAddon = {
 };
 
 beforeEach(() => {
+  vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   vi.clearAllMocks();
   vi.mocked(addonsApi.community).mockResolvedValue({ schemaVersion: 1, sourceUrl: "https://example.test/index.json", updatedAt: "", addons: [catalogAddon] });
   vi.mocked(addonsApi.installed).mockResolvedValue({ addons: [installedAddon] });
@@ -66,6 +67,49 @@ beforeEach(() => {
     previousVersion: installedAddon.version,
     preservedConfiguration: true
   });
+});
+
+afterEach(() => vi.unstubAllGlobals());
+
+it("groups addon identity and submenu controls into five clear columns", async () => {
+  const setPinnedAddons = vi.fn();
+  render(<AddonsPanel pinnedAddons={[]} setPinnedAddons={setPinnedAddons} selectedAddonId=""
+    clearSelectedAddon={vi.fn()} setAddonUpdateAvailable={vi.fn()} confirmAction={vi.fn().mockResolvedValue(true)} />);
+  const table = await screen.findByRole("table", { name: "Addons" });
+  expect(within(table).getAllByRole("columnheader").map((heading) => heading.textContent)).toEqual(["Addon", "Version", "Permissions", "Status", "Actions"]);
+  const identity = within(table).getByRole("link", { name: catalogAddon.name }).closest("td")!;
+  expect(within(identity).getByText(catalogAddon.author)).toBeInTheDocument();
+  const pin = within(table).getByRole("checkbox", { name: /Sub-Menu/ });
+  expect(pin.closest("td")).toHaveClass("addon-actions-column");
+  setPinnedAddons.mockClear();
+  fireEvent.click(pin);
+  expect(setPinnedAddons).toHaveBeenCalledOnce();
+  expect(setPinnedAddons.mock.calls[0][0]([])).toEqual([{ id: installedAddon.id, name: installedAddon.name, entryPath: installedAddon.entryPath, enabled: true }]);
+});
+
+it("keeps full addon descriptions available from an accessible disclosure", async () => {
+  let resize: (() => void) | undefined;
+  vi.stubGlobal("ResizeObserver", class { constructor(callback: () => void) { resize = callback; } observe() {} disconnect() {} });
+  const description = "A detailed addon description that is longer than the compact preview and remains available on demand.";
+  vi.mocked(addonsApi.community).mockResolvedValue({ schemaVersion: 1, sourceUrl: "https://example.test/index.json", updatedAt: "", addons: [{ ...catalogAddon, description }] });
+  render(<AddonsPanel pinnedAddons={[]} setPinnedAddons={vi.fn()} selectedAddonId=""
+    clearSelectedAddon={vi.fn()} setAddonUpdateAvailable={vi.fn()} confirmAction={vi.fn().mockResolvedValue(true)} />);
+  await screen.findByTitle(description);
+  expect(screen.queryByRole("button", { name: "More" })).not.toBeInTheDocument();
+  const measure = document.querySelector(".addon-description-measure")!;
+  Object.defineProperties(measure, { scrollWidth: { configurable: true, value: 600 }, clientWidth: { configurable: true, value: 200 } });
+  act(() => resize?.());
+  const toggle = await screen.findByRole("button", { name: "More" });
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByTitle(description)).toHaveTextContent(description);
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByTitle(description)).toBeVisible();
+  expect(toggle).toHaveTextContent("Less");
+  Object.defineProperty(measure, "clientWidth", { configurable: true, value: 800 });
+  act(() => resize?.());
+  expect(screen.queryByRole("button", { name: "Less" })).not.toBeInTheDocument();
+  vi.unstubAllGlobals();
 });
 
 it("explains companion and database removal before uninstalling Airdrop", async () => {

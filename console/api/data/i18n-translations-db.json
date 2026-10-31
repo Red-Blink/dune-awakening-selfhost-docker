@@ -1445,6 +1445,7 @@
     "Leadership Board Demo",
     "Leave Message",
     "Leave empty for now.",
+    "Less",
     "Less than 1m",
     "Let external tools read the Console API over HTTPS using an API key. Your Console login stays at its current address.",
     "Level",
@@ -1638,6 +1639,7 @@
     "Modifier settings are loading independently of live map status.",
     "Modifier view",
     "Modules",
+    "More",
     "Most Downloaded",
     "Most Liked",
     "Movement / Vehicles",
@@ -6499,7 +6501,9 @@
       "Open the Console Now": "Ouvrez la console maintenant",
       "Ready to explore?": "Prêt à explorer ?",
       "Redirecting to the full console in": "Redirection vers la console complète dans",
-      "Saved Privately on Server": "Enregistré en privé sur le serveur"
+      "Saved Privately on Server": "Enregistré en privé sur le serveur",
+      "More": "Plus",
+      "Less": "Moins"
     },
     "NL": {
       "Game Server Connections": "Spelserververbindingen",
@@ -9721,7 +9725,9 @@
       "Open the Console Now": "Open nu de console",
       "Ready to explore?": "Klaar om te verkennen?",
       "Redirecting to the full console in": "Omleiden naar de volledige console in",
-      "Saved Privately on Server": "Privé opgeslagen op de server"
+      "Saved Privately on Server": "Privé opgeslagen op de server",
+      "More": "Meer",
+      "Less": "Minder"
     },
     "ES": {
       "Game Server Connections": "Conexiones de Servidores de Juego",
@@ -12943,7 +12949,9 @@
       "Open the Console Now": "Abra la consola ahora",
       "Ready to explore?": "¿Listo para explorar?",
       "Redirecting to the full console in": "Redirigiendo a la consola completa en",
-      "Saved Privately on Server": "Guardado de forma privada en el servidor"
+      "Saved Privately on Server": "Guardado de forma privada en el servidor",
+      "More": "Más",
+      "Less": "Menos"
     },
     "IT": {
       "Game Server Connections": "Connessioni dei Server di Gioco",
@@ -16165,7 +16173,9 @@
       "Open the Console Now": "Apri la console adesso",
       "Ready to explore?": "Pronto per esplorare?",
       "Redirecting to the full console in": "Reindirizzamento alla console completa in",
-      "Saved Privately on Server": "Salvato privatamente sul server"
+      "Saved Privately on Server": "Salvato privatamente sul server",
+      "More": "Altro",
+      "Less": "Meno"
     },
     "DE": {
       "Game Server Connections": "Spielserver-Verbindungen",
@@ -19387,7 +19397,9 @@
       "Open the Console Now": "Öffnen Sie jetzt die Konsole",
       "Ready to explore?": "Bereit zum Erkunden?",
       "Redirecting to the full console in": "Umleitung zur vollständigen Konsole in",
-      "Saved Privately on Server": "Privat auf dem Server gespeichert"
+      "Saved Privately on Server": "Privat auf dem Server gespeichert",
+      "More": "Mehr",
+      "Less": "Weniger"
     },
     "PL": {
       "Game Server Connections": "Połączenia Serwerów Gry",
@@ -22609,7 +22621,9 @@
       "Open the Console Now": "Otwórz teraz konsolę",
       "Ready to explore?": "Gotowy do zwiedzania?",
       "Redirecting to the full console in": "Przekierowanie do pełnej konsoli w",
-      "Saved Privately on Server": "Zapisano prywatnie na serwerze"
+      "Saved Privately on Server": "Zapisano prywatnie na serwerze",
+      "More": "Więcej",
+      "Less": "Mniej"
     },
     "PT-BR": {
       "Game Server Connections": "Conexões dos Servidores de Jogo",
@@ -25831,7 +25845,9 @@
       "Open the Console Now": "Abra o console agora",
       "Ready to explore?": "Pronto para explorar?",
       "Redirecting to the full console in": "Redirecionando para o console completo em",
-      "Saved Privately on Server": "Salvo de forma privada no servidor"
+      "Saved Privately on Server": "Salvo de forma privada no servidor",
+      "More": "Mais",
+      "Less": "Menos"
     },
     "PT-PT": {
       "Game Server Connections": "Ligações dos Servidores de Jogo",
@@ -29053,7 +29069,9 @@
       "Open the Console Now": "Abra o console agora",
       "Ready to explore?": "Pronto para explorar?",
       "Redirecting to the full console in": "Redirecionando para o console completo em",
-      "Saved Privately on Server": "Salvo de forma privada no servidor"
+      "Saved Privately on Server": "Salvo de forma privada no servidor",
+      "More": "Mais",
+      "Less": "Menos"
     },
     "UK": {
       "Game Server Connections": "З’єднання Ігрових Серверів",
@@ -32275,7 +32293,9 @@
       "Open the Console Now": "Відкрийте консоль зараз",
       "Ready to explore?": "Готові досліджувати?",
       "Redirecting to the full console in": "Переспрямування на повну консоль у",
-      "Saved Privately on Server": "Збережено приватно на сервері"
+      "Saved Privately on Server": "Збережено приватно на сервері",
+      "More": "Більше",
+      "Less": "Менше"
     },
     "RU": {
       "Game Server Connections": "Подключения Игровых Серверов",
@@ -35497,7 +35517,9 @@
       "Open the Console Now": "Откройте консоль сейчас",
       "Ready to explore?": "Готовы исследовать?",
       "Redirecting to the full console in": "Перенаправление на полную консоль в",
-      "Saved Privately on Server": "Сохранено конфиденциально на сервере"
+      "Saved Privately on Server": "Сохранено конфиденциально на сервере",
+      "More": "Ещё",
+      "Less": "Меньше"
     },
     "TR": {
       "Game Server Connections": "Oyun Sunucusu Bağlantıları",
@@ -38719,7 +38741,9 @@
       "Open the Console Now": "Konsolu Şimdi Açın",
       "Ready to explore?": "Keşfetmeye hazır mısınız?",
       "Redirecting to the full console in": "Tam konsola yönlendiriliyor",
-      "Saved Privately on Server": "Sunucuya Özel Olarak Kaydedildi"
+      "Saved Privately on Server": "Sunucuya Özel Olarak Kaydedildi",
+      "More": "Daha fazla",
+      "Less": "Daha az"
     },
     "JA": {
       "Game Server Connections": "ゲームサーバー接続",
@@ -41941,7 +41965,9 @@
       "Open the Console Now": "今すぐコンソールを開く",
       "Ready to explore?": "探索する準備はできましたか?",
       "Redirecting to the full console in": "完全なコンソールにリダイレクトします",
-      "Saved Privately on Server": "サーバーに非公開で保存"
+      "Saved Privately on Server": "サーバーに非公開で保存",
+      "More": "もっと見る",
+      "Less": "折りたたむ"
     },
     "KO": {
       "Game Server Connections": "게임 서버 연결",
@@ -45163,7 +45189,9 @@
       "Open the Console Now": "지금 콘솔 열기",
       "Ready to explore?": "탐험할 준비가 되셨나요?",
       "Redirecting to the full console in": "전체 콘솔로 리디렉션 중",
-      "Saved Privately on Server": "서버에 비공개로 저장됨"
+      "Saved Privately on Server": "서버에 비공개로 저장됨",
+      "More": "더 보기",
+      "Less": "접기"
     },
     "ZH-HANS": {
       "Game Server Connections": "游戏服务器连接",
@@ -48385,7 +48413,9 @@
       "Open the Console Now": "立即打开控制台",
       "Ready to explore?": "准备好探索了吗？",
       "Redirecting to the full console in": "重定向到完整控制台",
-      "Saved Privately on Server": "私密保存在服务器上"
+      "Saved Privately on Server": "私密保存在服务器上",
+      "More": "显示更多",
+      "Less": "收起"
     },
     "ZH-HANT": {
       "Game Server Connections": "遊戲伺服器連線",
@@ -51607,7 +51637,9 @@
       "Open the Console Now": "立即開啟控制台",
       "Ready to explore?": "準備好探索了嗎？",
       "Redirecting to the full console in": "重定向到完整控制台",
-      "Saved Privately on Server": "私密保存在伺服器上"
+      "Saved Privately on Server": "私密保存在伺服器上",
+      "More": "顯示更多",
+      "Less": "收起"
     },
     "AR": {
       "Game Server Connections": "اتصالات خوادم اللعبة",
@@ -54829,7 +54861,9 @@
       "Open the Console Now": "افتح وحدة التحكم الآن",
       "Ready to explore?": "هل أنت مستعد للاستكشاف؟",
       "Redirecting to the full console in": "إعادة التوجيه إلى وحدة التحكم الكاملة في",
-      "Saved Privately on Server": "تم الحفظ بشكل خاص على الخادم"
+      "Saved Privately on Server": "تم الحفظ بشكل خاص على الخادم",
+      "More": "المزيد",
+      "Less": "أقل"
     },
     "FI": {
       "Game Server Connections": "Pelipalvelinyhteydet",
@@ -58051,7 +58085,9 @@
       "Open the Console Now": "Avaa konsoli nyt",
       "Ready to explore?": "Oletko valmis tutkimaan?",
       "Redirecting to the full console in": "Uudelleenohjaus koko konsoliin sisään",
-      "Saved Privately on Server": "Tallennettu yksityisesti palvelimelle"
+      "Saved Privately on Server": "Tallennettu yksityisesti palvelimelle",
+      "More": "Lisää",
+      "Less": "Vähemmän"
     },
     "DA": {
       "Game Server Connections": "Spilserverforbindelser",
@@ -61273,7 +61309,9 @@
       "Open the Console Now": "Åbn konsollen nu",
       "Ready to explore?": "Klar til at udforske?",
       "Redirecting to the full console in": "Omdirigerer til den fulde konsol i",
-      "Saved Privately on Server": "Gemt privat på serveren"
+      "Saved Privately on Server": "Gemt privat på serveren",
+      "More": "Mere",
+      "Less": "Mindre"
     },
     "CS": {
       "Game Server Connections": "Připojení herních serverů",
@@ -64495,7 +64533,9 @@
       "Open the Console Now": "Otevřete nyní konzoli",
       "Ready to explore?": "Jste připraveni prozkoumat?",
       "Redirecting to the full console in": "Přesměrování na plnou konzolu v",
-      "Saved Privately on Server": "Uloženo soukromě na serveru"
+      "Saved Privately on Server": "Uloženo soukromě na serveru",
+      "More": "Více",
+      "Less": "Méně"
     },
     "NB": {
       "Game Server Connections": "Spillservertilkoblinger",
@@ -67717,7 +67757,9 @@
       "Open the Console Now": "Åpne konsollen nå",
       "Ready to explore?": "Klar til å utforske?",
       "Redirecting to the full console in": "Omdirigerer til hele konsollen i",
-      "Saved Privately on Server": "Lagret privat på server"
+      "Saved Privately on Server": "Lagret privat på server",
+      "More": "Mer",
+      "Less": "Mindre"
     },
     "HU": {
       "Game Server Connections": "Játékszerver-kapcsolatok",
@@ -70939,7 +70981,9 @@
       "Open the Console Now": "Nyissa meg a konzolt most",
       "Ready to explore?": "Készen áll a felfedezésre?",
       "Redirecting to the full console in": "Átirányítás a teljes konzolra",
-      "Saved Privately on Server": "Privát a szerveren mentve"
+      "Saved Privately on Server": "Privát a szerveren mentve",
+      "More": "Több",
+      "Less": "Kevesebb"
     },
     "EL": {
       "Game Server Connections": "Συνδέσεις Διακομιστών Παιχνιδιού",
@@ -74161,7 +74205,9 @@
       "Open the Console Now": "Ανοίξτε την Κονσόλα τώρα",
       "Ready to explore?": "Έτοιμοι να εξερευνήσετε;",
       "Redirecting to the full console in": "Ανακατεύθυνση στην πλήρη κονσόλα",
-      "Saved Privately on Server": "Αποθηκεύτηκε ιδιωτικά στον διακομιστή"
+      "Saved Privately on Server": "Αποθηκεύτηκε ιδιωτικά στον διακομιστή",
+      "More": "Περισσότερα",
+      "Less": "Λιγότερα"
     },
     "RO": {
       "Game Server Connections": "Conexiuni la Serverele de Joc",
@@ -77383,7 +77429,9 @@
       "Open the Console Now": "Deschideți Consola acum",
       "Ready to explore?": "Ești gata să explorezi?",
       "Redirecting to the full console in": "Redirecționare către consola completă în",
-      "Saved Privately on Server": "Salvat privat pe server"
+      "Saved Privately on Server": "Salvat privat pe server",
+      "More": "Mai mult",
+      "Less": "Mai puțin"
     },
     "SK": {
       "Game Server Connections": "Pripojenia herných serverov",
@@ -80605,7 +80653,9 @@
       "Open the Console Now": "Teraz otvorte konzolu",
       "Ready to explore?": "Ste pripravení preskúmať?",
       "Redirecting to the full console in": "Prebieha presmerovanie na plnú konzolu",
-      "Saved Privately on Server": "Súkromne uložené na serveri"
+      "Saved Privately on Server": "Súkromne uložené na serveri",
+      "More": "Viac",
+      "Less": "Menej"
     },
     "BG": {
       "Game Server Connections": "Връзки с игровите сървъри",
@@ -83827,7 +83877,9 @@
       "Open the Console Now": "Отворете конзолата сега",
       "Ready to explore?": "Готови ли сте да изследвате?",
       "Redirecting to the full console in": "Пренасочване към пълната конзола в",
-      "Saved Privately on Server": "Запазено частно на сървъра"
+      "Saved Privately on Server": "Запазено частно на сървъра",
+      "More": "Още",
+      "Less": "По-малко"
     },
     "SV": {
       "Game Server Connections": "Spelserveranslutningar",
@@ -87049,7 +87101,9 @@
       "Open the Console Now": "Öppna konsolen nu",
       "Ready to explore?": "Redo att utforska?",
       "Redirecting to the full console in": "Omdirigerar till hela konsolen in",
-      "Saved Privately on Server": "Sparad privat på servern"
+      "Saved Privately on Server": "Sparad privat på servern",
+      "More": "Mer",
+      "Less": "Mindre"
     },
     "TH": {
       "Game Server Connections": "การเชื่อมต่อเซิร์ฟเวอร์เกม",
@@ -90271,7 +90325,9 @@
       "Open the Console Now": "เปิดคอนโซลทันที",
       "Ready to explore?": "พร้อมที่จะสำรวจแล้วหรือยัง?",
       "Redirecting to the full console in": "เปลี่ยนเส้นทางไปยังคอนโซลแบบเต็มใน",
-      "Saved Privately on Server": "บันทึกแบบส่วนตัวบนเซิร์ฟเวอร์"
+      "Saved Privately on Server": "บันทึกแบบส่วนตัวบนเซิร์ฟเวอร์",
+      "More": "ดูเพิ่มเติม",
+      "Less": "ย่อ"
     },
     "VI": {
       "Game Server Connections": "Kết Nối Máy Chủ Trò Chơi",
@@ -93493,7 +93549,9 @@
       "Open the Console Now": "Mở bảng điều khiển ngay",
       "Ready to explore?": "Sẵn sàng để khám phá?",
       "Redirecting to the full console in": "Chuyển hướng đến bảng điều khiển đầy đủ trong",
-      "Saved Privately on Server": "Được lưu riêng tư trên máy chủ"
+      "Saved Privately on Server": "Được lưu riêng tư trên máy chủ",
+      "More": "Xem thêm",
+      "Less": "Thu gọn"
     },
     "ID": {
       "Game Server Connections": "Koneksi Server Game",
@@ -96715,7 +96773,9 @@
       "Open the Console Now": "Buka Konsol Sekarang",
       "Ready to explore?": "Siap menjelajah?",
       "Redirecting to the full console in": "Mengarahkan ke konsol lengkap di",
-      "Saved Privately on Server": "Disimpan Secara Pribadi di Server"
+      "Saved Privately on Server": "Disimpan Secara Pribadi di Server",
+      "More": "Selengkapnya",
+      "Less": "Lebih sedikit"
     },
     "HI": {
       "Game Server Connections": "गेम सर्वर कनेक्शन",
@@ -99937,7 +99997,9 @@
       "Open the Console Now": "अब कंसोल खोलें",
       "Ready to explore?": "अन्वेषण के लिए तैयार हैं?",
       "Redirecting to the full console in": "पूर्ण कंसोल पर रीडायरेक्ट किया जा रहा है",
-      "Saved Privately on Server": "सर्वर पर निजी तौर पर सहेजा गया"
+      "Saved Privately on Server": "सर्वर पर निजी तौर पर सहेजा गया",
+      "More": "और देखें",
+      "Less": "कम देखें"
     },
     "HR": {
       "Game Server Connections": "Veze poslužitelja igre",
@@ -103159,7 +103221,9 @@
       "Open the Console Now": "Sada otvorite konzolu",
       "Ready to explore?": "Spremni za istraživanje?",
       "Redirecting to the full console in": "Preusmjeravanje na punu konzolu u",
-      "Saved Privately on Server": "Spremljeno privatno na poslužitelj"
+      "Saved Privately on Server": "Spremljeno privatno na poslužitelj",
+      "More": "Više",
+      "Less": "Manje"
     },
     "SR": {
       "Game Server Connections": "Везе Сервера Игре",
@@ -106381,7 +106445,9 @@
       "Open the Console Now": "Отворите конзолу одмах",
       "Ready to explore?": "Спремни за истраживање?",
       "Redirecting to the full console in": "Преусмеравање на пуну конзолу у",
-      "Saved Privately on Server": "Приватно сачувано на серверу"
+      "Saved Privately on Server": "Приватно сачувано на серверу",
+      "More": "Више",
+      "Less": "Мање"
     },
     "SL": {
       "Game Server Connections": "Povezave igralnih strežnikov",
@@ -109603,7 +109669,9 @@
       "Open the Console Now": "Odprite konzolo zdaj",
       "Ready to explore?": "Ste pripravljeni na raziskovanje?",
       "Redirecting to the full console in": "Preusmerjanje na celotno konzolo v",
-      "Saved Privately on Server": "Shranjeno zasebno na strežniku"
+      "Saved Privately on Server": "Shranjeno zasebno na strežniku",
+      "More": "Več",
+      "Less": "Manj"
     },
     "ET": {
       "Game Server Connections": "Mänguserverite ühendused",
@@ -112825,7 +112893,9 @@
       "Open the Console Now": "Avage konsool kohe",
       "Ready to explore?": "Kas olete valmis uurima?",
       "Redirecting to the full console in": "Ümbersuunamine täiskonsooli sisse",
-      "Saved Privately on Server": "Salvestatud privaatselt serverisse"
+      "Saved Privately on Server": "Salvestatud privaatselt serverisse",
+      "More": "Rohkem",
+      "Less": "Vähem"
     },
     "LT": {
       "Game Server Connections": "Žaidimų serverių ryšiai",
@@ -116047,7 +116117,9 @@
       "Open the Console Now": "Atidarykite konsolę dabar",
       "Ready to explore?": "Pasiruošę tyrinėti?",
       "Redirecting to the full console in": "Peradresuojama į visą konsolę",
-      "Saved Privately on Server": "Išsaugota privačiai serveryje"
+      "Saved Privately on Server": "Išsaugota privačiai serveryje",
+      "More": "Daugiau",
+      "Less": "Mažiau"
     },
     "LV": {
       "Game Server Connections": "Spēļu serveru savienojumi",
@@ -119269,7 +119341,9 @@
       "Open the Console Now": "Atveriet konsoli tūlīt",
       "Ready to explore?": "Vai esat gatavs izpētīt?",
       "Redirecting to the full console in": "Notiek novirzīšana uz pilno konsoli",
-      "Saved Privately on Server": "Saglabāts privāti serverī"
+      "Saved Privately on Server": "Saglabāts privāti serverī",
+      "More": "Vairāk",
+      "Less": "Mazāk"
     },
     "HE": {
       "Game Server Connections": "חיבורי שרתי משחק",
@@ -122491,7 +122565,9 @@
       "Open the Console Now": "פתח את המסוף עכשיו",
       "Ready to explore?": "מוכנים לחקור?",
       "Redirecting to the full console in": "מפנה למסוף המלא ב-",
-      "Saved Privately on Server": "נשמר באופן פרטי בשרת"
+      "Saved Privately on Server": "נשמר באופן פרטי בשרת",
+      "More": "עוד",
+      "Less": "פחות"
     },
     "FA": {
       "Game Server Connections": "اتصال‌های سرور بازی",
@@ -125713,7 +125789,9 @@
       "Open the Console Now": "اکنون کنسول را باز کنید",
       "Ready to explore?": "آماده کاوش هستید؟",
       "Redirecting to the full console in": "تغییر مسیر به کنسول کامل در",
-      "Saved Privately on Server": "به صورت خصوصی در سرور ذخیره شده است"
+      "Saved Privately on Server": "به صورت خصوصی در سرور ذخیره شده است",
+      "More": "بیشتر",
+      "Less": "کمتر"
     },
     "UR": {
       "Game Server Connections": "گیم سرور کنکشنز",
@@ -128935,7 +129013,9 @@
       "Open the Console Now": "ابھی کنسول کھولیں۔",
       "Ready to explore?": "دریافت کرنے کے لیے تیار ہیں؟",
       "Redirecting to the full console in": "میں مکمل کنسول پر ری ڈائریکٹ کیا جا رہا ہے۔",
-      "Saved Privately on Server": "سرور پر نجی طور پر محفوظ کیا گیا۔"
+      "Saved Privately on Server": "سرور پر نجی طور پر محفوظ کیا گیا۔",
+      "More": "مزید",
+      "Less": "کم"
     },
     "MS": {
       "Game Server Connections": "Sambungan Pelayan Permainan",
@@ -132157,7 +132237,9 @@
       "Open the Console Now": "Buka Konsol Sekarang",
       "Ready to explore?": "Bersedia untuk meneroka?",
       "Redirecting to the full console in": "Mengubah hala ke konsol penuh dalam",
-      "Saved Privately on Server": "Disimpan Secara Persendirian pada Pelayan"
+      "Saved Privately on Server": "Disimpan Secara Persendirian pada Pelayan",
+      "More": "Lagi",
+      "Less": "Kurangkan"
     },
     "TL": {
       "Game Server Connections": "Mga Koneksyon ng Game Server",
@@ -135379,7 +135461,9 @@
       "Open the Console Now": "Buksan ang Console Ngayon",
       "Ready to explore?": "Handa nang mag-explore?",
       "Redirecting to the full console in": "Nagre-redirect sa buong console sa",
-      "Saved Privately on Server": "Na-save nang Pribado sa Server"
+      "Saved Privately on Server": "Na-save nang Pribado sa Server",
+      "More": "Higit pa",
+      "Less": "Mas kaunti"
     },
     "BN": {
       "Game Server Connections": "গেম সার্ভারের সংযোগ",
@@ -138601,7 +138685,9 @@
       "Open the Console Now": "এখন কনসোল খুলুন",
       "Ready to explore?": "অন্বেষণ করতে প্রস্তুত?",
       "Redirecting to the full console in": "সম্পূর্ণ কনসোলে পুনঃনির্দেশ করা হচ্ছে",
-      "Saved Privately on Server": "সার্ভারে ব্যক্তিগতভাবে সংরক্ষিত"
+      "Saved Privately on Server": "সার্ভারে ব্যক্তিগতভাবে সংরক্ষিত",
+      "More": "আরও",
+      "Less": "কম"
     },
     "IS": {
       "Game Server Connections": "Tengingar leikjaþjóna",
@@ -141823,7 +141909,9 @@
       "Open the Console Now": "Opnaðu stjórnborðið núna",
       "Ready to explore?": "Tilbúinn til að kanna?",
       "Redirecting to the full console in": "Beinir á fulla stjórnborðið í",
-      "Saved Privately on Server": "Vistað einslega á netþjóni"
+      "Saved Privately on Server": "Vistað einslega á netþjóni",
+      "More": "Meira",
+      "Less": "Minna"
     },
     "SQ": {
       "Game Server Connections": "Lidhjet e Serverëve të Lojës",
@@ -145045,7 +145133,9 @@
       "Open the Console Now": "Hapni tastierën tani",
       "Ready to explore?": "Gati për të eksploruar?",
       "Redirecting to the full console in": "Ridrejtimi në tastierën e plotë në",
-      "Saved Privately on Server": "Ruajtur privatisht në server"
+      "Saved Privately on Server": "Ruajtur privatisht në server",
+      "More": "Më shumë",
+      "Less": "Më pak"
     },
     "MK": {
       "Game Server Connections": "Врски со серверите за игра",
@@ -148267,7 +148357,9 @@
       "Open the Console Now": "Отворете ја конзолата сега",
       "Ready to explore?": "Подготвени за истражување?",
       "Redirecting to the full console in": "Се пренасочува кон целосната конзола во",
-      "Saved Privately on Server": "Зачувано приватно на серверот"
+      "Saved Privately on Server": "Зачувано приватно на серверот",
+      "More": "Повеќе",
+      "Less": "Помалку"
     },
     "KA": {
       "Game Server Connections": "თამაშის სერვერის კავშირები",
@@ -151489,7 +151581,9 @@
       "Open the Console Now": "გახსენით კონსოლი ახლავე",
       "Ready to explore?": "მზად ხართ შესასწავლად?",
       "Redirecting to the full console in": "გადამისამართება სრულ კონსოლზე",
-      "Saved Privately on Server": "შენახულია პირადად სერვერზე"
+      "Saved Privately on Server": "შენახულია პირადად სერვერზე",
+      "More": "მეტი",
+      "Less": "ნაკლები"
     },
     "HY": {
       "Game Server Connections": "Խաղային սերվերների կապեր",
@@ -154711,7 +154805,9 @@
       "Open the Console Now": "Բացեք կոնսոլը հիմա",
       "Ready to explore?": "Պատրա՞ստ եք ուսումնասիրել:",
       "Redirecting to the full console in": "Վերահղում դեպի ամբողջական վահանակ",
-      "Saved Privately on Server": "Պահպանվել է մասնավոր սերվերում"
+      "Saved Privately on Server": "Պահպանվել է մասնավոր սերվերում",
+      "More": "Ավելին",
+      "Less": "Քիչ"
     },
     "AZ": {
       "Game Server Connections": "Oyun serveri bağlantıları",
@@ -157933,7 +158029,9 @@
       "Open the Console Now": "İndi Konsolu açın",
       "Ready to explore?": "Kəşf etməyə hazırsınız?",
       "Redirecting to the full console in": "Tam konsola yönləndirilir",
-      "Saved Privately on Server": "Şəxsi olaraq Serverdə Saxlanılır"
+      "Saved Privately on Server": "Şəxsi olaraq Serverdə Saxlanılır",
+      "More": "Daha çox",
+      "Less": "Daha az"
     },
     "KK": {
       "Game Server Connections": "Ойын серверінің қосылымдары",
@@ -161155,7 +161253,9 @@
       "Open the Console Now": "Консольді қазір ашыңыз",
       "Ready to explore?": "Зерттеуге дайынсыз ба?",
       "Redirecting to the full console in": "Толық консольге қайта бағытталуда",
-      "Saved Privately on Server": "Серверде жеке сақталады"
+      "Saved Privately on Server": "Серверде жеке сақталады",
+      "More": "Көбірек",
+      "Less": "Азырақ"
     },
     "UZ": {
       "Game Server Connections": "O‘yin serveri ulanishlari",
@@ -164377,7 +164477,9 @@
       "Open the Console Now": "Konsolni hozir oching",
       "Ready to explore?": "Tadqiq qilishga tayyormisiz?",
       "Redirecting to the full console in": "Toʻliq konsolga yoʻnaltirilmoqda",
-      "Saved Privately on Server": "Serverda shaxsiy saqlangan"
+      "Saved Privately on Server": "Serverda shaxsiy saqlangan",
+      "More": "Ko‘proq",
+      "Less": "Kamroq"
     },
     "CA": {
       "Game Server Connections": "Connexions dels servidors de joc",
@@ -167599,7 +167701,9 @@
       "Open the Console Now": "Obriu la consola ara",
       "Ready to explore?": "Preparat per explorar?",
       "Redirecting to the full console in": "S'està redirigint a la consola completa",
-      "Saved Privately on Server": "Desat de manera privada al servidor"
+      "Saved Privately on Server": "Desat de manera privada al servidor",
+      "More": "Més",
+      "Less": "Menys"
     },
     "AF": {
       "Game Server Connections": "Speletjiebedienerverbindings",
@@ -170821,7 +170925,9 @@
       "Open the Console Now": "Maak die konsole nou oop",
       "Ready to explore?": "Gereed om te verken?",
       "Redirecting to the full console in": "Herlei tans na die volledige konsole in",
-      "Saved Privately on Server": "Privaat op bediener gestoor"
+      "Saved Privately on Server": "Privaat op bediener gestoor",
+      "More": "Meer",
+      "Less": "Minder"
     },
     "SW": {
       "Game Server Connections": "Miunganisho ya Seva za Mchezo",
@@ -174043,7 +174149,9 @@
       "Open the Console Now": "Fungua Console Sasa",
       "Ready to explore?": "Je, uko tayari kuchunguza?",
       "Redirecting to the full console in": "Inaelekeza kwenye kiweko kamili ndani",
-      "Saved Privately on Server": "Imehifadhiwa Faragha kwenye Seva"
+      "Saved Privately on Server": "Imehifadhiwa Faragha kwenye Seva",
+      "More": "Zaidi",
+      "Less": "Chache"
     }
   }
 }
