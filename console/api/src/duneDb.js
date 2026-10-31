@@ -1723,7 +1723,7 @@ export async function listPlayers(db, { status = "all", q = "", page = 0, pageSi
     ? `left join dune.encrypted_accounts ea on ea.id = a.owner_account_id
        left join lateral (
          select case
-           when ea.encrypted_funcom_id is null then ''
+           when ea.encrypted_funcom_id is null or nullif(trim(coalesce(ac.funcom_id, '')), '') is not null then ''
            else coalesce(dune.decrypt_user_data(ea.encrypted_funcom_id), '')
          end as funcom_id
        ) decrypted_account on true`
@@ -1912,17 +1912,24 @@ export async function listPlayers(db, { status = "all", q = "", page = 0, pageSi
     ) paged on true
     order by ${pagedOrder}`, values);
 
-  const totalsResult = includeTotals ? await db.query(`
-    with player_rows as (
-      select coalesce(nullif(ps.player_controller_id, 0), nullif(a.owner_account_id, 0), a.id) as dedupe_key
-      from dune.actors a
-      left join dune.player_state ps on ps.account_id = a.owner_account_id
-      left join dune.accounts ac on ac.id = a.owner_account_id
-      ${encryptedAccountsJoin}
-      where ${baseWhere}
-    )
-    select count(distinct dedupe_key)::int as total_players
-    from player_rows`) : null;
+  let totalsResult = null;
+  if (includeTotals) {
+    if (where === baseWhere && result.rows[0] && result.rows[0].actor_id !== null && result.rows[0].actor_id !== undefined) {
+      totalsResult = { rows: [{ total_players: Number(result.rows[0].total_count || 0) }] };
+    } else {
+      totalsResult = await db.query(`
+        with player_rows as (
+          select coalesce(nullif(ps.player_controller_id, 0), nullif(a.owner_account_id, 0), a.id) as dedupe_key
+          from dune.actors a
+          left join dune.player_state ps on ps.account_id = a.owner_account_id
+          left join dune.accounts ac on ac.id = a.owner_account_id
+          ${encryptedAccountsJoin}
+          where ${baseWhere}
+        )
+        select count(distinct dedupe_key)::int as total_players
+        from player_rows`);
+    }
+  }
 
   return {
     capabilities: {
@@ -4257,6 +4264,61 @@ export async function liveMapPoiMarkers(db, map, category) {
     capabilities: { [category]: true },
     rows: result.rows.map((row) => ({ ...row, x: Number(row.x), y: Number(row.y), z: Number(row.z) }))
   };
+}
+
+const ALL_POI_PATTERNS = Object.freeze(Object.values(POI_CATEGORY_PATTERNS).flat());
+
+export async function liveMapPoiAllMarkers(db, map = "") {
+  const categories = Object.keys(POI_CATEGORY_PATTERNS);
+  if (!(await tableExists(db, "markers")) || !(await tableExists(db, "map_names"))) {
+    const capabilities = Object.fromEntries(categories.map((key) => [key, false]));
+    return { capabilities, byCategory: Object.fromEntries(categories.map((key) => [key, []])) };
+  }
+  const values = [];
+  const caseArms = categories.map((category) => {
+    values.push(POI_CATEGORY_PATTERNS[category]);
+    return `when m.marker_type ilike any($${values.length}) then '${category}'`;
+  }).join("\n           ");
+  values.push(ALL_POI_PATTERNS);
+  const allPatternsParam = values.length;
+  let where = "";
+  if (map) {
+    const safe = validateMapName(map);
+    if (safe) {
+      values.push(safe);
+      where = ` and mn.map_name = $${values.length}`;
+    }
+  }
+  const result = await db.query(`
+    select m.marker_hash_id::text as id,
+           m.marker_type as marker_type,
+           case
+             ${caseArms}
+             else ''
+           end as category,
+           (m.position).x as x,
+           (m.position).y as y,
+           (m.position).z as z,
+           coalesce(mn.map_name, '') as map
+    from dune.markers m
+    join dune.map_names mn on mn.map_name_id = m.map_name_id
+    where m.marker_type ilike any($${allPatternsParam}) and m.marker_type not ilike 'NoIcon' ${where}
+    order by m.marker_hash_id`, values);
+  const capabilities = Object.fromEntries(categories.map((key) => [key, true]));
+  const byCategory = Object.fromEntries(categories.map((key) => [key, []]));
+  for (const row of result.rows || []) {
+    const category = String(row.category || "");
+    if (!byCategory[category]) continue;
+    byCategory[category].push({
+      id: row.id,
+      marker_type: row.marker_type,
+      map: row.map,
+      x: Number(row.x),
+      y: Number(row.y),
+      z: Number(row.z)
+    });
+  }
+  return { capabilities, byCategory };
 }
 
 export async function liveMapMarkers(db, map = "") {

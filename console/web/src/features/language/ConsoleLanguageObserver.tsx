@@ -146,49 +146,76 @@ export function ConsoleLanguageObserver() {
       return null;
     }
 
-    function applyTranslationsToDom() {
+    function translateTextNode(node: Node) {
+      const parent = node.parentElement;
+      if (!parent || shouldSkipElement(parent)) return;
+      const currentVal = node.nodeValue || "";
+      const previous = textTranslations.get(node);
+      const sourceVal = previous && currentVal === previous.applied ? previous.source : currentVal;
+      const replacement = translatePreservingWhitespace(sourceVal);
+      const nextValue = replacement ?? sourceVal;
+      // Untranslated live data is never captured for later restoration.
+      if (nextValue !== sourceVal) textTranslations.set(node, { source: sourceVal, applied: nextValue });
+      else textTranslations.delete(node);
+      if (currentVal !== nextValue) node.nodeValue = nextValue;
+    }
+
+    function translateElementAttributes(el: Element) {
+      if (shouldSkipElement(el)) return;
+      const translations = attributeTranslations.get(el) ?? new Map<TranslatableAttribute, AppliedTranslation>();
+      for (const attr of TRANSLATABLE_ATTRS) {
+        const val = el.getAttribute(attr);
+        if (val === null) {
+          translations.delete(attr);
+          continue;
+        }
+        const previous = translations.get(attr);
+        const sourceVal = previous && val === previous.applied ? previous.source : val;
+        const replacement = translatePreservingWhitespace(sourceVal);
+        const nextValue = replacement ?? sourceVal;
+        if (nextValue !== sourceVal) translations.set(attr, { source: sourceVal, applied: nextValue });
+        else translations.delete(attr);
+        if (val !== nextValue) el.setAttribute(attr, nextValue);
+      }
+      if (translations.size) attributeTranslations.set(el, translations);
+      else attributeTranslations.delete(el);
+    }
+
+    function translateSubtree(root: Node) {
+      if (root.nodeType === Node.TEXT_NODE) {
+        translateTextNode(root);
+        return;
+      }
+      if (root.nodeType !== Node.ELEMENT_NODE && root.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) return;
+      if (root.nodeType === Node.ELEMENT_NODE && shouldSkipElement(root as Element)) return;
+
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let node = walker.nextNode();
+      while (node) {
+        translateTextNode(node);
+        node = walker.nextNode();
+      }
+
+      if (root.nodeType === Node.ELEMENT_NODE) {
+        translateElementAttributes(root as Element);
+      }
+      if ("querySelectorAll" in root) {
+        const elements = (root as ParentNode).querySelectorAll("[placeholder],[title],[aria-label]");
+        elements.forEach(translateElementAttributes);
+      }
+    }
+
+    function applyTranslationsToDom(roots?: Iterable<Node>) {
       if (!document.body || activeLang === "EN" || isApplyingDom) return;
       isApplyingDom = true;
       try {
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-        let node = walker.nextNode();
-        while (node) {
-          const parent = node.parentElement;
-          if (parent && !shouldSkipElement(parent)) {
-            const currentVal = node.nodeValue || "";
-            const previous = textTranslations.get(node);
-            const sourceVal = previous && currentVal === previous.applied ? previous.source : currentVal;
-            const replacement = translatePreservingWhitespace(sourceVal);
-            const nextValue = replacement ?? sourceVal;
-            // Untranslated live data is never captured for later restoration.
-            if (nextValue !== sourceVal) textTranslations.set(node, { source: sourceVal, applied: nextValue });
-            else textTranslations.delete(node);
-            if (currentVal !== nextValue) node.nodeValue = nextValue;
-          }
-          node = walker.nextNode();
+        if (!roots) {
+          translateSubtree(document.body);
+          return;
         }
-
-        const elements = document.body.querySelectorAll("[placeholder],[title],[aria-label]");
-        elements.forEach((el) => {
-          if (shouldSkipElement(el)) return;
-          const translations = attributeTranslations.get(el) ?? new Map<TranslatableAttribute, AppliedTranslation>();
-          for (const attr of TRANSLATABLE_ATTRS) {
-            const val = el.getAttribute(attr);
-            if (val === null) {
-              translations.delete(attr);
-              continue;
-            }
-            const previous = translations.get(attr);
-            const sourceVal = previous && val === previous.applied ? previous.source : val;
-            const replacement = translatePreservingWhitespace(sourceVal);
-            const nextValue = replacement ?? sourceVal;
-            if (nextValue !== sourceVal) translations.set(attr, { source: sourceVal, applied: nextValue });
-            else translations.delete(attr);
-            if (val !== nextValue) el.setAttribute(attr, nextValue);
-          }
-          if (translations.size) attributeTranslations.set(el, translations);
-          else attributeTranslations.delete(el);
-        });
+        for (const root of roots) {
+          translateSubtree(root);
+        }
       } finally {
         isApplyingDom = false;
       }
@@ -216,9 +243,31 @@ export function ConsoleLanguageObserver() {
       }
     }
 
-    const observer = new MutationObserver(() => {
-      if (activeLang !== "EN" && !isApplyingDom) {
-        applyTranslationsToDom();
+    const observer = new MutationObserver((mutations) => {
+      if (activeLang === "EN" || isApplyingDom || !document.body) return;
+      isApplyingDom = true;
+      try {
+        const rootsToWalk = new Set<Node>();
+        for (const mutation of mutations) {
+          if (mutation.type === "characterData") {
+            translateTextNode(mutation.target);
+          } else if (mutation.type === "attributes") {
+            if (mutation.target.nodeType === Node.ELEMENT_NODE) {
+              translateElementAttributes(mutation.target as Element);
+            }
+          } else if (mutation.type === "childList") {
+            if (mutation.addedNodes.length > 0) {
+              mutation.addedNodes.forEach((node) => rootsToWalk.add(node));
+            } else if (mutation.target) {
+              rootsToWalk.add(mutation.target);
+            }
+          }
+        }
+        for (const root of rootsToWalk) {
+          translateSubtree(root);
+        }
+      } finally {
+        isApplyingDom = false;
       }
     });
 

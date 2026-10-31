@@ -1,9 +1,79 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { redact } from "./redact.js";
 
 const RMQ_CONTAINER = "dune-rmq-game";
 const BUILTIN_COMMAND_AUTH_TOKEN = "Nu6VmPWUMvdPMeB7qErr";
+
+let cachedRmqCreds = null;
+let cachedRmqCredsExpiresAt = 0;
+
+function resolveRmqAdminCreds(repoRoot) {
+  const now = Date.now();
+  if (cachedRmqCreds && cachedRmqCredsExpiresAt > now) return cachedRmqCreds;
+  const envUser = String(process.env.DUNE_RMQ_ADMIN_USER || "").trim();
+  const envPass = String(process.env.DUNE_RMQ_ADMIN_PASSWORD || "").trim();
+  if (envUser && envPass) {
+    cachedRmqCreds = { user: envUser, pass: envPass };
+    cachedRmqCredsExpiresAt = now + 300_000;
+    return cachedRmqCreds;
+  }
+  const logFile = resolve(repoRoot || process.cwd(), "runtime/text-router/director-current.log");
+  try {
+    if (existsSync(logFile)) {
+      const text = readFileSync(logFile, "utf8");
+      const patterns = [
+        /Generated new admin credentials:\s*(bgd\.[^/\s]+\.admin)\s*\/\s*([A-Za-z0-9+/=]+)/g,
+        /(bgd\.[^/\s]+\.admin)\/([A-Za-z0-9+/=]+) => allow administrator/g
+      ];
+      let found = null;
+      for (const pattern of patterns) {
+        let match;
+        while ((match = pattern.exec(text)) !== null) {
+          found = { user: match[1], pass: match[2] };
+        }
+      }
+      if (found) {
+        cachedRmqCreds = found;
+        cachedRmqCredsExpiresAt = now + 60_000;
+        return found;
+      }
+    }
+  } catch {
+    // Fallback to dockerExec if credentials cannot be read from log.
+  }
+  return null;
+}
+
+function resolveRmqGameHttpBaseUrl() {
+  if (process.env.DUNE_RMQ_GAME_HTTP_URL) return process.env.DUNE_RMQ_GAME_HTTP_URL.replace(/\/+$/, "");
+  const port = Number(process.env.RMQ_GAME_LOCAL_HTTP_PORT || process.env.RMQ_GAME_HTTP_PORT || 25672) || 25672;
+  return `http://127.0.0.1:${port}`;
+}
+
+async function tryRmqGameHttpGet(config, path) {
+  if (globalThis.__testSpawn || process.env.DUNE_RMQ_TRANSPORT === "exec") return null;
+  const creds = resolveRmqAdminCreds(config?.repoRoot);
+  if (!creds) return null;
+  const auth = Buffer.from(`${creds.user}:${creds.pass}`, "utf8").toString("base64");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Math.min(config?.commandTimeoutMs || 5000, 5000));
+  try {
+    const response = await fetch(`${resolveRmqGameHttpBaseUrl()}${path}`, {
+      method: "GET",
+      headers: { Authorization: `Basic ${auth}`, Accept: "application/json" },
+      signal: controller.signal
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 export function validateBroadcastMessage(message) {
   const raw = String(message || "").trim();
@@ -189,7 +259,31 @@ export async function publishCarePackageWhisper(config, fields) {
   };
 }
 
+let cachedReadyQueues = null;
+let cachedReadyQueuesExpiresAt = 0;
+
 export async function listReadyRabbitQueues(config) {
+  if (!globalThis.__testSpawn) {
+    const now = Date.now();
+    if (cachedReadyQueues && cachedReadyQueuesExpiresAt > now) {
+      return new Set(cachedReadyQueues);
+    }
+    const httpQueues = await tryRmqGameHttpGet(config, "/api/queues/%2F?columns=name,consumers,state");
+    if (Array.isArray(httpQueues)) {
+      const ready = new Set();
+      for (const row of httpQueues) {
+        const name = String(row?.name || "").trim();
+        const consumers = Number(row?.consumers);
+        const state = String(row?.state || "").trim();
+        if (name && Number.isInteger(consumers) && consumers > 0 && (!state || state === "running")) {
+          ready.add(name);
+        }
+      }
+      cachedReadyQueues = ready;
+      cachedReadyQueuesExpiresAt = now + 5000;
+      return new Set(ready);
+    }
+  }
   const output = await dockerExec(
     ["exec", RMQ_CONTAINER, "rabbitmqctl", "-q", "list_queues", "name", "consumers", "state"],
     config.commandTimeoutMs
@@ -199,6 +293,10 @@ export async function listReadyRabbitQueues(config) {
     const [name = "", consumersText = "", state = ""] = line.trim().split(/\s+/);
     const consumers = Number(consumersText);
     if (name && Number.isInteger(consumers) && consumers > 0 && (!state || state === "running")) ready.add(name);
+  }
+  if (!globalThis.__testSpawn) {
+    cachedReadyQueues = ready;
+    cachedReadyQueuesExpiresAt = Date.now() + 5000;
   }
   return ready;
 }

@@ -3,8 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
-const visibleProperties = new Set(["label", "title", "message", "description", "detail", "placeholder", "emptyText", "emptyMessage", "confirmLabel", "caption", "helpText", "tooltip", "buttonText", "tab"]);
-const visibleAttributes = new Set(["title", "aria-label", "placeholder", "alt", "label"]);
+const visibleProperties = new Set(["label", "title", "message", "description", "detail", "placeholder", "emptyText", "emptyMessage", "confirmLabel", "caption", "helpText", "tooltip", "buttonText", "tab", "warning", "note", "tertiaryLabel", "manualLabel", "nextStep", "failure", "progressMessage"]);
+const visibleAttributes = new Set(["title", "aria-label", "placeholder", "alt", "label", "hint", "help", "emptyMessage", "note", "emptyLabel", "ariaLabel"]);
 const skippedTags = new Set(["code", "pre", "script", "style", "textarea"]);
 const entities = { amp: "&", apos: "'", quot: '"', lt: "<", gt: ">", nbsp: "\u00a0", mdash: "—" };
 
@@ -27,8 +27,9 @@ export function extractUiPhrases(source, fileName = "Component.tsx", onPhrase = 
     onPhrase(text, node, file);
   };
   const numeric = node => ts.isNumericLiteral(node)
-    || (ts.isIdentifier(node) && /^(?:count|total|ready|online|queued|seconds|minutes|hours|days|percent|remaining|used|available|capacity|size|length|index|i)\d*$/i.test(node.text))
-    || (ts.isPropertyAccessExpression(node) && node.name.text === "length");
+    || (ts.isIdentifier(node) && /^(?:count|total|ready|online|queued|seconds|minutes|hours|days|percent|remaining|used|available|capacity|size|length|index|i|rangeStart|rangeEnd|totalCount|totalItems|page|totalPages|safePage|toggleableCount|dirtyCount)\d*$/i.test(node.text))
+    || (ts.isPropertyAccessExpression(node) && node.name.text === "length")
+    || (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === "toLocaleString" && numeric(node.expression.expression));
   const visible = node => {
     if (!node) return;
     if (ts.isStringLiteralLike(node)) add(node.text, node);
@@ -53,6 +54,7 @@ export function extractUiPhrases(source, fileName = "Component.tsx", onPhrase = 
     if (ts.isPropertyAssignment(node) && visibleProperties.has(node.name.getText(file))) visible(node.initializer);
     if (ts.isVariableDeclaration(node) && /(?:label|title|subtitle|message|caption|heading|description|detail)s?$/i.test(node.name.getText(file))) {
       if (node.initializer && ts.isArrayLiteralExpression(node.initializer)) node.initializer.elements.forEach(visible);
+      else if (node.initializer && ts.isObjectLiteralExpression(node.initializer)) node.initializer.properties.forEach(prop => { if (ts.isPropertyAssignment(prop)) visible(prop.initializer); });
       else visible(node.initializer);
     }
     if (ts.isReturnStatement(node) && !(node.expression && ts.isStringLiteralLike(node.expression) && /^[a-z\d_.-]+$/.test(node.expression.text))) visible(node.expression);

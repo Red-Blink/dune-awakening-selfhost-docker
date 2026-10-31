@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import dgram from "node:dgram";
-import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { actionForRoute } from "../actions.js";
@@ -48,19 +48,94 @@ function readJsonFileSafe(filePath) {
   }
 }
 
-// Load immutable repository seed catalog once at module initialization.
-const IMMUTABLE_SEED_RAW = readJsonFileSafe(SEED_DB_PATH) || {
-  version: 1,
-  updatedAt: "2026-10-30T00:00:00.000Z",
-  autoSyncLanguages: [],
-  sourceStrings: [],
-  translations: {}
-};
+// Index the immutable repository seed catalog at module initialization without
+// holding all 53 language dictionaries (~135 MB of V8 heap objects) in memory.
+const SEED_LANG_OFFSETS = new Map();
+let SEED_FALLBACK_TRANSLATIONS = null;
+const SEED_METADATA = (() => {
+  const fallback = {
+    version: 1,
+    updatedAt: "2026-10-30T00:00:00.000Z",
+    autoSyncLanguages: [],
+    sourceStrings: []
+  };
+  try {
+    if (!existsSync(SEED_DB_PATH)) return fallback;
+    const buf = readFileSync(SEED_DB_PATH);
+    const transKey = Buffer.from('\n  "translations": {');
+    const transPos = buf.indexOf(transKey);
+    if (transPos === -1) {
+      const parsed = JSON.parse(buf.toString("utf8"));
+      SEED_FALLBACK_TRANSLATIONS = parsed?.translations || {};
+      return {
+        version: parsed?.version || 1,
+        updatedAt: parsed?.updatedAt || fallback.updatedAt,
+        autoSyncLanguages: Array.isArray(parsed?.autoSyncLanguages) ? parsed.autoSyncLanguages : [],
+        sourceStrings: Array.isArray(parsed?.sourceStrings) ? parsed.sourceStrings : []
+      };
+    }
+    const headerJson = `${buf.subarray(0, transPos).toString("utf8").replace(/,\s*$/, "")}\n}`;
+    const header = JSON.parse(headerJson);
+    const openMarker = Buffer.from('": {');
+    const closeMarker = Buffer.from("\n    }");
+    let cursor = transPos + transKey.length;
+    while (cursor < buf.length) {
+      const lineStart = buf.indexOf(Buffer.from('\n    "'), cursor);
+      if (lineStart === -1) break;
+      const keyEnd = buf.indexOf(openMarker, lineStart + 6);
+      if (keyEnd === -1) break;
+      const langCode = buf.subarray(lineStart + 6, keyEnd).toString("utf8");
+      const objStart = keyEnd + openMarker.length - 1;
+      const closePos = buf.indexOf(closeMarker, objStart);
+      if (closePos === -1) break;
+      const objEnd = closePos + closeMarker.length;
+      SEED_LANG_OFFSETS.set(langCode, { offset: objStart, length: objEnd - objStart });
+      cursor = objEnd;
+    }
+    if (SEED_LANG_OFFSETS.size === 0) {
+      const parsed = JSON.parse(buf.toString("utf8"));
+      SEED_FALLBACK_TRANSLATIONS = parsed?.translations || {};
+    }
+    return {
+      version: header?.version || 1,
+      updatedAt: header?.updatedAt || fallback.updatedAt,
+      autoSyncLanguages: Array.isArray(header?.autoSyncLanguages) ? header.autoSyncLanguages : [],
+      sourceStrings: Array.isArray(header?.sourceStrings) ? header.sourceStrings : []
+    };
+  } catch {
+    return fallback;
+  }
+})();
+
+function readSeedLanguageSlice(langCode) {
+  const entry = SEED_LANG_OFFSETS.get(langCode);
+  if (!entry) {
+    return SEED_FALLBACK_TRANSLATIONS?.[langCode] || {};
+  }
+  let fd = null;
+  try {
+    fd = openSync(SEED_DB_PATH, "r");
+    const slice = Buffer.allocUnsafe(entry.length);
+    const bytesRead = readSync(fd, slice, 0, entry.length, entry.offset);
+    const parsed = JSON.parse(slice.subarray(0, bytesRead).toString("utf8"));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  } finally {
+    if (fd !== null) {
+      try {
+        closeSync(fd);
+      } catch {
+        // Ignore close errors
+      }
+    }
+  }
+}
 
 const REVIEWED_SOURCE_ARRAY = Object.freeze(
   Array.from(
     new Set(
-      (Array.isArray(IMMUTABLE_SEED_RAW.sourceStrings) ? IMMUTABLE_SEED_RAW.sourceStrings : [])
+      (Array.isArray(SEED_METADATA.sourceStrings) ? SEED_METADATA.sourceStrings : [])
         .map((s) => String(s || "").trim())
         .filter(Boolean)
     )
@@ -68,6 +143,9 @@ const REVIEWED_SOURCE_ARRAY = Object.freeze(
 );
 
 const REVIEWED_SOURCE_PHRASES = new Set(REVIEWED_SOURCE_ARRAY);
+const REVIEWED_EN_IDENTITY_MAP = Object.freeze(
+  Object.fromEntries(REVIEWED_SOURCE_ARRAY.map((s) => [s, s]))
+);
 
 export function getReviewedSourcePhrases() {
   return REVIEWED_SOURCE_ARRAY;
@@ -87,11 +165,20 @@ export function applyReviewedCorrections(db, corrections) {
   }
   return db;
 }
+let cachedBundledCorrections = null;
 function bundledCorrections() {
-  const directory = resolve(__dirname,'../../data/i18n-reviewed');
-  if (!existsSync(directory)) return {};
-  return Object.fromEntries(readdirSync(directory).filter(file => /^[A-Z]{2}(?:-[A-Z]{2,4})?\.json$/.test(file))
-    .map(file => [file.slice(0,-5),readJsonFileSafe(resolve(directory,file)) || {}]));
+  if (cachedBundledCorrections) return cachedBundledCorrections;
+  const directory = resolve(__dirname, "../../data/i18n-reviewed");
+  if (!existsSync(directory)) {
+    cachedBundledCorrections = {};
+    return cachedBundledCorrections;
+  }
+  cachedBundledCorrections = Object.fromEntries(
+    readdirSync(directory)
+      .filter((file) => /^[A-Z]{2}(?:-[A-Z]{2,4})?\.json$/.test(file))
+      .map((file) => [file.slice(0, -5), readJsonFileSafe(resolve(directory, file)) || {}])
+  );
+  return cachedBundledCorrections;
 }
 
 export function isReviewedUiPhrase(raw) {
@@ -211,10 +298,57 @@ function getOrCreateMasterSecret(config) {
   }
 }
 
+const derivedScryptKeyCache = new Map();
+const MAX_SCRYPT_CACHE_ENTRIES = 64;
+const decryptedVaultFileCache = new Map();
+
+function deriveScryptKeyCached(masterSecret, saltBuf) {
+  const cacheKey = crypto
+    .createHmac("sha256", String(masterSecret))
+    .update(saltBuf)
+    .digest("hex");
+  const cached = derivedScryptKeyCache.get(cacheKey);
+  if (cached) return cached;
+  const derived = crypto.scryptSync(String(masterSecret), saltBuf, 32);
+  if (derivedScryptKeyCache.size >= MAX_SCRYPT_CACHE_ENTRIES) {
+    const oldest = derivedScryptKeyCache.keys().next().value;
+    if (oldest !== undefined) derivedScryptKeyCache.delete(oldest);
+  }
+  derivedScryptKeyCache.set(cacheKey, derived);
+  return derived;
+}
+
+function readDecryptedVaultFileCached(vPath, config) {
+  try {
+    if (!existsSync(vPath)) {
+      decryptedVaultFileCache.delete(vPath);
+      return "";
+    }
+    const st = statSync(vPath, { bigint: true });
+    const stamp = `${st.mtimeNs}:${st.ctimeNs}:${st.size}`;
+    const cached = decryptedVaultFileCache.get(vPath);
+    if (cached && cached.stamp === stamp) {
+      return cached.value;
+    }
+    const parsed = JSON.parse(readFileSync(vPath, "utf8"));
+    const vault = parsed?.vault || parsed;
+    if (!vault?.ciphertext) {
+      decryptedVaultFileCache.set(vPath, { stamp, value: "" });
+      return "";
+    }
+    const masterSecret = getOrCreateMasterSecret(config);
+    const value = decryptDeepLVaultPayload(vault, masterSecret);
+    decryptedVaultFileCache.set(vPath, { stamp, value });
+    return value;
+  } catch {
+    return "";
+  }
+}
+
 export function encryptDeepLApiKey(plainKey, masterSecret = "dune-local-ephemeral-vault-key") {
   const salt = crypto.randomBytes(16);
   const iv = crypto.randomBytes(12);
-  const key = crypto.scryptSync(String(masterSecret), salt, 32);
+  const key = deriveScryptKeyCached(String(masterSecret), salt);
   const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
   const ciphertext = Buffer.concat([cipher.update(String(plainKey).trim(), "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
@@ -235,7 +369,7 @@ export function decryptDeepLVaultPayload(vault, masterSecret = "dune-local-ephem
   const tag = Buffer.from(String(vault.tag || ""), "base64");
   const ciphertext = Buffer.from(String(vault.ciphertext || ""), "base64");
   if (salt.length < 8 || iv.length !== 12 || tag.length !== 16) return "";
-  const key = crypto.scryptSync(String(masterSecret), salt, 32);
+  const key = deriveScryptKeyCached(String(masterSecret), salt);
   const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8").trim();
@@ -298,19 +432,7 @@ export function decryptDeepLApiKey(configOrVault = {}) {
   }
 
   const vPath = vaultFilePath(configOrVault);
-  try {
-    if (existsSync(vPath)) {
-      const parsed = JSON.parse(readFileSync(vPath, "utf8"));
-      const vault = parsed?.vault || parsed;
-      if (vault?.ciphertext) {
-        const masterSecret = getOrCreateMasterSecret(configOrVault);
-        return decryptDeepLVaultPayload(vault, masterSecret);
-      }
-    }
-  } catch {
-    return "";
-  }
-  return "";
+  return readDecryptedVaultFileCached(vPath, configOrVault);
 }
 
 export function deeplApiBaseUrl(apiKey) {
@@ -404,33 +526,148 @@ let backgroundDeltaSyncRunning = false;
 let lastDeltaSyncAt = null;
 let lastDeltaSyncError = null;
 
-function mergeDatabasePayloads(seed, overlay) {
-  // Source phrases are strictly pinned to the immutable repository-reviewed seed catalog.
-  const sourceStrings = [...REVIEWED_SOURCE_ARRAY];
-  const translations = {};
-  for (const src of [seed?.translations, overlay?.translations]) {
-    if (!src || typeof src !== "object") continue;
-    for (const [langKey, dict] of Object.entries(src)) {
-      const code = normalizeLanguageCode(langKey);
-      if (!code || code === "EN" || !dict || typeof dict !== "object") continue;
-      if (!translations[code]) translations[code] = {};
-      for (const [orig, translated] of Object.entries(dict)) {
-        const cleanOrig = String(orig || "").trim();
-        const cleanTrans = String(translated || "").trim();
-        if (isSafeReviewedTranslation(cleanOrig, cleanTrans)) {
-          // Old provider failures were cached as English. They must not hide
-          // a real translation supplied by a newer reviewed seed catalog.
-          const existing = translations[code][cleanOrig];
-          if (cleanTrans === cleanOrig && existing && existing !== cleanOrig) continue;
-          translations[code][cleanOrig] = cleanTrans;
-        }
+const ALL_NON_EN_CODES = Object.freeze(
+  SUPPORTED_LANGUAGES.filter((l) => l.code !== "EN").map((l) => l.code)
+);
+
+function buildSingleLanguageDictionary(code, runtimeTranslations, correctionsByLang) {
+  const dict = {};
+  const seedSlice = readSeedLanguageSlice(code);
+  for (const [orig, translated] of Object.entries(seedSlice)) {
+    const cleanOrig = String(orig || "").trim();
+    const cleanTrans = String(translated || "").trim();
+    if (isSafeReviewedTranslation(cleanOrig, cleanTrans)) {
+      dict[cleanOrig] = cleanTrans;
+    }
+  }
+  const overlayDict = runtimeTranslations?.[code];
+  if (overlayDict && typeof overlayDict === "object") {
+    for (const [orig, translated] of Object.entries(overlayDict)) {
+      const cleanOrig = String(orig || "").trim();
+      const cleanTrans = String(translated || "").trim();
+      if (isSafeReviewedTranslation(cleanOrig, cleanTrans)) {
+        const existing = dict[cleanOrig];
+        if (cleanTrans === cleanOrig && existing && existing !== cleanOrig) continue;
+        dict[cleanOrig] = cleanTrans;
       }
     }
   }
-  const autoSyncSet = new Set(
-    SUPPORTED_LANGUAGES.filter((l) => l.core && l.code !== "EN").map((l) => l.code)
-  );
-  for (const list of [seed?.autoSyncLanguages, overlay?.autoSyncLanguages]) {
+  const reviewedDict = correctionsByLang?.[code];
+  if (reviewedDict && typeof reviewedDict === "object") {
+    for (const [orig, translated] of Object.entries(reviewedDict)) {
+      if (isSafeReviewedTranslation(orig, translated)) {
+        dict[orig] = translated;
+      }
+    }
+  }
+  return dict;
+}
+
+function createLazyTranslationsMap(runtimeTranslations, correctionsByLang) {
+  const materialized = {};
+  const deletedLangs = new Set();
+
+  const ensureLang = (rawProp) => {
+    if (typeof rawProp !== "string") return undefined;
+    const code = normalizeLanguageCode(rawProp);
+    if (!code || code === "EN") return undefined;
+    if (Object.prototype.hasOwnProperty.call(materialized, code)) {
+      return materialized[code];
+    }
+    if (deletedLangs.has(code)) {
+      return undefined;
+    }
+    const loaded = buildSingleLanguageDictionary(code, runtimeTranslations, correctionsByLang);
+    materialized[code] = loaded;
+    return loaded;
+  };
+
+  const proxy = new Proxy(materialized, {
+    get(target, prop, receiver) {
+      if (prop === "__materialized") return target;
+      if (prop === "__isDeleted") return (code) => deletedLangs.has(normalizeLanguageCode(code) || code);
+      if (prop === "__buildEphemeral") {
+        return (rawCode) => {
+          const code = normalizeLanguageCode(rawCode);
+          if (!code || code === "EN" || deletedLangs.has(code)) return {};
+          return buildSingleLanguageDictionary(code, runtimeTranslations, correctionsByLang);
+        };
+      }
+      if (typeof prop === "symbol") return Reflect.get(target, prop, receiver);
+      if (Object.prototype.hasOwnProperty.call(target, prop)) {
+        return target[prop];
+      }
+      const loaded = ensureLang(prop);
+      if (loaded !== undefined) return loaded;
+      return Reflect.get(target, prop, receiver);
+    },
+    set(target, prop, value) {
+      if (typeof prop === "string") {
+        const code = normalizeLanguageCode(prop) || prop;
+        deletedLangs.delete(code);
+        target[code] = value;
+        return true;
+      }
+      target[prop] = value;
+      return true;
+    },
+    deleteProperty(target, prop) {
+      if (typeof prop === "string") {
+        const code = normalizeLanguageCode(prop) || prop;
+        deletedLangs.add(code);
+        delete target[code];
+        return true;
+      }
+      delete target[prop];
+      return true;
+    },
+    has(target, prop) {
+      if (typeof prop === "string") {
+        const code = normalizeLanguageCode(prop);
+        if (code && code !== "EN" && !deletedLangs.has(code)) return true;
+      }
+      return Reflect.has(target, prop);
+    },
+    ownKeys(target) {
+      const keys = new Set([...ALL_NON_EN_CODES, ...Object.keys(target)]);
+      for (const del of deletedLangs) keys.delete(del);
+      return [...keys];
+    },
+    getOwnPropertyDescriptor(target, prop) {
+      if (typeof prop === "string") {
+        const code = normalizeLanguageCode(prop);
+        if (code && code !== "EN" && !deletedLangs.has(code)) {
+          return {
+            value: ensureLang(code),
+            writable: true,
+            enumerable: true,
+            configurable: true
+          };
+        }
+      }
+      return Reflect.getOwnPropertyDescriptor(target, prop);
+    }
+  });
+
+  return proxy;
+}
+
+function createDatabaseState(overlay) {
+  const sourceStrings = [...REVIEWED_SOURCE_ARRAY];
+  const normalizedOverlayTranslations = {};
+  if (overlay?.translations && typeof overlay.translations === "object") {
+    for (const [langKey, dict] of Object.entries(overlay.translations)) {
+      const code = normalizeLanguageCode(langKey);
+      if (code && code !== "EN" && dict && typeof dict === "object") {
+        normalizedOverlayTranslations[code] = dict;
+      }
+    }
+  }
+  const corrections = bundledCorrections();
+  const translations = createLazyTranslationsMap(normalizedOverlayTranslations, corrections);
+
+  const autoSyncSet = new Set(ALL_NON_EN_CODES);
+  for (const list of [SEED_METADATA.autoSyncLanguages, overlay?.autoSyncLanguages]) {
     if (Array.isArray(list)) {
       for (const item of list) {
         const code = normalizeLanguageCode(item);
@@ -438,12 +675,9 @@ function mergeDatabasePayloads(seed, overlay) {
       }
     }
   }
-  for (const code of Object.keys(translations)) {
-    autoSyncSet.add(code);
-  }
   return {
     version: 1,
-    updatedAt: overlay?.updatedAt || seed?.updatedAt || new Date().toISOString(),
+    updatedAt: overlay?.updatedAt || SEED_METADATA.updatedAt || new Date().toISOString(),
     autoSyncLanguages: Array.from(autoSyncSet).sort(),
     sourceStrings,
     translations
@@ -456,7 +690,7 @@ export function loadTranslationDatabase(config) {
     return memoryDb;
   }
   const runtime = readJsonFileSafe(rtPath);
-  memoryDb = applyReviewedCorrections(mergeDatabasePayloads(IMMUTABLE_SEED_RAW, runtime), bundledCorrections());
+  memoryDb = createDatabaseState(runtime);
   loadedRuntimePath = rtPath;
   return memoryDb;
 }
@@ -467,20 +701,24 @@ export function resetTranslationDatabaseCache() {
   volatilePeerVaultByScope.clear();
   envPeersBootstrappedScopes.clear();
   seenMeshNonces.clear();
+  decryptedVaultFileCache.clear();
 }
 
 export function saveTranslationDatabase(config, db = memoryDb) {
   if (!db) return;
-  applyReviewedCorrections(db,bundledCorrections());
   const rtPath = runtimeDbPath(config);
   if (resolve(rtPath) === resolve(SEED_DB_PATH)) {
     throw new Error("Refusing to overwrite immutable repository seed translation database.");
   }
-  // Ensure only reviewed source phrases and safe translations are persisted to runtime cache.
+  const corrections = bundledCorrections();
+  const rawMaterialized = db.translations?.__materialized || db.translations || {};
+  const existingRuntime = readJsonFileSafe(rtPath)?.translations || {};
   const sanitizedTranslations = {};
-  for (const [langCode, dict] of Object.entries(db.translations || {})) {
+
+  for (const [langCode, dict] of Object.entries(existingRuntime)) {
     const code = normalizeLanguageCode(langCode);
     if (!code || code === "EN" || !dict || typeof dict !== "object") continue;
+    if (Object.prototype.hasOwnProperty.call(rawMaterialized, code)) continue;
     sanitizedTranslations[code] = {};
     for (const [orig, trans] of Object.entries(dict)) {
       if (isSafeReviewedTranslation(orig, trans)) {
@@ -488,6 +726,35 @@ export function saveTranslationDatabase(config, db = memoryDb) {
       }
     }
   }
+
+  for (const [langCode, dict] of Object.entries(rawMaterialized)) {
+    const code = normalizeLanguageCode(langCode);
+    if (!code || code === "EN" || !dict || typeof dict !== "object") continue;
+    const reviewedForLang = corrections[code];
+    if (reviewedForLang && typeof reviewedForLang === "object") {
+      for (const [orig, trans] of Object.entries(reviewedForLang)) {
+        if (isSafeReviewedTranslation(orig, trans)) {
+          dict[orig] = trans;
+        }
+      }
+    }
+    const cleanDict = {};
+    for (const [orig, trans] of Object.entries(dict)) {
+      if (isSafeReviewedTranslation(orig, trans)) {
+        cleanDict[orig.trim()] = String(trans).trim();
+      }
+    }
+    // In-place update on materialized dictionary preserves deleted keys in memory while sanitizing bad entries
+    for (const key of Object.keys(dict)) {
+      if (!Object.prototype.hasOwnProperty.call(cleanDict, key)) {
+        delete dict[key];
+      } else {
+        dict[key] = cleanDict[key];
+      }
+    }
+    sanitizedTranslations[code] = cleanDict;
+  }
+
   const payloadToWrite = {
     version: 1,
     updatedAt: new Date().toISOString(),
@@ -497,7 +764,9 @@ export function saveTranslationDatabase(config, db = memoryDb) {
   };
   db.updatedAt = payloadToWrite.updatedAt;
   db.sourceStrings = [...REVIEWED_SOURCE_ARRAY];
-  db.translations = sanitizedTranslations;
+  if (!db.translations?.__materialized) {
+    db.translations = createLazyTranslationsMap(sanitizedTranslations, corrections);
+  }
   try {
     mkdirSync(dirname(rtPath), { recursive: true });
     writeJsonAtomic(rtPath, payloadToWrite, 0o600);
@@ -712,9 +981,22 @@ export async function syncAllDatabaseLanguages(config, { languages = null, fetch
 
   const summary = {};
   let totalTranslated = 0;
+  const rawMaterialized = db.translations?.__materialized || {};
   for (const lang of requested) {
-    if (!db.translations[lang]) db.translations[lang] = {};
     if (!db.autoSyncLanguages.includes(lang)) db.autoSyncLanguages.push(lang);
+    if (
+      !Object.prototype.hasOwnProperty.call(rawMaterialized, lang) &&
+      !db.translations?.__isDeleted?.(lang) &&
+      SEED_LANG_OFFSETS.has(lang)
+    ) {
+      summary[lang] = {
+        translatedNow: 0,
+        remaining: 0,
+        totalCached: REVIEWED_SOURCE_ARRAY.length
+      };
+      continue;
+    }
+    if (!db.translations[lang]) db.translations[lang] = {};
     const missing = REVIEWED_SOURCE_ARRAY.filter((src) => !db.translations[lang][src]);
     let translatedNow = 0;
     if (missing.length > 0) {
@@ -809,20 +1091,8 @@ export function resolveMeshEnrollmentSecret(configOrSecret = {}) {
     return envSecret;
   }
   const vPath = meshEnrollmentVaultPath(configOrSecret);
-  try {
-    if (existsSync(vPath)) {
-      const parsed = JSON.parse(readFileSync(vPath, "utf8"));
-      const vault = parsed?.vault || parsed;
-      if (vault?.ciphertext) {
-        const masterSecret = getOrCreateMasterSecret(configOrSecret);
-        const decrypted = decryptDeepLVaultPayload(vault, masterSecret);
-        return isValidMeshEnrollmentSecret(decrypted) ? decrypted : "";
-      }
-    }
-  } catch {
-    return "";
-  }
-  return "";
+  const decrypted = readDecryptedVaultFileCached(vPath, configOrSecret);
+  return isValidMeshEnrollmentSecret(decrypted) ? decrypted : "";
 }
 
 function deriveMeshSigningKey(configOrSecret) {
@@ -840,17 +1110,22 @@ function deriveMeshEnvelopeKey(contextNonce = "", configOrSecret = {}) {
     .digest();
 }
 
+const MAX_SEEN_MESH_NONCES = 4096;
+
 function consumeMeshReplayNonce(scopePrefix, nonce, nowSec) {
   if (!/^[0-9a-f]{24,64}$/i.test(String(nonce || ""))) return false;
-  if (seenMeshNonces.size > 4000) {
-    for (const [k, exp] of seenMeshNonces.entries()) {
-      if (exp < nowSec) seenMeshNonces.delete(k);
-    }
+  for (const [k, exp] of seenMeshNonces.entries()) {
+    if (exp < nowSec) seenMeshNonces.delete(k);
+    else break;
   }
   const key = `${scopePrefix}:${nonce}`;
   const existingExp = seenMeshNonces.get(key);
   if (existingExp && existingExp >= nowSec) {
     return false;
+  }
+  if (seenMeshNonces.size >= MAX_SEEN_MESH_NONCES) {
+    const oldestKey = seenMeshNonces.keys().next().value;
+    if (oldestKey !== undefined) seenMeshNonces.delete(oldestKey);
   }
   seenMeshNonces.set(key, nowSec + 130);
   return true;
@@ -1428,41 +1703,6 @@ export async function pushLanguagePackToPeers(langCode, translationsDict, config
 
   for (const peerBase of ramPeers) {
     try {
-      const nonceSeedHeaders = createDuneDockerMeshHeaders(mesh.nodeId, "POST", pushPath, ownOrigin, config, "");
-      const nonce = nonceSeedHeaders["x-dune-docker-mesh-nonce"];
-      const encryptedEnvelope = encryptMeshWireEnvelope(
-        {
-          nodeId: mesh.nodeId,
-          lang: code,
-          translations: reviewedOnlyDict
-        },
-        nonce,
-        config
-      );
-      const bodyObj = { envelope: encryptedEnvelope };
-      const bodyStr = JSON.stringify(bodyObj);
-      const reqHeaders = {
-        ...createDuneDockerMeshHeaders(mesh.nodeId, "POST", pushPath, ownOrigin, config, bodyObj),
-        "Content-Type": "application/json"
-      };
-      // Re-encrypt with the signed request's nonce so envelope and header nonce match.
-      const finalNonce = reqHeaders["x-dune-docker-mesh-nonce"];
-      const finalEnvelope = encryptMeshWireEnvelope(
-        {
-          nodeId: mesh.nodeId,
-          lang: code,
-          translations: reviewedOnlyDict
-        },
-        finalNonce,
-        config
-      );
-      const finalBodyObj = { envelope: finalEnvelope };
-      const finalBodyStr = JSON.stringify(finalBodyObj);
-      const signedHeaders = {
-        ...createDuneDockerMeshHeaders(mesh.nodeId, "POST", pushPath, ownOrigin, config, finalBodyObj),
-        "Content-Type": "application/json"
-      };
-      // Compute envelope & signature using the same nonce:
       const ts = String(Math.floor(Date.now() / 1000));
       const unifiedNonce = crypto.randomBytes(16).toString("hex");
       const unifiedEnvelope = encryptMeshWireEnvelope(
@@ -1580,9 +1820,17 @@ export async function syncLanguagePacksFromPeers(config = {}, { targetLang = nul
         ? peerCompleted.filter((c) => c === targetLang)
         : peerCompleted;
 
+      const rawMaterialized = db.translations?.__materialized || {};
       for (const langCode of langsToPull) {
         const code = normalizeLanguageCode(langCode);
         if (!code || code === "EN") continue;
+        if (
+          !Object.prototype.hasOwnProperty.call(rawMaterialized, code) &&
+          !db.translations?.__isDeleted?.(code) &&
+          SEED_LANG_OFFSETS.has(code)
+        ) {
+          continue;
+        }
         const localDict = db.translations[code] || {};
         const missingCount = REVIEWED_SOURCE_ARRAY.filter((s) => !localDict[s]).length;
         if (missingCount === 0) continue;
@@ -1652,6 +1900,7 @@ export async function syncLanguagePacksFromPeers(config = {}, { targetLang = nul
 export function getLanguageCatalogStatus(config) {
   const db = loadTranslationDatabase(config);
   const totalSource = REVIEWED_SOURCE_ARRAY.length;
+  const materialized = db.translations?.__materialized || {};
   const languages = SUPPORTED_LANGUAGES.map((lang) => {
     if (lang.code === "EN") {
       return {
@@ -1659,6 +1908,15 @@ export function getLanguageCatalogStatus(config) {
         translatedCount: totalSource,
         coveragePercent: 100,
         cachedInDb: true
+      };
+    }
+    // Avoid materializing untouched seed dictionaries just to compute status counts.
+    if (!Object.prototype.hasOwnProperty.call(materialized, lang.code) && SEED_LANG_OFFSETS.has(lang.code)) {
+      return {
+        ...lang,
+        translatedCount: totalSource,
+        coveragePercent: 100,
+        cachedInDb: totalSource > 0
       };
     }
     const dict = db.translations[lang.code] || {};
@@ -1775,8 +2033,8 @@ function enforceProtectedI18nRouteGate({ req, res, path, config, auth, apiKeys, 
     }
   }
 
-  // 3. Enforce IAM policy (`settings:write` -> Owner only in DEFAULT_POLICIES)
-  const effectiveSession = session?.tier ? session : { ...session, tier: session?.tier || "owner" };
+  // 3. Enforce IAM policy (`settings:write` -> Owner only in DEFAULT_POLICIES; fail-closed if tier is missing)
+  const effectiveSession = session?.tier ? session : { ...session, tier: "none" };
   if (!evaluate(effectiveSession, action)) {
     json(res, 403, { error: "Your account does not have permission to access this resource." });
     return null;
@@ -1786,12 +2044,66 @@ function enforceProtectedI18nRouteGate({ req, res, path, config, auth, apiKeys, 
   return effectiveSession;
 }
 
+const MAX_CACHED_PUBLIC_LANGS = 4;
+const sanitizedLangCache = new WeakMap();
+function getCachedSanitizedReviewedMap(db, code) {
+  if (!db || typeof db !== "object") {
+    return sanitizeReviewedTranslationsMap(db?.translations?.[code] || {});
+  }
+  let perDb = sanitizedLangCache.get(db);
+  if (!perDb) {
+    perDb = new Map();
+    sanitizedLangCache.set(db, perDb);
+  }
+  const rawMaterialized = db.translations?.__materialized;
+  const isMaterialized = Boolean(rawMaterialized && Object.prototype.hasOwnProperty.call(rawMaterialized, code));
+  if (!isMaterialized && db.translations?.__isDeleted?.(code)) {
+    perDb.delete(code);
+    return {};
+  }
+  const entry = perDb.get(code);
+  if (entry) {
+    if (!isMaterialized && entry.fromCleanSeed) {
+      perDb.delete(code);
+      perDb.set(code, entry);
+      return entry.sanitized;
+    }
+    const currentMatDict = rawMaterialized?.[code];
+    if (isMaterialized && entry.rawDict === currentMatDict && entry.dictSize === Object.keys(currentMatDict || {}).length) {
+      perDb.delete(code);
+      perDb.set(code, entry);
+      return entry.sanitized;
+    }
+  }
+  const rawDict = isMaterialized
+    ? (rawMaterialized[code] || {})
+    : (db.translations?.__buildEphemeral ? db.translations.__buildEphemeral(code) : (db.translations?.[code] || {}));
+  const sanitized = sanitizeReviewedTranslationsMap(rawDict);
+  if (perDb.size >= MAX_CACHED_PUBLIC_LANGS && !perDb.has(code)) {
+    const oldestKey = perDb.keys().next().value;
+    if (oldestKey !== undefined) perDb.delete(oldestKey);
+  }
+  perDb.set(code, {
+    rawDict: isMaterialized ? rawDict : null,
+    dictSize: isMaterialized ? Object.keys(rawDict).length : Object.keys(sanitized).length,
+    fromCleanSeed: !isMaterialized,
+    sanitized
+  });
+  return sanitized;
+}
+
 export async function handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json, fetchImpl = globalThis.fetch }) {
   try {
     // Public strictly read-only endpoints (never trigger provider work or state changes)
     if (path === "/api/i18n/languages" && req.method === "GET") {
       const status = getLanguageCatalogStatus(config);
-      return json(res, 200, status);
+      const etag = `W/"i18n-langs-${status.updatedAt || "seed"}-${status.totalSourceStrings}"`;
+      if (req?.headers?.["if-none-match"] === etag && typeof res?.writeHead === "function") {
+        res.writeHead(304, { etag, "cache-control": "private, max-age=15" });
+        res.end();
+        return;
+      }
+      return json(res, 200, status, { etag, "cache-control": "private, max-age=15" });
     }
 
     if (path === "/api/i18n/translations" && req.method === "GET") {
@@ -1802,6 +2114,12 @@ export async function handleI18nRoute({ req, res, path, url, config, auth, apiKe
       }
       const db = loadTranslationDatabase(config);
       const langMeta = LANGUAGE_MAP.get(code);
+      const etag = `W/"i18n-${code}-${db.updatedAt || "seed"}-${REVIEWED_SOURCE_ARRAY.length}"`;
+      if (req?.headers?.["if-none-match"] === etag && typeof res?.writeHead === "function") {
+        res.writeHead(304, { etag, "cache-control": "public, max-age=60, stale-while-revalidate=300" });
+        res.end();
+        return;
+      }
       if (code === "EN") {
         return json(res, 200, {
           lang: "EN",
@@ -1810,14 +2128,13 @@ export async function handleI18nRoute({ req, res, path, url, config, auth, apiKe
           dir: "ltr",
           totalSourceStrings: REVIEWED_SOURCE_ARRAY.length,
           translatedCount: REVIEWED_SOURCE_ARRAY.length,
-          translations: Object.fromEntries(REVIEWED_SOURCE_ARRAY.map((s) => [s, s]))
-        });
+          translations: REVIEWED_EN_IDENTITY_MAP
+        }, { etag, "cache-control": "public, max-age=60, stale-while-revalidate=300" });
       }
 
       // Strictly read-only dictionary lookup limited to reviewed phrases.
       // Public GET requests never trigger paid/external provider calls, even when auth cookies are present.
-      const rawDict = db.translations[code] || {};
-      const reviewedDict = sanitizeReviewedTranslationsMap(rawDict);
+      const reviewedDict = getCachedSanitizedReviewedMap(db, code);
       return json(res, 200, {
         lang: code,
         name: langMeta.name,
@@ -1827,15 +2144,19 @@ export async function handleI18nRoute({ req, res, path, url, config, auth, apiKe
         translatedCount: Object.keys(reviewedDict).length,
         updatedAt: db.updatedAt,
         translations: reviewedDict
-      });
+      }, { etag, "cache-control": "public, max-age=60, stale-while-revalidate=300" });
     }
 
     if (path === '/api/i18n/suggestions' && req.method === 'POST') {
       const session = enforceProtectedI18nRouteGate({req,res,path,config,auth,apiKeys,json});
       if (!session) return;
       const input = (await readJson(req)) || {};
+      const langUpper = String(input.lang || '').toUpperCase();
+      const sourceTrimmed = String(input.source || '').trim();
       const db = loadTranslationDatabase(config);
-      const current = db.translations[String(input.lang || '').toUpperCase()]?.[input.source] || input.source;
+      const current = (LANGUAGE_MAP.has(langUpper) && langUpper !== 'EN' && isReviewedUiPhrase(sourceTrimmed))
+        ? (getCachedSanitizedReviewedMap(db, langUpper)[sourceTrimmed] || sourceTrimmed)
+        : input.source;
       const catalog={ sourceStrings:REVIEWED_SOURCE_ARRAY, languages:SUPPORTED_LANGUAGES };
       try { validateCorrection({ ...input,current },catalog); } catch(error) { return json(res,400,{error:error.message}); }
       try {
@@ -1945,9 +2266,14 @@ export async function handleI18nRoute({ req, res, path, url, config, auth, apiKe
       }
       const db = loadTranslationDatabase(config);
       const total = REVIEWED_SOURCE_ARRAY.length;
-      const completedLanguages = Object.entries(db.translations)
-        .filter(([, dict]) => dict && total > 0 && Object.keys(sanitizeReviewedTranslationsMap(dict)).length >= Math.floor(total * 0.95))
-        .map(([code]) => code);
+      const materialized = db.translations?.__materialized || {};
+      const completedLanguages = ALL_NON_EN_CODES.filter((code) => {
+        if (!Object.prototype.hasOwnProperty.call(materialized, code) && SEED_LANG_OFFSETS.has(code)) {
+          return total > 0;
+        }
+        const dict = db.translations[code];
+        return dict && total > 0 && Object.keys(sanitizeReviewedTranslationsMap(dict)).length >= Math.floor(total * 0.95);
+      });
       const attestation = createDuneDockerMeshResponseSignature(mesh.nodeId, verified.nonce, "manifest", config);
       return json(res, 200, {
         envelope: encryptMeshWireEnvelope(
@@ -1978,8 +2304,8 @@ export async function handleI18nRoute({ req, res, path, url, config, auth, apiKe
         return json(res, 400, { error: "Invalid language pack code." });
       }
       const db = loadTranslationDatabase(config);
-      // Export strictly reviewed static phrases only.
-      const reviewedDict = sanitizeReviewedTranslationsMap(db.translations[code] || {});
+      // Export strictly reviewed static phrases only without pinning unmutated languages in __materialized.
+      const reviewedDict = getCachedSanitizedReviewedMap(db, code);
       const attestation = createDuneDockerMeshResponseSignature(mesh.nodeId, verified.nonce, code, config);
       return json(res, 200, {
         envelope: encryptMeshWireEnvelope(
