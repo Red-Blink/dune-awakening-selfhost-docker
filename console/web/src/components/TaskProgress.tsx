@@ -11,6 +11,9 @@ export function TaskProgress({ task, onDismiss }: { task: Task | null; onDismiss
 
   useEffect(() => {
     setLiveTask(task);
+  }, [task]);
+
+  useEffect(() => {
     if (!task || terminalStatuses.has(task.status)) return;
     const source = new EventSource(`/api/setup/tasks/${encodeURIComponent(task.id)}/stream`, { withCredentials: true });
     source.onmessage = (event) => {
@@ -20,7 +23,7 @@ export function TaskProgress({ task, onDismiss }: { task: Task | null; onDismiss
     };
     source.onerror = () => source.close();
     return () => source.close();
-  }, [task?.id]);
+  }, [task?.id, task?.status]);
 
   useEffect(() => {
     if (!liveTask || !terminalStatuses.has(liveTask.status) || !onDismiss) return;
@@ -45,12 +48,12 @@ export function TaskProgress({ task, onDismiss }: { task: Task | null; onDismiss
         <div className="action-row">
           <StatusBadge status={liveTask.status} />
           {warnings.length > 0 && <span className="badge badge-warn task-warning-count" title={warningLabel(warnings.length)} aria-label={warningLabel(warnings.length)}><TriangleAlert size={13} aria-hidden="true" />{warnings.length}</span>}
-          {terminalStatuses.has(liveTask.status) && <button onClick={onDismiss}>Dismiss</button>}
+          {terminalStatuses.has(liveTask.status) && onDismiss && <button onClick={onDismiss}>Dismiss</button>}
         </div>
       </div>
       <p>{formatUiSentence(message)}</p>
       {liveTask.operation === "init" && !terminalStatuses.has(liveTask.status) && <p className="task-elapsed">This can take a while on a fresh server. Elapsed time: <strong>{formatElapsed(now - new Date(liveTask.startedAt).getTime())}</strong></p>}
-      {liveTask.operation === "init" && <ProgressBar progress={initTaskProgress(liveTask)} />}
+      {liveTask.operation === "init" && <ProgressBar progress={initTaskProgress(liveTask)} completed={liveTask.status === "succeeded"} />}
       {error && <p className="error">{formatUiSentence(error)}</p>}
       {/* A task can succeed while a queued base or vehicle write inside it did
           not apply. That is not a task failure -- the restart itself worked --
@@ -81,16 +84,16 @@ function formatElapsed(ms: number) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-function ProgressBar({ progress }: { progress: { percent: number; label: string } }) {
+function ProgressBar({ progress, completed }: { progress: { percent: number; label: string }; completed: boolean }) {
   return (
-    <div className="deployment-progress">
+    <div className={`deployment-progress${completed ? " result-ok" : ""}`}>
       <div className="progress-row">
         <div className="progress-track" aria-label={`Deployment progress ${progress.percent}%`}>
           <div className="progress-fill" style={{ width: `${progress.percent}%` }} />
         </div>
         <strong>{progress.percent}%</strong>
       </div>
-      <span>{progress.label}</span>
+      {!completed && <span>{progress.label}</span>}
     </div>
   );
 }
@@ -106,7 +109,7 @@ function formatUiSentence(value: unknown, pending = false) {
 
 function taskTitle(task: Task) {
   if (task.operation === "init") {
-    if (task.status === "succeeded") return "Deployment Complete";
+    if (task.status === "succeeded") return "Deployment Complete!";
     if (task.status === "failed" && diskSpaceFailure(task)) return "Not Enough Disk Space";
     if (task.status === "failed" && steamContentHostFailure(task)) return "Steam Download Failed";
     if (task.status === "failed") return "Deployment Failed";

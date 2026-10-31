@@ -39,7 +39,7 @@ function renderWizard() {
 
 async function chooseRestore() {
   renderWizard();
-  fireEvent.click(await screen.findByText("Restore a Dune Docker system backup"));
+  fireEvent.click(await screen.findByText("Restore a Dune Docker System Backup"));
 }
 
 // The host step gates Next until its checks pass, so a test cannot simply click
@@ -71,6 +71,68 @@ describe("setup wizard restore path", () => {
     window.localStorage.clear();
   });
 
+  it("keeps completed deployment on Install until Next, then offers immediate Console access", async () => {
+    vi.useFakeTimers();
+    try {
+      const completed = { ...done("deployment"), type: "setup", operation: "init" };
+      vi.mocked(setupApi.init).mockResolvedValue({ task: completed } as never);
+      vi.mocked(setupApi.task).mockResolvedValue({ task: completed } as never);
+      const onSetupComplete = vi.fn();
+      render(<SetupWizard mode="first-run" initialStep={8} onSetupComplete={onSetupComplete} />);
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Start Deployment" })); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(20000); });
+      expect(screen.getByRole("button", { name: "Deployment Complete" })).toBeDisabled();
+      expect(screen.getByRole("heading", { name: "Deployment Complete!" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Dismiss" })).not.toBeInTheDocument();
+      expect(screen.queryByText("Deployment complete.")).not.toBeInTheDocument();
+      expect(screen.queryByText("Congratulations")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Opening the finish step/)).not.toBeInTheDocument();
+      expect(onSetupComplete).not.toHaveBeenCalled();
+      expect(document.querySelector(".deployment-progress")).toHaveClass("result-ok");
+      fireEvent.click(screen.getByRole("button", { name: /^Next$/ }));
+      expect(screen.getByText("Congratulations")).toBeInTheDocument();
+      expect(document.querySelector(".setup-success-countdown strong")).toHaveTextContent("15");
+      fireEvent.click(screen.getByRole("button", { name: "Open the Console Now" }));
+      expect(onSetupComplete).toHaveBeenCalledTimes(1);
+      await act(async () => { await vi.advanceTimersByTimeAsync(20000); });
+      expect(onSetupComplete).toHaveBeenCalledTimes(1);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("opens the Console automatically only after the Finish countdown", async () => {
+    vi.useFakeTimers();
+    try {
+      const completed = { ...done("deployment"), type: "setup", operation: "init" };
+      vi.mocked(setupApi.init).mockResolvedValue({ task: completed } as never);
+      vi.mocked(setupApi.task).mockResolvedValue({ task: completed } as never);
+      const onSetupComplete = vi.fn();
+      render(<SetupWizard mode="first-run" initialStep={8} onSetupComplete={onSetupComplete} />);
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Start Deployment" })); });
+      fireEvent.click(screen.getByRole("button", { name: /^Next$/ }));
+      for (let second = 0; second < 14; second++) await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(onSetupComplete).not.toHaveBeenCalled();
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(onSetupComplete).toHaveBeenCalledTimes(1);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("retains the banner across steps and uses the requested Review labels", async () => {
+    const { container } = render(<SetupWizard mode="first-run" initialStep={4} />);
+    const banner = container.querySelector(".setup-banner img");
+    expect(banner).toHaveAttribute("src", "/images/features/five_survivors.png");
+    expect(screen.getByLabelText("Install Mode")).toHaveValue("public");
+    fireEvent.click(screen.getByRole("button", { name: /^Next$/ }));
+    fireEvent.change(screen.getByPlaceholderText("Paste token"), { target: { value: "preview-token" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Next$/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Next$/ }));
+    expect(container.querySelector(".setup-banner img")).toBe(banner);
+    for (const text of ["Funcom Token", "Admin Auth", "Secret Storage", "Ready to Save", "Enabled Unless ADMIN_AUTH_DISABLED is Set", "Saved Privately on Server", "Don't Expose Publicly"]) {
+      expect(screen.getByText(text, { exact: true })).toBeInTheDocument();
+    }
+    expect(screen.getByText(/\/TCP Private Only$/)).toBeInTheDocument();
+    expect(screen.getAllByText(/\/UDP$/)).toHaveLength(2);
+  });
+
   it("swaps in the restore steps and drops the ones the archive supplies", async () => {
     await chooseRestore();
     // Identity, token, ports and review all collect values the restore
@@ -98,7 +160,7 @@ describe("setup wizard restore path", () => {
     await walkToArchive();
 
     fireEvent.click(screen.getByText("1. Welcome"));
-    fireEvent.click(await screen.findByText("Deploy a new server"));
+    fireEvent.click(await screen.findByText("Deploy a New Server"));
 
     const identity = await screen.findByText("5. Server Identity");
     expect(identity).toBeDisabled();
@@ -295,7 +357,7 @@ describe("setup wizard restore path", () => {
     expect(await screen.findByLabelText("Archive passphrase")).toBeTruthy();
 
     fireEvent.click(screen.getByText("1. Welcome"));
-    fireEvent.click(await screen.findByText("Deploy a new server"));
+    fireEvent.click(await screen.findByText("Deploy a New Server"));
 
     expect(window.localStorage.getItem("arrakis.setupRestore")).toBeNull();
   });

@@ -314,6 +314,7 @@ h1, h2, h3, h4, h5 { color: var(--title); line-height: 1.2; letter-spacing: 0; }
 .sidebar-nav-main { display: inline-flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
 .sidebar-nav-main > svg { flex: 0 0 auto; }
 .sidebar-nav-main > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-nav a > .sidebar-external-link { width: 14px; height: 14px; flex: 0 0 auto; margin-inline-start: auto; opacity: .75; }
 .sidebar-nav-indicators { display: inline-flex; align-items: center; justify-content: flex-end; min-width: 24px; margin-left: auto; flex: 0 0 auto; }
 .sidebar-nav button.active {
   border-color: #96559e;
@@ -1525,13 +1526,19 @@ main { padding: 22px; min-width: 0; }
 .setup-path-choice { margin-top: 18px; }
 .setup-path-choice h4 { margin: 0 0 10px; }
 .setup-path-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.setup-banner { height: clamp(160px, 18vw, 280px); margin-bottom: 18px; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; }
+.setup-banner img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 55%; }
 /* A choice, not a submit: these read as cards and the selected one is the only
    thing the stepper acts on, so the border carries the state rather than a
    filled background that would compete with the panel's own. */
-/* justify-content is reset because the base `button` rule centres it for a
-   flex row; left as centre, this grid centres its auto track and the shorter
-   card's text sits indented from its own padding edge. */
-.setup-path-option { display: grid; justify-content: start; gap: 6px; text-align: left; padding: 14px; height: auto; border: 1px solid #39332c; border-radius: 8px; background: rgba(0,0,0,.12); }
+/* Keep the icon and text aligned to the starting edge of each card. */
+.setup-path-option { display: flex; align-items: flex-start; justify-content: start; gap: 12px; text-align: left; padding: 14px; height: auto; border: 1px solid #39332c; border-radius: 8px; background: rgba(0,0,0,.12); }
+.setup-path-icon { flex: 0 0 auto; margin-top: 2px; color: var(--title); }
+.setup-path-content { display: grid; gap: 6px; min-width: 0; }
+.setup-path-content strong { font-size: 16px; }
+.setup-success-countdown { margin-bottom: 0; }
+.setup-open-console-row { margin-top: 6px; }
+.setup-open-console-row .setup-open-console { display: inline; width: auto; min-height: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 3px; box-shadow: none; }
 .setup-path-option strong { color: #f1dfc1; }
 .setup-path-option span { color: #cbbb9c; font-size: 13px; line-height: 1.5; }
 .setup-path-option.selected { border-color: var(--accent); }

@@ -897,9 +897,9 @@ export function App() {
               ))}
               {group.title === "Community" && (
                 <>
-                  <a className="sidebar-request-button" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer"><MessageCircle size={18} />Requests</a>
-                  <a className="sidebar-request-button" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer"><Bug size={18} />Report Issues</a>
-                  <a className="sidebar-request-button" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer"><CircleHelp size={18} />Get Help</a>
+                  <a className="sidebar-request-button" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer"><span className="sidebar-nav-main"><MessageCircle size={18} aria-hidden="true" /><span>Requests</span></span><ExternalLink className="sidebar-external-link" size={14} aria-hidden="true" /></a>
+                  <a className="sidebar-request-button" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer"><span className="sidebar-nav-main"><Bug size={18} aria-hidden="true" /><span>Report Issues</span></span><ExternalLink className="sidebar-external-link" size={14} aria-hidden="true" /></a>
+                  <a className="sidebar-request-button" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer"><span className="sidebar-nav-main"><CircleHelp size={18} aria-hidden="true" /><span>Get Help</span></span><ExternalLink className="sidebar-external-link" size={14} aria-hidden="true" /></a>
                 </>
               )}
             </section>
