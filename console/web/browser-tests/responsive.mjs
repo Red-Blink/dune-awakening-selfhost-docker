@@ -8,6 +8,12 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const root = fileURLToPath(new URL('../dist/', import.meta.url));
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox'] });
 const sizes = [[320, 740], [390, 844], [768, 1024], [844, 390], [1024, 600], [1280, 720], [1440, 900], [1536, 864], [1920, 1080], [2560, 1440]];
+async function checkCommunityButtons(page) {
+  const buttons = await page.locator('.topbar-links .community-button').evaluateAll(elements => elements.map(element => ({height:element.getBoundingClientRect().height,weight:getComputedStyle(element).fontWeight})));
+  assert.equal(buttons.length,3,'language, Discord and Support controls are present');
+  assert.ok(Math.max(...buttons.map(button=>button.height))-Math.min(...buttons.map(button=>button.height))<=1,'community controls share the same height');
+  assert.ok(buttons.every(button=>button.weight==='400'),'community labels use normal font weight');
+}
 let firstRun = false;
 try {
   const page = await browser.newPage({ hasTouch: true });
@@ -71,6 +77,7 @@ try {
   await page.getByRole('button',{name:'Create Key',exact:true}).waitFor();
   for (const [width, height] of sizes) {
     await page.setViewportSize({ width, height });
+    await checkCommunityButtons(page);
     const toggle = page.getByRole('button', { name: 'Open navigation' });
     if (width <= 900 && await toggle.isVisible()) await toggle.click();
     for (const selector of ['.sidebar', '.sidebar-nav']) {

@@ -504,12 +504,13 @@ main { padding: 22px; min-width: 0; }
   align-items: center;
   justify-content: center;
   gap: 9px;
+  height: 40px;
   min-height: 40px;
-  padding: 10px 15px;
+  padding: 0 15px;
   border: 1px solid transparent;
   border-radius: 8px;
   color: #fff;
-  font-weight: 800;
+  font-weight: 400;
   line-height: 1;
   text-decoration: none;
   text-shadow: 0 1px 2px rgba(31, 7, 34, .68);
@@ -544,7 +545,6 @@ main { padding: 22px; min-width: 0; }
 .topbar-links .language-shortcut {
   flex: 0 0 44px;
   width: 44px;
-  min-height: 44px;
   padding: 0;
 }
 .language-shortcut[aria-expanded="true"] { outline: 2px solid var(--title); outline-offset: 2px; }
