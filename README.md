@@ -130,17 +130,14 @@ Developers can start with the [Official Addon Template](https://github.com/Red-B
 
 ## Contributing
 
-Issues, fixes, and improvements are welcome. Keep secrets, generated runtime files, and backups out of Git, and never expose the Web UI to untrusted users.
+Dune Docker welcomes contributions from developers, server owners, and players. Check existing [issues](https://github.com/Red-Blink/dune-awakening-selfhost-docker/issues) and [pull requests](https://github.com/Red-Blink/dune-awakening-selfhost-docker/pulls) before starting to avoid duplicate work.
 
-Translation corrections can be submitted from the Console's language globe: select **Suggest a Translation Fix**, find the incorrect phrase, edit it, and submit. A credit name is optional; contributors need no GitHub account. Suggestions do not immediately change the interface or other installations. Existing Console authentication and the separate `community:suggest-translation` permission protect submissions; API keys cannot submit corrections.
+- **Report Bugs:** Include your project version, steps to reproduce, and what you expected to happen. Add relevant logs or screenshots with passwords and personal information removed.
+- **Suggest Improvements:** Explain the problem your idea would solve and how it would help the community. Discuss larger changes in an issue before implementing them.
+- **Submit Pull Requests:** Keep changes focused, link related issues, and explain what changed and how you tested it.
+- **Help Beyond Code:** Improve documentation, test changes, create community addons, or suggest translation corrections directly from the Console.
 
-Founders review suggestions at `https://dunedocker.app/translations.html` using the existing website Discord login. Accepting or editing a correction adds it to the approved queue. **Prepare Translation Update** freezes approved corrections into a batch. The repository's **Prepare Community Translation Updates** workflow creates an ordinary PR every 15 minutes or on manual dispatch, then requests the normal CI checks. A maintainer reviews, merges, and includes the changes in a normal project release. No suggestions are automatically merged, released, or installed.
-
-Reviewed corrections are stored in `console/api/data/i18n-reviewed/<LANG>.json`, using the original English phrase as the key. They take precedence over generated translations and older runtime caches. `credits.json` preserves optional contributor credit. Machine translation maintenance only fills the generated catalog and never overwrites these reviewed files. CI validates phrase keys, languages, placeholders and safe text. Run `node console/api/scripts/export-translation-catalog.mjs` after updating interface phrases; commit the public catalog along with the reviewed source changes.
-
-Every suggestion receives a permanent reference such as **TR-000001**, shown in its Console receipt and review card. Reviewers can find it by ID or open `https://dunedocker.app/translations.html#TR-000001` to see the original wording, correction, review history, and static source locations with nearby interface labels. Context contains only reviewed public interface text; verify meaning and layout in the Console before approving. Prepared updates have independent pagination. Translation PR descriptions link back to the included suggestion references.
-
-Maintainers must publish the website review service and this workflow, and enable GitHub's **Allow GitHub Actions to create and approve pull requests** repository setting before activating PR preparation. The workflow itself never approves or merges a PR. Website deployment/authentication details and isolated integration-test instructions are in the directory-service repository. The Console language picker has no provider-key or peer-network setup requirement.
+For questions or to discuss an idea, join the [Discord Community](https://discord.gg/duneawakeningdocker).
 
 ## Credits and License
 
