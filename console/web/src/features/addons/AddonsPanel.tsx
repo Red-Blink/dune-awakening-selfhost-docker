@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { addonsApi, type AddonLifecycle, type CommunityAddonSummary, type InstalledAddon } from "../../api/addons";
 import { addonUpdateAvailable, hasAddonUpdates } from "./addonVersions";
@@ -23,6 +23,7 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
   const [openAddonId, setOpenAddonId] = useState("");
   const [expandedDescriptions, setExpandedDescriptions] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState<{ title: string; message: string; tone: "ok" | "fail" } | null>(null);
+  const addonFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   async function load() {
     setLoading(true);
@@ -172,17 +173,21 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
     if (!openAddon) return undefined;
     const activeAddon = openAddon;
     function onMessage(event: MessageEvent) {
-      if (event.origin !== window.location.origin) return;
+      if (!addonFrameRef.current || event.source !== addonFrameRef.current.contentWindow) return;
+      const fromSameOrigin = event.origin === window.location.origin;
+      const fromSandboxedFrame = event.origin === "null" && Boolean(addonFrameRef.current && event.source === addonFrameRef.current.contentWindow);
+      if (!fromSameOrigin && !fromSandboxedFrame) return;
       const request = normalizeAddonBridgeRequest(event.data);
       if (!request || request.addonId !== activeAddon.id) return;
       const source = event.source as Window | null;
       if (!source) return;
+      const targetOrigin = event.origin === "null" ? "*" : event.origin;
       void (async () => {
         try {
           const response = await addonsApi.bridge(activeAddon.id, request.action, request.payload);
-          source.postMessage({ type: "dune-addon-response", requestId: request.requestId, ok: true, result: response.result }, event.origin);
+          source.postMessage({ type: "dune-addon-response", requestId: request.requestId, ok: true, result: response.result }, targetOrigin);
         } catch (err) {
-          source.postMessage({ type: "dune-addon-response", requestId: request.requestId, ok: false, error: formatAddonError(err) }, event.origin);
+          source.postMessage({ type: "dune-addon-response", requestId: request.requestId, ok: false, error: formatAddonError(err) }, targetOrigin);
         }
       })();
     }
@@ -220,7 +225,7 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
       {openAddon
         ? <>
           <div className="panel-title"><h2>{openAddon.name}</h2></div>
-          <iframe className="addon-frame" title={openAddon.name} src={addonContentUrl(openAddon)} />
+          <iframe ref={addonFrameRef} className="addon-frame" title={openAddon.name} src={addonContentUrl(openAddon)} sandbox="allow-scripts" referrerPolicy="no-referrer" />
         </>
         : <div className="result-panel result-fail"><strong>Addon unavailable.</strong><p>This pinned addon is not installed, enabled, or fully loaded yet.</p></div>}
     </section>;
@@ -257,7 +262,7 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
     />
     {openAddon && <section className="action-section">
       <div className="panel-title"><h4>{openAddon.name}</h4></div>
-      <iframe className="addon-frame" title={openAddon.name} src={addonContentUrl(openAddon)} />
+      <iframe ref={addonFrameRef} className="addon-frame" title={openAddon.name} src={addonContentUrl(openAddon)} sandbox="allow-scripts" referrerPolicy="no-referrer" />
     </section>}
   </section>;
 }

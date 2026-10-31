@@ -235,6 +235,7 @@ export function loadConfig() {
     adminPasswordEnvManaged,
     generatedDir,
     secretsDir,
+    sessionStoreFile: resolve(generatedDir, "sessions.json"),
     apiKeysFile: resolve(secretsDir, "api-keys.json"),
     auditLog: resolve(generatedDir, "web-admin-audit.jsonl"),
     restartHistoryFile: resolve(generatedDir, "restart-history.jsonl"),
@@ -330,6 +331,7 @@ function repairRootOwnedHostState(repoRoot) {
     resolve(repoRoot, "runtime/generated/restart-queue-state.json"),
     resolve(repoRoot, "runtime/generated/restart-schedule.env"),
     resolve(repoRoot, "runtime/generated/shutdown-protection.env"),
+    resolve(repoRoot, "runtime/generated/sessions.json"),
     resolve(repoRoot, "runtime/generated/sietch-config.json"),
     resolve(repoRoot, "runtime/generated/spicefield-overrides.json"),
     resolve(repoRoot, "runtime/generated/learned-spice-locations.json"),
@@ -405,7 +407,7 @@ export function readConsoleBuildId(staticDir, fallback = "dev") {
   }
 }
 
-function resolveAdminBindHost(value) {
+export function resolveAdminBindHost(value) {
   const raw = String(value || "0.0.0.0").trim();
   if (raw && raw !== "auto") return raw;
   return detectPrivateIpv4() || "127.0.0.1";

@@ -117,6 +117,10 @@ docker run -d \
   --name dune-rmq-admin \
   --network dune-net \
   --restart unless-stopped \
+  --health-cmd "rabbitmq-diagnostics -q ping" \
+  --health-interval 30s \
+  --health-timeout 10s \
+  --health-retries 3 \
   -p "127.0.0.1:${RMQ_ADMIN_PORT}:5672" \
   -p "127.0.0.1:${RMQ_ADMIN_HTTP_PORT}:15672/tcp" \
   -v "$(host_path "$PWD/runtime/rabbitmq-admin/config/rabbitmq.conf"):/etc/rabbitmq/rabbitmq.conf:ro" \
@@ -127,6 +131,10 @@ docker run -d \
   --name dune-rmq-game \
   --network dune-net \
   --restart unless-stopped \
+  --health-cmd "rabbitmq-diagnostics -q ping" \
+  --health-interval 30s \
+  --health-timeout 10s \
+  --health-retries 3 \
   -p "${RMQ_GAME_PORT}:5672/tcp" \
   -p "127.0.0.1:${RMQ_GAME_LOCAL_HTTP_PORT}:15672/tcp" \
   -p "${RMQ_GAME_HTTP_PORT}:15672/tcp" \

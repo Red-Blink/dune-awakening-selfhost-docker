@@ -205,6 +205,7 @@ jobs:
           tests/autoscaler-env-forwarding-test.sh
           python3 tests/test_autoscaler_log_cache.py
           python3 tests/test_chat_binding_batch.py
+          python3 tests/test_game_container_security.py
           tests/psql-transport-test.sh
           tests/rmq-transport-test.sh
           tests/postgres-shutdown-test.sh

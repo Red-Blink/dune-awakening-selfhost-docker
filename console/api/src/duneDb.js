@@ -73,6 +73,27 @@ let mapRegionNamesCache = null;
 let augmentCompatibilityCache = null;
 const PLAYER_TARGET_CACHE_TTL_MS = 3000;
 const playerTargetCache = new Map(); // id -> { promise, expiresAt }
+const queueFileCache = new Map(); // path -> { stats, parsed }
+
+function readCachedQueueJson(file) {
+  let stats;
+  try {
+    stats = statSync(file, { bigint: true });
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      queueFileCache.delete(file);
+      return null;
+    }
+    throw error;
+  }
+  const cached = queueFileCache.get(file);
+  if (cached && ["dev", "ino", "mtimeNs", "ctimeNs", "size"].every(key => cached.stats[key] === stats[key])) {
+    return cached.parsed;
+  }
+  const parsed = JSON.parse(readFileSync(file, "utf8"));
+  queueFileCache.set(file, { stats, parsed });
+  return parsed;
+}
 
 export class UnsupportedCapabilityError extends Error {
   constructor(message, details = {}) {
@@ -157,14 +178,50 @@ export async function routineDefinition(db, oid) {
   return result.rows[0];
 }
 
-export async function listTables(db, schema = "dune") {
+export async function listTables(db, schema = "dune", options = {}) {
   assertIdentifier(schema, "schema");
+  if (options?.approximate === true) {
+    const approx = await db.query(`
+      select t.table_schema as schema,
+             t.table_name as name,
+             greatest(coalesce(s.n_live_tup, c.reltuples::bigint, 0), 0)::bigint::text as row_count
+      from information_schema.tables t
+      left join pg_namespace n on n.nspname = t.table_schema
+      left join pg_class c on c.relnamespace = n.oid and c.relname = t.table_name and c.relkind in ('r', 'p')
+      left join pg_stat_user_tables s on s.relid = c.oid
+      where t.table_type = 'BASE TABLE' and t.table_schema = $1
+      order by t.table_name`, [schema]);
+    return approx.rows.map((row) => ({
+      schema: row.schema,
+      name: row.name,
+      row_count: String(row.row_count ?? "0")
+    }));
+  }
   const result = await db.query(`
     select t.table_schema as schema,
            t.table_name as name
     from information_schema.tables t
     where t.table_type = 'BASE TABLE' and t.table_schema = $1
     order by t.table_name`, [schema]);
+  if (result.rows.length === 0) return [];
+  if (result.rows.length === 1) {
+    const row = result.rows[0];
+    const safe = quoteQualified(row.schema, row.name);
+    const count = await db.query(`select count(*)::bigint as row_count from ${safe}`);
+    return [{ ...row, row_count: count.rows[0]?.row_count ?? "0" }];
+  }
+  const unionParts = result.rows.map((row, index) => {
+    const safe = quoteQualified(row.schema, row.name);
+    return `select ${index}::int as table_idx, (select count(*)::bigint from ${safe}) as row_count`;
+  });
+  const batched = await db.query(unionParts.join(" union all "));
+  if (Array.isArray(batched?.rows) && batched.rows.some((r) => r && Object.prototype.hasOwnProperty.call(r, "table_idx"))) {
+    const countsByIdx = new Map(batched.rows.map((r) => [Number(r.table_idx), r.row_count ?? "0"]));
+    return result.rows.map((row, index) => ({
+      ...row,
+      row_count: String(countsByIdx.get(index) ?? "0")
+    }));
+  }
   const rows = [];
   for (const row of result.rows) {
     const safe = quoteQualified(row.schema, row.name);
@@ -4763,9 +4820,8 @@ export function hasQueuedBaseChildAccess(repoRoot) {
 
 export function listQueuedBaseChildAccess(repoRoot) {
   const file = pendingBaseChildAccessFile(repoRoot);
-  if (!existsSync(file)) return [];
   try {
-    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    const parsed = readCachedQueueJson(file);
     if (!Array.isArray(parsed)) return [];
     const seen = new Set();
     return parsed.map(normalizePendingChildAccess).filter((entry) => {
@@ -11627,9 +11683,8 @@ function normalizePendingRefill(entry) {
 
 export function listQueuedGeneratorRefills(repoRoot) {
   const file = pendingRefillFile(repoRoot);
-  if (!existsSync(file)) return [];
   try {
-    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    const parsed = readCachedQueueJson(file);
     if (!Array.isArray(parsed)) return [];
     // One entry per base, so a double-clicked button cannot queue a base twice.
     const seen = new Set();
@@ -12081,9 +12136,8 @@ function normalizePendingBaseDelete(entry) {
 
 export function listQueuedBaseDeletes(repoRoot) {
   const file = pendingBaseDeleteFile(repoRoot);
-  if (!existsSync(file)) return [];
   try {
-    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    const parsed = readCachedQueueJson(file);
     if (!Array.isArray(parsed)) return [];
     // One entry per base, so a double-clicked button cannot queue it twice.
     const seen = new Set();
@@ -12297,9 +12351,8 @@ function normalizePendingVehicleDelete(entry) {
 
 export function listQueuedVehicleDeletes(repoRoot) {
   const file = pendingVehicleDeleteFile(repoRoot);
-  if (!existsSync(file)) return [];
   try {
-    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    const parsed = readCachedQueueJson(file);
     if (!Array.isArray(parsed)) return [];
     // One entry per vehicle, so a double-clicked button cannot queue it twice.
     const seen = new Set();
@@ -14038,9 +14091,8 @@ function pendingWaterRefillFile(repoRoot) {
 
 export function listQueuedWaterRefills(repoRoot) {
   const file = pendingWaterRefillFile(repoRoot);
-  if (!existsSync(file)) return [];
   try {
-    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    const parsed = readCachedQueueJson(file);
     if (!Array.isArray(parsed)) return [];
     const seen = new Set();
     return parsed.map(normalizePendingRefill).filter((entry) => {

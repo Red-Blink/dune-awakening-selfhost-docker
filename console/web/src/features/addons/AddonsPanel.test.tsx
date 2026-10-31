@@ -94,6 +94,18 @@ it("reports failed cleanup and keeps the addon visible and disabled for retry", 
 });
 
 describe("AddonsPanel updates", () => {
+  it("only bridges messages from the active sandboxed addon frame", async () => {
+    vi.mocked(addonsApi.bridge).mockResolvedValue({ ok: true, result: {} });
+    render(<AddonsPanel pinnedAddons={[]} setPinnedAddons={vi.fn()} selectedAddonId={installedAddon.id} clearSelectedAddon={vi.fn()} setAddonUpdateAvailable={vi.fn()} confirmAction={vi.fn().mockResolvedValue(true)} />);
+    const frame = await screen.findByTitle(installedAddon.name) as HTMLIFrameElement;
+    expect(frame).toHaveAttribute("sandbox", "allow-scripts");
+    expect(frame).toHaveAttribute("referrerpolicy", "no-referrer");
+    const data = { type: "dune-addon-request", addonId: installedAddon.id, requestId: "test-request", action: "leadership.players.list", payload: {} };
+    window.dispatchEvent(new MessageEvent("message", { data, origin: window.location.origin, source: window }));
+    expect(addonsApi.bridge).not.toHaveBeenCalled();
+    window.dispatchEvent(new MessageEvent("message", { data, origin: "null", source: frame.contentWindow }));
+    await waitFor(() => expect(addonsApi.bridge).toHaveBeenCalledWith(installedAddon.id, data.action, {}));
+  });
   it("keeps multiple permission labels contained beside addon status", async () => {
     render(<AddonsPanel
       pinnedAddons={[]}

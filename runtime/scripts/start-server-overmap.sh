@@ -15,6 +15,8 @@ source runtime/scripts/fake-k8s-serviceaccount.sh
 
 # shellcheck source=runtime/scripts/lib/postgres.sh
 source runtime/scripts/lib/postgres.sh
+# shellcheck source=runtime/scripts/lib/game-container.sh
+source runtime/scripts/lib/game-container.sh
 IMAGE="$(resolve_game_server_image)"
 
 TOKEN_FILE="runtime/secrets/funcom-token.txt"
@@ -54,91 +56,7 @@ mapfile -t GAME_EXTERNAL_ADDRESS_ENV < <(game_external_address_override_env_args
 validate_game_external_address_override_env_args "${GAME_EXTERNAL_ADDRESS_ENV[@]}"
 
 bind_partition_to_live_server() {
-  local partition_id="$1"
-  local map_name="$2"
-  local game_port="$3"
-  local igw_port="$4"
-  local tries="${5:-30}"
-  local sleep_seconds="${6:-2}"
-  local live_server_id="" i
-
-  for i in $(seq 1 "$tries"); do
-    live_server_id="$(psql_value "
-      select coalesce(server_id, '')
-      from dune.farm_state
-      where map = '${map_name//\'/\'\'}'
-        and game_port = $game_port
-        and igw_port = $igw_port
-        and coalesce(alive, false) = true
-      order by ready desc, server_id
-      limit 1;
-    " | tr -d '\r[:space:]')"
-
-    if [ -n "$live_server_id" ]; then
-      dune_psql -v ON_ERROR_STOP=1 -c "
-begin;
-update dune.world_partition
-set server_id = '$live_server_id'
-where partition_id = $partition_id;
-create temporary table dune_rebound_stale_accounts(account_id bigint primary key) on commit drop;
-insert into dune_rebound_stale_accounts(account_id)
-select distinct ps.account_id
-from dune.player_state ps
-left join dune.farm_state fs on fs.server_id = ps.server_id
-where ps.previous_server_partition_id = $partition_id
-  and ps.account_id is not null
-  and coalesce(ps.character_state::text, '') <> 'Deleted'
-  and coalesce(ps.server_id, '') <> '$live_server_id'
-  and (
-    coalesce(ps.server_id, '') = ''
-    or fs.server_id is null
-    or (
-      fs.map = '${map_name//\'/\'\'}'
-      and fs.game_port = $game_port
-      and fs.igw_port = $igw_port
-      and fs.server_id <> '$live_server_id'
-    )
-  );
-with target as (
-  select partition_id, coalesce(dimension_index, 0) as dimension_index
-  from dune.world_partition
-  where partition_id = $partition_id
-)
-update dune.player_state ps
-set
-  server_id = '$live_server_id',
-  previous_server_partition_id = target.partition_id,
-  home_dimension_index = target.dimension_index,
-  return_dimension_index = target.dimension_index
-from target
-where ps.account_id in (select account_id from dune_rebound_stale_accounts);
-with target as (
-  select partition_id, coalesce(dimension_index, 0) as dimension_index
-  from dune.world_partition
-  where partition_id = $partition_id
-)
-update dune.encrypted_player_state eps
-set
-  server_id = '$live_server_id',
-  previous_server_partition_id = target.partition_id,
-  return_dimension_index = target.dimension_index
-from target
-where eps.account_id in (select account_id from dune_rebound_stale_accounts);
-delete from dune.farm_state
-where map = '${map_name//\'/\'\'}'
-  and server_id <> '$live_server_id'
-  and game_port = $game_port
-  and igw_port = $igw_port;
-commit;
-" >/dev/null
-      printf '%s' "$live_server_id"
-      return 0
-    fi
-
-    sleep "$sleep_seconds"
-  done
-
-  return 1
+  bind_core_partition_to_live_server "$@"
 }
 
 mkdir -p runtime/game/overmap/Saved
@@ -178,15 +96,15 @@ commit;
 
 ensure_host_latency_tuned
 mapfile -t MEMORY_SWAP_ARGS < <(memory_swap_docker_args "$MEMORY")
+mapfile -t GAME_CONTAINER_SECURITY_ARGS < <(game_container_security_args)
+GAME_SECRET_ENV_FILE="$(prepare_game_container_secret_file overmap)"
 
 docker run -d \
   "${DUNE_DOCKER_LOG_ARGS[@]}" \
   --name dune-server-overmap \
   --network host \
   --restart unless-stopped \
-  --privileged \
-  --cap-add SYS_ADMIN \
-  --security-opt seccomp=unconfined \
+  "${GAME_CONTAINER_SECURITY_ARGS[@]}" \
   --memory "$MEMORY" \
   "${MEMORY_SWAP_ARGS[@]}" \
   --memory-reservation "$MEMORY" \
@@ -194,6 +112,7 @@ docker run -d \
   -v "$(host_path "$PWD/runtime/game/artifacts"):/home/dune/artifacts" \
   -v "$(host_path "$PWD/runtime/container"):/opt/dune-local:ro" \
   -v "$(host_path "$FAKE_K8S_SERVICEACCOUNT_DIR"):/run/secrets/kubernetes.io/serviceaccount:ro" \
+  -v "$(host_path "$GAME_SECRET_ENV_FILE"):/run/secrets/dune-game-env:ro" \
   -e "POD_UID=docker-overmap" \
   -e "POD_NAME=${BATTLEGROUP_ID}-sg-overmap-pod-2" \
   -e "POD_IP=$MULTIHOME_IP" \
@@ -206,40 +125,7 @@ docker run -d \
   -e "BATTLEGROUP_DISPLAY_NAME=$BATTLEGROUP_ID" \
   -e "BATTLEGROUP_TITLE=$SERVER_TITLE" \
   -e "FC_CRASHREPORTER_LOGS=/home/dune/server/DuneSandbox/Saved/CrashReporterLogs" \
-  -e "FuncomLiveServices__ServiceAuthToken=$FUNCOM_TOKEN" \
   -e "FuncomLiveServices__RmqTlsEnabled=true" \
-  -e "RMQ_HTTP_TOKEN_AUTH_SECRET=$RMQ_HTTP_TOKEN_AUTH_SECRET" \
-  -e "DUNE_SERVER_LOGIN_PASSWORD_SECRET=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "DUNE_USERNAME_SERVER_LOGIN_SECRET=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "DUNE_LOGIN_PASSWORD_SKEW_SECONDS=$LOGIN_PASSWORD_SKEW_SECONDS" \
-  -e "ServerLoginPasswordSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "UsernameServerLoginSecret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "LoginPasswordSkew=$LOGIN_PASSWORD_SKEW_SECONDS" \
-  -e "BackendLoginConfiguration__ServerLoginPasswordSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "BackendLoginConfiguration__UsernameServerLoginSecret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "BackendLoginConfiguration__LoginPasswordSkew=$LOGIN_PASSWORD_SKEW_SECONDS" \
-  -e "BackendLoginConfiguration__ServerLoginPasswordSecretEnvironmentVariable=DUNE_SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "BackendLoginConfiguration__UsernameServerLoginSecretEnvironmentVariable=DUNE_USERNAME_SERVER_LOGIN_SECRET" \
-  -e "BackendLoginConfiguration__LoginPasswordSkewEnvironmentVariable=DUNE_LOGIN_PASSWORD_SKEW_SECONDS" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__ServerLoginPasswordSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__UsernameServerLoginSecret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__LoginPasswordSkew=$LOGIN_PASSWORD_SKEW_SECONDS" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__ServerLoginPasswordSecretEnvironmentVariable=DUNE_SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__UsernameServerLoginSecretEnvironmentVariable=DUNE_USERNAME_SERVER_LOGIN_SECRET" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__LoginPasswordSkewEnvironmentVariable=DUNE_LOGIN_PASSWORD_SKEW_SECONDS" \
-  -e "Secret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "UsernameSecret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "ServerLoginSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "ChecksumSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "BackendLoginConfiguration__Secret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "BackendLoginConfiguration__UsernameSecret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "BackendLoginConfiguration__ServerLoginSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "BackendLoginConfiguration__ChecksumSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__Secret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__UsernameSecret=$USERNAME_SERVER_LOGIN_SECRET" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__ServerLoginSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "AuthenticationConfiguration__BackendLoginConfiguration__ChecksumSecret=$SERVER_LOGIN_PASSWORD_SECRET" \
-  -e "fls-apikey=$FLS_APIKEY" \
   "${SIETCH_LOGIN_PASSWORD_ARGS[@]}" \
   "$IMAGE" \
   /opt/dune-local/run-server.sh \

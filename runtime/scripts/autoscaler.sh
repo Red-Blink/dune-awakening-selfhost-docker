@@ -1815,10 +1815,9 @@ map_for_partition() {
 
 survival_fallback_target_info() {
   local home_dimension_index="$1"
-  local row
 
   if [ -n "$home_dimension_index" ] && printf '%s' "$home_dimension_index" | grep -Eq '^[0-9]+$'; then
-    row="$(psql_value "
+    psql_value "
       select
         partition_id || '|' ||
         map || '|' ||
@@ -1826,14 +1825,10 @@ survival_fallback_target_info() {
         coalesce(server_id, '')
       from dune.world_partition
       where lower(map) = lower('Survival_1')
-        and dimension_index = $home_dimension_index
-      order by partition_id
+      order by (case when dimension_index = $home_dimension_index then 0 else 1 end), dimension_index, partition_id
       limit 1;
-    ")"
-    if [ -n "$row" ]; then
-      echo "$row"
-      return 0
-    fi
+    "
+    return 0
   fi
 
   psql_value "
@@ -2156,20 +2151,21 @@ PY
       [ -n "${flow_id:-}" ] || continue
       hub_travel_seen "$flow_id" && continue
 
-      local target_map account_id destination_row target_partition_id target_dimension target_server_id current_map target_respawn_map
+      local target_map account_info account_id destination_row target_partition_id target_dimension target_server_id current_map target_respawn_map
       target_map="$(named_destination_target_map "$destination_name" 2>/dev/null || true)"
       [ -n "$target_map" ] || continue
 
-      account_id="$(psql_value "select id from dune.accounts where \"user\" = '${funcom_id//\'/\'\'}' limit 1;")"
-      [ -n "$account_id" ] || continue
-
-      current_map="$(psql_value "
-        select coalesce(fs.map, '')
-        from dune.player_state ps
+      account_info="$(psql_value "
+        select a.id || '|' || coalesce(fs.map, '')
+        from dune.accounts a
+        left join dune.player_state ps on ps.account_id = a.id
         left join dune.farm_state fs on fs.server_id = ps.server_id
-        where ps.account_id = $account_id
+        where a.\"user\" = '${funcom_id//\'/\'\'}'
         limit 1;
       ")"
+      [ -n "$account_info" ] || continue
+      IFS='|' read -r account_id current_map <<< "$account_info"
+      [ -n "$account_id" ] || continue
 
       destination_row="$(psql_value "
         select

@@ -50,18 +50,30 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && arch="$(dpkg --print-architecture)" \
     && case "$arch" in \
-        amd64) docker_arch="x86_64"; compose_arch="x86_64" ;; \
-        arm64) docker_arch="aarch64"; compose_arch="aarch64" ;; \
+        amd64) \
+          docker_arch="x86_64"; \
+          compose_arch="x86_64"; \
+          docker_sha256="4f798b3ee1e0140eab5bf30b0edc4e84f4cdb53255a429dc3bbae9524845d640"; \
+          compose_sha256="383ce6698cd5d5bbf958d2c8489ed75094e34a77d340404d9f32c4ae9e12baf0" \
+          ;; \
+        arm64) \
+          docker_arch="aarch64"; \
+          compose_arch="aarch64"; \
+          docker_sha256="e6b53725a73763ab3f988c73f8772eaed429754c1a579db5ff11f21990fd1817"; \
+          compose_sha256="6e9fbd5daa20dca5d7d89145081ae8155d68ef2928b497d9f85b54fe0f9dbb2c" \
+          ;; \
         *) echo "Unsupported architecture for Docker CLI: $arch" >&2; exit 1 ;; \
        esac \
-    && curl -fsSL "https://download.docker.com/linux/static/stable/${docker_arch}/docker-27.5.1.tgz" -o /tmp/docker.tgz \
+    && curl -fsSL --proto '=https' "https://download.docker.com/linux/static/stable/${docker_arch}/docker-27.5.1.tgz" -o /tmp/docker.tgz \
+    && echo "${docker_sha256}  /tmp/docker.tgz" | sha256sum -c - \
     && tar -xzf /tmp/docker.tgz -C /tmp \
     && mv /tmp/docker/docker /usr/local/bin/docker \
     && chmod +x /usr/local/bin/docker \
     && rm -rf /tmp/docker /tmp/docker.tgz \
     && mkdir -p /usr/local/lib/docker/cli-plugins \
-    && curl -fsSL "https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-${compose_arch}" \
+    && curl -fsSL --proto '=https' "https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-${compose_arch}" \
         -o /usr/local/lib/docker/cli-plugins/docker-compose \
+    && echo "${compose_sha256}  /usr/local/lib/docker/cli-plugins/docker-compose" | sha256sum -c - \
     && chmod +x /usr/local/lib/docker/cli-plugins/docker-compose \
     && docker --version \
     && docker compose version
