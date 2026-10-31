@@ -44,8 +44,6 @@ Nie musisz znać się na Linux. Instalator sprawdza podstawy i przygotowuje Dock
 | Dysk | 200 GB lub więcej |
 | Token Funcom | Bezpiecznie wprowadzany podczas konfiguracji w przeglądarce |
 
-Na hostach SELinux, np. Fedora i Bazzite, używana jest wspólna etykieta montowań projektu. Ograniczenie etykietami jest wyłączone tylko dla Console potrzebującej gniazda Docker hosta. SELinux hosta oraz etykiety i uprawnienia gniazda pozostają bez zmian. Po aktualizacji uruchom `dune console reload`. Zainstaluj Docker wcześniej, jeśli jego automatyczny instalator nie obsługuje dystrybucji.
-
 <details>
 <summary>Pamięć i Procesor</summary>
 

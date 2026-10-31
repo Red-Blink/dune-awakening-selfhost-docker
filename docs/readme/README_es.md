@@ -46,8 +46,6 @@ No necesitas ser experto en Linux. El instalador comprueba los requisitos básic
 | Almacenamiento | 200 GB o más |
 | Token de Funcom | Se introduce de forma segura durante la configuración en el navegador |
 
-En equipos con SELinux, como Fedora y Bazzite, la configuración incluye una etiqueta compartida para los montajes del proyecto y desactiva el confinamiento por etiquetas únicamente para la Console, que necesita acceder al socket Docker del equipo. SELinux sigue activo en el equipo; las etiquetas y los permisos del socket Docker no cambian. Después de actualizar una instalación existente, ejecuta `dune console reload` para aplicar estos ajustes a la Console. Docker debe estar instalado previamente si su instalador automático no admite tu distribución.
-
 <details>
 <summary>Orientación Sobre Memoria y CPU</summary>
 

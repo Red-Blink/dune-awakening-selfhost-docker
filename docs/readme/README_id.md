@@ -44,8 +44,6 @@ Tidak perlu ahli Linux. Pemasang memeriksa dasar-dasarnya dan menyiapkan Docker 
 | Penyimpanan | 200 GB atau lebih |
 | Token Funcom | Dimasukkan dengan aman saat penyiapan di peramban |
 
-Host SELinux seperti Fedora dan Bazzite memakai label mount proyek bersama. Pembatasan label dinonaktifkan hanya untuk Console yang membutuhkan soket Docker host; SELinux host, label dan izin soket tetap sama. Setelah peningkatan jalankan `dune console reload`. Pasang Docker terlebih dahulu jika pemasang otomatis Docker tidak mendukung distribusi Anda.
-
 <details>
 <summary>Panduan RAM dan CPU</summary>
 

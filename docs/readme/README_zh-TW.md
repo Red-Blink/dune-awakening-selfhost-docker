@@ -44,8 +44,6 @@ Dune Docker Console 是基於 Docker 的 Dune: Awakening 專用伺服器管理�
 | 儲存 | 200 GB 以上 |
 | Funcom 權杖 | 在瀏覽器設定時安全輸入 |
 
-Fedora、Bazzite 等 SELinux 主機會採用共用專案掛載標籤，且僅對需要存取主機 Docker 通訊端的 Console 關閉標籤隔離。主機 SELinux、通訊端標籤與權限維持不變。升級後執行 `dune console reload` 套用設定；若 Docker 自動安裝程式不支援你的發行版，請先安裝 Docker。
-
 <details>
 <summary>記憶體與 CPU 建議</summary>
 

@@ -44,8 +44,6 @@ Non serve essere esperti di Linux. Il programma d’installazione verifica i req
 | Archiviazione | 200 GB o più |
 | Token Funcom | Inserito in sicurezza durante la configurazione nel browser |
 
-Su SELinux, come Fedora e Bazzite, viene usata un’etichetta condivisa per i montaggi del progetto. Il confinamento tramite etichette è disabilitato solo per Console, che richiede il socket Docker dell’host. SELinux dell’host, etichette e permessi del socket restano invariati. Dopo l’aggiornamento esegui `dune console reload`. Installa prima Docker se il suo installatore automatico non supporta la distribuzione.
-
 <details>
 <summary>Indicazioni su RAM e CPU</summary>
 

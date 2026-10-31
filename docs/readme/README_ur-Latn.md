@@ -44,8 +44,6 @@ Linux expert hona zaroori nahin. Installer bunyadi sharaait check karta aur supp
 | Storage | 200 GB ya zyada |
 | Funcom Token | Browser setup mein mehfooz tareeqe se enter hota hai |
 
-Fedora aur Bazzite jaisay SELinux hosts par project mounts ka shared label istemal hota hai. Label confinement sirf Console ke liye band hoti hai kyun ke usay host Docker socket chahiye. Host SELinux, socket labels aur permissions nahin badalte. Upgrade ke baad `dune console reload` chalayein. Agar Docker ka automatic installer aap ki distribution support nahin karta to Docker pehle install karein.
-
 <details>
 <summary>RAM aur CPU ki Rehnumai</summary>
 

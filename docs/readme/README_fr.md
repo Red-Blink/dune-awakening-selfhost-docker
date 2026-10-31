@@ -46,8 +46,6 @@ Pas besoin d’être spécialiste de Linux. L’installateur effectue les vérif
 | Stockage | Au moins 200 Go |
 | Jeton Funcom | Saisi de manière sécurisée lors de la configuration dans le navigateur |
 
-Sur les systèmes SELinux comme Fedora et Bazzite, la configuration de la Console utilise un étiquetage partagé pour le montage du projet et désactive l’isolation par étiquette SELinux uniquement pour la Console, qui doit accéder au socket Docker de l’hôte. SELinux reste actif sur l’hôte ; les étiquettes et permissions du socket Docker restent inchangées. Après la mise à niveau d’une installation existante, exécutez `dune console reload` pour appliquer ces paramètres. Docker doit déjà être installé si l’installation automatique ne prend pas en charge votre distribution.
-
 <details>
 <summary>Conseils Sur La Mémoire Et Le Processeur</summary>
 

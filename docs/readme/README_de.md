@@ -46,8 +46,6 @@ Du musst kein Linux-Experte sein. Das Installationsprogramm prüft die Grundlage
 | Speicherplatz | Mindestens 200 GB |
 | Funcom-Token | Wird bei der Einrichtung sicher im Browser eingegeben |
 
-Auf SELinux-Systemen wie Fedora und Bazzite verwendet die Console-Konfiguration eine gemeinsame Projekt-Mount-Kennzeichnung und deaktiviert die SELinux-Label-Isolierung ausschließlich für die Console, die auf den Docker-Socket des Hosts zugreifen muss. SELinux auf dem Host bleibt aktiv; Kennzeichnungen und Berechtigungen des Docker-Sockets bleiben unverändert. Führe nach dem Upgrade einer bestehenden Installation `dune console reload` aus, um diese Einstellungen anzuwenden. Unterstützt das automatische Docker-Installationsprogramm deine Distribution nicht, muss Docker bereits installiert sein.
-
 <details>
 <summary>Hinweise Zu Arbeitsspeicher Und CPU</summary>
 

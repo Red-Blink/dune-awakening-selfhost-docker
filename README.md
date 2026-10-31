@@ -46,14 +46,6 @@ You do not need to be a Linux expert. The installer checks the basics and prepar
 | Storage | 200 GB or more |
 | Funcom token | Entered securely during browser setup |
 
-On SELinux hosts such as Fedora and Bazzite, the Console configuration includes
-a shared project mount label and disables SELinux label confinement only for the
-Console, which needs access to the host Docker socket. Host SELinux remains enabled;
-the Docker socket's labels and permissions are unchanged. After upgrading an existing
-installation, run `dune console reload` to apply these settings to the Console.
-Docker must already be installed if its automatic installer does not support your
-distribution.
-
 <details>
 <summary>Memory & CPU Guidance</summary>
 

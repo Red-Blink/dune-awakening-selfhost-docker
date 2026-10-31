@@ -44,8 +44,6 @@ Não é preciso ser especialista em Linux. O instalador verifica o básico e pre
 | Armazenamento | 200 GB ou mais |
 | Token Funcom | Informado com segurança na configuração pelo navegador |
 
-Em hosts SELinux, como Fedora e Bazzite, usa-se um rótulo compartilhado nas montagens do projeto. O confinamento por rótulo é desativado apenas para a Console, que precisa acessar o socket Docker do host. SELinux do host, rótulos e permissões do socket permanecem iguais. Após atualizar, execute `dune console reload`. Instale Docker previamente se o instalador automático dele não aceitar sua distribuição.
-
 <details>
 <summary>Orientações de Memória e CPU</summary>
 

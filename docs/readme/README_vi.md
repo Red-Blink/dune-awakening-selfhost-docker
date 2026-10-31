@@ -44,8 +44,6 @@ Không cần là chuyên gia Linux. Trình cài đặt kiểm tra điều kiện
 | Lưu trữ | 200 GB trở lên |
 | Token Funcom | Nhập an toàn khi thiết lập trên trình duyệt |
 
-Trên Fedora, Bazzite và máy dùng SELinux, cấu hình dùng nhãn gắn kết dự án dùng chung và chỉ tắt cách ly nhãn cho Console cần truy cập socket Docker. SELinux của máy, nhãn và quyền socket không đổi. Sau nâng cấp chạy `dune console reload`. Cài Docker trước nếu trình cài tự động của Docker không hỗ trợ bản phân phối.
-
 <details>
 <summary>Hướng Dẫn RAM và CPU</summary>
 

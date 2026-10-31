@@ -44,8 +44,6 @@ Linux の専門知識は不要です。インストーラーが基本条件を�
 | ストレージ | 200 GB 以上 |
 | Funcom トークン | ブラウザーの設定時に安全に入力 |
 
-Fedora や Bazzite など SELinux 環境ではプロジェクトのマウントに共有ラベルを使用し、ホストの Docker ソケットが必要な Console のみラベルによる隔離を無効にします。ホストの SELinux、ソケットのラベルと権限は変わりません。更新後は `dune console reload` で適用してください。Docker の自動インストーラーが非対応のディストリビューションでは、事前に Docker を導入してください。
-
 <details>
 <summary>メモリと CPU の目安</summary>
 

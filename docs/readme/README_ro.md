@@ -44,8 +44,6 @@ Nu trebuie să fii expert Linux. Instalatorul verifică bazele și pregătește 
 | Stocare | 200 GB sau mai mult |
 | Token Funcom | Introdus în siguranță la configurarea în browser |
 
-Pe gazde SELinux precum Fedora și Bazzite se folosește o etichetă comună pentru montările proiectului. Izolarea prin etichete se dezactivează numai pentru Console, care necesită socketul Docker al gazdei. SELinux al gazdei, etichetele și permisiunile socketului nu se schimbă. După actualizare rulează `dune console reload`. Instalează Docker înainte dacă instalatorul automat Docker nu acceptă distribuția.
-
 <details>
 <summary>Memorie și Procesor</summary>
 

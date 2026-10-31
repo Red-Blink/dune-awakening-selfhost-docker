@@ -44,8 +44,6 @@ Linux 전문가일 필요는 없습니다. 설치 도구가 기본 요건을 확
 | 저장 공간 | 200 GB 이상 |
 | Funcom 토큰 | 브라우저 설정 중 안전하게 입력 |
 
-Fedora, Bazzite 같은 SELinux 호스트에서는 공유 프로젝트 마운트 레이블을 사용하고, 호스트 Docker 소켓에 접근해야 하는 Console에만 레이블 격리를 해제합니다. 호스트 SELinux와 소켓 레이블·권한은 유지됩니다. 업그레이드 후 `dune console reload`를 실행하세요. 자동 Docker 설치가 배포판을 지원하지 않으면 Docker를 미리 설치해야 합니다.
-
 <details>
 <summary>메모리와 CPU 안내</summary>
 

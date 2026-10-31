@@ -44,8 +44,6 @@ Linux uzmanı olmanız gerekmez. Kurucu temel koşulları denetler ve desteklene
 | Depolama | 200 GB veya üzeri |
 | Funcom Belirteci | Tarayıcı kurulumu sırasında güvenle girilir |
 
-Fedora ve Bazzite gibi SELinux sistemlerinde paylaşılan proje bağlama etiketi kullanılır. Etiket kısıtlaması yalnızca ana makinenin Docker soketine erişmesi gereken Console için kaldırılır; ana makinenin SELinux'u, soket etiketleri ve izinleri değişmez. Yükseltmeden sonra `dune console reload` çalıştırın. Docker'ın otomatik kurucusu dağıtımınızı desteklemiyorsa Docker önceden kurulmalıdır.
-
 <details>
 <summary>Bellek ve İşlemci Rehberi</summary>
 
