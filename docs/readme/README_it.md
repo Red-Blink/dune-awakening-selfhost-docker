@@ -29,7 +29,7 @@ Dune Docker Console è un gestore di server dedicati Dune: Awakening basato su D
 - **Costruisci e Condividi:** Progetti di basi 3D, importazione e condivisione di planimetrie, profilo pubblico e test di latenza.
 - **Personalizza:** Addon comunitari, Discord, diverse lingue e correzioni delle traduzioni dalla comunità.
 
-Consulta la [Galleria di Schermate](../screenshots.md).
+Prendi il controllo ed esplora il tuo centro di comando! [Prova la console](https://try.dunedocker.app/) con dati di esempio, senza installazione.
 
 ## Requisiti
 

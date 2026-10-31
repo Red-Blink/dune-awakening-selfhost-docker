@@ -29,7 +29,7 @@ To nieoficjalny projekt społeczności, niepowiązany z Funcom, bez jego aprobat
 - **Buduj i Udostępniaj:** Projektowanie baz 3D, import i udostępnianie planów, publiczny profil serwera i pomiary opóźnień.
 - **Dostosuj:** Dodatki społeczności, integracja Discord, wiele języków i społecznościowe poprawki tłumaczeń.
 
-Zobacz [Galerię Zrzutów](../screenshots.md).
+Przejmij stery i odkryj swoje centrum dowodzenia! [Wypróbuj konsolę](https://try.dunedocker.app/) z przykładowymi danymi — bez instalacji.
 
 ## Wymagania
 

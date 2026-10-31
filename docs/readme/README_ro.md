@@ -29,7 +29,7 @@ Este un proiect comunitar neoficial, fără afiliere, aprobare, sponsorizare sau
 - **Construiește și Distribuie:** Proiectează baze 3D, importă și partajează planuri, prezintă serverul prin profil public și teste de latență.
 - **Personalizează:** Addonuri comunitare, Discord, mai multe limbi și corecturi de traducere din comunitate.
 
-Vezi [Galeria de Capturi](../screenshots.md).
+Preia controlul și explorează centrul tău de comandă! [Încearcă consola](https://try.dunedocker.app/) cu date de exemplu, fără instalare.
 
 ## Cerințe
 

@@ -31,7 +31,7 @@ Das Projekt ist experimentell. Funcom kann das Verhalten selbst gehosteter Serve
 - **Bauen & Teilen:** Basen in 3D entwerfen, Baupläne importieren und teilen sowie den Server mit öffentlichem Profil und Latenztests präsentieren.
 - **Individuell Anpassen:** Community-Addons, Discord-Integration, mehrere Oberflächensprachen und Übersetzungskorrekturen aus der Community.
 
-Mehr zeigt die [Screenshot-Galerie](../screenshots.md).
+Übernimm das Steuer und entdecke deine Kommandozentrale! [Probiere die Konsole aus](https://try.dunedocker.app/) – mit Beispieldaten und ohne Installation.
 
 ## Voraussetzungen
 

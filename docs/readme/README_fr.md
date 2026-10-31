@@ -31,7 +31,7 @@ Le projet est expérimental. Le fonctionnement de l’auto-hébergement Funcom p
 - **Construire Et Partager :** Concevoir des bases en 3D, importer et partager des plans, présenter son serveur avec un profil public et des mesures de latence.
 - **Personnaliser :** Addons communautaires, intégration Discord, plusieurs langues d’interface et corrections de traduction proposées par la communauté.
 
-Consultez la [galerie de captures d’écran](../screenshots.md).
+Prenez les commandes et explorez votre centre de contrôle ! [Essayez la console](https://try.dunedocker.app/) avec des données d’exemple, sans installation.
 
 ## Prérequis
 

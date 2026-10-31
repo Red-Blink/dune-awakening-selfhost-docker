@@ -29,7 +29,7 @@ Este projeto comunitário não é oficial nem possui vínculo, aprovação, patr
 - **Construir e Compartilhar:** Projete bases em 3D, importe e compartilhe plantas, divulgue o servidor com perfil público e testes de latência.
 - **Personalizar:** Addons comunitários, integração Discord, vários idiomas e correções de tradução da comunidade.
 
-Veja a [Galeria de Capturas](../screenshots.md).
+Assuma o controle e explore seu centro de comando! [Experimente o Console](https://try.dunedocker.app/) com dados de exemplo, sem precisar instalar.
 
 ## Requisitos
 
