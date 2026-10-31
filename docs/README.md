@@ -141,6 +141,7 @@ current doc for anything still accurate today.
 
 ## Other
 
+- [Upcoming Release Notes](../RELEASE_NOTES.md) — Current. Prepared notes for v1.4.58, pending publication.
 - README editions — Current. [English](../README.md), [简体中文](readme/README_zh.md), [繁體中文](readme/README_zh-TW.md), [日本語](readme/README_ja.md), [한국어](readme/README_ko.md), [Türkçe](readme/README_tr.md), [Русский](readme/README_ru.md), [Tiếng Việt](readme/README_vi.md), [ไทย](readme/README_th.md), [Deutsch](readme/README_de.md), [Español](readme/README_es.md), [Français](readme/README_fr.md), [Українська](readme/README_uk.md), [Polski](readme/README_pl.md), [Português (Brasil)](readme/README_pt-BR.md), [العربية](readme/README_ar.md), [فارسی](readme/README_fa.md), [Bahasa Indonesia](readme/README_id.md), [Italiano](readme/README_it.md), [Ελληνικά](readme/README_el.md), [മലയാളം](readme/README_ml.md), [Roman Urdu](readme/README_ur-Latn.md), [Română](readme/README_ro.md): project overview, features, requirements, and installation.
 - [operator-guide.md](operator-guide.md) — Current. End-user/operator guide: Web UI feature tour, bases, backups, updates, community addons (including a stated documentation gap on the addon-install UI flow), the Public Server Directory, Discord integration, and multi-server hosting. Cross-links the feature docs above rather than duplicating them.
 - [screenshots.md](screenshots.md) — Current. Whole-product screenshot gallery, linked from the root [README](../README.md).

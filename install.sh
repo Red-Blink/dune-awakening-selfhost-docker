@@ -305,7 +305,12 @@ ensure_docker_group_access() {
 
   echo "$docker_group_user is not in the docker group."
   set_docker_group_access "$docker_group_user"
-  echo "User $docker_group_user has been added to the docker group. Log out and back in for this change to take effect."
+  echo "User $docker_group_user has been added to the docker group."
+  echo "Your current login session has not changed."
+  if [ "$DOCKER_NEEDS_SUDO" = "1" ]; then
+    echo "The installer will continue using sudo for Docker commands. You can finish setup now."
+  fi
+  echo "After setup, log out and back in to use the new group membership."
 
   DOCKER_GROUP_UPDATED=1
 }

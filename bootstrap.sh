@@ -116,4 +116,9 @@ fi
 
 printf '%s\n' "==> Starting the installer..."
 cd "$INSTALL_DIR"
+# A piped bootstrap has no terminal on stdin. Restore the controlling terminal
+# for installer prompts when available; unattended installs keep their stdin.
+if [ ! -t 0 ] && ( : </dev/tty ) 2>/dev/null; then
+  exec ./install.sh </dev/tty
+fi
 exec ./install.sh

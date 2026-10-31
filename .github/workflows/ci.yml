@@ -170,6 +170,7 @@ jobs:
       - name: Test runtime safety regressions
         run: |
           bash tests/bootstrap-test.sh
+          python3 tests/test_installer_interaction.py
           runtime/tests/test-command-auth-token.sh
           runtime/tests/test-bind-ip-resolution.sh
           runtime/tests/test-rmq-host-resolution.sh
