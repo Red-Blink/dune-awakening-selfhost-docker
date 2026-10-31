@@ -1,10 +1,12 @@
 import crypto from "node:crypto";
 import dgram from "node:dgram";
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { actionForRoute } from "../actions.js";
 import { evaluate } from "../policy.js";
+import { submitTranslationCorrection } from './translationSuggestions.js';
+import { validateCorrection } from './translationContract.js';
 
 function writeJsonAtomic(filePath, data, mode = undefined) {
   const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
@@ -28,8 +30,8 @@ export const ENCRYPTION_METADATA = Object.freeze({
   kdf: "scrypt"
 });
 
-const MAX_TRANSLATION_LENGTH = 600;
-const MAX_MESH_ENVELOPE_CHARS = 512 * 1024;
+const MAX_TRANSLATION_LENGTH = 1800;
+const MAX_MESH_ENVELOPE_CHARS = 1024 * 1024;
 const MAX_MESH_PEERS = 32;
 const MIN_ENROLLMENT_SECRET_LENGTH = 32;
 const MIN_ENROLLMENT_SECRET_DISTINCT_CHARS = 8;
@@ -71,6 +73,27 @@ export function getReviewedSourcePhrases() {
   return REVIEWED_SOURCE_ARRAY;
 }
 
+// Maintainer-reviewed contributions are authoritative, including over older
+// provider caches. Machine maintenance never edits these per-language files.
+export function applyReviewedCorrections(db, corrections) {
+  for (const [lang, phrases] of Object.entries(corrections)) {
+    if (!SUPPORTED_LANGUAGES.some(item => item.code === lang && lang !== 'EN')) continue;
+    for (const [source, translation] of Object.entries(phrases || {})) {
+      if (isSafeReviewedTranslation(source, translation)) {
+        db.translations[lang] ||= {};
+        db.translations[lang][source] = translation;
+      }
+    }
+  }
+  return db;
+}
+function bundledCorrections() {
+  const directory = resolve(__dirname,'../../data/i18n-reviewed');
+  if (!existsSync(directory)) return {};
+  return Object.fromEntries(readdirSync(directory).filter(file => /^[A-Z]{2}(?:-[A-Z]{2,4})?\.json$/.test(file))
+    .map(file => [file.slice(0,-5),readJsonFileSafe(resolve(directory,file)) || {}]));
+}
+
 export function isReviewedUiPhrase(raw) {
   if (typeof raw !== "string") return false;
   const trimmed = raw.trim();
@@ -81,6 +104,34 @@ export function isReviewedUiPhrase(raw) {
 export function extractPhrasePlaceholders(text) {
   const matches = String(text || "").match(/\{\{[a-zA-Z0-9_.-]+\}\}|\{[a-zA-Z0-9_.-]+\}|%[sd]/g) || [];
   return [...matches].sort();
+}
+
+// Providers can translate words inside {placeholders}. Use static numeric
+// stand-ins, then restore the reviewed tokens before validating or caching.
+// These are maintenance tokens, never live player/server values.
+function protectPlaceholders(source) {
+  let next = 8731;
+  const tokens = new Map();
+  const text = source.replace(/\{\{[a-zA-Z0-9_.-]+\}\}|\{[a-zA-Z0-9_.-]+\}|%[sd]/g, token => {
+    if (!tokens.has(token)) {
+      while (source.includes(String(next))) next++;
+      tokens.set(token, String(next++));
+    }
+    return tokens.get(token);
+  });
+  return {
+    text,
+    restore(candidate) {
+      if (typeof candidate !== "string") return "";
+      for (const [token, standIn] of tokens) {
+        const digits = [...standIn].map(digit => `[${digit}${[0x660, 0x6f0, 0x966, 0x9e6, 0xe50, 0xff10].map(start => String.fromCodePoint(start + Number(digit))).join("")}]`);
+        const pattern = new RegExp(digits.join("[.,\\s\\u00a0\\u202f\\u066c]*"), "g");
+        if (!pattern.test(candidate)) return "";
+        candidate = candidate.replace(pattern, () => token);
+      }
+      return candidate;
+    }
+  };
 }
 
 export function isSafeReviewedTranslation(sourcePhrase, translatedText) {
@@ -367,6 +418,10 @@ function mergeDatabasePayloads(seed, overlay) {
         const cleanOrig = String(orig || "").trim();
         const cleanTrans = String(translated || "").trim();
         if (isSafeReviewedTranslation(cleanOrig, cleanTrans)) {
+          // Old provider failures were cached as English. They must not hide
+          // a real translation supplied by a newer reviewed seed catalog.
+          const existing = translations[code][cleanOrig];
+          if (cleanTrans === cleanOrig && existing && existing !== cleanOrig) continue;
           translations[code][cleanOrig] = cleanTrans;
         }
       }
@@ -401,7 +456,7 @@ export function loadTranslationDatabase(config) {
     return memoryDb;
   }
   const runtime = readJsonFileSafe(rtPath);
-  memoryDb = mergeDatabasePayloads(IMMUTABLE_SEED_RAW, runtime);
+  memoryDb = applyReviewedCorrections(mergeDatabasePayloads(IMMUTABLE_SEED_RAW, runtime), bundledCorrections());
   loadedRuntimePath = rtPath;
   return memoryDb;
 }
@@ -416,6 +471,7 @@ export function resetTranslationDatabaseCache() {
 
 export function saveTranslationDatabase(config, db = memoryDb) {
   if (!db) return;
+  applyReviewedCorrections(db,bundledCorrections());
   const rtPath = runtimeDbPath(config);
   if (resolve(rtPath) === resolve(SEED_DB_PATH)) {
     throw new Error("Refusing to overwrite immutable repository seed translation database.");
@@ -468,9 +524,10 @@ export async function callNeuralFallbackBatch(texts, targetLangCode, { fetchImpl
 
   for (let i = 0; i < reviewedTexts.length; i += CHUNK_SIZE) {
     const chunk = reviewedTexts.slice(i, i + CHUNK_SIZE);
+    const protectedTexts = chunk.map(protectPlaceholders);
     const params = new URLSearchParams();
-    for (const item of chunk) {
-      params.append("q", item);
+    for (const item of protectedTexts) {
+      params.append("q", item.text);
     }
     const url = `https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=en&tl=${encodeURIComponent(tl)}`;
     const fetchOpts = {
@@ -490,8 +547,8 @@ export async function callNeuralFallbackBatch(texts, targetLangCode, { fetchImpl
     for (let idx = 0; idx < chunk.length; idx += 1) {
       const entry = list[idx];
       const textVal = Array.isArray(entry) ? entry[0] : entry;
-      const candidate = String(textVal || chunk[idx]).trim() || chunk[idx];
-      results[chunk[idx]] = isSafeReviewedTranslation(chunk[idx], candidate) ? candidate : chunk[idx];
+      const candidate = protectedTexts[idx].restore(textVal).trim();
+      if (isSafeReviewedTranslation(chunk[idx], candidate)) results[chunk[idx]] = candidate;
     }
   }
   return results;
@@ -517,6 +574,7 @@ export async function callDeepLTranslateBatch(texts, targetLangCode, { config = 
 
       for (let i = 0; i < cleanTexts.length; i += BATCH_SIZE) {
         const chunk = cleanTexts.slice(i, i + BATCH_SIZE);
+        const protectedTexts = chunk.map(protectPlaceholders);
         const deeplOpts = {
           method: "POST",
           headers: {
@@ -524,7 +582,7 @@ export async function callDeepLTranslateBatch(texts, targetLangCode, { config = 
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            text: chunk,
+            text: protectedTexts.map(item => item.text),
             source_lang: "EN",
             target_lang: langMeta.deeplCode,
             preserve_formatting: true
@@ -541,8 +599,8 @@ export async function callDeepLTranslateBatch(texts, targetLangCode, { config = 
         const payload = await response.json();
         const list = Array.isArray(payload?.translations) ? payload.translations : [];
         for (let idx = 0; idx < chunk.length; idx += 1) {
-          const translatedText = String(list[idx]?.text || chunk[idx]).trim() || chunk[idx];
-          results[chunk[idx]] = isSafeReviewedTranslation(chunk[idx], translatedText) ? translatedText : chunk[idx];
+          const translatedText = protectedTexts[idx].restore(list[idx]?.text).trim();
+          if (isSafeReviewedTranslation(chunk[idx], translatedText)) results[chunk[idx]] = translatedText;
         }
       }
       return results;
@@ -634,7 +692,7 @@ export async function translateAndCacheTexts(texts, targetLangInput, { config, f
     newlyAddedCount: 0,
     rejectedUnreviewedCount,
     translatedNowCount,
-    servedFromCacheCount: reviewedTexts.length - translatedNowCount
+    servedFromCacheCount: reviewedTexts.filter(text => Boolean(langDict[text])).length - translatedNowCount
   };
 }
 
@@ -658,12 +716,14 @@ export async function syncAllDatabaseLanguages(config, { languages = null, fetch
     if (!db.translations[lang]) db.translations[lang] = {};
     if (!db.autoSyncLanguages.includes(lang)) db.autoSyncLanguages.push(lang);
     const missing = REVIEWED_SOURCE_ARRAY.filter((src) => !db.translations[lang][src]);
+    let translatedNow = 0;
     if (missing.length > 0) {
       const fetched = await callDeepLTranslateBatch(missing, lang, { config, fetchImpl });
       for (const [orig, trans] of Object.entries(fetched)) {
         if (isSafeReviewedTranslation(orig, trans)) {
           db.translations[lang][orig] = trans;
           totalTranslated += 1;
+          translatedNow += 1;
         }
       }
       Promise.resolve()
@@ -671,7 +731,8 @@ export async function syncAllDatabaseLanguages(config, { languages = null, fetch
         .catch(() => {});
     }
     summary[lang] = {
-      translatedNow: missing.length,
+      translatedNow,
+      remaining: REVIEWED_SOURCE_ARRAY.filter(src => !db.translations[lang][src]).length,
       totalCached: Object.keys(db.translations[lang]).length
     };
   }
@@ -1769,6 +1830,19 @@ export async function handleI18nRoute({ req, res, path, url, config, auth, apiKe
       });
     }
 
+    if (path === '/api/i18n/suggestions' && req.method === 'POST') {
+      const session = enforceProtectedI18nRouteGate({req,res,path,config,auth,apiKeys,json});
+      if (!session) return;
+      const input = (await readJson(req)) || {};
+      const db = loadTranslationDatabase(config);
+      const current = db.translations[String(input.lang || '').toUpperCase()]?.[input.source] || input.source;
+      const catalog={ sourceStrings:REVIEWED_SOURCE_ARRAY, languages:SUPPORTED_LANGUAGES };
+      try { validateCorrection({ ...input,current },catalog); } catch(error) { return json(res,400,{error:error.message}); }
+      try {
+        const receipt = await submitTranslationCorrection({ ...input, current }, config, catalog, {fetchImpl});
+        return json(res,201,receipt);
+      } catch(error) { return json(res,502,{error:error.message}); }
+    }
     // Protected Owner-only routes (require session/CSRF, API-key check, and settings:write Owner permission)
     if (
       (path === "/api/i18n/translate" && req.method === "POST") ||

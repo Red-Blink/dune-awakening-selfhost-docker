@@ -13,7 +13,8 @@ import { allKnownActions } from "./policy.js";
 // lookup, so a hand-edited api-keys.json cannot grant them: `settings` would
 // let a key mint further keys, `database` and `setup` sidestep the scope model
 // entirely.
-export const KEY_DENIED_NAMESPACES = new Set(["settings", "database", "setup"]);
+// Community submissions are interactive Console actions, not automation scopes.
+export const KEY_DENIED_NAMESPACES = new Set(["settings", "database", "setup", "community"]);
 
 // Offered at None/Read only. `updates` because apply/fix/repair/write-config
 // self-update the console. `addons` because POST /api/addons/installed/{id}/bridge

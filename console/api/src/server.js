@@ -1463,6 +1463,7 @@ async function handleApi(req, res) {
   if (path === "/api/i18n/key" && req.method === "DELETE") return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
   if (path === "/api/i18n/settings" && req.method === "POST") return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
   if (path === "/api/i18n/sync-all" && req.method === "POST") return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+  if (path === "/api/i18n/suggestions" && req.method === "POST") return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
 
   return json(res, 404, { error: "Not found" });
 }

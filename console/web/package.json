@@ -11,6 +11,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
+    "check:i18n": "node --test scripts/translation-catalog.test.mjs && node scripts/translation-catalog.mjs check",
+    "list:i18n": "node scripts/translation-catalog.mjs list",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },

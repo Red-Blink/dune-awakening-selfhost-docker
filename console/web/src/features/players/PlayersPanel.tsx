@@ -499,7 +499,7 @@ export function formatTotalPlaytime(value: unknown) {
   const minutes = Math.floor((seconds % 3600) / 60);
   if (hours > 0) return `${hours.toLocaleString()}h ${minutes}m`;
   if (minutes > 0) return `${minutes}m`;
-  return seconds > 0 ? "< 1m" : "0m";
+  return seconds > 0 ? "Less than 1m" : "0m";
 }
 
 function parseLastOnline(value: unknown) {

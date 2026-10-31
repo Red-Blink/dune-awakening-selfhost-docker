@@ -32,6 +32,11 @@ jobs:
       - name: Run console web tests
         run: npm test
         working-directory: console/web
+      - name: Check reviewed interface translation coverage
+        run: npm run check:i18n
+        working-directory: console/web
+      - name: Check public translation contribution catalog
+        run: node console/api/scripts/export-translation-catalog.mjs --check
       - name: Build console web
         run: npm run build
         working-directory: console/web

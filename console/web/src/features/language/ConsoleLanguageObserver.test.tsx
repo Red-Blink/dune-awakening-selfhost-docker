@@ -12,7 +12,7 @@ beforeEach(() => {
     return new Response(JSON.stringify({
       lang,
       dir: "ltr",
-      translations: lang === "FR" ? { Home: "Accueil" } : { Home: "Startseite", Ready: "Bereit", Stop: "Stoppen" }
+      translations: lang === "FR" ? { Home: "Accueil" } : { Home: "Startseite", Ready: "Bereit", Stop: "Stoppen", "{count0} of {count1}": "{count0} von {count1}", "{count0} ready out of {count1}": "{count1} insgesamt, {count0} bereit" }
     }), { status: 200, headers: { "content-type": "application/json" } });
   });
   saveSelectedLanguage("DE");
@@ -121,4 +121,21 @@ test("control changes made in English are used when translation is enabled again
   view.rerender(<Fixture value="Stop" />);
   await act(async () => { saveSelectedLanguage("DE"); });
   await waitFor(() => expect(screen.getByTestId("control")).toHaveAttribute("title", "Stoppen"));
+});
+
+test("numeric UI templates translate locally and restore the latest live counts", async () => {
+  const view = render(<Fixture count="3 of 40" />);
+  await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("3 von 40"));
+  view.rerender(<Fixture count="7 of 40" />);
+  await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("7 von 40"));
+  await act(async () => { saveSelectedLanguage("EN"); });
+  expect(screen.getByTestId("count")).toHaveTextContent("7 of 40");
+  expect(vi.mocked(fetch).mock.calls).toHaveLength(1);
+});
+
+test("numeric placeholders can change order without translating arbitrary text", async () => {
+  render(<Fixture count="3 ready out of 40" message="Private Guild of Arrakis" />);
+  await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("40 insgesamt, 3 bereit"));
+  expect(screen.getByTestId("message")).toHaveTextContent("Private Guild of Arrakis");
+  expect(vi.mocked(fetch).mock.calls).toHaveLength(1);
 });

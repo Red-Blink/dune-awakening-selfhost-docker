@@ -83,6 +83,7 @@ COPY console/api/package-lock.json ./
 RUN npm ci --omit=dev
 COPY console/api/src ./src
 COPY console/api/data/i18n-translations-db.json ./data/i18n-translations-db.json
+COPY console/api/data/i18n-reviewed ./data/i18n-reviewed
 COPY --from=web-build /app/web/dist /app/web-dist
 COPY console/api/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh \

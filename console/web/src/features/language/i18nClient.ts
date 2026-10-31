@@ -68,7 +68,7 @@ export type SyncAllResponse = {
   totalSourceStrings: number;
   totalTranslatedNow: number;
   updatedAt: string;
-  languages: Record<string, { translatedNow: number; totalCached: number }>;
+  languages: Record<string, { translatedNow: number; totalCached: number; remaining?: number }>;
 };
 
 export type UpdateMeshSettingsResponse = {
@@ -101,6 +101,7 @@ export function saveSelectedLanguage(langCode: string): void {
 }
 
 export const i18nApi = {
+  suggest: (payload: {lang:string;source:string;translation:string;credit:string}) => post<{id:string;status:string}>("/api/i18n/suggestions",payload),
   catalog: () => api<LanguageCatalogResponse>("/api/i18n/languages"),
   translations: (lang: string) =>
     api<LanguageTranslationsResponse>(`/api/i18n/translations?lang=${encodeURIComponent(lang)}`),

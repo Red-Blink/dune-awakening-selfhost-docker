@@ -1,191 +1,66 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ConsoleLanguageObserver } from "./ConsoleLanguageObserver";
-import { LanguagePanel } from "./LanguagePanel";
-import { LANGUAGE_STORAGE_KEY, loadSelectedLanguage, saveSelectedLanguage } from "./i18nClient";
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach,beforeEach,expect,it,vi } from 'vitest';
+import { LanguagePanel } from './LanguagePanel';
+import { loadSelectedLanguage,saveSelectedLanguage } from './i18nClient';
 
-describe("LanguagePanel, ConsoleLanguageObserver & Privacy Boundaries", () => {
-  beforeEach(() => {
-    window.localStorage.clear();
+const languages=[{code:'EN',name:'English',nativeName:'English'},{code:'DE',name:'German',nativeName:'Deutsch'},{code:'HE',name:'Hebrew',nativeName:'עברית'}];
+let posted:unknown,failSubmit=false;
+beforeEach(()=>{
+  localStorage.clear();posted=undefined;failSubmit=false;
+  vi.spyOn(globalThis,'fetch').mockImplementation(async(input,options)=>{
+    const url=String(input);let body:unknown={};let status=200;
+    if(url==='/api/i18n/languages')body={languages,totalSourceStrings:2};
+    else if(url.startsWith('/api/i18n/translations?'))body={translations:url.endsWith('lang=EN')?{Home:'Home',Ready:'Ready'}:{Home:'Startseite',Ready:'Bereit'}};
+    else if(url==='/api/i18n/suggestions'){posted=JSON.parse(String(options?.body));body=failSubmit?{error:'Review service unavailable'}:{id:'125e4567-e89b-42d3-a456-426614174000',status:'pending'};status=failSubmit?503:201;}
+    else if(url==='/api/auth/state')body={authenticated:true,csrfToken:'fixture'};
+    else throw new Error('Unexpected request '+url);
+    return new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json'}});
   });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-    window.localStorage.clear();
-  });
-
-  it("defaults to EN and persists selected language in localStorage", () => {
-    expect(loadSelectedLanguage()).toBe("EN");
-    saveSelectedLanguage("de");
-    expect(loadSelectedLanguage()).toBe("DE");
-    expect(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe("DE");
-  });
-
-  it("renders language catalog with Peer Sync opt-in disabled by default, opens Settings gear icon, and switches language", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      const url = String(input);
-      if (url.includes("/api/i18n/languages")) {
-        return new Response(
-          JSON.stringify({
-            version: 1,
-            updatedAt: "2026-10-30T16:00:00Z",
-            totalSourceStrings: 2293,
-            autoSyncLanguages: ["DE", "FR"],
-            encryptedKeyConfigured: true,
-            encryptionAlgorithm: "AES-256-GCM (scrypt)",
-            syncInProgress: false,
-            lastDeltaSyncAt: null,
-            lastDeltaSyncError: null,
-            mesh: {
-              nodeId: "dune-node-test",
-              peerSyncEnabled: false,
-              enrollmentConfigured: false,
-              peers: [],
-              exchangedPacksCount: 0,
-              verifiedPeersCount: 0,
-              lastMeshSyncAt: null
-            },
-            languages: [
-              {
-                code: "EN",
-                deeplCode: "EN-US",
-                name: "English",
-                nativeName: "English",
-                region: "GB / US",
-                dir: "ltr",
-                core: true,
-                translatedCount: 2293,
-                coveragePercent: 100,
-                cachedInDb: true
-              },
-              {
-                code: "DE",
-                deeplCode: "DE",
-                name: "German",
-                nativeName: "Deutsch",
-                region: "DE / AT / CH",
-                dir: "ltr",
-                core: true,
-                translatedCount: 2293,
-                coveragePercent: 100,
-                cachedInDb: true
-              }
-            ]
-          }),
-          { status: 200, headers: { "content-type": "application/json" } }
-        );
-      }
-      if (url.includes("/api/i18n/translations?lang=DE")) {
-        return new Response(
-          JSON.stringify({
-            lang: "DE",
-            name: "German",
-            nativeName: "Deutsch",
-            dir: "ltr",
-            totalSourceStrings: 2293,
-            translatedCount: 2293,
-            translations: { Home: "Startseite" }
-          }),
-          { status: 200, headers: { "content-type": "application/json" } }
-        );
-      }
-      if (url.includes("/api/i18n/settings")) {
-        return new Response(
-          JSON.stringify({
-            ok: true,
-            mesh: {
-              nodeId: "dune-node-test",
-              peerSyncEnabled: true,
-              enrollmentConfigured: true,
-              peers: [],
-              exchangedPacksCount: 0,
-              verifiedPeersCount: 0,
-              lastMeshSyncAt: null
-            }
-          }),
-          { status: 200, headers: { "content-type": "application/json" } }
-        );
-      }
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
-    });
-
-    render(<LanguagePanel />);
-
-    await waitFor(() => {
-      expect(screen.getByText("Deutsch")).toBeInTheDocument();
-    });
-
-    expect(screen.getByText("2293")).toBeInTheDocument();
-    expect(screen.getByText("Phrases")).toBeInTheDocument();
-    expect(screen.getByText("Dune-Docker Peer Mesh")).toBeInTheDocument();
-    expect(screen.getByText("Disabled")).toBeInTheDocument();
-
-    const settingsBtn = screen.getByLabelText("Language Settings");
-    fireEvent.click(settingsBtn);
-
-    expect(screen.getByText("Important Notice (DeepL API Key)")).toBeInTheDocument();
-    expect(screen.getByText("Dune-Docker Peer Language Pack Sync (Token Saver)")).toBeInTheDocument();
-
-    const toggleSwitch = screen.getByRole("switch", { name: "Toggle Dune-Docker Peer Language Pack Sync" });
-    expect(toggleSwitch).toHaveAttribute("aria-checked", "false");
-    fireEvent.click(toggleSwitch);
-
-    const searchInput = screen.getByPlaceholderText("Search language by name or code...");
-    fireEvent.change(searchInput, { target: { value: "Deutsch" } });
-    expect(screen.getByText("Deutsch")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByText("Deutsch"));
-
-    await waitFor(() => {
-      expect(loadSelectedLanguage()).toBe("DE");
-    });
-
-    expect(fetchSpy).toHaveBeenCalled();
-  });
-
-  it("never uploads dynamic or private DOM screen text from ConsoleLanguageObserver", async () => {
-    const requestedUrls: string[] = [];
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      const url = String(input);
-      requestedUrls.push(url);
-      if (url.includes("/api/i18n/translations?lang=DE")) {
-        return new Response(
-          JSON.stringify({
-            lang: "DE",
-            name: "German",
-            nativeName: "Deutsch",
-            dir: "ltr",
-            totalSourceStrings: 2,
-            translatedCount: 2,
-            translations: {
-              Home: "Startseite",
-              "Server Control": "Serversteuerung"
-            }
-          }),
-          { status: 200, headers: { "content-type": "application/json" } }
-        );
-      }
-      throw new Error(`Unexpected network call from DOM observer: ${url}`);
-    });
-
-    saveSelectedLanguage("DE");
-
-    render(
-      <div>
-        <ConsoleLanguageObserver />
-        <span data-testid="reviewed-ui">Home</span>
-        <span data-testid="private-player">Player_Atreides_Private_Character_9912</span>
-        <span data-testid="private-server">Secret Guild Note: Do Not Share</span>
-      </div>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("reviewed-ui").textContent).toBe("Startseite");
-    });
-
-    // Private dynamic content remains untouched in DOM and is NEVER sent over the network
-    expect(screen.getByTestId("private-player").textContent).toBe("Player_Atreides_Private_Character_9912");
-    expect(screen.getByTestId("private-server").textContent).toBe("Secret Guild Note: Do Not Share");
-    expect(requestedUrls.some((u) => u.includes("/api/i18n/translate"))).toBe(false);
-  });
+});
+afterEach(()=>{vi.restoreAllMocks();localStorage.clear();});
+it('shows a compact language picker with no provider, sync or peer controls',async()=>{
+  render(<LanguagePanel/>);
+  expect(await screen.findByRole('button',{name:/Deutsch/})).toBeVisible();
+  expect(screen.getByRole('dialog')).toHaveAccessibleName('Console Language');
+  expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+  expect(screen.queryByText(/DeepL|Token Saver|Fill Missing Translations/)).not.toBeInTheDocument();
+  fireEvent.change(screen.getByRole('searchbox'),{target:{value:'Hebrew'}});
+  expect(screen.queryByRole('button',{name:/Deutsch/})).not.toBeInTheDocument();
+  expect(screen.getByRole('button',{name:/עברית/})).toBeVisible();
+});
+it('changes only this browser preference, closes the picker and makes no submission',async()=>{
+  const close=vi.fn();render(<LanguagePanel onClose={close}/>);
+  fireEvent.click(await screen.findByRole('button',{name:/Deutsch/}));
+  await waitFor(()=>expect(close).toHaveBeenCalledOnce());
+  expect(loadSelectedLanguage()).toBe('DE');expect(posted).toBeUndefined();
+});
+async function enterCorrection(){
+  saveSelectedLanguage('DE');render(<LanguagePanel/>);
+  await screen.findByRole('button',{name:/Deutsch/});
+  fireEvent.click(screen.getByRole('button',{name:'Suggest a Translation Fix'}));
+  fireEvent.change(screen.getByLabelText('Find the Incorrect Text'),{target:{value:'Home'}});
+  fireEvent.click(await screen.findByRole('button',{name:/Startseite.*Home/}));
+  fireEvent.change(screen.getByLabelText('Your Correction'),{target:{value:'Start'}});
+}
+it('prefills language and source, submits only the selected correction and shows a review receipt',async()=>{
+  await enterCorrection();
+  expect(screen.getByLabelText('Language')).toHaveValue('DE');
+  fireEvent.change(screen.getByLabelText('Name for Credits (Optional)'),{target:{value:'Desert Translator'}});
+  fireEvent.click(screen.getByRole('button',{name:'Submit Correction'}));
+  expect(await screen.findByText('Thank You for Your Suggestion')).toBeVisible();
+  expect(posted).toEqual({lang:'DE',source:'Home',translation:'Start',credit:'Desert Translator'});
+  expect(screen.getByRole('status')).toHaveTextContent('waiting for review');
+});
+it('preserves the correction after a submission failure so it can be retried',async()=>{
+  failSubmit=true;await enterCorrection();fireEvent.click(screen.getByRole('button',{name:'Submit Correction'}));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Review service unavailable');
+  expect(screen.getByLabelText('Your Correction')).toHaveValue('Start');
+  failSubmit=false;fireEvent.click(screen.getByRole('button',{name:'Submit Correction'}));
+  expect(await screen.findByText('Thank You for Your Suggestion')).toBeVisible();
+});
+it('supports Escape and restores scrolling when the picker closes',async()=>{
+  const close=vi.fn();const {unmount}=render(<LanguagePanel onClose={close}/>);
+  await screen.findByRole('button',{name:/Deutsch/});
+  expect(document.body.style.overflow).toBe('hidden');fireEvent.keyDown(screen.getByRole('dialog'),{key:'Escape'});
+  expect(close).toHaveBeenCalledOnce();unmount();expect(document.body.style.overflow).not.toBe('hidden');
 });

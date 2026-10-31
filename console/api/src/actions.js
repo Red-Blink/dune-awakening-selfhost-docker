@@ -29,6 +29,7 @@
 // ---- Namespaces ----
 
 export const NAMESPACES = {
+  COMMUNITY:   "community",
   SETUP:       "setup",
   SERVER:      "server",
   LOGS:        "logs",
@@ -195,6 +196,7 @@ export const ROUTE_ACTIONS = {
   "DELETE /api/i18n/key":                      "settings:write",
   "POST /api/i18n/settings":                   "settings:write",
   "POST /api/i18n/sync-all":                   "settings:write",
+  "POST /api/i18n/suggestions":                "community:suggest-translation",
 
   // --- Players (read) ---
   "GET /api/players":                          "players:read",

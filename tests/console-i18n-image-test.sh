@@ -4,16 +4,18 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 console_image="${1:-dune-console:ci}"
 seed_sha="$(sha256sum console/api/data/i18n-translations-db.json | cut -d ' ' -f 1)"
+reviewed_sha="$(node --input-type=module -e 'import {readFileSync,readdirSync} from "node:fs";import {createHash} from "node:crypto";const dir="console/api/data/i18n-reviewed";const hash=createHash("sha256");for(const file of readdirSync(dir).sort())if(file.endsWith(".json")){hash.update(file);hash.update(readFileSync(dir+"/"+file));}process.stdout.write(hash.digest("hex"));')"
 
 # Exercise the shipped dictionary endpoint without host mounts, writable state,
 # provider access, or the entrypoint that manages local runtime services.
 docker run --rm -i --network=none --read-only \
   --env "DUNE_TEST_SEED_SHA=$seed_sha" \
+  --env "DUNE_TEST_REVIEWED_SHA=$reviewed_sha" \
   --entrypoint node "$console_image" --input-type=module <<'NODE'
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { SEED_DB_PATH, getReviewedSourcePhrases, handleI18nRoute } from "/app/src/services/i18nService.js";
+import { readFileSync, readdirSync } from "node:fs";
+import { SEED_DB_PATH, getReviewedSourcePhrases, handleI18nRoute, loadTranslationDatabase } from "/app/src/services/i18nService.js";
 
 const bytes = readFileSync(SEED_DB_PATH);
 assert.equal(createHash("sha256").update(bytes).digest("hex"), process.env.DUNE_TEST_SEED_SHA);
@@ -21,6 +23,9 @@ const seed = JSON.parse(bytes);
 assert.ok(seed.sourceStrings.length > 0, "The image must ship the reviewed source catalog");
 assert.equal(getReviewedSourcePhrases().length, new Set(seed.sourceStrings.map(text => text.trim())).size);
 assert.ok(seed.translations.DE.Home, "The image must ship cached translations");
+const reviewedHash=createHash('sha256');
+for(const file of readdirSync('/app/data/i18n-reviewed').sort())if(file.endsWith('.json')){reviewedHash.update(file);reviewedHash.update(readFileSync('/app/data/i18n-reviewed/'+file));}
+assert.equal(reviewedHash.digest('hex'),process.env.DUNE_TEST_REVIEWED_SHA,'The image must ship the exact reviewed corrections');
 let reply;
 await handleI18nRoute({
   req: { method: "GET" },
@@ -33,6 +38,6 @@ await handleI18nRoute({
 });
 assert.equal(reply.status, 200);
 assert.equal(reply.body.totalSourceStrings, getReviewedSourcePhrases().length);
-assert.equal(reply.body.translations.Home, seed.translations.DE.Home);
+assert.equal(reply.body.translations.Home, loadTranslationDatabase({generatedDir:'/tmp/console-image-i18n-test'}).translations.DE.Home);
 console.log(`Console image serves ${reply.body.totalSourceStrings} reviewed phrases and cached German translations.`);
 NODE

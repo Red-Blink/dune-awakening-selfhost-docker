@@ -28,14 +28,24 @@ export function ConsoleLanguageObserver() {
     let activeLang = loadSelectedLanguage();
     let dictionary: Record<string, string> = {};
     let lowerDictionary = new Map<string, string>();
+    let numericTemplates: Array<{ pattern: RegExp; names: string[]; translation: string }> = [];
     let isDisposed = false;
     let isApplyingDom = false;
 
     function rebuildLowerDictionary() {
       lowerDictionary = new Map<string, string>();
+      numericTemplates = [];
       for (const [k, v] of Object.entries(dictionary)) {
         if (k && v) {
           lowerDictionary.set(k.toLowerCase(), v);
+          const names = k.match(/\{count\d+\}/g);
+          if (names) {
+            const parts = k.split(/(\{count\d+\})/g);
+            const pattern = parts.map(part => /^\{count\d+\}$/.test(part)
+              ? "([+-]?\\d[\\d.,\\u00a0\\u202f]*)"
+              : part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("");
+            numericTemplates.push({ pattern: new RegExp(`^${pattern}$`, "i"), names, translation: v });
+          }
         }
       }
     }
@@ -74,10 +84,20 @@ export function ConsoleLanguageObserver() {
     // Unknown or dynamic DOM text (player names, server titles, logs, IDs) never leaves the browser.
     function lookupReviewedSegment(segment: string): string | null {
       const trimmed = segment.trim();
-      if (!trimmed || trimmed.length > 500) return null;
+      if (!trimmed || trimmed.length > 600) return null;
 
       const exact = dictionary[trimmed] || lowerDictionary.get(trimmed.toLowerCase());
       if (exact) return exact;
+
+      // Only numeric placeholders are matched. Values stay in the browser and
+      // arbitrary names or messages cannot become provider requests.
+      if (/\d/.test(trimmed)) for (const template of numericTemplates) {
+        const match = template.pattern.exec(trimmed);
+        if (match) {
+          const values = new Map(template.names.map((name, i) => [name, match[i + 1]]));
+          return template.translation.replace(/\{count\d+\}/g, name => values.get(name) ?? name);
+        }
+      }
 
       // Separate numeric/punctuation variable wrappers from reviewed static phrase keys locally in memory
       const wrapperMatch = trimmed.match(/^([\d\s•·:()[\]/%+-]*?)([A-Za-z][A-Za-z\s,'/-]*[A-Za-z.])([\d\s•·:()[\]/%+-]*)$/);
@@ -96,7 +116,7 @@ export function ConsoleLanguageObserver() {
 
     function translatePreservingWhitespace(raw: string): string | null {
       const trimmed = raw.trim();
-      if (!trimmed || trimmed.length > 500) return null;
+      if (!trimmed || trimmed.length > 600) return null;
 
       const direct = lookupReviewedSegment(trimmed);
       if (direct) {
@@ -179,6 +199,7 @@ export function ConsoleLanguageObserver() {
       if (activeLang === "EN") {
         dictionary = {};
         lowerDictionary.clear();
+        numericTemplates = [];
         restoreEnglishDom();
         return;
       }

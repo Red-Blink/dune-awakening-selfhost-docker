@@ -357,15 +357,14 @@ const navGroups: { title: string; items: { tab: Tab; icon: React.ReactNode }[] }
   {
     title: "Community",
     items: [
-      { tab: "Addons", icon: <Sparkles size={18} /> },
-      { tab: "Language", icon: <Globe size={18} /> }
+      { tab: "Addons", icon: <Sparkles size={18} /> }
     ]
   }
 ];
 
-// The tabs the sidebar actually lists. ALL_TABS is wider: "Services" and
-// "Storage" exist and render but have no nav entry, so anything that routes the
-// operator somewhere must check against this, not ALL_TABS -- landing on a tab
+// The tabs the sidebar actually lists. Language is opened from the header;
+// "Services" and "Storage" render but have no nav entry, so Home routes must
+// check against this, not ALL_TABS -- landing on a tab
 // with no highlighted nav item and no way back reads as a broken jump.
 export const NAV_TABS: readonly Tab[] = navGroups.flatMap((group) => group.items.map((item) => item.tab));
 
@@ -461,6 +460,7 @@ export function App() {
   // boolean so a second failure re-triggers it after the first was handled.
   const [installGameFilesRequest, setInstallGameFilesRequest] = useState(0);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
   const [pinnedAddons, setPinnedAddons] = useState<PinnedAddon[]>(() => loadPinnedAddons());
   const [selectedPinnedAddonId, setSelectedPinnedAddonId] = useState("");
   const [addonUpdatesAvailable, setAddonUpdatesAvailable] = useState(false);
@@ -814,6 +814,7 @@ export function App() {
   if (firstRunSetup) {
     return (
       <div className="app-shell setup-only-shell">
+        <ConsoleLanguageObserver />
         <main className="home-main setup-main">
           <div className="home-backdrop" aria-hidden="true">
             <span className="home-sand-fine" />
@@ -922,6 +923,18 @@ export function App() {
               rel="noreferrer"
               title="Open Public Server Listing"
             >{publicDirectoryStatus.listingClaimed ? "Claimed Listing" : "Unclaimed Listing"}</a>}
+            <button
+              className="community-button language-shortcut"
+              type="button"
+              title="Console Language"
+              aria-label="Console Language"
+              aria-haspopup="dialog"
+              aria-expanded={languagePickerOpen || tab === "Language"}
+              onClick={() => {
+                setLanguagePickerOpen(true);
+                closeMobileNav();
+              }}
+            ><Globe size={19} aria-hidden="true" /></button>
             <a className="community-button discord" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer" title="Join Discord"><span>Join Discord</span><DiscordLogo size={19} /></a>
             <a className="community-button support" href={REDBLINK_KOFI_URL} target="_blank" rel="noreferrer" title="Support Project"><span>Support Project</span><KofiLogo size={19} /></a>
           </div>
@@ -946,7 +959,7 @@ export function App() {
         {!redeploySetupOpen && tab === "Maps" && <LazyTabBoundary label="Loading Maps"><MapsPanel onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} confirmSettingsRestart={confirmSettingsRestart} waitForTaskWithUpdates={waitForTaskWithUpdates} taskTechnicalDetails={taskTechnicalDetails} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Care Package" && <LazyTabBoundary label="Loading Care Package"><CarePackagePanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Addons" && <LazyTabBoundary label="Loading Addons"><AddonsPanel pinnedAddons={pinnedAddons} setPinnedAddons={setPinnedAddons} selectedAddonId={selectedPinnedAddonId} clearSelectedAddon={() => setSelectedPinnedAddonId("")} setAddonUpdateAvailable={setAddonUpdatesAvailable} confirmAction={confirmDialog} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Language" && <LazyTabBoundary label="Loading Language"><LanguagePanel /></LazyTabBoundary>}
+        {(languagePickerOpen || tab === "Language") && <LazyTabBoundary label="Loading Language"><LanguagePanel onClose={() => {setLanguagePickerOpen(false);if(tab === "Language")setTab("Home");}} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Database" && <LazyTabBoundary label="Loading Database"><DatabasePanel /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Storage" && <LazyTabBoundary label="Loading Storage"><StoragePanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Backups" && <LazyTabBoundary label="Loading Backups"><BackupsPanel
