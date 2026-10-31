@@ -169,6 +169,7 @@ jobs:
           python3 runtime/scripts/test_sietch_publication.py
       - name: Test runtime safety regressions
         run: |
+          bash tests/bootstrap-test.sh
           runtime/tests/test-command-auth-token.sh
           runtime/tests/test-bind-ip-resolution.sh
           runtime/tests/test-rmq-host-resolution.sh

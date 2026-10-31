@@ -31,8 +31,14 @@ if command -v curl >/dev/null 2>&1; then
   fetch() { curl -fL --proto '=https' --retry 3 --connect-timeout 20 "$1" -o "$2"; }
   fetch_text() { curl -fsSL --proto '=https' --retry 3 --connect-timeout 20 "$1"; }
 elif command -v wget >/dev/null 2>&1; then
-  fetch() { wget --https-only -O "$2" "$1"; }
-  fetch_text() { wget --https-only -qO- "$1"; }
+  # GNU wget supports this flag; BusyBox wget does not. Both download URLs
+  # below already use HTTPS, so keep the fallback portable without disabling TLS.
+  WGET_HTTPS_ONLY=""
+  if wget --help 2>&1 | grep -q -- '--https-only'; then
+    WGET_HTTPS_ONLY="--https-only"
+  fi
+  fetch() { wget ${WGET_HTTPS_ONLY:+"$WGET_HTTPS_ONLY"} -O "$2" "$1"; }
+  fetch_text() { wget ${WGET_HTTPS_ONLY:+"$WGET_HTTPS_ONLY"} -qO- "$1"; }
 else
   fail "curl or wget is required. Install curl and tar with your distribution's package manager, then retry."
 fi
