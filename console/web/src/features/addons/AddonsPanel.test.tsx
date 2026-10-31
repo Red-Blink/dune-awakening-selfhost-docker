@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { addonsApi, type CommunityAddonSummary, type InstalledAddon } from "../../api/addons";
 import { AddonsPanel } from "./AddonsPanel";
@@ -96,7 +96,11 @@ it("reports failed cleanup and keeps the addon visible and disabled for retry", 
 describe("AddonsPanel updates", () => {
   it("only bridges messages from the active sandboxed addon frame", async () => {
     vi.mocked(addonsApi.bridge).mockResolvedValue({ ok: true, result: {} });
-    render(<AddonsPanel pinnedAddons={[]} setPinnedAddons={vi.fn()} selectedAddonId={installedAddon.id} clearSelectedAddon={vi.fn()} setAddonUpdateAvailable={vi.fn()} confirmAction={vi.fn().mockResolvedValue(true)} />);
+    // Finish the asynchronous addon load and its message-listener effect before
+    // sending an event. Seeing the iframe alone does not flush passive effects.
+    await act(async () => {
+      render(<AddonsPanel pinnedAddons={[]} setPinnedAddons={vi.fn()} selectedAddonId={installedAddon.id} clearSelectedAddon={vi.fn()} setAddonUpdateAvailable={vi.fn()} confirmAction={vi.fn().mockResolvedValue(true)} />);
+    });
     const frame = await screen.findByTitle(installedAddon.name) as HTMLIFrameElement;
     expect(frame).toHaveAttribute("sandbox", "allow-scripts");
     expect(frame).toHaveAttribute("referrerpolicy", "no-referrer");
