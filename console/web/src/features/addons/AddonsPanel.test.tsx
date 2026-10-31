@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { addonsApi, type CommunityAddonSummary, type InstalledAddon } from "../../api/addons";
 import { AddonsPanel } from "./AddonsPanel";
@@ -69,7 +69,11 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  // Flush pending React effects while their browser API stubs still exist.
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 it("groups addon identity and submenu controls into five clear columns", async () => {
   const setPinnedAddons = vi.fn();
@@ -109,7 +113,6 @@ it("keeps full addon descriptions available from an accessible disclosure", asyn
   Object.defineProperty(measure, "clientWidth", { configurable: true, value: 800 });
   act(() => resize?.());
   expect(screen.queryByRole("button", { name: "Less" })).not.toBeInTheDocument();
-  vi.unstubAllGlobals();
 });
 
 it("explains companion and database removal before uninstalling Airdrop", async () => {
