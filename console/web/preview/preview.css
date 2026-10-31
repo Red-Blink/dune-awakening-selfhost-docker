@@ -1,0 +1,3 @@
+.console-preview-notice{position:relative;z-index:200;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 12px;padding:10px 14px;border-bottom:1px solid #ffb368;background:#f39435;color:#241507;font-size:12px;line-height:1.5;text-align:center}
+.console-preview-copy{display:inline;min-width:0}
+.console-preview-notice a{color:#241507;font-weight:600;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}

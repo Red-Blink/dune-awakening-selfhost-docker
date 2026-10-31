@@ -140,6 +140,14 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
   const [playerAdmin_busyActionKey, playerAdmin_setBusyActionKey] = useState("");
   const [playerAdmin_characterLog, playerAdmin_setCharacterLog] = useState<Record<string, string>[]>([]);
   const [playerAdmin_adminLog, playerAdmin_setAdminLog] = useState<Record<string, string>[]>([]);
+  useEffect(() => {
+    if (import.meta.env.VITE_CONSOLE_PREVIEW !== "true") return;
+    let active = true;
+    void import("../../../preview/playerHistory").then(({ playerHistory }) => {
+      if (active) { playerAdmin_setCharacterLog(playerHistory(playerName)); playerAdmin_setAdminLog(playerHistory(playerName).slice(-1)); }
+    });
+    return () => { active = false; };
+  }, [playerName]);
   const [playerAdmin_craftingRows, playerAdmin_setCraftingRows] = useState<CraftingRecipeRow[]>([]);
   const [playerAdmin_craftingLoading, playerAdmin_setCraftingLoading] = useState(false);
   const [playerAdmin_craftingError, playerAdmin_setCraftingError] = useState("");

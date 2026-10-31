@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { addonsApi, type AddonLifecycle, type CommunityAddonSummary, type InstalledAddon } from "../../api/addons";
 import { addonUpdateAvailable, hasAddonUpdates } from "./addonVersions";
+const PreviewAddon = import.meta.env.VITE_CONSOLE_PREVIEW === "true" ? lazy(() => import("../../../preview/AddonSample")) : null;
 import type { PinnedAddon } from "./pinnedAddons";
 
 type AddonsPanelProps = {
@@ -225,7 +226,7 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
       {openAddon
         ? <>
           <div className="panel-title"><h2>{openAddon.name}</h2></div>
-          <iframe ref={addonFrameRef} className="addon-frame" title={openAddon.name} src={addonContentUrl(openAddon)} sandbox="allow-scripts" referrerPolicy="no-referrer" />
+          {PreviewAddon ? <Suspense fallback={<p>Loading...</p>}><PreviewAddon id={openAddon.id} /></Suspense> : <iframe ref={addonFrameRef} className="addon-frame" title={openAddon.name} src={addonContentUrl(openAddon)} sandbox="allow-scripts" referrerPolicy="no-referrer" />}
         </>
         : <div className="result-panel result-fail"><strong>Addon unavailable.</strong><p>This pinned addon is not installed, enabled, or fully loaded yet.</p></div>}
     </section>;
@@ -262,7 +263,7 @@ export function AddonsPanel({ pinnedAddons, setPinnedAddons, selectedAddonId, cl
     />
     {openAddon && <section className="action-section">
       <div className="panel-title"><h4>{openAddon.name}</h4></div>
-      <iframe ref={addonFrameRef} className="addon-frame" title={openAddon.name} src={addonContentUrl(openAddon)} sandbox="allow-scripts" referrerPolicy="no-referrer" />
+      {PreviewAddon ? <Suspense fallback={<p>Loading...</p>}><PreviewAddon id={openAddon.id} /></Suspense> : <iframe ref={addonFrameRef} className="addon-frame" title={openAddon.name} src={addonContentUrl(openAddon)} sandbox="allow-scripts" referrerPolicy="no-referrer" />}
     </section>}
   </section>;
 }

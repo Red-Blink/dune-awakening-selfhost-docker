@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
+    "build:preview": "tsc -b && node scripts/build-preview.mjs",
+    "test:preview": "node browser-tests/preview.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "check:i18n": "node --test scripts/translation-catalog.test.mjs && node scripts/translation-catalog.mjs check",
