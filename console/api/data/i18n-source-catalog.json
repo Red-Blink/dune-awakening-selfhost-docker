@@ -1772,7 +1772,6 @@
     "Only this phrase, your correction, and the optional credit name will be sent to DuneDocker for review.",
     "Only weapons and clothing can be augmented.",
     "Open",
-    "Open the Console Now",
     "Open Base",
     "Open Base Builder",
     "Open Home",
@@ -1783,6 +1782,7 @@
     "Open in Bases",
     "Open in Vehicles",
     "Open navigation",
+    "Open the Console Now",
     "Open this section to load Landsraad data.",
     "Opening the finish step.",
     "Opening the full console in",
@@ -2042,8 +2042,8 @@
     "Redeploy Server",
     "Redeploy Setup",
     "Redeploy was successful.",
-    "Redirecting to the full console in",
     "Redeploying...",
+    "Redirecting to the full console in",
     "Reduce Host Memory Protection",
     "Reference",
     "Refill",
@@ -3691,7 +3691,7 @@
     ". Nothing is applied until you confirm.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 516,
+        "line": 518,
         "nearby": [
           "Uploading...",
           "Stored as",
@@ -3751,7 +3751,7 @@
     ". The": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 605,
+        "line": 607,
         "nearby": [
           "and increase as maps are started. Overmap commonly uses",
           "and Survival_1 commonly uses",
@@ -4084,11 +4084,11 @@
     "{count0} warnings": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 74,
+        "line": 77,
         "nearby": [
           "Technical details",
           "1 warning",
-          "Deployment Complete",
+          "Deployment Complete!",
           "Not Enough Disk Space"
         ]
       }
@@ -4307,12 +4307,12 @@
     "1 warning": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 74,
+        "line": 77,
         "nearby": [
           "Deployment Log",
           "Technical details",
           "{count0} warnings",
-          "Deployment Complete"
+          "Deployment Complete!"
         ]
       }
     ],
@@ -4468,7 +4468,7 @@
     "A Funcom database backup (.backup) is a different thing and cannot be restored here: it holds the game database only, with no configuration and no credentials. Import one from Backups after setup finishes.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 507,
+        "line": 509,
         "nearby": [
           "Backup Archive",
           "The encrypted archive this console produced on the old server, downloaded from its Backups page.",
@@ -5177,7 +5177,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 154,
+        "line": 157,
         "nearby": [
           "Database restore completed successfully. Restarting Dune services.",
           "Relinking restored characters to current Docker player identities.",
@@ -5734,7 +5734,7 @@
     "Admin Panel": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 600,
+        "line": 602,
         "nearby": [
           "for the RabbitMQ Game HTTP Endpoint.",
           "This is the port guidance most users need.",
@@ -5852,7 +5852,7 @@
     "Advanced review data": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 664,
+        "line": 666,
         "nearby": [
           "Server IP is set to auto. Confirm Home readiness after setup to verify advertised IP.",
           "Deployment starts a fresh local world and keeps a backup of existing local setup files when they exist.",
@@ -6369,7 +6369,7 @@
     "An existing token is already saved. Paste a new one only if you want to replace it.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 582,
+        "line": 584,
         "nearby": [
           "Paste your Funcom self-host token here. When you continue, the console saves it securely on this server and keeps it out of logs.",
           "Create or copy one at",
@@ -6420,7 +6420,7 @@
           "You will need your",
           "Funcom self-host token",
           "What should this host do?",
-          "Deploy a new server"
+          "Deploy a New Server"
         ]
       }
     ],
@@ -6439,7 +6439,7 @@
     "and increase as maps are started. Overmap commonly uses": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 605,
+        "line": 607,
         "nearby": [
           "Game Map Ports",
           "Game UDP ports start at",
@@ -6463,7 +6463,7 @@
     "and Survival_1 commonly uses": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 605,
+        "line": 607,
         "nearby": [
           "Game UDP ports start at",
           "and increase as maps are started. Overmap commonly uses",
@@ -6893,7 +6893,7 @@
     "Archive passphrase": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 522,
+        "line": 524,
         "nearby": [
           "Passphrase",
           "The passphrase set when this archive was created. There is no way to open it without that passphrase.",
@@ -6940,7 +6940,7 @@
     "assets": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 65,
+        "line": 66,
         "nearby": [
           "Restore",
           "Finish",
@@ -6964,7 +6964,7 @@
     "At least 12 characters and 5 different characters.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 523,
+        "line": 525,
         "nearby": [
           "Archive passphrase",
           "Restore",
@@ -7255,12 +7255,12 @@
     "Auth / Token": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 647,
+        "line": 649,
         "nearby": [
           "Server Identity",
           "Network / Ports",
           "Warnings / Missing Values",
-          "Funcom token was not entered in this wizard session. Existing token file may still be used if present."
+          "Funcom Token was not entered in this wizard session. Existing token file may still be used if present."
         ]
       }
     ],
@@ -7691,7 +7691,7 @@
     "Back": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 695,
+        "line": 699,
         "nearby": [
           "Start it from Home once the console is back.",
           "Game services can take several minutes to warm up, and the in-game browser can take a little longer to show the server.",
@@ -7838,7 +7838,7 @@
     "Backup Archive": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 42,
+        "line": 43,
         "nearby": [
           "Docker Setup",
           "Runtime Location",
@@ -7848,9 +7848,9 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 505,
+        "line": 507,
         "nearby": [
-          "Restore a Dune Docker system backup",
+          "Restore a Dune Docker System Backup",
           "Moves an existing server here with its configuration, secrets and database. Encrypted archive named dune-system-*.tar.",
           "The encrypted archive this console produced on the old server, downloaded from its Backups page.",
           "A Funcom database backup (.backup) is a different thing and cannot be restored here: it holds the game database only, with no configuration and no credentials. Import one from Backups after setup finishes."
@@ -8020,7 +8020,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 117,
+        "line": 120,
         "nearby": [
           "Deploying Dune Server",
           "Restore Completed",
@@ -12476,10 +12476,10 @@
     "Congratulations": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 685,
+        "line": 686,
         "nearby": [
-          "Redeploy was successful.",
-          "Opening the finish step.",
+          "Start Deployment",
+          "Start Redeploy",
           "The system backup was restored. This host now carries the archive's configuration, credentials and database.",
           "The server was installed successfully. The full console is ready to open."
         ]
@@ -13342,7 +13342,7 @@
     "Create or copy one at": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 581,
+        "line": 583,
         "nearby": [
           "Funcom Token",
           "Paste your Funcom self-host token here. When you continue, the console saves it securely on this server and keeps it out of logs.",
@@ -13420,11 +13420,11 @@
     "Creates a fresh world and a new Battlegroup identity.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 495,
+        "line": 496,
         "nearby": [
           "What should this host do?",
-          "Deploy a new server",
-          "Restore a Dune Docker system backup",
+          "Deploy a New Server",
+          "Restore a Dune Docker System Backup",
           "Moves an existing server here with its configuration, secrets and database. Encrypted archive named dune-system-*.tar."
         ]
       }
@@ -13442,7 +13442,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 158,
+        "line": 161,
         "nearby": [
           "Recreating the Dune database before import.",
           "Stopping Dune services before the database restore.",
@@ -14091,7 +14091,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 151,
+        "line": 154,
         "nearby": [
           "Database restore finished and the Dune console restart completed.",
           "Database restore failed.",
@@ -14113,7 +14113,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 152,
+        "line": 155,
         "nearby": [
           "Database restore failed.",
           "Database restore completed successfully. Dune services are restarting.",
@@ -14125,7 +14125,7 @@
     "Database restore failed.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 148,
+        "line": 151,
         "nearby": [
           "Restoring System Backup",
           "Database restore finished and the Dune console restart completed.",
@@ -14147,7 +14147,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 147,
+        "line": 150,
         "nearby": [
           "System Backup Restore Failed",
           "Restoring System Backup",
@@ -15286,22 +15286,22 @@
         ]
       }
     ],
-    "Deploy a new server": [
+    "Deploy a New Server": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 494,
+        "line": 495,
         "nearby": [
           "and a server with enough CPU, memory, disk, and open game ports.",
           "What should this host do?",
           "Creates a fresh world and a new Battlegroup identity.",
-          "Restore a Dune Docker system backup"
+          "Restore a Dune Docker System Backup"
         ]
       }
     ],
     "Deploy Server": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 669,
+        "line": 671,
         "nearby": [
           "Deployment starts a fresh local world and keeps a backup of existing local setup files when they exist.",
           "Advanced review data",
@@ -15313,7 +15313,7 @@
     "Deploying Dune Server": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 113,
+        "line": 116,
         "nearby": [
           "Steam Download Failed",
           "Deployment Failed",
@@ -15325,7 +15325,7 @@
     "Deploying...": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 677,
+        "line": 679,
         "nearby": [
           "Deployment Complete",
           "Redeploy Complete",
@@ -15337,17 +15337,19 @@
     "Deployment Complete": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 675,
+        "line": 677,
         "nearby": [
           "This starts the Dune Docker deployment. The console will prepare local settings, download required server assets, update the database, and start the game services. First-time deployment can take a while, so keep this page open while the progress updates.",
-          "This reapplies your server identity and Funcom token settings, then restarts the deployment flow so the console uses the updated values. Keep this page open while the progress updates.",
+          "This reapplies your server identity and Funcom Token settings, then restarts the deployment flow so the console uses the updated values. Keep this page open while the progress updates.",
           "Redeploy Complete",
           "Deploying..."
         ]
-      },
+      }
+    ],
+    "Deployment Complete!": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 109,
+        "line": 112,
         "nearby": [
           "1 warning",
           "{count0} warnings",
@@ -15359,7 +15361,7 @@
     "Deployment complete.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 185,
+        "line": 188,
         "nearby": [
           "Preparing Dune database and world data.",
           "Preparing deployment.",
@@ -15371,7 +15373,7 @@
     "Deployment Failed": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 112,
+        "line": 115,
         "nearby": [
           "Not Enough Disk Space",
           "Steam Download Failed",
@@ -15383,7 +15385,7 @@
     "Deployment failed. Open the deployment log to see the last server output.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 169,
+        "line": 172,
         "nearby": [
           "Preparing database restore.",
           "Deployment finished. The game services are starting and may need several minutes before they are ready.",
@@ -15395,7 +15397,7 @@
     "Deployment finished. The game services are starting and may need several minutes before they are ready.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 168,
+        "line": 171,
         "nearby": [
           "Creating a pre-restore safety backup.",
           "Preparing database restore.",
@@ -15407,7 +15409,7 @@
     "Deployment Log": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 63,
+        "line": 66,
         "nearby": [
           "Dismiss",
           "This can take a while on a fresh server. Elapsed time:",
@@ -15419,9 +15421,9 @@
     "Deployment starts a fresh local world and keeps a backup of existing local setup files when they exist.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 659,
+        "line": 661,
         "nearby": [
-          "Funcom token was not entered in this wizard session. Existing token file may still be used if present.",
+          "Funcom Token was not entered in this wizard session. Existing token file may still be used if present.",
           "Server IP is set to auto. Confirm Home readiness after setup to verify advertised IP.",
           "Advanced review data",
           "Deploy Server"
@@ -15431,24 +15433,12 @@
     "Deployment stopped.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 186,
+        "line": 189,
         "nearby": [
           "Preparing deployment.",
           "Deployment complete.",
           "Starting game services.",
           "Refreshing generated map catalogs."
-        ]
-      }
-    ],
-    "Deployment was successful.": [
-      {
-        "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 681,
-        "nearby": [
-          "Start Deployment",
-          "Start Redeploy",
-          "Redeploy was successful.",
-          "Opening the finish step."
         ]
       }
     ],
@@ -16278,7 +16268,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 48,
+        "line": 51,
         "nearby": [
           "This can take a while on a fresh server. Elapsed time:",
           "Deployment Log"
@@ -16344,7 +16334,7 @@
     "Do Not Publicly Expose": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 616,
+        "line": 618,
         "nearby": [
           "IGW/S2S UDP ports start at",
           "for map-to-map traffic inside the console. Do not forward these publicly for a normal single-host Docker setup.",
@@ -16368,7 +16358,7 @@
     "Docker Setup": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 18,
+        "line": 19,
         "nearby": [
           "Welcome",
           "Host Check",
@@ -16378,7 +16368,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 40,
+        "line": 41,
         "nearby": [
           "Welcome",
           "Host Check",
@@ -16388,7 +16378,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 558,
+        "line": 560,
         "nearby": [
           "Run Checks",
           "Fix the failed checks before continuing.",
@@ -16674,7 +16664,7 @@
     "Downloading assets and preparing game data.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 190,
+        "line": 193,
         "nearby": [
           "Starting game services.",
           "Refreshing generated map catalogs.",
@@ -16698,7 +16688,7 @@
     "Downloading or updating Dune server files.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 179,
+        "line": 182,
         "nearby": [
           "Preparing the database volume.",
           "Downloading required Docker images.",
@@ -16710,7 +16700,7 @@
     "Downloading required Docker images.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 178,
+        "line": 181,
         "nearby": [
           "Preparing local runtime files.",
           "Preparing the database volume.",
@@ -16722,7 +16712,7 @@
     "Downloading server assets, loading Funcom images, and preparing the database.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 172,
+        "line": 175,
         "nearby": [
           "Deployment failed. Open the deployment log to see the last server output.",
           "Starting the deployment container.",
@@ -16912,7 +16902,7 @@
     "Dune Docker Console listens on": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 601,
+        "line": 603,
         "nearby": [
           "This is the port guidance most users need.",
           "Admin Panel",
@@ -17855,7 +17845,7 @@
     "Enter a valid hostname or short ID using only letters, numbers, dots, and hyphens.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 576,
+        "line": 578,
         "nearby": [
           "Server Hostname (Datacenter ID)",
           "Steam app ID",
@@ -19465,7 +19455,7 @@
     "Finish": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 25,
+        "line": 26,
         "nearby": [
           "Review",
           "Install",
@@ -19475,7 +19465,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 32,
+        "line": 33,
         "nearby": [
           "Review",
           "Install",
@@ -19485,7 +19475,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 45,
+        "line": 46,
         "nearby": [
           "Passphrase",
           "Restore",
@@ -19749,7 +19739,7 @@
     "Fix the failed checks before continuing.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 554,
+        "line": 556,
         "nearby": [
           "Run a quick check before setup starts. Some items are expected to be created later by the wizard, so they will be shown as setup items instead of problems.",
           "Run Checks",
@@ -19809,7 +19799,7 @@
     "For a normal public server, forward these ports from your router/firewall to this Docker host:": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 591,
+        "line": 593,
         "nearby": [
           "Ports and Firewall",
           "Public Router Forwarding",
@@ -19833,7 +19823,7 @@
     "for Dune game server traffic.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 593,
+        "line": 595,
         "nearby": [
           "Public Router Forwarding",
           "For a normal public server, forward these ports from your router/firewall to this Docker host:",
@@ -19845,7 +19835,7 @@
     "for map-to-map traffic inside the console. Do not forward these publicly for a normal single-host Docker setup.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 613,
+        "line": 615,
         "nearby": [
           "Internal Map Traffic",
           "IGW/S2S UDP ports start at",
@@ -19869,7 +19859,7 @@
     "for the RabbitMQ Game HTTP Endpoint.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 595,
+        "line": 597,
         "nearby": [
           "for Dune game server traffic.",
           "for the RabbitMQ Game Messaging Endpoint.",
@@ -19881,7 +19871,7 @@
     "for the RabbitMQ Game Messaging Endpoint.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 594,
+        "line": 596,
         "nearby": [
           "For a normal public server, forward these ports from your router/firewall to this Docker host:",
           "for Dune game server traffic.",
@@ -20154,7 +20144,7 @@
     "Funcom Token": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 21,
+        "line": 22,
         "nearby": [
           "Runtime Location",
           "Server Identity",
@@ -20164,7 +20154,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 29,
+        "line": 30,
         "nearby": [
           "Finish",
           "Server Identity",
@@ -20174,7 +20164,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 579,
+        "line": 581,
         "nearby": [
           "Steam app ID",
           "Enter a valid hostname or short ID using only letters, numbers, dots, and hyphens.",
@@ -20260,10 +20250,10 @@
         ]
       }
     ],
-    "Funcom token was not entered in this wizard session. Existing token file may still be used if present.": [
+    "Funcom Token was not entered in this wizard session. Existing token file may still be used if present.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 657,
+        "line": 659,
         "nearby": [
           "Auth / Token",
           "Warnings / Missing Values",
@@ -20323,7 +20313,7 @@
     "Game File Install Failed": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 123,
+        "line": 126,
         "nearby": [
           "Restoring Backup",
           "Game Files Installed",
@@ -20357,7 +20347,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 122,
+        "line": 125,
         "nearby": [
           "Restarting Dune Services",
           "Restoring Backup",
@@ -20369,7 +20359,7 @@
     "Game Map Ports": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 604,
+        "line": 606,
         "nearby": [
           "Admin Panel",
           "Dune Docker Console listens on",
@@ -20415,7 +20405,7 @@
     "Game services can take several minutes to warm up, and the in-game browser can take a little longer to show the server.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 692,
+        "line": 696,
         "nearby": [
           "The Battlegroup did not start:",
           "Start it from Home once the console is back.",
@@ -20427,7 +20417,7 @@
     "Game UDP ports start at": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 605,
+        "line": 607,
         "nearby": [
           "Dune Docker Console listens on",
           "Game Map Ports",
@@ -21754,7 +21744,7 @@
     "Host Check": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 17,
+        "line": 18,
         "nearby": [
           "Welcome",
           "Docker Setup",
@@ -21763,7 +21753,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 39,
+        "line": 40,
         "nearby": [
           "Finish",
           "Welcome",
@@ -21773,7 +21763,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 551,
+        "line": 553,
         "nearby": [
           "Retry Restore",
           "Start Restore",
@@ -22021,7 +22011,7 @@
     "IGW/S2S UDP ports start at": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 613,
+        "line": 615,
         "nearby": [
           "Optional Direct Listing Ping",
           "Internal Map Traffic",
@@ -22605,7 +22595,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 24,
+        "line": 25,
         "nearby": [
           "Ports",
           "Review",
@@ -22615,7 +22605,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 31,
+        "line": 32,
         "nearby": [
           "Funcom Token",
           "Review",
@@ -22680,10 +22670,10 @@
         ]
       }
     ],
-    "Install mode": [
+    "Install Mode": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 570,
+        "line": 572,
         "nearby": [
           "Server Title",
           "Region",
@@ -22731,7 +22721,7 @@
     "Installing Game Files": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 124,
+        "line": 127,
         "nearby": [
           "Game Files Installed",
           "Game File Install Failed",
@@ -22799,7 +22789,7 @@
     "Installs the game files this host is missing, checks the passphrase, then replaces this host's configuration, credentials and database with the archive's.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 527,
+        "line": 529,
         "nearby": [
           "At least 12 characters and 5 different characters.",
           "Restore",
@@ -22847,7 +22837,7 @@
     "Internal Map Traffic": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 612,
+        "line": 614,
         "nearby": [
           "range covers normal map growth.",
           "Optional Direct Listing Ping",
@@ -23610,7 +23600,7 @@
     "Keep the web admin, Postgres, Director, TextRouter, RabbitMQ Admin, the local RabbitMQ management mirror, and other internal service ports private.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 617,
+        "line": 619,
         "nearby": [
           "for map-to-map traffic inside the console. Do not forward these publicly for a normal single-host Docker setup.",
           "Do Not Publicly Expose",
@@ -25326,9 +25316,9 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 570,
+        "line": 572,
         "nearby": [
-          "Install mode",
+          "Install Mode",
           "Public",
           "Server IP",
           "Server Hostname (Datacenter ID)"
@@ -26755,10 +26745,10 @@
     "Moves an existing server here with its configuration, secrets and database. Encrypted archive named dune-system-*.tar.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 499,
+        "line": 501,
         "nearby": [
           "Creates a fresh world and a new Battlegroup identity.",
-          "Restore a Dune Docker system backup",
+          "Restore a Dune Docker System Backup",
           "Backup Archive",
           "The encrypted archive this console produced on the old server, downloaded from its Backups page."
         ]
@@ -27042,7 +27032,7 @@
     "Network / Ports": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 636,
+        "line": 638,
         "nearby": [
           "Review",
           "Server Identity",
@@ -27348,7 +27338,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 696,
+        "line": 700,
         "nearby": [
           "Game services can take several minutes to warm up, and the in-game browser can take a little longer to show the server.",
           "Back",
@@ -28612,10 +28602,10 @@
     "Not Enough Disk Space": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 110,
+        "line": 113,
         "nearby": [
           "{count0} warnings",
-          "Deployment Complete",
+          "Deployment Complete!",
           "Steam Download Failed",
           "Deployment Failed"
         ]
@@ -28788,7 +28778,7 @@
     "Not set": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 722,
+        "line": 727,
         "nearby": [
           "Back",
           "Next"
@@ -29697,6 +29687,18 @@
         ]
       }
     ],
+    "Open the Console Now": [
+      {
+        "file": "console/web/src/components/SetupWizard.tsx",
+        "line": 692,
+        "nearby": [
+          "seconds.",
+          "Ready to Explore?",
+          "The archive's admin password is now this host's, so you may be asked to sign in again.",
+          "The Battlegroup did not start:"
+        ]
+      }
+    ],
     "Open this section to load Landsraad data.": [
       {
         "file": "console/web/src/features/landsraad/LandsraadPanel.tsx",
@@ -29716,30 +29718,6 @@
         "nearby": [
           "Update Available",
           "Latest"
-        ]
-      }
-    ],
-    "Opening the finish step.": [
-      {
-        "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 681,
-        "nearby": [
-          "Deployment was successful.",
-          "Redeploy was successful.",
-          "Congratulations",
-          "The system backup was restored. This host now carries the archive's configuration, credentials and database."
-        ]
-      }
-    ],
-    "Opening the full console in": [
-      {
-        "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 689,
-        "nearby": [
-          "Setup completed successfully. The server has been redeployed and the full console is still available.",
-          "Restarting the console in",
-          "seconds.",
-          "The archive's admin password is now this host's, so you may be asked to sign in again."
         ]
       }
     ],
@@ -29768,7 +29746,7 @@
     "Optional Direct Listing Ping": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 608,
+        "line": 610,
         "nearby": [
           ". The",
           "range covers normal map growth.",
@@ -29816,7 +29794,7 @@
     "or its working directory.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 563,
+        "line": 565,
         "nearby": [
           "Runtime Location",
           "The backend is using the repository path configured by",
@@ -30558,7 +30536,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 43,
+        "line": 44,
         "nearby": [
           "Runtime Location",
           "Backup Archive",
@@ -30568,7 +30546,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 520,
+        "line": 522,
         "nearby": [
           "Stored as",
           ". Nothing is applied until you confirm.",
@@ -30763,7 +30741,7 @@
     "Paste token": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 583,
+        "line": 585,
         "nearby": [
           "Create or copy one at",
           "An existing token is already saved. Paste a new one only if you want to replace it.",
@@ -30775,7 +30753,7 @@
     "Paste your Funcom self-host token here. When you continue, the console saves it securely on this server and keeps it out of logs.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 580,
+        "line": 582,
         "nearby": [
           "Enter a valid hostname or short ID using only letters, numbers, dots, and hyphens.",
           "Funcom Token",
@@ -30787,7 +30765,7 @@
     "Paste your Funcom self-host token to continue to deployment.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 584,
+        "line": 586,
         "nearby": [
           "An existing token is already saved. Paste a new one only if you want to replace it.",
           "Paste token",
@@ -31742,7 +31720,7 @@
     "Ports": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 22,
+        "line": 23,
         "nearby": [
           "Server Identity",
           "Funcom Token",
@@ -31764,7 +31742,7 @@
     "Ports and Firewall": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 587,
+        "line": 589,
         "nearby": [
           "Paste token",
           "Paste your Funcom self-host token to continue to deployment.",
@@ -31901,7 +31879,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 159,
+        "line": 162,
         "nearby": [
           "Stopping Dune services before the database restore.",
           "Creating a pre-restore safety backup.",
@@ -31913,7 +31891,7 @@
     "Preparing deployment.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 181,
+        "line": 184,
         "nearby": [
           "Downloading or updating Dune server files.",
           "Preparing Dune database and world data.",
@@ -31925,7 +31903,7 @@
     "Preparing Dune database and world data.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 180,
+        "line": 183,
         "nearby": [
           "Downloading required Docker images.",
           "Downloading or updating Dune server files.",
@@ -31937,7 +31915,7 @@
     "Preparing local runtime files.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 176,
+        "line": 179,
         "nearby": [
           "Starting Dune services.",
           "Saving server settings and token.",
@@ -31989,7 +31967,7 @@
     "Preparing the database volume.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 177,
+        "line": 180,
         "nearby": [
           "Saving server settings and token.",
           "Preparing local runtime files.",
@@ -32027,7 +32005,7 @@
     "Preparing the server workspace.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 193,
+        "line": 196,
         "nearby": [
           "Starting deployment tools.",
           "Saving setup settings.",
@@ -32472,10 +32450,10 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 570,
+        "line": 572,
         "nearby": [
           "Region",
-          "Install mode",
+          "Install Mode",
           "Local",
           "Server IP"
         ]
@@ -32574,7 +32552,7 @@
     "Public Router Forwarding": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 590,
+        "line": 592,
         "nearby": [
           "Paste your Funcom self-host token to continue to deployment.",
           "Ports and Firewall",
@@ -33071,7 +33049,7 @@
     "range covers normal map growth.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 605,
+        "line": 607,
         "nearby": [
           "and Survival_1 commonly uses",
           ". The",
@@ -33249,7 +33227,7 @@
     "Reading setup details.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 194,
+        "line": 197,
         "nearby": [
           "Saving setup settings.",
           "Preparing the server workspace.",
@@ -33294,6 +33272,18 @@
         "nearby": [
           "3.00 GB (Default)",
           "Loading"
+        ]
+      }
+    ],
+    "Ready to Explore?": [
+      {
+        "file": "console/web/src/components/SetupWizard.tsx",
+        "line": 692,
+        "nearby": [
+          "Redirecting to the full console in",
+          "seconds.",
+          "Open the Console Now",
+          "The archive's admin password is now this host's, so you may be asked to sign in again."
         ]
       }
     ],
@@ -33537,7 +33527,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 156,
+        "line": 159,
         "nearby": [
           "Adapting imported backup to this Docker battlegroup.",
           "Restoring database contents from the selected backup.",
@@ -33582,9 +33572,9 @@
     "Redeploy Complete": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 675,
+        "line": 677,
         "nearby": [
-          "This reapplies your server identity and Funcom token settings, then restarts the deployment flow so the console uses the updated values. Keep this page open while the progress updates.",
+          "This reapplies your server identity and Funcom Token settings, then restarts the deployment flow so the console uses the updated values. Keep this page open while the progress updates.",
           "Deployment Complete",
           "Deploying...",
           "Redeploying..."
@@ -33594,36 +33584,36 @@
     "Redeploy Server": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 669,
+        "line": 671,
         "nearby": [
           "Advanced review data",
           "Deploy Server",
           "This starts the Dune Docker deployment. The console will prepare local settings, download required server assets, update the database, and start the game services. First-time deployment can take a while, so keep this page open while the progress updates.",
-          "This reapplies your server identity and Funcom token settings, then restarts the deployment flow so the console uses the updated values. Keep this page open while the progress updates."
-        ]
-      }
-    ],
-    "Redeploy was successful.": [
-      {
-        "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 681,
-        "nearby": [
-          "Start Redeploy",
-          "Deployment was successful.",
-          "Opening the finish step.",
-          "Congratulations"
+          "This reapplies your server identity and Funcom Token settings, then restarts the deployment flow so the console uses the updated values. Keep this page open while the progress updates."
         ]
       }
     ],
     "Redeploying...": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 677,
+        "line": 679,
         "nearby": [
           "Redeploy Complete",
           "Deploying...",
           "Start Deployment",
           "Start Redeploy"
+        ]
+      }
+    ],
+    "Redirecting to the full console in": [
+      {
+        "file": "console/web/src/components/SetupWizard.tsx",
+        "line": 691,
+        "nearby": [
+          "Setup completed successfully. The server has been redeployed and the full console is still available.",
+          "Restarting the console in",
+          "seconds.",
+          "Ready to Explore?"
         ]
       }
     ],
@@ -34188,7 +34178,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 173,
+        "line": 176,
         "nearby": [
           "Starting the deployment container.",
           "Downloading server assets, loading Funcom images, and preparing the database.",
@@ -34198,7 +34188,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 189,
+        "line": 192,
         "nearby": [
           "Deployment stopped.",
           "Starting game services.",
@@ -34254,11 +34244,11 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 569,
+        "line": 571,
         "nearby": [
           "Server Identity",
           "Server Title",
-          "Install mode",
+          "Install Mode",
           "Public"
         ]
       }
@@ -34364,7 +34354,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 153,
+        "line": 156,
         "nearby": [
           "Database restore completed successfully. Dune services are restarting.",
           "Database restore completed successfully. Restarting Dune services.",
@@ -36042,7 +36032,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 118,
+        "line": 121,
         "nearby": [
           "Restore Completed",
           "Backup Restore Failed",
@@ -36124,11 +36114,11 @@
     "Restarting the console in": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 689,
+        "line": 691,
         "nearby": [
           "The server was installed successfully. The full console is ready to open.",
           "Setup completed successfully. The server has been redeployed and the full console is still available.",
-          "Opening the full console in",
+          "Redirecting to the full console in",
           "seconds."
         ]
       }
@@ -36198,7 +36188,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 44,
+        "line": 45,
         "nearby": [
           "Backup Archive",
           "Passphrase",
@@ -36208,7 +36198,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 526,
+        "line": 528,
         "nearby": [
           "Archive passphrase",
           "At least 12 characters and 5 different characters.",
@@ -36227,12 +36217,12 @@
         ]
       }
     ],
-    "Restore a Dune Docker system backup": [
+    "Restore a Dune Docker System Backup": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 498,
+        "line": 500,
         "nearby": [
-          "Deploy a new server",
+          "Deploy a New Server",
           "Creates a fresh world and a new Battlegroup identity.",
           "Moves an existing server here with its configuration, secrets and database. Encrypted archive named dune-system-*.tar.",
           "Backup Archive"
@@ -36288,7 +36278,7 @@
     "Restore complete": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 73,
+        "line": 74,
         "nearby": [
           "Finish",
           "assets",
@@ -36310,7 +36300,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 116,
+        "line": 119,
         "nearby": [
           "Deployment Failed",
           "Deploying Dune Server",
@@ -36534,7 +36524,7 @@
     "Restore steps": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 75,
+        "line": 76,
         "nearby": [
           "Restore stopped",
           "Restoring",
@@ -36546,7 +36536,7 @@
     "Restore stopped": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 74,
+        "line": 75,
         "nearby": [
           "assets",
           "Restore complete",
@@ -36625,7 +36615,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 75,
+        "line": 76,
         "nearby": [
           "Restore complete",
           "Restore stopped",
@@ -36637,7 +36627,7 @@
     "Restoring Backup": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 119,
+        "line": 122,
         "nearby": [
           "Backup Restore Failed",
           "Restarting Dune Services",
@@ -36692,7 +36682,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 155,
+        "line": 158,
         "nearby": [
           "Relinking restored characters to current Docker player identities.",
           "Adapting imported backup to this Docker battlegroup.",
@@ -36704,7 +36694,7 @@
     "Restoring System Backup": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 129,
+        "line": 132,
         "nearby": [
           "System Backup Restored",
           "System Backup Restore Failed",
@@ -36934,7 +36924,7 @@
     "Retry Restore": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 533,
+        "line": 535,
         "nearby": [
           "Restore",
           "Installs the game files this host is missing, checks the passphrase, then replaces this host's configuration, credentials and database with the archive's.",
@@ -37024,7 +37014,7 @@
     "Review": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 23,
+        "line": 24,
         "nearby": [
           "Funcom Token",
           "Ports",
@@ -37034,7 +37024,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 30,
+        "line": 31,
         "nearby": [
           "Server Identity",
           "Funcom Token",
@@ -37044,7 +37034,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 622,
+        "line": 624,
         "nearby": [
           "Do Not Publicly Expose",
           "Keep the web admin, Postgres, Director, TextRouter, RabbitMQ Admin, the local RabbitMQ management mirror, and other internal service ports private.",
@@ -37371,7 +37361,7 @@
     "Run a quick check before setup starts. Some items are expected to be created later by the wizard, so they will be shown as setup items instead of problems.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 552,
+        "line": 554,
         "nearby": [
           "Start Restore",
           "Host Check",
@@ -37453,7 +37443,7 @@
     "Run Checks": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 553,
+        "line": 555,
         "nearby": [
           "Host Check",
           "Run a quick check before setup starts. Some items are expected to be created later by the wizard, so they will be shown as setup items instead of problems.",
@@ -37677,7 +37667,7 @@
     "Runtime Location": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 19,
+        "line": 20,
         "nearby": [
           "Host Check",
           "Docker Setup",
@@ -37687,7 +37677,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 41,
+        "line": 42,
         "nearby": [
           "Host Check",
           "Docker Setup",
@@ -37697,7 +37687,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 562,
+        "line": 564,
         "nearby": [
           "Docker Setup",
           "The installer takes care of the Docker check before you get here. If anything was missing on a supported Linux server, it was installed and started for you so you can continue in the browser.",
@@ -38623,7 +38613,7 @@
     "Saving server settings and token.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 175,
+        "line": 178,
         "nearby": [
           "Refreshing generated map catalogs.",
           "Starting Dune services.",
@@ -38669,7 +38659,7 @@
     "Saving setup settings.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 192,
+        "line": 195,
         "nearby": [
           "Downloading assets and preparing game data.",
           "Starting deployment tools.",
@@ -39579,12 +39569,12 @@
     "seconds.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 689,
+        "line": 691,
         "nearby": [
           "Restarting the console in",
-          "Opening the full console in",
-          "The archive's admin password is now this host's, so you may be asked to sign in again.",
-          "The Battlegroup did not start:"
+          "Redirecting to the full console in",
+          "Ready to Explore?",
+          "Open the Console Now"
         ]
       }
     ],
@@ -40263,7 +40253,7 @@
     "Server Hostname (Datacenter ID)": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 572,
+        "line": 574,
         "nearby": [
           "Local",
           "Server IP",
@@ -40275,7 +40265,7 @@
     "Server Identity": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 20,
+        "line": 21,
         "nearby": [
           "Docker Setup",
           "Runtime Location",
@@ -40285,7 +40275,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 28,
+        "line": 29,
         "nearby": [
           "Install",
           "Finish",
@@ -40295,7 +40285,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 566,
+        "line": 568,
         "nearby": [
           "The backend is using the repository path configured by",
           "or its working directory.",
@@ -40305,7 +40295,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 625,
+        "line": 627,
         "nearby": [
           "Keep the web admin, Postgres, Director, TextRouter, RabbitMQ Admin, the local RabbitMQ management mirror, and other internal service ports private.",
           "Review",
@@ -40337,7 +40327,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 571,
+        "line": 573,
         "nearby": [
           "Public",
           "Local",
@@ -40349,10 +40339,10 @@
     "Server IP is set to auto. Confirm Home readiness after setup to verify advertised IP.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 658,
+        "line": 660,
         "nearby": [
           "Warnings / Missing Values",
-          "Funcom token was not entered in this wizard session. Existing token file may still be used if present.",
+          "Funcom Token was not entered in this wizard session. Existing token file may still be used if present.",
           "Deployment starts a fresh local world and keeps a backup of existing local setup files when they exist.",
           "Advanced review data"
         ]
@@ -40480,12 +40470,12 @@
     "Server Title": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 568,
+        "line": 570,
         "nearby": [
           "or its working directory.",
           "Server Identity",
           "Region",
-          "Install mode"
+          "Install Mode"
         ]
       }
     ],
@@ -40948,12 +40938,12 @@
     "Setup completed successfully. The server has been redeployed and the full console is still available.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 688,
+        "line": 689,
         "nearby": [
           "The system backup was restored. This host now carries the archive's configuration, credentials and database.",
           "The server was installed successfully. The full console is ready to open.",
           "Restarting the console in",
-          "Opening the full console in"
+          "Redirecting to the full console in"
         ]
       }
     ],
@@ -42076,19 +42066,19 @@
     "Start Deployment": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 678,
+        "line": 680,
         "nearby": [
           "Deploying...",
           "Redeploying...",
           "Start Redeploy",
-          "Deployment was successful."
+          "Congratulations"
         ]
       }
     ],
     "Start it from Home once the console is back.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 691,
+        "line": 695,
         "nearby": [
           "The archive's admin password is now this host's, so you may be asked to sign in again.",
           "The Battlegroup did not start:",
@@ -42100,19 +42090,19 @@
     "Start Redeploy": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 678,
+        "line": 680,
         "nearby": [
           "Redeploying...",
           "Start Deployment",
-          "Deployment was successful.",
-          "Redeploy was successful."
+          "Congratulations",
+          "The system backup was restored. This host now carries the archive's configuration, credentials and database."
         ]
       }
     ],
     "Start Restore": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 533,
+        "line": 535,
         "nearby": [
           "Installs the game files this host is missing, checks the passphrase, then replaces this host's configuration, credentials and database with the archive's.",
           "Retry Restore",
@@ -42190,7 +42180,7 @@
     "Starting deployment tools.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 191,
+        "line": 194,
         "nearby": [
           "Refreshing generated map catalogs.",
           "Downloading assets and preparing game data.",
@@ -42202,7 +42192,7 @@
     "Starting deployment.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 195,
+        "line": 198,
         "nearby": [
           "Preparing the server workspace.",
           "Reading setup details.",
@@ -42214,7 +42204,7 @@
     "Starting Dune services.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 174,
+        "line": 177,
         "nearby": [
           "Downloading server assets, loading Funcom images, and preparing the database.",
           "Refreshing generated map catalogs.",
@@ -42226,7 +42216,7 @@
     "Starting game services.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 188,
+        "line": 191,
         "nearby": [
           "Deployment complete.",
           "Deployment stopped.",
@@ -42250,7 +42240,7 @@
     "Starting the deployment container.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 171,
+        "line": 174,
         "nearby": [
           "Deployment finished. The game services are starting and may need several minutes before they are ready.",
           "Deployment failed. Open the deployment log to see the last server output.",
@@ -42392,7 +42382,7 @@
     "Steam app ID": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 573,
+        "line": 575,
         "nearby": [
           "Server IP",
           "Server Hostname (Datacenter ID)",
@@ -42404,7 +42394,7 @@
     "Steam could not download the Dune server files from its selected content host. This is usually temporary; retry deployment later so Steam can select another host.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 231,
+        "line": 234,
         "nearby": [
           "Starting deployment.",
           "There is not enough free disk space for a safe Dune server deployment. Free up disk space or move Docker's data-root to a larger disk, then retry."
@@ -42425,9 +42415,9 @@
     "Steam Download Failed": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 111,
+        "line": 114,
         "nearby": [
-          "Deployment Complete",
+          "Deployment Complete!",
           "Not Enough Disk Space",
           "Deployment Failed",
           "Deploying Dune Server"
@@ -42579,7 +42569,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 157,
+        "line": 160,
         "nearby": [
           "Restoring database contents from the selected backup.",
           "Recreating the Dune database before import.",
@@ -42636,7 +42626,7 @@
     "Stored as": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 516,
+        "line": 518,
         "nearby": [
           "System backup archive",
           "Uploading...",
@@ -42935,7 +42925,7 @@
     "System backup archive": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 508,
+        "line": 510,
         "nearby": [
           "The encrypted archive this console produced on the old server, downloaded from its Backups page.",
           "A Funcom database backup (.backup) is a different thing and cannot be restored here: it holds the game database only, with no configuration and no credentials. Import one from Backups after setup finishes.",
@@ -42996,7 +42986,7 @@
     "System Backup Restore Failed": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 128,
+        "line": 131,
         "nearby": [
           "Installing Game Files",
           "System Backup Restored",
@@ -43018,7 +43008,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 127,
+        "line": 130,
         "nearby": [
           "Game File Install Failed",
           "Installing Game Files",
@@ -43302,7 +43292,7 @@
       },
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 63,
+        "line": 66,
         "nearby": [
           "This can take a while on a fresh server. Elapsed time:",
           "Deployment Log",
@@ -43833,10 +43823,10 @@
     "The archive's admin password is now this host's, so you may be asked to sign in again.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 690,
+        "line": 694,
         "nearby": [
-          "Opening the full console in",
-          "seconds.",
+          "Ready to Explore?",
+          "Open the Console Now",
           "The Battlegroup did not start:",
           "Start it from Home once the console is back."
         ]
@@ -43845,7 +43835,7 @@
     "The backend is using the repository path configured by": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 563,
+        "line": 565,
         "nearby": [
           "The installer takes care of the Docker check before you get here. If anything was missing on a supported Linux server, it was installed and started for you so you can continue in the browser.",
           "Runtime Location",
@@ -43868,9 +43858,9 @@
     "The Battlegroup did not start:": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 691,
+        "line": 695,
         "nearby": [
-          "seconds.",
+          "Open the Console Now",
           "The archive's admin password is now this host's, so you may be asked to sign in again.",
           "Start it from Home once the console is back.",
           "Game services can take several minutes to warm up, and the in-game browser can take a little longer to show the server."
@@ -44075,7 +44065,7 @@
     "The encrypted archive this console produced on the old server, downloaded from its Backups page.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 506,
+        "line": 508,
         "nearby": [
           "Moves an existing server here with its configuration, secrets and database. Encrypted archive named dune-system-*.tar.",
           "Backup Archive",
@@ -44217,7 +44207,7 @@
     "The installer takes care of the Docker check before you get here. If anything was missing on a supported Linux server, it was installed and started for you so you can continue in the browser.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 559,
+        "line": 561,
         "nearby": [
           "Fix the failed checks before continuing.",
           "Docker Setup",
@@ -44415,7 +44405,7 @@
     "The passphrase set when this archive was created. There is no way to open it without that passphrase.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 521,
+        "line": 523,
         "nearby": [
           ". Nothing is applied until you confirm.",
           "Passphrase",
@@ -44584,7 +44574,7 @@
     "The server was installed successfully. The full console is ready to open.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 688,
+        "line": 689,
         "nearby": [
           "Congratulations",
           "The system backup was restored. This host now carries the archive's configuration, credentials and database.",
@@ -44596,9 +44586,9 @@
     "The system backup was restored. This host now carries the archive's configuration, credentials and database.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 687,
+        "line": 688,
         "nearby": [
-          "Opening the finish step.",
+          "Start Redeploy",
           "Congratulations",
           "The server was installed successfully. The full console is ready to open.",
           "Setup completed successfully. The server has been redeployed and the full console is still available."
@@ -44757,7 +44747,7 @@
     "There is not enough free disk space for a safe Dune server deployment. Free up disk space or move Docker's data-root to a larger disk, then retry.": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 225,
+        "line": 228,
         "nearby": [
           "Reading setup details.",
           "Starting deployment.",
@@ -44965,7 +44955,7 @@
     "This can take a while on a fresh server. Elapsed time:": [
       {
         "file": "console/web/src/components/TaskProgress.tsx",
-        "line": 52,
+        "line": 55,
         "nearby": [
           "Dismiss",
           "Deployment Log",
@@ -45107,7 +45097,7 @@
     "This is the port guidance most users need.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 597,
+        "line": 599,
         "nearby": [
           "for the RabbitMQ Game Messaging Endpoint.",
           "for the RabbitMQ Game HTTP Endpoint.",
@@ -45238,10 +45228,10 @@
         ]
       }
     ],
-    "This reapplies your server identity and Funcom token settings, then restarts the deployment flow so the console uses the updated values. Keep this page open while the progress updates.": [
+    "This reapplies your server identity and Funcom Token settings, then restarts the deployment flow so the console uses the updated values. Keep this page open while the progress updates.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 672,
+        "line": 674,
         "nearby": [
           "Redeploy Server",
           "This starts the Dune Docker deployment. The console will prepare local settings, download required server assets, update the database, and start the game services. First-time deployment can take a while, so keep this page open while the progress updates.",
@@ -45287,11 +45277,11 @@
     "This starts the Dune Docker deployment. The console will prepare local settings, download required server assets, update the database, and start the game services. First-time deployment can take a while, so keep this page open while the progress updates.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 671,
+        "line": 673,
         "nearby": [
           "Deploy Server",
           "Redeploy Server",
-          "This reapplies your server identity and Funcom token settings, then restarts the deployment flow so the console uses the updated values. Keep this page open while the progress updates.",
+          "This reapplies your server identity and Funcom Token settings, then restarts the deployment flow so the console uses the updated values. Keep this page open while the progress updates.",
           "Deployment Complete"
         ]
       }
@@ -47353,7 +47343,7 @@
     "Uploading...": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 515,
+        "line": 517,
         "nearby": [
           "A Funcom database backup (.backup) is a different thing and cannot be restored here: it holds the game database only, with no configuration and no credentials. Import one from Backups after setup finishes.",
           "System backup archive",
@@ -48413,11 +48403,11 @@
     "Warnings / Missing Values": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 655,
+        "line": 657,
         "nearby": [
           "Network / Ports",
           "Auth / Token",
-          "Funcom token was not entered in this wizard session. Existing token file may still be used if present.",
+          "Funcom Token was not entered in this wizard session. Existing token file may still be used if present.",
           "Server IP is set to auto. Confirm Home readiness after setup to verify advertised IP."
         ]
       }
@@ -48589,7 +48579,7 @@
     "Welcome": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 16,
+        "line": 17,
         "nearby": [
           "Host Check",
           "Docker Setup"
@@ -48597,7 +48587,7 @@
       },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
-        "line": 38,
+        "line": 39,
         "nearby": [
           "Install",
           "Finish",
@@ -48637,7 +48627,7 @@
         "nearby": [
           "Funcom self-host token",
           "and a server with enough CPU, memory, disk, and open game ports.",
-          "Deploy a new server",
+          "Deploy a New Server",
           "Creates a fresh world and a new Battlegroup identity."
         ]
       }

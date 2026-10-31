@@ -6493,7 +6493,13 @@
       "Your Correction": "Votre correction",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Votre correction est en attente d'examen. Les corrections approuvées seront incluses dans une future mise à jour du projet.",
       "unchanged.": "inchangé.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Déploiement terminé !",
+      "Don't Expose Publicly": "Ne pas exposer publiquement",
+      "Open the Console Now": "Ouvrez la console maintenant",
+      "Ready to explore?": "Prêt à explorer ?",
+      "Redirecting to the full console in": "Redirection vers la console complète dans",
+      "Saved Privately on Server": "Enregistré en privé sur le serveur"
     },
     "NL": {
       "Game Server Connections": "Spelserververbindingen",
@@ -9709,7 +9715,13 @@
       "Your Correction": "Jouw correctie",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Uw correctie wacht op beoordeling. Goedgekeurde correcties zullen worden opgenomen in een toekomstige projectupdate.",
       "unchanged.": "onveranderd.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Implementatie voltooid!",
+      "Don't Expose Publicly": "Niet publiekelijk blootstellen",
+      "Open the Console Now": "Open nu de console",
+      "Ready to explore?": "Klaar om te verkennen?",
+      "Redirecting to the full console in": "Omleiden naar de volledige console in",
+      "Saved Privately on Server": "Privé opgeslagen op de server"
     },
     "ES": {
       "Game Server Connections": "Conexiones de Servidores de Juego",
@@ -12925,7 +12937,13 @@
       "Your Correction": "Tu corrección",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Su corrección está esperando revisión. Las correcciones aprobadas se incluirán en una futura actualización del proyecto.",
       "unchanged.": "sin alterar.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "¡Implementación completa!",
+      "Don't Expose Publicly": "No exponer públicamente",
+      "Open the Console Now": "Abra la consola ahora",
+      "Ready to explore?": "¿Listo para explorar?",
+      "Redirecting to the full console in": "Redirigiendo a la consola completa en",
+      "Saved Privately on Server": "Guardado de forma privada en el servidor"
     },
     "IT": {
       "Game Server Connections": "Connessioni dei Server di Gioco",
@@ -16141,7 +16159,13 @@
       "Your Correction": "La tua correzione",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "La tua correzione è in attesa di revisione. Le correzioni approvate verranno incluse in un futuro aggiornamento del progetto.",
       "unchanged.": "invariato.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Distribuzione completata!",
+      "Don't Expose Publicly": "Non esporre pubblicamente",
+      "Open the Console Now": "Apri la console adesso",
+      "Ready to explore?": "Pronto per esplorare?",
+      "Redirecting to the full console in": "Reindirizzamento alla console completa in",
+      "Saved Privately on Server": "Salvato privatamente sul server"
     },
     "DE": {
       "Game Server Connections": "Spielserver-Verbindungen",
@@ -19357,7 +19381,13 @@
       "Your Correction": "Ihre Korrektur",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Ihre Korrektur wartet auf Überprüfung. Genehmigte Korrekturen werden in einer zukünftigen Projektaktualisierung enthalten sein.",
       "unchanged.": "unverändert.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Bereitstellung abgeschlossen!",
+      "Don't Expose Publicly": "Nicht öffentlich bloßstellen",
+      "Open the Console Now": "Öffnen Sie jetzt die Konsole",
+      "Ready to explore?": "Bereit zum Erkunden?",
+      "Redirecting to the full console in": "Umleitung zur vollständigen Konsole in",
+      "Saved Privately on Server": "Privat auf dem Server gespeichert"
     },
     "PL": {
       "Game Server Connections": "Połączenia Serwerów Gry",
@@ -22573,7 +22603,13 @@
       "Your Correction": "Twoja korekta",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Twoja poprawka oczekuje na sprawdzenie. Zatwierdzone poprawki zostaną uwzględnione w przyszłej aktualizacji projektu.",
       "unchanged.": "niezmienione.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Wdrożenie zakończone!",
+      "Don't Expose Publicly": "Nie ujawniaj się publicznie",
+      "Open the Console Now": "Otwórz teraz konsolę",
+      "Ready to explore?": "Gotowy do zwiedzania?",
+      "Redirecting to the full console in": "Przekierowanie do pełnej konsoli w",
+      "Saved Privately on Server": "Zapisano prywatnie na serwerze"
     },
     "PT-BR": {
       "Game Server Connections": "Conexões dos Servidores de Jogo",
@@ -25789,7 +25825,13 @@
       "Your Correction": "Sua correção",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Sua correção está aguardando revisão. As correções aprovadas serão incluídas em uma atualização futura do projeto.",
       "unchanged.": "inalterado.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Implantação concluída!",
+      "Don't Expose Publicly": "Não exponha publicamente",
+      "Open the Console Now": "Abra o console agora",
+      "Ready to explore?": "Pronto para explorar?",
+      "Redirecting to the full console in": "Redirecionando para o console completo em",
+      "Saved Privately on Server": "Salvo de forma privada no servidor"
     },
     "PT-PT": {
       "Game Server Connections": "Ligações dos Servidores de Jogo",
@@ -29005,7 +29047,13 @@
       "Your Correction": "Sua correção",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Sua correção está aguardando revisão. As correções aprovadas serão incluídas em uma atualização futura do projeto.",
       "unchanged.": "inalterado.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Implantação concluída!",
+      "Don't Expose Publicly": "Não exponha publicamente",
+      "Open the Console Now": "Abra o console agora",
+      "Ready to explore?": "Pronto para explorar?",
+      "Redirecting to the full console in": "Redirecionando para o console completo em",
+      "Saved Privately on Server": "Salvo de forma privada no servidor"
     },
     "UK": {
       "Game Server Connections": "З’єднання Ігрових Серверів",
@@ -32221,7 +32269,13 @@
       "Your Correction": "Ваше виправлення",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Ваше виправлення очікує на розгляд. Схвалені виправлення будуть включені до майбутнього оновлення проекту.",
       "unchanged.": "без змін.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Розгортання завершено!",
+      "Don't Expose Publicly": "Не викривайте публічно",
+      "Open the Console Now": "Відкрийте консоль зараз",
+      "Ready to explore?": "Готові досліджувати?",
+      "Redirecting to the full console in": "Переспрямування на повну консоль у",
+      "Saved Privately on Server": "Збережено приватно на сервері"
     },
     "RU": {
       "Game Server Connections": "Подключения Игровых Серверов",
@@ -35437,7 +35491,13 @@
       "Your Correction": "Ваша поправка",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Ваше исправление ожидает рассмотрения. Утвержденные исправления будут включены в будущее обновление проекта.",
       "unchanged.": "без изменений.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Развертывание завершено!",
+      "Don't Expose Publicly": "Не выставляйте напоказ публично",
+      "Open the Console Now": "Откройте консоль сейчас",
+      "Ready to explore?": "Готовы исследовать?",
+      "Redirecting to the full console in": "Перенаправление на полную консоль в",
+      "Saved Privately on Server": "Сохранено конфиденциально на сервере"
     },
     "TR": {
       "Game Server Connections": "Oyun Sunucusu Bağlantıları",
@@ -38653,7 +38713,13 @@
       "Your Correction": "Düzeltmeniz",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Düzeltmeniz incelenmeyi bekliyor. Onaylanan düzeltmeler gelecekteki bir proje güncellemesine dahil edilecektir.",
       "unchanged.": "değişmedi.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Dağıtım Tamamlandı!",
+      "Don't Expose Publicly": "Kamuya Açıklamayın",
+      "Open the Console Now": "Konsolu Şimdi Açın",
+      "Ready to explore?": "Keşfetmeye hazır mısınız?",
+      "Redirecting to the full console in": "Tam konsola yönlendiriliyor",
+      "Saved Privately on Server": "Sunucuya Özel Olarak Kaydedildi"
     },
     "JA": {
       "Game Server Connections": "ゲームサーバー接続",
@@ -41869,7 +41935,13 @@
       "Your Correction": "あなたの訂正",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "あなたの修正は審査を待っています。承認された修正は、将来のプロジェクトの更新に含まれる予定です。",
       "unchanged.": "変わらない。",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "導入完了！",
+      "Don't Expose Publicly": "公にさらさないでください",
+      "Open the Console Now": "今すぐコンソールを開く",
+      "Ready to explore?": "探索する準備はできましたか?",
+      "Redirecting to the full console in": "完全なコンソールにリダイレクトします",
+      "Saved Privately on Server": "サーバーに非公開で保存"
     },
     "KO": {
       "Game Server Connections": "게임 서버 연결",
@@ -45085,7 +45157,13 @@
       "Your Correction": "당신의 정정",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "수정 사항이 검토를 기다리고 있습니다. 승인된 수정 사항은 향후 프로젝트 업데이트에 포함될 예정입니다.",
       "unchanged.": "변하지 않은.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "배포 완료!",
+      "Don't Expose Publicly": "공개적으로 노출하지 마세요",
+      "Open the Console Now": "지금 콘솔 열기",
+      "Ready to explore?": "탐험할 준비가 되셨나요?",
+      "Redirecting to the full console in": "전체 콘솔로 리디렉션 중",
+      "Saved Privately on Server": "서버에 비공개로 저장됨"
     },
     "ZH-HANS": {
       "Game Server Connections": "游戏服务器连接",
@@ -48301,7 +48379,13 @@
       "Your Correction": "您的更正",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "您的更正正在等待审核。批准的更正将包含在未来的项目更新中。",
       "unchanged.": "不变。",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "部署完成！",
+      "Don't Expose Publicly": "不要公开暴露",
+      "Open the Console Now": "立即打开控制台",
+      "Ready to explore?": "准备好探索了吗？",
+      "Redirecting to the full console in": "重定向到完整控制台",
+      "Saved Privately on Server": "私密保存在服务器上"
     },
     "ZH-HANT": {
       "Game Server Connections": "遊戲伺服器連線",
@@ -51517,7 +51601,13 @@
       "Your Correction": "您的更正",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "您的更正正在等待審核。批准的更正將包含在未來的專案更新中。",
       "unchanged.": "不變。",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "部署完成！",
+      "Don't Expose Publicly": "不要公開暴露",
+      "Open the Console Now": "立即開啟控制台",
+      "Ready to explore?": "準備好探索了嗎？",
+      "Redirecting to the full console in": "重定向到完整控制台",
+      "Saved Privately on Server": "私密保存在伺服器上"
     },
     "AR": {
       "Game Server Connections": "اتصالات خوادم اللعبة",
@@ -54733,7 +54823,13 @@
       "Your Correction": "التصحيح الخاص بك",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "التصحيح الخاص بك في انتظار المراجعة. سيتم تضمين التصحيحات المعتمدة في تحديث المشروع في المستقبل.",
       "unchanged.": "دون تغيير.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "اكتمل النشر!",
+      "Don't Expose Publicly": "لا تفضح علنا",
+      "Open the Console Now": "افتح وحدة التحكم الآن",
+      "Ready to explore?": "هل أنت مستعد للاستكشاف؟",
+      "Redirecting to the full console in": "إعادة التوجيه إلى وحدة التحكم الكاملة في",
+      "Saved Privately on Server": "تم الحفظ بشكل خاص على الخادم"
     },
     "FI": {
       "Game Server Connections": "Pelipalvelinyhteydet",
@@ -57949,7 +58045,13 @@
       "Your Correction": "Sinun korjauksesi",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Korjauksesi odottaa tarkistusta. Hyväksytyt korjaukset sisällytetään tulevaan projektipäivitykseen.",
       "unchanged.": "muuttumattomana.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Käyttöönotto valmis!",
+      "Don't Expose Publicly": "Älä paljasta julkisesti",
+      "Open the Console Now": "Avaa konsoli nyt",
+      "Ready to explore?": "Oletko valmis tutkimaan?",
+      "Redirecting to the full console in": "Uudelleenohjaus koko konsoliin sisään",
+      "Saved Privately on Server": "Tallennettu yksityisesti palvelimelle"
     },
     "DA": {
       "Game Server Connections": "Spilserverforbindelser",
@@ -61165,7 +61267,13 @@
       "Your Correction": "Din rettelse",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Din rettelse venter på gennemgang. Godkendte rettelser vil blive inkluderet i en fremtidig projektopdatering.",
       "unchanged.": "uændret.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Implementeringen er fuldført!",
+      "Don't Expose Publicly": "Udsæt ikke offentligt",
+      "Open the Console Now": "Åbn konsollen nu",
+      "Ready to explore?": "Klar til at udforske?",
+      "Redirecting to the full console in": "Omdirigerer til den fulde konsol i",
+      "Saved Privately on Server": "Gemt privat på serveren"
     },
     "CS": {
       "Game Server Connections": "Připojení herních serverů",
@@ -64381,7 +64489,13 @@
       "Your Correction": "Vaše oprava",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Vaše oprava čeká na kontrolu. Schválené opravy budou zahrnuty do budoucí aktualizace projektu.",
       "unchanged.": "beze změny.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Nasazení dokončeno!",
+      "Don't Expose Publicly": "Nevystavujte se veřejně",
+      "Open the Console Now": "Otevřete nyní konzoli",
+      "Ready to explore?": "Jste připraveni prozkoumat?",
+      "Redirecting to the full console in": "Přesměrování na plnou konzolu v",
+      "Saved Privately on Server": "Uloženo soukromě na serveru"
     },
     "NB": {
       "Game Server Connections": "Spillservertilkoblinger",
@@ -67597,7 +67711,13 @@
       "Your Correction": "Din rettelse",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Rettelsen din venter på vurdering. Godkjente rettelser vil bli inkludert i en fremtidig prosjektoppdatering.",
       "unchanged.": "uendret.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Implementeringen er fullført!",
+      "Don't Expose Publicly": "Ikke utsett offentlig",
+      "Open the Console Now": "Åpne konsollen nå",
+      "Ready to explore?": "Klar til å utforske?",
+      "Redirecting to the full console in": "Omdirigerer til hele konsollen i",
+      "Saved Privately on Server": "Lagret privat på server"
     },
     "HU": {
       "Game Server Connections": "Játékszerver-kapcsolatok",
@@ -70813,7 +70933,13 @@
       "Your Correction": "Az Ön helyesbítése",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Javítása ellenőrzésre vár. A jóváhagyott korrekciókat egy jövőbeli projektfrissítés tartalmazza.",
       "unchanged.": "változatlan.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "A telepítés kész!",
+      "Don't Expose Publicly": "Ne tedd ki nyilvánosan",
+      "Open the Console Now": "Nyissa meg a konzolt most",
+      "Ready to explore?": "Készen áll a felfedezésre?",
+      "Redirecting to the full console in": "Átirányítás a teljes konzolra",
+      "Saved Privately on Server": "Privát a szerveren mentve"
     },
     "EL": {
       "Game Server Connections": "Συνδέσεις Διακομιστών Παιχνιδιού",
@@ -74029,7 +74155,13 @@
       "Your Correction": "Η διόρθωση σας",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Η διόρθωση σας περιμένει έλεγχο. Οι εγκεκριμένες διορθώσεις θα συμπεριληφθούν σε μελλοντική ενημέρωση του έργου.",
       "unchanged.": "αμετάβλητος.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Η ανάπτυξη ολοκληρώθηκε!",
+      "Don't Expose Publicly": "Μην εκθέτετε δημόσια",
+      "Open the Console Now": "Ανοίξτε την Κονσόλα τώρα",
+      "Ready to explore?": "Έτοιμοι να εξερευνήσετε;",
+      "Redirecting to the full console in": "Ανακατεύθυνση στην πλήρη κονσόλα",
+      "Saved Privately on Server": "Αποθηκεύτηκε ιδιωτικά στον διακομιστή"
     },
     "RO": {
       "Game Server Connections": "Conexiuni la Serverele de Joc",
@@ -77245,7 +77377,13 @@
       "Your Correction": "Corecția ta",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Corecția dvs. așteaptă revizuire. Corecțiile aprobate vor fi incluse într-o actualizare viitoare a proiectului.",
       "unchanged.": "neschimbat.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Implementare finalizată!",
+      "Don't Expose Publicly": "Nu expuneți în mod public",
+      "Open the Console Now": "Deschideți Consola acum",
+      "Ready to explore?": "Ești gata să explorezi?",
+      "Redirecting to the full console in": "Redirecționare către consola completă în",
+      "Saved Privately on Server": "Salvat privat pe server"
     },
     "SK": {
       "Game Server Connections": "Pripojenia herných serverov",
@@ -80461,7 +80599,13 @@
       "Your Correction": "Vaša oprava",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Vaša oprava čaká na kontrolu. Schválené opravy budú zahrnuté v budúcej aktualizácii projektu.",
       "unchanged.": "nezmenené.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Nasadenie dokončené!",
+      "Don't Expose Publicly": "Nevystavujte sa verejne",
+      "Open the Console Now": "Teraz otvorte konzolu",
+      "Ready to explore?": "Ste pripravení preskúmať?",
+      "Redirecting to the full console in": "Prebieha presmerovanie na plnú konzolu",
+      "Saved Privately on Server": "Súkromne uložené na serveri"
     },
     "BG": {
       "Game Server Connections": "Връзки с игровите сървъри",
@@ -83677,7 +83821,13 @@
       "Your Correction": "Вашата корекция",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Вашата корекция чака преглед. Одобрените корекции ще бъдат включени в бъдеща актуализация на проекта.",
       "unchanged.": "непроменени.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Внедряването е завършено!",
+      "Don't Expose Publicly": "Не излагайте публично",
+      "Open the Console Now": "Отворете конзолата сега",
+      "Ready to explore?": "Готови ли сте да изследвате?",
+      "Redirecting to the full console in": "Пренасочване към пълната конзола в",
+      "Saved Privately on Server": "Запазено частно на сървъра"
     },
     "SV": {
       "Game Server Connections": "Spelserveranslutningar",
@@ -86893,7 +87043,13 @@
       "Your Correction": "Din rättelse",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Din rättelse väntar på granskning. Godkända korrigeringar kommer att inkluderas i en framtida projektuppdatering.",
       "unchanged.": "oförändrad.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Implementeringen är klar!",
+      "Don't Expose Publicly": "Exponera inte offentligt",
+      "Open the Console Now": "Öppna konsolen nu",
+      "Ready to explore?": "Redo att utforska?",
+      "Redirecting to the full console in": "Omdirigerar till hela konsolen in",
+      "Saved Privately on Server": "Sparad privat på servern"
     },
     "TH": {
       "Game Server Connections": "การเชื่อมต่อเซิร์ฟเวอร์เกม",
@@ -90109,7 +90265,13 @@
       "Your Correction": "การแก้ไขของคุณ",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "การแก้ไขของคุณกำลังรอการตรวจสอบ การแก้ไขที่ได้รับอนุมัติจะรวมอยู่ในการอัปเดตโครงการในอนาคต",
       "unchanged.": "ไม่เปลี่ยนแปลง",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "การปรับใช้เสร็จสมบูรณ์!",
+      "Don't Expose Publicly": "อย่าเปิดเผยต่อสาธารณะ",
+      "Open the Console Now": "เปิดคอนโซลทันที",
+      "Ready to explore?": "พร้อมที่จะสำรวจแล้วหรือยัง?",
+      "Redirecting to the full console in": "เปลี่ยนเส้นทางไปยังคอนโซลแบบเต็มใน",
+      "Saved Privately on Server": "บันทึกแบบส่วนตัวบนเซิร์ฟเวอร์"
     },
     "VI": {
       "Game Server Connections": "Kết Nối Máy Chủ Trò Chơi",
@@ -93325,7 +93487,13 @@
       "Your Correction": "Chỉnh sửa của bạn",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Sự điều chỉnh của bạn đang chờ xem xét. Các chỉnh sửa đã được phê duyệt sẽ được đưa vào bản cập nhật dự án trong tương lai.",
       "unchanged.": "không thay đổi.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Triển khai hoàn tất!",
+      "Don't Expose Publicly": "Đừng phơi bày công khai",
+      "Open the Console Now": "Mở bảng điều khiển ngay",
+      "Ready to explore?": "Sẵn sàng để khám phá?",
+      "Redirecting to the full console in": "Chuyển hướng đến bảng điều khiển đầy đủ trong",
+      "Saved Privately on Server": "Được lưu riêng tư trên máy chủ"
     },
     "ID": {
       "Game Server Connections": "Koneksi Server Game",
@@ -96541,7 +96709,13 @@
       "Your Correction": "Koreksi Anda",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Koreksi Anda menunggu untuk ditinjau. Koreksi yang disetujui akan disertakan dalam pembaruan proyek mendatang.",
       "unchanged.": "tidak berubah.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Penerapan Selesai!",
+      "Don't Expose Publicly": "Jangan Ekspos ke Publik",
+      "Open the Console Now": "Buka Konsol Sekarang",
+      "Ready to explore?": "Siap menjelajah?",
+      "Redirecting to the full console in": "Mengarahkan ke konsol lengkap di",
+      "Saved Privately on Server": "Disimpan Secara Pribadi di Server"
     },
     "HI": {
       "Game Server Connections": "गेम सर्वर कनेक्शन",
@@ -99757,7 +99931,13 @@
       "Your Correction": "आपका सुधार",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "आपका सुधार समीक्षा की प्रतीक्षा में है. स्वीकृत सुधारों को भविष्य के प्रोजेक्ट अपडेट में शामिल किया जाएगा।",
       "unchanged.": "अपरिवर्तित.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "परिनियोजन पूर्ण!",
+      "Don't Expose Publicly": "सार्वजनिक रूप से उजागर न करें",
+      "Open the Console Now": "अब कंसोल खोलें",
+      "Ready to explore?": "अन्वेषण के लिए तैयार हैं?",
+      "Redirecting to the full console in": "पूर्ण कंसोल पर रीडायरेक्ट किया जा रहा है",
+      "Saved Privately on Server": "सर्वर पर निजी तौर पर सहेजा गया"
     },
     "HR": {
       "Game Server Connections": "Veze poslužitelja igre",
@@ -102973,7 +103153,13 @@
       "Your Correction": "Vaš ispravak",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Vaš ispravak čeka na pregled. Odobreni ispravci bit će uključeni u buduće ažuriranje projekta.",
       "unchanged.": "nepromijenjeno.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Implementacija dovršena!",
+      "Don't Expose Publicly": "Ne eksponirajte javno",
+      "Open the Console Now": "Sada otvorite konzolu",
+      "Ready to explore?": "Spremni za istraživanje?",
+      "Redirecting to the full console in": "Preusmjeravanje na punu konzolu u",
+      "Saved Privately on Server": "Spremljeno privatno na poslužitelj"
     },
     "SR": {
       "Game Server Connections": "Везе Сервера Игре",
@@ -106189,7 +106375,13 @@
       "Your Correction": "Ваша исправка",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Ваша исправка чека на преглед. Одобрене исправке ће бити укључене у будуће ажурирање пројекта.",
       "unchanged.": "непромењена.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Деплоимент Цомплете!",
+      "Don't Expose Publicly": "Не излажите јавно",
+      "Open the Console Now": "Отворите конзолу одмах",
+      "Ready to explore?": "Спремни за истраживање?",
+      "Redirecting to the full console in": "Преусмеравање на пуну конзолу у",
+      "Saved Privately on Server": "Приватно сачувано на серверу"
     },
     "SL": {
       "Game Server Connections": "Povezave igralnih strežnikov",
@@ -109405,7 +109597,13 @@
       "Your Correction": "Vaš popravek",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Vaš popravek čaka na pregled. Odobreni popravki bodo vključeni v prihodnjo posodobitev projekta.",
       "unchanged.": "nespremenjeno.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Razmestitev končana!",
+      "Don't Expose Publicly": "Ne izpostavljaj javno",
+      "Open the Console Now": "Odprite konzolo zdaj",
+      "Ready to explore?": "Ste pripravljeni na raziskovanje?",
+      "Redirecting to the full console in": "Preusmerjanje na celotno konzolo v",
+      "Saved Privately on Server": "Shranjeno zasebno na strežniku"
     },
     "ET": {
       "Game Server Connections": "Mänguserverite ühendused",
@@ -112621,7 +112819,13 @@
       "Your Correction": "Teie parandus",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Teie parandus ootab ülevaatamist. Heakskiidetud parandused lisatakse tulevasse projekti värskendusse.",
       "unchanged.": "muutmata.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Juurutamine lõpetatud!",
+      "Don't Expose Publicly": "Ärge eksponeerige avalikult",
+      "Open the Console Now": "Avage konsool kohe",
+      "Ready to explore?": "Kas olete valmis uurima?",
+      "Redirecting to the full console in": "Ümbersuunamine täiskonsooli sisse",
+      "Saved Privately on Server": "Salvestatud privaatselt serverisse"
     },
     "LT": {
       "Game Server Connections": "Žaidimų serverių ryšiai",
@@ -115837,7 +116041,13 @@
       "Your Correction": "Jūsų pataisymas",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Jūsų pataisymas laukia peržiūros. Patvirtinti pataisymai bus įtraukti į būsimą projekto atnaujinimą.",
       "unchanged.": "nepakitęs.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Diegimas baigtas!",
+      "Don't Expose Publicly": "Nenurodykite viešai",
+      "Open the Console Now": "Atidarykite konsolę dabar",
+      "Ready to explore?": "Pasiruošę tyrinėti?",
+      "Redirecting to the full console in": "Peradresuojama į visą konsolę",
+      "Saved Privately on Server": "Išsaugota privačiai serveryje"
     },
     "LV": {
       "Game Server Connections": "Spēļu serveru savienojumi",
@@ -119053,7 +119263,13 @@
       "Your Correction": "Jūsu labojums",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Jūsu labojums gaida pārskatīšanu. Apstiprinātie labojumi tiks iekļauti turpmākā projekta atjauninājumā.",
       "unchanged.": "nemainīgs.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Izvietošana pabeigta!",
+      "Don't Expose Publicly": "Neatklājiet publiski",
+      "Open the Console Now": "Atveriet konsoli tūlīt",
+      "Ready to explore?": "Vai esat gatavs izpētīt?",
+      "Redirecting to the full console in": "Notiek novirzīšana uz pilno konsoli",
+      "Saved Privately on Server": "Saglabāts privāti serverī"
     },
     "HE": {
       "Game Server Connections": "חיבורי שרתי משחק",
@@ -122269,7 +122485,13 @@
       "Your Correction": "התיקון שלך",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "התיקון שלך ממתין לבדיקה. תיקונים שאושרו ייכללו בעדכון פרויקט עתידי.",
       "unchanged.": "ללא שינוי.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "הפריסה הושלמה!",
+      "Don't Expose Publicly": "אל תחשוף בפומבי",
+      "Open the Console Now": "פתח את המסוף עכשיו",
+      "Ready to explore?": "מוכנים לחקור?",
+      "Redirecting to the full console in": "מפנה למסוף המלא ב-",
+      "Saved Privately on Server": "נשמר באופן פרטי בשרת"
     },
     "FA": {
       "Game Server Connections": "اتصال‌های سرور بازی",
@@ -125485,7 +125707,13 @@
       "Your Correction": "تصحیح شما",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "تصحیح شما منتظر بررسی است. اصلاحات تایید شده در به روز رسانی پروژه آینده گنجانده خواهد شد.",
       "unchanged.": "بدون تغییر",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "استقرار کامل شد!",
+      "Don't Expose Publicly": "به صورت علنی افشاگری نکنید",
+      "Open the Console Now": "اکنون کنسول را باز کنید",
+      "Ready to explore?": "آماده کاوش هستید؟",
+      "Redirecting to the full console in": "تغییر مسیر به کنسول کامل در",
+      "Saved Privately on Server": "به صورت خصوصی در سرور ذخیره شده است"
     },
     "UR": {
       "Game Server Connections": "گیم سرور کنکشنز",
@@ -128701,7 +128929,13 @@
       "Your Correction": "آپ کی تصحیح",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "آپ کی تصحیح کا انتظار ہے۔ منظور شدہ اصلاحات مستقبل کے پروجیکٹ اپ ڈیٹ میں شامل کی جائیں گی۔",
       "unchanged.": "غیر تبدیل شدہ",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "تعیناتی مکمل!",
+      "Don't Expose Publicly": "عوامی سطح پر بے نقاب نہ کریں۔",
+      "Open the Console Now": "ابھی کنسول کھولیں۔",
+      "Ready to explore?": "دریافت کرنے کے لیے تیار ہیں؟",
+      "Redirecting to the full console in": "میں مکمل کنسول پر ری ڈائریکٹ کیا جا رہا ہے۔",
+      "Saved Privately on Server": "سرور پر نجی طور پر محفوظ کیا گیا۔"
     },
     "MS": {
       "Game Server Connections": "Sambungan Pelayan Permainan",
@@ -131917,7 +132151,13 @@
       "Your Correction": "Pembetulan Anda",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Pembetulan anda sedang menunggu untuk semakan. Pembetulan yang diluluskan akan disertakan dalam kemas kini projek akan datang.",
       "unchanged.": "tidak berubah.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Pengerahan Selesai!",
+      "Don't Expose Publicly": "Jangan Dedahkan Secara Umum",
+      "Open the Console Now": "Buka Konsol Sekarang",
+      "Ready to explore?": "Bersedia untuk meneroka?",
+      "Redirecting to the full console in": "Mengubah hala ke konsol penuh dalam",
+      "Saved Privately on Server": "Disimpan Secara Persendirian pada Pelayan"
     },
     "TL": {
       "Game Server Connections": "Mga Koneksyon ng Game Server",
@@ -135133,7 +135373,13 @@
       "Your Correction": "Iyong Pagwawasto",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Ang iyong pagwawasto ay naghihintay para sa pagsusuri. Ang mga naaprubahang pagwawasto ay isasama sa isang pag-update ng proyekto sa hinaharap.",
       "unchanged.": "hindi nagbabago.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Kumpleto na ang Deployment!",
+      "Don't Expose Publicly": "Huwag Ilantad sa Publiko",
+      "Open the Console Now": "Buksan ang Console Ngayon",
+      "Ready to explore?": "Handa nang mag-explore?",
+      "Redirecting to the full console in": "Nagre-redirect sa buong console sa",
+      "Saved Privately on Server": "Na-save nang Pribado sa Server"
     },
     "BN": {
       "Game Server Connections": "গেম সার্ভারের সংযোগ",
@@ -138349,7 +138595,13 @@
       "Your Correction": "আপনার সংশোধন",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "আপনার সংশোধন পর্যালোচনার জন্য অপেক্ষা করছে. অনুমোদিত সংশোধনগুলি ভবিষ্যতের প্রকল্প আপডেটে অন্তর্ভুক্ত করা হবে।",
       "unchanged.": "অপরিবর্তিত",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "স্থাপনা সম্পূর্ণ!",
+      "Don't Expose Publicly": "প্রকাশ্যে প্রকাশ করবেন না",
+      "Open the Console Now": "এখন কনসোল খুলুন",
+      "Ready to explore?": "অন্বেষণ করতে প্রস্তুত?",
+      "Redirecting to the full console in": "সম্পূর্ণ কনসোলে পুনঃনির্দেশ করা হচ্ছে",
+      "Saved Privately on Server": "সার্ভারে ব্যক্তিগতভাবে সংরক্ষিত"
     },
     "IS": {
       "Game Server Connections": "Tengingar leikjaþjóna",
@@ -141565,7 +141817,13 @@
       "Your Correction": "Leiðrétting þín",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Leiðrétting þín bíður skoðunar. Samþykktar leiðréttingar verða innifaldar í framtíðaruppfærslu verkefnisins.",
       "unchanged.": "óbreytt.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Dreifingu lokið!",
+      "Don't Expose Publicly": "Ekki afhjúpa opinberlega",
+      "Open the Console Now": "Opnaðu stjórnborðið núna",
+      "Ready to explore?": "Tilbúinn til að kanna?",
+      "Redirecting to the full console in": "Beinir á fulla stjórnborðið í",
+      "Saved Privately on Server": "Vistað einslega á netþjóni"
     },
     "SQ": {
       "Game Server Connections": "Lidhjet e Serverëve të Lojës",
@@ -144781,7 +145039,13 @@
       "Your Correction": "Korrigjimi juaj",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Korrigjimi juaj është në pritje të rishikimit. Korrigjimet e miratuara do të përfshihen në një përditësim të ardhshëm të projektit.",
       "unchanged.": "e pandryshuar.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Vendosja përfundoi!",
+      "Don't Expose Publicly": "Mos ekspozoni publikisht",
+      "Open the Console Now": "Hapni tastierën tani",
+      "Ready to explore?": "Gati për të eksploruar?",
+      "Redirecting to the full console in": "Ridrejtimi në tastierën e plotë në",
+      "Saved Privately on Server": "Ruajtur privatisht në server"
     },
     "MK": {
       "Game Server Connections": "Врски со серверите за игра",
@@ -147997,7 +148261,13 @@
       "Your Correction": "Вашата исправка",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Вашата исправка чека преглед. Одобрените корекции ќе бидат вклучени во идното ажурирање на проектот.",
       "unchanged.": "непроменет.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Распоредувањето е завршено!",
+      "Don't Expose Publicly": "Не изложувајте јавно",
+      "Open the Console Now": "Отворете ја конзолата сега",
+      "Ready to explore?": "Подготвени за истражување?",
+      "Redirecting to the full console in": "Се пренасочува кон целосната конзола во",
+      "Saved Privately on Server": "Зачувано приватно на серверот"
     },
     "KA": {
       "Game Server Connections": "თამაშის სერვერის კავშირები",
@@ -151213,7 +151483,13 @@
       "Your Correction": "შენი შესწორება",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "თქვენი შესწორება ელოდება განხილვას. დამტკიცებული შესწორებები ჩართული იქნება მომავალი პროექტის განახლებაში.",
       "unchanged.": "უცვლელი.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "განლაგება დასრულებულია!",
+      "Don't Expose Publicly": "არ გამოამჟღავნოთ საჯაროდ",
+      "Open the Console Now": "გახსენით კონსოლი ახლავე",
+      "Ready to explore?": "მზად ხართ შესასწავლად?",
+      "Redirecting to the full console in": "გადამისამართება სრულ კონსოლზე",
+      "Saved Privately on Server": "შენახულია პირადად სერვერზე"
     },
     "HY": {
       "Game Server Connections": "Խաղային սերվերների կապեր",
@@ -154429,7 +154705,13 @@
       "Your Correction": "Ձեր ուղղումը",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Ձեր ուղղումը սպասում է վերանայման: Հաստատված ուղղումները կներառվեն ապագա նախագծի թարմացումներում:",
       "unchanged.": "անփոփոխ.",
-      "{count0}": "{count0} թ"
+      "{count0}": "{count0} թ",
+      "Deployment Complete!": "Տեղակայումն ավարտված է:",
+      "Don't Expose Publicly": "Մի բացահայտեք հրապարակայնորեն",
+      "Open the Console Now": "Բացեք կոնսոլը հիմա",
+      "Ready to explore?": "Պատրա՞ստ եք ուսումնասիրել:",
+      "Redirecting to the full console in": "Վերահղում դեպի ամբողջական վահանակ",
+      "Saved Privately on Server": "Պահպանվել է մասնավոր սերվերում"
     },
     "AZ": {
       "Game Server Connections": "Oyun serveri bağlantıları",
@@ -157645,7 +157927,13 @@
       "Your Correction": "Sənin düzəlişin",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Düzəlişiniz nəzərdən keçirilməsini gözləyir. Təsdiq edilmiş düzəlişlər gələcək layihə yeniləməsinə daxil ediləcək.",
       "unchanged.": "dəyişməz.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Yerləşdirmə Tamamlandı!",
+      "Don't Expose Publicly": "İctimaiyyət qarşısında ifşa etməyin",
+      "Open the Console Now": "İndi Konsolu açın",
+      "Ready to explore?": "Kəşf etməyə hazırsınız?",
+      "Redirecting to the full console in": "Tam konsola yönləndirilir",
+      "Saved Privately on Server": "Şəxsi olaraq Serverdə Saxlanılır"
     },
     "KK": {
       "Game Server Connections": "Ойын серверінің қосылымдары",
@@ -160861,7 +161149,13 @@
       "Your Correction": "Сіздің түзетуіңіз",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Түзетуіңіз тексеруді күтуде. Бекітілген түзетулер болашақ жоба жаңартуына енгізіледі.",
       "unchanged.": "өзгеріссіз.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Орналастыру аяқталды!",
+      "Don't Expose Publicly": "Көпшілікке жария етпеңіз",
+      "Open the Console Now": "Консольді қазір ашыңыз",
+      "Ready to explore?": "Зерттеуге дайынсыз ба?",
+      "Redirecting to the full console in": "Толық консольге қайта бағытталуда",
+      "Saved Privately on Server": "Серверде жеке сақталады"
     },
     "UZ": {
       "Game Server Connections": "O‘yin serveri ulanishlari",
@@ -164077,7 +164371,13 @@
       "Your Correction": "Sizning tuzatishingiz",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Sizning tuzatishingiz ko'rib chiqilishini kutmoqda. Tasdiqlangan tuzatishlar kelajakdagi loyiha yangilanishiga kiritiladi.",
       "unchanged.": "o'zgarmagan.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Joylashtirish tugallandi!",
+      "Don't Expose Publicly": "Ommaga oshkor qilmang",
+      "Open the Console Now": "Konsolni hozir oching",
+      "Ready to explore?": "Tadqiq qilishga tayyormisiz?",
+      "Redirecting to the full console in": "Toʻliq konsolga yoʻnaltirilmoqda",
+      "Saved Privately on Server": "Serverda shaxsiy saqlangan"
     },
     "CA": {
       "Game Server Connections": "Connexions dels servidors de joc",
@@ -167293,7 +167593,13 @@
       "Your Correction": "La teva correcció",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "La teva correcció està pendent de revisió. Les correccions aprovades s'inclouran en una futura actualització del projecte.",
       "unchanged.": "sense canvis.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Desplegament completat!",
+      "Don't Expose Publicly": "No exposis públicament",
+      "Open the Console Now": "Obriu la consola ara",
+      "Ready to explore?": "Preparat per explorar?",
+      "Redirecting to the full console in": "S'està redirigint a la consola completa",
+      "Saved Privately on Server": "Desat de manera privada al servidor"
     },
     "AF": {
       "Game Server Connections": "Speletjiebedienerverbindings",
@@ -170509,7 +170815,13 @@
       "Your Correction": "Jou Regstelling",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Jou regstelling wag vir hersiening. Goedgekeurde regstellings sal in 'n toekomstige projekopdatering ingesluit word.",
       "unchanged.": "onveranderd.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Ontplooiing voltooi!",
+      "Don't Expose Publicly": "Moenie in die openbaar blootstel nie",
+      "Open the Console Now": "Maak die konsole nou oop",
+      "Ready to explore?": "Gereed om te verken?",
+      "Redirecting to the full console in": "Herlei tans na die volledige konsole in",
+      "Saved Privately on Server": "Privaat op bediener gestoor"
     },
     "SW": {
       "Game Server Connections": "Miunganisho ya Seva za Mchezo",
@@ -173725,7 +174037,13 @@
       "Your Correction": "Usahihishaji Wako",
       "Your correction is waiting for review. Approved corrections will be included in a future project update.": "Marekebisho yako yanasubiri ukaguzi. Marekebisho yaliyoidhinishwa yatajumuishwa katika sasisho la mradi ujao.",
       "unchanged.": "bila kubadilika.",
-      "{count0}": "{count0}"
+      "{count0}": "{count0}",
+      "Deployment Complete!": "Usambazaji Umekamilika!",
+      "Don't Expose Publicly": "Usifichue Hadharani",
+      "Open the Console Now": "Fungua Console Sasa",
+      "Ready to explore?": "Je, uko tayari kuchunguza?",
+      "Redirecting to the full console in": "Inaelekeza kwenye kiweko kamili ndani",
+      "Saved Privately on Server": "Imehifadhiwa Faragha kwenye Seva"
     }
   }
 }
