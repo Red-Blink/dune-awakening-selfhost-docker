@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { scryptSync } from "node:crypto";
+import { scryptSync, createHmac } from "node:crypto";
 import { mkdtempSync, rmSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -31,6 +31,25 @@ test("auth creates readable signed sessions", async () => {
   assert.equal(auth.readSession(req)?.id, session.id);
   assert.equal(await auth.passwordMatches("admin"), true);
   assert.equal(await auth.passwordMatches("wrong"), false);
+});
+
+test("session persistence uses versioned credential-derived MACs and expires legacy stores", t => {
+  const dir = mkdtempSync(join(tmpdir(), 'auth-kdf-persistence-'));
+  t.after(() => rmSync(dir, {recursive:true,force:true}));
+  const config = {sessionSecret:'synthetic-instance-key',adminPassword:'Synthetic-Password-123!',sessionStoreFile:join(dir,'sessions.json')};
+  const auth = createAuth(config), session = auth.makeSession({tier:'player'});
+  const store = JSON.parse(readFileSync(config.sessionStoreFile,'utf8'));
+  assert.equal(store.version,2);
+  const entry = store.sessions[0];
+  const key = scryptSync(config.adminPassword,`dune-session-store-v2:${config.sessionSecret}`,32,{N:32768,r:8,p:3,maxmem:64*1024*1024});
+  const expected = createHmac('sha256',key).update(JSON.stringify([entry.id,entry.csrf,entry.expiresAt,entry.tier,'','','',false])).digest('base64url');
+  assert.equal(entry.mac,expected);
+  assert.ok(!readFileSync(config.sessionStoreFile,'utf8').includes(config.adminPassword));
+  const req={headers:{cookie:`asc_session=${session.cookie}`}};
+  assert.equal(createAuth(config).readSession(req)?.id,session.id);
+  assert.equal(createAuth({...config,sessionSecret:'different-instance-key'}).readSession(req),null);
+  writeFileSync(config.sessionStoreFile,JSON.stringify({version:1,sessions:[entry]}));
+  assert.equal(createAuth(config).readSession(req),null);
 });
 
 test("auth accepts a file-backed scrypt password from another Console build", async () => {

@@ -27,12 +27,14 @@ class GameSecretsTests(unittest.TestCase):
     def test_mounted_secrets_reach_child_including_hyphenated_fls_key(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            secret = root / 'game.env'
-            secret.write_text('FuncomLiveServices__ServiceAuthToken=synthetic=token\nfls-apikey=synthetic-fls\n')
+            # Fixed dummy values only: this fixture never reads host credentials.
+            fixture_path = root / 'game.env'
+            fixture_path.write_text('FuncomLiveServices__ServiceAuthToken=synthetic=token\nfls-apikey=synthetic-fls\n')
+            fixture_path.chmod(0o600)
             # Exercise the actual entrypoint loader, stopping before all game,
             # certificate, network and service startup operations.
             loader = (ROOT / 'runtime/container/run-server.sh').read_text().split('    install_cert', 1)[0]
-            loader = loader.replace('/run/secrets/dune-game-env', str(secret))
+            loader = loader.replace('/run/secrets/dune-game-env', str(fixture_path))
             harness = root / 'loader.sh'
             harness.write_text(loader + '''    python3 - <<'CHECK'
 import os

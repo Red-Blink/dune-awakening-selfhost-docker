@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual, scryptSync } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:zlib";
 import { writeJsonAtomic } from "./jsonStore.js";
@@ -36,13 +36,22 @@ export function createAuth(config) {
   const now = config.now || (() => Date.now());
   const sessionStoreFile = config.sessionStoreFile ? String(config.sessionStoreFile) : "";
   let lastPersistAt = 0;
+  let persistenceCredential, persistenceSecret, persistenceKey;
 
   function sign(value) {
     return createHmac("sha256", config.sessionSecret).update(value).digest("base64url");
   }
 
   function sessionMac(entry) {
-    return sign(JSON.stringify([entry.id, entry.csrf, entry.expiresAt, entry.tier || "owner", entry.userId || "", entry.username || "", entry.guildId || "", config.adminPassword, Boolean(config.adminPasswordEnvManaged)]));
+    // Password-dependent persistence uses a slow KDF once per credential change.
+    // The password never enters the fast cookie-signing data path. Version 1
+    // sessions are intentionally expired on upgrade; credentials remain valid.
+    if (!persistenceKey || persistenceCredential !== config.adminPassword || persistenceSecret !== config.sessionSecret) {
+      persistenceKey = scryptSync(String(config.adminPassword || ""), `dune-session-store-v2:${config.sessionSecret}`, 32, { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 });
+      persistenceCredential = config.adminPassword;
+      persistenceSecret = config.sessionSecret;
+    }
+    return createHmac("sha256", persistenceKey).update(JSON.stringify([entry.id, entry.csrf, entry.expiresAt, entry.tier || "owner", entry.userId || "", entry.username || "", entry.guildId || "", Boolean(config.adminPasswordEnvManaged)])).digest("base64url");
   }
 
   function constantTimeStringEqual(left, right) {
@@ -55,6 +64,7 @@ export function createAuth(config) {
     if (!sessionStoreFile || !existsSync(sessionStoreFile)) return;
     try {
       const parsed = JSON.parse(readFileSync(sessionStoreFile, "utf8"));
+      if (parsed?.version !== 2) return;
       const entries = Array.isArray(parsed?.sessions) ? parsed.sessions : [];
       const currentNow = now();
       for (const entry of entries) {
@@ -100,7 +110,7 @@ export function createAuth(config) {
           mac: sessionMac(session)
         });
       }
-      writeJsonAtomic(sessionStoreFile, { version: 1, sessions: active }, 0o600);
+      writeJsonAtomic(sessionStoreFile, { version: 2, sessions: active }, 0o600);
     } catch {
       // Best-effort persistence: in-memory sessions continue working if disk is read-only.
     }
