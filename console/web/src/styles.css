@@ -1813,10 +1813,6 @@ body.debug .technical-details { display: block; }
 .playerAdmin_schematicTable th, .playerAdmin_schematicTable td { max-width: none; text-align: center; }
 .playerAdmin_schematicTable th:nth-child(1), .playerAdmin_schematicTable td:nth-child(1) { width: 22%; }
 .playerAdmin_schematicTable th:nth-child(2), .playerAdmin_schematicTable td:nth-child(2) { width: 27%; }
-.playerAdmin_buildingUnlockTable th[data-column="group"],
-.playerAdmin_buildingUnlockTable td[data-column="group"] { width: 18%; }
-.playerAdmin_buildingUnlockTable th[data-column="status"],
-.playerAdmin_buildingUnlockTable td[data-column="status"] { width: 14%; min-width: 150px; overflow: visible; text-overflow: clip; }
 .playerAdmin_buildingUnlockTable td[data-column="status"] .badge { display: inline-flex; align-items: center; justify-content: center; max-width: 100%; box-sizing: border-box; }
 .playerAdmin_customizationHeader { align-items: center; justify-content: space-between; gap: 16px; }
 .playerAdmin_customizationHeader h4 { margin-bottom: 4px; }
@@ -1830,10 +1826,6 @@ body.debug .technical-details { display: block; }
 .playerAdmin_customizationCardSelect strong { color: #ffd08a; font-size: 15px; }
 .playerAdmin_customizationCardSelect span { max-width: 100%; color: #b9ad98; font-size: 12px; white-space: normal; }
 .playerAdmin_customizationCard > button:last-child { flex: 0 0 auto; align-self: center; min-height: 36px; padding: 7px 10px; }
-.playerAdmin_customizationTable th[data-column="group"],
-.playerAdmin_customizationTable td[data-column="group"] { width: 12%; }
-.playerAdmin_customizationTable th[data-column="status"],
-.playerAdmin_customizationTable td[data-column="status"] { width: 13%; min-width: 135px; overflow: visible; text-overflow: clip; }
 .playerAdmin_craftingTable th:nth-child(3), .playerAdmin_craftingTable td:nth-child(3) { width: 15%; }
 .playerAdmin_craftingTable th:nth-child(4), .playerAdmin_craftingTable td:nth-child(4) { width: 80px; }
 .playerAdmin_researchTable th:nth-child(3), .playerAdmin_researchTable td:nth-child(3) { width: 10%; }
@@ -1842,6 +1834,17 @@ body.debug .technical-details { display: block; }
 .playerAdmin_schematicTable td.playerAdmin_schematicActionCell { width: 150px; }
 .playerAdmin_schematicTable th.playerAdmin_schematicResultCell,
 .playerAdmin_schematicTable td.playerAdmin_schematicResultCell { width: 15%; white-space: normal; overflow: hidden; text-overflow: clip; }
+/* Name and Item ID stay unsized to share what is left. In a fixed-layout table
+   an unsized column gets 0px once the sized ones fill the width, and its text
+   then wraps per character and stretches the whole row; min-width prevents it. */
+.playerAdmin_previewTable { min-width: 1000px; }
+.playerAdmin_previewTable th[data-column="image"], .playerAdmin_previewTable td[data-column="image"] { width: 84px; }
+.playerAdmin_previewTable th:nth-child(2), .playerAdmin_previewTable td:nth-child(2) { width: auto; }
+.playerAdmin_previewTable th[data-column="group"], .playerAdmin_previewTable td[data-column="group"] { width: 130px; }
+.playerAdmin_previewTable th[data-column="requirement"], .playerAdmin_previewTable td[data-column="requirement"] { width: 110px; }
+.playerAdmin_previewTable th[data-column="status"], .playerAdmin_previewTable td[data-column="status"] { width: 130px; overflow: visible; text-overflow: clip; }
+.playerAdmin_previewTable th.playerAdmin_schematicActionCell, .playerAdmin_previewTable td.playerAdmin_schematicActionCell { width: 120px; }
+.playerAdmin_previewTable th.playerAdmin_schematicResultCell, .playerAdmin_previewTable td.playerAdmin_schematicResultCell { width: 150px; }
 .playerAdmin_schematicResultCell .inline-action-result-wrap { width: 100%; min-width: 0; min-height: 28px; align-items: center; justify-content: center; }
 .playerAdmin_schematicResultCell .inline-action-result {
   display: -webkit-box;
@@ -3934,7 +3937,7 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.player-inventory-table { table-layout: fixed; min-width: 880px; }
+.player-inventory-table { table-layout: fixed; min-width: 920px; }
 .player-inventory-table th { white-space: normal; overflow-wrap: normal; vertical-align: bottom; line-height: 1.2; }
 /* The Character-tab panel is a stack of nested CSS grids, whose items default to
    min-width:auto (min-content). The wide inventory table would otherwise expand
@@ -3946,7 +3949,7 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
 /* Names can wrap without squeezing numeric headings into individual letters.
    Key columns by name so the shorter schematics view keeps its own structure. */
 .player-inventory-table th, .player-inventory-table td { padding-inline: 6px; }
-.player-inventory-table th[data-column="id"] { width: 64px; }
+.player-inventory-table th[data-column="id"] { width: 104px; }
 .player-inventory-table th[data-column="item_name"] { width: auto; }
 .player-inventory-table th[data-column="stack_size"] { width: 92px; }
 .player-inventory-table th[data-column="quality_level"] { width: 68px; }
@@ -3974,8 +3977,6 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   white-space: nowrap;
 }
 .inventory-item-name { display: inline-flex; max-width: 100%; align-items: center; gap: 5px; white-space: normal; }
-.inventory-name-info { display: inline-flex; align-items: center; flex-shrink: 0; color: var(--muted); cursor: help; }
-.inventory-name-info:hover { color: var(--accent); }
 .inventory-augment-list {
   display: grid;
   gap: 2px;

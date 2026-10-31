@@ -205,7 +205,7 @@ export function CustomizationsTab({ dbPlayerId, playerName, confirmAction, onAct
         sortDirection={sorted.sortDirection}
         onSort={sorted.onSort}
         resizableColumns
-        tableClassName="playerAdmin_schematicTable playerAdmin_customizationTable"
+        tableClassName="playerAdmin_schematicTable playerAdmin_previewTable playerAdmin_customizationTable"
         rowKey={(item) => String(item.itemId)}
         renderCell={(item, column) => column === "image"
           ? <CatalogItemThumb item={{ id: String(item.itemId), name: String(item.name), image: String(item.image || "") }} small />
