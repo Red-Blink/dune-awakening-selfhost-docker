@@ -141,5 +141,6 @@ current doc for anything still accurate today.
 
 ## Other
 
+- README editions — Current. [English](../README.md), [Deutsch](readme/README_de.md), [Français](readme/README_fr.md), [Español](readme/README_es.md), [Русский](readme/README_ru.md), [简体中文](readme/README_zh.md), and [العربية](readme/README_ar.md): project overview, features, requirements, and installation.
 - [operator-guide.md](operator-guide.md) — Current. End-user/operator guide: Web UI feature tour, bases, backups, updates, community addons (including a stated documentation gap on the addon-install UI flow), the Public Server Directory, Discord integration, and multi-server hosting. Cross-links the feature docs above rather than duplicating them.
 - [screenshots.md](screenshots.md) — Current. Whole-product screenshot gallery, linked from the root [README](../README.md).

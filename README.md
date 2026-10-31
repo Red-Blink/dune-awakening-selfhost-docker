@@ -1,4 +1,16 @@
+<div align="center">
+
+**English** · [Deutsch](docs/readme/README_de.md) · [Français](docs/readme/README_fr.md) · [Español](docs/readme/README_es.md) · [Русский](docs/readme/README_ru.md) · [简体中文](docs/readme/README_zh.md) · [العربية](docs/readme/README_ar.md)
+
+</div>
+
 # Dune: Awakening Docker - Self-Hosted Server Console
+
+<p align="center">
+  <img src="assets/community-trending-daily.svg" alt="Dune Awakening Community — Daily Top Repository" width="260" height="88">
+  <img src="assets/community-trending-weekly.svg" alt="Dune Awakening Community — Weekly Top Repository" width="260" height="88">
+  <img src="assets/community-trending-monthly.svg" alt="Dune Awakening Community — Monthly Top Repository" width="260" height="88">
+</p>
 
 ![Dune Awakening Self-Host Docker cover](assets/cover.png)
 
@@ -12,14 +24,14 @@ The project is experimental, and Funcom self-hosting behavior may change over ti
 
 ## What You Can Do
 
-- Set up and manage the server from your browser
-- Monitor status, logs, readiness, backups, and updates
-- Manage players, inventories, progression, rewards, vehicles, and admin actions
-- Control maps, Sietches, Deep Desert layouts, and live map activity
-- Configure memory, autoscaling, and game settings
-- Manage databases, bases, storage, and player blueprints
-- Plan, preview, and share base layouts in 3D with the Base Builder
-- Extend the console with optional Community Addons
+- **Deploy & Operate:** Guided browser setup, updates, service controls, scheduled restarts, restart queues, diagnostics, and recovery.
+- **See It Live:** Interactive world maps, player and vehicle tracking, resource locations, server health, performance, and logs.
+- **Control Arrakis:** Configure maps, Sietches, Deep Desert layouts, autoscaling, memory, gameplay settings, and **experimental Regis Tanks**.
+- **Manage Players:** Player and guild tools, inventories, progression, bases, storage, vehicles, Landsraad, rewards, and Care Packages.
+- **Run the Economy:** Browse Exchange listings and automate trading with the built-in Market Bot.
+- **Protect Your Server:** Database and encrypted system backups, restore and migration tools, access roles, scoped API keys, and encrypted API access.
+- **Build & Share:** Design bases in 3D, import and share blueprints, and showcase your server with a public profile and latency checks.
+- **Make It Yours:** Community Addons, Discord integration, multiple Console languages, and community translation corrections.
 
 See the [Screenshots Gallery](docs/screenshots.md) for a closer look.
 

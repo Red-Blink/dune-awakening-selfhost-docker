@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="260" height="88" viewBox="0 0 260 88" role="img" aria-labelledby="title">
+  <title id="title">Dune Awakening Community — #1 Repository of the Day — 31 October 2026</title>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#252015"/><stop offset="1" stop-color="#101719"/></linearGradient></defs>
+  <rect x=".5" y=".5" width="259" height="87" rx="10" fill="url(#bg)" stroke="#cba05d"/>
+  <path d="M14 28h232" stroke="#cba05d" opacity=".25"/>
+  <text x="130" y="18" text-anchor="middle" fill="#ead8b6" font-family="Segoe UI,Arial,sans-serif" font-size="9.2" font-weight="600" letter-spacing=".65">DUNE AWAKENING COMMUNITY</text>
+  <g transform="translate(17 37)" fill="none" stroke="#e8bc74" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 0h14v8a7 7 0 0 1-14 0V0ZM6 2H1v3a6 6 0 0 0 6 6M20 2h5v3a6 6 0 0 1-6 6M13 15v7M7 24h12M9 22h8"/></g>
+  <text x="57" y="48" fill="#fff5df" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700">#1 REPOSITORY</text>
+  <text x="57" y="64" fill="#e8bc74" font-family="Segoe UI,Arial,sans-serif" font-size="10.5" font-weight="600" letter-spacing="1.5">OF THE DAY</text>
+  <text x="57" y="78" fill="#aaa798" font-family="Segoe UI,Arial,sans-serif" font-size="8">31 OCT 2026</text>
+</svg>
