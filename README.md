@@ -7,9 +7,7 @@
 # Dune: Awakening Docker - Self-Hosted Server Console
 
 <p align="center">
-  <img src="assets/community-trending-daily.svg" alt="Dune Awakening Community — Daily Top Repository" width="280" height="79">
-  <img src="assets/community-trending-weekly.svg" alt="Dune Awakening Community — Weekly Top Repository" width="280" height="79">
-  <img src="assets/community-trending-monthly.svg" alt="Dune Awakening Community — Monthly Top Repository" width="280" height="79">
+  <img src="assets/community-trending.svg" alt="Dune Awakening Community — #1 Repository Of The Day, Week, and Month" width="840" height="79">
 </p>
 
 ![Dune Awakening Self-Host Docker cover](assets/cover.png)
