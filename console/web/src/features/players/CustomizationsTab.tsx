@@ -209,7 +209,7 @@ export function CustomizationsTab({ dbPlayerId, playerName, confirmAction, onAct
         rowKey={(item) => String(item.itemId)}
         renderCell={(item, column) => column === "image"
           ? <CatalogItemThumb item={{ id: String(item.itemId), name: String(item.name), image: String(item.image || "") }} small />
-          : column === "itemId" ? <code>{String(item.itemId)}</code> : column === "status" ? <span className={`badge ${item.status === "Available" ? "" : "warn"}`}>{item.status === "Pending" ? "Pending Login" : item.status === "Processing" ? "Delivered" : String(item.status)}</span> : String(item[column] || "")}
+          : column === "itemId" ? <code>{String(item.itemId)}</code> : column === "status" ? <span className={`badge ${item.status === "Available" ? "ok" : "warn"}`}>{item.status === "Pending" ? "Pending Login" : item.status === "Processing" ? "Delivered" : String(item.status)}</span> : String(item[column] || "")}
         actionClassName="playerAdmin_schematicActionCell"
         action={(item) => {
           const row = item as unknown as CustomizationRow;

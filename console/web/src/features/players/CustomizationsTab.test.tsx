@@ -46,6 +46,11 @@ it("unlocks Halloween cosmetics directly with an offline confirmation and owners
 });
 
 describe("CustomizationsTab", () => {
+  it("shows Available customizations in green while pending delivery stays a warning", async () => {
+    render(<CustomizationsTab dbPlayerId="123" playerName="Chani" confirmAction={vi.fn()} />);
+    expect((await screen.findAllByText("Available"))[0]).toHaveClass("ok");
+    expect(screen.getByText("Pending Login")).toHaveClass("warn");
+  });
   it("shows grouped sets and marks tokens already waiting for login", async () => {
     render(<CustomizationsTab dbPlayerId="123" playerName="Chani" confirmAction={vi.fn().mockResolvedValue(true)} />);
     expect(await screen.findByText("Atreides Pistol")).toBeInTheDocument();

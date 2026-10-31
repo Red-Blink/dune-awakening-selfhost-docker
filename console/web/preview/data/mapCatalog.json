@@ -1,0 +1,146 @@
+[
+  {
+    "map": "Survival_1",
+    "limitGiB": 12.0
+  },
+  {
+    "map": "Overmap",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "DeepDesert_1",
+    "limitGiB": 15.0
+  },
+  {
+    "map": "SH_Arrakeen",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "SH_HarkoVillage",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "CB_Story_OrbitalMonitor",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "CB_Story_Hephaestus",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "CB_Story_Ecolab_Carthag",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "CB_Story_WaterFatManor",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "Story_ProcesVerbal",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "DLC_Story_LostHarvest_EcolabA",
+    "limitGiB": 3.0
+  },
+  {
+    "map": "DLC_Story_LostHarvest_EcolabB",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "DLC_Story_LostHarvest_ForgottenLab",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "Story_ArtOfKanly",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "CB_Dungeon_Hephaestus",
+    "limitGiB": 3.0
+  },
+  {
+    "map": "CB_Dungeon_OldCarthag",
+    "limitGiB": 3.0
+  },
+  {
+    "map": "Story_Faction_Outpost_Atre",
+    "limitGiB": 3.0
+  },
+  {
+    "map": "Story_Faction_Outpost_Hark",
+    "limitGiB": 3.0
+  },
+  {
+    "map": "Story_HeighlinerDungeon",
+    "limitGiB": 3.0
+  },
+  {
+    "map": "CB_Ecolab_Bronze_Green_089",
+    "limitGiB": 6.0
+  },
+  {
+    "map": "CB_Ecolab_Bronze_Green_152",
+    "limitGiB": 3.0
+  },
+  {
+    "map": "CB_Ecolab_Bronze_Green_024",
+    "limitGiB": 3.0
+  },
+  {
+    "map": "CB_Ecolab_Bronze_Green_195",
+    "limitGiB": 3.0
+  },
+  {
+    "map": "CB_Ecolab_Bronze_Green_136",
+    "limitGiB": 3.0
+  },
+  {
+    "map": "CB_Overland_M_01",
+    "limitGiB": 3.0
+  },
+  {
+    "map": "CB_Overland_S_04",
+    "limitGiB": 3.0
+  },
+  {
+    "map": "CB_Overland_S_06",
+    "limitGiB": 3.0
+  },
+  {
+    "map": "CB_Story_BanditFortress01",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "CB_Overland_S_07",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "CB_Overland_S_08",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "CB_Dungeon_ThePit",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "CB_Story_DestroyedZanovar",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "CB_Arrakis_Story_Paranoid_PrayerRoom",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "CB_Arrakis_Story_Glutton_DiningRoom",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "CB_Arrakis_Generic_Sietch_Room",
+    "limitGiB": 2.0
+  },
+  {
+    "map": "CB_Halloween_Event_Shipwreck_01",
+    "limitGiB": 2
+  }
+]

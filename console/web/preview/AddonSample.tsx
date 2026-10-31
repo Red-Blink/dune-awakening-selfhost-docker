@@ -1,0 +1,5 @@
+import { people } from './data/shared';
+export default function AddonSample({id}:{id:string}) {
+ const chat=id==='chat-monitor';
+ return <section className="panel"><h3>{chat?'Community Chat':'Community Leadership Board'}</h3><p className="muted">{chat?'Recent conversations from the Docker Community.':'Rankings from the Docker Community.'}</p><div className="table-wrap"><table><thead><tr>{(chat?['Time','Player','Channel','Message']:['Rank','Player','Level','Playtime','Guild']).map(label=><th key={label}>{label}</th>)}</tr></thead><tbody>{people.map((person,index)=><tr key={person.actor_id}>{chat?<><td>{String(18+Math.floor(index/6)).padStart(2,'0')}:{String(index*4%60).padStart(2,'0')}</td><td>{person.character_name}</td><td>{index%3===0?'Guild':'Global'}</td><td>{['Anyone joining the expedition tonight?','Steel ingots are stocked at the market.','Great work on the new outpost!','We found a spice field in the Deep Desert.'][index%4]}</td></>:<><td>{index+1}</td><td>{person.character_name}</td><td>{person.level}</td><td>{Math.round(person.total_playtime_seconds/3600)} Hours</td><td>{person.guild_name}</td></>}</tr>)}</tbody></table></div></section>;
+}

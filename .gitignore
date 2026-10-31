@@ -24,6 +24,7 @@ work/
 console/api/node_modules/
 console/web/node_modules/
 console/web/dist/
+console/web/dist-preview/
 *.tsbuildinfo
 **/bin/
 **/obj/

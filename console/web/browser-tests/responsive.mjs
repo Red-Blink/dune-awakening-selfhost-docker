@@ -26,6 +26,7 @@ try {
     if (url.hostname !== 'console.test') return route.abort();
     if (url.pathname.startsWith('/api/')) {
       let body = { ok: true, stdout: '', items: [], keys: [], areas: [], addons: [], players: [], pending: [], byTarget: [], tasks: [] };
+      if(url.pathname==='/api/addons/community')body={schemaVersion:1,addons:[{id:'fixture-addon',name:'Community Addon',description:'A detailed description that should only offer More when the available browser width cannot show all of this text.',author:'Community',version:'1.0.0',sourceUrl:'https://example.test/addon',lifecycle:'active',permissions:['database:read']}]};
       if (url.pathname === '/api/auth/state') body = { authenticated: true, csrfToken: 'fixture', config: { version: '1.4.52' } };
       if (url.pathname === '/api/setup/state') body = { files: { complete: !firstRun }, config: {} };
       if (url.pathname === '/api/settings') body = { config: { port: 8088 }, files: {}, publicDirectory: { available: true, enabled: true }, serverStartup: { settings: { autoStartBattlegroup: true } } };
@@ -75,6 +76,26 @@ try {
   const sections = await page.getByRole('button', { name: /^Expand / }).evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')));
   for (const name of sections) await page.getByRole('button', { name, exact: true }).click();
   await page.getByRole('button',{name:'Create Key',exact:true}).waitFor();
+  const sidebarLayout = await page.evaluate(() => ({ minHeight: document.querySelector('.app-shell > main').style.minHeight, direction: document.documentElement.dir }));
+  for (const width of [1024, 1440]) {
+    await page.setViewportSize({ width, height: 800 });
+    for (const direction of ['ltr', 'rtl']) {
+      await page.evaluate(direction => {
+        document.documentElement.dir = direction;
+        document.querySelector('.app-shell > main').style.minHeight = '3200px';
+      }, direction);
+      const gap = await page.evaluate(() => document.querySelector('.app-shell').getBoundingClientRect().bottom - document.querySelector('.sidebar').getBoundingClientRect().bottom);
+      assert.ok(Math.abs(gap) < 1, `sidebar divider reaches the bottom of a long page at ${width}px (${direction})`);
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      const bottom = await page.locator('.sidebar').evaluate(el => el.getBoundingClientRect().bottom);
+      assert.ok(Math.abs(bottom - 800) < 1, 'sidebar divider remains visible at the bottom of the page');
+    }
+  }
+  await page.evaluate(original => {
+    document.querySelector('.app-shell > main').style.minHeight = original.minHeight;
+    document.documentElement.dir = original.direction;
+    window.scrollTo(0, 0);
+  }, sidebarLayout);
   for (const [width, height] of sizes) {
     await page.setViewportSize({ width, height });
     await checkCommunityButtons(page);
@@ -95,11 +116,12 @@ try {
     }
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no page overflow');
   }
-  for (const tab of ['Live Map', 'Players', 'Guilds', 'Vehicles', 'Bases', 'Exchange', 'Care Package', 'Backups', 'Server Control', 'Logs', 'Admin Tools']) {
+  for (const tab of ['Addons', 'Live Map', 'Players', 'Guilds', 'Vehicles', 'Bases', 'Exchange', 'Care Package', 'Backups', 'Server Control', 'Logs', 'Admin Tools']) {
     await page.evaluate(tab => sessionStorage.setItem('dune-console:active-tab', tab), tab);
     await page.reload();
     await page.locator('main h2').first().waitFor();
     if(tab==='Live Map') await page.getByRole('button',{name:'Deep Desert',exact:true}).waitFor();
+    if(tab==='Addons')await page.locator('.addon-description-measure').waitFor({state:'attached'});
     if(tab==='Bases') await page.getByRole('button',{name:'Discard Queued Permission Changes',exact:true}).waitFor();
     if(tab==='Exchange'){
       await page.getByRole('tab',{name:'Bot Items',exact:true}).click();
@@ -109,6 +131,17 @@ try {
     if(tab==='Admin Tools') await page.getByRole('button',{name:'Expand Schedule Server Restart',exact:true}).click();
     for (const [width,height] of sizes) {
       await page.setViewportSize({width,height});
+      if(tab==='Addons'){
+        await page.waitForFunction(()=>{const e=document.querySelector('.addon-description-measure');return (e.scrollWidth>e.clientWidth+1)===Boolean(document.querySelector('.addon-description-more'));});
+        assert.equal(await page.locator('.addon-description-toggle').count(),0,'no icon disclosure remains');
+        const more=page.getByRole('button',{name:'More',exact:true});
+        if(await more.count()){
+          assert.equal(await page.locator('.addon-description-text').evaluate(e=>getComputedStyle(e).textOverflow),'ellipsis');
+          await more.click();
+          assert.equal(await page.locator('.addon-description-text').evaluate(e=>getComputedStyle(e).whiteSpace),'normal');
+          await page.getByRole('button',{name:'Less',exact:true}).click();
+        }
+      }
       assert.equal(await page.getByText('Could not load this section.', {exact:true}).count(),0,`${tab} rendered`);
       if (width<=560 && ['Players','Bases'].includes(tab)) {
         const pagination=page.locator('.database-pagination-controls').first();
@@ -203,7 +236,9 @@ try {
         await table.locator('tbody tr').first().waitFor();
         for(const [width,height]of sizes){
           await page.setViewportSize({width,height});
-          if(width>=1280)assert.ok(await table.evaluate(e=>e.getBoundingClientRect().width<=e.parentElement.clientWidth+1),`${section} uses the available detail panel width`);
+          if(section==='Character') {
+            assert.ok(await table.evaluate(e=>['auto','scroll'].includes(getComputedStyle(e.parentElement).overflowX)), 'wide inventory stays in its horizontal scroll container');
+          } else if(width>=1280)assert.ok(await table.evaluate(e=>e.getBoundingClientRect().width<=e.parentElement.clientWidth+1),`${section} uses the available detail panel width`);
           for(const control of await table.locator('button,input,select').all())assert.ok(await control.evaluate(e=>{const r=e.getBoundingClientRect(),c=e.closest('td,th').getBoundingClientRect();return r.left>=c.left&&r.right<=c.right+1}),`${section} controls are not clipped by their cells`);
           for(const cell of await table.locator('th').all())assert.ok(await cell.evaluate(e=>e.scrollWidth<=e.clientWidth+1),`${section} ${await cell.textContent()} heading fits at ${width}px`);
           assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${section} detail panel fits ${width}px`);

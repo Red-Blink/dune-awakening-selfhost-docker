@@ -174,7 +174,7 @@ export function BuildingUnlocksTab({ dbPlayerId, playerName, confirmAction, onAc
         renderCell={(item, column) => column === "image"
           ? <CatalogItemThumb item={{ id: String(item.itemId), name: String(item.name), image: String(item.image || "") }} small />
           : column === "itemId"
-          ? <code>{String(item.itemId)}</code>
+          ? <code title={String(item.itemId)}>{String(item.itemId)}</code>
           : column === "status"
             ? <span className={`badge ${item.status === "Owned" && !item.entitlementControlled ? "ok" : item.status === "Available" ? "" : item.status === "Unknown" ? "bad" : "warn"}`}>{item.status === "Pending" ? "Pending Login" : item.status === "Owned" && item.entitlementControlled ? "Recorded" : String(item.status)}</span>
             : String(item[column] || "")}

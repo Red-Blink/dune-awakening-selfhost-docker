@@ -1,0 +1,15 @@
+import { build } from 'vite';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { SUPPORTED_LANGUAGES } from '../../api/src/services/i18nService.js';
+const web=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const out=path.resolve(web,process.env.PREVIEW_OUT_DIR||'dist-preview');
+process.env.VITE_CONSOLE_PREVIEW='true';
+await build({root:web,build:{outDir:out,emptyOutDir:true}});
+const db=JSON.parse(fs.readFileSync(path.join(web,'../api/data/i18n-translations-db.json'),'utf8'));
+const data=path.join(out,'preview-data');fs.mkdirSync(data,{recursive:true});
+const languages=SUPPORTED_LANGUAGES.map(lang=>({...lang,translatedCount:db.sourceStrings.length,coveragePercent:100,cachedInDb:true}));
+fs.writeFileSync(path.join(data,'languages.json'),JSON.stringify({version:1,updatedAt:db.updatedAt,totalSourceStrings:db.sourceStrings.length,autoSyncLanguages:[],encryptedKeyConfigured:false,syncInProgress:false,languages,mesh:{nodeId:'preview',peerSyncEnabled:false,peers:[],exchangedPacksCount:0,verifiedPeersCount:0,lastMeshSyncAt:null}}));
+for(const language of languages)fs.writeFileSync(path.join(data,language.code+'.json'),JSON.stringify({...language,lang:language.code,totalSourceStrings:db.sourceStrings.length,translations:db.translations[language.code]||{}}));
+console.log('Static read-only Console preview built. No backend or credentials included.');

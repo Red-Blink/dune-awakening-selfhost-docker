@@ -1388,6 +1388,7 @@
     "Leadership Board Demo",
     "Leave Message",
     "Leave empty for now.",
+    "Less",
     "Less than 1m",
     "Let external tools read the Console API over HTTPS using an API key. Your Console login stays at its current address.",
     "Level",
@@ -1581,6 +1582,7 @@
     "Modifier settings are loading independently of live map status.",
     "Modifier view",
     "Modules",
+    "More",
     "Most Downloaded",
     "Most Liked",
     "Movement / Vehicles",
@@ -3929,7 +3931,7 @@
     "(Online)": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 448,
+        "line": 449,
         "nearby": [
           "Select player",
           "No players are online",
@@ -4033,7 +4035,7 @@
     "{count0} of {count1}": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1195,
+        "line": 1203,
         "nearby": [
           "Filter Crafting Schematics",
           "Clear",
@@ -4043,7 +4045,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1222,
+        "line": 1230,
         "nearby": [
           "Filter Research Schematics",
           "Clear",
@@ -4053,7 +4055,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2649,
+        "line": 2653,
         "nearby": [
           "Needs Review",
           "Unknown",
@@ -4062,7 +4064,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2677,
+        "line": 2681,
         "nearby": [
           "Needs Review",
           "Unknown"
@@ -4139,7 +4141,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1506,
+        "line": 1510,
         "nearby": [
           "Partition",
           "Unknown",
@@ -4444,7 +4446,7 @@
     "A First Online rule already exists.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 235,
+        "line": 236,
         "nearby": [
           "Package",
           "Auto Grant Rule Already Exists.",
@@ -4480,7 +4482,7 @@
     "A relog is required to see the change.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1181,
+        "line": 1189,
         "nearby": [
           "Loadout",
           "Unique schematics",
@@ -4633,7 +4635,7 @@
     "About Faction Reputation": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1173,
+        "line": 1181,
         "nearby": [
           "Adds available Intel while the player is offline and never exceeds the game's spendable cap. It does not purchase or unlock Research entries. The player should join after the grant before spending it.",
           "Give Faction Reputation",
@@ -4645,7 +4647,7 @@
     "About Give Intel": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1172,
+        "line": 1180,
         "nearby": [
           "Refill Container",
           "Give Intel",
@@ -4728,7 +4730,7 @@
     "About Repair Vehicle Durability": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1310,
+        "line": 1318,
         "nearby": [
           "Repair Gear",
           "Repair Vehicle Durability",
@@ -4809,12 +4811,12 @@
     "Action": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1099,
+        "line": 1107,
         "nearby": [
           "Tags",
           "Result",
-          "Unknown",
-          "Complete"
+          "Collapse",
+          "Expand"
         ]
       },
       {
@@ -4870,7 +4872,7 @@
     "Action failed.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 479,
+        "line": 489,
         "nearby": [
           "This addon was removed from the community catalog.",
           "This addon was blocked for safety and cannot be installed or opened."
@@ -4890,17 +4892,17 @@
     "Actions": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 301,
+        "line": 300,
         "nearby": [
           "Permissions",
           "Status",
-          "Sub-Menu",
-          "Working"
+          "Working",
+          "Enabled"
         ]
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1176,
+        "line": 1184,
         "nearby": [
           "Augments",
           "Aug. Grade",
@@ -4910,7 +4912,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 368,
+        "line": 369,
         "nearby": [
           "Item ID",
           "Quantity",
@@ -5301,19 +5303,19 @@
     "Add community-built tools into your Dune Docker Console. Discover addons created by the community, see what each one adds, review what it can access, and enable new features whenever you're ready to expand your console.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 239,
+        "line": 241,
         "nearby": [
           "Refresh Addons",
           "Community Addons",
           "Addon catalog lifecycle summary",
-          "Loading community addons..."
+          "Loading..."
         ]
       }
     ],
     "Add Item": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1175,
+        "line": 1183,
         "nearby": [
           "Give Package",
           "Give Item",
@@ -5323,7 +5325,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 361,
+        "line": 362,
         "nearby": [
           "Selected Item",
           "Quantity",
@@ -5412,7 +5414,7 @@
     "Add Package": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 339,
+        "line": 340,
         "nearby": [
           "New Package Name",
           "New package",
@@ -5550,31 +5552,31 @@
     "Addon": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 301,
+        "line": 300,
         "nearby": [
-          "Loading community addons...",
           "No community addons are listed yet.",
-          "Author",
-          "Version"
+          "Addons",
+          "Version",
+          "Permissions"
         ]
       }
     ],
     "Addon catalog lifecycle summary": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 241,
+        "line": 243,
         "nearby": [
           "Community Addons",
           "Add community-built tools into your Dune Docker Console. Discover addons created by the community, see what each one adds, review what it can access, and enable new features whenever you're ready to expand your console.",
-          "Loading community addons...",
-          "No community addons are listed yet."
+          "Loading...",
+          "Loading community addons..."
         ]
       }
     ],
     "Addon Disabled": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 106,
+        "line": 108,
         "nearby": [
           "Update Failed",
           "Addon Enabled",
@@ -5586,7 +5588,7 @@
     "Addon Enabled": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 106,
+        "line": 108,
         "nearby": [
           "Addon Updated",
           "Update Failed",
@@ -5598,7 +5600,7 @@
     "Addon Installed": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 65,
+        "line": 67,
         "nearby": [
           "Addons Unavailable",
           "Install Blocked",
@@ -5610,10 +5612,10 @@
     "Addon unavailable.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 230,
+        "line": 232,
         "nearby": [
-          "Addon Uninstalled",
           "Uninstall Failed",
+          "Loading...",
           "This pinned addon is not installed, enabled, or fully loaded yet.",
           "Addons"
         ]
@@ -5622,12 +5624,12 @@
     "Addon Uninstalled": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 125,
+        "line": 127,
         "nearby": [
           "Disable Failed",
           "Uninstall",
           "Uninstall Failed",
-          "Addon unavailable."
+          "Loading..."
         ]
       }
     ],
@@ -5645,7 +5647,7 @@
     "Addon Updated": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 91,
+        "line": 93,
         "nearby": [
           "Update Blocked",
           "Update Addon",
@@ -5666,19 +5668,29 @@
       },
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 235,
+        "line": 237,
         "nearby": [
           "Addon unavailable.",
           "This pinned addon is not installed, enabled, or fully loaded yet.",
           "Experimental: Permissioned",
           "For Developers"
         ]
+      },
+      {
+        "file": "console/web/src/features/addons/AddonsPanel.tsx",
+        "line": 292,
+        "nearby": [
+          "Loading community addons...",
+          "No community addons are listed yet.",
+          "Addon",
+          "Version"
+        ]
       }
     ],
     "Addons Unavailable": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 40,
+        "line": 42,
         "nearby": [
           "Install Blocked",
           "Addon Installed"
@@ -5688,7 +5700,7 @@
     "Adds available Intel while the player is offline and never exceeds the game's spendable cap. It does not purchase or unlock Research entries. The player should join after the grant before spending it.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1172,
+        "line": 1180,
         "nearby": [
           "Give Intel",
           "About Give Intel",
@@ -5712,7 +5724,7 @@
     "Admin action ID": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 478,
+        "line": 479,
         "nearby": [
           "Selected player has no Admin action ID, so CLI-backed grants are disabled.",
           "Advanced manual player ID override",
@@ -5828,7 +5840,7 @@
     "Advanced manual override": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1398,
+        "line": 1406,
         "nearby": [
           "Manual Template",
           "Spawn",
@@ -5840,7 +5852,7 @@
     "Advanced manual player ID override": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 477,
+        "line": 478,
         "nearby": [
           "Grant Package",
           "Selected player has no Admin action ID, so CLI-backed grants are disabled.",
@@ -5864,7 +5876,7 @@
     "Advanced SQL Console": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 594,
+        "line": 595,
         "nearby": [
           "Collapse Advanced SQL Console",
           "Expand Advanced SQL Console",
@@ -5876,7 +5888,7 @@
     "Advertised IP Warning": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1753,
+        "line": 1757,
         "nearby": [
           "Gateway DB monitoring not recently observed",
           "Check Gateway logs if readiness is unhealthy.",
@@ -6109,7 +6121,7 @@
     "All Product Groups": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1225,
+        "line": 1233,
         "nearby": [
           "ies",
           "Detected",
@@ -6145,9 +6157,9 @@
     "All Restarts": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1470,
+        "line": 1474,
         "nearby": [
-          "Tracking begins after this update",
+          "Last Battlegroup Restart",
           "Show",
           "Battlegroup",
           "Maps"
@@ -7045,7 +7057,7 @@
     "Attention Needed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2788,
+        "line": 2792,
         "nearby": [
           "Unknown",
           "Failed",
@@ -7077,7 +7089,7 @@
     "Aug. Grade": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1175,
+        "line": 1183,
         "nearby": [
           "Grade",
           "Augments",
@@ -7087,7 +7099,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1176,
+        "line": 1184,
         "nearby": [
           "Grade",
           "Augments",
@@ -7171,7 +7183,7 @@
     "Augments": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1175,
+        "line": 1183,
         "nearby": [
           "Quantity",
           "Grade",
@@ -7181,7 +7193,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1176,
+        "line": 1184,
         "nearby": [
           "Quantity",
           "Grade",
@@ -7267,7 +7279,7 @@
     "Authenticate and keep the terminal open": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 494,
+        "line": 495,
         "nearby": [
           "SSH tunnel command",
           "Copy",
@@ -7276,22 +7288,10 @@
         ]
       }
     ],
-    "Author": [
-      {
-        "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 301,
-        "nearby": [
-          "No community addons are listed yet.",
-          "Addon",
-          "Version",
-          "Permissions"
-        ]
-      }
-    ],
     "Authorization Failed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1613,
+        "line": 1617,
         "nearby": [
           "Funcom Token Change Needs Review",
           "The token was saved, but the server did not become fully ready. Check Server Control status and logs.",
@@ -7300,7 +7300,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1622,
+        "line": 1626,
         "nearby": [
           "Please make sure the Funcom token belongs to the current Battlegroup ID, then save it again.",
           "Unset"
@@ -7310,7 +7310,7 @@
     "Auto Grant": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 407,
+        "line": 408,
         "nearby": [
           "Save Package",
           "Care Package grants",
@@ -7322,7 +7322,7 @@
     "Auto Grant rule": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 590,
+        "line": 591,
         "nearby": [
           "Care Package save failed.",
           "Unknown Package",
@@ -7334,7 +7334,7 @@
     "Auto Grant Rule Already Exists.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 232,
+        "line": 233,
         "nearby": [
           "Delete",
           "Package",
@@ -7346,7 +7346,7 @@
     "Auto grant rule was saved.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 249,
+        "line": 250,
         "nearby": [
           "Auto Grant Rule Already Exists.",
           "A First Online rule already exists.",
@@ -7358,7 +7358,7 @@
     "Auto Grant Save Failed.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 150,
+        "line": 151,
         "nearby": [
           "Creating Package...",
           "Saving Package...",
@@ -7772,7 +7772,7 @@
     "Backpack": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1181,
+        "line": 1189,
         "nearby": [
           "Remove",
           "Inventory type",
@@ -8065,7 +8065,7 @@
     "Ban Player": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1371,
+        "line": 1379,
         "nearby": [
           "Unban Player",
           "Player"
@@ -8073,7 +8073,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1372,
+        "line": 1380,
         "nearby": [
           "Player",
           "Enforcement"
@@ -8081,7 +8081,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1380,
+        "line": 1388,
         "nearby": [
           "Enforcement",
           "Unban Player",
@@ -8450,7 +8450,7 @@
     "based on": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 434,
+        "line": 435,
         "nearby": [
           "OFF",
           "Grants",
@@ -8621,7 +8621,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1471,
+        "line": 1475,
         "nearby": [
           "Show",
           "All Restarts",
@@ -8631,7 +8631,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1926,
+        "line": 1930,
         "nearby": [
           "Mode",
           "Server IP",
@@ -8751,7 +8751,7 @@
     "Bene Gesserit starter skills": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 962,
+        "line": 970,
         "nearby": [
           "Mentat starter skills",
           "Planetologist starter skills",
@@ -9029,7 +9029,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1294,
+        "line": 1302,
         "nearby": [
           "ies",
           "Detected",
@@ -9583,7 +9583,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1178,
+        "line": 1186,
         "nearby": [
           "Actions",
           "Save",
@@ -9593,7 +9593,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 370,
+        "line": 371,
         "nearby": [
           "Actions",
           "Save",
@@ -9900,7 +9900,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 319,
+        "line": 320,
         "nearby": [
           "A First Online rule already exists.",
           "Auto grant rule was saved.",
@@ -9909,7 +9909,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 327,
+        "line": 328,
         "nearby": [
           "Care Package Configuration",
           "ON",
@@ -9920,7 +9920,7 @@
     "Care Package Configuration": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 323,
+        "line": 324,
         "nearby": [
           "Auto grant rule was saved.",
           "Care Package",
@@ -9931,7 +9931,7 @@
     "Care Package grants": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 406,
+        "line": 407,
         "nearby": [
           "Package Save Failed.",
           "Save Package",
@@ -9943,7 +9943,7 @@
     "Care Package items are granted as live-safe Grade 0 rewards. Use Give Items for graded or augmented gear.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 364,
+        "line": 365,
         "nearby": [
           "Quantity",
           "Add Item",
@@ -9966,7 +9966,7 @@
     "Care Package save failed.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 567,
+        "line": 568,
         "nearby": [
           "No Care Package grants have been recorded yet.",
           "Raw Care Package JSON",
@@ -9978,7 +9978,7 @@
     "Care Package setup": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 329,
+        "line": 330,
         "nearby": [
           "ON",
           "OFF",
@@ -10119,7 +10119,7 @@
     "Change Database Password": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 456,
+        "line": 457,
         "nearby": [
           "Status",
           "SSH Tunnel Access",
@@ -10184,7 +10184,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 454,
+        "line": 455,
         "nearby": [
           "Database edits may require relog or map/server restart.",
           "Refresh Tables",
@@ -10218,7 +10218,7 @@
     "Change the default database password before connecting an external database tool.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 486,
+        "line": 487,
         "nearby": [
           "Connect DBeaver or another PostgreSQL application without exposing the database to your network. PostgreSQL remains bound to the server loopback interface, and the encrypted SSH connection carries database traffic.",
           "Checking the database listener...",
@@ -10302,7 +10302,7 @@
     "Changing Password...": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 336,
+        "line": 337,
         "nearby": [
           "Password Change Failed",
           "Passwords do not match.",
@@ -10321,7 +10321,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1181,
+        "line": 1189,
         "nearby": [
           "Inventory type",
           "Backpack",
@@ -10462,7 +10462,7 @@
     "Check Director logs if readiness is unhealthy.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1742,
+        "line": 1746,
         "nearby": [
           "Public IP bind detected",
           "Director heartbeat not recently observed",
@@ -10505,7 +10505,7 @@
     "Check Every (s)": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 420,
+        "line": 421,
         "nearby": [
           "Auto Grant",
           "Manual Grant",
@@ -10529,7 +10529,7 @@
     "Check Gateway logs if readiness is unhealthy.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1748,
+        "line": 1752,
         "nearby": [
           "Check Director logs if readiness is unhealthy.",
           "Gateway DB monitoring not recently observed",
@@ -10696,7 +10696,7 @@
     "Checking deleted character history...": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "Recover Deleted Character",
           "The player must be offline.",
@@ -10708,7 +10708,7 @@
     "Checking diagnostics": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1701,
+        "line": 1705,
         "nearby": [
           "Unset",
           "Doctor Diagnostics",
@@ -10720,7 +10720,7 @@
     "Checking Funcom Token": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1557,
+        "line": 1561,
         "nearby": [
           "Funcom Token Change Failed",
           "The token was saved, but the server restart failed. Check the task details and try again.",
@@ -10729,7 +10729,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1580,
+        "line": 1584,
         "nearby": [
           "Restarting Server",
           "Funcom Token Changed Successfully",
@@ -10774,7 +10774,7 @@
     "Checking the database connection...": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 470,
+        "line": 471,
         "nearby": [
           "Save Password",
           "Database Status",
@@ -10786,7 +10786,7 @@
     "Checking the database listener...": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 483,
+        "line": 484,
         "nearby": [
           "SSH Tunnel Access",
           "Connect DBeaver or another PostgreSQL application without exposing the database to your network. PostgreSQL remains bound to the server loopback interface, and the encrypted SSH connection carries database traffic.",
@@ -10808,7 +10808,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 454,
+        "line": 455,
         "nearby": [
           "Refresh Tables",
           "Change Password",
@@ -11009,7 +11009,7 @@
     "Choose a port on your computer": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 488,
+        "line": 489,
         "nearby": [
           "Checking the database listener...",
           "Change the default database password before connecting an external database tool.",
@@ -11192,7 +11192,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1719,
+        "line": 1723,
         "nearby": [
           "Clean Images",
           "Cleaning...",
@@ -11226,7 +11226,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1716,
+        "line": 1720,
         "nearby": [
           "Fix Binding",
           "Cleaning...",
@@ -11285,7 +11285,7 @@
     "Cleaning...": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1716,
+        "line": 1720,
         "nearby": [
           "Fixing...",
           "Fix Binding",
@@ -11294,7 +11294,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1719,
+        "line": 1723,
         "nearby": [
           "Clean Images",
           "Clean Build Cache",
@@ -11345,7 +11345,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1181,
+        "line": 1189,
         "nearby": [
           "Filter by name, item ID, or template",
           "Filter Inventory",
@@ -11354,7 +11354,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1182,
+        "line": 1190,
         "nearby": [
           "Filter Inventory",
           "No character actions have been recorded in this layout yet.",
@@ -11363,7 +11363,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1194,
+        "line": 1202,
         "nearby": [
           "Filter by name, recipe ID, source, or category",
           "Filter Crafting Schematics",
@@ -11373,7 +11373,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1221,
+        "line": 1229,
         "nearby": [
           "Filter by name, item key, type, or product group",
           "Filter Research Schematics",
@@ -11383,7 +11383,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1293,
+        "line": 1301,
         "nearby": [
           "Filter by name, ID, status, or dependency",
           "Filter Journey Browser",
@@ -11393,7 +11393,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1398,
+        "line": 1406,
         "nearby": [
           "Manual Template",
           "T1_ExtraSeat",
@@ -11402,7 +11402,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 494,
+        "line": 495,
         "nearby": [
           "RedBlink#75570",
           "Grant History",
@@ -11538,7 +11538,7 @@
     "Close": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 322,
+        "line": 321,
         "nearby": [
           "Updating...",
           "Update",
@@ -11548,7 +11548,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1153,
+        "line": 1161,
         "nearby": [
           "Player admin layout",
           "Player Summary",
@@ -11676,6 +11676,16 @@
     ],
     "Close dialog": [
       {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 76,
+        "nearby": [
+          "Details",
+          "Grant History",
+          "Player",
+          "Package"
+        ]
+      },
+      {
         "file": "console/web/src/components/common/ConfirmDialog.tsx",
         "line": 49,
         "nearby": []
@@ -11771,8 +11781,18 @@
     ],
     "Collapse": [
       {
+        "file": "console/web/src/features/players/CharacterAdminUI.tsx",
+        "line": 1115,
+        "nearby": [
+          "Result",
+          "Action",
+          "Expand",
+          "Unknown"
+        ]
+      },
+      {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 436,
+        "line": 437,
         "nearby": [
           "Collapse Eligibility",
           "Expand Eligibility",
@@ -11801,7 +11821,7 @@
     "Collapse Advanced SQL Console": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 594,
+        "line": 595,
         "nearby": [
           "Expand Database Objects",
           "Database Objects",
@@ -11873,7 +11893,7 @@
     "Collapse Database Objects": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 588,
+        "line": 589,
         "nearby": [
           "Search",
           "No matching tables or columns found.",
@@ -11885,7 +11905,7 @@
     "Collapse Eligibility": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 436,
+        "line": 437,
         "nearby": [
           "Delete Auto Grant rule",
           "Delete",
@@ -11981,7 +12001,7 @@
     "Collapse Select Items": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 353,
+        "line": 354,
         "nearby": [
           "XP",
           "Send Message",
@@ -12029,7 +12049,7 @@
     "Columns": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 546,
+        "line": 547,
         "nearby": [
           "Next",
           "Last",
@@ -12140,7 +12160,7 @@
     "Community Addons": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 237,
+        "line": 239,
         "nearby": [
           "Refreshing...",
           "Refresh Addons",
@@ -12221,7 +12241,7 @@
     "Complete": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 689,
+        "line": 697,
         "nearby": [
           "Give Multiple Items",
           "Complete Journey Node",
@@ -12231,9 +12251,9 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1117,
+        "line": 1125,
         "nearby": [
-          "Action",
+          "Expand",
           "Unknown",
           "Reset",
           "The game manages related rewards, schematics, and tags."
@@ -12243,7 +12263,7 @@
     "Complete Journey Node": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 688,
+        "line": 696,
         "nearby": [
           "Give Item",
           "Give Multiple Items",
@@ -12255,12 +12275,32 @@
     "Completed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1480,
+        "line": 1484,
         "nearby": [
           "No Matching Restarts",
           "No matching restarts have been recorded yet.",
           "Type",
           "Target"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 40,
+        "nearby": [
+          "Failed",
+          "Unknown",
+          "Player",
+          "Package"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 81,
+        "nearby": [
+          "Player",
+          "Package",
+          "Source",
+          "Succeeded"
         ]
       }
     ],
@@ -12314,7 +12354,7 @@
     "Configure": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 331,
+        "line": 332,
         "nearby": [
           "Care Package setup",
           "Create",
@@ -12416,7 +12456,7 @@
     "Confirm password": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 460,
+        "line": 461,
         "nearby": [
           "New password",
           "Confirm Password",
@@ -12428,7 +12468,7 @@
     "Confirm Password": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 460,
+        "line": 461,
         "nearby": [
           "New Password",
           "New password",
@@ -12488,7 +12528,7 @@
     "Connect DBeaver or another PostgreSQL application without exposing the database to your network. PostgreSQL remains bound to the server loopback interface, and the encrypted SSH connection carries database traffic.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 482,
+        "line": 483,
         "nearby": [
           "Postgres version",
           "SSH Tunnel Access",
@@ -12500,7 +12540,7 @@
     "Connect DBeaver to PostgreSQL": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 497,
+        "line": 498,
         "nearby": [
           "when finished.",
           "Optional Windows check",
@@ -13033,7 +13073,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 492,
+        "line": 493,
         "nearby": [
           "with its LAN IP, VPN address, hostname, or public SSH address.",
           "SSH tunnel command",
@@ -13226,7 +13266,7 @@
     "Crafting Schematics": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1187,
+        "line": 1195,
         "nearby": [
           "Clear",
           "No character actions have been recorded in this layout yet.",
@@ -13248,7 +13288,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 330,
+        "line": 331,
         "nearby": [
           "OFF",
           "Care Package setup",
@@ -13354,7 +13394,7 @@
     "Create Rule": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 424,
+        "line": 425,
         "nearby": [
           "Last Seen",
           "Days Ago",
@@ -13466,7 +13506,7 @@
     "Creating Package...": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 134,
+        "line": 135,
         "nearby": [
           "Saving Auto Grant...",
           "Saving Package...",
@@ -13577,7 +13617,7 @@
     "Current Character": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 313,
+        "line": 321,
         "nearby": [
           "Recover Deleted Character",
           "Recover Character",
@@ -13959,7 +13999,7 @@
     "Danger Zone": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1345,
+        "line": 1353,
         "nearby": [
           "Map Servers",
           "Repair Vehicles",
@@ -13993,7 +14033,7 @@
     "Database Browser": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 450,
+        "line": 451,
         "nearby": [
           "The row was not updated. Refresh the table and try again.",
           "Row Save Failed",
@@ -14005,7 +14045,7 @@
     "Database edits may require relog or map/server restart.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 452,
+        "line": 453,
         "nearby": [
           "Row Save Failed",
           "Database Browser",
@@ -14049,7 +14089,7 @@
     "Database Objects": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 588,
+        "line": 589,
         "nearby": [
           "Collapse Database Objects",
           "Expand Database Objects",
@@ -14061,7 +14101,7 @@
     "Database password must be at least 4 characters.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 329,
+        "line": 330,
         "nearby": [
           "Password Change Failed",
           "Passwords do not match."
@@ -14159,7 +14199,7 @@
     "Database Status": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 469,
+        "line": 470,
         "nearby": [
           "Confirm password",
           "Save Password",
@@ -14183,7 +14223,7 @@
     "Days Ago": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 423,
+        "line": 424,
         "nearby": [
           "First Online",
           "Last Seen",
@@ -14521,7 +14561,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 194,
+        "line": 195,
         "nearby": [
           "Delete the Auto Grant rule first.",
           "Delete Package",
@@ -14531,7 +14571,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 435,
+        "line": 436,
         "nearby": [
           "based on",
           "Delete Auto Grant rule",
@@ -14672,7 +14712,7 @@
     "Delete Auto Grant rule": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 435,
+        "line": 436,
         "nearby": [
           "Grants",
           "based on",
@@ -14789,7 +14829,7 @@
     "Delete Package": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 193,
+        "line": 194,
         "nearby": [
           "Package Delete Failed.",
           "Delete the Auto Grant rule first.",
@@ -14799,7 +14839,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 343,
+        "line": 344,
         "nearby": [
           "Select Package",
           "Name Required",
@@ -15010,7 +15050,7 @@
     "Delete the Auto Grant rule first.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 189,
+        "line": 190,
         "nearby": [
           "Package name is required.",
           "Package Delete Failed.",
@@ -15095,7 +15135,7 @@
     "Deleted character to recover": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "Restores the selected character's saved data while preserving the current Funcom identity. A safety backup and Sietch restart are included.",
           "No recoverable deleted character was detected.",
@@ -15277,7 +15317,7 @@
     "Depends On": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1072,
+        "line": 1080,
         "nearby": [
           "Name",
           "Type",
@@ -15490,12 +15530,12 @@
     "Details": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 416,
+        "line": 425,
         "nearby": [
           "None",
           "Unknown",
-          "This addon is installed locally but is no longer listed in the community catalog.",
-          "This addon is deprecated and may stop receiving updates."
+          "Less",
+          "More"
         ]
       },
       {
@@ -15517,12 +15557,30 @@
           "Run port checks to see listener status.",
           "Open"
         ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 40,
+        "nearby": [
+          "Package",
+          "Result",
+          "Grant History"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 44,
+        "nearby": [
+          "Result",
+          "Grant History",
+          "Close dialog"
+        ]
       }
     ],
     "Detected": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1195,
+        "line": 1203,
         "nearby": [
           "{count0} of {count1}",
           "Schematic",
@@ -15532,7 +15590,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1222,
+        "line": 1230,
         "nearby": [
           "Research Entr",
           "ies",
@@ -15542,7 +15600,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1293,
+        "line": 1301,
         "nearby": [
           "Journey Entr",
           "ies",
@@ -15565,7 +15623,7 @@
     "Detected Event": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 315,
+        "line": 323,
         "nearby": [
           "Current Character",
           "Recover From",
@@ -15601,7 +15659,7 @@
     "Developer raw package item textarea": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 377,
+        "line": 378,
         "nearby": [
           "Edit",
           "Remove",
@@ -15613,7 +15671,7 @@
     "Diagnostic Note": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1727,
+        "line": 1731,
         "nearby": [
           "Cleaning...",
           "Clean Build Cache",
@@ -15625,7 +15683,7 @@
     "Diagnostic Warning": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1771,
+        "line": 1775,
         "nearby": [
           "Obsolete Docker images can be cleaned",
           "Unused Docker build cache can be cleaned",
@@ -15684,7 +15742,7 @@
     "Director heartbeat not recently observed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1741,
+        "line": 1745,
         "nearby": [
           "Diagnostic Note",
           "Public IP bind detected",
@@ -15732,7 +15790,7 @@
     "Disable Failed": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 111,
+        "line": 113,
         "nearby": [
           "Addon Disabled",
           "Enable Failed",
@@ -15821,12 +15879,12 @@
     "Disabled": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 317,
+        "line": 316,
         "nearby": [
           "Working",
           "Enabled",
-          "ON",
-          "OFF"
+          "Installing...",
+          "Install"
         ]
       },
       {
@@ -16013,7 +16071,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1273,
+        "line": 1281,
         "nearby": [
           "Leave empty for now.",
           "Save",
@@ -16346,7 +16404,7 @@
     "Do not run it inside the Dune server’s SSH terminal. Replace": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 491,
+        "line": 492,
         "nearby": [
           "Local Port",
           "Run the command on the computer running DBeaver",
@@ -16390,7 +16448,7 @@
     "Docker status is unavailable. Check that Docker is running and the web admin has access.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2490,
+        "line": 2494,
         "nearby": [
           "Warming",
           "Stopped",
@@ -16402,7 +16460,7 @@
     "Doctor Diagnostics": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1700,
+        "line": 1704,
         "nearby": [
           "Please make sure the Funcom token belongs to the current Battlegroup ID, then save it again.",
           "Unset",
@@ -16414,7 +16472,7 @@
     "Doctor diagnostics have not loaded yet.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1701,
+        "line": 1705,
         "nearby": [
           "Checking diagnostics",
           "Doctor diagnostics look healthy.",
@@ -16426,7 +16484,7 @@
     "Doctor diagnostics look healthy.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1701,
+        "line": 1705,
         "nearby": [
           "Doctor Diagnostics",
           "Checking diagnostics",
@@ -16950,7 +17008,7 @@
     "Duration": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1480,
+        "line": 1484,
         "nearby": [
           "Source",
           "Reason",
@@ -17065,7 +17123,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1178,
+        "line": 1186,
         "nearby": [
           "Save",
           "Cancel",
@@ -17075,7 +17133,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 370,
+        "line": 371,
         "nearby": [
           "Save",
           "Cancel",
@@ -17149,7 +17207,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 550,
+        "line": 551,
         "nearby": [
           "Last",
           "Columns",
@@ -17250,7 +17308,7 @@
     "Edit Row": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 557,
+        "line": 558,
         "nearby": [
           "No matching rows found.",
           "This table has no rows to preview.",
@@ -17329,7 +17387,7 @@
     "Eligibility": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 437,
+        "line": 438,
         "nearby": [
           "Collapse",
           "Expand",
@@ -17459,7 +17517,7 @@
     "Enable Failed": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 111,
+        "line": 113,
         "nearby": [
           "Addon Enabled",
           "Addon Disabled",
@@ -17572,12 +17630,12 @@
     "Enabled": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 317,
+        "line": 316,
         "nearby": [
-          "Sub-Menu",
+          "Actions",
           "Working",
           "Disabled",
-          "ON"
+          "Installing..."
         ]
       },
       {
@@ -17777,7 +17835,7 @@
     "Enforcement": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1376,
+        "line": 1384,
         "nearby": [
           "Ban Player",
           "Player",
@@ -17891,7 +17949,7 @@
     "Enter package name": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 345,
+        "line": 346,
         "nearby": [
           "Delete Package",
           "Package Name",
@@ -17903,7 +17961,7 @@
     "Enter the server’s SSH password when prompted. Password characters will not appear while typing. A blank terminal after login means the tunnel is active; close it with": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 494,
+        "line": 495,
         "nearby": [
           "Copy",
           "Authenticate and keep the terminal open",
@@ -17937,7 +17995,7 @@
     "Equipped and carried gear durability. Relog required.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "Repair Gear",
           "The player must be offline.",
@@ -18275,8 +18333,18 @@
     ],
     "Expand": [
       {
+        "file": "console/web/src/features/players/CharacterAdminUI.tsx",
+        "line": 1115,
+        "nearby": [
+          "Action",
+          "Collapse",
+          "Unknown",
+          "Complete"
+        ]
+      },
+      {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 436,
+        "line": 437,
         "nearby": [
           "Expand Eligibility",
           "Collapse",
@@ -18325,7 +18393,7 @@
     "Expand Advanced SQL Console": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 594,
+        "line": 595,
         "nearby": [
           "Database Objects",
           "Collapse Advanced SQL Console",
@@ -18397,7 +18465,7 @@
     "Expand Database Objects": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 588,
+        "line": 589,
         "nearby": [
           "No matching tables or columns found.",
           "Collapse Database Objects",
@@ -18409,7 +18477,7 @@
     "Expand Eligibility": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 436,
+        "line": 437,
         "nearby": [
           "Delete",
           "Collapse Eligibility",
@@ -18505,7 +18573,7 @@
     "Expand Select Items": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 353,
+        "line": 354,
         "nearby": [
           "Send Message",
           "Collapse Select Items",
@@ -18589,7 +18657,7 @@
     "Experimental: Permissioned": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 235,
+        "line": 237,
         "nearby": [
           "This pinned addon is not installed, enabled, or fully loaded yet.",
           "Addons",
@@ -18668,7 +18736,7 @@
     "Export Query JSON": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 597,
+        "line": 598,
         "nearby": [
           "Advanced SQL Console",
           "Run Query",
@@ -18703,7 +18771,7 @@
     "External access:": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 507,
+        "line": 508,
         "nearby": [
           "Connect DBeaver to PostgreSQL",
           "Select PostgreSQL and use these values. Leave DBeaver’s built-in SSH tab disabled because the separate terminal already provides the tunnel.",
@@ -18773,7 +18841,7 @@
     "Faction Reputation affects rank, but Ranks 1–5 also require faction story progression. The player must be offline so the reputation used by vendors can be updated safely.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1173,
+        "line": 1181,
         "nearby": [
           "Give Faction Reputation",
           "About Faction Reputation",
@@ -18819,7 +18887,7 @@
     "Failed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2449,
+        "line": 2453,
         "nearby": [
           "Getting Ready",
           "Info",
@@ -18829,7 +18897,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2787,
+        "line": 2791,
         "nearby": [
           "Unavailable",
           "Unknown",
@@ -18845,6 +18913,39 @@
           "Unknown",
           "Attention Needed",
           "Ready"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 24,
+        "nearby": [
+          "Succeeded"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 27,
+        "nearby": [
+          "Succeeded"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 28,
+        "nearby": [
+          "Succeeded",
+          "Unknown",
+          "Completed"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 89,
+        "nearby": [
+          "Source",
+          "Succeeded",
+          "Close",
+          "Retry"
         ]
       },
       {
@@ -19103,7 +19204,7 @@
     "Filter by name, ID, status, or dependency": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1293,
+        "line": 1301,
         "nearby": [
           "Journey Browser",
           "Journey changes require the player to be fully offline and take effect on the next login. Reset keeps rewards already granted and cannot recreate a consumed Contract item.",
@@ -19127,7 +19228,7 @@
     "Filter by name, item ID, or template": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1181,
+        "line": 1189,
         "nearby": [
           "A relog is required to see the change.",
           "of",
@@ -19151,7 +19252,7 @@
     "Filter by name, item key, type, or product group": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1220,
+        "line": 1228,
         "nearby": [
           "Research Schematics",
           "Research unlocks require the player to be offline and add the linked build recipe. Existing incomplete unlocks show Repair Unlock. Group markers are informational; unlock their individual Recipe or Building entries.",
@@ -19163,7 +19264,7 @@
     "Filter by name, recipe ID, source, or category": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1193,
+        "line": 1201,
         "nearby": [
           "Crafting Schematics",
           "Recipe unlocks require the player to be offline. The Grade shown is the recipe grade found in the game database.",
@@ -19187,7 +19288,7 @@
     "Filter Crafting Schematics": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1193,
+        "line": 1201,
         "nearby": [
           "Recipe unlocks require the player to be offline. The Grade shown is the recipe grade found in the game database.",
           "Filter by name, recipe ID, source, or category",
@@ -19235,7 +19336,7 @@
     "Filter Inventory": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1181,
+        "line": 1189,
         "nearby": [
           "of",
           "Filter by name, item ID, or template",
@@ -19270,7 +19371,7 @@
     "Filter Journey Browser": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1293,
+        "line": 1301,
         "nearby": [
           "Journey changes require the player to be fully offline and take effect on the next login. Reset keeps rewards already granted and cannot recreate a consumed Contract item.",
           "Filter by name, ID, status, or dependency",
@@ -19337,7 +19438,7 @@
     "Filter Research Schematics": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1220,
+        "line": 1228,
         "nearby": [
           "Research unlocks require the player to be offline and add the linked build recipe. Existing incomplete unlocks show Repair Unlock. Group markers are informational; unlock their individual Recipe or Building entries.",
           "Filter by name, item key, type, or product group",
@@ -19593,7 +19694,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 538,
+        "line": 539,
         "nearby": [
           "rows.",
           "Rows",
@@ -19627,7 +19728,7 @@
     "First Online": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 422,
+        "line": 423,
         "nearby": [
           "Name Required",
           "Grant When",
@@ -19637,7 +19738,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 595,
+        "line": 596,
         "nearby": [
           "Unknown Package",
           "Auto Grant rule",
@@ -19695,7 +19796,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1713,
+        "line": 1717,
         "nearby": [
           "Doctor diagnostics have not loaded yet.",
           "Fixing...",
@@ -19775,7 +19876,7 @@
     "Fixing...": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1713,
+        "line": 1717,
         "nearby": [
           "Doctor diagnostics look healthy.",
           "Doctor diagnostics have not loaded yet.",
@@ -19811,7 +19912,7 @@
     "For Developers": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 235,
+        "line": 237,
         "nearby": [
           "Addons",
           "Experimental: Permissioned",
@@ -20206,7 +20307,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1549,
+        "line": 1553,
         "nearby": [
           "Unknown",
           "{count0}m",
@@ -20218,7 +20319,7 @@
     "Funcom Token Change Needs Review": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1604,
+        "line": 1608,
         "nearby": [
           "The Funcom token was changed successfully and the server is up and running.",
           "Restarting Server",
@@ -20230,7 +20331,7 @@
     "Funcom Token Changed Successfully": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1586,
+        "line": 1590,
         "nearby": [
           "Restarting Server",
           "Checking Funcom Token",
@@ -20477,7 +20578,7 @@
     "Gateway DB monitoring not recently observed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1747,
+        "line": 1751,
         "nearby": [
           "Director heartbeat not recently observed",
           "Check Director logs if readiness is unhealthy.",
@@ -20680,7 +20781,7 @@
     "Getting Ready": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2343,
+        "line": 2347,
         "nearby": [
           "Stopped",
           "Needs Review",
@@ -20748,7 +20849,7 @@
     "Give Faction Reputation": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1173,
+        "line": 1181,
         "nearby": [
           "About Give Intel",
           "Adds available Intel while the player is offline and never exceeds the game's spendable cap. It does not purchase or unlock Research entries. The player should join after the grant before spending it.",
@@ -20760,7 +20861,7 @@
     "Give Intel": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1172,
+        "line": 1180,
         "nearby": [
           "Give Water",
           "Refill Container",
@@ -20772,7 +20873,7 @@
     "Give Item": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 386,
+        "line": 394,
         "nearby": [
           "Items Retained",
           "Sietch",
@@ -20782,7 +20883,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1175,
+        "line": 1183,
         "nearby": [
           "Aug. Grade",
           "Give Package",
@@ -20824,7 +20925,7 @@
     "Give Items": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1175,
+        "line": 1183,
         "nearby": [
           "About Faction Reputation",
           "Faction Reputation affects rank, but Ranks 1–5 also require faction story progression. The player must be offline so the reputation used by vendors can be updated safely.",
@@ -20836,7 +20937,7 @@
     "Give Multiple Items": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 386,
+        "line": 394,
         "nearby": [
           "Sietch",
           "Give Item",
@@ -20859,7 +20960,7 @@
     "Give Package": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1175,
+        "line": 1183,
         "nearby": [
           "Augments",
           "Aug. Grade",
@@ -20871,7 +20972,7 @@
     "Give Water": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1162,
+        "line": 1170,
         "nearby": [
           "Close",
           "Player admin sections",
@@ -20982,7 +21083,7 @@
     "Grade": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1175,
+        "line": 1183,
         "nearby": [
           "Selected Item",
           "Quantity",
@@ -20992,7 +21093,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1176,
+        "line": 1184,
         "nearby": [
           "Item ID",
           "Quantity",
@@ -21074,7 +21175,7 @@
     "Grade 0 items and Grade 0 physical schematics use the live grant path and require the player to be online. Item Grades 1-5, ranked schematics, standalone augments, and pre-augmented items use database grants; relog after granting to an online player.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1175,
+        "line": 1183,
         "nearby": [
           "Give Item",
           "Add Item",
@@ -21086,7 +21187,7 @@
     "Grant": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 347,
+        "line": 348,
         "nearby": [
           "Package Name",
           "Enter package name",
@@ -21096,7 +21197,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 455,
+        "line": 456,
         "nearby": [
           "(Online)",
           "Grant Package",
@@ -21265,12 +21366,21 @@
     "Grant History": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 486,
+        "line": 487,
         "nearby": [
           "Admin action ID",
           "RedBlink#75570",
           "Clear",
           "Retry Grant"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 76,
+        "nearby": [
+          "Details",
+          "Close dialog",
+          "Player"
         ]
       }
     ],
@@ -21311,7 +21421,7 @@
     "Grant Package": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 454,
+        "line": 455,
         "nearby": [
           "No players are online",
           "(Online)",
@@ -21321,7 +21431,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 473,
+        "line": 474,
         "nearby": [
           "Package",
           "Player",
@@ -21345,7 +21455,7 @@
     "Grant When": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 422,
+        "line": 423,
         "nearby": [
           "Package",
           "Name Required",
@@ -21400,7 +21510,7 @@
     "Grants": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 434,
+        "line": 435,
         "nearby": [
           "ON",
           "OFF",
@@ -21481,7 +21591,7 @@
     "Group Entry": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1049,
+        "line": 1057,
         "nearby": [
           "Researching...",
           "Researched",
@@ -21493,7 +21603,7 @@
     "Group markers cannot be safely unlocked as one entry. Unlock the individual Recipe or Building entries.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1049,
+        "line": 1057,
         "nearby": [
           "Unlocked",
           "Unlock",
@@ -21953,7 +22063,7 @@
     "ies": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1222,
+        "line": 1230,
         "nearby": [
           "{count0} of {count1}",
           "Research Entr",
@@ -21963,7 +22073,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1293,
+        "line": 1301,
         "nearby": [
           "Clear",
           "Journey Entr",
@@ -22521,7 +22631,7 @@
     "Info": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2437,
+        "line": 2441,
         "nearby": [
           "Needs Review",
           "Getting Ready",
@@ -22555,9 +22665,9 @@
     "Install": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 320,
+        "line": 319,
         "nearby": [
-          "OFF",
+          "Disabled",
           "Installing...",
           "Updating...",
           "Update"
@@ -22617,7 +22727,7 @@
     "Install Blocked": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 52,
+        "line": 54,
         "nearby": [
           "Addons Unavailable",
           "Addon Installed",
@@ -22639,7 +22749,7 @@
     "Install Failed": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 67,
+        "line": 69,
         "nearby": [
           "Install Blocked",
           "Addon Installed",
@@ -22767,10 +22877,10 @@
     "Installing...": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 320,
+        "line": 319,
         "nearby": [
-          "ON",
-          "OFF",
+          "Enabled",
+          "Disabled",
           "Install",
           "Updating..."
         ]
@@ -22919,7 +23029,7 @@
     "Inventory type": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1181,
+        "line": 1189,
         "nearby": [
           "Edit",
           "Remove",
@@ -23173,7 +23283,7 @@
     "Item ID": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1176,
+        "line": 1184,
         "nearby": [
           "Preview",
           "Item Name",
@@ -23183,7 +23293,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 368,
+        "line": 369,
         "nearby": [
           "Preview",
           "Item Name",
@@ -23256,7 +23366,7 @@
     "Item Name": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1176,
+        "line": 1184,
         "nearby": [
           "Grade 0 items and Grade 0 physical schematics use the live grant path and require the player to be online. Item Grades 1-5, ranked schematics, standalone augments, and pre-augmented items use database grants; relog after granting to an online player.",
           "Preview",
@@ -23266,7 +23376,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 368,
+        "line": 369,
         "nearby": [
           "Care Package items are granted as live-safe Grade 0 rewards. Use Give Items for graded or augmented gear.",
           "Preview",
@@ -23380,7 +23490,7 @@
     "Items ·": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "No recoverable deleted character was detected.",
           "Deleted character to recover",
@@ -23414,7 +23524,7 @@
     "Items Retained": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 316,
+        "line": 324,
         "nearby": [
           "Recover From",
           "Detected Event",
@@ -23494,7 +23604,7 @@
     "Journey Browser": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1293,
+        "line": 1301,
         "nearby": [
           "Save",
           "Discard",
@@ -23506,7 +23616,7 @@
     "Journey changes require the player to be fully offline and take effect on the next login. Reset keeps rewards already granted and cannot recreate a consumed Contract item.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1293,
+        "line": 1301,
         "nearby": [
           "Discard",
           "Journey Browser",
@@ -23518,7 +23628,7 @@
     "Journey Entr": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1293,
+        "line": 1301,
         "nearby": [
           "Filter Journey Browser",
           "Clear",
@@ -23552,7 +23662,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 488,
+        "line": 489,
         "nearby": [
           "Change the default database password before connecting an external database tool.",
           "Choose a port on your computer",
@@ -23681,7 +23791,7 @@
     "Kick Player": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1359,
+        "line": 1367,
         "nearby": [
           "Queue",
           "Repair Login Queue",
@@ -23887,7 +23997,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 542,
+        "line": 543,
         "nearby": [
           "of",
           "Next",
@@ -23961,6 +24071,16 @@
           "Not Recorded Yet",
           "Refresh Status"
         ]
+      },
+      {
+        "file": "console/web/src/features/server/ServerPanels.tsx",
+        "line": 1468,
+        "nearby": [
+          "Restart History",
+          "Tracking begins after this update",
+          "Show",
+          "All Restarts"
+        ]
       }
     ],
     "Last delivery attempt:": [
@@ -24012,7 +24132,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 422,
+        "line": 423,
         "nearby": [
           "Grant When",
           "First Online",
@@ -24080,7 +24200,7 @@
     "Leave empty for now.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1273,
+        "line": 1281,
         "nearby": [
           "Loading...",
           "Reload",
@@ -24098,6 +24218,18 @@
           "Enable Leave Announcements",
           "Save",
           "Restore Defaults"
+        ]
+      }
+    ],
+    "Less": [
+      {
+        "file": "console/web/src/features/addons/AddonsPanel.tsx",
+        "line": 426,
+        "nearby": [
+          "Unknown",
+          "Details",
+          "More",
+          "This addon is installed locally but is no longer listed in the community catalog."
         ]
       }
     ],
@@ -24550,7 +24682,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1295,
+        "line": 1303,
         "nearby": [
           "Detected",
           "Blueprints",
@@ -24598,12 +24730,12 @@
     "Loading community addons...": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 290,
+        "line": 291,
         "nearby": [
-          "Add community-built tools into your Dune Docker Console. Discover addons created by the community, see what each one adds, review what it can access, and enable new features whenever you're ready to expand your console.",
           "Addon catalog lifecycle summary",
+          "Loading...",
           "No community addons are listed yet.",
-          "Addon"
+          "Addons"
         ]
       }
     ],
@@ -24727,7 +24859,7 @@
     "Loading journey data...": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1124,
+        "line": 1132,
         "nearby": [
           "The game manages related rewards, schematics, and tags.",
           "Read-only",
@@ -25040,7 +25172,7 @@
     "Loading table page...": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 523,
+        "line": 524,
         "nearby": [
           "Table Preview",
           "No table selected. Select a table to preview and edit rows.",
@@ -25129,8 +25261,28 @@
     ],
     "Loading...": [
       {
+        "file": "console/web/src/features/addons/AddonsPanel.tsx",
+        "line": 230,
+        "nearby": [
+          "Addon Uninstalled",
+          "Uninstall Failed",
+          "Addon unavailable.",
+          "This pinned addon is not installed, enabled, or fully loaded yet."
+        ]
+      },
+      {
+        "file": "console/web/src/features/addons/AddonsPanel.tsx",
+        "line": 267,
+        "nearby": [
+          "Add community-built tools into your Dune Docker Console. Discover addons created by the community, see what each one adds, review what it can access, and enable new features whenever you're ready to expand your console.",
+          "Addon catalog lifecycle summary",
+          "Loading community addons...",
+          "No community addons are listed yet."
+        ]
+      },
+      {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1198,
+        "line": 1206,
         "nearby": [
           "Schematic",
           "Detected",
@@ -25140,7 +25292,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1226,
+        "line": 1234,
         "nearby": [
           "Detected",
           "All Product Groups",
@@ -25150,7 +25302,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1257,
+        "line": 1265,
         "nearby": [
           "Unsaved Change",
           "Restore Starter Skills",
@@ -25294,7 +25446,7 @@
     "Loadout": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1181,
+        "line": 1189,
         "nearby": [
           "Backpack",
           "Character",
@@ -25338,7 +25490,7 @@
     "Local Port": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 489,
+        "line": 490,
         "nearby": [
           "Keep",
           "unless another application on your computer already uses it. This does not change the server’s database port.",
@@ -25554,7 +25706,7 @@
     "Manual Grant": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 408,
+        "line": 409,
         "nearby": [
           "Care Package grants",
           "Auto Grant",
@@ -25566,7 +25718,7 @@
     "Manual Template": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1386,
+        "line": 1394,
         "nearby": [
           "Spawn Vehicle",
           "Manual Vehicle ID",
@@ -25576,7 +25728,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1398,
+        "line": 1406,
         "nearby": [
           "Manual Vehicle ID",
           "Sandbike",
@@ -25597,7 +25749,7 @@
     "Manual Vehicle ID": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1386,
+        "line": 1394,
         "nearby": [
           "Movement / Vehicles",
           "Spawn Vehicle",
@@ -25607,7 +25759,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1398,
+        "line": 1406,
         "nearby": [
           "Spawn",
           "Advanced manual override",
@@ -25782,7 +25934,7 @@
     "Map Servers": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1321,
+        "line": 1329,
         "nearby": [
           "Repair Vehicles",
           "Threshold",
@@ -25851,7 +26003,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1472,
+        "line": 1476,
         "nearby": [
           "All Restarts",
           "Battlegroup",
@@ -26367,7 +26519,7 @@
     "Mentat starter skills": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 948,
+        "line": 956,
         "nearby": [
           "Type:",
           "Trooper starter skills",
@@ -26563,7 +26715,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1924,
+        "line": 1928,
         "nearby": [
           "Title",
           "Region",
@@ -26685,12 +26837,24 @@
     "Modules": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 986,
+        "line": 994,
         "nearby": [
           "Restore Starter Skills",
           "Restore",
           "Unlocking...",
           "Unlocked"
+        ]
+      }
+    ],
+    "More": [
+      {
+        "file": "console/web/src/features/addons/AddonsPanel.tsx",
+        "line": 426,
+        "nearby": [
+          "Details",
+          "Less",
+          "This addon is installed locally but is no longer listed in the community catalog.",
+          "This addon is deprecated and may stop receiving updates."
         ]
       }
     ],
@@ -26733,7 +26897,7 @@
     "Movement / Vehicles": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1386,
+        "line": 1394,
         "nearby": [
           "Wipe Inventory",
           "Reset Progression",
@@ -26769,7 +26933,7 @@
     "Name": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1069,
+        "line": 1077,
         "nearby": [
           "Repair Unlock",
           "Research",
@@ -26855,7 +27019,7 @@
     "Name Required": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 342,
+        "line": 343,
         "nearby": [
           "Add Package",
           "Select Package",
@@ -26865,7 +27029,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 421,
+        "line": 422,
         "nearby": [
           "Check Every (s)",
           "Package",
@@ -26875,7 +27039,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 443,
+        "line": 444,
         "nearby": [
           "No eligible players were found for this rule.",
           "Package",
@@ -26911,7 +27075,7 @@
     "Needs Review": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2336,
+        "line": 2340,
         "nearby": [
           "Starting",
           "Stopped",
@@ -26921,7 +27085,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2513,
+        "line": 2517,
         "nearby": [
           "Server status is unavailable.",
           "Unknown"
@@ -26929,35 +27093,35 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2580,
+        "line": 2584,
         "nearby": [
           "Unknown"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2581,
+        "line": 2585,
         "nearby": [
           "Unknown"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2592,
+        "line": 2596,
         "nearby": [
           "Unknown"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2597,
+        "line": 2601,
         "nearby": [
           "Unknown"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2619,
+        "line": 2623,
         "nearby": [
           "Unknown",
           "{count0} of {count1}"
@@ -26965,7 +27129,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2650,
+        "line": 2654,
         "nearby": [
           "Unknown",
           "{count0} of {count1}",
@@ -26975,7 +27139,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2659,
+        "line": 2663,
         "nearby": [
           "Warming",
           "Waiting",
@@ -26985,7 +27149,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2678,
+        "line": 2682,
         "nearby": [
           "Unknown",
           "{count0} of {count1}"
@@ -26993,14 +27157,14 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2687,
+        "line": 2691,
         "nearby": [
           "Unknown"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2695,
+        "line": 2699,
         "nearby": [
           "Unknown"
         ]
@@ -27145,7 +27309,7 @@
     "New package": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 338,
+        "line": 339,
         "nearby": [
           "Configure",
           "New Package Name",
@@ -27157,7 +27321,7 @@
     "New Package Name": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 338,
+        "line": 339,
         "nearby": [
           "Create",
           "Configure",
@@ -27169,7 +27333,7 @@
     "New password": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 459,
+        "line": 460,
         "nearby": [
           "The default password is \"dune\".",
           "New Password",
@@ -27191,7 +27355,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 459,
+        "line": 460,
         "nearby": [
           "Change Database Password",
           "The default password is \"dune\".",
@@ -27328,7 +27492,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 541,
+        "line": 542,
         "nearby": [
           "Page",
           "of",
@@ -27434,7 +27598,7 @@
     "No admin actions have been recorded in this layout yet.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1398,
+        "line": 1406,
         "nearby": [
           "T1_ExtraSeat",
           "Clear"
@@ -27515,10 +27679,10 @@
     "No Care Package grants have been recorded yet.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 509,
+        "line": 510,
         "nearby": [
+          "Package",
           "Player",
-          "Retry",
           "Raw Care Package JSON",
           "Care Package save failed."
         ]
@@ -27551,7 +27715,7 @@
     "No character actions have been recorded in this layout yet.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1182,
+        "line": 1190,
         "nearby": [
           "Clear",
           "Crafting Schematics",
@@ -27586,12 +27750,12 @@
     "No community addons are listed yet.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 290,
+        "line": 291,
         "nearby": [
-          "Addon catalog lifecycle summary",
+          "Loading...",
           "Loading community addons...",
-          "Addon",
-          "Author"
+          "Addons",
+          "Addon"
         ]
       }
     ],
@@ -27681,7 +27845,7 @@
     "No eligible players were found for this rule.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 437,
+        "line": 438,
         "nearby": [
           "Expand",
           "Eligibility",
@@ -27870,7 +28034,7 @@
     "No Matching Restarts": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1478,
+        "line": 1482,
         "nearby": [
           "Refreshing",
           "Refresh",
@@ -27882,7 +28046,7 @@
     "No matching restarts have been recorded yet.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1478,
+        "line": 1482,
         "nearby": [
           "Refresh",
           "No Matching Restarts",
@@ -27894,7 +28058,7 @@
     "No matching rows found.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 551,
+        "line": 552,
         "nearby": [
           "Columns",
           "Edit",
@@ -27906,7 +28070,7 @@
     "No matching tables found.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 519,
+        "line": 520,
         "nearby": [
           "Search table names",
           "Clear",
@@ -27928,7 +28092,7 @@
     "No matching tables or columns found.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 586,
+        "line": 587,
         "nearby": [
           "Search tables or columns",
           "Search",
@@ -28091,7 +28255,7 @@
     "No players are online": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 445,
+        "line": 446,
         "nearby": [
           "Player",
           "Select player",
@@ -28242,7 +28406,7 @@
     "No recoverable deleted character was detected.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "Checking deleted character history...",
           "Restores the selected character's saved data while preserving the current Funcom identity. A safety backup and Sietch restart are included.",
@@ -28404,7 +28568,7 @@
     "No table selected. Select a table to preview and edit rows.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 521,
+        "line": 522,
         "nearby": [
           "No matching tables found.",
           "Table Preview",
@@ -28440,7 +28604,7 @@
     "Node": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 690,
+        "line": 698,
         "nearby": [
           "Complete",
           "Player",
@@ -28450,7 +28614,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 714,
+        "line": 722,
         "nearby": [
           "Reset",
           "Player",
@@ -28462,7 +28626,7 @@
     "None": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 350,
+        "line": 348,
         "nearby": [
           "OFF",
           "Open addon source on GitHub",
@@ -28684,7 +28848,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1983,
+        "line": 1987,
         "nearby": [
           "Battlegroup",
           "Population",
@@ -28906,7 +29070,7 @@
     "Obsolete Docker images can be cleaned": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1759,
+        "line": 1763,
         "nearby": [
           "Check Gateway logs if readiness is unhealthy.",
           "Advertised IP Warning",
@@ -28970,7 +29134,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1181,
+        "line": 1189,
         "nearby": [
           "Unique schematics",
           "A relog is required to see the change.",
@@ -29062,19 +29226,9 @@
     "OFF": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 317,
+        "line": 324,
         "nearby": [
-          "Disabled",
-          "ON",
-          "Installing...",
-          "Install"
-        ]
-      },
-      {
-        "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 326,
-        "nearby": [
-          "Uninstall",
+          "Sub-Menu",
           "ON",
           "Open addon source on GitHub",
           "None"
@@ -29152,7 +29306,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 327,
+        "line": 328,
         "nearby": [
           "Care Package",
           "ON",
@@ -29162,7 +29316,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 433,
+        "line": 434,
         "nearby": [
           "Rule",
           "ON",
@@ -29178,6 +29332,16 @@
           "ON",
           "Schedule",
           "Check for updates every"
+        ]
+      },
+      {
+        "file": "console/web/src/features/landsraad/LandsraadPanel.tsx",
+        "line": 395,
+        "nearby": [
+          "Apply Automatically Each Cycle",
+          "ON",
+          "Save And Apply",
+          "Reward levels will appear after the current Landsraad term generates its milestones."
         ]
       }
     ],
@@ -29317,20 +29481,10 @@
     "ON": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 317,
+        "line": 324,
         "nearby": [
-          "Enabled",
-          "Disabled",
-          "OFF",
-          "Installing..."
-        ]
-      },
-      {
-        "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 326,
-        "nearby": [
-          "Open",
           "Uninstall",
+          "Sub-Menu",
           "OFF",
           "Open addon source on GitHub"
         ]
@@ -29406,7 +29560,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 327,
+        "line": 328,
         "nearby": [
           "Care Package Configuration",
           "Care Package",
@@ -29416,7 +29570,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 433,
+        "line": 434,
         "nearby": [
           "Create Rule",
           "Rule",
@@ -29433,12 +29587,22 @@
           "OFF",
           "Schedule"
         ]
+      },
+      {
+        "file": "console/web/src/features/landsraad/LandsraadPanel.tsx",
+        "line": 395,
+        "nearby": [
+          "Reward Threshold",
+          "Apply Automatically Each Cycle",
+          "OFF",
+          "Save And Apply"
+        ]
       }
     ],
     "on your router.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 507,
+        "line": 508,
         "nearby": [
           "External access:",
           "use a VPN address or an SSH-reachable public hostname. Never forward or expose PostgreSQL port",
@@ -29486,7 +29650,7 @@
     "One item per line: item name or raw item ID, quantity. Extra legacy grade or augment columns are ignored for Care Packages.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 377,
+        "line": 378,
         "nearby": [
           "Remove",
           "Developer raw package item textarea",
@@ -29554,12 +29718,11 @@
     "Open": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 322,
+        "line": 321,
         "nearby": [
           "Update",
           "Close",
-          "Uninstall",
-          "ON"
+          "Uninstall"
         ]
       },
       {
@@ -29583,7 +29746,7 @@
     "Open addon source on GitHub": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 346,
+        "line": 344,
         "nearby": [
           "ON",
           "OFF",
@@ -29654,7 +29817,7 @@
     "Open Large JSON Editor": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 564,
+        "line": 565,
         "nearby": [
           "This table has no rows to preview.",
           "Edit Row",
@@ -29770,7 +29933,7 @@
     "Optional Windows check": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 495,
+        "line": 496,
         "nearby": [
           "Enter the server’s SSH password when prompted. Password characters will not appear while typing. A blank terminal after login means the tunnel is active; close it with",
           "when finished.",
@@ -29863,7 +30026,7 @@
     "Overall": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1921,
+        "line": 1925,
         "nearby": [
           "Diagnostic Warning",
           "Token Mismatch Detected",
@@ -30121,7 +30284,7 @@
     "Package": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 196,
+        "line": 197,
         "nearby": [
           "Delete Package",
           "Delete",
@@ -30131,7 +30294,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 383,
+        "line": 384,
         "nearby": [
           "Save Package",
           "Save",
@@ -30141,7 +30304,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 421,
+        "line": 422,
         "nearby": [
           "Manual Grant",
           "Check Every (s)",
@@ -30151,7 +30314,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 443,
+        "line": 444,
         "nearby": [
           "Eligibility",
           "No eligible players were found for this rule.",
@@ -30161,7 +30324,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 457,
+        "line": 458,
         "nearby": [
           "Grant Package",
           "Grant",
@@ -30170,18 +30333,39 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 503,
+        "line": 504,
         "nearby": [
           "Retry Grant",
           "Retry",
-          "Player"
+          "Player",
+          "No Care Package grants have been recorded yet."
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 40,
+        "nearby": [
+          "Completed",
+          "Player",
+          "Result",
+          "Details"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 80,
+        "nearby": [
+          "Close dialog",
+          "Player",
+          "Completed",
+          "Source"
         ]
       }
     ],
     "Package Create Failed.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 150,
+        "line": 151,
         "nearby": [
           "Saving Package...",
           "Auto Grant Save Failed.",
@@ -30190,7 +30374,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 170,
+        "line": 171,
         "nearby": [
           "Package Save Failed.",
           "Package name is required.",
@@ -30201,7 +30385,7 @@
     "Package Delete Failed.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 189,
+        "line": 190,
         "nearby": [
           "Package Create Failed.",
           "Package name is required.",
@@ -30213,7 +30397,7 @@
     "Package Items": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 377,
+        "line": 378,
         "nearby": [
           "Developer raw package item textarea",
           "One item per line: item name or raw item ID, quantity. Extra legacy grade or augment columns are ignored for Care Packages.",
@@ -30225,7 +30409,7 @@
     "Package Name": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 345,
+        "line": 346,
         "nearby": [
           "Name Required",
           "Delete Package",
@@ -30237,7 +30421,7 @@
     "Package name is required.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 170,
+        "line": 171,
         "nearby": [
           "Package Save Failed.",
           "Package Create Failed.",
@@ -30249,7 +30433,7 @@
     "Package Save Failed.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 150,
+        "line": 151,
         "nearby": [
           "Auto Grant Save Failed.",
           "Package Create Failed.",
@@ -30258,7 +30442,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 393,
+        "line": 394,
         "nearby": [
           "Saving Package...",
           "Package was saved successfully.",
@@ -30270,7 +30454,7 @@
     "Package was saved successfully.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 391,
+        "line": 392,
         "nearby": [
           "Package",
           "Saving Package...",
@@ -30352,7 +30536,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 540,
+        "line": 541,
         "nearby": [
           "First",
           "Previous",
@@ -30422,7 +30606,7 @@
     "Partition": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1484,
+        "line": 1488,
         "nearby": [
           "Duration",
           "Result",
@@ -30630,7 +30814,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 329,
+        "line": 330,
         "nearby": [
           "Password Changed Successfully",
           "Database password must be at least 4 characters."
@@ -30638,7 +30822,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 333,
+        "line": 334,
         "nearby": [
           "Database password must be at least 4 characters.",
           "Passwords do not match.",
@@ -30647,7 +30831,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 345,
+        "line": 346,
         "nearby": [
           "Changing Password...",
           "Restarting Server...",
@@ -30717,7 +30901,7 @@
     "Passwords do not match.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 333,
+        "line": 334,
         "nearby": [
           "Database password must be at least 4 characters.",
           "Password Change Failed",
@@ -30963,9 +31147,9 @@
     "Permissions": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 301,
+        "line": 300,
         "nearby": [
-          "Author",
+          "Addon",
           "Version",
           "Status",
           "Actions"
@@ -31174,7 +31358,7 @@
     "Planetologist starter skills": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 955,
+        "line": 963,
         "nearby": [
           "Trooper starter skills",
           "Mentat starter skills",
@@ -31208,7 +31392,7 @@
     "Player": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 277,
+        "line": 285,
         "nearby": [
           "Repair Landsraad Quests",
           "Repair Quests",
@@ -31218,7 +31402,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 690,
+        "line": 698,
         "nearby": [
           "Complete Journey Node",
           "Complete",
@@ -31228,7 +31412,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 714,
+        "line": 722,
         "nearby": [
           "Reset Journey Node",
           "Reset",
@@ -31238,7 +31422,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1351,
+        "line": 1359,
         "nearby": [
           "Repair Login Queue",
           "Repair Queue",
@@ -31247,7 +31431,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1365,
+        "line": 1373,
         "nearby": [
           "Unban Player",
           "Ban Player"
@@ -31255,7 +31439,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1375,
+        "line": 1383,
         "nearby": [
           "Ban Player",
           "Enforcement",
@@ -31264,7 +31448,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 444,
+        "line": 445,
         "nearby": [
           "Package",
           "Name Required",
@@ -31274,7 +31458,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 458,
+        "line": 459,
         "nearby": [
           "Grant",
           "Package",
@@ -31284,11 +31468,12 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 504,
+        "line": 505,
         "nearby": [
           "Retry",
           "Package",
-          "No Care Package grants have been recorded yet."
+          "No Care Package grants have been recorded yet.",
+          "Raw Care Package JSON"
         ]
       },
       {
@@ -31325,7 +31510,7 @@
     "Player Admin Actions": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "Blueprints",
           "Loading Bases",
@@ -31337,7 +31522,7 @@
     "Player admin layout": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1152,
+        "line": 1160,
         "nearby": [
           "Read-only",
           "Loading journey data...",
@@ -31349,7 +31534,7 @@
     "Player admin sections": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1155,
+        "line": 1163,
         "nearby": [
           "Player Summary",
           "Close",
@@ -31534,7 +31719,7 @@
     "Player Summary": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1153,
+        "line": 1161,
         "nearby": [
           "Loading journey data...",
           "Player admin layout",
@@ -31655,7 +31840,7 @@
     "Please make sure the Funcom token belongs to the current Battlegroup ID, then save it again.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1614,
+        "line": 1618,
         "nearby": [
           "The token was saved, but the server did not become fully ready. Check Server Control status and logs.",
           "Authorization Failed"
@@ -31663,7 +31848,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1623,
+        "line": 1627,
         "nearby": [
           "Authorization Failed",
           "Unset",
@@ -31674,7 +31859,7 @@
     "Population": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1927,
+        "line": 1931,
         "nearby": [
           "Server IP",
           "Battlegroup",
@@ -31822,7 +32007,7 @@
     "Postgres version": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 478,
+        "line": 479,
         "nearby": [
           "Database Status",
           "Checking the database connection...",
@@ -32029,7 +32214,7 @@
     "Preview": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1176,
+        "line": 1184,
         "nearby": [
           "Add Item",
           "Grade 0 items and Grade 0 physical schematics use the live grant path and require the player to be online. Item Grades 1-5, ranked schematics, standalone augments, and pre-augmented items use database grants; relog after granting to an online player.",
@@ -32039,7 +32224,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 368,
+        "line": 369,
         "nearby": [
           "Add Item",
           "Care Package items are granted as live-safe Grade 0 rewards. Use Give Items for graded or augmented gear.",
@@ -32081,7 +32266,7 @@
     "Preview failed:": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 524,
+        "line": 525,
         "nearby": [
           "No table selected. Select a table to preview and edit rows.",
           "Loading table page...",
@@ -32187,7 +32372,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 539,
+        "line": 540,
         "nearby": [
           "Rows",
           "First",
@@ -32473,7 +32658,7 @@
     "Public IP bind detected": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1735,
+        "line": 1739,
         "nearby": [
           "Clean Build Cache",
           "Diagnostic Note",
@@ -32717,7 +32902,7 @@
     "Quantity": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1175,
+        "line": 1183,
         "nearby": [
           "Give Items",
           "Selected Item",
@@ -32727,7 +32912,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1176,
+        "line": 1184,
         "nearby": [
           "Item Name",
           "Item ID",
@@ -32737,7 +32922,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 359,
+        "line": 360,
         "nearby": [
           "Select Items",
           "Selected Item",
@@ -32747,7 +32932,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 368,
+        "line": 369,
         "nearby": [
           "Item Name",
           "Item ID",
@@ -32805,7 +32990,7 @@
     "Query completed. Rows affected:": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 601,
+        "line": 602,
         "nearby": [
           "Run Query",
           "Export Query JSON"
@@ -32815,7 +33000,7 @@
     "Queue": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1352,
+        "line": 1360,
         "nearby": [
           "Repair Queue",
           "Player",
@@ -33096,9 +33281,9 @@
     "Raw Care Package JSON": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 514,
+        "line": 515,
         "nearby": [
-          "Retry",
+          "Player",
           "No Care Package grants have been recorded yet.",
           "Care Package save failed.",
           "Unknown Package"
@@ -33120,7 +33305,7 @@
     "Read-only": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1119,
+        "line": 1127,
         "nearby": [
           "Reset",
           "The game manages related rewards, schematics, and tags.",
@@ -33215,7 +33400,7 @@
     "Readiness is unavailable right now. The server may be starting, stopping, or stopped.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2491,
+        "line": 2495,
         "nearby": [
           "Stopped",
           "Docker status is unavailable. Check that Docker is running and the web admin has access.",
@@ -33249,7 +33434,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2789,
+        "line": 2793,
         "nearby": [
           "Failed",
           "Attention Needed",
@@ -33290,7 +33475,7 @@
     "Reason": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1480,
+        "line": 1484,
         "nearby": [
           "Target",
           "Source",
@@ -33335,7 +33520,7 @@
     "Recipe unlocks require the player to be offline. The Grade shown is the recipe grade found in the game database.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1189,
+        "line": 1197,
         "nearby": [
           "No character actions have been recorded in this layout yet.",
           "Crafting Schematics",
@@ -33451,7 +33636,7 @@
     "Recover Character": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 310,
+        "line": 318,
         "nearby": [
           "Player",
           "Recover Deleted Character",
@@ -33461,7 +33646,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "Items ·",
           "Unknown Date",
@@ -33473,7 +33658,7 @@
     "Recover Deleted Character": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 309,
+        "line": 317,
         "nearby": [
           "Repair Quests",
           "Player",
@@ -33483,7 +33668,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "Use this area for player maintenance and high-impact admin actions. Some actions require the player to be online, while database repairs require the player to be offline.",
           "Repair",
@@ -33495,7 +33680,7 @@
     "Recover From": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 314,
+        "line": 322,
         "nearby": [
           "Recover Character",
           "Current Character",
@@ -33539,7 +33724,7 @@
     "RedBlink#75570": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 478,
+        "line": 479,
         "nearby": [
           "Advanced manual player ID override",
           "Admin action ID",
@@ -33664,7 +33849,7 @@
     "Refill Container": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1163,
+        "line": 1171,
         "nearby": [
           "Player admin sections",
           "Give Water",
@@ -33886,7 +34071,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1475,
+        "line": 1479,
         "nearby": [
           "Services",
           "Refreshing",
@@ -33978,7 +34163,7 @@
     "Refresh Addons": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 235,
+        "line": 237,
         "nearby": [
           "For Developers",
           "Refreshing...",
@@ -34134,7 +34319,7 @@
     "Refresh Tables": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 454,
+        "line": 455,
         "nearby": [
           "Database Browser",
           "Database edits may require relog or map/server restart.",
@@ -34156,7 +34341,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1475,
+        "line": 1479,
         "nearby": [
           "Maps",
           "Services",
@@ -34200,7 +34385,7 @@
     "Refreshing...": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 235,
+        "line": 237,
         "nearby": [
           "Experimental: Permissioned",
           "For Developers",
@@ -34234,7 +34419,7 @@
     "Region": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1923,
+        "line": 1927,
         "nearby": [
           "Overall",
           "Title",
@@ -34366,7 +34551,7 @@
     "Reload": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1198,
+        "line": 1206,
         "nearby": [
           "Detected",
           "Loading...",
@@ -34376,7 +34561,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1226,
+        "line": 1234,
         "nearby": [
           "All Product Groups",
           "Loading...",
@@ -34386,7 +34571,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1257,
+        "line": 1265,
         "nearby": [
           "Restore Starter Skills",
           "Loading...",
@@ -34489,7 +34674,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1178,
+        "line": 1186,
         "nearby": [
           "Cancel",
           "Edit",
@@ -34499,7 +34684,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 375,
+        "line": 376,
         "nearby": [
           "Cancel",
           "Edit",
@@ -34776,7 +34961,7 @@
     "Repair": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "Player Admin Actions",
           "Use this area for player maintenance and high-impact admin actions. Some actions require the player to be online, while database repairs require the player to be offline.",
@@ -34788,7 +34973,7 @@
     "Repair Below": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1310,
+        "line": 1318,
         "nearby": [
           "About Repair Vehicle Durability",
           "Repairs owned vehicle modules whose current durability is below the selected percentage of a trustworthy stored or inferred maximum. Modules without usable current durability or a trustworthy maximum are skipped. Affected running map servers restart so their in-memory vehicle state cannot overwrite the repair.",
@@ -34800,7 +34985,7 @@
     "Repair Faction": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "Unknown Date",
           "Recover Character",
@@ -34822,7 +35007,7 @@
     "Repair Gear": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "Repairs recognized stuck Landsraad quest states. A safety backup is created when needed.",
           "Repair Quests",
@@ -34832,7 +35017,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1310,
+        "line": 1318,
         "nearby": [
           "The player must be offline.",
           "Equipped and carried gear durability. Relog required.",
@@ -34844,7 +35029,7 @@
     "Repair Landsraad Quests": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 275,
+        "line": 283,
         "nearby": [
           "Solari Credit",
           "Scrip",
@@ -34854,7 +35039,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "Restores earned story progression and synchronizes reputation. Relog required.",
           "Repair Faction",
@@ -34866,7 +35051,7 @@
     "Repair Login Queue": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1347,
+        "line": 1355,
         "nearby": [
           "Repair Vehicles",
           "Danger Zone",
@@ -34876,7 +35061,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1356,
+        "line": 1364,
         "nearby": [
           "Player",
           "Queue",
@@ -34888,7 +35073,7 @@
     "Repair Quests": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 276,
+        "line": 284,
         "nearby": [
           "Scrip",
           "Repair Landsraad Quests",
@@ -34898,7 +35083,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "The player must be offline.",
           "Repairs recognized stuck Landsraad quest states. A safety backup is created when needed.",
@@ -34909,7 +35094,7 @@
     "Repair Queue": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1348,
+        "line": 1356,
         "nearby": [
           "Danger Zone",
           "Repair Login Queue",
@@ -34921,7 +35106,7 @@
     "Repair Unlock": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1049,
+        "line": 1057,
         "nearby": [
           "Researched",
           "Group Entry",
@@ -34933,7 +35118,7 @@
     "Repair Vehicle Durability": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1310,
+        "line": 1318,
         "nearby": [
           "Equipped and carried gear durability. Relog required.",
           "Repair Gear",
@@ -34943,7 +35128,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1317,
+        "line": 1325,
         "nearby": [
           "The player must be offline.",
           "Repairs eligible modules and restarts only their affected running maps.",
@@ -34955,7 +35140,7 @@
     "Repair Vehicles": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1318,
+        "line": 1326,
         "nearby": [
           "Repairs eligible modules and restarts only their affected running maps.",
           "Repair Vehicle Durability",
@@ -34965,7 +35150,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1345,
+        "line": 1353,
         "nearby": [
           "Threshold",
           "Map Servers",
@@ -34977,7 +35162,7 @@
     "Repairing...": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1049,
+        "line": 1057,
         "nearby": [
           "Unlock",
           "Group markers cannot be safely unlocked as one entry. Unlock the individual Recipe or Building entries.",
@@ -35001,7 +35186,7 @@
     "Repairs eligible modules and restarts only their affected running maps.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1310,
+        "line": 1318,
         "nearby": [
           "Vehicle durability repair threshold percent",
           "The player must be offline.",
@@ -35013,7 +35198,7 @@
     "Repairs owned vehicle modules whose current durability is below the selected percentage of a trustworthy stored or inferred maximum. Modules without usable current durability or a trustworthy maximum are skipped. Affected running map servers restart so their in-memory vehicle state cannot overwrite the repair.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1310,
+        "line": 1318,
         "nearby": [
           "Repair Vehicle Durability",
           "About Repair Vehicle Durability",
@@ -35025,7 +35210,7 @@
     "Repairs recognized stuck Landsraad quest states. A safety backup is created when needed.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "Repair Landsraad Quests",
           "The player must be offline.",
@@ -35189,7 +35374,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1049,
+        "line": 1057,
         "nearby": [
           "Group Entry",
           "Repair Unlock",
@@ -35201,7 +35386,7 @@
     "Research Entr": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1222,
+        "line": 1230,
         "nearby": [
           "Clear",
           "{count0} of {count1}",
@@ -35213,7 +35398,7 @@
     "Research Schematics": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1214,
+        "line": 1222,
         "nearby": [
           "Loading...",
           "Reload",
@@ -35225,7 +35410,7 @@
     "Research unlocks require the player to be offline and add the linked build recipe. Existing incomplete unlocks show Repair Unlock. Group markers are informational; unlock their individual Recipe or Building entries.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1216,
+        "line": 1224,
         "nearby": [
           "Reload",
           "Research Schematics",
@@ -35237,7 +35422,7 @@
     "Researched": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1049,
+        "line": 1057,
         "nearby": [
           "Repairing...",
           "Researching...",
@@ -35249,7 +35434,7 @@
     "Researching...": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1049,
+        "line": 1057,
         "nearby": [
           "Group markers cannot be safely unlocked as one entry. Unlock the individual Recipe or Building entries.",
           "Repairing...",
@@ -35307,7 +35492,7 @@
     "Reset": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 712,
+        "line": 720,
         "nearby": [
           "Node",
           "Reset Journey Node",
@@ -35316,7 +35501,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1118,
+        "line": 1126,
         "nearby": [
           "Unknown",
           "Complete",
@@ -35396,7 +35581,7 @@
     "Reset Journey Node": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 711,
+        "line": 719,
         "nearby": [
           "Player",
           "Node",
@@ -35419,7 +35604,7 @@
     "Reset Progression": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1386,
+        "line": 1394,
         "nearby": [
           "Ban Player",
           "Wipe Inventory",
@@ -35628,12 +35813,12 @@
     "Restart History": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1466,
+        "line": 1468,
         "nearby": [
           "Paste new token",
           "Save Token",
           "Tracking begins after this update",
-          "Show"
+          "Last Battlegroup Restart"
         ]
       }
     ],
@@ -36054,7 +36239,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1563,
+        "line": 1567,
         "nearby": [
           "The token was saved, but the server restart failed. Check the task details and try again.",
           "Checking Funcom Token",
@@ -36063,7 +36248,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1594,
+        "line": 1598,
         "nearby": [
           "Funcom Token Changed Successfully",
           "The Funcom token was changed successfully and the server is up and running.",
@@ -36090,7 +36275,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 341,
+        "line": 342,
         "nearby": [
           "Passwords do not match.",
           "Changing Password...",
@@ -36178,7 +36363,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 984,
+        "line": 992,
         "nearby": [
           "Swordmaster starter skills",
           "Restore Starter Skills",
@@ -36502,7 +36687,7 @@
     "Restore Starter Skills": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 983,
+        "line": 991,
         "nearby": [
           "Bene Gesserit starter skills",
           "Swordmaster starter skills",
@@ -36512,7 +36697,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1256,
+        "line": 1264,
         "nearby": [
           "The player must be online to change skills or restore starter skills.",
           "Unsaved Change",
@@ -36582,7 +36767,7 @@
     "Restores earned story progression and synchronizes reputation. Relog required.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "Repair Faction",
           "The player must be offline.",
@@ -36593,7 +36778,7 @@
     "Restores the selected character's saved data while preserving the current Funcom identity. A safety backup and Sietch restart are included.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "The player must be offline.",
           "Checking deleted character history...",
@@ -36706,17 +36891,17 @@
     "Result": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1099,
+        "line": 1107,
         "nearby": [
           "Status",
           "Tags",
           "Action",
-          "Unknown"
+          "Collapse"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1480,
+        "line": 1484,
         "nearby": [
           "Reason",
           "Duration",
@@ -36732,6 +36917,15 @@
           "Code",
           "Item",
           "Grade"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 40,
+        "nearby": [
+          "Player",
+          "Package",
+          "Details"
         ]
       },
       {
@@ -36781,22 +36975,12 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 501,
+        "line": 502,
         "nearby": [
           "Clear",
           "Retry Grant",
           "Package",
           "Player"
-        ]
-      },
-      {
-        "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 509,
-        "nearby": [
-          "Package",
-          "Player",
-          "No Care Package grants have been recorded yet.",
-          "Raw Care Package JSON"
         ]
       },
       {
@@ -36817,6 +37001,14 @@
           "Loading Contents…",
           "Cargo contents are unsupported by the detected schema.",
           "That vehicle has no cargo hold."
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 96,
+        "nearby": [
+          "Failed",
+          "Close"
         ]
       },
       {
@@ -36912,7 +37104,7 @@
     "Retry Grant": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 500,
+        "line": 501,
         "nearby": [
           "Grant History",
           "Clear",
@@ -37171,7 +37363,7 @@
     "Row Save Failed": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 376,
+        "line": 377,
         "nearby": [
           "Saving Row...",
           "Row Saved Successfully",
@@ -37180,7 +37372,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 378,
+        "line": 379,
         "nearby": [
           "The row was not updated. Refresh the table and try again.",
           "Database Browser",
@@ -37191,7 +37383,7 @@
     "Row Saved Successfully": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 375,
+        "line": 376,
         "nearby": [
           "Password Change Failed",
           "Saving Row...",
@@ -37273,7 +37465,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 535,
+        "line": 536,
         "nearby": [
           "of",
           "rows.",
@@ -37325,7 +37517,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 532,
+        "line": 533,
         "nearby": [
           "Showing",
           "of",
@@ -37337,7 +37529,7 @@
     "Rule": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 433,
+        "line": 434,
         "nearby": [
           "Days Ago",
           "Create Rule",
@@ -37478,7 +37670,7 @@
     "Run Query": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 597,
+        "line": 598,
         "nearby": [
           "Expand Advanced SQL Console",
           "Advanced SQL Console",
@@ -37550,7 +37742,7 @@
     "Run the command on the computer running DBeaver": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 491,
+        "line": 492,
         "nearby": [
           "unless another application on your computer already uses it. This does not change the server’s database port.",
           "Local Port",
@@ -37794,7 +37986,7 @@
     "Sandbike": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1398,
+        "line": 1406,
         "nearby": [
           "Advanced manual override",
           "Manual Vehicle ID",
@@ -37868,7 +38060,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1178,
+        "line": 1186,
         "nearby": [
           "Aug. Grade",
           "Actions",
@@ -37878,7 +38070,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1273,
+        "line": 1281,
         "nearby": [
           "Reload",
           "Leave empty for now.",
@@ -37888,7 +38080,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 370,
+        "line": 371,
         "nearby": [
           "Quantity",
           "Actions",
@@ -37898,7 +38090,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 382,
+        "line": 383,
         "nearby": [
           "Package Items",
           "Save Package",
@@ -38205,7 +38397,7 @@
     "Save Package": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 381,
+        "line": 382,
         "nearby": [
           "One item per line: item name or raw item ID, quantity. Extra legacy grade or augment columns are ignored for Care Packages.",
           "Package Items",
@@ -38215,7 +38407,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 395,
+        "line": 396,
         "nearby": [
           "Package was saved successfully.",
           "Package Save Failed.",
@@ -38227,7 +38419,7 @@
     "Save Password": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 461,
+        "line": 462,
         "nearby": [
           "Confirm Password",
           "Confirm password",
@@ -38299,7 +38491,7 @@
     "Save Row": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 569,
+        "line": 570,
         "nearby": [
           "Edit Row",
           "Open Large JSON Editor",
@@ -38464,7 +38656,7 @@
     "Saving Auto Grant...": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 134,
+        "line": 135,
         "nearby": [
           "Creating Package...",
           "Saving Package..."
@@ -38533,7 +38725,7 @@
     "Saving Package...": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 134,
+        "line": 135,
         "nearby": [
           "Saving Auto Grant...",
           "Creating Package...",
@@ -38543,7 +38735,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 385,
+        "line": 386,
         "nearby": [
           "Save",
           "Package",
@@ -38579,7 +38771,7 @@
     "Saving Row...": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 357,
+        "line": 358,
         "nearby": [
           "Restarting Server...",
           "Password Change Failed",
@@ -39075,7 +39267,7 @@
     "Schematic": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1195,
+        "line": 1203,
         "nearby": [
           "Clear",
           "{count0} of {count1}",
@@ -39099,7 +39291,7 @@
     "Scrip": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 185,
+        "line": 193,
         "nearby": [
           "Admin",
           "Solari Credit",
@@ -39210,7 +39402,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 527,
+        "line": 528,
         "nearby": [
           "Preview failed:",
           "Search columns, or column='value' and/or ...",
@@ -39220,7 +39412,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 585,
+        "line": 586,
         "nearby": [
           "Search Tables and Columns",
           "Search tables or columns",
@@ -39320,7 +39512,7 @@
     "Search columns, or column='value' and/or ...": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 526,
+        "line": 527,
         "nearby": [
           "Loading table page...",
           "Preview failed:",
@@ -39497,7 +39689,7 @@
     "Search table names": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 514,
+        "line": 515,
         "nearby": [
           "The console is using a non-loopback database connection, so tunnel instructions are unavailable. No public binding will be created automatically.",
           "Tables",
@@ -39509,7 +39701,7 @@
     "Search Tables and Columns": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 584,
+        "line": 585,
         "nearby": [
           "Save Row",
           "Cancel",
@@ -39521,7 +39713,7 @@
     "Search tables or columns": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 585,
+        "line": 586,
         "nearby": [
           "Cancel",
           "Search Tables and Columns",
@@ -39887,7 +40079,7 @@
     "Select Items": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 353,
+        "line": 354,
         "nearby": [
           "Collapse Select Items",
           "Expand Select Items",
@@ -39945,7 +40137,7 @@
     "Select Package": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 342,
+        "line": 343,
         "nearby": [
           "New package",
           "Add Package",
@@ -39957,7 +40149,7 @@
     "Select player": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 445,
+        "line": 446,
         "nearby": [
           "Name Required",
           "Player",
@@ -39969,7 +40161,7 @@
     "Select PostgreSQL and use these values. Leave DBeaver’s built-in SSH tab disabled because the separate terminal already provides the tunnel.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 497,
+        "line": 498,
         "nearby": [
           "Optional Windows check",
           "Connect DBeaver to PostgreSQL",
@@ -40023,7 +40215,7 @@
     "Selected Item": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1175,
+        "line": 1183,
         "nearby": [
           "Faction Reputation affects rank, but Ranks 1–5 also require faction story progression. The player must be offline so the reputation used by vendors can be updated safely.",
           "Give Items",
@@ -40033,7 +40225,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 358,
+        "line": 359,
         "nearby": [
           "Expand Select Items",
           "Select Items",
@@ -40045,7 +40237,7 @@
     "Selected player has no Admin action ID, so CLI-backed grants are disabled.": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 475,
+        "line": 476,
         "nearby": [
           "Player",
           "Grant Package",
@@ -40103,7 +40295,7 @@
       },
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 351,
+        "line": 352,
         "nearby": [
           "Grant",
           "XP",
@@ -40317,7 +40509,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1925,
+        "line": 1929,
         "nearby": [
           "Region",
           "Mode",
@@ -40434,7 +40626,7 @@
     "Server status is unavailable.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2493,
+        "line": 2497,
         "nearby": [
           "Readiness is unavailable right now. The server may be starting, stopping, or stopped.",
           "Server status is unavailable. Refresh again or check Services and Logs if it persists.",
@@ -40446,7 +40638,7 @@
     "Server status is unavailable. Refresh again or check Services and Logs if it persists.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2492,
+        "line": 2496,
         "nearby": [
           "Docker status is unavailable. Check that Docker is running and the web admin has access.",
           "Readiness is unavailable right now. The server may be starting, stopping, or stopped.",
@@ -40546,7 +40738,7 @@
     "Services": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1473,
+        "line": 1477,
         "nearby": [
           "Battlegroup",
           "Maps",
@@ -40982,10 +41174,10 @@
     "Show": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1469,
+        "line": 1473,
         "nearby": [
-          "Restart History",
           "Tracking begins after this update",
+          "Last Battlegroup Restart",
           "All Restarts",
           "Battlegroup"
         ]
@@ -41139,7 +41331,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 532,
+        "line": 533,
         "nearby": [
           "Search",
           "Clear",
@@ -41269,7 +41461,7 @@
     "Sietch": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 317,
+        "line": 325,
         "nearby": [
           "Detected Event",
           "Items Retained",
@@ -41488,7 +41680,7 @@
     "Skill Browser": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1251,
+        "line": 1259,
         "nearby": [
           "Reload",
           "Skill Point Controls",
@@ -41500,7 +41692,7 @@
     "Skill Point Controls": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1247,
+        "line": 1255,
         "nearby": [
           "Loading...",
           "Reload",
@@ -41690,7 +41882,7 @@
     "Solari Credit": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 185,
+        "line": 193,
         "nearby": [
           "Vehicles",
           "Admin",
@@ -41772,12 +41964,22 @@
     "Source": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1480,
+        "line": 1484,
         "nearby": [
           "Type",
           "Target",
           "Reason",
           "Duration"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 82,
+        "nearby": [
+          "Package",
+          "Completed",
+          "Succeeded",
+          "Failed"
         ]
       },
       {
@@ -41794,7 +41996,7 @@
     "Spawn": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1398,
+        "line": 1406,
         "nearby": [
           "Manual Vehicle ID",
           "Manual Template",
@@ -41805,7 +42007,7 @@
     "Spawn Vehicle": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1386,
+        "line": 1394,
         "nearby": [
           "Reset Progression",
           "Movement / Vehicles",
@@ -41945,7 +42147,7 @@
     "SSH Tunnel Access": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 454,
+        "line": 455,
         "nearby": [
           "Checking...",
           "Status",
@@ -41955,7 +42157,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 481,
+        "line": 482,
         "nearby": [
           "Checking the database connection...",
           "Postgres version",
@@ -41967,7 +42169,7 @@
     "SSH tunnel command": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 492,
+        "line": 493,
         "nearby": [
           "with the server’s SSH username and",
           "with its LAN IP, VPN address, hostname, or public SSH address.",
@@ -42136,7 +42338,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2328,
+        "line": 2332,
         "nearby": [
           "Population",
           "Not Installed",
@@ -42308,17 +42510,17 @@
     "Status": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 301,
+        "line": 300,
         "nearby": [
           "Version",
           "Permissions",
           "Actions",
-          "Sub-Menu"
+          "Working"
         ]
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1073,
+        "line": 1081,
         "nearby": [
           "Type",
           "Depends On",
@@ -42358,7 +42560,7 @@
       },
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 454,
+        "line": 455,
         "nearby": [
           "Change Password",
           "Checking...",
@@ -42493,7 +42695,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2335,
+        "line": 2339,
         "nearby": [
           "Not Installed",
           "Starting",
@@ -42503,7 +42705,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2456,
+        "line": 2460,
         "nearby": [
           "Failed",
           "Warming",
@@ -42753,12 +42955,11 @@
     "Sub-Menu": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 301,
+        "line": 324,
         "nearby": [
-          "Status",
-          "Actions",
-          "Working",
-          "Enabled"
+          "Uninstall",
+          "ON",
+          "OFF"
         ]
       }
     ],
@@ -42783,6 +42984,40 @@
           "Only this phrase, your correction, and the optional credit name will be sent to DuneDocker for review.",
           "Submit Correction",
           "Choose the language for this browser. Translations are included with project updates."
+        ]
+      }
+    ],
+    "Succeeded": [
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 23,
+        "nearby": [
+          "Failed"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 27,
+        "nearby": [
+          "Failed"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 28,
+        "nearby": [
+          "Failed",
+          "Unknown"
+        ]
+      },
+      {
+        "file": "console/web/src/features/carePackage/CarePackageGrantHistory.tsx",
+        "line": 89,
+        "nearby": [
+          "Completed",
+          "Source",
+          "Failed",
+          "Close"
         ]
       }
     ],
@@ -42913,7 +43148,7 @@
     "Swordmaster starter skills": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 969,
+        "line": 977,
         "nearby": [
           "Planetologist starter skills",
           "Bene Gesserit starter skills",
@@ -43043,7 +43278,7 @@
     "T1_ExtraSeat": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1398,
+        "line": 1406,
         "nearby": [
           "Sandbike",
           "Manual Template",
@@ -43066,7 +43301,7 @@
     "Table Preview": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 520,
+        "line": 521,
         "nearby": [
           "Clear",
           "No matching tables found.",
@@ -43078,7 +43313,7 @@
     "Tables": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 512,
+        "line": 513,
         "nearby": [
           "on your router.",
           "The console is using a non-loopback database connection, so tunnel instructions are unavailable. No public binding will be created automatically.",
@@ -43100,7 +43335,7 @@
     "Tags": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1074,
+        "line": 1082,
         "nearby": [
           "Depends On",
           "Status",
@@ -43134,7 +43369,7 @@
     "Target": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1480,
+        "line": 1484,
         "nearby": [
           "Completed",
           "Type",
@@ -43941,7 +44176,7 @@
     "The console is using a non-loopback database connection, so tunnel instructions are unavailable. No public binding will be created automatically.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 510,
+        "line": 511,
         "nearby": [
           "use a VPN address or an SSH-reachable public hostname. Never forward or expose PostgreSQL port",
           "on your router.",
@@ -44053,7 +44288,7 @@
     "The default password is \"dune\".": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 457,
+        "line": 458,
         "nearby": [
           "SSH Tunnel Access",
           "Change Database Password",
@@ -44113,7 +44348,7 @@
     "The Funcom token was changed successfully and the server is up and running.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1587,
+        "line": 1591,
         "nearby": [
           "Checking Funcom Token",
           "Funcom Token Changed Successfully",
@@ -44137,7 +44372,7 @@
     "The game manages related rewards, schematics, and tags.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1119,
+        "line": 1127,
         "nearby": [
           "Complete",
           "Reset",
@@ -44487,7 +44722,7 @@
     "The player must be offline.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "Repair",
           "Recover Deleted Character",
@@ -44497,7 +44732,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1310,
+        "line": 1318,
         "nearby": [
           "Repair Below",
           "Vehicle durability repair threshold percent",
@@ -44509,7 +44744,7 @@
     "The player must be online to change skills or restore starter skills.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1253,
+        "line": 1261,
         "nearby": [
           "Skill Browser",
           "Use Restore Starter Skills after a progression reset leaves the starting tree locked.",
@@ -44531,7 +44766,7 @@
     "The row was not updated. Refresh the table and try again.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 376,
+        "line": 377,
         "nearby": [
           "Row Saved Successfully",
           "Row Save Failed",
@@ -44598,7 +44833,7 @@
     "The token was saved, but the server did not become fully ready. Check Server Control status and logs.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1605,
+        "line": 1609,
         "nearby": [
           "Restarting Server",
           "Funcom Token Change Needs Review",
@@ -44619,7 +44854,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1550,
+        "line": 1554,
         "nearby": [
           "{count0}m",
           "Funcom Token Change Failed",
@@ -44816,9 +45051,9 @@
     "This addon is deprecated and may stop receiving updates.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 450,
+        "line": 460,
         "nearby": [
-          "Details",
+          "More",
           "This addon is installed locally but is no longer listed in the community catalog.",
           "This addon is no longer supported by its maintainer.",
           "This addon was removed from the community catalog."
@@ -44828,10 +45063,10 @@
     "This addon is installed locally but is no longer listed in the community catalog.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 449,
+        "line": 459,
         "nearby": [
-          "Unknown",
-          "Details",
+          "Less",
+          "More",
           "This addon is deprecated and may stop receiving updates.",
           "This addon is no longer supported by its maintainer."
         ]
@@ -44840,7 +45075,7 @@
     "This addon is no longer supported by its maintainer.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 451,
+        "line": 461,
         "nearby": [
           "This addon is installed locally but is no longer listed in the community catalog.",
           "This addon is deprecated and may stop receiving updates.",
@@ -44852,7 +45087,7 @@
     "This addon was blocked for safety and cannot be installed or opened.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 453,
+        "line": 463,
         "nearby": [
           "This addon is no longer supported by its maintainer.",
           "This addon was removed from the community catalog.",
@@ -44863,7 +45098,7 @@
     "This addon was removed from the community catalog.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 452,
+        "line": 462,
         "nearby": [
           "This addon is deprecated and may stop receiving updates.",
           "This addon is no longer supported by its maintainer.",
@@ -45161,9 +45396,9 @@
     "This pinned addon is not installed, enabled, or fully loaded yet.": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 230,
+        "line": 232,
         "nearby": [
-          "Uninstall Failed",
+          "Loading...",
           "Addon unavailable.",
           "Addons",
           "Experimental: Permissioned"
@@ -45311,7 +45546,7 @@
     "This table has no rows to preview.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 551,
+        "line": 552,
         "nearby": [
           "Edit",
           "No matching rows found.",
@@ -45355,7 +45590,7 @@
     "Threshold": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1320,
+        "line": 1328,
         "nearby": [
           "Repair Vehicle Durability",
           "Repair Vehicles",
@@ -45453,7 +45688,7 @@
     "Title": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1922,
+        "line": 1926,
         "nearby": [
           "Token Mismatch Detected",
           "Overall",
@@ -45571,7 +45806,7 @@
     "Token Mismatch Detected": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1899,
+        "line": 1903,
         "nearby": [
           "Unused Docker build cache can be cleaned",
           "Diagnostic Warning",
@@ -45751,12 +45986,12 @@
     "Tracking begins after this update": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1466,
+        "line": 1468,
         "nearby": [
           "Save Token",
           "Restart History",
-          "Show",
-          "All Restarts"
+          "Last Battlegroup Restart",
+          "Show"
         ]
       }
     ],
@@ -45947,7 +46182,7 @@
     "Trooper starter skills": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 941,
+        "line": 949,
         "nearby": [
           "Node",
           "Type:",
@@ -46032,7 +46267,7 @@
     "Type": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1070,
+        "line": 1078,
         "nearby": [
           "Research",
           "Name",
@@ -46042,22 +46277,12 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1480,
+        "line": 1484,
         "nearby": [
           "No matching restarts have been recorded yet.",
           "Completed",
           "Target",
           "Source"
-        ]
-      },
-      {
-        "file": "console/web/src/features/bases/BaseChildPermissionsTab.tsx",
-        "line": 307,
-        "nearby": [
-          "Pieces ·",
-          "not Sub-Fief",
-          "All Types",
-          "Clear"
         ]
       },
       {
@@ -46089,6 +46314,16 @@
           "Returns",
           "Loading functions and procedures..."
         ]
+      },
+      {
+        "file": "console/web/src/features/bases/BaseChildPermissionsTab.tsx",
+        "line": 307,
+        "nearby": [
+          "Pieces ·",
+          "not Sub-Fief",
+          "All Types",
+          "Clear"
+        ]
       }
     ],
     "Type to search fillable items…": [
@@ -46118,7 +46353,7 @@
     "Type:": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 831,
+        "line": 839,
         "nearby": [
           "Player",
           "Node",
@@ -46204,7 +46439,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2752,
+        "line": 2756,
         "nearby": [
           "Unknown",
           "Needs Review"
@@ -46212,7 +46447,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2753,
+        "line": 2757,
         "nearby": [
           "Needs Review",
           "Unknown",
@@ -46242,7 +46477,7 @@
     "Unban Player": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1362,
+        "line": 1370,
         "nearby": [
           "Repair Login Queue",
           "Kick Player",
@@ -46251,7 +46486,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1363,
+        "line": 1371,
         "nearby": [
           "Kick Player",
           "Player",
@@ -46260,7 +46495,7 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1380,
+        "line": 1388,
         "nearby": [
           "Player",
           "Enforcement",
@@ -46307,7 +46542,7 @@
     "Uninstall": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 118,
+        "line": 120,
         "nearby": [
           "Enable Failed",
           "Disable Failed",
@@ -46317,31 +46552,30 @@
       },
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 323,
+        "line": 322,
         "nearby": [
           "Close",
           "Open",
-          "ON",
-          "OFF"
+          "Sub-Menu"
         ]
       }
     ],
     "Uninstall Failed": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 128,
+        "line": 130,
         "nearby": [
           "Uninstall",
           "Addon Uninstalled",
-          "Addon unavailable.",
-          "This pinned addon is not installed, enabled, or fully loaded yet."
+          "Loading...",
+          "Addon unavailable."
         ]
       }
     ],
     "Unique schematics": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1181,
+        "line": 1189,
         "nearby": [
           "Character",
           "Loadout",
@@ -46411,12 +46645,12 @@
     "Unknown": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 392,
+        "line": 390,
         "nearby": [
           "Open addon source on GitHub",
           "None",
           "Details",
-          "This addon is installed locally but is no longer listed in the community catalog."
+          "Less"
         ]
       },
       {
@@ -46457,10 +46691,10 @@
       },
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1110,
+        "line": 1118,
         "nearby": [
-          "Result",
-          "Action",
+          "Collapse",
+          "Expand",
           "Complete",
           "Reset"
         ]
@@ -46492,7 +46726,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1497,
+        "line": 1501,
         "nearby": [
           "Result",
           "Partition",
@@ -46502,7 +46736,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2507,
+        "line": 2511,
         "nearby": [
           "Server status is unavailable. Refresh again or check Services and Logs if it persists.",
           "Server status is unavailable.",
@@ -46511,7 +46745,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2578,
+        "line": 2582,
         "nearby": [
           "Needs Review"
         ]
@@ -46520,7 +46754,7 @@
     "Unknown Date": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "Deleted character to recover",
           "Items ·",
@@ -46580,7 +46814,7 @@
     "Unknown Package": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 575,
+        "line": 576,
         "nearby": [
           "Raw Care Package JSON",
           "Care Package save failed.",
@@ -46604,7 +46838,7 @@
     "unless another application on your computer already uses it. This does not change the server’s database port.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 488,
+        "line": 489,
         "nearby": [
           "Choose a port on your computer",
           "Keep",
@@ -46616,7 +46850,7 @@
     "Unlock": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1028,
+        "line": 1036,
         "nearby": [
           "Unlocking...",
           "Unlocked",
@@ -46628,7 +46862,7 @@
     "Unlocked": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1028,
+        "line": 1036,
         "nearby": [
           "Modules",
           "Unlocking...",
@@ -46649,7 +46883,7 @@
     "Unlocking...": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1028,
+        "line": 1036,
         "nearby": [
           "Restore",
           "Modules",
@@ -46731,7 +46965,7 @@
     "Unsaved Change": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1255,
+        "line": 1263,
         "nearby": [
           "Use Restore Starter Skills after a progression reset leaves the starting tree locked.",
           "The player must be online to change skills or restore starter skills.",
@@ -46862,7 +47096,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1664,
+        "line": 1668,
         "nearby": [
           "Authorization Failed",
           "Please make sure the Funcom token belongs to the current Battlegroup ID, then save it again.",
@@ -46874,7 +47108,7 @@
     "Unused Docker build cache can be cleaned": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1765,
+        "line": 1769,
         "nearby": [
           "Advertised IP Warning",
           "Obsolete Docker images can be cleaned",
@@ -46951,7 +47185,7 @@
     "Update": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 321,
+        "line": 320,
         "nearby": [
           "Install",
           "Updating...",
@@ -46975,7 +47209,7 @@
     "Update Addon": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 84,
+        "line": 86,
         "nearby": [
           "Install Failed",
           "Update Blocked",
@@ -47007,7 +47241,7 @@
     "Update Blocked": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 75,
+        "line": 77,
         "nearby": [
           "Addon Installed",
           "Install Failed",
@@ -47043,7 +47277,7 @@
     "Update Failed": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 93,
+        "line": 95,
         "nearby": [
           "Update Addon",
           "Addon Updated",
@@ -47254,7 +47488,7 @@
     "Updating...": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 321,
+        "line": 320,
         "nearby": [
           "Installing...",
           "Install",
@@ -47401,7 +47635,7 @@
     "use a VPN address or an SSH-reachable public hostname. Never forward or expose PostgreSQL port": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 507,
+        "line": 508,
         "nearby": [
           "Select PostgreSQL and use these values. Leave DBeaver’s built-in SSH tab disabled because the separate terminal already provides the tunnel.",
           "External access:",
@@ -47471,7 +47705,7 @@
     "Use Restore Starter Skills after a progression reset leaves the starting tree locked.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1253,
+        "line": 1261,
         "nearby": [
           "Skill Point Controls",
           "Skill Browser",
@@ -47483,7 +47717,7 @@
     "Use this area for player maintenance and high-impact admin actions. Some actions require the player to be online, while database repairs require the player to be offline.": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1297,
+        "line": 1305,
         "nearby": [
           "Loading Bases",
           "Player Admin Actions",
@@ -47755,7 +47989,7 @@
     "Vehicle durability repair threshold percent": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1310,
+        "line": 1318,
         "nearby": [
           "Repairs owned vehicle modules whose current durability is below the selected percentage of a trustworthy stored or inferred maximum. Modules without usable current durability or a trustworthy maximum are skipped. Affected running map servers restart so their in-memory vehicle state cannot overwrite the repair.",
           "Repair Below",
@@ -47977,10 +48211,10 @@
     "Version": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 301,
+        "line": 300,
         "nearby": [
+          "Addons",
           "Addon",
-          "Author",
           "Permissions",
           "Status"
         ]
@@ -48214,7 +48448,7 @@
     "Waiting": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2655,
+        "line": 2659,
         "nearby": [
           "Needs Review",
           "Warming",
@@ -48347,7 +48581,7 @@
     "Warming": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2455,
+        "line": 2459,
         "nearby": [
           "Info",
           "Failed",
@@ -48357,7 +48591,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2654,
+        "line": 2658,
         "nearby": [
           "{count0} of {count1}",
           "Needs Review",
@@ -48671,7 +48905,7 @@
     "when finished.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 494,
+        "line": 495,
         "nearby": [
           "Authenticate and keep the terminal open",
           "Enter the server’s SSH password when prompted. Password characters will not appear while typing. A blank terminal after login means the tunnel is active; close it with",
@@ -48738,7 +48972,7 @@
     "Wipe Inventory": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
-        "line": 1383,
+        "line": 1391,
         "nearby": [
           "Unban Player",
           "Ban Player",
@@ -48750,7 +48984,7 @@
     "with its LAN IP, VPN address, hostname, or public SSH address.": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 491,
+        "line": 492,
         "nearby": [
           "Do not run it inside the Dune server’s SSH terminal. Replace",
           "with the server’s SSH username and",
@@ -48774,7 +49008,7 @@
     "with the server’s SSH username and": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 491,
+        "line": 492,
         "nearby": [
           "Run the command on the computer running DBeaver",
           "Do not run it inside the Dune server’s SSH terminal. Replace",
@@ -48786,10 +49020,10 @@
     "Working": [
       {
         "file": "console/web/src/features/addons/AddonsPanel.tsx",
-        "line": 317,
+        "line": 316,
         "nearby": [
+          "Status",
           "Actions",
-          "Sub-Menu",
           "Enabled",
           "Disabled"
         ]
@@ -48871,7 +49105,7 @@
     "XP": [
       {
         "file": "console/web/src/features/carePackage/CarePackagePanel.tsx",
-        "line": 349,
+        "line": 350,
         "nearby": [
           "Enter package name",
           "Grant",
