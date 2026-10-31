@@ -220,6 +220,54 @@ test("status fixture exposes exact logical listeners and game servers", () => {
   assert.deepEqual(parseStatusGameServers(healthyStatusWithSections).map((row) => row.map), ["Survival_1", "Overmap"]);
 });
 
+// status.sh reports one row per expected always-on map server, not the two it
+// used to hardcode. The fixture above stays as the fresh-install shape; this is
+// the real dune2 roster, where two maps have a second partition and therefore a
+// "#<partition>" label.
+test("status game server parser reads a full always-on roster", () => {
+  const roster = `=== Game servers ===
+MAP                      STATE         UPTIME
+Survival_1               READY         Up 4 hours
+Survival_1#60            READY         Up 4 hours
+Overmap                  READY         Up 4 hours
+SH_Arrakeen              WARMING       Up 12 seconds
+DeepDesert_1             NOT RUNNING   missing
+DeepDesert_1#59          WAIT          pending
+
+Note: 6 always-on map servers expected, starting 2 at a time.`;
+
+  const rows = parseStatusGameServers(roster);
+
+  assert.deepEqual(rows.map((row) => row.map), [
+    "Survival_1",
+    "Survival_1#60",
+    "Overmap",
+    "SH_Arrakeen",
+    "DeepDesert_1",
+    "DeepDesert_1#59"
+  ]);
+  // "NOT RUNNING" contains a space, so it exercises the lazy group in the row
+  // regex rather than just the single-token states.
+  assert.deepEqual(rows.map((row) => row.state), [
+    "READY",
+    "READY",
+    "READY",
+    "WARMING",
+    "NOT RUNNING",
+    "WAIT"
+  ]);
+  assert.deepEqual(rows.map((row) => row.uptime), [
+    "Up 4 hours",
+    "Up 4 hours",
+    "Up 4 hours",
+    "Up 12 seconds",
+    "missing",
+    "pending"
+  ]);
+  // The concurrency note must not be mistaken for a map.
+  assert.equal(rows.length, 6);
+});
+
 test("server status response provides a typed contract and preserves command diagnostics", () => {
   const response = buildServerStatusResponse({ operation: "status", stdout: healthyStatusWithSections, stderr: "", exitCode: 0 });
   assert.equal(response.schemaVersion, 1);

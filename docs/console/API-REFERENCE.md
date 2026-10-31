@@ -56,9 +56,9 @@ Complete reference for all HTTP API endpoints in the Dune Docker Console. All en
 
 | Method | Route | Description | Parameters |
 |--------|-------|-------------|------------|
-| GET | `/api/server/status` | Structured server status and command diagnostics | `raw?` (`0` omits legacy command output) |
+| GET | `/api/server/status` | Structured server status and command diagnostics | `raw?` (`0` omits legacy command output), `fresh?` (`1` skips cached snapshots) |
 | GET | `/api/server/performance` | Performance snapshot (CPU, memory, disk) | None |
-| GET | `/api/server/readiness` | Service readiness check | None |
+| GET | `/api/server/readiness` | Service readiness check | `fresh?` (`1` skips cached snapshots) |
 | GET | `/api/server/ports` | List service ports | None |
 | GET | `/api/server/services` | List services and status | None |
 | GET | `/api/server/doctor` | Run diagnostic check | None |
@@ -122,7 +122,7 @@ When the Restart Queue is enabled, the restart routes above (`/api/server/restar
 }
 ```
 
-Unavailable numeric and boolean values are `null`, and unavailable collections are empty arrays. `ok` reports whether the underlying status command completed successfully; health is reported separately in `data.summary.overall`. The legacy `operation`, `stdout`, `stderr`, and `exitCode` fields remain available for command diagnostics and backward compatibility. Add `?raw=0` to omit those legacy fields and return only the compact structured response. Status snapshots are cached briefly and refreshed in the background so frequent integration polling does not repeatedly block on the same host checks.
+Unavailable numeric and boolean values are `null`, and unavailable collections are empty arrays. `ok` reports whether the underlying status command completed successfully; health is reported separately in `data.summary.overall`. The legacy `operation`, `stdout`, `stderr`, and `exitCode` fields remain available for command diagnostics and backward compatibility. Add `?raw=0` to omit those legacy fields and return only the compact structured response. Status snapshots are cached briefly and refreshed in the background so frequent integration polling does not repeatedly block on the same host checks. Add `?fresh=1` to wait for a current reading instead. Responses carry `sampledAt`, when the command actually ran (a cached answer keeps its original time), and `fromCache`; both are absent when the command failed. Starting, stopping or restarting the Battlegroup discards cached snapshots. `/api/server/readiness` takes the same `fresh` parameter and returns the same two fields.
 
 ---
 

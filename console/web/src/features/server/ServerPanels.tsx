@@ -1,22 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import { HomeHighlights } from "./HomeHighlights";
 import type { Dispatch, SetStateAction } from "react";
+import type { Tab } from "../../App";
 import { Play, Trash2 } from "lucide-react";
 import { serverApi, type PerformanceSnapshot, type RestartHistoryResponse, type RestartHistoryRow } from "../../api/server";
 import { ServerHostnameSetting, useServerHostname } from "./ServerHostnameSetting";
+import { getServerPorts } from "../../api/serverPorts";
 import { runGatedRestart, serviceRestartTarget, type RestartGate } from "./restartQueueGuard";
 import { setupApi, type Task } from "../../api/setup";
 import { PortChecklist } from "../../components/PortChecklist";
 import { ReadinessTimeline } from "../../components/ReadinessTimeline";
 import { SecretInput } from "../../components/SecretInput";
 import { KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/common/DisplayPrimitives";
-import { formatDisplayValue, formatUiSentence, friendlyColumnName, stripAnsi, summarizeCommandText, titleCase } from "../../lib/display";
+import { formatDisplayValue, formatUiSentence, friendlyColumnName, normalizeStatus, stripAnsi, summarizeCommandText, titleCase } from "../../lib/display";
 import { friendlyServiceName } from "../../lib/serviceDisplay";
 import { conciseTaskError, funcomTokenMismatchDetected } from "../../lib/taskDisplay";
 import { QueueBadges, queueCountsSummary, queueCountsTotal, type QueueCounts } from "../../components/common/QueueBadges";
 import { childAccessPieceCount, usePendingQueues } from "../../lib/usePendingRefills";
 
-export type HomeLoadResult = { statusLoaded: boolean; readinessLoaded: boolean; statusError: string; readinessError: string; statusText: string; readinessText: string };
+export type HomeLoadResult = { statusLoaded: boolean; readinessLoaded: boolean; statusError: string; readinessError: string; statusText: string; readinessText: string; sampledAtMs: number };
 export type HomeTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
 export type RestartLifecycleState = { stopObserved: boolean; startObserved: boolean };
 
@@ -114,7 +116,98 @@ export function isRestartLifecycleReady(action: "start" | "stop" | "restart" | "
   return action !== "restart" || state.startObserved;
 }
 
-export function HomePanel({ status, readiness, taskResult, setTaskResult, funcomTokenResult, setFuncomTokenResult, runningAction, restartStartObserved, setRunningAction, onLoad, confirmAction, restartGate }: {
+// Returned strings are the ones normalizeStatus() maps to
+// badge-pass / badge-warn / badge-fail, so StatusPill needs no change.
+export const PERFORMANCE_WARN_PERCENT = 75;
+export const PERFORMANCE_FAIL_PERCENT = 90;
+
+// `null` is "no reading yet", not "no percentage concept": the API returns null
+// routinely (cpuPercent needs two samples for a delta), and that must read INFO,
+// never OK. Cards with no percentage at all are excluded by the caller.
+export function performanceCardStatus(percent: number | null, sampled: boolean) {
+  if (!sampled || percent === null || !Number.isFinite(percent)) return "INFO";
+  // Nonsense rather than healthy -- must not fall through to OK.
+  if (percent < 0) return "INFO";
+  if (percent > PERFORMANCE_FAIL_PERCENT) return "FAILED";
+  if (percent >= PERFORMANCE_WARN_PERCENT) return "WARN";
+  return "OK";
+}
+
+export function performanceTrackTone(percent: number | null, sampled: boolean) {
+  const status = performanceCardStatus(percent, sampled);
+  if (status === "FAILED") return "metric-track-fail";
+  if (status === "WARN") return "metric-track-warn";
+  return "";
+}
+
+// Keyed on the stable row id, never the label. The label is display text and is
+// expected to change; the id is not. Keying on the label meant a rename silently
+// dropped the route -- the lookup fails closed, so the row simply stopped being
+// clickable with nothing failing but a button count.
+//
+// Every row goes to Server Control. These rows report *health*, and Server
+// Control is where health is diagnosed -- ReadinessTimeline, PortChecklist,
+// DoctorSummary and the Change Funcom Token form all live there. The Database
+// row deliberately does not go to the Database tab: that tab is for data (schema
+// browser, queries), not for whether Postgres is up and its partitions readable.
+//
+// Kept as a per-label map rather than one constant so a subsystem can be pointed
+// somewhere better later without restructuring. Every destination must be a tab
+// the sidebar lists -- "Services" is in ALL_TABS but has no navGroups entry, and
+// routing there dropped the operator on a panel with nothing highlighted and no
+// way back. App.activeTab.test.tsx guards that.
+// A Readiness & Health row. `id` is the stable key every lookup uses; `label` is
+// display text only.
+export type HomeHealthRow = { id: string; label: string; value: string; status: string; detail: string };
+
+// The rows, in display order. One home per service:
+//   database    dune-postgres, the world partitions, and 15432
+//   messaging   the two RabbitMQ brokers and the text router, which is a hard
+//               client of the game broker -- start-text-router.sh blocks on its
+//               TLS listener before starting
+//   battlegroup dune-director and dune-server-gateway
+//   games       every always-on map server and every map port
+//   fls         registration with Funcom's live service; owns no container
+//
+// dune-orchestrator and dune-coriolis-coordinator are deliberately unowned: the
+// control plane is always up, and the coordinator is optional.
+const HOME_HEALTH_ROWS: Array<{ id: string; label: string }> = [
+  { id: "database", label: "Database" },
+  { id: "messaging", label: "Messaging" },
+  { id: "battlegroup", label: "Battlegroup services" },
+  { id: "games", label: "Game servers" },
+  { id: "fls", label: "Funcom/FLS" }
+];
+
+export const HOME_SUBSYSTEM_ROUTES: Record<string, Tab> = {
+  database: "Server Control",
+  messaging: "Server Control",
+  battlegroup: "Server Control",
+  games: "Server Control",
+  fls: "Server Control"
+};
+
+// Three missed idle polls. Derived from the sample's own age rather than a
+// count of consecutive failures: age is true by construction whatever the cause
+// -- failed poll, hidden tab, dead backend -- and unlike a counter it survives
+// leaving Home and coming back.
+export const STALE_SAMPLE_AGE_MS = 90_000;
+
+export function isStatusSampleStale(sampledAtMs: number, now: number) {
+  if (!sampledAtMs) return false;
+  return now - sampledAtMs > STALE_SAMPLE_AGE_MS;
+}
+
+export function formatFreshness(lastUpdatedAt: number, now: number) {
+  if (!lastUpdatedAt) return "";
+  const seconds = Math.max(0, Math.round((now - lastUpdatedAt) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m ago`;
+}
+
+export function HomePanel({ status, readiness, taskResult, setTaskResult, funcomTokenResult, setFuncomTokenResult, runningAction, restartStartObserved, setRunningAction, onLoad, confirmAction, restartGate, onNavigate, sampledAtMs = 0, setSampledAtMs }: {
   status: string;
   readiness: string;
   taskResult: HomeTaskResult | null;
@@ -124,9 +217,14 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   runningAction: "start" | "stop" | "restart" | "";
   restartStartObserved: boolean;
   setRunningAction: Dispatch<SetStateAction<"start" | "stop" | "restart" | "">>;
-  onLoad: () => Promise<HomeLoadResult>;
+  onLoad: (options?: { fresh?: boolean }) => Promise<HomeLoadResult>;
   confirmAction: ConfirmAction;
   restartGate: RestartGate;
+  // Absent (e.g. in tests) means the subsystem rows render as text, not buttons.
+  onNavigate?: (tab: Tab) => void;
+  // Held by App so it outlives this panel unmounting on a tab switch.
+  sampledAtMs?: number;
+  setSampledAtMs?: (value: number) => void;
 }) {
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState("");
@@ -152,12 +250,20 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   }, [runningAction]);
 
   function applyHomeLoadResult(result: HomeLoadResult) {
-    if (result.statusLoaded || result.readinessLoaded) setHasLoaded(true);
+    const loaded = result.statusLoaded || result.readinessLoaded;
+    if (loaded) setHasLoaded(true);
+    // Only a successful read moves the clock. A failed poll leaves the old
+    // sample time in place, so its age keeps growing and eventually reads as
+    // stale on its own -- no failure counter needed.
+    if (loaded && result.sampledAtMs) setSampledAtMs?.(result.sampledAtMs);
     setReadinessWarning(!result.readinessLoaded && result.readinessError ? result.readinessError : "");
     if (!result.statusLoaded && !result.readinessLoaded && result.statusError) setLocalError(friendlyHomeStatusError(result.statusError));
   }
 
-  async function refresh(isActive = () => true) {
+  // `fresh` is opt-in per caller. The mount read deliberately accepts a cached
+  // snapshot -- that read is the whole reason the cache exists -- while an
+  // operator pressing Refresh Status is asking to go and look again.
+  async function refresh(isActive = () => true, options: { fresh?: boolean } = {}) {
     const runId = ++refreshRunId.current;
     setLoading(true);
     setLocalError("");
@@ -165,7 +271,7 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
     try {
       const historyRequestId = ++restartHistoryRequestId.current;
       const [result, history] = await Promise.all([
-        onLoad(), serverApi.restartHistory().catch(() => null)
+        onLoad({ fresh: options.fresh }), serverApi.restartHistory().catch(() => null)
       ]);
       if (!isActive() || refreshRunId.current !== runId) return;
       if (history && restartHistoryRequestId.current === historyRequestId) setRestartHistory(history);
@@ -175,7 +281,9 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
         setLocalError(friendlyHomeStatusError(result.statusError || result.readinessError || "Server status and readiness checks failed."));
       }
     } catch (error) {
-      if (isActive() && refreshRunId.current === runId) setLocalError(friendlyHomeStatusError(error instanceof Error ? error.message : String(error)));
+      if (isActive() && refreshRunId.current === runId) {
+        setLocalError(friendlyHomeStatusError(error instanceof Error ? error.message : String(error)));
+      }
     } finally {
       if (isActive() && refreshRunId.current === runId) setLoading(false);
     }
@@ -195,7 +303,7 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
     setHomeAction(action);
     setTaskResult(stackActionPendingResult(action));
     if (action === "restart") {
-      const preLoad = await onLoad().catch(() => null);
+      const preLoad = await onLoad({ fresh: true }).catch(() => null);
       if (homeActionRunId.current !== actionRunId) return;
       if (preLoad) {
         applyHomeLoadResult(preLoad);
@@ -223,21 +331,21 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
       if (homeActionRunId.current !== actionRunId) return;
       const details = taskTechnicalDetails(final);
       if (action === "restart") homeRestartLifecycle.current = advanceRestartLifecycleFromTaskDetails(homeRestartLifecycle.current, details);
-      const postLoad = await onLoad().catch(() => null);
+      const postLoad = await onLoad({ fresh: true }).catch(() => null);
       if (homeActionRunId.current !== actionRunId) return;
       if (postLoad) applyHomeLoadResult(postLoad);
       const postState = getHomeServerState(postLoad?.statusText || status, postLoad?.readinessText || readiness);
-      const postReady = isHomeActionComplete(postLoad?.statusText || status, postLoad?.readinessText || readiness);
+      const elapsedMs = Date.now() - homeActionStartedAt.current;
+      const postReady = isHomeActionComplete(postLoad?.statusText || status, postLoad?.readinessText || readiness, elapsedMs);
       if (action === "restart") {
         homeRestartLifecycle.current = advanceRestartLifecycle(homeRestartLifecycle.current, postLoad?.statusText || status, postLoad?.readinessText || readiness);
       }
       const restartReady = isRestartLifecycleReady(action, homeRestartLifecycle.current);
-      const elapsedMs = Date.now() - homeActionStartedAt.current;
       if (action === "stop" && isHomeStopComplete(postLoad?.statusText || status, postLoad?.readinessText || readiness)) {
         setTaskResult({ status: "stopped", title: copy.success, details });
       } else if (action === "restart" && restartReady) {
         keepPolling = true;
-        if (isHomeActionComplete(postLoad?.statusText || status, postLoad?.readinessText || readiness)) {
+        if (isHomeActionComplete(postLoad?.statusText || status, postLoad?.readinessText || readiness, elapsedMs)) {
           setTaskResult((current) => preserveTerminalStackResult(current, { status: "succeeded", title: copy.success, details }));
           setHomeAction("");
         }
@@ -323,9 +431,20 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   useEffect(() => {
     if (runningAction || !homeNeedsWarmRefresh(status, readiness)) return;
     let active = true;
+    // fresh: true bypasses the server-side cache by design, so each tick costs a
+    // real ~4s status.sh run. Without this guard the interval keeps firing while
+    // one is still in flight and they queue back-to-back for the whole warm-up,
+    // which is exactly when the host is most loaded. The server dedupes
+    // concurrent collects, so this never manufactured parallel subprocesses --
+    // it just asked for far more of them than anyone could read.
+    let inFlight = false;
     const id = window.setInterval(async () => {
-      const result = await onLoad().catch(() => null);
-      if (active && result) applyHomeLoadResult(result);
+      if (inFlight) return;
+      inFlight = true;
+      // Warming: the whole point is to watch it change, so never cached.
+      const result = await onLoad({ fresh: true }).catch(() => null).finally(() => { inFlight = false; });
+      if (!active) return;
+      if (result) applyHomeLoadResult(result);
     }, 5000);
     return () => {
       active = false;
@@ -338,8 +457,11 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
     let active = true;
     const id = window.setInterval(async () => {
       if (document.hidden) return;
+      // Idle: a cached read is acceptable here and on mount. These are the only
+      // two paths that tolerate staleness.
       const result = await onLoad().catch(() => null);
-      if (active && result) applyHomeLoadResult(result);
+      if (!active) return;
+      if (result) applyHomeLoadResult(result);
     }, 30000);
     return () => {
       active = false;
@@ -350,9 +472,18 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   useEffect(() => {
     if (!isRestartSuccessAwaitingFreshStatus(taskResult, status, readiness)) return;
     let active = true;
+    // Same guard as the warm-up poll above, and it matters more here: a 1.5s
+    // interval against a ~4s uncached read means every tick but the first would
+    // land on top of one already running.
+    let inFlight = false;
     const id = window.setInterval(async () => {
-      const result = await onLoad().catch(() => null);
-      if (active && result) applyHomeLoadResult(result);
+      if (inFlight) return;
+      inFlight = true;
+      // Waiting for the restart to show up in status; a cached snapshot here
+      // would be the pre-restart one.
+      const result = await onLoad({ fresh: true }).catch(() => null).finally(() => { inFlight = false; });
+      if (!active) return;
+      if (result) applyHomeLoadResult(result);
     }, 1500);
     return () => {
       active = false;
@@ -413,72 +544,282 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
       <article className="hero-panel wide">
         <h2>Server status unavailable</h2>
         <p className="error">{localError}</p>
-        <button onClick={() => refresh()}>Retry Status Check</button>
+        <button onClick={() => refresh(undefined, { fresh: true })}>Retry Status Check</button>
       </article>
     </section>;
   }
 
+  const funcomTokenCheckRunning = funcomTokenResult?.status === "running";
+  const summary = summarizeHomeStatus(status, readiness, readinessWarning, loading, runningAction, taskResult, restartStartObserved, !funcomTokenCheckRunning && (isFuncomTokenAuthFailure(funcomTokenResult) || hasPersistedFuncomTokenAuthFailure()));
+  const overall = summary.identity.find((item) => item.label === "Overall");
+  const identityCards = summary.identity.filter((item) => item.label !== "Overall");
+  const populationItem = identityCards.find((item) => item.label === "Population");
+  const populationWarn = /^warn$/i.test(String(populationItem?.status || ""));
+  const populationSegment = homePopulationSegment(populationItem?.value);
+  // Drives the dot and the reading beside it from one value, so the two can
+  // never disagree about severity.
+  const stateTone = homeStateDotTone(overall?.value, summary.health);
+  const identityLine = homeIdentityLine(identityCards);
+
   return (
-    <section className="grid">
-      <article className="hero-panel">
-        <h2>Server Overview</h2>
-        <p>Use this dashboard for setup, service health, logs, backups, updates, and player admin actions.</p>
-        <p className="home-last-restart"><span>Last Battlegroup Restart</span><strong>{restartHistory?.lastBattlegroupRestart ? formatRestartTime(restartHistory.lastBattlegroupRestart.finishedAt) : "Not Recorded Yet"}</strong></p>
+    <section className="grid home-grid" aria-labelledby="home-overview-heading">
+      {/* The h2 is visually hidden but structurally real: without it the page
+          jumps h1 -> h3 and this region has no accessible name. Each block's
+          h3 (Battlegroup Status, Readiness & Health, Performance) sits under it. */}
+      <h2 id="home-overview-heading" className="sr-only">Server overview</h2>
+      <article className="hero-panel home-block home-status-block" aria-labelledby="home-status-heading">
+        {/* An h3, not a styled span: it is the peer of the "Readiness &
+            Health" and "Performance" headings, so matching them by using
+            the same element guarantees the same size and colour instead of
+            restating their computed value here. The reading sits beside it
+            rather than inside, so the heading text stays just the label. */}
+        <div className="home-hero-state">
+          <h3 id="home-status-heading" className="home-hero-state-label">Battlegroup Status:</h3>
+          {/* Explicit space: the dot between the label and the reading is an
+              empty element, so without it the heading's text content reads
+              "Battlegroup Status:Stopped" to a screen reader and to anyone
+              copying it. Whitespace-only text between flex items is not
+              rendered, so this costs nothing visually. */}
+          {" "}
+          <span className={`home-state-dot home-state-dot-${stateTone}`} aria-hidden="true" />
+          <span className={`home-hero-state-value home-hero-state-value-${stateTone}`}>{homeOverallHeading(overall?.value)}</span>
+        </div>
+        {/* The status above already says Starting/Restarting and the subsystem
+            rows show progress, so an in-flight action gets one line here instead
+            of a result card; the card is kept for outcomes. */}
+        <p className="home-hero-step" aria-live="polite">
+          {taskResult?.status === "running" && taskResult.message ? formatResultMessage(taskResult.message) : ""}
+        </p>
+        {/* Population is rendered apart from the rest of the line so its
+            WARN can survive: summarizeHomeStatus flags an unreadable count
+            ("14 / ?" or "Unavailable"), and the deleted Server Identity
+            band was the only thing that showed that. Folding it into the
+            plain summary string dropped the signal silently. */}
+        <p className="home-hero-identity">
+          {identityLine || (populationSegment ? "" : "Server details are still loading.")}
+          {populationSegment && <>
+            {identityLine ? " · " : ""}
+            <span className={populationWarn ? "home-population-warn" : undefined}>{populationSegment}</span>
+          </>}
+        </p>
+        <dl className="home-hero-meta">
+          {HOME_HERO_META_LABELS.map((label) => <div className="home-hero-meta-item" key={label}>
+            <dt>{label}</dt>
+            <dd>{formatDisplayValue(identityCards.find((item) => item.label === label)?.value || "Unknown")}</dd>
+          </div>)}
+          <div className="home-hero-meta-item home-last-restart">
+            <dt>Last Battlegroup Restart</dt>
+            <dd>{restartHistory?.lastBattlegroupRestart ? formatRestartTime(restartHistory.lastBattlegroupRestart.finishedAt) : "Not Recorded Yet"}</dd>
+          </div>
+        </dl>
         <div className="action-row">
-          <button className={loading ? "refresh-status-button refreshing" : "refresh-status-button"} disabled={refreshDisabled} onClick={() => refresh()}>{loading ? <span className="loading-dots">Refreshing</span> : "Refresh Status"}</button>
+          <button className={loading ? "refresh-status-button refreshing" : "refresh-status-button"} disabled={refreshDisabled} onClick={() => refresh(undefined, { fresh: true })}>{loading ? <span className="loading-dots">Refreshing</span> : "Refresh Status"}</button>
           <button disabled={startDisabled} title={controlsState.running ? "Battlegroup is already running." : ""} onClick={() => runServerAction("start")}><Play size={16} /> Start</button>
-          <button disabled={stopDisabled} onClick={() => runServerAction("stop")}>Stop</button>
+          <button className="danger-button" disabled={stopDisabled} onClick={() => runServerAction("stop")}>Stop</button>
           <button disabled={restartDisabled} onClick={() => runServerAction("restart")}>Restart Battlegroup</button>
         </div>
+        <StatusFreshness sampledAtMs={sampledAtMs} />
         <PendingRefillNote />
-        {taskResult && <HomeTaskResultCard result={taskResult} />}
+        {taskResult && taskResult.status !== "running" && <HomeTaskResultCard result={taskResult} />}
         {localError && <p className="error">{localError}</p>}
       </article>
       <HomeHighlights />
-      <PerformanceCards performance={performance} error={performanceError} />
-      <HomeHealthCards status={status} readiness={readiness} readinessWarning={readinessWarning} loading={loading} runningAction={runningAction} restartStartObserved={restartStartObserved} taskResult={taskResult} funcomTokenResult={funcomTokenResult} />
+      <HomeSubsystemList items={summary.health} onNavigate={onNavigate} />
+      <HomePerformance performance={performance} error={performanceError} />
     </section>
   );
 }
 
-function PerformanceCards({ performance, error }: { performance: PerformanceSnapshot | null; error: string }) {
-  const cards = [
+export type HomeStateTone = "ok" | "motion" | "attention" | "failed" | "loading" | "nodata";
+
+// Splits the readings by what the operator should do about them, rather than
+// putting six of the ten on one amber -- a restart in flight and a failed
+// readiness check are not the same problem.
+export function homeStateDotTone(overallValue: unknown, health: { status: string }[] = []): HomeStateTone {
+  const value = String(overallValue || "").trim().toLowerCase();
+  // Self-resolving states win over the escalation below: during a stop or
+  // restart the subsystems are legitimately down, and red would cry wolf.
+  if (/^(starting|stopping|restarting)\b/.test(value)) return "motion";
+  if (value === "checking") return "loading";
+  // Stopped is reported at full severity, same as the rows below it: one
+  // state, one colour. It is checked before the escalation so a stop reads as
+  // stopped rather than as whichever subsystem happens to have failed.
+  if (value === "stopped") return "failed";
+  if (value === "unknown" || value === "status loaded") return "nodata";
+  // summarizeHomeStatus can report "OK" while Funcom/FLS is FAILED (the
+  // token-mismatch branch overrides its ready override), so the heading word
+  // alone is not the worst thing on screen.
+  if (health.some((item) => normalizeStatus(String(item.status || "")) === "fail")) return "failed";
+  if (value === "ok") return "ok";
+  return "attention";
+}
+
+// summarizeHomeStatus yields "Restarting Battlegroup", which under the
+// "Battlegroup Status:" prefix would say Battlegroup twice. Trimmed here, not in
+// the summary -- that value is shared with homeNeedsWarmRefresh and with
+// isHomeActionComplete, which matches /^OK$/ to detect a finished restart. So
+// "OK" is renamed for display only, never in the summary.
+// Does this heading read green to the operator?
+//
+// The union is deliberate. homeStateDotTone with an empty health array asks
+// "how green is this word on its own", which already encodes the carve-outs
+// this must respect -- motion for starting/stopping, failed for stopped, nodata
+// for unknown. homeOverallBadge closes the other half: friendlyHomeOverall
+// passes an unrecognised Overall: token straight through, and inferStatus
+// badges Healthy, Running, Up, Listening and Found as Ready.
+//
+// A false positive here is safe: the only thing it enables is a downgrade.
+export function heroReadsGreen(value: unknown) {
+  return homeStateDotTone(value, []) === "ok" || homeOverallBadge(String(value || "")) === "Ready";
+}
+
+export function homeOverallHeading(value: unknown) {
+  const text = formatDisplayValue(value || "Unknown");
+  if (/^ok$/i.test(text.trim())) return "Ready";
+  return text.replace(/\s+battlegroup$/i, "");
+}
+
+// Shown even when Unknown: with the Server Identity band gone this is the only
+// place they appear, so an absent one must read as absent rather than vanish.
+const HOME_HERO_META_LABELS = ["Server IP", "Battlegroup"];
+
+// Title/Region/Mode only. Unknown entries are dropped -- a line reading
+// "Unknown · Unknown" tells an operator nothing, and the caller supplies a
+// loading sentence when nothing resolves. Population is rendered separately so
+// its warn state survives; uptime belongs to the Performance card.
+function homeIdentityLine(items: { label: string; value: string }[]) {
+  const pick = (label: string) => {
+    const value = String(items.find((item) => item.label === label)?.value || "").trim();
+    return value && !/^(unknown|unavailable)$/i.test(value) ? value : "";
+  };
+  const parts = [pick("Title"), pick("Region"), pick("Mode")].filter(Boolean);
+  return parts.join(" · ");
+}
+
+
+// formatHomePopulation yields "14", "14 / 40", "14 / ?" or "Unavailable", all of
+// which read as a bare trailing number unlabelled. "Unavailable" is kept rather
+// than dropped: with the warn tone it says the count could not be read.
+function homePopulationSegment(value: unknown) {
+  const text = String(value || "").trim();
+  if (!text || /^unknown$/i.test(text)) return "";
+  // Absence, not a warning. This used to read "population unavailable", and the
+  // caller suppressed the whole segment by inspecting the HEADING -- so hiding
+  // the count was coupled to whatever word the hero happened to be showing.
+  // A count that cannot be read is simply not shown; the reason belongs to the
+  // row that owns it.
+  if (/^unavailable$/i.test(text)) return "";
+  return `${text} online`;
+}
+
+// Owns its 1s tick so the per-second re-render stays here instead of redrawing
+// every card in the panel.
+function StatusFreshness({ sampledAtMs }: { sampledAtMs: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  if (!sampledAtMs) return null;
+  const stale = isStatusSampleStale(sampledAtMs, now);
+  const ago = formatFreshness(sampledAtMs, now);
+  return <p className={stale ? "home-freshness stale" : "home-freshness"}>
+    {stale ? `Status may be stale — last updated ${ago}` : `Updated ${ago}`}
+  </p>;
+}
+
+// A row is a button when the subsystem has somewhere to be dealt with, so a
+// warning routes to the tab that can fix it instead of being a dead end.
+function HomeSubsystemList({ items, onNavigate }: { items: HomeHealthRow[]; onNavigate?: (tab: Tab) => void }) {
+  return <section className="panel home-block home-subsystems" aria-label="Readiness and health">
+    <h3>Readiness & Health</h3>
+    <ul className="home-subsystem-list">
+      {items.map((item) => {
+        // hasOwn, not a bare index: a plain object inherits Object.prototype,
+        // so a label of "constructor" would return a truthy non-Tab value and
+        // reach setTab. Fail-closed if labels ever stop being literals.
+        const route = Object.hasOwn(HOME_SUBSYSTEM_ROUTES, item.id) ? HOME_SUBSYSTEM_ROUTES[item.id] : undefined;
+        const body = <>
+          <span className="home-subsystem-label">{item.label}</span>
+          <span className="home-subsystem-value">
+            {/* A healthy row's value is the literal "OK" beside a "Ready"
+                pill saying the same thing twice -- and healthy is the common
+                case. Anything else ("Warming", "Token Mismatch Detected",
+                "3 of 8 up") is the detail the pill cannot carry, so it stays. */}
+            {!/^OK$/i.test(item.value) && <span>{formatDisplayValue(item.value)}</span>}
+            {item.detail && <span className="home-subsystem-count">{item.detail}</span>}
+            <StatusPill value={item.status} />
+          </span>
+        </>;
+        // detail carries how much of each subsystem is ready ("7 of 7"). It is
+        // rendered inline rather than as a title, since a tooltip would hide the
+        // count behind a hover the reading is not worth.
+        return <li key={item.id} className="home-subsystem-row">
+          {route && onNavigate
+            ? <button type="button" className="home-subsystem-button" onClick={() => onNavigate(route)} aria-label={`${item.label}: ${item.value}${item.detail ? `, ${item.detail}` : ""}. Open ${route}`}>{body}</button>
+            : <div className="home-subsystem-static">{body}</div>}
+        </li>;
+      })}
+    </ul>
+  </section>;
+}
+
+// Rows in the same style as Readiness & Health beside it, so the two lower
+// blocks read as a pair.
+function HomePerformance({ performance, error }: { performance: PerformanceSnapshot | null; error: string }) {
+  const rows = [
     {
       label: "CPU Usage",
       value: performance?.cpuPercent == null ? "Sampling..." : `${performance.cpuPercent.toFixed(1)}%`,
-      percent: performance?.cpuPercent ?? 0,
+      percent: performance?.cpuPercent ?? null,
+      metered: true,
       detail: "Host Processor Load"
     },
     {
       label: "Memory",
       value: performance?.memory.percent == null ? "Unknown" : `${performance.memory.percent.toFixed(1)}%`,
-      percent: performance?.memory.percent ?? 0,
+      percent: performance?.memory.percent ?? null,
+      metered: true,
       detail: performance ? `${formatBytes(performance.memory.usedBytes)} / ${formatBytes(performance.memory.totalBytes)}` : "Waiting for Sample"
     },
     {
       label: "Disk",
       value: performance?.disk.percent == null ? "Unknown" : `${performance.disk.percent.toFixed(1)}%`,
-      percent: performance?.disk.percent ?? 0,
+      percent: performance?.disk.percent ?? null,
+      metered: true,
       detail: performance ? `${formatBytes(performance.disk.usedBytes)} / ${formatBytes(performance.disk.totalBytes)}` : "Waiting for Sample"
     },
     {
       label: "Uptime",
       value: performance?.uptime || "0d 00h 00m",
       percent: null,
+      // Not a utilisation figure, so no badge and no bar -- distinct from a
+      // metered card whose reading has not arrived yet.
+      metered: false,
       detail: "Host Uptime"
     }
   ];
-  return <section className="dashboard-band performance-band wide">
-    <h3>Performance</h3>
+  return <section className="panel home-block home-performance" aria-labelledby="home-performance-heading">
+    <h3 id="home-performance-heading">Performance</h3>
     {error && !performance && <p className="error">{error}</p>}
-    <div className="health-grid health-grid-compact">
-      {cards.map((item) => <article className="status-card performance-card" key={item.label}>
-        <div className="status-card-title"><span>{item.label}</span><StatusPill value={performance ? "OK" : "INFO"} /></div>
-        <strong>{item.value}</strong>
-        <p>{item.detail}</p>
-        {item.percent !== null && <div className="metric-track" aria-hidden="true"><span style={{ width: `${clampPercent(item.percent)}%` }} /></div>}
-      </article>)}
-    </div>
+    <ul className="home-subsystem-list">
+      {rows.map((item) => {
+        const rowStatus = item.metered ? performanceCardStatus(item.percent, Boolean(performance)) : "";
+        return <li className="home-subsystem-row home-perf-row" key={item.label}>
+          <div className="home-subsystem-static home-perf-line">
+            <span className="home-subsystem-label home-perf-label">{item.label}</span>
+            <span className="home-perf-meter">
+              {item.metered && item.percent !== null && <span className="metric-track" aria-hidden="true"><span className={performanceTrackTone(item.percent, Boolean(performance))} style={{ width: `${clampPercent(item.percent)}%` }} /></span>}
+            </span>
+            <span className="home-perf-figure">
+              <span className="home-perf-detail">{item.detail}</span>
+              <span className="home-perf-value">{item.value}</span>
+              {rowStatus && <StatusPill value={rowStatus} />}
+            </span>
+          </div>
+        </li>;
+      })}
+    </ul>
   </section>;
 }
 
@@ -592,10 +933,11 @@ export function ServerPanel(props: {
       : [serverApi.status(), serverApi.readiness()] as const;
     const results = await Promise.allSettled(requests);
     const [nextStatus, nextReadiness, nextPorts, nextDoctor] = results;
-    const result: HomeLoadResult = { statusLoaded: false, readinessLoaded: false, statusError: "", readinessError: "", statusText: "", readinessText: "" };
+    const result: HomeLoadResult = { statusLoaded: false, readinessLoaded: false, statusError: "", readinessError: "", statusText: "", readinessText: "", sampledAtMs: 0 };
     if (nextStatus?.status === "fulfilled") {
       result.statusText = nextStatus.value.stdout;
       result.statusLoaded = true;
+      result.sampledAtMs = Date.parse(nextStatus.value.sampledAt || "") || Date.now();
       props.setStatus(nextStatus.value.stdout);
     } else if (nextStatus) {
       result.statusError = nextStatus.reason instanceof Error ? nextStatus.reason.message : String(nextStatus.reason);
@@ -803,11 +1145,11 @@ export function ServerPanel(props: {
         setTaskResult({ status: "stopped", title: copy.success, details });
       } else if (action === "restart" && restartReady) {
         keepPolling = true;
-        if (isHomeActionComplete(statusText, readinessText)) {
+        if (isHomeActionComplete(statusText, readinessText, elapsedMs)) {
           setTaskResult((current) => preserveTerminalStackResult(current, { status: "succeeded", title: copy.success, details }));
           setControlAction("");
         }
-      } else if (action === "start" && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText)) {
+      } else if (action === "start" && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText, elapsedMs)) {
         keepPolling = true;
         setTaskResult((current) => preserveTerminalStackResult(current, { ...stackActionPendingResult(action, "confirming"), details }));
       } else if (final.status !== "succeeded") {
@@ -1330,33 +1672,6 @@ function isValidHourMinuteTime(value: string) {
 
 
 
-function HomeHealthCards({ status, readiness, readinessWarning, loading, runningAction, restartStartObserved, taskResult, funcomTokenResult }: { status: string; readiness: string; readinessWarning: string; loading: boolean; runningAction: "start" | "stop" | "restart" | ""; restartStartObserved: boolean; taskResult: HomeTaskResult | null; funcomTokenResult: HomeTaskResult | null }) {
-  const funcomTokenCheckRunning = funcomTokenResult?.status === "running";
-  const summary = summarizeHomeStatus(status, readiness, readinessWarning, loading, runningAction, taskResult, restartStartObserved, !funcomTokenCheckRunning && (isFuncomTokenAuthFailure(funcomTokenResult) || hasPersistedFuncomTokenAuthFailure()));
-  return <div className="home-health wide">
-    <section className="dashboard-band">
-      <h3>Server Identity</h3>
-      <div className="health-grid">
-        {summary.identity.map((item) => <article className="status-card" key={item.label}>
-          <div className="status-card-title"><span>{item.label}</span><StatusPill value={item.status} /></div>
-          <strong>{formatDisplayValue(item.value)}</strong>
-          {item.detail && <p>{item.detail}</p>}
-        </article>)}
-      </div>
-    </section>
-    <section className="dashboard-band">
-      <h3>Readiness & Health</h3>
-      <div className="health-grid health-grid-compact">
-        {summary.health.map((item) => <article className="status-card" key={item.label}>
-          <div className="status-card-title"><span>{item.label}</span><StatusPill value={item.status} /></div>
-          <strong>{formatDisplayValue(item.value)}</strong>
-          {item.detail && <p>{item.detail}</p>}
-        </article>)}
-      </div>
-    </section>
-  </div>;
-}
-
 function DoctorSummary({ text, readiness, loading, error, onFixBinding, onCleanupImages, onCleanupBuildCache, fixingBinding, cleanupOperation, fixDisabled }: {
   text: string;
   readiness: string;
@@ -1499,7 +1814,7 @@ function firstArray(...values: unknown[]) {
   return values.find((value) => Array.isArray(value)) as unknown[] | undefined;
 }
 
-function summarizeHomeStatus(status: string, readiness: string, readinessWarning: string, loading: boolean, runningAction: "start" | "stop" | "restart" | "" = "", taskResult: HomeTaskResult | null = null, restartStarted = false, funcomTokenAuthFailure = false) {
+export function summarizeHomeStatus(status: string, readiness: string, readinessWarning: string, loading: boolean, runningAction: "start" | "stop" | "restart" | "" = "", taskResult: HomeTaskResult | null = null, restartStarted = false, funcomTokenAuthFailure = false) {
   void readinessWarning;
   const serverState = getHomeServerState(status, readiness);
   const bootStarting = isHomeBootStarting(status, readiness);
@@ -1509,35 +1824,91 @@ function summarizeHomeStatus(status: string, readiness: string, readinessWarning
   const rawOverall = findLineValue(status, ["overall"]);
   const readinessReady = /^READY:/m.test(readiness);
   const liveOverall = readinessReady ? "OK" : friendlyHomeOverall(rawOverall || (readiness ? "Readiness checked" : readinessWarning ? "Status loaded, readiness warning" : status ? "Status loaded" : loading ? "Checking" : "Unknown"));
-  const rawContainers = preferKnownHomeHealth(summarizeContainers(status), summarizeReadinessContainers(readiness));
-  const rawListeners = preferKnownHomeHealth(summarizeListeners(status), summarizeReadinessListeners(readiness));
-  const rawDatabase = preferKnownHomeHealth(summarizeDatabase(status), summarizeReadinessDatabase(readiness));
-  const rawGames = preferKnownHomeHealth(summarizeGameServers(status), summarizeReadinessGameServers(readiness));
-  const rawRabbit = preferKnownHomeHealth(summarizeRabbit(status), summarizeReadinessRabbit(readiness));
-  const rawFls = preferKnownHomeHealth(summarizeFls(status), summarizeReadinessFls(readiness));
-  const readyOverride = readinessReady ? { label: "OK", status: "Ready", detail: "" } : null;
-  const coreReadyWithReview = !runningAction && isHomeCoreReadyWithReview(status, readiness, rawContainers, rawListeners, rawDatabase, rawGames, rawRabbit, rawFls);
-  const isStarting = runningAction === "start" || runningAction === "restart" || restartSuccessAwaitingFreshStatus || (bootStarting && !coreReadyWithReview);
+  // One card per row, keyed by the row id. Every battlegroup container has
+  // exactly one home here, so nothing is reported twice.
+  //
+  // battlegroup has no readiness-derived fallback: `dune ready` reports per
+  // container and per check, with nothing that corresponds to "the director and
+  // gateway as a pair".
+  const raw: Record<string, { label: string; status: string; detail: string }> = {
+    database: preferKnownHomeHealth(summarizeDatabase(status), summarizeReadinessDatabase(readiness)),
+    messaging: preferKnownHomeHealth(summarizeMessaging(status), summarizeReadinessRabbit(readiness)),
+    battlegroup: summarizeBattlegroupServices(status),
+    games: preferKnownHomeHealth(summarizeGameServers(status), summarizeReadinessGameServers(readiness)),
+    fls: preferKnownHomeHealth(summarizeFls(status), summarizeReadinessFls(readiness))
+  };
+  const rawGames = raw.games;
+  // ready.sh reports READY off the core containers and the two protected maps
+  // only -- it has no notion of the wider always-on roster. So on a host with
+  // more always-on maps it says READY while several are still coming up, and
+  // believing it left the hero reading "Ready" beside "Game servers 2 of 7".
+  // A readiness all-clear is not allowed to override the roster.
+  const rosterWarming = isGameServersComingUp(rawGames.label);
+  const rosterIncomplete = rosterWarming || /^Needs Review$/i.test(rawGames.label);
+  const coreReadyWithReview = !runningAction && isHomeCoreReadyWithReview(status, readiness, raw);
+  const isStarting = runningAction === "start" || runningAction === "restart" || restartSuccessAwaitingFreshStatus || rosterWarming || (bootStarting && !coreReadyWithReview);
   const restartSuccessObserved = taskResult?.status === "succeeded" && /restart/i.test(taskResult.title || "");
   const restartStartObserved = restartStarted || restartSuccessAwaitingFreshStatus || restartSuccessObserved;
   const transitionOverall = runningAction === "restart"
     ? restartStartObserved ? "Starting" : "Restarting Battlegroup"
     : runningAction === "stop" ? "Stopping" : isStarting ? "Starting" : "";
-  const warmingOverall = /^Warming$/i.test(rawGames.label) ? "Warming" : "";
-  const overall = readinessReady && !runningAction ? "OK" : isStarting ? transitionOverall : runningAction ? transitionOverall : serverState.databaseOnly && !actionStopped ? "Database Only" : serverState.stopped || actionStopped ? "Stopped" : coreReadyWithReview ? "Needs Review" : warmingOverall || liveOverall;
-  const attentionHealth = !isStarting && !restartSuccessAwaitingFreshStatus && (serverState.stopped || actionStopped || actionFailed) ? attentionHomeHealthCards() : null;
+  const attentionHealth = !isStarting && !restartSuccessAwaitingFreshStatus && (serverState.stopped || actionStopped || actionFailed) ? attentionHomeHealthCard(serverState.stopped || actionStopped ? "stopped" : "failed") : null;
+  // status and readiness are two separate reads, so they can disagree: a stop
+  // updates status to STOPPED while readiness is still the previous "READY:".
+  // Believing readiness there left the heading and every row reading Ready
+  // under a "Battlegroup Stopped" banner. A stop we observed, or an Overall:
+  // STOPPED, beats a stale all-clear.
+  const readinessAllClear = readinessReady && !attentionHealth && !rosterIncomplete;
   const transitionAction: "start" | "stop" | "restart" | "" = restartStartObserved
     ? "start"
     : runningAction === "restart" ? ""
-      : runningAction || (restartSuccessAwaitingFreshStatus || (bootStarting && !coreReadyWithReview) ? "start" : "");
-  const containers = readyOverride || transitionHomeHealthCard(rawContainers, transitionAction) || attentionHealth?.containers || rawContainers;
-  const listeners = readyOverride || transitionHomeHealthCard(rawListeners, transitionAction) || attentionHealth?.listeners || rawListeners;
-  const database = readyOverride || transitionHomeHealthCard(rawDatabase, transitionAction) || attentionHealth?.database || rawDatabase;
-  const games = readyOverride || transitionHomeHealthCard(rawGames, transitionAction) || attentionHealth?.games || rawGames;
-  const rabbit = readyOverride || transitionHomeHealthCard(rawRabbit, transitionAction) || attentionHealth?.rabbit || rawRabbit;
-  const fls = funcomTokenAuthFailure
-    ? { label: "Token Mismatch Detected", status: "FAILED", detail: "" }
-    : readyOverride || transitionHomeHealthCard(rawFls, transitionAction) || attentionHealth?.fls || rawFls;
+      : runningAction || (restartSuccessAwaitingFreshStatus || rosterWarming || (bootStarting && !coreReadyWithReview) ? "start" : "");
+  // Database Only is a stopped battlegroup over a live Postgres. The blanket
+  // "Stopped" below would have the Database row contradict the heading, so that
+  // one row keeps its own reading.
+  const databaseStillUp = serverState.databaseOnly && !actionStopped;
+  const healthRows: HomeHealthRow[] = HOME_HEALTH_ROWS.map(({ id, label }) => {
+    const rawCard = raw[id];
+    // Applied per row, and only to a row that is not itself reporting a fault.
+    //
+    // This override only ever does anything when the two reads DISAGREE: when
+    // they agree the row is already OK. So it is really the rule "when status
+    // and readiness disagree, believe readiness" -- and every guard above it was
+    // carved out after a case where that was wrong (an observed stop, an
+    // incomplete map roster). A container or listener fault that status reports
+    // and readiness does not was the third: `ready.sh` checks the same
+    // containers and TCP ports, so the two are contradicting each other about
+    // the same fact, and one of the reads is simply stale.
+    //
+    // Showing the fault is the fail-safe direction. At worst it is one poll of
+    // amber that clears itself; hiding it makes a real outage read green.
+    // Filling in a reading status could not produce at all (Unknown) is still
+    // worth doing, which is what this override is left to do.
+    //
+    // Nothing hangs on it: isHomeActionComplete is satisfied by readinessReady
+    // alone, so a row left at WARN cannot stall a start or a restart, and mid
+    // transition transitionHomeHealthCard below still reports "Getting Ready".
+    const readyOverride = readinessAllClear && !homeCardReportsFault(rawCard) ? HOME_READY_CARD : null;
+    const shown = id === "fls" && funcomTokenAuthFailure
+      ? { label: "Token Mismatch Detected", status: "FAILED", detail: "" }
+      : readyOverride || transitionHomeHealthCard(rawCard, transitionAction) || (databaseStillUp && id === "database" ? null : attentionHealth) || rawCard;
+    // The count comes from the RAW reading, not from whichever display override
+    // won. readyOverride and transitionHomeHealthCard both carry an empty
+    // detail, so taking it from them would blank the count in the two states it
+    // is most wanted: healthy, and mid-start. "3 of 7" is equally true whether
+    // the row is showing OK or "Getting Ready".
+    return { id, label, value: shown.label, status: shown.status, detail: rawCard.detail };
+  });
+  // The rows are computed first so the heading can be held to them. Everything
+  // that can make this green flows through applyHeroHealthFloor -- keep it that
+  // way: exactly one binding named `overall`, defined once, consumed once. An
+  // ungated `overall` left in scope is how the last three incidents happened.
+  //
+  // rosterIncomplete still appears twice: blocking the readiness all-clear at
+  // the front does not stop liveOverall, which is "OK" whenever readiness
+  // reports READY.
+  const overallCandidate = readinessReady && !runningAction && !attentionHealth && !rosterIncomplete ? "OK" : isStarting ? transitionOverall : runningAction ? transitionOverall : serverState.databaseOnly && !actionStopped ? "Database Only" : serverState.stopped || actionStopped ? "Stopped" : coreReadyWithReview ? "Needs Review" : rosterIncomplete ? "Needs Review" : liveOverall;
+  const overall = applyHeroHealthFloor(overallCandidate, healthRows);
   const population = formatHomePopulation(findPopulation(status) || findLineValue(status, ["population", "players"]));
   return {
     identity: [
@@ -1549,28 +1920,28 @@ function summarizeHomeStatus(status: string, readiness: string, readinessWarning
       { label: "Battlegroup", value: findLineValue(status, ["battlegroup", "battlegroup id"]) || "Unknown", status: "Info", detail: "" },
       { label: "Population", value: population, status: population.includes("?") || population === "Unavailable" ? "WARN" : "Info", detail: "" }
     ],
-    health: [
-      { label: "Containers", value: containers.label, status: containers.status, detail: containers.detail },
-      { label: "Listeners", value: listeners.label, status: listeners.status, detail: listeners.detail },
-      { label: "Database", value: database.label, status: database.status, detail: database.detail },
-      { label: "Game Servers", value: games.label, status: games.status, detail: games.detail },
-      { label: "RabbitMQ", value: rabbit.label, status: rabbit.status, detail: rabbit.detail },
-      { label: "Funcom/FLS", value: fls.label, status: fls.status, detail: fls.detail }
-    ]
+    health: healthRows
   };
 }
 
-function homeNeedsWarmRefresh(status: string, readiness: string) {
+// Exported for the regression guard in ServerPanels.homeCards.test.tsx: this and
+// isHomeActionComplete both read summarizeHomeStatus()'s identity/health arrays,
+// so dropping an entry has to fail a test rather than silently break the poll
+// cadence and restart detection.
+export function homeNeedsWarmRefresh(status: string, readiness: string) {
   if (!status && !readiness) return false;
+  // A stopped battlegroup lists its maps as WAIT (nothing to spawn them yet),
+  // which would otherwise hold the fresh 5s poll for as long as it stays down.
+  if (/Overall:\s*STOPPED\b/i.test(status)) return false;
   const summary = summarizeHomeStatus(status, readiness, "", false);
   const overall = summary.identity.find((item) => item.label === "Overall");
-  const games = summary.health.find((item) => item.label === "Game Servers");
+  const games = summary.health.find((item) => item.id === "games");
   const overallOk = /^OK$/i.test(String(overall?.value || "")) || /^Ready$/i.test(String(overall?.status || ""));
   const gamesOk = /^OK$/i.test(String(games?.value || "")) && /^Ready$/i.test(String(games?.status || ""));
   const gameServerText = sectionLines(status, "Game servers").join("\n");
   const warming = /Overall:\s*(WARMING|WAIT|STARTING)/i.test(status) ||
-    /\b(WARMING|WAIT|STARTING)\b/i.test(gameServerText) ||
-    /^(Warming|Starting)$/i.test(String(games?.value || "")) ||
+    /\b(WARMING|WAIT|QUEUED|STARTING)\b/i.test(gameServerText) ||
+    isGameServersComingUp(games?.value) || /^Starting$/i.test(String(games?.value || "")) ||
     isHomeBootStarting(status, readiness);
   return warming && (!overallOk || !gamesOk);
 }
@@ -1578,19 +1949,14 @@ function homeNeedsWarmRefresh(status: string, readiness: string) {
 function isHomeCoreReadyWithReview(
   status: string,
   readiness: string,
-  containers: { label: string; status: string; detail: string },
-  listeners: { label: string; status: string; detail: string },
-  database: { label: string; status: string; detail: string },
-  games: { label: string; status: string; detail: string },
-  rabbit: { label: string; status: string; detail: string },
-  fls: { label: string; status: string; detail: string }
+  cards: Record<string, { label: string; status: string; detail: string }>
 ) {
   const text = `${status}\n${readiness}`;
-  const gamesReady = isReadyHomeCard(games) || (/OK\s+Survival_1\s+ready/i.test(text) && /OK\s+Overmap\s+ready/i.test(text));
-  const databaseReady = isReadyHomeCard(database) || /OK\s+world_partition rows:/i.test(text);
-  const rabbitReady = isReadyHomeCard(rabbit) || /OK\s+game server sg\.\* RMQ connections/i.test(text);
-  const hasReview = [containers, listeners, database, games, rabbit, fls].some((item) => /^Needs Review$/i.test(item.label) || /^WARN$/i.test(item.status));
-  return gamesReady && databaseReady && rabbitReady && hasReview;
+  const gamesReady = isReadyHomeCard(cards.games) || (/OK\s+Survival_1\s+ready/i.test(text) && /OK\s+Overmap\s+ready/i.test(text));
+  const databaseReady = isReadyHomeCard(cards.database) || /OK\s+world_partition rows:/i.test(text);
+  const messagingReady = isReadyHomeCard(cards.messaging) || /OK\s+game server sg\.\* RMQ connections/i.test(text);
+  const hasReview = Object.values(cards).some((item) => /^Needs Review$/i.test(item.label) || /^WARN$/i.test(item.status));
+  return gamesReady && databaseReady && messagingReady && hasReview;
 }
 
 function isReadyHomeCard(item: { label: string; status: string; detail: string }) {
@@ -1653,18 +2019,68 @@ function isTerminalTask(status: string) {
   return ["succeeded", "failed", "cancelled"].includes(status);
 }
 
-export function isHomeActionComplete(status: string, readiness: string) {
+// Game servers are the slowest part of a start: measured on a live restart, two
+// maps took roughly four minutes to reach READY, and a host with more always-on
+// maps brings them up in batches (DUNE_ALWAYS_ON_STARTUP_PARALLELISM). So wait
+// for them -- but never indefinitely. A map that stays WARMING must not pin the
+// console in "Starting" with its controls disabled forever, so once this window
+// has passed a battlegroup whose only remaining gap is warming maps counts as
+// started. This is a backstop, not a target.
+export const GAME_SERVER_WARMUP_GRACE_MS = 10 * 60 * 1000;
+
+// Measured on the 2026-08-31 live restart: a map reached READY roughly three
+// minutes after its container started. Four gives margin.
+const GAME_SERVER_WARMUP_PER_BATCH_MS = 4 * 60 * 1000;
+
+// A backstop on the backstop. However many maps are configured, the console
+// stops waiting eventually.
+const GAME_SERVER_WARMUP_GRACE_CAP_MS = 45 * 60 * 1000;
+
+// How long a start may legitimately take before a still-warming map is treated
+// as "close enough to done".
+//
+// A flat budget was wrong once the section reported every always-on map rather
+// than two: the autoscaler brings them up a few at a time
+// (DUNE_ALWAYS_ON_STARTUP_PARALLELISM, clamped by host memory safety), so the
+// wait scales with the number of BATCHES, not the number of maps. status.sh
+// publishes the concurrency on the section's Note: line -- which every row
+// parser already ignores -- so no extra request is needed to read it.
+//
+// Falls back to the flat floor when the section or the note is absent, so an
+// older backend or a roster that could not be read behaves exactly as before.
+export function gameServerWarmupGraceMs(status: string) {
+  const rows = gameServerRows(status);
+  if (!rows.length) return GAME_SERVER_WARMUP_GRACE_MS;
+  const noted = String(status || "").match(/starting\s+(\d+)\s+at a time/i);
+  const concurrency = Math.max(1, Number(noted?.[1]) || 1);
+  const batches = Math.ceil(rows.length / concurrency);
+  return Math.min(
+    GAME_SERVER_WARMUP_GRACE_CAP_MS,
+    Math.max(GAME_SERVER_WARMUP_GRACE_MS, batches * GAME_SERVER_WARMUP_PER_BATCH_MS)
+  );
+}
+
+export function isHomeActionComplete(status: string, readiness: string, elapsedMs: number = Number.POSITIVE_INFINITY) {
   const statusReady = isHomeStartComplete(status, readiness);
   const readinessReady = isHomeReadinessOperational(readiness);
   const summary = summarizeHomeStatus(status, readiness, "", false);
-  const games = summary.health.find((item) => item.label === "Game Servers");
+  const games = summary.health.find((item) => item.id === "games");
   const healthOk = summary.health.length > 0 && summary.health.every((item) =>
     /^OK$/i.test(String(item.value || "")) && /^Ready$/i.test(String(item.status || ""))
   );
-  const nonGameHealthOk = summary.health.filter((item) => item.label !== "Game Servers").every((item) =>
+  const nonGameHealthOk = summary.health.filter((item) => item.id !== "games").every((item) =>
     /^OK$/i.test(String(item.value || "")) && /^Ready$/i.test(String(item.status || ""))
   );
-  const gamesWarming = /^Warming$/i.test(String(games?.value || ""));
+  const gamesWarming = isGameServersComingUp(games?.value);
+  // Inside the grace window a warming map blocks completion outright. None of
+  // the signals below can stand in for it: isHomeReadinessOperational only
+  // proves the map containers are up, not that the maps are playable.
+  //
+  // Read the raw summariser rather than gamesWarming above: summarizeHomeStatus
+  // rewrites every health row to OK once readiness reports READY (readyOverride),
+  // so the view model reports a warming map as OK and the gate would never fire.
+  const rawGamesWarming = isGameServersComingUp(summarizeGameServers(status).label);
+  if (rawGamesWarming && elapsedMs < gameServerWarmupGraceMs(status)) return false;
   return statusReady || readinessReady || (healthOk || (gamesWarming && nonGameHealthOk));
 }
 
@@ -1685,26 +2101,86 @@ function isHomeReadinessOperational(readiness: string) {
   return requiredSignals.every((pattern) => pattern.test(readiness));
 }
 
+// status.sh prints ten container rows, but only these eight are battlegroup
+// services. dune-orchestrator is the control plane -- it creates and removes the
+// others, so it is always Up, including with the battlegroup stopped -- and
+// dune-coriolis-coordinator is optional (DUNE_CORIOLIS_COORDINATOR_ENABLED=0
+// deletes it, and start-all treats a failed start as non-fatal). Scanning the
+// printed rows instead of this list makes "all down" unreachable, "any up"
+// always true, and reports a disabled coordinator as a container problem.
+const BATTLEGROUP_CONTAINERS = [
+  "dune-postgres",
+  "dune-rmq-admin",
+  "dune-rmq-game",
+  "dune-text-router",
+  "dune-director",
+  "dune-server-gateway",
+  "dune-server-survival-1",
+  "dune-server-overmap"
+];
+
+// docker's own status strings reach these rows verbatim, so a paused container
+// arrives as "Up 3 hours (Paused)" -- it matches \bUp\b and would otherwise read
+// as healthy. status.sh itself only ever emits a docker status, the literal
+// "stopped", or the literal "missing"; the rest are kept for readiness text and
+// any other producer of a container table.
+const CONTAINER_DOWN = /\b(missing|stopped|exited|dead|paused|not running)\b/i;
+
+// A completed stop, which is a different question from "is this container
+// down". A paused container is down but has not stopped, so the restart
+// lifecycle must not read it as a finished stop.
+const CONTAINER_STOPPED = /\b(missing|stopped|exited|dead|not running)\b/i;
+
+// The status table pads columns, so the name is everything before the first gap.
+function containerLineName(line: string) {
+  const trimmed = line.trim();
+  const firstSpace = trimmed.search(/\s/);
+  return firstSpace < 0 ? "" : trimmed.slice(0, firstSpace);
+}
+
+function containerSectionLines(status: string) {
+  return sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
+}
+
+// The single definition of which printed rows belong to the battlegroup, and
+// the only way to ask about their status. Two shapes, deliberately NOT
+// interchangeable -- collapsing either onto the other is a real bug:
+//
+//   rows()          the printed rows for the eight. A name with no printed row
+//                   is simply absent, so the length shrinks. Callers that count
+//                   rows or test emptiness want this.
+//   all() / any()   quantify over the eight *names*. A name with no printed row
+//                   makes all() false, so a truncated or partial table can
+//                   never read as "they are all down" / "they are all up".
+//
+// all() and any() match the status text only, via containerStatusLineHas, so a
+// container's name can never satisfy a status pattern.
+const battlegroup = {
+  rows(status: string) {
+    return containerSectionLines(status).filter((line) =>
+      BATTLEGROUP_CONTAINERS.includes(containerLineName(line).toLowerCase())
+    );
+  },
+  all(status: string, pattern: RegExp) {
+    const lines = containerSectionLines(status);
+    return BATTLEGROUP_CONTAINERS.every((name) =>
+      lines.some((line) => containerStatusLineHas(name, line, pattern))
+    );
+  },
+  any(status: string, pattern: RegExp) {
+    const lines = containerSectionLines(status);
+    return BATTLEGROUP_CONTAINERS.some((name) =>
+      lines.some((line) => containerStatusLineHas(name, line, pattern))
+    );
+  }
+};
+
 export function isHomeStopComplete(status: string, readiness: string) {
   if (getHomeServerState(status, readiness).stopped) return true;
-  const requiredContainers = [
-    "dune-postgres",
-    "dune-rmq-admin",
-    "dune-rmq-game",
-    "dune-text-router",
-    "dune-director",
-    "dune-server-gateway",
-    "dune-server-survival-1",
-    "dune-server-overmap"
-  ];
-  const containerLines = sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
-  const statusContainersStopped = containerLines.length >= requiredContainers.length && requiredContainers.every((name) =>
-    containerLines.some((line) => containerStatusLineHas(name, line, /\b(missing|stopped|exited|dead|not running)\b/i))
-  );
-  if (statusContainersStopped) return true;
+  if (battlegroup.all(status, CONTAINER_STOPPED)) return true;
 
   const text = `${status}\n${readiness}`;
-  const readinessContainersStopped = requiredContainers.every((name) =>
+  const readinessContainersStopped = BATTLEGROUP_CONTAINERS.every((name) =>
     textHasContainerReadiness(text, "FAIL", name)
   );
   const allListenersMissing = sectionLines(status, "Listeners").filter((line) => !/^CHECK\s+PORT\s+STATUS/i.test(line)).length >= 6 &&
@@ -1715,60 +2191,21 @@ export function isHomeStopComplete(status: string, readiness: string) {
 
 function hasRestartStopSignal(status: string, readiness: string) {
   const text = `${status}\n${readiness}`;
-  const requiredContainers = [
-    "dune-postgres",
-    "dune-rmq-admin",
-    "dune-rmq-game",
-    "dune-text-router",
-    "dune-director",
-    "dune-server-gateway",
-    "dune-server-survival-1",
-    "dune-server-overmap"
-  ];
-  const containerLines = sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
-  return requiredContainers.some((name) =>
-    containerLines.some((line) => containerStatusLineHas(name, line, /\b(missing|stopped|exited|dead|not running)\b/i)) ||
-    textHasContainerReadiness(text, "FAIL", name)
-  );
+  return battlegroup.any(status, CONTAINER_STOPPED) ||
+    BATTLEGROUP_CONTAINERS.some((name) => textHasContainerReadiness(text, "FAIL", name));
 }
 
 function hasRestartStartSignal(status: string, readiness: string) {
   const text = `${status}\n${readiness}`;
-  const requiredContainers = [
-    "dune-postgres",
-    "dune-rmq-admin",
-    "dune-rmq-game",
-    "dune-text-router",
-    "dune-director",
-    "dune-server-gateway",
-    "dune-server-survival-1",
-    "dune-server-overmap"
-  ];
-  const containerLines = sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
-  return requiredContainers.some((name) =>
-    containerLines.some((line) => containerStatusLineHas(name, line, /\bUp\b/i)) ||
-    textHasContainerReadiness(text, "OK", name)
-  );
+  return battlegroup.any(status, /\bUp\b/i) ||
+    BATTLEGROUP_CONTAINERS.some((name) => textHasContainerReadiness(text, "OK", name));
 }
 
-function isHomeStartComplete(status: string, readiness: string) {
+export function isHomeStartComplete(status: string, readiness: string) {
   const serverState = getHomeServerState(status, readiness);
   if (serverState.stopped) return false;
 
-  const containerLines = sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
-  const requiredContainers = [
-    "dune-postgres",
-    "dune-rmq-admin",
-    "dune-rmq-game",
-    "dune-text-router",
-    "dune-director",
-    "dune-server-gateway",
-    "dune-server-survival-1",
-    "dune-server-overmap"
-  ];
-  const containersReady = requiredContainers.every((name) =>
-    containerLines.some((line) => containerStatusLineHas(name, line, /^Up\b/i))
-  );
+  const containersReady = battlegroup.all(status, /^Up\b/i);
 
   const listenerLines = sectionLines(status, "Listeners").filter((line) => !/^CHECK\s+PORT\s+STATUS/i.test(line));
   const listenersReady = listenerLines.length > 0 && !listenerLines.some((line) => /\b(MISSING|FAIL|ERROR)\b/i.test(line));
@@ -1779,10 +2216,17 @@ function isHomeStartComplete(status: string, readiness: string) {
   const flsLines = sectionLines(status, "Funcom/FLS summary");
   const flsReady = flsLines.length > 0 && !flsLines.some((line) => /:\s*(WAIT|FAIL|ERROR|MISSING)/i.test(line));
 
-  const rabbit = summarizeRabbit(status);
-  const rabbitReady = /^OK$/i.test(rabbit.label) && /^Ready$/i.test(rabbit.status);
+  const messaging = summarizeMessaging(status);
+  const messagingReady = /^OK$/i.test(messaging.label) && /^Ready$/i.test(messaging.status);
 
-  return containersReady && listenersReady && databaseReady && flsReady && rabbitReady;
+  // A battlegroup whose containers are up but whose maps are still WARMING is
+  // not ready to play on, so the maps gate "started" like everything else.
+  // isHomeActionComplete owns the grace window that stops a map stuck warming
+  // from hanging the lifecycle on this.
+  const games = summarizeGameServers(status);
+  const gameServersReady = /^OK$/i.test(games.label) && /^Ready$/i.test(games.status);
+
+  return containersReady && listenersReady && databaseReady && flsReady && messagingReady && gameServersReady;
 }
 
 // dune-postgres, dune-orchestrator and dune-coriolis-coordinator all run
@@ -1809,11 +2253,10 @@ export function isGameStackDown(status: string) {
 }
 
 export function containerStatusLineHas(containerName: string, line: string, statusPattern: RegExp) {
+  const name = containerLineName(line);
+  if (!name || name.toLowerCase() !== containerName.toLowerCase()) return false;
   const trimmed = line.trim();
   const firstSpace = trimmed.search(/\s/);
-  if (firstSpace < 0) return false;
-  const name = trimmed.slice(0, firstSpace);
-  if (name.toLowerCase() !== containerName.toLowerCase()) return false;
   // Status output may pad columns with multiple spaces or tabs. Normalize
   // the remainder before applying either anchored or unanchored patterns.
   return statusPattern.test(trimmed.slice(firstSpace + 1).trimStart());
@@ -1826,23 +2269,80 @@ function textHasContainerReadiness(text: string, state: "OK" | "FAIL", container
   });
 }
 
-function attentionHomeHealthCards() {
-  const item = { label: "Needs Review", status: "WARN", detail: "" };
-  return {
-    containers: item,
-    listeners: item,
-    database: item,
-    games: item,
-    rabbit: item,
-    fls: item
-  };
+// Applied when the battlegroup is down or an action failed. The two are not
+// the same: a stopped battlegroup has a known cause and every subsystem is off,
+// while a failed start leaves the subsystems in whatever state the failure left
+// them. Saying "Stopped" for a failed start would be a false claim.
+// Every row gets the same card, so this is one card rather than a per-row map.
+type HomeRowSeverity = "fail" | "warn" | "transition" | "unknown" | "ok";
+
+// Order is load-bearing: transition MUST be tested before warn, because
+// normalizeStatus("Starting") returns "warn". Checking normalizeStatus first
+// would classify every transitional row as a warning and make the hero read
+// "Needs Review" through every normal start.
+//
+// Status first, value second: three transitional values (Warming, Waiting,
+// Getting Ready) share the one Starting status, so keying on value alone lets a
+// future fourth slip through as ok.
+function homeHealthRowSeverity(row: { value: string; status: string }): HomeRowSeverity {
+  if (/^Starting$/i.test(row.status) || /^(Warming|Waiting|Getting Ready)$/i.test(row.value)) return "transition";
+  const normalized = normalizeStatus(String(row.status || ""));
+  if (normalized === "fail") return "fail";
+  if (normalized === "warn") return "warn";
+  if (/^Unknown$/i.test(row.status)) return "unknown";
+  return "ok";
+}
+
+const HOME_ROW_SEVERITY_ORDER: HomeRowSeverity[] = ["fail", "warn", "transition"];
+
+// The hero is never greener than its worst health row.
+//
+// "OK" is produced in four independent expressions -- the Overall ternary's
+// first branch, liveOverall's readinessReady arm, friendlyHomeOverall("READY"),
+// and friendlyHomeOverall's passthrough into inferStatus's pass-list -- each
+// with its own guard set. Guarding them one at a time is what let a green
+// heading sit above a "Needs Review" row three separate times. This is the one
+// place they all flow through, so a guard added here protects every producer,
+// including ones added later.
+//
+// Only ever downgrades. A non-green heading is returned byte-identical, so
+// nothing that reads the hero can be made *more* optimistic by this.
+//
+// `unknown` deliberately does not downgrade: an absent reading is not a
+// severity, and preferKnownHomeHealth exists precisely to paper over first-paint
+// gaps. Making Unknown a trigger would flicker the heading on every cold load.
+export function applyHeroHealthFloor(candidate: string, rows: readonly { value: string; status: string }[]) {
+  if (!heroReadsGreen(candidate)) return candidate;
+  for (const severity of HOME_ROW_SEVERITY_ORDER) {
+    const worst = rows.find((row) => homeHealthRowSeverity(row) === severity);
+    if (!worst) continue;
+    // Transitional rows resolve to the fixed word rather than the row's own
+    // value: "Starting" is a first-class hero value everywhere downstream,
+    // where "Warming" badges Info and dots attention.
+    return severity === "transition" ? "Starting" : worst.value;
+  }
+  return candidate;
+}
+
+function attentionHomeHealthCard(reason: "stopped" | "failed") {
+  return reason === "stopped"
+    ? { label: "Stopped", status: "FAILED", detail: "" }
+    : { label: "Needs Review", status: "WARN", detail: "" };
 }
 
 function transitionHomeHealthCard(item: { label: string; status: string; detail: string }, runningAction: "start" | "stop" | "restart" | "") {
   if (runningAction !== "start" && runningAction !== "restart") return null;
   if (/^OK$/i.test(item.label) && /^Ready$/i.test(item.status)) return item;
-  if (/^Warming$/i.test(item.label)) return item;
+  if (isGameServersComingUp(item.label)) return item;
   return { label: "Getting Ready", status: "Starting", detail: "" };
+}
+
+const HOME_READY_CARD = { label: "OK", status: "Ready", detail: "" };
+
+// A row that positively reports a fault. Unknown is deliberately not one: it
+// means "no reading", which is exactly what a readiness all-clear may fill in.
+function homeCardReportsFault(card: { status: string }) {
+  return /^(WARN|FAILED)$/i.test(String(card.status || ""));
 }
 
 function preferKnownHomeHealth(primary: { label: string; status: string; detail: string }, fallback: { label: string; status: string; detail: string }) {
@@ -1852,8 +2352,10 @@ function preferKnownHomeHealth(primary: { label: string; status: string; detail:
 export function getHomeServerState(status: string, readiness: string) {
   const text = `${status}\n${readiness}`;
   const overall = findLineValue(status, ["overall"]);
-  const containerLines = sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
-  const allContainersMissing = containerLines.length >= 4 && containerLines.every((line) => /\b(missing|stopped|exited|dead)\b/i.test(line));
+  const containerLines = containerSectionLines(status);
+  // No length guard needed: all() quantifies over the eight names, so a name
+  // with no printed row already makes this false on an empty or partial table.
+  const allContainersMissing = battlegroup.all(status, CONTAINER_DOWN);
   const coreRuntimeContainerUp = containerLines.some((line) =>
     /^(dune-postgres|dune-rmq-admin|dune-rmq-game|dune-text-router|dune-server-survival-1|dune-server-overmap)\s+.*\bUp\b/i.test(line)
   );
@@ -1885,7 +2387,7 @@ export function getHomeServerState(status: string, readiness: string) {
   const databaseOnly = databaseUp && isGameStackDown(status);
   const stopped = !bootStarting && stoppedSignals.some(Boolean);
   const running = !stopped && runningSignals.some(Boolean);
-  const starting = bootStarting || (!stopped && !running && coreRuntimeContainerUp && (/\bUp\s+\d+/i.test(text) || /\b(WARMING|WAIT|STARTING)\b/i.test(text)));
+  const starting = bootStarting || (!stopped && !running && coreRuntimeContainerUp && (/\bUp\s+\d+/i.test(text) || /\b(WARMING|WAIT|QUEUED|STARTING)\b/i.test(text)));
   return { running, stopped, starting, databaseOnly };
 }
 
@@ -1895,27 +2397,32 @@ function isHomeBootStarting(status: string, readiness: string) {
   if (/\b(server|stack)\s+(is\s+)?(stopped|offline)\b/i.test(text) || /\bNo\s+(running\s+)?containers\b/i.test(text)) return false;
   if (/Overall:\s*(READY|STOPPED|OFFLINE)/i.test(status) || /^READY:/m.test(readiness)) return false;
   if (isGameStackDown(status)) return false;
-  const containerLines = sectionLines(status, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
-  const anyContainerUp = containerLines.some((line) => /\bUp\b/i.test(line));
+  const containerLines = containerSectionLines(status);
+  const battlegroupLines = battlegroup.rows(status);
+  const anyContainerUp = battlegroupLines.some((line) => /\bUp\b/i.test(line));
   const coreStartupContainerUp = containerLines.some((line) =>
     /^(dune-postgres|dune-rmq-admin|dune-rmq-game|dune-text-router|dune-server-survival-1|dune-server-overmap)\s+.*\bUp\b/i.test(line)
   );
-  const missingContainers = containerLines.filter((line) => /\b(missing|stopped|exited|dead|not running)\b/i.test(line)).length;
-  if (containerLines.length >= 8 && missingContainers >= 8 && !anyContainerUp) return false;
+  const missingContainers = battlegroupLines.filter((line) => CONTAINER_DOWN.test(line)).length;
+  if (battlegroupLines.length >= 8 && missingContainers >= 8 && !anyContainerUp) return false;
   const listenerLines = sectionLines(status, "Listeners").filter((line) => !/^CHECK\s+PORT\s+STATUS/i.test(line));
   const missingListeners = listenerLines.filter((line) => /\bMISSING\b/i.test(line)).length;
   const gameServersStopped = /Survival_1\s+NOT RUNNING/i.test(text) && /Overmap\s+NOT RUNNING/i.test(text);
   if (gameServersStopped && listenerLines.length > 0 && missingListeners === listenerLines.length && !anyContainerUp) return false;
   if (gameServersStopped && anyContainerUp && !coreStartupContainerUp) return false;
   const gameServerText = sectionLines(status, "Game servers").join("\n");
-  if (/Overall:\s*(WARMING|STARTING)/i.test(status) || /\b(WARMING|STARTING)\b/i.test(gameServerText)) return true;
+  if (/Overall:\s*(WARMING|STARTING)/i.test(status) || /\b(WARMING|QUEUED|STARTING)\b/i.test(gameServerText)) return true;
   const readinessStarting = coreStartupContainerUp &&
     /^\s*(WARN|FAIL)\s+container\s+dune-/im.test(readiness) &&
     !/^\s*OK\s+container\s+dune-server-(survival-1|overmap)\b/im.test(readiness);
-  return coreStartupContainerUp || readinessStarting || (coreStartupContainerUp && containerLines.length > 0 && missingContainers > 0) || (coreStartupContainerUp && listenerLines.length > 0 && missingListeners > 0);
+  return coreStartupContainerUp || readinessStarting || (coreStartupContainerUp && battlegroupLines.length > 0 && missingContainers > 0) || (coreStartupContainerUp && listenerLines.length > 0 && missingListeners > 0);
 }
 
-function homeOverallBadge(value: string) {
+// Colours nothing on screen: the hero dot reads homeStateDotTone(overall.value).
+// This produces identity[0].status, whose only remaining consumer is
+// homeNeedsWarmRefresh's poll-cadence check. Kept correct because a helper that
+// calls a failed readiness check "Ready" is wrong regardless of who reads it.
+export function homeOverallBadge(value: string) {
   const normalized = String(value || "").trim().toLowerCase();
   if (/\b(restarting|restart|stopping|starting)\b/.test(normalized)) return "WARN";
   if (/^stopped$/i.test(value)) return "WARN";
@@ -1923,6 +2430,17 @@ function homeOverallBadge(value: string) {
   if (/^issue(?: detected)?$/i.test(value)) return "WARN";
   if (/warming/i.test(value)) return "Info";
   if (/stopped|not running|offline/i.test(value)) return "WARN";
+  // Only ever the label for a readiness run that did NOT pass (a passing one
+  // reads "OK"), but inferStatus matches "checked" against its pass list.
+  if (normalized === "readiness checked") return "WARN";
+  // Something is flagged, but inferStatus finds no keyword and falls through to
+  // "Info" -- the same neutral as "Unknown", i.e. "nothing known yet".
+  if (normalized === "needs review") return "WARN";
+  // The Funcom/FLS row's value when the stored token is rejected. Only reachable
+  // here since applyHeroHealthFloor mirrors the worst row into the hero, and
+  // inferStatus matches no keyword in the phrase -- so a credential fault would
+  // otherwise badge "Unknown", i.e. "nothing known yet".
+  if (normalized === "token mismatch detected") return "Failed";
   return inferStatus(value);
 }
 
@@ -1975,72 +2493,181 @@ function conciseTaskMessage(text: string) {
   return line.replace(/^dune\s+\w+\s+failed\s+with\s+exit\s+\d+[:\s-]*/i, "").slice(0, 220);
 }
 
-function summarizeContainers(text: string) {
-  const lines = sectionLines(text, "Containers").filter((line) => !/^SERVICE\s+STATUS/i.test(line));
+export function summarizeContainers(text: string) {
+  // Scoped to the battlegroup eight: a coordinator that is off by configuration
+  // is not a container problem, and reporting it as one put "Needs Review" on
+  // the row while the other five read OK.
+  const lines = battlegroup.rows(text);
   if (!lines.length) return { label: "Unknown", status: "Unknown", detail: "" };
-  const bad = lines.find((line) => /\b(missing|stopped|exited|dead)\b/i.test(line));
-  return bad ? { label: "Needs Review", status: "WARN", detail: "" } : { label: "OK", status: "Ready", detail: "" };
+  // Denominator is the expected eight, not the printed rows: a container with
+  // no row at all is missing, and "7 of 7" would hide exactly that.
+  const up = lines.filter((line) => !CONTAINER_DOWN.test(line)).length;
+  const detail = `${up} of ${BATTLEGROUP_CONTAINERS.length}`;
+  const bad = lines.find((line) => CONTAINER_DOWN.test(line));
+  return bad ? { label: "Needs Review", status: "WARN", detail } : { label: "OK", status: "Ready", detail };
 }
 
-function summarizeListeners(text: string) {
-  const lines = sectionLines(text, "Listeners").filter((line) => !/^CHECK\s+PORT\s+STATUS/i.test(line));
-  if (!lines.length) return { label: "Unknown", status: "Unknown", detail: "" };
-  const bad = lines.find((line) => /\b(MISSING|FAIL|ERROR)\b/i.test(line));
-  return bad ? { label: "Needs Review", status: "WARN", detail: "" } : { label: "OK", status: "Ready", detail: "" };
+// Which services each row owns. Every battlegroup container has exactly one
+// home, so nothing is counted twice: the Containers and Listeners rows used to
+// re-report services that Database, Messaging, Game servers and Funcom/FLS
+// already covered.
+const DATABASE_CONTAINERS = ["dune-postgres"];
+const MESSAGING_CONTAINERS = ["dune-rmq-admin", "dune-rmq-game", "dune-text-router"];
+const BATTLEGROUP_SERVICE_CONTAINERS = ["dune-director", "dune-server-gateway"];
+
+// Listener rows keyed by `${port}/${protocol}` -- the only unique key. Labels
+// repeat: two partitions of Survival_1 both print "Survival_1 clients", on
+// different ports, and a map may be named anything Funcom's world template
+// contains. Ports come from the instance's resolved configuration, not the
+// stock values, so a host on non-default ports still attributes correctly.
+function listenerStates(text: string) {
+  const states = new Map<string, string>();
+  for (const line of sectionLines(text, "Listeners")) {
+    const match = line.match(/^(.+?)\s+(\d{2,5})\/(tcp|udp)\s+(\S+)$/i);
+    if (match) states.set(`${match[2]}/${match[3].toLowerCase()}`, match[4].toUpperCase());
+  }
+  return states;
+}
+
+// The six TCP service ports, by owning row. Everything else in the section --
+// every map client/S2S port, fixed or dynamically spawned -- belongs to Game
+// servers, so no listener row is unowned and none is owned twice.
+function ownedListenerKeys() {
+  const ports = getServerPorts();
+  return {
+    database: [`${ports.postgres}/tcp`],
+    messaging: [`${ports.rmqAdmin}/tcp`, `${ports.rmqGame}/tcp`, `${ports.rmqGameHttp}/tcp`, `${ports.textRouter}/tcp`],
+    battlegroup: [`${ports.director}/tcp`]
+  };
+}
+
+// A port that is not printed at all is unknown, not failed: status.sh omits
+// rows whose port could not be resolved.
+function listenerPortsOk(states: Map<string, string>, keys: string[]) {
+  return keys.every((key) => !states.has(key) || states.get(key) === "OK");
+}
+
+function mapListenerPortsOk(text: string) {
+  const owned = ownedListenerKeys();
+  const service = new Set([...owned.database, ...owned.messaging, ...owned.battlegroup]);
+  const states = listenerStates(text);
+  return [...states.entries()].every(([key, state]) => service.has(key) || state === "OK");
+}
+
+// How many of a row's containers are up, from the container table.
+function serviceContainerState(text: string, names: string[]) {
+  const lines = containerSectionLines(text);
+  const rows = names.map((name) => lines.find((line) => containerLineName(line).toLowerCase() === name));
+  return {
+    listed: rows.filter(Boolean).length,
+    up: rows.filter((line) => line && !CONTAINER_DOWN.test(line)).length,
+    total: names.length
+  };
+}
+
+// Counts are services, not checks: a closed port turns the row amber without
+// changing the denominator, so "Messaging" reads 3 of 3 rather than 7 of 7.
+function summarizeServiceGroup(text: string, names: string[], portKeys: string[]) {
+  const { listed, up, total } = serviceContainerState(text, names);
+  if (!listed) return { label: "Unknown", status: "Unknown", detail: "" };
+  const detail = `${up} of ${total}`;
+  if (up < total) return { label: "Needs Review", status: "WARN", detail };
+  if (!listenerPortsOk(listenerStates(text), portKeys)) return { label: "Needs Review", status: "WARN", detail };
+  return { label: "OK", status: "Ready", detail };
+}
+
+function summarizeMessaging(text: string) {
+  const group = summarizeServiceGroup(text, MESSAGING_CONTAINERS, ownedListenerKeys().messaging);
+  if (!/^OK$/i.test(group.label)) return group;
+  // This row also owns the game broker's connection report: the containers can
+  // all be up while no game server has actually connected to the broker.
+  const lines = sectionLines(text, "RabbitMQ game connections");
+  if (lines.some((line) => /not running|missing|failed/i.test(line))) {
+    return { ...group, label: "Needs Review", status: "WARN" };
+  }
+  const director = numberAfterLabel(lines, "Director connections");
+  const game = numberAfterLabel(lines, "Game server connections");
+  if ((director !== null && director < 1) || (game !== null && game < 1)) {
+    return { ...group, label: "Needs Review", status: "WARN" };
+  }
+  return group;
+}
+
+function summarizeBattlegroupServices(text: string) {
+  return summarizeServiceGroup(text, BATTLEGROUP_SERVICE_CONTAINERS, ownedListenerKeys().battlegroup);
 }
 
 function summarizeDatabase(text: string) {
   const value = findLineValue(sectionLines(text, "Database").join("\n"), ["World partitions"]);
   if (!value) return { label: "Unknown", status: "Unknown", detail: "" };
   const count = Number(value);
-  if (Number.isFinite(count) && count > 0) return { label: "OK", status: "Ready", detail: "" };
-  return { label: "Needs Review", status: "WARN", detail: "" };
+  // This row owns dune-postgres outright, so it reports the container and its
+  // port as well as the world data. It carries a count like every other row --
+  // one service, so "1 of 1" -- rather than the partition figure, which is a
+  // property of the world and not a measure of readiness.
+  const { up, total } = serviceContainerState(text, DATABASE_CONTAINERS);
+  const detail = `${up} of ${total}`;
+  const portsOk = listenerPortsOk(listenerStates(text), ownedListenerKeys().database);
+  const ready = Number.isFinite(count) && count > 0 && up === total && portsOk;
+  if (ready) return { label: "OK", status: "Ready", detail };
+  return { label: "Needs Review", status: "WARN", detail };
+}
+
+// The map rows of the Game servers section: the header and any Note: line are
+// not servers. status.sh reports one row per expected always-on map server, so
+// the length of this is the denominator for how long a start should take.
+function gameServerRows(text: string) {
+  return sectionLines(text, "Game servers").filter((line) => !/^MAP\s+STATE\s+UPTIME/i.test(line) && !/^Note:/i.test(line));
+}
+
+// "Warming" and "Waiting" both mean the maps are on their way up. Every caller
+// that cares about that distinction-free question goes through here: a bare
+// /^Warming$/i check would silently stop matching the moment a start is early
+// enough to report Waiting.
+export function isGameServersComingUp(label: unknown) {
+  return /^(Warming|Waiting)$/i.test(String(label || ""));
 }
 
 function summarizeGameServers(text: string) {
-  const lines = sectionLines(text, "Game servers").filter((line) => !/^MAP\s+STATE\s+UPTIME/i.test(line) && !/^Note:/i.test(line));
+  const lines = gameServerRows(text);
   if (!lines.length) return { label: "Unknown", status: "Unknown", detail: "" };
   const bad = lines.find((line) => /\b(ERROR|NOT RUNNING|MISSING)\b/i.test(line));
-  const wait = lines.find((line) => /\b(WARMING|WAIT)\b/i.test(line));
-  if (bad) return { label: "Needs Review", status: "WARN", detail: "" };
-  if (wait) return { label: "Warming", status: "Info", detail: "" };
-  return { label: "OK", status: "Ready", detail: "" };
-}
-
-function summarizeRabbit(text: string) {
-  const lines = sectionLines(text, "RabbitMQ game connections");
-  if (!lines.length) return { label: "Unknown", status: "Unknown", detail: "" };
-  if (lines.some((line) => /not running|missing|failed/i.test(line))) return { label: "Needs Review", status: "WARN", detail: "" };
-  const director = numberAfterLabel(lines, "Director connections");
-  const game = numberAfterLabel(lines, "Game server connections");
-  if ((director !== null && director < 1) || (game !== null && game < 1)) {
-    return { label: "Needs Review", status: "WARN", detail: "" };
-  }
-  return { label: "OK", status: "Ready", detail: "" };
+  // WARMING means the map server is up and loading. WAIT means it has not been
+  // spawned yet -- world servers start after Postgres, RabbitMQ, the text
+  // router and the director, so early in a start they are waiting on their
+  // dependencies rather than warming. Reporting both as "Warming" overstated
+  // how far along a start was. QUEUED is a map the autoscaler has not reached
+  // yet, so it is waiting too.
+  const warming = lines.find((line) => /\bWARMING\b/i.test(line));
+  const waiting = lines.find((line) => /\b(WAIT|QUEUED)\b/i.test(line));
+  const detail = `${lines.filter((line) => /\bREADY\b/i.test(line)).length} of ${lines.length}`;
+  if (bad) return { label: "Needs Review", status: "WARN", detail };
+  // Starting, not Info: this is a transitional state and the hero says
+  // "Starting" at the same moment. Info read as a neutral aside for something
+  // the operator is actively waiting on.
+  if (warming) return { label: "Warming", status: "Starting", detail };
+  if (waiting) return { label: "Waiting", status: "Starting", detail };
+  // This row owns every listener port that is not one of the six TCP service
+  // ports -- all the map client and S2S ports, fixed and dynamic alike. Without
+  // this they would be unowned once the flat Listeners row went away.
+  if (!mapListenerPortsOk(text)) return { label: "Needs Review", status: "WARN", detail };
+  return { label: "OK", status: "Ready", detail };
 }
 
 function summarizeFls(text: string) {
-  const lines = sectionLines(text, "Funcom/FLS summary");
+  // Funcom/FLS is the LAST section status.sh prints, so sectionLines runs to end
+  // of output and picks up the trailing "Tip:" lines with it. Narrow to rows
+  // that actually carry a state: counting the tips made a healthy host read
+  // "4 of 6", and only luck kept them out of the failure check below -- one of
+  // those tips contains the word "fail".
+  const lines = sectionLines(text, "Funcom/FLS summary").filter((line) =>
+    /:\s*(OK|WAIT|FAIL|ERROR|MISSING)\b/i.test(line)
+  );
   if (!lines.length) return { label: "Unknown", status: "Unknown", detail: "" };
   const bad = lines.find((line) => /:\s*(WAIT|FAIL|ERROR|MISSING)/i.test(line));
-  if (bad) return { label: "Needs Review", status: "WARN", detail: "" };
-  return { label: "OK", status: "Ready", detail: "" };
-}
-
-function summarizeReadinessContainers(text: string) {
-  const lines = readinessRows(text, /container\s+dune-/i);
-  if (!lines.length) return { label: "Unknown", status: "Unknown", detail: "" };
-  return lines.every((line) => /^OK\s+/i.test(line))
-    ? { label: "OK", status: "Ready", detail: "" }
-    : { label: "Needs Review", status: "WARN", detail: "" };
-}
-
-function summarizeReadinessListeners(text: string) {
-  const lines = readinessRows(text, /\b(TCP|UDP)\s+\d+/i);
-  if (!lines.length) return { label: "Unknown", status: "Unknown", detail: "" };
-  return lines.every((line) => /^OK\s+/i.test(line))
-    ? { label: "OK", status: "Ready", detail: "" }
-    : { label: "Needs Review", status: "WARN", detail: "" };
+  const detail = `${lines.filter((line) => /:\s*OK\b/i.test(line)).length} of ${lines.length}`;
+  if (bad) return { label: "Needs Review", status: "WARN", detail };
+  return { label: "OK", status: "Ready", detail };
 }
 
 function summarizeReadinessDatabase(text: string) {
@@ -2099,7 +2726,15 @@ function findPopulation(text: string) {
 function normalizePopulationPair(current: string, max: string) {
   const normalizedCurrent = /^unknown$/i.test(current) ? "?" : current;
   const normalizedMax = /^unknown$/i.test(max) ? "?" : max;
-  if (normalizedCurrent === "?" && normalizedMax === "?") return "";
+  // An unknown CURRENT count is not a count. A stopped battlegroup prints
+  // "Population: unknown/60", and rendering that as "?/60 online" states a
+  // player figure nobody measured. The capacity half may still be unknown --
+  // "14/?" is a real reading of 14 players -- so only the current side decides.
+  //
+  // This used to be handled by suppressing the whole segment whenever the HERO
+  // read stopped/starting, which coupled a population decision to whatever word
+  // the heading happened to show.
+  if (normalizedCurrent === "?") return "";
   return `${normalizedCurrent}/${normalizedMax}`;
 }
 

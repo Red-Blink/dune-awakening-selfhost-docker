@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getHomeServerState, isGameStackDown } from "./ServerPanels";
+import { getHomeServerState, isGameStackDown, summarizeHomeStatus } from "./ServerPanels";
 
 // Verbatim from a host after a system restore: the console started Postgres
 // itself, and nothing else in the Battlegroup is up. Every field the state
@@ -86,5 +86,35 @@ describe("isGameStackDown", () => {
       "dune-rmq-admin             missing"
     ].join("\n");
     expect(isGameStackDown(partial)).toBe(false);
+  });
+});
+
+describe("Home rows on a host where only Postgres is up", () => {
+  // What status.sh adds once Postgres answers: its listener and the world data.
+  const status = [
+    restoredHostStatus,
+    "",
+    "=== Listeners ===",
+    "CHECK                    PORT     STATUS",
+    "Postgres localhost       15432/tcp OK",
+    "",
+    "=== Database ===",
+    "World partitions: 30"
+  ].join("\n");
+  const summary = summarizeHomeStatus(status, "", "", false);
+  const row = (label: string) => summary.health.find((item) => item.label === label);
+
+  it("heads the page Database Only", () => {
+    expect(summary.identity.find((item) => item.label === "Overall")?.value).toBe("Database Only");
+  });
+
+  it("does not report the running database as stopped", () => {
+    expect(row("Database")).toMatchObject({ value: "OK", status: "Ready", detail: "1 of 1" });
+  });
+
+  it("still reports the rest of the battlegroup stopped", () => {
+    for (const label of ["Messaging", "Battlegroup services", "Game servers", "Funcom/FLS"]) {
+      expect(row(label)).toMatchObject({ value: "Stopped", status: "FAILED" });
+    }
   });
 });
