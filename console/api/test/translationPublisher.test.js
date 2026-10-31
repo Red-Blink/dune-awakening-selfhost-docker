@@ -7,7 +7,7 @@ test('approved batch writes only reviewed locale files, creates one PR and dispa
   const fetchImpl=async(url,options={})=>{
     requests.push([url,options]);const body=options.body?JSON.parse(options.body):null;
     let result={};let status=200;
-    if(url==='https://dunedocker.app/api/v1/translations/releases/pending')result={batches:[{id,entries:[{lang:'DE',source:'Home',translation:'Reviewed Startseite',credit:'Desert Helper'}]}]};
+    if(url==='https://dunedocker.app/api/v1/translations/releases/pending')result={batches:[{id,entries:[{reference:'TR-000123',lang:'DE',source:'Home',translation:'Reviewed Startseite',credit:'Desert Helper'}]}]};
     else if(url.includes('/pulls?'))result=pr?[pr]:[];
     else if(url.endsWith('/git/ref/heads/translations/'+id))status=404;
     else if(url.endsWith('/git/ref/heads/main'))result={object:{sha:'parent'}};
@@ -24,6 +24,7 @@ test('approved batch writes only reviewed locale files, creates one PR and dispa
   assert.equal((await prepareTranslationPRs({token:'synthetic-workflow-token',fetchImpl}))[0].existing,false);
   assert.deepEqual(tree.tree.map(item=>item.path),['console/api/data/i18n-reviewed/DE.json','console/api/data/i18n-reviewed/credits.json']);
   assert.equal(JSON.parse(tree.tree[0].content).Home,'Reviewed Startseite');assert.ok(tree.tree[1].content.includes('Desert Helper'));assert.equal(dispatches,1);
+  assert.ok(requests.some(([url,options])=>url.endsWith('/pulls')&&JSON.parse(options.body).body.includes('[TR-000123](https://dunedocker.app/translations.html#TR-000123)')));
   assert.equal((await prepareTranslationPRs({token:'synthetic-workflow-token',fetchImpl}))[0].existing,true);assert.equal(commits,1);assert.equal(dispatches,1);
   assert.ok(requests.every(([url])=>url.startsWith('https://api.github.com/repos/Red-Blink/dune-awakening-selfhost-docker/')||url==='https://dunedocker.app/api/v1/translations/releases/pending'));
 });

@@ -16,8 +16,8 @@ test('only reviewed phrases with intact placeholders can be submitted',()=>{
 test('relay signs only the correction using a persistent private identity, with no server credentials',async t=>{
   const directory=mkdtempSync(join(tmpdir(),'translation-relay-'));t.after(()=>rmSync(directory,{recursive:true,force:true}));
   const bodies=[];
-  const fetchImpl=async(url,options)=>{assert.equal(url,'https://dunedocker.app/api/v1/translations/suggestions');assert.equal(options.redirect,'error');const body=JSON.parse(options.body);bodies.push(body);assert.ok(verify(null,Buffer.from(submissionMessage(body)),createPublicKey({key:Buffer.from(body.publicKey,'base64'),format:'der',type:'spki'}),Buffer.from(body.signature,'base64')));return {ok:true,json:async()=>({id:body.id})};};
-  for(let i=0;i<2;i++)await submitTranslationCorrection({lang:'DE',source:'Home',translation:'Start',credit:'Translator',current:'Startseite',password:'never-export-this'}, {secretsDir:directory},catalog,{fetchImpl});
+  const fetchImpl=async(url,options)=>{assert.equal(url,'https://dunedocker.app/api/v1/translations/suggestions');assert.equal(options.redirect,'error');const body=JSON.parse(options.body);bodies.push(body);assert.ok(verify(null,Buffer.from(submissionMessage(body)),createPublicKey({key:Buffer.from(body.publicKey,'base64'),format:'der',type:'spki'}),Buffer.from(body.signature,'base64')));return {ok:true,json:async()=>({id:body.id,reference:'TR-000123'})};};
+  for(let i=0;i<2;i++){const result=await submitTranslationCorrection({lang:'DE',source:'Home',translation:'Start',credit:'Translator',current:'Startseite',password:'never-export-this'}, {secretsDir:directory},catalog,{fetchImpl});assert.equal(result.reference,'TR-000123');}
   assert.equal(bodies[0].publicKey,bodies[1].publicKey);assert.notEqual(bodies[0].id,bodies[1].id);
   assert.equal(statSync(join(directory,'translation-contributor-key.pem')).mode&0o777,0o600);
   assert.ok(!JSON.stringify(bodies).includes('never-export-this'));

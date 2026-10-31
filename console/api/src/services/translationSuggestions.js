@@ -32,5 +32,5 @@ export async function submitTranslationCorrection(input, config, catalog, { fetc
   }
   const receipt = await response.json();
   if (!/^[0-9a-f-]{36}$/i.test(receipt.id || '')) throw new Error('The review service returned an invalid receipt.');
-  return { id: receipt.id, status: 'pending' };
+  return { id: receipt.id, ...(/^TR-[0-9]{6,16}$/.test(receipt.reference||'')?{reference:receipt.reference}:{}), status: 'pending' };
 }

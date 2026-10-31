@@ -15,27 +15,28 @@ function decodeText(value) {
   }).replace(/\s+/g, " ").trim();
 }
 
-export function extractUiPhrases(source, fileName = "Component.tsx") {
+export function extractUiPhrases(source, fileName = "Component.tsx", onPhrase = () => {}) {
   const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const phrases = new Set();
-  const add = value => {
+  const add = (value, node) => {
     const text = decodeText(value);
     if (text.length < 2 || text.length > 600 || !/[A-Za-z]/.test(text)) return;
     if (/^(https?:|\/|\?|#[a-f0-9]|data:)/i.test(text) || /^[a-z\d]+(?:[-_][a-z\d]+)+$/.test(text) || /^[\w.-]+\.[a-z]{2,}$/i.test(text)) return;
     if (/^(?:CRIT|INFO|WARN|OK|CPU|RAM|JSON|API|FLS|ID|UTC|UID|GID|TCP|UDP)$/.test(text) || /^[\d\s.,/%:dhms]+$/i.test(text)) return;
     phrases.add(text);
+    onPhrase(text, node, file);
   };
   const numeric = node => ts.isNumericLiteral(node)
     || (ts.isIdentifier(node) && /^(?:count|total|ready|online|queued|seconds|minutes|hours|days|percent|remaining|used|available|capacity|size|length|index|i)\d*$/i.test(node.text))
     || (ts.isPropertyAccessExpression(node) && node.name.text === "length");
   const visible = node => {
     if (!node) return;
-    if (ts.isStringLiteralLike(node)) add(node.text);
+    if (ts.isStringLiteralLike(node)) add(node.text, node);
     else if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node)) visible(node.expression);
     else if (ts.isConditionalExpression(node)) { visible(node.whenTrue); visible(node.whenFalse); }
     else if (ts.isBinaryExpression(node) && [ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.PlusToken].includes(node.operatorToken.kind)) { visible(node.left); visible(node.right); }
     else if (ts.isTemplateExpression(node) && node.templateSpans.every(span => numeric(span.expression))) {
-      add(node.head.text + node.templateSpans.map((span, i) => `{count${i}}${span.literal.text}`).join(""));
+      add(node.head.text + node.templateSpans.map((span, i) => `{count${i}}${span.literal.text}`).join(""), node);
     }
   };
   const visit = node => {
@@ -43,7 +44,7 @@ export function extractUiPhrases(source, fileName = "Component.tsx") {
       const opening = ts.isJsxElement(node) ? node.openingElement : node;
       if (skippedTags.has(opening.tagName.getText(file)) || opening.attributes.properties.some(attr => ts.isJsxAttribute(attr) && attr.name.getText(file) === "data-no-translate")) return;
     }
-    if (ts.isJsxText(node)) add(node.text);
+    if (ts.isJsxText(node)) add(node.text, node);
     if (ts.isJsxAttribute(node) && visibleAttributes.has(node.name.getText(file))) {
       if (node.initializer && ts.isJsxExpression(node.initializer)) visible(node.initializer.expression);
       else visible(node.initializer);
@@ -82,6 +83,29 @@ export function collectUiPhrases(sourceDir) {
 export function missingUiPhrases(phrases, reviewed) {
   const known = new Set(reviewed.map(text => text.toLowerCase()));
   return [...phrases].filter(([text]) => !known.has(text.toLowerCase())).map(([text, files]) => ({ text, files }));
+}
+
+// Only static interface literals enter this catalog, never rendered runtime data.
+export function collectUiContexts(sourceDir) {
+  const contexts = {};
+  const visited = new Set();
+  for (const files of collectUiPhrases(sourceDir).values()) for (const relative of files) {
+    if (visited.has(relative)) continue;
+    visited.add(relative);
+    const fileName = path.join(sourceDir, relative), occurrences = [];
+    extractUiPhrases(fs.readFileSync(fileName, 'utf8'), fileName, (text, node, file) => {
+      occurrences.push({text, line:file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1});
+    });
+    for (let i = 0; i < occurrences.length; i++) {
+      const item = occurrences[i];
+      contexts[item.text] ||= [];
+      if (contexts[item.text].length >= 12) continue;
+      const file = `console/web/src/${relative.split(path.sep).join('/')}`;
+      if (contexts[item.text].some(row => row.file === file && row.line === item.line)) continue;
+      contexts[item.text].push({file, line:item.line, nearby:[...new Set(occurrences.slice(Math.max(0,i-2),i+3).map(row=>row.text).filter(text=>text!==item.text))]});
+    }
+  }
+  return Object.fromEntries(Object.entries(contexts).sort(([a],[b])=>a.localeCompare(b)));
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

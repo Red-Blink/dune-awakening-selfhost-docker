@@ -40,7 +40,7 @@ export function LanguagePanel({ onClose = () => {} }: { onClose?: () => void }) 
   }
   async function submit(event:React.FormEvent){
     event.preventDefault();setBusy(true);setError('');
-    try{const result=await i18nApi.suggest({lang,source,translation,credit});setReceipt(result.id);}
+    try{const result=await i18nApi.suggest({lang,source,translation,credit});setReceipt(result.reference||result.id);}
     catch(reason){setError(reason instanceof Error?reason.message:'The correction could not be submitted. Please try again.');}finally{setBusy(false);}
   }
   const q=search.trim().toLocaleLowerCase();

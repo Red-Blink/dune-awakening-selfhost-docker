@@ -138,6 +138,8 @@ Founders review suggestions at `https://dunedocker.app/translations.html` using 
 
 Reviewed corrections are stored in `console/api/data/i18n-reviewed/<LANG>.json`, using the original English phrase as the key. They take precedence over generated translations and older runtime caches. `credits.json` preserves optional contributor credit. Machine translation maintenance only fills the generated catalog and never overwrites these reviewed files. CI validates phrase keys, languages, placeholders and safe text. Run `node console/api/scripts/export-translation-catalog.mjs` after updating interface phrases; commit the public catalog along with the reviewed source changes.
 
+Every suggestion receives a permanent reference such as **TR-000001**, shown in its Console receipt and review card. Reviewers can find it by ID or open `https://dunedocker.app/translations.html#TR-000001` to see the original wording, correction, review history, and static source locations with nearby interface labels. Context contains only reviewed public interface text; verify meaning and layout in the Console before approving. Prepared updates have independent pagination. Translation PR descriptions link back to the included suggestion references.
+
 Maintainers must publish the website review service and this workflow, and enable GitHub's **Allow GitHub Actions to create and approve pull requests** repository setting before activating PR preparation. The workflow itself never approves or merges a PR. Website deployment/authentication details and isolated integration-test instructions are in the directory-service repository. The Console language picker has no provider-key or peer-network setup requirement.
 
 ## Credits and License

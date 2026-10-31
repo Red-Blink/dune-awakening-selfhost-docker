@@ -62,7 +62,9 @@ export async function prepareTranslationPRs({token,fetchImpl=globalThis.fetch}={
       await api(`git/refs/heads/${branch}`,{sha:next.sha,force:false},'PATCH');
     }
     const names=[...new Set(entries.map(entry=>entry.credit).filter(Boolean))].map(name=>'`'+name.replace(/`/g,'')+'`').join(', ');
-    const pr=await api('pulls',{title:`Improve ${languages.join(', ')} community translations`,head:branch,base:'main',body:`Applies ${entries.length} corrections approved in the DuneDocker translation review queue.\n\nBatch: \`${batch.id}\`\n\nReviewed translations take precedence over generated caches. No automatic release or installation update is performed.\n\nCommunity Contributions: ${names||'Anonymous contributors'}.`});
+    const references=[...new Set(batch.entries.map(entry=>entry.reference).filter(value=>/^TR-[0-9]{6,16}$/.test(value||'')))];
+    const links=references.length?'\n\nSuggestions: '+references.map(value=>`[${value}](https://dunedocker.app/translations.html#${value})`).join(', '):'';
+    const pr=await api('pulls',{title:`Improve ${languages.join(', ')} community translations`,head:branch,base:'main',body:`Applies ${entries.length} corrections approved in the DuneDocker translation review queue.\n\nBatch: \`${batch.id}\`${links}\n\nReviewed translations take precedence over generated caches. No automatic release or installation update is performed.\n\nCommunity Contributions: ${names||'Anonymous contributors'}.`});
     // Token-created PR workflows can require manual approval. Explicit dispatch
     // runs the existing full CI on the exact proposed branch and is retryable.
     await api('actions/workflows/ci.yml/dispatches',{ref:branch});

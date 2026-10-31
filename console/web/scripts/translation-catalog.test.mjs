@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { extractUiPhrases, missingUiPhrases } from "./translation-catalog.mjs";
+import { extractUiPhrases, missingUiPhrases, collectUiContexts } from "./translation-catalog.mjs";
+import {mkdtempSync,writeFileSync,rmSync} from 'node:fs';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
 
 test("extracts rendered text, conditional labels, accessible names and UI metadata", () => {
   const source = `const rows = [{ label: "Battlegroup Services" }];
@@ -22,4 +25,12 @@ test("numeric UI templates keep values separate from reviewed phrases", () => {
 test("existing capitalization aliases do not create duplicate translation entries", () => {
   const missing = missingUiPhrases(new Map([["Game Servers", ["Home.tsx"]], ["Refresh Status", ["Home.tsx"]]]), ["Game servers"]);
   assert.deepEqual(missing, [{ text: "Refresh Status", files: ["Home.tsx"] }]);
+});
+
+test('source context preserves exact locations and static nearby labels without harvesting runtime expressions',t=>{
+  const dir=mkdtempSync(join(tmpdir(),'ui-context-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
+  writeFileSync(join(dir,'Settings.tsx'),'<section>\n<h2>Security</h2>\n<label>Admin Password</label>\n<span>{player.privateName}</span>\n<button>Save</button>\n</section>');
+  const contexts=collectUiContexts(dir);
+  assert.deepEqual(contexts['Admin Password'],[{file:'console/web/src/Settings.tsx',line:3,nearby:['Security','Save']}]);
+  assert.ok(!JSON.stringify(contexts).includes('privateName'));
 });
