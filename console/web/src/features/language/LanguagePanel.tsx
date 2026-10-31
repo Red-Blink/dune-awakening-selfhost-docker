@@ -322,7 +322,7 @@ export function LanguagePanel() {
                 Important Notice (DeepL API Key)
               </strong>
               <span>
-                You have the option to enter and use your own personal DeepL API key here if you own one. Otherwise, please leave this setting untouched — the console already includes a pre-populated 53-language database, automatic fallback translation, and Dune-Docker peer synchronization.
+                The Console includes a pre-populated translation database. You can optionally add your own DeepL API key to synchronize reviewed interface phrases. Peer synchronization requires explicit opt-in and trust enrollment.
               </span>
             </div>
           </div>
@@ -505,7 +505,7 @@ export function LanguagePanel() {
           <div>
             <h4 style={{ margin: 0 }}>Console Language</h4>
             <p style={{ margin: "4px 0 0", fontSize: 13, opacity: 0.78 }}>
-              Translate the entire Dune Docker Console into any national language using DeepL. New UI text is automatically detected, translated via DeepL, and cached in the local translation database to save API traffic.
+              Choose a language for the Dune Docker Console using reviewed interface translations. Live server and player data stays local. Owners can synchronize missing reviewed phrases from Language Settings.
             </p>
           </div>
           <div style={{ position: "relative", minWidth: 260 }}>
