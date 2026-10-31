@@ -11,7 +11,7 @@ import { setupApi, type Task } from "../../api/setup";
 import { PortChecklist } from "../../components/PortChecklist";
 import { ReadinessTimeline } from "../../components/ReadinessTimeline";
 import { SecretInput } from "../../components/SecretInput";
-import { KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/common/DisplayPrimitives";
+import { InfoTooltip, KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/common/DisplayPrimitives";
 import { formatDisplayValue, formatUiSentence, friendlyColumnName, normalizeStatus, stripAnsi, summarizeCommandText, titleCase } from "../../lib/display";
 import { friendlyServiceName } from "../../lib/serviceDisplay";
 import { conciseTaskError, funcomTokenMismatchDetected } from "../../lib/taskDisplay";
@@ -625,7 +625,7 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
         {localError && <p className="error">{localError}</p>}
       </article>
       <HomeHighlights />
-      <HomeSubsystemList items={summary.health} onNavigate={onNavigate} />
+      <HomeSubsystemList items={summary.health} details={homeRowDetails(status, readiness)} onNavigate={onNavigate} />
       <HomePerformance performance={performance} error={performanceError} />
     </section>
   );
@@ -731,7 +731,7 @@ function StatusFreshness({ sampledAtMs }: { sampledAtMs: number }) {
 
 // A row is a button when the subsystem has somewhere to be dealt with, so a
 // warning routes to the tab that can fix it instead of being a dead end.
-function HomeSubsystemList({ items, onNavigate }: { items: HomeHealthRow[]; onNavigate?: (tab: Tab) => void }) {
+function HomeSubsystemList({ items, details, onNavigate }: { items: HomeHealthRow[]; details: Record<string, HomeDetailGroup[]>; onNavigate?: (tab: Tab) => void }) {
   return <section className="panel home-block home-subsystems" aria-label="Readiness and health">
     <h3>Readiness & Health</h3>
     <ul className="home-subsystem-list">
@@ -755,14 +755,32 @@ function HomeSubsystemList({ items, onNavigate }: { items: HomeHealthRow[]; onNa
         // detail carries how much of each subsystem is ready ("7 of 7"). It is
         // rendered inline rather than as a title, since a tooltip would hide the
         // count behind a hover the reading is not worth.
-        return <li key={item.id} className="home-subsystem-row">
+        const groups = details[item.id] || [];
+        return <li key={item.id} className="home-subsystem-row home-subsystem-row-info">
           {route && onNavigate
             ? <button type="button" className="home-subsystem-button" onClick={() => onNavigate(route)} aria-label={`${item.label}: ${item.value}${item.detail ? `, ${item.detail}` : ""}. Open ${route}`}>{body}</button>
             : <div className="home-subsystem-static">{body}</div>}
+          {/* Beside the row, not inside it: the row is itself a button. */}
+          {groups.length > 0 && <InfoTooltip id={`home-detail-${item.id}`} label={`${item.label} details`} portal interactive>
+            <HomeDetailList groups={groups} />
+          </InfoTooltip>}
         </li>;
       })}
     </ul>
   </section>;
+}
+
+function HomeDetailList({ groups }: { groups: HomeDetailGroup[] }) {
+  return <span className="home-detail">
+    {groups.map((group) => <span className="home-detail-group" key={group.title}>
+      <span className="home-detail-title">{group.title}</span>
+      {group.rows.map((row, index) => <span className="home-detail-row" key={`${row.name}-${index}`} data-no-translate>
+        <span>{row.name}</span>
+        <span className={`home-detail-value ${homeDetailTone(row.value)}`}>{row.value}</span>
+        {row.note && <span className="home-detail-note">{row.note}</span>}
+      </span>)}
+    </span>)}
+  </span>;
 }
 
 // Rows in the same style as Readiness & Health beside it, so the two lower
@@ -2530,13 +2548,15 @@ const BATTLEGROUP_SERVICE_CONTAINERS = ["dune-director", "dune-server-gateway"];
 // different ports, and a map may be named anything Funcom's world template
 // contains. Ports come from the instance's resolved configuration, not the
 // stock values, so a host on non-default ports still attributes correctly.
-function listenerStates(text: string) {
-  const states = new Map<string, string>();
-  for (const line of sectionLines(text, "Listeners")) {
+function listenerRows(text: string) {
+  return sectionLines(text, "Listeners").flatMap((line) => {
     const match = line.match(/^(.+?)\s+(\d{2,5})\/(tcp|udp)\s+(\S+)$/i);
-    if (match) states.set(`${match[2]}/${match[3].toLowerCase()}`, match[4].toUpperCase());
-  }
-  return states;
+    return match ? [{ label: match[1], key: `${match[2]}/${match[3].toLowerCase()}`, state: match[4].toUpperCase() }] : [];
+  });
+}
+
+function listenerStates(text: string) {
+  return new Map(listenerRows(text).map((row) => [row.key, row.state]));
 }
 
 // The six TCP service ports, by owning row. Everything else in the section --
@@ -2664,15 +2684,19 @@ function summarizeGameServers(text: string) {
   return { label: "OK", status: "Ready", detail };
 }
 
-function summarizeFls(text: string, tokenAuthFailure = false) {
-  // Funcom/FLS is the LAST section status.sh prints, so sectionLines runs to end
-  // of output and picks up the trailing "Tip:" lines with it. Narrow to rows
-  // that actually carry a state: counting the tips made a healthy host read
-  // "4 of 6", and only luck kept them out of the failure check below -- one of
-  // those tips contains the word "fail".
-  const lines = sectionLines(text, "Funcom/FLS summary").filter((line) =>
+// Funcom/FLS is the LAST section status.sh prints, so sectionLines runs to end
+// of output and picks up the trailing "Tip:" lines with it. Narrow to rows
+// that actually carry a state: counting the tips made a healthy host read
+// "4 of 6", and only luck kept them out of the failure check below -- one of
+// those tips contains the word "fail".
+function flsRows(text: string) {
+  return sectionLines(text, "Funcom/FLS summary").filter((line) =>
     /:\s*(OK|WAIT|FAIL|ERROR|MISSING)\b/i.test(line)
   );
+}
+
+function summarizeFls(text: string, tokenAuthFailure = false) {
+  const lines = flsRows(text);
   if (!lines.length) return { label: "Unknown", status: "Unknown", detail: "" };
   const bad = lines.find((line) => /:\s*(WAIT|FAIL|ERROR|MISSING)/i.test(line));
   // The token probe can fail before the cached status snapshot catches up.
@@ -2713,6 +2737,102 @@ function summarizeReadinessFls(text: string) {
   return lines.every((line) => /^OK\s+/i.test(line))
     ? { label: "OK", status: "Ready", detail: "" }
     : { label: "Needs Review", status: "WARN", detail: "" };
+}
+
+// What the (i) on each Readiness & Health row lists: the raw readings behind the
+// row, as printed, so a "Needs Review" can be traced to the line that caused it.
+// Same ownership as the summarisers above -- every container and port has one row.
+type HomeDetailRow = { name: string; value: string; note?: string };
+type HomeDetailGroup = { title: string; rows: HomeDetailRow[] };
+
+const DETAIL_BAD = /\b(fail|error|missing|not listed|stopped|exited|dead|paused|not running|unhealthy)\b/i;
+
+// Green only for a reading known to be healthy: docker's status text reaches
+// these rows verbatim, and a figure like "0" partitions is not a state at all.
+function homeDetailTone(value: string) {
+  if (DETAIL_BAD.test(value)) return "bad";
+  if (/\b(wait|warn|warming|queued|restarting|starting)\b/i.test(value)) return "pending";
+  if (/^(ok|ready|up)\b/i.test(value)) return "good";
+  return "";
+}
+
+function detailContainers(status: string, names: string[]): HomeDetailGroup {
+  const lines = containerSectionLines(status);
+  return {
+    title: "Containers",
+    rows: names.map((name) => {
+      const line = lines.find((candidate) => containerLineName(candidate).toLowerCase() === name);
+      return { name, value: line ? line.trim().slice(name.length).trim() : "Not listed" };
+    })
+  };
+}
+
+function detailPorts(rows: ReturnType<typeof listenerRows>): HomeDetailGroup {
+  return { title: "Ports", rows: rows.map((row) => ({ name: `${row.label} ${row.key}`, value: row.state })) };
+}
+
+// Not readinessRows: that drops ready.sh's WAIT rows, which are the ones that
+// explain an amber row.
+function detailReadiness(readiness: string, pattern: RegExp) {
+  return stripAnsi(readiness).split(/\r?\n/).flatMap((line) => {
+    const match = line.trim().match(/^(OK|WAIT|WARN|FAIL)\s+(.+)$/i);
+    return match && pattern.test(match[2]) ? [{ name: match[2], value: match[1].toUpperCase() }] : [];
+  });
+}
+
+// Readings are "Label: value", except status.sh's "RabbitMQ game is not running".
+function detailLabelled(lines: string[]) {
+  return lines.flatMap((line) => {
+    const match = line.match(/^(.+?)(?::\s*|\s+is\s+)(.+)$/);
+    return match ? [{ name: match[1], value: match[2] }] : [];
+  });
+}
+
+function detailMaps(status: string): HomeDetailGroup {
+  return {
+    title: "Maps",
+    rows: gameServerRows(status).flatMap((line) => {
+      const match = line.match(/^(\S+)\s+(NOT RUNNING|\S+)\s*(.*)$/i);
+      if (!match) return [];
+      // The uptime column explains a map that isn't up; anything routine there
+      // is not a reason. A WAIT row can carry "missing" when Postgres is down.
+      return [{ name: match[1], value: match[2], note: /^(up|pending|queued)\b/i.test(match[3]) ? undefined : match[3] || undefined }];
+    })
+  };
+}
+
+export function homeRowDetails(status: string, readiness: string): Record<string, HomeDetailGroup[]> {
+  const listeners = listenerRows(status);
+  const owned = ownedListenerKeys();
+  const service = new Set([...owned.database, ...owned.messaging, ...owned.battlegroup]);
+  const ports = (keys: string[]) => detailPorts(listeners.filter((row) => keys.includes(row.key)));
+  const groups: Record<string, HomeDetailGroup[]> = {
+    database: [
+      detailContainers(status, DATABASE_CONTAINERS),
+      ports(owned.database),
+      { title: "Health", rows: [...detailLabelled(sectionLines(status, "Database")), ...detailReadiness(readiness, /world.partition/i)] }
+    ],
+    messaging: [
+      detailContainers(status, MESSAGING_CONTAINERS),
+      ports(owned.messaging),
+      // "Checked by readiness" is a pointer, not a reading: the row below it is the check.
+      { title: "Health", rows: [
+        ...detailLabelled(sectionLines(status, "RabbitMQ game connections")).filter((row) => !/^Checked by readiness$/i.test(row.value)),
+        ...detailReadiness(readiness, /game server sg\.\* RMQ connections/i)
+      ] }
+    ],
+    battlegroup: [detailContainers(status, BATTLEGROUP_SERVICE_CONTAINERS), ports(owned.battlegroup)],
+    games: [detailMaps(status), detailPorts(listeners.filter((row) => !service.has(row.key)))],
+    fls: [{ title: "Health", rows: [
+      ...detailLabelled(flsRows(status)),
+      // ready.sh labels the gateway's wait row differently from its OK row.
+      ...detailReadiness(readiness, /\b(Director FLS|Gateway monitoring DB|Gateway DB monitoring)\b/i)
+    ] }]
+  };
+  // No status yet means nothing to list, and a container reading "Not listed"
+  // for every name would read as a fault.
+  if (!containerSectionLines(status).length) groups.database = groups.messaging = groups.battlegroup = [];
+  return Object.fromEntries(Object.entries(groups).map(([id, list]) => [id, list.filter((group) => group.rows.length)]));
 }
 
 function readinessRows(text: string, pattern: RegExp) {

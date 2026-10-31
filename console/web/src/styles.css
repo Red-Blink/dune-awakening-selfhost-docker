@@ -2665,6 +2665,29 @@ body.debug .technical-details { display: block; }
 .home-subsystem-button { cursor: pointer; }
 .home-subsystem-button:hover { background: #1c2024; color: var(--text-strong); }
 .home-subsystem-button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* The (i) sits beside the row button rather than inside it, so the row carries
+   the panel surface and the button only takes what is left. */
+.home-subsystem-row-info { display: flex; align-items: center; background: var(--panel); }
+.home-subsystem-row-info:first-child { border-start-start-radius: 7px; border-start-end-radius: 7px; }
+.home-subsystem-row-info:last-child { border-end-start-radius: 7px; border-end-end-radius: 7px; }
+.home-subsystem-row-info > .home-subsystem-button, .home-subsystem-row-info > .home-subsystem-static { flex: 1 1 0; width: auto; min-width: 0; }
+.home-subsystem-row-info > .memory-info-tooltip { flex: 0 0 auto; margin-inline-end: 6px; }
+/* The row's end corners belong to the row now, and hover lights all of it. */
+.home-subsystem-row.home-subsystem-row-info > .home-subsystem-button,
+.home-subsystem-row.home-subsystem-row-info > .home-subsystem-static { border-start-end-radius: 0; border-end-end-radius: 0; }
+.home-subsystem-row-info:has(> .home-subsystem-button:hover) { background: #1c2024; }
+.memory-info-box.interactive { pointer-events: auto; overflow-y: auto; overscroll-behavior: contain; }
+.memory-info-box.interactive:focus-visible { outline: 2px solid var(--title); outline-offset: 1px; }
+.home-detail, .home-detail-group { display: grid; gap: 3px; }
+.home-detail { gap: 10px; }
+.home-detail-title { color: var(--title); font-weight: 700; }
+/* The floor keeps a long value from taking the name's whole column. */
+.home-detail-row { display: grid; grid-template-columns: minmax(40%, 1fr) minmax(0, auto); column-gap: 12px; overflow-wrap: anywhere; }
+.home-detail-value { text-align: end; }
+.home-detail-value.good { color: #9be6bd; }
+.home-detail-value.pending { color: #b6d5ff; }
+.home-detail-value.bad { color: var(--danger-text); }
+.home-detail-note { grid-column: 1 / -1; color: var(--muted-warm); }
 /* The label is a fixed short string; the value is the variable part and can be
    as long as "Token Mismatch Detected", so the value is what gives way. With
    flex: 0 0 auto on the value it refused to shrink and crushed the label to a

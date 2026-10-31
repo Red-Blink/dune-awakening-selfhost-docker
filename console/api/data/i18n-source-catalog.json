@@ -4055,7 +4055,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2653,
+        "line": 2673,
         "nearby": [
           "Needs Review",
           "Unknown",
@@ -4064,7 +4064,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2681,
+        "line": 2705,
         "nearby": [
           "Needs Review",
           "Unknown"
@@ -4141,7 +4141,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1510,
+        "line": 1528,
         "nearby": [
           "Partition",
           "Unknown",
@@ -4275,7 +4275,7 @@
     "0 B": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 828,
+        "line": 846,
         "nearby": [
           "Host Uptime",
           "Performance",
@@ -5023,7 +5023,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 919,
+        "line": 937,
         "nearby": [
           "Disabled",
           "Checking",
@@ -5888,7 +5888,7 @@
     "Advertised IP Warning": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1757,
+        "line": 1775,
         "nearby": [
           "Gateway DB monitoring not recently observed",
           "Check Gateway logs if readiness is unhealthy.",
@@ -6157,7 +6157,7 @@
     "All Restarts": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1474,
+        "line": 1492,
         "nearby": [
           "Last Battlegroup Restart",
           "Show",
@@ -7057,7 +7057,7 @@
     "Attention Needed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2792,
+        "line": 2912,
         "nearby": [
           "Unknown",
           "Failed",
@@ -7291,7 +7291,7 @@
     "Authorization Failed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1617,
+        "line": 1635,
         "nearby": [
           "Funcom Token Change Needs Review",
           "The token was saved, but the server did not become fully ready. Check Server Control status and logs.",
@@ -7300,7 +7300,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1626,
+        "line": 1644,
         "nearby": [
           "Please make sure the Funcom token belongs to the current Battlegroup ID, then save it again.",
           "Unset"
@@ -8570,7 +8570,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1130,
+        "line": 1148,
         "nearby": [
           "Build Cache Cleanup Failed",
           "Image Cleanup Failed",
@@ -8621,7 +8621,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1475,
+        "line": 1493,
         "nearby": [
           "Show",
           "All Restarts",
@@ -8631,7 +8631,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1930,
+        "line": 1948,
         "nearby": [
           "Mode",
           "Server IP",
@@ -8787,7 +8787,7 @@
     "Binding Fixed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1051,
+        "line": 1069,
         "nearby": [
           "Fix Binding",
           "Fixing Binding",
@@ -9243,7 +9243,7 @@
     "Build Cache Cleaned": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1086,
+        "line": 1104,
         "nearby": [
           "Removing unused Docker build cache.",
           "Removing obsolete project-owned images while protecting current and in-use images.",
@@ -9255,7 +9255,7 @@
     "Build Cache Cleanup Failed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1092,
+        "line": 1110,
         "nearby": [
           "Unused Docker build cache was cleaned.",
           "Obsolete Dune images were cleaned. Protected and unrelated images were left intact.",
@@ -9265,7 +9265,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1100,
+        "line": 1118,
         "nearby": [
           "Image Cleanup Failed",
           "Review the task details before trying again.",
@@ -10151,7 +10151,7 @@
     "Change Funcom Token": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1420,
+        "line": 1438,
         "nearby": [
           "Restart Service",
           "Funcom token",
@@ -10462,7 +10462,7 @@
     "Check Director logs if readiness is unhealthy.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1746,
+        "line": 1764,
         "nearby": [
           "Public IP bind detected",
           "Director heartbeat not recently observed",
@@ -10529,7 +10529,7 @@
     "Check Gateway logs if readiness is unhealthy.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1752,
+        "line": 1770,
         "nearby": [
           "Check Director logs if readiness is unhealthy.",
           "Gateway DB monitoring not recently observed",
@@ -10633,7 +10633,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 918,
+        "line": 936,
         "nearby": [
           "Technical details",
           "Not Installed",
@@ -10643,7 +10643,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 919,
+        "line": 937,
         "nearby": [
           "Enabled",
           "Disabled",
@@ -10708,7 +10708,7 @@
     "Checking diagnostics": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1705,
+        "line": 1723,
         "nearby": [
           "Unset",
           "Doctor Diagnostics",
@@ -10720,7 +10720,7 @@
     "Checking Funcom Token": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1561,
+        "line": 1579,
         "nearby": [
           "Funcom Token Change Failed",
           "The token was saved, but the server restart failed. Check the task details and try again.",
@@ -10729,7 +10729,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1584,
+        "line": 1602,
         "nearby": [
           "Restarting Server",
           "Funcom Token Changed Successfully",
@@ -11182,7 +11182,7 @@
     "Clean Build Cache": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1065,
+        "line": 1083,
         "nearby": [
           "Clean Docker Build Cache?",
           "Clean Obsolete Dune Images?",
@@ -11192,7 +11192,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1723,
+        "line": 1741,
         "nearby": [
           "Clean Images",
           "Cleaning...",
@@ -11204,7 +11204,7 @@
     "Clean Docker Build Cache?": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1064,
+        "line": 1082,
         "nearby": [
           "Run the command shown in Doctor manually, then restart the battlegroup.",
           "Fix Failed",
@@ -11216,7 +11216,7 @@
     "Clean Images": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1065,
+        "line": 1083,
         "nearby": [
           "Clean Obsolete Dune Images?",
           "Clean Build Cache",
@@ -11226,7 +11226,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1720,
+        "line": 1738,
         "nearby": [
           "Fix Binding",
           "Cleaning...",
@@ -11237,7 +11237,7 @@
     "Clean Obsolete Dune Images?": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1064,
+        "line": 1082,
         "nearby": [
           "Fix Failed",
           "Clean Docker Build Cache?",
@@ -11261,7 +11261,7 @@
     "Cleaning Docker Build Cache": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1075,
+        "line": 1093,
         "nearby": [
           "Clean Build Cache",
           "Clean Images",
@@ -11273,7 +11273,7 @@
     "Cleaning Obsolete Dune Images": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1075,
+        "line": 1093,
         "nearby": [
           "Clean Images",
           "Cleaning Docker Build Cache",
@@ -11285,7 +11285,7 @@
     "Cleaning...": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1720,
+        "line": 1738,
         "nearby": [
           "Fixing...",
           "Fix Binding",
@@ -11294,7 +11294,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1723,
+        "line": 1741,
         "nearby": [
           "Clean Images",
           "Clean Build Cache",
@@ -12275,7 +12275,7 @@
     "Completed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1484,
+        "line": 1502,
         "nearby": [
           "No Matching Restarts",
           "No matching restarts have been recorded yet.",
@@ -12802,6 +12802,16 @@
     ],
     "Containers": [
       {
+        "file": "console/web/src/features/server/ServerPanels.tsx",
+        "line": 2762,
+        "nearby": [
+          "Unknown",
+          "Needs Review",
+          "Ports",
+          "Maps"
+        ]
+      },
+      {
         "file": "console/web/src/features/bases/BaseInventoryTab.tsx",
         "line": 1033,
         "nearby": [
@@ -13243,7 +13253,7 @@
     "CPU Usage": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 773,
+        "line": 791,
         "nearby": [
           "Readiness and health",
           "Readiness & Health",
@@ -13674,7 +13684,7 @@
     "Current Server Title": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1387,
+        "line": 1405,
         "nearby": [
           "Server Controls",
           "Server Configurations",
@@ -13987,7 +13997,7 @@
     "Daily restart time must be a valid 24-hour time, for example 05:00 or 23:30.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1227,
+        "line": 1245,
         "nearby": [
           "Restart Failed",
           "Schedule Save Failed",
@@ -14286,7 +14296,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 919,
+        "line": 937,
         "nearby": [
           "Checking",
           "Activating",
@@ -15671,7 +15681,7 @@
     "Diagnostic Note": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1731,
+        "line": 1749,
         "nearby": [
           "Cleaning...",
           "Clean Build Cache",
@@ -15683,7 +15693,7 @@
     "Diagnostic Warning": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1775,
+        "line": 1793,
         "nearby": [
           "Obsolete Docker images can be cleaned",
           "Unused Docker build cache can be cleaned",
@@ -15742,7 +15752,7 @@
     "Director heartbeat not recently observed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1745,
+        "line": 1763,
         "nearby": [
           "Diagnostic Note",
           "Public IP bind detected",
@@ -15925,7 +15935,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 918,
+        "line": 936,
         "nearby": [
           "Checking",
           "Enabled",
@@ -16257,7 +16267,7 @@
     "Disk": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 787,
+        "line": 805,
         "nearby": [
           "Memory",
           "Waiting for Sample",
@@ -16448,7 +16458,7 @@
     "Docker status is unavailable. Check that Docker is running and the web admin has access.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2494,
+        "line": 2512,
         "nearby": [
           "Warming",
           "Stopped",
@@ -16460,7 +16470,7 @@
     "Doctor Diagnostics": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1704,
+        "line": 1722,
         "nearby": [
           "Please make sure the Funcom token belongs to the current Battlegroup ID, then save it again.",
           "Unset",
@@ -16472,7 +16482,7 @@
     "Doctor diagnostics have not loaded yet.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1705,
+        "line": 1723,
         "nearby": [
           "Checking diagnostics",
           "Doctor diagnostics look healthy.",
@@ -16484,7 +16494,7 @@
     "Doctor diagnostics look healthy.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1705,
+        "line": 1723,
         "nearby": [
           "Doctor Diagnostics",
           "Checking diagnostics",
@@ -16530,7 +16540,7 @@
     "Double-check the token and try again.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1039,
+        "line": 1057,
         "nearby": [
           "The token was saved, but the server restart failed. Check the task details and try again.",
           "Funcom Token Change Failed",
@@ -17008,7 +17018,7 @@
     "Duration": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1484,
+        "line": 1502,
         "nearby": [
           "Source",
           "Reason",
@@ -17667,7 +17677,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 918,
+        "line": 936,
         "nearby": [
           "Not Installed",
           "Checking",
@@ -18887,7 +18897,7 @@
     "Failed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2453,
+        "line": 2471,
         "nearby": [
           "Getting Ready",
           "Info",
@@ -18897,7 +18907,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2791,
+        "line": 2911,
         "nearby": [
           "Unavailable",
           "Unknown",
@@ -19786,7 +19796,7 @@
     "Fix Binding": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1043,
+        "line": 1061,
         "nearby": [
           "Funcom Token Change Failed",
           "Double-check the token and try again.",
@@ -19796,7 +19806,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1717,
+        "line": 1735,
         "nearby": [
           "Doctor diagnostics have not loaded yet.",
           "Fixing...",
@@ -19808,7 +19818,7 @@
     "Fix Failed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1052,
+        "line": 1070,
         "nearby": [
           "Binding Fixed",
           "Restart the battlegroup so game sockets bind to the local IP.",
@@ -19817,7 +19827,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1054,
+        "line": 1072,
         "nearby": [
           "Run the command shown in Doctor manually, then restart the battlegroup.",
           "Clean Docker Build Cache?",
@@ -19852,7 +19862,7 @@
     "Fixing Binding": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1044,
+        "line": 1062,
         "nearby": [
           "Double-check the token and try again.",
           "Fix Binding",
@@ -19876,7 +19886,7 @@
     "Fixing...": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1717,
+        "line": 1735,
         "nearby": [
           "Doctor diagnostics look healthy.",
           "Doctor diagnostics have not loaded yet.",
@@ -20233,7 +20243,7 @@
     "Funcom token": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1422,
+        "line": 1440,
         "nearby": [
           "Restart Service",
           "Change Funcom Token",
@@ -20277,7 +20287,7 @@
     "Funcom token cannot be empty.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1019,
+        "line": 1037,
         "nearby": [
           "Settings Save Failed",
           "Token Save Failed",
@@ -20289,7 +20299,7 @@
     "Funcom Token Change Failed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1033,
+        "line": 1051,
         "nearby": [
           "Saving Funcom Token...",
           "Restarting Server",
@@ -20298,7 +20308,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1039,
+        "line": 1057,
         "nearby": [
           "The token was saved, but the server restart failed. Check the task details and try again.",
           "Double-check the token and try again.",
@@ -20307,7 +20317,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1553,
+        "line": 1571,
         "nearby": [
           "Unknown",
           "{count0}m",
@@ -20319,7 +20329,7 @@
     "Funcom Token Change Needs Review": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1608,
+        "line": 1626,
         "nearby": [
           "The Funcom token was changed successfully and the server is up and running.",
           "Restarting Server",
@@ -20331,7 +20341,7 @@
     "Funcom Token Changed Successfully": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1590,
+        "line": 1608,
         "nearby": [
           "Restarting Server",
           "Checking Funcom Token",
@@ -20578,7 +20588,7 @@
     "Gateway DB monitoring not recently observed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1751,
+        "line": 1769,
         "nearby": [
           "Director heartbeat not recently observed",
           "Check Director logs if readiness is unhealthy.",
@@ -20781,7 +20791,7 @@
     "Getting Ready": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2347,
+        "line": 2365,
         "nearby": [
           "Stopped",
           "Needs Review",
@@ -21706,6 +21716,29 @@
     ],
     "Health": [
       {
+        "file": "console/web/src/features/server/ServerPanels.tsx",
+        "line": 2813,
+        "nearby": [
+          "Ports",
+          "Maps"
+        ]
+      },
+      {
+        "file": "console/web/src/features/server/ServerPanels.tsx",
+        "line": 2819,
+        "nearby": [
+          "Maps",
+          "Unavailable"
+        ]
+      },
+      {
+        "file": "console/web/src/features/server/ServerPanels.tsx",
+        "line": 2826,
+        "nearby": [
+          "Unavailable"
+        ]
+      },
+      {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
         "line": 179,
         "nearby": [
@@ -21897,7 +21930,7 @@
     "Host Processor Load": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 777,
+        "line": 795,
         "nearby": [
           "Readiness & Health",
           "CPU Usage",
@@ -21943,7 +21976,7 @@
     "Host Uptime": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 800,
+        "line": 818,
         "nearby": [
           "Waiting for Sample",
           "Uptime",
@@ -22133,7 +22166,7 @@
     "Image Cleanup Failed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1092,
+        "line": 1110,
         "nearby": [
           "Obsolete Dune images were cleaned. Protected and unrelated images were left intact.",
           "Build Cache Cleanup Failed",
@@ -22142,7 +22175,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1100,
+        "line": 1118,
         "nearby": [
           "Review the task details before trying again.",
           "Build Cache Cleanup Failed",
@@ -22597,7 +22630,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 919,
+        "line": 937,
         "nearby": [
           "Activating",
           "Deactivating",
@@ -22631,7 +22664,7 @@
     "Info": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2441,
+        "line": 2459,
         "nearby": [
           "Needs Review",
           "Getting Ready",
@@ -24074,7 +24107,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1468,
+        "line": 1486,
         "nearby": [
           "Restart History",
           "Tracking begins after this update",
@@ -25458,7 +25491,7 @@
     "Local": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1390,
+        "line": 1408,
         "nearby": [
           "Mode",
           "Public",
@@ -26003,12 +26036,21 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1476,
+        "line": 1494,
         "nearby": [
           "All Restarts",
           "Battlegroup",
           "Services",
           "Refreshing"
+        ]
+      },
+      {
+        "file": "console/web/src/features/server/ServerPanels.tsx",
+        "line": 2793,
+        "nearby": [
+          "Containers",
+          "Ports",
+          "Health"
         ]
       }
     ],
@@ -26330,7 +26372,7 @@
     "Memory": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 780,
+        "line": 798,
         "nearby": [
           "CPU Usage",
           "Host Processor Load",
@@ -26705,7 +26747,7 @@
     "Mode": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1388,
+        "line": 1406,
         "nearby": [
           "Server Configurations",
           "Current Server Title",
@@ -26715,7 +26757,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1928,
+        "line": 1946,
         "nearby": [
           "Title",
           "Region",
@@ -27075,7 +27117,7 @@
     "Needs Review": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2340,
+        "line": 2358,
         "nearby": [
           "Starting",
           "Stopped",
@@ -27085,7 +27127,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2517,
+        "line": 2535,
         "nearby": [
           "Server status is unavailable.",
           "Unknown"
@@ -27093,35 +27135,35 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2584,
+        "line": 2604,
         "nearby": [
           "Unknown"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2585,
+        "line": 2605,
         "nearby": [
           "Unknown"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2596,
+        "line": 2616,
         "nearby": [
           "Unknown"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2601,
+        "line": 2621,
         "nearby": [
           "Unknown"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2623,
+        "line": 2643,
         "nearby": [
           "Unknown",
           "{count0} of {count1}"
@@ -27129,7 +27171,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2654,
+        "line": 2674,
         "nearby": [
           "Unknown",
           "{count0} of {count1}",
@@ -27139,7 +27181,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2663,
+        "line": 2683,
         "nearby": [
           "Warming",
           "Waiting",
@@ -27149,7 +27191,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2682,
+        "line": 2706,
         "nearby": [
           "Unknown",
           "{count0} of {count1}"
@@ -27157,14 +27199,14 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2691,
+        "line": 2715,
         "nearby": [
           "Unknown"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2699,
+        "line": 2723,
         "nearby": [
           "Unknown"
         ]
@@ -27703,7 +27745,7 @@
     "No Changes to Save": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 982,
+        "line": 1000,
         "nearby": [
           "Settings Save Failed",
           "Server title cannot be empty.",
@@ -28034,7 +28076,7 @@
     "No Matching Restarts": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1482,
+        "line": 1500,
         "nearby": [
           "Refreshing",
           "Refresh",
@@ -28046,7 +28088,7 @@
     "No matching restarts have been recorded yet.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1482,
+        "line": 1500,
         "nearby": [
           "Refresh",
           "No Matching Restarts",
@@ -28838,7 +28880,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 912,
+        "line": 930,
         "nearby": [
           "0 B",
           "Technical details",
@@ -28848,7 +28890,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1987,
+        "line": 2005,
         "nearby": [
           "Battlegroup",
           "Population",
@@ -29070,7 +29112,7 @@
     "Obsolete Docker images can be cleaned": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1763,
+        "line": 1781,
         "nearby": [
           "Check Gateway logs if readiness is unhealthy.",
           "Advertised IP Warning",
@@ -29082,7 +29124,7 @@
     "Obsolete Dune images were cleaned. Protected and unrelated images were left intact.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1087,
+        "line": 1105,
         "nearby": [
           "Obsolete Images Cleaned",
           "Unused Docker build cache was cleaned.",
@@ -29094,7 +29136,7 @@
     "Obsolete Images Cleaned": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1086,
+        "line": 1104,
         "nearby": [
           "Removing obsolete project-owned images while protecting current and in-use images.",
           "Build Cache Cleaned",
@@ -30026,7 +30068,7 @@
     "Overall": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1925,
+        "line": 1943,
         "nearby": [
           "Diagnostic Warning",
           "Token Mismatch Detected",
@@ -30606,7 +30648,7 @@
     "Partition": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1488,
+        "line": 1506,
         "nearby": [
           "Duration",
           "Result",
@@ -30913,7 +30955,7 @@
     "Paste new token": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1422,
+        "line": 1440,
         "nearby": [
           "Change Funcom Token",
           "Funcom token",
@@ -31118,7 +31160,7 @@
     "Performance": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 804,
+        "line": 822,
         "nearby": [
           "Uptime",
           "Host Uptime",
@@ -31840,7 +31882,7 @@
     "Please make sure the Funcom token belongs to the current Battlegroup ID, then save it again.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1618,
+        "line": 1636,
         "nearby": [
           "The token was saved, but the server did not become fully ready. Check Server Control status and logs.",
           "Authorization Failed"
@@ -31848,7 +31890,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1627,
+        "line": 1645,
         "nearby": [
           "Authorization Failed",
           "Unset",
@@ -31859,7 +31901,7 @@
     "Population": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1931,
+        "line": 1949,
         "nearby": [
           "Server IP",
           "Battlegroup",
@@ -31903,6 +31945,16 @@
       }
     ],
     "Ports": [
+      {
+        "file": "console/web/src/features/server/ServerPanels.tsx",
+        "line": 2771,
+        "nearby": [
+          "Needs Review",
+          "Containers",
+          "Maps",
+          "Health"
+        ]
+      },
       {
         "file": "console/web/src/components/SetupWizard.tsx",
         "line": 23,
@@ -32625,7 +32677,7 @@
     "Public": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1389,
+        "line": 1407,
         "nearby": [
           "Current Server Title",
           "Mode",
@@ -32658,7 +32710,7 @@
     "Public IP bind detected": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1739,
+        "line": 1757,
         "nearby": [
           "Clean Build Cache",
           "Diagnostic Note",
@@ -33400,7 +33452,7 @@
     "Readiness is unavailable right now. The server may be starting, stopping, or stopped.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2495,
+        "line": 2513,
         "nearby": [
           "Stopped",
           "Docker status is unavailable. Check that Docker is running and the web admin has access.",
@@ -33434,7 +33486,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2793,
+        "line": 2913,
         "nearby": [
           "Failed",
           "Attention Needed",
@@ -33475,7 +33527,7 @@
     "Reason": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1484,
+        "line": 1502,
         "nearby": [
           "Target",
           "Source",
@@ -33746,7 +33798,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1403,
+        "line": 1421,
         "nearby": [
           "Stop",
           "Restart Battlegroup",
@@ -34071,7 +34123,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1479,
+        "line": 1497,
         "nearby": [
           "Services",
           "Refreshing",
@@ -34341,7 +34393,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1479,
+        "line": 1497,
         "nearby": [
           "Maps",
           "Services",
@@ -34419,7 +34471,7 @@
     "Region": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1927,
+        "line": 1945,
         "nearby": [
           "Overall",
           "Title",
@@ -34901,7 +34953,7 @@
     "Removing obsolete project-owned images while protecting current and in-use images.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1076,
+        "line": 1094,
         "nearby": [
           "Cleaning Obsolete Dune Images",
           "Removing unused Docker build cache.",
@@ -34925,7 +34977,7 @@
     "Removing unused Docker build cache.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1076,
+        "line": 1094,
         "nearby": [
           "Cleaning Docker Build Cache",
           "Cleaning Obsolete Dune Images",
@@ -35725,7 +35777,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1402,
+        "line": 1420,
         "nearby": [
           "Start",
           "Stop",
@@ -35781,7 +35833,7 @@
     "Restart Failed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1202,
+        "line": 1220,
         "nearby": [
           "Restart queued",
           "Service Restarted Successfully",
@@ -35790,7 +35842,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1208,
+        "line": 1226,
         "nearby": [
           "Restarting",
           "Schedule Save Failed",
@@ -35813,7 +35865,7 @@
     "Restart History": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1468,
+        "line": 1486,
         "nearby": [
           "Paste new token",
           "Save Token",
@@ -35970,7 +36022,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1133,
+        "line": 1151,
         "nearby": [
           "Image Cleanup Failed",
           "battlegroup",
@@ -35979,7 +36031,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1190,
+        "line": 1208,
         "nearby": [
           "Restarting",
           "Service Restarted Successfully",
@@ -36065,7 +36117,7 @@
     "Restart Service": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1408,
+        "line": 1426,
         "nearby": [
           "Restart Battlegroup",
           "Redeploy",
@@ -36074,7 +36126,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1411,
+        "line": 1429,
         "nearby": [
           "Redeploy",
           "Change Funcom Token",
@@ -36097,7 +36149,7 @@
     "Restart the battlegroup so game sockets bind to the local IP.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1051,
+        "line": 1069,
         "nearby": [
           "Fixing Binding",
           "Binding Fixed",
@@ -36176,7 +36228,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1184,
+        "line": 1202,
         "nearby": [
           "battlegroup",
           "Restart queued",
@@ -36185,7 +36237,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1204,
+        "line": 1222,
         "nearby": [
           "Service Restarted Successfully",
           "Restart Failed",
@@ -36229,7 +36281,7 @@
     "Restarting Server": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1029,
+        "line": 1047,
         "nearby": [
           "Funcom token cannot be empty.",
           "Saving Funcom Token...",
@@ -36239,7 +36291,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1567,
+        "line": 1585,
         "nearby": [
           "The token was saved, but the server restart failed. Check the task details and try again.",
           "Checking Funcom Token",
@@ -36248,7 +36300,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1598,
+        "line": 1616,
         "nearby": [
           "Funcom Token Changed Successfully",
           "The Funcom token was changed successfully and the server is up and running.",
@@ -36901,7 +36953,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1484,
+        "line": 1502,
         "nearby": [
           "Reason",
           "Duration",
@@ -37261,7 +37313,7 @@
     "Review the task details before trying again.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1093,
+        "line": 1111,
         "nearby": [
           "Build Cache Cleanup Failed",
           "Image Cleanup Failed"
@@ -37754,7 +37806,7 @@
     "Run the command shown in Doctor manually, then restart the battlegroup.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1052,
+        "line": 1070,
         "nearby": [
           "Restart the battlegroup so game sockets bind to the local IP.",
           "Fix Failed",
@@ -38535,7 +38587,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1393,
+        "line": 1411,
         "nearby": [
           "Public",
           "Local",
@@ -38557,7 +38609,7 @@
     "Save Token": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1423,
+        "line": 1441,
         "nearby": [
           "Funcom token",
           "Paste new token",
@@ -38701,7 +38753,7 @@
     "Saving Funcom Token...": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1024,
+        "line": 1042,
         "nearby": [
           "Token Save Failed",
           "Funcom token cannot be empty.",
@@ -38793,7 +38845,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1231,
+        "line": 1249,
         "nearby": [
           "Schedule Save Failed",
           "Daily restart time must be a valid 24-hour time, for example 05:00 or 23:30.",
@@ -38829,7 +38881,7 @@
     "Saving Settings": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 990,
+        "line": 1008,
         "nearby": [
           "Server title cannot be empty.",
           "No Changes to Save",
@@ -39180,7 +39232,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1227,
+        "line": 1245,
         "nearby": [
           "Restarting",
           "Restart Failed",
@@ -39190,7 +39242,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1247,
+        "line": 1265,
         "nearby": [
           "Schedule Saved Successfully",
           "Timer Install Failed",
@@ -39199,7 +39251,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1250,
+        "line": 1268,
         "nearby": [
           "Timer Install Failed",
           "Service Restarted Successfully"
@@ -39219,7 +39271,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1246,
+        "line": 1264,
         "nearby": [
           "Daily restart time must be a valid 24-hour time, for example 05:00 or 23:30.",
           "Saving Schedule",
@@ -40376,7 +40428,7 @@
     "Server Configurations": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1385,
+        "line": 1403,
         "nearby": [
           "Service Restarted Successfully",
           "Server Controls",
@@ -40400,7 +40452,7 @@
     "Server Controls": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1383,
+        "line": 1401,
         "nearby": [
           "Service Restarted Successfully",
           "Server Configurations",
@@ -40509,7 +40561,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1929,
+        "line": 1947,
         "nearby": [
           "Region",
           "Mode",
@@ -40626,7 +40678,7 @@
     "Server status is unavailable.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2497,
+        "line": 2515,
         "nearby": [
           "Readiness is unavailable right now. The server may be starting, stopping, or stopped.",
           "Server status is unavailable. Refresh again or check Services and Logs if it persists.",
@@ -40638,7 +40690,7 @@
     "Server status is unavailable. Refresh again or check Services and Logs if it persists.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2496,
+        "line": 2514,
         "nearby": [
           "Docker status is unavailable. Check that Docker is running and the web admin has access.",
           "Readiness is unavailable right now. The server may be starting, stopping, or stopped.",
@@ -40674,7 +40726,7 @@
     "Server title cannot be empty.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 974,
+        "line": 992,
         "nearby": [
           "Inactive",
           "Settings Save Failed",
@@ -40698,7 +40750,7 @@
     "Service Restarted Successfully": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1199,
+        "line": 1217,
         "nearby": [
           "Restarting",
           "Restart queued",
@@ -40707,7 +40759,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1336,
+        "line": 1354,
         "nearby": [
           "Schedule Save Failed",
           "Server Controls"
@@ -40715,7 +40767,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1348,
+        "line": 1366,
         "nearby": [
           "Schedule Save Failed",
           "Server Controls",
@@ -40738,7 +40790,7 @@
     "Services": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1477,
+        "line": 1495,
         "nearby": [
           "Battlegroup",
           "Maps",
@@ -41046,7 +41098,7 @@
     "Settings Save Failed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 974,
+        "line": 992,
         "nearby": [
           "Deactivating",
           "Inactive",
@@ -41056,7 +41108,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1011,
+        "line": 1029,
         "nearby": [
           "Settings Saved — Battlegroup Restart Required",
           "Settings Saved Successfully",
@@ -41065,7 +41117,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1013,
+        "line": 1031,
         "nearby": [
           "Settings Saved Successfully",
           "Token Save Failed",
@@ -41076,7 +41128,7 @@
     "Settings Saved — Battlegroup Restart Required": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 995,
+        "line": 1013,
         "nearby": [
           "No Changes to Save",
           "Saving Settings",
@@ -41085,7 +41137,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1010,
+        "line": 1028,
         "nearby": [
           "Saving Settings",
           "Settings Saved Successfully",
@@ -41096,7 +41148,7 @@
     "Settings Saved Successfully": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1010,
+        "line": 1028,
         "nearby": [
           "Settings Saved — Battlegroup Restart Required",
           "Settings Save Failed"
@@ -41174,7 +41226,7 @@
     "Show": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1473,
+        "line": 1491,
         "nearby": [
           "Tracking begins after this update",
           "Last Battlegroup Restart",
@@ -41964,7 +42016,7 @@
     "Source": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1484,
+        "line": 1502,
         "nearby": [
           "Type",
           "Target",
@@ -42232,7 +42284,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1400,
+        "line": 1418,
         "nearby": [
           "Local",
           "Save Settings",
@@ -42338,7 +42390,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2332,
+        "line": 2350,
         "nearby": [
           "Population",
           "Not Installed",
@@ -42651,7 +42703,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1401,
+        "line": 1419,
         "nearby": [
           "Save Settings",
           "Start",
@@ -42695,7 +42747,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2339,
+        "line": 2357,
         "nearby": [
           "Not Installed",
           "Starting",
@@ -42705,7 +42757,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2460,
+        "line": 2478,
         "nearby": [
           "Failed",
           "Warming",
@@ -43369,7 +43421,7 @@
     "Target": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1484,
+        "line": 1502,
         "nearby": [
           "Completed",
           "Type",
@@ -43498,7 +43550,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 849,
+        "line": 867,
         "nearby": [
           "Performance",
           "0 B",
@@ -44348,7 +44400,7 @@
     "The Funcom token was changed successfully and the server is up and running.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1591,
+        "line": 1609,
         "nearby": [
           "Checking Funcom Token",
           "Funcom Token Changed Successfully",
@@ -44833,7 +44885,7 @@
     "The token was saved, but the server did not become fully ready. Check Server Control status and logs.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1609,
+        "line": 1627,
         "nearby": [
           "Restarting Server",
           "Funcom Token Change Needs Review",
@@ -44845,7 +44897,7 @@
     "The token was saved, but the server restart failed. Check the task details and try again.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1033,
+        "line": 1051,
         "nearby": [
           "Restarting Server",
           "Funcom Token Change Failed",
@@ -44854,7 +44906,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1554,
+        "line": 1572,
         "nearby": [
           "{count0}m",
           "Funcom Token Change Failed",
@@ -45656,7 +45708,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1247,
+        "line": 1265,
         "nearby": [
           "Saving Schedule",
           "Schedule Saved Successfully",
@@ -45688,7 +45740,7 @@
     "Title": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1926,
+        "line": 1944,
         "nearby": [
           "Token Mismatch Detected",
           "Overall",
@@ -45806,7 +45858,7 @@
     "Token Mismatch Detected": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1903,
+        "line": 1921,
         "nearby": [
           "Unused Docker build cache can be cleaned",
           "Diagnostic Warning",
@@ -45818,7 +45870,7 @@
     "Token Save Failed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1019,
+        "line": 1037,
         "nearby": [
           "Settings Save Failed",
           "Funcom token cannot be empty.",
@@ -45986,7 +46038,7 @@
     "Tracking begins after this update": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1468,
+        "line": 1486,
         "nearby": [
           "Save Token",
           "Restart History",
@@ -46277,7 +46329,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1484,
+        "line": 1502,
         "nearby": [
           "No matching restarts have been recorded yet.",
           "Completed",
@@ -46439,17 +46491,17 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2756,
+        "line": 2876,
         "nearby": [
-          "Unknown",
-          "Needs Review"
+          "Health",
+          "Unknown"
         ]
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2757,
+        "line": 2877,
         "nearby": [
-          "Needs Review",
+          "Health",
           "Unknown",
           "Failed"
         ]
@@ -46726,7 +46778,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1501,
+        "line": 1519,
         "nearby": [
           "Result",
           "Partition",
@@ -46736,7 +46788,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2511,
+        "line": 2529,
         "nearby": [
           "Server status is unavailable. Refresh again or check Services and Logs if it persists.",
           "Server status is unavailable.",
@@ -46745,7 +46797,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2582,
+        "line": 2602,
         "nearby": [
           "Needs Review"
         ]
@@ -47096,7 +47148,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1668,
+        "line": 1686,
         "nearby": [
           "Authorization Failed",
           "Please make sure the Funcom token belongs to the current Battlegroup ID, then save it again.",
@@ -47108,7 +47160,7 @@
     "Unused Docker build cache can be cleaned": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1769,
+        "line": 1787,
         "nearby": [
           "Advertised IP Warning",
           "Obsolete Docker images can be cleaned",
@@ -47120,7 +47172,7 @@
     "Unused Docker build cache was cleaned.": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 1087,
+        "line": 1105,
         "nearby": [
           "Build Cache Cleaned",
           "Obsolete Images Cleaned",
@@ -47612,7 +47664,7 @@
     "Uptime": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 794,
+        "line": 812,
         "nearby": [
           "Disk",
           "Waiting for Sample",
@@ -48448,7 +48500,7 @@
     "Waiting": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2659,
+        "line": 2679,
         "nearby": [
           "Needs Review",
           "Warming",
@@ -48503,7 +48555,7 @@
     "Waiting for Sample": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 784,
+        "line": 802,
         "nearby": [
           "Host Processor Load",
           "Memory",
@@ -48512,7 +48564,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 791,
+        "line": 809,
         "nearby": [
           "Disk",
           "Uptime",
@@ -48581,7 +48633,7 @@
     "Warming": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2459,
+        "line": 2477,
         "nearby": [
           "Info",
           "Failed",
@@ -48591,7 +48643,7 @@
       },
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
-        "line": 2658,
+        "line": 2678,
         "nearby": [
           "{count0} of {count1}",
           "Needs Review",
