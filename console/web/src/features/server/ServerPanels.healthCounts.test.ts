@@ -16,6 +16,16 @@ function values(status: string, readiness = READY_READINESS, runningAction: "sta
 }
 
 describe("Readiness & Health rows carry an x-of-y count", () => {
+  it.each([[0, "3 of 4"], [1, "3 of 4"], [2, "2 of 4"]])("accounts for token authentication failure with %s existing failures", (flsWait, detail) => {
+    const summary = summarizeHomeStatus(statusText({ flsWait: Number(flsWait) }), READY_READINESS, "", false, "", null, false, true);
+    expect(summary.health.find((row) => row.id === "fls")).toMatchObject({ value: "Token Mismatch Detected", status: "FAILED", detail });
+  });
+
+  it("restores the FLS count when a transient token mismatch clears", () => {
+    const snapshot = statusText();
+    expect(summarizeHomeStatus(snapshot, READY_READINESS, "", false, "", null, false, true).health.find((row) => row.id === "fls")?.detail).toBe("3 of 4");
+    expect(summarizeHomeStatus(snapshot, READY_READINESS, "", false, "", null, false, false).health.find((row) => row.id === "fls")).toMatchObject({ value: "OK", status: "Ready", detail: "4 of 4" });
+  });
   it("counts a fully healthy battlegroup", () => {
     expect(counts(statusText())).toMatchObject({
       Messaging: "3 of 3",

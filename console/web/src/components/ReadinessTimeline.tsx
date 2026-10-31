@@ -9,6 +9,8 @@ type CheckRow = {
 
 type GroupedCheckRow = CheckRow & { group: string };
 
+const GAME_CONNECTIONS_LABEL = "Game Server Connections";
+
 const CONTAINER_LABELS: Record<string, string> = {
   "dune-postgres": "Dune Postgres",
   "dune-rmq-admin": "RabbitMQ Admin",
@@ -57,7 +59,8 @@ export function buildReadinessGroups(readyText: string, statusText: string) {
 
 function parseReadyRows(text: string): GroupedCheckRow[] {
   return stripAnsi(text).split(/\r?\n/).map((line) => line.trim()).filter((line) => /^(OK|WAIT|FAIL)\s+/i.test(line)).map((line) => {
-    const raw = line.replace(/^(OK|WAIT|FAIL)\s+/i, "").trim();
+    const raw = line.replace(/^(OK|WAIT|FAIL)\s+/i, "").trim()
+      .replace(/^game server sg\.\* RMQ connections$/i, GAME_CONNECTIONS_LABEL);
     const status: CheckRow["status"] = /^FAIL\s+/i.test(line) ? "Failed" : /^WAIT\s+/i.test(line) && /warming/i.test(raw) ? "Info" : /^WAIT\s+/i.test(line) ? "Warn" : "Ready";
     const group = readyGroupFor(raw);
     const name = friendlyReadyName(raw);
@@ -238,6 +241,7 @@ function friendlyIssue(value: string) {
 
 function friendlyCheckDetail(value: string) {
   return normalizeDisplayText(value
+    .replace(/\b(healthy|unhealthy|starting|paused|exited|dead|stopped)\b/gi, (state) => state.charAt(0).toUpperCase() + state.slice(1).toLowerCase())
     .replace(/\bmissing\b/gi, "Missing")
     .replace(/\bwait\b/gi, "Wait")
     .replace(/\bnot running\b/gi, "Not Running")

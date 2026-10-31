@@ -30,6 +30,7 @@ import {
   stackActionPendingResult,
   type HomeLoadResult,
   type HomeTaskResult,
+  type StorageCleanupOperation,
   type RestartLifecycleState
 } from "./features/server/ServerPanels";
 import { parseUpdateTask, stackVersionButtonLabel, preferKnownVersions, stackVersionButtonTitle, withInstalledVersion } from "./features/updates/updateUtils";
@@ -477,6 +478,8 @@ export function App() {
   const [task, setTask] = useState<Task | null>(null);
   const [backupRestoreTask, setBackupRestoreTask] = useState<Task | null>(null);
   const [homeTaskResult, setHomeTaskResult] = useState<HomeTaskResult | null>(null);
+  const [storageCleanupResult, setStorageCleanupResult] = useState<HomeTaskResult | null>(null);
+  const [storageCleanupOperation, setStorageCleanupOperation] = useState<StorageCleanupOperation>("");
   const [funcomTokenResult, setFuncomTokenResult] = useState<HomeTaskResult | null>(() => loadPersistedFuncomTokenResult());
   const [homeRunningAction, setHomeRunningAction] = useState<"start" | "stop" | "restart" | "">("");
   const [homeRestartStarted, setHomeRestartStarted] = useState(false);
@@ -942,7 +945,7 @@ export function App() {
         {error && <div className="error-banner">{error}</div>}
         {redeploySetupOpen && <SetupWizard initialStep={setupJump.step} jumpNonce={setupJump.nonce} mode="redeploy" onSetupComplete={async () => setSetupState(await setupApi.state())} />}
         {!redeploySetupOpen && tab === "Home" && <HomePanel status={status} readiness={readiness} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onLoad={loadStackStatus} confirmAction={confirmDialog} restartGate={restartGateChoice} sampledAtMs={homeSampledAtMs} setSampledAtMs={setHomeSampledAtMs} onNavigate={(nextTab) => { setRedeploySetupOpen(false); setSelectedPinnedAddonId(""); setTab(nextTab); }} />}
-        {!redeploySetupOpen && tab === "Server Control" && <ServerPanel setTask={setTask} setStatus={setStatus} status={status} setReadiness={setReadiness} setPorts={setPorts} setDoctor={setDoctor} ports={ports} readiness={readiness} doctor={doctor} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} onRedeploy={() => {
+        {!redeploySetupOpen && tab === "Server Control" && <ServerPanel setTask={setTask} setStatus={setStatus} status={status} setReadiness={setReadiness} setPorts={setPorts} setDoctor={setDoctor} ports={ports} readiness={readiness} doctor={doctor} storageCleanupResult={storageCleanupResult} setStorageCleanupResult={setStorageCleanupResult} storageCleanupOperation={storageCleanupOperation} setStorageCleanupOperation={setStorageCleanupOperation} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} onRedeploy={() => {
           setSetupJump((current) => ({ step: 0, nonce: current.nonce + 1 }));
           setSelectedPinnedAddonId("");
           setRedeploySetupOpen(true);

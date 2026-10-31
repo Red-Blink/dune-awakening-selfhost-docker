@@ -1204,6 +1204,7 @@
     "Game Files Installed",
     "Game Map Ports",
     "Game Server Checks",
+    "Game Server Connections",
     "Game Servers",
     "Game UDP ports start at",
     "Game Update",
@@ -3273,6 +3274,7 @@
   ],
   "translations": {
     "FR": {
+      "Game Server Connections": "Connexions des Serveurs de Jeu",
       "API Keys": "Clés API",
       "Actions": "Actions",
       "Active": "Actif",
@@ -6488,6 +6490,7 @@
       "{count0}": "{count0}"
     },
     "NL": {
+      "Game Server Connections": "Spelserververbindingen",
       "API Keys": "API-sleutels",
       "Actions": "Acties",
       "Active": "Actief",
@@ -9703,6 +9706,7 @@
       "{count0}": "{count0}"
     },
     "ES": {
+      "Game Server Connections": "Conexiones de Servidores de Juego",
       "API Keys": "Claves de API",
       "Actions": "Acciones",
       "Active": "Activo",
@@ -12918,6 +12922,7 @@
       "{count0}": "{count0}"
     },
     "IT": {
+      "Game Server Connections": "Connessioni dei Server di Gioco",
       "API Keys": "Chiavi API",
       "Actions": "Azioni",
       "Active": "Attivo",
@@ -16133,6 +16138,7 @@
       "{count0}": "{count0}"
     },
     "DE": {
+      "Game Server Connections": "Spielserver-Verbindungen",
       "API Keys": "API-Schlüssel",
       "Actions": "Aktionen",
       "Active": "Aktiv",
@@ -19348,6 +19354,7 @@
       "{count0}": "{count0}"
     },
     "PL": {
+      "Game Server Connections": "Połączenia Serwerów Gry",
       "API Keys": "Klucze API",
       "Actions": "Działania",
       "Active": "Aktywne",
@@ -22563,6 +22570,7 @@
       "{count0}": "{count0}"
     },
     "PT-BR": {
+      "Game Server Connections": "Conexões dos Servidores de Jogo",
       "API Keys": "Chaves de API",
       "Actions": "Ações",
       "Active": "Ativo",
@@ -25778,6 +25786,7 @@
       "{count0}": "{count0}"
     },
     "PT-PT": {
+      "Game Server Connections": "Ligações dos Servidores de Jogo",
       "API Keys": "Chaves API",
       "Actions": "Ações",
       "Active": "Ativo",
@@ -28993,6 +29002,7 @@
       "{count0}": "{count0}"
     },
     "UK": {
+      "Game Server Connections": "З’єднання Ігрових Серверів",
       "API Keys": "Ключі API",
       "Actions": "Дії",
       "Active": "Активний",
@@ -32208,6 +32218,7 @@
       "{count0}": "{count0}"
     },
     "RU": {
+      "Game Server Connections": "Подключения Игровых Серверов",
       "API Keys": "Ключи API",
       "Actions": "Действия",
       "Active": "Активный",
@@ -35423,6 +35434,7 @@
       "{count0}": "{count0}"
     },
     "TR": {
+      "Game Server Connections": "Oyun Sunucusu Bağlantıları",
       "API Keys": "API Anahtarları",
       "Actions": "Eylemler",
       "Active": "Etkin",
@@ -38638,6 +38650,7 @@
       "{count0}": "{count0}"
     },
     "JA": {
+      "Game Server Connections": "ゲームサーバー接続",
       "API Keys": "APIキー",
       "Actions": "アクション",
       "Active": "アクティブ",
@@ -41853,6 +41866,7 @@
       "{count0}": "{count0}"
     },
     "KO": {
+      "Game Server Connections": "게임 서버 연결",
       "API Keys": "API 키",
       "Actions": "작업",
       "Active": "활성",
@@ -45068,6 +45082,7 @@
       "{count0}": "{count0}"
     },
     "ZH-HANS": {
+      "Game Server Connections": "游戏服务器连接",
       "API Keys": "API 密钥",
       "Actions": "操作",
       "Active": "有效",
@@ -48283,6 +48298,7 @@
       "{count0}": "{count0}"
     },
     "ZH-HANT": {
+      "Game Server Connections": "遊戲伺服器連線",
       "API Keys": "API 金鑰",
       "Actions": "動作",
       "Active": "有效",
@@ -51498,6 +51514,7 @@
       "{count0}": "{count0}"
     },
     "AR": {
+      "Game Server Connections": "اتصالات خوادم اللعبة",
       "API Keys": "مفاتيح واجهة برمجة التطبيقات (API)",
       "Actions": "الإجراءات",
       "Active": "نشط",
@@ -54713,6 +54730,7 @@
       "{count0}": "{count0}"
     },
     "FI": {
+      "Game Server Connections": "Pelipalvelinyhteydet",
       "API Keys": "API-avaimet",
       "Actions": "Toimenpiteet",
       "Active": "Aktiivinen",
@@ -57928,6 +57946,7 @@
       "{count0}": "{count0}"
     },
     "DA": {
+      "Game Server Connections": "Spilserverforbindelser",
       "API Keys": "API-nøgler",
       "Actions": "Handlinger",
       "Active": "Aktiv",
@@ -61143,6 +61162,7 @@
       "{count0}": "{count0}"
     },
     "CS": {
+      "Game Server Connections": "Připojení herních serverů",
       "API Keys": "Klíče API",
       "Actions": "Akce",
       "Active": "Aktivní",
@@ -64358,6 +64378,7 @@
       "{count0}": "{count0}"
     },
     "NB": {
+      "Game Server Connections": "Spillservertilkoblinger",
       "API Keys": "API-nøkler",
       "Actions": "Handlinger",
       "Active": "Aktiv",
@@ -67573,6 +67594,7 @@
       "{count0}": "{count0}"
     },
     "HU": {
+      "Game Server Connections": "Játékszerver-kapcsolatok",
       "API Keys": "API-kulcsok",
       "Actions": "Műveletek",
       "Active": "Aktív",
@@ -70788,6 +70810,7 @@
       "{count0}": "{count0}"
     },
     "EL": {
+      "Game Server Connections": "Συνδέσεις Διακομιστών Παιχνιδιού",
       "API Keys": "Κλειδιά API",
       "Actions": "Ενέργειες",
       "Active": "Ενεργό",
@@ -74003,6 +74026,7 @@
       "{count0}": "{count0}"
     },
     "RO": {
+      "Game Server Connections": "Conexiuni la Serverele de Joc",
       "API Keys": "Chei API",
       "Actions": "Acțiuni",
       "Active": "Activ",
@@ -77218,6 +77242,7 @@
       "{count0}": "{count0}"
     },
     "SK": {
+      "Game Server Connections": "Pripojenia herných serverov",
       "API Keys": "Kľúče API",
       "Actions": "Akcie",
       "Active": "Aktívne",
@@ -80433,6 +80458,7 @@
       "{count0}": "{count0}"
     },
     "BG": {
+      "Game Server Connections": "Връзки с игровите сървъри",
       "API Keys": "API ключове",
       "Actions": "Действия",
       "Active": "Активен",
@@ -83648,6 +83674,7 @@
       "{count0}": "{count0}"
     },
     "SV": {
+      "Game Server Connections": "Spelserveranslutningar",
       "API Keys": "API-nycklar",
       "Actions": "Åtgärder",
       "Active": "Aktiv",
@@ -86863,6 +86890,7 @@
       "{count0}": "{count0}"
     },
     "TH": {
+      "Game Server Connections": "การเชื่อมต่อเซิร์ฟเวอร์เกม",
       "API Keys": "กุญแจ API",
       "Actions": "การดำเนินการ",
       "Active": "กำลังทำงาน",
@@ -90078,6 +90106,7 @@
       "{count0}": "{count0}"
     },
     "VI": {
+      "Game Server Connections": "Kết Nối Máy Chủ Trò Chơi",
       "API Keys": "Khóa API",
       "Actions": "Các hành động",
       "Active": "Hoạt động",
@@ -93293,6 +93322,7 @@
       "{count0}": "{count0}"
     },
     "ID": {
+      "Game Server Connections": "Koneksi Server Game",
       "API Keys": "Kunci API",
       "Actions": "Tindakan",
       "Active": "Aktif",
@@ -96508,6 +96538,7 @@
       "{count0}": "{count0}"
     },
     "HI": {
+      "Game Server Connections": "गेम सर्वर कनेक्शन",
       "API Keys": "एपीआई कुंजी",
       "Actions": "क्रियाएँ",
       "Active": "सक्रिय",
@@ -99723,6 +99754,7 @@
       "{count0}": "{count0}"
     },
     "HR": {
+      "Game Server Connections": "Veze poslužitelja igre",
       "API Keys": "API ključevi",
       "Actions": "Radnje",
       "Active": "Aktivno",
@@ -102938,6 +102970,7 @@
       "{count0}": "{count0}"
     },
     "SR": {
+      "Game Server Connections": "Везе Сервера Игре",
       "API Keys": "АПИ кључеви",
       "Actions": "Акције",
       "Active": "Активан",
@@ -106153,6 +106186,7 @@
       "{count0}": "{count0}"
     },
     "SL": {
+      "Game Server Connections": "Povezave igralnih strežnikov",
       "API Keys": "API-ključi",
       "Actions": "Ukrepi",
       "Active": "Aktivno",
@@ -109368,6 +109402,7 @@
       "{count0}": "{count0}"
     },
     "ET": {
+      "Game Server Connections": "Mänguserverite ühendused",
       "API Keys": "API-võtmed",
       "Actions": "Tegevused",
       "Active": "Aktiivne",
@@ -112583,6 +112618,7 @@
       "{count0}": "{count0}"
     },
     "LT": {
+      "Game Server Connections": "Žaidimų serverių ryšiai",
       "API Keys": "API raktai",
       "Actions": "Veiksmai",
       "Active": "Aktyvus",
@@ -115798,6 +115834,7 @@
       "{count0}": "{count0}"
     },
     "LV": {
+      "Game Server Connections": "Spēļu serveru savienojumi",
       "API Keys": "API atslēgas",
       "Actions": "Darbības",
       "Active": "Aktīvs",
@@ -119013,6 +119050,7 @@
       "{count0}": "{count0}"
     },
     "HE": {
+      "Game Server Connections": "חיבורי שרתי משחק",
       "API Keys": "מפתחות API",
       "Actions": "פעולות",
       "Active": "פעיל",
@@ -122228,6 +122266,7 @@
       "{count0}": "{count0}"
     },
     "FA": {
+      "Game Server Connections": "اتصال‌های سرور بازی",
       "API Keys": "کلیدهای API",
       "Actions": "اقدامات",
       "Active": "فعال",
@@ -125443,6 +125482,7 @@
       "{count0}": "{count0}"
     },
     "UR": {
+      "Game Server Connections": "گیم سرور کنکشنز",
       "API Keys": "API کیز",
       "Actions": "کارروائیاں",
       "Active": "فعال",
@@ -128658,6 +128698,7 @@
       "{count0}": "{count0}"
     },
     "MS": {
+      "Game Server Connections": "Sambungan Pelayan Permainan",
       "API Keys": "Kunci API",
       "Actions": "Tindakan",
       "Active": "Aktif",
@@ -131873,6 +131914,7 @@
       "{count0}": "{count0}"
     },
     "TL": {
+      "Game Server Connections": "Mga Koneksyon ng Game Server",
       "API Keys": "Mga Susi ng API",
       "Actions": "Mga Aksyon",
       "Active": "Aktibo",
@@ -135088,6 +135130,7 @@
       "{count0}": "{count0}"
     },
     "BN": {
+      "Game Server Connections": "গেম সার্ভারের সংযোগ",
       "API Keys": "এপিআই কীসমূহ",
       "Actions": "ক্রিয়া",
       "Active": "সক্রিয়",
@@ -138303,6 +138346,7 @@
       "{count0}": "{count0}"
     },
     "IS": {
+      "Game Server Connections": "Tengingar leikjaþjóna",
       "API Keys": "API-lyklar",
       "Actions": "Aðgerðir",
       "Active": "Virkt",
@@ -141518,6 +141562,7 @@
       "{count0}": "{count0}"
     },
     "SQ": {
+      "Game Server Connections": "Lidhjet e Serverëve të Lojës",
       "API Keys": "Çelësa API",
       "Actions": "Veprime",
       "Active": "Aktiv",
@@ -144733,6 +144778,7 @@
       "{count0}": "{count0}"
     },
     "MK": {
+      "Game Server Connections": "Врски со серверите за игра",
       "API Keys": "API клучеви",
       "Actions": "Дејства",
       "Active": "Активен",
@@ -147948,6 +147994,7 @@
       "{count0}": "{count0}"
     },
     "KA": {
+      "Game Server Connections": "თამაშის სერვერის კავშირები",
       "API Keys": "API გასაღებები",
       "Actions": "მოქმედებები",
       "Active": "აქტიური",
@@ -151163,6 +151210,7 @@
       "{count0}": "{count0}"
     },
     "HY": {
+      "Game Server Connections": "Խաղային սերվերների կապեր",
       "API Keys": "API բանալիներ",
       "Actions": "Գործողություններ",
       "Active": "Ակտիվ",
@@ -154378,6 +154426,7 @@
       "{count0}": "{count0} թ"
     },
     "AZ": {
+      "Game Server Connections": "Oyun serveri bağlantıları",
       "API Keys": "API açarları",
       "Actions": "Hərəkətlər",
       "Active": "Aktiv",
@@ -157593,6 +157642,7 @@
       "{count0}": "{count0}"
     },
     "KK": {
+      "Game Server Connections": "Ойын серверінің қосылымдары",
       "API Keys": "API кілттері",
       "Actions": "Іс-әрекеттер",
       "Active": "Активті",
@@ -160808,6 +160858,7 @@
       "{count0}": "{count0}"
     },
     "UZ": {
+      "Game Server Connections": "O‘yin serveri ulanishlari",
       "API Keys": "API kalitlari",
       "Actions": "Harakatlar",
       "Active": "Faol",
@@ -164023,6 +164074,7 @@
       "{count0}": "{count0}"
     },
     "CA": {
+      "Game Server Connections": "Connexions dels servidors de joc",
       "API Keys": "Claus d'API",
       "Actions": "Accions",
       "Active": "Actiu",
@@ -167238,6 +167290,7 @@
       "{count0}": "{count0}"
     },
     "AF": {
+      "Game Server Connections": "Speletjiebedienerverbindings",
       "API Keys": "API-sleutels",
       "Actions": "Handelinge",
       "Active": "Aktief",
@@ -170453,6 +170506,7 @@
       "{count0}": "{count0}"
     },
     "SW": {
+      "Game Server Connections": "Miunganisho ya Seva za Mchezo",
       "API Keys": "Funguo za API",
       "Actions": "Vitendo",
       "Active": "Inayofanya kazi",

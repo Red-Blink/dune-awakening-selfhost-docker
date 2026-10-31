@@ -9,6 +9,118 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class GameSecretsTests(unittest.TestCase):
+    def run_container_removal(self, scenario, name='dune-server-survival-1'):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            executable = root / 'docker'
+            executable.write_text('''#!/bin/bash
+set -eu
+printf '%s\\n' "$*" >> "$FIXTURE_CALLS"
+case "$1" in
+  ps)
+    [ "$FIXTURE_SCENARIO" != daemon-error ] || exit 1
+    if [ "$FIXTURE_SCENARIO" != absent ] && [ ! -f "$FIXTURE_REMOVED" ]; then
+      printf 'synthetic-container-id\\n'
+    fi
+    ;;
+  rm)
+    count=0
+    [ ! -f "$FIXTURE_COUNT" ] || count="$(cat "$FIXTURE_COUNT")"
+    count=$((count+1))
+    printf '%s' "$count" > "$FIXTURE_COUNT"
+    case "$FIXTURE_SCENARIO" in
+      immediate) touch "$FIXTURE_REMOVED" ;;
+      delayed) [ "$count" -gt 1 ] || exit 1; touch "$FIXTURE_REMOVED" ;;
+      disappeared-after-error) touch "$FIXTURE_REMOVED"; exit 1 ;;
+      persistent-failure) exit 124 ;;
+      false-success) exit 0 ;;
+      *) exit 1 ;;
+    esac
+    ;;
+  *) exit 1 ;;
+esac
+''')
+            executable.chmod(0o755)
+            env = os.environ.copy()
+            env.update(
+                PATH=str(root) + os.pathsep + env['PATH'],
+                FIXTURE_SCENARIO=scenario,
+                FIXTURE_CALLS=str(root / 'calls'),
+                FIXTURE_COUNT=str(root / 'count'),
+                FIXTURE_REMOVED=str(root / 'removed'),
+            )
+            script = '''set -euo pipefail
+source "$1/runtime/scripts/lib/game-container.sh"
+# Keep tests fast and assert that every Docker operation has a time limit.
+timeout() {
+  case "$1:$2" in 15:docker|30:docker) shift; "$@" ;; *) return 99 ;; esac
+}
+sleep() { :; }
+remove_existing_game_container "$2"
+printf 'replacement-allowed\\n'
+'''
+            result = subprocess.run(['bash', '-c', script, 'test', str(ROOT), name],
+                                    env=env, capture_output=True, text=True, timeout=5)
+            calls = (root / 'calls').read_text().splitlines() if (root / 'calls').exists() else []
+            return result, calls
+
+    def test_missing_container_needs_no_removal(self):
+        result, calls = self.run_container_removal('absent')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(any(c.startswith('rm ') for c in calls))
+
+    def test_container_removal_is_verified_before_replacement(self):
+        result, calls = self.run_container_removal('immediate')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(sum(c.startswith('rm ') for c in calls), 1)
+        self.assertTrue(calls[-1].startswith('ps '))
+        self.assertIn('name=^/dune-server-survival-1$', calls[-1])
+
+    def test_delayed_exit_event_retries_removal(self):
+        result, calls = self.run_container_removal('delayed')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(sum(c.startswith('rm ') for c in calls), 2)
+
+    def test_removal_error_can_still_finish_asynchronously(self):
+        result, calls = self.run_container_removal('disappeared-after-error')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(sum(c.startswith('rm ') for c in calls), 1)
+
+    def test_persistent_removal_failure_prevents_replacement(self):
+        result, calls = self.run_container_removal('persistent-failure')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(sum(c.startswith('rm ') for c in calls), 3)
+        self.assertNotIn('replacement-allowed', result.stdout)
+        self.assertIn('still exists after 3 removal attempts', result.stderr)
+
+    def test_success_without_removal_does_not_allow_replacement(self):
+        result, calls = self.run_container_removal('false-success')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(sum(c.startswith('rm ') for c in calls), 3)
+        self.assertNotIn('replacement-allowed', result.stdout)
+
+    def test_unreachable_docker_is_not_treated_as_missing_container(self):
+        result, calls = self.run_container_removal('daemon-error')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(any(c.startswith('rm ') for c in calls))
+        self.assertNotIn('replacement-allowed', result.stdout)
+
+    def test_invalid_name_never_reaches_docker(self):
+        result, calls = self.run_container_removal('immediate', 'invalid.*name')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(calls, [])
+
+    def test_all_game_launchers_require_successful_removal(self):
+        for filename, target in [
+            ('start-server-survival-1.sh', 'dune-server-survival-1'),
+            ('start-server-overmap.sh', 'dune-server-overmap'),
+            ('spawn-server.sh', '"$CONTAINER_NAME"'),
+        ]:
+            source = (ROOT / 'runtime/scripts' / filename).read_text()
+            self.assertIn(f'\nremove_existing_game_container {target}\n', source)
+            self.assertLess(source.index(f'remove_existing_game_container {target}'),
+                            source.index('docker run -d'))
+
     def test_parallel_catalog_refresh_propagates_either_failure(self):
         source = (ROOT / 'runtime/scripts/start-all.sh').read_text()
         command = re.search(r'run_timed_step "Refreshing Map Catalogs" bash -c \'(.*?)\n\'', source, re.S).group(1)

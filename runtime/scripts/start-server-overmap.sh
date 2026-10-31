@@ -78,7 +78,7 @@ SIETCH_RUNTIME_ARGS=("${SIETCH_RUNTIME_ARGS_FILTERED[@]}")
 
 runtime/scripts/network-addresses.sh reconcile >/dev/null 2>&1 || true
 
-docker rm -f dune-server-overmap 2>/dev/null || true
+remove_existing_game_container dune-server-overmap
 runtime/scripts/repair-map-settings-permissions.sh overmap
 python3 runtime/scripts/usersettings.py materialize Overmap "$PWD/runtime/game/overmap/Saved" "$PARTITION_ID"
 

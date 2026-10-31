@@ -82,7 +82,7 @@ SIETCH_RUNTIME_ARGS=("${SIETCH_RUNTIME_ARGS_FILTERED[@]}")
 
 runtime/scripts/network-addresses.sh reconcile >/dev/null 2>&1 || true
 
-docker rm -f dune-server-survival-1 2>/dev/null || true
+remove_existing_game_container dune-server-survival-1
 runtime/scripts/repair-map-settings-permissions.sh survival-1
 python3 runtime/scripts/usersettings.py materialize Survival_1 "$PWD/runtime/game/survival-1/Saved" "$PARTITION_ID"
 

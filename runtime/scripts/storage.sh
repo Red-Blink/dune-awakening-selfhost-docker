@@ -54,49 +54,53 @@ current_image_refs() {
 }
 
 protected_image_ids() {
-  local container ref
+  local -a containers=() refs=()
   if [ -f runtime/generated/experimental-tanks.json ]; then
     runtime/scripts/experimental-tanks.sh resolve Survival_1
   fi
 
-  while IFS= read -r container; do
-    [ -n "$container" ] || continue
-    docker inspect --format '{{.Image}}' "$container" 2>/dev/null || true
-  done < <(docker container ls -aq)
+  mapfile -t containers < <(docker container ls -aq)
+  if [ "${#containers[@]}" -gt 0 ]; then
+    docker inspect --format '{{.Image}}' "${containers[@]}" 2>/dev/null || true
+  fi
 
-  while IFS= read -r ref; do
-    [ -n "$ref" ] || continue
-    docker image inspect --format '{{.Id}}' "$ref" 2>/dev/null || true
-  done < <(current_image_refs)
+  mapfile -t refs < <(current_image_refs)
+  if [ "${#refs[@]}" -gt 0 ]; then
+    docker image inspect --format '{{.Id}}' "${refs[@]}" 2>/dev/null || true
+  fi
 }
 
 cleanup_candidate_images() {
-  docker image ls --no-trunc --format '{{.Repository}}|{{.Tag}}|{{.ID}}'
-  docker image ls --no-trunc \
-    --filter label=io.github.red-blink.dune-selfhost.component \
-    --format '{{.Repository}}|{{.Tag}}|{{.ID}}'
+  local component
+  docker image ls --no-trunc --format '{{.Repository}}|{{.Tag}}|{{.ID}}' | awk -F'|' '
+    $1 ~ /^registry\.funcom\.com\/funcom\/self-hosting\/(igw-postgres|seabass-server|seabass-server-bg-director|seabass-server-db-utils|seabass-server-gateway|seabass-server-rabbitmq|seabass-server-text-router)$/ ||
+    $1 == "redblink-dune-tanks" || $1 == "redblink-dune-tank-base"'
+  # Let Docker filter labels once per component instead of spawning an inspect
+  # process for every unrelated image during each Doctor refresh.
+  for component in console orchestrator; do
+    docker image ls --no-trunc \
+      --filter "label=io.github.red-blink.dune-selfhost.component=$component" \
+      --format '{{.Repository}}|{{.Tag}}|{{.ID}}'
+  done
 }
 
 obsolete_dune_image_ids() {
-  local protected_file id repo tag
+  local protected_file id repo tag current_build=""
+  if [ -r runtime/generated/image-tags.env ]; then
+    # shellcheck disable=SC1091
+    . runtime/generated/image-tags.env
+    current_build="${DUNE_WORLD_IMAGE_TAG:-}"
+    current_build="${current_build%%-*}"
+  fi
   declare -A seen=()
   protected_file="$(mktemp)"
   protected_image_ids | sort -u > "$protected_file"
 
   while IFS='|' read -r repo tag id; do
+    # Keep the installed build's tank/base images even when tanks are disabled.
     case "$repo" in
-      registry.funcom.com/funcom/self-hosting/igw-postgres|\
-      registry.funcom.com/funcom/self-hosting/seabass-server|\
-      registry.funcom.com/funcom/self-hosting/seabass-server-bg-director|\
-      registry.funcom.com/funcom/self-hosting/seabass-server-db-utils|\
-      registry.funcom.com/funcom/self-hosting/seabass-server-gateway|\
-      registry.funcom.com/funcom/self-hosting/seabass-server-rabbitmq|\
-      registry.funcom.com/funcom/self-hosting/seabass-server-text-router) ;;
-      *)
-        if ! docker image inspect --format '{{index .Config.Labels "io.github.red-blink.dune-selfhost.component"}}' "$id" 2>/dev/null \
-          | grep -Eq '^(console|orchestrator)$'; then
-          continue
-        fi
+      redblink-dune-tanks|redblink-dune-tank-base)
+        [ -n "$current_build" ] && [ "${tag%%-*}" = "$current_build" ] && continue
         ;;
     esac
     grep -qxF "$id" "$protected_file" && continue
@@ -113,6 +117,39 @@ storage_status() {
   echo
   echo "The reclaimable image figure can include obsolete Funcom releases."
   echo "Use 'dune storage cleanup --dry-run' to list project-owned candidates."
+}
+
+remove_obsolete_image() {
+  local id="$1" ref current_build=""
+  local -a refs=()
+  if [ -r runtime/generated/image-tags.env ]; then
+    # shellcheck disable=SC1091
+    . runtime/generated/image-tags.env
+    current_build="${DUNE_WORLD_IMAGE_TAG:-}"
+    current_build="${current_build%%-*}"
+  fi
+  # Recheck protection immediately before removing tags. Docker also refuses
+  # removal when a container has started using the image in the meantime.
+  if protected_image_ids | grep -qxF "$id"; then
+    return 1
+  fi
+  mapfile -t refs < <(docker image inspect --format '{{range .RepoTags}}{{println .}}{{end}}' "$id" | sed '/^$/d')
+  for ref in "${refs[@]}"; do
+    case "$ref" in
+      redblink-dune-tank-base:"${current_build}-"*|redblink-dune-tanks:"${current_build}-"*)
+        [ -z "$current_build" ] || return 1
+        ;;
+    esac
+    case "$ref" in
+      registry.funcom.com/funcom/self-hosting/*|redblink-dune-tank-base:*|redblink-dune-tanks:*|redblink-dune-docker-console:*|dune-orchestrator:*) ;;
+      *) return 1 ;;
+    esac
+  done
+  if [ "${#refs[@]}" -gt 0 ]; then
+    docker image rm "${refs[@]}" >/dev/null
+  else
+    docker image rm "$id" >/dev/null
+  fi
 }
 
 cleanup_storage() {
@@ -134,11 +171,11 @@ cleanup_storage() {
     ref="${row#*|}"
     if [ "$dry_run" = "1" ]; then
       echo "WOULD REMOVE $ref ($id)"
-    elif docker image rm "$id" >/dev/null; then
+    elif remove_obsolete_image "$id"; then
       echo "REMOVED $ref"
       removed=$((removed + 1))
     else
-      echo "SKIPPED $ref (Docker reports it is still in use)"
+      echo "SKIPPED $ref (protected, shared with another project, or Docker could not remove it)"
     fi
   done < <(obsolete_dune_image_ids)
 

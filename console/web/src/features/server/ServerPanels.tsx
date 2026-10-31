@@ -20,6 +20,7 @@ import { childAccessPieceCount, usePendingQueues } from "../../lib/usePendingRef
 
 export type HomeLoadResult = { statusLoaded: boolean; readinessLoaded: boolean; statusError: string; readinessError: string; statusText: string; readinessText: string; sampledAtMs: number };
 export type HomeTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
+export type StorageCleanupOperation = "" | "images" | "build-cache";
 export type RestartLifecycleState = { stopObserved: boolean; startObserved: boolean };
 
 // A stop alone leaves refills queued -- stop-all.sh removes the Postgres
@@ -859,6 +860,10 @@ export function ServerPanel(props: {
   ports: string;
   readiness: string;
   doctor: string;
+  storageCleanupResult: HomeTaskResult | null;
+  setStorageCleanupResult: Dispatch<SetStateAction<HomeTaskResult | null>>;
+  storageCleanupOperation: StorageCleanupOperation;
+  setStorageCleanupOperation: Dispatch<SetStateAction<StorageCleanupOperation>>;
   taskResult: HomeTaskResult | null;
   setTaskResult: Dispatch<SetStateAction<HomeTaskResult | null>>;
   funcomTokenResult: HomeTaskResult | null;
@@ -887,8 +892,7 @@ export function ServerPanel(props: {
   const [serviceRestartResult, setServiceRestartResult] = useState<HomeTaskResult | null>(null);
   const [serviceRestartingService, setServiceRestartingService] = useState("");
   const [networkBindResult, setNetworkBindResult] = useState<HomeTaskResult | null>(null);
-  const [storageCleanupResult, setStorageCleanupResult] = useState<HomeTaskResult | null>(null);
-  const [storageCleanupOperation, setStorageCleanupOperation] = useState<"" | "images" | "build-cache">("");
+  const { storageCleanupResult, setStorageCleanupResult, storageCleanupOperation, setStorageCleanupOperation } = props;
   const [doctorLoading, setDoctorLoading] = useState(!props.doctor);
   const [doctorError, setDoctorError] = useState("");
   const controlActionRunId = useRef(0);
@@ -928,11 +932,21 @@ export function ServerPanel(props: {
       setDoctorLoading(true);
       setDoctorError("");
     }
-    const requests = includeDiagnostics
-      ? [serverApi.status(), serverApi.readiness(), serverApi.ports(), serverApi.doctor()] as const
-      : [serverApi.status(), serverApi.readiness()] as const;
-    const results = await Promise.allSettled(requests);
-    const [nextStatus, nextReadiness, nextPorts, nextDoctor] = results;
+    if (includeDiagnostics) {
+      // Doctor can take much longer than status/readiness. Publish each
+      // independent section without holding the main controls behind it.
+      void serverApi.ports().then((ports) => props.setPorts(ports.stdout)).catch(() => null);
+      void serverApi.doctor().then((doctor) => {
+        if (currentDoctorRequestId !== doctorRequestId.current) return;
+        props.setDoctor(doctor.stdout || doctor.stderr || "");
+        setDoctorLoading(false);
+      }).catch((error) => {
+        if (currentDoctorRequestId !== doctorRequestId.current) return;
+        setDoctorError(error instanceof Error ? error.message : String(error));
+        setDoctorLoading(false);
+      });
+    }
+    const [nextStatus, nextReadiness] = await Promise.allSettled([serverApi.status(), serverApi.readiness()]);
     const result: HomeLoadResult = { statusLoaded: false, readinessLoaded: false, statusError: "", readinessError: "", statusText: "", readinessText: "", sampledAtMs: 0 };
     if (nextStatus?.status === "fulfilled") {
       result.statusText = nextStatus.value.stdout;
@@ -950,14 +964,6 @@ export function ServerPanel(props: {
       props.setReadiness(readinessText);
     } else if (nextReadiness) {
       result.readinessError = nextReadiness.reason instanceof Error ? nextReadiness.reason.message : String(nextReadiness.reason);
-    }
-    if (nextPorts?.status === "fulfilled") props.setPorts(nextPorts.value.stdout);
-    if (nextDoctor?.status === "fulfilled" && currentDoctorRequestId === doctorRequestId.current) {
-      props.setDoctor(nextDoctor.value.stdout || nextDoctor.value.stderr || "");
-      setDoctorLoading(false);
-    } else if (nextDoctor?.status === "rejected" && currentDoctorRequestId === doctorRequestId.current) {
-      setDoctorError(nextDoctor.reason instanceof Error ? nextDoctor.reason.message : String(nextDoctor.reason));
-      setDoctorLoading(false);
     }
     if (!result.statusLoaded && result.statusError) props.onError(friendlyHomeStatusError(result.statusError));
     return result;
@@ -1072,9 +1078,8 @@ export function ServerPanel(props: {
     props.onError("");
     try {
       const response = buildCache ? await serverApi.cleanupDockerBuildCache() : await serverApi.cleanupDockerImages();
-      const final = await waitForTaskSilently(response.task);
+      const final = await waitForTaskSilently(response.task, 3600);
       const details = taskTechnicalDetails(final);
-      await loadControlStatus(true).catch(() => null);
       setStorageCleanupResult(final.status === "succeeded"
         ? {
             status: "succeeded",
@@ -1088,6 +1093,7 @@ export function ServerPanel(props: {
             message: "Review the task details before trying again.",
             details
           });
+      void loadControlStatus(true).catch(() => null);
     } catch (error) {
       setStorageCleanupResult({
         status: "failed",
@@ -1511,9 +1517,9 @@ async function waitForTask(task: Task, setTask: (task: Task) => void) {
   return current;
 }
 
-async function waitForTaskSilently(task: Task) {
+async function waitForTaskSilently(task: Task, maxPolls = 180) {
   let current = task;
-  for (let i = 0; i < 180 && !["succeeded", "failed", "cancelled"].includes(current.status); i += 1) {
+  for (let i = 0; i < maxPolls && !["succeeded", "failed", "cancelled"].includes(current.status); i += 1) {
     await new Promise((resolvePromise) => window.setTimeout(resolvePromise, 1000));
     current = (await setupApi.task(current.id)).task;
   }
@@ -1835,7 +1841,7 @@ export function summarizeHomeStatus(status: string, readiness: string, readiness
     messaging: preferKnownHomeHealth(summarizeMessaging(status), summarizeReadinessRabbit(readiness)),
     battlegroup: summarizeBattlegroupServices(status),
     games: preferKnownHomeHealth(summarizeGameServers(status), summarizeReadinessGameServers(readiness)),
-    fls: preferKnownHomeHealth(summarizeFls(status), summarizeReadinessFls(readiness))
+    fls: preferKnownHomeHealth(summarizeFls(status, funcomTokenAuthFailure), summarizeReadinessFls(readiness))
   };
   const rawGames = raw.games;
   // ready.sh reports READY off the core containers and the two protected maps
@@ -2654,7 +2660,7 @@ function summarizeGameServers(text: string) {
   return { label: "OK", status: "Ready", detail };
 }
 
-function summarizeFls(text: string) {
+function summarizeFls(text: string, tokenAuthFailure = false) {
   // Funcom/FLS is the LAST section status.sh prints, so sectionLines runs to end
   // of output and picks up the trailing "Tip:" lines with it. Narrow to rows
   // that actually carry a state: counting the tips made a healthy host read
@@ -2665,7 +2671,10 @@ function summarizeFls(text: string) {
   );
   if (!lines.length) return { label: "Unknown", status: "Unknown", detail: "" };
   const bad = lines.find((line) => /:\s*(WAIT|FAIL|ERROR|MISSING)/i.test(line));
-  const detail = `${lines.filter((line) => /:\s*OK\b/i.test(line)).length} of ${lines.length}`;
+  // The token probe can fail before the cached status snapshot catches up.
+  // Authentication invalidates the Director heartbeat; do not count that
+  // cached OK or subtract it twice if status already reports it as failing.
+  const detail = `${lines.filter((line) => /:\s*OK\b/i.test(line) && !(tokenAuthFailure && /^Director heartbeat\s*:/i.test(line))).length} of ${lines.length}`;
   if (bad) return { label: "Needs Review", status: "WARN", detail };
   return { label: "OK", status: "Ready", detail };
 }

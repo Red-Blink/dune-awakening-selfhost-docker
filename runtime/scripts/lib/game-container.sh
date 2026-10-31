@@ -4,6 +4,34 @@
 # partition binding helpers for start-server-survival-1.sh,
 # start-server-overmap.sh, and spawn-server.sh (S-02, S-06, E-02).
 
+remove_existing_game_container() {
+  local name="$1" attempt existing
+  [[ "$name" =~ ^[a-zA-Z0-9_-]+$ ]] || {
+    echo "Invalid game container name." >&2
+    return 1
+  }
+
+  # Docker can time out before a killed process delivers its exit event.
+  # Retry that incomplete removal and verify the postcondition; otherwise a
+  # subsequent docker run only fails with a misleading name-conflict error.
+  for attempt in 1 2 3 4; do
+    if ! existing="$(timeout 15 docker ps -a --filter "name=^/${name}$" --format '{{.ID}}')"; then
+      echo "Cannot verify existing game container $name; refusing to launch a replacement." >&2
+      return 1
+    fi
+    [ -n "$existing" ] || return 0
+    [ "$attempt" -lt 4 ] || break
+
+    if ! timeout 30 docker rm -f "$name" >/dev/null; then
+      echo "Game container removal did not complete for $name (attempt $attempt of 3)." >&2
+    fi
+    sleep 2
+  done
+
+  echo "Game container $name still exists after 3 removal attempts; refusing to launch a replacement." >&2
+  return 1
+}
+
 game_container_security_args() {
   if [ "${DUNE_GAME_CONTAINER_PRIVILEGED:-1}" = "1" ]; then
     printf '%s\n' \
