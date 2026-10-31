@@ -296,6 +296,8 @@ jobs:
       # 2.2.40 while db.sh required 2.3 for --aead-algo: every check was green.
       - name: Build the console image
         run: docker build -f console/api/Dockerfile -t dune-console:ci .
+      - name: Check the packaged translation catalog
+        run: bash tests/console-i18n-image-test.sh dune-console:ci
       - name: Build the encrypted front door image (go vet and its tests run in the build)
         run: docker build -t dune-tls-front:ci runtime/tls-front
       - name: Check the runtime it actually ships
