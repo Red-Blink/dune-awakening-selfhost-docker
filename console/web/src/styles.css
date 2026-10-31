@@ -1854,22 +1854,8 @@ body.debug .technical-details { display: block; }
 .playerAdmin_schematicTable th, .playerAdmin_schematicTable td { max-width: none; text-align: center; }
 .playerAdmin_schematicTable th:nth-child(1), .playerAdmin_schematicTable td:nth-child(1) { width: 22%; }
 .playerAdmin_schematicTable th:nth-child(2), .playerAdmin_schematicTable td:nth-child(2) { width: 27%; }
-.playerAdmin_buildingUnlockTable th[data-column="group"],
-.playerAdmin_buildingUnlockTable td[data-column="group"] { width: 18%; }
-.playerAdmin_buildingUnlockTable th[data-column="status"],
-.playerAdmin_buildingUnlockTable td[data-column="status"] { width: 14%; min-width: 150px; overflow: visible; text-overflow: clip; }
 .playerAdmin_buildingUnlockTable td[data-column="status"] .badge { display: inline-flex; align-items: center; justify-content: center; max-width: 100%; box-sizing: border-box; }
-.playerAdmin_schematicTable.playerAdmin_buildingUnlockTable { min-width: 1200px; }
 .playerAdmin_buildingUnlockTable th, .playerAdmin_buildingUnlockTable td { padding: 6px 10px; line-height: 1.3; }
-.playerAdmin_schematicTable.playerAdmin_buildingUnlockTable th[data-column="image"], .playerAdmin_schematicTable.playerAdmin_buildingUnlockTable td[data-column="image"] { width: 64px; }
-.playerAdmin_schematicTable.playerAdmin_buildingUnlockTable th[data-column="unlockName"], .playerAdmin_schematicTable.playerAdmin_buildingUnlockTable td[data-column="unlockName"] { width: 190px; text-align: start; }
-.playerAdmin_schematicTable.playerAdmin_buildingUnlockTable th[data-column="itemId"], .playerAdmin_schematicTable.playerAdmin_buildingUnlockTable td[data-column="itemId"] { width: 230px; text-align: start; }
-.playerAdmin_schematicTable.playerAdmin_buildingUnlockTable th[data-column="group"], .playerAdmin_schematicTable.playerAdmin_buildingUnlockTable td[data-column="group"] { width: 160px; text-align: start; }
-.playerAdmin_schematicTable.playerAdmin_buildingUnlockTable th[data-column="requirement"], .playerAdmin_schematicTable.playerAdmin_buildingUnlockTable td[data-column="requirement"] { width: 120px; }
-.playerAdmin_schematicTable.playerAdmin_buildingUnlockTable th[data-column="status"], .playerAdmin_schematicTable.playerAdmin_buildingUnlockTable td[data-column="status"] { width: 140px; }
-.playerAdmin_schematicTable.playerAdmin_buildingUnlockTable .playerAdmin_schematicResultCell { width: 160px; }
-.playerAdmin_schematicTable.playerAdmin_buildingUnlockTable .playerAdmin_schematicActionCell { width: 120px; }
-.playerAdmin_buildingUnlockTable td[data-column="itemId"] code { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .playerAdmin_customizationHeader { align-items: center; justify-content: space-between; gap: 16px; }
 .playerAdmin_customizationHeader h4 { margin-bottom: 4px; }
 .playerAdmin_customizationHeader p { margin: 0; }
@@ -1882,10 +1868,6 @@ body.debug .technical-details { display: block; }
 .playerAdmin_customizationCardSelect strong { color: #ffd08a; font-size: 15px; }
 .playerAdmin_customizationCardSelect span { max-width: 100%; color: #b9ad98; font-size: 12px; white-space: normal; }
 .playerAdmin_customizationCard > button:last-child { flex: 0 0 auto; align-self: center; min-height: 36px; padding: 7px 10px; }
-.playerAdmin_customizationTable th[data-column="group"],
-.playerAdmin_customizationTable td[data-column="group"] { width: 12%; }
-.playerAdmin_customizationTable th[data-column="status"],
-.playerAdmin_customizationTable td[data-column="status"] { width: 13%; min-width: 135px; overflow: visible; text-overflow: clip; }
 .playerAdmin_craftingTable th:nth-child(3), .playerAdmin_craftingTable td:nth-child(3) { width: 15%; }
 .playerAdmin_craftingTable th:nth-child(4), .playerAdmin_craftingTable td:nth-child(4) { width: 80px; }
 .playerAdmin_researchTable th:nth-child(3), .playerAdmin_researchTable td:nth-child(3) { width: 10%; }
@@ -1894,6 +1876,19 @@ body.debug .technical-details { display: block; }
 .playerAdmin_schematicTable td.playerAdmin_schematicActionCell { width: 150px; }
 .playerAdmin_schematicTable th.playerAdmin_schematicResultCell,
 .playerAdmin_schematicTable td.playerAdmin_schematicResultCell { width: 15%; white-space: normal; overflow: hidden; text-overflow: clip; }
+/* Name and Item ID stay unsized to share what is left. In a fixed-layout table
+   an unsized column gets 0px once the sized ones fill the width, and its text
+   then wraps per character and stretches the whole row; min-width prevents it. */
+.playerAdmin_previewTable { min-width: 1000px; }
+.playerAdmin_previewTable th[data-column="unlockName"], .playerAdmin_previewTable td[data-column="unlockName"], .playerAdmin_previewTable th[data-column="itemId"], .playerAdmin_previewTable td[data-column="itemId"] { text-align: start; }
+.playerAdmin_previewTable td[data-column="itemId"] code { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.playerAdmin_previewTable th[data-column="image"], .playerAdmin_previewTable td[data-column="image"] { width: 84px; }
+.playerAdmin_previewTable th:nth-child(2), .playerAdmin_previewTable td:nth-child(2) { width: auto; }
+.playerAdmin_previewTable th[data-column="group"], .playerAdmin_previewTable td[data-column="group"] { width: 130px; }
+.playerAdmin_previewTable th[data-column="requirement"], .playerAdmin_previewTable td[data-column="requirement"] { width: 110px; }
+.playerAdmin_previewTable th[data-column="status"], .playerAdmin_previewTable td[data-column="status"] { width: 130px; overflow: visible; text-overflow: clip; }
+.playerAdmin_previewTable th.playerAdmin_schematicActionCell, .playerAdmin_previewTable td.playerAdmin_schematicActionCell { width: 120px; }
+.playerAdmin_previewTable th.playerAdmin_schematicResultCell, .playerAdmin_previewTable td.playerAdmin_schematicResultCell { width: 150px; }
 .playerAdmin_schematicResultCell .inline-action-result-wrap { width: 100%; min-width: 0; min-height: 28px; align-items: center; justify-content: center; }
 .playerAdmin_schematicResultCell .inline-action-result {
   display: -webkit-box;
@@ -4028,8 +4023,6 @@ label.exchange-category-select, label.exchange-owner-select { display: flex; fle
   white-space: nowrap;
 }
 .inventory-item-name { display: inline-flex; max-width: 100%; align-items: center; gap: 5px; white-space: normal; }
-.inventory-name-info { display: inline-flex; align-items: center; flex-shrink: 0; color: var(--muted); cursor: help; }
-.inventory-name-info:hover { color: var(--accent); }
 .inventory-augment-list {
   display: grid;
   gap: 2px;

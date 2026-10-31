@@ -18,7 +18,7 @@ const server=http.createServer((req,res)=>{
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH || undefined,args:['--no-sandbox']});
 try{
- const page=await browser.newPage({viewport:{width:1440,height:1000}});
+ const page=await browser.newPage({viewport:{width:1440,height:1000},hasTouch:true});
  page.on('request',request=>{if(new URL(request.url()).pathname.startsWith('/api/'))apiRequests++;});
  const errors=[];page.on('pageerror',error=>errors.push(error.message));
  page.on('console',message=>{if(message.type()==='error'&&!message.text().includes('404')){console.log('BROWSER '+message.text().slice(0,160));errors.push(message.text().slice(0,160));}});
@@ -97,12 +97,30 @@ try{
    for(const section of await page.locator('.playerAdmin_tabs button').allTextContents()){
     await page.locator('.playerAdmin_tabs').getByRole('button',{name:section.trim(),exact:true}).click();
     await expand();await roleTabs('Player/'+section);await report('Player/'+section);
+    if(['Building Sets','Customizations'].includes(section.trim())){
+     const table=page.locator('.playerAdmin_previewTable');
+     for(const column of ['unlockName','itemId'])for(const cell of await table.locator(`tbody td[data-column="${column}"]`).all())assert.ok((await cell.boundingBox()).width>=90,section+' '+column+' has readable width');
+     for(const row of await table.locator('tbody tr').all())assert.ok((await row.boundingBox()).height<140,section+' rows stay compact');
+    }
     if(section.trim()==='Character'){
      for(const group of ['Backpack','Character','Loadout','Unique schematics']){
       await page.locator('.playerAdmin_invGroupTabs').getByRole('button',{name:new RegExp('^'+group+' ')}).click();
       const table=page.locator('.playerAdmin_invGroupTabs').locator('..').locator('table').first();
       assert.ok(await table.locator('tbody tr').count()>0,group+' inventory has items');
       for(const cell of await table.locator('tbody tr td:first-child').allTextContents())assert.match(cell.trim(),/^\d{5,9}$/,'inventory ID uses native length');
+      const trigger=table.getByRole('button',{name:/^About /}).first();
+      await trigger.focus();
+      const tooltip=page.getByRole('tooltip').filter({hasText:/^Template ID:/}).first();
+      await tooltip.waitFor();
+      assert.equal(await tooltip.evaluate(node=>node.parentElement===document.body),true,'template tooltip is portalled outside the table');
+      await page.keyboard.press('Escape');
+      assert.equal(await trigger.getAttribute('aria-expanded'),'false');
+      await trigger.hover();await tooltip.waitFor();
+      await page.keyboard.press('Escape');await page.mouse.move(0,0);
+      await page.setViewportSize({width:390,height:900});
+      await trigger.tap();await tooltip.waitFor();
+      const box=await tooltip.boundingBox();assert.ok(box.x>=0&&box.x+box.width<=390,'touch tooltip stays inside the viewport');
+      await page.keyboard.press('Escape');await page.setViewportSize({width:1440,height:1000});
      }
     }
     if(['Crafting','Research','Skills'].includes(section.trim())){

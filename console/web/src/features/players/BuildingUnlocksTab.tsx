@@ -169,7 +169,7 @@ export function BuildingUnlocksTab({ dbPlayerId, playerName, confirmAction, onAc
         sortDirection={sorted.sortDirection}
         onSort={sorted.onSort}
         resizableColumns
-        tableClassName="playerAdmin_schematicTable playerAdmin_buildingUnlockTable"
+        tableClassName="playerAdmin_schematicTable playerAdmin_previewTable playerAdmin_buildingUnlockTable"
         rowKey={(item) => String(item.itemId)}
         renderCell={(item, column) => column === "image"
           ? <CatalogItemThumb item={{ id: String(item.itemId), name: String(item.name), image: String(item.image || "") }} small />

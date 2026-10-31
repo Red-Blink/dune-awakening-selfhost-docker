@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Info, Pencil, X } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import { playersApi } from "../../api/players";
 import { adminApi } from "../../api/admin";
 import { DataTable, useSortableRows } from "../../components/common/DataTable";
-import { TechnicalDetails } from "../../components/common/DisplayPrimitives";
+import { InfoTooltip, TechnicalDetails } from "../../components/common/DisplayPrimitives";
 import { AugmentDropdown } from "../../components/common/AugmentDropdown";
 import { ItemGradeSelect } from "../../components/common/ItemCatalog";
 import { formatUiSentence, friendlyColumnName } from "../../lib/display";
@@ -357,7 +357,7 @@ export function PlayerDetailTab({
       if (column === "item_name") {
         const name = value == null || value === "" ? "—" : String(value);
         const templateId = String(row.template_id || "");
-        return <span className="inventory-item-name">{name}{templateId && <span className="inventory-name-info" title={`Template ID: ${templateId}`} aria-label={`Template ID: ${templateId}`}><Info size={13} /></span>}</span>;
+        return <span className="inventory-item-name">{name}{templateId && <InfoTooltip id={`inventory-template-${String(row.id)}`} label={`About ${value == null || value === "" ? templateId : name}`} portal>{`Template ID: ${templateId}`}</InfoTooltip>}</span>;
       }
       if (Array.isArray(value)) return value.join(", ");
       return value == null || value === "" ? "—" : String(value);
