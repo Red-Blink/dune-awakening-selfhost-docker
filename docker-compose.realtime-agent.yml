@@ -1,0 +1,47 @@
+name: dune-realtime-agent
+
+# Optional Realtime Data position agent (mvagent): reads live sandworms, enemies,
+# vehicles and storms (optionally players) from the game server processes and
+# serves them on 127.0.0.1:8796. It has no login; the Console is the one door to
+# it (docs/console/realtime.md). Started and stopped by
+# runtime/scripts/realtime-agent.sh and Settings -> API Keys.
+services:
+  dune-realtime-agent:
+    build:
+      context: ./runtime/realtime-agent
+      target: agent
+      args:
+        MV_REF: "${DUNE_REALTIME_AGENT_REF:-beta.15}"
+        MV_COMMIT: "${DUNE_REALTIME_AGENT_COMMIT:-7e1a73044023da89d42c9ea3ab3dba133904e8c1}"
+    image: dune-realtime-agent:dev
+    container_name: dune-realtime-agent
+    restart: unless-stopped
+    # Sees the game server processes of the Dune Docker containers.
+    pid: host
+    # Loopback of the host, where the Console (host networking) reaches it; the
+    # agent itself refuses any address that is not loopback.
+    network_mode: host
+    # Reading /proc/<pid>/mem of another container's process needs ptrace.
+    cap_drop:
+      - ALL
+    cap_add:
+      - SYS_PTRACE
+      - DAC_OVERRIDE
+    security_opt:
+      - no-new-privileges:true
+      # The game containers run privileged with AppArmor "unconfined"; the
+      # docker-default profile refuses ptrace of such a peer.
+      - apparmor=unconfined
+    read_only: true
+    command:
+      - -addr=127.0.0.1:8796
+      - -players=${DUNE_REALTIME_AGENT_PLAYERS:-false}
+      - -hz=10
+    cpus: "1.0"
+    mem_limit: 512m
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: "${DUNE_DOCKER_LOG_MAX_SIZE:-10m}"
+        max-file: "${DUNE_DOCKER_LOG_MAX_FILES:-3}"

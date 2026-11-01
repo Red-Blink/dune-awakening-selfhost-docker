@@ -12,6 +12,32 @@ for example a MapViewer3D running on an administrator's PC.
 
 ## Setup
 
+### From the Console (recommended)
+
+When an API key holds **Realtime Data** and the agent does not answer, **Settings → API Keys**
+shows a notice with **Set Up Agent**. The notice also appears while you tick Realtime Data in
+the key you are creating. Nothing is installed until the owner confirms the dialog.
+
+Set Up Agent builds the agent from the pinned MapViewer3D release (`beta.15`, verified against its
+commit; the build fails if the tag moved) and starts it as the container `dune-realtime-agent`.
+The same notice offers **Remove Agent** once no key uses Realtime Data any more. Removing stops the
+container and deletes the image; API keys are not touched.
+
+What the agent needs, and why it is an owner-only action (`settings:write`, like Encrypted API
+Access, so no API key, addon or admin-tier account can start it):
+
+- runs as root with `pid: host` and `SYS_PTRACE` to read the game server processes' memory (read-only),
+  with all other capabilities dropped, a read-only file system and `no-new-privileges`;
+- `apparmor=unconfined`, because the game containers run unconfined and the default profile refuses ptrace of such a peer;
+- listens on `127.0.0.1:8796` only, no login; the Console is the one door to it.
+
+The same steps are available on the command line: `runtime/scripts/realtime-agent.sh enable|disable|status`.
+Player positions stay off at the agent by default; set `DUNE_REALTIME_AGENT_PLAYERS=true` in the
+environment of that script to let the agent read players (the Console still shows them only to
+callers with `players:read`).
+
+### Manual
+
 The agent runs next to the Console as its own compose project and changes
 nothing in the Dune containers. It listens on `127.0.0.1:8796` of the host and
 has no login, so it is reachable only through the Console.
