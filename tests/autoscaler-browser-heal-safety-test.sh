@@ -12,7 +12,7 @@ grep -Fq 'dune-server-survival-1|1' "$script"
 grep -Fq 'dune-server-overmap|2' "$script"
 grep -Fq 'Server farm is READY .*partition ${partition}' "$script"
 grep -Fq 'DIRECTOR_CORE_READY_GRACE_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_CORE_READY_GRACE_SECONDS:-120}"' "$script"
-grep -Fq 'DIRECTOR_HEAL_REPUBLISH_GRACE_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_HEAL_REPUBLISH_GRACE_SECONDS:-45}"' "$script"
+grep -Fq 'DIRECTOR_HEAL_REPUBLISH_GRACE_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_HEAL_REPUBLISH_GRACE_SECONDS:-120}"' "$script"
 grep -Fq "AUTOSCALER_STARTED_AT=\"\$(date +%s)\"" "$script"
 grep -Fq "docker logs --since \"\$started_at\" --tail 5000 \"\$container\"" "$script"
 
@@ -28,7 +28,7 @@ core_grace = text.index('if [ "$age" -lt "$DIRECTOR_CORE_READY_GRACE_SECONDS" ];
 stale_eval = text.index('rows="$(director_live_server_rows)"', scan)
 republish = text.index('action=republish', stale_eval)
 restart = text.index('echo "HEAL director stale browser state', scan)
-restart = text.index('action=restart', restart)
+restart = text.index('action=coordinated-game-farm-restart', restart)
 
 assert core_gate < startup_grace < core_grace < stale_eval < republish < restart
 
@@ -44,10 +44,11 @@ assert "browser_restart_pending" in scan_body
 assert 'director_heal_set browser_restart_pending "$now"' not in scan_body
 assert "director_heal_clear browser_restart_pending" in scan_body
 assert 'online_players="unknown"' in scan_body
-assert scan_body.index("action=republish") < scan_body.index("restart-director.sh")
+assert scan_body.index("action=republish") < scan_body.index("restart-game-farm.sh")
 online_guard = scan_body.index('online_players="$(battlegroup_effective_player_count')
 defer_guard = scan_body.index('if [ "$online_players" = "unknown" ] || [ "$online_players" -gt 0 ]; then')
-assert online_guard < defer_guard < scan_body.index("restart-director.sh")
+assert online_guard < defer_guard < scan_body.index("restart-game-farm.sh")
+assert "restart-director.sh" not in scan_body
 assert 'if [ -n "$restart_pending" ]' not in scan_body
 
 core_ready = text.index("core_maps_ready_for_browser_heal()")
