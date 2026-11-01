@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
+import net from "node:net";
 import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,8 +10,17 @@ import { createRealtime, parseObjectFilter, RealtimeError } from "../src/service
 import { READ_ONLY_BRIDGE_ACTIONS } from "../src/bridgeReadActions.js";
 
 const API_ROOT = resolve(import.meta.dirname, "..");
-const PORT = 26000 + (process.pid % 12000);
-const BASE = `http://127.0.0.1:${PORT}`;
+// A free port per server start: a fixed, pid-derived port can collide with
+// another process on a busy runner.
+let PORT = 0;
+let BASE = "";
+async function pickPort() {
+  const probe = net.createServer();
+  await new Promise((resolve) => probe.listen(0, "127.0.0.1", resolve));
+  PORT = probe.address().port;
+  await new Promise((resolve) => probe.close(resolve));
+  BASE = `http://127.0.0.1:${PORT}`;
+}
 
 const SNAP = {
   gen: 1,
@@ -183,6 +193,7 @@ async function stop(child) {
 test("realtime bridge actions are permission gated and filter players", async (t) => {
   const agent = await fakeAgent();
   const repoRoot = makeRepoRoot();
+  await pickPort();
   const { child, ready } = startServer(repoRoot, agent.url);
   try {
     await ready;
@@ -249,6 +260,7 @@ test("realtime bridge actions are permission gated and filter players", async (t
 
 test("realtime bridge answers available:false when the agent is down", async (t) => {
   const repoRoot = makeRepoRoot();
+  await pickPort();
   // Nothing listens on this loopback port.
   const { child, ready } = startServer(repoRoot, "http://127.0.0.1:9");
   try {
