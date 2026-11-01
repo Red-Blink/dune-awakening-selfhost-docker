@@ -312,6 +312,8 @@ jobs:
         run: bash tests/console-i18n-image-test.sh dune-console:ci
       - name: Build the encrypted front door image (go vet and its tests run in the build)
         run: docker build -t dune-tls-front:ci runtime/tls-front
+      - name: Build the public connectivity probe (its tests run in the build)
+        run: docker build -t dune-public-probe:ci runtime/public-probe
       - name: Check the runtime it actually ships
         run: |
           set -euo pipefail
