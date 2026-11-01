@@ -19,6 +19,7 @@ import { DataTable } from "../../components/common/DataTable";
 import { InlineActionResult, type InlineActionResultState } from "../../components/common/InlineActionResult";
 import { SegmentedControl, type SegmentOption } from "../../components/common/SegmentedControl";
 import { copyText } from "../../lib/clipboard";
+import { RealtimeAgentNotice } from "./RealtimeAgentNotice";
 
 type ConfirmAction = (
   message: string,
@@ -269,6 +270,11 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
     </button>;
   }
 
+  // Realtime Data needs the position agent: true while an active key, or the key
+  // being created, holds the permission.
+  const realtimeNeeded = Boolean(keys?.some((key) => key.enabled && !key.expired && scopeValueOf(key.scopes, "realtime") !== undefined))
+    || (formOpen && scopeValueOf(draftScopes, "realtime") !== undefined);
+
   return <div className="api-keys-section">
     <div className="api-keys-header">
       <p className="muted">Give external tools their own API keys, with only the permissions they need. You can disable or revoke a key at any time.</p>
@@ -348,6 +354,8 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
     </p>}
 
     <InlineActionResult result={result} resultKey="list" />
+
+    <RealtimeAgentNotice needed={realtimeNeeded} confirmAction={confirmAction} />
 
     {formOpen && <div className="api-key-form">
       <div className="api-key-form-heading"><h3>Create API Key</h3><p className="muted">Name the key, choose its limits, then select its permissions.</p></div>

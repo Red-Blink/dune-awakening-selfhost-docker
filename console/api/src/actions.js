@@ -181,6 +181,11 @@ export const ROUTE_ACTIONS = {
   "GET /api/realtime/healthz":                 "realtime:read",
   "GET /api/realtime/objects":                 "realtime:read",
   "GET /api/realtime/stream":                  "realtime:read",
+  // Realtime Data agent (services/realtimeAgent.js): shows the optional position agent and
+  // sets it up or removes it. It runs as root with ptrace rights, so this is Settings: owner
+  // only, never reachable with an API key or an addon.
+  "GET /api/settings/realtime-agent":          "settings:read",
+  "POST /api/settings/realtime-agent":         "settings:write",
   // Encrypted API access (services/encryptedApi.js): the optional HTTPS front door. Shows its state and
   // key fingerprint and turns it on or off. Settings, so never reachable with an API key.
   "GET /api/settings/encrypted-api":           "settings:read",

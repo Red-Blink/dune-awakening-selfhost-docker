@@ -48,6 +48,7 @@ import { createMemoryBalancer } from "./services/memoryBalancer.js";
 import { collectContainerHealth } from "./services/containerHealth.js";
 import { createRealtime, RealtimeError } from "./services/realtime.js";
 import { createEncryptedApi, EncryptedApiError } from "./services/encryptedApi.js";
+import { createRealtimeAgent, RealtimeAgentError } from "./services/realtimeAgent.js";
 import { tlsClientAddress } from "./services/tlsClientAddress.js";
 import { createConsoleAccess } from "./services/consoleAccess.js";
 import { parseMemorySwapStatus } from "./services/memorySwap.js";
@@ -194,6 +195,7 @@ function shouldNoteApiKeyAuthThrottle(failureKey, at = Date.now()) {
 }
 const apiKeys = createApiKeyStore({ file: config.apiKeysFile });
 const realtime = createRealtime();
+const realtimeAgent = createRealtimeAgent({ repoRoot: config.repoRoot, health: () => realtime.health() });
 const encryptedApi = createEncryptedApi({ repoRoot: config.repoRoot });
 // Proof that a restore was previewed, for the apply that follows it. In memory
 // beside the sessions it is keyed by -- see the module header for why it is not
@@ -1010,6 +1012,8 @@ async function handleApi(req, res) {
   if (path === "/api/realtime/healthz" && req.method === "GET") return realtimeRoute(res, () => realtime.health());
   if (path === "/api/realtime/objects" && req.method === "GET") return realtimeRoute(res, () => realtime.objects({ allowPlayers: principalMay(req, "players:read") }));
   if (path === "/api/realtime/stream" && req.method === "GET") return realtimeStreamRoute(req, res);
+  if (path === "/api/settings/realtime-agent" && req.method === "GET") return realtimeAgentRoute(res, () => realtimeAgent.status());
+  if (path === "/api/settings/realtime-agent" && req.method === "POST") return realtimeAgentToggleRoute(req, res);
   if (path === "/api/settings/encrypted-api" && req.method === "GET") return encryptedApiRoute(res, () => encryptedApi.status());
   if (path === "/api/settings/console-access/confirm" && req.method === "POST") {
     const body = await readJson(req);
@@ -2873,6 +2877,24 @@ function realtimeStreamRoute(req, res) {
     principal,
     allowPlayers: () => may("players:read"),
     stillAllowed: () => may("realtime:read")
+  });
+}
+
+async function realtimeAgentRoute(res, action) {
+  try {
+    return json(res, 200, await action(), { "cache-control": "no-store" });
+  } catch (error) {
+    if (error instanceof RealtimeAgentError) return json(res, error.status, { error: error.message });
+    throw error;
+  }
+}
+
+async function realtimeAgentToggleRoute(req, res) {
+  const body = await readJson(req);
+  return realtimeAgentRoute(res, async () => {
+    const status = await realtimeAgent.setEnabled(body?.enabled, { confirmed: body?.confirmed });
+    audit(config, req, body.enabled ? "settings.realtime-agent-install" : "settings.realtime-agent-remove", { running: status.running });
+    return status;
   });
 }
 

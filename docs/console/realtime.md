@@ -12,6 +12,40 @@ for example a MapViewer3D running on an administrator's PC.
 
 ## Setup
 
+### From the Console (recommended)
+
+When an API key holds **Realtime Data** and the agent does not answer, **Settings → API Keys**
+shows a notice with **Set Up Agent**. The notice also appears while you tick Realtime Data in
+the key you are creating. Nothing is installed until the owner confirms the dialog.
+
+Set Up Agent builds the agent from the pinned MapViewer3D release (`beta.15`, verified against its
+commit; the build fails if the tag moved) and starts it as the container `dune-realtime-agent`.
+The same notice offers **Remove Agent** once no key uses Realtime Data any more. Removing stops the
+container and deletes the image; API keys are not touched.
+
+Setting it up is an owner-only action (`settings:write`, like Encrypted API Access, so no API key,
+addon or admin-tier account can start it). A short note on trust, because the agent's *intended
+behaviour* is narrower than the *privileges it is given*:
+
+- **Intended behaviour:** read object positions from the game server processes, read-only, and offer
+  them on `127.0.0.1:8796` for the Console to pass on to authorized callers.
+- **Privileges granted:** root, `pid: host`, `SYS_PTRACE`, `DAC_OVERRIDE` and
+  `apparmor=unconfined` (the game containers run unconfined, and the default profile refuses ptrace
+  of such a peer), with all other capabilities dropped, a read-only file system, `no-new-privileges`
+  and a fixed memory and process limit.
+- **What is *not* enforced:** that it only reads, or only game processes. The container cannot
+  guarantee either; a compromised or modified agent could read or change any process it can see.
+- **Who can reach it:** it listens on loopback and has no login. The Console authorizes API callers,
+  but loopback does not stop other local processes from connecting to `127.0.0.1:8796` directly, so
+  install it only on a host where you trust the local processes.
+
+The same steps are available on the command line: `runtime/scripts/realtime-agent.sh enable|disable|status`.
+Player positions stay off at the agent by default; set `DUNE_REALTIME_AGENT_PLAYERS=true` in the
+environment of that script to let the agent read players (the Console still shows them only to
+callers with `players:read`).
+
+### Manual
+
 The agent runs next to the Console as its own compose project and changes
 nothing in the Dune containers. It listens on `127.0.0.1:8796` of the host and
 has no login, so it is reachable only through the Console.
