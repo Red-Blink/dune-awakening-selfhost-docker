@@ -57,6 +57,27 @@ function publicSources(sources) {
   });
 }
 
+// Optional caller filters for the addon bridge: object kinds and one map.
+// Unknown kinds are an error rather than silently ignored, so a typo does not
+// look like "nothing is out there".
+export function parseObjectFilter({ kinds, map } = {}) {
+  const out = {};
+  if (kinds !== undefined && kinds !== null) {
+    if (!Array.isArray(kinds) || kinds.length > 16) throw new RealtimeError("kinds must be an array of object kinds.", 400);
+    const known = new Set([...REALTIME_KINDS, "player"]);
+    const list = kinds.map((kind) => String(kind));
+    for (const kind of list) {
+      if (!known.has(kind)) throw new RealtimeError(`Unknown realtime object kind: ${kind.slice(0, 32)}`, 400);
+    }
+    out.kinds = [...new Set(list)];
+  }
+  if (map !== undefined && map !== null) {
+    if (typeof map !== "string" || !/^[A-Za-z0-9_]{1,64}$/.test(map)) throw new RealtimeError("map must be a map name such as Survival_1.", 400);
+    out.map = map;
+  }
+  return out;
+}
+
 function filterSnapshot(snapshot, allowPlayers) {
   const objects = Array.isArray(snapshot?.objects) ? snapshot.objects : [];
   const kept = allowPlayers ? objects : objects.filter((object) => object?.k !== "player");
@@ -119,16 +140,33 @@ export function createRealtime({
     },
 
     // GET /api/realtime/objects
-    async objects({ allowPlayers }) {
+    // Optional `kinds` and `map` narrow the answer; they can only remove
+    // objects, never add ones the caller may not see (players stay gated by
+    // allowPlayers).
+    async objects({ allowPlayers, kinds: wanted, map } = {}) {
       if (baseError) throw baseError;
-      const kinds = allowPlayers ? [...REALTIME_KINDS, "player"] : REALTIME_KINDS;
+      const permitted = allowPlayers ? [...REALTIME_KINDS, "player"] : REALTIME_KINDS;
+      const kinds = wanted ? permitted.filter((kind) => wanted.includes(kind)) : permitted;
+      if (!kinds.length) return filterSnapshot({ objects: [], sources: [] }, allowPlayers);
       let snapshot;
       try {
         snapshot = await get(`/api/objects?kinds=${kinds.join(",")}`, { timeout: 10_000 });
       } catch {
         throw new RealtimeError("Realtime Data is not available: the MapViewer3D position agent is not running on this host.", 503);
       }
-      return filterSnapshot(snapshot, allowPlayers);
+      const filtered = filterSnapshot(snapshot, allowPlayers);
+      if (!map) return filtered;
+      // Each object carries `s`, the index of its source in `sources`. Keep
+      // only the sources on the wanted map and renumber `s` to match.
+      const renumber = new Map();
+      const sources = [];
+      filtered.sources.forEach((source, index) => {
+        if (source.map !== map) return;
+        renumber.set(index, sources.length);
+        sources.push(source);
+      });
+      const objects = filtered.objects.filter((object) => renumber.has(object.s)).map((object) => ({ ...object, s: renumber.get(object.s) }));
+      return { ...filtered, sources, objects };
     },
 
     // GET /api/realtime/stream (server-sent events, same events as the agent).
