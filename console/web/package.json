@@ -11,6 +11,7 @@
     "build": "tsc -b && vite build",
     "build:preview": "tsc -b && node scripts/build-preview.mjs",
     "test:preview": "node browser-tests/preview.mjs",
+    "check:preview-seo": "node --test scripts/preview-seo.test.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "check:i18n": "node --test scripts/translation-catalog.test.mjs && node scripts/translation-catalog.mjs check",
