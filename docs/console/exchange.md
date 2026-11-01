@@ -327,8 +327,8 @@ already uninstalled, the console creates clean disabled Market Bot schedules; ga
 database listings are not changed. A malformed legacy schedule postpones removal
 instead of discarding it, and an interrupted cleanup is retried on the next startup.
 
-Reads, the eligibility probe, and dry-run log refresh require the `exchange:market` action; schedule saves,
-run-now, and log clear require `exchange:market-write`. Neither is granted to the viewer tiers
+Reads and the eligibility probe require the `exchange:market` action; the dry-run log refresh, schedule
+saves, run-now, and log clear require `exchange:market-write`. Neither is granted to the viewer tiers
 that receive `exchange:read`, so by default only the admin tier (`exchange:*`) sees
 the Market Bot button at all. All mutations are rate-limited and audited.
 

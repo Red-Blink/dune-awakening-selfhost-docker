@@ -1,7 +1,7 @@
 # RFC: Automated Discord Command Discovery from Core
 
 **Date:** 2026-08-08
-**Status:** Layer 1 Design — Request for Comment
+**Status:** Historical record — design RFC; Phase 1 (Core catalog, `/catalog`, `protocolVersion`) shipped, with a version 2 catalog shape that differs from this text. Phases 2-4 are bot-repo work not present here. Not maintained.
 **Audit:** Eight-Hat Layer 1 completed. Findings incorporated.
 
 ---

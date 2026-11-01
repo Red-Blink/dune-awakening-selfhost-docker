@@ -1,6 +1,6 @@
 # Services Reference
 
-**Status:** Observed — verified against game build 2117304-0-shipping (September 2026). Re-verify after a game update.
+**Status:** Observed — verified against game build 2168446-0-shipping (November 2026). Re-verify after a game update.
 
 A running deployment is a dozen-plus containers. Some are defined by this
 repo; most are the closed-source Funcom server image under different command
@@ -43,8 +43,9 @@ observed.
 | `dune-server-gateway` | Funcom (`seabass-server-gateway`) | [§2](#2-the-closed-source-services) |
 | game servers | Funcom (`seabass-server`) | out of scope |
 
-Everything but Postgres and the game servers runs on the `dune-net` bridge
-network; the Overmap game server and the orchestrator use host networking.
+The Funcom infrastructure services, Postgres included, run on the `dune-net`
+bridge network. All game servers and every container from this repo use host
+networking.
 
 ---
 

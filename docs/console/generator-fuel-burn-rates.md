@@ -1,6 +1,6 @@
 # Generator fuel burn rates
 
-**Status:** Current | **Last Updated:** August 2026
+**Status:** Current | **Last Updated:** November 2026
 
 `FUEL_BURN_SECONDS` in `console/api/src/duneDb.js` stores the normal, per-unit
 uptime for each supported generator consumable. The values match the persisted
@@ -30,7 +30,7 @@ https://duneawakening.com/news/dune-awakening-1-4-10-0-patch-notes/
 
 ## Effective uptime by power source
 
-| Power source | Accepted consumable | Normal | July-August 2026 event |
+| Power source | Accepted consumable | Normal | July-August 2026 event (ended 2026-08-31) |
 |---|---|---:|---:|
 | Fuel-Powered Generator | Fuel Cell (`Oil`) | 1 hour | 2 hours |
 | Omnidirectional Wind Turbine | Low-grade Lubricant (`WindTurbineLubricant1`) | 1 hour | 2 hours |

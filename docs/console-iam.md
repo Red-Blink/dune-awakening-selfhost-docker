@@ -1,6 +1,8 @@
 # Console IAM Architecture
 
-The Web Console applies an IAM action to every authenticated API route. Public authentication and health routes remain outside this gate, and Discord adapter routes continue to use their existing bearer-token and Discord capability checks.
+**Status:** Current | **Last Updated:** November 2026
+
+The Web Console applies an IAM action to every authenticated API route. Public authentication and health routes remain outside this gate, as do the public i18n read routes (`GET /api/i18n/languages` and `/translations`) and the signed peer-mesh i18n routes. Discord adapter routes continue to use their existing bearer-token and Discord capability checks.
 
 ## Authorization flow
 
@@ -35,12 +37,12 @@ reject it. Its scope is a per-namespace Read/Read+write map of its own, evaluate
 
 Keys carry no configurable tier. The `owner` tier in the synthesized principal exists only so
 `resolveSessionTier` recognises it — `owner` is `Allow *`, so the policy check is a no-op and
-the key's scope map is the single thing deciding access. `settings:*`, `database:*` and `setup:*` are
+the key's scope map is the single thing deciding access. `settings:*`, `database:*`, `setup:*` and `community:*` are
 denied to every key regardless of what its stored record says, which is what keeps key
 management a browser-session operation. `updates:*` and `addons:*` are write-denied rather than
 denied outright, so a key can poll for updates and list addons but never install either. See [console/api-keys.md](console/api-keys.md).
 
-Session tier and identity stay in the in-memory session store; they are not placed in the browser cookie. A Console process restart invalidates existing sessions, matching the previous session lifecycle and preventing stale role claims from surviving a restart.
+Session tier and identity are held in the server-side session store, not in the browser cookie. The store is persisted to `runtime/generated/sessions.json` with a MAC derived from the login password and session secret, so sessions survive a Console restart until they expire (12 hours) and are discarded if the password or secret changes or an entry fails verification.
 
 ## Policies
 

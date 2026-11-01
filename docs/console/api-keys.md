@@ -1,13 +1,13 @@
 # API Keys
 
-**Status:** Current | **Last Updated:** August 2026
+**Status:** Current | **Last Updated:** November 2026
 
 Named, revocable credentials for calling the Console HTTP API from outside the browser — a
 Grafana panel, a Discord bot, a community stats site, a monitoring script. Managed from the
 **API Keys** section at the bottom of the Settings page.
 
 Before this existed, the only credential was the admin login password, which mints an
-owner-tier browser session with full access to all 21 IAM namespaces. Handing that to an
+owner-tier browser session with full access to all 23 IAM namespaces. Handing that to an
 integration also hands it the ability to restart the server, mutate the database, and change
 the password. An API key is scoped to exactly what you grant it, and nothing else.
 
@@ -82,7 +82,7 @@ another namespace, or is a write action in a write-denied namespace, is removed.
 survives, the namespace becomes None — never a fallback to Read. A complete list is stored as a
 list and is *not* collapsed into `"write"`, because the two mean different things going forward.
 
-Denied namespaces (`settings`, `database`, `setup`) cannot be reached by naming their actions
+Denied namespaces (`settings`, `database`, `setup`, `community`) cannot be reached by naming their actions
 individually; the namespace denial is checked before the scope lookup.
 
 In the Settings UI, each namespace gains a fourth **Custom** segment that opens a checklist of
@@ -137,8 +137,6 @@ Two actions are POST-shaped but read-only in effect, and are reachable by a **Re
 
 `carepackage:scan` is deliberately *not* one of these: `POST /api/care-package/run` actually
 runs a grant cycle. The verb-shaped name is not the test; what the route does is.
-
-### The two system-backup scopes
 
 ### Actions no level ever grants
 
@@ -206,7 +204,7 @@ Listing system backups (`GET /api/backups/system`) is a genuine read and stays o
 
 ### What a key can never reach
 
-Three namespaces are **denied outright** at every level — `settings`, `database` and `setup`.
+Four namespaces are **denied outright** at every level — `settings`, `database`, `setup` and `community`.
 They are not offered in the UI, and the check runs before the scope lookup, so hand-editing
 `runtime/secrets/api-keys.json` to add them changes nothing.
 
@@ -216,6 +214,7 @@ They are not offered in the UI, and the check runs before the scope lookup, so h
 - `setup` — `setup:write` rewrites `.env` and can re-run initialization, and `setup:read`
   exposes the configuration that describes the deployment. Unlike `updates` below, there is no
   half of it worth granting.
+- `community` — translation submissions are interactive Console actions, not automation.
 
 Two more namespaces are **write-denied** rather than denied outright — their reads are
 grantable, their writes are unreachable at any level:
@@ -262,9 +261,9 @@ high-entropy bearer token.
 **The full key is displayed exactly once, at creation.** It cannot be recovered afterwards. A
 lost key must be revoked and replaced.
 
-Unlike browser sessions, which are held in memory and cleared by a console restart, keys are
-persisted and survive restarts — that is the point of them. Revocation therefore deletes from
-the file, not just from memory.
+Browser sessions are also persisted (to `runtime/generated/sessions.json`, signed, 12-hour
+lifetime), but they expire and are tied to the login password; keys have no such coupling and
+survive restarts until revoked. Revocation therefore deletes from the file, not just from memory.
 
 ## Lifecycle
 
@@ -294,7 +293,9 @@ global ceiling caps all key traffic together.
 Failed credentials are counted separately, bucketed by client address rather than by key
 (a refused request has no key to attribute), and every failure is written to the audit log as
 `auth.api-key-failed`. Brute-forcing a 256-bit secret is infeasible; the point is that an
-attempt leaves a trace to alert on.
+attempt leaves a trace to alert on. A client address that makes more than 30 failed attempts in a
+minute is answered `429` with a `retry-after` header until the window passes, and the audit log
+records one throttled row rather than one per attempt.
 
 A key holding `updates: read` is pinned to the cached update check — it cannot force the
 uncached path that spawns a subprocess per call. That stays with the browser session.

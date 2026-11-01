@@ -1,5 +1,7 @@
 # Age-encrypted runtime secrets
 
+**Status:** Current | **Last Updated:** November 2026
+
 This optional backend encrypts the server-login password and username
 secrets at rest. Existing installations remain on plaintext until an
 operator explicitly migrates them.
