@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { addonsApi, type CommunityAddonSummary, type InstalledAddon } from "../../api/addons";
+import { addonsApi, type AddonLifecycle, type CommunityAddonSummary, type InstalledAddon } from "../../api/addons";
 import { AddonsPanel } from "./AddonsPanel";
 import { addonUpdateAvailable, hasAddonUpdates } from "./addonVersions";
 import "../../styles.css";
@@ -89,6 +89,30 @@ it("groups addon identity and submenu controls into five clear columns", async (
   fireEvent.click(pin);
   expect(setPinnedAddons).toHaveBeenCalledOnce();
   expect(setPinnedAddons.mock.calls[0][0]([])).toEqual([{ id: installedAddon.id, name: installedAddon.name, entryPath: installedAddon.entryPath, enabled: true }]);
+});
+
+it.each<{ lifecycle: AddonLifecycle; status: string; installable: boolean }>([
+  { lifecycle: "active", status: "Available", installable: true },
+  { lifecycle: "deprecated", status: "Available", installable: true },
+  { lifecycle: "unsupported", status: "Unsupported", installable: false },
+  { lifecycle: "blocked", status: "Blocked", installable: false }
+])("shows $status in the Status column for an uninstalled $lifecycle addon", async ({ lifecycle, status, installable }) => {
+  vi.mocked(addonsApi.community).mockResolvedValue({ schemaVersion: 1, sourceUrl: "https://example.test/index.json", updatedAt: "", addons: [{ ...catalogAddon, lifecycle }] });
+  vi.mocked(addonsApi.installed).mockResolvedValue({ addons: [] });
+  render(<AddonsPanel pinnedAddons={[]} setPinnedAddons={vi.fn()} selectedAddonId=""
+    clearSelectedAddon={vi.fn()} setAddonUpdateAvailable={vi.fn()} confirmAction={vi.fn().mockResolvedValue(true)} />);
+  const table = await screen.findByRole("table", { name: "Addons" });
+  const row = within(table).getByRole("link", { name: catalogAddon.name }).closest("tr")!;
+  const statusCell = within(row).getAllByRole("cell")[3];
+  expect(statusCell).toHaveTextContent(new RegExp(`^${status}$`));
+  const install = within(row).getByRole("button", { name: "Install" });
+  if (installable) {
+    expect(install).toBeEnabled();
+  } else {
+    expect(install).toBeDisabled();
+    expect(within(row).queryByText("Available")).not.toBeInTheDocument();
+    expect(within(row).getAllByText(status)).toHaveLength(1);
+  }
 });
 
 it("keeps full addon descriptions available from an accessible disclosure", async () => {

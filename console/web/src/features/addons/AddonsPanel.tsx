@@ -305,7 +305,7 @@ function AddonsTable({ rows, loading, installedById, pinnedAddons, installingId,
     return <tr key={row.id}>
       <td data-label="Addon" className="addon-identity-cell">
         <div className="addon-identity-content">
-          <div className="addon-name-line"><AddonNameCell addon={row} />{row.lifecycle !== "active" && <LifecyclePill lifecycle={installedAddon?.lifecycle || row.lifecycle} />}</div>
+          <div className="addon-name-line"><AddonNameCell addon={row} />{row.lifecycle !== "active" && (installedAddon || !isInstallBlocked(row.lifecycle)) && <LifecyclePill lifecycle={installedAddon?.lifecycle || row.lifecycle} />}</div>
           <small className="addon-author-cell">{row.author}</small>
           <AddonDescriptionCell addon={row} expanded={Boolean(expandedDescriptions[row.id])} onToggle={() => setExpandedDescriptions((current) => ({ ...current, [row.id]: !current[row.id] }))} />
         </div>
@@ -313,7 +313,7 @@ function AddonsTable({ rows, loading, installedById, pinnedAddons, installingId,
       <td data-label="Version" className="addon-version-column"><AddonVersionCell catalogVersion={row.version} installedAddon={installedAddon} updateAvailable={updateAvailable} /></td>
       <td data-label="Permissions" className="addon-permissions-cell"><PermissionList permissions={updateAvailable ? row.permissions || [] : installedAddon?.permissions || row.permissions || []} approvedPermissions={installedAddon?.approvedPermissions || []} /></td>
       <td data-label="Status" className="addon-status-column">
-        {installedAddon ? <div className="addon-status-cell"><label className={`switch-checkbox addon-status-toggle ${installedAddon.enabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={busy || installedAddon.lifecycle === "blocked"} checked={installedAddon.enabled} onChange={(event) => void setAddonEnabled(installedAddon, event.target.checked)} /><span className="switch-label">{busy ? "Working" : installedAddon.enabled ? "Enabled" : "Disabled"}</span><strong className="switch-state" aria-hidden="true" /></label></div> : <div className="addon-status-cell"><StatusPill value="Available" /></div>}
+        {installedAddon ? <div className="addon-status-cell"><label className={`switch-checkbox addon-status-toggle ${installedAddon.enabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={busy || installedAddon.lifecycle === "blocked"} checked={installedAddon.enabled} onChange={(event) => void setAddonEnabled(installedAddon, event.target.checked)} /><span className="switch-label">{busy ? "Working" : installedAddon.enabled ? "Enabled" : "Disabled"}</span><strong className="switch-state" aria-hidden="true" /></label></div> : <div className="addon-status-cell">{isInstallBlocked(row.lifecycle) ? <LifecyclePill lifecycle={row.lifecycle} /> : <StatusPill value="Available" />}</div>}
       </td>
       <td data-label="Actions" className="addon-actions-column"><div className="addon-actions-cell"><div className="service-actions">
         {!installedAddon && <button disabled={installingId === row.id || isInstallBlocked(row.lifecycle)} title={isInstallBlocked(row.lifecycle) ? lifecycleInstallMessage(row) : undefined} onClick={() => void installAddon(row)}>{installingId === row.id ? "Installing..." : "Install"}</button>}
