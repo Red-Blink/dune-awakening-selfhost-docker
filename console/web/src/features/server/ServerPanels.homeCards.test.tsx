@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -504,11 +504,19 @@ describe("HomePanel subsystem rows", () => {
     expect(within(fls).getByText("3 of 4")).toBeVisible();
     expect(within(fls).queryByText("4 of 4")).toBeNull();
 
+    fireEvent.click(screen.getByRole("button", { name: "Funcom/FLS details" }));
+    const detail = document.getElementById("home-detail-fls")!;
+    expect(within(detail).getByText("Token Mismatch Detected")).toHaveClass("bad");
+    const heartbeat = within(detail).getByText("Director heartbeat").closest(".home-detail-row")!;
+    expect(within(heartbeat as HTMLElement).queryByText("OK")).toBeNull();
+
     checkFuncomTokenMock.mockResolvedValue({ ok: true, mismatch: false, checkedSince: "10m" });
     await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
     expect(view.container.querySelector(".home-hero-state-value")).toHaveTextContent("Ready");
     expect(within(fls).getByText("4 of 4")).toBeVisible();
     expect(within(fls).queryByText("3 of 4")).toBeNull();
+    expect(within(detail).queryByText("Token Mismatch Detected")).toBeNull();
+    expect(within(heartbeat as HTMLElement).getByText("OK")).toHaveClass("good");
   });
 
   it("lists every readiness subsystem", async () => {

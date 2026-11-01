@@ -9,7 +9,7 @@ type CheckRow = {
 
 type GroupedCheckRow = CheckRow & { group: string };
 
-const GAME_CONNECTIONS_LABEL = "Game Server Connections";
+export const GAME_CONNECTIONS_LABEL = "Game Server Connections";
 
 const CONTAINER_LABELS: Record<string, string> = {
   "dune-postgres": "Dune Postgres",

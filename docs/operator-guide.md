@@ -42,9 +42,9 @@ table.
 
 ## 2. Web UI feature tour
 
-The screenshots gallery ([`docs/screenshots.md`](screenshots.md)) shows
-every major panel; the list below matches its section order and links to
-the feature documentation that exists for each area. A "—" in the
+[Take the Console for a spin](https://try.dunedocker.app/) with sample data,
+without installing anything. The list below introduces each major panel and
+links to its feature documentation. A "—" in the
 Further reading column means the panel is self-explanatory from the Web
 UI itself and has no separate written doc yet — file a documentation
 issue if you get stuck on one of those.

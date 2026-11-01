@@ -42,7 +42,7 @@ describe("homeRowDetails", () => {
   });
 
   it("replaces the status pointer with the readiness check it points at", () => {
-    expect(rows(statusText(), "messaging", "Health")).toEqual([{ name: "game server sg.* RMQ connections", value: "OK" }]);
+    expect(rows(statusText(), "messaging", "Health")).toEqual([{ name: "Game Server Connections", value: "OK" }]);
   });
 
   it("gives a port on a map to Game servers rather than to a service row", () => {
@@ -92,7 +92,7 @@ describe("homeRowDetails", () => {
     const details = homeRowDetails(statusText(), readiness);
     const health = (id: string) => details[id].find((group) => group.title === "Health")?.rows ?? [];
     expect(health("database")).toContainEqual({ name: "world_partition rows: 38", value: "OK" });
-    expect(health("messaging")).toEqual([{ name: "game server sg.* RMQ connections", value: "WAIT" }]);
+    expect(health("messaging")).toEqual([{ name: "Game Server Connections", value: "WAIT" }]);
     expect(health("fls")).toEqual(expect.arrayContaining([
       { name: "Director FLS heartbeat pending", value: "WAIT" },
       { name: "Gateway DB monitoring pending", value: "WAIT" }

@@ -29,7 +29,7 @@ Funcom ile bağlantısı, onayı, sponsorluğu veya desteği bulunmayan gayrires
 - **İnşa Edin ve Paylaşın:** 3B üs tasarımı, plan içe aktarma ve paylaşma, herkese açık sunucu profili ve gecikme ölçümü.
 - **Özelleştirin:** Topluluk eklentileri, Discord entegrasyonu, çok dilli Console ve topluluk çeviri düzeltmeleri.
 
-[Ekran Görüntüleri](../screenshots.md) sayfasına göz atın.
+Kontrolü ele alın ve komuta merkezinizi keşfedin! Örnek verilerle [Konsolu Deneyin](https://try.dunedocker.app/), kurulum gerekmez.
 
 ## Gereksinimler
 

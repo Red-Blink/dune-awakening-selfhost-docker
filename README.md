@@ -31,7 +31,7 @@ The project is experimental, and Funcom self-hosting behavior may change over ti
 - **Build & Share:** Design bases in 3D, import and share blueprints, and showcase your server with a public profile and latency checks.
 - **Make It Yours:** Community Addons, Discord integration, multiple Console languages, and community translation corrections.
 
-See the [Screenshots Gallery](docs/screenshots.md) for a closer look.
+Take the controls and explore your command center! [Try the Console](https://try.dunedocker.app/) with sample data — no installation needed.
 
 ## Requirements
 

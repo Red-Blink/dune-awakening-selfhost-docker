@@ -29,7 +29,7 @@ Yeh community ka ghair rasmi project hai; Funcom se koi talluq, tasdeeq, sponsor
 - **Banayein aur Share Karein:** 3D base design, blueprints import aur share, public server profile aur latency tests.
 - **Apni Pasand se Dhalain:** Community Addons, Discord integration, mukhtalif zubanein aur community translation corrections.
 
-[Screenshots Gallery](../screenshots.md) dekhein.
+Command apne haath mein lein aur apna control center dekhein! Sample data ke saath [Console Azmayein](https://try.dunedocker.app/) — install karne ki zaroorat nahi.
 
 ## Zarooriyat
 

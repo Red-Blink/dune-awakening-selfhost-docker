@@ -29,7 +29,7 @@ Proyek komunitas tidak resmi ini tidak berafiliasi, disetujui, disponsori, atau 
 - **Bangun dan Bagikan:** Rancang markas 3D, impor dan bagikan cetak biru, tampilkan profil server publik dan uji latensi.
 - **Sesuaikan:** Addon komunitas, integrasi Discord, berbagai bahasa Console, dan perbaikan terjemahan komunitas.
 
-Lihat [Galeri Tangkapan Layar](../screenshots.md).
+Ambil kendali dan jelajahi pusat komando Anda! [Coba Konsol](https://try.dunedocker.app/) dengan data contoh, tanpa perlu instalasi.
 
 ## Persyaratan
 

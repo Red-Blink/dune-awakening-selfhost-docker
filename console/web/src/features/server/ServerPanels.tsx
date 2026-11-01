@@ -9,7 +9,7 @@ import { getServerPorts } from "../../api/serverPorts";
 import { runGatedRestart, serviceRestartTarget, type RestartGate } from "./restartQueueGuard";
 import { setupApi, type Task } from "../../api/setup";
 import { PortChecklist } from "../../components/PortChecklist";
-import { ReadinessTimeline } from "../../components/ReadinessTimeline";
+import { GAME_CONNECTIONS_LABEL, ReadinessTimeline } from "../../components/ReadinessTimeline";
 import { SecretInput } from "../../components/SecretInput";
 import { InfoTooltip, KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/common/DisplayPrimitives";
 import { formatDisplayValue, formatUiSentence, friendlyColumnName, normalizeStatus, stripAnsi, summarizeCommandText, titleCase } from "../../lib/display";
@@ -551,7 +551,8 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
   }
 
   const funcomTokenCheckRunning = funcomTokenResult?.status === "running";
-  const summary = summarizeHomeStatus(status, readiness, readinessWarning, loading, runningAction, taskResult, restartStartObserved, !funcomTokenCheckRunning && (isFuncomTokenAuthFailure(funcomTokenResult) || hasPersistedFuncomTokenAuthFailure()));
+  const funcomTokenAuthFailure = !funcomTokenCheckRunning && (isFuncomTokenAuthFailure(funcomTokenResult) || hasPersistedFuncomTokenAuthFailure());
+  const summary = summarizeHomeStatus(status, readiness, readinessWarning, loading, runningAction, taskResult, restartStartObserved, funcomTokenAuthFailure);
   const overall = summary.identity.find((item) => item.label === "Overall");
   const identityCards = summary.identity.filter((item) => item.label !== "Overall");
   const populationItem = identityCards.find((item) => item.label === "Population");
@@ -625,7 +626,7 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
         {localError && <p className="error">{localError}</p>}
       </article>
       <HomeHighlights />
-      <HomeSubsystemList items={summary.health} details={homeRowDetails(status, readiness)} onNavigate={onNavigate} />
+      <HomeSubsystemList items={summary.health} details={homeRowDetails(status, readiness, funcomTokenAuthFailure)} onNavigate={onNavigate} />
       <HomePerformance performance={performance} error={performanceError} />
     </section>
   );
@@ -2745,7 +2746,7 @@ function summarizeReadinessFls(text: string) {
 type HomeDetailRow = { name: string; value: string; note?: string };
 type HomeDetailGroup = { title: string; rows: HomeDetailRow[] };
 
-const DETAIL_BAD = /\b(fail|error|missing|not listed|stopped|exited|dead|paused|not running|unhealthy)\b/i;
+const DETAIL_BAD = /\b(fail|error|missing|not listed|stopped|exited|dead|paused|not running|unhealthy|token mismatch)\b/i;
 
 // Green only for a reading known to be healthy: docker's status text reaches
 // these rows verbatim, and a figure like "0" partitions is not a state at all.
@@ -2776,7 +2777,7 @@ function detailPorts(rows: ReturnType<typeof listenerRows>): HomeDetailGroup {
 function detailReadiness(readiness: string, pattern: RegExp) {
   return stripAnsi(readiness).split(/\r?\n/).flatMap((line) => {
     const match = line.trim().match(/^(OK|WAIT|WARN|FAIL)\s+(.+)$/i);
-    return match && pattern.test(match[2]) ? [{ name: match[2], value: match[1].toUpperCase() }] : [];
+    return match && pattern.test(match[2]) ? [{ name: match[2].replace(/^game server sg\.\* RMQ connections$/i, GAME_CONNECTIONS_LABEL), value: match[1].toUpperCase() }] : [];
   });
 }
 
@@ -2801,7 +2802,7 @@ function detailMaps(status: string): HomeDetailGroup {
   };
 }
 
-export function homeRowDetails(status: string, readiness: string): Record<string, HomeDetailGroup[]> {
+export function homeRowDetails(status: string, readiness: string, tokenAuthFailure = false): Record<string, HomeDetailGroup[]> {
   const listeners = listenerRows(status);
   const owned = ownedListenerKeys();
   const service = new Set([...owned.database, ...owned.messaging, ...owned.battlegroup]);
@@ -2829,6 +2830,12 @@ export function homeRowDetails(status: string, readiness: string): Record<string
       ...detailReadiness(readiness, /\b(Director FLS|Gateway monitoring DB|Gateway DB monitoring)\b/i)
     ] }]
   };
+  if (tokenAuthFailure) {
+    const health = groups.fls[0];
+    const heartbeat = health.rows.filter((row) => /^Director(?: FLS)? heartbeat\b/i.test(row.name));
+    if (heartbeat.length) heartbeat.forEach((row) => { row.value = "Token Mismatch Detected"; });
+    else health.rows.push({ name: "Funcom/FLS", value: "Token Mismatch Detected" });
+  }
   // No status yet means nothing to list, and a container reading "Not listed"
   // for every name would read as a fault.
   if (!containerSectionLines(status).length) groups.database = groups.messaging = groups.battlegroup = [];

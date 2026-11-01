@@ -29,7 +29,7 @@ Dune Docker Console là công cụ quản lý máy chủ riêng Dune: Awakening 
 - **Xây Dựng và Chia Sẻ:** Thiết kế căn cứ 3D, nhập và chia sẻ bản thiết kế, hồ sơ máy chủ công khai và kiểm tra độ trễ.
 - **Tùy Chỉnh:** Tiện ích cộng đồng, tích hợp Discord, nhiều ngôn ngữ và góp ý sửa bản dịch từ cộng đồng.
 
-Xem [Thư Viện Ảnh](../screenshots.md).
+Nắm quyền điều khiển và khám phá trung tâm chỉ huy của bạn! [Dùng thử bảng điều khiển](https://try.dunedocker.app/) với dữ liệu mẫu, không cần cài đặt.
 
 ## Yêu Cầu
 

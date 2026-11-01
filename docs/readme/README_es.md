@@ -31,7 +31,7 @@ El proyecto es experimental y el funcionamiento del alojamiento propio de Funcom
 - **Construir y Compartir:** Diseña bases en 3D, importa y comparte planos, y presenta tu servidor con un perfil público y pruebas de latencia.
 - **Personalizar Tu Experiencia:** Complementos comunitarios, integración con Discord, varios idiomas y correcciones de traducción aportadas por la comunidad.
 
-Consulta la [Galería de Capturas](../screenshots.md) para verlo con más detalle.
+¡Toma el control y explora tu centro de mando! [Prueba la consola](https://try.dunedocker.app/) con datos de ejemplo, sin necesidad de instalar nada.
 
 ## Requisitos
 

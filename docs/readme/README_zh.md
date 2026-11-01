@@ -31,7 +31,7 @@ Dune Docker Console 是基于 Docker 的 Dune: Awakening 专用服务器管理�
 - **建造与分享：** 设计 3D 基地、导入和分享蓝图，通过公开服务器资料页和延迟检测展示你的服务器。
 - **按需定制：** 社区插件、Discord 集成、多语言 Console，以及社区提供的翻译修正。
 
-请查看[截图集](../screenshots.md)，进一步了解界面。
+掌握全局，探索你的专属指挥中心！使用示例数据[体验控制台](https://try.dunedocker.app/)，无需安装。
 
 ## 环境要求
 
