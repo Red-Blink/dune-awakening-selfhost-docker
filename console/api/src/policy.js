@@ -664,22 +664,26 @@ export const DEFAULT_POLICIES = {
     ]
   },
 
-  // PLAYER -- a tight read-only self-service view. Only Home (server health),
-  // Players, Guilds, and the Live Map. Deliberately does NOT include the broad
-  // game-world reads (bases/storage/blueprints/vehicles/exchange/landsraad/
-  // sietches/deepdesert) an operator does not want ordinary players browsing.
-  // NOTE: these grants are still tier-wide (players:read = all players); scoping
-  // a player to *their own* player/guild is ownership-based access tracked
-  // separately (follow-up), as is hiding the tabs a player cannot use.
+  // PLAYER -- a tight read-only self-service view: Home (server health), their
+  // own character, their guild and its roster, the bases/vehicles/storage they
+  // own (permission rank 1 only). Deliberately does NOT
+  // include the broad game-world reads (blueprints/exchange/landsraad/sietches/
+  // deepdesert) an operator does not want ordinary players browsing.
+  // These grants are tier-wide, so they are NOT the scoping: playerScope.js is a
+  // deny-by-default route allowlist applied after this policy, and the handlers
+  // it admits scope every result to the caller (#1276). Hiding the tabs a player
+  // cannot use is cosmetic and lives in the web app.
   player: {
     version: 1,
     tier: "player",
     statements: [
       { Effect: "Allow", Action: [
         "server:read",   // Home: performance / readiness / health
-        "players:read",  // Players (own-only scoping is a follow-up)
-        "guilds:read",   // Guilds (own-only scoping is a follow-up)
-        "maps:read",     // Live Map
+        "players:read",  // Players (the handlers return only the caller's own character)
+        "guilds:read",   // Guilds (the caller's own guild and its roster)
+        "bases:read",    // Bases (rank-1 owned only; playerScope.js allows the list route alone)
+        "vehicles:read", // Vehicles (owned only)
+        "storage:read",  // Storage (owned only)
       ]},
       { Effect: "Deny", Action: CROWN_JEWEL_DENY_ACTIONS }
     ]

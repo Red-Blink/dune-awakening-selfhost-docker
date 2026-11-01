@@ -63,11 +63,14 @@ test("observer is no longer a recognized tier -- fails closed like any other unr
 });
 
 // --- Player is a tight read-only self-service set (server/players/guilds/maps) ---
-test("player reads only server health, players, guilds, and the live map", () => {
-  for (const a of ["server:read", "players:read", "guilds:read", "maps:read"]) assert.equal(can("player", a), true, a);
+test("player reads only server health, players, guilds and its own bases/vehicles/storage", () => {
+  // bases/vehicles/storage:read are tier-wide grants; playerScope.js narrows them to the
+  // rank-1 owned list routes (#1276, playerRouteAllowlist.test.js).
+  for (const a of ["server:read", "players:read", "guilds:read", "bases:read", "vehicles:read", "storage:read"]) assert.equal(can("player", a), true, a);
 });
-test("player cannot read the broad game world or write anything", () => {
-  for (const a of ["bases:read", "storage:read", "blueprints:read", "vehicles:read", "exchange:read", "landsraad:read", "sietches:read", "deepdesert:read", "backups:read", "database:read"]) assert.equal(can("player", a), false, `read ${a}`);
+test("player cannot read the rest of the game world or write anything", () => {
+  assert.equal(can("player", "maps:read"), false, "no Live Map for players");
+  for (const a of ["blueprints:read", "exchange:read", "landsraad:read", "sietches:read", "deepdesert:read", "backups:read", "database:read"]) assert.equal(can("player", a), false, `read ${a}`);
   for (const a of ["players:mutate", "players:moderate", "server:restart", "maps:write-config"]) assert.equal(can("player", a), false, `write ${a}`);
 });
 

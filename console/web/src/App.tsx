@@ -10,6 +10,9 @@ import { updatesApi } from "./api/updates";
 import { addonsApi } from "./api/addons";
 import { playersApi } from "./api/players";
 import { setupApi, type Task } from "./api/setup";
+import { isPlayerTier, tabAllowedForTier } from "./lib/playerTabs";
+import { PlayerHome } from "./features/home/PlayerHome";
+import { PlayerAssetsPage, PlayerCharacterPage, PlayerGuildPage } from "./features/player/PlayerPages";
 import { SetupWizard } from "./components/SetupWizard";
 import { TaskProgress } from "./components/TaskProgress";
 import { ConfirmDialog, type ConfirmDialogDetail, type ConfirmDialogOutcome, type ConfirmDialogRequest } from "./components/common/ConfirmDialog";
@@ -347,6 +350,7 @@ const navGroups: { title: string; items: { tab: Tab; icon: React.ReactNode }[] }
       { tab: "Guilds", icon: <Shield size={18} /> },
       { tab: "Bases", icon: <Building2 size={18} /> },
       { tab: "Vehicles", icon: <Car size={18} /> },
+      { tab: "Storage", icon: <Database size={18} /> },
       { tab: "Exchange", icon: <Store size={18} /> },
       { tab: "Live Map", icon: <MapIcon size={18} /> },
       { tab: "Landsraad", icon: <Landmark size={18} /> },
@@ -584,6 +588,12 @@ export function App() {
     return () => { cancelled = true; };
   }, [auth]);
 
+  // A player never lands on a page the API refuses: a persisted tab from an
+  // earlier session, or a deep link, falls back to Home once the tier is known.
+  useEffect(() => {
+    if (meLoaded && isPlayerTier(userInfo?.tier) && !tabAllowedForTier(tab, userInfo?.tier)) setTab("Home");
+  }, [meLoaded, userInfo?.tier, tab, setTab]);
+
   useEffect(() => {
     const handleSessionExpired = () => {
       setCsrfToken(null);
@@ -681,7 +691,7 @@ export function App() {
   }, [auth, meLoaded, meFetchFailed, allowedActions]);
 
   useEffect(() => {
-    if (!auth) return;
+    if (!auth || !meLoaded || isPlayerTier(userInfo?.tier)) return;
     let cancelled = false;
     const refreshDirectoryStatus = async () => {
       try {
@@ -699,10 +709,10 @@ export function App() {
       window.clearInterval(timer);
       window.removeEventListener("public-directory-claim-changed", refreshDirectoryStatus);
     };
-  }, [auth]);
+  }, [auth, meLoaded, userInfo?.tier]);
 
   useEffect(() => {
-    if (!auth) return;
+    if (!auth || !meLoaded || isPlayerTier(userInfo?.tier)) return;
     let cancelled = false;
     const refreshAddonUpdates = async () => {
       try {
@@ -718,10 +728,10 @@ export function App() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [auth]);
+  }, [auth, meLoaded, userInfo?.tier]);
 
   useEffect(() => {
-    if (!auth) return;
+    if (!auth || !meLoaded || isPlayerTier(userInfo?.tier)) return;
     let cancelled = false;
     async function refreshOnlinePlayers() {
       try {
@@ -737,7 +747,7 @@ export function App() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [auth]);
+  }, [auth, meLoaded, userInfo?.tier]);
 
   useEffect(() => {
     openConfirmDialog = (request) => setConfirmRequest(request);
@@ -957,7 +967,7 @@ export function App() {
   }, [homeTaskResult?.status, homeTaskResult?.title]);
 
   useEffect(() => {
-    if (!auth || !setupComplete) return;
+    if (!auth || !setupComplete || !meLoaded || isPlayerTier(userInfo?.tier)) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -968,7 +978,7 @@ export function App() {
       }
     })();
     return () => { cancelled = true; };
-  }, [auth, setupComplete]);
+  }, [auth, setupComplete, meLoaded, userInfo?.tier]);
 
   if (setupMode) {
     return <TotpSetupScreen mode={setupMode} onComplete={afterTotpSetup} onCancel={afterTotpSetup} />;
@@ -1167,6 +1177,9 @@ export function App() {
             <section className="sidebar-nav-group" key={group.title} aria-label={group.title}>
               <p className="sidebar-nav-heading">{group.title}</p>
               {group.items.filter((item) => {
+                if (!tabAllowedForTier(item.tab, userInfo?.tier)) return false;
+                // Storage has never had an entry for operators; only players get one.
+                if (item.tab === "Storage" && !isPlayerTier(userInfo?.tier)) return false;
                 if (item.tab !== "Settings" && item.tab !== "Access Control") return true;
                 const hasSettingsAccess = allowedActions.length === 0 || allowedActions.some((a) => a.startsWith("settings:"));
                 if (!hasSettingsAccess) return false;
@@ -1237,17 +1250,22 @@ export function App() {
         </header>
         {error && <div className="error-banner">{error}</div>}
         {redeploySetupOpen && <SetupWizard initialStep={setupJump.step} jumpNonce={setupJump.nonce} mode="redeploy" onSetupComplete={async () => setSetupState(await setupApi.state())} />}
-        {!redeploySetupOpen && tab === "Home" && <HomePanel status={status} readiness={readiness} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onLoad={loadStackStatus} confirmAction={confirmDialog} restartGate={restartGateChoice} />}
+        {!redeploySetupOpen && tab === "Home" && isPlayerTier(userInfo?.tier) && <PlayerHome />}
+        {!redeploySetupOpen && tab === "Home" && !isPlayerTier(userInfo?.tier) && <HomePanel status={status} readiness={readiness} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onLoad={loadStackStatus} confirmAction={confirmDialog} restartGate={restartGateChoice} />}
         {!redeploySetupOpen && tab === "Server Control" && <ServerPanel setTask={setTask} setStatus={setStatus} status={status} setReadiness={setReadiness} setPorts={setPorts} setDoctor={setDoctor} ports={ports} readiness={readiness} doctor={doctor} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} onRedeploy={() => {
           setSetupJump((current) => ({ step: 0, nonce: current.nonce + 1 }));
           setSelectedPinnedAddonId("");
           setRedeploySetupOpen(true);
         }} />}
         {!redeploySetupOpen && tab === "Services" && <LazyTabBoundary label="Loading Services"><ServicesPanel services={services} setServices={setServices} setTask={setTask} openLogs={(service) => { setRedeploySetupOpen(false); setSelectedLogService(service); setTab("Logs"); }} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Players" && <LazyTabBoundary label="Loading Players"><PlayersPanel onError={setError} confirmAction={confirmDialog} onOpenBase={(baseId) => { setBaseFocusRequest((current) => ({ baseId, nonce: current.nonce + 1 })); setTab("Bases"); }} renderCharacterAdmin={(props) => <LazyTabBoundary label="Loading Player Details"><CharacterAdminUI {...props} onError={setError} confirmAction={confirmDialog} waitForTask={waitForTaskSilently} formatMutationResult={formatMutationResult} restartGate={restartGateChoice} /></LazyTabBoundary>} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Guilds" && <LazyTabBoundary label="Loading Guilds"><GuildsPanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Bases" && <LazyTabBoundary label="Loading Bases"><BasesPage onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} formatMutationResult={formatMutationResult} focusRequest={baseFocusRequest} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Vehicles" && <LazyTabBoundary label="Loading Vehicles"><VehiclesPanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} focusRequest={vehicleFocusRequest} /></LazyTabBoundary>}
+        {!redeploySetupOpen && tab === "Players" && isPlayerTier(userInfo?.tier) && <PlayerCharacterPage />}
+        {!redeploySetupOpen && tab === "Players" && !isPlayerTier(userInfo?.tier) && <LazyTabBoundary label="Loading Players"><PlayersPanel onError={setError} confirmAction={confirmDialog} onOpenBase={(baseId) => { setBaseFocusRequest((current) => ({ baseId, nonce: current.nonce + 1 })); setTab("Bases"); }} renderCharacterAdmin={(props) => <LazyTabBoundary label="Loading Player Details"><CharacterAdminUI {...props} onError={setError} confirmAction={confirmDialog} waitForTask={waitForTaskSilently} formatMutationResult={formatMutationResult} restartGate={restartGateChoice} /></LazyTabBoundary>} /></LazyTabBoundary>}
+        {!redeploySetupOpen && tab === "Guilds" && isPlayerTier(userInfo?.tier) && <PlayerGuildPage />}
+        {!redeploySetupOpen && tab === "Guilds" && !isPlayerTier(userInfo?.tier) && <LazyTabBoundary label="Loading Guilds"><GuildsPanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
+        {!redeploySetupOpen && tab === "Bases" && isPlayerTier(userInfo?.tier) && <PlayerAssetsPage kind="bases" />}
+        {!redeploySetupOpen && tab === "Bases" && !isPlayerTier(userInfo?.tier) && <LazyTabBoundary label="Loading Bases"><BasesPage onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} formatMutationResult={formatMutationResult} focusRequest={baseFocusRequest} /></LazyTabBoundary>}
+        {!redeploySetupOpen && tab === "Vehicles" && isPlayerTier(userInfo?.tier) && <PlayerAssetsPage kind="vehicles" />}
+        {!redeploySetupOpen && tab === "Vehicles" && !isPlayerTier(userInfo?.tier) && <LazyTabBoundary label="Loading Vehicles"><VehiclesPanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} focusRequest={vehicleFocusRequest} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Exchange" && <LazyTabBoundary label="Loading Market Board"><ExchangePanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Landsraad" && <LazyTabBoundary label="Loading Landsraad"><LandsraadPanel onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Admin Tools" && <LazyTabBoundary label="Loading Admin Tools"><AdminToolsPanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
@@ -1256,7 +1274,8 @@ export function App() {
         {!redeploySetupOpen && tab === "Care Package" && <LazyTabBoundary label="Loading Care Package"><CarePackagePanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Addons" && <LazyTabBoundary label="Loading Addons"><AddonsPanel pinnedAddons={pinnedAddons} setPinnedAddons={setPinnedAddons} selectedAddonId={selectedPinnedAddonId} clearSelectedAddon={() => setSelectedPinnedAddonId("")} setAddonUpdateAvailable={setAddonUpdatesAvailable} confirmAction={confirmDialog} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Database" && <LazyTabBoundary label="Loading Database"><DatabasePanel /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Storage" && <LazyTabBoundary label="Loading Storage"><StoragePanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} /></LazyTabBoundary>}
+        {!redeploySetupOpen && tab === "Storage" && isPlayerTier(userInfo?.tier) && <PlayerAssetsPage kind="storage" />}
+        {!redeploySetupOpen && tab === "Storage" && !isPlayerTier(userInfo?.tier) && <LazyTabBoundary label="Loading Storage"><StoragePanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Backups" && <LazyTabBoundary label="Loading Backups"><BackupsPanel
             backupRestoreTask={backupRestoreTask}
             setBackupRestoreTask={setBackupRestoreTask}

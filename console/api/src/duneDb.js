@@ -6401,6 +6401,41 @@ export async function listStorage(db) {
   return { capabilities: { storage: true, storageGiveItem: await supportsStorageGiveItem(db) }, rows: result.rows };
 }
 
+// Storage containers the given player OWNS (permission rank 1), for the
+// console's `player` tier (#1276). Not a filter over listStorage: that query
+// joins every permission rank, so a shared container would carry another
+// player's name. Here the only rank row joined is the caller's own rank-1 row,
+// which is also the ownership test, and owner_name is therefore always the
+// caller. `controllerId` is the linked character's player controller id.
+export async function listOwnedStorage(db, controllerId) {
+  const requiredTables = ["placeables", "actors", "permission_actor", "permission_actor_rank", "inventories", "items", "actor_fgl_entities", "player_state"];
+  const present = await Promise.all(requiredTables.map((table) => tableExists(db, table)));
+  if (present.some((exists) => !exists)) return unsupported("storage", requiredTables.map((t) => `dune.${t}`));
+  const owner = intParam(controllerId, "player controller id", 1);
+  const result = await db.query(`
+    select p.id,
+           coalesce(max(case when pa.actor_name not like '##%' and pa.actor_name <> 'None' then pa.actor_name end), '') as name,
+           p.building_type as class,
+           coalesce(a.map, '') as map,
+           count(distinct i.id)::int as item_count,
+           coalesce(max(ps.character_name), '') as owner_name
+    from dune.placeables p
+    left join dune.actors a on a.id = p.id
+    left join dune.permission_actor pa on pa.actor_id = p.id
+    left join dune.inventories inv on inv.actor_id = p.id
+    left join dune.items i on i.inventory_id = inv.id
+    join dune.actor_fgl_entities afe on afe.entity_id = p.owner_entity_id
+    join dune.permission_actor_rank par on par.permission_actor_id = afe.actor_id
+      and par.player_id = $1 and par.rank = ${PERMISSION_OWNER_RANK}
+    left join dune.actors player_a on player_a.id = par.player_id
+    left join dune.player_state ps on ps.account_id = player_a.owner_account_id
+    where p.building_type in ('SpiceSilo_Placeable','GenericContainer_Placeable','StorageContainer_Placeable','MediumStorageContainer_Placeable','Developer_StorageContainer_Placeable')
+      and p.is_hologram = false and p.owner_entity_id is not null and p.owner_entity_id != 0
+    group by p.id, p.building_type, a.map
+    order by p.id`, [owner]);
+  return { capabilities: { storage: true, storageGiveItem: false }, rows: result.rows };
+}
+
 export async function storageItems(db, id) {
   return playerInventory(db, id);
 }

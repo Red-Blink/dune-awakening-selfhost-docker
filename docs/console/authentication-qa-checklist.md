@@ -417,7 +417,16 @@ substitute for. Results below are still blank pending that pass.
 
 **Expected**
 - Discord shows an authorization screen naming the application and the permissions "know who you are / your servers / your roles in a server". After **Authorize**, each lands in the console.
-- A: Admin — sees Server Control, Players, Bases…; **no Settings tab**; typing the Settings URL directly does not open it. B: Player — read-only tabs only. C: Admin (highest of the two).
+- A: Admin — sees Server Control, Players, Bases…; **no Settings tab**; typing the Settings URL directly does not open it. B: Player — read-only, own data only (see T27a). C: Admin (highest of the two).
+
+### T27a · Player sees only their own data
+1. Link two players (P1, P2) to two Discord accounts. Give P1 a base they own, a base P2 owns and shares with them, a vehicle they own and a chest they own. Sign in as P1.
+
+**Expected**
+- Players and Guilds list only P1's character and guild (the roster of their own guild only). Bases, Vehicles and Storage list only what P1 owns; the shared base is absent, and no other player's name appears on any row. Searching for P2's name or base finds nothing.
+- There is no Live Map tab for P1, and `/api/map/players`, `/api/map/poi` and every other `/api/map/*` route return 403.
+- Directly requesting `/api/map/bases`, `/api/maps/user-settings/raw`, `/api/players/deleted-characters`, `/api/server/doctor`, `/api/server/readiness`, `/api/players/<P1 id>/teleport-destinations` or any POST returns 403. `/api/server/status` carries no container names, listener ports, server IP or battlegroup id.
+- An unlinked Discord account sees the link instructions, not an empty list.
 
 ### T28 · Not authorized
 1. An account that is a member but holds no mapped role signs in.

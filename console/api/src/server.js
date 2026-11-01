@@ -61,11 +61,12 @@ import { handleDiscordAdapterRoute, isDiscordAdapterRoute } from "./integrations
 import { discordAdapterEnabled } from "./integrations/discord/adapter.js";
 import { initializeDiscordAdapterSchema } from "./integrations/discord/schema.js";
 import { actionForRoute, ROUTE_ACTIONS, NAMESPACES } from "./actions.js";
+import { playerMayCall, guildRosterForSession, playerOwnedAssetsBody, effectiveAccess, ownedViewForSession, statusBodyForSession } from "./playerScope.js";
 // Merged during the 2026-09-21 upstream rebase: upstream/main independently
 // added the customization-grant exports below while this branch added
 // resolveAllowedActions -- both are genuinely used (by unrelated features),
 // so this is a union, not a pick-one-side choice.
-import { evaluate, loadPolicies, getAllPolicies, setPolicies, allKnownActions, resolveAllowedActions } from "./policy.js";
+import { evaluate, loadPolicies, getAllPolicies, setPolicies, allKnownActions, resolveAllowedActions, resolveSessionTier } from "./policy.js";
 import { customizationGrantOutcome, liveItemGrantOk, liveItemGrantPublished, liveItemGrantWarning, summarizeCustomizationGrantResults } from "./grantResults.js";
 import { primeMessageOfTheDayOnlineState, readMessageOfTheDay, recordMessageOfTheDayScanFailure, restoreMessageOfTheDay, runMessageOfTheDayScan, saveMessageOfTheDay } from "./services/messageOfTheDay.js";
 import { primePlayerAnnouncementOnlineState, readPlayerAnnouncements, restorePlayerAnnouncements, runPlayerAnnouncementScan, savePlayerAnnouncements } from "./services/playerAnnouncements.js";
@@ -940,6 +941,13 @@ function requireAction(req, res, action) {
   return true;
 }
 
+// GET /api/bases | /api/vehicles | /api/storage for the `player` tier: only the
+// assets the caller owns (permission rank 1; not co-owned, not shared). The
+// scope comes from the linked character, never from the request.
+function playerOwnedAssetsRoute(res, session, path, url) {
+  return dbJson(res, () => playerOwnedAssetsBody({ duneDb, db, session, path, query: Object.fromEntries(url.searchParams), linkInstructions: PLAYER_LINK_INSTRUCTIONS }));
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, "http://localhost");
   const path = url.pathname;
@@ -1321,8 +1329,11 @@ async function handleApi(req, res) {
       secondFactorEnrolled,
       secondFactorUnavailable: factorStoreUnavailable,
       // What the policy engine will allow this session, so the UI can hide what
-      // a 403 would refuse anyway. Enrollment-scope sessions get nothing.
-      allowedActions: SETUP_SCOPES.has(session.scope) ? [] : resolveAllowedActions(session.tier || "owner")
+      // a 403 would refuse anyway. Enrollment-scope sessions get nothing, and so
+      // does a session whose tier the policy engine does not recognise: evaluate()
+      // denies it everything, so reporting owner's actions here (the old
+      // `tier || "owner"`) would show a UI the server then refuses (#1276).
+      allowedActions: SETUP_SCOPES.has(session.scope) ? [] : resolveAllowedActions(resolveSessionTier(session))
     });
   }
   if (path === "/api/auth/discord/start" && req.method === "GET") {
@@ -1473,6 +1484,12 @@ async function handleApi(req, res) {
   if (!action || !evaluate(session, action)) {
     return json(res, 403, { error: "Your account does not have permission to access this resource." });
   }
+  // Second gate for the `player` tier (#1276): deny by default, independent of
+  // the stored IAM policy. Everything listed in playerScope.js is scoped to the
+  // caller in its own handler; nothing else is reachable.
+  if (session.tier === "player" && !playerMayCall(req.method, path)) {
+    return json(res, 403, { error: "Your account does not have permission to access this resource." });
+  }
   // The key's own scope grid, applied on top of the policy engine. This is the
   // check that actually constrains a key (see the tier comment in apiKeys.js).
   // settings:* and database:* are denied inside allows(), so a key can never
@@ -1512,7 +1529,7 @@ async function handleApi(req, res) {
   if (path === "/api/public-directory/status") return json(res, 200, publicDirectory.publicState());
   if (path.startsWith("/api/setup/tasks/")) return taskRoute(req, res, path);
 
-  if (path === "/api/server/status") return serverStatusRoute(res, url);
+  if (path === "/api/server/status") return serverStatusRoute(res, url, session);
   if (path === "/api/server/performance") return json(res, 200, await collectPerformanceSnapshot(config.repoRoot));
   if (path === "/api/server/restart-history") return json(res, 200, readRestartHistory(config));
   if (path === "/api/server/readiness") return safeCommandJson(res, "readiness");
@@ -1876,8 +1893,9 @@ async function handleApi(req, res) {
       if (!scope.linked) return json(res, 200, { capabilities: { guildMembers: true }, rows: [], notLinked: true, reason: PLAYER_LINK_INSTRUCTIONS.reason, linkInstructions: PLAYER_LINK_INSTRUCTIONS });
       if (!scope.guildId || scope.guildId !== guildId) return json(res, 403, { error: "You can only view your own guild's roster." });
     }
-    return dbJson(res, () => duneDb.guildMembers(db, guildId));
+    return dbJson(res, async () => guildRosterForSession(session, await duneDb.guildMembers(db, guildId)));
   }
+  if (session.tier === "player" && (path === "/api/bases" || path === "/api/vehicles" || path === "/api/storage")) return playerOwnedAssetsRoute(res, session, path, url);
   if (path === "/api/bases") return dbJson(res, () => duneDb.listBases(db, {
     q: url.searchParams.get("q") || "",
     page: url.searchParams.get("page") || 0,
@@ -2054,16 +2072,16 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/players\/[^/]+\/customizations$/) && req.method === "GET") return customizationGrantsRoute(req, res, path);
   if (path.match(/^\/api\/players\/[^/]+\/journey$/)) return dbPlayerRoute(req, res, path, (database, playerId) => duneDb.playerJourney(database, playerId, journeyTagsData));
   if (path.match(/^\/api\/players\/[^/]+\/inventory$/)) return dbPlayerRoute(req, res, path, duneDb.playerInventoryAll);
-  if (path.match(/^\/api\/players\/[^/]+\/vehicles$/) && req.method === "GET") return dbPlayerRoute(req, res, path, (database, playerId) => duneDb.listVehicles(database, { playerId, pageSize: 200, access: playerAccessParam(url) }));
-  if (path.match(/^\/api\/players\/[^/]+\/bases$/) && req.method === "GET") return dbPlayerRoute(req, res, path, (database, playerId) => duneDb.listBases(database, {
+  if (path.match(/^\/api\/players\/[^/]+\/vehicles$/) && req.method === "GET") return dbPlayerRoute(req, res, path, async (database, playerId) => ownedViewForSession(session, await duneDb.listVehicles(database, { playerId, pageSize: 200, access: effectiveAccess(session, playerAccessParam(url)) })));
+  if (path.match(/^\/api\/players\/[^/]+\/bases$/) && req.method === "GET") return dbPlayerRoute(req, res, path, async (database, playerId) => ownedViewForSession(session, await duneDb.listBases(database, {
     playerId,
     q: url.searchParams.get("q") || "",
     page: 0,
     pageSize: 5000,
-    access: playerAccessParam(url),
+    access: effectiveAccess(session, playerAccessParam(url)),
     sortColumn: url.searchParams.get("sortColumn") || "name",
     sortDirection: url.searchParams.get("sortDirection") || "asc"
-  }));
+  })));
   if (path.match(/^\/api\/players\/[^/]+\/currency$/)) return dbPlayerRoute(req, res, path, duneDb.playerCurrency);
   if (path.match(/^\/api\/players\/[^/]+\/solaris-coin$/)) return dbPlayerRoute(req, res, path, duneDb.playerSolarisCoinTotal);
   if (path.match(/^\/api\/players\/[^/]+\/factions$/)) return dbPlayerRoute(req, res, path, (database, playerId) => duneDb.playerFactions(database, playerId, journeyTagsData));
@@ -3099,9 +3117,10 @@ function includeRawStatus(url) {
   return !["0", "false", "no"].includes(value);
 }
 
-async function serverStatusRoute(res, url) {
+async function serverStatusRoute(res, url, session) {
   const result = config.mockMode ? mockCommand("status") : await safeCommand("status", {}, statusCommandCache);
-  return json(res, 200, buildServerStatusResponse(result, { includeRaw: includeRawStatus(url) }));
+  const body = buildServerStatusResponse(result, { includeRaw: includeRawStatus(url) });
+  return json(res, 200, statusBodyForSession(session, body));
 }
 
 async function structuredVehiclesRoute(res) {
