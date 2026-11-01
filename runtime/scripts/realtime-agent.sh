@@ -62,9 +62,11 @@ stop_agent() {
   fi
 }
 
+# Seconds to wait for the agent to answer after the start (default 30).
 wait_for_agent() {
-  local attempt=1
-  while [ "$attempt" -le 30 ]; do
+  local attempt=1 limit="${DUNE_REALTIME_AGENT_WAIT_SECONDS:-30}"
+  case "$limit" in ''|*[!0-9]*) limit=30 ;; esac
+  while [ "$attempt" -le "$limit" ]; do
     if curl -fsS --max-time 2 http://127.0.0.1:8796/healthz >/dev/null 2>&1; then return 0; fi
     sleep 1
     attempt=$((attempt + 1))
@@ -85,7 +87,13 @@ case "${1:-status}" in
   enable)
     write_env true
     start_agent
-    wait_for_agent || echo "The agent did not answer on 127.0.0.1:8796 within 30 seconds." >&2
+    # A start that never becomes healthy is a failure, not a success: the Console
+    # and the CLI must not report the agent as set up when it is not answering.
+    if ! wait_for_agent; then
+      echo "The agent did not answer on 127.0.0.1:8796 in time. $(status_agent)" >&2
+      echo "Inspect it with: docker logs $CONTAINER" >&2
+      exit 1
+    fi
     status_agent
     ;;
   disable)

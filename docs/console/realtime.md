@@ -23,13 +23,21 @@ commit; the build fails if the tag moved) and starts it as the container `dune-r
 The same notice offers **Remove Agent** once no key uses Realtime Data any more. Removing stops the
 container and deletes the image; API keys are not touched.
 
-What the agent needs, and why it is an owner-only action (`settings:write`, like Encrypted API
-Access, so no API key, addon or admin-tier account can start it):
+Setting it up is an owner-only action (`settings:write`, like Encrypted API Access, so no API key,
+addon or admin-tier account can start it). A short note on trust, because the agent's *intended
+behaviour* is narrower than the *privileges it is given*:
 
-- runs as root with `pid: host` and `SYS_PTRACE` to read the game server processes' memory (read-only),
-  with all other capabilities dropped, a read-only file system and `no-new-privileges`;
-- `apparmor=unconfined`, because the game containers run unconfined and the default profile refuses ptrace of such a peer;
-- listens on `127.0.0.1:8796` only, no login; the Console is the one door to it.
+- **Intended behaviour:** read object positions from the game server processes, read-only, and offer
+  them on `127.0.0.1:8796` for the Console to pass on to authorized callers.
+- **Privileges granted:** root, `pid: host`, `SYS_PTRACE`, `DAC_OVERRIDE` and
+  `apparmor=unconfined` (the game containers run unconfined, and the default profile refuses ptrace
+  of such a peer), with all other capabilities dropped, a read-only file system, `no-new-privileges`
+  and a fixed memory and process limit.
+- **What is *not* enforced:** that it only reads, or only game processes. The container cannot
+  guarantee either; a compromised or modified agent could read or change any process it can see.
+- **Who can reach it:** it listens on loopback and has no login. The Console authorizes API callers,
+  but loopback does not stop other local processes from connecting to `127.0.0.1:8796` directly, so
+  install it only on a host where you trust the local processes.
 
 The same steps are available on the command line: `runtime/scripts/realtime-agent.sh enable|disable|status`.
 Player positions stay off at the agent by default; set `DUNE_REALTIME_AGENT_PLAYERS=true` in the

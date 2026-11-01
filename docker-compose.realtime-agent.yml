@@ -2,9 +2,16 @@ name: dune-realtime-agent
 
 # Optional Realtime Data position agent (mvagent): reads live sandworms, enemies,
 # vehicles and storms (optionally players) from the game server processes and
-# serves them on 127.0.0.1:8796. It has no login; the Console is the one door to
-# it (docs/console/realtime.md). Started and stopped by
+# serves them on 127.0.0.1:8796 (docs/console/realtime.md). Started and stopped by
 # runtime/scripts/realtime-agent.sh and Settings -> API Keys.
+#
+# Intended behaviour vs. granted privileges: the agent is meant to read object
+# positions only, and the Console is meant to be the one authorized way to reach
+# it. This file does not enforce either. Root, pid: host, SYS_PTRACE,
+# DAC_OVERRIDE and apparmor=unconfined would let a compromised or modified agent
+# read or alter any process it can see, and the agent has no login, so any local
+# process can connect to 127.0.0.1:8796. Install it only where the local
+# processes are trusted.
 services:
   dune-realtime-agent:
     build:

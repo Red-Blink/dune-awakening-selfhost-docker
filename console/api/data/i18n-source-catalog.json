@@ -6488,7 +6488,7 @@
     "and running": [
       {
         "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
-        "line": 84,
+        "line": 135,
         "nearby": [
           "Setting Up...",
           "No API key uses Realtime Data any more, but the position agent is still installed",
@@ -9268,7 +9268,7 @@
     "Build and Start": [
       {
         "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
-        "line": 44,
+        "line": 85,
         "nearby": [
           "Set Up Realtime Data Agent",
           "Remove Realtime Data Agent",
@@ -27686,7 +27686,7 @@
     "No API key uses Realtime Data any more, but the position agent is still installed": [
       {
         "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
-        "line": 84,
+        "line": 135,
         "nearby": [
           "Set Up Agent",
           "Setting Up...",
@@ -33575,7 +33575,7 @@
     "Realtime Data is enabled, but DUNE_REALTIME_AGENT_URL is not usable. Fix the address in the Console settings.": [
       {
         "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
-        "line": 74,
+        "line": 125,
         "nearby": [
           "Remove Realtime Data Agent",
           "Remove Agent",
@@ -33587,7 +33587,7 @@
     "Realtime Data is enabled, but the position agent is installed and not answering.": [
       {
         "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
-        "line": 76,
+        "line": 127,
         "nearby": [
           "Remove Agent",
           "Realtime Data is enabled, but DUNE_REALTIME_AGENT_URL is not usable. Fix the address in the Console settings.",
@@ -33599,7 +33599,7 @@
     "Realtime Data is enabled, but the position agent is not installed on this host. Without it the Realtime Data routes answer 503.": [
       {
         "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
-        "line": 77,
+        "line": 128,
         "nearby": [
           "Realtime Data is enabled, but DUNE_REALTIME_AGENT_URL is not usable. Fix the address in the Console settings.",
           "Realtime Data is enabled, but the position agent is installed and not answering.",
@@ -33644,7 +33644,7 @@
     "Rebuild Agent": [
       {
         "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
-        "line": 80,
+        "line": 131,
         "nearby": [
           "Realtime Data is enabled, but the position agent is installed and not answering.",
           "Realtime Data is enabled, but the position agent is not installed on this host. Without it the Realtime Data routes answer 503.",
@@ -34913,7 +34913,7 @@
     "Remove Agent": [
       {
         "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
-        "line": 45,
+        "line": 86,
         "nearby": [
           "Build and Start",
           "Remove Realtime Data Agent",
@@ -34923,7 +34923,7 @@
       },
       {
         "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
-        "line": 86,
+        "line": 137,
         "nearby": [
           "No API key uses Realtime Data any more, but the position agent is still installed",
           "and running",
@@ -35013,7 +35013,7 @@
     "Remove Realtime Data Agent": [
       {
         "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
-        "line": 45,
+        "line": 86,
         "nearby": [
           "Set Up Realtime Data Agent",
           "Build and Start",
@@ -35118,7 +35118,7 @@
     "Removing...": [
       {
         "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
-        "line": 86,
+        "line": 137,
         "nearby": [
           "and running",
           "Remove Agent"
@@ -41137,7 +41137,7 @@
     "Set Up Agent": [
       {
         "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
-        "line": 80,
+        "line": 131,
         "nearby": [
           "Realtime Data is enabled, but the position agent is not installed on this host. Without it the Realtime Data routes answer 503.",
           "Rebuild Agent",
@@ -41149,7 +41149,7 @@
     "Set Up Realtime Data Agent": [
       {
         "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
-        "line": 44,
+        "line": 85,
         "nearby": [
           "Build and Start",
           "Remove Realtime Data Agent"
@@ -41183,7 +41183,7 @@
     "Setting Up...": [
       {
         "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
-        "line": 80,
+        "line": 131,
         "nearby": [
           "Rebuild Agent",
           "Set Up Agent",

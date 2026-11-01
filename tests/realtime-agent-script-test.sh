@@ -65,15 +65,18 @@ case "$1" in
       *" down "*) rm -f "$MOCK_RUNNING" ;;
     esac
     ;;
-  inspect) echo "State: running" ;;
+  inspect)
+    if [ -e "$MOCK_EXITED" ]; then echo "State: exited"; else echo "State: running"; fi
+    ;;
 esac
 MOCK
 cat >"$work/bin/curl" <<'MOCK'
 #!/bin/sh
-exit 0
+# the agent answers unless the test marks it as down
+[ ! -e "$MOCK_AGENT_DOWN" ]
 MOCK
 chmod +x "$work/bin/docker" "$work/bin/curl"
-export MOCK_CALLS="$calls" MOCK_RUNNING="$running"
+export MOCK_CALLS="$calls" MOCK_RUNNING="$running" MOCK_EXITED="$work/container-exited" MOCK_AGENT_DOWN="$work/agent-down"
 export PATH="$work/bin:$PATH"
 
 run() { (cd "$work" && ./runtime/scripts/realtime-agent.sh "$@"); }
@@ -87,6 +90,21 @@ grep -Fq 'DUNE_REALTIME_AGENT_ENABLED=true' "$work/runtime/generated/realtime-ag
 grep -Fq 'docker compose -f docker-compose.realtime-agent.yml build dune-realtime-agent' "$calls" || fail "image was not built"
 grep -Fq 'docker compose -f docker-compose.realtime-agent.yml up -d --force-recreate' "$calls" || fail "agent was not started"
 grep -Fq 'State: running' <<<"$out" || fail "status after enable: $out"
+
+# A start whose agent never answers is a failure: non-zero exit, and the state is shown
+: >"$work/agent-down"
+: >"$work/container-exited"
+set +e
+out="$(DUNE_REALTIME_AGENT_WAIT_SECONDS=2 run enable 2>&1)"
+code=$?
+set -e
+[ "$code" -ne 0 ] || fail "enable reported success although the agent never answered: $out"
+grep -Fq 'did not answer' <<<"$out" || fail "enable gave no reason for the failure: $out"
+grep -Fq 'State: exited' <<<"$out" || fail "enable did not show the container state: $out"
+rm -f "$work/agent-down" "$work/container-exited"
+# a non-numeric wait falls back to the default instead of failing the arithmetic
+out="$(DUNE_REALTIME_AGENT_WAIT_SECONDS=abc run enable 2>&1)"
+grep -Fq 'State: running' <<<"$out" || fail "bad wait value broke enable: $out"
 
 : >"$calls"
 run reconcile

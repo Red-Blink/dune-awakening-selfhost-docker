@@ -99,6 +99,7 @@ test("a failed build gives a generic message without the script output", async (
   await assert.rejects(agent.setEnabled(true, { confirmed: true }), (error) => {
     assert.equal(error.status, 502);
     assert.doesNotMatch(error.message, /secret-looking/);
+    assert.match(error.message, /did not answer in time/);
     return true;
   });
   // the lock is released after a failure

@@ -86,7 +86,7 @@ export function createRealtimeAgent({ repoRoot, health, run = execFileOutput, ex
         });
       } catch {
         throw new RealtimeAgentError(enabled
-          ? "The Realtime Data agent could not be set up. Check the build output with: runtime/scripts/realtime-agent.sh enable"
+          ? "The Realtime Data agent could not be set up, or it started but did not answer in time. Check the output with: runtime/scripts/realtime-agent.sh enable"
           : "The Realtime Data agent could not be removed.", 502);
       } finally {
         busy = null;
