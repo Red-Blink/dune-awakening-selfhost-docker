@@ -1,19 +1,13 @@
-# Patch Notes v1.4.59
+# Patch Notes v1.4.60
 
 ## Improved
 
-- Explore the Console before installing at [try.dunedocker.app](https://try.dunedocker.app/), with sample players, maps, inventories, Landsraad, backups, and more. Server management actions are disabled in the preview.
-- Made Server Control load sooner, corrected readiness totals during a Funcom token mismatch, and clarified service status labels.
-- Kept image-cleanup progress visible when moving between pages and improved cleanup handling on busy servers.
-- Improved game-server restart recovery when Docker has not finished removing the previous container.
-- Refreshed first-time setup with a banner, clearer progress, a green completion bar, and a manual Next step before finishing.
-- Simplified the addons table with better spacing, readable permissions, and descriptions that expand only when needed.
-- Made Care Package Grant History easier to scan, with clear success and failure results and details in a separate window.
-- Improved player inventory, Building Sets, and Customizations tables with clearer columns, compact rows, accessible item information, and green Available labels.
-- Added the Regis Tank icon to Live Map markers and layers; centered map and Journey expand controls.
-- Improved Restart History, sidebar borders on long pages, and header button sizing. Marked external menu links more clearly.
-- Updated bundled translations across all Console languages and fixed Console image packaging.
+- Improved automatic recovery from stalled game servers, allowing more time for recovery and requiring fresh failure reports before restarting an empty Battlegroup together.
+- Corrected readiness reporting when a server can no longer accept players, and added recovery success or failure results to Restart History.
+- Show Unsupported or Blocked in the addon Status column instead of Available, without repeating the badge beside the addon name.
+- Improved search listings and shared-link previews for [try.dunedocker.app](https://try.dunedocker.app/).
 
 ## Community Contributions
 
-- Thanks to **@drkshrk** for improving player table columns and item information in [#275](https://github.com/Red-Blink/dune-awakening-selfhost-docker/pull/275).
+- Thanks to **@drkshrk** for adding expandable details to each Readiness & Health row, making warnings easier to understand, in [#277](https://github.com/Red-Blink/dune-awakening-selfhost-docker/pull/277).
+- Thanks to **@drkshrk** for adding 778 missing images for catalog items, building sets, customizations, and color swatches in [#278](https://github.com/Red-Blink/dune-awakening-selfhost-docker/pull/278).
