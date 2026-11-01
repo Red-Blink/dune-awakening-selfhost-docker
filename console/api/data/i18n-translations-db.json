@@ -3278,7 +3278,20 @@
     "× Uptime Event",
     "— restore it afterwards, with its passphrase.",
     "— sent",
-    "— the Funcom token, admin console password, RMQ credentials, sietch join password and IAM policies. It is encrypted with the passphrase you set here, and"
+    "— the Funcom token, admin console password, RMQ credentials, sietch join password and IAM policies. It is encrypted with the passphrase you set here, and",
+    "Build and Start",
+    "No API key uses Realtime Data any more, but the position agent is still installed",
+    "Realtime Data is enabled, but DUNE_REALTIME_AGENT_URL is not usable. Fix the address in the Console settings.",
+    "Realtime Data is enabled, but the position agent is installed and not answering.",
+    "Realtime Data is enabled, but the position agent is not installed on this host. Without it the Realtime Data routes answer 503.",
+    "Rebuild Agent",
+    "Remove Agent",
+    "Remove Realtime Data Agent",
+    "Removing...",
+    "Set Up Agent",
+    "Set Up Realtime Data Agent",
+    "Setting Up...",
+    "and running"
   ],
   "translations": {
     "FR": {
@@ -19399,7 +19412,20 @@
       "Redirecting to the full console in": "Umleitung zur vollständigen Konsole in",
       "Saved Privately on Server": "Privat auf dem Server gespeichert",
       "More": "Mehr",
-      "Less": "Weniger"
+      "Less": "Weniger",
+      "Build and Start": "Bauen und starten",
+      "No API key uses Realtime Data any more, but the position agent is still installed": "Kein API-Key nutzt Realtime Data mehr, aber der Positions-Agent ist noch installiert",
+      "Realtime Data is enabled, but DUNE_REALTIME_AGENT_URL is not usable. Fix the address in the Console settings.": "Realtime Data ist aktiviert, aber DUNE_REALTIME_AGENT_URL ist nicht nutzbar. Korrigiere die Adresse in den Console-Einstellungen.",
+      "Realtime Data is enabled, but the position agent is installed and not answering.": "Realtime Data ist aktiviert, aber der Positions-Agent ist installiert und antwortet nicht.",
+      "Realtime Data is enabled, but the position agent is not installed on this host. Without it the Realtime Data routes answer 503.": "Realtime Data ist aktiviert, aber der Positions-Agent ist auf diesem Host nicht installiert. Ohne ihn antworten die Realtime-Data-Routen mit 503.",
+      "Rebuild Agent": "Agent neu bauen",
+      "Remove Agent": "Agent entfernen",
+      "Remove Realtime Data Agent": "Realtime-Data-Agent entfernen",
+      "Removing...": "Wird entfernt...",
+      "Set Up Agent": "Agent einrichten",
+      "Set Up Realtime Data Agent": "Realtime-Data-Agent einrichten",
+      "Setting Up...": "Wird eingerichtet...",
+      "and running": "und läuft"
     },
     "PL": {
       "Game Server Connections": "Połączenia Serwerów Gry",
