@@ -2978,6 +2978,7 @@
     "Unset",
     "Unused Docker build cache can be cleaned",
     "Unused Docker build cache was cleaned.",
+    "Unused Docker images can be cleaned",
     "Up 1d ago",
     "Up 1h ago",
     "Up 1m ago",
@@ -6503,7 +6504,8 @@
       "Redirecting to the full console in": "Redirection vers la console complète dans",
       "Saved Privately on Server": "Enregistré en privé sur le serveur",
       "More": "Plus",
-      "Less": "Moins"
+      "Less": "Moins",
+      "Unused Docker images can be cleaned": "Les images Docker inutilisées peuvent être nettoyées"
     },
     "NL": {
       "Game Server Connections": "Spelserververbindingen",
@@ -9727,7 +9729,8 @@
       "Redirecting to the full console in": "Omleiden naar de volledige console in",
       "Saved Privately on Server": "Privé opgeslagen op de server",
       "More": "Meer",
-      "Less": "Minder"
+      "Less": "Minder",
+      "Unused Docker images can be cleaned": "Ongebruikte Docker-images kunnen worden opgeschoond"
     },
     "ES": {
       "Game Server Connections": "Conexiones de Servidores de Juego",
@@ -12951,7 +12954,8 @@
       "Redirecting to the full console in": "Redirigiendo a la consola completa en",
       "Saved Privately on Server": "Guardado de forma privada en el servidor",
       "More": "Más",
-      "Less": "Menos"
+      "Less": "Menos",
+      "Unused Docker images can be cleaned": "Se pueden limpiar las imágenes de Docker sin usar"
     },
     "IT": {
       "Game Server Connections": "Connessioni dei Server di Gioco",
@@ -16175,7 +16179,8 @@
       "Redirecting to the full console in": "Reindirizzamento alla console completa in",
       "Saved Privately on Server": "Salvato privatamente sul server",
       "More": "Altro",
-      "Less": "Meno"
+      "Less": "Meno",
+      "Unused Docker images can be cleaned": "È possibile eliminare le immagini Docker inutilizzate"
     },
     "DE": {
       "Game Server Connections": "Spielserver-Verbindungen",
@@ -19399,7 +19404,8 @@
       "Redirecting to the full console in": "Umleitung zur vollständigen Konsole in",
       "Saved Privately on Server": "Privat auf dem Server gespeichert",
       "More": "Mehr",
-      "Less": "Weniger"
+      "Less": "Weniger",
+      "Unused Docker images can be cleaned": "Ungenutzte Docker-Images können bereinigt werden"
     },
     "PL": {
       "Game Server Connections": "Połączenia Serwerów Gry",
@@ -22623,7 +22629,8 @@
       "Redirecting to the full console in": "Przekierowanie do pełnej konsoli w",
       "Saved Privately on Server": "Zapisano prywatnie na serwerze",
       "More": "Więcej",
-      "Less": "Mniej"
+      "Less": "Mniej",
+      "Unused Docker images can be cleaned": "Można usunąć nieużywane obrazy Docker"
     },
     "PT-BR": {
       "Game Server Connections": "Conexões dos Servidores de Jogo",
@@ -25847,7 +25854,8 @@
       "Redirecting to the full console in": "Redirecionando para o console completo em",
       "Saved Privately on Server": "Salvo de forma privada no servidor",
       "More": "Mais",
-      "Less": "Menos"
+      "Less": "Menos",
+      "Unused Docker images can be cleaned": "As imagens Docker não utilizadas podem ser removidas"
     },
     "PT-PT": {
       "Game Server Connections": "Ligações dos Servidores de Jogo",
@@ -29071,7 +29079,8 @@
       "Redirecting to the full console in": "Redirecionando para o console completo em",
       "Saved Privately on Server": "Salvo de forma privada no servidor",
       "More": "Mais",
-      "Less": "Menos"
+      "Less": "Menos",
+      "Unused Docker images can be cleaned": "As imagens Docker não utilizadas podem ser removidas"
     },
     "UK": {
       "Game Server Connections": "З’єднання Ігрових Серверів",
@@ -32295,7 +32304,8 @@
       "Redirecting to the full console in": "Переспрямування на повну консоль у",
       "Saved Privately on Server": "Збережено приватно на сервері",
       "More": "Більше",
-      "Less": "Менше"
+      "Less": "Менше",
+      "Unused Docker images can be cleaned": "Невикористовувані образи Docker можна очистити"
     },
     "RU": {
       "Game Server Connections": "Подключения Игровых Серверов",
@@ -35519,7 +35529,8 @@
       "Redirecting to the full console in": "Перенаправление на полную консоль в",
       "Saved Privately on Server": "Сохранено конфиденциально на сервере",
       "More": "Ещё",
-      "Less": "Меньше"
+      "Less": "Меньше",
+      "Unused Docker images can be cleaned": "Неиспользуемые образы Docker можно очистить"
     },
     "TR": {
       "Game Server Connections": "Oyun Sunucusu Bağlantıları",
@@ -38743,7 +38754,8 @@
       "Redirecting to the full console in": "Tam konsola yönlendiriliyor",
       "Saved Privately on Server": "Sunucuya Özel Olarak Kaydedildi",
       "More": "Daha fazla",
-      "Less": "Daha az"
+      "Less": "Daha az",
+      "Unused Docker images can be cleaned": "Kullanılmayan Docker görüntüleri temizlenebilir"
     },
     "JA": {
       "Game Server Connections": "ゲームサーバー接続",
@@ -41967,7 +41979,8 @@
       "Redirecting to the full console in": "完全なコンソールにリダイレクトします",
       "Saved Privately on Server": "サーバーに非公開で保存",
       "More": "もっと見る",
-      "Less": "折りたたむ"
+      "Less": "折りたたむ",
+      "Unused Docker images can be cleaned": "未使用のDockerイメージを削除できます"
     },
     "KO": {
       "Game Server Connections": "게임 서버 연결",
@@ -45191,7 +45204,8 @@
       "Redirecting to the full console in": "전체 콘솔로 리디렉션 중",
       "Saved Privately on Server": "서버에 비공개로 저장됨",
       "More": "더 보기",
-      "Less": "접기"
+      "Less": "접기",
+      "Unused Docker images can be cleaned": "사용하지 않는 Docker 이미지를 정리할 수 있습니다"
     },
     "ZH-HANS": {
       "Game Server Connections": "游戏服务器连接",
@@ -48415,7 +48429,8 @@
       "Redirecting to the full console in": "重定向到完整控制台",
       "Saved Privately on Server": "私密保存在服务器上",
       "More": "显示更多",
-      "Less": "收起"
+      "Less": "收起",
+      "Unused Docker images can be cleaned": "可以清理未使用的 Docker 镜像"
     },
     "ZH-HANT": {
       "Game Server Connections": "遊戲伺服器連線",
@@ -51639,7 +51654,8 @@
       "Redirecting to the full console in": "重定向到完整控制台",
       "Saved Privately on Server": "私密保存在伺服器上",
       "More": "顯示更多",
-      "Less": "收起"
+      "Less": "收起",
+      "Unused Docker images can be cleaned": "可以清理未使用的 Docker 映像"
     },
     "AR": {
       "Game Server Connections": "اتصالات خوادم اللعبة",
@@ -54863,7 +54879,8 @@
       "Redirecting to the full console in": "إعادة التوجيه إلى وحدة التحكم الكاملة في",
       "Saved Privately on Server": "تم الحفظ بشكل خاص على الخادم",
       "More": "المزيد",
-      "Less": "أقل"
+      "Less": "أقل",
+      "Unused Docker images can be cleaned": "يمكن تنظيف صور Docker غير المستخدمة"
     },
     "FI": {
       "Game Server Connections": "Pelipalvelinyhteydet",
@@ -58087,7 +58104,8 @@
       "Redirecting to the full console in": "Uudelleenohjaus koko konsoliin sisään",
       "Saved Privately on Server": "Tallennettu yksityisesti palvelimelle",
       "More": "Lisää",
-      "Less": "Vähemmän"
+      "Less": "Vähemmän",
+      "Unused Docker images can be cleaned": "Käyttämättömät Docker-levykuvat voidaan poistaa"
     },
     "DA": {
       "Game Server Connections": "Spilserverforbindelser",
@@ -61311,7 +61329,8 @@
       "Redirecting to the full console in": "Omdirigerer til den fulde konsol i",
       "Saved Privately on Server": "Gemt privat på serveren",
       "More": "Mere",
-      "Less": "Mindre"
+      "Less": "Mindre",
+      "Unused Docker images can be cleaned": "Ubrugte Docker-images kan ryddes op"
     },
     "CS": {
       "Game Server Connections": "Připojení herních serverů",
@@ -64535,7 +64554,8 @@
       "Redirecting to the full console in": "Přesměrování na plnou konzolu v",
       "Saved Privately on Server": "Uloženo soukromě na serveru",
       "More": "Více",
-      "Less": "Méně"
+      "Less": "Méně",
+      "Unused Docker images can be cleaned": "Nepoužívané obrazy Docker lze vyčistit"
     },
     "NB": {
       "Game Server Connections": "Spillservertilkoblinger",
@@ -67759,7 +67779,8 @@
       "Redirecting to the full console in": "Omdirigerer til hele konsollen i",
       "Saved Privately on Server": "Lagret privat på server",
       "More": "Mer",
-      "Less": "Mindre"
+      "Less": "Mindre",
+      "Unused Docker images can be cleaned": "Ubrukte Docker-avbildninger kan ryddes opp"
     },
     "HU": {
       "Game Server Connections": "Játékszerver-kapcsolatok",
@@ -70983,7 +71004,8 @@
       "Redirecting to the full console in": "Átirányítás a teljes konzolra",
       "Saved Privately on Server": "Privát a szerveren mentve",
       "More": "Több",
-      "Less": "Kevesebb"
+      "Less": "Kevesebb",
+      "Unused Docker images can be cleaned": "A nem használt Docker-lemezképek eltávolíthatók"
     },
     "EL": {
       "Game Server Connections": "Συνδέσεις Διακομιστών Παιχνιδιού",
@@ -74207,7 +74229,8 @@
       "Redirecting to the full console in": "Ανακατεύθυνση στην πλήρη κονσόλα",
       "Saved Privately on Server": "Αποθηκεύτηκε ιδιωτικά στον διακομιστή",
       "More": "Περισσότερα",
-      "Less": "Λιγότερα"
+      "Less": "Λιγότερα",
+      "Unused Docker images can be cleaned": "Οι αχρησιμοποίητες εικόνες Docker μπορούν να διαγραφούν"
     },
     "RO": {
       "Game Server Connections": "Conexiuni la Serverele de Joc",
@@ -77431,7 +77454,8 @@
       "Redirecting to the full console in": "Redirecționare către consola completă în",
       "Saved Privately on Server": "Salvat privat pe server",
       "More": "Mai mult",
-      "Less": "Mai puțin"
+      "Less": "Mai puțin",
+      "Unused Docker images can be cleaned": "Imaginile Docker neutilizate pot fi șterse"
     },
     "SK": {
       "Game Server Connections": "Pripojenia herných serverov",
@@ -80655,7 +80679,8 @@
       "Redirecting to the full console in": "Prebieha presmerovanie na plnú konzolu",
       "Saved Privately on Server": "Súkromne uložené na serveri",
       "More": "Viac",
-      "Less": "Menej"
+      "Less": "Menej",
+      "Unused Docker images can be cleaned": "Nepoužívané obrazy Docker možno vyčistiť"
     },
     "BG": {
       "Game Server Connections": "Връзки с игровите сървъри",
@@ -83879,7 +83904,8 @@
       "Redirecting to the full console in": "Пренасочване към пълната конзола в",
       "Saved Privately on Server": "Запазено частно на сървъра",
       "More": "Още",
-      "Less": "По-малко"
+      "Less": "По-малко",
+      "Unused Docker images can be cleaned": "Неизползваните Docker образи могат да бъдат изчистени"
     },
     "SV": {
       "Game Server Connections": "Spelserveranslutningar",
@@ -87103,7 +87129,8 @@
       "Redirecting to the full console in": "Omdirigerar till hela konsolen in",
       "Saved Privately on Server": "Sparad privat på servern",
       "More": "Mer",
-      "Less": "Mindre"
+      "Less": "Mindre",
+      "Unused Docker images can be cleaned": "Oanvända Docker-avbilder kan rensas"
     },
     "TH": {
       "Game Server Connections": "การเชื่อมต่อเซิร์ฟเวอร์เกม",
@@ -90327,7 +90354,8 @@
       "Redirecting to the full console in": "เปลี่ยนเส้นทางไปยังคอนโซลแบบเต็มใน",
       "Saved Privately on Server": "บันทึกแบบส่วนตัวบนเซิร์ฟเวอร์",
       "More": "ดูเพิ่มเติม",
-      "Less": "ย่อ"
+      "Less": "ย่อ",
+      "Unused Docker images can be cleaned": "สามารถล้างอิมเมจ Docker ที่ไม่ได้ใช้งานได้"
     },
     "VI": {
       "Game Server Connections": "Kết Nối Máy Chủ Trò Chơi",
@@ -93551,7 +93579,8 @@
       "Redirecting to the full console in": "Chuyển hướng đến bảng điều khiển đầy đủ trong",
       "Saved Privately on Server": "Được lưu riêng tư trên máy chủ",
       "More": "Xem thêm",
-      "Less": "Thu gọn"
+      "Less": "Thu gọn",
+      "Unused Docker images can be cleaned": "Có thể dọn dẹp các ảnh Docker không được sử dụng"
     },
     "ID": {
       "Game Server Connections": "Koneksi Server Game",
@@ -96775,7 +96804,8 @@
       "Redirecting to the full console in": "Mengarahkan ke konsol lengkap di",
       "Saved Privately on Server": "Disimpan Secara Pribadi di Server",
       "More": "Selengkapnya",
-      "Less": "Lebih sedikit"
+      "Less": "Lebih sedikit",
+      "Unused Docker images can be cleaned": "Image Docker yang tidak digunakan dapat dibersihkan"
     },
     "HI": {
       "Game Server Connections": "गेम सर्वर कनेक्शन",
@@ -99999,7 +100029,8 @@
       "Redirecting to the full console in": "पूर्ण कंसोल पर रीडायरेक्ट किया जा रहा है",
       "Saved Privately on Server": "सर्वर पर निजी तौर पर सहेजा गया",
       "More": "और देखें",
-      "Less": "कम देखें"
+      "Less": "कम देखें",
+      "Unused Docker images can be cleaned": "इस्तेमाल न हो रही Docker इमेज साफ़ की जा सकती हैं"
     },
     "HR": {
       "Game Server Connections": "Veze poslužitelja igre",
@@ -103223,7 +103254,8 @@
       "Redirecting to the full console in": "Preusmjeravanje na punu konzolu u",
       "Saved Privately on Server": "Spremljeno privatno na poslužitelj",
       "More": "Više",
-      "Less": "Manje"
+      "Less": "Manje",
+      "Unused Docker images can be cleaned": "Nekorištene Docker slike mogu se ukloniti"
     },
     "SR": {
       "Game Server Connections": "Везе Сервера Игре",
@@ -106447,7 +106479,8 @@
       "Redirecting to the full console in": "Преусмеравање на пуну конзолу у",
       "Saved Privately on Server": "Приватно сачувано на серверу",
       "More": "Више",
-      "Less": "Мање"
+      "Less": "Мање",
+      "Unused Docker images can be cleaned": "Некоришћене Docker слике могу се уклонити"
     },
     "SL": {
       "Game Server Connections": "Povezave igralnih strežnikov",
@@ -109671,7 +109704,8 @@
       "Redirecting to the full console in": "Preusmerjanje na celotno konzolo v",
       "Saved Privately on Server": "Shranjeno zasebno na strežniku",
       "More": "Več",
-      "Less": "Manj"
+      "Less": "Manj",
+      "Unused Docker images can be cleaned": "Neuporabljene slike Docker je mogoče odstraniti"
     },
     "ET": {
       "Game Server Connections": "Mänguserverite ühendused",
@@ -112895,7 +112929,8 @@
       "Redirecting to the full console in": "Ümbersuunamine täiskonsooli sisse",
       "Saved Privately on Server": "Salvestatud privaatselt serverisse",
       "More": "Rohkem",
-      "Less": "Vähem"
+      "Less": "Vähem",
+      "Unused Docker images can be cleaned": "Kasutamata Dockeri tõmmised saab eemaldada"
     },
     "LT": {
       "Game Server Connections": "Žaidimų serverių ryšiai",
@@ -116119,7 +116154,8 @@
       "Redirecting to the full console in": "Peradresuojama į visą konsolę",
       "Saved Privately on Server": "Išsaugota privačiai serveryje",
       "More": "Daugiau",
-      "Less": "Mažiau"
+      "Less": "Mažiau",
+      "Unused Docker images can be cleaned": "Nenaudojamus Docker atvaizdus galima pašalinti"
     },
     "LV": {
       "Game Server Connections": "Spēļu serveru savienojumi",
@@ -119343,7 +119379,8 @@
       "Redirecting to the full console in": "Notiek novirzīšana uz pilno konsoli",
       "Saved Privately on Server": "Saglabāts privāti serverī",
       "More": "Vairāk",
-      "Less": "Mazāk"
+      "Less": "Mazāk",
+      "Unused Docker images can be cleaned": "Neizmantotos Docker attēlus var noņemt"
     },
     "HE": {
       "Game Server Connections": "חיבורי שרתי משחק",
@@ -122567,7 +122604,8 @@
       "Redirecting to the full console in": "מפנה למסוף המלא ב-",
       "Saved Privately on Server": "נשמר באופן פרטי בשרת",
       "More": "עוד",
-      "Less": "פחות"
+      "Less": "פחות",
+      "Unused Docker images can be cleaned": "אפשר לנקות תמונות Docker שאינן בשימוש"
     },
     "FA": {
       "Game Server Connections": "اتصال‌های سرور بازی",
@@ -125791,7 +125829,8 @@
       "Redirecting to the full console in": "تغییر مسیر به کنسول کامل در",
       "Saved Privately on Server": "به صورت خصوصی در سرور ذخیره شده است",
       "More": "بیشتر",
-      "Less": "کمتر"
+      "Less": "کمتر",
+      "Unused Docker images can be cleaned": "می‌توان ایمیج‌های استفاده‌نشدهٔ Docker را پاک‌سازی کرد"
     },
     "UR": {
       "Game Server Connections": "گیم سرور کنکشنز",
@@ -129015,7 +129054,8 @@
       "Redirecting to the full console in": "میں مکمل کنسول پر ری ڈائریکٹ کیا جا رہا ہے۔",
       "Saved Privately on Server": "سرور پر نجی طور پر محفوظ کیا گیا۔",
       "More": "مزید",
-      "Less": "کم"
+      "Less": "کم",
+      "Unused Docker images can be cleaned": "غیر استعمال شدہ Docker امیجز صاف کی جا سکتی ہیں"
     },
     "MS": {
       "Game Server Connections": "Sambungan Pelayan Permainan",
@@ -132239,7 +132279,8 @@
       "Redirecting to the full console in": "Mengubah hala ke konsol penuh dalam",
       "Saved Privately on Server": "Disimpan Secara Persendirian pada Pelayan",
       "More": "Lagi",
-      "Less": "Kurangkan"
+      "Less": "Kurangkan",
+      "Unused Docker images can be cleaned": "Imej Docker yang tidak digunakan boleh dibersihkan"
     },
     "TL": {
       "Game Server Connections": "Mga Koneksyon ng Game Server",
@@ -135463,7 +135504,8 @@
       "Redirecting to the full console in": "Nagre-redirect sa buong console sa",
       "Saved Privately on Server": "Na-save nang Pribado sa Server",
       "More": "Higit pa",
-      "Less": "Mas kaunti"
+      "Less": "Mas kaunti",
+      "Unused Docker images can be cleaned": "Maaaring linisin ang mga hindi ginagamit na Docker image"
     },
     "BN": {
       "Game Server Connections": "গেম সার্ভারের সংযোগ",
@@ -138687,7 +138729,8 @@
       "Redirecting to the full console in": "সম্পূর্ণ কনসোলে পুনঃনির্দেশ করা হচ্ছে",
       "Saved Privately on Server": "সার্ভারে ব্যক্তিগতভাবে সংরক্ষিত",
       "More": "আরও",
-      "Less": "কম"
+      "Less": "কম",
+      "Unused Docker images can be cleaned": "অব্যবহৃত Docker ইমেজ পরিষ্কার করা যাবে"
     },
     "IS": {
       "Game Server Connections": "Tengingar leikjaþjóna",
@@ -141911,7 +141954,8 @@
       "Redirecting to the full console in": "Beinir á fulla stjórnborðið í",
       "Saved Privately on Server": "Vistað einslega á netþjóni",
       "More": "Meira",
-      "Less": "Minna"
+      "Less": "Minna",
+      "Unused Docker images can be cleaned": "Hægt er að hreinsa ónotaðar Docker-myndir"
     },
     "SQ": {
       "Game Server Connections": "Lidhjet e Serverëve të Lojës",
@@ -145135,7 +145179,8 @@
       "Redirecting to the full console in": "Ridrejtimi në tastierën e plotë në",
       "Saved Privately on Server": "Ruajtur privatisht në server",
       "More": "Më shumë",
-      "Less": "Më pak"
+      "Less": "Më pak",
+      "Unused Docker images can be cleaned": "Imazhet Docker të papërdorura mund të pastrohen"
     },
     "MK": {
       "Game Server Connections": "Врски со серверите за игра",
@@ -148359,7 +148404,8 @@
       "Redirecting to the full console in": "Се пренасочува кон целосната конзола во",
       "Saved Privately on Server": "Зачувано приватно на серверот",
       "More": "Повеќе",
-      "Less": "Помалку"
+      "Less": "Помалку",
+      "Unused Docker images can be cleaned": "Неискористените Docker слики може да се исчистат"
     },
     "KA": {
       "Game Server Connections": "თამაშის სერვერის კავშირები",
@@ -151583,7 +151629,8 @@
       "Redirecting to the full console in": "გადამისამართება სრულ კონსოლზე",
       "Saved Privately on Server": "შენახულია პირადად სერვერზე",
       "More": "მეტი",
-      "Less": "ნაკლები"
+      "Less": "ნაკლები",
+      "Unused Docker images can be cleaned": "გამოუყენებელი Docker-ის იმიჯების გასუფთავება შესაძლებელია"
     },
     "HY": {
       "Game Server Connections": "Խաղային սերվերների կապեր",
@@ -154807,7 +154854,8 @@
       "Redirecting to the full console in": "Վերահղում դեպի ամբողջական վահանակ",
       "Saved Privately on Server": "Պահպանվել է մասնավոր սերվերում",
       "More": "Ավելին",
-      "Less": "Քիչ"
+      "Less": "Քիչ",
+      "Unused Docker images can be cleaned": "Չօգտագործվող Docker պատկերները կարելի է մաքրել"
     },
     "AZ": {
       "Game Server Connections": "Oyun serveri bağlantıları",
@@ -158031,7 +158079,8 @@
       "Redirecting to the full console in": "Tam konsola yönləndirilir",
       "Saved Privately on Server": "Şəxsi olaraq Serverdə Saxlanılır",
       "More": "Daha çox",
-      "Less": "Daha az"
+      "Less": "Daha az",
+      "Unused Docker images can be cleaned": "İstifadə olunmayan Docker təsvirləri təmizlənə bilər"
     },
     "KK": {
       "Game Server Connections": "Ойын серверінің қосылымдары",
@@ -161255,7 +161304,8 @@
       "Redirecting to the full console in": "Толық консольге қайта бағытталуда",
       "Saved Privately on Server": "Серверде жеке сақталады",
       "More": "Көбірек",
-      "Less": "Азырақ"
+      "Less": "Азырақ",
+      "Unused Docker images can be cleaned": "Пайдаланылмайтын Docker бейнелерін тазалауға болады"
     },
     "UZ": {
       "Game Server Connections": "O‘yin serveri ulanishlari",
@@ -164479,7 +164529,8 @@
       "Redirecting to the full console in": "Toʻliq konsolga yoʻnaltirilmoqda",
       "Saved Privately on Server": "Serverda shaxsiy saqlangan",
       "More": "Ko‘proq",
-      "Less": "Kamroq"
+      "Less": "Kamroq",
+      "Unused Docker images can be cleaned": "Ishlatilmayotgan Docker tasvirlarini tozalash mumkin"
     },
     "CA": {
       "Game Server Connections": "Connexions dels servidors de joc",
@@ -167703,7 +167754,8 @@
       "Redirecting to the full console in": "S'està redirigint a la consola completa",
       "Saved Privately on Server": "Desat de manera privada al servidor",
       "More": "Més",
-      "Less": "Menys"
+      "Less": "Menys",
+      "Unused Docker images can be cleaned": "Es poden netejar les imatges Docker que no s’utilitzen"
     },
     "AF": {
       "Game Server Connections": "Speletjiebedienerverbindings",
@@ -170927,7 +170979,8 @@
       "Redirecting to the full console in": "Herlei tans na die volledige konsole in",
       "Saved Privately on Server": "Privaat op bediener gestoor",
       "More": "Meer",
-      "Less": "Minder"
+      "Less": "Minder",
+      "Unused Docker images can be cleaned": "Ongebruikte Docker-beelde kan skoongemaak word"
     },
     "SW": {
       "Game Server Connections": "Miunganisho ya Seva za Mchezo",
@@ -174151,7 +174204,8 @@
       "Redirecting to the full console in": "Inaelekeza kwenye kiweko kamili ndani",
       "Saved Privately on Server": "Imehifadhiwa Faragha kwenye Seva",
       "More": "Zaidi",
-      "Less": "Chache"
+      "Less": "Chache",
+      "Unused Docker images can be cleaned": "Taswira za Docker zisizotumika zinaweza kuondolewa"
     }
   }
 }

@@ -30,7 +30,7 @@ const simpleOperations = {
   ports: ["ports"],
   doctor: ["doctor"],
   networkBindFix: ["network", "fix"],
-  storageCleanupImages: ["storage", "cleanup"],
+  storageCleanupImages: ["storage", "cleanup", "--unused-images"],
   storageCleanupBuildCache: ["storage", "cleanup", "--build-cache"],
   start: ["start"],
   stop: ["stop"],

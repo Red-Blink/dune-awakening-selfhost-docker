@@ -801,7 +801,7 @@ async function handleApi(req, res) {
   if (path === "/api/server/doctor") return safeCommandJson(res, "doctor");
   if (path === "/api/server/network-bind/fix" && req.method === "POST") return task(req, res, "server", "networkBindFix", {});
   if (path === "/api/server/storage/cleanup-images" && req.method === "POST") {
-    return confirmedTask(req, res, "storage", "storageCleanupImages", {}, "CLEAN OBSOLETE DUNE IMAGES");
+    return confirmedTask(req, res, "storage", "storageCleanupImages", {}, "CLEAN UNUSED DOCKER IMAGES");
   }
   if (path === "/api/server/storage/cleanup-build-cache" && req.method === "POST") {
     return confirmedTask(req, res, "storage", "storageCleanupBuildCache", {}, "CLEAN DOCKER BUILD CACHE");

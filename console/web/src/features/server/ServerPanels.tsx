@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { HomeHighlights } from "./HomeHighlights";
 import type { Dispatch, SetStateAction } from "react";
 import type { Tab } from "../../App";
@@ -21,6 +21,20 @@ import { childAccessPieceCount, usePendingQueues } from "../../lib/usePendingRef
 export type HomeLoadResult = { statusLoaded: boolean; readinessLoaded: boolean; statusError: string; readinessError: string; statusText: string; readinessText: string; sampledAtMs: number };
 export type HomeTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
 export type StorageCleanupOperation = "" | "images" | "build-cache";
+
+function storageCleanupReportLines(details: string) {
+  const lines = details.split(/\r?\n/).filter((line) => line.startsWith("STORAGE_RESULT ")).map((line) => line.slice(15));
+  const images = lines.find((line) => /^(?:OK\s+(?:No obsolete project-owned Docker images found|No unused Docker images eligible for cleanup)|WARN Docker has \d+ (?:obsolete project-owned|unused) image\(s\) that can be cleaned(?: \(up to [0-9.]+[A-Za-z]+\))?)$/.test(line));
+  const cache = lines.find((line) => /^(?:OK\s+Reclaimable Docker build cache: .+|WARN Docker has .+ of reclaimable build cache)$/.test(line));
+  return images && cache ? [images, cache] : [];
+}
+
+export function applyStorageCleanupReport(previous: string, details: string) {
+  const report = storageCleanupReportLines(details);
+  if (!report.length) return previous;
+  const otherLines = previous.split(/\r?\n/).filter((line) => !/^(?:OK|WARN)\s+(?:Docker has .*?(?:reclaimable images|obsolete project-owned image|unused image|of reclaimable build cache)|No obsolete project-owned Docker images found|No unused Docker images eligible for cleanup|Reclaimable Docker build cache:)/.test(line.trim()));
+  return [...otherLines, ...report].join("\n");
+}
 export type RestartLifecycleState = { stopObserved: boolean; startObserved: boolean };
 
 // A stop alone leaves refills queued -- stop-all.sh removes the Postgres
@@ -875,7 +889,7 @@ export function ServerPanel(props: {
   status: string;
   setReadiness: (text: string) => void;
   setPorts: (text: string) => void;
-  setDoctor: (text: string) => void;
+  setDoctor: Dispatch<SetStateAction<string>>;
   ports: string;
   readiness: string;
   doctor: string;
@@ -919,6 +933,16 @@ export function ServerPanel(props: {
   const controlRestartLifecycle = useRef<RestartLifecycleState>(createRestartLifecycleState());
   const serviceRestartRunId = useRef(0);
   const doctorRequestId = useRef(0);
+  useLayoutEffect(() => {
+    const details = storageCleanupResult?.details || "";
+    if (storageCleanupResult?.status !== "succeeded" || !storageCleanupReportLines(details).length) return;
+    // Runs before painting success, including when a cleanup finishes while
+    // this page is away. An older in-flight Doctor response must not undo it.
+    doctorRequestId.current += 1;
+    props.setDoctor((previous) => applyStorageCleanupReport(previous, details));
+    setDoctorLoading(false);
+    setDoctorError("");
+  }, [storageCleanupResult, props.setDoctor]);
   const { taskResult, setTaskResult, funcomTokenResult, setFuncomTokenResult, runningAction, setRunningAction, confirmAction, restartGate } = props;
   const actionRunning = Boolean(runningAction);
   const serviceRestartRunning = serviceRestartResult?.status === "running";
@@ -1078,9 +1102,9 @@ export function ServerPanel(props: {
     const confirmed = await confirmAction(
       buildCache
         ? "Remove all unused Docker build cache? This does not remove running containers, images, volumes, databases, game files, or backups. Docker protects cache used by active builds. Build cache is shared across this Docker host, and future image rebuilds may take longer after cleanup."
-        : "Remove obsolete Dune/Funcom and old Dune Docker Console images? Current images, images used by any container, volumes, databases, game files, and backups are protected. Unrelated Docker images are not removed.",
+        : "Remove unused images across this Docker host, including old game builds, development tools, and other projects' unused images? Images used by running or stopped containers and configured startup images are protected. Containers, volumes, databases, game files, and backups are not removed. Future builds may need to rebuild or download removed images.",
       {
-        title: buildCache ? "Clean Docker Build Cache?" : "Clean Obsolete Dune Images?",
+        title: buildCache ? "Clean Docker Build Cache?" : "Clean Images",
         confirmLabel: buildCache ? "Clean Build Cache" : "Clean Images",
         cancelLabel: "Cancel",
         danger: true
@@ -1091,19 +1115,20 @@ export function ServerPanel(props: {
     setStorageCleanupOperation(operation);
     setStorageCleanupResult({
       status: "running",
-      title: buildCache ? "Cleaning Docker Build Cache" : "Cleaning Obsolete Dune Images",
-      message: buildCache ? "Removing unused Docker build cache." : "Removing obsolete project-owned images while protecting current and in-use images."
+      title: buildCache ? "Cleaning Docker Build Cache" : "Clean Images",
+      message: buildCache ? "Removing unused Docker build cache." : "Cleaning..."
     });
     props.onError("");
     try {
       const response = buildCache ? await serverApi.cleanupDockerBuildCache() : await serverApi.cleanupDockerImages();
       const final = await waitForTaskSilently(response.task, 3600);
       const details = taskTechnicalDetails(final);
+      const verified = final.status === "succeeded" && storageCleanupReportLines(details).length > 0;
       setStorageCleanupResult(final.status === "succeeded"
         ? {
             status: "succeeded",
-            title: buildCache ? "Build Cache Cleaned" : "Obsolete Images Cleaned",
-            message: buildCache ? "Unused Docker build cache was cleaned." : "Obsolete Dune images were cleaned. Protected and unrelated images were left intact.",
+            title: buildCache ? "Build Cache Cleaned" : "Clean Images",
+            message: buildCache ? "Unused Docker build cache was cleaned." : "Action completed.",
             details
           }
         : {
@@ -1112,7 +1137,7 @@ export function ServerPanel(props: {
             message: "Review the task details before trying again.",
             details
           });
-      void loadControlStatus(true).catch(() => null);
+      void loadControlStatus(!verified).catch(() => null);
     } catch (error) {
       setStorageCleanupResult({
         status: "failed",
@@ -1779,9 +1804,9 @@ function doctorAdvice(issue: string) {
     status: "WARN"
   };
   if (isDockerImageCleanupIssue(issue)) return {
-    title: "Obsolete Docker images can be cleaned",
+    title: "Unused Docker images can be cleaned",
     message: clean,
-    nextStep: "Clean Images removes obsolete project-owned images while protecting current, in-use, and unrelated images.",
+    nextStep: "Clean Images removes unused images across this Docker host, including development images. Container and startup images are protected.",
     status: "WARN"
   };
   if (isDockerBuildCacheCleanupIssue(issue)) return {
@@ -1803,7 +1828,7 @@ function isPublicIpBindIssue(issue: string) {
 }
 
 function isDockerImageCleanupIssue(issue: string) {
-  return /Docker has .*reclaimable images|obsolete project-owned image/i.test(issue);
+  return /Docker has .*reclaimable images|obsolete project-owned image|unused image\(s\)/i.test(issue);
 }
 
 function isDockerBuildCacheCleanupIssue(issue: string) {
