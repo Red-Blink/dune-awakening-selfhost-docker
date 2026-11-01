@@ -266,7 +266,10 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
 
   function applyHomeLoadResult(result: HomeLoadResult) {
     const loaded = result.statusLoaded || result.readinessLoaded;
-    if (loaded) setHasLoaded(true);
+    if (loaded) {
+      setHasLoaded(true);
+      setLocalError("");
+    }
     // Only a successful read moves the clock. A failed poll leaves the old
     // sample time in place, so its age keeps growing and eventually reads as
     // stale on its own -- no failure counter needed.
@@ -1746,7 +1749,7 @@ function DoctorSummary({ text, readiness, loading, error, onFixBinding, onCleanu
   const info = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^INFO\s+/i.test(line)).slice(0, 3);
   return <section className="action-section doctor-section">
     <div className="panel-title"><h4>Doctor Diagnostics</h4></div>
-    {loading ? <p className="loading-dots">Checking diagnostics</p> : error ? <p className="error">{error}</p> : text ? <p>{issues.length ? `${issues.length} diagnostic item${issues.length === 1 ? "" : "s"} need attention.` : "Doctor diagnostics look healthy."}</p> : <p>Doctor diagnostics have not loaded yet.</p>}
+    {loading ? <p className="loading-dots">Scanning</p> : error ? <p className="error">{error}</p> : text ? <p>{issues.length ? `${issues.length} diagnostic item${issues.length === 1 ? "" : "s"} need attention.` : "Doctor diagnostics look healthy."}</p> : <p>Doctor diagnostics have not loaded yet.</p>}
     {issues.length > 0 && <div className="check-grid">{issues.map((issue, index) => {
       const advice = doctorAdvice(issue);
       const canFixBinding = isPublicIpBindIssue(issue);

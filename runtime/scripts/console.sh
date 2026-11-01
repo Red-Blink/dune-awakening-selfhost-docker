@@ -112,7 +112,9 @@ restart_console() {
   echo "Rebuilding Dune Docker Console..."
   COMPOSE_PROJECT_NAME="$PROJECT_NAME" DUNE_COMPOSE_PROJECT_NAME="$MAIN_PROJECT_NAME" DUNE_HOST_REPO_ROOT="$HOST_ROOT" docker compose -f "$WEB_COMPOSE" build "$WEB_SERVICE"
   if [ -x runtime/scripts/start-coriolis-coordinator.sh ]; then
-    runtime/scripts/start-coriolis-coordinator.sh --replace-if-stack-running || {
+    # A recovery may be executing inside the coordinator. A Console rebuild
+    # must reuse it, not kill that recovery by replacing its container.
+    runtime/scripts/start-coriolis-coordinator.sh --if-stack-running || {
       echo "Warning: the Coriolis Coordinator could not be started after the Console deployment." >&2
     }
   fi

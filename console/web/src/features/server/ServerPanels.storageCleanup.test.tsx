@@ -73,6 +73,7 @@ describe("storage cleanup navigation", () => {
     mocks.doctor.mockImplementationOnce(() => new Promise(() => {}));
     await act(async () => { render(<Harness />); });
     expect(mocks.setStatus).toHaveBeenCalledWith("");
+    expect(screen.getByText("Scanning")).toHaveClass("loading-dots");
   });
   it.each(["succeeded", "failed"])("keeps the running task and its %s result across page changes", async (status) => {
     vi.useFakeTimers();
