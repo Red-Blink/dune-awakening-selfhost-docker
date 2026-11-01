@@ -29,6 +29,7 @@ const ALLOWED_ADDON_PERMISSIONS = new Set([
   "players:message",
   "server:status",
   "server:restart",
+  "realtime:read",
   "files:addon-data",
   "broadcast:send",
   "scheduler:server"
