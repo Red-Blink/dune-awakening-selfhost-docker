@@ -15,6 +15,7 @@ the preview code and continues using the normal authentication and API flow.
 
 When updating the interface or API contracts, update the fictional fixtures and
 test every preview page, language switching, and blocked mutations before publishing.
-Run `npm run test:preview` after building. As with the other browser checks,
+Run `npm run check:preview-seo` to test the generated search and share metadata
+(titles, descriptions and crawler files), and `npm run test:preview` after building. As with the other browser checks,
 `PLAYWRIGHT_MODULE` and `CHROMIUM_PATH` can select an existing browser installation;
 `PREVIEW_DIST` can select a different build directory. All test traffic stays local.

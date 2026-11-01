@@ -1,5 +1,12 @@
 # Frequently Asked Questions
 
+**Status:** Current | **Last Updated:** November 2026
+
+Variables such as `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DUNE_POST_*` and
+`DUNE_SCHEDULER_INTERVAL_MS` are bot-side: they belong to the external bot
+([repository](https://github.com/yacketrj/dune-awakening-selfhost-discordbot)),
+not to the console.
+
 ## General
 
 **Q: What is this bot for?**
@@ -56,9 +63,9 @@ Regular members with the Observer role can only use read-only commands.
 
 **Q: What does "diagnostic mode" mean?**
 
-Adding `diagnostic:true` to `/dune server status` or `/dune server readiness`
-shows detailed technical output — similar to running `dune status` on the
-command line. Only available to admins.
+Adding `diagnostic:true` to `/dune server status` shows detailed technical
+output — similar to running `dune status` on the command line. Only available to
+admins (the console's `/status` route is the only one with a diagnostic flag).
 
 ---
 
@@ -135,9 +142,12 @@ directory has 0600 permissions and is gitignored.
 
 **Q: Can the bot do anything destructive?**
 
-No. All commands are read-only by default. Write commands like broadcast are
-behind `DUNE_DISCORD_WRITES_ENABLED=true` which is off by default. The bot
-has no access to the Docker socket, database, or game files.
+Not to game data. Most commands are read-only. The exceptions are player
+linking (`/dune player link`), which records a Discord-to-character link in the
+console's own tables and whispers a verification code to the online player, and
+broadcast, which is behind the console's `DUNE_DISCORD_WRITES_ENABLED=true` and is
+off by default. The bot has no access to the Docker socket, database, or game
+files.
 
 **Q: Does the bot see my Discord messages?**
 
@@ -165,14 +175,17 @@ Use `DISCORD_GUILD_ID` for instant registration.
 
 **Q: I get "not authorized" on commands I should have access to.**
 
-Check that your Discord role ID matches the IDs in the `.env` file under
-`DISCORD_OBSERVER_ROLE_IDS` or `DISCORD_ADMIN_ROLE_IDS`.
+Check that your Discord role ID matches the IDs in both the bot's `.env` and
+the console's `.env` under `DISCORD_OBSERVER_ROLE_IDS`,
+`DISCORD_MODERATOR_ROLE_IDS`, `DISCORD_ADMIN_ROLE_IDS` or
+`DISCORD_OWNER_ROLE_IDS`. Several commands (population, maps, player link and
+inventory) need the Moderator tier.
 
 For a full troubleshooting guide, see [Troubleshooting](troubleshooting.md).
 
 ## Sources
 
 - [Admin Guide](admin-guide.md) — full server setup instructions
-- [User Guide](../discord-control-bot/user-guide.md) — how to use all commands
+- [Adapter README](README.md) — console-side routes, tiers and the live command catalog
 - [Troubleshooting](troubleshooting.md) — error messages and fixes
 - [Configuration Reference](admin-guide.md#step-10-create-the-configuration-file) — all settings explained

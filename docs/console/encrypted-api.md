@@ -1,6 +1,6 @@
 # Encrypted API access
 
-**Status:** Optional | **Last Updated:** October 2026
+**Status:** Optional | **Last Updated:** November 2026
 
 ## Safe Upgrade and Console Access
 
@@ -89,7 +89,7 @@ further. The forwarding key stays alongside the TLS key and is not an API key.
 
 | Variable (`runtime/generated/tls-front.env`) | Default | Meaning |
 |---|---|---|
-| `DUNE_TLS_FRONT_ENABLED` | `true` after a new install | start it |
+| `DUNE_TLS_FRONT_ENABLED` | `false` (set to `true` by `dune encrypted-api enable`, the Settings switch, or `DUNE_ENCRYPTED_API=1` at install) | start it |
 | `DUNE_TLS_FRONT_PORT` | `8797` | TCP port on the host |
 | `DUNE_TLS_FRONT_BIND` | `0.0.0.0` | interface |
 | `DUNE_TLS_FRONT_NAMES` | empty | host names / IPs for the certificate (only browsers look at them; tools pin the key) |

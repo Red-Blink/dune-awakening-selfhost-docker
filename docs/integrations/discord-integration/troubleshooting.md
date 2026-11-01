@@ -1,5 +1,12 @@
 # Troubleshooting
 
+**Status:** Current | **Last Updated:** November 2026
+
+Container names such as `dune-discord-bot` and variables such as
+`DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_RBAC_MODE`,
+`DUNE_CONSOLE_API_URL` and `DUNE_POST_*` are bot-side: they belong to the
+external bot, not the console.
+
 Common issues, what they mean, and how to fix them.
 
 ## Discord Errors
@@ -31,9 +38,11 @@ but the bot wasn't there to answer it.
 
 **How to fix:**
 1. Check your role in the server
-2. Ask your server admin to add your role ID to `DISCORD_OBSERVER_ROLE_IDS`
-   or `DISCORD_ADMIN_ROLE_IDS` in the `.env` file
-3. The bot needs to be restarted after changing `.env`:
+2. Ask your server admin to add your role ID to `DISCORD_OBSERVER_ROLE_IDS`,
+   `DISCORD_MODERATOR_ROLE_IDS` or `DISCORD_ADMIN_ROLE_IDS` in both the bot's and
+   the console's `.env` (population, maps and player commands need Moderator)
+3. The bot needs to be restarted after changing its `.env`, and the console
+   after changing its own:
    ```bash
    docker restart dune-discord-bot
    ```
@@ -42,8 +51,8 @@ but the bot wasn't there to answer it.
 
 ### "Adapter request failed HTTP 503"
 
-**What it means:** The console's Discord adapter isn't configured or is
-missing a token.
+**What it means:** The console's Discord adapter has no token configured, or
+the token file is missing or empty.
 
 **How to fix:**
 1. Check that the console has the adapter enabled:
@@ -53,9 +62,11 @@ missing a token.
    Should show `DUNE_DISCORD_ADAPTER_ENABLED=true`
 2. Check that the token file exists:
    ```bash
-   docker exec redblink-dune-docker-console cat /repo/secrets/bot-api-token.txt
+   docker exec redblink-dune-docker-console cat /repo/runtime/secrets/bot-api-token.txt
    ```
-3. The bot's `DUNE_DISCORD_ADAPTER_TOKEN` must match this file's contents
+3. The bot's `DUNE_DISCORD_ADAPTER_TOKEN` must match this file's contents (or
+   the console's `DUNE_DISCORD_ADAPTER_TOKEN`, which takes precedence over the
+   file)
 
 ---
 
@@ -65,10 +76,10 @@ missing a token.
 isn't set at all.
 
 **How to fix:**
-Add to the console's `docker-compose.web.yml`:
-```yaml
-environment:
-  DUNE_DISCORD_ADAPTER_ENABLED: "true"
+Set this in the repo's `.env` (`docker-compose.web.yml` already forwards it, so
+do not add the key to the compose file again):
+```bash
+DUNE_DISCORD_ADAPTER_ENABLED=true
 ```
 Then rebuild and restart the console:
 ```bash

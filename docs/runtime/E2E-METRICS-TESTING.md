@@ -1,6 +1,6 @@
 # E2E Metrics Stack Testing
 
-**Status:** Current | **Last Updated:** August 2026
+**Status:** Current | **Last Updated:** November 2026
 
 This document describes the end-to-end validation procedure for the addon-supporting operational metrics stack.
 
@@ -214,7 +214,8 @@ Expected result:
 
 ```text
 Prometheus returns rule groups.
-Host, container, Postgres, RabbitMQ, and Dune stack rule groups are loaded.
+Host, container, Postgres, and RabbitMQ rule groups are loaded with rules.
+The `dune-stack` group is loaded but currently contains no rules.
 ```
 
 ## Metrics Query Validation
@@ -253,10 +254,12 @@ Inspect all metrics stack logs:
 bash runtime/scripts/dune metrics logs
 ```
 
-Inspect a specific service log:
+Inspect a specific service log (the argument is the Compose service name:
+`dune-prometheus`, `dune-node-exporter`, `dune-cadvisor` or
+`dune-postgres-exporter`):
 
 ```bash
-bash runtime/scripts/dune metrics logs prometheus
+bash runtime/scripts/dune metrics logs dune-prometheus
 ```
 
 Expected result:

@@ -1,6 +1,6 @@
 # World Model: Maps, Dimensions and Partitions
 
-**Status:** Observed — verified against game build 2117304-0-shipping (September 2026). Re-verify after a game update.
+**Status:** Observed — verified against game build 2168446-0-shipping (November 2026). Re-verify after a game update.
 
 The game addresses world space in three levels — **map**, **dimension**,
 **partition** — and every one of them is a column on a single table,
@@ -80,7 +80,7 @@ nothing has loaded it. `label` is set automatically by the
 
 ## 2. The catalog
 
-37 partitions on the verified build. This list drifts with every game update
+38 partitions on the verified build. This list drifts with every game update
 (and with DLC), so treat it as a snapshot, not a contract — regenerate it with
 `runtime/scripts/extract-partition-catalog.sh` (writes
 `runtime/generated/partition-catalog.json`), or directly:
@@ -151,6 +151,12 @@ single `1x1` box.
 | `DLC_Story_LostHarvest_EcolabA` | LostHarvest_EcolabA_0 |
 | `DLC_Story_LostHarvest_EcolabB` | LostHarvest_EcolabB_0 |
 | `DLC_Story_LostHarvest_ForgottenLab` | LostHarvest_ForgottenLab_0 |
+
+**Event maps**
+
+| Map | Label |
+|---|---|
+| `CB_Halloween_Event_Shipwreck_01` | Halloween2026Shipwreck_0 |
 
 **Sietch / story rooms**
 

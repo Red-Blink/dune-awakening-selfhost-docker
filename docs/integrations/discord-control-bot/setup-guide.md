@@ -1,11 +1,12 @@
 # Dune Discord Companion Bot - Setup Guide
 
-**Status:** Current | **Last Updated:** July 2026
+**Status:** Historical record — describes an early prototype of the companion bot, which is not in this repository. Not maintained.
 
-> **Which Discord docs do I want?** This folder (`discord-control-bot/`) is the
-> **internal** set — the adapter contract, command surface, and bot-side reference.
-> If you are a server owner setting up Discord, start with the operator-facing
-> [`discord-integration/`](../discord-integration/README.md) instead.
+> If you are a server owner setting up Discord, use
+> [`discord-integration/README.md`](../discord-integration/README.md) instead. The
+> `discord-bot/` directory, the repository-root `scripts/` helpers and `npm run start:discord-adapter` /
+> `smoke:*` commands below are not part of this repository; the adapter runs inside
+> the console when `DUNE_DISCORD_ADAPTER_ENABLED=true`.
 
 ## Scope
 
