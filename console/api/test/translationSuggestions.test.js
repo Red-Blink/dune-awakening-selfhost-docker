@@ -1,14 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,rmSync,readFileSync,statSync,readdirSync} from 'node:fs';
+import {mkdtempSync,rmSync,readFileSync,statSync,readdirSync,writeFileSync,utimesSync,renameSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {createPublicKey,verify} from 'node:crypto';
+import {createPublicKey,verify,generateKeyPairSync} from 'node:crypto';
 import {submitTranslationCorrection} from '../src/services/translationSuggestions.js';
 import {validateCorrection,submissionMessage} from '../src/services/translationContract.js';
 import {applyReviewedCorrections,handleI18nRoute,isSafeReviewedTranslation,SUPPORTED_LANGUAGES,getReviewedSourcePhrases} from '../src/services/i18nService.js';
 import {evaluate} from '../src/policy.js';
 const catalog={languages:[{code:'DE'}],sourceStrings:['Home','{count0} of {count1}']};
+test('same-size, same-mtime identity replacement invalidates the signing-key cache',async t=>{
+  const dir=mkdtempSync(join(tmpdir(),'translation-identity-rotation-'));
+  t.after(()=>rmSync(dir,{recursive:true,force:true}));
+  const file=join(dir,'translation-contributor-key.pem');
+  const pem=()=>generateKeyPairSync('ed25519').privateKey.export({type:'pkcs8',format:'pem'});
+  const stamp=new Date('2026-01-01T00:00:00Z');
+  writeFileSync(file,pem(),{mode:0o600});utimesSync(file,stamp,stamp);
+  const bodies=[];
+  const fetchImpl=async(_url,options)=>{const body=JSON.parse(options.body);bodies.push(body);assert.ok(verify(null,Buffer.from(submissionMessage(body)),createPublicKey({key:Buffer.from(body.publicKey,'base64'),format:'der',type:'spki'}),Buffer.from(body.signature,'base64')));return {ok:true,json:async()=>({id:body.id})};};
+  const submit=()=>submitTranslationCorrection({lang:'DE',source:'Home',translation:'Start'}, {secretsDir:dir}, catalog, {fetchImpl});
+  await submit();
+  const original=statSync(file),replacement=join(dir,'replacement.pem');
+  writeFileSync(replacement,pem(),{mode:0o600});utimesSync(replacement,stamp,stamp);renameSync(replacement,file);
+  assert.equal(statSync(file).size,original.size);assert.equal(statSync(file).mtimeMs,original.mtimeMs);
+  await submit();assert.notEqual(bodies[0].publicKey,bodies[1].publicKey);
+});
 test('only reviewed phrases with intact placeholders can be submitted',()=>{
   for(const input of [{lang:'DE',source:'Private Player Name',translation:'Name'},{lang:'DE',source:'Home',translation:'<script>x</script>'},{lang:'EN',source:'Home',translation:'Home'},{lang:'DE',source:'{count0} of {count1}',translation:'Missing count'}])assert.throws(()=>validateCorrection(input,catalog));
   assert.equal(validateCorrection({lang:'DE',source:'{count0} of {count1}',translation:'{count0} von {count1}'},catalog).translation,'{count0} von {count1}');
