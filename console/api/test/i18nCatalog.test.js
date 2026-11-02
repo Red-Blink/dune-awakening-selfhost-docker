@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   SEED_DB_PATH, SUPPORTED_LANGUAGES, getReviewedSourcePhrases, loadTranslationDatabase,
   resetTranslationDatabaseCache, callNeuralFallbackBatch, callDeepLTranslateBatch,
@@ -82,10 +82,13 @@ test("every bundled translation survives loading; new reviewed phrases remain el
     // translations keep their English UI text; never fabricate cached English
     // entries merely to make this catalog look completely translated.
     const bundled = seed.translations[language.code];
+    const reviewedFile = join(dirname(SEED_DB_PATH), 'i18n-reviewed', `${language.code}.json`);
+    const reviewed = existsSync(reviewedFile) ? JSON.parse(readFileSync(reviewedFile)) : {};
     assert.ok(Object.keys(bundled).length > 100, `${language.code}: bundled dictionary missing`);
     for (const [source, translated] of Object.entries(bundled)) {
       if (isSafeReviewedTranslation(source, translated)) {
-        assert.equal(db.translations[language.code]?.[source], translated, `${language.code}: ${source}`);
+        const expected = isSafeReviewedTranslation(source, reviewed[source]) ? reviewed[source] : translated;
+        assert.equal(db.translations[language.code]?.[source], expected, `${language.code}: ${source}`);
       }
     }
   }

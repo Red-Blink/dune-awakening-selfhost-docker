@@ -9,10 +9,12 @@ import { createApiKeyStore } from "../src/apiKeys.js";
 import { loadPolicies } from "../src/policy.js";
 import {
   ENCRYPTION_METADATA,
+  MAX_SEEN_MESH_NONCES,
   SEED_DB_PATH,
+  applyReviewedCorrections,
   callDeepLTranslateBatch,
   callNeuralFallbackBatch,
-  computeZeroKnowledgePeerToken,
+  consumeMeshReplayNonce,
   createDuneDockerMeshHeaders,
   createDuneDockerMeshResponseSignature,
   createMeshDiscoveryBeacon,
@@ -22,6 +24,7 @@ import {
   encryptMeshWireEnvelope,
   generateMeshEnrollmentSecret,
   getLanguageCatalogStatus,
+  getReviewedSourcePhrases,
   handleI18nRoute,
   isI18nRoute,
   isReviewedUiPhrase,
@@ -36,6 +39,8 @@ import {
   saveEncryptedDeepLApiKey,
   saveMeshSettings,
   saveTranslationDatabase,
+  setSeedLanguageSliceOverride,
+  syncAllDatabaseLanguages,
   syncLanguagePacksFromPeers,
   translateAndCacheTexts,
   verifyDuneDockerMeshHeaders,
@@ -46,10 +51,43 @@ function sha256File(filePath) {
   return crypto.createHash("sha256").update(readFileSync(filePath)).digest("hex");
 }
 
+test('cached vault plaintext is invalidated when the master key changes', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'i18n-master-rotation-'));
+  const previous = process.env.DEEPL_VAULT_MASTER_KEY;
+  t.after(() => {
+    if (previous === undefined) delete process.env.DEEPL_VAULT_MASTER_KEY;
+    else process.env.DEEPL_VAULT_MASTER_KEY = previous;
+    resetTranslationDatabaseCache(); rmSync(dir, { recursive: true, force: true });
+  });
+  const config = { generatedDir: dir, secretsDir: join(dir, 'secrets') };
+  process.env.DEEPL_VAULT_MASTER_KEY = 'synthetic-master-a'.repeat(4);
+  saveEncryptedDeepLApiKey('synthetic-provider-key:fx', config);
+  assert.equal(decryptDeepLApiKey(config), 'synthetic-provider-key:fx');
+  process.env.DEEPL_VAULT_MASTER_KEY = 'synthetic-master-b'.repeat(4);
+  assert.equal(decryptDeepLApiKey(config), '');
+  process.env.DEEPL_VAULT_MASTER_KEY = 'synthetic-master-a'.repeat(4);
+  assert.equal(decryptDeepLApiKey(config), 'synthetic-provider-key:fx');
+});
+
+test('saving a deleted lazy language does not restore its old runtime overlay', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'i18n-overlay-delete-'));
+  t.after(() => { resetTranslationDatabaseCache(); rmSync(dir, { recursive: true, force: true }); });
+  const config = { generatedDir: dir, secretsDir: join(dir, 'secrets') };
+  resetTranslationDatabaseCache();
+  const db = loadTranslationDatabase(config);
+  db.translations.FR = { Home: 'Accueil de test' };
+  saveTranslationDatabase(config, db);
+  assert.ok(JSON.parse(readFileSync(runtimeDbPath(config))).translations.FR);
+  delete db.translations.FR;
+  saveTranslationDatabase(config, db);
+  assert.equal(JSON.parse(readFileSync(runtimeDbPath(config))).translations.FR, undefined);
+});
+
 function createMockHttpCall({ method = "GET", path = "/api/i18n/languages", headers = {}, body = {} }) {
   const url = new URL(path, "http://localhost");
   let statusCode = 200;
   let responseBody = null;
+  let responseHeaders = {};
   const req = {
     method,
     url: path,
@@ -58,19 +96,33 @@ function createMockHttpCall({ method = "GET", path = "/api/i18n/languages", head
   };
   const res = {
     req,
-    writeHead(code) {
+    writeHead(code, hdrs = {}) {
       statusCode = code;
+      responseHeaders = { ...responseHeaders, ...hdrs };
     },
     end(payload) {
-      responseBody = typeof payload === "string" ? JSON.parse(payload) : payload;
+      if (payload !== undefined) {
+        responseBody = typeof payload === "string" ? JSON.parse(payload) : payload;
+      }
     }
   };
-  const json = (_res, code, data) => {
+  const json = (_res, code, data, hdrs = {}) => {
     statusCode = code;
     responseBody = data;
+    responseHeaders = { ...responseHeaders, ...hdrs };
   };
   const readJson = async () => body;
-  return { req, res, url, path: url.pathname, json, readJson, getStatus: () => statusCode, getBody: () => responseBody };
+  return {
+    req,
+    res,
+    url,
+    path: url.pathname,
+    json,
+    readJson,
+    getStatus: () => statusCode,
+    getBody: () => responseBody,
+    getHeaders: () => responseHeaders
+  };
 }
 
 test("encryptDeepLApiKey and saveEncryptedDeepLApiKey store and decrypt AES-256-GCM vault in config.generatedDir", () => {
@@ -642,4 +694,337 @@ test("Dune-Docker Mesh mutual attestation, SSRF origin normalization, discovery 
   const status = getLanguageCatalogStatus({ generatedDir: join(tmpdir(), "dune-status-check") });
   assert.ok(status.encryptionAlgorithm.includes(ENCRYPTION_METADATA.alg.toUpperCase()));
   assert.ok(isI18nRoute("/api/i18n/languages"));
+});
+
+test("Cycling all 53 languages via public GET /api/i18n/translations does not pin dictionaries in __materialized and supports 304 ETag", async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "dune-i18n-bounded-lru-"));
+  try {
+    resetTranslationDatabaseCache();
+    const config = {
+      generatedDir: join(tempDir, "generated"),
+      secretsDir: join(tempDir, "secrets")
+    };
+    const db = loadTranslationDatabase(config);
+    assert.equal(Object.keys(db.translations.__materialized).length, 0);
+    const catalogLanguages = getLanguageCatalogStatus(config).languages;
+    assert.equal(catalogLanguages.length, 54);
+
+    for (const lang of catalogLanguages) {
+      const getCall = createMockHttpCall({
+        method: "GET",
+        path: `/api/i18n/translations?lang=${encodeURIComponent(lang.code)}`
+      });
+      await handleI18nRoute({ ...getCall, config });
+      assert.equal(getCall.getStatus(), 200);
+      assert.equal(getCall.getBody().lang, lang.code);
+      assert.ok(getCall.getBody().translatedCount > 0);
+
+      const etag = getCall.getHeaders().etag;
+      assert.ok(etag, `Expected ETag header for lang=${lang.code}`);
+      const conditionalCall = createMockHttpCall({
+        method: "GET",
+        path: `/api/i18n/translations?lang=${encodeURIComponent(lang.code)}`,
+        headers: { "if-none-match": etag }
+      });
+      await handleI18nRoute({ ...conditionalCall, config });
+      assert.equal(conditionalCall.getStatus(), 304);
+    }
+
+    // Even after reading all 53 non-EN languages + EN via the public endpoint, __materialized stays at 0 entries!
+    assert.equal(Object.keys(db.translations.__materialized).length, 0);
+
+    // Submitting or probing POST /api/i18n/suggestions across multiple languages also keeps __materialized at 0
+    for (const code of ["DE", "FR", "ES", "JA", "KO", "PL"]) {
+      const suggestCall = createMockHttpCall({
+        method: "POST",
+        path: "/api/i18n/suggestions",
+        headers: { "x-csrf-token": "csrf-tok" },
+        body: { lang: code, source: "Home", translation: "Start", credit: "Tester" }
+      });
+      suggestCall.req.authSession = { id: "s1", csrf: "csrf-tok", tier: "observer" };
+      await handleI18nRoute({
+        ...suggestCall,
+        config,
+        fetchImpl: async (_url, opts) => {
+          const parsed = JSON.parse(opts.body);
+          return { ok: true, json: async () => ({ id: parsed.id, reference: "TR-999999" }) };
+        }
+      });
+      assert.equal(suggestCall.getStatus(), 201);
+    }
+    assert.equal(Object.keys(db.translations.__materialized).length, 0);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("In-place replacement of an existing reviewed translation invalidates sanitizedLangCache across saves and corrections", async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "dune-i18n-cache-invalidation-"));
+  try {
+    resetTranslationDatabaseCache();
+    const config = {
+      generatedDir: join(tempDir, "generated"),
+      secretsDir: join(tempDir, "secrets")
+    };
+    const db = loadTranslationDatabase(config);
+
+    // 1. Set a safe reviewed French phrase, save, and GET /api/i18n/translations?lang=FR
+    db.translations.FR.Home = "Accueil Version 1";
+    saveTranslationDatabase(config, db);
+
+    const firstGet = createMockHttpCall({
+      method: "GET",
+      path: "/api/i18n/translations?lang=FR"
+    });
+    await handleI18nRoute({ ...firstGet, config });
+    assert.equal(firstGet.getStatus(), 200);
+    assert.equal(firstGet.getBody().lang, "FR");
+    assert.equal(firstGet.getBody().translations.Home, "Accueil Version 1");
+    const firstEtag = firstGet.getHeaders().etag;
+
+    // 2. Replace the exact same existing key in-place (same object identity & key count), save, and GET again
+    const dictIdentityBefore = db.translations.FR;
+    const keyCountBefore = Object.keys(db.translations.FR).length;
+    db.translations.FR.Home = "Accueil Version 2";
+    assert.equal(db.translations.FR, dictIdentityBefore);
+    assert.equal(Object.keys(db.translations.FR).length, keyCountBefore);
+    saveTranslationDatabase(config, db);
+
+    const secondGet = createMockHttpCall({
+      method: "GET",
+      path: "/api/i18n/translations?lang=FR"
+    });
+    await handleI18nRoute({ ...secondGet, config });
+    assert.equal(secondGet.getStatus(), 200);
+    assert.equal(secondGet.getBody().translations.Home, "Accueil Version 2");
+    assert.notEqual(secondGet.getHeaders().etag, firstEtag);
+
+    // 3. applyReviewedCorrections replacing the same key in-place also invalidates the cache immediately
+    const langsBeforeCall = createMockHttpCall({
+      method: "GET",
+      path: "/api/i18n/languages"
+    });
+    await handleI18nRoute({ ...langsBeforeCall, config });
+    const langsEtagBefore = langsBeforeCall.getHeaders().etag;
+
+    applyReviewedCorrections(db, { FR: { Home: "Accueil Version 3" } });
+    const thirdGet = createMockHttpCall({
+      method: "GET",
+      path: "/api/i18n/translations?lang=FR"
+    });
+    await handleI18nRoute({ ...thirdGet, config });
+    assert.equal(thirdGet.getStatus(), 200);
+    assert.equal(thirdGet.getBody().translations.Home, "Accueil Version 3");
+
+    const langsAfterCall = createMockHttpCall({
+      method: "GET",
+      path: "/api/i18n/languages",
+      headers: { "if-none-match": langsEtagBefore }
+    });
+    await handleI18nRoute({ ...langsAfterCall, config });
+    assert.equal(langsAfterCall.getStatus(), 200, "GET /api/i18n/languages ETag must change after in-memory applyReviewedCorrections");
+    assert.notEqual(langsAfterCall.getHeaders().etag, langsEtagBefore);
+    assert.equal(db.translations.__hasOverlay("FR"), true, "Runtime overlay closure must reflect saved translations after saveTranslationDatabase");
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("consumeMeshReplayNonce fails closed when replay table reaches MAX_SEEN_MESH_NONCES without evicting unexpired nonces", () => {
+  resetTranslationDatabaseCache();
+  const nowSec = 1_750_000_000;
+  const scope = "replay-saturation-scope";
+  const makeNonce = (idx) => idx.toString(16).padStart(32, "0");
+
+  // Fill the replay table to capacity with unexpired nonces
+  for (let i = 0; i < MAX_SEEN_MESH_NONCES; i += 1) {
+    assert.equal(
+      consumeMeshReplayNonce(scope, makeNonce(i), nowSec),
+      true,
+      `Expected nonce ${i} to be accepted before reaching capacity`
+    );
+  }
+
+  // Attempting to consume a new nonce while MAX_SEEN_MESH_NONCES unexpired entries are active must fail closed (false)
+  const overflowNonce = makeNonce(MAX_SEEN_MESH_NONCES + 1);
+  assert.equal(
+    consumeMeshReplayNonce(scope, overflowNonce, nowSec),
+    false,
+    "New nonce must be rejected (fail-closed) when replay table is full of unexpired nonces"
+  );
+
+  // Crucially, the earliest unexpired nonce (nonce 0) must NOT have been evicted and must still be rejected on replay
+  assert.equal(
+    consumeMeshReplayNonce(scope, makeNonce(0), nowSec + 10),
+    false,
+    "Earliest unexpired nonce must remain protected against replay while within its validity window"
+  );
+
+  // Once the 130-second window expires, expired entries are purged and new nonces are accepted again
+  assert.equal(
+    consumeMeshReplayNonce(scope, overflowNonce, nowSec + 131),
+    true,
+    "New nonce must be accepted after expired nonces are purged"
+  );
+});
+
+test("Partial or invalid seed language slice is not treated as 100% coverage in status, manifest, peer sync, or syncAllDatabaseLanguages", async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "dune-i18n-partial-seed-"));
+  try {
+    resetTranslationDatabaseCache();
+    const config = {
+      generatedDir: join(tempDir, "generated"),
+      secretsDir: join(tempDir, "secrets")
+    };
+    const allReviewed = getReviewedSourcePhrases();
+    assert.ok(allReviewed.length > 100);
+
+    // Simulate FR having a seed slice with only 1 valid reviewed phrase ("Home") and 1 invalid XSS entry ("Settings")
+    setSeedLanguageSliceOverride("FR", {
+      Home: "Accueil",
+      Settings: "<script>alert(1)</script>"
+    });
+
+    const db = loadTranslationDatabase(config);
+    assert.equal(Object.keys(db.translations.__materialized).length, 0);
+
+    // 1. getLanguageCatalogStatus must report actual validated coverage (1 phrase), NOT totalSourceStrings, without materializing FR
+    const status = getLanguageCatalogStatus(config);
+    assert.equal(Object.keys(db.translations.__materialized).length, 0);
+    const frStatus = status.languages.find((l) => l.code === "FR");
+    assert.ok(frStatus);
+    assert.equal(frStatus.translatedCount, 1);
+    assert.ok(frStatus.coveragePercent < 100);
+
+    // 2. GET /api/i18n/mesh/manifest must NOT advertise FR as a completed language (>= 95%) and must not materialize FR
+    const secret = generateMeshEnrollmentSecret();
+    saveMeshSettings(config, {
+      meshEnrollmentKey: secret,
+      peerSyncEnabled: true,
+      peers: ["http://192.168.1.77:8088"]
+    });
+    const manifestHeaders = createDuneDockerMeshHeaders(
+      "peer-checker-node",
+      "GET",
+      "/api/i18n/mesh/manifest",
+      "",
+      config,
+      ""
+    );
+    const manifestCall = createMockHttpCall({
+      method: "GET",
+      path: "/api/i18n/mesh/manifest",
+      headers: manifestHeaders
+    });
+    await handleI18nRoute({ ...manifestCall, config });
+    assert.equal(manifestCall.getStatus(), 200);
+    assert.equal(Object.keys(db.translations.__materialized).length, 0);
+    const manifestDecrypted = decryptMeshWireEnvelope(
+      manifestCall.getBody().envelope,
+      manifestHeaders["x-dune-docker-mesh-nonce"],
+      config
+    );
+    assert.equal(
+      manifestDecrypted.completedLanguages.includes("FR"),
+      false,
+      "Partial seed language FR must not be reported as completed in mesh manifest"
+    );
+    assert.equal(
+      manifestDecrypted.completedLanguages.includes("DE"),
+      true,
+      "Complete seed language DE must still be reported as completed in mesh manifest"
+    );
+
+    // 3. syncLanguagePacksFromPeers must NOT skip unmaterialized partial seed language FR
+    let peerPackRequestedForFr = false;
+    const peerNodeId = "remote-peer-node-1";
+    const peerFetch = async (urlStr, opts = {}) => {
+      const parsedUrl = new URL(urlStr);
+      const reqNonce = opts.headers?.["x-dune-docker-mesh-nonce"] || "";
+      if (parsedUrl.pathname === "/api/i18n/mesh/manifest") {
+        const attestation = createDuneDockerMeshResponseSignature(peerNodeId, reqNonce, "manifest", config);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            envelope: encryptMeshWireEnvelope(
+              {
+                nodeId: peerNodeId,
+                totalSourceStrings: allReviewed.length,
+                completedLanguages: ["FR"],
+                attestation
+              },
+              reqNonce,
+              config
+            )
+          })
+        };
+      }
+      if (parsedUrl.pathname === "/api/i18n/mesh/pack" && parsedUrl.searchParams.get("lang") === "FR") {
+        peerPackRequestedForFr = true;
+        const attestation = createDuneDockerMeshResponseSignature(peerNodeId, reqNonce, "FR", config);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            envelope: encryptMeshWireEnvelope(
+              {
+                nodeId: peerNodeId,
+                lang: "FR",
+                translations: {
+                  Home: "Accueil",
+                  Settings: "Paramètres"
+                },
+                attestation
+              },
+              reqNonce,
+              config
+            )
+          })
+        };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    };
+
+    const peerSyncResult = await syncLanguagePacksFromPeers(config, {
+      targetLang: "FR",
+      fetchImpl: peerFetch
+    });
+    assert.equal(peerPackRequestedForFr, true, "syncLanguagePacksFromPeers must request pack for partial seed language FR");
+    assert.equal(peerSyncResult.syncedLanguages.includes("FR"), true);
+    assert.equal(peerSyncResult.syncedPhrasesCount, 1);
+    assert.equal(db.translations.FR.Settings, "Paramètres");
+
+    // 4. syncAllDatabaseLanguages must NOT skip unmaterialized partial seed language ES
+    const esPartial = Object.fromEntries(
+      allReviewed.slice(0, allReviewed.length - 2).map((s) => [s, `[ES] ${s.replace(/[<>]/g, "")}`])
+    );
+    const missingTwo = allReviewed.slice(allReviewed.length - 2);
+    setSeedLanguageSliceOverride("ES", esPartial);
+    assert.equal(Object.prototype.hasOwnProperty.call(db.translations.__materialized, "ES"), false);
+
+    saveEncryptedDeepLApiKey("partial-seed-deepl-key:fx", config);
+    const syncedAll = await syncAllDatabaseLanguages(config, {
+      languages: ["ES"],
+      fetchImpl: async (_url, opts) => {
+        const body = JSON.parse(opts.body);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            translations: body.text.map((t) => ({ text: `[ES-Synced] ${t.replace(/[<>]/g, "")}` }))
+          })
+        };
+      }
+    });
+    assert.equal(syncedAll.languages.ES.translatedNow, 2);
+    assert.equal(syncedAll.languages.ES.remaining, 0);
+    assert.equal(syncedAll.languages.ES.totalCached, allReviewed.length);
+    for (const phrase of missingTwo) {
+      assert.equal(db.translations.ES[phrase], `[ES-Synced] ${phrase.replace(/[<>]/g, "")}`);
+    }
+  } finally {
+    resetTranslationDatabaseCache();
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 });
