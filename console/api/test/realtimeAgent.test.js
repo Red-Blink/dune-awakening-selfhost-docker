@@ -140,19 +140,28 @@ test("the setup is owner-only and not part of any API key scope", () => {
 
 // ---- HTTP routes against a real server (mock mode, no Docker) ----
 import { spawn } from "node:child_process";
+import { createServer } from "node:net";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve as resolvePath } from "node:path";
 
-test("routes: status answers, install without confirmation is refused, nothing runs", async () => {
+test("routes: status answers, install without confirmation is refused, nothing runs", { timeout: 30_000 }, async () => {
   const apiRoot = resolvePath(import.meta.dirname, "..");
-  const port = 27000 + (process.pid % 10000);
+  const port = await new Promise((resolvePort, reject) => {
+    const probe = createServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const chosen = probe.address().port;
+      probe.close((error) => error ? reject(error) : resolvePort(chosen));
+    });
+  });
   const base = `http://127.0.0.1:${port}`;
   const repoRoot = mkdtempSync(join(tmpdir(), "dune-realtime-agent-http-"));
   mkdirSync(join(repoRoot, "console/web/dist"), { recursive: true });
   const child = spawn(process.execPath, ["src/server.js"], {
     cwd: apiRoot,
     shell: false,
+    stdio: ["ignore", "ignore", "ignore"],
     env: {
       ...process.env,
       DUNE_DOCKER_DIR: repoRoot,
@@ -165,11 +174,19 @@ test("routes: status answers, install without confirmation is refused, nothing r
       ADMIN_STATIC_DIR: join(repoRoot, "console/web/dist")
     }
   });
+  let spawnError;
+  const exited = new Promise((resolveExit) => {
+    child.once("exit", resolveExit);
+    child.once("error", (error) => { spawnError = error; resolveExit(); });
+  });
   try {
+    let ready = false;
     for (let i = 0; i < 200; i += 1) {
-      try { if ((await fetch(`${base}/api/health`)).ok) break; } catch {}
+      try { ready = (await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(1000) })).ok; } catch {}
+      if (ready || child.exitCode !== null || spawnError) break;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
+    assert.equal(ready, true, `Test Console did not start (exit=${child.exitCode}, spawn=${spawnError?.code || "ok"})`);
     const get = await fetch(`${base}/api/settings/realtime-agent`);
     assert.equal(get.status, 200);
     const status = await get.json();
@@ -182,8 +199,13 @@ test("routes: status answers, install without confirmation is refused, nothing r
     assert.equal((await post({ enabled: true, confirmed: true })).status, 404); // setup files absent
     assert.equal((await post({ enabled: false })).status, 404);
   } finally {
-    child.kill("SIGTERM");
-    await new Promise((resolve) => { child.on("exit", resolve); setTimeout(() => { child.kill("SIGKILL"); resolve(); }, 3000).unref?.(); });
+    if (child.exitCode === null && child.signalCode === null && !spawnError) {
+      child.kill("SIGTERM");
+      const forceKill = setTimeout(() => child.kill("SIGKILL"), 3000);
+      try { await exited; } finally { clearTimeout(forceKill); }
+    } else {
+      await exited;
+    }
     rmSync(repoRoot, { recursive: true, force: true });
   }
 });
