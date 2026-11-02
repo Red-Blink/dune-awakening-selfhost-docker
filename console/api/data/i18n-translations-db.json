@@ -430,6 +430,7 @@
     "Buggy",
     "Build Cache Cleaned",
     "Build Cache Cleanup Failed",
+    "Build and Start",
     "Build recipe",
     "Building Pieces",
     "Building Set",
@@ -1684,6 +1685,7 @@
     "Next",
     "Next Delivery",
     "No",
+    "No API key uses Realtime Data any more, but the position agent is still installed",
     "No API keys yet.",
     "No Bases Available",
     "No Care Package grants have been recorded yet.",
@@ -1831,7 +1833,6 @@
     "Only this phrase, your correction, and the optional credit name will be sent to DuneDocker for review.",
     "Only weapons and clothing can be augmented.",
     "Open",
-    "Open the Console Now",
     "Open Base",
     "Open Base Builder",
     "Open Home",
@@ -1842,6 +1843,7 @@
     "Open in Bases",
     "Open in Vehicles",
     "Open navigation",
+    "Open the Console Now",
     "Open this section to load Landsraad data.",
     "Opening the finish step.",
     "Opening the full console in",
@@ -2076,8 +2078,12 @@
     "Ready",
     "Ready to explore?",
     "Ready to save",
+    "Realtime Data is enabled, but DUNE_REALTIME_AGENT_URL is not usable. Fix the address in the Console settings.",
+    "Realtime Data is enabled, but the position agent is installed and not answering.",
+    "Realtime Data is enabled, but the position agent is not installed on this host. Without it the Realtime Data routes answer 503.",
     "Reason",
     "Reason Unrecorded",
+    "Rebuild Agent",
     "Rebuilding and restarting the web console container.",
     "Recipe Repaired",
     "Recipe unlocks require the player to be offline. The Grade shown is the recipe grade found in the game database.",
@@ -2101,8 +2107,8 @@
     "Redeploy Server",
     "Redeploy Setup",
     "Redeploy was successful.",
-    "Redirecting to the full console in",
     "Redeploying...",
+    "Redirecting to the full console in",
     "Reduce Host Memory Protection",
     "Reference",
     "Refill",
@@ -2148,10 +2154,12 @@
     "Reload specializations",
     "Reloading land claim",
     "Remove",
+    "Remove Agent",
     "Remove From Stack",
     "Remove Listings",
     "Remove Member",
     "Remove NPC Listings",
+    "Remove Realtime Data Agent",
     "Remove Service",
     "Remove Shutdown Protection",
     "Remove Terminals",
@@ -2160,6 +2168,7 @@
     "Removing Shutdown Protection",
     "Removing obsolete project-owned images while protecting current and in-use images.",
     "Removing unused Docker build cache.",
+    "Removing...",
     "Removing…",
     "Rep",
     "Repair",
@@ -2417,6 +2426,7 @@
     "Saving...",
     "Saving…",
     "Scan & Translate Current View",
+    "Scanning",
     "Schedule",
     "Schedule Name",
     "Schedule Save Failed",
@@ -2537,6 +2547,8 @@
     "Set All Current Goals",
     "Set Base Permissions",
     "Set Position",
+    "Set Up Agent",
+    "Set Up Realtime Data Agent",
     "Set a passphrase for the new archive. It is entered twice because a typo produces an archive",
     "Set as Active Plan",
     "Set by",
@@ -2548,6 +2560,7 @@
     "Set the position this trade post's terminals install at",
     "Setting Category",
     "Setting Key",
+    "Setting Up...",
     "Settings",
     "Settings Save Failed",
     "Settings Saved Successfully",
@@ -2978,6 +2991,7 @@
     "Unset",
     "Unused Docker build cache can be cleaned",
     "Unused Docker build cache was cleaned.",
+    "Unused Docker images can be cleaned",
     "Up 1d ago",
     "Up 1h ago",
     "Up 1m ago",
@@ -3151,6 +3165,7 @@
     "and every file in",
     "and increase as maps are started. Overmap commonly uses",
     "and preserves unmanaged file values.",
+    "and running",
     "at most once per player every 24 hours",
     "at restart",
     "at the",
@@ -3278,20 +3293,7 @@
     "× Uptime Event",
     "— restore it afterwards, with its passphrase.",
     "— sent",
-    "— the Funcom token, admin console password, RMQ credentials, sietch join password and IAM policies. It is encrypted with the passphrase you set here, and",
-    "Build and Start",
-    "No API key uses Realtime Data any more, but the position agent is still installed",
-    "Realtime Data is enabled, but DUNE_REALTIME_AGENT_URL is not usable. Fix the address in the Console settings.",
-    "Realtime Data is enabled, but the position agent is installed and not answering.",
-    "Realtime Data is enabled, but the position agent is not installed on this host. Without it the Realtime Data routes answer 503.",
-    "Rebuild Agent",
-    "Remove Agent",
-    "Remove Realtime Data Agent",
-    "Removing...",
-    "Set Up Agent",
-    "Set Up Realtime Data Agent",
-    "Setting Up...",
-    "and running"
+    "— the Funcom token, admin console password, RMQ credentials, sietch join password and IAM policies. It is encrypted with the passphrase you set here, and"
   ],
   "translations": {
     "FR": {
@@ -6529,7 +6531,9 @@
       "Set Up Agent": "Configurer l'agent",
       "Set Up Realtime Data Agent": "Configurer l'agent de données en temps réel",
       "Setting Up...": "Configuration en cours...",
-      "and running": "et en cours d'exécution"
+      "and running": "et en cours d'exécution",
+      "Unused Docker images can be cleaned": "Les images Docker inutilisées peuvent être nettoyées",
+      "Scanning": "Analyse"
     },
     "NL": {
       "Game Server Connections": "Spelserververbindingen",
@@ -9766,7 +9770,9 @@
       "Set Up Agent": "Agent instellen",
       "Set Up Realtime Data Agent": "Realtime-gegevensagent instellen",
       "Setting Up...": "Bezig met opstarten...",
-      "and running": "en in werking"
+      "and running": "en in werking",
+      "Unused Docker images can be cleaned": "Ongebruikte Docker-images kunnen worden opgeschoond",
+      "Scanning": "Scannen"
     },
     "ES": {
       "Game Server Connections": "Conexiones de Servidores de Juego",
@@ -13003,7 +13009,9 @@
       "Set Up Agent": "Configurar el agente",
       "Set Up Realtime Data Agent": "Configurar el agente de datos en tiempo real",
       "Setting Up...": "Configurando...",
-      "and running": "y en marcha"
+      "and running": "y en marcha",
+      "Unused Docker images can be cleaned": "Se pueden limpiar las imágenes de Docker sin usar",
+      "Scanning": "Escaneando"
     },
     "IT": {
       "Game Server Connections": "Connessioni dei Server di Gioco",
@@ -16240,7 +16248,9 @@
       "Set Up Agent": "Configura l'agente",
       "Set Up Realtime Data Agent": "Configurazione dell'agente dati in tempo reale",
       "Setting Up...": "Configurazione in corso...",
-      "and running": "e in funzione"
+      "and running": "e in funzione",
+      "Unused Docker images can be cleaned": "È possibile eliminare le immagini Docker inutilizzate",
+      "Scanning": "Scansione"
     },
     "DE": {
       "Game Server Connections": "Spielserver-Verbindungen",
@@ -19477,7 +19487,9 @@
       "Set Up Agent": "Agent einrichten",
       "Set Up Realtime Data Agent": "Realtime-Data-Agent einrichten",
       "Setting Up...": "Wird eingerichtet...",
-      "and running": "und läuft"
+      "and running": "und läuft",
+      "Unused Docker images can be cleaned": "Ungenutzte Docker-Images können bereinigt werden",
+      "Scanning": "Scannen"
     },
     "PL": {
       "Game Server Connections": "Połączenia Serwerów Gry",
@@ -22714,7 +22726,9 @@
       "Set Up Agent": "Skonfiguruj agenta",
       "Set Up Realtime Data Agent": "Konfiguracja agenta danych w czasie rzeczywistym",
       "Setting Up...": "Konfiguracja...",
-      "and running": "i działa"
+      "and running": "i działa",
+      "Unused Docker images can be cleaned": "Można usunąć nieużywane obrazy Docker",
+      "Scanning": "Skanowanie"
     },
     "PT-BR": {
       "Game Server Connections": "Conexões dos Servidores de Jogo",
@@ -25951,7 +25965,9 @@
       "Set Up Agent": "Configurar o agente",
       "Set Up Realtime Data Agent": "Configurar o agente de dados em tempo real",
       "Setting Up...": "Configurando...",
-      "and running": "e em funcionamento"
+      "and running": "e em funcionamento",
+      "Unused Docker images can be cleaned": "As imagens Docker não utilizadas podem ser removidas",
+      "Scanning": "Verificando"
     },
     "PT-PT": {
       "Game Server Connections": "Ligações dos Servidores de Jogo",
@@ -29188,7 +29204,9 @@
       "Set Up Agent": "Configurar o agente",
       "Set Up Realtime Data Agent": "Configurar o agente de dados em tempo real",
       "Setting Up...": "A configurar...",
-      "and running": "e em funcionamento"
+      "and running": "e em funcionamento",
+      "Unused Docker images can be cleaned": "As imagens Docker não utilizadas podem ser removidas",
+      "Scanning": "A verificar"
     },
     "UK": {
       "Game Server Connections": "З’єднання Ігрових Серверів",
@@ -32425,7 +32443,9 @@
       "Set Up Agent": "Налаштування агента",
       "Set Up Realtime Data Agent": "Налаштування агента даних у реальному часі",
       "Setting Up...": "Налаштування...",
-      "and running": "та працює"
+      "and running": "та працює",
+      "Unused Docker images can be cleaned": "Невикористовувані образи Docker можна очистити",
+      "Scanning": "Сканування"
     },
     "RU": {
       "Game Server Connections": "Подключения Игровых Серверов",
@@ -35662,7 +35682,9 @@
       "Set Up Agent": "Настройка агента",
       "Set Up Realtime Data Agent": "Настройка агента данных в реальном времени",
       "Setting Up...": "Настройка...",
-      "and running": "и работает"
+      "and running": "и работает",
+      "Unused Docker images can be cleaned": "Неиспользуемые образы Docker можно очистить",
+      "Scanning": "Сканирование"
     },
     "TR": {
       "Game Server Connections": "Oyun Sunucusu Bağlantıları",
@@ -38899,7 +38921,9 @@
       "Set Up Agent": "Aracı Kurma",
       "Set Up Realtime Data Agent": "Gerçek Zamanlı Veri Aracısını Kurma",
       "Setting Up...": "Hazırlanıyor...",
-      "and running": "ve çalışır durumda"
+      "and running": "ve çalışır durumda",
+      "Unused Docker images can be cleaned": "Kullanılmayan Docker görüntüleri temizlenebilir",
+      "Scanning": "Taranıyor"
     },
     "JA": {
       "Game Server Connections": "ゲームサーバー接続",
@@ -42136,7 +42160,9 @@
       "Set Up Agent": "エージェントの設定",
       "Set Up Realtime Data Agent": "リアルタイムデータエージェントの設定",
       "Setting Up...": "設定中...",
-      "and running": "そして稼働中"
+      "and running": "そして稼働中",
+      "Unused Docker images can be cleaned": "未使用のDockerイメージを削除できます",
+      "Scanning": "スキャン中"
     },
     "KO": {
       "Game Server Connections": "게임 서버 연결",
@@ -45373,7 +45399,9 @@
       "Set Up Agent": "에이전트 설정",
       "Set Up Realtime Data Agent": "실시간 데이터 에이전트 설정",
       "Setting Up...": "설정 중...",
-      "and running": "그리고 실행 중"
+      "and running": "그리고 실행 중",
+      "Unused Docker images can be cleaned": "사용하지 않는 Docker 이미지를 정리할 수 있습니다",
+      "Scanning": "스캔 중"
     },
     "ZH-HANS": {
       "Game Server Connections": "游戏服务器连接",
@@ -48610,7 +48638,9 @@
       "Set Up Agent": "设置代理",
       "Set Up Realtime Data Agent": "设置实时数据代理",
       "Setting Up...": "正在设置中...",
-      "and running": "并正在运行"
+      "and running": "并正在运行",
+      "Unused Docker images can be cleaned": "可以清理未使用的 Docker 镜像",
+      "Scanning": "正在扫描"
     },
     "ZH-HANT": {
       "Game Server Connections": "遊戲伺服器連線",
@@ -51847,7 +51877,9 @@
       "Set Up Agent": "設定代理程式",
       "Set Up Realtime Data Agent": "設定即時資料代理程式",
       "Setting Up...": "正在設定中...",
-      "and running": "並持續運作中"
+      "and running": "並持續運作中",
+      "Unused Docker images can be cleaned": "可以清理未使用的 Docker 映像",
+      "Scanning": "正在掃描"
     },
     "AR": {
       "Game Server Connections": "اتصالات خوادم اللعبة",
@@ -55084,7 +55116,9 @@
       "Set Up Agent": "إعداد الوكيل",
       "Set Up Realtime Data Agent": "إعداد وكيل البيانات في الوقت الفعلي",
       "Setting Up...": "جاري الإعداد...",
-      "and running": "ويعمل"
+      "and running": "ويعمل",
+      "Unused Docker images can be cleaned": "يمكن تنظيف صور Docker غير المستخدمة",
+      "Scanning": "جارٍ الفحص"
     },
     "FI": {
       "Game Server Connections": "Pelipalvelinyhteydet",
@@ -58321,7 +58355,9 @@
       "Set Up Agent": "Agentin määrittäminen",
       "Set Up Realtime Data Agent": "Reaaliaikaisen data-agentin määrittäminen",
       "Setting Up...": "Asennetaan...",
-      "and running": "ja käynnissä"
+      "and running": "ja käynnissä",
+      "Unused Docker images can be cleaned": "Käyttämättömät Docker-levykuvat voidaan poistaa",
+      "Scanning": "Tarkistetaan"
     },
     "DA": {
       "Game Server Connections": "Spilserverforbindelser",
@@ -61558,7 +61594,9 @@
       "Set Up Agent": "Konfigurer agent",
       "Set Up Realtime Data Agent": "Konfigurer Realtime Data Agent",
       "Setting Up...": "Oprettelse i gang...",
-      "and running": "og kører"
+      "and running": "og kører",
+      "Unused Docker images can be cleaned": "Ubrugte Docker-images kan ryddes op",
+      "Scanning": "Scanner"
     },
     "CS": {
       "Game Server Connections": "Připojení herních serverů",
@@ -64795,7 +64833,9 @@
       "Set Up Agent": "Nastavení agenta",
       "Set Up Realtime Data Agent": "Nastavení agenta pro data v reálném čase",
       "Setting Up...": "Probíhá nastavení...",
-      "and running": "a běží"
+      "and running": "a běží",
+      "Unused Docker images can be cleaned": "Nepoužívané obrazy Docker lze vyčistit",
+      "Scanning": "Skenování"
     },
     "NB": {
       "Game Server Connections": "Spillservertilkoblinger",
@@ -68032,7 +68072,9 @@
       "Set Up Agent": "Konfigurer agent",
       "Set Up Realtime Data Agent": "Konfigurere sanntidsdataagent",
       "Setting Up...": "Konfigurerer...",
-      "and running": "og i gang"
+      "and running": "og i gang",
+      "Unused Docker images can be cleaned": "Ubrukte Docker-avbildninger kan ryddes opp",
+      "Scanning": "Skanner"
     },
     "HU": {
       "Game Server Connections": "Játékszerver-kapcsolatok",
@@ -71269,7 +71311,9 @@
       "Set Up Agent": "Ügynök beállítása",
       "Set Up Realtime Data Agent": "Valós idejű adatügynök beállítása",
       "Setting Up...": "Beállítás...",
-      "and running": "és fut"
+      "and running": "és fut",
+      "Unused Docker images can be cleaned": "A nem használt Docker-lemezképek eltávolíthatók",
+      "Scanning": "Vizsgálat"
     },
     "EL": {
       "Game Server Connections": "Συνδέσεις Διακομιστών Παιχνιδιού",
@@ -74506,7 +74550,9 @@
       "Set Up Agent": "Ρύθμιση παραμέτρων πράκτορα",
       "Set Up Realtime Data Agent": "Ρύθμιση του Realtime Data Agent",
       "Setting Up...": "Προετοιμασία...",
-      "and running": "και σε λειτουργία"
+      "and running": "και σε λειτουργία",
+      "Unused Docker images can be cleaned": "Οι αχρησιμοποίητες εικόνες Docker μπορούν να διαγραφούν",
+      "Scanning": "Σάρωση"
     },
     "RO": {
       "Game Server Connections": "Conexiuni la Serverele de Joc",
@@ -77743,7 +77789,9 @@
       "Set Up Agent": "Configurare agent",
       "Set Up Realtime Data Agent": "Configurarea agentului de date în timp real",
       "Setting Up...": "Se pregătește...",
-      "and running": "și în desfășurare"
+      "and running": "și în desfășurare",
+      "Unused Docker images can be cleaned": "Imaginile Docker neutilizate pot fi șterse",
+      "Scanning": "Se scanează"
     },
     "SK": {
       "Game Server Connections": "Pripojenia herných serverov",
@@ -80980,7 +81028,9 @@
       "Set Up Agent": "Nastavenie agenta",
       "Set Up Realtime Data Agent": "Nastavenie agenta pre údaje v reálnom čase",
       "Setting Up...": "Pripravuje sa...",
-      "and running": "a v chode"
+      "and running": "a v chode",
+      "Unused Docker images can be cleaned": "Nepoužívané obrazy Docker možno vyčistiť",
+      "Scanning": "Skenovanie"
     },
     "BG": {
       "Game Server Connections": "Връзки с игровите сървъри",
@@ -84217,7 +84267,9 @@
       "Set Up Agent": "Настройка на агент",
       "Set Up Realtime Data Agent": "Настройка на агента за данни в реално време",
       "Setting Up...": "Настройка...",
-      "and running": "и работи"
+      "and running": "и работи",
+      "Unused Docker images can be cleaned": "Неизползваните Docker образи могат да бъдат изчистени",
+      "Scanning": "Сканиране"
     },
     "SV": {
       "Game Server Connections": "Spelserveranslutningar",
@@ -87454,7 +87506,9 @@
       "Set Up Agent": "Konfigurera agent",
       "Set Up Realtime Data Agent": "Konfigurera realtidsdataagenten",
       "Setting Up...": "Konfigurerar...",
-      "and running": "och i full gång"
+      "and running": "och i full gång",
+      "Unused Docker images can be cleaned": "Oanvända Docker-avbilder kan rensas",
+      "Scanning": "Skannar"
     },
     "TH": {
       "Game Server Connections": "การเชื่อมต่อเซิร์ฟเวอร์เกม",
@@ -90691,7 +90745,9 @@
       "Set Up Agent": "Set Up Agent",
       "Set Up Realtime Data Agent": "Set Up Realtime Data Agent",
       "Setting Up...": "Setting Up...",
-      "and running": "and running"
+      "and running": "and running",
+      "Unused Docker images can be cleaned": "สามารถล้างอิมเมจ Docker ที่ไม่ได้ใช้งานได้",
+      "Scanning": "กำลังสแกน"
     },
     "VI": {
       "Game Server Connections": "Kết Nối Máy Chủ Trò Chơi",
@@ -93928,7 +93984,9 @@
       "Set Up Agent": "Thiết lập tác nhân",
       "Set Up Realtime Data Agent": "Cài đặt Trình thu thập dữ liệu thời gian thực",
       "Setting Up...": "Đang thiết lập...",
-      "and running": "và đang chạy"
+      "and running": "và đang chạy",
+      "Unused Docker images can be cleaned": "Có thể dọn dẹp các ảnh Docker không được sử dụng",
+      "Scanning": "Đang quét"
     },
     "ID": {
       "Game Server Connections": "Koneksi Server Game",
@@ -97165,7 +97223,9 @@
       "Set Up Agent": "Konfigurasi Agen",
       "Set Up Realtime Data Agent": "Mengatur Agen Data Real-Time",
       "Setting Up...": "Sedang disiapkan...",
-      "and running": "dan sedang berjalan"
+      "and running": "dan sedang berjalan",
+      "Unused Docker images can be cleaned": "Image Docker yang tidak digunakan dapat dibersihkan",
+      "Scanning": "Memindai"
     },
     "HI": {
       "Game Server Connections": "गेम सर्वर कनेक्शन",
@@ -100402,7 +100462,9 @@
       "Set Up Agent": "एजेंट सेट अप करें",
       "Set Up Realtime Data Agent": "रियलटाइम डेटा एजेंट सेट अप करें",
       "Setting Up...": "सेटअप हो रहा है...",
-      "and running": "और चल रहा है"
+      "and running": "और चल रहा है",
+      "Unused Docker images can be cleaned": "इस्तेमाल न हो रही Docker इमेज साफ़ की जा सकती हैं",
+      "Scanning": "स्कैन हो रहा है"
     },
     "HR": {
       "Game Server Connections": "Veze poslužitelja igre",
@@ -103639,7 +103701,9 @@
       "Set Up Agent": "Postavi agenta",
       "Set Up Realtime Data Agent": "Postavljanje agenta za podatke u stvarnom vremenu",
       "Setting Up...": "Postavljanje...",
-      "and running": "i radi"
+      "and running": "i radi",
+      "Unused Docker images can be cleaned": "Nekorištene Docker slike mogu se ukloniti",
+      "Scanning": "Skeniranje"
     },
     "SR": {
       "Game Server Connections": "Везе Сервера Игре",
@@ -106876,7 +106940,9 @@
       "Set Up Agent": "Подешавање агента",
       "Set Up Realtime Data Agent": "Подешавање агента за податке у реалном времену",
       "Setting Up...": "Подешавање...",
-      "and running": "и ради"
+      "and running": "и ради",
+      "Unused Docker images can be cleaned": "Некоришћене Docker слике могу се уклонити",
+      "Scanning": "Скенирање"
     },
     "SL": {
       "Game Server Connections": "Povezave igralnih strežnikov",
@@ -110113,7 +110179,9 @@
       "Set Up Agent": "Nastavitev agenta",
       "Set Up Realtime Data Agent": "Nastavitev agenta za podatke v realnem času",
       "Setting Up...": "Nastavljanje...",
-      "and running": "in deluje"
+      "and running": "in deluje",
+      "Unused Docker images can be cleaned": "Neuporabljene slike Docker je mogoče odstraniti",
+      "Scanning": "Pregledovanje"
     },
     "ET": {
       "Game Server Connections": "Mänguserverite ühendused",
@@ -113350,7 +113418,9 @@
       "Set Up Agent": "Agendi seadistamine",
       "Set Up Realtime Data Agent": "Reaalajas andmeagendi seadistamine",
       "Setting Up...": "Seadistamine...",
-      "and running": "ja töötab"
+      "and running": "ja töötab",
+      "Unused Docker images can be cleaned": "Kasutamata Dockeri tõmmised saab eemaldada",
+      "Scanning": "Skannimine"
     },
     "LT": {
       "Game Server Connections": "Žaidimų serverių ryšiai",
@@ -116587,7 +116657,9 @@
       "Set Up Agent": "Agento nustatymas",
       "Set Up Realtime Data Agent": "„Realtime Data Agent“ nustatymas",
       "Setting Up...": "Rengiamasi...",
-      "and running": "ir veikia"
+      "and running": "ir veikia",
+      "Unused Docker images can be cleaned": "Nenaudojamus Docker atvaizdus galima pašalinti",
+      "Scanning": "Skenuojama"
     },
     "LV": {
       "Game Server Connections": "Spēļu serveru savienojumi",
@@ -119824,7 +119896,9 @@
       "Set Up Agent": "Aģenta konfigurēšana",
       "Set Up Realtime Data Agent": "Reāllaika datu aģenta konfigurēšana",
       "Setting Up...": "Iestatīšana...",
-      "and running": "un darbojas"
+      "and running": "un darbojas",
+      "Unused Docker images can be cleaned": "Neizmantotos Docker attēlus var noņemt",
+      "Scanning": "Notiek skenēšana"
     },
     "HE": {
       "Game Server Connections": "חיבורי שרתי משחק",
@@ -123061,7 +123135,9 @@
       "Set Up Agent": "הגדרת סוכן",
       "Set Up Realtime Data Agent": "הגדרת סוכן נתונים בזמן אמת",
       "Setting Up...": "מתבצע...",
-      "and running": "ופועל"
+      "and running": "ופועל",
+      "Unused Docker images can be cleaned": "אפשר לנקות תמונות Docker שאינן בשימוש",
+      "Scanning": "מתבצעת סריקה"
     },
     "FA": {
       "Game Server Connections": "اتصال‌های سرور بازی",
@@ -126298,7 +126374,9 @@
       "Set Up Agent": "راه‌اندازی عامل",
       "Set Up Realtime Data Agent": "راه‌اندازی عامل داده‌های بی‌درنگ",
       "Setting Up...": "در حال راه‌اندازی...",
-      "and running": "و در حال اجرا"
+      "and running": "و در حال اجرا",
+      "Unused Docker images can be cleaned": "می‌توان ایمیج‌های استفاده‌نشدهٔ Docker را پاک‌سازی کرد",
+      "Scanning": "در حال اسکن"
     },
     "UR": {
       "Game Server Connections": "گیم سرور کنکشنز",
@@ -129535,7 +129613,9 @@
       "Set Up Agent": "ایجنٹ سیٹ اپ کریں",
       "Set Up Realtime Data Agent": "ریئل ٹائم ڈیٹا ایجنٹ سیٹ اپ کریں",
       "Setting Up...": "سیٹ اپ ہو رہا ہے...",
-      "and running": "اور چل رہا ہے"
+      "and running": "اور چل رہا ہے",
+      "Unused Docker images can be cleaned": "غیر استعمال شدہ Docker امیجز صاف کی جا سکتی ہیں",
+      "Scanning": "اسکین ہو رہا ہے"
     },
     "MS": {
       "Game Server Connections": "Sambungan Pelayan Permainan",
@@ -132772,7 +132852,9 @@
       "Set Up Agent": "Menyiapkan ejen",
       "Set Up Realtime Data Agent": "Menyiapkan Ejen Data Masa Sebenar",
       "Setting Up...": "Sedang disediakan...",
-      "and running": "dan sedang berjalan"
+      "and running": "dan sedang berjalan",
+      "Unused Docker images can be cleaned": "Imej Docker yang tidak digunakan boleh dibersihkan",
+      "Scanning": "Mengimbas"
     },
     "TL": {
       "Game Server Connections": "Mga Koneksyon ng Game Server",
@@ -136009,7 +136091,9 @@
       "Set Up Agent": "I-set up ang ahente",
       "Set Up Realtime Data Agent": "I-set up ang Realtime Data Agent",
       "Setting Up...": "Nagse-set up...",
-      "and running": "at tumatakbo"
+      "and running": "at tumatakbo",
+      "Unused Docker images can be cleaned": "Maaaring linisin ang mga hindi ginagamit na Docker image",
+      "Scanning": "Nagsa-scan"
     },
     "BN": {
       "Game Server Connections": "গেম সার্ভারের সংযোগ",
@@ -139246,7 +139330,9 @@
       "Set Up Agent": "এজেন্ট সেট আপ করুন",
       "Set Up Realtime Data Agent": "রিয়েলটাইম ডেটা এজেন্ট সেট আপ করুন",
       "Setting Up...": "সেটআপ হচ্ছে...",
-      "and running": "এবং চলছে"
+      "and running": "এবং চলছে",
+      "Unused Docker images can be cleaned": "অব্যবহৃত Docker ইমেজ পরিষ্কার করা যাবে",
+      "Scanning": "স্ক্যান করা হচ্ছে"
     },
     "IS": {
       "Game Server Connections": "Tengingar leikjaþjóna",
@@ -142483,7 +142569,9 @@
       "Set Up Agent": "Setja upp umboðsmann",
       "Set Up Realtime Data Agent": "Settu upp rauntímagagnamiðlara",
       "Setting Up...": "Að stilla upp...",
-      "and running": "og í gangi"
+      "and running": "og í gangi",
+      "Unused Docker images can be cleaned": "Hægt er að hreinsa ónotaðar Docker-myndir",
+      "Scanning": "Skanna"
     },
     "SQ": {
       "Game Server Connections": "Lidhjet e Serverëve të Lojës",
@@ -145720,7 +145808,9 @@
       "Set Up Agent": "Konfiguro agjentin",
       "Set Up Realtime Data Agent": "Konfiguroni agjentin e të dhënave në kohë reale",
       "Setting Up...": "Po vendoset...",
-      "and running": "dhe po funksionon"
+      "and running": "dhe po funksionon",
+      "Unused Docker images can be cleaned": "Imazhet Docker të papërdorura mund të pastrohen",
+      "Scanning": "Duke skanuar"
     },
     "MK": {
       "Game Server Connections": "Врски со серверите за игра",
@@ -148957,7 +149047,9 @@
       "Set Up Agent": "Поставување агент",
       "Set Up Realtime Data Agent": "Поставете агент за податоци во реално време",
       "Setting Up...": "Поставување...",
-      "and running": "и работи"
+      "and running": "и работи",
+      "Unused Docker images can be cleaned": "Неискористените Docker слики може да се исчистат",
+      "Scanning": "Скенирање"
     },
     "KA": {
       "Game Server Connections": "თამაშის სერვერის კავშირები",
@@ -152194,7 +152286,9 @@
       "Set Up Agent": "აგენტის დაყენება",
       "Set Up Realtime Data Agent": "რეალურ დროში მონაცემთა აგენტის დაყენება",
       "Setting Up...": "დაყენება...",
-      "and running": "და მუშაობს"
+      "and running": "და მუშაობს",
+      "Unused Docker images can be cleaned": "გამოუყენებელი Docker-ის იმიჯების გასუფთავება შესაძლებელია",
+      "Scanning": "სკანირება"
     },
     "HY": {
       "Game Server Connections": "Խաղային սերվերների կապեր",
@@ -155431,7 +155525,9 @@
       "Set Up Agent": "Ագենտի կարգավորում",
       "Set Up Realtime Data Agent": "Տեղադրել իրական ժամանակի տվյալների գործակալը",
       "Setting Up...": "Հաստատում...",
-      "and running": "և աշխատում է"
+      "and running": "և աշխատում է",
+      "Unused Docker images can be cleaned": "Չօգտագործվող Docker պատկերները կարելի է մաքրել",
+      "Scanning": "Սկանավորում"
     },
     "AZ": {
       "Game Server Connections": "Oyun serveri bağlantıları",
@@ -158668,7 +158764,9 @@
       "Set Up Agent": "Agentin quraşdırılması",
       "Set Up Realtime Data Agent": "Real vaxt məlumat agenti qurun",
       "Setting Up...": "Qurulur...",
-      "and running": "və işləyir"
+      "and running": "və işləyir",
+      "Unused Docker images can be cleaned": "İstifadə olunmayan Docker təsvirləri təmizlənə bilər",
+      "Scanning": "Skan edilir"
     },
     "KK": {
       "Game Server Connections": "Ойын серверінің қосылымдары",
@@ -161905,7 +162003,9 @@
       "Set Up Agent": "Агентті баптау",
       "Set Up Realtime Data Agent": "Нақты уақыттағы деректер агентін баптау",
       "Setting Up...": "Орнату...",
-      "and running": "және жұмыс істеп тұр"
+      "and running": "және жұмыс істеп тұр",
+      "Unused Docker images can be cleaned": "Пайдаланылмайтын Docker бейнелерін тазалауға болады",
+      "Scanning": "Сканерленуде"
     },
     "UZ": {
       "Game Server Connections": "O‘yin serveri ulanishlari",
@@ -165142,7 +165242,9 @@
       "Set Up Agent": "Agentni sozlash",
       "Set Up Realtime Data Agent": "Real vaqtli ma'lumotlar agentini sozlash",
       "Setting Up...": "Sozlanmoqda...",
-      "and running": "va ishlayapti"
+      "and running": "va ishlayapti",
+      "Unused Docker images can be cleaned": "Ishlatilmayotgan Docker tasvirlarini tozalash mumkin",
+      "Scanning": "Skanerlanmoqda"
     },
     "CA": {
       "Game Server Connections": "Connexions dels servidors de joc",
@@ -168379,7 +168481,9 @@
       "Set Up Agent": "Configurar agent",
       "Set Up Realtime Data Agent": "Configurar l'agent de dades en temps real",
       "Setting Up...": "Configurant...",
-      "and running": "i en execució"
+      "and running": "i en execució",
+      "Unused Docker images can be cleaned": "Es poden netejar les imatges Docker que no s’utilitzen",
+      "Scanning": "S’està escanejant"
     },
     "AF": {
       "Game Server Connections": "Speletjiebedienerverbindings",
@@ -171616,7 +171720,9 @@
       "Set Up Agent": "Stel agent op",
       "Set Up Realtime Data Agent": "Stel die intydse datagentskap op",
       "Setting Up...": "Aan die opstel...",
-      "and running": "en aan die gang"
+      "and running": "en aan die gang",
+      "Unused Docker images can be cleaned": "Ongebruikte Docker-beelde kan skoongemaak word",
+      "Scanning": "Skandeer"
     },
     "SW": {
       "Game Server Connections": "Miunganisho ya Seva za Mchezo",
@@ -174853,7 +174959,9 @@
       "Set Up Agent": "Weka Mwakala",
       "Set Up Realtime Data Agent": "Sakinisha Wakala wa Data wa Wakati Halisi",
       "Setting Up...": "Kusanidi...",
-      "and running": "na inafanya kazi"
+      "and running": "na inafanya kazi",
+      "Unused Docker images can be cleaned": "Taswira za Docker zisizotumika zinaweza kuondolewa",
+      "Scanning": "Inachanganua"
     }
   }
 }

@@ -63,7 +63,7 @@ Complete reference for all HTTP API endpoints in the Dune Docker Console. All en
 | GET | `/api/server/services` | List services and status | None |
 | GET | `/api/server/doctor` | Run diagnostic check | None |
 | POST | `/api/server/network-bind/fix` | Fix network binding issue | None |
-| POST | `/api/server/storage/cleanup-images` | Clean obsolete Docker images | `confirmation: "CLEAN OBSOLETE DUNE IMAGES"` |
+| POST | `/api/server/storage/cleanup-images` | Clean unused Docker images across the host | `confirmation: "CLEAN UNUSED DOCKER IMAGES"` |
 | POST | `/api/server/storage/cleanup-build-cache` | Clean Docker build cache | `confirmation: "CLEAN DOCKER BUILD CACHE"` |
 | POST | `/api/server/start` | Start server | None |
 | POST | `/api/server/stop` | Stop server | None |
