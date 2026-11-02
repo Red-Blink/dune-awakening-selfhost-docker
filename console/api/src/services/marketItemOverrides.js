@@ -27,7 +27,7 @@ function readSeedPlanCached(path) {
   } catch {
     return JSON.parse(readFileSync(path, "utf8"));
   }
-  const stamp = `${stat.mtimeNs}:${stat.ctimeNs}:${stat.size}`;
+  const stamp = `${stat.ino}:${stat.mtimeNs}:${stat.ctimeNs}:${stat.size}`;
   const cached = seedPlanFileCache.get(path);
   if (cached && cached.stamp === stamp) return cached.plan;
   const plan = JSON.parse(readFileSync(path, "utf8"));

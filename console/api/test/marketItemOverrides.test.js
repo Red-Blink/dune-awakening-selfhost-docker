@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, renameSync, statSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -43,7 +43,12 @@ test('cached market lists cannot be changed by callers and follow plan updates',
     readBaseMarketTemplateIds(repo).push('Injected');
     assert.deepEqual(readUnsafeTemplateIds(repo), ['BadItem1']);
     assert.deepEqual(readBaseMarketTemplateIds(repo), ['Existing1']);
-    seedPlanFile(repo, { unsafeTemplateIds: ['BadItem2'] });
+    const path = join(repo, 'runtime/data/market-seed-plan.json');
+    const before = statSync(path);
+    const next = readFileSync(path, 'utf8').replace('BadItem1', 'BadItem2');
+    writeFileSync(`${path}.new`, next);
+    utimesSync(`${path}.new`, before.atime, before.mtime);
+    renameSync(`${path}.new`, path);
     assert.deepEqual(readUnsafeTemplateIds(repo), ['BadItem2']);
   });
 });

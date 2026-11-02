@@ -114,7 +114,7 @@ function readPlanJsonCached(path) {
   } catch {
     return parsePlanJson(readFileSync(path, "utf8"), path);
   }
-  const stamp = `${stat.mtimeNs}:${stat.ctimeNs}:${stat.size}`;
+  const stamp = `${stat.ino}:${stat.mtimeNs}:${stat.ctimeNs}:${stat.size}`;
   const cached = parsedPlanJsonCache.get(path);
   if (cached && cached.stamp === stamp) return cached.plan;
   const plan = parsePlanJson(readFileSync(path, "utf8"), path);

@@ -13,7 +13,7 @@ function loadAdminItemsCatalog(repoRoot) {
     const byId = new Map(items.map((item) => [String(item?.id || ""), item]));
     return { items, byId };
   }
-  const stamp = `${stat.mtimeNs}:${stat.ctimeNs}:${stat.size}`;
+  const stamp = `${stat.ino}:${stat.mtimeNs}:${stat.ctimeNs}:${stat.size}`;
   const cached = adminItemsCache.get(file);
   if (cached && cached.stamp === stamp) return cached;
   const items = JSON.parse(readFileSync(file, "utf8"));
