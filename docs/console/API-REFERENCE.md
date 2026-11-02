@@ -1001,6 +1001,10 @@ queued private messages under `players:message`. See
 [Addon Runtime API](../addons/addon-runtime-api.md) for payloads and delivery
 semantics.
 
+### Realtime Data Bridge
+
+`realtime.health` and `realtime.objects` require approved `realtime:read` addon permission and return snapshots from the optional position agent; player objects additionally need `players:read`. See [Addon Runtime API](../addons/addon-runtime-api.md#realtime-data).
+
 ### Hardware Status Bridge
 
 `server.hardware.status` requires approved `server:status` addon permission and returns the core-owned hardware snapshot documented in [Addon Hardware Status Bridge](../addons/hardware-status.md). Addon packages are never permitted to execute their own telemetry scripts.

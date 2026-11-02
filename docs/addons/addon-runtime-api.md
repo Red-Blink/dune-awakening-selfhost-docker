@@ -20,9 +20,38 @@ const result = await window.DuneAddon.request("players.summary.list");
 | `files:addon-data` | Private persistent JSON storage scoped to the addon ID |
 | `rewards:grant` | Item, game XP, Intel, currency, and Building Sets rewards |
 | `players:message` | Queue a private in-game message for one player |
+| `realtime:read` | Read Realtime Data snapshots (sandworms, NPCs, vehicles, storms) from the optional position agent |
 
 Installing or updating an addon never approves a new permission automatically.
 The server owner must approve every requested permission.
+
+## Realtime Data
+
+Requires `realtime:read` (manifest: `"permissions": { "realtime": ["read"] }`). The optional
+MapViewer3D position agent must run on the host; see
+[Realtime Data](../console/realtime.md). Both actions are read-only snapshots; the
+bridge has no streaming channel, so poll at a modest rate (the bridge allows 60
+calls per minute per addon).
+
+### `realtime.health`
+
+```js
+const health = await window.DuneAddon.request("realtime.health");
+// { available: true, version: 1, ok: true, ready: 2, sources: [{ map, partition, ready, n }] }
+```
+
+### `realtime.objects`
+
+```js
+const snap = await window.DuneAddon.request("realtime.objects", { kinds: ["worm", "storm"], map: "Survival_1" });
+// { gen, t, sources: [{ map, partition, ready, n }], objects: [{ i, k, c, s, x, y, z }] }
+```
+
+- `kinds` (optional): array of `worm`, `vehicle`, `npc`, `civilian`, `storm`, `coriolis`, `player`.
+- `map` (optional): one map name such as `Survival_1`. `sources` then lists that map only and `s` indexes into it.
+- `player` objects are returned only when the addon also holds `players:read`; otherwise they are never included, even when requested.
+- Unknown kinds or a malformed `map` fail with HTTP 400.
+- When the agent is not running the call still succeeds with `{ available: false, error }` so a polling addon can show a hint instead of handling an error.
 
 ## Players
 

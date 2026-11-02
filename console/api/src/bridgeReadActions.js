@@ -24,7 +24,9 @@ export const READ_ONLY_BRIDGE_ACTIONS = new Set([
   "ops.activity.summary",
   "ops.resources.summary",
   "ops.combat.deaths",
-  "ops.economy.summary"
+  "ops.economy.summary",
+  "realtime.health",
+  "realtime.objects"
 ]);
 
 // True when the bridge call may change state, so concurrent read sharing must
