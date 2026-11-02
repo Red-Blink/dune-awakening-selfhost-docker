@@ -373,6 +373,7 @@
     "Buggy",
     "Build Cache Cleaned",
     "Build Cache Cleanup Failed",
+    "Build and Start",
     "Build recipe",
     "Building Pieces",
     "Building Set",
@@ -1627,6 +1628,7 @@
     "Next",
     "Next Delivery",
     "No",
+    "No API key uses Realtime Data any more, but the position agent is still installed",
     "No API keys yet.",
     "No Bases Available",
     "No Care Package grants have been recorded yet.",
@@ -2019,8 +2021,12 @@
     "Ready",
     "Ready to explore?",
     "Ready to save",
+    "Realtime Data is enabled, but DUNE_REALTIME_AGENT_URL is not usable. Fix the address in the Console settings.",
+    "Realtime Data is enabled, but the position agent is installed and not answering.",
+    "Realtime Data is enabled, but the position agent is not installed on this host. Without it the Realtime Data routes answer 503.",
     "Reason",
     "Reason Unrecorded",
+    "Rebuild Agent",
     "Rebuilding and restarting the web console container.",
     "Recipe Repaired",
     "Recipe unlocks require the player to be offline. The Grade shown is the recipe grade found in the game database.",
@@ -2091,10 +2097,12 @@
     "Reload specializations",
     "Reloading land claim",
     "Remove",
+    "Remove Agent",
     "Remove From Stack",
     "Remove Listings",
     "Remove Member",
     "Remove NPC Listings",
+    "Remove Realtime Data Agent",
     "Remove Service",
     "Remove Shutdown Protection",
     "Remove Terminals",
@@ -2103,6 +2111,7 @@
     "Removing Shutdown Protection",
     "Removing obsolete project-owned images while protecting current and in-use images.",
     "Removing unused Docker build cache.",
+    "Removing...",
     "Removing…",
     "Rep",
     "Repair",
@@ -2481,6 +2490,8 @@
     "Set All Current Goals",
     "Set Base Permissions",
     "Set Position",
+    "Set Up Agent",
+    "Set Up Realtime Data Agent",
     "Set a passphrase for the new archive. It is entered twice because a typo produces an archive",
     "Set as Active Plan",
     "Set by",
@@ -2492,6 +2503,7 @@
     "Set the position this trade post's terminals install at",
     "Setting Category",
     "Setting Key",
+    "Setting Up...",
     "Settings",
     "Settings Save Failed",
     "Settings Saved Successfully",
@@ -3096,6 +3108,7 @@
     "and every file in",
     "and increase as maps are started. Overmap commonly uses",
     "and preserves unmanaged file values.",
+    "and running",
     "at most once per player every 24 hours",
     "at restart",
     "at the",
@@ -4973,7 +4986,7 @@
     "actions selected": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 404,
+        "line": 412,
         "nearby": [
           "Custom",
           "of",
@@ -6481,6 +6494,18 @@
           ". Dune Docker keeps",
           "Enter a supported value within the displayed range before saving.",
           "Save Custom Settings"
+        ]
+      }
+    ],
+    "and running": [
+      {
+        "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
+        "line": 135,
+        "nearby": [
+          "Setting Up...",
+          "No API key uses Realtime Data any more, but the position agent is still installed",
+          "Remove Agent",
+          "Removing..."
         ]
       }
     ],
@@ -9252,6 +9277,17 @@
         ]
       }
     ],
+    "Build and Start": [
+      {
+        "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
+        "line": 85,
+        "nearby": [
+          "Set Up Realtime Data Agent",
+          "Remove Realtime Data Agent",
+          "Remove Agent"
+        ]
+      }
+    ],
     "Build Cache Cleaned": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
@@ -11021,7 +11057,7 @@
     "Choose access for each area. Everything starts at None.": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 361,
+        "line": 369,
         "nearby": [
           "The maximum request rate for this key.",
           "Permissions",
@@ -11045,7 +11081,7 @@
     "Choose at least one permission to continue.": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 427,
+        "line": 435,
         "nearby": [
           "Create Key",
           "Cancel"
@@ -11433,7 +11469,7 @@
     "Clear All": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 362,
+        "line": 370,
         "nearby": [
           "of",
           "selected",
@@ -11477,7 +11513,7 @@
     "Clear Search": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 420,
+        "line": 428,
         "nearby": [
           "actions selected",
           "No permissions match your search.",
@@ -13050,7 +13086,7 @@
       },
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 297,
+        "line": 303,
         "nearby": [
           "Create Key",
           "Copy this key now. It will not be shown again.",
@@ -13082,7 +13118,7 @@
       },
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 297,
+        "line": 303,
         "nearby": [
           "Copy this key now. It will not be shown again.",
           "Copied",
@@ -13128,7 +13164,7 @@
     "Copy this key now. It will not be shown again.": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 287,
+        "line": 293,
         "nearby": [
           "Give external tools their own API keys, with only the permissions they need. You can disable or revoke a key at any time.",
           "Create Key",
@@ -13331,7 +13367,7 @@
     "Create a key to connect an external tool.": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 307,
+        "line": 313,
         "nearby": [
           "Loading API Keys...",
           "No API keys yet.",
@@ -13343,7 +13379,7 @@
     "Create API Key": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 353,
+        "line": 361,
         "nearby": [
           "Create a key to connect an external tool.",
           "Revoke this key",
@@ -13367,7 +13403,7 @@
     "Create Key": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 276,
+        "line": 282,
         "nearby": [
           "This key has expired. Create a new key to restore access.",
           "Give external tools their own API keys, with only the permissions they need. You can disable or revoke a key at any time.",
@@ -13377,7 +13413,7 @@
       },
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 424,
+        "line": 432,
         "nearby": [
           "Clear Search",
           "Creating...",
@@ -13547,7 +13583,7 @@
     "Creating...": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 424,
+        "line": 432,
         "nearby": [
           "No permissions match your search.",
           "Clear Search",
@@ -13795,7 +13831,7 @@
       },
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 385,
+        "line": 393,
         "nearby": [
           "Read",
           "Read+Write",
@@ -17097,7 +17133,7 @@
     "e.g. Map Viewer": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 355,
+        "line": 363,
         "nearby": [
           "Name the key, choose its limits, then select its permissions.",
           "Name",
@@ -18698,7 +18734,7 @@
     "Expires": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 356,
+        "line": 364,
         "nearby": [
           "e.g. Map Viewer",
           "The tool or service that will use this key.",
@@ -20856,7 +20892,7 @@
     "Give external tools their own API keys, with only the permissions they need. You can disable or revoke a key at any time.": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 274,
+        "line": 280,
         "nearby": [
           "Revoke",
           "This key has expired. Create a new key to restore access.",
@@ -22081,7 +22117,7 @@
     "I've Saved It": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 300,
+        "line": 306,
         "nearby": [
           "Copied",
           "Copy",
@@ -24646,7 +24682,7 @@
     "Loading API Keys...": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 306,
+        "line": 312,
         "nearby": [
           "Copy",
           "I've Saved It",
@@ -27034,7 +27070,7 @@
       },
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 355,
+        "line": 363,
         "nearby": [
           "Create API Key",
           "Name the key, choose its limits, then select its permissions.",
@@ -27102,7 +27138,7 @@
     "Name the key, choose its limits, then select its permissions.": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 353,
+        "line": 361,
         "nearby": [
           "Revoke this key",
           "Create API Key",
@@ -27656,10 +27692,22 @@
         ]
       }
     ],
+    "No API key uses Realtime Data any more, but the position agent is still installed": [
+      {
+        "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
+        "line": 135,
+        "nearby": [
+          "Set Up Agent",
+          "Setting Up...",
+          "and running",
+          "Remove Agent"
+        ]
+      }
+    ],
     "No API keys yet.": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 307,
+        "line": 313,
         "nearby": [
           "I've Saved It",
           "Loading API Keys...",
@@ -28248,7 +28296,7 @@
     "No permissions match your search.": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 420,
+        "line": 428,
         "nearby": [
           "of",
           "actions selected",
@@ -28723,7 +28771,7 @@
       },
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 380,
+        "line": 388,
         "nearby": [
           "Search permissions",
           "Search permissions...",
@@ -29960,7 +30008,7 @@
     "Optional. Leave blank for no expiry.": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 356,
+        "line": 364,
         "nearby": [
           "The tool or service that will use this key.",
           "Expires",
@@ -31192,7 +31240,7 @@
       },
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 361,
+        "line": 369,
         "nearby": [
           "Requests per Minute",
           "The maximum request rate for this key.",
@@ -33318,7 +33366,7 @@
     "Read": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 381,
+        "line": 389,
         "nearby": [
           "Search permissions...",
           "None",
@@ -33366,7 +33414,7 @@
     "Read+Write": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 383,
+        "line": 391,
         "nearby": [
           "None",
           "Read",
@@ -33497,6 +33545,42 @@
         ]
       }
     ],
+    "Realtime Data is enabled, but DUNE_REALTIME_AGENT_URL is not usable. Fix the address in the Console settings.": [
+      {
+        "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
+        "line": 125,
+        "nearby": [
+          "Remove Realtime Data Agent",
+          "Remove Agent",
+          "Realtime Data is enabled, but the position agent is installed and not answering.",
+          "Realtime Data is enabled, but the position agent is not installed on this host. Without it the Realtime Data routes answer 503."
+        ]
+      }
+    ],
+    "Realtime Data is enabled, but the position agent is installed and not answering.": [
+      {
+        "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
+        "line": 127,
+        "nearby": [
+          "Remove Agent",
+          "Realtime Data is enabled, but DUNE_REALTIME_AGENT_URL is not usable. Fix the address in the Console settings.",
+          "Realtime Data is enabled, but the position agent is not installed on this host. Without it the Realtime Data routes answer 503.",
+          "Rebuild Agent"
+        ]
+      }
+    ],
+    "Realtime Data is enabled, but the position agent is not installed on this host. Without it the Realtime Data routes answer 503.": [
+      {
+        "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
+        "line": 128,
+        "nearby": [
+          "Realtime Data is enabled, but DUNE_REALTIME_AGENT_URL is not usable. Fix the address in the Console settings.",
+          "Realtime Data is enabled, but the position agent is installed and not answering.",
+          "Rebuild Agent",
+          "Set Up Agent"
+        ]
+      }
+    ],
     "Reason": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
@@ -33527,6 +33611,18 @@
           "Deleted In FLS",
           "Unknown",
           "Delete Queued"
+        ]
+      }
+    ],
+    "Rebuild Agent": [
+      {
+        "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
+        "line": 131,
+        "nearby": [
+          "Realtime Data is enabled, but the position agent is installed and not answering.",
+          "Realtime Data is enabled, but the position agent is not installed on this host. Without it the Realtime Data routes answer 503.",
+          "Set Up Agent",
+          "Setting Up..."
         ]
       }
     ],
@@ -34787,6 +34883,27 @@
         ]
       }
     ],
+    "Remove Agent": [
+      {
+        "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
+        "line": 86,
+        "nearby": [
+          "Build and Start",
+          "Remove Realtime Data Agent",
+          "Realtime Data is enabled, but DUNE_REALTIME_AGENT_URL is not usable. Fix the address in the Console settings.",
+          "Realtime Data is enabled, but the position agent is installed and not answering."
+        ]
+      },
+      {
+        "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
+        "line": 137,
+        "nearby": [
+          "No API key uses Realtime Data any more, but the position agent is still installed",
+          "and running",
+          "Removing..."
+        ]
+      }
+    ],
     "Remove from guild": [
       {
         "file": "console/web/src/features/guilds/GuildsPanel.tsx",
@@ -34863,6 +34980,18 @@
           "Run Reseed Now",
           "Removing…",
           "Close"
+        ]
+      }
+    ],
+    "Remove Realtime Data Agent": [
+      {
+        "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
+        "line": 86,
+        "nearby": [
+          "Set Up Realtime Data Agent",
+          "Build and Start",
+          "Remove Agent",
+          "Realtime Data is enabled, but DUNE_REALTIME_AGENT_URL is not usable. Fix the address in the Console settings."
         ]
       }
     ],
@@ -34944,6 +35073,16 @@
           "Clean Images",
           "Cleaning...",
           "Build Cache Cleaned"
+        ]
+      }
+    ],
+    "Removing...": [
+      {
+        "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
+        "line": 137,
+        "nearby": [
+          "and running",
+          "Remove Agent"
         ]
       }
     ],
@@ -35313,7 +35452,7 @@
     "Requests per Minute": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 357,
+        "line": 365,
         "nearby": [
           "Expires",
           "Optional. Leave blank for no expiry.",
@@ -37284,7 +37423,7 @@
     "Revoke": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 210,
+        "line": 211,
         "nearby": [
           "Revoke API Key",
           "This key has expired. Create a new key to restore access.",
@@ -37295,7 +37434,7 @@
     "Revoke API Key": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 210,
+        "line": 211,
         "nearby": [
           "Revoke",
           "This key has expired. Create a new key to restore access."
@@ -37305,7 +37444,7 @@
     "Revoke this key": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 333,
+        "line": 339,
         "nearby": [
           "No API keys yet.",
           "Create a key to connect an external tool.",
@@ -39690,7 +39829,7 @@
     "Search permissions": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 364,
+        "line": 372,
         "nearby": [
           "selected",
           "Clear All",
@@ -39702,7 +39841,7 @@
     "Search permissions...": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 364,
+        "line": 372,
         "nearby": [
           "Clear All",
           "Search permissions",
@@ -40209,7 +40348,7 @@
     "selected": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 362,
+        "line": 370,
         "nearby": [
           "Choose access for each area. Everything starts at None.",
           "of",
@@ -40968,6 +41107,28 @@
         ]
       }
     ],
+    "Set Up Agent": [
+      {
+        "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
+        "line": 131,
+        "nearby": [
+          "Realtime Data is enabled, but the position agent is not installed on this host. Without it the Realtime Data routes answer 503.",
+          "Rebuild Agent",
+          "Setting Up...",
+          "No API key uses Realtime Data any more, but the position agent is still installed"
+        ]
+      }
+    ],
+    "Set Up Realtime Data Agent": [
+      {
+        "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
+        "line": 85,
+        "nearby": [
+          "Build and Start",
+          "Remove Realtime Data Agent"
+        ]
+      }
+    ],
     "Setting Category": [
       {
         "file": "console/web/src/features/maps/MapsPanel.tsx",
@@ -40989,6 +41150,18 @@
           "Modifier",
           "Value",
           "Client \""
+        ]
+      }
+    ],
+    "Setting Up...": [
+      {
+        "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
+        "line": 131,
+        "nearby": [
+          "Rebuild Agent",
+          "Set Up Agent",
+          "No API key uses Realtime Data any more, but the position agent is still installed",
+          "and running"
         ]
       }
     ],
@@ -44607,7 +44780,7 @@
     "The maximum request rate for this key.": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 357,
+        "line": 365,
         "nearby": [
           "Optional. Leave blank for no expiry.",
           "Requests per Minute",
@@ -44891,7 +45064,7 @@
     "The tool or service that will use this key.": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 355,
+        "line": 363,
         "nearby": [
           "Name",
           "e.g. Map Viewer",
@@ -45385,7 +45558,7 @@
     "This key has expired. Create a new key to restore access.": [
       {
         "file": "console/web/src/features/settings/ApiKeysSection.tsx",
-        "line": 264,
+        "line": 265,
         "nearby": [
           "Revoke API Key",
           "Revoke",

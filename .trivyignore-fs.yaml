@@ -45,3 +45,13 @@ misconfigurations:
       changed in a CI PR because adding the flag changes the image's installed package set and needs its own
       build-and-run check. Re-triage and fix at expiry.
     expired_at: 2027-01-07
+  - id: DS-0002
+    paths:
+      - "runtime/realtime-agent/Dockerfile"
+    statement: >-
+      The Realtime Data position agent (mvagent) has to run as root: it reads /proc/<pid>/mem of the game server
+      processes, which needs ptrace rights over processes owned by other users. The final image is distroless with
+      no shell, runs with every capability dropped except SYS_PTRACE and DAC_OVERRIDE, a read-only root file system
+      and no-new-privileges, and listens on 127.0.0.1 only (docker-compose.realtime-agent.yml). It is installed only
+      by the owner after an explicit confirmation. Triaged 2026-11-01. Re-check if the agent gains a non-root mode.
+    expired_at: 2027-01-07
