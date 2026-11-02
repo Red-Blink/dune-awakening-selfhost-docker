@@ -1,7 +1,7 @@
-import { createReadStream } from "node:fs";
+import { createReadStream, statSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { extname } from "node:path";
-import { createBrotliCompress, createGzip } from "node:zlib";
+import { constants as zlibConstants, createBrotliCompress, createGzip } from "node:zlib";
 import { pipeline } from "node:stream";
 import { preferredContentEncoding } from "./contentEncoding.js";
 import { json, withSecurityHeaders } from "../auth.js";
@@ -26,6 +26,21 @@ export function contentTypeForPath(target) {
 function negotiateStaticEncoding(acceptEncoding = "", ext = "", size = 0) {
   if (!COMPRESSIBLE_EXTENSIONS.has(ext) || size < MIN_COMPRESSION_BYTES) return null;
   return preferredContentEncoding(acceptEncoding);
+}
+
+function resolveFreshPrecompressedTarget(target, encoding, sourceMtimeMs) {
+  const ext = encoding === "br" ? ".br" : encoding === "gzip" ? ".gz" : null;
+  if (!ext) return null;
+  const candidate = `${target}${ext}`;
+  try {
+    const preStats = statSync(candidate);
+    if (preStats.isFile() && preStats.mtimeMs >= sourceMtimeMs) {
+      return candidate;
+    }
+  } catch {
+    // Fall back to streaming compression when precompressed sibling does not exist.
+  }
+  return null;
 }
 
 // Vite fingerprints every file under its default assetsDir ("/assets") with a
@@ -69,14 +84,24 @@ export function serveStatic(config, req, res) {
         headers.vary = "Accept-Encoding";
       }
       res.writeHead(200, withSecurityHeaders(headers));
-      const stream = createReadStream(target);
+      const precompressedTarget = resolveFreshPrecompressedTarget(target, encoding, stats.mtimeMs);
+      const stream = createReadStream(precompressedTarget || target);
       stream.on("error", () => {
         if (!res.destroyed) res.destroy();
       });
-      if (encoding === "br") {
-        pipeline(stream, createBrotliCompress(), res, () => {});
+      if (precompressedTarget) {
+        pipeline(stream, res, () => {});
+      } else if (encoding === "br") {
+        pipeline(
+          stream,
+          createBrotliCompress({
+            params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 4 }
+          }),
+          res,
+          () => {}
+        );
       } else if (encoding === "gzip") {
-        pipeline(stream, createGzip(), res, () => {});
+        pipeline(stream, createGzip({ level: 6 }), res, () => {});
       } else {
         pipeline(stream, res, () => {});
       }

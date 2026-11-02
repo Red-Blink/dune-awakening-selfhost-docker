@@ -112,6 +112,18 @@ docker rm -f dune-rmq-admin dune-rmq-game 2>/dev/null || true
 # it, which is what keeps those calls from having to be a container exec each.
 # Until this container is recreated with the mapping the seam simply falls back,
 # so the change is safe to roll out before the next start-rabbitmq.sh run.
+RMQ_ERL_ARGS="${DUNE_RMQ_ERL_ARGS:-+S 2:2 +sbwt none +sbwtdcpu none +sbwtdio none}"
+# Preserve the documented public game-broker HTTP binding (${RMQ_GAME_HTTP_PORT}:15672/tcp)
+# by default alongside the separate loopback shortcut (127.0.0.1:${RMQ_GAME_LOCAL_HTTP_PORT}:15672/tcp).
+# Operators who explicitly want to restrict the external game HTTP binding to a specific
+# host interface IP may opt in by setting RMQ_GAME_HTTP_BIND_IP.
+RMQ_GAME_HTTP_BIND_IP="${RMQ_GAME_HTTP_BIND_IP:-}"
+if [ -n "$RMQ_GAME_HTTP_BIND_IP" ]; then
+  RMQ_GAME_HTTP_PUBLISH="${RMQ_GAME_HTTP_BIND_IP}:${RMQ_GAME_HTTP_PORT}:15672/tcp"
+else
+  RMQ_GAME_HTTP_PUBLISH="${RMQ_GAME_HTTP_PORT}:15672/tcp"
+fi
+
 docker run -d \
   "${DUNE_DOCKER_LOG_ARGS[@]}" \
   --name dune-rmq-admin \
@@ -121,6 +133,7 @@ docker run -d \
   --health-interval 30s \
   --health-timeout 10s \
   --health-retries 3 \
+  -e "RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=${RMQ_ERL_ARGS}" \
   -p "127.0.0.1:${RMQ_ADMIN_PORT}:5672" \
   -p "127.0.0.1:${RMQ_ADMIN_HTTP_PORT}:15672/tcp" \
   -v "$(host_path "$PWD/runtime/rabbitmq-admin/config/rabbitmq.conf"):/etc/rabbitmq/rabbitmq.conf:ro" \
@@ -135,9 +148,10 @@ docker run -d \
   --health-interval 30s \
   --health-timeout 10s \
   --health-retries 3 \
+  -e "RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=${RMQ_ERL_ARGS}" \
   -p "${RMQ_GAME_PORT}:5672/tcp" \
   -p "127.0.0.1:${RMQ_GAME_LOCAL_HTTP_PORT}:15672/tcp" \
-  -p "${RMQ_GAME_HTTP_PORT}:15672/tcp" \
+  -p "$RMQ_GAME_HTTP_PUBLISH" \
   -v "$(host_path "$PWD/runtime/rabbitmq-game/config/rabbitmq.conf"):/etc/rabbitmq/rabbitmq.conf:ro" \
   -v "$(host_path "$PWD/runtime/rabbitmq-game/config/enabled_plugins"):/etc/rabbitmq/enabled_plugins:ro" \
   -v "$(host_path "$PWD/runtime/rabbitmq-game/certs/cacert.pem"):/etc/rabbitmq/cacert.pem:ro" \

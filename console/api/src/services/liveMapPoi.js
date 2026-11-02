@@ -1,4 +1,4 @@
-import { liveMapPoiMarkers } from "../duneDb.js";
+import { liveMapPoiAllMarkers, liveMapPoiMarkers } from "../duneDb.js";
 import { withLiveMapSector } from "../liveMapSector.js";
 
 // The registry of dune.markers-backed live map categories -- one source of
@@ -63,7 +63,61 @@ export const LIVE_MAP_SUBTYPE_LABELS = Object.freeze(Object.fromEntries(
   ])
 ));
 
+const POI_CACHE_TTL_MS = 15_000;
+const poiCacheByDb = new WeakMap();
+const fallbackPoiCacheByMap = new Map();
+
+function getPoiCacheForDb(db) {
+  if (!db || (typeof db !== "object" && typeof db !== "function")) {
+    return fallbackPoiCacheByMap;
+  }
+  let mapCache = poiCacheByDb.get(db);
+  if (!mapCache) {
+    mapCache = new Map();
+    poiCacheByDb.set(db, mapCache);
+  }
+  return mapCache;
+}
+
 export async function liveMapPoi(db, map = "", { fetchCategory = liveMapPoiMarkers } = {}) {
+  if (fetchCategory === liveMapPoiMarkers) {
+    const poiCacheByMap = getPoiCacheForDb(db);
+    const cacheKey = String(map || "");
+    const now = Date.now();
+    const cached = poiCacheByMap.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      return cached.payload;
+    }
+    try {
+      const combined = await liveMapPoiAllMarkers(db, map);
+      const capabilities = {};
+      const rows = [];
+      for (const { key } of POI_CATEGORIES) {
+        capabilities[key] = Boolean(combined.capabilities?.[key]);
+        for (const row of combined.byCategory?.[key] || []) {
+          rows.push(withLiveMapSector({
+            id: row.id,
+            type: key,
+            name: row.marker_type,
+            subtype: row.marker_type,
+            subtypeLabel: liveMapSubtypeLabel(key, row.marker_type),
+            map: row.map,
+            x: row.x,
+            y: row.y,
+            z: row.z
+          }));
+        }
+      }
+      const payload = { capabilities, knownSubtypes: LIVE_MAP_KNOWN_SUBTYPES, subtypeLabels: LIVE_MAP_SUBTYPE_LABELS, rows };
+      if (poiCacheByMap.size > 16) poiCacheByMap.clear();
+      poiCacheByMap.set(cacheKey, { expiresAt: now + POI_CACHE_TTL_MS, payload });
+      return payload;
+    } catch {
+      const capabilities = Object.fromEntries(POI_CATEGORIES.map(({ key }) => [key, false]));
+      return { capabilities, knownSubtypes: LIVE_MAP_KNOWN_SUBTYPES, subtypeLabels: LIVE_MAP_SUBTYPE_LABELS, rows: [] };
+    }
+  }
+
   const results = await Promise.all(POI_CATEGORIES.map(({ key }) =>
     fetchCategory(db, map, key).catch(() => ({ capabilities: { [key]: false }, rows: [] }))));
   const capabilities = {};

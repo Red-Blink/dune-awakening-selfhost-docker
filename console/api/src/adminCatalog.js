@@ -1,5 +1,32 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
+
+const adminItemsCache = new Map();
+
+function loadAdminItemsCatalog(repoRoot) {
+  const file = resolve(repoRoot, "runtime/data/admin-items.json");
+  let stat;
+  try {
+    stat = statSync(file, { bigint: true });
+  } catch {
+    const items = JSON.parse(readFileSync(file, "utf8"));
+    const byId = new Map(items.map((item) => [String(item?.id || ""), item]));
+    return { items, byId };
+  }
+  const stamp = `${stat.mtimeNs}:${stat.ctimeNs}:${stat.size}`;
+  const cached = adminItemsCache.get(file);
+  if (cached && cached.stamp === stamp) return cached;
+  const items = JSON.parse(readFileSync(file, "utf8"));
+  const byId = new Map();
+  for (const item of items) {
+    const id = String(item?.id || "");
+    if (id && !byId.has(id)) byId.set(id, item);
+  }
+  const entry = { stamp, items, byId };
+  if (adminItemsCache.size > 16) adminItemsCache.clear();
+  adminItemsCache.set(file, entry);
+  return entry;
+}
 
 const FILLABLE_GROUPS = new Set(["refined_resource", "component", "raw_resource"]);
 
@@ -33,10 +60,10 @@ export function resolveCatalogItem(repoRoot, { itemName = "", itemId = "" } = {}
   const value = String(itemId || itemName || "").trim();
   if (!value || value.length > 240 || /[\r\n]/.test(value)) throw new Error("Item name or id is required");
 
-  const items = JSON.parse(readFileSync(resolve(repoRoot, "runtime/data/admin-items.json"), "utf8"));
+  const { items, byId } = loadAdminItemsCatalog(repoRoot);
   const mode = itemId ? "id" : "name";
   if (mode === "id") {
-    const exact = items.find((item) => String(item.id || "") === value);
+    const exact = byId.get(value);
     return normalizeItem(exact || { id: value, name: value, category: "manual", source: "manual" }, repoRoot);
   }
 
@@ -47,7 +74,7 @@ export function resolveCatalogItem(repoRoot, { itemName = "", itemId = "" } = {}
     throw new Error(`Ambiguous item name: ${value}. Select the item by its exact catalog ID.`);
   }
 
-  const exactId = items.find((item) => String(item.id || "") === value);
+  const exactId = byId.get(value);
   if (exactId) return normalizeItem(exactId, repoRoot);
   throw new Error(`No item found for: ${value}`);
 }
@@ -91,8 +118,8 @@ export function isFillableItem(item = {}) {
 }
 
 export function resolveItemVolume(repoRoot, templateId) {
-  const items = JSON.parse(readFileSync(resolve(repoRoot, "runtime/data/admin-items.json"), "utf8"));
-  const match = items.find((item) => String(item.id || "") === templateId);
+  const { byId } = loadAdminItemsCatalog(repoRoot);
+  const match = byId.get(String(templateId || ""));
   return Number(match?.volume) || 0;
 }
 
@@ -104,8 +131,8 @@ export function resolveItemVolume(repoRoot, templateId) {
 // docs/console/base-inventory.md's curation note) -- a wrong value silently
 // mis-splits or over-clamps every grant of that item.
 export function resolveItemStackSize(repoRoot, templateId) {
-  const items = JSON.parse(readFileSync(resolve(repoRoot, "runtime/data/admin-items.json"), "utf8"));
-  const match = items.find((item) => String(item.id || "") === templateId);
+  const { byId } = loadAdminItemsCatalog(repoRoot);
+  const match = byId.get(String(templateId || ""));
   return isValidStackSize(match?.stackSize) ? match.stackSize : 0;
 }
 
@@ -119,7 +146,7 @@ function isValidStackSize(value) {
 }
 
 export function listCatalogItems(repoRoot, { q = "", limit = 500 } = {}) {
-  const items = JSON.parse(readFileSync(resolve(repoRoot, "runtime/data/admin-items.json"), "utf8"));
+  const { items } = loadAdminItemsCatalog(repoRoot);
   const term = String(q || "").trim().toLowerCase();
   const max = Math.max(1, Math.min(Number(limit) || 500, 10000));
   return items
@@ -150,7 +177,7 @@ export function isBuildingUnlockItem(item = {}) {
 }
 
 export function listBuildingUnlockItems(repoRoot) {
-  const items = JSON.parse(readFileSync(resolve(repoRoot, "runtime/data/admin-items.json"), "utf8"));
+  const { items } = loadAdminItemsCatalog(repoRoot);
   return items
     .filter(isBuildingUnlockItem)
     .map((item) => ({
@@ -167,7 +194,7 @@ export function isCustomizationGrantItem(item = {}) {
 }
 
 export function listCustomizationGrantItems(repoRoot) {
-  const items = JSON.parse(readFileSync(resolve(repoRoot, "runtime/data/admin-items.json"), "utf8"));
+  const { items } = loadAdminItemsCatalog(repoRoot);
   return CUSTOMIZATION_GROUPS.flatMap((group) => items
     .filter(isCustomizationGrantItem)
     .filter((item) => group.matches(String(item.id || "")))

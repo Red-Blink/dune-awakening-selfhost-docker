@@ -28,6 +28,8 @@ def seconds(value):
 def connect(path):
     db = sqlite3.connect(path, timeout=5)
     db.execute("pragma journal_mode=WAL")
+    db.execute("pragma synchronous=NORMAL")
+    db.execute("pragma temp_store=MEMORY")
     db.executescript("""
         create table if not exists logs (id integer primary key autoincrement, stamp real, line text);
         create index if not exists log_stamp on logs(stamp);
@@ -81,6 +83,8 @@ def follow(path, retention, parent):
     buffer = b""
     next_probe = 0
     next_flush = 0
+    next_prune = 0
+    dirty_logs = False
     stopped = False
 
     def stop(_signal, _frame):
@@ -126,12 +130,17 @@ def follow(path, retention, parent):
                     buffer += chunk
                     lines = buffer.split(b"\n")
                     buffer = lines.pop()
-                    append(db, [line.decode("utf-8", errors="replace") for line in lines])
+                    if lines:
+                        append(db, [line.decode("utf-8", errors="replace") for line in lines])
+                        dirty_logs = True
                 else:
                     next_probe = 0
             if now >= next_flush:
                 next_flush = now + 1
-                db.execute("delete from logs where stamp < ?", (now - retention,))
+                if dirty_logs or now >= next_prune:
+                    db.execute("delete from logs where stamp < ?", (now - retention,))
+                    dirty_logs = False
+                    next_prune = now + 10
                 db.execute("insert or replace into state values (1,?,?,?)",
                            (now, generation, int(process is not None and process.poll() is None)))
                 db.commit()

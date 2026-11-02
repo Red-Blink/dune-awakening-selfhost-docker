@@ -11,12 +11,34 @@
 // unsafe-ids lookup below duplicates the few lines of plan-path resolution
 // addonSeedJob.js already duplicates into addonJobs.js for the same reason.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { writeJsonAtomic, clampInt } from "../jsonStore.js";
 import { applyExchangeCategoryToSeedRow } from "./exchangeCategoryMask.js";
 import { validateTemplateId } from "../duneDb/presentation.js";
-import { listCatalogItems } from "../adminCatalog.js";
+import { listCatalogItems, resolveCatalogItem } from "../adminCatalog.js";
+
+const seedPlanFileCache = new Map();
+
+function readSeedPlanCached(path) {
+  let stat;
+  try {
+    stat = statSync(path, { bigint: true });
+  } catch {
+    return JSON.parse(readFileSync(path, "utf8"));
+  }
+  const stamp = `${stat.mtimeNs}:${stat.ctimeNs}:${stat.size}`;
+  const cached = seedPlanFileCache.get(path);
+  if (cached && cached.stamp === stamp) return cached.plan;
+  const plan = JSON.parse(readFileSync(path, "utf8"));
+  const unsafeIds = Array.isArray(plan?.unsafe_template_ids) ? plan.unsafe_template_ids.map(String) : [];
+  const baseTemplateIds = [...new Set((Array.isArray(plan?.rows) ? plan.rows : [])
+    .map((row) => String(row?.template_id ?? row?.templateId ?? "").trim())
+    .filter(Boolean))];
+  if (seedPlanFileCache.size > 16) seedPlanFileCache.clear();
+  seedPlanFileCache.set(path, { stamp, plan, unsafeIds, baseTemplateIds });
+  return plan;
+}
 
 const OVERRIDES_PATH = "runtime/generated/market-bot/items.json";
 
@@ -82,8 +104,8 @@ export function readUnsafeTemplateIds(repoRoot) {
   const path = resolveSeedPlanFile(repoRoot);
   if (!path) return [];
   try {
-    const plan = JSON.parse(readFileSync(path, "utf8"));
-    return Array.isArray(plan?.unsafe_template_ids) ? plan.unsafe_template_ids.map(String) : [];
+    readSeedPlanCached(path);
+    return seedPlanFileCache.get(path)?.unsafeIds || [];
   } catch {
     return [];
   }
@@ -96,24 +118,21 @@ export function readBaseMarketTemplateIds(repoRoot) {
   const path = resolveSeedPlanFile(repoRoot);
   if (!path) return [];
   try {
-    const plan = JSON.parse(readFileSync(path, "utf8"));
-    return [...new Set((Array.isArray(plan?.rows) ? plan.rows : [])
-      .map((row) => String(row?.template_id ?? row?.templateId ?? "").trim())
-      .filter(Boolean))];
+    readSeedPlanCached(path);
+    return seedPlanFileCache.get(path)?.baseTemplateIds || [];
   } catch {
     return [];
   }
 }
 
 function findCatalogEntry(repoRoot, templateId) {
-  let items;
   try {
-    items = JSON.parse(readFileSync(resolve(repoRoot, "runtime/data/admin-items.json"), "utf8"));
+    const resolved = resolveCatalogItem(repoRoot, { itemId: templateId });
+    if (resolved && resolved.source !== "manual") return resolved;
+    return null;
   } catch {
     return null;
   }
-  if (!Array.isArray(items)) return null;
-  return items.find((item) => String(item?.id || "") === templateId) || null;
 }
 
 function normalizeOverrideRow(raw) {
