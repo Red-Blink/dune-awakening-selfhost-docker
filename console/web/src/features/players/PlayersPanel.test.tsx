@@ -4,6 +4,8 @@ import { playersApi } from "../../api/players";
 import { mapsApi } from "../../api/maps";
 import { invalidateInstanceNames } from "../maps/instanceNames";
 import { PlayersPanel } from "./PlayersPanel";
+import { combatApi } from "../../api/combat";
+vi.mock("../../api/combat", () => ({ combatApi: { history: vi.fn().mockResolvedValue({ supported: true, status: "recording", leaderboard: [], recentKills: [] }) } }));
 
 vi.mock("../../api/maps", () => ({ mapsApi: { sietchDimensions: vi.fn() } }));
 
@@ -74,6 +76,16 @@ beforeEach(() => {
       orphanedVehicles: 0
     }
   });
+});
+
+it("opens PvP inside Players without continuing the hidden roster poll", async () => {
+  vi.mocked(combatApi.history).mockResolvedValue({ supported: true, status: "recording", reason: "", selfOnly: false, recordingStartedAt: null, recordedSince: null, lastCapturedAt: null, leaderboard: [], recentKills: [] });
+  render(<PlayersPanel onError={vi.fn()} renderCharacterAdmin={() => null} />);
+  await screen.findByText("Vixen");
+  fireEvent.click(screen.getByRole("radio", { name: "PvP" }));
+  expect(await screen.findByText("No PvP kills have been recorded yet.")).toBeVisible();
+  expect(screen.queryByText("Vixen")).toBeNull();
+  expect(combatApi.history).toHaveBeenCalledWith(undefined, { leaderboardLimit: 10, killsLimit: 10 });
 });
 
 afterEach(() => {

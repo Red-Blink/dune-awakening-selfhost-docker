@@ -53,6 +53,7 @@ import { tlsClientAddress } from "./services/tlsClientAddress.js";
 import { createConsoleAccess } from "./services/consoleAccess.js";
 import { parseMemorySwapStatus } from "./services/memorySwap.js";
 import { createDeathPoller } from "./deathPoller.js";
+import { createCombatHistory, combatScope } from "./services/combatHistory.js";
 import { updateEnvFileValue as updateEnvValue } from "./services/envFile.js";
 import { funcomAuthMismatchDetected, matchingFuncomAuthLines, saveFuncomTokenValue as writeFuncomToken, validDockerSince } from "./services/funcomAuth.js";
 import { readCharacterTransferSettingsStatus, saveAndApplyCharacterTransferSettings } from "./services/characterTransferSettings.js";
@@ -288,6 +289,7 @@ let restartQueueAutoLastRun = 0;
 const journeyTagsData = loadJourneyTagsData();
 const memoryBalancer = createMemoryBalancer(config);
 const deathPoller = createDeathPoller(config);
+const combatHistory = createCombatHistory(db, { mockMode: config.mockMode });
 const POSTGRES_UNAVAILABLE_MESSAGE = "Postgres is not running or is restarting. Wait for the database service to come back online, then refresh.";
 const DEFAULT_ALWAYS_ON_STARTUP_PARALLELISM = 1;
 const MAX_ALWAYS_ON_STARTUP_PARALLELISM = 16;
@@ -382,6 +384,9 @@ createServer(async (req, res) => {
   });
   runBackgroundTick("Player playtime tracker", () => duneDb.trackPlayerPlaytime(db));
 });
+
+runBackgroundTick("Combat history", () => combatHistory.tick());
+setInterval(() => { void combatHistory.tick(); }, 30_000).unref?.();
 
 // Reconcile periodically because a Funcom database migration can recreate the
 // fulfilled-orders table and thereby remove third-party triggers. The service
@@ -1045,6 +1050,11 @@ async function handleApi(req, res) {
     });
   }
 
+  if (path === "/api/players/combat" && req.method === "GET") {
+    const controllerId = combatScope(url.searchParams.get("controllerId"));
+    return dbJson(res, () => combatHistory.read({ controllerId,
+      leaderboardLimit: url.searchParams.get("leaderboardLimit"), killsLimit: url.searchParams.get("killsLimit") }));
+  }
   if (path === "/api/players/list-settings" && req.method === "GET") {
     return json(res, 200, {
       ...playerListSettingsView(config.repoRoot),
