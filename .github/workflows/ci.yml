@@ -223,6 +223,7 @@ jobs:
           tests/postgres-shutdown-test.sh
           tests/postgres-bootstrap-test.sh
           tests/coriolis-coordinator-test.sh
+          bash tests/console-restart-isolation-test.sh
           tests/db-backup-validation-test.sh
           tests/battlegroup-identity-test.sh
           tests/db-system-backup-test.sh
