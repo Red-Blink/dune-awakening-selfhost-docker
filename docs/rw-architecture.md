@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-08
 
-**Status:** Layer 1 Design (Requirement 20)
+**Status:** Historical record — Layer 1 design proposal (2026-08-08); the write adapter bridge was never built. Not maintained. For the Discord adapter as shipped, see the Discord Adapter section of [API-REFERENCE.md](console/API-REFERENCE.md).
 
 **Audit:** Eight-Hat Layer 1 completed. 8 issues filed (#215-223). Awaiting fixes before Layer 2.
 

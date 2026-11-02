@@ -1,6 +1,6 @@
 # Live Map
 
-**Status:** Current | **Last Updated:** October 2026
+**Status:** Current | **Last Updated:** November 2026
 
 The Live Map panel renders Hagga Basin and The Deep Desert as pannable,
 zoomable square maps with real-time markers read directly from Postgres --
@@ -65,6 +65,11 @@ joined against `player_state` / `vehicles` / `buildings` / `placeables`.
   Owner row is a `left join lateral` on `permission_actor_rank` at
   `rank = 1` (owner). An unclaimed vehicle has no such row and shows
   "No Owner", exactly like an unclaimed base.
+- **Vehicle** markers exclude vehicles whose lifecycle state is `Travel`,
+  `VehicleBackup` or `VehicleRecovery` (in transit, backed up, or stored for
+  recovery). Those keep their last world transform but are not on the map.
+  The state is read from `dune.actors.state`, falling back to the former
+  `dune.actor_state` table; a schema with neither shows every vehicle.
 - **Base** markers link to the Bases panel (`Open in Bases` in the marker
   overlay); **Vehicle** markers link to the Vehicles panel the same way
   (`Open in Vehicles`) -- both search by the exact numeric id and
@@ -641,10 +646,10 @@ Feature-level changes to the Live Map, newest first.
 
 | Release | Date | Change |
 |---|---|---|
-| Unreleased | 2026-10 | Instances under 8 pixels across draw with a reduced triangle list built at load: 15-45% less frame time on the views that were slowest. |
-| Unreleased | 2026-10 | Sand height fields are stored as one shared base plus each layout's differences: terrain assets drop from 16.0 MB to 11.5 MB, and a Coriolis reset re-fetches about 0.24 MB instead of 0.65 MB. |
-| Unreleased | 2026-10 | **Sector grid corrected** to the game's measured grid (about 269,650 x 269,217 uu cells). It was 250,000 uu cells, which mislabelled anything more than a fraction of a cell from the centre. **Map rect widened** to that grid, about 90,000 uu further each way, so the whole of every edge sector shows, row A in the south included. The Vehicles page now uses the same grid. |
-| Unreleased | 2026-10 | **Tilt and rotation** of the Deep Desert terrain, with perspective: Tilt slider, Top-Down reset, right-drag and a compass. Markers are projected through the camera and hidden where rock covers them; the sector grid is drawn on the terrain, over rock and cliffs. Tilted, the view reaches 375,000 uu past the map's edge: the shield walls outside the square, hand-placed pieces included and floating upper tiers closed down to the ground, on the game's own sand for the first 90,000 uu and a level plain beyond. **Elevation Lines** layer. Rock is painted with the game's own textures (its normal map baked into the two big wall shapes), lit with its authored normals and a per-instance tone, sealed at load, lit as a solid and textured from the side when tilted; the camera's eye stays above the rock at high zoom. The map frame fits the window's height. Terrain instances are culled per frame and the depth pass stops before shading; assets are 1.9 MB smaller (delta-coded mesh indices, shared placements shipped once). |
+| v1.4.47 | 2026-10 | Instances under 8 pixels across draw with a reduced triangle list built at load: 15-45% less frame time on the views that were slowest. |
+| v1.4.47 | 2026-10 | Sand height fields are stored as one shared base plus each layout's differences: terrain assets drop from 16.0 MB to 11.5 MB, and a Coriolis reset re-fetches about 0.24 MB instead of 0.65 MB. |
+| v1.4.47 | 2026-10 | **Sector grid corrected** to the game's measured grid (about 269,650 x 269,217 uu cells). It was 250,000 uu cells, which mislabelled anything more than a fraction of a cell from the centre. **Map rect widened** to that grid, about 90,000 uu further each way, so the whole of every edge sector shows, row A in the south included. The Vehicles page now uses the same grid. |
+| v1.4.45 | 2026-10 | **Tilt and rotation** of the Deep Desert terrain, with perspective: Tilt slider, Top-Down reset, right-drag and a compass. Markers are projected through the camera and hidden where rock covers them; the sector grid is drawn on the terrain, over rock and cliffs. Tilted, the view reaches 375,000 uu past the map's edge: the shield walls outside the square, hand-placed pieces included and floating upper tiers closed down to the ground, on the game's own sand for the first 90,000 uu and a level plain beyond. **Elevation Lines** layer. Rock is painted with the game's own textures (its normal map baked into the two big wall shapes), lit with its authored normals and a per-instance tone, sealed at load, lit as a solid and textured from the side when tilted; the camera's eye stays above the rock at high zoom. The map frame fits the window's height. Terrain instances are culled per frame and the depth pass stops before shading; assets are 1.9 MB smaller (delta-coded mesh indices, shared placements shipped once). |
 | v1.4.35 | 2026-09-20 | The Coriolis block is read from the game log by pattern instead of from a tail, so the layout no longer goes missing on long-running servers. |
 | v1.4.23 | 2026-09-17 | Spice and Flour Sand layers fixed after the game changed `resourcefield_state`. |
 | v1.4.7 | 2026-09-02 | **Rendered Deep Desert terrain** for the live Coriolis layout, with the flat image as fallback. **Sector Grid** overlay. Map rect corrected to the sector square. A double-clicked location opens as an overlay. |

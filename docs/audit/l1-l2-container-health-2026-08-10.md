@@ -1,5 +1,7 @@
 # L1/L2 Audit — ops.health.containers bridge
 
+**Status:** Historical record — audit of the `ops.health.containers` addon bridge as implemented on 2026-08-10. Not maintained.
+
 ## L1 Design
 Use the Console's existing Docker socket (no new privileges and no cAdvisor dependency). Scope Docker queries to the configured Compose project so an addon cannot enumerate unrelated host containers.
 

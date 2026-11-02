@@ -1,10 +1,17 @@
 # Generator refill caps
 
-**Status:** Current | **Last Updated:** August 2026
+**Status:** Current | **Last Updated:** November 2026
 
 `POST /api/bases/:baseId/refill-generators` tops every power device at a base
-up to a per-type fuel cap. The defaults live in the `refill` block of
-`GENERATOR_TYPES` (`console/api/src/duneDb.js`, ~line 3704) alongside the
+up to a per-type fuel cap. If the base's map is running, the route does not
+write: it records the refill and answers `{ ok: true, queued: true, ... }`, and
+the queue flush applies it once that map is confirmed down (the 5 s poll, plus
+the restart map-down hook; see
+[restart-queue.md](restart-queue.md#what-a-restart-will-flush)). A base with a
+queued delete, or one picked up via the base-backup tool, is refused with
+`409`. Only a base whose map is down (or any base on a schema without
+`dune.world_partition`) gets the per-device result described below. The defaults live in the `refill` block of
+`GENERATOR_TYPES` (`console/api/src/duneDb.js`) alongside the
 existing display name / accepted-fuel / building-type metadata for each
 generator type. See [generator-fuel-burn-rates.md](generator-fuel-burn-rates.md)
 for how those same generator types map to burn durations.
@@ -50,7 +57,7 @@ used by `runtime/data/admin-items.json` (loaded by `console/api/src/adminCatalog
 The file is optional — nothing is created by default, and its absence is not
 an error.
 
-Loaded by `refillCaps(repoRoot)` in `console/api/src/duneDb.js` (~line 3752),
+Loaded by `refillCaps(repoRoot)` in `console/api/src/duneDb.js`,
 called once per refill request. Shape: an object keyed by the same type keys
 as the table above, each value overriding any subset of `stackSize`,
 `maxStacks`, and `totalCap`:
@@ -85,8 +92,8 @@ as a warning and treated as no overrides (defaults apply everywhere).
 
 ## How it's used
 
-`refillBaseGenerators(db, repoRoot, baseId)` (`console/api/src/duneDb.js`,
-~line 4730) calls `refillCaps(repoRoot)` once, then for each power device at
+`refillBaseGenerators(db, repoRoot, baseId)` (`console/api/src/duneDb.js`)
+calls `refillCaps(repoRoot)` once, then for each power device at
 the base: tops up existing partial stacks first, then inserts new stacks
 bounded by `maxStacks`, `totalCap`, and the inventory's free slot count. A
 device already at or above `totalCap` is left untouched (`added: 0`).

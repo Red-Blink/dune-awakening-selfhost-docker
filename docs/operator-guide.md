@@ -1,6 +1,6 @@
 # Operator Guide
 
-**Status:** Current | **Last Updated:** August 2026
+**Status:** Current | **Last Updated:** November 2026
 
 This is the end-user (server operator) guide to running a Dune: Awakening
 server with this project. It assumes you have already completed
@@ -38,6 +38,13 @@ once it has been changed via the Settings page's Login Password section.
 Only forward it to trusted administrators — see the root README's Ports
 table.
 
+**Configuration reference.** Every supported `.env` setting (bind host and
+port, database pool and timeouts, retention, update and refill tuning) is
+documented, grouped by feature, in the commented
+[`.env.example`](../.env.example). The installer also honours
+`ADMIN_BIND_PORT=<port>` to choose the Web UI port at install time, and the
+port can later be changed from Settings → Web Console Port.
+
 ---
 
 ## 2. Web UI feature tour
@@ -51,21 +58,85 @@ issue if you get stuck on one of those.
 
 | Panel | What it's for | Further reading |
 |---|---|---|
-| Home | Dashboard/overview | — |
+| Home | Battlegroup state, Readiness & Health rows, Game Servers, Restart History | §2.1 below |
 | Server Control | Start/stop/restart the server and individual services | [`docs/console/restart-queue.md`](console/restart-queue.md) |
-| Players | Player management, kick/ban, inventory actions. A player's Bases and Vehicles tabs list owned items by default; the Permission dropdown (Owner / Co-owner / All levels) widens or narrows them | [`docs/console/API-REFERENCE.md`](console/API-REFERENCE.md) (Players section) |
-| Care Package | Scheduled/manual player reward grants | — |
-| Admin Tools | GM/admin toolbox: item grants, XP/skill grants, teleport, broadcasts, scheduled restarts | [`docs/console/restart-queue.md`](console/restart-queue.md) |
-| Live Map | Real-time map/player activity view | — |
-| Maps | Per-map mode configuration (dynamic / always-on / disabled) | — |
-| Landsraad | The in-game faction/political system | — |
-| Database | Schema/table browsing, SQL preview/export | — |
 | Backups | Database, encrypted system, and base backups | §4 below, [`docs/console/database-backups.md`](console/database-backups.md) |
-| Updates | Game-server content updates | §5 below |
-| Bases (accessed by expanding a base row) | Power, Water, Inventory, Sub-Fief Permissions, Base Permissions tabs | [`docs/console/base-inventory.md`](console/base-inventory.md), [`docs/console/base-permissions.md`](console/base-permissions.md), [`docs/console/base-child-permissions.md`](console/base-child-permissions.md), [`docs/console/base-deletion.md`](console/base-deletion.md) |
-| Exchange | Read-only view of the game's live CHOAM market listings | [`docs/console/exchange.md`](console/exchange.md) |
-| Addons | Browse, install, enable, and approve permissions for Community Addons | §6 below |
-| Settings | Public Server Directory claim, Web Console port, login password | §7 below |
+| Database | Schema/table browsing, SQL preview/export | — |
+| Updates | Game updates, Console (Dune Docker) updates, automatic-update configuration; a **QA Tester Login** button in the page title is for project testers and is not needed for normal operation | §5 below |
+| Logs | Service and container logs | — |
+| Settings | Public listing profile and directory claim, Server Startup, Web Console Port, Login Password, Encrypted API Access, API Keys, Experimental Features (Regis Tanks) | §7 below, [`docs/console/encrypted-api.md`](console/encrypted-api.md), [`docs/console/api-keys.md`](console/api-keys.md) |
+| Maps | Per-map mode configuration (dynamic / always-on / disabled) and settings | — |
+| Players | Player management, kick/ban, inventory actions. A player's Bases and Vehicles tabs list owned items by default; the Permission dropdown (Owner / Co-owner / All levels) widens or narrows them | [`docs/console/API-REFERENCE.md`](console/API-REFERENCE.md) (Players section) |
+| Guilds | Guild list, members, promote/demote and delete | [`docs/console/API-REFERENCE.md`](console/API-REFERENCE.md) |
+| Bases | Power, Water, Inventory, Sub-Fief Permissions, Base Permissions and Land Claim tabs (expand a base row) | [`docs/console/base-inventory.md`](console/base-inventory.md), [`docs/console/base-permissions.md`](console/base-permissions.md), [`docs/console/base-child-permissions.md`](console/base-child-permissions.md), [`docs/console/base-deletion.md`](console/base-deletion.md) |
+| Vehicles | Vehicle list, permissions, storage and deletion | [`docs/console/vehicle-permissions.md`](console/vehicle-permissions.md), [`docs/console/vehicle-storage.md`](console/vehicle-storage.md), [`docs/console/vehicle-deletion.md`](console/vehicle-deletion.md) |
+| Exchange | CHOAM market listings (All / Player / Bot), transactions, and the Market Bot (NPC market seeding and buyback) | [`docs/console/exchange.md`](console/exchange.md) |
+| Live Map | Real-time map/player activity view | [`docs/console/live-map.md`](console/live-map.md), [Realtime Data API](console/API-REFERENCE.md#realtime-data) |
+| Landsraad | The in-game faction/political system | — |
+| Admin Tools | GM/admin toolbox: item grants, XP/skill grants, teleport, broadcasts, scheduled map messages, scheduled restarts | [`docs/console/restart-queue.md`](console/restart-queue.md) |
+| Care Package | Scheduled/manual player reward grants | — |
+| Addons | Browse, install, enable, update and remove Community Addons | §6 below |
+| Language (header globe button) | Console language picker and translation-correction form | §2.2 below |
+
+The sidebar groups these as Server Operations (Home through Settings), Arrakis
+Management (Maps through Care Package) and Community (Addons). Two further
+pages, Services and Storage, exist but have no sidebar entry.
+
+### 2.1 Home: readiness, health and restart history
+
+Home shows the state of the Battlegroup and five **Readiness & Health** rows:
+Database, Messaging, Battlegroup Services, Game Servers and Funcom/FLS. Each row
+has a status and expands to the readings behind it (which containers, ports and
+partitions were checked), so a warning can be traced to a specific service.
+Readings are dated, and a reading older than 90 seconds is treated as stale
+rather than shown as current. Readiness reflects whether the Battlegroup can
+accept players, not only whether containers are running.
+
+**Restart History** is a collapsible panel on Home. It lists completed
+restarts with their time, type (Battlegroup, Map or Service), target, source
+(for example Console, Scheduled, Game Update or Automatic), reason, duration and result (Succeeded or
+Failed), and can be filtered by type. Records are kept in
+`runtime/generated/restart-history.jsonl`, trimmed to the most recent 500
+entries once the file passes 2 MB.
+
+**Stalled game-server recovery.** The Autoscaler watches the Director's view of
+server capacity. If maps stop reporting usable capacity, it first republishes
+the Director state, which is safe with players online. If fresh capacity reports
+taken after that repair still show zero, it asks the Coriolis coordinator for a
+coordinated game-farm restart, which replaces every world map. That restart is
+never run while a player is connected or while the player count cannot be
+confirmed; it is retried automatically once the Battlegroup is empty. Every
+such restart is recorded in Restart History as Source "Automatic", Reason
+"Stalled Game Server Recovery", with a Succeeded or Failed result. A Failed
+entry means the restart did not complete and needs your attention: check
+Server Control and the Autoscaler logs.
+
+### 2.2 Console language and translations
+
+The globe button in the page header opens **Console Language**, a searchable
+list of the languages the Console is translated into. Your choice applies to
+this browser. Only the Console's own interface text is translated; live values
+such as player names, map names and server data are never changed or sent to a
+translation provider, and only repository-reviewed interface phrases can be
+translated at all.
+
+Translations that the project's maintainers have reviewed are authoritative
+and are never overwritten by machine translation. If a phrase reads wrongly,
+use **Suggest a Translation Fix** at the bottom of the picker: choose the
+language, find the text by its current translation or its English source,
+enter the correction (keep placeholders such as `{count0}` unchanged), and
+optionally add a name for credits. Corrections are reviewed before they are
+included in a future project update.
+
+Owners can optionally extend coverage. A DeepL API key can be stored for
+machine translation of languages that are not yet complete; it is saved
+encrypted (AES-256-GCM) on the host and is submitted through the Console's
+i18n API rather than set in `.env`. Peer language sync, which exchanges
+language packs with other Dune Docker installations over an encrypted channel,
+is off by default and requires an explicit opt-in plus a per-installation
+enrollment key. See the Localization (i18n) section of
+[`docs/console/API-REFERENCE.md`](console/API-REFERENCE.md#localization-i18n)
+for the routes.
 
 ---
 
@@ -135,15 +206,6 @@ startup; an out-of-range one is clamped to the nearest bound. A blank one reads
 as unset — though on the standard Docker deployment `docker-compose.web.yml`
 substitutes its own default for a variable that is blank or missing, so a blank
 never reaches the console there.
-
-**Upgrade note.** Until this release the four `ADMIN_AUTO_REFILL_*` variables
-never reached the console in the standard Docker deployment: the console
-service passes an explicit list of variables and these were not on it, and
-nothing loads `.env` directly. They worked only when the console was run
-outside Docker. They are now passed through, so a value you set in `.env` and
-never saw take effect **will** apply after this upgrade. If you set one while
-troubleshooting and forgot about it, check it before deploying — or set the
-value you want from the gear icon, which overrides the variable either way.
 
 Two timing details worth knowing. **A shortened interval pulls the next scan
 in**; a lengthened one applies only after the currently scheduled scan runs.
@@ -224,8 +286,9 @@ the Web UI's Updates panel — do not confuse them:
   `install-assets`, `fix-steamcmd`, `fix-install-dir`, and an unattended
   option,
   `dune update auto enable [interval-minutes] ...` / `disable` /
-  `status`, backed by a systemd timer that runs 5 minutes after boot and
-  then repeats on a rolling interval (default: every 60 minutes,
+  `status`, backed by a systemd timer whose first check runs 5 minutes after
+  the timer is enabled (not after boot) and then repeats on a rolling interval
+  counted from the end of each run (default: every 60 minutes,
   configurable via the first argument to `auto enable`). A successful Web
   Console check is cached for 30 minutes and survives Console restarts;
   **Refresh Game Check** always requests a live result. Read-only checks use
@@ -252,9 +315,10 @@ the Web UI's Updates panel — do not confuse them:
 - **`dune self-update`** (alias `dune stack-update`) — updates **this
   repository/stack itself** (fetching a new GitHub release of
   `dune-awakening-selfhost-docker`). Subcommands: `check`, `list`,
-  `install [latest|<tag>]`. As of this writing, self-update has no
-  automated/scheduled equivalent to `dune update auto` — it is a manual,
-  operator-triggered action.
+  `install [latest|<tag>]`. On its own it is a manual,
+  operator-triggered action; to install new Dune Docker releases automatically,
+  enable `update-console` in `dune update auto enable` (above). The Updates page
+  has matching Game Update and Console Update sections.
 
 ---
 
@@ -270,23 +334,40 @@ can start from the
 An addon can only ever request a permission from a fixed, platform-defined
 list (things like read-only player/database access, granting items,
 restarting the server, or sending broadcasts) — it cannot invent new
-capabilities. Installing an addon does **not** automatically grant it any
-requested permission; you approve each permission explicitly, and an
-addon update that adds a new permission request needs your approval again
-before it can use it.
+capabilities. An addon only receives the permissions you confirm, and an
+addon update that adds a new permission request asks for your confirmation
+again before it can use it.
 
-> **Documentation gap, stated explicitly rather than guessed at:** as of
-> this writing, no document in this repository describes the exact
-> click-by-click Web UI flow for browsing, installing, enabling, or
-> approving permissions for a Community Addon. If you need this, use the
-> Web UI directly (the feature lives under the Addons/Settings area) or
-> file a documentation issue.
-> The developer-facing side of the addon contract (manifest format,
-> permission list, provenance/integrity checks) is documented in
-> [`docs/addons/addon-item-grants.md`](addons/addon-item-grants.md),
-> [`docs/addons/addon-scheduled-jobs.md`](addons/addon-scheduled-jobs.md),
-> [`docs/addons/hardware-status.md`](addons/hardware-status.md), and
-> [`docs/security/addon-provenance.md`](security/addon-provenance.md).
+### Using the Addons page
+
+Open **Addons** in the sidebar (Community group). The page lists the community
+catalog plus any locally installed addon in a table with the columns Addon,
+Version, Permissions, Status and Actions, and a summary of how many addons are
+in each lifecycle state.
+
+- **Install** shows a confirmation that lists every permission the addon
+  requests. Confirming downloads the archive, verifies it, and installs it
+  **disabled**; the confirmation grants the listed permissions.
+- **Enabled / Disabled** switch (Status column) starts or stops an installed
+  addon. Once enabled, the **Sub-Menu** switch pins it into the sidebar.
+- **Update** appears when the catalog has a newer version. If the update
+  requests additional permissions, the confirmation names them, and confirming
+  approves that extra access.
+- **Uninstall** (trash icon) removes the addon.
+
+Each addon has a lifecycle state, shown in the Status column in place of
+"Available" when it is not active: **Deprecated** (installable, may stop
+receiving updates), **Unsupported** (no longer supported by its maintainer),
+**Removed** (taken out of the catalog) and **Blocked** (blocked for safety). Unsupported, Removed and Blocked
+addons cannot be installed or updated, and a Blocked addon cannot be enabled
+or opened; hovering the disabled button shows the reason.
+
+The developer-facing side of the addon contract (manifest format,
+permission list, provenance/integrity checks) is documented in
+[`docs/addons/addon-item-grants.md`](addons/addon-item-grants.md),
+[`docs/addons/addon-scheduled-jobs.md`](addons/addon-scheduled-jobs.md),
+[`docs/addons/hardware-status.md`](addons/hardware-status.md), and
+[`docs/security/addon-provenance.md`](security/addon-provenance.md).
 
 ---
 
@@ -316,7 +397,8 @@ summary — treat those two as the complete current documentation for it.
 
 ## 8. Discord integration
 
-Two separate things exist under the "Discord" name — use the right one:
+The Discord adapter is the supported integration. A separate early prototype
+doc set still exists under the "Discord" name — use the right one:
 
 - **The Discord adapter** (current, operator-facing) — lets you connect a
   companion Discord bot,
@@ -324,20 +406,19 @@ Two separate things exist under the "Discord" name — use the right one:
   for server monitoring; its slash commands are organized into 6 groups
   (`core`, `server`, `data`, `ops`, `admin`, `infra`) — see the linked
   README below for the current, authoritative command list and count. The
-  adapter is disabled by default, read-only unless you separately enable
-  write commands, bearer-token protected, and role-gated. Start with
+  adapter is disabled by default, read-mostly (its only writes are player-link
+  bookkeeping and the opt-in `/broadcast`, which stays disabled on the stock
+  `docker-compose.web.yml`), bearer-token protected, and role-gated. Start with
   [`docs/integrations/discord-integration/README.md`](integrations/discord-integration/README.md);
   the guided, screenshot-illustrated walkthrough is
   [`docs/integrations/discord-integration/admin-guide.md`](integrations/discord-integration/admin-guide.md);
   common problems are in
   [`docs/integrations/discord-integration/troubleshooting.md`](integrations/discord-integration/troubleshooting.md)
   and [`docs/integrations/discord-integration/faq.md`](integrations/discord-integration/faq.md).
-- **The `discord-control-bot`** — a separate, **experimental, internal,
-  read-only** companion project. It cannot write to your database, mutate
-  players/maps/addons, or send broadcasts — the console remains the sole
-  authority for any action it triggers. Only use this if you specifically
-  need it; start with
-  [`docs/integrations/discord-control-bot/admin-guide.md`](integrations/discord-control-bot/admin-guide.md).
+- **The `discord-control-bot` prototype docs** — **historical**. They describe
+  an early prototype of the companion bot, which is not in this repository, and
+  are not maintained. Do not follow them for setup; they remain only for
+  context ([`docs/integrations/discord-control-bot/admin-guide.md`](integrations/discord-control-bot/admin-guide.md)).
 
 ---
 
@@ -368,8 +449,7 @@ manually editing `.env` port variables without reading that document first
 - [Discord Community](https://discord.gg/duneawakeningdocker) — support and discussion.
 - [`docs/README.md`](README.md) — the full documentation index, including
   every feature/security/incident document referenced above.
-- GitHub Issues on this repository — bug reports and documentation gaps
-  (including the addon-UI gap noted in §6).
+- GitHub Issues on this repository — bug reports and documentation gaps.
 
 ---
 

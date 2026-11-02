@@ -87,11 +87,15 @@ by nature, so it gets its own.
 - [restart-queue.md](console/restart-queue.md) — Current. The Restart Queue toggle: player-aware countdowns with in-game warnings, the two broadcast variants, concurrency rules, crash recovery, the "Restart later" deferred-restart option, and the join-lock limitation.
 - [exchange.md](console/exchange.md) — Current. The read-only Market Board: aggregated-by-item CHOAM exchange listings, seller resolution, how bot listings are identified, the bot/blacklist filter config, the Market Bot seed/buyback engine, and the Bot items tab's per-item catalog overrides.
 - [encrypted-api.md](console/encrypted-api.md) — Optional. The encrypted front door for the Console API: HTTPS with its own long-lived key that clients pin, the API-only door (`GET /api/*` with an API key, no web UI, no cookies), the fingerprint shown by the installer, Settings and `dune encrypted-api`, and how to compare it.
+- [console-iam.md](console-iam.md) — Current. The Console's IAM layer: how every authenticated route maps to one action, the tiers and policy overrides, and the split namespaces.
+- [realtime.md](console/realtime.md) — Optional. Live sandworm, NPC, storm and vehicle positions from the optional MapViewer3D `mvagent`, including the `/api/realtime/*` routes and their limits.
+- [server-custom-settings.md](console/server-custom-settings.md) — Current. `ServerCustomSettings.ini`: where it lives and how the Console's Custom Settings tab manages it.
+- [spice-fields-custom-settings-uat.md](console/spice-fields-custom-settings-uat.md) — Historical record. Manual test plan for PR #228's spice field Custom Settings.
 - [live-map.md](console/live-map.md) — Current. The Live Map panel: partition display-name resolution, the actor/spice/POI marker data model (static archive + live decode + self-learning pool, the registry-driven POI framework), the Layers legend's hide-if-empty and default-settings mechanism, Coriolis seed/layout/countdown resolution, and the WebGL terrain renderer that draws the Deep Desert's own cartography meshes: rock textures and elevation lines; tilt and rotation with a compass, markers projected and hidden behind rock, the sector grid drawn over rock and cliffs, and the shield walls and sand past the map's edge; the shipped assets; and the conditions under which it degrades or falls back to the flat map image.
 
 ## Runtime (`runtime/`)
 
-- [CONTAINER-HARDENING.md](runtime/CONTAINER-HARDENING.md) — Current. Summary of container hardening changes.
+- [CONTAINER-HARDENING.md](runtime/CONTAINER-HARDENING.md) — Historical record. Summary of the container hardening change as merged.
 - [E2E-METRICS-TESTING.md](runtime/E2E-METRICS-TESTING.md) — Current. End-to-end validation procedure for the metrics stack (`runtime/metrics`).
 - [MULTI-SERVER-SINGLE-PUBLIC-IP.md](runtime/MULTI-SERVER-SINGLE-PUBLIC-IP.md) — Current. Executive overview and detailed SOP for running multiple isolated battlegroups behind one public IPv4, including full per-instance port profiles, NAT/hairpin requirements, UserEngine configuration, validation, rollback, and the `multi-server-config.py` automation helper.
 
@@ -110,14 +114,18 @@ Two overlapping doc sets — start with whichever matches your role:
   - [admin-guide.md](integrations/discord-integration/admin-guide.md) — Walkthrough for getting the bot running on your server.
   - [faq.md](integrations/discord-integration/faq.md) — Frequently asked questions.
   - [troubleshooting.md](integrations/discord-integration/troubleshooting.md) — Common problems and fixes.
-- [discord-control-bot/admin-guide.md](integrations/discord-control-bot/admin-guide.md) — Current, **internal**. Admin guide for the experimental read-only companion bot.
-  - [setup-guide.md](integrations/discord-control-bot/setup-guide.md) — Validating the command layer and adapter without a live Discord connection.
-  - [user-guide.md](integrations/discord-control-bot/user-guide.md) — Command reference for end users.
-  - [api-adapter-contract.md](integrations/discord-control-bot/api-adapter-contract.md) — The protected server-side adapter contract.
+- [api-adapter-contract.md](integrations/discord-control-bot/api-adapter-contract.md) — Current, **developer-facing**. The protected server-side adapter contract. The `/catalog` route is authoritative for live routes.
+- [discord-control-bot/admin-guide.md](integrations/discord-control-bot/admin-guide.md) — Historical record. Admin guide for an early prototype of the companion bot, which is not in this repository.
+  - [setup-guide.md](integrations/discord-control-bot/setup-guide.md) — Historical record. Validating that prototype without a live Discord connection.
+  - [user-guide.md](integrations/discord-control-bot/user-guide.md) — Historical record. That prototype's command reference.
+- [bot/output-architecture.md](bot/output-architecture.md) — Historical record. Output design notes for the companion repository's Arrakis Control Panel bot.
 
 ## Security
 
-All four docs below describe controls that are still in force; they are marked
+- [age-secrets.md](security/age-secrets.md) — Current. Optional age encryption at rest for the server-login secrets, and how to migrate to it.
+- [ci-security-checks.md](security/ci-security-checks.md) — Current. What the `security-checks` CI gate scans and how accepted findings are recorded.
+
+The four docs below describe controls that are still in force; they are marked
 historical because they read as point-in-time PR records, not because the
 control itself is stale.
 
@@ -129,6 +137,19 @@ control itself is stale.
 ## Incidents
 
 - [INC-2026-07-24-STEAMCMD-CDN-OUTAGE.md](incidents/INC-2026-07-24-STEAMCMD-CDN-OUTAGE.md) — Historical record. Post-incident case study: SteamCMD content-host failure.
+- [INC-2026-08-19-GIVE-FILL-POSITION-INDEX-COLLISION.md](incidents/INC-2026-08-19-GIVE-FILL-POSITION-INDEX-COLLISION.md) — Historical record. Give and Fill writing colliding container position indexes.
+- [INC-2026-08-19-VOLUME-OVERRIDE-DOUBLE-MULTIPLIED.md](incidents/INC-2026-08-19-VOLUME-OVERRIDE-DOUBLE-MULTIPLIED.md) — Historical record. Item volume overrides multiplied twice.
+
+## Design records
+
+Proposals and audits kept for their reasoning. Each one's status line says how
+much of it shipped; none is a description of current behavior.
+
+- [rfc-console-auth.md](rfc-console-auth.md) — Historical record. Layered Console authentication proposal; none of it is implemented here.
+- [rfc-command-discovery.md](rfc-command-discovery.md) — Historical record. Discord command discovery from Core; Phase 1 shipped.
+- [rw-architecture.md](rw-architecture.md) — Historical record. Discord write-command design that was never built.
+- [spice-fields-per-map-scoping-l1-design-2026-09-21.md](design/spice-fields-per-map-scoping-l1-design-2026-09-21.md) — Historical record. Per-map scoping design for spice field settings.
+- [l1-l2-container-health-2026-08-10.md](audit/l1-l2-container-health-2026-08-10.md) — Historical record. Design and implementation audit of the `ops.health.containers` bridge.
 
 ## Archive
 
@@ -141,6 +162,6 @@ current doc for anything still accurate today.
 
 ## Other
 
-- [Release Notes](../RELEASE_NOTES.md) — Current. Notes for v1.4.59.
+- [Release Notes](../RELEASE_NOTES.md) — Current. Notes for the latest release.
 - README editions — Current. [English](../README.md), [简体中文](readme/README_zh.md), [繁體中文](readme/README_zh-TW.md), [日本語](readme/README_ja.md), [한국어](readme/README_ko.md), [Türkçe](readme/README_tr.md), [Русский](readme/README_ru.md), [Tiếng Việt](readme/README_vi.md), [ไทย](readme/README_th.md), [Deutsch](readme/README_de.md), [Español](readme/README_es.md), [Français](readme/README_fr.md), [Українська](readme/README_uk.md), [Polski](readme/README_pl.md), [Português (Brasil)](readme/README_pt-BR.md), [العربية](readme/README_ar.md), [فارسی](readme/README_fa.md), [Bahasa Indonesia](readme/README_id.md), [Italiano](readme/README_it.md), [Ελληνικά](readme/README_el.md), [മലയാളം](readme/README_ml.md), [Roman Urdu](readme/README_ur-Latn.md), [Română](readme/README_ro.md): project overview, features, requirements, and installation.
-- [operator-guide.md](operator-guide.md) — Current. End-user/operator guide: Web UI feature tour, bases, backups, updates, community addons (including a stated documentation gap on the addon-install UI flow), the Public Server Directory, Discord integration, and multi-server hosting. Cross-links the feature docs above rather than duplicating them.
+- [operator-guide.md](operator-guide.md) — Current. End-user/operator guide: Web UI feature tour, readiness and recovery, language settings, bases, backups, updates, community addons, the Public Server Directory, Discord integration, and multi-server hosting. Cross-links the feature docs above rather than duplicating them.

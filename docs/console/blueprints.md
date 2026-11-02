@@ -1,6 +1,6 @@
 # Blueprint Import/Export — Developer Documentation
 
-**Status:** Current | **Last Updated:** August 2026
+**Status:** Current | **Last Updated:** November 2026
 
 ## Overview
 
@@ -29,6 +29,8 @@ player building blueprints through the admin console. Blueprints are stored as
 │ ┌──────────────────────────────────────────────────────┐ │
 │ │ GET  /api/blueprints              → listBlueprints()  │ │
 │ │ GET  /api/blueprints/:id/export   → exportBlueprint() │ │
+│ │ POST /api/blueprints/export       → bulk zip export   │ │
+│ │ GET  /api/blueprints/community*   → community catalog │ │
 │ │ POST /api/blueprints/import       → importBlueprint() │ │
 │ │ DEL  /api/blueprints/:id          → deleteBlueprint() │ │
 │ └──────────────────┬───────────────────────────────────┘ │
@@ -127,6 +129,40 @@ Exports a blueprint as downloadable JSON file.
   "pentashields": [...]
 }
 ```
+
+### POST /api/blueprints/export
+
+Exports several blueprints as one zip (Export Selected / Export All).
+
+**Request**: JSON `{ "ids": [14, 15] }`. Ids are deduplicated and must be
+positive safe integers. At least one is required, at most 500 (`400` with
+"Select at least one valid blueprint to export." or "A maximum of 500
+blueprints can be exported at once.").
+
+**Response**: `application/zip` named `blueprints-<timestamp>.zip`, one
+`<blueprint name>.json` per id (a numeric suffix is added on a name clash), each
+in the same format as the single export. Requires the `blueprints:export`
+action, which is not included in `blueprints:read`.
+
+### Community blueprints
+
+The Blueprints sub-tab has a **Browse Blueprints** view
+(`CommunityBlueprintBrowser.tsx`) next to the player's own list. It reads a
+remote catalog (base URL from `DUNE_BLUEPRINT_CATALOG_URL`,
+`console/api/src/services/blueprintCatalog.js`):
+
+- `GET /api/blueprints/community?q=&set=&sort=newest&limit=20&offset=0` lists
+  catalog entries. A catalog failure returns the upstream status (default
+  `502`) with an error message.
+- `GET /api/blueprints/community/:id/preview` returns the entry's preview image
+  (`cache-control: private, max-age=300`).
+- `POST /api/blueprints/community/:id/install` with body `{ "playerId": <pawn id> }`
+  imports the entry into that player's backpack through the same
+  `importBlueprint()` path as a file import, audited as
+  `blueprints.community-install`. The response is the import result plus a
+  `source` summary.
+
+The two `GET` routes use `blueprints:read`; install uses `blueprints:import`.
 
 ### POST /api/blueprints/import
 
@@ -323,11 +359,13 @@ No SQL string concatenation with user input.
 
 Routes are registered in order to prevent path confusion:
 1. `GET /api/blueprints` (list)
-2. `GET /api/blueprints/:id/export` (export)
-3. `POST /api/blueprints/import` (import)
-4. `DELETE /api/blueprints/:id` (delete)
+2. `GET /api/blueprints/community`, `.../community/:id/preview`, `POST .../community/:id/install` (community catalog)
+3. `POST /api/blueprints/export` (bulk export)
+4. `GET /api/blueprints/:id/export` (export)
+5. `POST /api/blueprints/import` (import)
+6. `DELETE /api/blueprints/:id` (delete)
 
-Routes 1-3 use exact matching before the generic `:id` delete pattern,
+Routes 1-5 use exact matching before the generic `:id` delete pattern,
 preventing `"import"` or `"export"` from being interpreted as blueprint IDs.
 
 ### Error Redaction
@@ -411,10 +449,12 @@ cd console/web && npx vite build
 | File | Purpose |
 |------|---------|
 | `console/api/src/blueprints.js` | Blueprint CRUD operations |
+| `console/api/src/services/blueprintCatalog.js` | Community catalog client |
 | `console/api/src/httpSafety.js` | Multipart form parser, static safety |
 | `console/api/src/server.js` | HTTP route handlers |
 | `console/api/src/duneDb.js` | Inventory query (backpack-only filter) |
 | `console/web/src/features/blueprints/BlueprintsPanel.tsx` | React UI component |
+| `console/web/src/features/blueprints/CommunityBlueprintBrowser.tsx` | Community catalog browser |
 | `console/web/src/features/players/CharacterAdminUI.tsx` | Tab integration |
 | `console/api/test/blueprints.test.js` | Unit tests |
 | `console/api/test/httpSafety.test.js` | Multipart tests |

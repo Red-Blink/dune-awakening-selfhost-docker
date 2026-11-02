@@ -1,5 +1,13 @@
 # Admin Guide — Setting Up the Bot on Your Server
 
+**Status:** Current | **Last Updated:** November 2026
+
+This guide covers the Discord side and the bot-side configuration. The bot is
+maintained outside this repository
+([dune-awakening-selfhost-discordbot](https://github.com/yacketrj/dune-awakening-selfhost-discordbot)),
+so variables labeled "bot-side" below are read only by the bot. Console-side
+variables are listed in the [adapter README](README.md).
+
 This guide walks you through getting the Dune Discord Bot running on your own
 server. You'll need access to your Dune Awakening game server and about 20
 minutes.
@@ -12,7 +20,7 @@ minutes.
 - About 20 minutes of setup time
 
 No coding or Docker experience is required if someone else handles the hosting.
-If you're doing everything yourself, see the [Companion Bot Setup Guide](../discord-control-bot/setup-guide.md).
+If you're doing everything yourself, see the [adapter README](README.md) for the console side and the bot repository for hosting the bot.
 
 ---
 
@@ -121,7 +129,7 @@ The bot can automatically post server status to a channel every 30 minutes.
 
 1. Create or identify a channel for updates (e.g., `#server-status`)
 2. Right-click the channel → **Copy Channel ID**
-3. Add these to your `.env` file:
+3. Add these to the bot's `.env` file (bot-side variables):
 
 ```bash
 DUNE_POST_SCHEDULE_TYPE=status-summary
@@ -143,7 +151,8 @@ DUNE_SCHEDULER_INTERVAL_MS=1800000    # 30 minutes
 
 ## Step 8: Enable In-Game Announcements (Optional)
 
-The bot can forward in-game announcements to a Discord channel:
+The bot can forward in-game announcements to a Discord channel (bot-side
+variables):
 
 ```bash
 DUNE_ANNOUNCEMENTS_ENABLED=true
@@ -155,21 +164,28 @@ DUNE_ANNOUNCEMENTS_CHANNEL=YOUR_CHANNEL_ID
 ## Step 9: Configure Write Commands (Optional, Advanced)
 
 Write commands like `/dune admin broadcast` are **disabled by default** for
-security. To enable them:
+security. The console enforces this: `/broadcast` needs the console's
+`DUNE_DISCORD_WRITES_ENABLED=true`, and only actors holding a role in the
+console's `DISCORD_ADMIN_ROLE_IDS` or `DISCORD_OWNER_ROLE_IDS` may use it. On the
+stock `docker-compose.web.yml`, `DUNE_DISCORD_WRITES_ENABLED` is not forwarded to
+the container, so `/broadcast` stays disabled (403 `writes_disabled`) even if
+`.env` sets the flag.
 
-```bash
-DUNE_DISCORD_WRITES_ENABLED=true
-DISCORD_WRITE_ADMIN_ROLE_IDS=YOUR_ADMIN_ROLE_ID
-```
+The bot has its own write switches (bot-side, for example
+`DISCORD_WRITE_ADMIN_ROLE_IDS`); the console does not read them. See the bot
+repository for details.
 
-> ⚠️ Write commands should only be enabled after the upstream write-contract
-> is approved and you've tested thoroughly.
+> ⚠️ Test write commands thoroughly before enabling them for real users.
 
 ---
 
 ## Step 10: Create the Configuration File
 
-Create a `.env` file with your settings. Here's a complete template:
+Create the bot's `.env` file with your settings. Everything in this template is
+bot-side. The role IDs must also be set on the console (see the
+[adapter README](README.md#rbac-configuration)), and
+`DUNE_DISCORD_ADAPTER_TOKEN` must equal the token the console is configured with.
+Here's a complete template:
 
 ```bash
 # === Required ===
@@ -236,7 +252,7 @@ Test these commands in your Discord server:
 
 ## Next Steps
 
-- [User Guide](../discord-control-bot/user-guide.md) — how to use all 25 commands
+- [Bot repository](https://github.com/yacketrj/dune-awakening-selfhost-discordbot) — current command list and user guide
 - [FAQ](faq.md) — answers to common questions
 - [Troubleshooting](troubleshooting.md) — what to do when things go wrong
 - [Configuration Reference](#step-10-create-the-configuration-file) — all available settings
