@@ -46,7 +46,7 @@ import { looksLikeTar, mintSystemBackupName, normalizeImportedSystemMetadata, re
 import { createTarHeader, tarArchiveLength, tarPadding, TAR_TRAILER_BYTES, createBackupDownloadArchive, enrichBackupRows, nextImportedBackupName, normalizeImportedBackupMetadata, readCurrentBattlegroupId, validBackupDownloadName } from "./services/backups.js";
 import { createMemoryBalancer } from "./services/memoryBalancer.js";
 import { collectContainerHealth } from "./services/containerHealth.js";
-import { createRealtime, RealtimeError } from "./services/realtime.js";
+import { createRealtime, parseObjectFilter, RealtimeError } from "./services/realtime.js";
 import { createEncryptedApi, EncryptedApiError } from "./services/encryptedApi.js";
 import { tlsClientAddress } from "./services/tlsClientAddress.js";
 import { createConsoleAccess } from "./services/consoleAccess.js";
@@ -1622,6 +1622,34 @@ async function dispatchAddonBridgeAction(req, res, id, body, action) {
     const result = await hardwareStatus();
     audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, sensorCount: result.temperatures.length, ok: true });
     return json(res, 200, { ok: true, result });
+  }
+  if (action === "realtime.health" || action === "realtime.objects") {
+    const addon = assertInstalledAddonPermission(config, id, "realtime:read");
+    try {
+      let result;
+      if (action === "realtime.health") {
+        result = await realtime.health();
+      } else {
+        // Player objects leave only for an addon that also holds players:read,
+        // the same rule as the API key scope.
+        let allowPlayers = false;
+        try {
+          assertInstalledAddonPermission(config, id, "players:read");
+          allowPlayers = true;
+        } catch {}
+        result = await realtime.objects({ allowPlayers, ...parseObjectFilter({ kinds: body.kinds, map: body.map }) });
+      }
+      audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: true });
+      return json(res, 200, { ok: true, result });
+    } catch (error) {
+      if (!(error instanceof RealtimeError)) throw error;
+      audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: false, error: redact(error.message) });
+      // An agent that is not running is a state the addon shows, not a fault of
+      // the call: answer 200 with available:false so a polling addon needs no
+      // error handling for it. Bad input stays an error.
+      if (error.status === 400) return json(res, 400, { ok: false, error: error.message });
+      return json(res, 200, { ok: true, result: { available: false, error: error.message } });
+    }
   }
   if (action === "admin.items.grant") {
     const addon = assertInstalledAddonPermission(config, id, "admin:grant-items");

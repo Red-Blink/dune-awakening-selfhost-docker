@@ -59,6 +59,15 @@ streams per key and 16 in total are open at once.
 Sources never carry process ids. Object kinds: `worm`, `vehicle`, `npc`,
 `civilian`, `storm`, `coriolis`, and `player` (see above).
 
+## Addons
+
+Addons cannot use API keys (the addon bridge rejects them, and the addon sandbox
+has no network access). Instead, an addon that declares `realtime:read` and is
+approved by the server owner can call the bridge actions `realtime.health` and
+`realtime.objects` for snapshots. Player objects follow the same rule as API
+keys: only for addons that also hold `players:read`. See
+[Addon Runtime API](../addons/addon-runtime-api.md#realtime-data).
+
 ## Transport
 
 API keys and positions travel inside the Console's own connection. Serve the
