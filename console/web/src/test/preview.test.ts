@@ -6,6 +6,13 @@ import { itemRows, people, inventoryForPlayer } from '../../preview/data/shared'
 import catalog from '../../../../runtime/data/admin-items.json';
 import settingsMetadata from '../../preview/data/settingsSchema.json';
 describe('public Console preview isolation',()=>{
+ it('provides fictional combat history without a live backend',async()=>{
+  const profile=sampleResponse(new URL('https://try.example/api/players/101')) as {player:{player_controller_id:string}};
+  const combat=await previewApiResponse(new URL('https://try.example/api/players/combat?controllerId='+profile.player.player_controller_id)).json();
+  expect(combat.leaderboard).toHaveLength(1);
+  expect(combat.leaderboard[0].controllerId).toBe(profile.player.player_controller_id);
+  expect(combat.recentKills[0]).toMatchObject({killer:'Aster Vale',victim:'Mira Sandwalker'});
+ });
  it('shows v1.4.59 in the Console and sample update checks',()=>{
   expect(sampleResponse(new URL('https://try.example/api/auth/state'))).toMatchObject({config:{version:'1.4.59'}});
   const task=sampleResponse(new URL('https://try.example/api/setup/tasks/preview-check-stack')) as {task:{logLines:{line:string}[]}};

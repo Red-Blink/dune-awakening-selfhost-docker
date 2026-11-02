@@ -51,6 +51,38 @@ function sha256File(filePath) {
   return crypto.createHash("sha256").update(readFileSync(filePath)).digest("hex");
 }
 
+test('cached vault plaintext is invalidated when the master key changes', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'i18n-master-rotation-'));
+  const previous = process.env.DEEPL_VAULT_MASTER_KEY;
+  t.after(() => {
+    if (previous === undefined) delete process.env.DEEPL_VAULT_MASTER_KEY;
+    else process.env.DEEPL_VAULT_MASTER_KEY = previous;
+    resetTranslationDatabaseCache(); rmSync(dir, { recursive: true, force: true });
+  });
+  const config = { generatedDir: dir, secretsDir: join(dir, 'secrets') };
+  process.env.DEEPL_VAULT_MASTER_KEY = 'synthetic-master-a'.repeat(4);
+  saveEncryptedDeepLApiKey('synthetic-provider-key:fx', config);
+  assert.equal(decryptDeepLApiKey(config), 'synthetic-provider-key:fx');
+  process.env.DEEPL_VAULT_MASTER_KEY = 'synthetic-master-b'.repeat(4);
+  assert.equal(decryptDeepLApiKey(config), '');
+  process.env.DEEPL_VAULT_MASTER_KEY = 'synthetic-master-a'.repeat(4);
+  assert.equal(decryptDeepLApiKey(config), 'synthetic-provider-key:fx');
+});
+
+test('saving a deleted lazy language does not restore its old runtime overlay', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'i18n-overlay-delete-'));
+  t.after(() => { resetTranslationDatabaseCache(); rmSync(dir, { recursive: true, force: true }); });
+  const config = { generatedDir: dir, secretsDir: join(dir, 'secrets') };
+  resetTranslationDatabaseCache();
+  const db = loadTranslationDatabase(config);
+  db.translations.FR = { Home: 'Accueil de test' };
+  saveTranslationDatabase(config, db);
+  assert.ok(JSON.parse(readFileSync(runtimeDbPath(config))).translations.FR);
+  delete db.translations.FR;
+  saveTranslationDatabase(config, db);
+  assert.equal(JSON.parse(readFileSync(runtimeDbPath(config))).translations.FR, undefined);
+});
+
 function createMockHttpCall({ method = "GET", path = "/api/i18n/languages", headers = {}, body = {} }) {
   const url = new URL(path, "http://localhost");
   let statusCode = 200;

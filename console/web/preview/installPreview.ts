@@ -52,7 +52,7 @@ export function installPreview(){
   });
   document.querySelectorAll<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>('input,textarea,select').forEach(field=>{
    const label=[field.getAttribute('aria-label'),field.getAttribute('placeholder'),field.getAttribute('name'),field.closest('label')?.textContent].join(' ');
-   if(field.closest('.live-map-layers,.live-map-layer,.language-picker,.segmented-control,.database-schema-select,.playerAdmin_filterToolsRow')||/search|filter|page size|rows per|sort|select service|select map|category|schema|target|school/i.test(label)||field.getAttribute('type')==='search')return;
+   if(field.closest('.live-map-layers,.live-map-layer,.language-picker,.segmented-control,.database-schema-select,.playerAdmin_filterToolsRow,.combat-row-control')||/search|filter|page size|rows per|sort|select service|select map|category|schema|target|school/i.test(label)||field.getAttribute('type')==='search')return;
    if(field instanceof HTMLSelectElement||field.getAttribute('type')==='checkbox'||field.getAttribute('type')==='radio')field.disabled=true;
    else field.readOnly=true;
    field.title='Preview Only';

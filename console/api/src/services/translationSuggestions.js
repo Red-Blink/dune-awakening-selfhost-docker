@@ -10,14 +10,15 @@ function loadOrCreateContributorIdentity(secretsDir) {
   const file = join(secretsDir, 'translation-contributor-key.pem');
   mkdirSync(secretsDir, { recursive: true, mode: 0o700 });
   try {
-    const st = statSync(file);
+    const st = statSync(file, { bigint: true });
+    const stamp = `${st.ino}:${st.mtimeNs}:${st.ctimeNs}:${st.size}`;
     const cached = contributorKeyCache.get(file);
-    if (cached && cached.mtimeMs === st.mtimeMs && cached.size === st.size) {
+    if (cached && cached.stamp === stamp) {
       return cached;
     }
     const privateKey = createPrivateKey(readFileSync(file));
     const publicKey = createPublicKey(privateKey).export({ type: 'spki', format: 'der' }).toString('base64');
-    const entry = { mtimeMs: st.mtimeMs, size: st.size, privateKey, publicKey };
+    const entry = { stamp, privateKey, publicKey };
     if (contributorKeyCache.size >= 16) contributorKeyCache.clear();
     contributorKeyCache.set(file, entry);
     return entry;
@@ -26,10 +27,10 @@ function loadOrCreateContributorIdentity(secretsDir) {
     const generated = generateKeyPairSync('ed25519');
     try { writeFileSync(file, generated.privateKey.export({ type: 'pkcs8', format: 'pem' }), { flag: 'wx', mode: 0o600 }); }
     catch (writeError) { if (writeError.code !== 'EEXIST') throw writeError; }
-    const st = statSync(file);
+    const st = statSync(file, { bigint: true });
     const privateKey = createPrivateKey(readFileSync(file));
     const publicKey = createPublicKey(privateKey).export({ type: 'spki', format: 'der' }).toString('base64');
-    const entry = { mtimeMs: st.mtimeMs, size: st.size, privateKey, publicKey };
+    const entry = { stamp: `${st.ino}:${st.mtimeNs}:${st.ctimeNs}:${st.size}`, privateKey, publicKey };
     if (contributorKeyCache.size >= 16) contributorKeyCache.clear();
     contributorKeyCache.set(file, entry);
     return entry;

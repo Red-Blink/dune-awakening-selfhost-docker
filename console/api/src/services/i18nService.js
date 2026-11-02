@@ -341,6 +341,13 @@ const derivedScryptKeyCache = new Map();
 const MAX_SCRYPT_CACHE_ENTRIES = 64;
 const decryptedVaultFileCache = new Map();
 
+function rememberVaultFile(path, value) {
+  if (!decryptedVaultFileCache.has(path) && decryptedVaultFileCache.size >= 64) {
+    decryptedVaultFileCache.delete(decryptedVaultFileCache.keys().next().value);
+  }
+  decryptedVaultFileCache.set(path, value);
+}
+
 function deriveScryptKeyCached(masterSecret, saltBuf) {
   const cacheKey = crypto
     .createHmac("sha256", String(masterSecret))
@@ -364,7 +371,9 @@ function readDecryptedVaultFileCached(vPath, config) {
       return "";
     }
     const st = statSync(vPath, { bigint: true });
-    const stamp = `${st.mtimeNs}:${st.ctimeNs}:${st.size}`;
+    const masterSecret = getOrCreateMasterSecret(config);
+    const masterIdentity = crypto.createHash("sha256").update(String(masterSecret)).digest("hex");
+    const stamp = `${st.ino}:${st.mtimeNs}:${st.ctimeNs}:${st.size}:${masterIdentity}`;
     const cached = decryptedVaultFileCache.get(vPath);
     if (cached && cached.stamp === stamp) {
       return cached.value;
@@ -372,12 +381,11 @@ function readDecryptedVaultFileCached(vPath, config) {
     const parsed = JSON.parse(readFileSync(vPath, "utf8"));
     const vault = parsed?.vault || parsed;
     if (!vault?.ciphertext) {
-      decryptedVaultFileCache.set(vPath, { stamp, value: "" });
+      rememberVaultFile(vPath, { stamp, value: "" });
       return "";
     }
-    const masterSecret = getOrCreateMasterSecret(config);
     const value = decryptDeepLVaultPayload(vault, masterSecret);
-    decryptedVaultFileCache.set(vPath, { stamp, value });
+    rememberVaultFile(vPath, { stamp, value });
     return value;
   } catch {
     return "";
@@ -900,6 +908,7 @@ export function saveTranslationDatabase(config, db = memoryDb) {
   for (const [langCode, dict] of Object.entries(existingRuntime)) {
     const code = normalizeLanguageCode(langCode);
     if (!code || code === "EN" || !dict || typeof dict !== "object") continue;
+    if (db.translations?.__isDeleted?.(code)) continue;
     if (Object.prototype.hasOwnProperty.call(rawMaterialized, code)) continue;
     sanitizedTranslations[code] = {};
     for (const [orig, trans] of Object.entries(dict)) {

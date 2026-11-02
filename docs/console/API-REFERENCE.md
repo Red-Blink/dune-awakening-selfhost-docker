@@ -227,6 +227,11 @@ them.
 | GET | `/api/players/online` | List currently online players | `page?`, `pageSize?` |
 | GET | `/api/players/search` | Search players by name/ID | `q?` (query param; omitted lists the first page of all players) |
 | GET | `/api/players/deleted-characters` | List deleted characters holding bases or vehicles, plus unattributed orphaned assets. See [deleted-characters.md](deleted-characters.md) | None |
+| GET | `/api/players/combat` | Read recorded combat statistics and recent PvP kills. API keys require `players:read`; browser access uses the existing Console login. | `controllerId?` (positive signed-bigint player controller ID), `leaderboardLimit?`, `killsLimit?` (`10`, `20`, `50`, or `all`) |
+
+The Players → PvP view and each player's Combat tab use this endpoint. The Console captures available native type-0 death events every 30 seconds into its own `dune_console_combat` history tables. It does not modify game tables. Type-5 kill notifications are not counted again. Distinct attacker/victim Player deaths count toward PvP K/D; self-deaths, known non-player causes and unclassified deaths have separate counters. K/D is `null` when there are no PvP deaths.
+
+The response includes `supported`, recorder `status`/`reason`, `recordingStartedAt`, `recordedSince`, `lastCapturedAt`, `selfOnly`, `leaderboard` and `recentKills`. The Console defaults to ten rows in each panel, with independent selectors for 10, 20, 50 or All. API calls omitting the limit parameters retain the original defaults of 100 players and 50 kills. `all` returns every available recorded entry in that panel, including entries beyond the old caps, within the existing query timeout. Invalid sizes return HTTP 400. Rows are keyed by controller ID, not character name. History survives native actor/event deletion once captured, but events removed before collection cannot be recovered. These totals describe available recorded history, not lifetime statistics. No weapon attribution is inferred.
 
 Player rows include `total_playtime_seconds`. The console samples `player_state.online_status` every 10 seconds and persists completed session time in `dune.console_player_playtime`; the currently active session is included from `last_login_time`. Tracking begins when this console version first runs, so time from older completed sessions cannot be reconstructed.
 

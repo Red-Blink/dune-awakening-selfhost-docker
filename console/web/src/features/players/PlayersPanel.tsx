@@ -4,6 +4,7 @@ import { playersApi } from "../../api/players";
 import { DataTable, type SortDirection } from "../../components/common/DataTable";
 import { SegmentedControl } from "../../components/common/SegmentedControl";
 import { DeletedCharacterAssets } from "./DeletedCharacterAssets";
+import { CombatPanel } from "./CombatPanel";
 import { PlayerStatusCell } from "../../components/common/DisplayPrimitives";
 import { formatAbsoluteDateTime, formatCell, formatRelativeAge } from "../../lib/display";
 import { cachedInstanceNames, resolveInstanceNames } from "../maps/instanceNames";
@@ -31,11 +32,12 @@ type PlayerStatusFilter = "all" | "online" | "offline" | "banned";
 // they cannot be rows in the players table -- selecting one there opens
 // CharacterAdminUI, which assumes an inventory, skills, a position to teleport
 // and so on. The whole body swaps instead.
-type PlayersViewMode = "active" | "deleted";
+type PlayersViewMode = "active" | "deleted" | "pvp";
 
 const PLAYERS_VIEW_MODES = [
   { value: "active", label: "Active Players" },
-  { value: "deleted", label: "Deleted Characters" }
+  { value: "deleted", label: "Deleted Characters" },
+  { value: "pvp", label: "PvP" }
 ] as const satisfies ReadonlyArray<{ value: PlayersViewMode; label: string }>;
 
 const PLAYERS_AUTO_REFRESH_MS = 10_000;
@@ -329,7 +331,7 @@ export function PlayersPanel({ onError, renderCharacterAdmin, onOpenBase, confir
     setSortDirection("asc");
   }
 
-  if (viewMode === "deleted") {
+  if (viewMode !== "active") {
     return (
       <section className="panel">
         <div className="panel-title">
@@ -343,7 +345,7 @@ export function PlayersPanel({ onError, renderCharacterAdmin, onOpenBase, confir
             groupClassName="segmented-control players-view-segments"
           />
         </div>
-        <DeletedCharacterAssets onOpenBase={onOpenBase} onError={onError} confirmAction={confirmAction} />
+        {viewMode === "pvp" ? <CombatPanel /> : <DeletedCharacterAssets onOpenBase={onOpenBase} onError={onError} confirmAction={confirmAction} />}
       </section>
     );
   }
