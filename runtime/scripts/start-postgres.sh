@@ -67,8 +67,8 @@ docker run -d \
   -c effective_cache_size="${DUNE_PG_EFFECTIVE_CACHE_SIZE:-1GB}" \
   -c work_mem="${DUNE_PG_WORK_MEM:-16MB}" \
   -c synchronous_commit="${DUNE_PG_SYNCHRONOUS_COMMIT:-local}" \
-  -c jit="${DUNE_PG_JIT:-off}" \
-  -c random_page_cost="${DUNE_PG_RANDOM_PAGE_COST:-1.1}" \
+  -c jit="${DUNE_PG_JIT:-on}" \
+  -c random_page_cost="${DUNE_PG_RANDOM_PAGE_COST:-4}" \
   -c checkpoint_completion_target="${DUNE_PG_CHECKPOINT_COMPLETION_TARGET:-0.9}"
 
 echo "Waiting for Postgres..."

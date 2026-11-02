@@ -206,6 +206,7 @@ export const ROUTE_ACTIONS = {
   // --- Players (read) ---
   "GET /api/players":                          "players:read",
   "GET /api/players/list-settings":            "players:read",
+  "GET /api/players/combat":                   "players:read",
   "GET /api/players/online":                   "players:read",
   "GET /api/players/search":                   "players:read",
   "GET /api/players/deleted-characters":       "players:read",

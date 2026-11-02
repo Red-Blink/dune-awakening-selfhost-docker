@@ -14,7 +14,6 @@ FROM node:20-trixie
 LABEL io.github.red-blink.dune-selfhost.component="console"
 WORKDIR /app
 ENV NODE_ENV=production
-ENV NODE_OPTIONS="--max-old-space-size=384"
 
 # Runtime tools required by RedBlink dune scripts when the web admin runs in a container.
 # We install small OS tools through apt, then install Docker CLI + Compose plugin

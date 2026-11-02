@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { closeSync, existsSync, fstatSync, openSync, readSync } from "node:fs";
 import { resolve } from "node:path";
 import { redact } from "./redact.js";
@@ -7,8 +7,20 @@ import { redact } from "./redact.js";
 const RMQ_CONTAINER = "dune-rmq-game";
 const BUILTIN_COMMAND_AUTH_TOKEN = "Nu6VmPWUMvdPMeB7qErr";
 
-let cachedRmqCreds = null;
-let cachedRmqCredsExpiresAt = 0;
+const cachedRmqCreds = new Map();
+const cachedReadyQueues = new Map();
+
+function transportKey(config) {
+  return createHash('sha256').update(JSON.stringify([
+    resolve(config?.repoRoot || process.cwd()), resolveRmqGameHttpBaseUrl(),
+    process.env.DUNE_RMQ_ADMIN_USER || '', process.env.DUNE_RMQ_ADMIN_PASSWORD || ''
+  ])).digest('hex');
+}
+
+function rememberTransport(cache, key, value) {
+  if (!cache.has(key) && cache.size >= 16) cache.delete(cache.keys().next().value);
+  cache.set(key, value);
+}
 
 function readBoundedLogText(filePath, maxEdgeBytes = 128 * 1024) {
   let fd = null;
@@ -37,15 +49,15 @@ function readBoundedLogText(filePath, maxEdgeBytes = 128 * 1024) {
   }
 }
 
-function resolveRmqAdminCreds(repoRoot) {
-  const now = Date.now();
-  if (cachedRmqCreds && cachedRmqCredsExpiresAt > now) return cachedRmqCreds;
+function resolveRmqAdminCreds(repoRoot, key, now) {
+  const cached = cachedRmqCreds.get(key);
+  if (cached?.expiresAt > now) return cached.credentials;
   const envUser = String(process.env.DUNE_RMQ_ADMIN_USER || "").trim();
   const envPass = String(process.env.DUNE_RMQ_ADMIN_PASSWORD || "").trim();
   if (envUser && envPass) {
-    cachedRmqCreds = { user: envUser, pass: envPass };
-    cachedRmqCredsExpiresAt = now + 300_000;
-    return cachedRmqCreds;
+    const credentials = { user: envUser, pass: envPass };
+    rememberTransport(cachedRmqCreds, key, { credentials, expiresAt: now + 300_000 });
+    return credentials;
   }
   const logFile = resolve(repoRoot || process.cwd(), "runtime/text-router/director-current.log");
   try {
@@ -56,15 +68,18 @@ function resolveRmqAdminCreds(repoRoot) {
         /(bgd\.[^/\s]+\.admin)\/([A-Za-z0-9+/=]+) => allow administrator/g
       ];
       let found = null;
+      let latestPosition = -1;
       for (const pattern of patterns) {
         let match;
         while ((match = pattern.exec(text)) !== null) {
-          found = { user: match[1], pass: match[2] };
+          if (match.index > latestPosition) {
+            found = { user: match[1], pass: match[2] };
+            latestPosition = match.index;
+          }
         }
       }
       if (found) {
-        cachedRmqCreds = found;
-        cachedRmqCredsExpiresAt = now + 60_000;
+        rememberTransport(cachedRmqCreds, key, { credentials: found, expiresAt: now + 60_000 });
         return found;
       }
     }
@@ -76,26 +91,25 @@ function resolveRmqAdminCreds(repoRoot) {
 
 function resolveRmqGameHttpBaseUrl() {
   if (process.env.DUNE_RMQ_GAME_HTTP_URL) return process.env.DUNE_RMQ_GAME_HTTP_URL.replace(/\/+$/, "");
-  const port = Number(process.env.RMQ_GAME_LOCAL_HTTP_PORT || process.env.RMQ_GAME_HTTP_PORT || 15672) || 15672;
+  const port = Number(process.env.RMQ_GAME_LOCAL_HTTP_PORT || 15672) || 15672;
   return `http://127.0.0.1:${port}`;
 }
 
-async function tryRmqGameHttpGet(config, path) {
+async function tryRmqGameHttpGet(config, path, key, now, fetchImpl) {
   if (globalThis.__testSpawn || process.env.DUNE_RMQ_TRANSPORT === "exec") return null;
-  const creds = resolveRmqAdminCreds(config?.repoRoot);
+  const creds = resolveRmqAdminCreds(config?.repoRoot, key, now);
   if (!creds) return null;
   const auth = Buffer.from(`${creds.user}:${creds.pass}`, "utf8").toString("base64");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Math.min(config?.commandTimeoutMs || 5000, 5000));
   try {
-    const response = await fetch(`${resolveRmqGameHttpBaseUrl()}${path}`, {
+    const response = await fetchImpl(`${resolveRmqGameHttpBaseUrl()}${path}`, {
       method: "GET",
       headers: { Authorization: `Basic ${auth}`, Accept: "application/json" },
       signal: controller.signal
     });
     if (response.status === 401 || response.status === 403) {
-      cachedRmqCreds = null;
-      cachedRmqCredsExpiresAt = 0;
+      cachedRmqCreds.delete(key);
       return null;
     }
     if (!response.ok) return null;
@@ -291,16 +305,14 @@ export async function publishCarePackageWhisper(config, fields) {
   };
 }
 
-let cachedReadyQueues = null;
-let cachedReadyQueuesExpiresAt = 0;
-
-export async function listReadyRabbitQueues(config) {
+export async function listReadyRabbitQueues(config, { fetchImpl = globalThis.fetch, exec = dockerExec, now = Date.now } = {}) {
+  const key = transportKey(config);
   if (!globalThis.__testSpawn) {
-    const now = Date.now();
-    if (cachedReadyQueues && cachedReadyQueuesExpiresAt > now) {
-      return new Set(cachedReadyQueues);
+    const cached = cachedReadyQueues.get(key);
+    if (cached?.expiresAt > now()) {
+      return new Set(cached.queues);
     }
-    const httpQueues = await tryRmqGameHttpGet(config, "/api/queues/%2F?columns=name,consumers,state");
+    const httpQueues = await tryRmqGameHttpGet(config, "/api/queues/%2F?columns=name,consumers,state", key, now(), fetchImpl);
     if (Array.isArray(httpQueues)) {
       const ready = new Set();
       for (const row of httpQueues) {
@@ -311,12 +323,11 @@ export async function listReadyRabbitQueues(config) {
           ready.add(name);
         }
       }
-      cachedReadyQueues = ready;
-      cachedReadyQueuesExpiresAt = now + 5000;
+      rememberTransport(cachedReadyQueues, key, { queues: new Set(ready), expiresAt: now() + 5000 });
       return new Set(ready);
     }
   }
-  const output = await dockerExec(
+  const output = await exec(
     ["exec", RMQ_CONTAINER, "rabbitmqctl", "-q", "list_queues", "name", "consumers", "state"],
     config.commandTimeoutMs
   );
@@ -327,8 +338,7 @@ export async function listReadyRabbitQueues(config) {
     if (name && Number.isInteger(consumers) && consumers > 0 && (!state || state === "running")) ready.add(name);
   }
   if (!globalThis.__testSpawn) {
-    cachedReadyQueues = ready;
-    cachedReadyQueuesExpiresAt = Date.now() + 5000;
+    rememberTransport(cachedReadyQueues, key, { queues: new Set(ready), expiresAt: now() + 5000 });
   }
   return ready;
 }

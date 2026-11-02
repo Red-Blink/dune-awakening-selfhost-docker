@@ -63,31 +63,8 @@ export const LIVE_MAP_SUBTYPE_LABELS = Object.freeze(Object.fromEntries(
   ])
 ));
 
-const POI_CACHE_TTL_MS = 15_000;
-const poiCacheByDb = new WeakMap();
-const fallbackPoiCacheByMap = new Map();
-
-function getPoiCacheForDb(db) {
-  if (!db || (typeof db !== "object" && typeof db !== "function")) {
-    return fallbackPoiCacheByMap;
-  }
-  let mapCache = poiCacheByDb.get(db);
-  if (!mapCache) {
-    mapCache = new Map();
-    poiCacheByDb.set(db, mapCache);
-  }
-  return mapCache;
-}
-
 export async function liveMapPoi(db, map = "", { fetchCategory = liveMapPoiMarkers } = {}) {
   if (fetchCategory === liveMapPoiMarkers) {
-    const poiCacheByMap = getPoiCacheForDb(db);
-    const cacheKey = String(map || "");
-    const now = Date.now();
-    const cached = poiCacheByMap.get(cacheKey);
-    if (cached && cached.expiresAt > now) {
-      return cached.payload;
-    }
     try {
       const combined = await liveMapPoiAllMarkers(db, map);
       const capabilities = {};
@@ -109,8 +86,6 @@ export async function liveMapPoi(db, map = "", { fetchCategory = liveMapPoiMarke
         }
       }
       const payload = { capabilities, knownSubtypes: LIVE_MAP_KNOWN_SUBTYPES, subtypeLabels: LIVE_MAP_SUBTYPE_LABELS, rows };
-      if (poiCacheByMap.size > 16) poiCacheByMap.clear();
-      poiCacheByMap.set(cacheKey, { expiresAt: now + POI_CACHE_TTL_MS, payload });
       return payload;
     } catch {
       const capabilities = Object.fromEntries(POI_CATEGORIES.map(({ key }) => [key, false]));

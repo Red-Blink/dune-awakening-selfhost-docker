@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { liveMapPoiMarkers } from "../src/duneDb.js";
+import { liveMapPoiAllMarkers, liveMapPoiMarkers } from "../src/duneDb.js";
+import { liveMapPoi, POI_CATEGORIES } from "../src/services/liveMapPoi.js";
 import { pgTransactionalDb, withIsolatedDatabase } from "../test-support/pgIntegrationDb.js";
 
 // Real schema pulled from dune2's live database -- marker_type is a flat
@@ -31,6 +32,28 @@ const SCHEMA = `
     map_name text not null
   );
 `;
+
+test("batched POIs preserve overlapping categories, map filters, and database changes", async (t) => {
+  await withIsolatedDatabase(t, { namePrefix: "dune_poi_batch" }, async (pool) => {
+    await pool.query(SCHEMA);
+    await pool.query(`insert into dune.map_names values (1, 'HaggaBasin'), (2, 'DeepDesert');
+      insert into dune.markers (marker_hash_id, dimension_index, marker_type, position, payload_type, map_name_id)
+      values (1, 0, 'ScrapPickup', (1,2,3)::dune.vector, '', 1),
+             (2, 0, 'TrainerOre', (1,2,3)::dune.vector, '', 2),
+             (3, 0, 'NoIcon', (1,2,3)::dune.vector, '', 1);`);
+    const db = pgTransactionalDb(pool);
+    for (const map of ['', 'HaggaBasin', 'DeepDesert']) {
+      const batch = await liveMapPoiAllMarkers(db, map);
+      for (const { key } of POI_CATEGORIES) {
+        const original = await liveMapPoiMarkers(db, map, key);
+        assert.deepEqual(batch.byCategory[key], original.rows, `${map}/${key}`);
+      }
+    }
+    assert.ok((await liveMapPoi(db)).rows.length > 0);
+    await pool.query('truncate dune.markers');
+    assert.deepEqual((await liveMapPoi(db)).rows, []);
+  });
+});
 
 test("real PostgreSQL: liveMapPoiMarkers filters by category pattern, excludes NoIcon, filters by map", async (t) => {
   await withIsolatedDatabase(t, {

@@ -36,6 +36,18 @@ function seedPlanFile(repo, { unsafeTemplateIds = [] } = {}) {
   }));
 }
 
+test('cached market lists cannot be changed by callers and follow plan updates', () => {
+  withRepo(repo => {
+    seedPlanFile(repo, { unsafeTemplateIds: ['BadItem1'] });
+    readUnsafeTemplateIds(repo).splice(0);
+    readBaseMarketTemplateIds(repo).push('Injected');
+    assert.deepEqual(readUnsafeTemplateIds(repo), ['BadItem1']);
+    assert.deepEqual(readBaseMarketTemplateIds(repo), ['Existing1']);
+    seedPlanFile(repo, { unsafeTemplateIds: ['BadItem2'] });
+    assert.deepEqual(readUnsafeTemplateIds(repo), ['BadItem2']);
+  });
+});
+
 test("readMarketItemOverrides returns empty defaults when no file exists", () => {
   withRepo((repo) => {
     assert.deepEqual(readMarketItemOverrides(repo), { overrides: {}, newItems: {} });

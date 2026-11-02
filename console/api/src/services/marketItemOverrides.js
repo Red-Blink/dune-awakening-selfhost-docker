@@ -16,7 +16,7 @@ import { resolve } from "node:path";
 import { writeJsonAtomic, clampInt } from "../jsonStore.js";
 import { applyExchangeCategoryToSeedRow } from "./exchangeCategoryMask.js";
 import { validateTemplateId } from "../duneDb/presentation.js";
-import { listCatalogItems, resolveCatalogItem } from "../adminCatalog.js";
+import { listCatalogItems } from "../adminCatalog.js";
 
 const seedPlanFileCache = new Map();
 
@@ -105,7 +105,7 @@ export function readUnsafeTemplateIds(repoRoot) {
   if (!path) return [];
   try {
     readSeedPlanCached(path);
-    return seedPlanFileCache.get(path)?.unsafeIds || [];
+    return [...(seedPlanFileCache.get(path)?.unsafeIds || [])];
   } catch {
     return [];
   }
@@ -119,7 +119,7 @@ export function readBaseMarketTemplateIds(repoRoot) {
   if (!path) return [];
   try {
     readSeedPlanCached(path);
-    return seedPlanFileCache.get(path)?.baseTemplateIds || [];
+    return [...(seedPlanFileCache.get(path)?.baseTemplateIds || [])];
   } catch {
     return [];
   }
@@ -127,9 +127,8 @@ export function readBaseMarketTemplateIds(repoRoot) {
 
 function findCatalogEntry(repoRoot, templateId) {
   try {
-    const resolved = resolveCatalogItem(repoRoot, { itemId: templateId });
-    if (resolved && resolved.source !== "manual") return resolved;
-    return null;
+    const items = JSON.parse(readFileSync(resolve(repoRoot, "runtime/data/admin-items.json"), "utf8"));
+    return Array.isArray(items) ? items.find(item => String(item?.id || '') === templateId) || null : null;
   } catch {
     return null;
   }

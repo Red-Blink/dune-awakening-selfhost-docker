@@ -4275,10 +4275,10 @@ export async function liveMapPoiAllMarkers(db, map = "") {
     return { capabilities, byCategory: Object.fromEntries(categories.map((key) => [key, []])) };
   }
   const values = [];
-  const caseArms = categories.map((category) => {
+  const categoryValues = categories.map((category) => {
     values.push(POI_CATEGORY_PATTERNS[category]);
-    return `when m.marker_type ilike any($${values.length}) then '${category}'`;
-  }).join("\n           ");
+    return `('${category}', $${values.length}::text[])`;
+  }).join(", ");
   values.push(ALL_POI_PATTERNS);
   const allPatternsParam = values.length;
   let where = "";
@@ -4292,16 +4292,15 @@ export async function liveMapPoiAllMarkers(db, map = "") {
   const result = await db.query(`
     select m.marker_hash_id::text as id,
            m.marker_type as marker_type,
-           case
-             ${caseArms}
-             else ''
-           end as category,
+           c.category,
            (m.position).x as x,
            (m.position).y as y,
            (m.position).z as z,
            coalesce(mn.map_name, '') as map
     from dune.markers m
     join dune.map_names mn on mn.map_name_id = m.map_name_id
+    join (values ${categoryValues}) as c(category, patterns)
+      on m.marker_type ilike any(c.patterns)
     where m.marker_type ilike any($${allPatternsParam}) and m.marker_type not ilike 'NoIcon' ${where}
     order by m.marker_hash_id`, values);
   const capabilities = Object.fromEntries(categories.map((key) => [key, true]));
