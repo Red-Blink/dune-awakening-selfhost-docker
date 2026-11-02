@@ -1086,6 +1086,8 @@ semantics.
 | POST | `/api/settings/experimental-tanks` | Enable or disable Experimental Tanks (restarts Hagga) as a task | `enabled` (boolean), `confirmRestart: true` |
 | GET | `/api/settings/encrypted-api` | Encrypted API access state (`available`, `enabled`, `running`, `state`, `health`, `port`, `fingerprint`); no secret. See [encrypted-api.md](encrypted-api.md) | None |
 | POST | `/api/settings/encrypted-api` | Turn the HTTPS front door on or off. Helper-script failures return 502. Audited | `enabled` (boolean) |
+| GET | `/api/settings/realtime-agent` | Optional position-agent status (`available`, `installed`, `running`, `state`, `reachable`, `reason`, `busy`). Requires `settings:read`; unavailable to API keys | None |
+| POST | `/api/settings/realtime-agent` | Build/start or remove the optional position agent. Requires `settings:write`; unavailable to API keys and addons. Setup grants host process access; see [realtime.md](realtime.md). Returns 409 while another change runs and 502 if setup/removal fails | `enabled` (boolean), `confirmed: true` when enabling |
 | POST | `/api/settings/console-access/confirm` | Confirm a pending `ADMIN_ALLOWED_IPS` review. 409 if the list would block the caller or the review is stale | `confirmed: true`, `fingerprint` |
 
 ---

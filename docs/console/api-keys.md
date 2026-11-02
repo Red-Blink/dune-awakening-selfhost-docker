@@ -118,7 +118,7 @@ namespace" rule, so Create stays disabled until something is selected.
 
 `logs`, `realtime`, `updates` and `addons` render a two-segment control (None / Read), not
 three. `logs` and `realtime` have no write action at all; the other two have several, but they
-are denied to keys — see below. All three are read from the action catalog rather than hardcoded, so a future `logs`
+are denied to keys — see below. The controls are read from the action catalog rather than hardcoded, so a future `logs`
 write action makes the third segment appear on its own.
 
 ### Two read exceptions
