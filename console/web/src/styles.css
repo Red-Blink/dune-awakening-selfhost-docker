@@ -7693,6 +7693,8 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
 .api-keys-section code { color: var(--muted-warm); }
 .api-keys-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .api-keys-header p { max-width: 78ch; margin: 0; line-height: 1.5; }
+.realtime-agent-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.realtime-agent-notice p { margin: 0; max-width: 78ch; line-height: 1.5; }
 .api-keys-header > button { flex: 0 0 auto; }
 .api-keys-empty { display: flex; align-items: center; gap: 14px; padding: 22px; border: 1px dashed var(--border-strong); border-radius: 8px; }
 .api-keys-empty > svg { flex: 0 0 auto; color: var(--muted); }

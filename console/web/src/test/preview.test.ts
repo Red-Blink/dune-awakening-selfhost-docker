@@ -38,6 +38,12 @@ describe('public Console preview isolation',()=>{
   for(const code of ['EN','DE','AR','PT-BR','PT-PT','ZH-HANS','ZH-HANT'])expect(previewLanguageFile(code)).toBe('/preview-data/'+code+'.json');
   expect(previewLanguageFile('../../api')).toBeNull();
  });
+ it('serves a read-only Realtime Data agent status and blocks its controls',async()=>{
+  const url=new URL('https://try.example/api/settings/realtime-agent');
+  expect(sampleResponse(url)).toMatchObject({available:true,installed:false,running:false,busy:null});
+  for(const method of ['POST','DELETE'])expect(previewApiResponse(url,method).status).toBe(405);
+  for(const label of ['Set Up Agent','Rebuild Agent','Remove Agent'])expect(isManagementAction(label)).toBe(true);
+ });
  it('rejects every mutation method without changing sample records',async()=>{
   const url=new URL('https://try.example/api/players');
   const before=await previewApiResponse(url).json();
