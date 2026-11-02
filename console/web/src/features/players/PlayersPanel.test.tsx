@@ -34,6 +34,33 @@ const bannedPlayer = {
   total_playtime_seconds: 3665
 };
 
+it('hides PvP on a confirmed PvE-only server in both Players views', async () => {
+  vi.mocked(playersApi.listSettings).mockResolvedValue({
+    settings: { inactiveWeeks: null }, defaults: { inactiveWeeks: null },
+    limits: { inactiveWeeks: { min: 1, max: 8 } }, source: 'default', pvpVisible: false
+  });
+  render(<PlayersPanel onError={vi.fn()} renderCharacterAdmin={() => null} />);
+  expect(await screen.findByText('Vixen')).toBeInTheDocument();
+  await waitFor(() => expect(playersApi.listSettings).toHaveBeenCalled());
+  expect(screen.queryByRole('radio', { name: 'PvP' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('radio', { name: 'Deleted Characters' }));
+  expect(screen.queryByRole('radio', { name: 'PvP' })).not.toBeInTheDocument();
+});
+
+it('removes an open PvP view after modes change without resetting the player filter', async () => {
+  vi.useFakeTimers();
+  render(<PlayersPanel onError={vi.fn()} renderCharacterAdmin={() => null} />);
+  await act(async () => { await Promise.resolve(); });
+  fireEvent.click(screen.getByRole('radio', { name: 'PvP' }));
+  vi.mocked(playersApi.listSettings).mockResolvedValue({
+    settings: { inactiveWeeks: null }, defaults: { inactiveWeeks: null },
+    limits: { inactiveWeeks: { min: 1, max: 8 } }, source: 'default', pvpVisible: false
+  });
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  expect(screen.queryByRole('radio', { name: 'PvP' })).not.toBeInTheDocument();
+  expect(screen.getByRole('radio', { name: 'Active Players' })).toBeChecked();
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   invalidateInstanceNames();

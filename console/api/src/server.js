@@ -55,6 +55,7 @@ import { createConsoleAccess } from "./services/consoleAccess.js";
 import { parseMemorySwapStatus } from "./services/memorySwap.js";
 import { createDeathPoller } from "./deathPoller.js";
 import { createCombatHistory, combatScope } from "./services/combatHistory.js";
+import { createCombatAvailability } from "./services/combatAvailability.js";
 import { updateEnvFileValue as updateEnvValue } from "./services/envFile.js";
 import { funcomAuthMismatchDetected, matchingFuncomAuthLines, saveFuncomTokenValue as writeFuncomToken, validDockerSince } from "./services/funcomAuth.js";
 import { readCharacterTransferSettingsStatus, saveAndApplyCharacterTransferSettings } from "./services/characterTransferSettings.js";
@@ -291,6 +292,7 @@ const journeyTagsData = loadJourneyTagsData();
 const memoryBalancer = createMemoryBalancer(config);
 const deathPoller = createDeathPoller(config);
 const combatHistory = createCombatHistory(db, { mockMode: config.mockMode });
+const combatAvailability = createCombatAvailability(config, db);
 const POSTGRES_UNAVAILABLE_MESSAGE = "Postgres is not running or is restarting. Wait for the database service to come back online, then refresh.";
 const DEFAULT_ALWAYS_ON_STARTUP_PARALLELISM = 1;
 const MAX_ALWAYS_ON_STARTUP_PARALLELISM = 16;
@@ -1059,6 +1061,7 @@ async function handleApi(req, res) {
   if (path === "/api/players/list-settings" && req.method === "GET") {
     return json(res, 200, {
       ...playerListSettingsView(config.repoRoot),
+      ...await combatAvailability.read(),
       canConfigure: evaluate(session, "players:configure-list")
     });
   }

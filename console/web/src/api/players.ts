@@ -9,6 +9,7 @@ export type PlayerListSettings = {
   limits: { inactiveWeeks: { min: number; max: number } };
   source: "default" | "console";
   canConfigure?: boolean;
+  pvpVisible?: boolean;
 };
 
 const PLAYERS_ALL_PAGE_SIZE = 200;

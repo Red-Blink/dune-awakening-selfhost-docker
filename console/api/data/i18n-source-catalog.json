@@ -4331,7 +4331,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 502,
+        "line": 510,
         "nearby": [
           "Currently Active",
           "Unavailable",
@@ -4375,7 +4375,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 503,
+        "line": 511,
         "nearby": [
           "Unavailable",
           "{count0}h {count1}m",
@@ -4521,7 +4521,7 @@
     "1 Month": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 387,
+        "line": 395,
         "nearby": [
           "2 Weeks",
           "3 Weeks",
@@ -4545,7 +4545,7 @@
     "1 Week": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 384,
+        "line": 392,
         "nearby": [
           "Never",
           "Weeks",
@@ -4568,7 +4568,7 @@
     "2 Months": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 388,
+        "line": 396,
         "nearby": [
           "3 Weeks",
           "1 Month",
@@ -4580,7 +4580,7 @@
     "2 Weeks": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 385,
+        "line": 393,
         "nearby": [
           "Weeks",
           "1 Week",
@@ -4592,7 +4592,7 @@
     "3 Weeks": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 386,
+        "line": 394,
         "nearby": [
           "1 Week",
           "2 Weeks",
@@ -6547,7 +6547,7 @@
     "All Players": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 369,
+        "line": 377,
         "nearby": [
           "Filter",
           "Status filtering isn't available on this database version",
@@ -8663,7 +8663,7 @@
     "Banned": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 372,
+        "line": 380,
         "nearby": [
           "Online",
           "Offline",
@@ -14844,7 +14844,7 @@
     "Currently Active": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 492,
+        "line": 500,
         "nearby": [
           "Next",
           "Last",
@@ -20459,7 +20459,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 367,
+        "line": 375,
         "nearby": [
           "Players",
           "Players view",
@@ -21000,7 +21000,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 448,
+        "line": 456,
         "nearby": [
           "of",
           "Rows",
@@ -23249,7 +23249,7 @@
     "Hide Inactive Players After": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 376,
+        "line": 384,
         "nearby": [
           "Offline",
           "Banned",
@@ -25702,7 +25702,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 452,
+        "line": 460,
         "nearby": [
           "of",
           "Next",
@@ -26032,7 +26032,7 @@
     "Less than 1m": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 504,
+        "line": 512,
         "nearby": [
           "{count0}h {count1}m",
           "{count0}m"
@@ -29308,7 +29308,7 @@
     "Never": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 382,
+        "line": 390,
         "nearby": [
           "Banned",
           "Hide Inactive Players After",
@@ -29559,7 +29559,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 451,
+        "line": 459,
         "nearby": [
           "Page",
           "of",
@@ -29734,7 +29734,7 @@
     "No banned players were found.": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 298,
+        "line": 306,
         "nearby": [
           "No players are currently online.",
           "No offline players were found.",
@@ -30429,7 +30429,7 @@
     "No offline players were found.": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 296,
+        "line": 304,
         "nearby": [
           "PvP",
           "No players are currently online.",
@@ -30534,7 +30534,7 @@
     "No players are currently online.": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 294,
+        "line": 302,
         "nearby": [
           "Deleted Characters",
           "PvP",
@@ -30570,7 +30570,7 @@
     "No players have been found yet.": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 299,
+        "line": 307,
         "nearby": [
           "No offline players were found.",
           "No banned players were found.",
@@ -31766,7 +31766,7 @@
     "Offline": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 371,
+        "line": 379,
         "nearby": [
           "All Players",
           "Online",
@@ -32049,7 +32049,7 @@
     "Online": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 370,
+        "line": 378,
         "nearby": [
           "Status filtering isn't available on this database version",
           "All Players",
@@ -33050,7 +33050,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 450,
+        "line": 458,
         "nearby": [
           "First",
           "Previous",
@@ -34374,7 +34374,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 338,
+        "line": 346,
         "nearby": [
           "No banned players were found.",
           "No players have been found yet.",
@@ -34383,7 +34383,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 356,
+        "line": 364,
         "nearby": [
           "Players view",
           "Filter"
@@ -34450,7 +34450,7 @@
     "Players view": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 341,
+        "line": 349,
         "nearby": [
           "No players have been found yet.",
           "Players"
@@ -34458,7 +34458,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 359,
+        "line": 367,
         "nearby": [
           "Players",
           "Filter",
@@ -35042,7 +35042,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 449,
+        "line": 457,
         "nearby": [
           "Rows",
           "First",
@@ -37168,7 +37168,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 391,
+        "line": 399,
         "nearby": [
           "1 Month",
           "2 Months",
@@ -40665,7 +40665,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 443,
+        "line": 451,
         "nearby": [
           "Showing",
           "of",
@@ -42647,7 +42647,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 407,
+        "line": 415,
         "nearby": [
           "Refresh",
           "Search Character, FLS ID, Account ID, or Actor ID",
@@ -42755,7 +42755,7 @@
     "Search Character, FLS ID, Account ID, or Actor ID": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 405,
+        "line": 413,
         "nearby": [
           "2 Months",
           "Refresh",
@@ -44705,7 +44705,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 440,
+        "line": 448,
         "nearby": [
           "Search",
           "Clear",
@@ -46115,7 +46115,7 @@
     "Status filtering isn't available on this database version": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 368,
+        "line": 376,
         "nearby": [
           "Players view",
           "Filter",
@@ -50353,7 +50353,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 494,
+        "line": 502,
         "nearby": [
           "Last",
           "Currently Active",
@@ -52853,7 +52853,7 @@
     "Weeks": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 383,
+        "line": 391,
         "nearby": [
           "Hide Inactive Players After",
           "Never",

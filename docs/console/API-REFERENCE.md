@@ -222,7 +222,7 @@ them.
 | Method | Route | Description | Parameters |
 |--------|-------|-------------|------------|
 | GET | `/api/players` | List players (paginated). Set `recentOnly=1` to keep online players and hide offline players beyond the configured inactivity threshold. | `q?`, `page?`, `pageSize?` (1-200, default 50), `status?` (`all`, `online`, `offline`, or `banned`), `sortColumn?`, `sortDirection?`, `recentOnly?` (`1`) |
-| GET | `/api/players/list-settings` | Read the Active Players visibility threshold (`null`/Never by default) and whether the current session may change it | None |
+| GET | `/api/players/list-settings` | Read the Active Players visibility threshold (`null`/Never by default), whether the session may change it, and `pvpVisible`/`reason` | None |
 | POST | `/api/players/list-settings` | Change the inactivity threshold; `null` means Never | `inactiveWeeks` (whole number from 1 to 8, or `null`) |
 | GET | `/api/players/online` | List currently online players | `page?`, `pageSize?` |
 | GET | `/api/players/search` | Search players by name/ID | `q?` (query param; omitted lists the first page of all players) |
@@ -230,6 +230,8 @@ them.
 | GET | `/api/players/combat` | Read recorded combat statistics and recent PvP kills. API keys require `players:read`; browser access uses the existing Console login. | `controllerId?` (positive signed-bigint player controller ID), `leaderboardLimit?`, `killsLimit?` (`10`, `20`, `50`, or `all`) |
 
 The Players → PvP view and each player's Combat tab use this endpoint. The Console captures available native type-0 death events every 30 seconds into its own `dune_console_combat` history tables. It does not modify game tables. Type-5 kill notifications are not counted again. Distinct attacker/victim Player deaths count toward PvP K/D; self-deaths, known non-player causes and unclassified deaths have separate counters. K/D is `null` when there are no PvP deaths.
+
+Players hides the PvP view when every configured partition is confirmed PvE and no recorded PvP history exists. This includes all sietches and Deep Desert, using the existing configuration resolver. Unknown/conflicting modes, configuration drift, or retained PvP history keep the view available. Visibility is refreshed each minute; individual character Combat tabs remain available for other death statistics.
 
 The response includes `supported`, recorder `status`/`reason`, `recordingStartedAt`, `recordedSince`, `lastCapturedAt`, `selfOnly`, `leaderboard` and `recentKills`. The Console defaults to ten rows in each panel, with independent selectors for 10, 20, 50 or All. API calls omitting the limit parameters retain the original defaults of 100 players and 50 kills. `all` returns every available recorded entry in that panel, including entries beyond the old caps, within the existing query timeout. Invalid sizes return HTTP 400. Rows are keyed by controller ID, not character name. History survives native actor/event deletion once captured, but events removed before collection cannot be recovered. These totals describe available recorded history, not lifetime statistics. No weapon attribution is inferred.
 

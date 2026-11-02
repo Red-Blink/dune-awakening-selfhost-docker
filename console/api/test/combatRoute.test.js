@@ -72,6 +72,13 @@ test('combat endpoint requires authentication and the existing player-data scope
     assert.equal((await request(denied.secret, '?leaderboardLimit=all&killsLimit=all')).status, 403);
     assert.equal((await request(allowed.secret, '?leaderboardLimit=500')).status, 400);
     assert.equal((await request(allowed.secret, '?killsLimit=-1')).status, 400);
+    const settings = secret => fetch(`http://127.0.0.1:${port}/api/players/list-settings`,
+      { headers: secret ? { authorization: `Bearer ${secret}` } : {} });
+    assert.equal((await settings()).status, 401);
+    assert.equal((await settings(denied.secret)).status, 403);
+    const visibility = await settings(allowed.secret);
+    assert.equal(visibility.status, 200);
+    assert.equal((await visibility.json()).pvpVisible, true);
   } finally {
     await stopProcess(child);
     rmSync(dir, { recursive: true, force: true });

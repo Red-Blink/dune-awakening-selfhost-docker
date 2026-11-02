@@ -53,6 +53,8 @@ type PlayersLoadParams = { q: string; page: number; pageSize: number; status: Pl
 
 export function PlayersPanel({ onError, renderCharacterAdmin, onOpenBase, confirmAction }: PlayersPanelProps) {
   const [viewMode, setViewMode] = useState<PlayersViewMode>("active");
+  const [pvpVisible, setPvpVisible] = useState(false);
+  const viewModes = PLAYERS_VIEW_MODES.filter(mode => mode.value !== 'pvp' || pvpVisible);
   const [q, setQ] = useState("");
   const [submittedQ, setSubmittedQ] = useState("");
   const [playerFilter, setPlayerFilter] = useState<PlayerStatusFilter>("all");
@@ -87,16 +89,22 @@ export function PlayersPanel({ onError, renderCharacterAdmin, onOpenBase, confir
 
   useEffect(() => {
     let cancelled = false;
-    void playersApi.listSettings().then((result) => {
+    const refresh = (initial: boolean) => { void playersApi.listSettings().then((result) => {
       if (cancelled) return;
+      const visible = result.pvpVisible !== false;
+      setPvpVisible(visible);
+      if (!visible) setViewMode(current => current === 'pvp' ? 'active' : current);
+      if (!initial) return;
       const weeks = result.settings?.inactiveWeeks === null ? null : Number(result.settings?.inactiveWeeks);
       setInactiveWeeks(weeks);
       setShowInactive(weeks === null);
       setCanConfigureVisibility(result.canConfigure === true);
     }).catch((error) => {
-      if (!cancelled) onError(errorText(error));
-    });
-    return () => { cancelled = true; };
+      if (!cancelled) { setPvpVisible(true); onError(errorText(error)); }
+    }); };
+    refresh(true);
+    const interval = window.setInterval(() => refresh(false), 60_000);
+    return () => { cancelled = true; window.clearInterval(interval); };
   }, [onError]);
 
   function submitSearch() {
@@ -340,7 +348,7 @@ export function PlayersPanel({ onError, renderCharacterAdmin, onOpenBase, confir
             name="players-view-mode"
             ariaLabel="Players view"
             value={viewMode}
-            options={PLAYERS_VIEW_MODES}
+            options={viewModes}
             onChange={handleViewModeChange}
             groupClassName="segmented-control players-view-segments"
           />
@@ -358,7 +366,7 @@ export function PlayersPanel({ onError, renderCharacterAdmin, onOpenBase, confir
           name="players-view-mode"
           ariaLabel="Players view"
           value={viewMode}
-          options={PLAYERS_VIEW_MODES}
+          options={viewModes}
           onChange={handleViewModeChange}
           groupClassName="segmented-control players-view-segments"
         />
