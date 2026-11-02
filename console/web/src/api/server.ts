@@ -161,7 +161,7 @@ export const serverApi = {
   // is answered before the container goes away; the caller then waits for the
   // Console to answer again rather than for a task result.
   reloadConsole: () => post<{ task: Task }>("/api/console/reload"),
-  cleanupDockerImages: () => post<{ task: Task }>("/api/server/storage/cleanup-images", { confirmation: "CLEAN OBSOLETE DUNE IMAGES" }),
+  cleanupDockerImages: () => post<{ task: Task }>("/api/server/storage/cleanup-images", { confirmation: "CLEAN UNUSED DOCKER IMAGES" }),
   cleanupDockerBuildCache: () => post<{ task: Task }>("/api/server/storage/cleanup-build-cache", { confirmation: "CLEAN DOCKER BUILD CACHE" }),
   start: () => post<{ task: Task }>("/api/server/start"),
   stop: () => post<{ task: Task }>("/api/server/stop"),

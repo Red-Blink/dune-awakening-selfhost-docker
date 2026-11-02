@@ -553,6 +553,23 @@ describe("HomePanel subsystem rows", () => {
 });
 
 describe("HomePanel status freshness", () => {
+  it("clears a transient fetch error after a successful background poll", async () => {
+    vi.useFakeTimers();
+    const failed = loadResult({ statusLoaded: false, readinessLoaded: false, statusError: "Failed to fetch", sampledAtMs: 0 });
+    const onLoad = vi.fn()
+      .mockResolvedValueOnce(failed)
+      .mockResolvedValueOnce(failed)
+      .mockImplementation(async () => loadResult({ sampledAtMs: Date.now() }));
+    const { container } = renderStateful({ onLoad });
+    await act(async () => {});
+    expect(screen.getByText("Failed to fetch")).toBeTruthy();
+    await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
+    expect(screen.getByText("Failed to fetch")).toBeTruthy();
+    await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
+    expect(onLoad.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(screen.queryByText("Failed to fetch")).toBeNull();
+    expect(container.querySelector(".home-freshness")?.textContent).toMatch(/^Updated /);
+  });
   it("dates the values from the sample once a load succeeds", async () => {
     const { container } = renderStateful();
     await waitFor(() => expect(container.querySelector(".home-freshness")).toBeTruthy());

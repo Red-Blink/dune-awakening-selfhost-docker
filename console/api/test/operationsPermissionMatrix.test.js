@@ -207,11 +207,11 @@ test("24 Config: network repair route is allowlisted", () => {
 });
 
 test("24b Maintenance: Docker storage cleanup routes are fixed and allowlisted", () => {
-  assert.deepEqual(buildDuneArgs("storageCleanupImages"), ["storage", "cleanup"]);
+  assert.deepEqual(buildDuneArgs("storageCleanupImages"), ["storage", "cleanup", "--unused-images"]);
   assert.deepEqual(buildDuneArgs("storageCleanupBuildCache"), ["storage", "cleanup", "--build-cache"]);
   assertDuneRoute("storage", "runtime/scripts/storage.sh");
   const server = source("console/api/src/server.js");
-  assert.match(server, /storage\/cleanup-images[\s\S]*?confirmedTask[\s\S]*?storageCleanupImages[\s\S]*?CLEAN OBSOLETE DUNE IMAGES/);
+  assert.match(server, /storage\/cleanup-images[\s\S]*?confirmedTask[\s\S]*?storageCleanupImages[\s\S]*?CLEAN UNUSED DOCKER IMAGES/);
   assert.match(server, /storage\/cleanup-build-cache[\s\S]*?confirmedTask[\s\S]*?storageCleanupBuildCache[\s\S]*?CLEAN DOCKER BUILD CACHE/);
 });
 
