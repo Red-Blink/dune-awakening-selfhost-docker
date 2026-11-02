@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync } from "node:fs";
+import { gzipSync, gunzipSync } from "node:zlib";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Writable } from "node:stream";
@@ -40,6 +41,36 @@ function fakeResponse() {
   };
   return res;
 }
+
+test("precompressed siblings are served only while fresh; stale siblings fall back to current source", async () => {
+  const dist = mkdtempSync(join(tmpdir(), 'static-precompressed-'));
+  try {
+    const source = 'const current = true;\n'.repeat(100);
+    const asset = join(dist, 'app.js');
+    writeFileSync(asset, source);
+    // Level zero makes it possible to distinguish this file from runtime compression.
+    const precompressed = gzipSync(source, { level: 0 });
+    writeFileSync(`${asset}.gz`, precompressed);
+    utimesSync(asset, 100, 100);
+    utimesSync(`${asset}.gz`, 200, 200);
+    const request = async () => {
+      const chunks = [];
+      const res = fakeResponse();
+      res._write = (chunk, _enc, cb) => { chunks.push(chunk); cb(); };
+      serveStatic({ staticDir: dist }, { url: '/app.js', headers: { 'accept-encoding': 'gzip' } }, res);
+      await once(res, 'finish');
+      assert.equal(res.headers['content-encoding'], 'gzip');
+      return Buffer.concat(chunks);
+    };
+    assert.deepEqual(await request(), precompressed);
+    utimesSync(asset, 300, 300);
+    const fresh = await request();
+    assert.notDeepEqual(fresh, precompressed);
+    assert.equal(gunzipSync(fresh).toString(), source);
+  } finally {
+    rmSync(dist, { recursive: true, force: true });
+  }
+});
 
 test("serveStatic sends cache-control: no-cache for index.html and immutable for hashed assets", async () => {
   const dist = mkdtempSync(join(tmpdir(), "static-files-test-"));
