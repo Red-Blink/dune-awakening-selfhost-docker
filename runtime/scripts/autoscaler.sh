@@ -9,6 +9,9 @@ source runtime/scripts/lib/igw-socket-health.sh
 # shellcheck source=runtime/scripts/lib/postgres.sh
 source runtime/scripts/lib/postgres.sh
 
+# shellcheck source=runtime/scripts/farm-readiness.sh
+source runtime/scripts/farm-readiness.sh
+
 INTERVAL="${DUNE_AUTOSCALER_INTERVAL:-5}"
 if ! [[ "$INTERVAL" =~ ^[1-9][0-9]*$ ]]; then
   echo "Invalid DUNE_AUTOSCALER_INTERVAL; using 5 seconds." >&2
@@ -3310,7 +3313,7 @@ director_capacity_failure_confirmed() {
 }
 
 core_maps_ready_for_browser_heal() {
-  local container partition state running started_at logs
+  local container partition state running started_at logs cached_start pattern
 
   while IFS='|' read -r container partition; do
     state="$(docker inspect -f '{{.State.Running}}|{{.State.StartedAt}}' "$container" 2>/dev/null || true)"
@@ -3318,13 +3321,41 @@ core_maps_ready_for_browser_heal() {
     [ "$running" = "true" ] || return 1
     [ -n "${started_at:-}" ] || return 1
 
+    # Readiness is a one-time startup message, so a busy map eventually pushes
+    # it out of the bounded tail. Retain proof for this process generation;
+    # a restart of the same container must establish its own readiness again.
+    cached_start="$(director_heal_get "core-ready:${container}" 2>/dev/null || true)"
+    if [ "$cached_start" = "$started_at" ]; then
+      continue
+    fi
+
     # Docker retains logs across restarts of the same named container. Looking
     # at the unbounded tail can therefore find a READY marker from the previous
     # process and let browser healing restart Director while the replacement
     # core server is still loading. Only accept readiness emitted by the
     # container's current process generation.
-    logs="$(timeout --kill-after=2s 12s docker logs --since "$started_at" --tail 5000 "$container" 2>&1 || true)"
-    grep -Eq "Server farm is READY .*partition ${partition}([,[:space:]]|$)" <<<"$logs" || return 1
+    logs="$(timeout --kill-after=2s 12s docker logs --timestamps --tail 5000 "$container" 2>&1 \
+      | python3 runtime/scripts/filter-container-logs.py "$started_at" || true)"
+    pattern="Server farm is READY .*partition ${partition}([,[:space:]]|$)"
+    if ! grep -Eq "$pattern" <<<"$logs"; then
+      # As with the shared readiness reader, a damaged large-tail index can
+      # hide the current log while a smaller bounded tail remains readable.
+      logs="$(timeout --kill-after=2s 12s docker logs --timestamps --tail 1000 "$container" 2>&1 \
+        | python3 runtime/scripts/filter-container-logs.py "$started_at" || true)"
+    fi
+    if ! grep -Eq "$pattern" <<<"$logs"; then
+      # One cold lookup may need older retained output from this same process.
+      # Stream it so a large log never becomes a shell variable, and grep's
+      # early exit cannot turn a matching line into a pipefail/SIGPIPE failure.
+      if ! grep -Eq "$pattern" < <(timeout --kill-after=2s 12s docker logs --timestamps "$container" 2>&1 \
+        | python3 runtime/scripts/filter-container-logs.py "$started_at" 2>/dev/null); then
+        # Docker can lose the startup line or return only an old rotated log.
+        # Reuse the canonical, timestamp-filtered native Director proof rather
+        # than treating a DB ready flag as evidence of completed startup.
+        farm_partition_has_stable_director_reports "$partition" "$farm_ready_director_fallback_reports" "$container" || return 1
+      fi
+    fi
+    director_heal_set "core-ready:${container}" "$started_at" || true
   done <<'EOF'
 dune-server-survival-1|1
 dune-server-overmap|2

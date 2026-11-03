@@ -22,6 +22,7 @@ mock_db_state="true|true"
 mock_target="abc|Survival_1"
 mock_container_id="container-generation-1"
 mock_director_id="director-generation-1"
+mock_director_started_at="2026-09-05T13:00:00Z"
 mock_container_started_at="2026-09-05T13:00:00Z"
 mock_report_timestamp="2026-09-05T13:10:00.000000000Z"
 mock_stale_large_tail=0
@@ -52,6 +53,8 @@ docker() {
         else
           printf '%s\n' "$mock_container_id"
         fi
+      elif [ "${3:-}" = "{{.Id}}|{{.State.StartedAt}}" ] && [ "${4:-}" = "dune-director" ]; then
+        printf '%s|%s\n' "$mock_director_id" "$mock_director_started_at"
       elif [ "${3:-}" = "{{.State.StartedAt}}" ]; then
         printf '%s\n' "$mock_container_started_at"
       else
@@ -190,6 +193,17 @@ farm_partition_is_ready dune-server-survival-1 1 3
 # generations instead of reparsing a noisy Director log on every UI refresh.
 mock_director_log=""
 farm_partition_is_ready dune-server-survival-1 1 3
+# A restart of either process with the same container ID invalidates proof.
+mock_director_started_at="2026-09-05T13:11:00Z"
+expect_not_ready
+# Retained reports predating this Director process cannot replace fresh proof.
+mock_director_log=$'[ServerState] {"partitionId":1,"ready":true}\n[ServerState] {"partitionId":1,"ready":true}\n[ServerState] {"partitionId":1,"ready":true}'
+expect_not_ready
+mock_director_log=""
+mock_director_started_at="2026-09-05T13:00:00Z"
+mock_container_started_at="2026-09-05T13:11:00Z"
+expect_not_ready
+mock_container_started_at="2026-09-05T13:00:00Z"
 mock_director_id="director-generation-2"
 expect_not_ready
 mock_director_id="director-generation-1"

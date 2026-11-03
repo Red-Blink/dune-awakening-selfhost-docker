@@ -206,15 +206,23 @@ farm_partition_has_stable_director_reports() {
   local partition_id="$1"
   local required_reports="${2:-1}"
   local container="${3:-}"
-  local container_id="" director_id="" container_started_at=""
+  local container_id="" director_id="" container_started_at="" director_started_at=""
   local reports report_count director_logs
 
   [ "$required_reports" -gt 0 ] 2>/dev/null || return 0
 
   if [ -n "$container" ]; then
     container_id="$(docker inspect -f '{{.Id}}' "$container" 2>/dev/null)"
-    director_id="$(docker inspect -f '{{.Id}}' dune-director 2>/dev/null)"
+    director_id="$(docker inspect -f '{{.Id}}|{{.State.StartedAt}}' dune-director 2>/dev/null)"
+    director_started_at="${director_id#*|}"
     container_started_at="$(docker inspect -f '{{.State.StartedAt}}' "$container" 2>/dev/null)"
+    # Host/Docker restarts retain container IDs. Cached reports from the old
+    # process must not establish readiness for the new map or Director.
+    if [ -n "$container_id" ] && [ -n "$container_started_at" ]; then
+      container_id="${container_id}|${container_started_at}"
+    else
+      container_id=""
+    fi
     if [ -n "$container_id" ] && [ -n "$director_id" ] \
       && farm_cached_stable_reports_match \
         "$container" "$partition_id" "$container_id" "$director_id"; then
@@ -229,7 +237,7 @@ farm_partition_has_stable_director_reports() {
         # timestamps locally, retaining the exact map-generation boundary.
         farm_docker_timeout docker logs --tail "$farm_ready_director_tail_lines" \
           --timestamps dune-director 2>&1 \
-          | python3 runtime/scripts/filter-container-logs.py "$container_started_at"
+          | python3 runtime/scripts/filter-container-logs.py "$container_started_at" "$director_started_at"
       else
         farm_docker_timeout docker logs --tail "$farm_ready_director_tail_lines" dune-director 2>&1
       fi
@@ -239,12 +247,16 @@ farm_partition_has_stable_director_reports() {
   # a large tail while the recent tail is intact. Retry a smaller bounded read
   # only when no current-generation evidence survived. Keep the same timestamp
   # filter and fail closed; never substitute historical reports or DB state.
-  if [ -n "$container_started_at" ] && [ -z "$director_logs" ] \
-    && [ "$farm_ready_director_tail_lines" -gt 500 ] 2>/dev/null; then
-    director_logs="$(
-      farm_docker_timeout docker logs --tail 500 --timestamps dune-director 2>&1 \
-        | python3 runtime/scripts/filter-container-logs.py "$container_started_at"
-    )" || return 1
+  if [ -n "$container_started_at" ] && [ -z "$director_logs" ]; then
+    local fallback_tail
+    for fallback_tail in 1000 500; do
+      [ "$farm_ready_director_tail_lines" -gt "$fallback_tail" ] 2>/dev/null || continue
+      director_logs="$(
+        farm_docker_timeout docker logs --tail "$fallback_tail" --timestamps dune-director 2>&1 \
+          | python3 runtime/scripts/filter-container-logs.py "$container_started_at" "$director_started_at"
+      )" || return 1
+      [ -z "$director_logs" ] || break
+    done
   fi
 
   # A completed arrival proves this exact current-generation server accepts

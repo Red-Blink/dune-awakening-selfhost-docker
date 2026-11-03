@@ -14,7 +14,7 @@ grep -Fq 'Server farm is READY .*partition ${partition}' "$script"
 grep -Fq 'DIRECTOR_CORE_READY_GRACE_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_CORE_READY_GRACE_SECONDS:-120}"' "$script"
 grep -Fq 'DIRECTOR_HEAL_REPUBLISH_GRACE_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_HEAL_REPUBLISH_GRACE_SECONDS:-120}"' "$script"
 grep -Fq "AUTOSCALER_STARTED_AT=\"\$(date +%s)\"" "$script"
-grep -Fq "docker logs --since \"\$started_at\" --tail 5000 \"\$container\"" "$script"
+grep -Fq 'docker logs --timestamps --tail 5000 "$container"' "$script"
 
 python3 - "$script" <<'PY'
 from pathlib import Path
@@ -55,7 +55,8 @@ core_ready = text.index("core_maps_ready_for_browser_heal()")
 core_ready_end = text.index("scan_director_browser_state()", core_ready)
 core_ready_body = text[core_ready:core_ready_end]
 assert "{{.State.StartedAt}}" in core_ready_body
-assert 'docker logs --since "$started_at"' in core_ready_body
+assert 'filter-container-logs.py "$started_at"' in core_ready_body
+assert 'docker logs --timestamps --tail 1000 "$container"' in core_ready_body
 
 dynamic_start = text.index("dynamic_ready_desync_heal()")
 dynamic_end = text.index("remember_map_demand()", dynamic_start)

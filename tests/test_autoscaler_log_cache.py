@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import sqlite3
 import selectors
+import shutil
 import subprocess
 import tempfile
 import time
@@ -21,6 +22,81 @@ def line(stamp, message):
 
 
 class CacheTests(unittest.TestCase):
+    def run_core_gate(self, commands):
+        source = (ROOT / 'runtime/scripts/autoscaler.sh').read_text()
+        function = source.split('core_maps_ready_for_browser_heal() {', 1)[1].split('\n}\n', 1)[0]
+        with tempfile.TemporaryDirectory() as temp:
+            scripts = Path(temp) / 'runtime/scripts'
+            scripts.mkdir(parents=True)
+            shutil.copyfile(ROOT / 'runtime/scripts/filter-container-logs.py', scripts / 'filter-container-logs.py')
+            harness = '''set -euo pipefail
+generation=2026-09-05T13:00:00Z
+mode=bounded
+farm_ready_director_fallback_reports=3
+farm_partition_has_stable_director_reports() {
+  [ "$mode" = director ] || return 1
+  [ "$2" = 3 ] || return 1
+  printf '%s\\n' "$3" >>director-proof-calls
+}
+director_heal_get() { [ -f "$1" ] && cat "$1"; }
+director_heal_set() { printf '%s' "$2" >"$1"; }
+timeout() { shift 2; "$@"; }
+docker() {
+  if [ "$1" = inspect ]; then printf 'true|%s\\n' "$generation"; return; fi
+  printf '%s\\n' "$*" >>log-calls
+  [[ "$*" == *--timestamps* ]] || return 1
+  if [ "$mode" = missing ] || [ "$mode" = director ] || { [ "$mode" = rotated ] && [[ "$*" == *"--tail 5000"* ]]; }; then
+    echo 'ordinary runtime log'; return
+  fi
+  local stamp="$generation"
+  [ "$mode" != prior ] || stamp=2026-09-05T13:00:00Z
+  case "$*" in
+    *survival-1*) echo "$stamp Server farm is READY for partition 1, running" ;;
+    *overmap*) echo "$stamp Server farm is READY for partition 2, running" ;;
+  esac
+}
+'''
+            harness += 'core_maps_ready_for_browser_heal() {' + function + '\n}\n' + commands
+            result = subprocess.run(['bash', '-c', harness], cwd=temp, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return result.stdout.strip().splitlines()
+
+    def test_core_ready_proof_survives_noisy_logs_only_for_same_process(self):
+        result = self.run_core_gate('''
+core_maps_ready_for_browser_heal || exit 10
+initial_calls=$(wc -l <log-calls)
+mode=missing
+core_maps_ready_for_browser_heal || exit 11
+[ "$(wc -l <log-calls)" = "$initial_calls" ] || exit 12
+generation=2026-09-05T14:00:00Z
+if core_maps_ready_for_browser_heal; then exit 13; fi
+mode=prior
+if core_maps_ready_for_browser_heal; then exit 15; fi
+mode=bounded
+core_maps_ready_for_browser_heal || exit 14
+echo pass
+''')
+        self.assertEqual(result, ['pass'])
+
+    def test_core_ready_cold_lookup_uses_current_generation_when_tail_rotated(self):
+        result = self.run_core_gate('''
+mode=rotated
+core_maps_ready_for_browser_heal || exit 10
+grep -q 'logs --timestamps --tail 1000 dune-server-overmap' log-calls || exit 11
+echo pass
+''')
+        self.assertEqual(result, ['pass'])
+
+    def test_core_ready_uses_canonical_native_reports_when_startup_line_is_gone(self):
+        result = self.run_core_gate('''
+mode=director
+core_maps_ready_for_browser_heal || exit 10
+grep -q dune-server-survival-1 director-proof-calls || exit 11
+grep -q dune-server-overmap director-proof-calls || exit 12
+echo pass
+''')
+        self.assertEqual(result, ['pass'])
+
     def test_stream_waits_for_startup_and_reconnect_without_old_evidence(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / 'cache.sqlite'
