@@ -26,6 +26,7 @@ misconfigurations:
       - "patches/experimental-tanks/2160922/Dockerfile"
       - "patches/experimental-tanks/2162777/Dockerfile"
       - "patches/experimental-tanks/2168446/Dockerfile"
+      - "patches/experimental-tanks/2173753/Dockerfile"
     statement: >-
       Thin overlay images (`FROM ${BASE_IMAGE}` plus COPY --chown=dune:nogroup and one chmod) built on top of the
       vendor game-server base image. They set no USER of their own, so the runtime user is whatever that base
@@ -36,6 +37,7 @@ misconfigurations:
       Build 2160922 was re-triaged on 2026-10-20: run.sh still performs root ownership/SSH setup and su dune launch.
       Build 2162777 was re-triaged on 2026-10-22 and retains the same root setup followed by su dune.
       Build 2168446 was re-triaged on 2026-10-28: vendor startup still performs root ownership/SSH setup and su dune launch.
+      Build 2173753 was re-triaged on 2026-11-03: vendor /home/dune/run.sh retains root ownership/SSH setup followed by su dune launch.
     expired_at: 2027-01-07
   - id: DS-0029
     paths:

@@ -1,0 +1,20 @@
+{
+  "oldBuild": "2168446-0-shipping",
+  "newBuild": "2173753-0-shipping",
+  "steamBuild": "26332623",
+  "cleanSha256": "7c2eb20335c74fa40c42d6210ac7e6a45275bec7bcb1f7b2375cdda05f0329f8",
+  "moduleIdSites": ["0xf398680", "0xf79261e", "0xf797f74"],
+  "initializationBranches": [
+    {"address": "0xf3aa920", "target": "0xf3aaa38", "vehicleField": "0xed0"},
+    {"address": "0xf791fe1", "target": "0xf792184"}
+  ],
+  "overlayLoaderRegistration": "0xd79566a",
+  "overlayLoaderCallback": "0xd78e930",
+  "fnameDecoder": "0xfa73784",
+  "fnameDecoderBytes": "4489f0c1e810488d0daf942707488b44c168410fb7ce0fb73c48",
+  "fnamePool": "0x16cecc40",
+  "fnamePoolReady": "0x16cecc11",
+  "executablePadding": {"address": "0x14499819", "size": 231, "precededByReturn": true},
+  "instructionGeneratorUnchanged": true,
+  "review": "Independent old/new native disassembly and byte-window comparisons confirm module-record registers, initialization field and branch targets, loader callback, FName layout, and executable padding. Code sites moved by 0x25f0, globals by 0x2180, and padding by 0x2000. Detours are regenerated with the unchanged Tank-only generator; ordinary vehicle IDs remain native."
+}
