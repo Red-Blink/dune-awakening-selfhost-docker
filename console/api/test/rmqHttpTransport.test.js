@@ -5,6 +5,41 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { listReadyRabbitQueues } from '../src/rmq.js';
 
+test('credential rotation invalidates queue caches without allowing an old in-flight response back in', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'rmq-rotation-'));
+  const saved = { ...process.env };
+  try {
+    delete process.env.DUNE_RMQ_TRANSPORT;
+    process.env.DUNE_RMQ_ADMIN_USER = 'synthetic-user';
+    process.env.DUNE_RMQ_ADMIN_PASSWORD = 'synthetic-before';
+    const config = { repoRoot: root, commandTimeoutMs: 1000 };
+    let finishOld;
+    let calls = 0;
+    const fetchImpl = async (_url, options) => {
+      calls++;
+      const auth = Buffer.from(options.headers.Authorization.slice(6), 'base64').toString();
+      const response = name => ({ ok: true, json: async () => [{ name, consumers: 1, state: 'running' }] });
+      if (auth === 'synthetic-user:synthetic-before') {
+        return new Promise(resolve => { finishOld = () => resolve(response('before')); });
+      }
+      assert.equal(auth, 'synthetic-user:synthetic-after');
+      return response('after');
+    };
+    const options = { fetchImpl, now: () => 1000, exec: async () => { throw new Error('Unexpected exec'); } };
+    const oldRequest = listReadyRabbitQueues(config, options);
+    process.env.DUNE_RMQ_ADMIN_PASSWORD = 'synthetic-after';
+    assert.deepEqual([...(await listReadyRabbitQueues(config, options))], ['after']);
+    finishOld();
+    assert.deepEqual([...(await oldRequest)], ['before']);
+    assert.deepEqual([...(await listReadyRabbitQueues(config, options))], ['after']);
+    assert.equal(calls, 2);
+  } finally {
+    for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
+    Object.assign(process.env, saved);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('HTTP queue discovery scopes credentials and cache, expires, and falls back safely', async () => {
   const root = mkdtempSync(join(tmpdir(), 'rmq-http-'));
   const saved = { ...process.env };

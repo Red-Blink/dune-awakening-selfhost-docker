@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { closeSync, existsSync, fstatSync, openSync, readSync } from "node:fs";
 import { resolve } from "node:path";
 import { redact } from "./redact.js";
@@ -9,12 +9,24 @@ const BUILTIN_COMMAND_AUTH_TOKEN = "Nu6VmPWUMvdPMeB7qErr";
 
 const cachedRmqCreds = new Map();
 const cachedReadyQueues = new Map();
+let transportCredentials;
+let transportRevision = 0;
 
 function transportKey(config) {
-  return createHash('sha256').update(JSON.stringify([
+  const user = process.env.DUNE_RMQ_ADMIN_USER || '';
+  const password = process.env.DUNE_RMQ_ADMIN_PASSWORD || '';
+  if (!transportCredentials || transportCredentials.user !== user || transportCredentials.password !== password) {
+    transportCredentials = { user, password };
+    transportRevision++;
+    cachedRmqCreds.clear();
+    cachedReadyQueues.clear();
+  }
+  // Opaque process-local revision: no password-derived hash or secret in keys.
+  // In-flight responses keep their old revision after credentials change.
+  return JSON.stringify([
     resolve(config?.repoRoot || process.cwd()), resolveRmqGameHttpBaseUrl(),
-    process.env.DUNE_RMQ_ADMIN_USER || '', process.env.DUNE_RMQ_ADMIN_PASSWORD || ''
-  ])).digest('hex');
+    transportRevision
+  ]);
 }
 
 function rememberTransport(cache, key, value) {
