@@ -1,0 +1,25 @@
+name: Prepare Community Translation Updates
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+concurrency:
+  group: translation-contributions
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'Red-Blink/dune-awakening-selfhost-docker'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22'
+      - name: Prepare approved corrections as pull requests
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node console/api/scripts/prepare-translation-prs.mjs

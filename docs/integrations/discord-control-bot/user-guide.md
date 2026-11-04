@@ -1,5 +1,11 @@
 # Dune Discord Companion Bot - User Guide
 
+**Status:** Historical record — describes an early prototype of the companion bot, which is not in this repository. Not maintained.
+
+For the current adapter and command catalog, see
+[discord-integration/README.md](../discord-integration/README.md). The commands and
+read-only statements below describe the prototype only.
+
 ## Purpose
 
 The Dune Discord Companion Bot gives safe read-only visibility into Dune Docker Console from Discord.

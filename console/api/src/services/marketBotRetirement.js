@@ -21,7 +21,7 @@ import { removeInstalledAddon } from "../addons.js";
 
 const RETIREMENT_VERSION = 1;
 
-export function retireLegacyEdaExchangeBot(config, options = {}) {
+export async function retireLegacyEdaExchangeBot(config, options = {}) {
   const now = options.now || (() => new Date());
   const removeAddon = options.removeAddon || removeInstalledAddon;
   const coreDir = resolve(config.repoRoot, "runtime/generated/market-bot");
@@ -115,7 +115,7 @@ export function retireLegacyEdaExchangeBot(config, options = {}) {
   let cleanupError = "";
   try {
     if (hadInstalledAddon) {
-      removeAddon(config, EDA_EXCHANGE_BOT_ADDON_ID);
+      await removeAddon(config, EDA_EXCHANGE_BOT_ADDON_ID);
       addonRemoved = true;
     } else if (hadLegacyJobs) {
       rmSync(legacyJobsDir, { recursive: true, force: true });

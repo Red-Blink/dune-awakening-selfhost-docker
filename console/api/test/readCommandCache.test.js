@@ -127,3 +127,77 @@ test("failed background refresh retains the bounded stale snapshot", async () =>
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(runs, 3);
 });
+
+test("sampledAtMs is when the command ran, not when the cache was read", async () => {
+  let now = 1000;
+  const cache = createReadCommandCache({ ttlMs: 100, staleMs: 500, clock: () => now });
+
+  const first = await cache.runStamped("status", async () => "out");
+  assert.deepEqual(first, { value: "out", sampledAtMs: 1000, fromCache: false });
+
+  now = 1050;
+  assert.deepEqual(await cache.runStamped("status", async () => "other"), { value: "out", sampledAtMs: 1000, fromCache: true });
+
+  // Stale window: still the original sample time while a refresh runs behind it.
+  now = 1300;
+  assert.deepEqual(await cache.runStamped("status", async () => "newer"), { value: "out", sampledAtMs: 1000, fromCache: true });
+});
+
+test("invalidate forces the next read to re-run", async () => {
+  let runs = 0;
+  const cache = createReadCommandCache({ ttlMs: 60_000 });
+  assert.equal(await cache.run("status", async () => ++runs), 1);
+  cache.invalidate();
+  assert.equal(await cache.run("status", async () => ++runs), 2);
+});
+
+test("invalidate drops a stale snapshot instead of serving it", async () => {
+  let now = 1000;
+  let runs = 0;
+  const cache = createReadCommandCache({ ttlMs: 100, staleMs: 500, clock: () => now });
+  assert.equal(await cache.run("status", async () => ++runs), 1);
+  now = 1100;
+  // Inside the stale window a plain read would answer 1, but a stop landed in between.
+  cache.invalidate();
+  assert.equal(await cache.run("status", async () => ++runs), 2);
+});
+
+test("invalidate discards a collect that started before it", async () => {
+  const cache = createReadCommandCache({ ttlMs: 60_000 });
+  const gate = deferred();
+  let runs = 0;
+  const inFlight = cache.run("status", async () => { runs += 1; await gate.promise; return runs; });
+  cache.invalidate();
+  gate.resolve();
+  // Callers that asked before the change still get its answer...
+  assert.equal(await inFlight, 1);
+  // ...but it is not kept for the next reader.
+  assert.equal(await cache.run("status", async () => ++runs), 2);
+});
+
+test("a failed refresh after invalidate does not restore the old snapshot", async () => {
+  let now = 1000;
+  let runs = 0;
+  const cache = createReadCommandCache({ ttlMs: 100, staleMs: 500, clock: () => now });
+  assert.equal(await cache.run("status", async () => ++runs), 1);
+  now = 1100;
+  const gate = deferred();
+  // Starts a background refresh and answers from the stale snapshot.
+  assert.equal(await cache.run("status", () => gate.promise), 1);
+  cache.invalidate();
+  gate.reject(new Error("Docker is busy"));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(await cache.run("status", async () => ++runs), 2);
+});
+
+test("a zero TTL caches nothing but still coalesces concurrent readers", async () => {
+  const cache = createReadCommandCache({ ttlMs: 0 });
+  const gate = deferred();
+  let runs = 0;
+  const work = () => { runs += 1; return gate.promise; };
+  const readers = [cache.run("status", work), cache.run("status", work)];
+  gate.resolve("out");
+  assert.deepEqual(await Promise.all(readers), ["out", "out"]);
+  assert.equal(await cache.run("status", async () => { runs += 1; return "again"; }), "again");
+  assert.equal(runs, 2);
+});

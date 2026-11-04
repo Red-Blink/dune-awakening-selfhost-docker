@@ -1,6 +1,8 @@
 # Console IAM Architecture
 
-The Web Console applies an IAM action to every authenticated API route. Public authentication and health routes remain outside this gate, and Discord adapter routes continue to use their existing bearer-token and Discord capability checks.
+**Status:** Current | **Last Updated:** November 2026
+
+The Web Console applies an IAM action to every authenticated API route. Public authentication and health routes remain outside this gate, as do the public i18n read routes (`GET /api/i18n/languages` and `/translations`) and the signed peer-mesh i18n routes. Discord adapter routes continue to use their existing bearer-token and Discord capability checks.
 
 ## Authorization flow
 
@@ -35,12 +37,12 @@ reject it. Its scope is a per-namespace Read/Read+write map of its own, evaluate
 
 Keys carry no configurable tier. The `owner` tier in the synthesized principal exists only so
 `resolveSessionTier` recognises it — `owner` is `Allow *`, so the policy check is a no-op and
-the key's scope map is the single thing deciding access. `settings:*`, `database:*` and `setup:*` are
+the key's scope map is the single thing deciding access. `settings:*`, `database:*`, `setup:*` and `community:*` are
 denied to every key regardless of what its stored record says, which is what keeps key
 management a browser-session operation. `updates:*` and `addons:*` are write-denied rather than
 denied outright, so a key can poll for updates and list addons but never install either. See [console/api-keys.md](console/api-keys.md).
 
-Session tier and identity stay in the in-memory session store; they are not placed in the browser cookie. A Console process restart invalidates existing sessions, matching the previous session lifecycle and preventing stale role claims from surviving a restart.
+Session tier and identity are held in the server-side session store, not in the browser cookie. The store is persisted to `runtime/generated/sessions.json` with a MAC derived from the login password and session secret, so sessions survive a Console restart until they expire (12 hours) and are discarded if the password or secret changes or an entry fails verification.
 
 ## Policies
 
@@ -215,7 +217,7 @@ moderator and player; the observer tier is editable only through
   individual griefers (kick/ban/teleport, mass kick). No database, backups,
   updates, addons, setup, care-package or `admin:*` reads; no config, no
   economy, no server lifecycle, nothing destructive.
-- **player** — a tight read-only self-service view: Home health, Players, Guilds, and the Live Map only (not the broad game-world reads). Own-player/guild scoping is tracked separately (ownership-based access).
+- **player** — a read-only self-service view of the player's own things. It sees server health on Home, its own character, its own guild and that guild's roster, the bases, vehicles and storage it **owns** (permission rank 1; not ones it co-owns or has associate access to). It has no Live Map. It never sees another player's information: other players' names are removed from its asset lists, and search covers only what it owns. This is enforced in two layers. The policy above grants the tier-wide reads (`server`, `players`, `guilds`, `bases`, `vehicles`, `storage`); then `console/api/src/playerScope.js` applies a deny-by-default route allowlist (GET only) and the admitted handlers scope their results to the caller. Every other route, including base details, permissions, exports, deleted characters, raw settings, diagnostics and every `/api/map/*` route, is refused for the tier whatever the stored policy says. Widening the allowlist is a reviewed change (`playerRouteAllowlist.test.js` pins it). **Upgrading:** a stored `runtime/generated/iam-policies.json` replaces the shipped player policy, so an operator who has saved one must add `bases:read`, `vehicles:read` and `storage:read` to the player tier for those pages to work; until then they answer 403.
 - **observer** — minimal server-status viewer (`server:read`) — "is the server
   up?" A richer read-only ops/audit definition is tracked for revision.
 

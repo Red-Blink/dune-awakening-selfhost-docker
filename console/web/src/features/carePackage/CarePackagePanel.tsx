@@ -16,6 +16,7 @@ import {
 } from "../../components/common/ItemCatalog";
 import { formatUiSentence } from "../../lib/display";
 import { titleCaseWords } from "../players/playerAdminUtils";
+import { CarePackageGrantHistory } from "./CarePackageGrantHistory";
 
 type HomeTaskResult = { status: "running" | "succeeded" | "failed" | "stopped"; title: string; message?: string; details?: string };
 type ConfirmAction = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; details?: { label: string; value: string; tone?: "danger" | "success" | "accent" }[] }) => Promise<boolean>;
@@ -495,7 +496,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
         </div>
         <CarePackageResult output={outputScope === "history" ? output : ""} technicalOutput={outputScope === "history" ? technicalOutput : ""} />
         <div className="package-history-table">
-          {historyRows.length ? <DataTable rows={historyRows} columns={["timestamp", "character_name", "action_player_id", "source", "status", "summary"]} action={(row) => String(row.status || "").toLowerCase() === "failed" ? <button onClick={() => run(async () => {
+          {historyRows.length ? <CarePackageGrantHistory rows={historyRows} describeAction={describeCarePackageAction} actionError={carePackageActionError} onRetry={(row) => { void run(async () => {
             if (!(await confirmAction("Retry this failed grant?", {
               title: "Retry Grant",
               confirmLabel: "Retry",
@@ -506,7 +507,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
             }))) return;
             showGrantResult("history", await carePackageApi.retry(String(row.id), "RETRY CARE PACKAGE"));
             setHistory((await carePackageApi.history()).rows || []);
-          })}>Retry</button> : null} /> : <div className="empty package-history-empty">No Care Package grants have been recorded yet.</div>}
+          }); }} /> : <div className="empty package-history-empty">No Care Package grants have been recorded yet.</div>}
         </div>
       </section>
     </div>
@@ -634,8 +635,7 @@ function carePackageHistoryRows(rows: Record<string, unknown>[]) {
     timestamp: String(row.local_timestamp || row.timestamp || ""),
     character_name: titleCaseWords(String(row.character_name || "Unknown")),
     source: titleCaseWords(String(row.source || "")),
-    status: titleCaseWords(String(row.status || "")),
-    summary: titleCaseWords(String(row.summary || ""))
+    status: titleCaseWords(String(row.status || ""))
   }));
 }
 

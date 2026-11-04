@@ -76,6 +76,7 @@ Usage:
   dune maps set <map> overmap-active
   dune maps set <map> disabled
   dune maps reconcile
+  dune maps always-on-maps
 
 Survival_1 and Overmap are protected always-on maps and are not configurable here.
 Use overmap-active explicitly for maps that should only run while Overmap has demand.
@@ -690,23 +691,51 @@ despawn_map() {
   done <<< "$rows"
 }
 
-reconcile_all() {
-  local maps=() map
+# Machine-readable roster for status reporting.  Emits:
+#
+#   concurrency <n>
+#   map <MapName>
+#
+# Deliberately read-only.  It must NOT call require_postgres, canonical_map or
+# ensure_state_file: ensure_state_file WRITES $STATE_FILE (it creates the file
+# and runs the v1->v2 migration), and status.sh polls this every few seconds --
+# a read path must never mutate runtime state.  For the same reason callers must
+# not use `is-always-on` in a loop; each invocation is a docker exec plus python
+# and writes state.
+#
+# The effective-mode downgrade is reproduced here without mode_for_map: only
+# persisted "always-on" maps are selected, and that is never "disabled", so
+# effective_mode_for_map's rule collapses to requires_fresh_process alone.
+always_on_maps() {
+  local map
 
-  require_postgres
-  ensure_state_file
+  printf 'concurrency %s\n' "$MAX_WARMING_SERVERS"
+  [ -s "$STATE_FILE" ] || return 0
+
   while read -r map; do
     [ -n "$map" ] || continue
     protected_map "$map" && continue
-    # The persisted candidate list can contain a mode retired by a newer
-    # lifecycle policy.  Never reconcile it unless the effective policy still
-    # agrees that it is Always On.
-    [ "$(effective_mode_for_map "$map")" = "always-on" ] || continue
-    maps+=("$map")
-  done < <(python3 - "$STATE_FILE" "$STARTUP_PRIORITY" <<'PY'
+    requires_fresh_process "$map" && continue
+    printf 'map %s\n' "$map"
+  done < <(always_on_names_from_state 2>/dev/null || true)
+}
+
+# Shared by always_on_maps and reconcile_all: the persisted always-on names in
+# startup-priority order.  Pure read of $STATE_FILE; a missing or corrupt file
+# yields nothing rather than failing.
+always_on_names_from_state() {
+  python3 - "$STATE_FILE" "$STARTUP_PRIORITY" <<'PY'
 import json
 import sys
 from pathlib import Path
+
+# Emit LF regardless of platform: the shell callers read these with `read -r`,
+# and a translated CRLF would leave a trailing CR on every name, silently
+# defeating the protected_map / requires_fresh_process filters.
+try:
+    sys.stdout.reconfigure(newline="\n")
+except Exception:
+    pass
 
 try:
     data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
@@ -722,7 +751,22 @@ always_on = [
 for map_name in sorted(always_on, key=lambda name: (priority_index.get(name, len(priority)), name)):
     print(map_name)
 PY
-  )
+}
+
+reconcile_all() {
+  local maps=() map
+
+  require_postgres
+  ensure_state_file
+  while read -r map; do
+    [ -n "$map" ] || continue
+    protected_map "$map" && continue
+    # The persisted candidate list can contain a mode retired by a newer
+    # lifecycle policy.  Never reconcile it unless the effective policy still
+    # agrees that it is Always On.
+    [ "$(effective_mode_for_map "$map")" = "always-on" ] || continue
+    maps+=("$map")
+  done < <(always_on_names_from_state)
 
   reconcile_maps "${maps[@]}"
 }
@@ -804,6 +848,7 @@ case "$cmd" in
     map="$(canonical_map "${2:-}")"
     dynamic_grace_remaining "$map"
     ;;
+  always-on-maps) always_on_maps ;;
   help|--help|-h) usage ;;
   *) echo "Unknown maps command: $cmd"; usage; exit 2 ;;
 esac

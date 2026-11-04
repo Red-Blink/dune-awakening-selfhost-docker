@@ -1,5 +1,14 @@
 # Dune Discord Companion Bot - Admin Guide
 
+**Status:** Historical record — describes an early prototype of the companion bot, which is not in this repository. Not maintained.
+
+For current setup, routes and role tiers, see
+[discord-integration/README.md](../discord-integration/README.md) and the console-side
+[adapter contract](api-adapter-contract.md). The prototype described below had a
+read-only command surface; the current adapter also serves moderator-tier player
+link routes, admin-tier logs and `ops/*` routes, and an opt-in `/broadcast`, so the
+"No Write Actions" and "future" statements below no longer describe the console.
+
 ## Purpose
 
 This guide is for server owners and administrators configuring the experimental read-only Discord companion bot.

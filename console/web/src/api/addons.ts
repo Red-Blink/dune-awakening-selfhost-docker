@@ -35,6 +35,7 @@ export type CommunityAddonsIndex = {
 };
 
 export type InstalledAddon = {
+  uninstallNotice?: string;
   id: string;
   name: string;
   description: string;

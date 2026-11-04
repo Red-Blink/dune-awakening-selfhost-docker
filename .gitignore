@@ -30,6 +30,8 @@ console/web/dist/
 # #202, 2026-09-08: a Vitest cache file, node_modules/.vite/vitest/.../
 # results.json, had been committed this way).
 /node_modules/
+
+console/web/dist-preview/
 *.tsbuildinfo
 **/bin/
 **/obj/

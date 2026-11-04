@@ -13,7 +13,8 @@ import { allKnownActions, isCrownJewelAction } from "./policy.js";
 // lookup, so a hand-edited api-keys.json cannot grant them: `settings` would
 // let a key mint further keys, `database` and `setup` sidestep the scope model
 // entirely.
-export const KEY_DENIED_NAMESPACES = new Set(["settings", "database", "setup"]);
+// Community submissions are interactive Console actions, not automation scopes.
+export const KEY_DENIED_NAMESPACES = new Set(["settings", "database", "setup", "community"]);
 
 // Never reachable by a key at the ACTION level, regardless of the namespace's
 // scope grant. server:write-credentials rewrites the Funcom game-server token

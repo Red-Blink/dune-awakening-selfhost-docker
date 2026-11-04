@@ -1,6 +1,6 @@
 # Market Bot Scheduled Jobs and EDA Retirement
 
-**Status:** Current | **Last Updated:** August 2026
+**Status:** Current | **Last Updated:** November 2026
 
 The console API runs Market Bot reseed and buyback schedules in the background.
 No browser page or addon needs to remain open. Market Bot is managed from
@@ -52,6 +52,7 @@ The console stores owner-only, atomically written schedules at:
   5 days, 20 most recent). The scheduler prunes expired batches at most hourly,
   even when buyback is disabled. Appends also drop expired batches.
 - `runtime/generated/market-bot/plans.json` (active plan id and named-plan index)
+- `runtime/generated/market-bot/settings.json` (bot-wide settings; currently `safetyBackups`, default on)
 - `runtime/generated/market-bot/plans/<id>.json` (custom CSV-backed seed lists)
 
 The schedules are `source: "console"`. If the console was down when a run came due, it

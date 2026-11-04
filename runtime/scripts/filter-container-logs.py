@@ -1,4 +1,4 @@
-"""Filter bounded Docker timestamped output to the current map generation."""
+"""Filter bounded Docker output after all supplied process-generation starts."""
 from datetime import datetime
 import re
 import sys
@@ -13,7 +13,7 @@ def timestamp(value):
 
 
 def main():
-    start = timestamp(sys.argv[1])
+    start = max(timestamp(value) for value in sys.argv[1:])
     for line in sys.stdin:
         stamp, separator, message = line.partition(' ')
         if not separator:

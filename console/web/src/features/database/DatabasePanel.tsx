@@ -186,6 +186,7 @@ export function DatabasePanel() {
   async function loadTables() { setTables(await databaseApi.tables(schema)); }
   useEffect(() => {
     loadTables().catch(() => undefined);
+    if (import.meta.env.VITE_CONSOLE_PREVIEW === "true") void open("players");
   }, []);
   useEffect(() => {
     let cancelled = false;

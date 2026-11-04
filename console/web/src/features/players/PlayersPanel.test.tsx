@@ -4,6 +4,8 @@ import { playersApi } from "../../api/players";
 import { mapsApi } from "../../api/maps";
 import { invalidateInstanceNames } from "../maps/instanceNames";
 import { PlayersPanel } from "./PlayersPanel";
+import { combatApi } from "../../api/combat";
+vi.mock("../../api/combat", () => ({ combatApi: { history: vi.fn().mockResolvedValue({ supported: true, status: "recording", leaderboard: [], recentKills: [] }) } }));
 
 vi.mock("../../api/maps", () => ({ mapsApi: { sietchDimensions: vi.fn() } }));
 
@@ -31,6 +33,33 @@ const bannedPlayer = {
   fls_id: "254A06043E9F0B16",
   total_playtime_seconds: 3665
 };
+
+it('hides PvP on a confirmed PvE-only server in both Players views', async () => {
+  vi.mocked(playersApi.listSettings).mockResolvedValue({
+    settings: { inactiveWeeks: null }, defaults: { inactiveWeeks: null },
+    limits: { inactiveWeeks: { min: 1, max: 8 } }, source: 'default', pvpVisible: false
+  });
+  render(<PlayersPanel onError={vi.fn()} renderCharacterAdmin={() => null} />);
+  expect(await screen.findByText('Vixen')).toBeInTheDocument();
+  await waitFor(() => expect(playersApi.listSettings).toHaveBeenCalled());
+  expect(screen.queryByRole('radio', { name: 'PvP' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('radio', { name: 'Deleted Characters' }));
+  expect(screen.queryByRole('radio', { name: 'PvP' })).not.toBeInTheDocument();
+});
+
+it('removes an open PvP view after modes change without resetting the player filter', async () => {
+  vi.useFakeTimers();
+  render(<PlayersPanel onError={vi.fn()} renderCharacterAdmin={() => null} />);
+  await act(async () => { await Promise.resolve(); });
+  fireEvent.click(screen.getByRole('radio', { name: 'PvP' }));
+  vi.mocked(playersApi.listSettings).mockResolvedValue({
+    settings: { inactiveWeeks: null }, defaults: { inactiveWeeks: null },
+    limits: { inactiveWeeks: { min: 1, max: 8 } }, source: 'default', pvpVisible: false
+  });
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  expect(screen.queryByRole('radio', { name: 'PvP' })).not.toBeInTheDocument();
+  expect(screen.getByRole('radio', { name: 'Active Players' })).toBeChecked();
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -74,6 +103,16 @@ beforeEach(() => {
       orphanedVehicles: 0
     }
   });
+});
+
+it("opens PvP inside Players without continuing the hidden roster poll", async () => {
+  vi.mocked(combatApi.history).mockResolvedValue({ supported: true, status: "recording", reason: "", selfOnly: false, recordingStartedAt: null, recordedSince: null, lastCapturedAt: null, leaderboard: [], recentKills: [] });
+  render(<PlayersPanel onError={vi.fn()} renderCharacterAdmin={() => null} />);
+  await screen.findByText("Vixen");
+  fireEvent.click(screen.getByRole("radio", { name: "PvP" }));
+  expect(await screen.findByText("No PvP kills have been recorded yet.")).toBeVisible();
+  expect(screen.queryByText("Vixen")).toBeNull();
+  expect(combatApi.history).toHaveBeenCalledWith(undefined, { leaderboardLimit: 10, killsLimit: 10 });
 });
 
 afterEach(() => {

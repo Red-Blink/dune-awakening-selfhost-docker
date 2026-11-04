@@ -16,6 +16,7 @@ vi.mock("../../api/admin", () => ({
 vi.mock("../../api/players", () => ({
   playersApi: {
     inventory: vi.fn(),
+    journey: vi.fn(),
     specs: vi.fn(),
     giveItems: vi.fn(),
     addCurrency: vi.fn(),
@@ -50,11 +51,30 @@ beforeEach(() => {
     stdout: "Energy Capsule [Trooper]\n  id: Skills.Ability.EnergyCapsule\n  max level: 1"
   });
   vi.mocked(playersApi.inventory).mockResolvedValue({} as Awaited<ReturnType<typeof playersApi.inventory>>);
+  vi.mocked(playersApi.journey).mockResolvedValue({ capabilities: {}, rows: { story: [
+    { id: "parent", name: "Journey Parent", category: "Story", depth: 0, parentId: "" },
+    { id: "child", name: "Journey Child", category: "Story", depth: 1, parentId: "parent" }
+  ] } });
   vi.mocked(playersApi.specs).mockResolvedValue({ rows: [], skillModules: [], capabilities: {} });
   vi.mocked(playersApi.addCurrency).mockResolvedValue({ supported: true, result: {} });
 });
 
 describe("CharacterAdminUI Tank catalog", () => {
+  it("uses centered icons and expands Journey children without changing their state", async () => {
+    render(<CharacterAdminUI {...baseProps} detail={{ player: { actual_online_status: "Offline" } }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Journey" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Story (2)" }));
+    const expand = screen.getByRole("button", { name: "Expand" });
+    expect(expand.querySelector("svg.lucide-plus")).toHaveAttribute("width", "12");
+    expect(screen.queryByText("Journey Child")).toBeNull();
+    fireEvent.click(expand);
+    expect(screen.getByText("Journey Child")).toBeVisible();
+    const collapse = screen.getByRole("button", { name: "Collapse" });
+    expect(collapse).toHaveAttribute("aria-expanded", "true");
+    expect(collapse.querySelector("svg.lucide-minus")).toHaveAttribute("height", "12");
+    fireEvent.click(collapse);
+    expect(screen.queryByText("Journey Child")).toBeNull();
+  });
   it("uses the standard spawn confirmation and honors cancellation", async () => {
     const confirm = vi.fn().mockResolvedValue(false);
     vi.mocked(adminApi.structuredVehicles).mockResolvedValue({ vehicles: [{ id: "Tank", name: "Tank", templates: ["T0"] }] });

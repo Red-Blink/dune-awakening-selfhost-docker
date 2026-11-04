@@ -27,10 +27,10 @@ function paths(repoRoot) {
   };
 }
 
-test("initializes healthy core state when EDA was already uninstalled", () => {
+test("initializes healthy core state when EDA was already uninstalled", async () => {
   const repoRoot = makeRepo();
   try {
-    const result = retireLegacyEdaExchangeBot({ repoRoot }, { now: () => new Date("2026-08-17T12:00:00.000Z") });
+    const result = await retireLegacyEdaExchangeBot({ repoRoot }, { now: () => new Date("2026-08-17T12:00:00.000Z") });
     const target = paths(repoRoot);
     assert.equal(result.retired, true);
     assert.equal(result.addonRemoved, true);
@@ -49,7 +49,7 @@ test("initializes healthy core state when EDA was already uninstalled", () => {
   }
 });
 
-test("migrates enabled legacy schedules after EDA was already uninstalled", () => {
+test("migrates enabled legacy schedules after EDA was already uninstalled", async () => {
   const repoRoot = makeRepo();
   try {
     const target = paths(repoRoot);
@@ -70,7 +70,7 @@ test("migrates enabled legacy schedules after EDA was already uninstalled", () =
       nextRunAt: "2026-08-17T12:45:45.549Z"
     });
 
-    const result = retireLegacyEdaExchangeBot({ repoRoot }, { now: () => new Date("2026-08-17T12:40:00.000Z") });
+    const result = await retireLegacyEdaExchangeBot({ repoRoot }, { now: () => new Date("2026-08-17T12:40:00.000Z") });
 
     assert.equal(result.addonRemoved, true);
     assert.equal(existsSync(target.installed), false);
@@ -92,7 +92,7 @@ test("migrates enabled legacy schedules after EDA was already uninstalled", () =
   }
 });
 
-test("backs up and migrates installed EDA schedules before removal", () => {
+test("backs up and migrates installed EDA schedules before removal", async () => {
   const repoRoot = makeRepo();
   try {
     const target = paths(repoRoot);
@@ -104,7 +104,7 @@ test("backs up and migrates installed EDA schedules before removal", () => {
     writeJson(join(target.legacy, "buyback.json"), { enabled: true, exchangeId: "42", intervalMinutes: 30, nextRunAt: "2026-08-17T12:30:00.000Z", source: "addon" });
     writeJson(join(target.legacy, "seed.json"), { enabled: true, exchangeId: "42", intervalMinutes: 60, nextRunAt: "2026-08-17T13:00:00.000Z", source: "addon" });
 
-    const result = retireLegacyEdaExchangeBot({ repoRoot }, { now: () => new Date("2026-08-17T12:00:00.000Z") });
+    const result = await retireLegacyEdaExchangeBot({ repoRoot }, { now: () => new Date("2026-08-17T12:00:00.000Z") });
     assert.equal(existsSync(target.installed), false);
     assert.equal(existsSync(target.legacy), false);
     assert.equal(readJson(join(target.core, "buyback.json")).source, "console");
@@ -120,14 +120,14 @@ test("backs up and migrates installed EDA schedules before removal", () => {
   }
 });
 
-test("leaves legacy state untouched when a schedule is malformed", () => {
+test("leaves legacy state untouched when a schedule is malformed", async () => {
   const repoRoot = makeRepo();
   try {
     const target = paths(repoRoot);
     mkdirSync(target.installed, { recursive: true });
     writeFileSync(join(target.installed, "keep.txt"), "keep");
     writeJson(join(target.legacy, "buyback.json"), { enabled: true, exchangeId: "not-an-id" });
-    assert.throws(() => retireLegacyEdaExchangeBot({ repoRoot }), /Legacy EDA buyback schedule is invalid/);
+    await assert.rejects(retireLegacyEdaExchangeBot({ repoRoot }), /Legacy EDA buyback schedule is invalid/);
     assert.equal(existsSync(join(target.installed, "keep.txt")), true);
     assert.equal(existsSync(join(target.legacy, "buyback.json")), true);
     assert.equal(existsSync(target.core), false);
@@ -136,14 +136,14 @@ test("leaves legacy state untouched when a schedule is malformed", () => {
   }
 });
 
-test("keeps core state and retries an interrupted addon cleanup", () => {
+test("keeps core state and retries an interrupted addon cleanup", async () => {
   const repoRoot = makeRepo();
   try {
     const target = paths(repoRoot);
     mkdirSync(target.installed, { recursive: true });
     writeFileSync(join(target.installed, "keep.txt"), "keep");
-    const first = retireLegacyEdaExchangeBot({ repoRoot }, {
-      removeAddon: () => { throw new Error("busy"); }
+    const first = await retireLegacyEdaExchangeBot({ repoRoot }, {
+      removeAddon: async () => { await Promise.resolve(); throw new Error("busy"); }
     });
     assert.equal(first.retired, true);
     assert.equal(first.addonRemoved, false);
@@ -151,7 +151,7 @@ test("keeps core state and retries an interrupted addon cleanup", () => {
     assert.equal(existsSync(join(target.core, "buyback.json")), true);
     assert.equal(existsSync(target.installed), true);
 
-    const second = retireLegacyEdaExchangeBot({ repoRoot }, {
+    const second = await retireLegacyEdaExchangeBot({ repoRoot }, {
       removeAddon: (_config, _id) => rmSync(target.installed, { recursive: true, force: true })
     });
     assert.equal(second.migrated, false);
@@ -162,7 +162,7 @@ test("keeps core state and retries an interrupted addon cleanup", () => {
   }
 });
 
-test("preserves an existing native schedule and fills its missing companion", () => {
+test("preserves an existing native schedule and fills its missing companion", async () => {
   const repoRoot = makeRepo();
   try {
     const target = paths(repoRoot);
@@ -176,7 +176,7 @@ test("preserves an existing native schedule and fills its missing companion", ()
       enabled: true, exchangeId: "77", intervalMinutes: 60, source: "addon"
     });
 
-    const result = retireLegacyEdaExchangeBot({ repoRoot });
+    const result = await retireLegacyEdaExchangeBot({ repoRoot });
     assert.equal(result.migrated, true);
     assert.equal(readJson(join(target.core, "buyback.json")).exchangeId, "99");
     assert.equal(readJson(join(target.core, "seed.json")).exchangeId, "77");

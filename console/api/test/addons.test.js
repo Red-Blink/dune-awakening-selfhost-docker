@@ -629,7 +629,7 @@ function addonArchiveRunner(id, version, permissions) {
   };
 }
 
-test("tracks installed addon enable disable and removal state", () => {
+test("tracks installed addon enable disable and removal state", async () => {
   const repoRoot = mkdtempSync(join(tmpdir(), "dune-addons-"));
   try {
     const addonDir = join(repoRoot, "runtime/addons/installed/leadership-board-demo");
@@ -689,7 +689,7 @@ test("tracks installed addon enable disable and removal state", () => {
     assert.throws(() => installedAddonContentPath(config, "leadership-board-demo", "../addon.json"), /unsafe/);
     assert.equal(setInstalledAddonEnabled(config, "leadership-board-demo", false).addon.status, "Disabled");
     assert.throws(() => installedAddonContentPath(config, "leadership-board-demo", "web/index.html"), /disabled/);
-    assert.deepEqual(removeInstalledAddon(config, "leadership-board-demo"), { ok: true, id: "leadership-board-demo" });
+    assert.deepEqual(await removeInstalledAddon(config, "leadership-board-demo"), { ok: true, id: "leadership-board-demo" });
     assert.deepEqual(listInstalledAddons(config).addons, []);
     assert.equal(existsSync(addonJobsDir), false, "uninstall removes the addon's scheduled-job directory");
     assert.equal(existsSync(addonJob), false, "uninstall removes persisted addon jobs");

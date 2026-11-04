@@ -26,7 +26,9 @@ def load_rows(path: Path) -> list[dict[str, object]]:
         map_name = str(raw.get("map") or "").strip()
         if not map_name:
             raise ValueError("partition catalog row is missing map")
-        partition_id = int(raw["id"])
+        # Supplemental maps have no upstream canonical ID. Allocate from the
+        # database sequence instead of claiming an ID another host may use.
+        partition_id = int(raw["id"]) if raw["id"] is not None else None
         dimension = int(raw.get("dimension") or 0)
         key = (map_name.casefold(), dimension)
         if key in seen:
@@ -59,7 +61,7 @@ def reserved_partition_ids() -> set[int]:
 
 def emit(rows: list[dict[str, object]]) -> None:
     reserved_ids = reserved_partition_ids()
-    print("-- Generated from the installed Funcom world-template partition catalog.")
+    print("-- Generated from the installed world-template catalog and guarded supplements.")
     print("-- Additive only: existing map dimensions and customized rows are preserved.")
     print("begin;")
     print("select pg_advisory_xact_lock(hashtextextended('dune-docker:world-partitions', 0));")
@@ -68,22 +70,33 @@ def emit(rows: list[dict[str, object]]) -> None:
         "greatest((select coalesce(max(partition_id), 1) from dune.world_partition), "
         "(select last_value from dune.world_partition_partition_id_seq)), true);"
     )
-
     for row in rows:
+        if row["id"] is None:
+            # Native inserts earlier in this transaction can have advanced the
+            # highest ID without advancing the serial sequence themselves.
+            print(
+                "select setval('dune.world_partition_partition_id_seq', "
+                "greatest((select coalesce(max(partition_id), 1) from dune.world_partition), "
+                "(select last_value from dune.world_partition_partition_id_seq), "
+                f"{max(reserved_ids, default=1)}), true);"
+            )
         map_sql = sql_string(row["map"])
         definition_sql = sql_string(json.dumps(row["definition"], separators=(",", ":")))
         blocked_sql = "true" if row["blocked"] else "false"
-        canonical_available = row["id"] not in reserved_ids
+        canonical_available = row["id"] is not None and row["id"] not in reserved_ids
         canonical_condition = (
             f"not exists (select 1 from dune.world_partition where partition_id = {row['id']})"
             if canonical_available
             else "false"
         )
-        fallback_notice = (
+        fallback_notice = "no canonical ID was supplied" if row["id"] is None else (
             "canonical ID % has an existing partition override"
             if not canonical_available
             else "canonical ID % was already in use"
         )
+        canonical_id_sql = "null" if row["id"] is None else str(row["id"])
+        fallback_notice_args = "" if row["id"] is None else f", {canonical_id_sql}"
+        partition_kind = "supplemental" if row["id"] is None else "official"
         print(
             f"""
 do $reconcile$
@@ -99,11 +112,11 @@ begin
     insert into dune.world_partition (
       partition_id, server_id, map, partition_definition, dimension_index, blocked, label
     ) values (
-      {row['id']}, null, {map_sql}, {definition_sql}::jsonb,
+      {canonical_id_sql}, null, {map_sql}, {definition_sql}::jsonb,
       {row['dimension']}, {blocked_sql}, null
     );
     raise notice 'Added official world partition: % dimension % (ID %)',
-      {map_sql}, {row['dimension']}, {row['id']};
+      {map_sql}, {row['dimension']}, {canonical_id_sql};
   else
     insert into dune.world_partition (
       server_id, map, partition_definition, dimension_index, blocked, label
@@ -111,8 +124,8 @@ begin
       null, {map_sql}, {definition_sql}::jsonb,
       {row['dimension']}, {blocked_sql}, null
     );
-    raise notice 'Added official world partition: % dimension % ({fallback_notice})',
-      {map_sql}, {row['dimension']}, {row['id']};
+    raise notice 'Added {partition_kind} world partition: % dimension % ({fallback_notice})',
+      {map_sql}, {row['dimension']}{fallback_notice_args};
   end if;
 end
 $reconcile$;"""

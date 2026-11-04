@@ -1,6 +1,6 @@
 # Base backups (the game's "pick up base" tool)
 
-**Status:** Current | **Last Updated:** August 2026
+**Status:** Current | **Last Updated:** November 2026
 
 The game has its own base-backup tool: a player can "pick up" a placed base,
 which unclaims it so it can later be redeployed elsewhere. This is entirely
@@ -101,6 +101,11 @@ checks the [pending-delete lock](base-deletion.md#irreversibility):
 - `POST /api/bases/{baseId}/refill-water`
 - `PUT /api/bases/{baseId}/permissions`
 - `POST /api/bases/{baseId}/system-custodian`
+- `PUT /api/bases/{baseId}/land-claim`
+- `POST /api/bases/{baseId}/child-access`
+- the container item routes: `POST …/containers/{placeableId}/items`,
+  `DELETE …/items/{itemId}`, `DELETE …/items`, `DELETE …/all-items`,
+  `POST …/give-item`, `POST …/give-items` and `POST …/fill-item`
 - `POST /api/bases/{baseId}/auto-refill` and `.../auto-refill-water` (only
   when enabling — disabling is harmless and does not race anything)
 

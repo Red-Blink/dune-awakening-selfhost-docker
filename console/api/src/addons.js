@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, relative, resolve } from "node:path";
+import { addonUninstallNotice, cleanupAddonCompanions } from "./services/addonUninstall.js";
 
 export const COMMUNITY_ADDONS_INDEX_URL = "https://raw.githubusercontent.com/Red-Blink/dune-docker-addons/main/index.json";
 
@@ -28,6 +29,7 @@ const ALLOWED_ADDON_PERMISSIONS = new Set([
   "players:message",
   "server:status",
   "server:restart",
+  "realtime:read",
   "files:addon-data",
   "broadcast:send",
   "scheduler:server"
@@ -261,7 +263,8 @@ export function listInstalledAddons(config) {
           entryPath: manifest.entry.path,
           permissions: manifest.permissions,
           approvedPermissions,
-          provenance: normalizeAddonProvenance(addonState)
+          provenance: normalizeAddonProvenance(addonState),
+          uninstallNotice: addonUninstallNotice(manifest.id)
         };
       } catch {
         return {
@@ -276,7 +279,8 @@ export function listInstalledAddons(config) {
           entryPath: "",
           permissions: [],
           approvedPermissions: [],
-          provenance: {}
+          provenance: {},
+          uninstallNotice: addonUninstallNotice(entry.name)
         };
       }
     })
@@ -540,10 +544,14 @@ export function setInstalledAddonEnabled(config, addonId, enabled) {
   };
 }
 
-export function removeInstalledAddon(config, addonId) {
+export async function removeInstalledAddon(config, addonId, options = {}) {
   const id = normalizeAddonId(addonId);
   const addonDir = resolve(addonsInstalledRoot(config), id);
   if (!existsSync(addonDir)) throw new Error(`Installed addon not found: ${id}`);
+  // Stop future bridge/job deliveries immediately. A cleanup failure leaves
+  // the addon visible and disabled, with its files available for a retry.
+  setAddonEnabled(config, id, false);
+  await cleanupAddonCompanions(config, id, options);
   removeAddonJobState(config, id);
   removeAddonOwnedState(config, id);
   rmSync(addonDir, { recursive: true, force: true });

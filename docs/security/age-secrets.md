@@ -1,5 +1,7 @@
 # Age-encrypted runtime secrets
 
+**Status:** Current | **Last Updated:** November 2026
+
 This optional backend encrypts the server-login password and username
 secrets (Stage 2), and the hosted-bot wizard's Discord OAuth client
 secret (Stage 3), at rest. Existing installations remain on plaintext

@@ -9,6 +9,9 @@ source runtime/scripts/lib/igw-socket-health.sh
 # shellcheck source=runtime/scripts/lib/postgres.sh
 source runtime/scripts/lib/postgres.sh
 
+# shellcheck source=runtime/scripts/farm-readiness.sh
+source runtime/scripts/farm-readiness.sh
+
 INTERVAL="${DUNE_AUTOSCALER_INTERVAL:-5}"
 if ! [[ "$INTERVAL" =~ ^[1-9][0-9]*$ ]]; then
   echo "Invalid DUNE_AUTOSCALER_INTERVAL; using 5 seconds." >&2
@@ -40,7 +43,7 @@ SIETCH_TOPOLOGY_MAINTENANCE_FILE="${DUNE_SIETCH_TOPOLOGY_MAINTENANCE_FILE:-runti
 SIETCH_TOPOLOGY_HEAL_GRACE_SECONDS="${DUNE_SIETCH_TOPOLOGY_HEAL_GRACE_SECONDS:-600}"
 DIRECTOR_HEAL_STALE_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_HEAL_STALE_SECONDS:-15}"
 DIRECTOR_HEAL_COOLDOWN_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_HEAL_COOLDOWN_SECONDS:-300}"
-DIRECTOR_HEAL_REPUBLISH_GRACE_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_HEAL_REPUBLISH_GRACE_SECONDS:-45}"
+DIRECTOR_HEAL_REPUBLISH_GRACE_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_HEAL_REPUBLISH_GRACE_SECONDS:-120}"
 DIRECTOR_CORE_READY_GRACE_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_CORE_READY_GRACE_SECONDS:-120}"
 DYNAMIC_READY_HEAL_STALE_SECONDS="${DUNE_AUTOSCALER_DYNAMIC_READY_HEAL_STALE_SECONDS:-20}"
 DIRECTOR_BROWSER_SCAN_SECONDS="${DUNE_AUTOSCALER_DIRECTOR_BROWSER_SCAN_SECONDS:-30}"
@@ -1815,10 +1818,9 @@ map_for_partition() {
 
 survival_fallback_target_info() {
   local home_dimension_index="$1"
-  local row
 
   if [ -n "$home_dimension_index" ] && printf '%s' "$home_dimension_index" | grep -Eq '^[0-9]+$'; then
-    row="$(psql_value "
+    psql_value "
       select
         partition_id || '|' ||
         map || '|' ||
@@ -1826,14 +1828,10 @@ survival_fallback_target_info() {
         coalesce(server_id, '')
       from dune.world_partition
       where lower(map) = lower('Survival_1')
-        and dimension_index = $home_dimension_index
-      order by partition_id
+      order by (case when dimension_index = $home_dimension_index then 0 else 1 end), dimension_index, partition_id
       limit 1;
-    ")"
-    if [ -n "$row" ]; then
-      echo "$row"
-      return 0
-    fi
+    "
+    return 0
   fi
 
   psql_value "
@@ -2156,20 +2154,21 @@ PY
       [ -n "${flow_id:-}" ] || continue
       hub_travel_seen "$flow_id" && continue
 
-      local target_map account_id destination_row target_partition_id target_dimension target_server_id current_map target_respawn_map
+      local target_map account_info account_id destination_row target_partition_id target_dimension target_server_id current_map target_respawn_map
       target_map="$(named_destination_target_map "$destination_name" 2>/dev/null || true)"
       [ -n "$target_map" ] || continue
 
-      account_id="$(psql_value "select id from dune.accounts where \"user\" = '${funcom_id//\'/\'\'}' limit 1;")"
-      [ -n "$account_id" ] || continue
-
-      current_map="$(psql_value "
-        select coalesce(fs.map, '')
-        from dune.player_state ps
+      account_info="$(psql_value "
+        select a.id || '|' || coalesce(fs.map, '')
+        from dune.accounts a
+        left join dune.player_state ps on ps.account_id = a.id
         left join dune.farm_state fs on fs.server_id = ps.server_id
-        where ps.account_id = $account_id
+        where a.\"user\" = '${funcom_id//\'/\'\'}'
         limit 1;
       ")"
+      [ -n "$account_info" ] || continue
+      IFS='|' read -r account_id current_map <<< "$account_info"
+      [ -n "$account_id" ] || continue
 
       destination_row="$(psql_value "
         select
@@ -2582,6 +2581,172 @@ PY
   done <<< "$rejected_rows"
 }
 
+# A player who logs out inside a Deep Desert dimension and returns after that dimension's idle
+# server despawned is refused by the Director and queued for a partition that has no server. The
+# Deep Desert travel-response handler only runs for Overmap travel flows, never for a login, and
+# bare DeepDesert_1 demand deliberately never spawns, so nothing would ever start that partition
+# and the client would wait forever (#1271). Print "<partition id> <player FLS id> <epoch>" for
+# each DeepDesert_1 partition a Director login refusal says the player must return to, once per
+# partition, using the newest refusal. The ServerId is not matched here: whether that server is
+# really alive is decided against the database, which also covers a partition still bound to a
+# crashed server.
+# The Director log is not a trust boundary we control, so the match is anchored on the Director's
+# own line prefix and the "Player <FLS id> requested WorldPartition" shape (a chat line that
+# quotes the phrase does not match), every line is cut to 16 KiB first, and the text between the
+# two WorldPartition blocks is bounded (a real PartitionDefinition is a few hundred characters),
+# so a long or crafted line cannot stall the fast follower that runs this. A line without a
+# readable timestamp counts as "now".
+declare -A DEEPDESERT_LOGIN_SPAWNED_AT=()
+declare -A DEEPDESERT_LOGIN_ATTEMPTED_AT=()
+deepdesert_login_resume_partitions() {
+  python3 -c '
+import calendar
+import re
+import sys
+import time
+
+refusal = re.compile(
+    r"^(?:(\S+) )?\[[0-9:]+ [0-9]+ [A-Z]+ Director\] "
+    r"Player ([A-F0-9]+) requested WorldPartition \{.{0,8000}?\}\. "
+    r"Teleport not allowed, returning to WorldPartition \{ "
+    r"PartitionId = ([0-9]+), ServerId = [A-Za-z0-9_+/-]*, Map = DeepDesert_1,"
+)
+seen = {}
+for line in sys.stdin:
+    match = refusal.match(line[:16384])
+    if not match:
+        continue
+    try:
+        epoch = calendar.timegm(time.strptime(match.group(1)[:19], "%Y-%m-%dT%H:%M:%S"))
+    except (TypeError, ValueError):
+        epoch = int(time.time())
+    partition_id = match.group(3)
+    if partition_id not in seen or epoch >= seen[partition_id][1]:
+        seen[partition_id] = (match.group(2), epoch)
+for partition_id, (player_id, epoch) in seen.items():
+    print(partition_id, player_id, epoch)
+'
+}
+
+# Spawn exactly the partition the player must return to. Never the bare-map form, which picks the
+# first unassigned dimension and races the travel-response handler for a different player.
+#
+# What actually prevents a double spawn of one partition is the per-partition flock inside
+# spawn-server.sh (a second caller prints "Spawn already in progress" and exits 0); this scan
+# looks at the same lock so that a spawn that is still binding (about a minute) is neither
+# repeated nor mistaken for a stuck one. The database and container checks only avoid pointless
+# calls. spawn-server.sh also clears a partition still bound to a dead server, so a dead binding
+# counts as free here. A refusal older than this scan's own last spawn of that partition has
+# already been served and is ignored, so a refusal that is still inside the log window cannot
+# respawn a partition that has since idled out.
+#
+# The spawn runs in the background with no timeout: it waits for the server to bind (tens of
+# seconds) and this runs in the fast follower, which must keep serving Survival_1/Overmap
+# allocation demand. There is deliberately no kill: terminating spawn-server.sh after docker run
+# but before it finishes would release the port reservation of a running container. The existing
+# travel-response spawn has no timeout either.
+scan_deepdesert_login_resumes() {
+  local logs partitions partition_id player_id refused_at partition_state started
+
+  director_heal_due deepdesert_login_resume 5 || return 0
+
+  if ! logs="$(director_logs --timestamps --since 150s 2>/dev/null)"; then
+    director_heal_due deepdesert_login_resume_reader 60 \
+      && echo "WARN Deep Desert login resume scan could not read the Director log"
+    return 0
+  fi
+  # Almost every pass has nothing to do: skip the parser unless a Deep Desert refusal is present.
+  case "$logs" in
+    *"returning to WorldPartition { PartitionId = "*"Map = DeepDesert_1,"*) ;;
+    *) return 0 ;;
+  esac
+  # The window is a little over two cooldowns so one failed spawn is retried while the refusal is
+  # still readable. A refusal missed for longer than that is recovered by the next login attempt.
+  partitions="$(printf '%s\n' "$logs" | deepdesert_login_resume_partitions || true)"
+  [ -n "$partitions" ] || return 0
+
+  if map_is_disabled "DeepDesert_1"; then
+    director_heal_due deepdesert_login_resume_disabled 60 \
+      && echo "SKIP deepdesert-login-resume reason=map-disabled"
+    return 0
+  fi
+
+  while read -r partition_id player_id refused_at; do
+    [[ "$partition_id" =~ ^[0-9]+$ ]] || continue
+    [[ "$refused_at" =~ ^[0-9]+$ ]] || refused_at="$(date +%s)"
+    # Already served by a spawn of ours that happened after this refusal.
+    if [ -n "${DEEPDESERT_LOGIN_SPAWNED_AT[$partition_id]:-}" ] \
+        && [ "$refused_at" -le "${DEEPDESERT_LOGIN_SPAWNED_AT[$partition_id]}" ]; then
+      continue
+    fi
+    # A spawn that is still running (binding takes about a minute) is not stuck and not to be
+    # repeated; spawn-server.sh holds this lock for its whole run.
+    deepdesert_partition_spawn_in_progress "$partition_id" && continue
+    # Re-checked against the database, not the log: the log line can be minutes old. Free means
+    # no server is bound, or the bound server has no live farm_state row (a crashed server).
+    partition_state="$(psql_value "
+      select case
+        when coalesce(wp.server_id, '') = '' then 'free'
+        when not exists (
+          select 1 from dune.farm_state fs
+          where fs.server_id = wp.server_id and coalesce(fs.alive, false)
+        ) then 'free'
+        else 'taken'
+      end
+      from dune.world_partition wp
+      where wp.partition_id = ${partition_id}
+        and wp.map = 'DeepDesert_1'
+        and wp.blocked = false
+      limit 1;
+    " 2>/dev/null || true)"
+    if [ "$partition_state" = "taken" ]; then
+      # A successful command alone does not prove a server bound (the spawn
+      # command also returns zero when another spawn owns the lock). Only
+      # consume the refusal after the database confirms a live assignment.
+      if [ -n "${DEEPDESERT_LOGIN_ATTEMPTED_AT[$partition_id]:-}" ]; then
+        DEEPDESERT_LOGIN_SPAWNED_AT[$partition_id]="${DEEPDESERT_LOGIN_ATTEMPTED_AT[$partition_id]}"
+      fi
+      continue
+    fi
+    [ "$partition_state" = "free" ] || continue
+    # With no spawn running, a container for this partition that is not bound to it is a spawn
+    # that did not finish binding. Do not stack another one on top; say so, because nothing else
+    # will.
+    if [ -n "$(dynamic_container_name_for_partition "$partition_id" 2>/dev/null || true)" ]; then
+      director_heal_due "deepdesert_login_skip_${partition_id}" 60 \
+        && echo "SKIP deepdesert-login-resume partition=$partition_id reason=container-present-unbound player=$player_id"
+      continue
+    fi
+    # One spawn attempt per partition per cooldown, even if the spawn fails.
+    director_heal_due "deepdesert_login_spawn_${partition_id}" 60 || continue
+
+    echo "SPAWN deepdesert-login-resume partition=$partition_id player=$player_id"
+    started="$(date +%s)"
+    DEEPDESERT_LOGIN_ATTEMPTED_AT[$partition_id]="$started"
+    (
+      # spawn-server.sh exits 0 for "Spawn already in progress" as well, so the exit code says
+      # whether it ran to completion, not whether this call started the server.
+      rc=0
+      runtime/scripts/spawn-server.sh "$partition_id" || rc=$?
+      if [ "$rc" -eq 0 ]; then
+        echo "DONE deepdesert-login-resume partition=$partition_id rc=0 elapsed=$(( $(date +%s) - started ))s"
+      else
+        echo "ERROR failed to spawn DeepDesert_1 partition=$partition_id for login resume rc=$rc elapsed=$(( $(date +%s) - started ))s"
+      fi
+    ) &
+  done <<< "$partitions"
+}
+
+# True when spawn-server.sh currently holds this partition's spawn lock. A missing lock file, or
+# any failure to open it, means "not in progress" so a broken lock path can never block a spawn.
+deepdesert_partition_spawn_in_progress() {
+  local lock_file="runtime/generated/spawn-partition-${1}.lock" rc=0
+
+  [ -e "$lock_file" ] || return 1
+  ( exec 7>"$lock_file" || exit 2; flock -n 7 ) 2>/dev/null || rc=$?
+  [ "$rc" -eq 1 ]
+}
+
 scan_idle_servers() {
   local scope="${1:-standard}"
   local map_filter
@@ -2885,6 +3050,7 @@ follow_director_travel_demand() {
     # Recover exact credits-return refusals before considering the generic
     # map demand emitted by the Director for the same login attempt.
     scan_rejected_story_returns || echo "WARN story return scan failed; retrying"
+    scan_deepdesert_login_resumes || echo "WARN Deep Desert login resume scan failed; retrying"
     scan_travel_demand || echo "WARN travel demand scan failed; retrying"
     sleep "$DEMAND_INTERVAL"
   done
@@ -3138,8 +3304,16 @@ director_logs_contain_live_ids() {
   [ "$missing" -eq 0 ]
 }
 
+director_capacity_failure_confirmed() {
+  # Browser declarations arrive about once a minute. A cached pre-repair zero
+  # or absent server ID is not evidence that the live repair failed.
+  director_logs --timestamps --since 10m 2>/dev/null \
+    | python3 runtime/scripts/director-browser-state.py \
+      --after "$1" --now "$2" --grace "$DIRECTOR_HEAL_REPUBLISH_GRACE_SECONDS"
+}
+
 core_maps_ready_for_browser_heal() {
-  local container partition state running started_at logs
+  local container partition state running started_at logs cached_start pattern
 
   while IFS='|' read -r container partition; do
     state="$(docker inspect -f '{{.State.Running}}|{{.State.StartedAt}}' "$container" 2>/dev/null || true)"
@@ -3147,13 +3321,41 @@ core_maps_ready_for_browser_heal() {
     [ "$running" = "true" ] || return 1
     [ -n "${started_at:-}" ] || return 1
 
+    # Readiness is a one-time startup message, so a busy map eventually pushes
+    # it out of the bounded tail. Retain proof for this process generation;
+    # a restart of the same container must establish its own readiness again.
+    cached_start="$(director_heal_get "core-ready:${container}" 2>/dev/null || true)"
+    if [ "$cached_start" = "$started_at" ]; then
+      continue
+    fi
+
     # Docker retains logs across restarts of the same named container. Looking
     # at the unbounded tail can therefore find a READY marker from the previous
     # process and let browser healing restart Director while the replacement
     # core server is still loading. Only accept readiness emitted by the
     # container's current process generation.
-    logs="$(timeout --kill-after=2s 12s docker logs --since "$started_at" --tail 5000 "$container" 2>&1 || true)"
-    grep -Eq "Server farm is READY .*partition ${partition}([,[:space:]]|$)" <<<"$logs" || return 1
+    logs="$(timeout --kill-after=2s 12s docker logs --timestamps --tail 5000 "$container" 2>&1 \
+      | python3 runtime/scripts/filter-container-logs.py "$started_at" || true)"
+    pattern="Server farm is READY .*partition ${partition}([,[:space:]]|$)"
+    if ! grep -Eq "$pattern" <<<"$logs"; then
+      # As with the shared readiness reader, a damaged large-tail index can
+      # hide the current log while a smaller bounded tail remains readable.
+      logs="$(timeout --kill-after=2s 12s docker logs --timestamps --tail 1000 "$container" 2>&1 \
+        | python3 runtime/scripts/filter-container-logs.py "$started_at" || true)"
+    fi
+    if ! grep -Eq "$pattern" <<<"$logs"; then
+      # One cold lookup may need older retained output from this same process.
+      # Stream it so a large log never becomes a shell variable, and grep's
+      # early exit cannot turn a matching line into a pipefail/SIGPIPE failure.
+      if ! grep -Eq "$pattern" < <(timeout --kill-after=2s 12s docker logs --timestamps "$container" 2>&1 \
+        | python3 runtime/scripts/filter-container-logs.py "$started_at" 2>/dev/null); then
+        # Docker can lose the startup line or return only an old rotated log.
+        # Reuse the canonical, timestamp-filtered native Director proof rather
+        # than treating a DB ready flag as evidence of completed startup.
+        farm_partition_has_stable_director_reports "$partition" "$farm_ready_director_fallback_reports" "$container" || return 1
+      fi
+    fi
+    director_heal_set "core-ready:${container}" "$started_at" || true
   done <<'EOF'
 dune-server-survival-1|1
 dune-server-overmap|2
@@ -3267,9 +3469,15 @@ scan_director_browser_state() {
     publish_state_for_map Survival_1
     publish_state_for_map Overmap
     publish_state_for_map DeepDesert_1
-    director_heal_set browser_republish_at "$now"
+    # Publications can take tens of seconds. Start the observation window
+    # after they finish, so their execution time cannot consume the grace.
+    director_heal_set browser_republish_at "$(date +%s)"
     return 0
   fi
+
+  # Require sustained, fresh zero-capacity declarations AFTER the repair.
+  # Unknown/missing evidence can request a safe republish, never a restart.
+  director_capacity_failure_confirmed "$republish_at" "$now" || return 0
 
   if last_restart="$(director_heal_get last_restart 2>/dev/null)"; then
     since_restart=$((now - last_restart))
@@ -3278,7 +3486,7 @@ scan_director_browser_state() {
     fi
   fi
 
-  # Restarting Director also replaces Survival_1. Never run that disruptive
+  # Rebuilding the game farm replaces every world map. Never run that disruptive
   # recovery while a player is active (or while occupancy cannot be proved).
   # Republishing above remains safe to perform while players are connected;
   # the restart will be retried automatically after the battlegroup is empty.
@@ -3295,11 +3503,22 @@ scan_director_browser_state() {
     return 0
   fi
 
-  echo "HEAL director stale browser state action=restart capacity=${capacity:-unknown} ready_maps=$ready_count republish_age=$republish_age"
-  runtime/scripts/restart-director.sh >/dev/null 2>&1 || {
-    echo "ERROR failed to restart director during stale browser state heal"
+  # The browser can lose capacity because a core map stopped reporting state.
+  # Replacing only Director/Hagga leaves Overmap and other peers in the old
+  # farm generation. Use the same coordinated recovery as the IGW watchdog.
+  if ! docker inspect -f '{{.State.Running}}' dune-coriolis-coordinator 2>/dev/null | grep -qx true; then
+    echo "ERROR stale browser state action=coordinated-game-farm-restart coordinator=unavailable"
     return 0
-  }
+  fi
+  echo "HEAL director stale browser state action=coordinated-game-farm-restart capacity=${capacity:-unknown} ready_maps=$ready_count republish_age=$republish_age"
+  if ! docker exec -d dune-coriolis-coordinator bash -lc \
+    'set -o pipefail; umask 077
+     mkdir -p runtime/logs
+     runtime/scripts/restart-game-farm.sh stale-browser-state 2>&1 |
+       sed -n -e "/^=== .* ===$/p" -e "/^Finished: /p" -e "/^Coordinated game-farm restart completed\.$/p" >> runtime/logs/browser-state-recovery.log'; then
+    echo "ERROR failed to request coordinated game-farm restart during stale browser state heal"
+    return 0
+  fi
   director_heal_set last_restart "$now"
   director_heal_clear stale_since
   director_heal_clear browser_republish_at

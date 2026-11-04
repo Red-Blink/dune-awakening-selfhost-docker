@@ -15,6 +15,8 @@ describe("map friendly names", () => {
     ["CB_Arrakis_Story_Glutton_DiningRoom", "The Glutton's Dining Room"],
     ["CB_Arrakis_Generic_Sietch_Room", "Sietch Talab"],
     ["CB_Dungeon_OldCarthag", "Ruins Of Old Carthag"],
+    ["CB_Halloween_Event_Shipwreck_01", "Wreck of the Hieronymus"],
+    ["Halloween2026Shipwreck", "Wreck of the Hieronymus"],
     ["Story_Faction_Outpost_Hark", "Arsunt Garrison (Harkonnen)"]
   ])("maps %s to %s", (mapId, displayName) => {
     expect(friendlyMapName(mapId)).toBe(displayName);

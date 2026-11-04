@@ -1,6 +1,6 @@
 # Spice Fields Settings — UAT
 
-**Status:** Merged, pending QA | **For:** [PR #228](https://github.com/Red-Blink/dune-awakening-selfhost-docker/pull/228) (merged 2026-09-21, commit `461bd1e8`) — **updated for the per-map/per-partition scoping follow-up** (see this PR's own body)
+**Status:** Historical record — manual test plan for [PR #228](https://github.com/Red-Blink/dune-awakening-selfhost-docker/pull/228) (merged 2026-09-21, commit `461bd1e8`) and its per-map/per-partition scoping follow-up. Not maintained.
 
 **Location correction (2026-09-22):** this section originally lived under `Maps -> Interactive Modifiers -> Custom Settings`. Upstream's own commit `8eb6715c` ("Improve mobile bases and Spice Field settings", release v1.4.37) independently moved it into the `Maps -> Interactive Modifiers -> Spice Fields` tab, merged together with that tab's pre-existing read-only "Active Spice Fields" table. The steps below are updated for the current, real location — the **Target selector that scopes these settings still lives in the `Custom Settings` (or `UserGame`) tab**, not the `Spice Fields` tab itself; you'll switch tabs during this checklist.
 
@@ -31,11 +31,13 @@ also resolved — it isn't, and is tracked separately.
 ## 1. Section is visible and usable without selecting a Target
 
 - [ ] With **no** Target selected (check the **Custom Settings** tab's
-      "Target" dropdown — it's shared with this section, see below), confirm
+      "Target" dropdown — shared with this section and with the **UserGame**
+      tab, see below), confirm
       the Spice Fields tab's Settings section is still visible and its 9
       fields are populated with real values (not blank/loading forever).
 - [ ] Confirm the section's explanatory paragraph states these settings
-      apply to whichever Target is selected in the **Custom Settings** tab —
+      apply to whichever Target is selected in the **UserGame** or
+      **Custom Settings** tab —
       server-wide (Global) with nothing selected, or to that specific
       map/partition once one is chosen.
 - [ ] Confirm a small **"Editing: Global"** label, with a hint pointing to
