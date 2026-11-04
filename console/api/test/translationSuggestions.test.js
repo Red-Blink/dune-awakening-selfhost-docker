@@ -53,14 +53,16 @@ test('a missing review endpoint gives an actionable message instead of raw Not F
 });
 test('suggestion route rejects anonymous and invalid CSRF requests before any outbound call',async()=>{
   let calls=0,status;
-  await handleI18nRoute({req:{method:'POST',headers:{},authSession:{tier:'observer',csrf:'valid'}},res:{},path:'/api/i18n/suggestions',url:new URL('http://local/api/i18n/suggestions'),config:{},auth:{requireAuth(){throw new Error('Use the already resolved session');}},json(_res,code){status=code;},fetchImpl(){calls++;throw new Error('No external requests allowed');}});
+  await handleI18nRoute({req:{method:'POST',headers:{},authSession:{tier:'player',csrf:'valid'}},res:{},path:'/api/i18n/suggestions',url:new URL('http://local/api/i18n/suggestions'),config:{},auth:{requireAuth(){throw new Error('Use the already resolved session');}},json(_res,code){status=code;},fetchImpl(){calls++;throw new Error('No external requests allowed');}});
   assert.equal(status,403);assert.equal(calls,0);
-  for(const tier of ['owner','admin','moderator','player','observer'])assert.equal(evaluate({tier},'community:suggest-translation'),true);
-  assert.equal(evaluate({tier:'observer'},'settings:write'),false);
+  for(const tier of ['owner','admin','moderator','player'])assert.equal(evaluate({tier},'community:suggest-translation'),true);
+  assert.equal(evaluate({tier:'player'},'settings:write'),false);
+  // "observer" was folded into "player"; a session still carrying that name is refused outright.
+  assert.equal(evaluate({tier:'observer'},'community:suggest-translation'),false);
 });
 test('authenticated submission takes its current translation from the catalog, not browser data',async t=>{
   const directory=mkdtempSync(join(tmpdir(),'translation-route-'));t.after(()=>rmSync(directory,{recursive:true,force:true}));let status,wire;
-  await handleI18nRoute({req:{method:'POST',headers:{'x-csrf-token':'valid'},authSession:{tier:'observer',csrf:'valid'}},res:{},path:'/api/i18n/suggestions',url:new URL('http://local/api/i18n/suggestions'),config:{generatedDir:directory,secretsDir:join(directory,'secrets')},readJson:async()=>({lang:'DE',source:'Home',translation:'Reviewed Startseite',credit:'Helper',current:'PRIVATE RUNTIME TEXT',password:'PRIVATE PASSWORD'}),json(_res,code){status=code;},fetchImpl:async(_url,options)=>{wire=JSON.parse(options.body);return{ok:true,json:async()=>({id:wire.id})};}});
+  await handleI18nRoute({req:{method:'POST',headers:{'x-csrf-token':'valid'},authSession:{tier:'player',csrf:'valid'}},res:{},path:'/api/i18n/suggestions',url:new URL('http://local/api/i18n/suggestions'),config:{generatedDir:directory,secretsDir:join(directory,'secrets')},readJson:async()=>({lang:'DE',source:'Home',translation:'Reviewed Startseite',credit:'Helper',current:'PRIVATE RUNTIME TEXT',password:'PRIVATE PASSWORD'}),json(_res,code){status=code;},fetchImpl:async(_url,options)=>{wire=JSON.parse(options.body);return{ok:true,json:async()=>({id:wire.id})};}});
   assert.equal(status,201);assert.notEqual(wire.current,'PRIVATE RUNTIME TEXT');assert.ok(!JSON.stringify(wire).includes('PRIVATE PASSWORD'));
 });
 test('all checked-in reviewed language files and the public source catalog are valid',()=>{

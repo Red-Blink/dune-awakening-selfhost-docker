@@ -55,7 +55,8 @@ function bridgeFixture() {
     json: (_res, status, body) => ({ status, body }),
     hasExecutableStatement: () => true,
     isReadOnlySql: () => false,
-    applyMutationRateLimit: () => true
+    applyMutationRateLimit: () => true,
+    resolveClientIp: () => "127.0.0.1"
   };
   const route = new Function(...Object.keys(dependencies), `${routeSource}\nreturn addonBridgeRoute;`)(...Object.values(dependencies));
   function request(action, id = "allowed") {

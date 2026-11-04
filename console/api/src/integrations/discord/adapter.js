@@ -99,7 +99,15 @@ export function discordWritesEnabled(config) {
 
 export function discordRoleMappingFromEnv(env = process.env) {
   return {
-    observerRoleIds: csv(env.DISCORD_OBSERVER_ROLE_IDS),
+    // Renamed DISCORD_OBSERVER_ROLE_IDS -> DISCORD_PLAYER_ROLE_IDS (matching
+    // the tier rename below). The old name is still read as a fallback when
+    // the new one isn't set, so an operator who already configured it doesn't
+    // silently lose their role mapping on update (Strict Requirement 0). This
+    // is a genuinely different env var from DISCORD_CONSOLE_PLAYER_ROLE_IDS
+    // (the separate, independent console sign-in role mapping -- see the
+    // .env.example comment on both) despite the similar name; keep them
+    // straight when editing either.
+    playerRoleIds: csv(env.DISCORD_PLAYER_ROLE_IDS || env.DISCORD_OBSERVER_ROLE_IDS),
     moderatorRoleIds: csv(env.DISCORD_MODERATOR_ROLE_IDS),
     adminRoleIds: csv(env.DISCORD_ADMIN_ROLE_IDS),
     ownerRoleIds: csv(env.DISCORD_OWNER_ROLE_IDS)
@@ -108,7 +116,7 @@ export function discordRoleMappingFromEnv(env = process.env) {
 
 export function discordRolePolicyHealth(mapping = discordRoleMappingFromEnv()) {
   return {
-    observerConfigured: mapping.observerRoleIds.length > 0,
+    playerConfigured: mapping.playerRoleIds.length > 0,
     moderatorConfigured: mapping.moderatorRoleIds.length > 0,
     adminConfigured: mapping.adminRoleIds.length > 0,
     ownerConfigured: mapping.ownerRoleIds.length > 0
