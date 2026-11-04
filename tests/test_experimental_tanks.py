@@ -34,7 +34,7 @@ class TankTests(unittest.TestCase):
                 tanks.manifest('2141883-0-shipping')
 
     def test_new_build_assets_and_build_context_are_versioned(self):
-        for tag in ('2141883-0-shipping', '2147284-0-shipping', '2156652-0-shipping', '2160922-0-shipping', '2162777-0-shipping'):
+        for tag in ('2141883-0-shipping', '2147284-0-shipping', '2156652-0-shipping', '2160922-0-shipping', '2162777-0-shipping', '2168446-0-shipping', '2173753-0-shipping'):
             with self.subTest(tag=tag):
                 self.check_versioned_build(tag)
 
@@ -251,6 +251,20 @@ with patch.object(tanks, 'build', return_value={IMAGE!r}), patch.object(tanks, '
             tanks.save({'enabled': True, 'build': TAG, 'imageId': IMAGE})
             self.assertEqual(tanks.read_state()['imageId'], IMAGE)
             self.assertEqual(len(list(Path(directory).iterdir())), 1)
+
+    def test_republished_tag_accepts_only_independently_reviewed_bases(self):
+        spec = {**tanks.manifest(TAG), 'additionalBaseImages': [
+            {'imageId': 'sha256:' + '2' * 64, 'configId': 'sha256:' + '3' * 64}
+        ]}
+        reviewed = [spec['baseImage'].split('@')[1], spec['baseConfigId'],
+                    spec['additionalBaseImages'][0]['imageId'], spec['additionalBaseImages'][0]['configId']]
+        for image in reviewed:
+            with patch.object(tanks, 'run', return_value=image) as run:
+                self.assertEqual(tanks.base_image_id(spec, 'staged:reviewed'), image)
+                self.assertEqual(run.call_args.args[-1], 'staged:reviewed')
+        with patch.object(tanks, 'run', return_value=IMAGE):
+            with self.assertRaisesRegex(ValueError, 'supported base'):
+                tanks.base_image_id(spec, 'staged:unreviewed')
 
     def test_apply_restarts_only_running_hagga_and_preserves_saved_files(self):
         with tempfile.TemporaryDirectory() as directory:

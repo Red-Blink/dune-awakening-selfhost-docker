@@ -72,6 +72,24 @@ describe("App populates the shared serverPorts cache from /api/auth/state", () =
 });
 
 describe("sidebar version badge", () => {
+  it("marks community support links with a trailing external-link icon", async () => {
+    const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((path: string) => {
+      if (String(path).includes("/api/auth/state")) return json({ authenticated: true, csrfToken: "t" });
+      if (String(path).includes("/api/setup/state")) return json({ files: { complete: true }, config: {} });
+      return json({ error: "unavailable" }, 500);
+    }));
+    render(<App />);
+    for (const name of ["Requests", "Report Issues", "Get Help"]) {
+      const link = await screen.findByRole("link", { name });
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noreferrer");
+      expect(link).toHaveAttribute("href", "https://discord.gg/duneawakeningdocker");
+      expect(link.lastElementChild).toHaveClass("lucide-external-link", "sidebar-external-link");
+      expect(link.lastElementChild).toHaveAttribute("aria-hidden", "true");
+    }
+  });
+
   it("shows the installed version from /api/auth/state when the update check fails", async () => {
     const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }));
     vi.stubGlobal("fetch", vi.fn().mockImplementation((path: string) => {

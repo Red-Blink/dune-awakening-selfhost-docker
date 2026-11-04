@@ -1,0 +1,48 @@
+{
+  "oldBuild": "2162777-0-shipping",
+  "newBuild": "2168446-0-shipping",
+  "tool": "retoc 0.1.5 to-legacy --no-shaders --no-script-objects",
+  "stockPackagesByteIdentical": true,
+  "files": [
+    {
+      "path": "DuneSandbox/Content/Dune/Systems/Vehicles/Blueprints/GroundVehicles/BP_Tank_CHOAM.uasset",
+      "oldSha256": "7dbc415b35bf77e2f8416cc440206a719daea87d2d316918a395274f5aa0df33",
+      "newSha256": "7dbc415b35bf77e2f8416cc440206a719daea87d2d316918a395274f5aa0df33"
+    },
+    {
+      "path": "DuneSandbox/Content/Dune/Systems/Vehicles/Blueprints/GroundVehicles/BP_Tank_CHOAM.uexp",
+      "oldSha256": "9096d82f662916ad071c2b686795b33ba4b62655d6df452abec8f491079eeb55",
+      "newSha256": "9096d82f662916ad071c2b686795b33ba4b62655d6df452abec8f491079eeb55"
+    },
+    {
+      "path": "DuneSandbox/Content/Dune/Systems/Vehicles/DT_VehicleTemplates.uasset",
+      "oldSha256": "835b98b478a1b6a2b1c7f268a05adab0137dbd1bede3bc386f65b92db0703d26",
+      "newSha256": "835b98b478a1b6a2b1c7f268a05adab0137dbd1bede3bc386f65b92db0703d26"
+    },
+    {
+      "path": "DuneSandbox/Content/Dune/Systems/Vehicles/DT_VehicleTemplates.uexp",
+      "oldSha256": "426e372a20d6332396db3fb011d6b51b3ce0fc16693308bb4065067b75de272c",
+      "newSha256": "426e372a20d6332396db3fb011d6b51b3ce0fc16693308bb4065067b75de272c"
+    },
+    {
+      "path": "DuneSandbox/Content/Dune/Systems/Vehicles/Modules/DT_Buggy_Modules.uasset",
+      "oldSha256": "06b47877bdd12be80106f90b6b80e8ade381af1a0130a4d3ac2df5c58d02b60b",
+      "newSha256": "06b47877bdd12be80106f90b6b80e8ade381af1a0130a4d3ac2df5c58d02b60b"
+    },
+    {
+      "path": "DuneSandbox/Content/Dune/Systems/Vehicles/Modules/DT_Buggy_Modules.uexp",
+      "oldSha256": "b87b775acb0e371824b6c5be8c3f62212d7cd0dfd65c66f25ecc220b226f011a",
+      "newSha256": "b87b775acb0e371824b6c5be8c3f62212d7cd0dfd65c66f25ecc220b226f011a"
+    },
+    {
+      "path": "DuneSandbox/Content/Dune/Systems/Vehicles/Modules/DT_Tank_Modules.uasset",
+      "oldSha256": "bbe59d62379684445d2c19274f653ae1c59c1f9bb0a212a3c92d75cc4b3a8ecf",
+      "newSha256": "bbe59d62379684445d2c19274f653ae1c59c1f9bb0a212a3c92d75cc4b3a8ecf"
+    },
+    {
+      "path": "DuneSandbox/Content/Dune/Systems/Vehicles/Modules/DT_Tank_Modules.uexp",
+      "oldSha256": "d8d8301cc634b18b51c2b0cff744367c9e44c5a21d65212a9a8f3711aa2cde87",
+      "newSha256": "d8d8301cc634b18b51c2b0cff744367c9e44c5a21d65212a9a8f3711aa2cde87"
+    }
+  ]
+}

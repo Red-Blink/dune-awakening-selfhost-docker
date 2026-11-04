@@ -5,7 +5,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { redact } from "./redact.js";
-import { itemImagePath } from "./adminCatalog.js";
+import { itemImagePath, isDirectCustomizationUnlock } from "./adminCatalog.js";
 import { clampInt, writeJsonAtomic } from "./jsonStore.js";
 import { isFiefClaimPlaceable } from "./blueprintSafety.js";
 import { withLiveMapSector } from "./liveMapSector.js";
@@ -73,6 +73,27 @@ let mapRegionNamesCache = null;
 let augmentCompatibilityCache = null;
 const PLAYER_TARGET_CACHE_TTL_MS = 3000;
 const playerTargetCache = new Map(); // id -> { promise, expiresAt }
+const queueFileCache = new Map(); // path -> { stats, parsed }
+
+function readCachedQueueJson(file) {
+  let stats;
+  try {
+    stats = statSync(file, { bigint: true });
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      queueFileCache.delete(file);
+      return null;
+    }
+    throw error;
+  }
+  const cached = queueFileCache.get(file);
+  if (cached && ["dev", "ino", "mtimeNs", "ctimeNs", "size"].every(key => cached.stats[key] === stats[key])) {
+    return cached.parsed;
+  }
+  const parsed = JSON.parse(readFileSync(file, "utf8"));
+  queueFileCache.set(file, { stats, parsed });
+  return parsed;
+}
 
 export class UnsupportedCapabilityError extends Error {
   constructor(message, details = {}) {
@@ -157,14 +178,50 @@ export async function routineDefinition(db, oid) {
   return result.rows[0];
 }
 
-export async function listTables(db, schema = "dune") {
+export async function listTables(db, schema = "dune", options = {}) {
   assertIdentifier(schema, "schema");
+  if (options?.approximate === true) {
+    const approx = await db.query(`
+      select t.table_schema as schema,
+             t.table_name as name,
+             greatest(coalesce(s.n_live_tup, c.reltuples::bigint, 0), 0)::bigint::text as row_count
+      from information_schema.tables t
+      left join pg_namespace n on n.nspname = t.table_schema
+      left join pg_class c on c.relnamespace = n.oid and c.relname = t.table_name and c.relkind in ('r', 'p')
+      left join pg_stat_user_tables s on s.relid = c.oid
+      where t.table_type = 'BASE TABLE' and t.table_schema = $1
+      order by t.table_name`, [schema]);
+    return approx.rows.map((row) => ({
+      schema: row.schema,
+      name: row.name,
+      row_count: String(row.row_count ?? "0")
+    }));
+  }
   const result = await db.query(`
     select t.table_schema as schema,
            t.table_name as name
     from information_schema.tables t
     where t.table_type = 'BASE TABLE' and t.table_schema = $1
     order by t.table_name`, [schema]);
+  if (result.rows.length === 0) return [];
+  if (result.rows.length === 1) {
+    const row = result.rows[0];
+    const safe = quoteQualified(row.schema, row.name);
+    const count = await db.query(`select count(*)::bigint as row_count from ${safe}`);
+    return [{ ...row, row_count: count.rows[0]?.row_count ?? "0" }];
+  }
+  const unionParts = result.rows.map((row, index) => {
+    const safe = quoteQualified(row.schema, row.name);
+    return `select ${index}::int as table_idx, (select count(*)::bigint from ${safe}) as row_count`;
+  });
+  const batched = await db.query(unionParts.join(" union all "));
+  if (Array.isArray(batched?.rows) && batched.rows.some((r) => r && Object.prototype.hasOwnProperty.call(r, "table_idx"))) {
+    const countsByIdx = new Map(batched.rows.map((r) => [Number(r.table_idx), r.row_count ?? "0"]));
+    return result.rows.map((row, index) => ({
+      ...row,
+      row_count: String(countsByIdx.get(index) ?? "0")
+    }));
+  }
   const rows = [];
   for (const row of result.rows) {
     const safe = quoteQualified(row.schema, row.name);
@@ -1666,7 +1723,7 @@ export async function listPlayers(db, { status = "all", q = "", page = 0, pageSi
     ? `left join dune.encrypted_accounts ea on ea.id = a.owner_account_id
        left join lateral (
          select case
-           when ea.encrypted_funcom_id is null then ''
+           when ea.encrypted_funcom_id is null or nullif(trim(coalesce(ac.funcom_id, '')), '') is not null then ''
            else coalesce(dune.decrypt_user_data(ea.encrypted_funcom_id), '')
          end as funcom_id
        ) decrypted_account on true`
@@ -1871,17 +1928,24 @@ export async function listPlayers(db, { status = "all", q = "", page = 0, pageSi
     ) paged on true
     order by ${pagedOrder}`, values);
 
-  const totalsResult = includeTotals ? await db.query(`
-    with player_rows as (
-      select coalesce(nullif(ps.player_controller_id, 0), nullif(a.owner_account_id, 0), a.id) as dedupe_key
-      from dune.actors a
-      left join dune.player_state ps on ps.account_id = a.owner_account_id
-      left join dune.accounts ac on ac.id = a.owner_account_id
-      ${encryptedAccountsJoin}
-      where ${baseWhere}
-    )
-    select count(distinct dedupe_key)::int as total_players
-    from player_rows`) : null;
+  let totalsResult = null;
+  if (includeTotals) {
+    if (where === baseWhere && result.rows[0] && result.rows[0].actor_id !== null && result.rows[0].actor_id !== undefined) {
+      totalsResult = { rows: [{ total_players: Number(result.rows[0].total_count || 0) }] };
+    } else {
+      totalsResult = await db.query(`
+        with player_rows as (
+          select coalesce(nullif(ps.player_controller_id, 0), nullif(a.owner_account_id, 0), a.id) as dedupe_key
+          from dune.actors a
+          left join dune.player_state ps on ps.account_id = a.owner_account_id
+          left join dune.accounts ac on ac.id = a.owner_account_id
+          ${encryptedAccountsJoin}
+          where ${baseWhere}
+        )
+        select count(distinct dedupe_key)::int as total_players
+        from player_rows`);
+    }
+  }
 
   return {
     capabilities: {
@@ -4253,6 +4317,60 @@ export async function liveMapPoiMarkers(db, map, category) {
   };
 }
 
+const ALL_POI_PATTERNS = Object.freeze(Object.values(POI_CATEGORY_PATTERNS).flat());
+
+export async function liveMapPoiAllMarkers(db, map = "") {
+  const categories = Object.keys(POI_CATEGORY_PATTERNS);
+  if (!(await tableExists(db, "markers")) || !(await tableExists(db, "map_names"))) {
+    const capabilities = Object.fromEntries(categories.map((key) => [key, false]));
+    return { capabilities, byCategory: Object.fromEntries(categories.map((key) => [key, []])) };
+  }
+  const values = [];
+  const categoryValues = categories.map((category) => {
+    values.push(POI_CATEGORY_PATTERNS[category]);
+    return `('${category}', $${values.length}::text[])`;
+  }).join(", ");
+  values.push(ALL_POI_PATTERNS);
+  const allPatternsParam = values.length;
+  let where = "";
+  if (map) {
+    const safe = validateMapName(map);
+    if (safe) {
+      values.push(safe);
+      where = ` and mn.map_name = $${values.length}`;
+    }
+  }
+  const result = await db.query(`
+    select m.marker_hash_id::text as id,
+           m.marker_type as marker_type,
+           c.category,
+           (m.position).x as x,
+           (m.position).y as y,
+           (m.position).z as z,
+           coalesce(mn.map_name, '') as map
+    from dune.markers m
+    join dune.map_names mn on mn.map_name_id = m.map_name_id
+    join (values ${categoryValues}) as c(category, patterns)
+      on m.marker_type ilike any(c.patterns)
+    where m.marker_type ilike any($${allPatternsParam}) and m.marker_type not ilike 'NoIcon' ${where}
+    order by m.marker_hash_id`, values);
+  const capabilities = Object.fromEntries(categories.map((key) => [key, true]));
+  const byCategory = Object.fromEntries(categories.map((key) => [key, []]));
+  for (const row of result.rows || []) {
+    const category = String(row.category || "");
+    if (!byCategory[category]) continue;
+    byCategory[category].push({
+      id: row.id,
+      marker_type: row.marker_type,
+      map: row.map,
+      x: Number(row.x),
+      y: Number(row.y),
+      z: Number(row.z)
+    });
+  }
+  return { capabilities, byCategory };
+}
+
 export async function liveMapMarkers(db, map = "") {
   const [players, vehicles, bases, storage] = await Promise.all([
     liveMapPlayers(db, map),
@@ -4814,9 +4932,8 @@ export function hasQueuedBaseChildAccess(repoRoot) {
 
 export function listQueuedBaseChildAccess(repoRoot) {
   const file = pendingBaseChildAccessFile(repoRoot);
-  if (!existsSync(file)) return [];
   try {
-    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    const parsed = readCachedQueueJson(file);
     if (!Array.isArray(parsed)) return [];
     const seen = new Set();
     return parsed.map(normalizePendingChildAccess).filter((entry) => {
@@ -7821,11 +7938,40 @@ export async function playerCustomizationGrantState(db, id) {
         and i.template_id is not null`, [player.actorId]);
     pending = result.rows.map((item) => String(item.template_id || "")).filter(Boolean);
   }
+  const ownership = await db.query(`
+    select properties->'CustomizationLibraryActorComponent'->'m_UnlockedCustomizationSerializableList'->'m_UnlockedCustomizationIds' as customizations
+    from dune.actors where id = $1`, [player.actorId]);
+  const customizations = ownership.rows[0]?.customizations;
+  const owned = Array.isArray(customizations)
+    ? customizations.map((entry) => entry?.m_CustomizationId).filter((itemId) => isDirectCustomizationUnlock({ itemId })) : [];
   return {
     capabilities: { customizationOwnership: false, customizationPending: pendingSupported },
     player,
+    owned,
     pending
   };
+}
+
+export async function unlockPlayerCustomization(db, id, { itemId }) {
+  if (!isDirectCustomizationUnlock({ itemId })) throw new Error("Select a verified event customization.");
+  return db.transaction(async (tx) => {
+    // Lock the actor before resolving live status and reading the current list.
+    const current = await tx.query(`
+      select properties->'CustomizationLibraryActorComponent'->'m_UnlockedCustomizationSerializableList'->'m_UnlockedCustomizationIds' as customizations
+      from dune.actors where id = $1 for update`, [intParam(id, "player id", 1)]);
+    const player = await resolvePlayerMutationTarget(tx, id);
+    requireOfflinePlayer(player, "Event customization unlocks");
+    const customizations = current.rows[0]?.customizations;
+    if (!Array.isArray(customizations)) throw new UnsupportedCapabilityError("This character has no supported customization unlock list.");
+    if (customizations.some((entry) => entry?.m_CustomizationId === itemId)) {
+      return { ok: true, alreadyUnlocked: true, itemId };
+    }
+    await tx.query(`
+      update dune.actors set properties = jsonb_set(properties,
+        '{CustomizationLibraryActorComponent,m_UnlockedCustomizationSerializableList,m_UnlockedCustomizationIds}', $2::jsonb, false)
+      where id = $1`, [player.actorId, JSON.stringify([...customizations, { m_CustomizationId: itemId }])]);
+    return { ok: true, alreadyUnlocked: false, itemId };
+  });
 }
 
 export async function unlockResearchItem(db, id, { itemKey }) {
@@ -11684,9 +11830,8 @@ function normalizePendingRefill(entry) {
 
 export function listQueuedGeneratorRefills(repoRoot) {
   const file = pendingRefillFile(repoRoot);
-  if (!existsSync(file)) return [];
   try {
-    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    const parsed = readCachedQueueJson(file);
     if (!Array.isArray(parsed)) return [];
     // One entry per base, so a double-clicked button cannot queue a base twice.
     const seen = new Set();
@@ -12138,9 +12283,8 @@ function normalizePendingBaseDelete(entry) {
 
 export function listQueuedBaseDeletes(repoRoot) {
   const file = pendingBaseDeleteFile(repoRoot);
-  if (!existsSync(file)) return [];
   try {
-    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    const parsed = readCachedQueueJson(file);
     if (!Array.isArray(parsed)) return [];
     // One entry per base, so a double-clicked button cannot queue it twice.
     const seen = new Set();
@@ -12354,9 +12498,8 @@ function normalizePendingVehicleDelete(entry) {
 
 export function listQueuedVehicleDeletes(repoRoot) {
   const file = pendingVehicleDeleteFile(repoRoot);
-  if (!existsSync(file)) return [];
   try {
-    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    const parsed = readCachedQueueJson(file);
     if (!Array.isArray(parsed)) return [];
     // One entry per vehicle, so a double-clicked button cannot queue it twice.
     const seen = new Set();
@@ -14095,9 +14238,8 @@ function pendingWaterRefillFile(repoRoot) {
 
 export function listQueuedWaterRefills(repoRoot) {
   const file = pendingWaterRefillFile(repoRoot);
-  if (!existsSync(file)) return [];
   try {
-    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    const parsed = readCachedQueueJson(file);
     if (!Array.isArray(parsed)) return [];
     const seen = new Set();
     return parsed.map(normalizePendingRefill).filter((entry) => {
@@ -14209,6 +14351,7 @@ export async function flushWaterRefills(db, repoRoot, { now = Date.now, ignoreRe
 }
 
 export async function giveItemToPlayer(db, playerId, { itemName = "", itemId = "", templateId = "", quantity = 1, quality = 1, augments = [], augmentQuality = 1, allowOnlinePreAugmented = false }) {
+  if (isDirectCustomizationUnlock({ itemId: templateId || itemId || itemName })) throw new Error("Event cosmetics must be unlocked from Customizations.");
   await requireCapability(await supportsPlayerGiveItem(db), "Player give-item requires compatible dune.inventories and dune.items insert columns.");
   const target = intParam(playerId, "player id", 1);
   const resolvedTemplate = validateTemplateId(templateId || itemId || itemName);

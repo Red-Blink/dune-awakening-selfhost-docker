@@ -122,6 +122,19 @@ it("matches players by name and bases or vehicles by owner", () => {
   expect(liveMapMarkerMatchesSearch({ id: 3, type: "vehicle", name: "BP_Sandbike_C", owner_name: "Stilgar" }, "duncan")).toBe(false);
 });
 
+it("uses centered vector plus/minus icons as layer sections toggle", async () => {
+  const { container } = render(<LiveMapPanel onError={vi.fn()} confirmAction={vi.fn().mockResolvedValue(true)} waitForTask={vi.fn()} taskTechnicalDetails={vi.fn()} onOpenBase={vi.fn()} onOpenVehicle={vi.fn()} />);
+  await screen.findByRole("searchbox", { name: "Search Map" });
+  const toggle = container.querySelector<HTMLButtonElement>(".live-map-layer-group-header-toggle")!;
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(toggle.querySelector(".live-map-layer-expand > svg.lucide-minus")).toHaveAttribute("width", "12");
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(toggle.querySelector(".live-map-layer-expand > svg.lucide-plus")).toHaveAttribute("height", "12");
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+});
+
 it("filters map markers by player, marker, and owner names", async () => {
   render(<LiveMapPanel
     onError={vi.fn()}
@@ -144,6 +157,17 @@ it("filters map markers by player, marker, and owner names", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: "Clear" }));
   expect(screen.getByRole("button", { name: "Player: Liet" })).toBeInTheDocument();
+});
+
+it("shares the Tank icon subtype between its map marker and layer swatch", async () => {
+  const response = await liveMapApi.markers({} as never);
+  vi.mocked(liveMapApi.markers).mockResolvedValue({ ...response, knownSubtypes: { vehicle: ["Tank"] }, rows: [
+    { id: 901, type: "vehicle", subtype: "Tank", name: "BP_Regis_Tank_C", map: "HaggaBasin", partition_id: 1, x: 700, y: 700, z: 10 }
+  ] });
+  const { container } = render(<LiveMapPanel onError={vi.fn()} confirmAction={vi.fn().mockResolvedValue(true)} waitForTask={vi.fn()} taskTechnicalDetails={vi.fn()} onOpenBase={vi.fn()} onOpenVehicle={vi.fn()} />);
+  expect(await screen.findByRole("button", { name: "Vehicle: Tank" })).toHaveClass("marker-vehicle", "subtype-tank");
+  fireEvent.click(screen.getByRole("button", { name: /^Expand$/ }));
+  expect(container.querySelector(".live-map-legend-dot.marker-vehicle.subtype-tank")).toBeInTheDocument();
 });
 
 it("splits the Player layer into Online and Offline child layers", async () => {

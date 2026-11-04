@@ -30,6 +30,25 @@ error='[ERR FLSAPI] HTTP Request Error: Response status code does not indicate s
 
 expect_wait "heartbeat initiation only" "RMQ connection successful. Initiating heartbeat."
 expect_wait "zero capacity" "$zero"
+expect_wait "locked declaration invalidates older readiness" "$valid
+$valid
+Population declaration: {\"BattlegroupMaxPlayerCapacity\":60,\"IsLocked\":true}"
+expect_wait "zero capacity invalidates older healthy declarations" "$valid
+$valid
+$zero"
+expect_wait "heartbeat success cannot hide latest zero capacity" "$valid
+$valid
+$zero
+Battlegroups_SendBattlegroupHeartbeat Request successful"
+expect_wait "one recovery declaration remains unconfirmed" "$valid
+$valid
+$zero
+$valid"
+expect_ready "two recovery declarations restore readiness" "$valid
+$valid
+$zero
+$valid
+$valid"
 expect_wait "one unconfirmed declaration" "$valid"
 expect_wait "one declaration after an error" "$valid
 $error

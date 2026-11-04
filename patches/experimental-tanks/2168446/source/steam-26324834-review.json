@@ -1,0 +1,25 @@
+{
+  "steamBuild": "26324834",
+  "worldTag": "2168446-0-shipping",
+  "baseImage": {
+    "steamBuild": "26324834",
+    "imageId": "sha256:e48a5fc2655e74b275ddaa0514460b15d403b8a0a814134acdb4fff20bb314e1",
+    "configId": "sha256:8c1721f4ea7df881c797257bc05d6b00bb1d510d2a4650dae2298716c773458d"
+  },
+  "cleanSha256": "b48cc2e51249f53d6d1ddfafc039c979a9d0d3c0900934a8fc609b17d93b1b9b",
+  "patchedSha256": "1f08ba91a33dbc05e78027e19b0bff48d01f86aa9252b891c4ec5bffca62b23f",
+  "executableByteIdentical": true,
+  "stockContainersByteIdentical": true,
+  "stockContainers": {
+    "global.ucas": "a7e5f1e2f01225ee1a63c1ea7801a6efa82850c70b50129231878552c3dc5574",
+    "global.utoc": "8280e49985670d6f034355808436de57a649d14e9b8251ce4149d5aa26d3af64",
+    "pakchunk0-LinuxServer.ucas": "9aff2556d9199e19b1912a064ffe44d3fd5dca3380b14ec5d585ff6c1b6964df",
+    "pakchunk0-LinuxServer.utoc": "dc2ada0126f16d4af6ce1e9e2d0ee9e2f38eb3d617778bced989cf9c7d4223ba",
+    "pakchunk170-LinuxServer.ucas": "06e035f31768546a352992ff8abcc895bdfe893a6a1eed53ca6ae7775253e1d6",
+    "pakchunk170-LinuxServer.utoc": "1742e42ae22b05504407f5cd9ff708537cc0ffa77476c93b68d9a7cc717c48d9"
+  },
+  "instructionGeneratorUnchanged": true,
+  "overlayAssetsUnchanged": true,
+  "gameplayVerified": false,
+  "verification": "Exact executable and global/pakchunk0/pakchunk170 utoc/ucas hashes match the installed stock image. These complete stock containers contain the four affected Tank overlay packages. Existing guarded patch reproduces the pinned patched executable byte for byte. This is offline compatibility verification, not gameplay acceptance."
+}

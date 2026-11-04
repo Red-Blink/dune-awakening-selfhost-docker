@@ -33,13 +33,6 @@ else
   fail "Sietch display-name normalization"
 fi
 
-if grep -qF '[Screenshots Gallery](docs/screenshots.md)' README.md \
-  && [ -f docs/screenshots.md ]; then
-  ok "README Screenshots Gallery link resolves"
-else
-  fail "README Screenshots Gallery link is missing or broken"
-fi
-
 if grep -q '"isStartingMap": True' runtime/scripts/publish-sietch-overrides.sh \
   && grep -q 'payload\["isStartingMap"\] = True' runtime/scripts/publish-sietch-overrides.sh \
   && ! grep -q 'isStartingMap.*not .*ready' runtime/scripts/publish-sietch-overrides.sh; then

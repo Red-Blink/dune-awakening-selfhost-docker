@@ -1,4 +1,14 @@
+<div align="center" dir="ltr">
+
+**English** · [简体中文](docs/readme/README_zh.md) · [繁體中文](docs/readme/README_zh-TW.md) · [日本語](docs/readme/README_ja.md) · [한국어](docs/readme/README_ko.md) · [Türkçe](docs/readme/README_tr.md) · [Русский](docs/readme/README_ru.md) · [Tiếng Việt](docs/readme/README_vi.md) · [ไทย](docs/readme/README_th.md) · [Deutsch](docs/readme/README_de.md) · [Español](docs/readme/README_es.md) · [Français](docs/readme/README_fr.md) · [Українська](docs/readme/README_uk.md) · [Polski](docs/readme/README_pl.md) · [Português (Brasil)](docs/readme/README_pt-BR.md) · [العربية](docs/readme/README_ar.md) · [فارسی](docs/readme/README_fa.md) · [Bahasa Indonesia](docs/readme/README_id.md) · [Italiano](docs/readme/README_it.md) · [Ελληνικά](docs/readme/README_el.md) · [മലയാളം](docs/readme/README_ml.md) · [Roman Urdu](docs/readme/README_ur-Latn.md) · [Română](docs/readme/README_ro.md)
+
+</div>
+
 # Dune: Awakening Docker - Self-Hosted Server Console
+
+<p align="center">
+  <img src="assets/community-trending.svg" alt="Dune Awakening Community — #1 Repository Of The Day, Week, and Month" width="840" height="79">
+</p>
 
 ![Dune Awakening Self-Host Docker cover](assets/cover.png)
 
@@ -12,16 +22,16 @@ The project is experimental, and Funcom self-hosting behavior may change over ti
 
 ## What You Can Do
 
-- Set up and manage the server from your browser
-- Monitor status, logs, readiness, backups, and updates
-- Manage players, inventories, progression, rewards, vehicles, and admin actions
-- Control maps, Sietches, Deep Desert layouts, and live map activity
-- Configure memory, autoscaling, and game settings
-- Manage databases, bases, storage, and player blueprints
-- Plan, preview, and share base layouts in 3D with the Base Builder
-- Extend the console with optional Community Addons
+- **Deploy & Operate:** Guided browser setup, updates, service controls, scheduled restarts, restart queues, diagnostics, and recovery.
+- **See It Live:** Interactive world maps, player and vehicle tracking, resource locations, server health, performance, and logs.
+- **Control Arrakis:** Configure maps, Sietches, Deep Desert layouts, autoscaling, memory, gameplay settings, and **experimental Regis Tanks**.
+- **Manage Players:** Player and guild tools, inventories, progression, bases, storage, vehicles, Landsraad, rewards, and Care Packages.
+- **Run the Economy:** Browse Exchange listings and automate trading with the built-in Market Bot.
+- **Protect Your Server:** Database and encrypted system backups, restore and migration tools, access roles, scoped API keys, and encrypted API access.
+- **Build & Share:** Design bases in 3D, import and share blueprints, and showcase your server with a public profile and latency checks.
+- **Make It Yours:** Community Addons, Discord integration, multiple Console languages, and community translation corrections.
 
-See the [Screenshots Gallery](docs/screenshots.md) for a closer look.
+Take the controls and explore your command center! [Try the Console](https://try.dunedocker.app/) with sample data — no installation needed.
 
 ## Requirements
 
@@ -35,14 +45,6 @@ You do not need to be a Linux expert. The installer checks the basics and prepar
 | Memory | Start with 20 GB RAM; use 30–40 GB or more for additional always-on maps |
 | Storage | 200 GB or more |
 | Funcom token | Entered securely during browser setup |
-
-On SELinux hosts such as Fedora and Bazzite, the Console configuration includes
-a shared project mount label and disables SELinux label confinement only for the
-Console, which needs access to the host Docker socket. Host SELinux remains enabled;
-the Docker socket's labels and permissions are unchanged. After upgrading an existing
-installation, run `dune console reload` to apply these settings to the Console.
-Docker must already be installed if its automatic installer does not support your
-distribution.
 
 <details>
 <summary>Memory & CPU Guidance</summary>
@@ -130,7 +132,14 @@ Developers can start with the [Official Addon Template](https://github.com/Red-B
 
 ## Contributing
 
-Issues, fixes, and improvements are welcome. Keep secrets, generated runtime files, and backups out of Git, and never expose the Web UI to untrusted users.
+Dune Docker welcomes contributions from developers, server owners, and players. Check existing [issues](https://github.com/Red-Blink/dune-awakening-selfhost-docker/issues) and [pull requests](https://github.com/Red-Blink/dune-awakening-selfhost-docker/pulls) before starting to avoid duplicate work.
+
+- **Report Bugs:** Include your project version, steps to reproduce, and what you expected to happen. Add relevant logs or screenshots with passwords and personal information removed.
+- **Suggest Improvements:** Explain the problem your idea would solve and how it would help the community. Discuss larger changes in an issue before implementing them.
+- **Submit Pull Requests:** Keep changes focused, link related issues, and explain what changed and how you tested it.
+- **Help Beyond Code:** Improve documentation, test changes, create community addons, or suggest translation corrections directly from the Console.
+
+For questions or to discuss an idea, join the [Discord Community](https://discord.gg/duneawakeningdocker).
 
 ## Credits and License
 

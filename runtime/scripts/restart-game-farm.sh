@@ -22,8 +22,26 @@ if [ -f runtime/generated/manual-stop.env ]; then
   exit 2
 fi
 
+history_started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+history_epoch="$(date +%s)"
+history_source=Runtime
+history_reason="Game Farm Restart"
+case "$REASON" in
+  igw-socket-deadlock|stale-browser-state)
+    history_source=Automatic
+    history_reason="Stalled Game Server Recovery"
+    ;;
+esac
+
 cleanup() {
+  local rc=$? result=Failed finished
   rm -f "$MAINTENANCE_FILE"
+  [ "$rc" -ne 0 ] || result=Succeeded
+  finished="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  runtime/scripts/restart-history.sh record battlegroup "Game Farm" "$history_source" \
+    "$history_reason" "$result" "$history_started" "$finished" \
+    "$(( $(date +%s) - history_epoch ))" || true
+  return "$rc"
 }
 trap cleanup EXIT
 {

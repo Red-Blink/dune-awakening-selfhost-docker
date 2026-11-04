@@ -1,7 +1,7 @@
 # RFC: Console Layered Authentication — Discord OAuth (Fixed), Optional Passkeys, Hardened Password Fallback
 
 **Date:** 2026-08-17 (revised 2026-08-20)
-**Status:** Accepted — merged via PR #170 (2026-08-18); this revision closes findings from a post-merge validation review (see §8).
+**Status:** Historical record — design proposal accepted as an RFC via PR #170 (2026-08-18); none of Tiers 1-3 is implemented in this repository. Not maintained.
 **Audit:** Three Layer 1 Eight-Hat passes (two full, one targeted), upstream identity/recovery-code/upgrade-path corrections at merge review, and a 2026-08-20 four-lens post-merge validation (Technical Writer, Security Architect, UI/UX, GRC); findings summary in §8.
 
 **Dependency note (updated for the split submission):** §2.1 (Tier 1) and part of §2.2 (Tier 2) reference `console/api/src/integrations/discord/oauth.js` and `handoff.js` — the Discord OAuth sign-in + signed-handoff tier-resolution system. That code is submitted alongside this RFC as its own stacked draft PR (base: this Tier 3 PR); §2.3 (Tier 3), the mandatory-TOTP change this RFC section otherwise documents, has no dependency on it and can be reviewed and merged independently. Sequencing is left to the maintainer's judgment.

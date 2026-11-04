@@ -1,6 +1,6 @@
 # Restart Queue
 
-**Status:** Current | **Last Updated:** August 2026
+**Status:** Current | **Last Updated:** November 2026
 
 The Restart Queue turns any console-triggered restart into a warned, player-aware
 operation. When it is enabled and real players are online, a restart does not run
@@ -18,7 +18,10 @@ intercepted:
 
 - Battlegroup restart
 - Single-map respawn
-- Service restart
+- Service restart (the Overmap and Survival services are scoped to their own
+  partition; other services are battlegroup-wide)
+- Experimental-tanks apply (restarts every Hagga Basin Sietch; scoped as a
+  Survival_1 map restart)
 - Sietch restart
 - Settings-save-and-restart — the three ops that persist a setting and then
   restart to apply it: saving UserEngine/UserGame values, resetting them to

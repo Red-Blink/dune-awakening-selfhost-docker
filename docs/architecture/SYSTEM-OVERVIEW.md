@@ -1,6 +1,6 @@
 # System Architecture Overview
 
-**Status:** Current | **Last Updated:** August 2026
+**Status:** Current | **Last Updated:** November 2026
 
 This document is the whole-system engineering reference for
 `dune-awakening-selfhost-docker`. It exists because the repository's
@@ -34,8 +34,10 @@ by shell scripts under `runtime/scripts/`:
                     │        │                      │
                     │        ├─► docker-compose.yml           → orchestrator (SteamCMD)
                     │        ├─► docker-compose.web.yml        → console API + web (Web UI)
-                    │        ├─► docker-compose.metrics.yml     → Prometheus/Grafana/etc (opt-in)
+                    │        ├─► docker-compose.metrics.yml     → Prometheus + exporters (opt-in)
                     │        ├─► docker-compose.public-probe*.yml → public-probe (opt-in)
+                    │        ├─► docker-compose.tls-front.yml   → encrypted API front (opt-in)
+                    │        ├─► docker-compose.socket-proxy.yml → web-console overlay (opt-in)
                     │        └─► raw `docker run` for: Postgres, RabbitMQ, TextRouter,
                     │             BattlegroupDirector, the always-on world servers
                     │             (Survival_1, Overmap), ServerGateway, and each
@@ -97,6 +99,17 @@ see the root [`README.md`](../../README.md), "Public Server Directory." On
 native Linux it confines direct ICE candidates to UDP `32000-32015`; when that
 range is not permitted through the host and upstream network, the website's
 relay path remains available.
+
+### 1.4.1 Other opt-in Compose files
+
+`docker-compose.tls-front.yml` runs `dune-tls-front`, the optional HTTPS front
+door for the Console API (default port `8797`, managed by
+`runtime/scripts/tls-front.sh` and Settings → Encrypted API Access; see
+[`docs/console/encrypted-api.md`](../console/encrypted-api.md)).
+`docker-compose.socket-proxy.yml` is an overlay used together with
+`docker-compose.web.yml`: it adds a `dune-docker-socket-proxy` container
+(`tecnativa/docker-socket-proxy`, bound to `127.0.0.1:2375`) and points the
+console at it instead of mounting the Docker socket directly.
 
 ### 1.5 The gameplay containers (raw `docker run`, not Compose)
 
@@ -232,23 +245,22 @@ for the exact, current full list). An optional
 the catalog index/manifest fetch only — it is never sent with the addon
 archive download and never reaches installed-addon runtime code. An addon's
 manifest (`addon.json`, `schemaVersion: 1`, `type: "ui"` only) declares
-the permissions it wants; **installing an addon does not grant those
-permissions** — an operator must explicitly approve each permission
-before an addon can use it (`requireApprovedPermissions()`), and updates
-require re-approval of any newly-requested permission. See
+the permissions it wants; **installing an addon does not by itself grant those
+permissions** — the permission list must be approved when the operator confirms
+the install or enable, and `requireApprovedPermissions()` refuses an install or
+enable whose requested permissions are not all approved. Updates require
+confirmation of any newly-requested permission. Catalog entries also carry a
+lifecycle state (`active`, `deprecated`, `unsupported`, `removed`, `blocked`);
+the last three block installation. See
 [`docs/addons/addon-item-grants.md`](../addons/addon-item-grants.md),
 [`docs/addons/addon-scheduled-jobs.md`](../addons/addon-scheduled-jobs.md),
 [`docs/addons/hardware-status.md`](../addons/hardware-status.md), and
 [`docs/security/addon-provenance.md`](../security/addon-provenance.md)
 for the developer-facing contract in full.
 
-**Known documentation gap:** there is no document describing the
-operator-facing click-path for browsing, installing, enabling, or
-approving permissions for an addon in the Web UI (the UI exists at
-`console/web/src/features/addons/`, but its actual navigation flow is not
-written down anywhere in `docs/`). Do not assume a specific UI flow when
-answering operator questions about this — verify against the running
-`console/web` UI, or file a documentation issue.
+The operator-facing click path (the sidebar **Addons** page, implemented in
+`console/web/src/features/addons/AddonsPanel.tsx`) is described in
+[`docs/operator-guide.md`](../operator-guide.md) §6.
 
 ---
 
@@ -352,38 +364,35 @@ Three structural points, each load-bearing:
 Restore copies everything it is about to replace into
 `runtime/backups/restore-<timestamp>/` first, restores the database before
 swapping `.env` (the credentials the running process is using), and never
-restarts the stack — restoring `.env` can change the admin password and the
-database credentials, so that is left to the operator. See
+restarts the game stack — restoring `.env` can change the admin password and
+the database credentials, so that is left to the operator. The Console only
+recreates its own container, after a cancellable five-second countdown
+(equivalent to `dune console reload`), so it picks up the restored `.env`. See
 [`docs/console/database-backups.md`](../console/database-backups.md).
 
 ---
 
-## 5. Discord integration — two distinct components
-
-**Do not conflate these two.** [`docs/README.md`](../README.md) documents
-this split explicitly, and it matters architecturally:
+## 5. Discord integration
 
 1. **The Discord adapter** (`console/api/src/integrations/discord/`) — a
-   built-in, disabled-by-default, bearer-token-protected
-   HTTP surface the console exposes for a companion Discord bot to read
-   server status/population/etc., and, if `DUNE_DISCORD_WRITES_ENABLED=1`
-   is set, to perform a narrow set of gated write actions (see
-   `broadcastProvider.js`). This is the **operator-facing, current**
-   integration — see
+   built-in, disabled-by-default, bearer-token-protected, role-gated
+   HTTP surface the console exposes for a companion Discord bot. It is
+   read-mostly: routes return server status, population and similar data, and
+   its only writes are player-link bookkeeping in the console's own
+   `dune.discord_player_links` / `dune.discord_pending_links` tables and the
+   opt-in `/broadcast` (`broadcastProvider.js`), which requires
+   `DUNE_DISCORD_WRITES_ENABLED` and an admin or owner role. The stock
+   `docker-compose.web.yml` does not forward that variable, so `/broadcast`
+   stays disabled there. This is the operator-facing integration — see
    [`docs/integrations/discord-integration/README.md`](../integrations/discord-integration/README.md)
    for the full route list and RBAC config.
-2. **The `discord-control-bot`** — a separate, explicitly **experimental,
-   internal, read-only** companion bot project. Its own admin guide states
-   plainly that it "is not the authority" and cannot mount the Docker
-   socket, write to Postgres, mutate players/maps/addons, or send
-   broadcasts. See
-   [`docs/integrations/discord-control-bot/admin-guide.md`](../integrations/discord-control-bot/admin-guide.md).
+2. **The `discord-control-bot` prototype docs** under
+   `docs/integrations/discord-control-bot/` are a **Historical record** of an
+   early prototype and are not maintained; use the adapter docs above.
 
-A separate design document,
-[`docs/rw-architecture.md`](../rw-architecture.md), describes a
-write-command architecture for Discord (two-phase preview/execute with
-nonces) — check that document's own status line for whether it describes
-shipped behavior or a still-open design at the time you're reading it.
+[`docs/rw-architecture.md`](../rw-architecture.md) describes a proposed
+two-phase (preview/execute with nonces) Discord write-command architecture.
+It was never built; the adapter above is what ships.
 
 ---
 

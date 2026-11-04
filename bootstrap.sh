@@ -28,14 +28,34 @@ esac
 [ "$(id -u)" -ne 0 ] || fail "run this as your normal Linux user, without sudo."
 command -v tar >/dev/null 2>&1 || fail "tar is missing. Install curl and tar with your distribution's package manager, then retry."
 if command -v curl >/dev/null 2>&1; then
-  fetch() { curl -fL --retry 3 --connect-timeout 20 "$1" -o "$2"; }
-  fetch_text() { curl -fsSL --retry 3 --connect-timeout 20 "$1"; }
+  fetch() { curl -fL --proto '=https' --retry 3 --connect-timeout 20 "$1" -o "$2"; }
+  fetch_text() { curl -fsSL --proto '=https' --retry 3 --connect-timeout 20 "$1"; }
 elif command -v wget >/dev/null 2>&1; then
-  fetch() { wget -O "$2" "$1"; }
-  fetch_text() { wget -qO- "$1"; }
+  # GNU wget supports this flag; BusyBox wget does not. Both download URLs
+  # below already use HTTPS, so keep the fallback portable without disabling TLS.
+  WGET_HTTPS_ONLY=""
+  if wget --help 2>&1 | grep -q -- '--https-only'; then
+    WGET_HTTPS_ONLY="--https-only"
+  fi
+  fetch() { wget ${WGET_HTTPS_ONLY:+"$WGET_HTTPS_ONLY"} -O "$2" "$1"; }
+  fetch_text() { wget ${WGET_HTTPS_ONLY:+"$WGET_HTTPS_ONLY"} -qO- "$1"; }
 else
   fail "curl or wget is required. Install curl and tar with your distribution's package manager, then retry."
 fi
+
+verify_archive_sha256() {
+  expected_sha256="$1"
+  archive_path="$2"
+  [ -n "$expected_sha256" ] || return 0
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual_sha256=$(sha256sum "$archive_path" | awk '{print $1}')
+  elif command -v shasum >/dev/null 2>&1; then
+    actual_sha256=$(shasum -a 256 "$archive_path" | awk '{print $1}')
+  else
+    fail "sha256sum or shasum is required to verify release archive integrity."
+  fi
+  [ "$actual_sha256" = "$expected_sha256" ] || fail "release archive SHA-256 mismatch (expected $expected_sha256, got $actual_sha256)."
+}
 
 if [ -e "$INSTALL_DIR" ]; then
   if [ -f "$INSTALL_DIR/install.sh" ]; then
@@ -75,6 +95,11 @@ STAGE_DIR=$(mktemp -d "$PARENT_DIR/.dune-install.XXXXXX") \
 printf '%s\n' "==> Downloading $PROJECT $VERSION..."
 fetch "https://github.com/$REPOSITORY/archive/refs/tags/$VERSION.tar.gz" "$ARCHIVE" \
   || fail "the release download failed. Check free space and internet access, then retry."
+EXPECTED_SHA256="${DUNE_RELEASE_SHA256:-}"
+verify_archive_sha256 "$EXPECTED_SHA256" "$ARCHIVE"
+if tar -tzf "$ARCHIVE" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+  fail "the release archive contains unsafe path entries."
+fi
 tar -xzf "$ARCHIVE" -C "$STAGE_DIR" --strip-components=1 \
   || fail "the release archive could not be extracted. Check free space and filesystem permissions."
 [ -f "$STAGE_DIR/install.sh" ] || fail "the downloaded release is incomplete."
@@ -91,4 +116,9 @@ fi
 
 printf '%s\n' "==> Starting the installer..."
 cd "$INSTALL_DIR"
+# A piped bootstrap has no terminal on stdin. Restore the controlling terminal
+# for installer prompts when available; unattended installs keep their stdin.
+if [ ! -t 0 ] && ( : </dev/tty ) 2>/dev/null; then
+  exec ./install.sh </dev/tty
+fi
 exec ./install.sh

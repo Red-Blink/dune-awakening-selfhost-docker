@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Settings } from "lucide-react";
+import { Minus, Plus, Settings } from "lucide-react";
 import { liveMapApi, type LiveMapConfig, type LiveMapMarker, type LiveMapPartition } from "../../api/liveMap";
 import { mapsApi } from "../../api/maps";
 import type { Task } from "../../api/setup";
@@ -1302,8 +1302,8 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
                 });
               };
               return <div key={`header-${index}`} className="checkbox-row live-map-layer live-map-layer-group-header">
-                <button type="button" className="live-map-layer-group-header-toggle" onClick={() => setExpandedSections((prev) => ({ ...prev, [sectionName]: prev[sectionName] === false }))}>
-                  <span className="live-map-layer-expand" aria-hidden="true">{sectionExpanded ? "−" : "+"}</span>
+                <button type="button" className="live-map-layer-group-header-toggle" aria-expanded={sectionExpanded} onClick={() => setExpandedSections((prev) => ({ ...prev, [sectionName]: prev[sectionName] === false }))}>
+                  <span className="live-map-layer-expand" aria-hidden="true">{sectionExpanded ? <Minus size={12} /> : <Plus size={12} />}</span>
                   {sectionName}
                 </button>
                 {memberKeys.length > 0 && <IndeterminateCheckbox checked={sectionAllOn} indeterminate={!sectionAllOn && !sectionAllOff} onChange={toggleSection} />}
@@ -1328,7 +1328,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
               const expanded = Boolean(expandedGroups.player);
               return indent(<div className="live-map-layer-group">
                 <label className="checkbox-row live-map-layer">
-                  <button type="button" className="live-map-layer-expand" aria-label={expanded ? "Collapse Player" : "Expand Player"} onClick={() => setExpandedGroups((prev) => ({ ...prev, player: !prev.player }))}>{expanded ? "−" : "+"}</button>
+                  <button type="button" className="live-map-layer-expand" aria-label={expanded ? "Collapse Player" : "Expand Player"} onClick={() => setExpandedGroups((prev) => ({ ...prev, player: !prev.player }))}>{expanded ? <Minus size={12} aria-hidden="true" /> : <Plus size={12} aria-hidden="true" />}</button>
                   <span className="live-map-layer-label">Player</span>
                   <span className="muted">{markerCounts.player || 0}</span>
                   <span className="live-map-legend-dot-spacer" aria-hidden="true" />
@@ -1367,7 +1367,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
             }
             return indent(<div className="live-map-layer-group">
               <label className="checkbox-row live-map-layer">
-                <button type="button" className="live-map-layer-expand" aria-label={expanded ? "Collapse" : "Expand"} onClick={() => setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>{expanded ? "−" : "+"}</button>
+                <button type="button" className="live-map-layer-expand" aria-label={expanded ? "Collapse" : "Expand"} onClick={() => setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>{expanded ? <Minus size={12} aria-hidden="true" /> : <Plus size={12} aria-hidden="true" />}</button>
                 <span className="live-map-layer-label">{friendlyMarkerType(key)}</span>
                 <span className="muted">{markerCounts[key] || 0}</span>
                 <span className="live-map-legend-dot-spacer" aria-hidden="true" />
@@ -1417,7 +1417,7 @@ export function LiveMapPanel({ onError, confirmAction, waitForTask, taskTechnica
                   const groupExpanded = Boolean(expandedSubgroups[key]?.[group]);
                   return <div key={group} className="live-map-layer-subgroup-block">
                     <label className="checkbox-row live-map-layer live-map-layer-subgroup">
-                      <button type="button" className="live-map-layer-expand" aria-label={groupExpanded ? "Collapse" : "Expand"} onClick={() => setExpandedSubgroups((prev) => ({ ...prev, [key]: { ...prev[key], [group]: !prev[key]?.[group] } }))}>{groupExpanded ? "−" : "+"}</button>
+                      <button type="button" className="live-map-layer-expand" aria-label={groupExpanded ? "Collapse" : "Expand"} onClick={() => setExpandedSubgroups((prev) => ({ ...prev, [key]: { ...prev[key], [group]: !prev[key]?.[group] } }))}>{groupExpanded ? <Minus size={12} aria-hidden="true" /> : <Plus size={12} aria-hidden="true" />}</button>
                       <span className="live-map-layer-label">{group}</span>
                       <span className="muted">{groupCount}</span>
                       <span className="live-map-legend-dot-spacer" aria-hidden="true" />

@@ -1,7 +1,23 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Task } from "../api/setup";
 import { TaskProgress } from "./TaskProgress";
+
+it("shows completed deployment from polling even when its event stream is unavailable", () => {
+  const running = { ...failedDeployment([]), status: "running" as const, errorMessage: null, finishedAt: null };
+  const { container, rerender } = render(<TaskProgress task={running} />);
+  expect(container.querySelector(".deployment-progress")).not.toHaveClass("result-ok");
+  rerender(<TaskProgress task={{ ...running, status: "succeeded", finishedAt: "2026-10-31T20:30:00.000Z" }} />);
+  expect(container.querySelector(".deployment-progress")).toHaveClass("result-ok");
+  expect(screen.getByLabelText("Deployment progress 100%")).toBeInTheDocument();
+});
+
+it("retains dismissal for tasks whose caller supplies a dismiss action", () => {
+  const dismiss = vi.fn();
+  render(<TaskProgress task={failedDeployment([])} onDismiss={dismiss} />);
+  fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+  expect(dismiss).toHaveBeenCalledOnce();
+});
 
 function failedDeployment(lines: string[]): Task {
   return {

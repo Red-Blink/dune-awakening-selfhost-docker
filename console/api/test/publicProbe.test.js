@@ -40,11 +40,22 @@ test("public probe uses host ICE listeners without Docker port publishing and ru
 
 test("public probe image runs as an unprivileged dedicated user", () => {
   const dockerfile = readFileSync(resolve(repoRoot, "runtime/public-probe/Dockerfile"), "utf8");
-  assert.match(dockerfile, /FROM golang:1\.25-alpine AS build/);
   assert.match(dockerfile, /USER probe/);
   assert.match(dockerfile, /CGO_ENABLED=0/);
   assert.match(dockerfile, /RUN go test \.\/\.\.\./);
   assert.match(dockerfile, /HEALTHCHECK .*kill -0 1/);
+});
+
+test("public probe builder supports the module's minimum Go version", () => {
+  const dockerfile = readFileSync(resolve(repoRoot, "runtime/public-probe/Dockerfile"), "utf8");
+  const goMod = readFileSync(resolve(repoRoot, "runtime/public-probe/go.mod"), "utf8");
+  const builder = dockerfile.match(/^FROM golang:(\d+)\.(\d+)-alpine AS build$/m);
+  const required = goMod.match(/^go (\d+)\.(\d+)(?:\.\d+)?$/m);
+  assert.ok(builder, "The probe must use a versioned Go Alpine builder");
+  assert.ok(required, "The module must declare its minimum Go version");
+  assert.ok(Number(builder[1]) > Number(required[1])
+    || (builder[1] === required[1] && Number(builder[2]) >= Number(required[2])),
+  `Go ${builder[1]}.${builder[2]} builder cannot satisfy module requirement ${required[1]}.${required[2]}`);
 });
 
 test("public probe lifecycle script is executable and supports clean shutdown", () => {

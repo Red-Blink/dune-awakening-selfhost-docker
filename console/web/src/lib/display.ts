@@ -11,6 +11,7 @@ export function normalizeStatus(value: string) {
   const text = String(value || "").trim();
   if (/^ready$/i.test(text)) return "pass";
   if (/^not running$/i.test(text)) return "fail";
+  if (/^(crit|critical)$/i.test(text)) return "fail";
   if (/^starting$/i.test(text)) return "warn";
   if (/^loading$/i.test(text)) return "warn";
   if (/failed|failure|error|fatal|unhealthy|down|missing|blocked|disabled/i.test(value)) return "fail";

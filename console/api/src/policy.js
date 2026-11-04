@@ -616,6 +616,7 @@ export const DEFAULT_POLICIES = {
     version: 1,
     tier: "admin",
     statements: [
+      { Effect: "Allow", Action: "community:suggest-translation" },
       { Effect: "Allow", Action: [
         // Server lifecycle -- transient operations, no persistent config write
         "server:read", "server:start", "server:stop", "server:restart",
@@ -653,6 +654,7 @@ export const DEFAULT_POLICIES = {
     version: 1,
     tier: "moderator",
     statements: [
+      { Effect: "Allow", Action: "community:suggest-translation" },
       { Effect: "Allow", Action: [
         "server:read", "maps:read", "sietches:read", "deepdesert:read",
         "players:read", "players:kick-all", "players:moderate", "players:teleport",
@@ -677,6 +679,7 @@ export const DEFAULT_POLICIES = {
     version: 1,
     tier: "player",
     statements: [
+      { Effect: "Allow", Action: "community:suggest-translation" },
       { Effect: "Allow", Action: [
         "server:read",   // Home: performance / readiness / health
         "players:read",  // Players (the handlers return only the caller's own character)

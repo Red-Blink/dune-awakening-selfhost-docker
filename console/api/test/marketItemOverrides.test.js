@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, renameSync, statSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -35,6 +35,23 @@ function seedPlanFile(repo, { unsafeTemplateIds = [] } = {}) {
     unsafe_template_ids: unsafeTemplateIds
   }));
 }
+
+test('cached market lists cannot be changed by callers and follow plan updates', () => {
+  withRepo(repo => {
+    seedPlanFile(repo, { unsafeTemplateIds: ['BadItem1'] });
+    readUnsafeTemplateIds(repo).splice(0);
+    readBaseMarketTemplateIds(repo).push('Injected');
+    assert.deepEqual(readUnsafeTemplateIds(repo), ['BadItem1']);
+    assert.deepEqual(readBaseMarketTemplateIds(repo), ['Existing1']);
+    const path = join(repo, 'runtime/data/market-seed-plan.json');
+    const before = statSync(path);
+    const next = readFileSync(path, 'utf8').replace('BadItem1', 'BadItem2');
+    writeFileSync(`${path}.new`, next);
+    utimesSync(`${path}.new`, before.atime, before.mtime);
+    renameSync(`${path}.new`, path);
+    assert.deepEqual(readUnsafeTemplateIds(repo), ['BadItem2']);
+  });
+});
 
 test("readMarketItemOverrides returns empty defaults when no file exists", () => {
   withRepo((repo) => {

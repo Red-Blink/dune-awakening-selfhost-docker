@@ -141,6 +141,18 @@ OCCUPIED=1
 handle_demand CB_Overland_S_04 1 unrelated-request request
 [ ! -s "$SPAWN_LOG" ]
 
+# The supplemental event map has no server-catalog entry (dedicatedScaling=0).
+# A cold registered instance must still spawn through the ordinary demand path.
+ASSIGNED=0
+RUNNING=0
+DEDICATED=0
+handle_demand CB_Halloween_Event_Shipwreck_01 1 event-request request ClassicalInstancing
+[ "$(cat "$SPAWN_LOG")" = "CB_Halloween_Event_Shipwreck_01" ]
+: >"$SPAWN_LOG"
+ASSIGNED=1
+RUNNING=1
+DEDICATED=1
+
 # Director-classified party instances scale even when the local Director
 # configuration does not carry a map-specific MaxParties override. This
 # covers the difficulty-selectable Testing Stations, Old Quarry, and story

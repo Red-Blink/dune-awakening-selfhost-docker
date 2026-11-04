@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { Brain, Building2, Car, ChevronDown, ChevronUp, Hammer, House, Map as MapIcon, Microscope, Palette, ScrollText, ShieldCheck, Star, UserRound } from "lucide-react";
+import { Brain, Building2, Car, ChevronDown, ChevronUp, Hammer, House, Map as MapIcon, Microscope, Minus, Palette, Plus, ScrollText, ShieldCheck, Star, UserRound } from "lucide-react";
 import { adminApi } from "../../api/admin";
 import { playersApi, type CharacterRecoveryInspection } from "../../api/players";
 import type { Task } from "../../api/setup";
@@ -12,6 +12,7 @@ import { firstDefined, formatCell } from "../../lib/display";
 import { augmentLimitForItem, filterAugmentsForItem, formatAugmentOptions } from "../../lib/augmentEligibility";
 import { PlayerCategoryIconRail } from "./PlayerCategoryIconRail";
 import { PlayerDetailTab } from "./PlayerDetailTab";
+import { CombatPanel } from "./CombatPanel";
 import { PlayerFactionAssignment } from "./PlayerFactionAssignment";
 import { PlayerSummary } from "./PlayerSummary";
 import { PlayerVehiclesTab } from "./PlayerVehiclesTab";
@@ -95,6 +96,7 @@ function playerAdmin_effectiveGrade(value: unknown, item?: { itemId?: string; id
 export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId, playerName, onError, onRefresh, onClose, confirmAction, waitForTask, formatMutationResult, restartGate }: { detail: Record<string, unknown> | null; fallback: Record<string, unknown>; dbPlayerId: string; actionPlayerId: string; playerName: string; onError: (text: string) => void; onRefresh: () => void; onClose: () => void; confirmAction: ConfirmAction; waitForTask: (task: Task) => Promise<Task>; formatMutationResult: (result: unknown) => string; restartGate: RestartGate }) {
   const playerAdmin_tabs = [
     { label: "Character", icon: UserRound },
+    { label: "Combat", icon: ShieldCheck },
     { label: "Crafting", icon: Hammer },
     { label: "Research", icon: Microscope },
     { label: "Building Sets", icon: Building2 },
@@ -140,6 +142,14 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
   const [playerAdmin_busyActionKey, playerAdmin_setBusyActionKey] = useState("");
   const [playerAdmin_characterLog, playerAdmin_setCharacterLog] = useState<Record<string, string>[]>([]);
   const [playerAdmin_adminLog, playerAdmin_setAdminLog] = useState<Record<string, string>[]>([]);
+  useEffect(() => {
+    if (import.meta.env.VITE_CONSOLE_PREVIEW !== "true") return;
+    let active = true;
+    void import("../../../preview/playerHistory").then(({ playerHistory }) => {
+      if (active) { playerAdmin_setCharacterLog(playerHistory(playerName)); playerAdmin_setAdminLog(playerHistory(playerName).slice(-1)); }
+    });
+    return () => { active = false; };
+  }, [playerName]);
   const [playerAdmin_craftingRows, playerAdmin_setCraftingRows] = useState<CraftingRecipeRow[]>([]);
   const [playerAdmin_craftingLoading, playerAdmin_setCraftingLoading] = useState(false);
   const [playerAdmin_craftingError, playerAdmin_setCraftingError] = useState("");
@@ -1104,7 +1114,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
             const hasChildren = Boolean(childrenByParent.get(rowKey)?.length);
             const expanded = playerAdmin_journeyFilterTerms.length ? hasChildren : Boolean(playerAdmin_expandedJourney[`${row.category}:${rowKey}`]);
             return <tr key={`${row.category}-${row.id}`}>
-              <td className="playerAdmin_journeyName" style={{ ...resize.columnStyle("name"), paddingLeft: `${10 + row.depth * 18}px` }}>{hasChildren ? <button className="playerAdmin_expanderButton" type="button" onClick={() => playerAdmin_toggleJourney(`${row.category}:${rowKey}`)}>{expanded ? "-" : "+"}</button> : <span className="playerAdmin_expanderSpacer" />}<span title={row.name}>{row.name}</span></td>
+              <td className="playerAdmin_journeyName" style={{ ...resize.columnStyle("name"), paddingLeft: `${10 + row.depth * 18}px` }}>{hasChildren ? <button className="playerAdmin_expanderButton" type="button" aria-label={expanded ? "Collapse" : "Expand"} aria-expanded={expanded} onClick={() => playerAdmin_toggleJourney(`${row.category}:${rowKey}`)}>{expanded ? <Minus size={12} aria-hidden="true" /> : <Plus size={12} aria-hidden="true" />}</button> : <span className="playerAdmin_expanderSpacer" />}<span title={row.name}>{row.name}</span></td>
               <td style={resize.columnStyle("category")}>{row.category}</td>
               <td className="playerAdmin_shortCode" style={resize.columnStyle("id")}><code title={row.rawName || row.id} style={resize.columnStyle("id") ? { maxWidth: "100%" } : undefined}>{row.rawName || row.id}</code></td>
               <td className="playerAdmin_shortCode" style={resize.columnStyle("dependency")}>{row.dependency ? <code title={row.dependency} style={resize.columnStyle("dependency") ? { maxWidth: "100%" } : undefined}>{row.dependency}</code> : "Unknown"}</td>
@@ -1291,6 +1301,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
         </div>
       )}
       {playerAdmin_activeTab === "Journey" && <div className="playerAdmin_content"><section className="playerAdmin_box"><h4>Journey Browser</h4><div className="playerAdmin_boxHeaderLine playerAdmin_filterHeaderLine"><p>Journey changes require the player to be fully offline and take effect on the next login. Reset keeps rewards already granted and cannot recreate a consumed Contract item.</p><div className="playerAdmin_filterToolsRow"><input className="playerAdmin_filterTextInput" value={playerAdmin_journeyFilter} onChange={(event) => playerAdmin_setJourneyFilter(event.target.value)} placeholder="Filter by name, ID, status, or dependency" aria-label="Filter Journey Browser" />{playerAdmin_journeyFilter && <button type="button" onClick={() => playerAdmin_setJourneyFilter("")}>Clear</button>}<span className="playerAdmin_note">{playerAdmin_journeyFilterTerms.length ? `${playerAdmin_filteredJourneyEntryCount} of ${playerAdmin_journeyEntryCount}` : playerAdmin_journeyEntryCount} Journey Entr{(playerAdmin_journeyFilterTerms.length ? playerAdmin_filteredJourneyEntryCount : playerAdmin_journeyEntryCount) === 1 ? "y" : "ies"} Detected</span></div></div>{playerAdmin_journeyError && <p className="playerAdmin_note danger">{playerAdmin_journeyError}</p>}{playerAdmin_toggleBox("journey_story", `Story (${playerAdmin_filteredJourneyRows.story.length}${playerAdmin_journeyFilterTerms.length ? `/${playerAdmin_journeyRows.story.length}` : ""})`, playerAdmin_journeyTable(playerAdmin_filteredJourneyRows.story, playerAdmin_journeyFilterTerms.length ? "No story entries match this filter." : "No story entries were found.", playerAdmin_journeySortStory, playerAdmin_journeyResizeStory))}{playerAdmin_toggleBox("journey_contract", `Contracts (${playerAdmin_filteredJourneyRows.contract.length}${playerAdmin_journeyFilterTerms.length ? `/${playerAdmin_journeyRows.contract.length}` : ""})`, playerAdmin_journeyTable(playerAdmin_filteredJourneyRows.contract, playerAdmin_journeyFilterTerms.length ? "No contract entries match this filter." : "No contract entries were found.", playerAdmin_journeySortContract, playerAdmin_journeyResizeContract))}{playerAdmin_toggleBox("journey_codex", `Codex (${playerAdmin_filteredJourneyRows.codex.length}${playerAdmin_journeyFilterTerms.length ? `/${playerAdmin_journeyRows.codex.length}` : ""})`, playerAdmin_journeyTable(playerAdmin_filteredJourneyRows.codex, playerAdmin_journeyFilterTerms.length ? "No codex entries match this filter." : "No codex entries were found.", playerAdmin_journeySortCodex, playerAdmin_journeyResizeCodex))}{playerAdmin_toggleBox("journey_tutorial", `Tutorial (${playerAdmin_filteredJourneyRows.tutorial.length}${playerAdmin_journeyFilterTerms.length ? `/${playerAdmin_journeyRows.tutorial.length}` : ""})`, playerAdmin_journeyTable(playerAdmin_filteredJourneyRows.tutorial, playerAdmin_journeyFilterTerms.length ? "No tutorial entries match this filter." : "No tutorial entries were found.", playerAdmin_journeySortTutorial, playerAdmin_journeyResizeTutorial))}</section></div>}
+      {playerAdmin_activeTab === "Combat" && <div className="playerAdmin_content"><section className="playerAdmin_box">{Number(playerAdmin_profile.player_controller_id) > 0 ? <CombatPanel controllerId={String(playerAdmin_profile.player_controller_id)} playerName={playerName} /> : <p className="empty">Combat history is not available for this character.</p>}</section></div>}
       {playerAdmin_activeTab === "Blueprints" && <div className="playerAdmin_content"><section className="playerAdmin_box"><h4>Blueprints</h4><BlueprintsPanel dbPlayerId={dbPlayerId} playerName={playerName} onError={onError} confirmAction={confirmAction} /></section></div>}
       {playerAdmin_activeTab === "Bases" && <div className="playerAdmin_content"><Suspense fallback={<section className="playerAdmin_box"><div className="loading-panel"><span className="spinner" aria-hidden="true" /><strong className="loading-dots">Loading Bases</strong></div></section>}><PlayerBasesPanel key={dbPlayerId} playerId={dbPlayerId} playerName={playerName} embedded onError={onError} confirmAction={confirmAction} restartGate={restartGate} formatMutationResult={formatMutationResult} /></Suspense>{/* Picked-up bases sit with the player's bases rather than in a 13th tab. */}<BaseBackupsView key={`backups-${dbPlayerId}`} playerId={dbPlayerId} playerName={playerName} playerOnline={playerAdmin_isOnline} embedded onError={onError} confirmAction={confirmAction} /></div>}
       {playerAdmin_activeTab === "Vehicles" && <PlayerVehiclesTab playerId={dbPlayerId} playerName={playerName} confirmAction={confirmAction} />}

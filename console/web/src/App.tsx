@@ -1,5 +1,5 @@
 import { Fragment, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { Archive, Bug, Building2, Car, CircleHelp, Database, Download, ExternalLink, FileText, Gift, Heart, Home, Landmark, LogOut, Map as MapIcon, Menu, MessageCircle, PackagePlus, RefreshCw, Server, Settings, Shield, ShieldCheck, Sparkles, Store, UserRound, Users, X } from "lucide-react";
+import { Archive, Bug, Building2, Car, CircleHelp, Database, Download, ExternalLink, FileText, Gift, Globe, Heart, Home, Landmark, LogOut, Map as MapIcon, Menu, MessageCircle, PackagePlus, RefreshCw, Server, Settings, Shield, ShieldCheck, Sparkles, Store, UserRound, Users, X } from "lucide-react";
 import { api, AUTH_SESSION_EXPIRED_EVENT, AUTH_SESSION_EXPIRED_MESSAGE, loginRequest, post, setCsrfToken } from "./api/client";
 import { TotpSetupScreen } from "./features/auth/TotpSetupScreen";
 import { DiscordMigrationOffer } from "./features/auth/DiscordMigrationOffer";
@@ -36,17 +36,22 @@ import {
   stackActionPendingResult,
   type HomeLoadResult,
   type HomeTaskResult,
+  type StorageCleanupOperation,
   type RestartLifecycleState
 } from "./features/server/ServerPanels";
 import { parseUpdateTask, stackVersionButtonLabel, preferKnownVersions, stackVersionButtonTitle, withInstalledVersion } from "./features/updates/updateUtils";
 import { formatUiSentence, stripAnsi, summarizeCommandText, titleCase } from "./lib/display";
 import { useStaleBuildWatcher } from "./lib/staleBuildWatcher";
+import { ConsoleLanguageObserver } from "./features/language/ConsoleLanguageObserver";
 
 // The array is the source of truth (not just a type-level union) so restoring
 // a persisted tab (see loadPersistedTab below) can validate against the real,
 // current list at runtime instead of a hand-duplicated copy that could drift.
-export const ALL_TABS = ["Home", "Server Control", "Services", "Players", "Guilds", "Bases", "Vehicles", "Exchange", "Landsraad", "Admin Tools", "Live Map", "Maps", "Care Package", "Addons", "Database", "Storage", "Backups", "Logs", "Updates", "Settings", "Access Control"] as const;
-type Tab = typeof ALL_TABS[number];
+export const ALL_TABS = ["Home", "Server Control", "Services", "Players", "Guilds", "Bases", "Vehicles", "Exchange", "Landsraad", "Admin Tools", "Live Map", "Maps", "Care Package", "Addons", "Language", "Database", "Storage", "Backups", "Logs", "Updates", "Settings", "Access Control"] as const;
+// Exported so a panel routing to another tab types its destination against the
+// real list rather than `string`. Type-only, so a panel importing it back does
+// not create a runtime cycle.
+export type Tab = typeof ALL_TABS[number];
 const ACTIVE_TAB_STORAGE_KEY = "dune-console:active-tab";
 
 // Persisted in sessionStorage, not localStorage: it should survive the
@@ -99,6 +104,7 @@ type PublicDirectoryStatus = {
 let openConfirmDialog: ((request: ConfirmDialogRequest) => void) | null = null;
 
 const AddonsPanel = lazy(() => import("./features/addons/AddonsPanel").then((module) => ({ default: module.AddonsPanel })));
+const LanguagePanel = lazy(() => import("./features/language/LanguagePanel").then((module) => ({ default: module.LanguagePanel })));
 const AdminToolsPanel = lazy(() => import("./features/adminTools/AdminToolsPanel").then((module) => ({ default: module.AdminToolsPanel })));
 const BasesPage = lazy(() => import("./features/bases/BasesPage").then((module) => ({ default: module.BasesPage })));
 const IamPolicyEditor = lazy(() => import("./features/settings/IamPolicyEditor").then((module) => ({ default: module.IamPolicyEditor })));
@@ -366,6 +372,39 @@ const navGroups: { title: string; items: { tab: Tab; icon: React.ReactNode }[] }
   }
 ];
 
+// The tabs the sidebar actually lists. Language is opened from the header;
+// "Services" and "Storage" render but have no nav entry, so Home routes must
+// check against this, not ALL_TABS -- landing on a tab
+// with no highlighted nav item and no way back reads as a broken jump.
+export const NAV_TABS: readonly Tab[] = navGroups.flatMap((group) => group.items.map((item) => item.tab));
+
+// One tick of the poll that decides when a start, stop or restart has finished.
+// Always fresh: a cached snapshot from mid-stop can end the action early. It
+// also moves Home's "Updated" clock, which this loop otherwise never touches.
+export async function loadRunningActionStatus(
+  load: (options: { fresh?: boolean }) => Promise<HomeLoadResult>,
+  setSampledAtMs: (ms: number) => void
+) {
+  const result = await load({ fresh: true });
+  if ((result.statusLoaded || result.readinessLoaded) && result.sampledAtMs) setSampledAtMs(result.sampledAtMs);
+  return result;
+}
+
+// A fresh status read takes ~4s on a loaded host, longer than the 3s tick, so
+// without this the ticks run status checks back to back for the whole action.
+export function skipWhileInFlight(tick: () => Promise<void>) {
+  let inFlight = false;
+  return async () => {
+    if (inFlight) return;
+    inFlight = true;
+    try {
+      await tick();
+    } finally {
+      inFlight = false;
+    }
+  };
+}
+
 const COMMUNITY_CONTRIBUTORS_URL = "https://github.com/Red-Blink/dune-awakening-selfhost-docker/graphs/contributors";
 const DUNE_DOCKER_WEBSITE_URL = "https://dunedocker.app/";
 const DUNE_DOCKER_DOCS_URL = "https://docs.dunedocker.app/";
@@ -510,6 +549,7 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot on mount
   }, []);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
   const [pinnedAddons, setPinnedAddons] = useState<PinnedAddon[]>(() => loadPinnedAddons());
   const [selectedPinnedAddonId, setSelectedPinnedAddonId] = useState("");
   const [addonUpdatesAvailable, setAddonUpdatesAvailable] = useState(false);
@@ -526,9 +566,15 @@ export function App() {
   const [task, setTask] = useState<Task | null>(null);
   const [backupRestoreTask, setBackupRestoreTask] = useState<Task | null>(null);
   const [homeTaskResult, setHomeTaskResult] = useState<HomeTaskResult | null>(null);
+  const [storageCleanupResult, setStorageCleanupResult] = useState<HomeTaskResult | null>(null);
+  const [storageCleanupOperation, setStorageCleanupOperation] = useState<StorageCleanupOperation>("");
   const [funcomTokenResult, setFuncomTokenResult] = useState<HomeTaskResult | null>(() => loadPersistedFuncomTokenResult());
   const [homeRunningAction, setHomeRunningAction] = useState<"start" | "stop" | "restart" | "">("");
   const [homeRestartStarted, setHomeRestartStarted] = useState(false);
+  // Lives here, not in HomePanel: status/readiness already survive a tab
+  // switch, and component state would reset the age to zero on every remount --
+  // which is what made every visit to Home flash "Updated 0s ago".
+  const [homeSampledAtMs, setHomeSampledAtMs] = useState(0);
   const [stackVersionStatus, setStackVersionStatus] = useState<Record<string, string>>({ status: "Checking", current: "", latest: "" });
   const [installedVersion, setInstalledVersion] = useState("");
   const stackBadgeStatus = withInstalledVersion(stackVersionStatus, installedVersion);
@@ -870,23 +916,31 @@ export function App() {
     try { await action(); } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
   }
 
-  const loadStackStatus = useCallback(async () => {
+  // `fresh` is forwarded to the API to bypass its status cache. The in-flight
+  // dedupe below is deliberately not keyed on it: a cached read already in
+  // flight is fine to share, and the restart lifecycle re-polls on its own
+  // interval anyway.
+  const loadStackStatus = useCallback(async (options: { fresh?: boolean } = {}) => {
     if (stackStatusLoadRef.current) return stackStatusLoadRef.current;
     stackStatusLoadRef.current = (async () => {
       setError("");
       const [nextStatus, nextReadiness] = await Promise.allSettled([
-        withTimeout(serverApi.status(), 90000, "Server status check timed out."),
-        withTimeout(serverApi.readiness(), 90000, "Readiness check timed out.")
+        withTimeout(serverApi.status({ fresh: options.fresh }), 90000, "Server status check timed out."),
+        withTimeout(serverApi.readiness({ fresh: options.fresh }), 90000, "Readiness check timed out.")
       ]);
-      const result: HomeLoadResult = { statusLoaded: false, readinessLoaded: false, statusError: "", readinessError: "", statusText: "", readinessText: "" };
+      const result: HomeLoadResult = { statusLoaded: false, readinessLoaded: false, statusError: "", readinessError: "", statusText: "", readinessText: "", sampledAtMs: 0 };
       if (nextStatus.status === "fulfilled") {
         setStatus(nextStatus.value.stdout);
         result.statusText = nextStatus.value.stdout;
         result.statusLoaded = true;
+        // The server stamps when the command actually ran. Fall back to now for
+        // an older API that does not send it, so the age is never negative.
+        result.sampledAtMs = Date.parse(nextStatus.value.sampledAt || "") || Date.now();
       } else {
         result.statusError = nextStatus.reason instanceof Error ? nextStatus.reason.message : String(nextStatus.reason);
       }
       if (nextReadiness.status === "fulfilled") {
+        if (!result.sampledAtMs) result.sampledAtMs = Date.parse(nextReadiness.value.sampledAt || "") || Date.now();
         const readinessText = nextReadiness.value.stdout || nextReadiness.value.stderr || "";
         result.readinessText = readinessText;
         setReadiness(readinessText);
@@ -911,7 +965,7 @@ export function App() {
     setHomeRestartStarted(false);
     let active = true;
     async function refreshRunningAction() {
-      const result = await loadStackStatus().catch(() => null);
+      const result = await loadRunningActionStatus(loadStackStatus, setHomeSampledAtMs).catch(() => null);
       if (!active || !result) return;
       const statusText = result.statusText;
       const readinessText = result.readinessText;
@@ -929,8 +983,8 @@ export function App() {
           stackRestartSuccessAnnounced.current = true;
           setHomeTaskResult({ status: "succeeded", title: "Battlegroup Restarted Successfully" });
         }
-        if (isHomeActionComplete(statusText, readinessText)) setHomeRunningAction("");
-      } else if (homeRunningAction === "start" && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText)) {
+        if (isHomeActionComplete(statusText, readinessText, elapsedMs)) setHomeRunningAction("");
+      } else if (homeRunningAction === "start" && elapsedMs >= 8000 && isHomeActionComplete(statusText, readinessText, elapsedMs)) {
         stackActionReadyPolls.current += 1;
         if (stackActionReadyPolls.current >= 2) {
           setHomeTaskResult({ status: "succeeded", title: "Battlegroup Started Successfully" });
@@ -942,8 +996,9 @@ export function App() {
         stackActionReadyPolls.current = 0;
       }
     }
-    const id = window.setInterval(refreshRunningAction, 3000);
-    refreshRunningAction();
+    const tick = skipWhileInFlight(refreshRunningAction);
+    const id = window.setInterval(tick, 3000);
+    tick();
     return () => {
       active = false;
       window.clearInterval(id);
@@ -1048,6 +1103,7 @@ export function App() {
     );
     return (
       <main className="login-screen">
+        <ConsoleLanguageObserver />
         <form className="login-panel" onSubmit={(event) => { event.preventDefault(); void safe(login); }}>
           <h1>Dune Docker Console</h1>
           <img className="login-logo" src="/dune-docker-logo.png" alt="Dune Docker Console logo" />
@@ -1106,6 +1162,7 @@ export function App() {
   if (firstRunSetup) {
     return (
       <div className="app-shell setup-only-shell">
+        <ConsoleLanguageObserver />
         <main className="home-main setup-main">
           <div className="home-backdrop" aria-hidden="true">
             <span className="home-sand-fine" />
@@ -1143,6 +1200,7 @@ export function App() {
 
   return (
     <div className="app-shell">
+      <ConsoleLanguageObserver />
       <aside className="sidebar">
         <div className="sidebar-brand">
           <button className="sidebar-home-button" type="button" onClick={() => { setRedeploySetupOpen(false); setTab("Home"); closeMobileNav(); }} title="Open Home">
@@ -1215,9 +1273,9 @@ export function App() {
               ))}
               {group.title === "Community" && (
                 <>
-                  <a className="sidebar-request-button" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer"><MessageCircle size={18} />Requests</a>
-                  <a className="sidebar-request-button" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer"><Bug size={18} />Report Issues</a>
-                  <a className="sidebar-request-button" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer"><CircleHelp size={18} />Get Help</a>
+                  <a className="sidebar-request-button" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer"><span className="sidebar-nav-main"><MessageCircle size={18} aria-hidden="true" /><span>Requests</span></span><ExternalLink className="sidebar-external-link" size={14} aria-hidden="true" /></a>
+                  <a className="sidebar-request-button" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer"><span className="sidebar-nav-main"><Bug size={18} aria-hidden="true" /><span>Report Issues</span></span><ExternalLink className="sidebar-external-link" size={14} aria-hidden="true" /></a>
+                  <a className="sidebar-request-button" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer"><span className="sidebar-nav-main"><CircleHelp size={18} aria-hidden="true" /><span>Get Help</span></span><ExternalLink className="sidebar-external-link" size={14} aria-hidden="true" /></a>
                 </>
               )}
             </section>
@@ -1244,6 +1302,18 @@ export function App() {
               rel="noreferrer"
               title="Open Public Server Listing"
             >{publicDirectoryStatus.listingClaimed ? "Claimed Listing" : "Unclaimed Listing"}</a>}
+            <button
+              className="community-button language-shortcut"
+              type="button"
+              title="Console Language"
+              aria-label="Console Language"
+              aria-haspopup="dialog"
+              aria-expanded={languagePickerOpen || tab === "Language"}
+              onClick={() => {
+                setLanguagePickerOpen(true);
+                closeMobileNav();
+              }}
+            ><Globe size={19} aria-hidden="true" /></button>
             <a className="community-button discord" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer" title="Join Discord"><span>Join Discord</span><DiscordLogo size={19} /></a>
             <a className="community-button support" href={REDBLINK_KOFI_URL} target="_blank" rel="noreferrer" title="Support Project"><span>Support Project</span><KofiLogo size={19} /></a>
           </div>
@@ -1251,8 +1321,8 @@ export function App() {
         {error && <div className="error-banner">{error}</div>}
         {redeploySetupOpen && <SetupWizard initialStep={setupJump.step} jumpNonce={setupJump.nonce} mode="redeploy" onSetupComplete={async () => setSetupState(await setupApi.state())} />}
         {!redeploySetupOpen && tab === "Home" && isPlayerTier(userInfo?.tier) && <PlayerHome />}
-        {!redeploySetupOpen && tab === "Home" && !isPlayerTier(userInfo?.tier) && <HomePanel status={status} readiness={readiness} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onLoad={loadStackStatus} confirmAction={confirmDialog} restartGate={restartGateChoice} />}
-        {!redeploySetupOpen && tab === "Server Control" && <ServerPanel setTask={setTask} setStatus={setStatus} status={status} setReadiness={setReadiness} setPorts={setPorts} setDoctor={setDoctor} ports={ports} readiness={readiness} doctor={doctor} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} onRedeploy={() => {
+        {!redeploySetupOpen && tab === "Home" && !isPlayerTier(userInfo?.tier) && <HomePanel status={status} readiness={readiness} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onLoad={loadStackStatus} confirmAction={confirmDialog} restartGate={restartGateChoice} sampledAtMs={homeSampledAtMs} setSampledAtMs={setHomeSampledAtMs} onNavigate={(nextTab) => { setRedeploySetupOpen(false); setSelectedPinnedAddonId(""); setTab(nextTab); }} />}
+        {!redeploySetupOpen && tab === "Server Control" && <ServerPanel setTask={setTask} setStatus={setStatus} status={status} setReadiness={setReadiness} setPorts={setPorts} setDoctor={setDoctor} ports={ports} readiness={readiness} doctor={doctor} storageCleanupResult={storageCleanupResult} setStorageCleanupResult={setStorageCleanupResult} storageCleanupOperation={storageCleanupOperation} setStorageCleanupOperation={setStorageCleanupOperation} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} onRedeploy={() => {
           setSetupJump((current) => ({ step: 0, nonce: current.nonce + 1 }));
           setSelectedPinnedAddonId("");
           setRedeploySetupOpen(true);
@@ -1273,6 +1343,7 @@ export function App() {
         {!redeploySetupOpen && tab === "Maps" && <LazyTabBoundary label="Loading Maps"><MapsPanel onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} confirmSettingsRestart={confirmSettingsRestart} waitForTaskWithUpdates={waitForTaskWithUpdates} taskTechnicalDetails={taskTechnicalDetails} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Care Package" && <LazyTabBoundary label="Loading Care Package"><CarePackagePanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Addons" && <LazyTabBoundary label="Loading Addons"><AddonsPanel pinnedAddons={pinnedAddons} setPinnedAddons={setPinnedAddons} selectedAddonId={selectedPinnedAddonId} clearSelectedAddon={() => setSelectedPinnedAddonId("")} setAddonUpdateAvailable={setAddonUpdatesAvailable} confirmAction={confirmDialog} /></LazyTabBoundary>}
+        {(languagePickerOpen || tab === "Language") && <LazyTabBoundary label="Loading Language"><LanguagePanel onClose={() => {setLanguagePickerOpen(false);if(tab === "Language")setTab("Home");}} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Database" && <LazyTabBoundary label="Loading Database"><DatabasePanel /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Storage" && isPlayerTier(userInfo?.tier) && <PlayerAssetsPage kind="storage" />}
         {!redeploySetupOpen && tab === "Storage" && !isPlayerTier(userInfo?.tier) && <LazyTabBoundary label="Loading Storage"><StoragePanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} /></LazyTabBoundary>}

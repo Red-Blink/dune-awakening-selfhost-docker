@@ -356,6 +356,7 @@ export function loadConfig() {
     discordBotHandoffUrl: (process.env.DISCORD_BOT_HANDOFF_URL || "").replace(/\/+$/, ""),
     generatedDir,
     secretsDir,
+    sessionStoreFile: resolve(generatedDir, "sessions.json"),
     apiKeysFile: resolve(secretsDir, "api-keys.json"),
     auditLog: resolve(generatedDir, "web-admin-audit.jsonl"),
     restartHistoryFile: resolve(generatedDir, "restart-history.jsonl"),
@@ -389,6 +390,8 @@ export function loadConfig() {
     commandTimeoutMs: Number(process.env.ADMIN_COMMAND_TIMEOUT_MS || 120000),
     updateCheckCacheMs: Number(process.env.ADMIN_UPDATE_CHECK_CACHE_MS || 30 * 60 * 1000),
     updateCheckCacheFile: resolve(generatedDir, "game-update-check.json"),
+    // How long a status/readiness snapshot counts as fresh; 0 disables the cache.
+    statusCacheMs: clampInt(process.env.ADMIN_STATUS_CACHE_MS, 5000, 0, 120000),
     staticDir: process.env.ADMIN_STATIC_DIR || resolve(repoRoot, "console/web/dist"),
     allowedIps: parseAllowedIps(process.env.ADMIN_ALLOWED_IPS)
   };
@@ -449,6 +452,7 @@ function repairRootOwnedHostState(repoRoot) {
     resolve(repoRoot, "runtime/generated/restart-queue-state.json"),
     resolve(repoRoot, "runtime/generated/restart-schedule.env"),
     resolve(repoRoot, "runtime/generated/shutdown-protection.env"),
+    resolve(repoRoot, "runtime/generated/sessions.json"),
     resolve(repoRoot, "runtime/generated/sietch-config.json"),
     resolve(repoRoot, "runtime/generated/spicefield-overrides.json"),
     resolve(repoRoot, "runtime/generated/learned-spice-locations.json"),
@@ -524,7 +528,7 @@ export function readConsoleBuildId(staticDir, fallback = "dev") {
   }
 }
 
-function resolveAdminBindHost(value) {
+export function resolveAdminBindHost(value) {
   const raw = String(value || "0.0.0.0").trim();
   if (raw && raw !== "auto") return raw;
   return detectPrivateIpv4() || "127.0.0.1";

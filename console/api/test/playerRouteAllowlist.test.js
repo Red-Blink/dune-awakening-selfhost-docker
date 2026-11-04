@@ -65,12 +65,22 @@ for (const path of OWN_DATA) {
   });
 }
 
-test("player may never use a non-GET method on any route", () => {
+test("player may never use a non-GET method on any route except suggesting a translation", () => {
   for (const key of Object.keys(ROUTE_ACTIONS)) {
     const [, path] = key.split(" ", 2);
     for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
-      assert.equal(playerMayCall(method, path), false, `${method} ${path}`);
+      const allowed = method === "POST" && path === "/api/i18n/suggestions";
+      assert.equal(playerMayCall(method, path), allowed, `${method} ${path}`);
     }
+  }
+  assert.equal(playerMayCall("POST", "/api/i18n/suggestions"), true);
+  for (const method of ["GET", "PUT", "PATCH", "DELETE"]) assert.equal(playerMayCall(method, "/api/i18n/suggestions"), false, method);
+  for (const path of ["/api/i18n/suggestions/", "/api/i18n/suggestions/1", "/api/i18n/translations"]) assert.equal(playerMayCall("POST", path), false, path);
+});
+
+test("the server-wide combat history is never reachable by a player, not even read as a player id", () => {
+  for (const path of ["/api/players/combat", "/api/players/combat/", "/api/players/combat/inventory", "/api/players/combat/stats"]) {
+    assert.equal(playerMayCall("GET", path), false, path);
   }
 });
 
@@ -192,6 +202,6 @@ test("every reserved player path segment is denied on its own and with a sub-pat
 test("the player tier holds exactly this action set, so a policy over-grant is a visible change", async () => {
   const { resolveAllowedActions } = await import("../src/policy.js");
   assert.deepEqual([...resolveAllowedActions("player")].sort(), [
-    "bases:read", "guilds:read", "players:read", "server:read", "storage:read", "vehicles:read",
+    "bases:read", "community:suggest-translation", "guilds:read", "players:read", "server:read", "storage:read", "vehicles:read",
   ].sort());
 });

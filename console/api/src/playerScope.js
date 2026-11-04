@@ -53,6 +53,7 @@ const PLAYER_OWN_RESOURCES = new Set([
 ]);
 // First segments that are routes of their own, not player ids.
 const PLAYER_PATH_RESERVED_SEGMENTS = new Set([
+  "combat", // server-wide recorded-kill history: other players' data
   "deleted-characters",
   "list-settings",
   "online",
@@ -61,11 +62,17 @@ const PLAYER_PATH_RESERVED_SEGMENTS = new Set([
 ]);
 
 const PLAYER_ID_PREFIX = "/api/players/";
+const PLAYER_TRANSLATION_SUGGESTION_PATH = "/api/i18n/suggestions";
 const GUILD_ROSTER_PATH = /^\/api\/guilds\/[^/]+\/members$/;
 
 export function playerMayCall(method, path) {
   if (typeof method !== "string" || typeof path !== "string") return false;
-  if (method.toUpperCase() !== "GET") return false;
+  const verb = method.toUpperCase();
+  // The one write a player may make: suggesting a translation. The IAM policy
+  // grants it to the player tier (community:suggest-translation) and it touches
+  // no game data, so the allowlist admits exactly this route and no other write.
+  if (verb === "POST" && path === PLAYER_TRANSLATION_SUGGESTION_PATH) return true;
+  if (verb !== "GET") return false;
   if (PLAYER_EXACT_GET_ROUTES.has(path)) return true;
   if (GUILD_ROSTER_PATH.test(path)) return true;
   if (path.startsWith(PLAYER_ID_PREFIX)) {

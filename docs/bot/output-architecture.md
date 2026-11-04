@@ -1,5 +1,7 @@
 # Discord Bot Output Architecture
 
+**Status:** Historical record — describes the output pipeline of the companion bot in a separate repository as of 2026-08-10; its command counts and groups are not verifiable from this repository. Not maintained.
+
 **Date:** 2026-08-10
 **Companion repository:** [yacketrj/arrakis-control-panel](https://github.com/yacketrj/arrakis-control-panel)
 
