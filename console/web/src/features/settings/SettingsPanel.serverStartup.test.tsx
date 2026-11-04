@@ -28,7 +28,7 @@ beforeEach(() => {
 });
 
 test("shows the saved automatic Battlegroup startup choice", async () => {
-  render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={vi.fn()} />);
+  render(<SettingsPanel onPasswordChanged={vi.fn()} onTotpEnrollmentStarted={vi.fn()} confirmAction={vi.fn()} />);
   fireEvent.click(await screen.findByRole("button", { name: "Expand Server Startup" }));
   expect(screen.getByText("Start Battlegroup Automatically")).toBeVisible();
   expect(screen.getByRole("checkbox", { name: /automatic startup/i })).toBeChecked();
@@ -37,7 +37,7 @@ test("shows the saved automatic Battlegroup startup choice", async () => {
 
 test("persists the choice immediately and leaves the Console available", async () => {
   mockedPost.mockResolvedValue({ ok: true, ...settings(false).serverStartup });
-  render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={vi.fn()} />);
+  render(<SettingsPanel onPasswordChanged={vi.fn()} onTotpEnrollmentStarted={vi.fn()} confirmAction={vi.fn()} />);
   fireEvent.click(await screen.findByRole("button", { name: "Expand Server Startup" }));
   fireEvent.click(screen.getByRole("checkbox", { name: /automatic startup/i }));
 
@@ -49,7 +49,7 @@ test("persists the choice immediately and leaves the Console available", async (
 
 test("keeps the previous choice when saving fails", async () => {
   mockedPost.mockRejectedValue(new Error("Could not save the setting."));
-  render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={vi.fn()} />);
+  render(<SettingsPanel onPasswordChanged={vi.fn()} onTotpEnrollmentStarted={vi.fn()} confirmAction={vi.fn()} />);
   fireEvent.click(await screen.findByRole("button", { name: "Expand Server Startup" }));
   fireEvent.click(screen.getByRole("checkbox", { name: /automatic startup/i }));
 
