@@ -121,7 +121,8 @@ assert "reconcile_coriolis_coordinator_after_deploy\n  self_update_running resta
 assert "--replace-if-stack-running" in self_update
 assert "dune-orchestrator|dune-autoscaler|dune-director" in (root / "runtime/scripts/start-coriolis-coordinator.sh").read_text()
 assert "start-coriolis-coordinator.sh" in (root / "runtime/scripts/console.sh").read_text()
-assert "start-coriolis-coordinator.sh --replace-if-stack-running" in (root / "runtime/scripts/console.sh").read_text()
+assert "start-coriolis-coordinator.sh --if-stack-running" in (root / "runtime/scripts/console.sh").read_text()
+assert "--replace-if-stack-running" not in (root / "runtime/scripts/console.sh").read_text()
 assert "DUNE_CORIOLIS_SAFE_DATA_CLEANUP" in (root / "runtime/scripts/start-coriolis-coordinator.sh").read_text()
 entrypoint = (root / "console/api/entrypoint.sh").read_text()
 assert "start-coriolis-coordinator.sh --if-stack-running" in entrypoint

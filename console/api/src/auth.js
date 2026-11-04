@@ -1,13 +1,20 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual, scryptSync } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:zlib";
+import { writeJsonAtomic } from "./jsonStore.js";
 import { verifyPassword } from "./passwordHash.js";
+import { preferredContentEncoding } from "./http/contentEncoding.js";
 
-const sessions = new Map();
+const MIN_JSON_COMPRESSION_BYTES = 1024;
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+const SESSION_PERSIST_MIN_INTERVAL_MS = 30 * 1000;
 
 export const SECURITY_HEADERS = {
   "x-content-type-options": "nosniff",
   "x-frame-options": "DENY",
   "referrer-policy": "no-referrer",
-  "permissions-policy": "geolocation=(), microphone=(), camera=()"
+  "permissions-policy": "geolocation=(), microphone=(), camera=()",
+  "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 };
 
 export function withSecurityHeaders(headers = {}) {
@@ -25,7 +32,11 @@ export function parseCookies(header = "") {
 }
 
 export function createAuth(config) {
+  const sessions = new Map();
   const now = config.now || (() => Date.now());
+  const sessionStoreFile = config.sessionStoreFile ? String(config.sessionStoreFile) : "";
+  let lastPersistAt = 0;
+  let persistenceCredential, persistenceSecret, persistenceKey;
 
   // Integrity tag over an opaque session id -- NOT password storage.
   //
@@ -45,13 +56,87 @@ export function createAuth(config) {
     return createHmac("sha256", config.sessionSecret).update(value).digest("base64url");
   }
 
+  function sessionMac(entry) {
+    // Password-dependent persistence uses a slow KDF once per credential change.
+    // The password never enters the fast cookie-signing data path. Version 1
+    // sessions are intentionally expired on upgrade; credentials remain valid.
+    if (!persistenceKey || persistenceCredential !== config.adminPassword || persistenceSecret !== config.sessionSecret) {
+      persistenceKey = scryptSync(String(config.adminPassword || ""), `dune-session-store-v2:${config.sessionSecret}`, 32, { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 });
+      persistenceCredential = config.adminPassword;
+      persistenceSecret = config.sessionSecret;
+    }
+    return createHmac("sha256", persistenceKey).update(JSON.stringify([entry.id, entry.csrf, entry.expiresAt, entry.tier || "owner", entry.userId || "", entry.username || "", entry.guildId || "", Boolean(config.adminPasswordEnvManaged)])).digest("base64url");
+  }
+
   function constantTimeStringEqual(left, right) {
     const a = Buffer.from(String(left || ""));
     const b = Buffer.from(String(right || ""));
     return a.length > 0 && a.length === b.length && timingSafeEqual(a, b);
   }
 
-  const DEFAULT_TTL_MS = 12 * 60 * 60 * 1000;
+  function loadPersistedSessions() {
+    if (!sessionStoreFile || !existsSync(sessionStoreFile)) return;
+    try {
+      const parsed = JSON.parse(readFileSync(sessionStoreFile, "utf8"));
+      if (parsed?.version !== 2) return;
+      const entries = Array.isArray(parsed?.sessions) ? parsed.sessions : [];
+      const currentNow = now();
+      for (const entry of entries) {
+        if (!entry || typeof entry.id !== "string" || typeof entry.csrf !== "string") continue;
+        const expiresAt = Number(entry.expiresAt);
+        if (!Number.isFinite(expiresAt) || expiresAt < currentNow) continue;
+        if (!entry.mac || !constantTimeStringEqual(sessionMac(entry), entry.mac)) continue;
+        sessions.set(entry.id, {
+          id: entry.id,
+          csrf: entry.csrf,
+          expiresAt,
+          tier: entry.tier || "owner",
+          userId: entry.userId || "",
+          username: entry.username || "",
+          guildId: entry.guildId || ""
+        });
+      }
+    } catch {
+      // Corrupt or unreadable session store starts cleanly with in-memory sessions.
+    }
+  }
+
+  function persistSessions(force = false) {
+    if (!sessionStoreFile) return;
+    const currentNow = now();
+    if (!force && currentNow - lastPersistAt < SESSION_PERSIST_MIN_INTERVAL_MS) return;
+    lastPersistAt = currentNow;
+    try {
+      const active = [];
+      for (const [id, session] of sessions) {
+        if (!session || session.expiresAt < currentNow) {
+          sessions.delete(id);
+          continue;
+        }
+        // Enrollment / resetup sessions (scope set) are short-lived, non-renewable and
+        // memory-only: restoring one after a restart without its scope would hand back
+        // a full session, so they are never written to the store.
+        if (session.scope) continue;
+        active.push({
+          id: session.id,
+          csrf: session.csrf,
+          expiresAt: session.expiresAt,
+          tier: session.tier || "owner",
+          userId: session.userId || "",
+          username: session.username || "",
+          guildId: session.guildId || "",
+          mac: sessionMac(session)
+        });
+      }
+      writeJsonAtomic(sessionStoreFile, { version: 2, sessions: active }, 0o600);
+    } catch {
+      // Best-effort persistence: in-memory sessions continue working if disk is read-only.
+    }
+  }
+
+  loadPersistedSessions();
+
+  const DEFAULT_TTL_MS = SESSION_TTL_MS;
 
   // scope: null for a normal session; "enroll" for the short-lived, non-renewable
   // second-factor enrollment session (RFC §4) that the route gate restricts to
@@ -69,6 +154,7 @@ export function createAuth(config) {
     const expiresAt = now() + ttlMs;
     const session = { id, csrf, expiresAt, tier, userId, username, guildId, scope, renewable, expectedFactorVersion };
     sessions.set(id, session);
+    if (!scope) persistSessions(true);
     return { ...session, cookie: `${id}.${sign(id)}` };
   }
 
@@ -80,11 +166,20 @@ export function createAuth(config) {
     if (!id || !sig || !constantTimeStringEqual(sign(id), sig)) return null;
     const session = sessions.get(id);
     if (!session || session.expiresAt < now()) {
-      sessions.delete(id);
+      if (sessions.delete(id)) persistSessions(true);
       return null;
     }
     if (session.renewable !== false) session.expiresAt = now() + DEFAULT_TTL_MS;
+    if (!session.scope) persistSessions(false);
     return session;
+  }
+
+  function revokeSession(req) {
+    const raw = parseCookies(req?.headers?.cookie || "").get("asc_session");
+    if (!raw) return;
+    const [id, sig] = raw.split(".");
+    if (!id || !sig || !constantTimeStringEqual(sign(id), sig)) return;
+    if (sessions.delete(id)) persistSessions(true);
   }
 
   // Like readSession, but for long-lived checks (open streams): it never
@@ -100,7 +195,11 @@ export function createAuth(config) {
   }
 
   function invalidateSession(id) {
-    return sessions.delete(id);
+    const session = sessions.get(id);
+    const removed = sessions.delete(id);
+    // Ordinary sessions are persisted, so removing one must reach the store too.
+    if (removed && session && !session.scope) persistSessions(true);
+    return removed;
   }
 
   // Invalidate every OTHER password/TOTP-authenticated session (RFC §2.3/§5:
@@ -129,6 +228,8 @@ export function createAuth(config) {
       sessions.delete(id);
       count++;
     }
+    // These are ordinary (scope-less) sessions, which are persisted.
+    if (count) persistSessions(true);
     return count;
   }
 
@@ -186,7 +287,7 @@ export function createAuth(config) {
     return session;
   }
 
-  return { makeSession, readSession, peekSession, passwordMatches, requireAuth, invalidateSession, invalidatePasswordSessions, invalidateResetupSessions };
+  return { makeSession, readSession, revokeSession, peekSession, passwordMatches, requireAuth, invalidateSession, invalidatePasswordSessions, invalidateResetupSessions };
 }
 
 export function setSessionCookie(res, session, config = {}, { maxAgeSeconds = 43200 } = {}) {
@@ -200,8 +301,39 @@ export function clearSessionCookie(res, config = {}) {
 }
 
 export function json(res, status, body, headers = {}) {
+  const payload = serializeJsonResponse(body);
+  const acceptEncoding = String(res?.req?.headers?.["accept-encoding"] || "").toLowerCase();
+  const rawBuffer = acceptEncoding ? Buffer.from(payload, "utf8") : null;
+  const encoding = preferredContentEncoding(acceptEncoding);
+  if (Buffer.byteLength(payload) >= MIN_JSON_COMPRESSION_BYTES) headers = { vary: "Accept-Encoding", ...headers };
+  if (rawBuffer && rawBuffer.length >= MIN_JSON_COMPRESSION_BYTES && !headers["content-encoding"]) {
+    if (encoding === "br") {
+      const compressed = brotliCompressSync(rawBuffer, {
+        params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 4 }
+      });
+      res.writeHead(status, withSecurityHeaders({
+        "content-type": "application/json; charset=utf-8",
+        "content-encoding": "br",
+        vary: "Accept-Encoding",
+        ...headers
+      }));
+      res.end(compressed);
+      return;
+    }
+    if (encoding === "gzip") {
+      const compressed = gzipSync(rawBuffer, { level: 6 });
+      res.writeHead(status, withSecurityHeaders({
+        "content-type": "application/json; charset=utf-8",
+        "content-encoding": "gzip",
+        vary: "Accept-Encoding",
+        ...headers
+      }));
+      res.end(compressed);
+      return;
+    }
+  }
   res.writeHead(status, withSecurityHeaders({ "content-type": "application/json; charset=utf-8", ...headers }));
-  res.end(serializeJsonResponse(body));
+  res.end(payload);
 }
 
 export function serializeJsonResponse(body) {

@@ -512,6 +512,89 @@ rc=0
 DUNE_RMQ_TRANSPORT="exec" dune_rmq_game_connections >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq "$RMQ_HTTP_UNSUPPORTED" ] || fail "DUNE_RMQ_TRANSPORT=exec did not pin the exec leg for connections"
 
+# --- hermetic start-rabbitmq.sh launch-argument regression --------------------
+# Verify the actual docker run arguments constructed by start-rabbitmq.sh without
+# touching a real broker: default public game HTTP binding, separate localhost
+# shortcut, custom game HTTP port profiles, and opt-in RMQ_GAME_HTTP_BIND_IP.
+launch_repo="$work/launch-repo"
+mkdir -p "$launch_repo/runtime/rabbitmq-game/certs"
+cp -R "$repo_root/runtime/scripts" "$launch_repo/runtime/scripts"
+touch "$launch_repo/runtime/rabbitmq-game/certs/key.pem" \
+      "$launch_repo/runtime/rabbitmq-game/certs/cert.pem" \
+      "$launch_repo/runtime/rabbitmq-game/certs/cacert.pem"
+
+cat > "$work/bin/sleep" <<'STUB'
+#!/usr/bin/env bash
+exit 0
+STUB
+chmod +x "$work/bin/sleep"
+
+cat > "$work/bin/docker" <<'STUB'
+#!/usr/bin/env bash
+if [ "$1" = "run" ]; then
+  container=""
+  prev=""
+  for arg in "$@"; do
+    if [ "$prev" = "--name" ]; then
+      container="$arg"
+      break
+    fi
+    prev="$arg"
+  done
+  printf '%s\n' "$*" > "${DOCKER_RUN_CAPTURE_DIR}/${container}.args"
+fi
+exit 0
+STUB
+chmod +x "$work/bin/docker"
+
+run_start_rabbitmq_stub() {
+  rm -rf "$work/run-captures"
+  mkdir -p "$work/run-captures"
+  DOCKER_RUN_CAPTURE_DIR="$work/run-captures" "$@" bash "$launch_repo/runtime/scripts/start-rabbitmq.sh" >/dev/null
+}
+
+# 1. Default public game binding + separate localhost shortcut + loopback admin broker
+run_start_rabbitmq_stub env -u RMQ_GAME_HTTP_BIND_IP -u RMQ_GAME_HTTP_PORT -u RMQ_GAME_LOCAL_HTTP_PORT -u RMQ_GAME_PORT
+admin_args="$(cat "$work/run-captures/dune-rmq-admin.args")"
+game_args="$(cat "$work/run-captures/dune-rmq-game.args")"
+printf '%s\n' "$admin_args" | grep -Fq -- '-p 127.0.0.1:32573:5672' \
+  || fail "admin broker AMQP port was not bound to loopback: $admin_args"
+printf '%s\n' "$admin_args" | grep -Fq -- '-p 127.0.0.1:32574:15672/tcp' \
+  || fail "admin broker HTTP port was not bound to loopback: $admin_args"
+printf '%s\n' "$game_args" | grep -Fq -- '-p 31982:5672/tcp' \
+  || fail "game broker AMQPS port missing default public binding: $game_args"
+printf '%s\n' "$game_args" | grep -Fq -- '-p 127.0.0.1:15672:15672/tcp' \
+  || fail "game broker missing separate localhost HTTP shortcut: $game_args"
+printf '%s\n' "$game_args" | grep -Fq -- '-p 31983:15672/tcp' \
+  || fail "game broker HTTP port must be published publicly on 31983 by default: $game_args"
+! printf '%s\n' "$game_args" | grep -Fq -- '127.0.0.1:31983:15672/tcp' \
+  || fail "game broker public HTTP port 31983 must not default to loopback: $game_args"
+
+# 2. Custom game HTTP port and localhost shortcut profile via environment / .env
+printf 'RMQ_GAME_PORT=32982\nRMQ_GAME_HTTP_PORT=32983\nRMQ_GAME_LOCAL_HTTP_PORT=16672\n' > "$launch_repo/.env"
+run_start_rabbitmq_stub env -u RMQ_GAME_HTTP_BIND_IP -u RMQ_GAME_HTTP_PORT -u RMQ_GAME_LOCAL_HTTP_PORT -u RMQ_GAME_PORT
+game_args="$(cat "$work/run-captures/dune-rmq-game.args")"
+printf '%s\n' "$game_args" | grep -Fq -- '-p 32982:5672/tcp' \
+  || fail "custom RMQ_GAME_PORT was not applied: $game_args"
+printf '%s\n' "$game_args" | grep -Fq -- '-p 127.0.0.1:16672:15672/tcp' \
+  || fail "custom RMQ_GAME_LOCAL_HTTP_PORT was not bound to loopback: $game_args"
+printf '%s\n' "$game_args" | grep -Fq -- '-p 32983:15672/tcp' \
+  || fail "custom RMQ_GAME_HTTP_PORT must preserve public binding by default: $game_args"
+
+# 3. Explicit opt-in restricted bind IP (with custom and stock port profiles)
+run_start_rabbitmq_stub env RMQ_GAME_HTTP_BIND_IP=192.0.2.10
+game_args="$(cat "$work/run-captures/dune-rmq-game.args")"
+printf '%s\n' "$game_args" | grep -Fq -- '-p 127.0.0.1:16672:15672/tcp' \
+  || fail "opt-in RMQ_GAME_HTTP_BIND_IP must not clobber the localhost shortcut: $game_args"
+printf '%s\n' "$game_args" | grep -Fq -- '-p 192.0.2.10:32983:15672/tcp' \
+  || fail "opt-in RMQ_GAME_HTTP_BIND_IP did not bind custom RMQ_GAME_HTTP_PORT: $game_args"
+
+rm -f "$launch_repo/.env"
+run_start_rabbitmq_stub env RMQ_GAME_HTTP_BIND_IP=127.0.0.1 RMQ_GAME_HTTP_PORT=31983
+game_args="$(cat "$work/run-captures/dune-rmq-game.args")"
+printf '%s\n' "$game_args" | grep -Fq -- '-p 127.0.0.1:31983:15672/tcp' \
+  || fail "explicit RMQ_GAME_HTTP_BIND_IP=127.0.0.1 opt-in was not applied: $game_args"
+
 cd "$repo_root"
 
 echo "rabbitmq seam translates publish and get to the management API and falls back for everything else"

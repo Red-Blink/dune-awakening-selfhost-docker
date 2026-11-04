@@ -303,7 +303,7 @@ export function ExchangePanel({ onError, confirmAction }: ExchangePanelProps) {
             emptyMessage="No market listings match this filter."
           />
           <div className="panel-title exchange-pagination-footer">
-            <p className="action-help-note">Showing {rangeStart}-{rangeEnd} of {totalCount} items.</p>
+            <p className="action-help-note">{`Showing ${rangeStart}-${rangeEnd} of ${totalCount} items.`}</p>
             <div className="database-pagination-controls">
               <label className="compact-select">
                 Rows

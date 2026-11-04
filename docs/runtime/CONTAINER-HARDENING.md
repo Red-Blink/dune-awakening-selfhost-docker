@@ -1,6 +1,10 @@
 ## Container Hardening — Change Summary
 
-**Status:** Current | **Last Updated:** July 2026
+**Status:** Historical record — describes the container hardening change as merged. Not maintained.
+
+For the current behavior, see [`docker-compose.yml`](../../docker-compose.yml),
+[`docker-compose.web.yml`](../../docker-compose.web.yml) and
+[`tests/container-lifecycle-test.sh`](../../tests/container-lifecycle-test.sh).
 
 ### Overview
 

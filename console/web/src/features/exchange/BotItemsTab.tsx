@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { marketBotItemsApi, type MarketBotItemRow, type MarketCatalogPickItem } from "../../api/marketBotItems";
 import { InfoTooltip } from "../../components/common/DisplayPrimitives";
+import { EXCHANGE_CATEGORY_LABELS } from "./display";
 
 type BotItemsTabProps = {
   onError: (text: string) => void;
@@ -16,8 +17,10 @@ function qualityLabel(quality: number) {
 }
 
 function categoryLabel(category: string) {
-  return String(category || "")
-    .trim()
+  const raw = String(category || "").trim();
+  const known = EXCHANGE_CATEGORY_LABELS[raw.toLowerCase()];
+  if (known) return known;
+  return raw
     .replace(/[_-]+/g, " ")
     .split(/\s+/)
     .filter(Boolean)
@@ -411,7 +414,15 @@ export function BotItemsTab({ onError, onDirtyChange }: BotItemsTabProps) {
         <button className="bot-items-add-button" onClick={() => setPickerOpen(true)}><Plus size={14} /> Add Item</button>
       </div>
       <div className="panel-title bot-items-summary-row">
-        <p className="action-help-note">Showing {rangeStart}-{rangeEnd} of {filteredRows.length.toLocaleString()} item{filteredRows.length === 1 ? "" : "s"}{filteredRows.length !== combinedRows.length ? ` (${combinedRows.length.toLocaleString()} total)` : ""}.</p>
+        <p className="action-help-note">
+          {filteredRows.length !== combinedRows.length
+            ? (filteredRows.length === 1
+              ? `Showing ${rangeStart}-${rangeEnd} of ${filteredRows.length.toLocaleString()} item (${combinedRows.length.toLocaleString()} total).`
+              : `Showing ${rangeStart}-${rangeEnd} of ${filteredRows.length.toLocaleString()} items (${combinedRows.length.toLocaleString()} total).`)
+            : (filteredRows.length === 1
+              ? `Showing ${rangeStart}-${rangeEnd} of ${filteredRows.length.toLocaleString()} item.`
+              : `Showing ${rangeStart}-${rangeEnd} of ${filteredRows.length.toLocaleString()} items.`)}
+        </p>
         <div className="action-row bot-items-match-actions">
           <button title={`Disable all ${toggleableCount.toLocaleString()} matching items`} onClick={() => setEnabledForFilteredRows(false)} disabled={toggleableCount === 0}>Disable Matches</button>
           <button title={`Enable all ${toggleableCount.toLocaleString()} matching items`} onClick={() => setEnabledForFilteredRows(true)} disabled={toggleableCount === 0}>Enable Matches</button>
@@ -524,7 +535,7 @@ export function BotItemsTab({ onError, onDirtyChange }: BotItemsTabProps) {
         </table>
       </div>
       <div className="panel-title exchange-pagination-footer">
-        <p className="action-help-note">Showing {rangeStart}-{rangeEnd} of {filteredRows.length.toLocaleString()} items.</p>
+        <p className="action-help-note">{`Showing ${rangeStart}-${rangeEnd} of ${filteredRows.length.toLocaleString()} items.`}</p>
         <div className="database-pagination-controls">
           <label className="compact-select">
             Rows

@@ -261,17 +261,21 @@ def patch_binary(source, spec):
     return data
 
 
-def base_image_id(spec):
-    reference = f'registry.funcom.com/funcom/self-hosting/seabass-server:{spec["worldTag"]}'
+def base_image_id(spec, reference=None):
+    reference = reference or f'registry.funcom.com/funcom/self-hosting/seabass-server:{spec["worldTag"]}'
     image_id = run('docker', 'image', 'inspect', '--format', '{{.Id}}', reference, capture=True).strip()
     # The containerd store exposes the manifest ID; Docker's classic store
-    # exposes the archive's config ID. Both identify this same verified image.
-    if image_id not in {spec['baseImage'].split('@', 1)[1], spec['baseConfigId']}:
+    # exposes the archive's config ID. Pin both identities for each reviewed
+    # variant, including official republishes that reuse the world tag.
+    reviewed = {spec['baseImage'].split('@', 1)[1], spec['baseConfigId']}
+    for base in spec.get('additionalBaseImages', []):
+        reviewed.update((base['imageId'], base['configId']))
+    if image_id not in reviewed:
         raise ValueError('The installed official image does not match the supported base.')
     return image_id
 
 
-def build(tag):
+def build(tag, base_reference=None):
     spec = manifest(tag)
     if not spec:
         raise ValueError('This game build is not supported by Experimental Tanks.')
@@ -286,7 +290,7 @@ def build(tag):
         if hashlib.sha256((assets / name).read_bytes()).hexdigest() != expected:
             raise ValueError(f'Tank asset checksum mismatch: {name}')
     # Do not pull a possibly different base or modify the official tag.
-    base_id = base_image_id(spec)
+    base_id = base_image_id(spec, base_reference) if base_reference else base_image_id(spec)
     # Imported Funcom archives can lack registry metadata. Give the verified
     # local image its own build-only tag, without retagging the official image.
     base_tag = f'redblink-dune-tank-base:{build_number}-' + base_id[7:19]
@@ -325,7 +329,9 @@ def main():
     elif a.command == 'resolve':
         print(image_for_map(tag, a.args[0]) or '')
     elif a.command == 'prepare':
-        print(build(tag))
+        if len(a.args) > 1:
+            raise ValueError('Choose at most one reviewed base image reference.')
+        print(build(tag, a.args[0]) if a.args else build(tag))
     elif a.command == 'apply':
         if a.args not in (['true'], ['false']):
             raise ValueError('Choose true or false for Experimental Tanks.')

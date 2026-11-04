@@ -20,9 +20,38 @@ const result = await window.DuneAddon.request("players.summary.list");
 | `files:addon-data` | Private persistent JSON storage scoped to the addon ID |
 | `rewards:grant` | Item, game XP, Intel, currency, and Building Sets rewards |
 | `players:message` | Queue a private in-game message for one player |
+| `realtime:read` | Read Realtime Data snapshots (sandworms, NPCs, vehicles, storms) from the optional position agent |
 
 Installing or updating an addon never approves a new permission automatically.
 The server owner must approve every requested permission.
+
+## Realtime Data
+
+Requires `realtime:read` (manifest: `"permissions": { "realtime": ["read"] }`). The optional
+MapViewer3D position agent must run on the host; see
+[Realtime Data](../console/realtime.md). Both actions are read-only snapshots; the
+bridge has no streaming channel, so poll at a modest rate (the bridge allows 60
+calls per minute per addon).
+
+### `realtime.health`
+
+```js
+const health = await window.DuneAddon.request("realtime.health");
+// { available: true, version: 1, ok: true, ready: 2, sources: [{ map, partition, ready, n }] }
+```
+
+### `realtime.objects`
+
+```js
+const snap = await window.DuneAddon.request("realtime.objects", { kinds: ["worm", "storm"], map: "Survival_1" });
+// { gen, t, sources: [{ map, partition, ready, n }], objects: [{ i, k, c, s, x, y, z }] }
+```
+
+- `kinds` (optional): array of `worm`, `vehicle`, `npc`, `civilian`, `storm`, `coriolis`, `player`.
+- `map` (optional): one map name such as `Survival_1`. `sources` then lists that map only and `s` indexes into it.
+- `player` objects are returned only when the addon also holds `players:read`; otherwise they are never included, even when requested.
+- Unknown kinds or a malformed `map` fail with HTTP 400.
+- When the agent is not running the call still succeeds with `{ available: false, error }` so a polling addon can show a hint instead of handling an error.
 
 ## Players
 
@@ -158,3 +187,29 @@ submitted a reward or message, the core owns its queue and continues processing
 it after the iframe closes or the Console restarts. Eligibility scans and
 season-rule evaluation remain the addon's responsibility; third-party
 JavaScript is not executed as an unrestricted server process.
+
+## Addon Removal
+
+Uninstall disables the addon first, then removes its Console jobs, stored data,
+delivery state, and installed files. The confirmation explains what is removed.
+Manually installed external services are separate unless the Console explicitly
+supports their cleanup.
+
+For the legacy `dune-airdrop-addon`, Uninstall also removes its companion
+containers and reward automation before deleting the addon files. The Console
+matches companions to this server using their repository mounts or both labels
+`io.dunedocker.addon.id=dune-airdrop-addon` and
+`io.dunedocker.project.root=<absolute host repository path>`. A container name
+alone is insufficient. It disables container restart, stops the companions,
+removes the verified playtime triggers and isolated `dune_airdrop` schema in a
+database transaction, and removes the stopped containers. Shared legacy tables
+under `dune` are preserved.
+
+Docker and the database must be available. If cleanup cannot be completed, the
+addon stays installed and disabled, and the Console reports an error. Correct the
+reported access or ownership problem and retry Uninstall. No game service needs
+to be restarted.
+
+If an older Console already removed the Airdrop files while leaving its daemon
+running, reinstall the addon, leave it disabled, and select Uninstall again using
+the updated Console. Do not initialize its database schema or enable it first.

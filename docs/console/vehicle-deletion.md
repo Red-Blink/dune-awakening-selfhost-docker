@@ -1,6 +1,6 @@
 # Vehicle deletion
 
-**Status:** Current | **Last Updated:** October 2026
+**Status:** Current | **Last Updated:** November 2026
 
 The Vehicles panel can permanently delete a vehicle and everything fitted or
 stored on it. The action lives as a **Delete Vehicle** row action (trash icon)
@@ -257,8 +257,10 @@ explaining why, the same way they already do for an unclaimed vehicle.
 
 ## Scope
 
-Delete Vehicle ships on the global Vehicles panel only, matching how Delete
-Base shipped (it never reached a player-scoped Bases tab either). Unlike the
+Delete Vehicle is offered on the global Vehicles panel and, per row, in
+Players → Deleted Characters ([deleted-characters.md](deleted-characters.md)).
+A player's own Vehicles tab has no delete, matching how Delete Base never
+reached a player-scoped Bases tab. Unlike the
 system-custodian transfer button — which reaches both the global panel and a
 player's own Vehicles tab — `VehicleTable`'s delete props are optional and
 default off, so `PlayerVehiclesTab`'s mount point is unaffected until they are

@@ -1,6 +1,6 @@
 # Running Multiple Dune: Awakening Servers Behind One Public IPv4
 
-**Status:** Current | **Last Updated:** August 2026
+**Status:** Current | **Last Updated:** November 2026
 
 This document is the operator guide and standard operating procedure (SOP) for running multiple independent `dune-awakening-selfhost-docker` battlegroups on one physical server while sharing a single public IPv4 address.
 
@@ -107,6 +107,7 @@ It includes:
 - IGW UDP range;
 - PostgreSQL host port;
 - RabbitMQ Admin host port;
+- RabbitMQ Admin HTTP host port;
 - RabbitMQ Game host port;
 - RabbitMQ Game HTTP host port;
 - RabbitMQ Game local-management host port;
@@ -186,6 +187,9 @@ The following inventory represents the audited single-instance host-facing confi
 | RMQ Game | `31982` | TCP | Host-published game RabbitMQ endpoint |
 | RMQ Game HTTP | `31983` | TCP | Host-published game RabbitMQ HTTP/management endpoint |
 | RMQ Admin | `32573` | TCP | Host loopback publish to admin RMQ `5672` |
+| RMQ Admin HTTP | `32574` | TCP | Host loopback publish to admin RMQ management `15672` (`RMQ_ADMIN_HTTP_PORT`) |
+
+Two optional listeners are outside the planner. The public probe's UDP `32000-32015` is fixed in the probe and is not rewritten by the profile tool; with a single public IPv4, forward it to at most one VM, and the other battlegroups use the Dune Docker relay for latency. The optional encrypted API front door (`DUNE_TLS_FRONT_PORT`, default `8797`, see [`encrypted-api.md`](../console/encrypted-api.md)) is also not managed by the helper; if you enable it on several VMs, give each a distinct port that does not overlap any value in this plan.
 
 See the "Source-of-Truth Reference" table near the end of this document for exactly which file governs each behavior above. The public probe uses host networking on native Linux and confines direct ICE listeners to UDP `32000-32015`.
 
@@ -198,7 +202,7 @@ See the "Source-of-Truth Reference" table near the end of this document for exac
 | Function | VM1 / Instance 1 | VM2 / Instance 2 | VM3 / Instance 3 |
 |---|---:|---:|---:|
 | Player/Game UDP | `7777-7810` | `8777-8810` | `9777-9810` |
-| Public probe direct ICE UDP | `32000-32015` | `32000-32015` | `32000-32015` |
+| Public probe direct ICE UDP (fixed, not planned; forward to one VM only) | `32000-32015` | same range, one VM only | same range, one VM only |
 | IGW UDP | `7888-7921` | `8888-8921` | `9888-9921` |
 | Text Router TCP | `5059` | `6059` | `7059` |
 | Admin Web TCP | `8088` | `9088` | `10088` |
@@ -209,6 +213,7 @@ See the "Source-of-Truth Reference" table near the end of this document for exac
 | RMQ Game TCP | `31982` | `32982` | `33982` |
 | RMQ Game HTTP TCP | `31983` | `32983` | `33983` |
 | RMQ Admin TCP | `32573` | `33573` | `34573` |
+| RMQ Admin HTTP TCP | `32574` | `33574` | `34574` |
 
 There are **no numeric overlaps** among any values in this table.
 
@@ -572,6 +577,7 @@ RMQ Game local HTTP TCP  16672
 RMQ Game TCP             32982
 RMQ Game HTTP TCP        32983
 RMQ Admin TCP            33573
+RMQ Admin HTTP TCP       33574
 ```
 
 Expected validation:
@@ -808,6 +814,7 @@ RMQ Game local HTTP TCP  16672
 RMQ Game TCP             32982
 RMQ Game HTTP TCP        32983
 RMQ Admin TCP            33573
+RMQ Admin HTTP TCP       33574
 ```
 
 Not every port inside a dynamic Player/Game or IGW range must be actively listening at all times.
@@ -1134,6 +1141,7 @@ Player/Game              start-end
 IGW                      start-end
 PostgreSQL               port-port
 RMQ Admin                port-port
+RMQ Admin HTTP           port-port
 RMQ Game                 port-port
 RMQ Game HTTP            port-port
 RMQ Game local HTTP      port-port

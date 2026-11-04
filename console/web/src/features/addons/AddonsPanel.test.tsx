@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { addonsApi, type CommunityAddonSummary, type InstalledAddon } from "../../api/addons";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { addonsApi, type AddonLifecycle, type CommunityAddonSummary, type InstalledAddon } from "../../api/addons";
 import { AddonsPanel } from "./AddonsPanel";
 import { addonUpdateAvailable, hasAddonUpdates } from "./addonVersions";
 import "../../styles.css";
@@ -56,6 +56,7 @@ const installedAddon: InstalledAddon = {
 };
 
 beforeEach(() => {
+  vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   vi.clearAllMocks();
   vi.mocked(addonsApi.community).mockResolvedValue({ schemaVersion: 1, sourceUrl: "https://example.test/index.json", updatedAt: "", addons: [catalogAddon] });
   vi.mocked(addonsApi.installed).mockResolvedValue({ addons: [installedAddon] });
@@ -68,7 +69,118 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => {
+  // Flush pending React effects while their browser API stubs still exist.
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+it("groups addon identity and submenu controls into five clear columns", async () => {
+  const setPinnedAddons = vi.fn();
+  render(<AddonsPanel pinnedAddons={[]} setPinnedAddons={setPinnedAddons} selectedAddonId=""
+    clearSelectedAddon={vi.fn()} setAddonUpdateAvailable={vi.fn()} confirmAction={vi.fn().mockResolvedValue(true)} />);
+  const table = await screen.findByRole("table", { name: "Addons" });
+  expect(within(table).getAllByRole("columnheader").map((heading) => heading.textContent)).toEqual(["Addon", "Version", "Permissions", "Status", "Actions"]);
+  const identity = within(table).getByRole("link", { name: catalogAddon.name }).closest("td")!;
+  expect(within(identity).getByText(catalogAddon.author)).toBeInTheDocument();
+  const pin = within(table).getByRole("checkbox", { name: /Sub-Menu/ });
+  expect(pin.closest("td")).toHaveClass("addon-actions-column");
+  setPinnedAddons.mockClear();
+  fireEvent.click(pin);
+  expect(setPinnedAddons).toHaveBeenCalledOnce();
+  expect(setPinnedAddons.mock.calls[0][0]([])).toEqual([{ id: installedAddon.id, name: installedAddon.name, entryPath: installedAddon.entryPath, enabled: true }]);
+});
+
+it.each<{ lifecycle: AddonLifecycle; status: string; installable: boolean }>([
+  { lifecycle: "active", status: "Available", installable: true },
+  { lifecycle: "deprecated", status: "Available", installable: true },
+  { lifecycle: "unsupported", status: "Unsupported", installable: false },
+  { lifecycle: "blocked", status: "Blocked", installable: false }
+])("shows $status in the Status column for an uninstalled $lifecycle addon", async ({ lifecycle, status, installable }) => {
+  vi.mocked(addonsApi.community).mockResolvedValue({ schemaVersion: 1, sourceUrl: "https://example.test/index.json", updatedAt: "", addons: [{ ...catalogAddon, lifecycle }] });
+  vi.mocked(addonsApi.installed).mockResolvedValue({ addons: [] });
+  render(<AddonsPanel pinnedAddons={[]} setPinnedAddons={vi.fn()} selectedAddonId=""
+    clearSelectedAddon={vi.fn()} setAddonUpdateAvailable={vi.fn()} confirmAction={vi.fn().mockResolvedValue(true)} />);
+  const table = await screen.findByRole("table", { name: "Addons" });
+  const row = within(table).getByRole("link", { name: catalogAddon.name }).closest("tr")!;
+  const statusCell = within(row).getAllByRole("cell")[3];
+  expect(statusCell).toHaveTextContent(new RegExp(`^${status}$`));
+  const install = within(row).getByRole("button", { name: "Install" });
+  if (installable) {
+    expect(install).toBeEnabled();
+  } else {
+    expect(install).toBeDisabled();
+    expect(within(row).queryByText("Available")).not.toBeInTheDocument();
+    expect(within(row).getAllByText(status)).toHaveLength(1);
+  }
+});
+
+it("keeps full addon descriptions available from an accessible disclosure", async () => {
+  let resize: (() => void) | undefined;
+  vi.stubGlobal("ResizeObserver", class { constructor(callback: () => void) { resize = callback; } observe() {} disconnect() {} });
+  const description = "A detailed addon description that is longer than the compact preview and remains available on demand.";
+  vi.mocked(addonsApi.community).mockResolvedValue({ schemaVersion: 1, sourceUrl: "https://example.test/index.json", updatedAt: "", addons: [{ ...catalogAddon, description }] });
+  render(<AddonsPanel pinnedAddons={[]} setPinnedAddons={vi.fn()} selectedAddonId=""
+    clearSelectedAddon={vi.fn()} setAddonUpdateAvailable={vi.fn()} confirmAction={vi.fn().mockResolvedValue(true)} />);
+  await screen.findByTitle(description);
+  expect(screen.queryByRole("button", { name: "More" })).not.toBeInTheDocument();
+  const measure = document.querySelector(".addon-description-measure")!;
+  Object.defineProperties(measure, { scrollWidth: { configurable: true, value: 600 }, clientWidth: { configurable: true, value: 200 } });
+  act(() => resize?.());
+  const toggle = await screen.findByRole("button", { name: "More" });
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByTitle(description)).toHaveTextContent(description);
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByTitle(description)).toBeVisible();
+  expect(toggle).toHaveTextContent("Less");
+  Object.defineProperty(measure, "clientWidth", { configurable: true, value: 800 });
+  act(() => resize?.());
+  expect(screen.queryByRole("button", { name: "Less" })).not.toBeInTheDocument();
+});
+
+it("explains companion and database removal before uninstalling Airdrop", async () => {
+  const notice = "This stops the companion and deletes its reward queues and database triggers.";
+  vi.mocked(addonsApi.installed).mockResolvedValue({ addons: [{ ...installedAddon, uninstallNotice: notice }] });
+  const confirmAction = vi.fn().mockResolvedValue(false);
+  render(<AddonsPanel pinnedAddons={[]} setPinnedAddons={vi.fn()} selectedAddonId=""
+    clearSelectedAddon={vi.fn()} setAddonUpdateAvailable={vi.fn()} confirmAction={confirmAction} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Uninstall" }));
+  expect(confirmAction).toHaveBeenCalledWith(expect.stringContaining(notice), { danger: true, confirmLabel: "Uninstall" });
+  expect(addonsApi.remove).not.toHaveBeenCalled();
+});
+
+it("reports failed cleanup and keeps the addon visible and disabled for retry", async () => {
+  vi.mocked(addonsApi.remove).mockRejectedValue(new Error("Companion cleanup failed. Retry Uninstall."));
+  vi.mocked(addonsApi.installed).mockResolvedValueOnce({ addons: [installedAddon] })
+    .mockResolvedValue({ addons: [{ ...installedAddon, enabled: false, status: "Disabled" }] });
+  render(<AddonsPanel pinnedAddons={[]} setPinnedAddons={vi.fn()} selectedAddonId=""
+    clearSelectedAddon={vi.fn()} setAddonUpdateAvailable={vi.fn()} confirmAction={vi.fn().mockResolvedValue(true)} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Uninstall" }));
+  expect(await screen.findByText(/^Uninstall Failed\./)).toBeInTheDocument();
+  expect(screen.getByText("Companion cleanup failed. Retry Uninstall.")).toBeInTheDocument();
+  expect(screen.getByText("Disabled")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Uninstall" })).toBeEnabled();
+  expect(screen.queryByText(/^Addon Uninstalled/)).not.toBeInTheDocument();
+});
+
 describe("AddonsPanel updates", () => {
+  it("only bridges messages from the active sandboxed addon frame", async () => {
+    vi.mocked(addonsApi.bridge).mockResolvedValue({ ok: true, result: {} });
+    // Finish the asynchronous addon load and its message-listener effect before
+    // sending an event. Seeing the iframe alone does not flush passive effects.
+    await act(async () => {
+      render(<AddonsPanel pinnedAddons={[]} setPinnedAddons={vi.fn()} selectedAddonId={installedAddon.id} clearSelectedAddon={vi.fn()} setAddonUpdateAvailable={vi.fn()} confirmAction={vi.fn().mockResolvedValue(true)} />);
+    });
+    const frame = await screen.findByTitle(installedAddon.name) as HTMLIFrameElement;
+    expect(frame).toHaveAttribute("sandbox", "allow-scripts");
+    expect(frame).toHaveAttribute("referrerpolicy", "no-referrer");
+    const data = { type: "dune-addon-request", addonId: installedAddon.id, requestId: "test-request", action: "leadership.players.list", payload: {} };
+    window.dispatchEvent(new MessageEvent("message", { data, origin: window.location.origin, source: window }));
+    expect(addonsApi.bridge).not.toHaveBeenCalled();
+    window.dispatchEvent(new MessageEvent("message", { data, origin: "null", source: frame.contentWindow }));
+    await waitFor(() => expect(addonsApi.bridge).toHaveBeenCalledWith(installedAddon.id, data.action, {}));
+  });
   it("keeps multiple permission labels contained beside addon status", async () => {
     render(<AddonsPanel
       pinnedAddons={[]}

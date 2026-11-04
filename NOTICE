@@ -17,3 +17,6 @@ secrets, or proprietary assets with this project.
 
 Please keep the LICENSE and NOTICE files intact when redistributing or
 modifying this project.
+
+Catalog image credits and the separate license for generated wiki-derived
+swatch previews are recorded in console/web/public/images/items/ATTRIBUTION.md.

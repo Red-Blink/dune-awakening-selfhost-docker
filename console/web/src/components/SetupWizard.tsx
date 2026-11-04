@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ArchiveRestore, Server } from "lucide-react";
 import { setupApi, type Check, type Task } from "../api/setup";
 import { PreflightCheckCard } from "./PreflightCheckCard";
 import { SecretInput } from "./SecretInput";
@@ -80,7 +81,6 @@ const terminalStatuses = new Set(["succeeded", "failed", "cancelled"]);
 // The restore ends by restarting the console, which takes the page away, so
 // this is the window the operator has to read the result at all.
 const completionRedirectSeconds = 15;
-const deploymentSuccessHoldMs = 3000;
 const defaultSetupConfig: SetupConfig = { SERVER_TITLE: "My Dune Server", SERVER_REGION: "Europe", SERVER_IP: "auto", SERVER_IP_MODE: "public", HOST_DATACENTER_ID: "dune-docker", STEAM_APP_ID: "4754530" };
 const datacenterIdPattern = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
 export const DATACENTER_ID_GUIDANCE = "Recommended for server-browser ping: enter a hostname whose IPv4 A record points directly to the Server IP. Enter only the hostname—without https://, a port, or a path. Short IDs remain supported, but may not give Funcom a resolvable ping target. A Battlegroup restart applies this change; Funcom may still display ping intermittently.";
@@ -225,12 +225,12 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
     // The restore starts its own countdown and its final task is not an init,
     // so the branch below would otherwise cancel it.
     if (restoreDone) return;
-    if (task?.operation !== "init" || task.status !== "succeeded" || mode !== "first-run") {
+    if (task?.operation !== "init" || task.status !== "succeeded" || mode !== "first-run" || steps[step]?.id !== "finish") {
       setRedirectCountdown(null);
       return;
     }
     setRedirectCountdown(completionRedirectSeconds);
-  }, [mode, restoreDone, task?.id, task?.operation, task?.status]);
+  }, [mode, restoreDone, task?.id, task?.operation, task?.status, steps[step]?.id]);
 
   useEffect(() => {
     if (redirectCountdown === null) return;
@@ -416,10 +416,8 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
       setTask(current);
     }
     if (current.status === "succeeded") {
-      await new Promise((resolve) => window.setTimeout(resolve, deploymentSuccessHoldMs));
       const finishStep = stepIndex("finish");
       setMaxUnlockedStep((value) => Math.max(value, finishStep));
-      setStep(finishStep);
     }
   }
 
@@ -474,6 +472,8 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
   }
 
   return (
+    <>
+    {mode === "first-run" && <div className="setup-banner" aria-hidden="true"><img src="/images/features/five_survivors.png" alt="" /></div>}
     <section className="wizard">
       <div className="stepper">
         {steps.map((item, index) => <button key={item.id} className={index === step ? "active" : ""} disabled={index > maxUnlockedStep} onClick={() => setStep(index)}>{index + 1}. {item.label}</button>)}
@@ -491,12 +491,14 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
             <h4>What should this host do?</h4>
             <div className="setup-path-options">
               <button type="button" className={`setup-path-option${path === "deploy" ? " selected" : ""}`} aria-pressed={path === "deploy"} onClick={() => choosePath("deploy")}>
-                <strong>Deploy a new server</strong>
-                <span>Creates a fresh world and a new Battlegroup identity.</span>
+                <Server className="setup-path-icon" size={26} aria-hidden="true" />
+                <span className="setup-path-content"><strong>Deploy a New Server</strong>
+                <span>Creates a fresh world and a new Battlegroup identity.</span></span>
               </button>
               <button type="button" className={`setup-path-option${path === "restore" ? " selected" : ""}`} aria-pressed={path === "restore"} onClick={() => choosePath("restore")}>
-                <strong>Restore a Dune Docker system backup</strong>
-                <span>Moves an existing server here with its configuration, secrets and database. Encrypted archive named dune-system-*.tar.</span>
+                <ArchiveRestore className="setup-path-icon" size={26} aria-hidden="true" />
+                <span className="setup-path-content"><strong>Restore a Dune Docker System Backup</strong>
+                <span>Moves an existing server here with its configuration, secrets and database. Encrypted archive named dune-system-*.tar.</span></span>
               </button>
             </div>
           </div>}
@@ -567,7 +569,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
           <div className="setup-form-grid">
             <label>Server Title<input value={config.SERVER_TITLE} onChange={(event) => setConfig({ ...config, SERVER_TITLE: event.target.value })} /></label>
             <label>Region<select value={config.SERVER_REGION} onChange={(event) => setConfig({ ...config, SERVER_REGION: event.target.value })}>{regions.map((region) => <option key={region} value={region}>{region}</option>)}</select></label>
-            <label>Install mode<select value={config.SERVER_IP_MODE} onChange={(event) => setConfig({ ...config, SERVER_IP_MODE: event.target.value })}><option value="public">Public</option><option value="local">Local</option></select></label>
+            <label>Install Mode<select value={config.SERVER_IP_MODE} onChange={(event) => setConfig({ ...config, SERVER_IP_MODE: event.target.value })}><option value="public">Public</option><option value="local">Local</option></select></label>
             <label>Server IP<input value={config.SERVER_IP} onChange={(event) => setConfig({ ...config, SERVER_IP: event.target.value })} /></label>
             <label>Server Hostname (Datacenter ID)<input placeholder="game.example.com" value={config.HOST_DATACENTER_ID} onChange={(event) => setConfig({ ...config, HOST_DATACENTER_ID: event.target.value })} /></label>
             <label>Steam app ID<input value={config.STEAM_APP_ID} onChange={(event) => setConfig({ ...config, STEAM_APP_ID: event.target.value })} /></label>
@@ -598,7 +600,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
             </section>
             <section className="action-section">
               <h4>Admin Panel</h4>
-              <p>Dune Docker Console listens on {adminPort}/tcp by default. Do not expose it publicly. Use LAN access, VPN, SSH tunnel, or a protected reverse proxy.</p>
+              <p>Dune Docker Console listens on {adminPort}/TCP by default. Do not expose it publicly. Use LAN access, VPN, SSH tunnel, or a protected reverse proxy.</p>
             </section>
             <section className="action-section">
               <h4>Game Map Ports</h4>
@@ -635,26 +637,26 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
             <section className="action-section">
               <h4>Network / Ports</h4>
               <ReviewGrid items={[
-                ["Public Game UDP", `${wizardPorts.clientBase}-${wizardPorts.clientBase + 33}/udp`],
-                ["Public RabbitMQ Game", `${wizardPorts.rmqGame}/tcp`],
-                ["Public RabbitMQ Game HTTP", `${wizardPorts.rmqGameHttp}/tcp`],
-                ["Optional Direct Listing Ping", "32000–32015/udp"],
-                ["Admin Panel", `${adminPort}/tcp private only`],
-                ["Internal Services", "Do not expose publicly"]
+                ["Public Game UDP", `${wizardPorts.clientBase}-${wizardPorts.clientBase + 33}/UDP`],
+                ["Public RabbitMQ Game", `${wizardPorts.rmqGame}/TCP`],
+                ["Public RabbitMQ Game HTTP", `${wizardPorts.rmqGameHttp}/TCP`],
+                ["Optional Direct Listing Ping", "32000–32015/UDP"],
+                ["Admin Panel", `${adminPort}/TCP Private Only`],
+                ["Internal Services", "Don't Expose Publicly"]
               ]} />
             </section>
             <section className="action-section">
               <h4>Auth / Token</h4>
               <ReviewGrid items={[
-                ["Funcom token", token ? "Ready to save" : "Not entered in this session"],
-                ["Admin auth", "Enabled unless ADMIN_AUTH_DISABLED is set"],
-                ["Secret storage", "Saved privately on this server"]
+                ["Funcom Token", token ? "Ready to Save" : "Not entered in this session"],
+                ["Admin Auth", "Enabled Unless ADMIN_AUTH_DISABLED is Set"],
+                ["Secret Storage", "Saved Privately on Server"]
               ]} />
             </section>
             <section className="action-section warning-panel">
               <h4>Warnings / Missing Values</h4>
               <ul className="requirements">
-                {!token && <li>Funcom token was not entered in this wizard session. Existing token file may still be used if present.</li>}
+                {!token && <li>Funcom Token was not entered in this wizard session. Existing token file may still be used if present.</li>}
                 {config.SERVER_IP === "auto" && <li>Server IP is set to auto. Confirm Home readiness after setup to verify advertised IP.</li>}
                 <li>Deployment starts a fresh local world and keeps a backup of existing local setup files when they exist.</li>
               </ul>
@@ -669,7 +671,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
           <h2>{mode === "first-run" ? "Deploy Server" : "Redeploy Server"}</h2>
           <p>{mode === "first-run"
             ? "This starts the Dune Docker deployment. The console will prepare local settings, download required server assets, update the database, and start the game services. First-time deployment can take a while, so keep this page open while the progress updates."
-            : "This reapplies your server identity and Funcom token settings, then restarts the deployment flow so the console uses the updated values. Keep this page open while the progress updates."}</p>
+            : "This reapplies your server identity and Funcom Token settings, then restarts the deployment flow so the console uses the updated values. Keep this page open while the progress updates."}</p>
           <button disabled={deploymentRunning || deploymentSucceeded} onClick={init}>
             {deploymentSucceeded
               ? mode === "first-run" ? "Deployment Complete" : "Redeploy Complete"
@@ -678,7 +680,6 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
                 : mode === "first-run" ? "Start Deployment" : "Start Redeploy"}
           </button>
           <TaskProgress task={task} />
-          {deploymentSucceeded && <p className="success-note">{mode === "first-run" ? "Deployment was successful." : "Redeploy was successful."} Opening the finish step.</p>}
         </>}
         {activeStep === "finish" && <>
           <div className="setup-finish-celebration" aria-hidden="true"><span /><span /><span /><span /><span /></div>
@@ -686,7 +687,10 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
           <p>{restoreDone
             ? "The system backup was restored. This host now carries the archive's configuration, credentials and database."
             : mode === "first-run" ? "The server was installed successfully. The full console is ready to open." : "Setup completed successfully. The server has been redeployed and the full console is still available."}</p>
-          {mode === "first-run" && <p className="success-note setup-success-countdown">{restoreDone ? "Restarting the console in " : "Opening the full console in "}<strong>{redirectCountdown ?? completionRedirectSeconds}</strong> seconds.</p>}
+          {mode === "first-run" && <>
+            <p className="success-note setup-success-countdown">{restoreDone ? "Restarting the console in " : "Redirecting to the full console in "}<strong>{redirectCountdown ?? completionRedirectSeconds}</strong> seconds.</p>
+            {!restoreDone && <p className="success-note setup-open-console-row">Ready to Explore? <button type="button" className="setup-open-console" onClick={() => { setRedirectCountdown(null); onSetupCompleteRef.current?.(); }}>Open the Console Now</button></p>}
+          </>}
           {restoreDone && <p className="muted">The archive's admin password is now this host's, so you may be asked to sign in again.</p>}
           {startWarning && <p className="danger-note">The Battlegroup did not start: {startWarning} Start it from Home once the console is back.</p>}
           <p className="muted">Game services can take several minutes to warm up, and the in-game browser can take a little longer to show the server.</p>
@@ -697,6 +701,7 @@ export function SetupWizard({ initialStep = 0, jumpNonce = 0, mode = "redeploy",
         </div>
       </div>
     </section>
+    </>
   );
 }
 

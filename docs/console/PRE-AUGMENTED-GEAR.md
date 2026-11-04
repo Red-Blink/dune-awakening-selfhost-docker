@@ -1,6 +1,6 @@
 # Pre-Augmented Gear — API Reference
 
-**Status:** Implemented in main | **Last Updated:** July 2026
+**Status:** Implemented in main | **Last Updated:** November 2026
 
 ---
 
@@ -79,6 +79,9 @@ Complete stats JSON:
 POST /api/players/:id/augment-item
 Body: { itemId: 123, augments: ["T6_Augment_Damage1"], augmentQuality: 5 }
 ```
+
+The route is audited as `players.augment-item` and requires the confirmation
+phrase `APPLY AUGMENTS` in the request.
 
 **Flow:**
 1. Validates augment IDs, quality level

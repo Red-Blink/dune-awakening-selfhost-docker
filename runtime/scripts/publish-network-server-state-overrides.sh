@@ -213,29 +213,19 @@ server_state_maps() {
   " 2>/dev/null || true
 }
 
+# One invocation instead of one per candidate map. The old loop called
+# `map-modes.sh is-always-on` for every always-on entry, and each of those is a
+# docker exec into Postgres plus a python run -- and writes the state file,
+# because is-always-on goes through ensure_state_file. `always-on-maps` applies
+# the same effective-mode policy in a single read-only pass.
+#
+# Ordering changes from alphabetical to startup priority; priority_maps dedups
+# with a first-seen awk and puts PRIORITY_MAPS ahead of these regardless, so the
+# published set is unchanged.
 configured_always_on_maps() {
   [ -s "$MAP_MODES_FILE" ] || return 0
-  local map_name
-  while IFS= read -r map_name; do
-    [ -n "$map_name" ] || continue
-    if DUNE_MAP_MODES_FILE="$MAP_MODES_FILE" runtime/scripts/map-modes.sh is-always-on "$map_name" >/dev/null 2>&1; then
-      printf '%s\n' "$map_name"
-    fi
-  done < <(python3 - "$MAP_MODES_FILE" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-try:
-    data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-except Exception:
-    data = {}
-
-for map_name, config in sorted(data.get("maps", {}).items()):
-    if isinstance(config, dict) and config.get("mode") == "always-on":
-        print(map_name)
-PY
-  )
+  DUNE_MAP_MODES_FILE="$MAP_MODES_FILE" runtime/scripts/map-modes.sh always-on-maps 2>/dev/null |
+    awk '$1 == "map" { print $2 }' || true
 }
 
 priority_maps() {

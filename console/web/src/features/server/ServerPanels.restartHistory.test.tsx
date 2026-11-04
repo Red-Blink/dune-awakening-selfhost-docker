@@ -13,6 +13,31 @@ const restartHistory = vi.mocked(serverApi.restartHistory);
 
 beforeEach(() => vi.clearAllMocks());
 
+test("capitalizes the Last Battlegroup Restart caption independently of its timestamp", async () => {
+  restartHistory.mockResolvedValue({ rows: [], lastBattlegroupRestart: { id: "bg-restart", startedAt: "2026-10-31T18:00:00Z", finishedAt: "2026-10-31T18:01:00Z", durationSeconds: 60, scope: "battlegroup", target: "Battlegroup", map: "", partitionId: "", source: "Console", reason: "Manual restart", result: "Succeeded" } });
+  render(<RestartHistoryPanel refreshKey="caption" />);
+  expect(await screen.findByText("Last Battlegroup Restart")).toBeVisible();
+  expect(screen.queryByText(/Last Battlegroup restart/)).toBeNull();
+});
+
+test("starts closed and toggles its history without opening on refresh", async () => {
+  restartHistory.mockResolvedValue({ rows: [], lastBattlegroupRestart: null });
+  const { container, rerender } = render(<RestartHistoryPanel refreshKey="initial" />);
+  const panel = container.querySelector("details")!;
+  const toggle = container.querySelector("summary")!;
+  await waitFor(() => expect(restartHistory).toHaveBeenCalledTimes(1));
+  expect(panel.open).toBe(false);
+  expect(screen.getByText("No Matching Restarts")).not.toBeVisible();
+  fireEvent.click(toggle);
+  expect(panel.open).toBe(true);
+  expect(screen.getByText("No Matching Restarts")).toBeVisible();
+  fireEvent.click(toggle);
+  rerender(<RestartHistoryPanel refreshKey="updated" />);
+  await waitFor(() => expect(restartHistory).toHaveBeenCalledTimes(2));
+  expect(panel.open).toBe(false);
+  expect(screen.getByText("No Matching Restarts")).not.toBeVisible();
+});
+
 test("gives an empty restart history comfortable, structured spacing", async () => {
   restartHistory.mockResolvedValue({ rows: [], lastBattlegroupRestart: null });
   const { container } = render(<RestartHistoryPanel refreshKey="initial" />);

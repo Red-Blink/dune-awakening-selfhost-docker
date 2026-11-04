@@ -65,12 +65,35 @@ const AUDIT_FLUSH_MS = 200;
 const AUDIT_FLUSH_MAX_BACKOFF_MS = 10000;
 const AUDIT_MAX_PENDING_LINES = 5000;
 const pendingAuditLines = new Map();
+const verifiedAuditDirs = new Set();
 let pendingAuditCount = 0;
 let auditFlushTimer = null;
 let auditFlushDelay = AUDIT_FLUSH_MS;
 let auditRetryNotBefore = 0;
 let auditFailureReported = false;
 let auditDroppedRows = 0;
+
+function ensureAuditDir(dir) {
+  if (!dir || verifiedAuditDirs.has(dir)) return;
+  mkdirSync(dir, { recursive: true });
+  verifiedAuditDirs.add(dir);
+}
+
+function appendFileEnsureDir(file, content, options = { mode: 0o600 }) {
+  const dir = dirname(file);
+  ensureAuditDir(dir);
+  try {
+    appendFileSync(file, content, options);
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      verifiedAuditDirs.delete(dir);
+      ensureAuditDir(dir);
+      appendFileSync(file, content, options);
+      return;
+    }
+    throw error;
+  }
+}
 
 function bufferableBridgeRow(action, detail) {
   if (action !== "addons.bridge" || detail?.ok !== true) return false;
@@ -96,8 +119,7 @@ export function flushAuditLog({ respectBackoff = false } = {}) {
   let failure = null;
   for (const [file, lines] of [...pendingAuditLines]) {
     try {
-      mkdirSync(dirname(file), { recursive: true });
-      appendFileSync(file, lines.join(""), { mode: 0o600 });
+      appendFileEnsureDir(file, lines.join(""), { mode: 0o600 });
       pendingAuditLines.delete(file);
       pendingAuditCount -= lines.length;
     } catch (error) {
@@ -198,8 +220,7 @@ export function audit(config, req, action, detail = {}) {
   } else {
     // A failure flushing earlier polls must not stop this row from being written.
     try { flushAuditLog({ respectBackoff: true }); } catch (error) { reportAuditFlushFailure(error); }
-    mkdirSync(dirname(config.auditLog), { recursive: true });
-    appendFileSync(config.auditLog, line, { mode: 0o600 });
+    appendFileEnsureDir(config.auditLog, line, { mode: 0o600 });
   }
 
   if (action === "addons.bridge") {
@@ -210,7 +231,6 @@ export function audit(config, req, action, detail = {}) {
 }
 
 export function recordAdminHistory(config, { command, target = "-", friendly = "", path = "web", result = "ok", message = "" }) {
-  mkdirSync(config.generatedDir, { recursive: true });
   const safeMessage = redact(String(message || "")).replace(/[\r\n\t]/g, " ").slice(0, 160);
   const columns = [
     new Date().toISOString(),
@@ -221,7 +241,7 @@ export function recordAdminHistory(config, { command, target = "-", friendly = "
     safeColumn(result),
     safeMessage ? JSON.stringify({ messagePreview: safeMessage }) : "{}"
   ];
-  appendFileSync(join(config.generatedDir, "admin-command-history.tsv"), `${columns.join("\t")}\n`, { mode: 0o600 });
+  appendFileEnsureDir(join(config.generatedDir, "admin-command-history.tsv"), `${columns.join("\t")}\n`, { mode: 0o600 });
 }
 
 function safeColumn(value) {

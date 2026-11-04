@@ -1,5 +1,7 @@
 import { createServer } from "node:http";
+import { isDirectCustomizationUnlock } from "./adminCatalog.js";
 import { pipeline } from "node:stream/promises";
+import { createGzip } from "node:zlib";
 import { createServer as createNetServer } from "node:net";
 import { totalmem } from "node:os";
 import { spawn } from "node:child_process";
@@ -26,6 +28,8 @@ import { buildDuneArgs, isDynamicServerService, parseVehicleList, runDockerLogs,
 // execution decision from diverging.
 import { createDb, hasExecutableStatement, isReadOnlySql, quoteIdentifier } from "./db.js";
 import * as duneDb from "./duneDb.js";
+import { duneDbDomains } from "./duneDb/domains.js";
+import { API_ROUTE_DOMAINS, createExactRouteIndex } from "./http/routeTable.js";
 import { audit, installAuditShutdownHooks, recordAdminHistory } from "./audit.js";
 import { createSecondFactorStore } from "./auth/secondFactorStore.js";
 import { generateTotpSecret, provisioningUri, provisioningQrDataUri, verifyTotpMatch } from "./auth/totp.js";
@@ -45,16 +49,20 @@ import { looksLikeTar, mintSystemBackupName, normalizeImportedSystemMetadata, re
 import { createTarHeader, tarArchiveLength, tarPadding, TAR_TRAILER_BYTES, createBackupDownloadArchive, enrichBackupRows, nextImportedBackupName, normalizeImportedBackupMetadata, readCurrentBattlegroupId, validBackupDownloadName } from "./services/backups.js";
 import { createMemoryBalancer } from "./services/memoryBalancer.js";
 import { collectContainerHealth } from "./services/containerHealth.js";
-import { createRealtime, RealtimeError } from "./services/realtime.js";
+import { createRealtime, parseObjectFilter, RealtimeError } from "./services/realtime.js";
 import { createEncryptedApi, EncryptedApiError } from "./services/encryptedApi.js";
+import { createRealtimeAgent, RealtimeAgentError } from "./services/realtimeAgent.js";
 import { tlsClientAddress } from "./services/tlsClientAddress.js";
 import { createConsoleAccess } from "./services/consoleAccess.js";
 import { parseMemorySwapStatus } from "./services/memorySwap.js";
 import { createDeathPoller } from "./deathPoller.js";
+import { createCombatHistory, combatScope } from "./services/combatHistory.js";
+import { createCombatAvailability } from "./services/combatAvailability.js";
 import { updateEnvFileValue as updateEnvValue } from "./services/envFile.js";
 import { funcomAuthMismatchDetected, matchingFuncomAuthLines, saveFuncomTokenValue as writeFuncomToken, validDockerSince } from "./services/funcomAuth.js";
 import { readCharacterTransferSettingsStatus, saveAndApplyCharacterTransferSettings } from "./services/characterTransferSettings.js";
 import { handleDiscordAdapterRoute, isDiscordAdapterRoute } from "./integrations/discord/routes.js";
+import { handleI18nRoute, isPublicOrMeshI18nRoute } from "./services/i18nService.js";
 import { discordAdapterEnabled } from "./integrations/discord/adapter.js";
 import { initializeDiscordAdapterSchema } from "./integrations/discord/schema.js";
 import { actionForRoute, ROUTE_ACTIONS } from "./actions.js";
@@ -101,6 +109,7 @@ import { createSharedDeleteBackup, flushBaseRefillQueues } from "./services/base
 import { verifyBaseBackupState } from "./services/baseBackupSafety.js";
 import { createSingleFlight } from "./services/singleFlight.js";
 import { createReadCommandCache } from "./services/readCommandCache.js";
+import { createStatusReads } from "./services/statusReads.js";
 import { banPlayer, bannedFlsIds, createPlayerBanEnforcer, playerBanFor, unbanPlayer } from "./services/playerBans.js";
 import { findPlayerForLiveAction, playerIsOnlineForLiveAction } from "./playerLiveActions.js";
 import { retireLegacyEdaExchangeBot } from "./services/marketBotRetirement.js";
@@ -126,12 +135,18 @@ const readCommandCache = createReadCommandCache();
 // Status commands walk Docker, PostgreSQL, RabbitMQ, and logs. Keep a fresh
 // snapshot briefly, then serve that bounded snapshot while one shared refresh
 // runs in the background. This avoids repeating several seconds of identical
-// host work for every integration poll.
-const statusCommandCache = createReadCommandCache({ ttlMs: 5000, staleMs: 30000 });
+// host work for every integration poll. ADMIN_STATUS_CACHE_MS=0 turns it off.
+const statusCommandCache = createReadCommandCache({ ttlMs: config.statusCacheMs, staleMs: config.statusCacheMs > 0 ? 30000 : 0 });
+const statusReads = createStatusReads({
+  statusCache: statusCommandCache,
+  readinessCache: readCommandCache,
+  argsFor: (operation) => buildDuneArgs(operation, {}),
+  runArgs: (args) => runDune(config, args)
+});
 const CONSOLE_PROCESS_STARTED_AT = Date.now();
 let edaRetirement = { retired: false, addonRemoved: false, migrated: false, changed: false, backupDir: "", cleanupError: "" };
 try {
-  edaRetirement = retireLegacyEdaExchangeBot(config);
+  edaRetirement = await retireLegacyEdaExchangeBot(config);
   if (edaRetirement.changed) {
     console.log(`EDA Exchange Bot retirement complete; Market Bot is managed under Exchange.${edaRetirement.backupDir ? ` Backup: ${edaRetirement.backupDir}` : ""}`);
   }
@@ -357,6 +372,7 @@ function shouldNoteApiKeyAuthThrottle(failureKey, at = Date.now()) {
 }
 const apiKeys = createApiKeyStore({ file: config.apiKeysFile });
 const realtime = createRealtime();
+const realtimeAgent = createRealtimeAgent({ repoRoot: config.repoRoot, health: () => realtime.health() });
 const encryptedApi = createEncryptedApi({ repoRoot: config.repoRoot });
 // Proof that a restore was previewed, for the apply that follows it. In memory
 // beside the sessions it is keyed by -- see the module header for why it is not
@@ -449,6 +465,8 @@ let restartQueueAutoLastRun = 0;
 const journeyTagsData = loadJourneyTagsData();
 const memoryBalancer = createMemoryBalancer(config);
 const deathPoller = createDeathPoller(config);
+const combatHistory = createCombatHistory(db, { mockMode: config.mockMode });
+const combatAvailability = createCombatAvailability(config, db);
 const POSTGRES_UNAVAILABLE_MESSAGE = "Postgres is not running or is restarting. Wait for the database service to come back online, then refresh.";
 const DEFAULT_ALWAYS_ON_STARTUP_PARALLELISM = 1;
 const MAX_ALWAYS_ON_STARTUP_PARALLELISM = 16;
@@ -493,6 +511,7 @@ process.on("unhandledRejection", (error) => {
 });
 
 createServer(async (req, res) => {
+  res.req = req;
   req.trustedClientAddress = tlsClientAddress(req, config.repoRoot);
   if (req.trustedClientAddress === null) {
     res.writeHead(403, { "content-type": "application/json" });
@@ -555,6 +574,9 @@ createServer(async (req, res) => {
   });
   runBackgroundTick("Player playtime tracker", () => duneDb.trackPlayerPlaytime(db));
 });
+
+runBackgroundTick("Combat history", () => combatHistory.tick());
+setInterval(() => { void combatHistory.tick(); }, 30_000).unref?.();
 
 // Reconcile periodically because a Funcom database migration can recreate the
 // fulfilled-orders table and thereby remove third-party triggers. The service
@@ -709,9 +731,17 @@ function scheduleBootAutoStart() {
   }, 5000).unref?.();
 }
 
+let journeyTagsDataCache = null;
 function loadJourneyTagsData() {
+  const file = join(config.repoRoot, "runtime", "data", "journey-tags.json");
   try {
-    return JSON.parse(readFileSync(join(config.repoRoot, "runtime", "data", "journey-tags.json"), "utf8"));
+    const mtimeMs = statSync(file).mtimeMs;
+    if (journeyTagsDataCache && journeyTagsDataCache.file === file && journeyTagsDataCache.mtimeMs === mtimeMs) {
+      return journeyTagsDataCache.data;
+    }
+    const data = JSON.parse(readFileSync(file, "utf8"));
+    journeyTagsDataCache = { file, mtimeMs, data };
+    return data;
   } catch {
     return { journey_node_tags: {} };
   }
@@ -1219,6 +1249,9 @@ async function handleApi(req, res) {
   if (isDiscordAdapterRoute(path)) {
     return handleDiscordAdapterRoute({ req, res, path, config, readJson, json, db });
   }
+  if (isPublicOrMeshI18nRoute(path, req.method)) {
+    return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+  }
 
   // Runs BEFORE requireAuth: that couples session lookup with a CSRF check,
   // and CSRF does not apply to bearer auth. Returns null when there is no
@@ -1292,13 +1325,13 @@ async function handleApi(req, res) {
   if (path === "/api/server/status") return serverStatusRoute(res, url);
   if (path === "/api/server/performance") return json(res, 200, await collectPerformanceSnapshot(config.repoRoot));
   if (path === "/api/server/restart-history") return json(res, 200, readRestartHistory(config));
-  if (path === "/api/server/readiness") return safeCommandJson(res, "readiness");
+  if (path === "/api/server/readiness") return readinessRoute(res, url);
   if (path === "/api/server/ports") return commandJson(res, "ports");
   if (path === "/api/server/services") return commandJson(res, "services");
   if (path === "/api/server/doctor") return safeCommandJson(res, "doctor");
   if (path === "/api/server/network-bind/fix" && req.method === "POST") return task(req, res, "server", "networkBindFix", {});
   if (path === "/api/server/storage/cleanup-images" && req.method === "POST") {
-    return confirmedTask(req, res, "storage", "storageCleanupImages", {}, "CLEAN OBSOLETE DUNE IMAGES");
+    return confirmedTask(req, res, "storage", "storageCleanupImages", {}, "CLEAN UNUSED DOCKER IMAGES");
   }
   if (path === "/api/server/storage/cleanup-build-cache" && req.method === "POST") {
     return confirmedTask(req, res, "storage", "storageCleanupBuildCache", {}, "CLEAN DOCKER BUILD CACHE");
@@ -1469,7 +1502,7 @@ async function handleApi(req, res) {
   if (path === "/api/database/schemas") return dbJson(res, () => duneDb.listSchemas(db));
   if (path === "/api/database/routines") return dbJson(res, () => duneDb.listRoutines(db, url.searchParams.get("schema") || "dune", url.searchParams.get("q") || ""));
   if (path.match(/^\/api\/database\/routines\/[^/]+$/)) return dbJson(res, () => duneDb.routineDefinition(db, decodeURIComponent(path.split("/").pop())));
-  if (path === "/api/database/tables") return dbJson(res, () => duneDb.listTables(db, url.searchParams.get("schema") || "dune"));
+  if (path === "/api/database/tables") return dbJson(res, () => duneDb.listTables(db, url.searchParams.get("schema") || "dune", { approximate: url.searchParams.get("approximate") === "1" }));
   if (path.match(/^\/api\/database\/tables\/[^/]+\/[^/]+\/columns$/)) return databaseTableRoute(req, res, path, "columns", url);
   if (path.match(/^\/api\/database\/tables\/[^/]+\/[^/]+\/preview$/)) return databaseTableRoute(req, res, path, "preview", url);
   if (path.match(/^\/api\/database\/tables\/[^/]+\/[^/]+\/count$/)) return databaseTableRoute(req, res, path, "count", url);
@@ -1518,6 +1551,8 @@ async function handleApi(req, res) {
   if (path === "/api/realtime/healthz" && req.method === "GET") return realtimeRoute(res, () => realtime.health());
   if (path === "/api/realtime/objects" && req.method === "GET") return realtimeRoute(res, () => realtime.objects({ allowPlayers: principalMay(req, "players:read") }));
   if (path === "/api/realtime/stream" && req.method === "GET") return realtimeStreamRoute(req, res);
+  if (path === "/api/settings/realtime-agent" && req.method === "GET") return realtimeAgentRoute(res, () => realtimeAgent.status());
+  if (path === "/api/settings/realtime-agent" && req.method === "POST") return realtimeAgentToggleRoute(req, res);
   if (path === "/api/settings/encrypted-api" && req.method === "GET") return encryptedApiRoute(res, () => encryptedApi.status());
   if (path === "/api/settings/console-access/confirm" && req.method === "POST") {
     const body = await readJson(req);
@@ -1549,9 +1584,15 @@ async function handleApi(req, res) {
     });
   }
 
+  if (path === "/api/players/combat" && req.method === "GET") {
+    const controllerId = combatScope(url.searchParams.get("controllerId"));
+    return dbJson(res, () => combatHistory.read({ controllerId,
+      leaderboardLimit: url.searchParams.get("leaderboardLimit"), killsLimit: url.searchParams.get("killsLimit") }));
+  }
   if (path === "/api/players/list-settings" && req.method === "GET") {
     return json(res, 200, {
       ...playerListSettingsView(config.repoRoot),
+      ...await combatAvailability.read(),
       canConfigure: evaluate(session, "players:configure-list")
     });
   }
@@ -1709,7 +1750,7 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/addons\/installed\/[^/]+\/content\/.+$/) && req.method === "GET") return addonContentRoute(req, res, path);
   if (path.match(/^\/api\/addons\/installed\/[^/]+$/) && req.method === "DELETE") {
     const id = decodeURIComponent(path.split("/").pop());
-    const result = removeInstalledAddon(config, id);
+    const result = await removeInstalledAddon(config, id, { db });
     audit(config, req, "addons.remove", { id, ok: true });
     return json(res, 200, result);
   }
@@ -1957,13 +1998,46 @@ async function handleApi(req, res) {
   if (path === "/api/settings/experimental-tanks" && req.method === "GET") {
     const result = await runDune(config, buildDuneArgs("experimentalTanksStatus"));
     if (result.code !== 0) return json(res, 503, { error: result.stderr || "Experimental Tank settings could not be read." });
-    return json(res, 200, JSON.parse(result.stdout));
+    const queued = restartQueue.readState(config).entries.find((entry) => entry.operation === "experimentalTanksApply");
+    return json(res, 200, { ...JSON.parse(result.stdout), queuedEntryId: queued?.id || null,
+      queuedEnabled: typeof queued?.payload?.enabled === "boolean" ? queued.payload.enabled : null });
   }
   if (path === "/api/settings/experimental-tanks" && req.method === "POST") {
     return task(req, res, "settings", "experimentalTanksApply", await readJson(req));
   }
   if (path === "/api/settings" && req.method === "POST") return writeConfig(req, res);
   if (path === "/api/settings") return json(res, 200, await setupState(remoteIpOf(req)));
+  if (path === "/api/i18n/translate" && req.method === "POST") return handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+  if (path === "/api/i18n/key" && req.method === "POST") {
+    if (!applyMutationRateLimit(req, res, "i18n.key")) return;
+    await handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+    audit(config, req, "i18n.save-key", { ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode });
+    return;
+  }
+  if (path === "/api/i18n/key" && req.method === "DELETE") {
+    if (!applyMutationRateLimit(req, res, "i18n.key")) return;
+    await handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+    audit(config, req, "i18n.delete-key", { ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode });
+    return;
+  }
+  if (path === "/api/i18n/settings" && req.method === "POST") {
+    if (!applyMutationRateLimit(req, res, "i18n.settings")) return;
+    await handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+    audit(config, req, "i18n.settings", { ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode });
+    return;
+  }
+  if (path === "/api/i18n/sync-all" && req.method === "POST") {
+    if (!applyMutationRateLimit(req, res, "i18n.sync-all")) return;
+    await handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+    audit(config, req, "i18n.sync-all", { ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode });
+    return;
+  }
+  if (path === "/api/i18n/suggestions" && req.method === "POST") {
+    if (!applyMutationRateLimit(req, res, "i18n.suggestions")) return;
+    await handleI18nRoute({ req, res, path, url, config, auth, apiKeys, readJson, json });
+    audit(config, req, "i18n.suggestion", { ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode });
+    return;
+  }
 
   return json(res, 404, { error: "Not found" });
 }
@@ -2125,6 +2199,34 @@ async function dispatchAddonBridgeAction(req, res, id, body, action) {
     const result = await hardwareStatus();
     audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, sensorCount: result.temperatures.length, ok: true });
     return json(res, 200, { ok: true, result });
+  }
+  if (action === "realtime.health" || action === "realtime.objects") {
+    const addon = assertInstalledAddonPermission(config, id, "realtime:read");
+    try {
+      let result;
+      if (action === "realtime.health") {
+        result = await realtime.health();
+      } else {
+        // Player objects leave only for an addon that also holds players:read,
+        // the same rule as the API key scope.
+        let allowPlayers = false;
+        try {
+          assertInstalledAddonPermission(config, id, "players:read");
+          allowPlayers = true;
+        } catch {}
+        result = await realtime.objects({ allowPlayers, ...parseObjectFilter({ kinds: body.kinds, map: body.map }) });
+      }
+      audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: true });
+      return json(res, 200, { ok: true, result });
+    } catch (error) {
+      if (!(error instanceof RealtimeError)) throw error;
+      audit(config, req, "addons.bridge", { id: addon.id, action, permission: addon.permission, ok: false, error: redact(error.message) });
+      // An agent that is not running is a state the addon shows, not a fault of
+      // the call: answer 200 with available:false so a polling addon needs no
+      // error handling for it. Bad input stays an error.
+      if (error.status === 400) return json(res, 400, { ok: false, error: error.message });
+      return json(res, 200, { ok: true, result: { available: false, error: error.message } });
+    }
   }
   if (action === "admin.items.grant") {
     const addon = assertInstalledAddonPermission(config, id, "admin:grant-items");
@@ -2289,7 +2391,8 @@ function addonContentRoute(req, res, path) {
   if (!existsSync(target)) return json(res, 404, { error: "Addon content file not found." });
   res.writeHead(200, withSecurityHeaders({
     "content-type": contentTypeForPath(target),
-    "x-frame-options": "SAMEORIGIN"
+    "x-frame-options": "SAMEORIGIN",
+    "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; frame-ancestors 'self'; sandbox allow-scripts"
   }));
   createReadStream(target).pipe(res);
 }
@@ -2791,16 +2894,75 @@ async function backupDownloadRoute(req, res, backupName) {
   if (!existsSync(metadataPath)) return json(res, 404, { error: "Backup metadata .yaml file was not found." });
 
   const archiveName = `${backupName}.tar.gz`;
-  const archive = createBackupDownloadArchive([
-    { name: backupName, content: readFileSync(backupPath) },
-    { name: `${backupName}.yaml`, content: readFileSync(metadataPath) }
-  ]);
+  const members = [
+    { name: backupName, path: backupPath, size: statSync(backupPath).size },
+    { name: `${backupName}.yaml`, path: metadataPath, size: statSync(metadataPath).size }
+  ];
   res.writeHead(200, withSecurityHeaders({
     "content-type": "application/gzip",
-    "content-length": archive.length,
     "content-disposition": `attachment; filename="${archiveName.replace(/"/g, "")}"`
   }));
-  res.end(archive);
+  const gzip = createGzip({ level: 1 });
+  gzip.on("error", () => {});
+  let currentSource = null;
+  let outError = null;
+  const outPromise = pipeline(gzip, res).catch((error) => {
+    outError = error;
+    if (currentSource && !currentSource.destroyed) currentSource.destroy(error);
+  });
+  const writeGzipChunk = async (chunk) => {
+    if (outError) throw outError;
+    if (gzip.destroyed || res.destroyed || res.writableEnded) {
+      throw outError || new Error("Backup download stream closed prematurely.");
+    }
+    if (!gzip.write(chunk)) {
+      await new Promise((resolveWrite, rejectWrite) => {
+        const onDrain = () => { cleanup(); resolveWrite(); };
+        const onClose = () => { cleanup(); rejectWrite(outError || new Error("Backup download stream closed prematurely.")); };
+        const onError = (error) => { cleanup(); rejectWrite(error); };
+        const cleanup = () => {
+          gzip.off("drain", onDrain);
+          gzip.off("close", onClose);
+          gzip.off("error", onError);
+        };
+        gzip.on("drain", onDrain);
+        gzip.on("close", onClose);
+        gzip.on("error", onError);
+      });
+    }
+    if (outError) throw outError;
+  };
+  try {
+    for (const member of members) {
+      await writeGzipChunk(createTarHeader(member.name, member.size));
+      let written = 0;
+      const source = createReadStream(member.path);
+      currentSource = source;
+      source.on("error", () => {});
+      source.on("data", (chunk) => {
+        written += chunk.length;
+        if (written > member.size) {
+          source.destroy(new Error("Backup file size changed during download."));
+        }
+      });
+      await pipeline(source, gzip, { end: false });
+      currentSource = null;
+      if (outError) throw outError;
+      if (written !== member.size) {
+        throw new Error("Backup file size changed during download.");
+      }
+      const padding = tarPadding(member.size);
+      if (padding) await writeGzipChunk(Buffer.alloc(padding, 0));
+    }
+    gzip.end(Buffer.alloc(TAR_TRAILER_BYTES, 0));
+    await outPromise;
+    if (outError) throw outError;
+  } catch (error) {
+    if (currentSource && !currentSource.destroyed) currentSource.destroy(error);
+    if (!gzip.destroyed) gzip.destroy(error);
+    await outPromise;
+    if (!res.destroyed) res.destroy();
+  }
 }
 
 async function backupAutoStatusRoute(res) {
@@ -2815,8 +2977,13 @@ function includeRawStatus(url) {
 }
 
 async function serverStatusRoute(res, url) {
-  const result = config.mockMode ? mockCommand("status") : await safeCommand("status", {}, statusCommandCache);
-  return json(res, 200, buildServerStatusResponse(result, { includeRaw: includeRawStatus(url) }));
+  if (config.mockMode) return json(res, 200, buildServerStatusResponse(mockCommand("status"), { includeRaw: includeRawStatus(url) }));
+  return json(res, 200, await statusReads.status(url, { includeRaw: includeRawStatus(url) }));
+}
+
+async function readinessRoute(res, url) {
+  if (config.mockMode) return json(res, 200, mockCommand("readiness"));
+  return json(res, 200, await statusReads.readiness(url));
 }
 
 async function structuredVehiclesRoute(res) {
@@ -3486,6 +3653,24 @@ function realtimeStreamRoute(req, res) {
   });
 }
 
+async function realtimeAgentRoute(res, action) {
+  try {
+    return json(res, 200, await action(), { "cache-control": "no-store" });
+  } catch (error) {
+    if (error instanceof RealtimeAgentError) return json(res, error.status, { error: error.message });
+    throw error;
+  }
+}
+
+async function realtimeAgentToggleRoute(req, res) {
+  const body = await readJson(req);
+  return realtimeAgentRoute(res, async () => {
+    const status = await realtimeAgent.setEnabled(body?.enabled, { confirmed: body?.confirmed });
+    audit(config, req, body.enabled ? "settings.realtime-agent-install" : "settings.realtime-agent-remove", { running: status.running });
+    return status;
+  });
+}
+
 async function encryptedApiToggleRoute(req, res) {
   const body = await readJson(req);
   return encryptedApiRoute(res, async () => {
@@ -3870,6 +4055,8 @@ async function task(req, res, type, operation, payload, options = {}) {
     return json(res, 400, { error: redact(error?.message || "Unexpected error.") });
   }
   if (await maybeQueueRestart(req, res, type, operation, payload)) return;
+  // A server task changes what status/readiness report; don't serve the old answer.
+  if (type === "server") statusReads.invalidate();
   // Only `payload` is audited. Secrets travel in options.env, which is never
   // written to the audit log nor stored on the task -- keep it that way.
   audit(config, req, `task.${operation}`, payload);
@@ -6853,6 +7040,18 @@ async function customizationGrantRoute(req, res, path) {
       : { capabilities: { customizationPending: false }, pending: [] };
     const results = [];
     for (const item of selected) {
+      if (isDirectCustomizationUnlock(item)) {
+        try {
+          const result = await duneDb.unlockPlayerCustomization(db, target.actorId, { itemId: item.itemId });
+          results.push({ itemId: item.itemId, name: item.name, groupId: item.groupId,
+            ok: true, status: "Unlocked", unlocked: !result.alreadyUnlocked,
+            skipped: result.alreadyUnlocked, ownershipVerified: true });
+        } catch (error) {
+          results.push({ itemId: item.itemId, name: item.name, groupId: item.groupId,
+            ok: false, status: customizationGrantStatus(item.itemId, state), error: redact(error?.message || "Unexpected error.") });
+        }
+        continue;
+      }
       if (customizationGrantStatus(item.itemId, state) === "Pending") {
         results.push({ itemId: item.itemId, name: item.name, groupId: item.groupId, ok: true, status: "Pending", skipped: true });
         continue;
@@ -6878,9 +7077,10 @@ async function customizationGrantRoute(req, res, path) {
       }
     }
     const { ok, granted, requested, skipped, failed } = summarizeCustomizationGrantResults(results);
-    const delivered = granted;
-    audit(config, req, "players.customizations.grant", { playerId, itemId: body.itemId || null, groupId: body.groupId || null, delivered, requested, skipped, failed, ok, results });
-    return json(res, ok ? 200 : 207, { ok, delivered, granted, requested, skipped, failed, ownershipVerified: false, results });
+    const unlocked = results.filter((result) => result.unlocked).length;
+    const delivered = granted - unlocked;
+    audit(config, req, "players.customizations.grant", { playerId, itemId: body.itemId || null, groupId: body.groupId || null, delivered, unlocked, requested, skipped, failed, ok, results });
+    return json(res, ok ? 200 : 207, { ok, delivered, unlocked, granted, requested, skipped, failed, ownershipVerified: false, results });
   } catch (error) {
     audit(config, req, "players.customizations.grant", { playerId, itemId: body.itemId || null, groupId: body.groupId || null, ok: false, error: redact(error?.message || "Unexpected error.") });
     return json(res, 400, { ok: false, error: redact(error?.message || "Unexpected error.") });
@@ -6889,6 +7089,7 @@ async function customizationGrantRoute(req, res, path) {
 
 async function grantPlayerItem(playerId, item, target) {
   const resolved = item.itemId ? resolveCatalogItem(config.repoRoot, { itemId: item.itemId }) : resolveCatalogItem(config.repoRoot, item);
+  if (isDirectCustomizationUnlock(resolved)) throw new Error("Event cosmetics must be unlocked from Customizations while the player is offline.");
   const operation = resolved.itemId ? "adminGiveItemId" : "adminGiveItem";
   const hasExplicitGrade = item.quality !== undefined || item.grade !== undefined;
   const selectedGrade = hasExplicitGrade ? validateGrantGrade(item.quality ?? item.grade) : undefined;
@@ -7455,7 +7656,7 @@ async function messageOfTheDayAutoTick() {
   messageOfTheDayAutoRunning = true;
   messageOfTheDayAutoLastRun = now;
   try {
-    const players = await duneDb.listAllPlayers(db, { status: "online" });
+    const players = await shareInFlight("online-players-10s", () => duneDb.listAllPlayers(db, { status: "online" }));
     if (players.capabilities?.players === false) return;
     const result = await runMessageOfTheDayScan(config, players.rows || [], { db });
     if (result.sent || result.failed) {
@@ -7493,7 +7694,7 @@ async function playerAnnouncementsAutoTick() {
   playerAnnouncementsAutoRunning = true;
   playerAnnouncementsAutoLastRun = now;
   try {
-    const players = await duneDb.listAllPlayers(db, { status: "online" });
+    const players = await shareInFlight("online-players-10s", () => duneDb.listAllPlayers(db, { status: "online" }));
     if (players.capabilities?.players === false) return;
     const result = await runPlayerAnnouncementScan(config, players.rows || [], { db });
     if (result.joined || result.left || result.sent || result.failed) {

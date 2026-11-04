@@ -127,11 +127,12 @@ test("in-place upgrade: an existing single-factor install keeps logging in with 
     running = startConsole(portAfter, tempDir, { CONSOLE_TOTP_ENABLED: "1" });
     await waitForHealth(portAfter);
 
-    // Sessions are in-memory, so the pre-upgrade session does not survive the
-    // restart regardless -- unrelated to the opt-in change, just a fact about
-    // process restarts.
+    // Ordinary sessions are persisted across restarts (sessions.json), so the
+    // pre-upgrade session is still valid after the restart. Turning the flag on
+    // with no factor configured changes nothing for it -- the flag only makes
+    // the Settings control available.
     const carriedOver = await api(portAfter, "/api/auth/me", { method: "GET", cookie: legacyCookie });
-    assert.equal(carriedOver.status, 401, "the pre-upgrade session does not survive a restart");
+    assert.equal(carriedOver.status, 200, "the pre-upgrade single-factor session survives a restart");
 
     // The upgrade itself is invisible at the login surface: turning the flag on
     // with no factor configured logs the operator straight in, exactly as

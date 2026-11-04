@@ -29,6 +29,7 @@
 // ---- Namespaces ----
 
 export const NAMESPACES = {
+  COMMUNITY:   "community",
   SETUP:       "setup",
   SERVER:      "server",
   LOGS:        "logs",
@@ -183,6 +184,11 @@ export const ROUTE_ACTIONS = {
   "GET /api/realtime/healthz":                 "realtime:read",
   "GET /api/realtime/objects":                 "realtime:read",
   "GET /api/realtime/stream":                  "realtime:read",
+  // Realtime Data agent (services/realtimeAgent.js): shows the optional position agent and
+  // sets it up or removes it. It runs as root with ptrace rights, so this is Settings: owner
+  // only, never reachable with an API key or an addon.
+  "GET /api/settings/realtime-agent":          "settings:read",
+  "POST /api/settings/realtime-agent":         "settings:write",
   // Encrypted API access (services/encryptedApi.js): the optional HTTPS front door. Shows its state and
   // key fingerprint and turns it on or off. Settings, so never reachable with an API key.
   "GET /api/settings/encrypted-api":           "settings:read",
@@ -193,10 +199,17 @@ export const ROUTE_ACTIONS = {
   "POST /api/settings/server-startup":          "settings:write",
   "GET /api/settings/experimental-tanks":      "settings:read",
   "POST /api/settings/experimental-tanks":     "settings:write",
+  "POST /api/i18n/translate":                  "settings:write",
+  "POST /api/i18n/key":                        "settings:write",
+  "DELETE /api/i18n/key":                      "settings:write",
+  "POST /api/i18n/settings":                   "settings:write",
+  "POST /api/i18n/sync-all":                   "settings:write",
+  "POST /api/i18n/suggestions":                "community:suggest-translation",
 
   // --- Players (read) ---
   "GET /api/players":                          "players:read",
   "GET /api/players/list-settings":            "players:read",
+  "GET /api/players/combat":                   "players:read",
   "GET /api/players/online":                   "players:read",
   "GET /api/players/search":                   "players:read",
   "GET /api/players/deleted-characters":       "players:read",

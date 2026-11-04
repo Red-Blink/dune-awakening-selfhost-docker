@@ -164,7 +164,8 @@ test("autoscaler browser healing pauses during coordinated Sietch topology chang
 test("autoscaler browser healing ignores READY markers from previous core server processes", () => {
   const coreReady = autoscalerSource.match(/core_maps_ready_for_browser_heal\(\) \{([\s\S]*?)\n\}/)?.[1] || "";
   assert.match(coreReady, /\{\{\.State\.StartedAt\}\}/);
-  assert.match(coreReady, /docker logs --since "\$started_at"/);
+  assert.match(coreReady, /docker logs --timestamps/);
+  assert.match(coreReady, /filter-container-logs\.py "\$started_at"/);
   assert.match(autoscalerSource, /AUTOSCALER_STARTED_AT="\$\(date \+%s\)"/);
   assert.match(
     autoscalerSource,

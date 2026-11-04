@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { logsApi } from "../../api/logs";
 import { mapsApi } from "../../api/maps";
 import { LogViewer } from "../../components/LogViewer";
@@ -7,6 +7,21 @@ import { friendlyServiceName } from "../../lib/serviceDisplay";
 
 type LogSietchRow = { partitionId: string; dimension: string; displayName: string };
 const LOCAL_TIME_STORAGE_KEY = "dune.logs.showLocalTime";
+const MAX_LOG_LINES = 5000;
+
+function capLogLines(text: string, maxLines = MAX_LOG_LINES): string {
+  if (!text) return "";
+  let newlines = 0;
+  for (let i = text.length - 1; i >= 0; i -= 1) {
+    if (text.charCodeAt(i) === 10) {
+      newlines += 1;
+      if (newlines > maxLines) {
+        return text.slice(i + 1);
+      }
+    }
+  }
+  return text;
+}
 
 function savedLocalTimePreference() {
   try {
@@ -29,7 +44,7 @@ export function LogsPanel({ selectedService, setSelectedService, text, setText, 
     onError("");
     try {
       setText((current) => current ? current : "Loading logs...");
-      setText((await logsApi.get(service)).stdout);
+      setText(capLogLines((await logsApi.get(service)).stdout));
     } catch (error) {
       onError(error instanceof Error ? error.message : String(error));
     }
@@ -47,7 +62,7 @@ export function LogsPanel({ selectedService, setSelectedService, text, setText, 
     onError("");
     setText("Loading logs...");
     logsApi.get(selectedService).then((result) => {
-      if (active) setText(result.stdout);
+      if (active) setText(capLogLines(result.stdout));
     }).catch((error) => {
       if (active) onError(error instanceof Error ? error.message : String(error));
     });
@@ -60,14 +75,21 @@ export function LogsPanel({ selectedService, setSelectedService, text, setText, 
     source.onmessage = (event) => {
       if (paused) return;
       const data = JSON.parse(event.data) as { line: string };
-      setText((current) => `${current}${data.line}`);
+      setText((current) => capLogLines(`${current}${data.line}`));
     };
     source.onerror = () => source.close();
     return () => source.close();
   }, [streaming, paused, selectedService, setText]);
 
-  const displayText = showLocalTime ? convertUtcLogTimestamps(text, localTimeZone) : text;
-  const shown = filter ? displayText.split(/\r?\n/).filter((line) => line.toLowerCase().includes(filter.toLowerCase())).join("\n") : displayText;
+  const displayText = useMemo(
+    () => (showLocalTime ? convertUtcLogTimestamps(text, localTimeZone) : text),
+    [text, showLocalTime, localTimeZone]
+  );
+  const shown = useMemo(() => {
+    if (!filter) return displayText;
+    const lowerFilter = filter.toLowerCase();
+    return displayText.split(/\r?\n/).filter((line) => line.toLowerCase().includes(lowerFilter)).join("\n");
+  }, [displayText, filter]);
 
   function updateLocalTimePreference(enabled: boolean) {
     setShowLocalTime(enabled);

@@ -30,6 +30,7 @@ services:
       # Keep Docker CLI state out of / so deployment works for every host UID.
       HOME: /tmp/dune-console-home
       DOCKER_CONFIG: /tmp/dune-console-home/.docker
+      DOCKER_HOST: "${DUNE_DOCKER_SOCKET_PROXY_URL:-}"
       DUNE_HOST_UID: "${DUNE_HOST_UID:-0}"
       DUNE_HOST_GID: "${DUNE_HOST_GID:-0}"
       DUNE_DOCKER_DIR: /repo
@@ -83,6 +84,7 @@ services:
       RMQ_ADMIN_PORT: "${RMQ_ADMIN_PORT:-}"
       RMQ_GAME_PORT: "${RMQ_GAME_PORT:-}"
       RMQ_GAME_HTTP_PORT: "${RMQ_GAME_HTTP_PORT:-}"
+      RMQ_GAME_LOCAL_HTTP_PORT: "${RMQ_GAME_LOCAL_HTTP_PORT:-15672}"
       TEXT_ROUTER_PORT: "${TEXT_ROUTER_PORT:-}"
       DIRECTOR_PORT: "${DIRECTOR_PORT:-}"
       CLIENT_PORT_BASE: "${CLIENT_PORT_BASE:-}"
@@ -128,3 +130,9 @@ services:
       # WARNING: mounting the Docker socket gives this container broad control
       # over the host Docker daemon. Expose the web admin only to trusted admins.
       - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "node", "/app/src/healthcheck.js"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

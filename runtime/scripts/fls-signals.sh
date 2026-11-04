@@ -19,14 +19,22 @@ director_fls_logs_ready() {
       next
     }
 
-    /Population declaration:/ &&
-      /"BattlegroupMaxPlayerCapacity":[1-9][0-9]*/ &&
-      /"IsLocked":false/ {
-      valid_declarations++
+    /Population declaration:/ {
+      if ($0 ~ /"BattlegroupMaxPlayerCapacity":[[:space:]]*[1-9][0-9]*/ &&
+          $0 ~ /"IsLocked":[[:space:]]*false/) {
+        valid_declarations++
+        invalid_declaration = 0
+      } else {
+        # An older healthy report cannot keep a stalled/locked map Ready.
+        # A successful heartbeat alone does not restore usable capacity.
+        explicit_success = 0
+        valid_declarations = 0
+        invalid_declaration = 1
+      }
     }
 
     END {
-      exit(explicit_success || valid_declarations >= 2 ? 0 : 1)
+      exit(!invalid_declaration && (explicit_success || valid_declarations >= 2) ? 0 : 1)
     }
   ' <<< "$logs"
 }
