@@ -10,7 +10,7 @@ cleanup() {
 }
 trap cleanup EXIT
 mkdir -p "$fixture/repo/runtime/scripts/lib" "$fixture/bin" "$fixture/state"
-for script in console.sh start-coriolis-coordinator.sh compose-project.sh host-paths.sh runtime-env.sh memory-swap-common.sh env-file.sh host-file-ownership.sh lib/secrets.sh lib/ports.sh; do
+for script in console.sh start-coriolis-coordinator.sh compose-project.sh host-paths.sh runtime-env.sh memory-swap-common.sh env-file.sh host-file-ownership.sh lib/secrets.sh lib/ports.sh lib/console-secrets-env.sh; do
   cp "$repo_root/runtime/scripts/$script" "$fixture/repo/runtime/scripts/$script"
 done
 touch "$fixture/repo/docker-compose.web.yml"

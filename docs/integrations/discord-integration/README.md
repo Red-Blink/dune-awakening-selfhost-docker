@@ -37,7 +37,7 @@ make Compose reject the file):
 ```bash
 DUNE_DISCORD_ADAPTER_ENABLED=true
 DUNE_BOT_API_TOKEN_FILE=/repo/runtime/secrets/bot-api-token.txt
-DISCORD_OBSERVER_ROLE_IDS=role-id-1,role-id-2
+DISCORD_PLAYER_ROLE_IDS=role-id-1,role-id-2
 DISCORD_ADMIN_ROLE_IDS=role-id-1
 ```
 
@@ -98,12 +98,12 @@ the body.
 | `/api/integrations/discord/version` | GET | Dune stack version | Bearer token only |
 | `/api/integrations/discord/backups/list` | GET | Backup metadata (no paths) | Bearer token only |
 | `/api/integrations/discord/status` | POST | Public status summary; `diagnostic: true` returns detailed output | Public (diagnostic: Admin) |
-| `/api/integrations/discord/readiness` | POST | Readiness checks | Observer |
-| `/api/integrations/discord/services` | POST | Service container state | Observer |
-| `/api/integrations/discord/maintenance` | POST | Readiness output | Observer |
-| `/api/integrations/discord/servers` | POST | Game server partitions | Observer |
-| `/api/integrations/discord/ports` | POST | Network port status | Observer |
-| `/api/integrations/discord/db` | POST | Database health | Observer |
+| `/api/integrations/discord/readiness` | POST | Readiness checks | Player |
+| `/api/integrations/discord/services` | POST | Service container state | Player |
+| `/api/integrations/discord/maintenance` | POST | Readiness output | Player |
+| `/api/integrations/discord/servers` | POST | Game server partitions | Player |
+| `/api/integrations/discord/ports` | POST | Network port status | Player |
+| `/api/integrations/discord/db` | POST | Database health | Player |
 | `/api/integrations/discord/population` | POST | Player count (aggregate only) | Moderator |
 | `/api/integrations/discord/map-state` | POST | Map state | Moderator |
 | `/api/integrations/discord/announcements` | POST | Recent in-game announcements | Moderator |
@@ -121,8 +121,8 @@ console:
 
 | Variable | Tier and what it can reach |
 |----------|----------------------------|
-| `DISCORD_OBSERVER_ROLE_IDS` | Observer: status, readiness, services, maintenance, servers, ports, db |
-| `DISCORD_MODERATOR_ROLE_IDS` | Moderator: everything Observer can, plus population, map state, announcements, player link, inventory, storage and guild routes |
+| `DISCORD_PLAYER_ROLE_IDS` | Player: status, readiness, services, maintenance, servers, ports, db |
+| `DISCORD_MODERATOR_ROLE_IDS` | Moderator: everything Player can, plus population, map state, announcements, player link, inventory, storage and guild routes |
 | `DISCORD_ADMIN_ROLE_IDS` | Admin: everything, including diagnostic status, logs, `ops/*` and broadcast |
 | `DISCORD_OWNER_ROLE_IDS` | Owner: same access as Admin |
 
