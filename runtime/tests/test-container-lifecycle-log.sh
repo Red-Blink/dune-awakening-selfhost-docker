@@ -14,7 +14,7 @@ cat >"$test_root/bin/docker" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
   inspect)
-    [ "${*: -1}" = "dune-server-survival-1-38" ] || exit 1
+    case "${*: -1}" in dune-server-survival-1-38 | dune-server-survival-1) ;; *) exit 1 ;; esac
     case " $* " in
       *" --format "*) echo "status=running exit=0 oom=false started=2026-11-06T05:00:00Z finished=0001-01-01T00:00:00Z restarts=0" ;;
     esac
@@ -62,6 +62,17 @@ done
 DUNE_KEPT_CONTAINER_LOGS=2 dune_container_removal_hook dune-server-survival-1-38 despawn-server
 [ "$(ls runtime/generated/logs/containers | wc -l)" = "2" ] || fail "pruning did not keep exactly 2 outputs"
 
+# 3b. Pruning one container does not touch another whose name it prefixes.
+mkdir -p runtime/generated/logs/containers
+for i in 1 2 3; do
+  echo x | gzip -c >"runtime/generated/logs/containers/dune-server-survival-1-38-2026020${i}T000000Z.log.gz"
+done
+DUNE_KEPT_CONTAINER_LOGS=1 dune_container_removal_hook dune-server-survival-1 despawn-server
+[ "$(ls runtime/generated/logs/containers/dune-server-survival-1-38-2026020*.log.gz | wc -l)" = "3" ] \
+  || fail "pruning dune-server-survival-1 deleted dune-server-survival-1-38 outputs"
+[ "$(find runtime/generated/logs/containers -name 'dune-server-survival-1-2*.log.gz' ! -name '*-1-38-*' | wc -l)" = "1" ] \
+  || fail "pruning did not keep exactly 1 output for dune-server-survival-1"
+
 # 4. Archived game logs older than the window are removed; recent ones stay.
 echo old | gzip -c >runtime/generated/logs/archive/survival-1-38/DuneSandbox_PIDX-38-backup-2026.08.01-13.00.00.log.gz
 touch -d "90 days ago" runtime/generated/logs/archive/survival-1-38/DuneSandbox_PIDX-38-backup-2026.08.01-13.00.00.log.gz
@@ -73,10 +84,11 @@ dune_archive_game_logs survival-1-38 "" ""
 rm -rf runtime/generated
 DUNE_KEEP_CONTAINER_LOGS=0 DUNE_ARCHIVE_GAME_LOGS=0 dune_container_removal_hook dune-server-survival-1-38 despawn-server
 [ -s runtime/generated/container-lifecycle.log ] || fail "line not written with saving disabled"
-[ ! -d runtime/logs ] || fail "logs were saved although disabled"
+[ ! -d runtime/generated/logs ] || fail "logs were saved although disabled"
 
 # 6. It never fails the caller: unknown container, and no docker at all.
 dune_container_removal_hook not-a-container despawn-server || fail "unknown container made the hook fail"
-PATH="/usr/bin:/bin" bash -c 'source "$1"; command -v docker >/dev/null && exit 0; dune_container_removal_hook dune-server-survival-1-38 x' _ "$repo/runtime/scripts/lib/container-lifecycle.sh" || fail "missing docker made the hook fail"
+mkdir -p "$test_root/empty"
+PATH="$test_root/empty" /bin/bash -c 'source "$1"; dune_container_removal_hook dune-server-survival-1-38 x' _ "$repo/runtime/scripts/lib/container-lifecycle.sh" || fail "missing docker made the hook fail"
 
 echo "container removal records the requester, keeps output and game logs, and never blocks a stop"

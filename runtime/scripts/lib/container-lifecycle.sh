@@ -15,7 +15,11 @@
 #   DUNE_KEPT_CONTAINER_LOGS=N     saved outputs kept per container (default 10)
 #   DUNE_ARCHIVE_GAME_LOGS=0       do not archive rotated game logs (default 1)
 #   DUNE_GAME_LOG_ARCHIVE_DAYS=N   days to keep archived game logs (default 30)
+#   DUNE_CONTAINER_LOG_TIMEOUT=N   seconds to wait for `docker logs` (default 30)
 #   DUNE_REQUEST_SOURCE=text       free-form requester label recorded in the log
+#
+# Rotated game logs are archived at each removal, so a log the game rotates and
+# prunes during one very long run (without any removal in between) can be missed.
 
 DUNE_LIFECYCLE_LOG="${DUNE_LIFECYCLE_LOG:-runtime/generated/container-lifecycle.log}"
 DUNE_CONTAINER_LOG_DIR="${DUNE_CONTAINER_LOG_DIR:-runtime/generated/logs/containers}"
@@ -41,7 +45,7 @@ dune_lifecycle_clean() {
 }
 
 dune_container_removal_hook() {
-  local container="$1" reason="${2:-removal}" state="" caller="" who="" ts=""
+  local container="$1" reason="${2:-removal}" state="" caller="" who="" ts="" out=""
   command -v docker >/dev/null 2>&1 || return 0
   docker inspect "$container" >/dev/null 2>&1 || return 0
   (
@@ -54,11 +58,19 @@ dune_container_removal_hook() {
     [ -z "${DUNE_REQUEST_SOURCE:-}" ] || who="$who source=$(dune_lifecycle_clean "$DUNE_REQUEST_SOURCE")"
     caller="$(dune_caller_chain)"
     mkdir -p "$(dirname "$DUNE_LIFECYCLE_LOG")"
+    dune_trim_lifecycle_log
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -Iseconds)" "$reason" "$container" "$state" "$who" "$caller" >>"$DUNE_LIFECYCLE_LOG"
     if [ "${DUNE_KEEP_CONTAINER_LOGS:-1}" != "0" ]; then
       mkdir -p "$DUNE_CONTAINER_LOG_DIR"
-      docker logs --timestamps "$container" 2>&1 | gzip -c >"$DUNE_CONTAINER_LOG_DIR/$container-$ts.log.gz"
-      dune_prune_newest "$DUNE_CONTAINER_LOG_DIR" "$container-*.log.gz" "${DUNE_KEPT_CONTAINER_LOGS:-10}"
+      out="$DUNE_CONTAINER_LOG_DIR/$container-$ts.log.gz"
+      # A temp file renamed on success, so a failed or timed-out save never
+      # leaves a truncated file that counts toward the keep-N pruning.
+      if (set -o pipefail; timeout "${DUNE_CONTAINER_LOG_TIMEOUT:-30}" docker logs --timestamps "$container" 2>&1 | gzip -c >"$out.part"); then
+        mv -f "$out.part" "$out"
+      else
+        rm -f "$out.part"
+      fi
+      dune_prune_newest "$DUNE_CONTAINER_LOG_DIR" "$container-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z.log.gz" "${DUNE_KEPT_CONTAINER_LOGS:-10}"
     fi
     case "$container" in
       dune-server-*)
@@ -67,6 +79,15 @@ dune_container_removal_hook() {
     esac
   ) || true
   return 0
+}
+
+# Keep the lifecycle log small: past 1 MiB, keep the newest 2000 lines.
+dune_trim_lifecycle_log() {
+  local size=0
+  [ -f "$DUNE_LIFECYCLE_LOG" ] || return 0
+  size="$(wc -c <"$DUNE_LIFECYCLE_LOG" 2>/dev/null || echo 0)"
+  [ "$size" -gt 1048576 ] || return 0
+  tail -n 2000 "$DUNE_LIFECYCLE_LOG" >"$DUNE_LIFECYCLE_LOG.part" && mv -f "$DUNE_LIFECYCLE_LOG.part" "$DUNE_LIFECYCLE_LOG"
 }
 
 # Keep the newest N files matching a pattern in a directory.
@@ -93,13 +114,17 @@ dune_archive_game_logs() {
     for f in "$logs_dir"/*-backup-*.log; do
       [ -f "$f" ] || continue
       [ -e "$dest/$(basename "$f").gz" ] && continue
-      gzip -c "$f" >"$dest/$(basename "$f").gz.part" && mv -f "$dest/$(basename "$f").gz.part" "$dest/$(basename "$f").gz"
+      gzip -c "$f" >"$dest/$(basename "$f").gz.part" \
+        && mv -f "$dest/$(basename "$f").gz.part" "$dest/$(basename "$f").gz" \
+        || rm -f "$dest/$(basename "$f").gz.part"
     done
     if [ -n "$final_ts" ]; then
       for f in "$logs_dir"/*.log; do
         [ -f "$f" ] || continue
         case "$f" in *-backup-*) continue ;; esac
-        gzip -c "$f" >"$dest/$(basename "$f" .log)-final-$final_ts.log.gz"
+        gzip -c "$f" >"$dest/$(basename "$f" .log)-final-$final_ts.log.gz.part" \
+          && mv -f "$dest/$(basename "$f" .log)-final-$final_ts.log.gz.part" "$dest/$(basename "$f" .log)-final-$final_ts.log.gz" \
+          || rm -f "$dest/$(basename "$f" .log)-final-$final_ts.log.gz.part"
       done
     fi
     find "$dest" -maxdepth 1 -name '*.gz' -mtime "+$days" -delete 2>/dev/null

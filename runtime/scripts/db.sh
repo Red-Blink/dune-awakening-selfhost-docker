@@ -6,6 +6,8 @@ ROOT_DIR="$(pwd)"
 HOST_ROOT_DIR="${DUNE_HOST_REPO_ROOT:-$ROOT_DIR}"
 # shellcheck source=runtime/scripts/env-file.sh
 source runtime/scripts/env-file.sh
+# shellcheck source=runtime/scripts/lib/container-lifecycle.sh
+source runtime/scripts/lib/container-lifecycle.sh
 
 BACKUP_DIR_DEFAULT="runtime/backups/db"
 AUTO_STATE_FILE="runtime/generated/db-backup.env"
@@ -2612,6 +2614,10 @@ order by check_name;
 
 stop_db_dependents() {
   echo "Stopping services that depend on the database..."
+  local game_container
+  while IFS= read -r game_container; do
+    dune_container_removal_hook "$game_container" db-stop-dependents
+  done < <(docker ps --format '{{.Names}}' | grep '^dune-server-' || true)
   docker ps --format '{{.Names}}' | grep '^dune-server-' | xargs -r docker rm -f || true
   docker rm -f dune-server-gateway dune-director dune-text-router 2>/dev/null || true
 }
