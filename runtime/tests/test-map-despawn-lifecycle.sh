@@ -8,7 +8,7 @@ trap 'rm -rf "$test_root"' EXIT
 
 mkdir -p "$test_root/runtime/scripts/lib" "$test_root/runtime/generated" "$test_root/bin"
 cp runtime/scripts/despawn-server.sh "$test_root/runtime/scripts/despawn-server.sh"
-cp runtime/scripts/lib/ports.sh runtime/scripts/lib/postgres.sh "$test_root/runtime/scripts/lib/"
+cp runtime/scripts/lib/ports.sh runtime/scripts/lib/postgres.sh runtime/scripts/lib/container-lifecycle.sh "$test_root/runtime/scripts/lib/"
 
 # The docker mock below stands in for the Postgres container, so pin the query
 # transport to the exec leg rather than letting it depend on whether the

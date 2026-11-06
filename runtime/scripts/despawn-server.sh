@@ -13,6 +13,9 @@ source runtime/scripts/landsraad-instance-cleanup.sh
 
 # shellcheck source=runtime/scripts/lib/postgres.sh
 source runtime/scripts/lib/postgres.sh
+# shellcheck source=runtime/scripts/lib/container-lifecycle.sh
+# A missing helper (a partial copy of the scripts) must never stop a stop.
+source runtime/scripts/lib/container-lifecycle.sh 2>/dev/null || dune_container_removal_hook() { :; }
 
 usage() {
   cat <<'EOF'
@@ -236,6 +239,7 @@ despawn_container() {
   fi
 
   echo "Despawning: $container"
+  dune_container_removal_hook "$container" despawn-server
   docker rm -f "$container"
   ensure_runtime_state_file "$PORT_LOCK_FILE" "spawn port reservation lock"
   exec 9>"$PORT_LOCK_FILE"

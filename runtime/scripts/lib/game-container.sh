@@ -10,6 +10,15 @@ remove_existing_game_container() {
     echo "Invalid game container name." >&2
     return 1
   }
+  # The record is made before the container is replaced, so a crash that is
+  # recovered by a start is not lost.
+  if ! declare -F dune_container_removal_hook >/dev/null 2>&1; then
+    # shellcheck source=runtime/scripts/lib/container-lifecycle.sh
+    source runtime/scripts/lib/container-lifecycle.sh 2>/dev/null || true
+  fi
+  if declare -F dune_container_removal_hook >/dev/null 2>&1; then
+    dune_container_removal_hook "$name" start-replace
+  fi
 
   # Docker can time out before a killed process delivers its exit event.
   # Retry that incomplete removal and verify the postcondition; otherwise a
