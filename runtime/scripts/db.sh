@@ -7,7 +7,8 @@ HOST_ROOT_DIR="${DUNE_HOST_REPO_ROOT:-$ROOT_DIR}"
 # shellcheck source=runtime/scripts/env-file.sh
 source runtime/scripts/env-file.sh
 # shellcheck source=runtime/scripts/lib/container-lifecycle.sh
-source runtime/scripts/lib/container-lifecycle.sh
+# A missing helper (a partial copy of the scripts) must never stop a stop.
+source runtime/scripts/lib/container-lifecycle.sh 2>/dev/null || dune_container_removal_hook() { :; }
 
 BACKUP_DIR_DEFAULT="runtime/backups/db"
 AUTO_STATE_FILE="runtime/generated/db-backup.env"

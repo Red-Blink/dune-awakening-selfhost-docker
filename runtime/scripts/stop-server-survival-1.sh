@@ -8,7 +8,8 @@ cd "$(dirname "$0")/../.."
 
 source runtime/scripts/runtime-env.sh
 # shellcheck source=runtime/scripts/lib/container-lifecycle.sh
-source runtime/scripts/lib/container-lifecycle.sh
+# A missing helper (a partial copy of the scripts) must never stop a stop.
+source runtime/scripts/lib/container-lifecycle.sh 2>/dev/null || dune_container_removal_hook() { :; }
 
 CLIENT_PORT_BASE="$(resolve_client_port_base)"
 IGW_PORT_BASE="$(resolve_igw_port_base)"

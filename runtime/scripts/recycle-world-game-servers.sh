@@ -14,7 +14,8 @@ source runtime/scripts/landsraad-instance-cleanup.sh
 # shellcheck source=runtime/scripts/lib/postgres.sh
 source runtime/scripts/lib/postgres.sh
 # shellcheck source=runtime/scripts/lib/container-lifecycle.sh
-source runtime/scripts/lib/container-lifecycle.sh
+# A missing helper (a partial copy of the scripts) must never stop a stop.
+source runtime/scripts/lib/container-lifecycle.sh 2>/dev/null || dune_container_removal_hook() { :; }
 
 ACTION="${1:-remove-stale}"
 TARGET_IMAGE="$(resolve_game_server_image)"
