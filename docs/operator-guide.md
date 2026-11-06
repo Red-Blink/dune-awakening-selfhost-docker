@@ -443,6 +443,30 @@ manually editing `.env` port variables without reading that document first
 
 ---
 
+## 9b. Logs after a restart or crash
+
+When a game server container is stopped or removed (a Sietch restart, a despawn, `dune stop`, a recycle), the stack now keeps the evidence before the container disappears. Everything is under `runtime/generated/logs/` and `runtime/generated/`, which is not tracked by git.
+
+| What | Where |
+|---|---|
+| Who or what removed the container, and how it ended (exit code, out-of-memory, uptime) | `runtime/generated/container-lifecycle.log` (one tab-separated line per removal: time, reason, container, state, user/ssh/source, calling process chain) |
+| The container's console output | `runtime/generated/logs/containers/<container>-<UTC time>.log.gz` |
+| The game's own logs, including the run that just ended | `runtime/generated/logs/archive/<server>/` |
+
+A server that crashes and is restarted by Docker keeps its console output (Docker does not delete it on a restart), and the game writes its own log to `Saved/Logs` as before. The new files matter when a container is *removed*.
+
+Settings in `.env` (all optional; the defaults suit most hosts):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `DUNE_KEEP_CONTAINER_LOGS` | `1` | `0` stops saving container output |
+| `DUNE_KEPT_CONTAINER_LOGS` | `10` | saved outputs kept per container |
+| `DUNE_ARCHIVE_GAME_LOGS` | `1` | `0` stops archiving game logs |
+| `DUNE_GAME_LOG_ARCHIVE_DAYS` | `30` | days an archived game log is kept |
+| `DUNE_REQUEST_SOURCE` | unset | free text recorded as the requester, for scripts that call `dune` |
+
+Disk use is bounded: compressed, a container output is a few MB and a game log about 10 MB. Nothing here changes how a server starts, stops or logs; if saving fails, the stop still goes ahead.
+
 ## 10. Getting help
 
 - [Official Website](https://dunedocker.app/) — project info, FAQ, server directory.

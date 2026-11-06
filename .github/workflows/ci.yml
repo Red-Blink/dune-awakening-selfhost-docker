@@ -183,6 +183,7 @@ jobs:
           runtime/tests/test-deepdesert-dual-selector-cleanup.sh
           runtime/tests/test-deepdesert-layout-apply-safety.sh
           runtime/tests/test-map-despawn-lifecycle.sh
+          runtime/tests/test-container-lifecycle-log.sh
           runtime/tests/test-director-log-id-normalization.sh
           runtime/tests/test-director-story-admission.sh
           runtime/tests/test-overland-dynamic-allocation.sh

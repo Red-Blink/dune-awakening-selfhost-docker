@@ -7,6 +7,8 @@ cd "$(dirname "$0")/../.."
 [ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
 
 source runtime/scripts/runtime-env.sh
+# shellcheck source=runtime/scripts/lib/container-lifecycle.sh
+source runtime/scripts/lib/container-lifecycle.sh
 
 CLIENT_PORT_BASE="$(resolve_client_port_base)"
 IGW_PORT_BASE="$(resolve_igw_port_base)"
@@ -19,6 +21,7 @@ PARTITION_ID="${DUNE_SURVIVAL_PARTITION_ID:-1}"
 # make the refill queue treat a still-running map as safe to write.
 containers="$(docker ps -a --format '{{.Names}}')"
 if printf '%s\n' "$containers" | grep -qx dune-server-survival-1; then
+  dune_container_removal_hook dune-server-survival-1 stop-server-survival-1
   docker rm -f dune-server-survival-1 >/dev/null
 fi
 containers="$(docker ps -a --format '{{.Names}}')"

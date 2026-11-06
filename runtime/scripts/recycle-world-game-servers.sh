@@ -13,6 +13,8 @@ source runtime/scripts/landsraad-instance-cleanup.sh
 
 # shellcheck source=runtime/scripts/lib/postgres.sh
 source runtime/scripts/lib/postgres.sh
+# shellcheck source=runtime/scripts/lib/container-lifecycle.sh
+source runtime/scripts/lib/container-lifecycle.sh
 
 ACTION="${1:-remove-stale}"
 TARGET_IMAGE="$(resolve_game_server_image)"
@@ -87,6 +89,7 @@ remove_container() {
   fi
 
   echo "Removing world server container: $name"
+  dune_container_removal_hook "$name" recycle-world-game-servers
   docker rm -f "$name" >/dev/null
 
   if [ -n "$partition_id" ] && docker ps --format '{{.Names}}' | grep -qx dune-postgres; then
