@@ -443,6 +443,42 @@ manually editing `.env` port variables without reading that document first
 
 ---
 
+## 9b. Logs after a restart or crash
+
+When a game server container is removed by the stack, it takes its `docker logs` with it. Before that happens, the stack now records who asked and keeps the container's output and the game's logs. Removals that are covered: a Sietch or map restart (`dune sietches restart`), a despawn (including the autoscaler's), `dune stop`, a recycle of the world servers, a database stop or restore (which stops the game servers first), and a start that replaces an existing game server container. Not covered: the gateway, director and RabbitMQ containers, `docker compose down`, a manual `docker rm`, and a host reboot. A server that crashes and is restarted by Docker keeps its console output, because Docker does not delete it on a restart.
+
+| What | Where |
+|---|---|
+| Who or what removed the container, and how it ended | `runtime/generated/container-lifecycle.log`, one tab-separated line per removal: time, reason, container, state (`exit`, `oom`, start and finish time, restart count), who (`user`, plus `ssh` source address, `sudo_user` and `source` when set), calling process chain |
+| The container's console output | `runtime/generated/logs/containers/<container>-<UTC time>.log.gz` (read it with `zcat` or `zless`) |
+| The game's rotated logs, and the run that just ended | `runtime/generated/logs/archive/<server>/` (`*-backup-*.log.gz` and `*-final-<UTC time>.log.gz`) |
+
+The `reason` column says which path removed the container: `despawn-server`, `stop-server-survival-1`, `stop-server-overmap`, `recycle-world-game-servers`, `db-stop-dependents` or `start-replace`.
+
+Root-run maintenance assigns private records to the installation owner so subsequent Console operations can keep saving logs. Existing permissions on the shared `runtime/generated/` directory are preserved.
+
+**Treat these files as sensitive.** Console output and game logs contain player names and addresses, and the game echoes its own command line into them. The stack masks the value of anything named like a password, token, secret or API key before saving, and writes the files owner-only (files `0600`, directories `0700`). Masking is best effort: it cannot recognise every format, so do not share these files or include them in a support bundle without looking at them first.
+
+**What this is not.** The lifecycle log is a local, best-effort record, not a tamper-evident audit trail. The requester fields come from the environment (`SSH_CONNECTION`, `SUDO_USER`, `DUNE_REQUEST_SOURCE`) and can be empty or set by the caller. The game's own rotated logs are archived at each removal, so a log the game rotates and deletes during one very long run, with no removal in between, can be missed.
+
+**Upgrading.** The feature is on by default and needs no action. After the first removal on an updated install you will find the new files under `runtime/generated/`. A removal now takes a few seconds longer while the output is saved (at most 30 seconds for the container output and 60 seconds per game log before it gives up). To turn it off, set the switches below.
+
+Settings in `.env` (all optional; a value that is not a positive number falls back to the default):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `DUNE_KEEP_CONTAINER_LOGS` | `1` | `0` stops saving container output |
+| `DUNE_KEPT_CONTAINER_LOGS` | `10` | saved outputs kept per container |
+| `DUNE_KEPT_CONTAINER_LOGS_TOTAL` | `100` | saved outputs kept across all containers |
+| `DUNE_ARCHIVE_GAME_LOGS` | `1` | `0` stops archiving game logs |
+| `DUNE_GAME_LOG_ARCHIVE_DAYS` | `30` | days an archived game log is kept |
+| `DUNE_GAME_LOG_ARCHIVE_MAX_FILES` | `60` | archived files kept per server |
+| `DUNE_CONTAINER_LOG_TIMEOUT` | `30` | seconds to wait for `docker logs` |
+| `DUNE_ARCHIVE_TIMEOUT` | `60` | seconds allowed per archived game log |
+| `DUNE_REQUEST_SOURCE` | unset | free text recorded as the requester, for scripts that call `dune` |
+
+Disk use is bounded by the counts above (compressed, a container output is a few MB and a game log about 10 MB); the lifecycle log is trimmed to its newest 2000 lines once it passes 1 MiB. If saving fails, the stop still goes ahead and only the record is lost.
+
 ## 10. Getting help
 
 - [Official Website](https://dunedocker.app/) — project info, FAQ, server directory.
