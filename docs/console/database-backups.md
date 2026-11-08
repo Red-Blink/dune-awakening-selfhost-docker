@@ -41,6 +41,13 @@ now exposes it directly: enter a passphrase twice, and **Create System Backup**.
 Unlike a plain download, the archive is a genuine point-in-time capture — the
 config inside it is the config as it was when the backup ran, not as it is now.
 
+The server keeps writing `runtime/generated/` while the backup copies it. The
+copy is retried up to three times while files change, every JSON file in it
+must parse, and the autoscaler's log cache and half-written `*.tmp` files are
+left out. If `runtime/generated/` is still changing on the last try, that copy
+is used and a note is logged. `runtime/secrets/` still changing, or a JSON file
+still mid-rewrite, fails the backup instead of archiving a partial copy.
+
 ### The passphrase
 
 The archive is encrypted with AES-256 in AEAD (OCB) mode via gpg — an
