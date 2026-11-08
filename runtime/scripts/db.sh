@@ -1010,10 +1010,127 @@ RESTORE_SAFETY_KEEP_DEFAULT="${DUNE_RESTORE_SAFETY_KEEP:-5}"
 # attempting to selectively redact/exclude them -- encryption (below) is
 # the only access control, not field-level redaction, so there is no
 # secret-shaped value this backup can silently miss.
+#
+# director-log-cache.* holds the autoscaler's live SQLite cache (a copy taken
+# mid-write is torn, and it is rebuilt on start); *.tmp / *.tmp.* are the
+# half-written files of the temp-file + rename saves scripts make here.
 system_backup_ephemeral_exclude_patterns() {
   cat <<'EOF'
 dune-fake-k8s-serviceaccount-*
+director-log-cache.*
+*.tmp
+*.tmp.*
 EOF
+}
+
+# Checks that every staged *.json under $2 (the copy of $1) parses: tar's
+# change warning misses a file rewritten in place mid-read. Returns 0 if all
+# parse, 10 if a copy is broken and another attempt may fix it. On the final
+# attempt ($3=1) each broken copy is settled instead: source gone -> dropped,
+# source broken on disk -> kept with a warning, source valid -> return 11.
+# Without python3 nothing is checked.
+system_backup_check_staged_json() {
+  command -v python3 >/dev/null 2>&1 || return 0
+  python3 -I - "$1" "$2" "$3" <<'PY'
+import json, os, sys
+
+src, dst, final = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
+
+def parses(path):
+    try:
+        with open(path, "rb") as handle:
+            json.load(handle)
+        return True
+    except Exception:  # also RecursionError from deeply nested input
+        return False
+
+def show(path):
+    return path.encode("unicode_escape").decode("ascii")
+
+broken = [os.path.join(base, name)
+          for base, _dirs, files in os.walk(dst)
+          for name in files
+          if name.endswith(".json") and not parses(os.path.join(base, name))]
+if not broken:
+    sys.exit(0)
+if not final:
+    sys.exit(10)
+for copy in broken:
+    source = os.path.join(src, os.path.relpath(copy, dst))
+    if not os.path.lexists(source):
+        os.remove(copy)
+        print(f"Note: {show(source)} was removed during the backup; leaving it out.", file=sys.stderr)
+    elif parses(source):
+        print(f"{show(source)} was still being rewritten after the last attempt; its copy is incomplete.", file=sys.stderr)
+        sys.exit(11)
+    else:
+        print(f"Warning: {show(source)} is not valid JSON on disk; backing it up as-is.", file=sys.stderr)
+PY
+}
+
+# Copies the tree at $1 into the existing directory $2 with a tar pipe;
+# further arguments are --exclude patterns. With --strict first, a tree that
+# is still changing on the last attempt fails instead of being accepted.
+#
+# The autoscaler and console save into runtime/generated/ every few seconds
+# (temp file + rename), and GNU tar exits 1 whenever a file or directory
+# changes mid-read. Exit 1 and broken JSON copies are retried; >= 2 fails.
+SYSTEM_BACKUP_STAGE_ATTEMPTS=3
+system_backup_stage_tree() {
+  local strict=0
+  if [ "${1:-}" = "--strict" ]; then
+    strict=1
+    shift
+  fi
+  local src="$1"
+  local dst="$2"
+  shift 2
+  local -a exclude_args=()
+  local pattern
+  for pattern in "$@"; do
+    exclude_args+=("--exclude=$pattern")
+  done
+
+  local attempt=1
+  local -a statuses=()
+  local final
+  local changed
+  local json_status
+  while :; do
+    final=0
+    [ "$attempt" -lt "$SYSTEM_BACKUP_STAGE_ATTEMPTS" ] || final=1
+    changed=0
+    if tar -C "$src" --warning=no-file-changed --warning=no-file-removed \
+        "${exclude_args[@]}" -cf - . | tar -C "$dst" -xf -; then
+      :
+    else
+      statuses=("${PIPESTATUS[@]}")
+      if [ "${statuses[1]:-1}" -ne 0 ] || [ "${statuses[0]:-2}" -ne 1 ]; then
+        return 1
+      fi
+      changed=1
+    fi
+    json_status=0
+    system_backup_check_staged_json "$src" "$dst" "$final" || json_status=$?
+    case "$json_status" in
+      0|10) ;;
+      *) return 1 ;;
+    esac
+    if [ "$changed" = 0 ] && [ "$json_status" = 0 ]; then
+      return 0
+    fi
+    if [ "$final" = 1 ]; then
+      if [ "$strict" = 1 ]; then
+        echo "$src kept changing while it was copied ($attempt attempts)." >&2
+        return 1
+      fi
+      echo "Note: $src kept changing while it was copied ($attempt attempts); using the last copy." >&2
+      return 0
+    fi
+    attempt=$((attempt + 1))
+    find "$dst" -mindepth 1 -delete || return 1
+    sleep 1
+  done
 }
 
 # Whether this gpg can do authenticated (AEAD/OCB) encryption, which the
@@ -1252,8 +1369,7 @@ backup_system() {
     # present on a CI runner. tar is already a hard dependency of this
     # same function (used a few lines below to build the plaintext
     # archive), so a tar-to-tar pipe reuses a tool this feature already
-    # requires instead of adding a new one. `--exclude` preserves the
-    # same ephemeral-directory exclusion rsync's flag provided.
+    # requires instead of adding a new one.
     #
     # web-admin-audit.jsonl (this console's own audit log) is included
     # deliberately, same as .env and battlegroup.env: a system backup is a
@@ -1264,8 +1380,9 @@ backup_system() {
     # function excluded it outright, which broke restore for every host that
     # had ever logged an admin action; do not reintroduce that exclusion
     # without also updating restore_system()'s audit-log handling below.
-    if ! tar -C runtime/generated --exclude='dune-fake-k8s-serviceaccount-*' -cf - . \
-        | tar -C "$stage_dir/generated" -xf -; then
+    local -a generated_excludes=()
+    mapfile -t generated_excludes < <(system_backup_ephemeral_exclude_patterns)
+    if ! system_backup_stage_tree runtime/generated "$stage_dir/generated" "${generated_excludes[@]}"; then
       backup_system_cleanup_on_failure
       echo "System backup was not created because runtime/generated/ could not be staged." >&2
       return 1
@@ -1273,7 +1390,9 @@ backup_system() {
   fi
 
   if [ -d runtime/secrets ]; then
-    if ! tar -C runtime/secrets -cf - . | tar -C "$stage_dir/secrets" -xf -; then
+    # Strict: secrets change rarely, and a credential removed and recreated
+    # mid-copy must not be silently left out of the archive.
+    if ! system_backup_stage_tree --strict runtime/secrets "$stage_dir/secrets"; then
       backup_system_cleanup_on_failure
       echo "System backup was not created because runtime/secrets/ could not be staged." >&2
       return 1

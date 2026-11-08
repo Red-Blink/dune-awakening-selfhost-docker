@@ -340,9 +340,9 @@ commented list of every supported variable, grouped by feature area).
 
 `runtime/backups/system/` is the one runtime directory whose contents are
 *more* sensitive than the tree they came from: each archive bundles a database
-dump together with `.env`, all of `runtime/generated/` and all of
-`runtime/secrets/`. Nothing is redacted or excluded on the grounds of being a
-secret — confidentiality comes entirely from GPG AES-256-OCB (AEAD)
+dump together with `.env`, `runtime/generated/` (minus caches rebuilt on start
+and half-written temp files) and all of `runtime/secrets/`. Nothing is
+redacted or excluded on the grounds of being a secret — confidentiality comes entirely from GPG AES-256-OCB (AEAD)
 encryption under an operator-supplied passphrase, and there is no recovery
 without it.
 
