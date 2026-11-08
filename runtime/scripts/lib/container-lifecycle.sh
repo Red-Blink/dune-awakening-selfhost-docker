@@ -34,6 +34,18 @@ DUNE_LIFECYCLE_LOG="${DUNE_LIFECYCLE_LOG:-runtime/generated/container-lifecycle.
 DUNE_CONTAINER_LOG_DIR="${DUNE_CONTAINER_LOG_DIR:-runtime/generated/logs/containers}"
 DUNE_GAME_LOG_ARCHIVE_DIR="${DUNE_GAME_LOG_ARCHIVE_DIR:-runtime/generated/logs/archive}"
 
+# Root-run maintenance and the Console share these records. Use the existing
+# installation-owner contract when available; partial script copies still work.
+# shellcheck source=runtime/scripts/host-file-ownership.sh
+source runtime/scripts/host-file-ownership.sh 2>/dev/null || true
+
+dune_lifecycle_path_owner() {
+  if declare -F dune_set_host_path_owner >/dev/null 2>&1; then
+    dune_set_host_path_owner "$1"
+  fi
+  return 0
+}
+
 # A positive integer from a setting, or the default when it is empty, zero or not a number.
 dune_positive_or_default() {
   case "$1" in '' | *[!0-9]* | 0*) printf '%s' "$2" ;; *) printf '%s' "$1" ;; esac
@@ -69,8 +81,14 @@ dune_lifecycle_clean() {
 }
 
 dune_private_dir() {
+  local parent
+  parent="$(dirname "$1")"
+  if [ ! -d "$parent" ]; then
+    dune_private_dir "$parent" || return 1
+  fi
   mkdir -p "$1" 2>/dev/null
   chmod 700 "$1" 2>/dev/null || true
+  dune_lifecycle_path_owner "$1"
 }
 
 dune_container_removal_hook() {
@@ -87,10 +105,13 @@ dune_container_removal_hook() {
     [ -z "${SSH_CONNECTION:-}" ] || who="$who ssh=$(dune_lifecycle_clean "${SSH_CONNECTION%% *}")"
     [ -z "${DUNE_REQUEST_SOURCE:-}" ] || who="$who source=$(dune_lifecycle_clean "$DUNE_REQUEST_SOURCE")"
     caller="$(dune_caller_chain)"
-    dune_private_dir "$(dirname "$DUNE_LIFECYCLE_LOG")"
+    # runtime/generated is shared state, not a private archive directory.
+    # Preserve its existing access mode for other services and host users.
+    mkdir -p "$(dirname "$DUNE_LIFECYCLE_LOG")" 2>/dev/null
     dune_trim_lifecycle_log
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -Iseconds)" "$(dune_lifecycle_clean "$reason")" "$container" "$state" "$who" "$caller" >>"$DUNE_LIFECYCLE_LOG"
     chmod 600 "$DUNE_LIFECYCLE_LOG" 2>/dev/null
+    dune_lifecycle_path_owner "$DUNE_LIFECYCLE_LOG"
     if [ "${DUNE_KEEP_CONTAINER_LOGS:-1}" != "0" ]; then
       dune_private_dir "$DUNE_CONTAINER_LOG_DIR"
       out="$DUNE_CONTAINER_LOG_DIR/$container-$ts.log.gz"
@@ -98,6 +119,7 @@ dune_container_removal_hook() {
       # leaves a truncated file that counts toward the keep-N pruning.
       if (set -o pipefail; timeout "$(dune_positive_or_default "${DUNE_CONTAINER_LOG_TIMEOUT:-}" 30)" docker logs --timestamps "$container" 2>&1 | dune_redact_stream | gzip -c >"$out.part"); then
         mv -f "$out.part" "$out"
+        dune_lifecycle_path_owner "$out"
       else
         rm -f "$out.part"
       fi
@@ -138,6 +160,7 @@ dune_archive_one() {
   [ -f "$src" ] && [ ! -L "$src" ] || return 0
   if (set -o pipefail; timeout "$(dune_positive_or_default "${DUNE_ARCHIVE_TIMEOUT:-}" 60)" cat -- "$src" | dune_redact_stream | gzip -c >"$dest_file.part"); then
     mv -f "$dest_file.part" "$dest_file"
+    dune_lifecycle_path_owner "$dest_file"
   else
     rm -f "$dest_file.part"
   fi

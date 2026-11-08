@@ -455,6 +455,8 @@ When a game server container is removed by the stack, it takes its `docker logs`
 
 The `reason` column says which path removed the container: `despawn-server`, `stop-server-survival-1`, `stop-server-overmap`, `recycle-world-game-servers`, `db-stop-dependents` or `start-replace`.
 
+Root-run maintenance assigns private records to the installation owner so subsequent Console operations can keep saving logs. Existing permissions on the shared `runtime/generated/` directory are preserved.
+
 **Treat these files as sensitive.** Console output and game logs contain player names and addresses, and the game echoes its own command line into them. The stack masks the value of anything named like a password, token, secret or API key before saving, and writes the files owner-only (files `0600`, directories `0700`). Masking is best effort: it cannot recognise every format, so do not share these files or include them in a support bundle without looking at them first.
 
 **What this is not.** The lifecycle log is a local, best-effort record, not a tamper-evident audit trail. The requester fields come from the environment (`SSH_CONNECTION`, `SUDO_USER`, `DUNE_REQUEST_SOURCE`) and can be empty or set by the caller. The game's own rotated logs are archived at each removal, so a log the game rotates and deletes during one very long run, with no removal in between, can be missed.

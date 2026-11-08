@@ -66,6 +66,11 @@ echo "Command Line: -DatabasePassword=gamelogpass -ServiceAuthToken=gamelogtok" 
 # shellcheck source=runtime/scripts/lib/container-lifecycle.sh
 source "$repo/runtime/scripts/lib/container-lifecycle.sh"
 
+# The shared state directory is not an archive directory. Tightening it during
+# a root-run stop can lock the installation owner and Console out of state.
+mkdir -p runtime/generated
+chmod 775 runtime/generated
+
 # 1. A removal records the requester and the exit state, and saves the output.
 SSH_CONNECTION="192.0.2.7 50000 192.0.2.1 22" DUNE_REQUEST_SOURCE="unit test" \
   dune_container_removal_hook dune-server-survival-1-38 despawn-server
@@ -100,6 +105,7 @@ zcat "$saved_log" | grep -q "Atrium" || fail "redaction removed ordinary JSON va
 for p in runtime/generated/container-lifecycle.log "$saved_log" "$final"; do
   [ "$(stat -c %a "$p")" = "600" ] || fail "$p is not mode 600"
 done
+[ "$(stat -c %a runtime/generated)" = "775" ] || fail "shared generated directory permissions changed"
 for d in runtime/generated/logs runtime/generated/logs/containers runtime/generated/logs/archive runtime/generated/logs/archive/survival-1-38; do
   [ "$(stat -c %a "$d")" = "700" ] || fail "$d is not mode 700"
 done
@@ -177,6 +183,18 @@ DUNE_KEEP_CONTAINER_LOGS=0 DUNE_ARCHIVE_GAME_LOGS=0 dune_container_removal_hook 
 dune_container_removal_hook not-a-container despawn-server || fail "unknown container made the hook fail"
 mkdir -p "$test_root/empty"
 PATH="$test_root/empty" /bin/bash -c 'source "$1"; dune_container_removal_hook dune-server-survival-1-38 x' _ "$repo/runtime/scripts/lib/container-lifecycle.sh" || fail "missing docker made the hook fail"
+
+# Root-created private directories and files must use the existing host-owner
+# helper, including newly created intermediate archive directories. Spy on the
+# ownership boundary so this regression works without root privileges in CI.
+dune_set_host_path_owner() { printf '%s\n' "$1" >>"$test_root/owner-paths"; }
+dune_container_removal_hook dune-server-survival-1-38 ownership-test
+for path in runtime/generated/container-lifecycle.log runtime/generated/logs runtime/generated/logs/containers runtime/generated/logs/archive runtime/generated/logs/archive/survival-1-38; do
+  grep -Fxq "$path" "$test_root/owner-paths" || fail "ownership not assigned for $path"
+done
+grep -q '/containers/.*\.log.gz$' "$test_root/owner-paths" || fail "saved output ownership not assigned"
+grep -q '/archive/.*\.log.gz$' "$test_root/owner-paths" || fail "archived game log ownership not assigned"
+unset -f dune_set_host_path_owner
 
 # 13. The start path records a replaced container even though its caller never
 #     sources the lifecycle helper itself.
