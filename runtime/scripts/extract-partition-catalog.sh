@@ -90,10 +90,18 @@ if [ ! -s "$catalog_tmp" ]; then
   exit 1
 fi
 
-# Temporary upstream omission (issue #268). Use the same image as dune spawn;
-# preserve native definitions and skip builds without the event map assets.
-python3 runtime/scripts/supplement-event-partitions.py "$catalog_tmp" \
-  "$(resolve_game_server_image CB_Halloween_Event_Shipwreck_01)"
+# Seasonal maps follow the official template. The Scourge fallback has ended;
+# stale packaged assets must not automatically reintroduce a retired event.
+# Validate before publishing so an invalid/empty extraction keeps the old catalog.
+python3 - "$catalog_tmp" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+rows = json.loads(Path(sys.argv[1]).read_text())
+if not isinstance(rows, list) or not rows:
+    raise ValueError("Cannot publish an empty or invalid partition catalog")
+PY
 
 chmod 0644 "$catalog_tmp"
 mv -f -- "$catalog_tmp" "$catalog_output"
