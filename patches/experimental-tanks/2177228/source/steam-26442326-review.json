@@ -1,0 +1,17 @@
+{
+  "steamBuild": "26442326",
+  "worldTag": "2177228-0-shipping",
+  "imageId": "sha256:1532eabc9e00cf6e3217bdbf89070674f715aaf8c11bfb89bb0eea604dde2c43",
+  "configId": "sha256:91b4a6a9f9900793f0a052a7782b2c01dfb58a7057f3edeba7672a156b18e0db",
+  "identitySource": "Both identities independently read from the official server.tar OCI index and Docker manifest metadata.",
+  "cleanExecutableSha256": "416fe9656878ffd213584d88df8930905c46fc7401233d12448bba1a6e3a7e3e",
+  "patchedExecutableSha256": "67bc7bf984ad40b74ede13223ca582112c377ccbcbacd0fee9ca92db78127aa6",
+  "vendorStartupContract": "run.sh retains root ownership/SSH setup followed by su dune; overlay must inherit it.",
+  "directorStockConfigUnchangedFrom2173753": true,
+  "databaseUpdaterEntrypointsUnchangedFrom2173753": true,
+  "textRouterCommonStockConfigsUnchangedFrom2173753": true,
+  "stockPackagesByteIdentical": true,
+  "instructionGeneratorUnchanged": true,
+  "candidateOnly": true,
+  "gameplayVerified": false
+}

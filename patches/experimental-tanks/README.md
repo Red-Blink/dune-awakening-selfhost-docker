@@ -4,7 +4,7 @@ Opt-in, build-locked patch for **Survival_1 (all Hagga Sietches)** only.
 The official image remains unchanged. Other maps use their existing image policy.
 
 Each supported game build has its own directory here named by build number
-(2134304, 2141883, 2147284, 2156652, 2160922, 2162777, 2168446, 2173753), each with a
+(2134304, 2141883, 2147284, 2156652, 2160922, 2162777, 2168446, 2173753, 2177228), each with a
 manifest that pins the official image digest and every asset hash. Only 2134304
 is the original r5.8 patch; the later builds carry the r6.4 candidate patch
 rebased onto each official image (`candidateOnly: true`, `gameplayVerified:
