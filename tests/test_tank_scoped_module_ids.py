@@ -18,8 +18,13 @@ SPEC.loader.exec_module(scoped)
 @unittest.skipUnless(platform.machine() == 'x86_64' and shutil.which('gcc'), 'requires x86-64 assembler')
 class ScopedModuleTests(unittest.TestCase):
     def test_rebased_handlers_match_the_pinned_new_build(self):
-        directory = ROOT / 'patches/experimental-tanks/2177228'
-        spec = importlib.util.spec_from_file_location('scoped_2177228_test', directory / 'source/scoped_module_ids.py')
+        for build in ('2177228', '2180427'):
+            with self.subTest(build=build):
+                self.check_rebased_handlers(build)
+
+    def check_rebased_handlers(self, build):
+        directory = ROOT / 'patches/experimental-tanks' / build
+        spec = importlib.util.spec_from_file_location(f'scoped_{build}_test', directory / 'source/scoped_module_ids.py')
         rebased = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(rebased)
         manifest = json.loads((directory / 'manifest.json').read_text())

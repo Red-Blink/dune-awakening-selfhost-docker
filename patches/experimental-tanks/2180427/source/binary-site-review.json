@@ -1,0 +1,22 @@
+{
+  "oldBuild": "2168446-0-shipping",
+  "previousSupportedBuild": "2177228-0-shipping",
+  "newBuild": "2180427-0-shipping",
+  "steamBuild": "26547981",
+  "cleanSha256": "f7892810987d8c92b593804d1ef3807d9efb11c0e8dc75e9a17a053d473f8c05",
+  "moduleIdSites": ["0xf2e32c0", "0xf6de02e", "0xf6e3984"],
+  "initializationBranches": [
+    {"address": "0xf2f53f0", "target": "0xf2f5508", "vehicleField": "0xed0"},
+    {"address": "0xf6dd9f1", "target": "0xf6ddb94"}
+  ],
+  "overlayLoaderRegistration": "0xd6f0eba",
+  "overlayLoaderCallback": "0xd6ea180",
+  "fnameDecoder": "0xf9c0ce4",
+  "fnameDecoderBytes": "4489f0c1e810488d0dcf420b07488b44c168410fb7ce0fb73c48",
+  "fnamePool": "0x16a74fc0",
+  "fnamePoolReady": "0x16a74f91",
+  "executablePadding": {"address": "0x14228819", "size": 231, "precededByReturn": true},
+  "instructionGeneratorUnchanged": true,
+  "review": "Independent unique byte-window matches against checksum-verified stock 2168446 and native disassembly locate each new site. Module-record registers, the 0xed0 initialization field, branch destinations and loader callback registration retain their contracts. Native FName decoding confirms the relocated pool/ready globals, block offset 0x68, two-byte entry indexing and string header layout. The exported SEED_ofb128_encrypt ends with ret before 231 executable padding bytes. Changes from 2177228 are not uniform: code sites, globals and padding move differently. Detours and references are regenerated with the unchanged Tank-only generator; ordinary vehicle IDs remain native.",
+  "vendorStartupSha256": "a15e40134601470ca0ad8be424fadaa46deb4e6c7a3e9e7fdea671f7128e562d"
+}
