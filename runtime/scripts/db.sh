@@ -4135,13 +4135,18 @@ load_system_auto_state() {
 # First run in local server time; retain this anchor across hourly timer wakes
 # and reboots. Non-daily intervals advance by elapsed hours, not calendar days.
 system_auto_initial_epoch() {
-  local clock="$1" now="${2:-$(date +%s)}" today first
+  local clock="$1" now="${2:-$(date +%s)}" today first attempt
   today="$(date -d "@$now" +%F)"
-  first="$(date -d "$today $clock" +%s)" || return 1
-  if [ "$first" -lt "$now" ]; then
-    first="$(date -d "$today $clock tomorrow" +%s)" || return 1
-  fi
-  printf '%s\n' "$first"
+  for attempt in 1 2 3; do
+    # Match systemd's local calendar: skip a clock time that does not exist
+    # during the spring-forward gap, rather than normalizing it to a new hour.
+    if first="$(date -d "$today $clock" +%s 2>/dev/null)" && [ "$first" -ge "$now" ]; then
+      printf '%s\n' "$first"
+      return 0
+    fi
+    today="$(date -d "$today 12:00 tomorrow" +%F)" || return 1
+  done
+  return 1
 }
 
 system_auto_next_epoch() {

@@ -83,6 +83,15 @@ class TimingTests(unittest.TestCase):
                               'date -d "@$n" +%FT%R; echo $((n-a))',
                               "America/New_York"), "2026-11-01T04:30\n90000")
 
+    def test_daily_spring_forward_keeps_clock_and_skips_nonexistent_time(self):
+        self.assertEqual(bash('a=$(date -d "2026-03-07 04:30" +%s); '
+                              'n=$(system_auto_next_epoch "$a" "$a" 24); '
+                              'date -d "@$n" +%FT%R; echo $((n-a))',
+                              "America/New_York"), "2026-03-08T04:30\n82800")
+        self.assertEqual(bash('a=$(date -d "2026-03-07 02:30" +%s); '
+                              'date -d "@$(system_auto_next_epoch "$a" "$a" 24)" +%FT%R',
+                              "America/New_York"), "2026-03-09T02:30")
+
     def test_timer_condition_guards_hourly_wake(self):
         timer = bash('SYSTEM_AUTO_UNIT=dune-test; system_auto_timer_text 22:15 168')
         self.assertIn("OnCalendar=*-*-* *:15:00", timer)
