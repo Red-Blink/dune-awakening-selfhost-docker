@@ -1,7 +1,7 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 
 // Matches SYSTEM_BACKUP_PASSPHRASE_DIR and SYSTEM_AUTO_STATE_FILE in
 // runtime/scripts/db.sh. Outside runtime/secrets/ so the key is never archived
@@ -20,6 +20,7 @@ export function systemBackupPassphraseProblem(value) {
   if (typeof value !== "string" || value.length < 12) return "The passphrase must be at least 12 characters.";
   if (value.length > 1024) return "The passphrase is too long.";
   if (/[\r\n]/.test(value)) return "The passphrase cannot contain line breaks.";
+  if (value.includes("\0")) return "The passphrase cannot contain null characters.";
   // A floor, not a complexity policy: the archive is downloadable, so a
   // degenerate passphrase is crackable offline however strong the KDF is.
   if (new Set(value).size < 5) return "The passphrase must use at least 5 different characters.";
@@ -39,6 +40,10 @@ function writePrivateFileAtomic(path, data) {
 }
 
 export function saveSystemBackupPassphrase(config, passphrase, now = new Date()) {
+  return withSystemBackupLock(config, () => writeSystemBackupPassphrase(config, passphrase, now));
+}
+
+function writeSystemBackupPassphrase(config, passphrase, now) {
   const { dir, file, meta } = systemBackupPassphrasePaths(config);
   const replaced = existsSync(file);
   mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -50,6 +55,10 @@ export function saveSystemBackupPassphrase(config, passphrase, now = new Date())
 }
 
 export function removeSystemBackupPassphrase(config) {
+  return withSystemBackupLock(config, () => deleteSystemBackupPassphrase(config));
+}
+
+function deleteSystemBackupPassphrase(config) {
   const { file, meta } = systemBackupPassphrasePaths(config);
   const existed = existsSync(file);
   rmSync(file, { force: true });
@@ -89,6 +98,30 @@ export function systemAutoBackupEnabled(config) {
 
 // Matches SYSTEM_BACKUP_LOCK_FILE in runtime/scripts/db.sh.
 export const SYSTEM_BACKUP_LOCK_FILE = "runtime/backups/.system-backup.lock";
+
+// flock locks the inherited open-file description. Keeping our descriptor open
+// retains that lock after the short flock process exits, until both the secret
+// and its metadata have been updated. A probe alone leaves a race with systemd.
+export function withSystemBackupLock(config, action) {
+  const path = resolve(config.repoRoot, SYSTEM_BACKUP_LOCK_FILE);
+  mkdirSync(dirname(path), { recursive: true });
+  const fd = openSync(path, "a", 0o600);
+  try {
+    try {
+      execFileSync("flock", ["-n", "-E", "75", "3"], {
+        stdio: ["ignore", "ignore", "pipe", fd], timeout: 5000
+      });
+    } catch (error) {
+      if (error?.status === 75) {
+        throw Object.assign(new Error("A system backup or restore is running. Try again when it finishes."), { statusCode: 409 });
+      }
+      throw error;
+    }
+    return action();
+  } finally {
+    closeSync(fd);
+  }
+}
 
 // True while db.sh holds the system-backup lock. A running backup has already
 // read the old passphrase, so replacing it then would mislabel that archive.

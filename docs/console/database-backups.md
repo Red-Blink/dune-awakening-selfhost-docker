@@ -107,8 +107,11 @@ row of settings.
    passphrase saved in the **Saved Passphrase** block at the bottom of that
    section (entered twice). It cannot be read back afterwards. Only the Owner
    role can save, replace or remove it.
-2. **Set the schedule.** First Backup Time and Repeat Every work like the
-   database timer. **Keep Newest** is how many scheduled archives to keep. The
+2. **Set the schedule.** First Backup Time uses the server's local clock. Repeat
+   Every sets the hours between backups, including intervals longer than a day.
+   A 24-hour schedule keeps the same local time across daylight-saving changes.
+   Next Run shows when the next backup is due. **Keep Newest** is how many
+   scheduled archives to keep. The
    line under it shows how many automatic archives are stored now, how many the
    next run will remove, and how many remain. The next run counts its own new
    archive first, so a host already at the limit still loses one. Saving deletes

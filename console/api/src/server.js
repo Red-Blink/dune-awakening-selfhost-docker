@@ -2480,6 +2480,7 @@ async function systemBackupPassphraseSaveRoute(req, res) {
   try {
     saved = saveSystemBackupPassphrase(config, passphrase);
   } catch (error) {
+    if (error?.statusCode === 409) return json(res, 409, { error: error.message });
     audit(config, req, "backup.system-passphrase.save-failed", { passphrase: "<redacted>", error: redact(error?.code || "write failed") });
     return json(res, 500, { error: "Could not save the passphrase. Check that runtime/system-backup/ is writable by the console." });
   }

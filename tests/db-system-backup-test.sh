@@ -3471,8 +3471,8 @@ for expected in \
     'ExecStart=/usr/bin/env docker run --rm --name dune-system-backup --network host --user ' \
     'redblink-dune-docker-console:dev -lc "runtime/scripts/dune db auto-system run"' \
     '-v /etc/localtime:/etc/localtime:ro' \
-    'OnCalendar=*-*-* 03:15:00' \
-    'OnUnitActiveSec=12h' \
+    'OnCalendar=*-*-* *:15:00' \
+    'ExecCondition=/usr/bin/env bash' \
     'Persistent=true' \
     'Unit=dune-awakening-system-backup.service'; do
   if ! grep -qF -- "$expected" "$case62_root/auto.log"; then

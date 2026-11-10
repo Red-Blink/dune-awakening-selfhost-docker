@@ -4070,6 +4070,14 @@ acquire_system_backup_lock() {
   fi
   mkdir -p "$(dirname "$SYSTEM_BACKUP_LOCK_FILE")"
   exec {SYSTEM_BACKUP_LOCK_FD}>>"$SYSTEM_BACKUP_LOCK_FILE"
+  chmod 600 "$SYSTEM_BACKUP_LOCK_FILE"
+  if [ "$(id -u)" = "0" ]; then
+    # Root maintenance must not leave a lock the non-root Console cannot open.
+    # shellcheck source=runtime/scripts/host-file-ownership.sh
+    source runtime/scripts/host-file-ownership.sh
+    dune_set_host_path_owner "$(dirname "$SYSTEM_BACKUP_LOCK_FILE")"
+    dune_set_host_path_owner "$SYSTEM_BACKUP_LOCK_FILE"
+  fi
   if ! flock -n "$SYSTEM_BACKUP_LOCK_FD"; then
     echo "Another system backup or restore is in progress. Try again when it finishes." >&2
     return 75
@@ -4111,6 +4119,7 @@ load_system_auto_state() {
   SYSTEM_AUTO_INTERVAL_HOURS=24
   SYSTEM_AUTO_KEEP=7
   SYSTEM_AUTO_MODE=""
+  SYSTEM_AUTO_ANCHOR_EPOCH=0
   if [ -r "$SYSTEM_AUTO_STATE_FILE" ]; then
     # shellcheck disable=SC1090
     . "$SYSTEM_AUTO_STATE_FILE"
@@ -4118,6 +4127,57 @@ load_system_auto_state() {
   validate_backup_time "$SYSTEM_AUTO_TIME" || SYSTEM_AUTO_TIME="04:30"
   validate_interval_hours "$SYSTEM_AUTO_INTERVAL_HOURS" || SYSTEM_AUTO_INTERVAL_HOURS=24
   validate_system_auto_keep "$SYSTEM_AUTO_KEEP" || SYSTEM_AUTO_KEEP=7
+  if ! [[ "$SYSTEM_AUTO_ANCHOR_EPOCH" =~ ^[1-9][0-9]{0,10}$ ]]; then
+    SYSTEM_AUTO_ANCHOR_EPOCH="$(system_auto_initial_epoch "$SYSTEM_AUTO_TIME")"
+  fi
+}
+
+# First run in local server time; retain this anchor across hourly timer wakes
+# and reboots. Non-daily intervals advance by elapsed hours, not calendar days.
+system_auto_initial_epoch() {
+  local clock="$1" now="${2:-$(date +%s)}" today first
+  today="$(date -d "@$now" +%F)"
+  first="$(date -d "$today $clock" +%s)" || return 1
+  if [ "$first" -lt "$now" ]; then
+    first="$(date -d "$today $clock tomorrow" +%s)" || return 1
+  fi
+  printf '%s\n' "$first"
+}
+
+system_auto_next_epoch() {
+  local anchor="$1" last="$2" hours="$3" period
+  if [ "$last" -lt "$anchor" ]; then
+    printf '%s\n' "$anchor"
+  elif [ "$hours" -eq 24 ]; then
+    # A daily local-clock schedule must keep its clock time across DST.
+    system_auto_initial_epoch "$(date -d "@$anchor" +%H:%M)" "$((last + 1))"
+  else
+    period=$((10#$hours * 3600))
+    printf '%s\n' "$((anchor + ((last - anchor) / period + 1) * period))"
+  fi
+}
+
+load_system_auto_last_run() {
+  SYSTEM_AUTO_LAST_RUN_AT=""
+  SYSTEM_AUTO_LAST_RUN_EPOCH=0
+  SYSTEM_AUTO_LAST_RESULT=""
+  SYSTEM_AUTO_LAST_MESSAGE=""
+  SYSTEM_AUTO_LAST_ARCHIVE=""
+  # shellcheck disable=SC1090
+  [ ! -r "$SYSTEM_AUTO_LAST_RUN_FILE" ] || . "$SYSTEM_AUTO_LAST_RUN_FILE"
+  [[ "$SYSTEM_AUTO_LAST_RUN_EPOCH" =~ ^[0-9]{1,11}$ ]] || SYSTEM_AUTO_LAST_RUN_EPOCH=0
+}
+
+# ExecCondition does this inexpensive host-only check before starting a Docker
+# helper. A daily calendar plus OnUnitActiveSec is an OR, so it cannot express
+# intervals such as 36 or 168 hours: the daily trigger would run too soon.
+system_auto_due() {
+  load_system_auto_state
+  [ "$SYSTEM_AUTO_ENABLED" = "1" ] || return 1
+  load_system_auto_last_run
+  local next
+  next="$(system_auto_next_epoch "$SYSTEM_AUTO_ANCHOR_EPOCH" "$SYSTEM_AUTO_LAST_RUN_EPOCH" "$SYSTEM_AUTO_INTERVAL_HOURS")"
+  [ "$(date +%s)" -ge "$next" ]
 }
 
 write_system_auto_state() {
@@ -4130,6 +4190,7 @@ SYSTEM_AUTO_TIME=$2
 SYSTEM_AUTO_INTERVAL_HOURS=$3
 SYSTEM_AUTO_KEEP=$4
 SYSTEM_AUTO_MODE=$5
+SYSTEM_AUTO_ANCHOR_EPOCH=${6:-$(system_auto_initial_epoch "$2")}
 EOF
   chmod 644 "$tmp_file" 2>/dev/null || true
   mv -f "$tmp_file" "$SYSTEM_AUTO_STATE_FILE"
@@ -4149,6 +4210,7 @@ record_system_auto_run() {
   tmp_file="${SYSTEM_AUTO_LAST_RUN_FILE}.tmp.$$"
   {
     printf 'SYSTEM_AUTO_LAST_RUN_AT=%q\n' "$(date -Iseconds)"
+    printf 'SYSTEM_AUTO_LAST_RUN_EPOCH=%s\n' "$(date +%s)"
     printf 'SYSTEM_AUTO_LAST_RESULT=%q\n' "$result"
     printf 'SYSTEM_AUTO_LAST_MESSAGE=%q\n' "$(printf '%s' "$message" | tr '\n' ' ')"
     printf 'SYSTEM_AUTO_LAST_ARCHIVE=%q\n' "$archive"
@@ -4173,7 +4235,8 @@ system_auto_service_text() {
     "" \
     "[Service]" \
     "Type=oneshot" \
-    "WorkingDirectory=$host_root"
+    "WorkingDirectory=$host_root" \
+    "ExecCondition=/usr/bin/env bash $host_root/runtime/scripts/db.sh auto-system due"
   if [ "$mode" = "image" ]; then
     # The console image, not host gpg: the archive format needs GnuPG 2.3+,
     # which older host distributions do not ship. Same container shape as
@@ -4202,9 +4265,14 @@ system_auto_timer_text() {
     "[Unit]" \
     "Description=Run Dune Awakening scheduled system backup" \
     "" \
-    "[Timer]" \
-    "OnCalendar=*-*-* ${backup_time}:00"
-  [ "$interval_hours" = "24" ] || printf '%s\n' "OnUnitActiveSec=${interval_hours}h"
+    "[Timer]"
+  if [ "$interval_hours" = "24" ]; then
+    printf '%s\n' "OnCalendar=*-*-* ${backup_time}:00"
+  else
+    # The condition checks the persisted anchor/last run, including after a
+    # missed wake or reboot. Skipped conditions never start the backup helper.
+    printf '%s\n' "OnCalendar=*-*-* *:${backup_time#*:}:00"
+  fi
   printf '%s\n' \
     "Persistent=true" \
     "Unit=$SYSTEM_AUTO_UNIT.service" \
@@ -4289,24 +4357,26 @@ remove_system_auto_units() {
 
 # Prints the "Systemd timer:" and "Next run:" status lines.
 system_auto_timer_info() {
+  local next_epoch next_text
+  next_epoch="$(system_auto_next_epoch "$SYSTEM_AUTO_ANCHOR_EPOCH" "$SYSTEM_AUTO_LAST_RUN_EPOCH" "$SYSTEM_AUTO_INTERVAL_HOURS")"
+  next_text="$(date -d "@$next_epoch" '+%Y-%m-%d %H:%M:%S %Z')"
   local script='
     if systemctl list-unit-files "$UNIT_NAME.timer" --no-legend --no-pager 2>/dev/null | grep -q "^$UNIT_NAME.timer"; then
       echo "Systemd timer:    $(systemctl is-enabled "$UNIT_NAME.timer" 2>/dev/null || echo unknown)"
-      next="$(systemctl show "$UNIT_NAME.timer" -p NextElapseUSecRealtime --value 2>/dev/null || true)"
-      echo "Next run:         ${next:-unknown}"
+      echo "Next run:         ${NEXT_RUN_TEXT:-unknown}"
     else
       echo "Systemd timer:    not installed"
       echo "Next run:         -"
     fi
   '
   if command -v systemctl >/dev/null 2>&1; then
-    UNIT_NAME="$SYSTEM_AUTO_UNIT" bash -c "$script"
+    UNIT_NAME="$SYSTEM_AUTO_UNIT" NEXT_RUN_TEXT="$next_text" bash -c "$script"
     return
   fi
   if can_manage_host_systemd_with_docker; then
     docker run --rm --user 0:0 --privileged --pid=host --network=host \
-      -e "UNIT_NAME=$SYSTEM_AUTO_UNIT" -e "SCRIPT=$script" -v /:/host \
-      --entrypoint bash "$(docker_helper_image)" -lc 'chroot /host /usr/bin/env UNIT_NAME="$UNIT_NAME" bash -c "$SCRIPT"' && return
+      -e "UNIT_NAME=$SYSTEM_AUTO_UNIT" -e "NEXT_RUN_TEXT=$next_text" -e "SCRIPT=$script" -v /:/host \
+      --entrypoint bash "$(docker_helper_image)" -lc 'chroot /host /usr/bin/env UNIT_NAME="$UNIT_NAME" NEXT_RUN_TEXT="$NEXT_RUN_TEXT" bash -c "$SCRIPT"' && return
   fi
   echo "Systemd timer:    unknown"
   echo "Next run:         -"
@@ -4316,7 +4386,7 @@ system_auto_enable() {
   local backup_time="${1:-}"
   local interval_hours="${2:-}"
   local keep="${3:-}"
-  local mode
+  local mode anchor
 
   load_system_auto_state
   [ -n "$backup_time" ] || { echo "Usage: dune db auto-system enable <HH:MM> [interval-hours] [keep]" >&2; exit 2; }
@@ -4345,9 +4415,13 @@ system_auto_enable() {
   fi
 
   system_auto_units "$mode" "$backup_time" "$interval_hours"
-  write_system_auto_state 1 "$backup_time" "$interval_hours" "$keep" "$mode"
+  anchor="$SYSTEM_AUTO_ANCHOR_EPOCH"
+  if [ "$SYSTEM_AUTO_ENABLED" != "1" ] || [ "$SYSTEM_AUTO_TIME" != "$backup_time" ] || [ "$SYSTEM_AUTO_INTERVAL_HOURS" != "$interval_hours" ]; then
+    anchor="$(system_auto_initial_epoch "$backup_time")"
+  fi
+  write_system_auto_state 1 "$backup_time" "$interval_hours" "$keep" "$mode" "$anchor"
   if ! install_system_auto_units; then
-    write_system_auto_state 0 "$backup_time" "$interval_hours" "$keep" "$mode"
+    write_system_auto_state 0 "$backup_time" "$interval_hours" "$keep" "$mode" "$anchor"
     echo "Scheduled system backups were not enabled: the systemd timer could not be installed." >&2
     echo "Run this command as root on the host, or from the console with the Docker socket available." >&2
     exit 1
@@ -4388,12 +4462,7 @@ system_auto_disable() {
 system_auto_status() {
   local saved_at
   load_system_auto_state
-  SYSTEM_AUTO_LAST_RUN_AT=""
-  SYSTEM_AUTO_LAST_RESULT=""
-  SYSTEM_AUTO_LAST_MESSAGE=""
-  SYSTEM_AUTO_LAST_ARCHIVE=""
-  # shellcheck disable=SC1090
-  [ ! -r "$SYSTEM_AUTO_LAST_RUN_FILE" ] || . "$SYSTEM_AUTO_LAST_RUN_FILE"
+  load_system_auto_last_run
 
   echo "=== Scheduled system backups ==="
   if [ "$SYSTEM_AUTO_ENABLED" = "1" ]; then echo "Enabled:          true"; else echo "Enabled:          false"; fi
@@ -4545,6 +4614,7 @@ handle_system_auto_backup() {
     disable|off) system_auto_disable "${2:-}" "${3:-}" "${4:-}" ;;
     status) system_auto_status ;;
     run) system_auto_run ;;
+    due) system_auto_due ;;
     units)
       # Prints what enable would install, for a manual install or a review.
       load_system_auto_state

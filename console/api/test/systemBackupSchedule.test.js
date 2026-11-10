@@ -9,8 +9,26 @@ import {
   saveSystemBackupPassphrase,
   systemAutoBackupEnabled,
   systemBackupInProgress,
-  systemBackupPassphraseStatus
+  systemBackupPassphraseStatus,
+  systemBackupPassphraseProblem,
+  withSystemBackupLock
 } from "../src/services/systemBackupSchedule.js";
+
+test("a passphrase cannot contain a NUL that the shell would silently discard", () => {
+  assert.notEqual(systemBackupPassphraseProblem("correct horse\0battery staple"), "");
+});
+
+test("the inherited descriptor retains the backup lock throughout a passphrase write", () => {
+  const { config } = makeHost();
+  withSystemBackupLock(config, () => {
+    assert.equal(systemBackupInProgress(config), true);
+    assert.throws(() => saveSystemBackupPassphrase(config, "correct horse battery staple"), { statusCode: 409 });
+    assert.throws(() => removeSystemBackupPassphrase(config), { statusCode: 409 });
+  });
+  assert.equal(systemBackupInProgress(config), false);
+  assert.throws(() => withSystemBackupLock(config, () => { throw new Error("write failed"); }), /write failed/);
+  assert.equal(systemBackupInProgress(config), false);
+});
 
 function makeHost() {
   const root = mkdtempSync(join(tmpdir(), "system-backup-schedule-"));
