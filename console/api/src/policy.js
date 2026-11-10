@@ -350,6 +350,9 @@ export const DEFAULT_POLICIES = {
         "backups:download-system",
         "backups:import-system",
         "backups:restore-system",
+        // Choosing the key for every future scheduled archive is the same
+        // custody decision as the three above, even though it is never read back.
+        "backups:set-system-passphrase",
       ]}
     ]
   },

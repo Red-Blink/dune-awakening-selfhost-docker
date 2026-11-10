@@ -50,6 +50,7 @@ const simpleOperations = {
   backupSystemCreate: ["db", "backup-system"],
   backupSystemDeleteAll: ["db", "delete-system", "--all"],
   backupAutoDisable: ["db", "auto", "disable"],
+  backupSystemAutoStatus: ["db", "auto-system", "status"],
   init: ["init"],
   restartScheduleStatus: ["restart-schedule", "status"],
   restartScheduleDisable: ["restart-schedule", "disable"],
@@ -161,6 +162,23 @@ export function buildDuneArgs(operation, payload = {}) {
         args.push(String(retentionDays), String(intervalHours));
         return args;
       }
+    case "backupSystemAutoEnable":
+    case "backupSystemAutoDisable":
+      // A bare disable ({ enabled: false } from an API client) keeps the saved
+      // policy rather than resetting it to the defaults below.
+      if (operation === "backupSystemAutoDisable" && payload.time == null && payload.intervalHours == null && payload.keep == null) {
+        return ["db", "auto-system", "disable"];
+      }
+      // Otherwise all three explicit: omitted CLI arguments keep the saved
+      // policy, which would drop edits saved while the schedule is off.
+      return [
+        "db",
+        "auto-system",
+        operation === "backupSystemAutoEnable" ? "enable" : "disable",
+        validateUpdateTime(payload.time || "04:30"),
+        String(validateInteger(payload.intervalHours ?? 24, 1, 168)),
+        String(validateInteger(payload.keep ?? 7, 1, 365))
+      ];
     case "backupAutoRetention":
       return ["db", "auto", "retention", String(validateInteger(payload.retentionDays, 0, 3650))];
     case "updateAutoEnable":

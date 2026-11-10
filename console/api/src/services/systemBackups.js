@@ -92,7 +92,9 @@ export function listSystemBackups(config) {
     }
 
     const metadata = readSystemBackupMetadata(directory, entry.name);
-    const origin = String(metadata.backup_origin || "").trim().toLowerCase();
+    // Same fallback as db.sh backup_is_automatic, so the console and the prune
+    // never disagree about which archives are automatic.
+    const origin = String(metadata.backup_origin || metadata.origin || "").trim().toLowerCase();
     rows.push({
       name: entry.name,
       createdAt: metadata.created_at || "",
@@ -113,6 +115,10 @@ export function listSystemBackups(config) {
       // before this existed, or the earlier exclude-then-refuse design) reads
       // as false, which is correct: those archives genuinely carry none.
       includesAuditLog: String(metadata.includes_audit_log || "").trim() === "true",
+      // Which passphrase opens it, so a replaced saved passphrase does not leave
+      // the operator guessing. Older archives have no field: "".
+      passphraseSource: /^(saved|typed)$/.test(String(metadata.passphrase_source || "").trim()) ? String(metadata.passphrase_source).trim() : "",
+      passphraseSavedAt: String(metadata.passphrase_saved_at || "").trim(),
       sizeBytes,
       size: formatBackupSize(sizeBytes)
     });

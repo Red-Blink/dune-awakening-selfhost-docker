@@ -460,7 +460,7 @@ test("every action in the catalog is grantable by name", () => {
 // as { "backups": "write" } gained whole-host takeover on upgrade, with no
 // re-save and nothing for the operator to review.
 test("a stored write level does not reach the whole-host backup actions", () => {
-  for (const action of ["backups:download-system", "backups:import-system", "backups:restore-system"]) {
+  for (const action of ["backups:download-system", "backups:import-system", "backups:restore-system", "backups:set-system-passphrase"]) {
     assert.equal(scopeAllowsAction("backups", "write", action), false, `write must not cover ${action}`);
     assert.equal(scopeAllowsAction("backups", "read", action), false, `read must not cover ${action}`);
   }
@@ -494,7 +494,7 @@ test("a stored vehicles write level does not reach the stored-vehicle delete", (
 test("the excluded actions can still be granted by naming them", () => {
   // The point is that the operator has to choose them, not that they are
   // unreachable -- an explicit action list is a deliberate act.
-  for (const action of ["backups:download-system", "backups:import-system", "backups:restore-system"]) {
+  for (const action of ["backups:download-system", "backups:import-system", "backups:restore-system", "backups:set-system-passphrase"]) {
     assert.equal(scopeAllowsAction("backups", [action], action), true, `an explicit grant of ${action} must work`);
   }
 });

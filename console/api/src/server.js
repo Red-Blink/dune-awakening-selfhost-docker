@@ -36,12 +36,13 @@ import { buildingUnlockStatus, customizationGrantGroups, customizationGrantStatu
 import { buildBroadcastCommand, buildShutdownBroadcastCommand, publishCarePackageWhisper, publishServerCommand } from "./rmq.js";
 import { clearCarePackageHistory, enableCarePackage, ensureCarePackageServerPersona, grantEligibleCarePackages, grantCarePackage, retryCarePackageGrant, runCarePackageAutoScan, maintainCarePackageHistory, saveCarePackageConfig, carePackageCapabilities, carePackageConfig, carePackageEligiblePlayers, carePackageHistory } from "./carePackage.js";
 import { readJsonBody, readMultipartForm, streamRequestToFile } from "./httpSafety.js";
-import { buildMapStatusResponse, buildMapsListResponse, buildServerStatusResponse, parseBackupAutoStatus, parseBackupListRows } from "./statusParsers.js";
+import { buildMapStatusResponse, buildMapsListResponse, buildServerStatusResponse, parseBackupAutoStatus, parseBackupListRows, parseSystemBackupAutoStatus } from "./statusParsers.js";
 import { assertInstalledAddonPermission, fetchCommunityAddons, installCommunityAddon, installedAddonContentPath, listInstalledAddons, removeInstalledAddon, setInstalledAddonEnabled, syncInstalledAddonLifecycle, updateCommunityAddon } from "./addons.js";
 import { createHardwareStatusProvider, performanceSnapshot as collectPerformanceSnapshot } from "./services/performance.js";
 import { serveStatic, contentTypeForPath } from "./http/staticFiles.js";
 import { discoverServices } from "./services/serviceDiscovery.js";
 import { listSystemBackups, systemArchiveHash, systemBackupBundleMembers, systemBackupDir, validSystemArchiveName, validSystemBackupName } from "./services/systemBackups.js";
+import { automaticSystemBackupTotals, removeSystemBackupPassphrase, saveSystemBackupPassphrase, systemAutoBackupEnabled, systemBackupPassphrasePaths, systemBackupInProgress, systemBackupPassphraseProblem, systemBackupPassphraseStatus } from "./services/systemBackupSchedule.js";
 import { createRestorePreviewReceipts, restorePreviewRejectionMessage } from "./services/restorePreviewReceipts.js";
 import { looksLikeTar, mintSystemBackupName, normalizeImportedSystemMetadata, readEncryptedArchiveHeader, readTarMemberIndex, sanitizeUploadFilename, synthesizeSystemMetadata } from "./services/systemBackupImport.js";
 import { createTarHeader, tarArchiveLength, tarPadding, TAR_TRAILER_BYTES, createBackupDownloadArchive, enrichBackupRows, nextImportedBackupName, normalizeImportedBackupMetadata, readCurrentBattlegroupId, validBackupDownloadName } from "./services/backups.js";
@@ -928,6 +929,12 @@ async function handleApi(req, res) {
   if (path === "/api/backups/system" && req.method === "GET") return json(res, 200, { rows: listSystemBackups(config) });
   if (path === "/api/backups/system/create" && req.method === "POST") return systemBackupCreateRoute(req, res);
   if (path === "/api/backups/system/import" && req.method === "POST") return systemBackupImportRoute(req, res);
+  // Ahead of the "/api/backups/system/{name}" DELETE below, which would read
+  // "passphrase" as an archive name.
+  if (path === "/api/backups/system/auto" && req.method === "GET") return systemBackupAutoStatusRoute(res);
+  if (path === "/api/backups/system/auto" && req.method === "POST") return systemBackupAutoRoute(req, res);
+  if (path === "/api/backups/system/passphrase" && req.method === "PUT") return systemBackupPassphraseSaveRoute(req, res);
+  if (path === "/api/backups/system/passphrase" && req.method === "DELETE") return systemBackupPassphraseRemoveRoute(req, res);
   if (path.match(/^\/api\/backups\/system\/[^/]+\/download$/) && req.method === "GET") {
     return sendSystemBackupArchive(req, res, decodeURIComponent(path.split("/").at(-2)));
   }
@@ -2137,16 +2144,20 @@ async function systemBackupCreateRoute(req, res) {
   // leaves another archive of every credential on disk.
   if (!applyMutationRateLimit(req, res, "backups.system.create")) return;
   const body = await readJson(req);
-  const passphrase = String(body?.passphrase || "");
-  // Validated before any task exists, so a rejected request leaves no trace.
-  if (passphrase.length < 12) return json(res, 400, { error: "The passphrase must be at least 12 characters." });
-  if (passphrase.length > 1024) return json(res, 400, { error: "The passphrase is too long." });
-  // Not a complexity policy -- just a floor. The archive is downloadable, so a
-  // degenerate passphrase makes it trivially crackable offline no matter how
-  // strong the KDF is.
-  if (new Set(passphrase).size < 5) {
-    return json(res, 400, { error: "The passphrase must use at least 5 different characters." });
+  if (body?.useSavedPassphrase === true) {
+    if (!systemBackupPassphraseStatus(config).saved) {
+      return json(res, 400, { error: "No passphrase is saved. Save one under Automatic System Backups first." });
+    }
+    audit(config, req, "backup.create-system", { passphraseSource: "saved" });
+    // The path, not the secret: db.sh reads the file itself.
+    return task(req, res, "backup", "backupSystemCreate", {}, {
+      env: { DUNE_SYSTEM_BACKUP_PASSPHRASE: "", DUNE_SYSTEM_BACKUP_PASSPHRASE_FILE: systemBackupPassphrasePaths(config).file }
+    });
   }
+  const passphrase = typeof body?.passphrase === "string" ? body.passphrase : "";
+  // Validated before any task exists, so a rejected request leaves no trace.
+  const problem = systemBackupPassphraseProblem(passphrase);
+  if (problem) return json(res, 400, { error: problem });
 
   audit(config, req, "backup.create-system", {});
   // The passphrase goes in options.env -- never the payload, which is audited,
@@ -2429,6 +2440,67 @@ async function backupDownloadRoute(req, res, backupName) {
     await outPromise;
     if (!res.destroyed) res.destroy();
   }
+}
+
+async function systemBackupAutoStatusRoute(res) {
+  const passphrase = systemBackupPassphraseStatus(config);
+  const totals = automaticSystemBackupTotals(listSystemBackups(config));
+  const extra = { passphraseSaved: passphrase.saved, passphraseSavedAt: passphrase.savedAt, ...totals };
+  if (config.mockMode) {
+    return json(res, 200, { ...mockCommand("backupSystemAutoStatus"), status: { ok: true, enabled: false, backupTime: "04:30", intervalHours: "24", keep: "7", execution: "", timer: "not installed", nextRun: "", lastRunAt: "", lastResult: "", lastMessage: "", lastArchive: "", reason: "", ...extra } });
+  }
+  const result = await safeCommand("backupSystemAutoStatus");
+  return json(res, 200, { ...result, status: { ...parseSystemBackupAutoStatus(result), ...extra } });
+}
+
+async function systemBackupAutoRoute(req, res) {
+  const body = await readJson(req);
+  if (body?.enabled === true && !systemBackupPassphraseStatus(config).saved) {
+    return json(res, 400, { error: "Save a passphrase before enabling scheduled system backups." });
+  }
+  const operation = body?.enabled === true ? "backupSystemAutoEnable" : "backupSystemAutoDisable";
+  return task(req, res, "backup", operation, { time: body?.time, intervalHours: body?.intervalHours, keep: body?.keep });
+}
+
+// Write-only: no route reads the passphrase back, so a stolen session can
+// replace it but never learn it.
+async function systemBackupPassphraseSaveRoute(req, res) {
+  if (!applyMutationRateLimit(req, res, "backups.system.passphrase")) return;
+  const body = await readJson(req);
+  const passphrase = typeof body?.passphrase === "string" ? body.passphrase : "";
+  if (passphrase !== (typeof body?.passphraseConfirm === "string" ? body.passphraseConfirm : "")) {
+    return json(res, 400, { error: "The passphrases don't match." });
+  }
+  const problem = systemBackupPassphraseProblem(passphrase);
+  if (problem) return json(res, 400, { error: problem });
+  if (systemBackupInProgress(config)) {
+    return json(res, 409, { error: "A system backup or restore is running. Save the passphrase when it finishes." });
+  }
+  let saved;
+  try {
+    saved = saveSystemBackupPassphrase(config, passphrase);
+  } catch (error) {
+    if (error?.statusCode === 409) return json(res, 409, { error: error.message });
+    audit(config, req, "backup.system-passphrase.save-failed", { passphrase: "<redacted>", error: redact(error?.code || "write failed") });
+    return json(res, 500, { error: "Could not save the passphrase. Check that runtime/system-backup/ is writable by the console." });
+  }
+  audit(config, req, "backup.system-passphrase.save", { passphrase: "<redacted>", replaced: saved.replaced });
+  return json(res, 200, { ok: true, saved: true, savedAt: saved.savedAt, replaced: saved.replaced });
+}
+
+async function systemBackupPassphraseRemoveRoute(req, res) {
+  if (!applyMutationRateLimit(req, res, "backups.system.passphrase")) return;
+  // Fail closed: a schedule with no key would fail every run without anyone
+  // having asked for that.
+  if (systemAutoBackupEnabled(config)) {
+    return json(res, 409, { error: "Disable scheduled system backups before removing the saved passphrase." });
+  }
+  if (systemBackupInProgress(config)) {
+    return json(res, 409, { error: "A system backup or restore is running. Remove the passphrase when it finishes." });
+  }
+  const result = removeSystemBackupPassphrase(config);
+  audit(config, req, "backup.system-passphrase.remove", { removed: result.removed });
+  return json(res, 200, { ok: true, saved: false, removed: result.removed });
 }
 
 async function backupAutoStatusRoute(res) {

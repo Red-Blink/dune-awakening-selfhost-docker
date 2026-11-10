@@ -565,6 +565,10 @@ Usage:
   dune db auto status
   dune db auto retention <days>
   dune db auto retention off
+  dune db auto-system enable <HH:MM> [interval-hours] [keep]
+  dune db auto-system disable
+  dune db auto-system status
+  dune db auto-system passphrase set|remove
   dune db transfer [--dry-run] [--yes] [--no-backup] <old-fls-id> <new-fls-id>
   dune db transfer --file <plan.tsv> [--dry-run] [--yes]
   dune db transfer pending|apply-pending|clear-pending
