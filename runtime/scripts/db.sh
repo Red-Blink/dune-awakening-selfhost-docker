@@ -17,6 +17,14 @@ AUTO_TIMER_FILE="/etc/systemd/system/dune-awakening-db-backup.timer"
 PENDING_TRANSFER_FILE="runtime/generated/pending-character-transfers.tsv"
 BATTLEGROUP_RESTORE_FILE="runtime/generated/battlegroup-restore-point.env"
 DB_RESTORE_MAINTENANCE_FILE="${DUNE_DB_RESTORE_MAINTENANCE_FILE:-runtime/generated/db-restore-maintenance}"
+SYSTEM_AUTO_STATE_FILE="runtime/generated/system-backup-auto.env"
+SYSTEM_AUTO_UNIT="dune-awakening-system-backup"
+# Outside runtime/secrets/ on purpose: backup_system archives that whole tree and
+# restore_system replaces it, so a key kept there would ride inside every archive
+# it encrypts and be overwritten by the next restore.
+SYSTEM_BACKUP_PASSPHRASE_DIR="runtime/system-backup"
+SYSTEM_BACKUP_PASSPHRASE_FILE_DEFAULT="$SYSTEM_BACKUP_PASSPHRASE_DIR/passphrase"
+SYSTEM_BACKUP_PASSPHRASE_META_DEFAULT="$SYSTEM_BACKUP_PASSPHRASE_DIR/passphrase.json"
 
 begin_db_restore_maintenance() {
   mkdir -p "$(dirname "$DB_RESTORE_MAINTENANCE_FILE")"
@@ -63,6 +71,13 @@ Usage:
   dune db auto status
   dune db auto retention <days>
   dune db auto retention off
+  dune db auto-system enable <HH:MM> [interval-hours] [keep]
+  dune db auto-system disable [HH:MM] [interval-hours] [keep]
+  dune db auto-system status
+  dune db auto-system run
+  dune db auto-system units [HH:MM] [interval-hours]
+  dune db auto-system passphrase set
+  dune db auto-system passphrase remove
 
 Backups are written as official-style .backup files with a .backup.yaml sidecar.
 Import accepts official .backup files and older dune-db-*.dump or .sql backups.
@@ -86,7 +101,8 @@ cipher mode, not just confidentiality: a corrupted or tampered archive
 is rejected outright at decrypt time rather than silently producing
 wrong or manipulated plaintext. You will be prompted for a passphrase
 interactively (entered twice, to catch typos); for non-interactive/cron
-use, set DUNE_SYSTEM_BACKUP_PASSPHRASE in the environment instead. There
+use, set DUNE_SYSTEM_BACKUP_PASSPHRASE in the environment instead, or
+DUNE_SYSTEM_BACKUP_PASSPHRASE_FILE to the path of a file holding it. There
 is no way to recover an encrypted system backup without its passphrase --
 store the passphrase somewhere durable and separate from the archive
 itself (a password manager, not the same disk).
@@ -122,6 +138,13 @@ database first (while .env still describes the database it can reach), then
 to runtime/backups/restore-<timestamp>/ first. It does NOT restart the
 stack: .env may carry different database credentials and a different admin
 console password, so you choose when that takes effect.
+
+dune db auto-system schedules system backups on a systemd timer
+(dune-awakening-system-backup.timer). A scheduled run cannot prompt, so it
+uses a passphrase saved with `dune db auto-system passphrase set` (or from the
+console) in runtime/system-backup/passphrase, mode 600. That file is never put
+inside an archive. Scheduled archives are marked automatic and pruned to the
+newest [keep] (default 7); manual and imported archives are never counted.
 EOF
 }
 
@@ -1172,6 +1195,13 @@ resolve_system_backup_passphrase() {
     return 0
   fi
 
+  # A path, not the secret: the console and the timer pass this so the
+  # passphrase never sits in a task environment or a systemd EnvironmentFile.
+  if [ -n "${DUNE_SYSTEM_BACKUP_PASSPHRASE_FILE:-}" ]; then
+    read_saved_system_backup_passphrase "$DUNE_SYSTEM_BACKUP_PASSPHRASE_FILE"
+    return
+  fi
+
   if [ ! -t 0 ]; then
     echo "No passphrase available: not running interactively and DUNE_SYSTEM_BACKUP_PASSPHRASE is not set." >&2
     return 1
@@ -1195,6 +1225,29 @@ resolve_system_backup_passphrase() {
     return 1
   fi
   printf '%s' "$first"
+}
+
+read_saved_system_backup_passphrase() {
+  local file="$1"
+  local value
+
+  if [ ! -f "$file" ] || [ ! -r "$file" ]; then
+    echo "No saved system backup passphrase is readable at $file." >&2
+    return 1
+  fi
+  # $(...) strips trailing newlines, which a hand-written file usually has.
+  value="$(cat -- "$file")" || return 1
+  if [ -z "$value" ]; then
+    echo "The saved system backup passphrase is empty: $file" >&2
+    return 1
+  fi
+  printf '%s' "$value"
+}
+
+saved_system_backup_passphrase_set_at() {
+  local meta="${1:-$SYSTEM_BACKUP_PASSPHRASE_META_DEFAULT}"
+  [ -r "$meta" ] || return 1
+  sed -n 's/.*"savedAt"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$meta" | head -n 1
 }
 
 # Creates one encrypted system backup archive (.tar.gz.enc) covering:
@@ -1279,6 +1332,13 @@ backup_system() {
   fi
 
   passphrase="$(resolve_system_backup_passphrase)" || return 1
+  # Read beside the passphrase, not when the sidecar is written minutes later:
+  # a passphrase replaced mid-run would otherwise label this archive with the
+  # new one's date.
+  local passphrase_saved_at=""
+  if [ -z "${DUNE_SYSTEM_BACKUP_PASSPHRASE:-}" ] && [ -n "${DUNE_SYSTEM_BACKUP_PASSPHRASE_FILE:-}" ]; then
+    passphrase_saved_at="$(saved_system_backup_passphrase_set_at "$(dirname "$DUNE_SYSTEM_BACKUP_PASSPHRASE_FILE")/passphrase.json" || true)"
+  fi
 
   ensure_postgres_running || exit 1
   mkdir -p "$out_dir"
@@ -1491,6 +1551,14 @@ backup_system() {
     echo "s2k_digest: sha256"
     echo "s2k_count: $SYSTEM_BACKUP_S2K_COUNT"
     echo "includes_secrets: true"
+    # Which passphrase opens this archive, so a replaced saved passphrase does
+    # not leave the operator guessing. Never the passphrase or a hash of it.
+    if [ -z "${DUNE_SYSTEM_BACKUP_PASSPHRASE:-}" ] && [ -n "${DUNE_SYSTEM_BACKUP_PASSPHRASE_FILE:-}" ]; then
+      echo "passphrase_source: saved"
+      echo "passphrase_saved_at: $passphrase_saved_at"
+    else
+      echo "passphrase_source: typed"
+    fi
     # Mirrors what the staging tar actually captured, which copies only files
     # that exist. A host that has never logged an admin action has no audit
     # log, and claiming one makes the console offer an adopt/keep choice over
@@ -2037,6 +2105,16 @@ restore_system() {
     cp -a -- "$BATTLEGROUP_RESTORE_FILE" "$restore_point_saved"
   fi
 
+  # Same for the scheduled-backup state: it describes THIS host's systemd
+  # timer. The archive's copy can say "disabled" over a live timer (every run
+  # then silently does nothing) or "enabled" with no timer installed.
+  local schedule_state_dir="$stage_dir/host-schedule-state"
+  local schedule_file
+  mkdir -p "$schedule_state_dir"
+  for schedule_file in "$SYSTEM_AUTO_STATE_FILE" "$SYSTEM_AUTO_LAST_RUN_FILE"; do
+    [ ! -f "$schedule_file" ] || cp -a -- "$schedule_file" "$schedule_state_dir/"
+  done
+
   # This is a replacement, not an overlay. Leaving a file that the backup does
   # not contain can retain an old API key, session secret, IAM policy or other
   # machine state while the UI reports that the archive was restored. The
@@ -2063,6 +2141,14 @@ restore_system() {
     # rollback that cannot be performed here.
     rm -f -- "$BATTLEGROUP_RESTORE_FILE"
   fi
+
+  for schedule_file in "$SYSTEM_AUTO_STATE_FILE" "$SYSTEM_AUTO_LAST_RUN_FILE"; do
+    if [ -f "$schedule_state_dir/$(basename "$schedule_file")" ]; then
+      cp -a -- "$schedule_state_dir/$(basename "$schedule_file")" "$schedule_file"
+    else
+      rm -f -- "$schedule_file"
+    fi
+  done
 
   # SERVER_IP and SERVER_IP_MODE are preserved in .env by
   # restore_host_shaped_env_values, and then quietly overruled: the archive's
@@ -3968,6 +4054,526 @@ handle_auto_backup() {
   esac
 }
 
+# --- System backup lock -----------------------------------------------------
+# One system backup or restore at a time. A scheduled run that fired during a
+# restore would otherwise dump a database that is being replaced. The fd stays
+# open for the rest of this process, so the lock is released when it exits.
+# 75 is EX_TEMPFAIL: system_auto_run turns it into a logged skip.
+# Beside the archive directory, not in it, so that directory only ever holds
+# archives and their sidecars; and outside runtime/generated, which is archived.
+SYSTEM_BACKUP_LOCK_FILE="runtime/backups/.system-backup.lock"
+SYSTEM_BACKUP_LOCK_FD=""
+acquire_system_backup_lock() {
+  if ! command -v flock >/dev/null 2>&1; then
+    echo "Warning: flock is not installed; concurrent system backups and restores are not prevented." >&2
+    return 0
+  fi
+  mkdir -p "$(dirname "$SYSTEM_BACKUP_LOCK_FILE")"
+  exec {SYSTEM_BACKUP_LOCK_FD}>>"$SYSTEM_BACKUP_LOCK_FILE"
+  if ! flock -n "$SYSTEM_BACKUP_LOCK_FD"; then
+    echo "Another system backup or restore is in progress. Try again when it finishes." >&2
+    return 75
+  fi
+}
+
+# Keeps the newest $keep archives whose sidecar says automatic. Manual, imported
+# and sidecar-less archives are never candidates: each may be the only copy of
+# the credentials inside it.
+prune_automatic_system_backups() {
+  local out_dir="${1:-$SYSTEM_BACKUP_DIR_DEFAULT}"
+  local keep="${2:-}"
+  local removed=0
+  local index=0
+  local name
+
+  validate_positive_integer "$keep" || return 0
+  [ -d "$out_dir" ] || return 0
+
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    backup_is_automatic "$out_dir/$name" || continue
+    index=$((index + 1))
+    [ "$index" -gt "$keep" ] || continue
+    if delete_system_backup_files_for_name "$name" "$out_dir" >/dev/null 2>&1; then
+      removed=$((removed + 1))
+    fi
+  done < <(iter_valid_system_backup_names "$out_dir" | sort -r)
+
+  [ "$removed" -eq 0 ] || echo "Pruned $removed scheduled system backup(s), keeping the newest $keep."
+}
+
+# --- Scheduled system backups ---------------------------------------------
+SYSTEM_AUTO_LAST_RUN_FILE="runtime/generated/system-backup-auto-last.env"
+
+load_system_auto_state() {
+  SYSTEM_AUTO_ENABLED=0
+  SYSTEM_AUTO_TIME="04:30"
+  SYSTEM_AUTO_INTERVAL_HOURS=24
+  SYSTEM_AUTO_KEEP=7
+  SYSTEM_AUTO_MODE=""
+  if [ -r "$SYSTEM_AUTO_STATE_FILE" ]; then
+    # shellcheck disable=SC1090
+    . "$SYSTEM_AUTO_STATE_FILE"
+  fi
+  validate_backup_time "$SYSTEM_AUTO_TIME" || SYSTEM_AUTO_TIME="04:30"
+  validate_interval_hours "$SYSTEM_AUTO_INTERVAL_HOURS" || SYSTEM_AUTO_INTERVAL_HOURS=24
+  validate_system_auto_keep "$SYSTEM_AUTO_KEEP" || SYSTEM_AUTO_KEEP=7
+}
+
+write_system_auto_state() {
+  local tmp_file
+  mkdir -p runtime/generated
+  tmp_file="${SYSTEM_AUTO_STATE_FILE}.tmp.$$"
+  cat > "$tmp_file" <<EOF
+SYSTEM_AUTO_ENABLED=$1
+SYSTEM_AUTO_TIME=$2
+SYSTEM_AUTO_INTERVAL_HOURS=$3
+SYSTEM_AUTO_KEEP=$4
+SYSTEM_AUTO_MODE=$5
+EOF
+  chmod 644 "$tmp_file" 2>/dev/null || true
+  mv -f "$tmp_file" "$SYSTEM_AUTO_STATE_FILE"
+}
+
+validate_system_auto_keep() {
+  validate_positive_integer "$1" && [ "$1" -le 365 ]
+}
+
+# Single-line values only: the file is sourced by status.
+record_system_auto_run() {
+  local result="$1"
+  local message="${2:-}"
+  local archive="${3:-}"
+  local tmp_file
+  mkdir -p runtime/generated
+  tmp_file="${SYSTEM_AUTO_LAST_RUN_FILE}.tmp.$$"
+  {
+    printf 'SYSTEM_AUTO_LAST_RUN_AT=%q\n' "$(date -Iseconds)"
+    printf 'SYSTEM_AUTO_LAST_RESULT=%q\n' "$result"
+    printf 'SYSTEM_AUTO_LAST_MESSAGE=%q\n' "$(printf '%s' "$message" | tr '\n' ' ')"
+    printf 'SYSTEM_AUTO_LAST_ARCHIVE=%q\n' "$archive"
+  } > "$tmp_file"
+  chmod 644 "$tmp_file" 2>/dev/null || true
+  mv -f "$tmp_file" "$SYSTEM_AUTO_LAST_RUN_FILE"
+}
+
+system_auto_service_text() {
+  local mode="$1"
+  local host_root="$2"
+  local uid="$3"
+  local gid="$4"
+  local socket_gid="$5"
+  local image="$6"
+
+  printf '%s\n' \
+    "[Unit]" \
+    "Description=Dune Awakening scheduled system backup" \
+    "Wants=docker.service" \
+    "After=network-online.target docker.service" \
+    "" \
+    "[Service]" \
+    "Type=oneshot" \
+    "WorkingDirectory=$host_root"
+  if [ "$mode" = "image" ]; then
+    # The console image, not host gpg: the archive format needs GnuPG 2.3+,
+    # which older host distributions do not ship. Same container shape as
+    # schedule-deferred-reconcile.sh. A leftover container can only exist
+    # after a crash, since a oneshot unit never starts twice concurrently.
+    # /etc/localtime: archive names carry a local timestamp that pruning sorts
+    # on, so the container must use the host's clock, not UTC.
+    printf '%s\n' \
+      "ExecStartPre=-/usr/bin/env docker rm -f dune-system-backup" \
+      "ExecStart=/usr/bin/env docker run --rm --name dune-system-backup --network host --user $uid:$gid --group-add $socket_gid -v $host_root:/repo -v /var/run/docker.sock:/var/run/docker.sock -v /etc/localtime:/etc/localtime:ro -w /repo -e HOME=/tmp/dune-system-backup-home -e DUNE_HOST_REPO_ROOT=$host_root -e DUNE_CONTAINER_REPO_ROOT=/repo -e DUNE_DOCKER_DIR=/repo -e DUNE_HOST_UID=$uid -e DUNE_HOST_GID=$gid -e DOCKER_SOCKET_GID=$socket_gid --entrypoint bash $image -lc \"runtime/scripts/dune db auto-system run\""
+  else
+    # As the checkout owner, like restart-schedule.sh, so archives and state
+    # are not left root-owned for the console to trip over.
+    if [ "$uid" != "0" ]; then
+      printf '%s\n' "User=$uid" "Group=$gid"
+    fi
+    printf '%s\n' "ExecStart=$host_root/runtime/scripts/dune db auto-system run"
+  fi
+}
+
+system_auto_timer_text() {
+  local backup_time="$1"
+  local interval_hours="$2"
+
+  printf '%s\n' \
+    "[Unit]" \
+    "Description=Run Dune Awakening scheduled system backup" \
+    "" \
+    "[Timer]" \
+    "OnCalendar=*-*-* ${backup_time}:00"
+  [ "$interval_hours" = "24" ] || printf '%s\n' "OnUnitActiveSec=${interval_hours}h"
+  printf '%s\n' \
+    "Persistent=true" \
+    "Unit=$SYSTEM_AUTO_UNIT.service" \
+    "" \
+    "[Install]" \
+    "WantedBy=timers.target"
+}
+
+# Prints "image" when the console image can run the backup, "host" when only
+# this host's own gpg can, and fails when neither can produce an archive.
+system_auto_execution_mode() {
+  if command -v docker >/dev/null 2>&1 && docker image inspect "$(docker_helper_image)" >/dev/null 2>&1; then
+    echo image
+    return 0
+  fi
+  if system_backup_encryption_available; then
+    echo host
+    return 0
+  fi
+  return 1
+}
+
+system_auto_units() {
+  local mode="$1"
+  local backup_time="$2"
+  local interval_hours="$3"
+  # The checkout owner, not the caller: `sudo dune db auto-system enable` would
+  # otherwise bake uid 0 into the unit.
+  local uid="${DUNE_HOST_UID:-$(stat -c '%u' . 2>/dev/null || id -u)}"
+  local gid="${DUNE_HOST_GID:-$(stat -c '%g' . 2>/dev/null || id -g)}"
+  local socket_gid="${DOCKER_SOCKET_GID:-$(stat -c '%g' /var/run/docker.sock 2>/dev/null || echo 0)}"
+
+  SYSTEM_AUTO_SERVICE_TEXT="$(system_auto_service_text "$mode" "$HOST_ROOT_DIR" "$uid" "$gid" "$socket_gid" "$(docker_helper_image)")"
+  SYSTEM_AUTO_TIMER_TEXT="$(system_auto_timer_text "$backup_time" "$interval_hours")"
+}
+
+install_system_auto_units() {
+  if command -v systemctl >/dev/null 2>&1 && can_manage_systemd_units; then
+    printf '%s\n' "$SYSTEM_AUTO_SERVICE_TEXT" > "/etc/systemd/system/$SYSTEM_AUTO_UNIT.service"
+    printf '%s\n' "$SYSTEM_AUTO_TIMER_TEXT" > "/etc/systemd/system/$SYSTEM_AUTO_UNIT.timer"
+    systemctl daemon-reload
+    systemctl enable --now "$SYSTEM_AUTO_UNIT.timer"
+    return
+  fi
+  can_manage_host_systemd_with_docker || return 1
+  docker run --rm --user 0:0 --privileged --pid=host --network=host \
+    -e "UNIT_NAME=$SYSTEM_AUTO_UNIT" \
+    -e "SERVICE_TEXT=$SYSTEM_AUTO_SERVICE_TEXT" \
+    -e "TIMER_TEXT=$SYSTEM_AUTO_TIMER_TEXT" \
+    -v /:/host \
+    --entrypoint bash \
+    "$(docker_helper_image)" -lc '
+      set -euo pipefail
+      d=/host/etc/systemd/system
+      mkdir -p "$d"
+      printf "%s\n" "$SERVICE_TEXT" > "$d/$UNIT_NAME.service"
+      printf "%s\n" "$TIMER_TEXT" > "$d/$UNIT_NAME.timer"
+      chroot /host /bin/systemctl daemon-reload
+      chroot /host /bin/systemctl enable --now "$UNIT_NAME.timer"
+    '
+}
+
+remove_system_auto_units() {
+  if command -v systemctl >/dev/null 2>&1 && can_manage_systemd_units; then
+    systemctl disable --now "$SYSTEM_AUTO_UNIT.timer" >/dev/null 2>&1 || true
+    rm -f "/etc/systemd/system/$SYSTEM_AUTO_UNIT.service" "/etc/systemd/system/$SYSTEM_AUTO_UNIT.timer"
+    systemctl daemon-reload
+    return
+  fi
+  can_manage_host_systemd_with_docker || return 1
+  docker run --rm --user 0:0 --privileged --pid=host --network=host \
+    -e "UNIT_NAME=$SYSTEM_AUTO_UNIT" \
+    -v /:/host \
+    --entrypoint bash \
+    "$(docker_helper_image)" -lc '
+      set -euo pipefail
+      chroot /host /bin/systemctl disable --now "$UNIT_NAME.timer" >/dev/null 2>&1 || true
+      rm -f "/host/etc/systemd/system/$UNIT_NAME.service" "/host/etc/systemd/system/$UNIT_NAME.timer"
+      chroot /host /bin/systemctl daemon-reload
+    '
+}
+
+# Prints the "Systemd timer:" and "Next run:" status lines.
+system_auto_timer_info() {
+  local script='
+    if systemctl list-unit-files "$UNIT_NAME.timer" --no-legend --no-pager 2>/dev/null | grep -q "^$UNIT_NAME.timer"; then
+      echo "Systemd timer:    $(systemctl is-enabled "$UNIT_NAME.timer" 2>/dev/null || echo unknown)"
+      next="$(systemctl show "$UNIT_NAME.timer" -p NextElapseUSecRealtime --value 2>/dev/null || true)"
+      echo "Next run:         ${next:-unknown}"
+    else
+      echo "Systemd timer:    not installed"
+      echo "Next run:         -"
+    fi
+  '
+  if command -v systemctl >/dev/null 2>&1; then
+    UNIT_NAME="$SYSTEM_AUTO_UNIT" bash -c "$script"
+    return
+  fi
+  if can_manage_host_systemd_with_docker; then
+    docker run --rm --user 0:0 --privileged --pid=host --network=host \
+      -e "UNIT_NAME=$SYSTEM_AUTO_UNIT" -e "SCRIPT=$script" -v /:/host \
+      --entrypoint bash "$(docker_helper_image)" -lc 'chroot /host /usr/bin/env UNIT_NAME="$UNIT_NAME" bash -c "$SCRIPT"' && return
+  fi
+  echo "Systemd timer:    unknown"
+  echo "Next run:         -"
+}
+
+system_auto_enable() {
+  local backup_time="${1:-}"
+  local interval_hours="${2:-}"
+  local keep="${3:-}"
+  local mode
+
+  load_system_auto_state
+  [ -n "$backup_time" ] || { echo "Usage: dune db auto-system enable <HH:MM> [interval-hours] [keep]" >&2; exit 2; }
+  if ! validate_backup_time "$backup_time"; then
+    echo "Invalid backup time: $backup_time (use 24-hour HH:MM)" >&2
+    exit 1
+  fi
+  interval_hours="${interval_hours:-$SYSTEM_AUTO_INTERVAL_HOURS}"
+  if ! validate_interval_hours "$interval_hours"; then
+    echo "Invalid interval hours: $interval_hours (use 1 to 168)" >&2
+    exit 1
+  fi
+  keep="${keep:-$SYSTEM_AUTO_KEEP}"
+  if ! validate_system_auto_keep "$keep"; then
+    echo "Invalid keep count: $keep (use 1 to 365)" >&2
+    exit 1
+  fi
+  if [ ! -f "$SYSTEM_BACKUP_PASSPHRASE_FILE_DEFAULT" ]; then
+    echo "Save a passphrase first: dune db auto-system passphrase set" >&2
+    exit 1
+  fi
+  if ! mode="$(system_auto_execution_mode)"; then
+    echo "Scheduled system backups were not enabled: neither the console image ($(docker_helper_image))" >&2
+    echo "nor this host's gpg can write the authenticated archive format (GnuPG 2.3+ required)." >&2
+    exit 1
+  fi
+
+  system_auto_units "$mode" "$backup_time" "$interval_hours"
+  write_system_auto_state 1 "$backup_time" "$interval_hours" "$keep" "$mode"
+  if ! install_system_auto_units; then
+    write_system_auto_state 0 "$backup_time" "$interval_hours" "$keep" "$mode"
+    echo "Scheduled system backups were not enabled: the systemd timer could not be installed." >&2
+    echo "Run this command as root on the host, or from the console with the Docker socket available." >&2
+    exit 1
+  fi
+
+  echo "Scheduled system backups enabled."
+  echo "Backup time: $backup_time"
+  echo "Interval: every $interval_hours hours"
+  echo "Keep: newest $keep scheduled archives"
+  echo "Timer: $SYSTEM_AUTO_UNIT.timer"
+}
+
+# Optional time/interval/keep are saved with the schedule off, so the console's
+# Save Settings while disabled keeps what was typed.
+system_auto_disable() {
+  local backup_time="${1:-}"
+  local interval_hours="${2:-}"
+  local keep="${3:-}"
+
+  load_system_auto_state
+  backup_time="${backup_time:-$SYSTEM_AUTO_TIME}"
+  interval_hours="${interval_hours:-$SYSTEM_AUTO_INTERVAL_HOURS}"
+  keep="${keep:-$SYSTEM_AUTO_KEEP}"
+  if ! validate_backup_time "$backup_time" || ! validate_interval_hours "$interval_hours" || ! validate_system_auto_keep "$keep"; then
+    echo "Invalid schedule: time $backup_time, interval $interval_hours, keep $keep" >&2
+    exit 1
+  fi
+  write_system_auto_state 0 "$backup_time" "$interval_hours" "$keep" "$SYSTEM_AUTO_MODE"
+  if ! remove_system_auto_units; then
+    echo "Scheduled system backups are disabled, but the timer could not be removed from this context." >&2
+    echo "A run that still fires exits without backing up. Remove it as root:" >&2
+    echo "  systemctl disable --now $SYSTEM_AUTO_UNIT.timer" >&2
+    exit 1
+  fi
+  echo "Scheduled system backups disabled."
+}
+
+system_auto_status() {
+  local saved_at
+  load_system_auto_state
+  SYSTEM_AUTO_LAST_RUN_AT=""
+  SYSTEM_AUTO_LAST_RESULT=""
+  SYSTEM_AUTO_LAST_MESSAGE=""
+  SYSTEM_AUTO_LAST_ARCHIVE=""
+  # shellcheck disable=SC1090
+  [ ! -r "$SYSTEM_AUTO_LAST_RUN_FILE" ] || . "$SYSTEM_AUTO_LAST_RUN_FILE"
+
+  echo "=== Scheduled system backups ==="
+  if [ "$SYSTEM_AUTO_ENABLED" = "1" ]; then echo "Enabled:          true"; else echo "Enabled:          false"; fi
+  echo "Backup time:      $SYSTEM_AUTO_TIME"
+  echo "Interval hours:   $SYSTEM_AUTO_INTERVAL_HOURS"
+  echo "Keep:             $SYSTEM_AUTO_KEEP"
+  if [ -f "$SYSTEM_BACKUP_PASSPHRASE_FILE_DEFAULT" ]; then
+    echo "Passphrase:       saved"
+    saved_at="$(saved_system_backup_passphrase_set_at || true)"
+    echo "Passphrase set:   ${saved_at:-unknown}"
+  else
+    echo "Passphrase:       not saved"
+  fi
+  echo "Execution:        ${SYSTEM_AUTO_MODE:-unknown}"
+  system_auto_timer_info
+  echo "Last run:         ${SYSTEM_AUTO_LAST_RUN_AT:-never}"
+  echo "Last result:      ${SYSTEM_AUTO_LAST_RESULT:-none}"
+  [ -z "$SYSTEM_AUTO_LAST_MESSAGE" ] || echo "Last message:     $SYSTEM_AUTO_LAST_MESSAGE"
+  [ -z "$SYSTEM_AUTO_LAST_ARCHIVE" ] || echo "Last archive:     $SYSTEM_AUTO_LAST_ARCHIVE"
+}
+
+system_auto_run() {
+  local rc=0
+  local archive=""
+
+  load_system_auto_state
+  if [ "$SYSTEM_AUTO_ENABLED" != "1" ]; then
+    echo "Scheduled system backups are disabled; nothing to do."
+    return 0
+  fi
+  if [ -e "$DB_RESTORE_MAINTENANCE_FILE" ]; then
+    record_system_auto_run skipped "A database restore was in progress."
+    echo "Skipped: a database restore is in progress."
+    return 0
+  fi
+  if [ ! -f "$SYSTEM_BACKUP_PASSPHRASE_FILE_DEFAULT" ]; then
+    record_system_auto_run failed "No saved passphrase."
+    echo "Scheduled system backup failed: no saved passphrase. Save one from the console or with: dune db auto-system passphrase set" >&2
+    return 1
+  fi
+  acquire_system_backup_lock || rc=$?
+  if [ "$rc" -eq 75 ]; then
+    record_system_auto_run skipped "Another system backup or restore was in progress."
+    echo "Skipped: another system backup or restore is in progress."
+    return 0
+  fi
+  [ "$rc" -eq 0 ] || return "$rc"
+
+  record_system_auto_run running ""
+  # A subshell, because backup_system can `exit` (e.g. Postgres will not start)
+  # and the outcome must still be recorded.
+  rc=0
+  (
+    # Never DUNE_SYSTEM_BACKUP_KEEP's prune here: it counts every archive, so an
+    # hourly schedule would delete the manual ones. Only the automatic-only
+    # prune below runs for a scheduled backup.
+    SYSTEM_BACKUP_KEEP_DEFAULT=0
+    DB_BACKUP_ORIGIN=automatic \
+    DUNE_SYSTEM_BACKUP_PASSPHRASE="" \
+    DUNE_SYSTEM_BACKUP_PASSPHRASE_FILE="$SYSTEM_BACKUP_PASSPHRASE_FILE_DEFAULT" \
+      backup_system "$SYSTEM_BACKUP_DIR_DEFAULT" </dev/null
+  ) || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    record_system_auto_run failed "The system backup exited with status $rc; see the journal for $SYSTEM_AUTO_UNIT.service."
+    return "$rc"
+  fi
+  archive="$(iter_valid_system_backup_names "$SYSTEM_BACKUP_DIR_DEFAULT" | sort -r | head -n 1)"
+  prune_automatic_system_backups "$SYSTEM_BACKUP_DIR_DEFAULT" "$SYSTEM_AUTO_KEEP"
+  record_system_auto_run success "" "$archive"
+}
+
+validate_system_backup_passphrase_strength() {
+  local value="$1"
+  local distinct
+  if [ "${#value}" -lt 12 ] || [ "${#value}" -gt 1024 ]; then
+    echo "The passphrase must be 12 to 1024 characters." >&2
+    return 1
+  fi
+  case "$value" in
+    *$'\n'*|*$'\r'*) echo "The passphrase cannot contain line breaks." >&2; return 1 ;;
+  esac
+  distinct="$(printf '%s' "$value" | fold -w1 | sort -u | wc -l | tr -d '[:space:]')"
+  if [ "$distinct" -lt 5 ]; then
+    echo "The passphrase must use at least 5 different characters." >&2
+    return 1
+  fi
+}
+
+system_auto_passphrase_set() {
+  local first=""
+  local second=""
+  local tmp_file
+  local meta_tmp
+
+  if [ -t 0 ]; then
+    read -r -s -p "Passphrase for scheduled system backups: " first
+    echo >&2
+    read -r -s -p "Confirm passphrase: " second
+    echo >&2
+    if [ "$first" != "$second" ]; then
+      echo "Passphrases did not match. Nothing was saved." >&2
+      return 1
+    fi
+  else
+    IFS= read -r first || true
+  fi
+  validate_system_backup_passphrase_strength "$first" || return 1
+  # Not while a backup is mid-run: it has already read the old passphrase.
+  acquire_system_backup_lock || return $?
+
+  (
+    umask 077
+    mkdir -p "$SYSTEM_BACKUP_PASSPHRASE_DIR"
+    chmod 700 "$SYSTEM_BACKUP_PASSPHRASE_DIR"
+    tmp_file="$(mktemp "$SYSTEM_BACKUP_PASSPHRASE_DIR/.passphrase.XXXXXX")"
+    printf '%s' "$first" > "$tmp_file"
+    chmod 600 "$tmp_file"
+    mv -f -- "$tmp_file" "$SYSTEM_BACKUP_PASSPHRASE_FILE_DEFAULT"
+    meta_tmp="$(mktemp "$SYSTEM_BACKUP_PASSPHRASE_DIR/.passphrase-meta.XXXXXX")"
+    printf '{"savedAt":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$meta_tmp"
+    chmod 600 "$meta_tmp"
+    mv -f -- "$meta_tmp" "$SYSTEM_BACKUP_PASSPHRASE_META_DEFAULT"
+    # `sudo dune db auto-system ...` is the likely way in; a root-owned key is
+    # unreadable to the console and to the timer, which run as the checkout owner.
+    if [ "$(id -u)" = "0" ]; then
+      chown "$(stat -c '%u:%g' .)" "$SYSTEM_BACKUP_PASSPHRASE_DIR" \
+        "$SYSTEM_BACKUP_PASSPHRASE_FILE_DEFAULT" "$SYSTEM_BACKUP_PASSPHRASE_META_DEFAULT"
+    fi
+  )
+  echo "Passphrase saved for scheduled system backups."
+  echo "Archives made from now on need this passphrase; older ones still need the one they were made with."
+}
+
+system_auto_passphrase_remove() {
+  load_system_auto_state
+  if [ "$SYSTEM_AUTO_ENABLED" = "1" ]; then
+    echo "Disable scheduled system backups before removing the saved passphrase." >&2
+    return 1
+  fi
+  acquire_system_backup_lock || return $?
+  rm -f -- "$SYSTEM_BACKUP_PASSPHRASE_FILE_DEFAULT" "$SYSTEM_BACKUP_PASSPHRASE_META_DEFAULT"
+  echo "Saved passphrase removed."
+}
+
+handle_system_auto_backup() {
+  local sub="${1:-status}"
+  case "$sub" in
+    enable|on) system_auto_enable "${2:-}" "${3:-}" "${4:-}" ;;
+    disable|off) system_auto_disable "${2:-}" "${3:-}" "${4:-}" ;;
+    status) system_auto_status ;;
+    run) system_auto_run ;;
+    units)
+      # Prints what enable would install, for a manual install or a review.
+      load_system_auto_state
+      system_auto_units "$(system_auto_execution_mode || echo host)" "${2:-$SYSTEM_AUTO_TIME}" "${3:-$SYSTEM_AUTO_INTERVAL_HOURS}"
+      printf '# %s.service\n%s\n\n# %s.timer\n%s\n' "$SYSTEM_AUTO_UNIT" "$SYSTEM_AUTO_SERVICE_TEXT" "$SYSTEM_AUTO_UNIT" "$SYSTEM_AUTO_TIMER_TEXT"
+      ;;
+    passphrase)
+      case "${2:-}" in
+        set) system_auto_passphrase_set ;;
+        remove) system_auto_passphrase_remove ;;
+        *) echo "Usage: dune db auto-system passphrase set|remove" >&2; exit 2 ;;
+      esac
+      ;;
+    *)
+      echo "Unknown scheduled system backup command: $sub" >&2
+      echo "Usage: dune db auto-system enable <HH:MM> [interval-hours] [keep] | disable | status | run | units | passphrase set|remove" >&2
+      exit 2
+      ;;
+  esac
+}
+
+system_restore_args_are_dry_run() {
+  local arg
+  for arg in "$@"; do
+    [ "$arg" != "--dry-run" ] || return 0
+  done
+  return 1
+}
+
 cmd="${1:-help}"
 
 case "$cmd" in
@@ -3975,6 +4581,7 @@ case "$cmd" in
     backup_db "${2:-$BACKUP_DIR_DEFAULT}"
     ;;
   backup-system)
+    acquire_system_backup_lock || exit $?
     backup_system "${2:-$SYSTEM_BACKUP_DIR_DEFAULT}"
     ;;
   list)
@@ -3984,6 +4591,11 @@ case "$cmd" in
     list_system_backups "${2:-$SYSTEM_BACKUP_DIR_DEFAULT}"
     ;;
   restore-system)
+    # A preview only decrypts into a private staging dir, so it can run beside
+    # a backup; an apply cannot.
+    if ! system_restore_args_are_dry_run "${@:3}"; then
+      acquire_system_backup_lock || exit $?
+    fi
     restore_system "${2:-}" "${@:3}"
     ;;
   delete-system)
@@ -4010,6 +4622,9 @@ case "$cmd" in
     ;;
   auto)
     handle_auto_backup "${2:-status}" "${3:-}" "${4:-}" "${5:-}"
+    ;;
+  auto-system)
+    handle_system_auto_backup "${2:-status}" "${3:-}" "${4:-}" "${5:-}"
     ;;
   help|--help|-h)
     usage

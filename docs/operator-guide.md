@@ -270,6 +270,10 @@ one you need:
    equivalents. Restore previews before it applies, and asks what to do
    about Battlegroup identity and the admin audit log. See
    [`docs/console/database-backups.md`](console/database-backups.md).
+   **Automatic System Backups** on the same page runs them on a timer: the
+   Owner saves a passphrase once (it can't be read back), then sets a time,
+   an interval and how many scheduled archives to keep. See
+   [scheduled system backups](console/database-backups.md#scheduled-system-backups).
 3. **The in-game "pick up base" mechanic** — not a console feature at all;
    see §3 above and
    [`docs/console/base-backups.md`](console/base-backups.md).

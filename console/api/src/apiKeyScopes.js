@@ -55,6 +55,7 @@ export const LEVEL_EXCLUDED_ACTIONS = new Set([
   "backups:download-system",
   "backups:import-system",
   "backups:restore-system",
+  "backups:set-system-passphrase",
   "bases:import-backup",
   "bases:edit-backup",
   "bases:export-backup",

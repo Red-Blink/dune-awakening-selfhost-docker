@@ -66,6 +66,7 @@ CONTROL_PATHS=(
   runtime/logs
   runtime/backups
   runtime/secrets
+  runtime/system-backup
   runtime/addons
   runtime/container
   runtime/text-router

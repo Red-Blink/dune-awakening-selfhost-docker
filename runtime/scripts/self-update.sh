@@ -1280,6 +1280,8 @@ restore_local_state_ownership() {
     runtime/generated \
     runtime/generated/battlegroup.env \
     runtime/generated/db-backup.env \
+    runtime/generated/system-backup-auto.env \
+    runtime/generated/system-backup-auto-last.env \
     runtime/generated/director-character-transfer.ini \
     runtime/generated/director-capacity.ini \
     runtime/generated/director-deepdesert-dual.ini \
@@ -1315,6 +1317,9 @@ restore_local_state_ownership() {
     runtime/addons/state.json \
     runtime/secrets/public-directory.json \
     runtime/secrets/funcom-token.txt \
+    runtime/system-backup \
+    runtime/system-backup/passphrase \
+    runtime/system-backup/passphrase.json \
     2>/dev/null || true
 }
 

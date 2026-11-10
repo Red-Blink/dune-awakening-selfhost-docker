@@ -271,11 +271,15 @@
     "Automatic (",
     "Automatic (2 GB/Server)",
     "Automatic Backup",
+    "Automatic Backup Passphrase",
     "Automatic Backup Settings Failed",
     "Automatic Backups",
     "Automatic Delta Translation",
     "Automatic Game Updates",
     "Automatic Startup:",
+    "Automatic System Backups",
+    "Automatic archives stored: {count0}. The next run removes {count1} and keeps {count2}",
+    "Automatic backups can't ask for a passphrase, so they use the one saved here. It is stored on this host with owner-only permissions, is never placed inside an archive, and cannot be read back. Only the Owner role can save, replace or remove it.",
     "Automatic protection preserves 15% of physical RAM, with a 4 GB minimum. Swap remains emergency headroom rather than normal startup capacity.",
     "Autoscaler",
     "Available",
@@ -309,6 +313,7 @@
     "Backup name cannot be empty.",
     "Backup name cannot contain control characters.",
     "Backup name cannot start with ##.",
+    "Backup type",
     "Backups",
     "Ban Player",
     "Banned",
@@ -614,6 +619,7 @@
     "Configure bots and blacklist",
     "Confirm",
     "Confirm Action",
+    "Confirm Automatic Backup Passphrase",
     "Confirm Console Access",
     "Confirm New Password",
     "Confirm Passphrase",
@@ -1413,8 +1419,12 @@
     "Keep Both",
     "Keep Current History",
     "Keep Current ID",
+    "Keep Newest",
     "Keep all placeholders exactly as shown in the original phrase.",
     "Keep current owner",
+    "Keep must be a whole number from 1 to 365.",
+    "Keep one fewer",
+    "Keep one more",
     "Keep placeholders such as",
     "Keep the web admin, Postgres, Director, TextRouter, RabbitMQ Admin, the local RabbitMQ management mirror, and other internal service ports private.",
     "Kept Running",
@@ -1704,6 +1714,7 @@
     "Neutral",
     "Never",
     "New",
+    "New Automatic Backup Passphrase",
     "New Faction",
     "New Owner",
     "New Package Name",
@@ -1849,6 +1860,7 @@
     "Not Listed",
     "Not Recorded Yet",
     "Not Running",
+    "Not Saved",
     "Not entered in this session",
     "Not scheduled",
     "Not sent yet",
@@ -1878,6 +1890,7 @@
     "One item per line: item name or raw item ID, quantity. Extra legacy grade or augment columns are ignored for Care Packages.",
     "Online",
     "Online Players",
+    "Only automatic archives count. Manual and imported archives are never removed by this setting. Saving deletes nothing now; the next scheduled run prunes.",
     "Only this phrase, your correction, and the optional credit name will be sent to DuneDocker for review.",
     "Only weapons and clothing can be augmented.",
     "Open",
@@ -1951,6 +1964,10 @@
     "Party",
     "Passenger Taxi Enabled",
     "Passphrase",
+    "Passphrase Not Removed",
+    "Passphrase Not Saved",
+    "Passphrase Removed",
+    "Passphrase Saved",
     "Password",
     "Password Change Failed",
     "Password Changed Successfully",
@@ -2236,12 +2253,14 @@
     "Remove Listings",
     "Remove Member",
     "Remove NPC Listings",
+    "Remove Passphrase",
     "Remove Realtime Data Agent",
     "Remove Service",
     "Remove Shutdown Protection",
     "Remove Terminals",
     "Remove from guild",
     "Removing",
+    "Removing Passphrase",
     "Removing Shutdown Protection",
     "Removing obsolete project-owned images while protecting current and in-use images.",
     "Removing unused Docker build cache.",
@@ -2265,8 +2284,10 @@
     "Repairs owned vehicle modules whose current durability is below the selected percentage of a trustworthy stored or inferred maximum. Modules without usable current durability or a trustworthy maximum are skipped. Affected running map servers restart so their in-memory vehicle state cannot overwrite the repair.",
     "Repairs recognized stuck Landsraad quest states. A safety backup is created when needed.",
     "Repeat Every",
+    "Replace Passphrase",
     "Replaces",
     "Replaces only the bot's NPC sell listings from the active seed plan. Each write run creates a backup (when Safety Backups are on), clears the bot listings on the selected exchange, and seeds fresh stock; player listings are never touched. Augments use bottom-of-range rolls, with either discounted or original plan pricing.",
+    "Replacing it does not re-encrypt older archives. They still need the passphrase they were made with.",
     "Report Issues",
     "Request failed.",
     "Requests",
@@ -2464,6 +2485,7 @@
     "Save MOTD",
     "Save Messages",
     "Save Package",
+    "Save Passphrase",
     "Save Password",
     "Save Plan Name",
     "Save Position",
@@ -2474,12 +2496,15 @@
     "Save Schedule",
     "Save Settings",
     "Save Token",
+    "Save a passphrase below before turning on automatic system backups.",
+    "Save a passphrase first",
     "Save as Default",
     "Save changes",
     "Save or discard your changes before leaving Bot Items.",
     "Save or revert roster changes first",
     "Saved",
     "Saved Map Data",
+    "Saved Passphrase",
     "Saved Privately on Server",
     "Saved Translations",
     "Saved translations are included with project updates. An optional DeepL API key makes DeepL the preferred provider for missing translations, with Google Translate as a fallback. Peer sharing requires explicit opt-in and trust enrollment.",
@@ -2492,6 +2517,7 @@
     "Saving Funcom Token...",
     "Saving IP Monitor",
     "Saving Package...",
+    "Saving Passphrase",
     "Saving Restart Queue",
     "Saving Row...",
     "Saving Schedule",
@@ -2513,7 +2539,9 @@
     "Scanning",
     "Schedule",
     "Schedule Name",
+    "Schedule Not Saved",
     "Schedule Save Failed",
+    "Schedule Saved",
     "Schedule Saved Successfully",
     "Schedule Server Restart",
     "Scheduled Messages",
@@ -2821,9 +2849,11 @@
     "Syncing...",
     "System & Maintenance",
     "System Backup Failed",
+    "System Backup File (.tar or .tar.gz.enc)",
     "System Backup Imported",
     "System Backup Restore Failed",
     "System Backup Restored",
+    "System Backups",
     "System Backups (Encrypted)",
     "System Custodian",
     "System Health",
@@ -2885,6 +2915,7 @@
     "The Market Board is unsupported by the detected database schema.",
     "The Market Bot is unsupported by the detected database schema.",
     "The active seed plan could not be read. Choose another plan or upload a CSV.",
+    "The archive is encrypted with the passphrase saved under Automatic System Backups. You need that passphrase to restore it.",
     "The archive's admin password is now this host's, so you may be asked to sign in again.",
     "The archive's admin password replaces this one. You may need to sign in again.",
     "The backend is using the repository path configured by",
@@ -2962,6 +2993,7 @@
     "This addon was removed from the community catalog.",
     "This advanced editor bypasses normal in-game staking validation. Claiming a protected area does not guarantee that the game will permit building there, particularly around enemy camps and other restricted locations.",
     "This archive and this host each have their own admin audit history. Adopt the backup's history when moving the same server to new hardware. Keep this host's own history when restoring into a different server or rolling back a mistake.",
+    "This archive was encrypted with the saved scheduled-backup passphrase.",
     "This backup belongs to a different Battlegroup. Adopt the backup identity when moving the same server to new hardware. Keep the current identity only when intentionally importing data into this different server.",
     "This base has no Owner. Set one before saving.",
     "This base has no doors or devices with their own access level.",
@@ -3063,6 +3095,8 @@
     "Try again",
     "Turkish",
     "Turn On",
+    "Turn off automatic system backups first",
+    "Turning Off Schedule",
     "Type",
     "Type to search fillable items…",
     "Type to search items…",
@@ -3150,6 +3184,7 @@
     "Use Current Term Levels",
     "Use Fix Binding, then restart the battlegroup so game sockets bind to the local IP.",
     "Use Restore Starter Skills after a progression reset leaves the starting tree locked.",
+    "Use Saved Passphrase",
     "Use a credit name of up to 60 plain-text characters.",
     "Use inherited or game defaults",
     "Use only letters, numbers, dots, and hyphens.",
@@ -3755,12 +3790,12 @@
     "— restore it afterwards, with its passphrase.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 721,
+        "line": 828,
         "nearby": [
           ". It is",
           "stored, not applied",
-          "Backup file",
-          "Cancel"
+          "System Backup File (.tar or .tar.gz.enc)",
+          "Import system backup"
         ]
       }
     ],
@@ -3779,7 +3814,7 @@
     "— the Funcom token, admin console password, RMQ credentials, sietch join password and IAM policies. It is encrypted with the passphrase you set here, and": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 690,
+        "line": 742,
         "nearby": [
           "A system backup bundles the database together with",
           "and every file in",
@@ -3791,7 +3826,7 @@
     ", and this is the only copy of what is inside it.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 709,
+        "line": 768,
         "nearby": [
           "Set a passphrase for the new archive. It is entered twice because a typo produces an archive",
           "nobody can ever decrypt",
@@ -3871,7 +3906,7 @@
     ". It is": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 721,
+        "line": 828,
         "nearby": [
           "Upload the",
           "a download produced, or a bare",
@@ -3943,12 +3978,12 @@
     ". Store the passphrase somewhere durable and separate from the archive.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 690,
+        "line": 742,
         "nearby": [
           "— the Funcom token, admin console password, RMQ credentials, sietch join password and IAM policies. It is encrypted with the passphrase you set here, and",
           "there is no way to recover it without that passphrase",
-          "Create System Backup",
-          "Import Backup"
+          "Refresh Backups",
+          "Create System Backup"
         ]
       }
     ],
@@ -3991,7 +4026,7 @@
     ". What is replaced is copied to": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 738,
+        "line": 781,
         "nearby": [
           "and",
           "the entire database",
@@ -4658,7 +4693,7 @@
     "a download produced, or a bare": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 721,
+        "line": 828,
         "nearby": [
           "Import System Backup",
           "Upload the",
@@ -4823,9 +4858,9 @@
     "A snapshot of the game database only — characters, bases, vehicles, inventories and world state. These contain no console configuration and no credentials, so restoring one onto a fresh host still leaves every setting to re-enter by hand. Use a System Backup below to move a server to new hardware.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 613,
+        "line": 663,
         "nearby": [
-          "Backups",
+          "Backup type",
           "Funcom Backups",
           "Refresh Backups",
           "Create Backup"
@@ -4835,7 +4870,7 @@
     "A system backup bundles the database together with": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 690,
+        "line": 742,
         "nearby": [
           "Save Settings",
           "System Backups (Encrypted)",
@@ -5386,8 +5421,9 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 100,
+        "line": 135,
         "nearby": [
+          "System Backups",
           "Unavailable",
           "Deactivating",
           "Active"
@@ -5451,12 +5487,12 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 101,
+        "line": 136,
         "nearby": [
           "Activating",
           "Deactivating",
           "Inactive",
-          "System Backup Failed"
+          "Creating System Backup"
         ]
       },
       {
@@ -5467,6 +5503,16 @@
           "Choose how many independent Deep Desert instances this battlegroup provides.",
           "Deep Desert instances",
           "Single"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 183,
+        "nearby": [
+          "Schedule Not Saved",
+          "Unavailable",
+          "Inactive",
+          "Automatic System Backups"
         ]
       }
     ],
@@ -5555,7 +5601,7 @@
     "Adapting imported backup to this Docker battlegroup.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 869,
+        "line": 940,
         "nearby": [
           "Relinking restored characters to current Docker player identities.",
           "Changing Docker to use the backup battlegroup ID.",
@@ -6318,7 +6364,7 @@
     "After": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 348,
+        "line": 388,
         "nearby": [
           "Backup",
           "Replaces",
@@ -6843,7 +6889,7 @@
     "and": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 738,
+        "line": 781,
         "nearby": [
           "Restoring",
           "replaces this server's",
@@ -6877,7 +6923,7 @@
     "and every file in": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 690,
+        "line": 742,
         "nearby": [
           "System Backups (Encrypted)",
           "A system backup bundles the database together with",
@@ -7217,7 +7263,7 @@
     "Apply Restore": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 744,
+        "line": 789,
         "nearby": [
           "Cancel",
           "Preview Restore",
@@ -7559,7 +7605,7 @@
     "Attention Required": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 826,
+        "line": 897,
         "nearby": [
           "What went wrong",
           "Technical details",
@@ -8053,10 +8099,22 @@
         ]
       }
     ],
+    "Automatic archives stored: {count0}. The next run removes {count1} and keeps {count2}": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 226,
+        "nearby": [
+          "Save Settings",
+          "Keep must be a whole number from 1 to 365.",
+          "Only automatic archives count. Manual and imported archives are never removed by this setting. Saving deletes nothing now; the next scheduled run prunes.",
+          "Saved Passphrase"
+        ]
+      }
+    ],
     "Automatic Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 947,
+        "line": 1018,
         "nearby": [
           "Unknown",
           "Market Bot Backup",
@@ -8065,10 +8123,22 @@
         ]
       }
     ],
+    "Automatic Backup Passphrase": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 238,
+        "nearby": [
+          "Replacing it does not re-encrypt older archives. They still need the passphrase they were made with.",
+          "New Automatic Backup Passphrase",
+          "Confirm Automatic Backup Passphrase",
+          "Replace Passphrase"
+        ]
+      }
+    ],
     "Automatic Backup Settings Failed": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 451,
+        "line": 491,
         "nearby": [
           "Saving Automatic Backup Settings...",
           "Creating Backup...",
@@ -8077,7 +8147,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 456,
+        "line": 496,
         "nearby": [
           "Daily backup time must be a valid 24-hour time, for example 05:00 or 23:30.",
           "Backup interval must be a whole number from 1 to 168 hours.",
@@ -8088,11 +8158,23 @@
     "Automatic Backups": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 667,
+        "line": 717,
         "nearby": [
           "Metadata File (.yaml)",
           "Import",
           "ON"
+        ]
+      }
+    ],
+    "Automatic backups can't ask for a passphrase, so they use the one saved here. It is stored on this host with owner-only permissions, is never placed inside an archive, and cannot be read back. Only the Owner role can save, replace or remove it.": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 235,
+        "nearby": [
+          "Not Saved",
+          "Saved",
+          "Replacing it does not re-encrypt older archives. They still need the passphrase they were made with.",
+          "New Automatic Backup Passphrase"
         ]
       }
     ],
@@ -8129,6 +8211,34 @@
           "The Console always starts with Docker. When this is disabled, the Battlegroup remains stopped after the Linux host boots until you start it manually.",
           "Saving",
           "Enabled"
+        ]
+      }
+    ],
+    "Automatic System Backups": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 187,
+        "nearby": [
+          "Active",
+          "Inactive",
+          "Save a passphrase first"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 189,
+        "nearby": [
+          "Save a passphrase first",
+          "ON"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 190,
+        "nearby": [
+          "Save a passphrase first",
+          "ON",
+          "OFF"
         ]
       }
     ],
@@ -8351,7 +8461,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 346,
+        "line": 386,
         "nearby": [
           "Restore System Backup",
           "Restore",
@@ -8361,7 +8471,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 640,
+        "line": 690,
         "nearby": [
           "Restore Backup",
           "Restore",
@@ -8404,22 +8514,10 @@
         ]
       }
     ],
-    "Backup file": [
-      {
-        "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 723,
-        "nearby": [
-          "stored, not applied",
-          "— restore it afterwards, with its passphrase.",
-          "Cancel",
-          "Import system backup"
-        ]
-      }
-    ],
     "Backup File (.backup)": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 656,
+        "line": 706,
         "nearby": [
           "No database backups have been created yet.",
           "Import Funcom External Backup",
@@ -8443,7 +8541,7 @@
     "Backup Imported Successfully": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 493,
+        "line": 533,
         "nearby": [
           "The metadata file must end with .yaml or .yml.",
           "Importing Backup",
@@ -8455,7 +8553,7 @@
     "Backup interval must be a whole number from 1 to 168 hours.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 456,
+        "line": 496,
         "nearby": [
           "Daily backup time must be a valid 24-hour time, for example 05:00 or 23:30.",
           "Automatic Backup Settings Failed",
@@ -8467,12 +8565,12 @@
     "Backup List Unavailable": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 511,
+        "line": 551,
         "nearby": [
           "Backup Imported Successfully",
           "Import Failed",
           "Backups",
-          "Funcom Backups"
+          "Backup type"
         ]
       }
     ],
@@ -8569,7 +8667,7 @@
     "Backup Restore Failed": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 836,
+        "line": 907,
         "nearby": [
           "Restore Completed",
           "Database restore finished and the Dune console restart completed.",
@@ -8585,6 +8683,18 @@
           "Restore Completed",
           "Restarting Dune Services",
           "Restoring Backup"
+        ]
+      }
+    ],
+    "Backup type": [
+      {
+        "file": "console/web/src/features/backups/BackupsPanel.tsx",
+        "line": 652,
+        "nearby": [
+          "Backup List Unavailable",
+          "Backups",
+          "Funcom Backups",
+          "A snapshot of the game database only — characters, bases, vehicles, inventories and world state. These contain no console configuration and no credentials, so restoring one onto a fresh host still leaves every setting to re-enter by hand. Use a System Backup below to move a server to new hardware."
         ]
       }
     ],
@@ -8623,12 +8733,12 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 609,
+        "line": 649,
         "nearby": [
           "Import Failed",
           "Backup List Unavailable",
-          "Funcom Backups",
-          "A snapshot of the game database only — characters, bases, vehicles, inventories and world state. These contain no console configuration and no credentials, so restoring one onto a fresh host still leaves every setting to re-enter by hand. Use a System Backup below to move a server to new hardware."
+          "Backup type",
+          "Funcom Backups"
         ]
       }
     ],
@@ -9224,7 +9334,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 641,
+        "line": 691,
         "nearby": [
           "Restore",
           "Backup",
@@ -10293,7 +10403,7 @@
     "Cancel": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 714,
+        "line": 774,
         "nearby": [
           "Passphrase",
           "Confirm Passphrase",
@@ -10303,17 +10413,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 731,
-        "nearby": [
-          "— restore it afterwards, with its passphrase.",
-          "Backup file",
-          "Import system backup",
-          "Import"
-        ]
-      },
-      {
-        "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 742,
+        "line": 787,
         "nearby": [
           "Passphrase",
           "Restore passphrase",
@@ -10323,7 +10423,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 756,
+        "line": 801,
         "nearby": [
           "The Console is still running the configuration from before the restore. Restarting it loads the restored one. If the archive carried a different admin password you will be asked to sign in again.",
           "Cancel the console restart",
@@ -10409,6 +10509,15 @@
           "Save Schedule",
           "Loading scheduled messages...",
           "No scheduled messages yet"
+        ]
+      },
+      {
+        "file": "console/web/src/features/settings/ApiKeysSection.tsx",
+        "line": 434,
+        "nearby": [
+          "Creating...",
+          "Create Key",
+          "Choose at least one permission to continue."
         ]
       }
     ],
@@ -10591,7 +10700,7 @@
     "Cancel the console restart": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 756,
+        "line": 801,
         "nearby": [
           "Restarting The Console",
           "The Console is still running the configuration from before the restore. Restarting it loads the restored one. If the archive carried a different admin password you will be asked to sign in again.",
@@ -11069,7 +11178,7 @@
     "Changing Docker to use the backup battlegroup ID.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 868,
+        "line": 939,
         "nearby": [
           "Database restore completed successfully. Restarting Dune services.",
           "Relinking restored characters to current Docker player identities.",
@@ -13306,7 +13415,7 @@
     "Configuration, credentials and the database were replaced. Dune services are stopped - start them from Server Controls to bring the restored configuration up. The admin password and database credentials may now differ from the ones this session is using.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 375,
+        "line": 415,
         "nearby": [
           "After",
           "System Backup Restored",
@@ -13371,6 +13480,18 @@
         ]
       }
     ],
+    "Confirm Automatic Backup Passphrase": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 239,
+        "nearby": [
+          "New Automatic Backup Passphrase",
+          "Automatic Backup Passphrase",
+          "Replace Passphrase",
+          "Save Passphrase"
+        ]
+      }
+    ],
     "Confirm Console Access": [
       {
         "file": "console/web/src/features/settings/ConsoleAccessNotice.tsx",
@@ -13408,7 +13529,7 @@
     "Confirm Passphrase": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 712,
+        "line": 771,
         "nearby": [
           ", and this is the only copy of what is inside it.",
           "Passphrase",
@@ -14376,12 +14497,12 @@
     "Create": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 715,
+        "line": 775,
         "nearby": [
           "Cancel",
           "Create the system backup",
-          "Import System Backup",
-          "Upload the"
+          "Restore System Backup",
+          "Restoring"
         ]
       },
       {
@@ -14434,7 +14555,7 @@
     "Create Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 614,
+        "line": 664,
         "nearby": [
           "A snapshot of the game database only — characters, bases, vehicles, inventories and world state. These contain no console configuration and no credentials, so restoring one onto a fresh host still leaves every setting to re-enter by hand. Use a System Backup below to move a server to new hardware.",
           "Refresh Backups",
@@ -14504,33 +14625,34 @@
     "Create System Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 693,
+        "line": 747,
         "nearby": [
-          "there is no way to recover it without that passphrase",
           ". Store the passphrase somewhere durable and separate from the archive.",
-          "Import Backup",
-          "Delete System Backups"
+          "Refresh Backups",
+          "Delete System Backups",
+          "Delete"
         ]
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 707,
+        "line": 759,
         "nearby": [
           "Delete All",
-          "Set a passphrase for the new archive. It is entered twice because a typo produces an archive",
-          "nobody can ever decrypt"
+          "Delete All Backups",
+          "Use Saved Passphrase",
+          "The archive is encrypted with the passphrase saved under Automatic System Backups. You need that passphrase to restore it."
         ]
       }
     ],
     "Create the system backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 715,
+        "line": 775,
         "nearby": [
           "Confirm Passphrase",
           "Cancel",
           "Create",
-          "Import System Backup"
+          "Restore System Backup"
         ]
       }
     ],
@@ -14582,7 +14704,7 @@
     "Creating a pre-restore safety backup.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 873,
+        "line": 944,
         "nearby": [
           "Recreating the Dune database before import.",
           "Stopping Dune services before the database restore.",
@@ -14604,7 +14726,7 @@
     "Creating Backup...": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 414,
+        "line": 454,
         "nearby": [
           "Deleting Backup...",
           "Saving Automatic Backup Settings...",
@@ -14627,7 +14749,16 @@
     "Creating System Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 158,
+        "line": 179,
+        "nearby": [
+          "Active",
+          "Inactive",
+          "System Backup Failed"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/BackupsPanel.tsx",
+        "line": 210,
         "nearby": [
           "System Backup Failed",
           "The two passphrases do not match.",
@@ -15048,7 +15179,7 @@
     "Daily backup time must be a valid 24-hour time, for example 05:00 or 23:30.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 451,
+        "line": 491,
         "nearby": [
           "Creating Backup...",
           "Automatic Backup Settings Failed",
@@ -15231,7 +15362,7 @@
     "Database restore completed successfully. Dune services are restarting.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 847,
+        "line": 918,
         "nearby": [
           "Backup Restore Failed",
           "Restore Successful",
@@ -15241,7 +15372,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 865,
+        "line": 936,
         "nearby": [
           "Restarting Dune Services",
           "Restoring Backup...",
@@ -15263,7 +15394,7 @@
     "Database restore completed successfully. Restarting Dune services.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 866,
+        "line": 937,
         "nearby": [
           "Restoring Backup...",
           "Database restore completed successfully. Dune services are restarting.",
@@ -15297,7 +15428,7 @@
     "Database restore finished and the Dune console restart completed.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 833,
+        "line": 904,
         "nearby": [
           "Funcom token mismatch detected. Please update your token to match the one used with the previous Battlegroup ID from the Server Controls.",
           "Restore Completed",
@@ -15331,7 +15462,7 @@
     "Days": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 681,
+        "line": 731,
         "nearby": [
           "Hours",
           "Keep",
@@ -15406,7 +15537,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 100,
+        "line": 135,
         "nearby": [
           "Unavailable",
           "Activating",
@@ -15625,7 +15756,7 @@
     "Delete": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 647,
+        "line": 697,
         "nearby": [
           "Download",
           "Download backup",
@@ -15635,9 +15766,9 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 697,
+        "line": 750,
         "nearby": [
-          "Import Backup",
+          "Create System Backup",
           "Delete System Backups",
           "Delete Selected (",
           "Delete All System Backups"
@@ -15645,7 +15776,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 772,
+        "line": 817,
         "nearby": [
           "Restore",
           "Download archive and metadata (.tar)",
@@ -15654,11 +15785,11 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 774,
+        "line": 819,
         "nearby": [
           "Delete System Backup",
-          "What went wrong",
-          "Technical details"
+          "Import System Backup",
+          "Upload the"
         ]
       },
       {
@@ -15744,20 +15875,12 @@
     "Delete All": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 701,
+        "line": 754,
         "nearby": [
           "Delete Selected (",
           "Delete All System Backups",
+          "Delete All Backups",
           "Create System Backup"
-        ]
-      },
-      {
-        "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 703,
-        "nearby": [
-          "Delete All System Backups",
-          "Create System Backup",
-          "Set a passphrase for the new archive. It is entered twice because a typo produces an archive"
         ]
       },
       {
@@ -15801,11 +15924,21 @@
     "Delete All Backups": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 622,
+        "line": 672,
         "nearby": [
           "Create Backup",
           "Delete Selected (",
           "Select all backups"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/BackupsPanel.tsx",
+        "line": 756,
+        "nearby": [
+          "Delete All System Backups",
+          "Delete All",
+          "Create System Backup",
+          "Use Saved Passphrase"
         ]
       }
     ],
@@ -15833,11 +15966,12 @@
     "Delete All System Backups": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 701,
+        "line": 754,
         "nearby": [
           "Delete",
           "Delete Selected (",
-          "Delete All"
+          "Delete All",
+          "Delete All Backups"
         ]
       }
     ],
@@ -15856,7 +15990,7 @@
     "Delete backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 647,
+        "line": 697,
         "nearby": [
           "Download backup",
           "Delete",
@@ -16049,7 +16183,7 @@
     "Delete Selected (": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 619,
+        "line": 669,
         "nearby": [
           "Refresh Backups",
           "Create Backup",
@@ -16059,7 +16193,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 699,
+        "line": 752,
         "nearby": [
           "Delete System Backups",
           "Delete",
@@ -16159,21 +16293,21 @@
     "Delete System Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 774,
+        "line": 819,
         "nearby": [
           "Download archive and metadata (.tar)",
           "Delete",
-          "What went wrong"
+          "Import System Backup"
         ]
       }
     ],
     "Delete System Backups": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 697,
+        "line": 750,
         "nearby": [
+          "Refresh Backups",
           "Create System Backup",
-          "Import Backup",
           "Delete",
           "Delete Selected ("
         ]
@@ -16314,7 +16448,7 @@
     "Deleting Backup...": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 414,
+        "line": 454,
         "nearby": [
           "Configuration, credentials and the database were replaced. Dune services are stopped - start them from Server Controls to bring the restored configuration up. The admin password and database credentials may now differ from the ones this session is using.",
           "Restoring Backup...",
@@ -17711,7 +17845,7 @@
     "Download": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 646,
+        "line": 696,
         "nearby": [
           "Backup",
           "Battlegroup",
@@ -17753,7 +17887,7 @@
     "Download archive and metadata (.tar)": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 771,
+        "line": 816,
         "nearby": [
           "Select",
           "Restore",
@@ -17765,7 +17899,7 @@
     "Download backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 646,
+        "line": 696,
         "nearby": [
           "Battlegroup",
           "Download",
@@ -21032,10 +21166,20 @@
     "First Backup Time": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 679,
+        "line": 729,
         "nearby": [
           "ON",
           "OFF",
+          "Repeat Every",
+          "Hours"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 207,
+        "nearby": [
+          "OFF",
+          "Save a passphrase below before turning on automatic system backups.",
           "Repeat Every",
           "Hours"
         ]
@@ -21078,12 +21222,12 @@
     "first.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 738,
+        "line": 781,
         "nearby": [
           "the entire database",
           ". What is replaced is copied to",
           "Nothing changes until you apply.",
-          "Passphrase"
+          "This archive was encrypted with the saved scheduled-backup passphrase."
         ]
       }
     ],
@@ -21524,10 +21668,18 @@
     "Funcom Backups": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 612,
+        "line": 45,
         "nearby": [
-          "Backup List Unavailable",
+          "System Backups",
+          "Unavailable"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/BackupsPanel.tsx",
+        "line": 662,
+        "nearby": [
           "Backups",
+          "Backup type",
           "A snapshot of the game database only — characters, bases, vehicles, inventories and world state. These contain no console configuration and no credentials, so restoring one onto a fresh host still leaves every setting to re-enter by hand. Use a System Backup below to move a server to new hardware.",
           "Refresh Backups"
         ]
@@ -21680,7 +21832,7 @@
     "Funcom token mismatch detected. Please update your token to match the one used with the previous Battlegroup ID from the Server Controls.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 827,
+        "line": 898,
         "nearby": [
           "Technical details",
           "Attention Required",
@@ -23451,12 +23603,22 @@
     "Hours": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 680,
+        "line": 730,
         "nearby": [
           "First Backup Time",
           "Repeat Every",
           "Keep",
           "Days"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 208,
+        "nearby": [
+          "First Backup Time",
+          "Repeat Every",
+          "Keep Newest",
+          "Keep one fewer"
         ]
       }
     ],
@@ -23726,7 +23888,7 @@
     "Import": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 659,
+        "line": 709,
         "nearby": [
           "Backup File (.backup)",
           "Metadata File (.yaml)",
@@ -23735,12 +23897,12 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 732,
+        "line": 832,
         "nearby": [
-          "Cancel",
+          "System Backup File (.tar or .tar.gz.enc)",
           "Import system backup",
-          "Restore System Backup",
-          "Restoring"
+          "What went wrong",
+          "Technical details"
         ]
       },
       {
@@ -23806,18 +23968,6 @@
         ]
       }
     ],
-    "Import Backup": [
-      {
-        "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 694,
-        "nearby": [
-          ". Store the passphrase somewhere durable and separate from the archive.",
-          "Create System Backup",
-          "Delete System Backups",
-          "Delete"
-        ]
-      }
-    ],
     "Import Base Backup": [
       {
         "file": "console/web/src/features/bases/BaseBackupsView.tsx",
@@ -23833,7 +23983,7 @@
     "Import Failed": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 243,
+        "line": 284,
         "nearby": [
           "System Backup Failed",
           "Uploading System Backup",
@@ -23842,7 +23992,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 259,
+        "line": 300,
         "nearby": [
           "System Backup Imported",
           "Install Game Files",
@@ -23851,7 +24001,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 469,
+        "line": 509,
         "nearby": [
           "Automatic Backup Settings Failed",
           "Backup interval must be a whole number from 1 to 168 hours.",
@@ -23860,7 +24010,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 473,
+        "line": 513,
         "nearby": [
           "Select a .backup file.",
           "Select the matching .backup.yaml file."
@@ -23868,7 +24018,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 477,
+        "line": 517,
         "nearby": [
           "Select the matching .backup.yaml file.",
           "The backup file must end with .backup."
@@ -23876,7 +24026,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 481,
+        "line": 521,
         "nearby": [
           "The backup file must end with .backup.",
           "The metadata file must end with .yaml or .yml.",
@@ -23885,7 +24035,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 499,
+        "line": 539,
         "nearby": [
           "Importing Backup",
           "Backup Imported Successfully",
@@ -23897,7 +24047,7 @@
     "Import Funcom External Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 654,
+        "line": 704,
         "nearby": [
           "Loading Backups...",
           "No database backups have been created yet.",
@@ -23909,22 +24059,22 @@
     "Import system backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 732,
+        "line": 832,
         "nearby": [
-          "Backup file",
-          "Cancel",
+          "— restore it afterwards, with its passphrase.",
+          "System Backup File (.tar or .tar.gz.enc)",
           "Import",
-          "Restore System Backup"
+          "What went wrong"
         ]
       }
     ],
     "Import System Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 719,
+        "line": 827,
         "nearby": [
-          "Create the system backup",
-          "Create",
+          "Delete System Backup",
+          "Delete",
           "Upload the",
           "a download produced, or a bare"
         ]
@@ -23956,7 +24106,7 @@
     "Imported Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 952,
+        "line": 1023,
         "nearby": [
           "Pre-update Backup",
           "SQL Safety Backup",
@@ -23980,7 +24130,7 @@
     "Importing Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 485,
+        "line": 525,
         "nearby": [
           "Import Failed",
           "The metadata file must end with .yaml or .yml.",
@@ -24150,12 +24300,12 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 101,
+        "line": 136,
         "nearby": [
           "Deactivating",
           "Active",
-          "System Backup Failed",
-          "The passphrase must be at least 12 characters."
+          "Creating System Backup",
+          "System Backup Failed"
         ]
       },
       {
@@ -24166,6 +24316,16 @@
           "Deactivating",
           "Public Release",
           "Auto Updates Save Failed"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 183,
+        "nearby": [
+          "Unavailable",
+          "Active",
+          "Automatic System Backups",
+          "Save a passphrase first"
         ]
       }
     ],
@@ -24326,7 +24486,7 @@
     "Install Game Files": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 300,
+        "line": 340,
         "nearby": [
           "System Backup Imported",
           "Import Failed",
@@ -25287,7 +25447,7 @@
     "Keep": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 681,
+        "line": 731,
         "nearby": [
           "Repeat Every",
           "Hours",
@@ -25351,6 +25511,54 @@
           "Unknown",
           "Search for the new owner",
           "Map"
+        ]
+      }
+    ],
+    "Keep must be a whole number from 1 to 365.": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 224,
+        "nearby": [
+          "Save a passphrase first",
+          "Save Settings",
+          "Automatic archives stored: {count0}. The next run removes {count1} and keeps {count2}",
+          "Only automatic archives count. Manual and imported archives are never removed by this setting. Saving deletes nothing now; the next scheduled run prunes."
+        ]
+      }
+    ],
+    "Keep Newest": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 210,
+        "nearby": [
+          "Repeat Every",
+          "Hours",
+          "Keep one fewer",
+          "Keep one more"
+        ]
+      }
+    ],
+    "Keep one fewer": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 212,
+        "nearby": [
+          "Hours",
+          "Keep Newest",
+          "Keep one more",
+          "Save a passphrase first"
+        ]
+      }
+    ],
+    "Keep one more": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 214,
+        "nearby": [
+          "Keep Newest",
+          "Keep one fewer",
+          "Save a passphrase first",
+          "Save Settings"
         ]
       }
     ],
@@ -26446,7 +26654,7 @@
     "Loading Backups...": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 651,
+        "line": 701,
         "nearby": [
           "Delete",
           "Delete backup",
@@ -27651,7 +27859,7 @@
     "Manual Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 953,
+        "line": 1024,
         "nearby": [
           "SQL Safety Backup",
           "Imported Backup",
@@ -28067,7 +28275,7 @@
     "Market Bot Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 946,
+        "line": 1017,
         "nearby": [
           "Unknown",
           "Automatic Backup",
@@ -28649,7 +28857,7 @@
     "Metadata File (.yaml)": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 657,
+        "line": 707,
         "nearby": [
           "Import Funcom External Backup",
           "Backup File (.backup)",
@@ -29336,6 +29544,18 @@
           "Existing",
           "Available",
           "World-oriented view: North stays at the top. The claim grid is rotated using the Sub-Fief's original yaw, while saved coordinates remain unchanged."
+        ]
+      }
+    ],
+    "New Automatic Backup Passphrase": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 238,
+        "nearby": [
+          "Automatic backups can't ask for a passphrase, so they use the one saved here. It is stored on this host with owner-only permissions, is never placed inside an archive, and cannot be read back. Only the Owner role can save, replace or remove it.",
+          "Replacing it does not re-encrypt older archives. They still need the passphrase they were made with.",
+          "Automatic Backup Passphrase",
+          "Confirm Automatic Backup Passphrase"
         ]
       }
     ],
@@ -30041,7 +30261,7 @@
     "No database backups have been created yet.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 651,
+        "line": 701,
         "nearby": [
           "Delete backup",
           "Loading Backups...",
@@ -30885,7 +31105,7 @@
     "No system backups have been created yet.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 760,
+        "line": 805,
         "nearby": [
           "Cancel the console restart",
           "Cancel",
@@ -30978,9 +31198,9 @@
     "nobody can ever decrypt": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 709,
+        "line": 768,
         "nearby": [
-          "Create System Backup",
+          "The archive is encrypted with the passphrase saved under Automatic System Backups. You need that passphrase to restore it.",
           "Set a passphrase for the new archive. It is entered twice because a typo produces an archive",
           ", and this is the only copy of what is inside it.",
           "Passphrase"
@@ -31294,6 +31514,17 @@
         ]
       }
     ],
+    "Not Saved": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 232,
+        "nearby": [
+          "Saved Passphrase",
+          "Saved",
+          "Automatic backups can't ask for a passphrase, so they use the one saved here. It is stored on this host with owner-only permissions, is never placed inside an archive, and cannot be read back. Only the Owner role can save, replace or remove it."
+        ]
+      }
+    ],
     "Not scheduled": [
       {
         "file": "console/web/src/features/adminTools/ScheduledMapMessages.tsx",
@@ -31350,12 +31581,12 @@
     "Nothing changes until you apply.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 738,
+        "line": 781,
         "nearby": [
           ". What is replaced is copied to",
           "first.",
-          "Passphrase",
-          "Restore passphrase"
+          "This archive was encrypted with the saved scheduled-backup passphrase.",
+          "Saved"
         ]
       }
     ],
@@ -31662,7 +31893,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 667,
+        "line": 717,
         "nearby": [
           "Automatic Backups",
           "ON",
@@ -31917,7 +32148,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 667,
+        "line": 717,
         "nearby": [
           "Automatic Backups",
           "OFF",
@@ -32064,6 +32295,18 @@
           "No summary values available.",
           "Banned",
           "Offline"
+        ]
+      }
+    ],
+    "Only automatic archives count. Manual and imported archives are never removed by this setting. Saving deletes nothing now; the next scheduled run prunes.": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 228,
+        "nearby": [
+          "Keep must be a whole number from 1 to 365.",
+          "Automatic archives stored: {count0}. The next run removes {count1} and keeps {count2}",
+          "Saved Passphrase",
+          "Saved"
         ]
       }
     ],
@@ -33224,7 +33467,7 @@
     "Passphrase": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 711,
+        "line": 770,
         "nearby": [
           "nobody can ever decrypt",
           ", and this is the only copy of what is inside it.",
@@ -33234,10 +33477,10 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 740,
+        "line": 785,
         "nearby": [
-          "first.",
-          "Nothing changes until you apply.",
+          "This archive was encrypted with the saved scheduled-backup passphrase.",
+          "Saved",
           "Restore passphrase",
           "Cancel"
         ]
@@ -33260,6 +33503,61 @@
           ". Nothing is applied until you confirm.",
           "The passphrase set when this archive was created. There is no way to open it without that passphrase.",
           "Archive passphrase"
+        ]
+      }
+    ],
+    "Passphrase Not Removed": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 125,
+        "nearby": [
+          "Removing Passphrase",
+          "Passphrase Removed",
+          "Schedule Not Saved",
+          "Saving Schedule"
+        ]
+      }
+    ],
+    "Passphrase Not Saved": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 98,
+        "nearby": [
+          "Saving Passphrase",
+          "Passphrase Saved"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 108,
+        "nearby": [
+          "Saving Passphrase",
+          "Passphrase Saved",
+          "Removing Passphrase",
+          "Passphrase Removed"
+        ]
+      }
+    ],
+    "Passphrase Removed": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 122,
+        "nearby": [
+          "Passphrase Not Saved",
+          "Removing Passphrase",
+          "Passphrase Not Removed",
+          "Schedule Not Saved"
+        ]
+      }
+    ],
+    "Passphrase Saved": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 105,
+        "nearby": [
+          "Passphrase Not Saved",
+          "Saving Passphrase",
+          "Removing Passphrase"
         ]
       }
     ],
@@ -34688,7 +34986,7 @@
     "Pre-update Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 950,
+        "line": 1021,
         "nearby": [
           "Restore Safety Backup",
           "Vehicle Delete Safety Backup",
@@ -34735,7 +35033,7 @@
     "Preparing database restore.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 874,
+        "line": 945,
         "nearby": [
           "Stopping Dune services before the database restore.",
           "Creating a pre-restore safety backup.",
@@ -34958,7 +35256,7 @@
     "Preview Only - Nothing Changed": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 322,
+        "line": 362,
         "nearby": [
           "Import Failed",
           "Install Game Files",
@@ -34970,7 +35268,7 @@
     "Preview Restore": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 743,
+        "line": 788,
         "nearby": [
           "Restore passphrase",
           "Cancel",
@@ -36681,7 +36979,7 @@
     "Recreating the Dune database before import.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 871,
+        "line": 942,
         "nearby": [
           "Adapting imported backup to this Docker battlegroup.",
           "Restoring database contents from the selected backup.",
@@ -37202,12 +37500,22 @@
     "Refresh Backups": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 614,
+        "line": 664,
         "nearby": [
           "Funcom Backups",
           "A snapshot of the game database only — characters, bases, vehicles, inventories and world state. These contain no console configuration and no credentials, so restoring one onto a fresh host still leaves every setting to re-enter by hand. Use a System Backup below to move a server to new hardware.",
           "Create Backup",
           "Delete Selected ("
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/BackupsPanel.tsx",
+        "line": 746,
+        "nearby": [
+          "there is no way to recover it without that passphrase",
+          ". Store the passphrase somewhere durable and separate from the archive.",
+          "Create System Backup",
+          "Delete System Backups"
         ]
       }
     ],
@@ -37569,7 +37877,7 @@
     "Relinking restored characters to current Docker player identities.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 867,
+        "line": 938,
         "nearby": [
           "Database restore completed successfully. Dune services are restarting.",
           "Database restore completed successfully. Restarting Dune services.",
@@ -37902,6 +38210,16 @@
         ]
       }
     ],
+    "Remove Passphrase": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 242,
+        "nearby": [
+          "Save Passphrase",
+          "Turn off automatic system backups first"
+        ]
+      }
+    ],
     "Remove Realtime Data Agent": [
       {
         "file": "console/web/src/features/settings/RealtimeAgentNotice.tsx",
@@ -37968,6 +38286,18 @@
           "Item",
           "Add Item to Container",
           "Add"
+        ]
+      }
+    ],
+    "Removing Passphrase": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 119,
+        "nearby": [
+          "Passphrase Saved",
+          "Passphrase Not Saved",
+          "Passphrase Removed",
+          "Passphrase Not Removed"
         ]
       }
     ],
@@ -38293,19 +38623,41 @@
     "Repeat Every": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 680,
+        "line": 730,
         "nearby": [
           "OFF",
           "First Backup Time",
           "Hours",
           "Keep"
         ]
+      },
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 208,
+        "nearby": [
+          "Save a passphrase below before turning on automatic system backups.",
+          "First Backup Time",
+          "Hours",
+          "Keep Newest"
+        ]
+      }
+    ],
+    "Replace Passphrase": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 241,
+        "nearby": [
+          "Automatic Backup Passphrase",
+          "Confirm Automatic Backup Passphrase",
+          "Save Passphrase",
+          "Turn off automatic system backups first"
+        ]
       }
     ],
     "Replaces": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 347,
+        "line": 387,
         "nearby": [
           "Restore",
           "Backup",
@@ -38329,12 +38681,24 @@
     "replaces this server's": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 738,
+        "line": 781,
         "nearby": [
           "Restore System Backup",
           "Restoring",
           "and",
           "the entire database"
+        ]
+      }
+    ],
+    "Replacing it does not re-encrypt older archives. They still need the passphrase they were made with.": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 237,
+        "nearby": [
+          "Saved",
+          "Automatic backups can't ask for a passphrase, so they use the one saved here. It is stored on this host with owner-only permissions, is never placed inside an archive, and cannot be read back. Only the Owner role can save, replace or remove it.",
+          "New Automatic Backup Passphrase",
+          "Automatic Backup Passphrase"
         ]
       }
     ],
@@ -39359,7 +39723,7 @@
     "Restarting Dune Services": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 859,
+        "line": 930,
         "nearby": [
           "Restore Successful",
           "Database restore completed successfully. Dune services are restarting.",
@@ -39450,7 +39814,7 @@
     "Restarting The Console": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 750,
+        "line": 795,
         "nearby": [
           "Preview Restore",
           "Apply Restore",
@@ -39498,7 +39862,7 @@
     "Restore": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 343,
+        "line": 383,
         "nearby": [
           "The passphrase opened the archive. Review what it would replace below, then apply.",
           "Restore System Backup",
@@ -39508,7 +39872,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 627,
+        "line": 677,
         "nearby": [
           "Select All",
           "Select",
@@ -39518,7 +39882,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 637,
+        "line": 687,
         "nearby": [
           "Restore backup",
           "Restore Backup",
@@ -39528,7 +39892,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 770,
+        "line": 815,
         "nearby": [
           "Select All",
           "Select",
@@ -39604,7 +39968,7 @@
     "Restore backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 627,
+        "line": 677,
         "nearby": [
           "Select",
           "Restore",
@@ -39615,7 +39979,7 @@
     "Restore Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 636,
+        "line": 686,
         "nearby": [
           "Restore",
           "Restore backup",
@@ -39650,7 +40014,7 @@
     "Restore Completed": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 833,
+        "line": 904,
         "nearby": [
           "Attention Required",
           "Funcom token mismatch detected. Please update your token to match the one used with the previous Battlegroup ID from the Server Controls.",
@@ -39827,9 +40191,9 @@
     "Restore passphrase": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 740,
+        "line": 785,
         "nearby": [
-          "Nothing changes until you apply.",
+          "Saved",
           "Passphrase",
           "Cancel",
           "Preview Restore"
@@ -39850,7 +40214,7 @@
     "Restore Safety Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 948,
+        "line": 1019,
         "nearby": [
           "Market Bot Backup",
           "Automatic Backup",
@@ -39908,7 +40272,7 @@
     "Restore Successful": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 846,
+        "line": 917,
         "nearby": [
           "Database restore finished and the Dune console restart completed.",
           "Backup Restore Failed",
@@ -39920,7 +40284,7 @@
     "Restore System Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 342,
+        "line": 382,
         "nearby": [
           "Preview Only - Nothing Changed",
           "The passphrase opened the archive. Review what it would replace below, then apply.",
@@ -39930,10 +40294,10 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 736,
+        "line": 779,
         "nearby": [
-          "Import system backup",
-          "Import",
+          "Create the system backup",
+          "Create",
           "Restoring",
           "replaces this server's"
         ]
@@ -39965,9 +40329,9 @@
     "Restoring": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 738,
+        "line": 781,
         "nearby": [
-          "Import",
+          "Create",
           "Restore System Backup",
           "replaces this server's",
           "and"
@@ -40009,7 +40373,7 @@
     "Restoring Backup...": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 414,
+        "line": 454,
         "nearby": [
           "System Backup Restored",
           "Configuration, credentials and the database were replaced. Dune services are stopped - start them from Server Controls to bring the restored configuration up. The admin password and database credentials may now differ from the ones this session is using.",
@@ -40019,7 +40383,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 860,
+        "line": 931,
         "nearby": [
           "Database restore completed successfully. Dune services are restarting.",
           "Restarting Dune Services",
@@ -40042,7 +40406,7 @@
     "Restoring database contents from the selected backup.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 870,
+        "line": 941,
         "nearby": [
           "Changing Docker to use the backup battlegroup ID.",
           "Adapting imported backup to this Docker battlegroup.",
@@ -41368,6 +41732,38 @@
         ]
       }
     ],
+    "Save a passphrase below before turning on automatic system backups.": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 205,
+        "nearby": [
+          "ON",
+          "OFF",
+          "First Backup Time",
+          "Repeat Every"
+        ]
+      }
+    ],
+    "Save a passphrase first": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 188,
+        "nearby": [
+          "Inactive",
+          "Automatic System Backups"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 217,
+        "nearby": [
+          "Keep one fewer",
+          "Keep one more",
+          "Save Settings",
+          "Keep must be a whole number from 1 to 365."
+        ]
+      }
+    ],
     "Save And Apply": [
       {
         "file": "console/web/src/features/landsraad/LandsraadPanel.tsx",
@@ -41647,6 +42043,18 @@
         ]
       }
     ],
+    "Save Passphrase": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 241,
+        "nearby": [
+          "Confirm Automatic Backup Passphrase",
+          "Replace Passphrase",
+          "Turn off automatic system backups first",
+          "Remove Passphrase"
+        ]
+      }
+    ],
     "Save Password": [
       {
         "file": "console/web/src/features/database/DatabasePanel.tsx",
@@ -41766,7 +42174,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 682,
+        "line": 732,
         "nearby": [
           "Keep",
           "Days",
@@ -41783,6 +42191,16 @@
           "Loading Maps",
           "Map list could not be loaded."
         ]
+      },
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 217,
+        "nearby": [
+          "Keep one more",
+          "Save a passphrase first",
+          "Keep must be a whole number from 1 to 365.",
+          "Automatic archives stored: {count0}. The next run removes {count1} and keeps {count2}"
+        ]
       }
     ],
     "Save Token": [
@@ -41794,6 +42212,36 @@
           "Paste new token",
           "Restart History",
           "Tracking begins after this update"
+        ]
+      }
+    ],
+    "Saved": [
+      {
+        "file": "console/web/src/features/backups/BackupsPanel.tsx",
+        "line": 784,
+        "nearby": [
+          "Nothing changes until you apply.",
+          "This archive was encrypted with the saved scheduled-backup passphrase.",
+          "Passphrase",
+          "Restore passphrase"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 232,
+        "nearby": [
+          "Only automatic archives count. Manual and imported archives are never removed by this setting. Saving deletes nothing now; the next scheduled run prunes.",
+          "Saved Passphrase",
+          "Not Saved"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 233,
+        "nearby": [
+          "Not Saved",
+          "Automatic backups can't ask for a passphrase, so they use the one saved here. It is stored on this host with owner-only permissions, is never placed inside an archive, and cannot be read back. Only the Owner role can save, replace or remove it.",
+          "Replacing it does not re-encrypt older archives. They still need the passphrase they were made with."
         ]
       }
     ],
@@ -41818,6 +42266,18 @@
           "Awaiting Restart",
           "This dynamic partition is offline. Terrain, resources, bases, and vehicles remain visible from saved data. Teleport becomes available after normal in-game travel starts the partition.",
           "Search Map"
+        ]
+      }
+    ],
+    "Saved Passphrase": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 232,
+        "nearby": [
+          "Automatic archives stored: {count0}. The next run removes {count1} and keeps {count2}",
+          "Only automatic archives count. Manual and imported archives are never removed by this setting. Saving deletes nothing now; the next scheduled run prunes.",
+          "Saved",
+          "Not Saved"
         ]
       }
     ],
@@ -41909,7 +42369,7 @@
     "Saving Automatic Backup Settings...": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 414,
+        "line": 454,
         "nearby": [
           "Restoring Backup...",
           "Deleting Backup...",
@@ -41975,6 +42435,16 @@
         ]
       }
     ],
+    "Saving Passphrase": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 102,
+        "nearby": [
+          "Passphrase Not Saved",
+          "Passphrase Saved"
+        ]
+      }
+    ],
     "Saving records the position. An installed terminal only moves in-game after a map restart.": [
       {
         "file": "console/web/src/features/maps/MapsPanel.tsx",
@@ -42030,6 +42500,16 @@
           "Notification time must be between 1 and 1440 minutes.",
           "Schedule Saved Successfully",
           "Timer Install Failed"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 157,
+        "nearby": [
+          "Passphrase Not Removed",
+          "Schedule Not Saved",
+          "Turning Off Schedule",
+          "Schedule Saved"
         ]
       }
     ],
@@ -42384,6 +42864,36 @@
         ]
       }
     ],
+    "Schedule Not Saved": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 153,
+        "nearby": [
+          "Passphrase Removed",
+          "Passphrase Not Removed",
+          "Saving Schedule",
+          "Turning Off Schedule"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 167,
+        "nearby": [
+          "Turning Off Schedule",
+          "Schedule Saved",
+          "Unavailable"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 170,
+        "nearby": [
+          "Schedule Saved",
+          "Unavailable",
+          "Active"
+        ]
+      }
+    ],
     "Schedule Save Failed": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
@@ -42446,6 +42956,17 @@
           "Timer Install Failed",
           "Default countdown must be 1 to 1440 minutes",
           "Default countdown must be between 1 and 1440 minutes."
+        ]
+      }
+    ],
+    "Schedule Saved": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 165,
+        "nearby": [
+          "Saving Schedule",
+          "Turning Off Schedule",
+          "Schedule Not Saved"
         ]
       }
     ],
@@ -43136,7 +43657,7 @@
     "Select": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 625,
+        "line": 675,
         "nearby": [
           "Select all backups",
           "Select All",
@@ -43146,7 +43667,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 768,
+        "line": 813,
         "nearby": [
           "Select all system backups",
           "Select All",
@@ -43178,7 +43699,7 @@
     "Select a .backup file.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 469,
+        "line": 509,
         "nearby": [
           "Backup interval must be a whole number from 1 to 168 hours.",
           "Import Failed",
@@ -43235,7 +43756,7 @@
     "Select All": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 623,
+        "line": 673,
         "nearby": [
           "Select all backups",
           "Select",
@@ -43244,7 +43765,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 767,
+        "line": 812,
         "nearby": [
           "Select all system backups",
           "Select",
@@ -43265,7 +43786,7 @@
     "Select all backups": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 623,
+        "line": 673,
         "nearby": [
           "Delete Selected (",
           "Delete All Backups",
@@ -43276,7 +43797,7 @@
     "Select all system backups": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 767,
+        "line": 812,
         "nearby": [
           "Cancel",
           "No system backups have been created yet.",
@@ -43440,7 +43961,7 @@
     "Select the matching .backup.yaml file.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 473,
+        "line": 513,
         "nearby": [
           "Select a .backup file.",
           "Import Failed",
@@ -44095,10 +44616,10 @@
     "Set a passphrase for the new archive. It is entered twice because a typo produces an archive": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 709,
+        "line": 768,
         "nearby": [
-          "Delete All",
-          "Create System Backup",
+          "Use Saved Passphrase",
+          "The archive is encrypted with the passphrase saved under Automatic System Backups. You need that passphrase to restore it.",
           "nobody can ever decrypt",
           ", and this is the only copy of what is inside it."
         ]
@@ -45634,7 +46155,7 @@
     "SQL Safety Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 951,
+        "line": 1022,
         "nearby": [
           "Vehicle Delete Safety Backup",
           "Pre-update Backup",
@@ -46314,7 +46835,7 @@
     "Stopping Dune services before the database restore.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 872,
+        "line": 943,
         "nearby": [
           "Restoring database contents from the selected backup.",
           "Recreating the Dune database before import.",
@@ -46458,12 +46979,12 @@
     "stored, not applied": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 721,
+        "line": 828,
         "nearby": [
           "a download produced, or a bare",
           ". It is",
           "— restore it afterwards, with its passphrase.",
-          "Backup file"
+          "System Backup File (.tar or .tar.gz.enc)"
         ]
       }
     ],
@@ -46809,16 +47330,24 @@
     "System Backup Failed": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 145,
+        "line": 188,
         "nearby": [
-          "Active",
           "Inactive",
+          "Creating System Backup",
           "The passphrase must be at least 12 characters."
         ]
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 150,
+        "line": 197,
+        "nearby": [
+          "Creating System Backup",
+          "The passphrase must be at least 12 characters."
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/BackupsPanel.tsx",
+        "line": 202,
         "nearby": [
           "The passphrase must be at least 12 characters.",
           "The passphrase must use at least 5 different characters."
@@ -46826,7 +47355,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 154,
+        "line": 206,
         "nearby": [
           "The passphrase must use at least 5 different characters.",
           "The two passphrases do not match.",
@@ -46835,7 +47364,7 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 169,
+        "line": 221,
         "nearby": [
           "The two passphrases do not match.",
           "Creating System Backup",
@@ -46844,10 +47373,22 @@
         ]
       }
     ],
+    "System Backup File (.tar or .tar.gz.enc)": [
+      {
+        "file": "console/web/src/features/backups/BackupsPanel.tsx",
+        "line": 830,
+        "nearby": [
+          "stored, not applied",
+          "— restore it afterwards, with its passphrase.",
+          "Import system backup",
+          "Import"
+        ]
+      }
+    ],
     "System Backup Imported": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 254,
+        "line": 295,
         "nearby": [
           "Uploading System Backup",
           "Import Failed",
@@ -46870,7 +47411,7 @@
     "System Backup Restored": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 371,
+        "line": 411,
         "nearby": [
           "Replaces",
           "After",
@@ -46889,10 +47430,21 @@
         ]
       }
     ],
+    "System Backups": [
+      {
+        "file": "console/web/src/features/backups/BackupsPanel.tsx",
+        "line": 46,
+        "nearby": [
+          "Funcom Backups",
+          "Unavailable",
+          "Activating"
+        ]
+      }
+    ],
     "System Backups (Encrypted)": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 689,
+        "line": 741,
         "nearby": [
           "Days",
           "Save Settings",
@@ -47136,9 +47688,9 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 813,
+        "line": 884,
         "nearby": [
-          "Delete",
+          "Import",
           "What went wrong",
           "Attention Required",
           "Funcom token mismatch detected. Please update your token to match the one used with the previous Battlegroup ID from the Server Controls."
@@ -47745,6 +48297,18 @@
         ]
       }
     ],
+    "The archive is encrypted with the passphrase saved under Automatic System Backups. You need that passphrase to restore it.": [
+      {
+        "file": "console/web/src/features/backups/BackupsPanel.tsx",
+        "line": 765,
+        "nearby": [
+          "Create System Backup",
+          "Use Saved Passphrase",
+          "Set a passphrase for the new archive. It is entered twice because a typo produces an archive",
+          "nobody can ever decrypt"
+        ]
+      }
+    ],
     "The archive's admin password is now this host's, so you may be asked to sign in again.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
@@ -47784,7 +48348,7 @@
     "The backup file must end with .backup.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 477,
+        "line": 517,
         "nearby": [
           "Select the matching .backup.yaml file.",
           "Import Failed",
@@ -47866,7 +48430,7 @@
     "The Console is still running the configuration from before the restore. Restarting it loads the restored one. If the archive carried a different admin password you will be asked to sign in again.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 752,
+        "line": 797,
         "nearby": [
           "Apply Restore",
           "Restarting The Console",
@@ -48016,7 +48580,7 @@
     "the entire database": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 738,
+        "line": 781,
         "nearby": [
           "replaces this server's",
           "and",
@@ -48324,7 +48888,7 @@
     "The metadata file must end with .yaml or .yml.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 481,
+        "line": 521,
         "nearby": [
           "The backup file must end with .backup.",
           "Import Failed",
@@ -48336,9 +48900,8 @@
     "The passphrase must be at least 12 characters.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 145,
+        "line": 197,
         "nearby": [
-          "Inactive",
           "System Backup Failed",
           "The passphrase must use at least 5 different characters."
         ]
@@ -48347,7 +48910,7 @@
     "The passphrase must use at least 5 different characters.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 150,
+        "line": 202,
         "nearby": [
           "The passphrase must be at least 12 characters.",
           "System Backup Failed",
@@ -48358,7 +48921,7 @@
     "The passphrase opened the archive. Review what it would replace below, then apply.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 323,
+        "line": 363,
         "nearby": [
           "Install Game Files",
           "Preview Only - Nothing Changed",
@@ -48620,7 +49183,7 @@
     "The two passphrases do not match.": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 154,
+        "line": 206,
         "nearby": [
           "The passphrase must use at least 5 different characters.",
           "System Backup Failed",
@@ -48712,12 +49275,12 @@
     "there is no way to recover it without that passphrase": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 690,
+        "line": 742,
         "nearby": [
           "and every file in",
           "— the Funcom token, admin console password, RMQ credentials, sietch join password and IAM policies. It is encrypted with the passphrase you set here, and",
           ". Store the passphrase somewhere durable and separate from the archive.",
-          "Create System Backup"
+          "Refresh Backups"
         ]
       }
     ],
@@ -48868,6 +49431,18 @@
           "Choose Admin Audit History",
           "Adopt Backup History",
           "Keep Current History"
+        ]
+      }
+    ],
+    "This archive was encrypted with the saved scheduled-backup passphrase.": [
+      {
+        "file": "console/web/src/features/backups/BackupsPanel.tsx",
+        "line": 783,
+        "nearby": [
+          "first.",
+          "Nothing changes until you apply.",
+          "Saved",
+          "Passphrase"
         ]
       }
     ],
@@ -50112,6 +50687,17 @@
         ]
       }
     ],
+    "Turn off automatic system backups first": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 242,
+        "nearby": [
+          "Replace Passphrase",
+          "Save Passphrase",
+          "Remove Passphrase"
+        ]
+      }
+    ],
     "Turn On": [
       {
         "file": "console/web/src/features/bases/BasesPanel.tsx",
@@ -50129,6 +50715,17 @@
           "Auto-Refill Water",
           "Bases",
           "Expand a row to use the same tools available on the main Bases page."
+        ]
+      }
+    ],
+    "Turning Off Schedule": [
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 157,
+        "nearby": [
+          "Schedule Not Saved",
+          "Saving Schedule",
+          "Schedule Saved"
         ]
       }
     ],
@@ -50335,8 +50932,10 @@
       },
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 98,
+        "line": 133,
         "nearby": [
+          "Funcom Backups",
+          "System Backups",
           "Activating",
           "Deactivating"
         ]
@@ -50359,6 +50958,15 @@
           "Currently Active",
           "{count0}h {count1}m",
           "{count0}m"
+        ]
+      },
+      {
+        "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
+        "line": 183,
+        "nearby": [
+          "Schedule Not Saved",
+          "Active",
+          "Inactive"
         ]
       },
       {
@@ -51507,9 +52115,9 @@
     "Upload the": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 721,
+        "line": 828,
         "nearby": [
-          "Create",
+          "Delete",
           "Import System Backup",
           "a download produced, or a bare",
           ". It is"
@@ -51519,7 +52127,7 @@
     "Uploading System Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 227,
+        "line": 268,
         "nearby": [
           "Creating System Backup",
           "System Backup Failed",
@@ -51677,6 +52285,18 @@
           "Skill Browser",
           "The player must be online to change skills or restore starter skills.",
           "Unsaved Change"
+        ]
+      }
+    ],
+    "Use Saved Passphrase": [
+      {
+        "file": "console/web/src/features/backups/BackupsPanel.tsx",
+        "line": 762,
+        "nearby": [
+          "Delete All Backups",
+          "Create System Backup",
+          "The archive is encrypted with the passphrase saved under Automatic System Backups. You need that passphrase to restore it.",
+          "Set a passphrase for the new archive. It is entered twice because a typo produces an archive"
         ]
       }
     ],
@@ -51964,7 +52584,7 @@
     "Vehicle Delete Safety Backup": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 949,
+        "line": 1020,
         "nearby": [
           "Automatic Backup",
           "Restore Safety Backup",
@@ -52921,10 +53541,10 @@
     "What went wrong": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
-        "line": 813,
+        "line": 884,
         "nearby": [
-          "Delete System Backup",
-          "Delete",
+          "Import system backup",
+          "Import",
           "Technical details",
           "Attention Required"
         ]

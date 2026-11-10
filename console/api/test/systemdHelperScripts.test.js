@@ -10,7 +10,8 @@ const helperScripts = new Map([
   ["runtime/scripts/restart-schedule.sh", 3],
   ["runtime/scripts/ip-change-restart.sh", 3],
   ["runtime/scripts/shutdown-protection.sh", 4],
-  ["runtime/scripts/db.sh", 3],
+  // Database backup timer (3) plus scheduled system backup timer (3).
+  ["runtime/scripts/db.sh", 6],
   ["runtime/scripts/update.sh", 3]
 ]);
 
