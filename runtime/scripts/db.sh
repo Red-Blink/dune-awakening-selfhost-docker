@@ -4140,7 +4140,9 @@ system_auto_initial_epoch() {
   for attempt in 1 2 3; do
     # Match systemd's local calendar: skip a clock time that does not exist
     # during the spring-forward gap, rather than normalizing it to a new hour.
-    if first="$(date -d "$today $clock" +%s 2>/dev/null)" && [ "$first" -ge "$now" ]; then
+    if first="$(date -d "$today $clock" +%s 2>/dev/null)" \
+      && [ "$(date -d "@$first" '+%F %H:%M')" = "$today $clock" ] \
+      && [ "$first" -ge "$now" ]; then
       printf '%s\n' "$first"
       return 0
     fi

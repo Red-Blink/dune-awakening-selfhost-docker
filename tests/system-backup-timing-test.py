@@ -92,6 +92,15 @@ class TimingTests(unittest.TestCase):
                               'date -d "@$(system_auto_next_epoch "$a" "$a" 24)" +%FT%R',
                               "America/New_York"), "2026-03-09T02:30")
 
+    def test_normalizing_date_versions_cannot_shift_backup_clock(self):
+        self.assertEqual(bash('date() { '
+                              'if [ "${1:-}" = -d ] && [ "${2:-}" = "2026-03-08 02:30" ]; then '
+                              'command date -d "2026-03-08 03:30" +%s; '
+                              'else command date "$@"; fi; }; '
+                              'a=$(date -d "2026-03-07 02:30" +%s); '
+                              'date -d "@$(system_auto_next_epoch "$a" "$a" 24)" +%FT%R',
+                              "America/New_York"), "2026-03-09T02:30")
+
     def test_timer_condition_guards_hourly_wake(self):
         timer = bash('SYSTEM_AUTO_UNIT=dune-test; system_auto_timer_text 22:15 168')
         self.assertIn("OnCalendar=*-*-* *:15:00", timer)
