@@ -1452,6 +1452,11 @@ rebuild_web_console_after_update() {
   fi
 }
 
+refresh_shutdown_protection_after_update() {
+  [ -x runtime/scripts/shutdown-protection.sh ] || return 0
+  runtime/scripts/shutdown-protection.sh refresh || true
+}
+
 install_cli_command_after_update() {
   if [ ! -x runtime/scripts/install-command.sh ]; then
     return 0
@@ -1668,6 +1673,7 @@ case "$cmd" in
     ensure_self_update_preflight
     install_release_tag "$tag"
     install_cli_command_after_update
+    refresh_shutdown_protection_after_update
     rebuild_web_console_after_update
     self_update_finish_success
     ;;
@@ -1682,6 +1688,7 @@ case "$cmd" in
     ensure_self_update_preflight
     install_qa_commit "$tag"
     install_cli_command_after_update
+    refresh_shutdown_protection_after_update
     rebuild_web_console_after_update
     self_update_finish_success
     ;;
