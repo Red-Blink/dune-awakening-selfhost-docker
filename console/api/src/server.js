@@ -18,7 +18,7 @@ import { bridgeActionStartsNewGeneration } from "./bridgeReadActions.js";
 import { buildSelfUpdateHelperDockerArgs, detectDockerSocketGid, mapWriteFlushTimeoutMs, TaskManager, publicTask } from "./tasks.js";
 import { preflight } from "./preflight.js";
 import { playerAccessParam } from "./playerAccessParam.js";
-import { buildDuneArgs, isDynamicServerService, parseVehicleList, runDockerLogs, runDune, validateServiceName } from "./runner.js";
+import { buildDuneArgs, isDynamicServerService, parseVehicleList, runDockerLogs, runDune, validateLogServiceName } from "./runner.js";
 // isReadOnlySql comes from db.js, NOT runner.js. runner's copy tests the raw
 // string, so a read-only SELECT behind a leading `-- note` or `/* */` header
 // does not start with a read keyword and classifies as a WRITE -- a 403 for
@@ -47,6 +47,7 @@ import { createRestorePreviewReceipts, restorePreviewRejectionMessage } from "./
 import { looksLikeTar, mintSystemBackupName, normalizeImportedSystemMetadata, readEncryptedArchiveHeader, readTarMemberIndex, sanitizeUploadFilename, synthesizeSystemMetadata } from "./services/systemBackupImport.js";
 import { createTarHeader, tarArchiveLength, tarPadding, TAR_TRAILER_BYTES, createBackupDownloadArchive, enrichBackupRows, nextImportedBackupName, normalizeImportedBackupMetadata, readCurrentBattlegroupId, validBackupDownloadName } from "./services/backups.js";
 import { createMemoryBalancer } from "./services/memoryBalancer.js";
+import { createRequestTimingLogger } from "./services/requestTiming.js";
 import { collectContainerHealth } from "./services/containerHealth.js";
 import { createRealtime, parseObjectFilter, RealtimeError } from "./services/realtime.js";
 import { createEncryptedApi, EncryptedApiError } from "./services/encryptedApi.js";
@@ -337,7 +338,9 @@ process.on("unhandledRejection", (error) => {
   console.error(`Unhandled background rejection: ${redact(error?.message || "Unexpected error.")}`);
 });
 
+const logRequestTiming = createRequestTimingLogger();
 createServer(async (req, res) => {
+  logRequestTiming(req, res);
   res.req = req;
   req.trustedClientAddress = tlsClientAddress(req, config.repoRoot);
   if (req.trustedClientAddress === null) {
@@ -6710,7 +6713,7 @@ function taskRoute(req, res, path) {
 
 async function logsRoute(req, res, path) {
   const parts = path.split("/");
-  const service = validateServiceName(parts[3]);
+  const service = validateLogServiceName(parts[3]);
   if (parts[4] === "download") {
     try {
       const result = await readLogs(service, { timeoutMs: 30000 });

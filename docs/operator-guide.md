@@ -483,6 +483,40 @@ Settings in `.env` (all optional; a value that is not a positive number falls ba
 
 Disk use is bounded by the counts above (compressed, a container output is a few MB and a game log about 10 MB); the lifecycle log is trimmed to its newest 2000 lines once it passes 1 MiB. If saving fails, the stop still goes ahead and only the record is lost.
 
+## 9c. Safe dynamic-instance cleanup
+
+`dune despawn <map|partition|container>` checks player presence before stopping
+anything. It combines the native connection count with active player, pawn and
+reconnect/activity records, then checks recent gameplay or travel in the instance
+log. A zero Director player count alone does not establish that a story is empty.
+If a check fails or cannot be completed, the command refuses. A map-wide request
+checks all selected containers before removing the first one, then checks each
+again immediately before removal. Players can still arrive after a check; arrange
+maintenance with players when stopping instances manually.
+
+`--force` explicitly bypasses the player and Always On map guards for dynamic
+instances. It can disconnect players and end their story run. It cannot remove
+unrelated containers or the primary Survival/Overmap servers. The Console's
+existing **Force Despawn** confirmation has the same meaning. The Autoscaler's
+internal `--idle-confirmed` hint skips only the extra recent-log wait after its
+own idle policy; live database presence checks still apply.
+
+For single-party maps with dedicated scaling, the Autoscaler keeps one ready,
+empty spare while another instance is occupied. If all assigned instances are
+occupied, it requests one spare through normal allocation. Configured dimension
+caps and host-memory admission still apply; a warming instance counts as spare
+capacity. Extra empty instances and the last spare after everyone leaves follow
+the normal idle policy. Fresh-process activities still retire after each run.
+This capacity policy does not prove that the native Director will route every
+story travel correctly; routing reports still need matching request/refusal and
+destination-readiness evidence.
+
+## 9d. Investigating pauses and garbage collection
+
+See [Performance troubleshooting](runtime/PERFORMANCE-TROUBLESHOOTING.md) for
+Console request and memory-limit timing, the locations of server logs, and the
+evidence needed to distinguish native game pauses from stack activity.
+
 ## 10. Getting help
 
 - [Official Website](https://dunedocker.app/) — project info, FAQ, server directory.

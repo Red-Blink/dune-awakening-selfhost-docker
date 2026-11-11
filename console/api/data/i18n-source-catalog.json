@@ -634,6 +634,7 @@
     "Connected",
     "Connected Players",
     "Connecting To Steam",
+    "Console",
     "Console Access Review",
     "Console Language",
     "Console Password",
@@ -8250,12 +8251,12 @@
           "Overmap",
           "Orchestrator",
           "Coriolis Coordinator",
-          "Postgres"
+          "Console"
         ]
       },
       {
         "file": "console/web/src/lib/serviceDisplay.ts",
-        "line": 23,
+        "line": 25,
         "nearby": [
           "Overmap",
           "Orchestrator",
@@ -13646,6 +13647,26 @@
         ]
       }
     ],
+    "Console": [
+      {
+        "file": "console/web/src/lib/serviceDisplay.ts",
+        "line": 14,
+        "nearby": [
+          "Autoscaler",
+          "Coriolis Coordinator",
+          "Postgres"
+        ]
+      },
+      {
+        "file": "console/web/src/lib/serviceDisplay.ts",
+        "line": 15,
+        "nearby": [
+          "Coriolis Coordinator",
+          "Postgres",
+          "RabbitMQ Admin"
+        ]
+      }
+    ],
     "Console Access Review": [
       {
         "file": "console/web/src/features/settings/ConsoleAccessNotice.tsx",
@@ -14312,13 +14333,12 @@
         "nearby": [
           "Orchestrator",
           "Autoscaler",
-          "Postgres",
-          "RabbitMQ Admin"
+          "Console"
         ]
       },
       {
         "file": "console/web/src/lib/serviceDisplay.ts",
-        "line": 24,
+        "line": 26,
         "nearby": [
           "Orchestrator",
           "Autoscaler"
@@ -18252,7 +18272,7 @@
       },
       {
         "file": "console/web/src/lib/serviceDisplay.ts",
-        "line": 18,
+        "line": 20,
         "nearby": [
           "RabbitMQ Game",
           "Text Router",
@@ -22098,7 +22118,7 @@
       },
       {
         "file": "console/web/src/lib/serviceDisplay.ts",
-        "line": 19,
+        "line": 21,
         "nearby": [
           "Text Router",
           "Dune Director",
@@ -32620,7 +32640,7 @@
       },
       {
         "file": "console/web/src/lib/serviceDisplay.ts",
-        "line": 22,
+        "line": 24,
         "nearby": [
           "Survival 1",
           "Overmap",
@@ -32802,7 +32822,7 @@
       },
       {
         "file": "console/web/src/lib/serviceDisplay.ts",
-        "line": 21,
+        "line": 23,
         "nearby": [
           "Gateway",
           "Survival 1",
@@ -34939,10 +34959,9 @@
       },
       {
         "file": "console/web/src/lib/serviceDisplay.ts",
-        "line": 14,
+        "line": 16,
         "nearby": [
-          "Autoscaler",
-          "Coriolis Coordinator",
+          "Console",
           "RabbitMQ Admin",
           "RabbitMQ Game"
         ]
@@ -36258,9 +36277,9 @@
       },
       {
         "file": "console/web/src/lib/serviceDisplay.ts",
-        "line": 15,
+        "line": 17,
         "nearby": [
-          "Coriolis Coordinator",
+          "Console",
           "Postgres",
           "RabbitMQ Game",
           "Text Router"
@@ -36311,7 +36330,7 @@
       },
       {
         "file": "console/web/src/lib/serviceDisplay.ts",
-        "line": 16,
+        "line": 18,
         "nearby": [
           "Postgres",
           "RabbitMQ Admin",
@@ -47210,7 +47229,7 @@
       },
       {
         "file": "console/web/src/lib/serviceDisplay.ts",
-        "line": 20,
+        "line": 22,
         "nearby": [
           "Dune Director",
           "Gateway",
@@ -48192,7 +48211,7 @@
       },
       {
         "file": "console/web/src/lib/serviceDisplay.ts",
-        "line": 17,
+        "line": 19,
         "nearby": [
           "RabbitMQ Admin",
           "RabbitMQ Game",

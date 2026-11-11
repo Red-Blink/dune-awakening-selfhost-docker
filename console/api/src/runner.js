@@ -83,6 +83,14 @@ export function validateServiceName(value) {
   return normalized;
 }
 
+// Console diagnostics are readable through Logs; this must not widen the
+// service allowlist used by generic stop/restart operations.
+export function validateLogServiceName(value) {
+  const raw = String(value || "").trim();
+  if (raw === "console" || raw === "redblink-dune-docker-console") return "console";
+  return validateServiceName(raw);
+}
+
 export function buildDuneArgs(operation, payload = {}) {
   if (simpleOperations[operation]) return simpleOperations[operation];
 
@@ -485,7 +493,7 @@ function killProcessTree(child) {
 }
 
 export function runDockerLogs(service, options = {}) {
-  const normalizedService = validateServiceName(service);
+  const normalizedService = validateLogServiceName(service);
   const useComposeService = normalizedService === "orchestrator";
   const container = useComposeService ? "orchestrator" : dockerContainerForLogService(normalizedService);
   const args = useComposeService
@@ -622,7 +630,7 @@ export function isDynamicServerService(service) {
 
 export function dockerContainerForLogService(service) {
   const raw = String(service || "").trim();
-  const normalized = validateServiceName(raw);
+  const normalized = validateLogServiceName(raw);
   const containers = new Map([
     ["postgres", "dune-postgres"],
     ["rmq-admin", "dune-rmq-admin"],
@@ -635,7 +643,8 @@ export function dockerContainerForLogService(service) {
     ["overmap", "dune-server-overmap"],
     ["orchestrator", "dune-orchestrator"],
     ["autoscaler", "dune-autoscaler"],
-    ["coriolis", "dune-coriolis-coordinator"]
+    ["coriolis", "dune-coriolis-coordinator"],
+    ["console", "redblink-dune-docker-console"]
   ]);
   if (containers.has(normalized)) return containers.get(normalized);
   if (/^dune-server-[a-z0-9-]+$/i.test(normalized)) return normalized;

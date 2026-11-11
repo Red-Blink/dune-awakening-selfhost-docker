@@ -183,6 +183,8 @@ jobs:
           runtime/tests/test-deepdesert-dual-selector-cleanup.sh
           runtime/tests/test-deepdesert-layout-apply-safety.sh
           runtime/tests/test-map-despawn-lifecycle.sh
+          python3 tests/test_despawn_player_guard.py
+          python3 tests/test_story_spare.py
           runtime/tests/test-container-lifecycle-log.sh
           runtime/tests/test-director-log-id-normalization.sh
           runtime/tests/test-director-story-admission.sh

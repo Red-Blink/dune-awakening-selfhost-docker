@@ -97,6 +97,7 @@ by nature, so it gets its own.
 
 - [CONTAINER-HARDENING.md](runtime/CONTAINER-HARDENING.md) — Historical record. Summary of the container hardening change as merged.
 - [E2E-METRICS-TESTING.md](runtime/E2E-METRICS-TESTING.md) — Current. End-to-end validation procedure for the metrics stack (`runtime/metrics`).
+- [PERFORMANCE-TROUBLESHOOTING.md](runtime/PERFORMANCE-TROUBLESHOOTING.md) — Current. Request and memory-limit timing, native log locations, GC investigation, and evidence for cross-map stalls or story ejections.
 - [MULTI-SERVER-SINGLE-PUBLIC-IP.md](runtime/MULTI-SERVER-SINGLE-PUBLIC-IP.md) — Current. Executive overview and detailed SOP for running multiple isolated battlegroups behind one public IPv4, including full per-instance port profiles, NAT/hairpin requirements, UserEngine configuration, validation, rollback, and the `multi-server-config.py` automation helper.
 
 ## Addons
