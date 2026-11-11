@@ -546,7 +546,7 @@ Usage:
   dune ip-change-restart [enable [interval-minutes] [notify-minutes]|disable|status|check-now]
   dune encrypted-api [enable|disable|status|fingerprint]
   dune realtime-agent [enable|disable|status]
-  dune shutdown-protection [enable|disable|remove|status]
+  dune shutdown-protection [enable|disable|remove|refresh|status]
   dune network [status|fix]
   dune db backup [output-dir]
   dune db backup-system [output-dir]

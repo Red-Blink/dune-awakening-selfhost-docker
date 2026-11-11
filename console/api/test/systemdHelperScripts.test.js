@@ -30,6 +30,31 @@ test("host systemd helpers explicitly run as root", () => {
   }
 });
 
+test("shutdown protection unit is stopped at host shutdown", () => {
+  const source = readFileSync(resolve(repoRoot, "runtime/scripts/shutdown-protection.sh"), "utf8");
+
+  // One template for both install paths, so they cannot drift apart again.
+  assert.equal(source.match(/^\[Unit\]$/gm)?.length, 1);
+  assert.match(source, /^DefaultDependencies=no$/m);
+  // Without this, DefaultDependencies=no leaves the unit running and ExecStop never fires.
+  assert.match(source, /^Conflicts=shutdown\.target$/m);
+  assert.match(source, /^Before=shutdown\.target\b/m);
+  assert.match(source, /^After=docker\.service$/m);
+  assert.match(source, /DUNE_SHUTDOWN_UNIT_CONTENT="\$\(unit_content "\$HOST_ROOT_DIR"\)"/);
+});
+
+test("self-update refreshes an enabled shutdown protection unit", () => {
+  const selfUpdate = readFileSync(resolve(repoRoot, "runtime/scripts/self-update.sh"), "utf8");
+  const protection = readFileSync(resolve(repoRoot, "runtime/scripts/shutdown-protection.sh"), "utf8");
+
+  assert.equal(selfUpdate.match(/^    refresh_shutdown_protection_after_update$/gm)?.length, 2);
+  assert.match(selfUpdate, /runtime\/scripts\/shutdown-protection\.sh refresh \|\| true/);
+  const refresh = protection.match(/^refresh_protection\(\) \{[\s\S]*?^\}$/m)?.[0];
+  assert.ok(refresh, "refresh_protection is missing");
+  assert.match(refresh, /DUNE_SHUTDOWN_PROTECTION_ENABLED:-0\}" != "1" \]; then\n\s+return 0/);
+  assert.doesNotMatch(refresh, /write_state/, "refresh must not change the saved enabled state");
+});
+
 test("scheduled restart jobs run as the host checkout owner", () => {
   const source = readFileSync(resolve(repoRoot, "runtime/scripts/restart-schedule.sh"), "utf8");
 
