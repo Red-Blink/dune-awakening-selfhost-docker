@@ -18,7 +18,7 @@ SPEC.loader.exec_module(scoped)
 @unittest.skipUnless(platform.machine() == 'x86_64' and shutil.which('gcc'), 'requires x86-64 assembler')
 class ScopedModuleTests(unittest.TestCase):
     def test_rebased_handlers_match_the_pinned_new_build(self):
-        for build in ('2177228', '2180427'):
+        for build in ('2177228', '2180427', '2181988'):
             with self.subTest(build=build):
                 self.check_rebased_handlers(build)
 
@@ -224,6 +224,16 @@ class Build2173753ScopedModuleTests(UpdatedBuildScopedModuleTests):
         self.previous = scoped
         spec = importlib.util.spec_from_file_location('scoped_2173753',
             ROOT / 'patches/experimental-tanks/2173753/source/scoped_module_ids.py')
+        scoped = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(scoped)
+
+
+class Build2181988ScopedModuleTests(UpdatedBuildScopedModuleTests):
+    def setUp(self):
+        global scoped
+        self.previous = scoped
+        spec = importlib.util.spec_from_file_location('scoped_2181988',
+            ROOT / 'patches/experimental-tanks/2181988/source/scoped_module_ids.py')
         scoped = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(scoped)
 
