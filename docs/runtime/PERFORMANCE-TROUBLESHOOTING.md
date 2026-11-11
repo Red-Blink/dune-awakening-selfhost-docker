@@ -27,6 +27,20 @@ Long-lived streams are recorded when they finish or disconnect, not per message.
 Timing covers HTTP response completion, not completion of an asynchronous task
 started by that request.
 
+Discord adapter operations and public translation-mesh endpoints now retain
+their exact static route labels, even though they bypass the IAM action catalog.
+Unknown paths still use `/api/*`; dynamic identifiers, query strings and payloads
+are never included. A route label identifies an operation, not a specific caller.
+
+RabbitMQ node-ping healthchecks and startup probes limit only their temporary
+CLI Erlang VM to one normal scheduler, one dirty CPU scheduler and one dirty I/O
+scheduler. They retain the existing authenticated node ping and healthcheck
+interval, timeout and retries; the broker's own scheduler configuration is
+unchanged. Existing brokers acquire the healthcheck change when recreated through
+the normal RabbitMQ startup path. Updating repository files alone does not modify
+a running container's healthcheck. This reduces probe overhead on large hosts;
+it is not a fix for the unproven cross-map freeze.
+
 `memory.limit` records describe Memory Balancer requests and their applied/failed
 outcomes, with previous/new byte limits, reason and elapsed time. A previous limit
 of `null` means it was not sampled for that operation. These records cover the
@@ -67,6 +81,16 @@ but raising its live limit did not change the reported cadence. That does not
 establish whether the native process cached the initial limit, uses a different
 memory signal, or follows another GC policy.
 
+In the reporter's later test on build `2180427`, the affected map reached
+15.77 GiB of its configured 16 GiB limit and collected every 30 seconds.
+After saving a 24 GiB limit and restarting that map, the reporter's 50-minute
+follow-up showed GC returning to multi-minute intervals, with usage at
+15.45 GiB. This supports the low-memory explanation for that installation;
+the separate 63-second cross-map freezes continued. A fresh-process restart is
+also a change, so the report does not prove the exact native memory signal or
+that every live limit change requires a restart. See the
+[reporter's follow-up](https://github.com/Red-Blink/dune-awakening-selfhost-docker/issues/291#issuecomment-6803023359).
+
 To test the hypothesis, use the existing per-map **Memory** controls during a
 planned maintenance window. Save the original limits, ensure the host can safely
 support the higher limit, then restart only the affected map so the new native
@@ -74,6 +98,9 @@ process starts with that limit. Compare several minutes at similar player/load
 conditions, recording GC timestamps/durations, RAM/limit, container start time
 and Memory Balancer state. Restore the original setting if the test does not
 help. A live limit change or an empty local map is not an equivalent test.
+Save the per-map limit through the existing memory controls so the next scheduled
+restart retains it. Size for peak usage plus more than 4 GiB of headroom where
+the host can support it; do not apply the example's 24 GiB to every map blindly.
 
 Do not disable GC or enable experimental incremental reachability as a blanket
 fix. Epic's [incremental GC documentation](https://dev.epicgames.com/documentation/en-us/unreal-engine/incremental-garbage-collection-in-unreal-engine)

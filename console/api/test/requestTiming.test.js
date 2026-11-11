@@ -3,6 +3,17 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { createRequestTimingLogger, requestRouteLabel } from "../src/services/requestTiming.js";
 import { createDiagnosticWriter } from "../src/services/diagnosticLog.js";
+import { DISCORD_ADAPTER_ROUTES } from "../src/integrations/discord/adapter.js";
+
+test("non-IAM operations have exact safe labels without accepting dynamic adapter paths", () => {
+  for (const route of Object.values(DISCORD_ADAPTER_ROUTES)) {
+    assert.equal(requestRouteLabel(route, "POST"), route);
+  }
+  assert.equal(requestRouteLabel("/api/auth/state", "GET"), "/api/auth/state");
+  assert.equal(requestRouteLabel("/api/i18n/mesh/push", "POST"), "/api/i18n/mesh/push");
+  assert.equal(requestRouteLabel("/api/integrations/discord/status/private-player-id", "POST"), "/api/*");
+  assert.equal(requestRouteLabel("/api/i18n/mesh/private-token", "POST"), "/api/*");
+});
 
 test("request diagnostics retain static routes and timing without request secrets or player IDs", () => {
   let wall = 100000, mono = 10;

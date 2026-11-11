@@ -17,6 +17,7 @@ test("the real API logs completed and denied requests with static routes, and di
     cwd: resolve(import.meta.dirname, ".."), stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, NODE_ENV: "test", DUNE_DOCKER_DIR: root,
       ADMIN_MOCK_MODE: "1", ADMIN_PASSWORD: "Fixture-Request-Password-123",
+      DUNE_DISCORD_ADAPTER_ENABLED: "false",
       ADMIN_AUTH_DISABLED: "0", ADMIN_ALLOWED_IPS: "", DUNE_CONFIGURED_ADMIN_ALLOWED_IPS: "",
       ADMIN_BIND_HOST: "127.0.0.1", ADMIN_BIND_PORT: String(port), ADMIN_SECURE_COOKIES: "0" }
   });
@@ -36,6 +37,10 @@ test("the real API logs completed and denied requests with static routes, and di
     assert.equal((await fetch(`${base}/api/players/private-player-id/inventory?token=private-query`, {
       headers: { authorization: "Bearer private-bearer", "user-agent": "curl/8 private-agent" }
     })).status, 401);
+    assert.equal((await fetch(`${base}/api/integrations/discord/status?token=private-query`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ actor: { id: "private-player-id" } })
+    })).status, 404);
     const login = await fetch(`${base}/api/auth/login`, { method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ password: "Fixture-Request-Password-123" }) });
     assert.equal(login.status, 200);
@@ -47,6 +52,7 @@ test("the real API logs completed and denied requests with static routes, and di
       .filter(row => row.event === "console.request");
     assert.ok(rows.some(row => row.status === 401 && row.client === "cli"));
     assert.ok(rows.some(row => row.route === "/api/auth/login" && row.status === 200));
+    assert.ok(rows.some(row => row.route === "/api/integrations/discord/status" && row.method === "POST" && row.status === 404));
     assert.ok(rows.some(row => row.route === "/api/logs/services" && row.authentication === "session"));
     assert.ok(rows.every(row => row.durationMs >= 0 && Number.isFinite(Date.parse(row.startedAt))));
     assert.doesNotMatch(JSON.stringify(rows), /private-|Fixture-Request|Bearer/);

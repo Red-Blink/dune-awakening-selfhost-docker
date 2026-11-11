@@ -543,6 +543,9 @@ if [ "$1" = "run" ]; then
   done
   printf '%s\n' "$*" > "${DOCKER_RUN_CAPTURE_DIR}/${container}.args"
 fi
+if [ "$1" = "exec" ]; then
+  printf '%s\n' "$*" >> "${DOCKER_RUN_CAPTURE_DIR}/exec.args"
+fi
 exit 0
 STUB
 chmod +x "$work/bin/docker"
@@ -557,6 +560,16 @@ run_start_rabbitmq_stub() {
 run_start_rabbitmq_stub env -u RMQ_GAME_HTTP_BIND_IP -u RMQ_GAME_HTTP_PORT -u RMQ_GAME_LOCAL_HTTP_PORT -u RMQ_GAME_PORT
 admin_args="$(cat "$work/run-captures/dune-rmq-admin.args")"
 game_args="$(cat "$work/run-captures/dune-rmq-game.args")"
+for args in "$admin_args" "$game_args"; do
+  printf '%s\n' "$args" | grep -Fq -- "--health-cmd RABBITMQ_CTL_ERL_ARGS='+S 1:1 +SDcpu 1 +SDio 1' rabbitmq-diagnostics -q ping" \
+    || fail "healthcheck must retain node ping with bounded CLI schedulers"
+  printf '%s\n' "$args" | grep -Fq -- '--health-interval 30s --health-timeout 10s --health-retries 3' \
+    || fail "healthcheck timing changed"
+done
+for broker in dune-rmq-admin dune-rmq-game; do
+  grep -Fq -- "exec -e RABBITMQ_CTL_ERL_ARGS=+S 1:1 +SDcpu 1 +SDio 1 $broker rabbitmq-diagnostics -q ping" "$work/run-captures/exec.args" \
+    || fail "startup probe must also bound the CLI VM for $broker"
+done
 printf '%s\n' "$admin_args" | grep -Fq -- '-p 127.0.0.1:32573:5672' \
   || fail "admin broker AMQP port was not bound to loopback: $admin_args"
 printf '%s\n' "$admin_args" | grep -Fq -- '-p 127.0.0.1:32574:15672/tcp' \
@@ -569,6 +582,13 @@ printf '%s\n' "$game_args" | grep -Fq -- '-p 31983:15672/tcp' \
   || fail "game broker HTTP port must be published publicly on 31983 by default: $game_args"
 ! printf '%s\n' "$game_args" | grep -Fq -- '127.0.0.1:31983:15672/tcp' \
   || fail "game broker public HTTP port 31983 must not default to loopback: $game_args"
+
+# Probe flags must not replace the operator's broker scheduler configuration.
+run_start_rabbitmq_stub env DUNE_RMQ_ERL_ARGS='+S 4:4'
+for broker in dune-rmq-admin dune-rmq-game; do
+  grep -Fq -- '-e RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=+S 4:4' "$work/run-captures/$broker.args" \
+    || fail "probe scheduler cap replaced the broker configuration for $broker"
+done
 
 # 2. Custom game HTTP port and localhost shortcut profile via environment / .env
 printf 'RMQ_GAME_PORT=32982\nRMQ_GAME_HTTP_PORT=32983\nRMQ_GAME_LOCAL_HTTP_PORT=16672\n' > "$launch_repo/.env"

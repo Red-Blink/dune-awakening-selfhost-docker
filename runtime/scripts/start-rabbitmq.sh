@@ -116,6 +116,11 @@ RMQ_ERL_ARGS=()
 if [ -n "${DUNE_RMQ_ERL_ARGS:-}" ]; then
   RMQ_ERL_ARGS=(-e "RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=${DUNE_RMQ_ERL_ARGS}")
 fi
+# Each probe boots a separate Erlang VM. Bound that VM's scheduler counts on
+# large hosts without changing broker schedulers or weakening the cookie-based
+# node ping into a TCP-only check.
+RMQ_PROBE_ERL_ARGS='+S 1:1 +SDcpu 1 +SDio 1'
+RMQ_HEALTH_CMD="RABBITMQ_CTL_ERL_ARGS='$RMQ_PROBE_ERL_ARGS' rabbitmq-diagnostics -q ping"
 # Preserve the documented public game-broker HTTP binding (${RMQ_GAME_HTTP_PORT}:15672/tcp)
 # by default alongside the separate loopback shortcut (127.0.0.1:${RMQ_GAME_LOCAL_HTTP_PORT}:15672/tcp).
 # Operators who explicitly want to restrict the external game HTTP binding to a specific
@@ -132,7 +137,7 @@ docker run -d \
   --name dune-rmq-admin \
   --network dune-net \
   --restart unless-stopped \
-  --health-cmd "rabbitmq-diagnostics -q ping" \
+  --health-cmd "$RMQ_HEALTH_CMD" \
   --health-interval 30s \
   --health-timeout 10s \
   --health-retries 3 \
@@ -147,7 +152,7 @@ docker run -d \
   --name dune-rmq-game \
   --network dune-net \
   --restart unless-stopped \
-  --health-cmd "rabbitmq-diagnostics -q ping" \
+  --health-cmd "$RMQ_HEALTH_CMD" \
   --health-interval 30s \
   --health-timeout 10s \
   --health-retries 3 \
@@ -170,7 +175,7 @@ wait_for_rabbitmq() {
 
   echo "Waiting for $container..."
   for attempt in $(seq 1 36); do
-    if timeout 10 docker exec "$container" rabbitmq-diagnostics -q ping; then
+    if timeout 10 docker exec -e "RABBITMQ_CTL_ERL_ARGS=$RMQ_PROBE_ERL_ARGS" "$container" rabbitmq-diagnostics -q ping; then
       return 0
     fi
     sleep 5

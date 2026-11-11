@@ -1,14 +1,22 @@
 import { performance } from "node:perf_hooks";
 import { actionForRoute, ROUTE_ACTIONS, REGEX_ACTIONS, REGEX_ACTIONS_BY_METHOD, REGEX_ACTIONS_BY_METHOD_PATTERN } from "../actions.js";
 import { writeDiagnostic } from "./diagnosticLog.js";
+import { DISCORD_ADAPTER_ROUTES } from "../integrations/discord/adapter.js";
 
 const METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]);
-const PUBLIC_ROUTES = new Set(["/api/health", "/api/auth/login", "/api/auth/logout"]);
+// These handlers do not use IAM's action catalog. Keep diagnostic labels
+// separate from authorization, and reuse the adapter's canonical route names.
+const NON_IAM_ROUTES = new Set([
+  "/api/health", "/api/auth/state", "/api/auth/login", "/api/auth/logout",
+  "/api/i18n/languages", "/api/i18n/translations", "/api/i18n/mesh/manifest",
+  "/api/i18n/mesh/pack", "/api/i18n/mesh/push",
+  ...Object.values(DISCORD_ADAPTER_ROUTES)
+]);
 
 // Every returned string comes from the static route registry, never from a
 // dynamic identifier, query parameter, request body, cookie or authorization.
 export function requestRouteLabel(path, method) {
-  if (PUBLIC_ROUTES.has(path)) return path;
+  if (NON_IAM_ROUTES.has(path)) return path;
   const key = `${method} ${path}`;
   if (Object.hasOwn(ROUTE_ACTIONS, key)) return key.slice(method.length + 1);
   for (const entry of REGEX_ACTIONS_BY_METHOD_PATTERN) {
