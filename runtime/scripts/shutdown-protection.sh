@@ -228,14 +228,15 @@ refresh_protection() {
   if command -v systemctl >/dev/null 2>&1 && can_manage_systemd_units; then
     install_unit
     systemctl daemon-reload
-    systemctl enable "$SERVICE_NAME" >/dev/null 2>&1 || true
+    systemctl enable "$SERVICE_NAME"
     echo "Shutdown protection service refreshed."
   elif install_unit_via_docker_host; then
     echo "Shutdown protection service refreshed."
   else
     echo "Shutdown protection service could not be refreshed from this environment."
     echo "Run this command with sudo/root on the Linux host:"
-    echo "  runtime/scripts/shutdown-protection.sh enable"
+    echo "  runtime/scripts/shutdown-protection.sh refresh"
+    return 1
   fi
 }
 

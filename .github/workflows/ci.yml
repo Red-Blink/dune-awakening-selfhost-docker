@@ -226,6 +226,7 @@ jobs:
           tests/psql-transport-test.sh
           tests/rmq-transport-test.sh
           tests/postgres-shutdown-test.sh
+          python3 tests/shutdown-protection-refresh-test.py
           tests/postgres-bootstrap-test.sh
           tests/coriolis-coordinator-test.sh
           bash tests/console-restart-isolation-test.sh
