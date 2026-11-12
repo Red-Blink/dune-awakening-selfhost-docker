@@ -11,6 +11,8 @@ const SERVICE_LABELS: Record<string, string> = {
   orchestrator: "Orchestrator",
   autoscaler: "Autoscaler",
   coriolis: "Coriolis Coordinator",
+  console: "Console",
+  "redblink-dune-docker-console": "Console",
   "dune-postgres": "Postgres",
   "dune-rmq-admin": "RabbitMQ Admin",
   "dune-rmq-game": "RabbitMQ Game",

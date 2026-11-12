@@ -85,7 +85,7 @@ by nature, so it gets its own.
 - [base-deletion.md](console/base-deletion.md) — Current. Permanently deleting a base: what "the base" means for enumeration, the pending-delete queue for a live map, the mandatory pre-delete safety backup, and why a pending delete freezes every other mutation on that base.
 - [vehicle-deletion.md](console/vehicle-deletion.md) — Current. Permanently deleting a vehicle: the FK cascade closure verified against a real schema dump, its own parallel pending-delete queue, the vehicle-specific `dune.actors.state` guard bases have no equivalent of, where a stored vehicle's owner is recorded, and the separately-permissioned delete for a vehicle that is Stored for Recovery.
 - [base-backups.md](console/base-backups.md) — Current. What the game's own "pick up base" tool actually does in the database, why the Bases panel excludes a picked-up base, the Coriolis compatibility patch that preserves saved Deep Desert base actors, and how to export and import base backups between servers and players.
-- [database-backups.md](console/database-backups.md) — Current. Safe database restore behavior when the backup and current deployment use different Battlegroup IDs, and encrypted system backups that carry configuration and secrets to a new host.
+- [database-backups.md](console/database-backups.md) — Current. Safe database restore behavior when the backup and current deployment use different Battlegroup IDs, and encrypted system backups that carry configuration and secrets to a new host, including scheduled system backups with a saved, write-only passphrase and automatic-only pruning.
 - [deleted-characters.md](console/deleted-characters.md) — Current. Find characters deleted from the server that still hold bases or vehicles.
 - [restart-queue.md](console/restart-queue.md) — Current. The Restart Queue toggle: player-aware countdowns with in-game warnings, the two broadcast variants, concurrency rules, crash recovery, the "Restart later" deferred-restart option, and the join-lock limitation.
 - [exchange.md](console/exchange.md) — Current. The read-only Market Board: aggregated-by-item CHOAM exchange listings, seller resolution, how bot listings are identified, the bot/blacklist filter config, the Market Bot seed/buyback engine, and the Bot items tab's per-item catalog overrides.
@@ -100,6 +100,7 @@ by nature, so it gets its own.
 
 - [CONTAINER-HARDENING.md](runtime/CONTAINER-HARDENING.md) — Historical record. Summary of the container hardening change as merged.
 - [E2E-METRICS-TESTING.md](runtime/E2E-METRICS-TESTING.md) — Current. End-to-end validation procedure for the metrics stack (`runtime/metrics`).
+- [PERFORMANCE-TROUBLESHOOTING.md](runtime/PERFORMANCE-TROUBLESHOOTING.md) — Current. Request and memory-limit timing, native log locations, GC investigation, and evidence for cross-map stalls or story ejections.
 - [MULTI-SERVER-SINGLE-PUBLIC-IP.md](runtime/MULTI-SERVER-SINGLE-PUBLIC-IP.md) — Current. Executive overview and detailed SOP for running multiple isolated battlegroups behind one public IPv4, including full per-instance port profiles, NAT/hairpin requirements, UserEngine configuration, validation, rollback, and the `multi-server-config.py` automation helper.
 
 ## Addons

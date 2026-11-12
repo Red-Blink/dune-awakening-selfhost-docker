@@ -33,7 +33,12 @@ vi.mock("../../api/backups", async (importOriginal) => {
       deleteSystemSelected: vi.fn(),
       deleteSystemAll: vi.fn(),
       restoreSystem: vi.fn(),
-      importSystemUrl: vi.fn(original.backupsApi.importSystemUrl)
+      importSystemUrl: vi.fn(original.backupsApi.importSystemUrl),
+      createSystemWithSavedPassphrase: vi.fn(),
+      systemAutoStatus: vi.fn(),
+      saveSystemAuto: vi.fn(),
+      saveSystemPassphrase: vi.fn(),
+      removeSystemPassphrase: vi.fn()
     }
   };
 });
@@ -41,7 +46,10 @@ vi.mock("../../api/backups", async (importOriginal) => {
 const ARCHIVE = "dune-system-20260830-120000-4711-9931.tar.gz.enc";
 const PASSPHRASE = "correct-horse-battery-staple";
 
-function renderPanel(overrides: Partial<Parameters<typeof BackupsPanel>[0]> = {}) {
+// These tests exercise the System Backups tab, so they start on it, the way the
+// panel remembers it across visits.
+function renderPanel(overrides: Partial<Parameters<typeof BackupsPanel>[0]> = {}, view: "funcom" | "system" = "system") {
+  localStorage.setItem("dune-console.backups.view", view);
   return render(<BackupsPanel
     backupRestoreTask={null}
     setBackupRestoreTask={() => {}}
@@ -94,6 +102,7 @@ describe("system backups", () => {
     vi.mocked(backupsApi.autoStatus).mockResolvedValue({ stdout: "", status: { enabled: false } });
     vi.mocked(backupsApi.listSystem).mockResolvedValue({ rows: [] });
     vi.mocked(backupsApi.createSystem).mockResolvedValue({ task: { id: "t1", status: "queued" } as never });
+    vi.mocked(backupsApi.systemAutoStatus).mockResolvedValue({ status: { ok: true, enabled: false, passphraseSaved: false, automaticCount: 0, automaticBytes: 0 } });
   });
 
   it("uses the same column names as the database table, in the same order", async () => {
@@ -114,9 +123,63 @@ describe("system backups", () => {
     renderPanel();
     // The database backups carry no config or credentials; the system archive
     // carries both. The headers are what tells them apart.
-    expect(await screen.findByText("Funcom Backups")).toBeTruthy();
+    expect(await screen.findByText("Funcom Backups", { selector: "h4" })).toBeTruthy();
     expect(await screen.findByText("System Backups (Encrypted)")).toBeTruthy();
     expect(await screen.findByText(/no console configuration and no credentials/i)).toBeTruthy();
+  });
+
+  it("starts on Funcom Backups when no tab has been chosen yet", async () => {
+    localStorage.removeItem("dune-console.backups.view");
+    render(<BackupsPanel
+      backupRestoreTask={null} setBackupRestoreTask={() => {}} onError={() => {}}
+      confirmAction={vi.fn(async () => true)}
+      chooseBackupIdentity={vi.fn(async () => "keep-current" as const)} chooseAuditLogAction={vi.fn(async () => "keep-current" as const)}
+      onInstallGameFiles={() => {}} chooseImportConflict={vi.fn(async () => "rename" as const)}
+      waitForTask={vi.fn(async (task) => ({ ...task, status: "succeeded" }))} waitForTaskWithUpdates={vi.fn(async (task) => task)}
+      withTimeout={((promise: Promise<unknown>) => promise) as never}
+      toHourMinuteTime={(value) => String(value ?? "")} sanitizeTimeInput={(value) => value} isValidHourMinuteTime={() => true}
+      commandStatusSummary={() => ({ status: "ok" })} taskTechnicalDetails={() => ""} isTerminalTask={() => true}
+    />);
+    const funcom = await screen.findByRole("radio", { name: "Funcom Backups" }) as HTMLInputElement;
+    expect(funcom.checked).toBe(true);
+    expect(screen.getByText("System Backups (Encrypted)").closest(".backups-tab-group")?.hasAttribute("hidden")).toBe(true);
+    expect(screen.getByText("Funcom Backups", { selector: "h4" }).closest(".backups-tab-group")?.hasAttribute("hidden")).toBe(false);
+  });
+
+  it("switches tabs and remembers the choice", async () => {
+    renderPanel({}, "funcom");
+    fireEvent.click(await screen.findByRole("radio", { name: "System Backups" }));
+    await waitFor(() => expect(screen.getByText("System Backups (Encrypted)").closest(".backups-tab-group")?.hasAttribute("hidden")).toBe(false));
+    expect(screen.getByText("Funcom Backups", { selector: "h4" }).closest(".backups-tab-group")?.hasAttribute("hidden")).toBe(true);
+    expect(localStorage.getItem("dune-console.backups.view")).toBe("system");
+  });
+
+  it("keeps a half-typed passphrase when switching tabs and back", async () => {
+    renderPanel();
+    await openCreate();
+    const field = await screen.findByLabelText(/^Passphrase$/) as HTMLInputElement;
+    fireEvent.change(field, { target: { value: PASSPHRASE } });
+    fireEvent.click(screen.getByRole("radio", { name: "Funcom Backups" }));
+    fireEvent.click(screen.getByRole("radio", { name: "System Backups" }));
+    expect((screen.getByLabelText(/^Passphrase$/) as HTMLInputElement).value).toBe(PASSPHRASE);
+  });
+
+  it("offers the saved passphrase and never sends a typed one with it", async () => {
+    vi.mocked(backupsApi.systemAutoStatus).mockResolvedValue({ status: { ok: true, passphraseSaved: true, passphraseSavedAt: "2026-11-09T10:00:00.000Z" } });
+    vi.mocked(backupsApi.createSystemWithSavedPassphrase).mockResolvedValue({ task: { id: "t2", status: "queued", logLines: [] } as never });
+    renderPanel();
+    await openCreate();
+    const useSaved = await screen.findByLabelText("Use Saved Passphrase") as HTMLInputElement;
+    expect(useSaved.checked).toBe(true);
+    expect(screen.queryByLabelText(/^Passphrase$/)).toBeNull();
+    fireEvent.click(screen.getByLabelText("Create the system backup"));
+    await waitFor(() => expect(backupsApi.createSystemWithSavedPassphrase).toHaveBeenCalled());
+    expect(backupsApi.createSystem).not.toHaveBeenCalled();
+
+    // Unticking it brings back the typed fields.
+    await openCreate();
+    fireEvent.click(await screen.findByLabelText("Use Saved Passphrase"));
+    expect(await screen.findByLabelText(/^Passphrase$/)).toBeTruthy();
   });
 
   it("keeps the passphrase fields masked", async () => {
@@ -241,7 +304,7 @@ describe("deleting system backups", () => {
   it("deletes them all", async () => {
     renderPanel();
     const section = await systemSection();
-    fireEvent.click(await section.findByText("Delete All"));
+    fireEvent.click(await section.findByText("Delete All Backups"));
     await waitFor(() => expect(backupsApi.deleteSystemAll).toHaveBeenCalled());
   });
 });
@@ -601,57 +664,70 @@ describe("importing a system backup", () => {
   });
 
   function chooseFile(name = "dune-system-20260830-120000-4711-9931.tar.gz.enc.tar") {
-    const input = screen.getByLabelText(/Backup file/);
+    const input = screen.getByLabelText(/System Backup File/);
     const file = new File(["payload"], name, { type: "application/x-tar" });
     Object.defineProperty(input, "files", { value: [file], configurable: true });
     fireEvent.change(input);
     return file;
   }
 
-  it("opens the import panel from the button row", async () => {
+  async function importSection() {
+    const heading = await screen.findByText("Import System Backup");
+    return within(heading.closest("section") as HTMLElement);
+  }
+
+  it("has its own section, always shown, like the Funcom import", async () => {
     renderPanel();
-    fireEvent.click(await screen.findByText("Import Backup"));
-    expect(await screen.findByLabelText(/Backup file/)).toBeTruthy();
+    const section = await importSection();
+    expect(section.getByLabelText(/System Backup File/)).toBeTruthy();
+    expect(screen.queryByText("Import Backup")).toBeNull();
   });
 
   it("will not upload until a file is chosen", async () => {
     renderPanel();
-    fireEvent.click(await screen.findByText("Import Backup"));
     const button = await screen.findByLabelText("Import system backup");
     expect(button).toBeDisabled();
     chooseFile();
     await waitFor(() => expect(button).not.toBeDisabled());
   });
 
-  it("closes the restore panel, so two forms are never open at once", async () => {
+  it("stays available while a restore panel is open", async () => {
     renderPanel();
     fireEvent.click(await screen.findByLabelText(`Restore system backup ${ARCHIVE}`));
     expect(await screen.findByLabelText("Restore passphrase")).toBeTruthy();
-    fireEvent.click(await screen.findByText("Import Backup"));
-    await waitFor(() => expect(screen.queryByLabelText("Restore passphrase")).toBeNull());
-    expect(screen.getByLabelText(/Backup file/)).toBeTruthy();
+    expect(screen.getByLabelText(/System Backup File/)).toBeTruthy();
   });
 
-  it("opening import closes create, and opening create closes import", async () => {
-    // Create, import and restore share one slot: three forms stacked above the
-    // table would be worse than any one of them being a click away.
+  it("create and restore share one panel slot above the table", async () => {
+    // By heading: the restore field is also wrapped in a "Passphrase" label.
+    const createPanel = () => screen.queryByText("Create System Backup", { selector: "h4" });
     renderPanel();
-    fireEvent.click(await screen.findByText("Create System Backup"));
-    expect(await screen.findByLabelText(/^Passphrase$/)).toBeTruthy();
+    fireEvent.click(await screen.findByText("Create System Backup", { selector: "button" }));
+    await waitFor(() => expect(createPanel()).toBeTruthy());
 
-    fireEvent.click(await screen.findByText("Import Backup"));
-    await waitFor(() => expect(screen.queryByLabelText(/^Passphrase$/)).toBeNull());
-    expect(screen.getByLabelText(/Backup file/)).toBeTruthy();
+    fireEvent.click(await screen.findByLabelText(`Restore system backup ${ARCHIVE}`));
+    await waitFor(() => expect(createPanel()).toBeNull());
+    expect(screen.getByLabelText("Restore passphrase")).toBeTruthy();
 
-    fireEvent.click(await screen.findByText("Create System Backup"));
-    await waitFor(() => expect(screen.queryByLabelText(/Backup file/)).toBeNull());
-    expect(screen.getByLabelText(/^Passphrase$/)).toBeTruthy();
+    fireEvent.click(await screen.findByText("Create System Backup", { selector: "button" }));
+    await waitFor(() => expect(screen.queryByLabelText("Restore passphrase")).toBeNull());
+    expect(createPanel()).toBeTruthy();
+  });
+
+  it("reports the import in its own section and clears the chosen file", async () => {
+    responses = [{ status: 200, body: { ok: true, backup: ARCHIVE, hadSidecar: true } }];
+    renderPanel();
+    chooseFile();
+    fireEvent.click(await screen.findByLabelText("Import system backup"));
+    const section = await importSection();
+    await waitFor(() => expect(section.getByText(/Stored as/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText("Import system backup")).toBeDisabled());
   });
 
   it("uploads the file and reports where it was stored", async () => {
     responses = [{ status: 200, body: { ok: true, backup: ARCHIVE, hadSidecar: true } }];
     renderPanel();
-    fireEvent.click(await screen.findByText("Import Backup"));
+    await screen.findByLabelText(/System Backup File/);
     chooseFile();
     fireEvent.click(await screen.findByLabelText("Import system backup"));
     await waitFor(() => expect(sent.length).toBe(1));
@@ -662,7 +738,7 @@ describe("importing a system backup", () => {
   it("says so when no sidecar came with the archive", async () => {
     responses = [{ status: 200, body: { ok: true, backup: ARCHIVE, hadSidecar: false } }];
     renderPanel();
-    fireEvent.click(await screen.findByText("Import Backup"));
+    await screen.findByLabelText(/System Backup File/);
     chooseFile();
     fireEvent.click(await screen.findByLabelText("Import system backup"));
     // Otherwise the Unknown columns look like a bug rather than a consequence.
@@ -675,7 +751,7 @@ describe("importing a system backup", () => {
       { status: 200, body: { ok: true, backup: "dune-system-20260901-000000-1-2.tar.gz.enc", renamedFrom: ARCHIVE } }
     ];
     renderPanel();
-    fireEvent.click(await screen.findByText("Import Backup"));
+    await screen.findByLabelText(/System Backup File/);
     chooseFile();
     fireEvent.click(await screen.findByLabelText("Import system backup"));
     await waitFor(() => expect(sent.length).toBe(2));
@@ -688,7 +764,7 @@ describe("importing a system backup", () => {
   it("sends nothing more when the conflict prompt is cancelled", async () => {
     responses = [{ status: 409, body: { error: "exists", conflict: ARCHIVE } }];
     renderPanel({ chooseImportConflict: vi.fn(async () => "cancel" as const) });
-    fireEvent.click(await screen.findByText("Import Backup"));
+    await screen.findByLabelText(/System Backup File/);
     chooseFile();
     fireEvent.click(await screen.findByLabelText("Import system backup"));
     await waitFor(() => expect(sent.length).toBe(1));
@@ -704,7 +780,7 @@ describe("importing a system backup", () => {
     setCsrfToken("token-abc");
     responses = [{ status: 200, body: { ok: true, backup: ARCHIVE, hadSidecar: true } }];
     renderPanel();
-    fireEvent.click(await screen.findByText("Import Backup"));
+    await screen.findByLabelText(/System Backup File/);
     chooseFile();
     fireEvent.click(await screen.findByLabelText("Import system backup"));
     await waitFor(() => expect(sent.length).toBe(1));
@@ -715,7 +791,7 @@ describe("importing a system backup", () => {
   it("surfaces a rejection from the server", async () => {
     responses = [{ status: 400, body: { error: "That file is not an OpenPGP message." } }];
     renderPanel();
-    fireEvent.click(await screen.findByText("Import Backup"));
+    await screen.findByLabelText(/System Backup File/);
     chooseFile("notes.zip");
     fireEvent.click(await screen.findByLabelText("Import system backup"));
     await waitFor(() => expect(screen.getByText(/not an OpenPGP message/)).toBeTruthy());

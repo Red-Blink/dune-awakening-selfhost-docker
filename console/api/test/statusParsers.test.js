@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildMapStatusResponse, buildMapsListResponse, buildServerStatusResponse, parseBackupAutoStatus, parseBackupListRows, parseDoctorWarnings, parseFlsSummary, parseHomeStatus, parseMapListRows, parseMemoryStatusRows, parsePortRows, parseRabbitConnections, parseReadyRows, parseServerPartitionRows, parseSkillModules, parseStatusGameServers, parseStatusListenerRows } from "../src/statusParsers.js";
+import { buildMapStatusResponse, buildMapsListResponse, buildServerStatusResponse, parseBackupAutoStatus, parseBackupListRows, parseDoctorWarnings, parseSystemBackupAutoStatus, parseFlsSummary, parseHomeStatus, parseMapListRows, parseMemoryStatusRows, parsePortRows, parseRabbitConnections, parseReadyRows, parseServerPartitionRows, parseSkillModules, parseStatusGameServers, parseStatusListenerRows } from "../src/statusParsers.js";
 
 const healthyStatus = `=== Dune status ===
 Overall:     READY
@@ -520,4 +520,43 @@ Systemd timer:   enabled`
   const failed = parseBackupAutoStatus({ exitCode: 1, stderr: "runtime/scripts/db.sh: line 966: runtime/generated/db-backup.env: Permission denied" });
   assert.equal(failed.ok, false);
   assert.equal(failed.reason, "Backup scheduler status file is not readable by the web admin user.");
+});
+
+test("parseSystemBackupAutoStatus reads the scheduled system backup status", () => {
+  const stdout = [
+    "=== Scheduled system backups ===",
+    "Enabled:          true",
+    "Backup time:      04:30",
+    "Interval hours:   12",
+    "Keep:             9",
+    "Passphrase:       saved",
+    "Passphrase set:   2026-11-09T10:00:00Z",
+    "Execution:        image",
+    "Systemd timer:    enabled",
+    "Next run:         Tue 2026-11-10 04:30:00 UTC",
+    "Last run:         2026-11-09T04:30:02+00:00",
+    "Last result:      success",
+    "Last archive:     dune-system-20261109-043002-77-1.tar.gz.enc"
+  ].join("\n");
+  const status = parseSystemBackupAutoStatus({ exitCode: 0, stdout });
+  assert.equal(status.ok, true);
+  assert.equal(status.enabled, true);
+  assert.equal(status.backupTime, "04:30");
+  assert.equal(status.intervalHours, "12");
+  assert.equal(status.keep, "9");
+  assert.equal(status.execution, "image");
+  assert.equal(status.timer, "enabled");
+  assert.equal(status.nextRun, "Tue 2026-11-10 04:30:00 UTC");
+  assert.equal(status.lastResult, "success");
+  assert.equal(status.lastArchive, "dune-system-20261109-043002-77-1.tar.gz.enc");
+
+  const fresh = parseSystemBackupAutoStatus({
+    exitCode: 0,
+    stdout: ["Enabled:          false", "Execution:        unknown", "Next run:         -", "Last run:         never", "Last result:      none"].join("\n")
+  });
+  assert.equal(fresh.enabled, false);
+  assert.equal(fresh.execution, "");
+  assert.equal(fresh.nextRun, "");
+  assert.equal(fresh.lastRunAt, "");
+  assert.equal(fresh.lastResult, "");
 });

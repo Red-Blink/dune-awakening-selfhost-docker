@@ -18,9 +18,47 @@ export type SystemBackupRow = {
   battlegroupId: string;
   hasSidecar: boolean;
   includesAuditLog: boolean;
+  // "saved" when the archive was made with the saved passphrase; "" on archives
+  // older than the field.
+  passphraseSource?: "saved" | "typed" | "";
+  passphraseSavedAt?: string;
   sizeBytes: number;
   size: string;
 };
+
+export type SystemAutoStatus = {
+  ok?: boolean;
+  enabled?: boolean;
+  backupTime?: string;
+  intervalHours?: string;
+  keep?: string;
+  execution?: string;
+  timer?: string;
+  nextRun?: string;
+  lastRunAt?: string;
+  lastResult?: string;
+  lastMessage?: string;
+  lastArchive?: string;
+  reason?: string;
+  passphraseSaved?: boolean;
+  passphraseSavedAt?: string;
+  automaticCount?: number;
+  automaticBytes?: number;
+};
+
+// A malformed timestamp shows as itself rather than "Invalid Date".
+export function formatSavedAt(value: string | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+// How many automatic archives the next run's prune removes. The run writes its
+// own archive first, so a host already at the limit still loses one.
+export function scheduledPruneCount(storedAutomatic: number, keep: number) {
+  if (!Number.isFinite(storedAutomatic) || !Number.isFinite(keep) || keep < 1) return 0;
+  return Math.max(0, storedAutomatic + 1 - keep);
+}
 
 export function backupIdentityDiffers(currentBattlegroupId: unknown, backupBattlegroupId: unknown) {
   const current = String(currentBattlegroupId || "Unknown");
@@ -54,6 +92,14 @@ export const backupsApi = {
   listSystem: () => api<{ rows: SystemBackupRow[] }>("/api/backups/system"),
   // Body, never a query string: a passphrase in a URL lands in proxy and access logs.
   createSystem: (passphrase: string) => post<{ task: Task }>("/api/backups/system/create", { passphrase }),
+  createSystemWithSavedPassphrase: () => post<{ task: Task }>("/api/backups/system/create", { useSavedPassphrase: true }),
+  systemAutoStatus: () => api<{ stdout?: string; stderr?: string; exitCode?: number; status?: SystemAutoStatus }>("/api/backups/system/auto"),
+  // { enabled: false } alone turns the schedule off and keeps the saved policy.
+  saveSystemAuto: (body: { enabled: boolean; time?: string; intervalHours?: number; keep?: number }) => post<{ task: Task }>("/api/backups/system/auto", body),
+  // Write-only: there is no route that reads it back.
+  saveSystemPassphrase: (passphrase: string, passphraseConfirm: string) =>
+    api<{ ok: boolean; savedAt: string; replaced: boolean }>("/api/backups/system/passphrase", { method: "PUT", body: JSON.stringify({ passphrase, passphraseConfirm }) }),
+  removeSystemPassphrase: () => api<{ ok: boolean; removed: boolean }>("/api/backups/system/passphrase", { method: "DELETE" }),
   systemDownloadUrl: (name: string) => `/api/backups/system/${encodeURIComponent(name)}/download`,
   // Body for the same reason as createSystem. Defaults to a dry run: a call
   // that loses its apply flag must preview, never replace the host.

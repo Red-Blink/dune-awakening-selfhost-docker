@@ -127,6 +127,13 @@ export const ROUTE_ACTIONS = {
   "POST /api/backups/system/create":           "backups:create-system",
   "POST /api/backups/system/delete-selected":  "backups:delete-system",
   "POST /api/backups/system/delete-all":       "backups:delete-system",
+  "GET /api/backups/system/auto":              "backups:read",
+  "POST /api/backups/system/auto":             "backups:write-config",
+  // Sets the key every scheduled archive is encrypted with. Write-only, but
+  // still a credential: owner-only (denied to admin in policy.js) and never
+  // covered by a `backups: write` API key level.
+  "PUT /api/backups/system/passphrase":        "backups:set-system-passphrase",
+  "DELETE /api/backups/system/passphrase":     "backups:set-system-passphrase",
 
   // --- Database ---
   "GET /api/database/status":                  "database:read",

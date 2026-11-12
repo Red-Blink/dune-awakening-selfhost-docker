@@ -18,7 +18,9 @@ import sys
 source = Path("runtime/scripts/autoscaler.sh").read_text(encoding="utf-8")
 start = source.index("occupied_dimensions_for_map() {")
 end = source.index("\ncontainer_count_for_map() {", start)
-Path(sys.argv[1]).write_text(source[start:end].rstrip() + "\n", encoding="utf-8")
+scan_start = source.index("scan_idle_servers() {")
+scan_end = source.index("\n# Hyper-V scales", scan_start)
+Path(sys.argv[1]).write_text(source[start:end].rstrip() + "\n" + source[scan_start:scan_end] + "\n", encoding="utf-8")
 PY
 
 docker run -d --rm \
@@ -53,7 +55,9 @@ create schema dune;
 create table dune.farm_state (
   server_id text primary key,
   map text not null,
-  connected_players integer not null default 0
+  connected_players integer not null default 0,
+  ready boolean not null default true,
+  alive boolean not null default true
 );
 
 create table dune.world_partition (
@@ -110,6 +114,7 @@ psql_value() {
 }
 
 IDLE_SECONDS=300
+source runtime/scripts/lib/game-presence.sh
 source "$FUNCTION_FILE"
 
 # The pawn's authoritative partition must reserve the first isolated instance
@@ -137,6 +142,35 @@ docker exec "$CONTAINER" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
   -c "update dune.player_state set last_avatar_activity = current_timestamp;" >/dev/null
 [ "$(occupied_dimensions_for_map CB_Dungeon_Hephaestus | tr -d '[:space:]')" = "1" ]
 [ "$(occupied_dimensions_for_map CB_Story_Hephaestus | tr -d '[:space:]')" = "1" ]
+
+# Zero idle grace remains a supported setting; stale Offline rows do not hold
+# an instance when its most recent activity predates this query.
+IDLE_SECONDS=0
+[ "$(occupied_dimensions_for_map CB_Story_Hephaestus | tr -d '[:space:]')" = "0" ]
+IDLE_SECONDS=300
+
+# The idle scan must choose one deterministic READY spare, while counting
+# live native connections even when central player rows are absent.
+docker exec -i "$CONTAINER" psql -U postgres -d postgres -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
+insert into dune.farm_state(server_id,map,connected_players,ready) values
+ ('bandit-busy','CB_Story_BanditFortress01',1,true),
+ ('bandit-warming','CB_Story_BanditFortress01',0,false),
+ ('bandit-spare','CB_Story_BanditFortress01',0,true),
+ ('bandit-extra','CB_Story_BanditFortress01',0,true);
+insert into dune.world_partition(partition_id,server_id,map) values
+ (27,'bandit-busy','CB_Story_BanditFortress01'),
+ (43,'bandit-warming','CB_Story_BanditFortress01'),
+ (44,'bandit-spare','CB_Story_BanditFortress01'),
+ (45,'bandit-extra','CB_Story_BanditFortress01');
+SQL
+dune_psql() { docker exec "$CONTAINER" psql -U postgres -d postgres "$@"; }
+remember_server_id_map() { :; }
+ensure_isolated_story_spare() { :; }
+handle_idle_row() { printf '%s|%s|%s|%s\n' "$1" "$2" "$8" "$9"; }
+scan_output="$(scan_idle_servers standard)"
+for partition in 27 43 44 45; do
+  grep -qx "CB_Story_BanditFortress01|$partition|44|1" <<< "$scan_output"
+done
 SH
 
 echo "Autoscaler counts live server connections and pawn-resident players in isolated activity dimensions."

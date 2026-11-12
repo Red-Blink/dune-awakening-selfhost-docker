@@ -13,6 +13,9 @@ source runtime/scripts/landsraad-instance-cleanup.sh
 
 # shellcheck source=runtime/scripts/lib/postgres.sh
 source runtime/scripts/lib/postgres.sh
+# shellcheck source=runtime/scripts/lib/container-lifecycle.sh
+# A missing helper (a partial copy of the scripts) must never stop a stop.
+source runtime/scripts/lib/container-lifecycle.sh 2>/dev/null || dune_container_removal_hook() { :; }
 
 usage() {
   cat <<'EOF'
@@ -26,6 +29,8 @@ Examples:
 
 A map name despawns every running dimension of that map. A partition ID or
 container name despawns only that specific dimension.
+Occupied instances and recent gameplay are protected. --force explicitly
+overrides player protection and may disconnect players or end a story run.
 EOF
 }
 
@@ -36,10 +41,14 @@ fi
 
 TARGET="$1"
 FORCE=0
+CHECK_RECENT_ACTIVITY=1
 shift || true
 for arg in "$@"; do
   case "$arg" in
     --force) FORCE=1 ;;
+    # Internal lifecycle hint, never a player override: the same live player
+    # count guard still runs twice. Manual despawns check recent gameplay too.
+    --idle-confirmed) CHECK_RECENT_ACTIVITY=0 ;;
     *) echo "Unknown option: $arg"; usage; exit 2 ;;
   esac
 done
@@ -207,6 +216,28 @@ if [ "${#CONTAINERS[@]}" -eq 0 ]; then
   exit 1
 fi
 
+# Check the complete batch before removing anything. An exact Docker name is
+# not permission to stop an unrelated service, even with --force.
+for CONTAINER in "${CONTAINERS[@]}"; do
+  case "$CONTAINER" in
+    dune-server-survival-1|dune-server-overmap)
+      echo "Refusing to despawn always-on server: $CONTAINER" >&2
+      exit 1
+      ;;
+  esac
+  if ! [[ "$CONTAINER" =~ ^dune-server-[a-z0-9-]+-([0-9]+)$ ]]; then
+    echo "Refusing to despawn a container outside the dynamic game servers: $CONTAINER" >&2
+    exit 1
+  fi
+  if [ "$FORCE" != "1" ]; then
+    # shellcheck source=runtime/scripts/lib/game-presence.sh
+    source runtime/scripts/lib/game-presence.sh
+    PARTITION_ID="${BASH_REMATCH[1]}"
+    SERVER_ID="$(psql_value "select coalesce(server_id, '') from dune.world_partition where partition_id = $PARTITION_ID limit 1;")" || exit 1
+    dune_require_empty_game_server "$CONTAINER" "$PARTITION_ID" "$SERVER_ID" "$CHECK_RECENT_ACTIVITY" || exit 1
+  fi
+done
+
 despawn_container() {
   local container="$1"
   local container_map="" partition_from_name="" partition_id="" server_id=""
@@ -235,7 +266,13 @@ despawn_container() {
     server_id="$(psql_value "select coalesce(server_id, '') from dune.world_partition where partition_id = $partition_id limit 1;")"
   fi
 
+  # Recheck after batch preflight, immediately before this individual stop.
+  if [ "$FORCE" != "1" ]; then
+    dune_require_empty_game_server "$container" "$partition_id" "$server_id" "$CHECK_RECENT_ACTIVITY" || return 1
+  fi
+
   echo "Despawning: $container"
+  dune_container_removal_hook "$container" despawn-server
   docker rm -f "$container"
   ensure_runtime_state_file "$PORT_LOCK_FILE" "spawn port reservation lock"
   exec 9>"$PORT_LOCK_FILE"

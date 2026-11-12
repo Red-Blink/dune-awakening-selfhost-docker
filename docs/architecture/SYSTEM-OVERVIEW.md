@@ -328,7 +328,8 @@ reads/writes them. All are relative to the repo root.
 |---|---|---|
 | `runtime/secrets/` | Yes | Operator credentials: Funcom Self-Host Service Token, FLS API key, RabbitMQ HTTP token-auth secret, command-auth token, the console's own auto-generated admin password. Created empty by `dune init`. |
 | `runtime/generated/` | Yes | Ephemeral/derived state written by running scripts: battlegroup identity, image-tag resolution, per-partition port reservations, map/sietch/Deep-Desert config, systemd-timer state (auto-update, restart-schedule, IP-change-restart, shutdown-protection), the IAM policy store (`iam-policies.json`), the admin command audit log. Created empty by `dune init`. |
-| `runtime/backups/` | Yes | `db/` (database backups), `self-update/` (both the CLI's own Git-state-repair tarballs and `self-update.sh`'s own backups), `system/` (encrypted full-system archives, mode `0600`, each with a non-secret `.yaml` sidecar), `restore-<timestamp>/` (what a system restore replaced, written before it applies). |
+| `runtime/backups/` | Yes | `db/` (database backups), `self-update/` (both the CLI's own Git-state-repair tarballs and `self-update.sh`'s own backups), `system/` (encrypted full-system archives, mode `0600`, each with a non-secret `.yaml` sidecar), `restore-<timestamp>/` (what a system restore replaced, written before it applies), `.system-backup.lock` (held by whichever system backup or restore is running). |
+| `runtime/system-backup/` | Yes | The passphrase scheduled system backups encrypt with (`passphrase`, `0600`) and when it was saved (`passphrase.json`), in a `0700` directory. Deliberately outside `runtime/secrets/`, so it is never inside an archive and a restore never overwrites it. Included in the host permission repair. |
 | `runtime/data/` | No (shipped in the repo) | Static reference/lookup JSON shipped with the repo for `dune admin` item/vehicle/skill-module/XP-event-tag lookups — not operator-generated. |
 | `runtime/defaults/` | No (shipped in the repo) | `UserEngine.ini`, `UserGame.ini` — default engine config templates referenced by the multi-server documentation and `usersettings.py`. Patch-1.5 native difficulty controls are materialized into each server's `Saved/Config/LinuxServer/ServerCustomSettings.ini`. |
 
@@ -340,22 +341,35 @@ commented list of every supported variable, grouped by feature area).
 
 `runtime/backups/system/` is the one runtime directory whose contents are
 *more* sensitive than the tree they came from: each archive bundles a database
-dump together with `.env`, all of `runtime/generated/` and all of
-`runtime/secrets/`. Nothing is redacted or excluded on the grounds of being a
-secret — confidentiality comes entirely from GPG AES-256-OCB (AEAD)
+dump together with `.env`, `runtime/generated/` (minus caches rebuilt on start
+and half-written temp files) and all of `runtime/secrets/`. Nothing is
+redacted or excluded on the grounds of being a secret — confidentiality comes entirely from GPG AES-256-OCB (AEAD)
 encryption under an operator-supplied passphrase, and there is no recovery
 without it.
 
-Three structural points, each load-bearing:
+Four structural points, each load-bearing:
 
 - **Shell-owned.** `backup_system` and `restore_system` live in
   `runtime/scripts/db.sh`, not the console, because they have to work on a host
   whose console is not configured yet — which is the migration case the
   feature exists for. The console invokes them like any other operation.
-- **The passphrase never enters argv, the payload, or the audit log.** It
-  travels in the task's environment (`tasks.create`'s `options.env`, kept in
-  the run closure only, since the task object itself is retained and
-  serialized). The audit call and the secret are on different arguments.
+- **The passphrase never enters argv, the payload, or the audit log.** A typed
+  one travels in the task's environment (`tasks.create`'s `options.env`, kept
+  in the run closure only, since the task object itself is retained and
+  serialized). The audit call and the secret are on different arguments. A
+  saved one (scheduled backups, or "Use Saved Passphrase") is not passed at
+  all: the task gets `DUNE_SYSTEM_BACKUP_PASSPHRASE_FILE`, a path, and db.sh
+  reads the file itself.
+- **Scheduled runs happen one at a time, normally in the console image.** The
+  `dune-awakening-system-backup` timer starts a short-lived container from the
+  console image (it has GnuPG 2.4; many hosts' gpg cannot write the archive
+  format) that runs `dune db auto-system run`. Only when that image is missing
+  and the host's own gpg is 2.3+ does the unit run host `dune` instead, as the
+  checkout owner. `backup_system` and `restore_system` (apply only) take
+  `runtime/backups/.system-backup.lock`, so a scheduled run never overlaps a
+  restore. It skips instead, and prunes only archives whose sidecar says
+  `automatic`. A restore keeps this host's schedule state files rather than the
+  archive's, like the Battlegroup rollback point.
 - **The non-secret `.yaml` sidecar is the console's read path.** Listing,
   and the decisions the restore flow has to make before spending a passphrase
   (Battlegroup identity, whether the archive carries an admin audit log), are

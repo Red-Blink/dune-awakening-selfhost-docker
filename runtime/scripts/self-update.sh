@@ -1280,6 +1280,8 @@ restore_local_state_ownership() {
     runtime/generated \
     runtime/generated/battlegroup.env \
     runtime/generated/db-backup.env \
+    runtime/generated/system-backup-auto.env \
+    runtime/generated/system-backup-auto-last.env \
     runtime/generated/director-character-transfer.ini \
     runtime/generated/director-capacity.ini \
     runtime/generated/director-deepdesert-dual.ini \
@@ -1315,6 +1317,9 @@ restore_local_state_ownership() {
     runtime/addons/state.json \
     runtime/secrets/public-directory.json \
     runtime/secrets/funcom-token.txt \
+    runtime/system-backup \
+    runtime/system-backup/passphrase \
+    runtime/system-backup/passphrase.json \
     2>/dev/null || true
 }
 
@@ -1445,6 +1450,11 @@ rebuild_web_console_after_update() {
     rebuild_web_console_now "$service"
     echo "Dune Docker Console was rebuilt successfully."
   fi
+}
+
+refresh_shutdown_protection_after_update() {
+  [ -x runtime/scripts/shutdown-protection.sh ] || return 0
+  runtime/scripts/shutdown-protection.sh refresh || true
 }
 
 install_cli_command_after_update() {
@@ -1663,6 +1673,7 @@ case "$cmd" in
     ensure_self_update_preflight
     install_release_tag "$tag"
     install_cli_command_after_update
+    refresh_shutdown_protection_after_update
     rebuild_web_console_after_update
     self_update_finish_success
     ;;
@@ -1677,6 +1688,7 @@ case "$cmd" in
     ensure_self_update_preflight
     install_qa_commit "$tag"
     install_cli_command_after_update
+    refresh_shutdown_protection_after_update
     rebuild_web_console_after_update
     self_update_finish_success
     ;;

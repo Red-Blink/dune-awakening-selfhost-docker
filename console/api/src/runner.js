@@ -50,6 +50,7 @@ const simpleOperations = {
   backupSystemCreate: ["db", "backup-system"],
   backupSystemDeleteAll: ["db", "delete-system", "--all"],
   backupAutoDisable: ["db", "auto", "disable"],
+  backupSystemAutoStatus: ["db", "auto-system", "status"],
   init: ["init"],
   restartScheduleStatus: ["restart-schedule", "status"],
   restartScheduleDisable: ["restart-schedule", "disable"],
@@ -80,6 +81,14 @@ export function validateServiceName(value) {
     throw new Error(`Unsupported service: ${raw}`);
   }
   return normalized;
+}
+
+// Console diagnostics are readable through Logs; this must not widen the
+// service allowlist used by generic stop/restart operations.
+export function validateLogServiceName(value) {
+  const raw = String(value || "").trim();
+  if (raw === "console" || raw === "redblink-dune-docker-console") return "console";
+  return validateServiceName(raw);
 }
 
 export function buildDuneArgs(operation, payload = {}) {
@@ -161,6 +170,23 @@ export function buildDuneArgs(operation, payload = {}) {
         args.push(String(retentionDays), String(intervalHours));
         return args;
       }
+    case "backupSystemAutoEnable":
+    case "backupSystemAutoDisable":
+      // A bare disable ({ enabled: false } from an API client) keeps the saved
+      // policy rather than resetting it to the defaults below.
+      if (operation === "backupSystemAutoDisable" && payload.time == null && payload.intervalHours == null && payload.keep == null) {
+        return ["db", "auto-system", "disable"];
+      }
+      // Otherwise all three explicit: omitted CLI arguments keep the saved
+      // policy, which would drop edits saved while the schedule is off.
+      return [
+        "db",
+        "auto-system",
+        operation === "backupSystemAutoEnable" ? "enable" : "disable",
+        validateUpdateTime(payload.time || "04:30"),
+        String(validateInteger(payload.intervalHours ?? 24, 1, 168)),
+        String(validateInteger(payload.keep ?? 7, 1, 365))
+      ];
     case "backupAutoRetention":
       return ["db", "auto", "retention", String(validateInteger(payload.retentionDays, 0, 3650))];
     case "updateAutoEnable":
@@ -467,7 +493,7 @@ function killProcessTree(child) {
 }
 
 export function runDockerLogs(service, options = {}) {
-  const normalizedService = validateServiceName(service);
+  const normalizedService = validateLogServiceName(service);
   const useComposeService = normalizedService === "orchestrator";
   const container = useComposeService ? "orchestrator" : dockerContainerForLogService(normalizedService);
   const args = useComposeService
@@ -604,7 +630,7 @@ export function isDynamicServerService(service) {
 
 export function dockerContainerForLogService(service) {
   const raw = String(service || "").trim();
-  const normalized = validateServiceName(raw);
+  const normalized = validateLogServiceName(raw);
   const containers = new Map([
     ["postgres", "dune-postgres"],
     ["rmq-admin", "dune-rmq-admin"],
@@ -617,7 +643,8 @@ export function dockerContainerForLogService(service) {
     ["overmap", "dune-server-overmap"],
     ["orchestrator", "dune-orchestrator"],
     ["autoscaler", "dune-autoscaler"],
-    ["coriolis", "dune-coriolis-coordinator"]
+    ["coriolis", "dune-coriolis-coordinator"],
+    ["console", "redblink-dune-docker-console"]
   ]);
   if (containers.has(normalized)) return containers.get(normalized);
   if (/^dune-server-[a-z0-9-]+$/i.test(normalized)) return normalized;

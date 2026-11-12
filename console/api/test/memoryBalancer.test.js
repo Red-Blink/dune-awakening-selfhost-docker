@@ -172,3 +172,56 @@ test("memory balancer persists enabled state across restarts", async () => {
 
   rmSync(root, { recursive: true, force: true });
 });
+
+for (const failure of [false, true]) {
+  test(`memory limit diagnostics record ${failure ? "failure without secrets" : "each completed receiver and donor change"}`, async (t) => {
+    const root = mkdtempSync(join(tmpdir(), "dune-memory-diagnostics-"));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    writeFileSync(join(root, "memory-balancer.json"), JSON.stringify({ enabled: true }));
+    const gib = 1024 ** 3;
+    const rows = [
+      { container: "dune-server-survival-1", map: "Survival_1", usedBytes: 9.5 * gib, limitBytes: 10 * gib, percent: 95 },
+      { container: "dune-server-overmap", map: "Overmap", usedBytes: gib, limitBytes: 5 * gib, percent: 20 }
+    ];
+    const events = [], applied = [];
+    const balancer = createMemoryBalancer({ repoRoot: root, generatedDir: root }, {
+      sampler: { read: async () => ({ rows }) },
+      writeDiagnostic: event => events.push(event),
+      applyMemoryLimit: async (container, limit) => {
+        applied.push([container, limit]);
+        if (failure) throw new Error("private-error-password=do-not-log");
+      }
+    });
+    await balancer.tick();
+    assert.deepEqual(events.map(event => event.outcome), failure ? ["requested", "failed"] : ["requested", "applied", "requested", "applied"]);
+    assert.equal(events[0].previousLimitBytes, 10 * gib);
+    assert.equal(events[0].limitBytes, 11 * gib);
+    assert.equal(events[0].reason, "rebalance-receiver");
+    assert.ok(events.every(event => Number.isFinite(Date.parse(event.at)) && event.durationMs >= 0));
+    assert.doesNotMatch(JSON.stringify(events), /private-error|password|do-not-log/);
+    assert.equal(applied.length, failure ? 1 : 2);
+    if (!failure) {
+      assert.equal(events[2].reason, "rebalance-donor");
+      assert.equal(events[2].previousLimitBytes, 5 * gib);
+      assert.equal(events[2].limitBytes, 4 * gib);
+    }
+  });
+}
+
+test("diagnostic sink failure cannot prevent a memory transfer", async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "dune-memory-diagnostics-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(join(root, "memory-balancer.json"), JSON.stringify({ enabled: true }));
+  const gib = 1024 ** 3, applied = [];
+  const balancer = createMemoryBalancer({ repoRoot: root, generatedDir: root }, {
+    sampler: { read: async () => ({ rows: [
+      { container: "dune-server-survival-1", map: "Survival_1", usedBytes: 9.5 * gib, limitBytes: 10 * gib, percent: 95 },
+      { container: "dune-server-overmap", map: "Overmap", usedBytes: gib, limitBytes: 5 * gib, percent: 20 }
+    ] }) },
+    writeDiagnostic() { throw new Error("sink unavailable"); },
+    applyMemoryLimit: async (...args) => applied.push(args)
+  });
+  await balancer.tick();
+  assert.equal(applied.length, 2);
+  assert.equal(balancer.publicState().lastError, "");
+});

@@ -7,6 +7,9 @@ cd "$(dirname "$0")/../.."
 [ -r runtime/generated/battlegroup.env ] && . runtime/generated/battlegroup.env
 
 source runtime/scripts/runtime-env.sh
+# shellcheck source=runtime/scripts/lib/container-lifecycle.sh
+# A missing helper (a partial copy of the scripts) must never stop a stop.
+source runtime/scripts/lib/container-lifecycle.sh 2>/dev/null || dune_container_removal_hook() { :; }
 
 CLIENT_PORT_BASE="$(resolve_client_port_base)"
 IGW_PORT_BASE="$(resolve_igw_port_base)"
@@ -19,6 +22,7 @@ PARTITION_ID="${DUNE_OVERMAP_PARTITION_ID:-2}"
 # a failed container removal could make a live map appear safe for DB writes.
 containers="$(docker ps -a --format '{{.Names}}')"
 if printf '%s\n' "$containers" | grep -qx dune-server-overmap; then
+  dune_container_removal_hook dune-server-overmap stop-server-overmap
   docker rm -f dune-server-overmap >/dev/null
 fi
 containers="$(docker ps -a --format '{{.Names}}')"
