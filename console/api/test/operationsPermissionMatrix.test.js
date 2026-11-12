@@ -121,7 +121,8 @@ test("09 Critical: scheduled restart host helpers run explicitly as root", () =>
 
 test("10 Critical: automatic update and backup timer helpers run as root", () => {
   assertRootHelpers("runtime/scripts/update.sh", 3);
-  assertRootHelpers("runtime/scripts/db.sh", 3);
+  // 3 for the database backup timer, 3 for the scheduled system backup timer.
+  assertRootHelpers("runtime/scripts/db.sh", 6);
 });
 
 // Service operations (11-19)

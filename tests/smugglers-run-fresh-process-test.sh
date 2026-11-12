@@ -101,7 +101,7 @@ grep -q "standard) map_filter=\"and fs.map not in ('CB_Overland_S_06', 'CB_Story
 grep -q 'forget_map_demand "$map"' runtime/scripts/autoscaler.sh
 grep -A14 '^reconcile_all()' runtime/scripts/map-modes.sh \
   | grep -q 'effective_mode_for_map'
-grep -q 'runtime/scripts/map-modes.sh is-always-on' \
+grep -q 'runtime/scripts/map-modes.sh always-on-maps' \
   runtime/scripts/publish-network-server-state-overrides.sh
 
 main_loop="$(sed -n '/^while true; do$/,/^done$/p' runtime/scripts/autoscaler.sh | tail -n 30)"

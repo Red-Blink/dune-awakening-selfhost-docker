@@ -179,7 +179,11 @@ query; API keys always use the shared cached path.
 | POST | `/api/backups/delete-selected` | Delete the named database backups | `backups` (1-100 file names) |
 | POST | `/api/backups/import-external` | Import external backup | multipart form: `backup`, `metadata` |
 | GET | `/api/backups/system` | List encrypted system backups (archive + non-secret sidecar fields) | None |
-| POST | `/api/backups/system/create` | Create an encrypted system backup (database + `.env` + `runtime/generated` + `runtime/secrets`). Requires `backups:create-system` | `passphrase` (string, 12-1024 chars, at least 5 different characters) |
+| POST | `/api/backups/system/create` | Create an encrypted system backup (database + `.env` + `runtime/generated` + `runtime/secrets`). Requires `backups:create-system` | `passphrase` (string, 12-1024 chars, at least 5 different characters, no line breaks), **or** `useSavedPassphrase: true` to encrypt with the saved scheduled-backup passphrase instead (400 if none is saved) |
+| GET | `/api/backups/system/auto` | Scheduled system backup status: `enabled`, `backupTime`, `intervalHours`, `keep`, `execution` (`image` or `host`), `timer`, `nextRun`, `lastRunAt`, `lastResult` (`success`, `skipped`, `failed` or `running`), `lastMessage`, `lastArchive`, `passphraseSaved`, `passphraseSavedAt`, `automaticCount`, `automaticBytes`. Never includes the passphrase. Requires `backups:read` | None |
+| POST | `/api/backups/system/auto` | Save the scheduled system backup policy and install or remove its systemd timer. Enabling returns 400 when no passphrase is saved. Requires `backups:write-config` | `enabled` (boolean; false removes the timer), `time?` (`HH:MM`, default `04:30`), `intervalHours?` (integer 1-168, default 24), `keep?` (integer 1-365, default 7: how many automatic archives to keep). With `enabled: false` the three are optional: sent, they are saved for later; omitted, the saved policy is kept |
+| PUT | `/api/backups/system/passphrase` | Save or replace the passphrase scheduled backups encrypt with. Write-only: no route returns it. Replacing it does not re-encrypt older archives. 409 while a system backup or restore is running. Rate-limited (429). Requires `backups:set-system-passphrase` (Owner only) | `passphrase`, `passphraseConfirm` (must match; same rules as create). Returns `savedAt` and `replaced` |
+| DELETE | `/api/backups/system/passphrase` | Remove the saved passphrase. 409 while scheduled system backups are on, or while a system backup or restore is running. Requires `backups:set-system-passphrase` (Owner only) | None. Returns `removed` |
 | POST | `/api/backups/system/import` | Upload a system backup: the `.tar` the download produces, or a bare `.tar.gz.enc`. Body is the file itself, streamed to disk. Requires `backups:import-system` | `filename?` (query; a name is minted if absent or invalid), `onConflict?` (query: `overwrite` or `rename`; without it an existing name returns 409 with `conflict`); the body is the raw file |
 | GET | `/api/backups/system/{name}/download` | Download a system backup as one uncompressed `.tar` holding the encrypted archive and its `.yaml` sidecar. Add `?raw=1` for the bare archive, or name the sidecar directly to fetch it alone. Streamed, never buffered. Requires `backups:download-system` | `name` (string), `raw` (optional) |
 | DELETE | `/api/backups/system/{name}` | Delete a system backup and its `.yaml` sidecar. Requires `backups:delete-system` | `name` (string) |
@@ -192,7 +196,8 @@ query; API keys always use the shared cached path.
 See [database-backups.md](database-backups.md) for the difference between a plain
 backup and a system backup, the passphrase and Battlegroup-identity rules the
 `system/*` and `restore` routes above enforce, and how to move an archive to a
-new host.
+new host. Its [Scheduled system backups](database-backups.md#scheduled-system-backups)
+section covers the `system/auto` and `system/passphrase` routes.
 
 ### Preview before apply is enforced by the API
 

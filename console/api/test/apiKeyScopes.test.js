@@ -499,7 +499,7 @@ test("every action in the catalog is grantable by name", () => {
 // as { "backups": "write" } gained whole-host takeover on upgrade, with no
 // re-save and nothing for the operator to review.
 test("a stored write level does not reach the whole-host backup actions", () => {
-  for (const action of ["backups:download-system", "backups:import-system", "backups:restore-system"]) {
+  for (const action of ["backups:download-system", "backups:import-system", "backups:restore-system", "backups:set-system-passphrase"]) {
     assert.equal(scopeAllowsAction("backups", "write", action), false, `write must not cover ${action}`);
     assert.equal(scopeAllowsAction("backups", "read", action), false, `read must not cover ${action}`);
   }
@@ -530,7 +530,7 @@ test("a stored vehicles write level does not reach the stored-vehicle delete", (
   assert.equal(keyAllows({ scopes: { vehicles: ["vehicles:stored-delete"] } }, "vehicles:delete"), false);
 });
 
-// Tightened during the 2026-09-21 upstream rebase: these three were originally
+// Tightened during the 2026-09-21 upstream rebase: these (now four, with set-system-passphrase) were originally
 // LEVEL_EXCLUDED_ACTIONS-only (unreachable via a level, but grantable by naming
 // them explicitly). Reconciling this list with policy.js's CROWN_JEWEL_DENY_ACTIONS
 // (upstream PR #201/#202 review requirement -- these three must stay owner-only
@@ -541,7 +541,7 @@ test("a stored vehicles write level does not reach the stored-vehicle delete", (
 // catalog entirely) but is left in place since other, non-crown-jewel actions
 // could use the same level-exclusion mechanism in the future.
 test("the excluded actions cannot be granted at all, even by naming them", () => {
-  for (const action of ["backups:download-system", "backups:import-system", "backups:restore-system"]) {
+  for (const action of ["backups:download-system", "backups:import-system", "backups:restore-system", "backups:set-system-passphrase"]) {
     assert.equal(scopeAllowsAction("backups", [action], action), false, `an explicit grant of ${action} must still be refused -- it is owner-only`);
   }
 });

@@ -1,6 +1,6 @@
 # Database backups and Battlegroup identity
 
-**Status:** Current | **Last Updated:** August 2026
+**Status:** Current | **Last Updated:** November 2026
 
 Database backups contain character and world data associated with a Battlegroup
 ID. Restoring a backup into a deployment with a different ID therefore requires
@@ -41,6 +41,13 @@ now exposes it directly: enter a passphrase twice, and **Create System Backup**.
 Unlike a plain download, the archive is a genuine point-in-time capture — the
 config inside it is the config as it was when the backup ran, not as it is now.
 
+The server keeps writing `runtime/generated/` while the backup copies it. The
+copy is retried up to three times while files change, every JSON file in it
+must parse, and the autoscaler's log cache and half-written `*.tmp` files are
+left out. If `runtime/generated/` is still changing on the last try, that copy
+is used and a note is logged. `runtime/secrets/` still changing, or a JSON file
+still mid-rewrite, fails the backup instead of archiving a partial copy.
+
 ### The passphrase
 
 The archive is encrypted with AES-256 in AEAD (OCB) mode via gpg — an
@@ -52,9 +59,21 @@ somewhere durable and separate from the archive itself — a password manager, n
 the same disk. The console asks for it twice because a typo produces an archive
 nobody can ever open.
 
-The passphrase is never written to the audit log, never appears in the task log,
-and is never passed on a command line where other processes on the host could
-read it from `ps`.
+A passphrase typed into the create form is never stored, never written to the
+audit log, never appears in the task log, and is never passed on a command line
+where other processes on the host could read it from `ps`.
+
+A passphrase **saved** for [scheduled system backups](#scheduled-system-backups)
+is the one exception to "never stored": it sits in
+`runtime/system-backup/passphrase`, mode `0600` and owned by the console's user,
+because a timer cannot type. It is still never logged, never sent back by any
+route, and never placed inside an archive -- that directory is deliberately
+outside `runtime/secrets/`, which every archive copies. Keeping it on the host
+does not weaken what the encryption is for: anyone who can read that file can
+already read the plaintext `.env` and `runtime/secrets/` beside it. The
+encryption protects an archive **once it leaves the host**, and a copied archive
+is no easier to open than before. Store the passphrase off the host as well;
+it is the only way to open those archives anywhere else.
 
 Every credential is retained verbatim: the Funcom Self-Host Service Token, the
 admin console password, RMQ credentials and the sietch join password. Treat a
@@ -63,18 +82,109 @@ leaves the host.
 
 ### Retention
 
-System backups are never pruned automatically. Set `DUNE_SYSTEM_BACKUP_KEEP` to
-a positive integer to keep only that many newest archives; `0` (the default)
-keeps every one. Pruning is opt-in because each archive is the only copy of the
-credentials inside it — the console's Delete controls are the deliberate path.
+Manual and imported system backups are never pruned automatically. Set
+`DUNE_SYSTEM_BACKUP_KEEP` to a positive integer to keep only that many newest
+archives; `0` (the default) keeps every one. Pruning is opt-in because each
+archive is the only copy of the credentials inside it — the console's Delete
+controls are the deliberate path.
+
+Scheduled archives are the exception: a timer that never prunes fills the disk.
+Each scheduled run keeps the newest **Keep** archives marked `automatic` (default
+7) and removes older ones. It only ever counts archives whose sidecar says
+`automatic`; manual, imported and sidecar-less archives are never candidates.
+See [scheduled system backups](#scheduled-system-backups).
 
 A restore also leaves a plaintext safety copy of what it replaced -- `.env` and every secret -- under `runtime/backups/restore-<timestamp>/`. That copy is not the only one of anything, since the archive it came from is still there, so it is pruned automatically: `DUNE_RESTORE_SAFETY_KEEP` (default `5`) keeps that many newest, removing older ones each time a restore succeeds. Set it to `0` to keep every one.
+
+### Scheduled system backups
+
+**Backups -> Automatic System Backups** creates system backups on a timer
+(`dune-awakening-system-backup.timer`), laid out like the database
+**Automatic Backups** section: a switch in the heading, a status grid, and one
+row of settings.
+
+1. **Save a passphrase.** A scheduled run cannot ask for one, so it uses the
+   passphrase saved in the **Saved Passphrase** block at the bottom of that
+   section (entered twice). It cannot be read back afterwards. Only the Owner
+   role can save, replace or remove it.
+2. **Set the schedule.** First Backup Time uses the server's local clock. Repeat
+   Every sets the hours between backups, including intervals longer than a day.
+   A 24-hour schedule keeps the same local time across daylight-saving changes.
+   Next Run shows when the next backup is due. **Keep Newest** is how many
+   scheduled archives to keep. The
+   line under it shows how many automatic archives are stored now, how many the
+   next run will remove, and how many remain. The next run counts its own new
+   archive first, so a host already at the limit still loses one. Saving deletes
+   nothing on its own; the prune happens at the next run.
+3. **Turn it on.** The switch stays off until a passphrase is saved.
+
+Every scheduled archive is marked **Automatic Backup**, and its sidecar records
+that it was made with the saved passphrase and when that passphrase was saved
+(`passphrase_source`, `passphrase_saved_at` -- never the passphrase or a hash).
+**Replacing the passphrase does not re-encrypt older archives**: they still need
+the passphrase they were made with, and the restore form says which one an
+archive used.
+
+Once a passphrase is saved, **Create System Backup** also offers **Use Saved
+Passphrase** for a manual archive. Untick it to type a different one.
+
+**Where the backup runs.** The timer runs `dune db auto-system run` inside the
+console image (`docker run --rm --name dune-system-backup …`), not on the host:
+the archive format needs GnuPG 2.3 or newer, which older host distributions such
+as Ubuntu 22.04 do not ship. If the image is missing, enabling falls back to the
+host's own `dune` only when the host's gpg can write the format, and refuses
+otherwise. Neither the unit nor its environment ever holds the passphrase; the
+run reads the file itself.
+
+**What a run skips.** One system backup or restore runs at a time
+(`runtime/backups/.system-backup.lock`). A scheduled run that finds another one
+in progress, or a database restore underway, skips and records why. A manual
+backup started while another runs fails straight away. A run with no saved
+passphrase fails and says so. The passphrase cannot be saved, replaced or
+removed while a system backup or restore is running (409): that run has already
+read the old one.
+
+A scheduled run prunes only automatic archives, even when
+`DUNE_SYSTEM_BACKUP_KEEP` is set; that setting's prune runs after manual
+backups only. The container uses the host's clock (`/etc/localtime`), so
+archives from the console image and from the host fallback sort in one order.
+
+**Status.** The card shows the timer, next run, last run with its result
+(`success`, `skipped`, `failed`, or `running` while one is in progress), and the
+size of the stored automatic archives. A failed run's detail is in the journal:
+`journalctl -u dune-awakening-system-backup.service`. Save Settings with the
+schedule off keeps the edited time, interval and Keep for when it is turned on.
+
+**After moving to a new host.** The saved passphrase is not inside any archive,
+so a restored host has none. A restore also keeps this host's own schedule
+state rather than the archive's, because it describes this host's timer. Save
+the passphrase again and turn the schedule on.
+
+The same from a shell:
+
+```bash
+dune db auto-system passphrase set
+```
+
+```bash
+dune db auto-system enable 04:30 24 7
+```
+
+```bash
+dune db auto-system status
+```
+
+`dune db auto-system units` prints the service and timer `enable` would
+install, for a manual install or a review. `disable` removes them (and accepts
+the same time, interval and keep to save), and `passphrase remove` is refused
+while the schedule is on. Run as root, `passphrase set` hands the files to the
+checkout owner, so the console and the timer can still read them.
 
 ### Getting the archive onto the new host
 
 Download the backup from the old host's Backups page. On the new host, open
-**Backups -> System Backups (Encrypted)**, press **Import Backup**, and upload
-the file you downloaded.
+**Backups -> Import System Backup**, choose the file you downloaded, and press
+**Import**.
 
 The download is a single `.tar` holding both files a backup is made of: the
 encrypted archive and its `.yaml` sidecar. The sidecar holds no secrets, and it

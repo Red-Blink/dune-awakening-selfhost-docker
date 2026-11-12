@@ -187,6 +187,9 @@ jobs:
           runtime/tests/test-deepdesert-dual-selector-cleanup.sh
           runtime/tests/test-deepdesert-layout-apply-safety.sh
           runtime/tests/test-map-despawn-lifecycle.sh
+          python3 tests/test_despawn_player_guard.py
+          python3 tests/test_story_spare.py
+          runtime/tests/test-container-lifecycle-log.sh
           runtime/tests/test-director-log-id-normalization.sh
           runtime/tests/test-director-story-admission.sh
           runtime/tests/test-overland-dynamic-allocation.sh
@@ -198,6 +201,8 @@ jobs:
           tests/storage-cleanup-test.sh
           tests/fake-k8s-serviceaccount-cleanup-test.sh
           tests/runtime-permission-helper-rebuild-test.sh
+          tests/system-backup-permission-repair-test.sh
+          python3 tests/system-backup-timing-test.py
           tests/update-systemd-timer-health-test.sh
           python3 runtime/tests/test-update-auto-timer.py
           tests/update-auto-tanks-test.sh
@@ -227,6 +232,7 @@ jobs:
           tests/psql-transport-test.sh
           tests/rmq-transport-test.sh
           tests/postgres-shutdown-test.sh
+          python3 tests/shutdown-protection-refresh-test.py
           tests/postgres-bootstrap-test.sh
           tests/coriolis-coordinator-test.sh
           bash tests/console-restart-isolation-test.sh

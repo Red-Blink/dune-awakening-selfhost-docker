@@ -253,6 +253,34 @@ export function parseBackupAutoStatus(result = {}) {
   };
 }
 
+export function parseSystemBackupAutoStatus(result = {}) {
+  const stdout = String(result.stdout || "");
+  const stderr = String(result.stderr || "");
+  const values = {};
+  for (const rawLine of stdout.split(/\r?\n/)) {
+    const match = rawLine.trim().match(/^([^:]{2,80}):\s*(.*)$/);
+    if (!match) continue;
+    values[match[1].trim().toLowerCase().replace(/\s+/g, "_")] = match[2].trim();
+  }
+  const ok = Number(result.exitCode || 0) === 0;
+  const optional = (value) => (value && value !== "-" ? value : "");
+  return {
+    ok,
+    enabled: /^(true|1)$/i.test(values.enabled || ""),
+    backupTime: values.backup_time || "",
+    intervalHours: values.interval_hours || "",
+    keep: values.keep || "",
+    execution: optional(values.execution === "unknown" ? "" : values.execution),
+    timer: values.systemd_timer || "",
+    nextRun: optional(values.next_run),
+    lastRunAt: values.last_run && values.last_run !== "never" ? values.last_run : "",
+    lastResult: values.last_result && values.last_result !== "none" ? values.last_result : "",
+    lastMessage: values.last_message || "",
+    lastArchive: values.last_archive || "",
+    reason: ok ? "" : conciseBackupError(stderr || stdout)
+  };
+}
+
 function parseBackupLine(line) {
   const trimmed = String(line || "").trim();
   if (!trimmed) return null;

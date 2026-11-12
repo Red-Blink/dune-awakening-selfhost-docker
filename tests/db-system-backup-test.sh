@@ -46,6 +46,10 @@ case "${1:-} ${2:-}" in
   "start dune-postgres")
     [ -z "${MOCK_POSTGRES_STATE_FILE:-}" ] || printf 1 > "${MOCK_POSTGRES_STATE_FILE}"
     ;;
+  "image inspect")
+    # The console image the scheduled-backup unit runs in; present by default.
+    [ "${MOCK_HELPER_IMAGE_MISSING:-0}" != "1" ] || exit 1
+    ;;
   "exec dune-postgres")
     shift 2
     case "${1:-}" in
@@ -130,6 +134,10 @@ EOF
 
   mkdir -p "$root/runtime/generated/dune-fake-k8s-serviceaccount-director-12345"
   printf 'fake-token\n' > "$root/runtime/generated/dune-fake-k8s-serviceaccount-director-12345/token"
+  mkdir -p "$root/runtime/generated/director-log-cache.Ab12Cd"
+  printf 'sqlite\n' > "$root/runtime/generated/director-log-cache.Ab12Cd/recent.sqlite"
+  printf 'half-written\n' > "$root/runtime/generated/image-tags.env.tmp.Xy34Zw"
+  printf 'half-written\n' > "$root/runtime/generated/restart-history.json.tmp"
 
   printf '%s\n' "$SECRET_FUNCOM_TOKEN" > "$root/runtime/secrets/funcom-token.txt"
   printf 'admin-web-secret-value\n' > "$root/runtime/secrets/admin-web-password.txt"
@@ -237,6 +245,16 @@ if [ ! -f "$case1_extract/generated/.secrets-migrated/server-login-password-secr
 fi
 if [ -d "$case1_extract/generated/dune-fake-k8s-serviceaccount-director-12345" ]; then
   echo "FAIL happy-path: ephemeral fake-k8s-serviceaccount dir should be excluded"
+  exit 1
+fi
+for case1_ephemeral in director-log-cache.Ab12Cd image-tags.env.tmp.Xy34Zw restart-history.json.tmp; do
+  if [ -e "$case1_extract/generated/$case1_ephemeral" ]; then
+    echo "FAIL happy-path: ephemeral $case1_ephemeral should be excluded"
+    exit 1
+  fi
+done
+if [ ! -f "$case1_extract/generated/battlegroup.env" ]; then
+  echo "FAIL happy-path: battlegroup.env missing from the archive"
   exit 1
 fi
 if ! find "$case1_extract/db" -name '*.backup' | grep -q .; then
@@ -421,6 +439,307 @@ if [ -n "$case5_leaks" ]; then
   exit 1
 fi
 echo "PASS cleanup-on-mid-run-failure"
+
+# --- Live writers change runtime/generated/ during staging -----------------
+# GNU tar exits 1 for "file changed as we read it" / "File removed before we
+# read it" -- routine while the autoscaler saves files there. That must be
+# retried and then tolerated; exit >= 2 must still fail the backup.
+
+# Wraps the real tar. Calls are classified by mode (-cf / -xf) and by the
+# last path component of -C, so interception does not depend on how db.sh
+# spells the paths. Pack counts: tar-count (generated), tar-count.secrets;
+# unpack count: tar-count.torn.
+run_staging_tar_case() {
+  local root="$1"
+  local mode="$2"
+  local torn_file="${3:-sietch-config.json}"
+  local real_tar
+  real_tar="$(command -v tar)"
+  mkdir -p "$root/work" "$root/altbin"
+  seed_repo_tree "$root/work"
+  cp "$bin_dir/docker" "$root/altbin/docker"
+  cat > "$root/altbin/tar" <<'EOF'
+#!/usr/bin/env bash
+mode=""
+dir=""
+prev=""
+for arg in "$@"; do
+  case "$arg" in -cf) mode=pack ;; -xf) mode=unpack ;; esac
+  [ "$prev" = "-C" ] && dir="${arg%/}"
+  prev="$arg"
+done
+tree="${dir##*/}"
+[ "$tree" = generated ] || [ "$tree" = secrets ] || exec "$MOCK_REAL_TAR" "$@"
+bump() {
+  local n=$(( $(cat "$1" 2>/dev/null || echo 0) + 1 ))
+  printf '%s' "$n" > "$1"
+  echo "$n"
+}
+if [ "$mode" = unpack ]; then
+  "$MOCK_REAL_TAR" "$@" || exit $?
+  [ "$tree" = generated ] || exit 0
+  # Simulates a JSON file caught mid-rewrite: its copy is cut off.
+  torn="$(bump "$MOCK_TAR_COUNT_FILE.torn")"
+  tear() { printf '{"sietches":[{"pass' > "$dir/$MOCK_TORN_FILE"; }
+  case "$MOCK_TAR_MODE" in
+    torn-once) [ "$torn" -gt 1 ] || tear ;;
+    torn-always) tear ;;
+    torn-then-removed) tear; [ "$torn" -lt 3 ] || rm -f "runtime/generated/$MOCK_TORN_FILE" ;;
+  esac
+  exit 0
+fi
+if [ "$tree" = generated ]; then
+  count="$(bump "$MOCK_TAR_COUNT_FILE")"
+else
+  count="$(bump "$MOCK_TAR_COUNT_FILE.secrets")"
+fi
+"$MOCK_REAL_TAR" "$@" || exit $?
+case "$tree:$MOCK_TAR_MODE" in
+  generated:once) [ "$count" -gt 1 ] || { echo "tar: .: file changed as we read it" >&2; exit 1; } ;;
+  generated:always|secrets:secrets-always) echo "tar: .: file changed as we read it" >&2; exit 1 ;;
+  generated:fatal) echo "tar: ./battlegroup.env: Cannot open: Permission denied" >&2; exit 2 ;;
+esac
+exit 0
+EOF
+  chmod +x "$root/altbin/tar"
+  case "$mode" in
+    broken-on-disk)
+      printf '{"not valid json' > "$root/work/runtime/generated/player-announcements.json"
+      head -c 200000 /dev/zero | tr '\0' '[' > "$root/work/runtime/generated/deeply-nested.json"
+      ;;
+    torn-then-removed)
+      printf '{"messages":[]}\n' > "$root/work/runtime/generated/$torn_file"
+      ;;
+  esac
+  set +e
+  (
+    cd "$root/work"
+    PATH="$root/altbin:$PATH" MOCK_REAL_TAR="$real_tar" MOCK_TAR_MODE="$mode" \
+      MOCK_TAR_COUNT_FILE="$root/tar-count" MOCK_TORN_FILE="$torn_file" \
+      DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" \
+      bash runtime/scripts/db.sh backup-system
+  ) > "$root/output.log" 2>&1
+  staging_case_exit=$?
+  set -e
+}
+
+assert_staged_archive_complete() {
+  local name="$1"
+  local root="$2"
+  local archive
+  archive="$(find "$root/work/runtime/backups/system" -maxdepth 1 -name '*.tar.gz.enc' | head -n1)"
+  if [ -z "$archive" ]; then
+    echo "FAIL $name: no archive was written"
+    cat "$root/output.log"
+    exit 1
+  fi
+  decrypt_and_extract "$archive" "$root/extract" "$TEST_PASSPHRASE"
+  if ! grep -q "$SECRET_SIETCH_PASSWORD" "$root/extract/generated/sietch-config.json" 2>/dev/null \
+      || [ ! -f "$root/extract/generated/battlegroup.env" ] \
+      || [ ! -f "$root/extract/secrets/funcom-token.txt" ]; then
+    echo "FAIL $name: archive is missing staged generated/ or secrets/ files"
+    exit 1
+  fi
+}
+
+churn_once_root="$test_root/churn-once"
+run_staging_tar_case "$churn_once_root" once
+if [ "$staging_case_exit" -ne 0 ]; then
+  echo "FAIL staging-changed-once-retries: expected exit 0, got $staging_case_exit"
+  cat "$churn_once_root/output.log"
+  exit 1
+fi
+if [ "$(cat "$churn_once_root/tar-count")" != 2 ]; then
+  echo "FAIL staging-changed-once-retries: expected 2 staging attempts, got $(cat "$churn_once_root/tar-count")"
+  exit 1
+fi
+assert_staged_archive_complete staging-changed-once-retries "$churn_once_root"
+echo "PASS staging-changed-once-retries"
+
+churn_always_root="$test_root/churn-always"
+run_staging_tar_case "$churn_always_root" always
+if [ "$staging_case_exit" -ne 0 ]; then
+  echo "FAIL staging-keeps-changing-accepted: expected exit 0, got $staging_case_exit"
+  cat "$churn_always_root/output.log"
+  exit 1
+fi
+if [ "$(cat "$churn_always_root/tar-count")" != 3 ]; then
+  echo "FAIL staging-keeps-changing-accepted: expected 3 staging attempts, got $(cat "$churn_always_root/tar-count")"
+  exit 1
+fi
+if ! grep -q 'kept changing while it was copied' "$churn_always_root/output.log"; then
+  echo "FAIL staging-keeps-changing-accepted: expected a note about the accepted copy"
+  cat "$churn_always_root/output.log"
+  exit 1
+fi
+assert_staged_archive_complete staging-keeps-changing-accepted "$churn_always_root"
+echo "PASS staging-keeps-changing-accepted"
+
+churn_fatal_root="$test_root/churn-fatal"
+run_staging_tar_case "$churn_fatal_root" fatal
+if [ "$staging_case_exit" -eq 0 ]; then
+  echo "FAIL staging-fatal-tar-error-fails: expected non-zero exit on tar exit 2"
+  cat "$churn_fatal_root/output.log"
+  exit 1
+fi
+if [ "$(cat "$churn_fatal_root/tar-count")" != 1 ]; then
+  echo "FAIL staging-fatal-tar-error-fails: a fatal tar error must not be retried"
+  exit 1
+fi
+if ! grep -q 'runtime/generated/ could not be staged' "$churn_fatal_root/output.log" \
+    || find "$churn_fatal_root/work/runtime/backups/system" -maxdepth 1 -type f | grep -q .; then
+  echo "FAIL staging-fatal-tar-error-fails: expected the staging error and no artifacts left behind"
+  cat "$churn_fatal_root/output.log"
+  exit 1
+fi
+echo "PASS staging-fatal-tar-error-fails"
+
+torn_once_root="$test_root/torn-json-once"
+run_staging_tar_case "$torn_once_root" torn-once
+if [ "$staging_case_exit" -ne 0 ]; then
+  echo "FAIL staging-torn-json-retries: expected exit 0, got $staging_case_exit"
+  cat "$torn_once_root/output.log"
+  exit 1
+fi
+if [ "$(cat "$torn_once_root/tar-count.torn")" != 2 ]; then
+  echo "FAIL staging-torn-json-retries: expected 2 copies, got $(cat "$torn_once_root/tar-count.torn")"
+  exit 1
+fi
+assert_staged_archive_complete staging-torn-json-retries "$torn_once_root"
+if ! cmp -s "$torn_once_root/work/runtime/generated/sietch-config.json" \
+    "$torn_once_root/extract/generated/sietch-config.json"; then
+  echo "FAIL staging-torn-json-retries: archived sietch-config.json differs from the source"
+  exit 1
+fi
+echo "PASS staging-torn-json-retries"
+
+torn_always_root="$test_root/torn-json-always"
+run_staging_tar_case "$torn_always_root" torn-always
+if [ "$staging_case_exit" -eq 0 ]; then
+  echo "FAIL staging-torn-json-fails: expected non-zero exit when every copy is cut off"
+  cat "$torn_always_root/output.log"
+  exit 1
+fi
+if ! grep -q 'sietch-config.json was still being rewritten' "$torn_always_root/output.log" \
+    || find "$torn_always_root/work/runtime/backups/system" -maxdepth 1 -type f | grep -q .; then
+  echo "FAIL staging-torn-json-fails: expected the rewrite error and no artifacts left behind"
+  cat "$torn_always_root/output.log"
+  exit 1
+fi
+echo "PASS staging-torn-json-fails"
+
+broken_disk_root="$test_root/broken-json-on-disk"
+run_staging_tar_case "$broken_disk_root" broken-on-disk
+if [ "$staging_case_exit" -ne 0 ]; then
+  echo "FAIL staging-broken-json-on-disk-kept: expected exit 0, got $staging_case_exit"
+  cat "$broken_disk_root/output.log"
+  exit 1
+fi
+for broken_name in player-announcements.json deeply-nested.json; do
+  if ! grep -q "$broken_name is not valid JSON on disk" "$broken_disk_root/output.log"; then
+    echo "FAIL staging-broken-json-on-disk-kept: expected a warning naming $broken_name"
+    cat "$broken_disk_root/output.log"
+    exit 1
+  fi
+done
+assert_staged_archive_complete staging-broken-json-on-disk-kept "$broken_disk_root"
+if ! cmp -s "$broken_disk_root/work/runtime/generated/player-announcements.json" \
+    "$broken_disk_root/extract/generated/player-announcements.json"; then
+  echo "FAIL staging-broken-json-on-disk-kept: the broken file was not archived as-is"
+  exit 1
+fi
+echo "PASS staging-broken-json-on-disk-kept"
+
+torn_removed_root="$test_root/torn-json-removed"
+run_staging_tar_case "$torn_removed_root" torn-then-removed scheduled-map-messages.json
+if [ "$staging_case_exit" -ne 0 ]; then
+  echo "FAIL staging-torn-json-source-removed: expected exit 0, got $staging_case_exit"
+  cat "$torn_removed_root/output.log"
+  exit 1
+fi
+if ! grep -q 'scheduled-map-messages.json was removed during the backup' "$torn_removed_root/output.log"; then
+  echo "FAIL staging-torn-json-source-removed: expected a note naming the removed file"
+  cat "$torn_removed_root/output.log"
+  exit 1
+fi
+assert_staged_archive_complete staging-torn-json-source-removed "$torn_removed_root"
+if [ -e "$torn_removed_root/extract/generated/scheduled-map-messages.json" ]; then
+  echo "FAIL staging-torn-json-source-removed: the cut-off copy of a removed file was archived"
+  exit 1
+fi
+echo "PASS staging-torn-json-source-removed"
+
+secrets_strict_root="$test_root/secrets-keep-changing"
+run_staging_tar_case "$secrets_strict_root" secrets-always
+if [ "$staging_case_exit" -eq 0 ]; then
+  echo "FAIL staging-secrets-strict: expected non-zero exit when runtime/secrets keeps changing"
+  cat "$secrets_strict_root/output.log"
+  exit 1
+fi
+if [ "$(cat "$secrets_strict_root/tar-count.secrets")" != 3 ] \
+    || ! grep -q 'runtime/secrets kept changing while it was copied' "$secrets_strict_root/output.log" \
+    || ! grep -q 'runtime/secrets/ could not be staged' "$secrets_strict_root/output.log" \
+    || find "$secrets_strict_root/work/runtime/backups/system" -maxdepth 1 -type f | grep -q .; then
+  echo "FAIL staging-secrets-strict: expected 3 attempts, the strict error and no artifacts"
+  cat "$secrets_strict_root/output.log"
+  exit 1
+fi
+echo "PASS staging-secrets-strict"
+
+# Same failure with the real tar: a writer saving by temp file + rename in a
+# tight loop makes nearly every GNU tar read of the directory exit 1.
+churn_real_root="$test_root/churn-real"
+mkdir -p "$churn_real_root/work"
+seed_repo_tree "$churn_real_root/work"
+# Enough data that tar's directory walk overlaps the writer every time.
+mkdir -p "$churn_real_root/work/runtime/generated/bulk"
+for churn_i in $(seq 1 300); do
+  head -c 20000 /dev/urandom > "$churn_real_root/work/runtime/generated/bulk/f$churn_i"
+done
+(
+  generated="$churn_real_root/work/runtime/generated"
+  while [ ! -e "$churn_real_root/stop" ]; do
+    t="$(mktemp "$generated/autoscaler-idle.tsv.tmp.XXXXXX")" || break
+    printf 'idle\n' > "$t"
+    mv -f "$t" "$generated/autoscaler-idle.tsv"
+  done
+) &
+churn_writer_pid=$!
+set +e
+(
+  cd "$churn_real_root/work"
+  PATH="$bin_dir:$PATH" DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" \
+    bash runtime/scripts/db.sh backup-system
+) > "$churn_real_root/output.log" 2>&1
+staging_case_exit=$?
+set -e
+touch "$churn_real_root/stop"
+wait "$churn_writer_pid" || true
+if [ "$staging_case_exit" -ne 0 ]; then
+  echo "FAIL staging-real-writer-churn: expected exit 0, got $staging_case_exit"
+  cat "$churn_real_root/output.log"
+  exit 1
+fi
+assert_staged_archive_complete staging-real-writer-churn "$churn_real_root"
+if find "$churn_real_root/extract/generated" -name '*.tmp.*' | grep -q .; then
+  echo "FAIL staging-real-writer-churn: half-written temp files were archived"
+  exit 1
+fi
+# Every file that was not being written must match its source byte for byte,
+# and the one that was must hold a whole save, not a fragment.
+if ! diff -r \
+    --exclude='autoscaler-idle.tsv' --exclude='*.tmp' --exclude='*.tmp.*' \
+    --exclude='director-log-cache.*' --exclude='dune-fake-k8s-serviceaccount-*' \
+    "$churn_real_root/work/runtime/generated" "$churn_real_root/extract/generated" >/dev/null \
+    || ! diff -r "$churn_real_root/work/runtime/secrets" "$churn_real_root/extract/secrets" >/dev/null; then
+  echo "FAIL staging-real-writer-churn: archived files differ from their sources"
+  exit 1
+fi
+if [ "$(cat "$churn_real_root/extract/generated/autoscaler-idle.tsv" 2>/dev/null)" != idle ]; then
+  echo "FAIL staging-real-writer-churn: the file being rewritten was archived incomplete"
+  exit 1
+fi
+echo "PASS staging-real-writer-churn"
 
 # --- Case 6: list-system reports written archives -------------------------
 
@@ -2918,3 +3237,347 @@ if ! grep -q "keep-this-host-history" "$case57_root/work/runtime/generated/web-a
   exit 1
 fi
 echo "PASS restore-replaces-stale-state"
+
+# --- Scheduled system backups (auto-system) -------------------------------
+
+SAVED_PASSPHRASE="saved-passphrase-for-the-timer-4c1d"
+SAVED_AT="2026-11-09T10:00:00.000Z"
+
+seed_saved_passphrase() {
+  local work="$1"
+  mkdir -p "$work/runtime/system-backup"
+  chmod 700 "$work/runtime/system-backup"
+  printf '%s' "$SAVED_PASSPHRASE" > "$work/runtime/system-backup/passphrase"
+  printf '{"savedAt":"%s"}\n' "$SAVED_AT" > "$work/runtime/system-backup/passphrase.json"
+  chmod 600 "$work/runtime/system-backup/passphrase" "$work/runtime/system-backup/passphrase.json"
+}
+
+write_auto_state() {
+  local work="$1" enabled="$2" keep="$3"
+  printf 'SYSTEM_AUTO_ENABLED=%s\nSYSTEM_AUTO_TIME=04:30\nSYSTEM_AUTO_INTERVAL_HOURS=24\nSYSTEM_AUTO_KEEP=%s\nSYSTEM_AUTO_MODE=image\n' \
+    "$enabled" "$keep" > "$work/runtime/generated/system-backup-auto.env"
+}
+
+run_auto_system() {
+  local root="$1"
+  shift
+  local status=0
+  mkdir -p "$root/tmp"
+  (
+    cd "$root/work"
+    PATH="$bin_dir:$PATH" TMPDIR="$root/tmp" bash runtime/scripts/db.sh auto-system "$@"
+  ) > "$root/auto.log" 2>&1 || status=$?
+  return "$status"
+}
+
+make_fake_archive() {
+  local dir="$1" name="$2" origin="$3"
+  printf 'not-a-real-archive\n' > "$dir/$name"
+  [ "$origin" = "none" ] || printf 'backup_origin: %s\n' "$origin" > "$dir/$name.yaml"
+}
+
+# --- Case 58: a scheduled run uses the saved passphrase and never archives it
+
+case58_root="$test_root/case58"
+mkdir -p "$case58_root/work"
+seed_repo_tree "$case58_root/work"
+seed_saved_passphrase "$case58_root/work"
+write_auto_state "$case58_root/work" 1 7
+
+case58_status=0
+run_auto_system "$case58_root" run || case58_status=$?
+if [ "$case58_status" -ne 0 ]; then
+  echo "FAIL scheduled-run: expected exit 0, got $case58_status"
+  cat "$case58_root/auto.log"
+  exit 1
+fi
+case58_archive="$(find "$case58_root/work/runtime/backups/system" -maxdepth 1 -name '*.tar.gz.enc' | head -n1)"
+if [ -z "$case58_archive" ]; then
+  echo "FAIL scheduled-run: no archive was written"
+  cat "$case58_root/auto.log"
+  exit 1
+fi
+if ! grep -qx 'backup_origin: automatic' "$case58_archive.yaml" \
+    || ! grep -qx 'passphrase_source: saved' "$case58_archive.yaml" \
+    || ! grep -qx "passphrase_saved_at: $SAVED_AT" "$case58_archive.yaml"; then
+  echo "FAIL scheduled-run: sidecar does not record an automatic, saved-passphrase archive"
+  cat "$case58_archive.yaml"
+  exit 1
+fi
+if grep -q "$SAVED_PASSPHRASE" "$case58_archive.yaml"; then
+  echo "FAIL scheduled-run: the sidecar contains the passphrase"
+  exit 1
+fi
+case58_extract="$test_root/case58-extract"
+decrypt_and_extract "$case58_archive" "$case58_extract" "$SAVED_PASSPHRASE"
+if [ ! -f "$case58_extract/secrets/funcom-token.txt" ]; then
+  echo "FAIL scheduled-run: the archive does not open with the saved passphrase"
+  exit 1
+fi
+# The key must never ride inside the archives it encrypts.
+if grep -rqs "$SAVED_PASSPHRASE" "$case58_extract" || find "$case58_extract" -name 'passphrase*' | grep -q .; then
+  echo "FAIL scheduled-run: the saved passphrase was captured inside the archive"
+  exit 1
+fi
+if ! grep -q '^SYSTEM_AUTO_LAST_RESULT=success$' "$case58_root/work/runtime/generated/system-backup-auto-last.env"; then
+  echo "FAIL scheduled-run: the last run was not recorded as a success"
+  cat "$case58_root/work/runtime/generated/system-backup-auto-last.env"
+  exit 1
+fi
+echo "PASS scheduled-run"
+
+# --- Case 59: a restore leaves the saved passphrase alone ------------------
+
+# The archive carries case58's schedule state (enabled, keep 7). This host's own
+# state differs and must survive, because it describes this host's timer.
+write_auto_state "$case58_root/work" 0 3
+printf 'SYSTEM_AUTO_LAST_RESULT=host-own\n' > "$case58_root/work/runtime/generated/system-backup-auto-last.env"
+case59_status=0
+run_restore "$case58_root" "$case58_root/tmp-restore" "$SAVED_PASSPHRASE" "$(basename "$case58_archive")" || case59_status=$?
+if [ "$case59_status" -ne 0 ]; then
+  echo "FAIL restore-keeps-saved-passphrase: expected exit 0, got $case59_status"
+  cat "$case58_root/restore.log"
+  exit 1
+fi
+if [ "$(cat "$case58_root/work/runtime/system-backup/passphrase")" != "$SAVED_PASSPHRASE" ] \
+    || [ "$(stat -c '%a' "$case58_root/work/runtime/system-backup/passphrase")" != "600" ]; then
+  echo "FAIL restore-keeps-saved-passphrase: the restore changed the saved passphrase"
+  exit 1
+fi
+if ! grep -qx 'SYSTEM_AUTO_ENABLED=0' "$case58_root/work/runtime/generated/system-backup-auto.env" \
+    || ! grep -qx 'SYSTEM_AUTO_KEEP=3' "$case58_root/work/runtime/generated/system-backup-auto.env" \
+    || ! grep -qx 'SYSTEM_AUTO_LAST_RESULT=host-own' "$case58_root/work/runtime/generated/system-backup-auto-last.env"; then
+  echo "FAIL restore-keeps-saved-passphrase: the archive's schedule state replaced this host's"
+  cat "$case58_root/work/runtime/generated/system-backup-auto.env"
+  exit 1
+fi
+echo "PASS restore-keeps-saved-passphrase"
+
+# --- Case 60: pruning only ever removes automatic archives -----------------
+
+case60_root="$test_root/case60"
+mkdir -p "$case60_root/work"
+seed_repo_tree "$case60_root/work"
+seed_saved_passphrase "$case60_root/work"
+write_auto_state "$case60_root/work" 1 2
+case60_dir="$case60_root/work/runtime/backups/system"
+make_fake_archive "$case60_dir" dune-system-20260101-000000-1-1.tar.gz.enc manual
+make_fake_archive "$case60_dir" dune-system-20260102-000000-1-1.tar.gz.enc imported
+make_fake_archive "$case60_dir" dune-system-20260103-000000-1-1.tar.gz.enc none
+make_fake_archive "$case60_dir" dune-system-20260104-000000-1-1.tar.gz.enc automatic
+make_fake_archive "$case60_dir" dune-system-20260105-000000-1-1.tar.gz.enc automatic
+make_fake_archive "$case60_dir" dune-system-20260106-000000-1-1.tar.gz.enc scheduled
+
+case60_status=0
+# DUNE_SYSTEM_BACKUP_KEEP=1 counts every archive; a scheduled run must not apply
+# it, or the manual archives below would be deleted.
+DUNE_SYSTEM_BACKUP_KEEP=1 run_auto_system "$case60_root" run || case60_status=$?
+if [ "$case60_status" -ne 0 ]; then
+  echo "FAIL scheduled-prune: expected exit 0, got $case60_status"
+  cat "$case60_root/auto.log"
+  exit 1
+fi
+for kept in dune-system-20260101-000000-1-1.tar.gz.enc dune-system-20260102-000000-1-1.tar.gz.enc \
+    dune-system-20260103-000000-1-1.tar.gz.enc dune-system-20260106-000000-1-1.tar.gz.enc; do
+  if [ ! -f "$case60_dir/$kept" ]; then
+    echo "FAIL scheduled-prune: $kept should have been kept"
+    cat "$case60_root/auto.log"
+    exit 1
+  fi
+done
+for pruned in dune-system-20260104-000000-1-1.tar.gz.enc dune-system-20260105-000000-1-1.tar.gz.enc; do
+  if [ -e "$case60_dir/$pruned" ] || [ -e "$case60_dir/$pruned.yaml" ]; then
+    echo "FAIL scheduled-prune: $pruned should have been pruned with its sidecar"
+    exit 1
+  fi
+done
+case60_count="$(find "$case60_dir" -maxdepth 1 -name '*.tar.gz.enc' | wc -l | tr -d '[:space:]')"
+if [ "$case60_count" != "5" ]; then
+  echo "FAIL scheduled-prune: expected 5 archives (new + 1 automatic + 3 non-automatic), found $case60_count"
+  ls -la "$case60_dir"
+  exit 1
+fi
+echo "PASS scheduled-prune"
+
+# --- Case 61: the lock, the restore marker and a missing passphrase --------
+
+case61_root="$test_root/case61"
+mkdir -p "$case61_root/work"
+seed_repo_tree "$case61_root/work"
+seed_saved_passphrase "$case61_root/work"
+write_auto_state "$case61_root/work" 1 7
+case61_dir="$case61_root/work/runtime/backups/system"
+exec 8>>"$case61_root/work/runtime/backups/.system-backup.lock"
+flock -n 8
+
+case61_status=0
+run_auto_system "$case61_root" run || case61_status=$?
+if [ "$case61_status" -ne 0 ] || ! grep -q '^SYSTEM_AUTO_LAST_RESULT=skipped$' "$case61_root/work/runtime/generated/system-backup-auto-last.env"; then
+  echo "FAIL scheduled-lock: a run during another backup should skip with exit 0, got $case61_status"
+  cat "$case61_root/auto.log"
+  exit 1
+fi
+case61_manual_status=0
+(
+  cd "$case61_root/work"
+  PATH="$bin_dir:$PATH" DUNE_SYSTEM_BACKUP_PASSPHRASE="$TEST_PASSPHRASE" bash runtime/scripts/db.sh backup-system
+) > "$case61_root/manual.log" 2>&1 || case61_manual_status=$?
+if [ "$case61_manual_status" -ne 75 ]; then
+  echo "FAIL scheduled-lock: a manual backup during another one should exit 75, got $case61_manual_status"
+  cat "$case61_root/manual.log"
+  exit 1
+fi
+if find "$case61_dir" -maxdepth 1 -name '*.tar.gz.enc' | grep -q .; then
+  echo "FAIL scheduled-lock: an archive was written while the lock was held"
+  exit 1
+fi
+exec 8>&-
+
+mkdir -p "$case61_root/work/runtime/generated"
+printf 'restore in progress\n' > "$case61_root/work/runtime/generated/db-restore-maintenance"
+case61_status=0
+run_auto_system "$case61_root" run || case61_status=$?
+if [ "$case61_status" -ne 0 ] || ! grep -q 'restore is in progress' "$case61_root/auto.log"; then
+  echo "FAIL scheduled-restore-marker: a run during a restore should skip, got $case61_status"
+  cat "$case61_root/auto.log"
+  exit 1
+fi
+rm -f "$case61_root/work/runtime/generated/db-restore-maintenance"
+
+rm -f "$case61_root/work/runtime/system-backup/passphrase"
+case61_status=0
+run_auto_system "$case61_root" run || case61_status=$?
+if [ "$case61_status" -ne 1 ] || ! grep -q '^SYSTEM_AUTO_LAST_RESULT=failed$' "$case61_root/work/runtime/generated/system-backup-auto-last.env"; then
+  echo "FAIL scheduled-no-passphrase: a run with no saved passphrase should fail with 1, got $case61_status"
+  cat "$case61_root/auto.log"
+  exit 1
+fi
+case61_status=0
+run_auto_system "$case61_root" enable 04:30 24 7 || case61_status=$?
+if [ "$case61_status" -ne 1 ] || ! grep -q 'Save a passphrase first' "$case61_root/auto.log"; then
+  echo "FAIL scheduled-no-passphrase: enable without a saved passphrase should be refused, got $case61_status"
+  cat "$case61_root/auto.log"
+  exit 1
+fi
+echo "PASS scheduled-lock-and-guards"
+
+# --- Case 62: the timer runs the backup in the console image ---------------
+
+case62_root="$test_root/case62"
+mkdir -p "$case62_root/work"
+seed_repo_tree "$case62_root/work"
+run_auto_system "$case62_root" units 03:15 12
+for expected in \
+    'ExecStart=/usr/bin/env docker run --rm --name dune-system-backup --network host --user ' \
+    'redblink-dune-docker-console:dev -lc "runtime/scripts/dune db auto-system run"' \
+    '-v /etc/localtime:/etc/localtime:ro' \
+    'OnCalendar=*-*-* *:15:00' \
+    'ExecCondition=/usr/bin/env bash' \
+    'Persistent=true' \
+    'Unit=dune-awakening-system-backup.service'; do
+  if ! grep -qF -- "$expected" "$case62_root/auto.log"; then
+    echo "FAIL scheduled-units: missing: $expected"
+    cat "$case62_root/auto.log"
+    exit 1
+  fi
+done
+# No passphrase may reach the unit, its environment or an EnvironmentFile.
+if grep -qiE 'PASSPHRASE|EnvironmentFile' "$case62_root/auto.log"; then
+  echo "FAIL scheduled-units: the unit references a passphrase or an EnvironmentFile"
+  cat "$case62_root/auto.log"
+  exit 1
+fi
+case62_status=0
+MOCK_HELPER_IMAGE_MISSING=1 run_auto_system "$case62_root" units 03:15 24 || case62_status=$?
+if [ "$case62_status" -ne 0 ] || ! grep -qF 'runtime/scripts/dune db auto-system run' "$case62_root/auto.log" \
+    || grep -qF 'docker run' "$case62_root/auto.log" || grep -qF 'OnUnitActiveSec' "$case62_root/auto.log"; then
+  echo "FAIL scheduled-units: without the console image the unit should run host dune daily"
+  cat "$case62_root/auto.log"
+  exit 1
+fi
+echo "PASS scheduled-units"
+
+# --- Case 63: saving and removing the passphrase from the shell ------------
+
+case63_root="$test_root/case63"
+mkdir -p "$case63_root/work"
+seed_repo_tree "$case63_root/work"
+case63_status=0
+printf '%s\n' "$SAVED_PASSPHRASE" | (cd "$case63_root/work" && bash runtime/scripts/db.sh auto-system passphrase set) \
+  > "$case63_root/set.log" 2>&1 || case63_status=$?
+case63_file="$case63_root/work/runtime/system-backup/passphrase"
+if [ "$case63_status" -ne 0 ] || [ "$(cat "$case63_file")" != "$SAVED_PASSPHRASE" ] \
+    || [ "$(stat -c '%a' "$case63_file")" != "600" ] \
+    || [ "$(stat -c '%a' "$case63_root/work/runtime/system-backup")" != "700" ] \
+    || ! grep -q '"savedAt":"' "$case63_root/work/runtime/system-backup/passphrase.json"; then
+  echo "FAIL passphrase-set: expected a 600 file holding exactly the passphrase, in a 700 directory"
+  cat "$case63_root/set.log"
+  exit 1
+fi
+case63_status=0
+printf '%s\n' "aaaaaaaaaaaaaaaa" | (cd "$case63_root/work" && bash runtime/scripts/db.sh auto-system passphrase set) \
+  > "$case63_root/weak.log" 2>&1 || case63_status=$?
+if [ "$case63_status" -eq 0 ] || [ "$(cat "$case63_file")" != "$SAVED_PASSPHRASE" ]; then
+  echo "FAIL passphrase-set: a degenerate passphrase was accepted"
+  exit 1
+fi
+# Not while a system backup holds the lock: it has already read the old one.
+exec 8>>"$case63_root/work/runtime/backups/.system-backup.lock"
+flock -n 8
+case63_status=0
+printf '%s\n' "another-long-passphrase-1" | (cd "$case63_root/work" && bash runtime/scripts/db.sh auto-system passphrase set) \
+  > "$case63_root/locked.log" 2>&1 || case63_status=$?
+exec 8>&-
+if [ "$case63_status" -ne 75 ] || [ "$(cat "$case63_file")" != "$SAVED_PASSPHRASE" ]; then
+  echo "FAIL passphrase-set: saving while a backup holds the lock should exit 75, got $case63_status"
+  cat "$case63_root/locked.log"
+  exit 1
+fi
+
+# Saved as root (sudo), the files go to the checkout owner.
+if [ "$(id -u)" = "0" ]; then
+  chown -R 4242:4242 "$case63_root/work"
+  printf '%s\n' "$SAVED_PASSPHRASE" | (cd "$case63_root/work" && bash runtime/scripts/db.sh auto-system passphrase set) \
+    > "$case63_root/root.log" 2>&1
+  if [ "$(stat -c '%u:%g' "$case63_file")" != "4242:4242" ] \
+      || [ "$(stat -c '%u:%g' "$case63_root/work/runtime/system-backup")" != "4242:4242" ]; then
+    echo "FAIL passphrase-set: a root save left files the checkout owner cannot read"
+    ls -ln "$case63_root/work/runtime/system-backup"
+    exit 1
+  fi
+fi
+
+# disable saves the edited policy without turning anything on.
+write_auto_state "$case63_root/work" 0 7
+case63_status=0
+run_auto_system "$case63_root" disable 02:15 48 3 || case63_status=$?
+if ! grep -qx 'SYSTEM_AUTO_ENABLED=0' "$case63_root/work/runtime/generated/system-backup-auto.env" \
+    || ! grep -qx 'SYSTEM_AUTO_TIME=02:15' "$case63_root/work/runtime/generated/system-backup-auto.env" \
+    || ! grep -qx 'SYSTEM_AUTO_INTERVAL_HOURS=48' "$case63_root/work/runtime/generated/system-backup-auto.env" \
+    || ! grep -qx 'SYSTEM_AUTO_KEEP=3' "$case63_root/work/runtime/generated/system-backup-auto.env"; then
+  echo "FAIL schedule-disable-saves-policy: disable did not save the edited time, interval and keep"
+  cat "$case63_root/auto.log"
+  cat "$case63_root/work/runtime/generated/system-backup-auto.env"
+  exit 1
+fi
+case63_status=0
+run_auto_system "$case63_root" disable 02:15 48 0 || case63_status=$?
+if [ "$case63_status" -eq 0 ]; then
+  echo "FAIL schedule-disable-saves-policy: an invalid keep was accepted"
+  exit 1
+fi
+
+write_auto_state "$case63_root/work" 1 7
+case63_status=0
+run_auto_system "$case63_root" passphrase remove || case63_status=$?
+if [ "$case63_status" -eq 0 ] || [ ! -f "$case63_file" ]; then
+  echo "FAIL passphrase-remove: removal while the schedule is on should be refused"
+  exit 1
+fi
+write_auto_state "$case63_root/work" 0 7
+run_auto_system "$case63_root" passphrase remove
+if [ -e "$case63_file" ] || [ -e "$case63_root/work/runtime/system-backup/passphrase.json" ]; then
+  echo "FAIL passphrase-remove: the passphrase files survived removal"
+  exit 1
+fi
+echo "PASS passphrase-set-and-remove"

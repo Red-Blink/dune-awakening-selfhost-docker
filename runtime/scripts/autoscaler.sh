@@ -9,6 +9,9 @@ source runtime/scripts/lib/igw-socket-health.sh
 # shellcheck source=runtime/scripts/lib/postgres.sh
 source runtime/scripts/lib/postgres.sh
 
+# shellcheck source=runtime/scripts/lib/game-presence.sh
+source runtime/scripts/lib/game-presence.sh
+
 # shellcheck source=runtime/scripts/farm-readiness.sh
 source runtime/scripts/farm-readiness.sh
 
@@ -448,39 +451,7 @@ occupied_dimensions_for_map() {
         -- activity player_state rows can remain Offline or point at Overmap
         -- while the player is already active inside the instance.
         coalesce(fs.connected_players, 0) > 0
-        or exists (
-          select 1
-          from dune.player_state ps
-          left join dune.actors pawn
-            on pawn.id = ps.player_pawn_id
-          left join dune.farm_state player_fs
-            on player_fs.server_id = ps.server_id
-          left join dune.world_partition previous_wp
-            on previous_wp.partition_id = ps.previous_server_partition_id
-          where (
-            ps.server_id = fs.server_id
-            or pawn.partition_id = wp.partition_id
-            or (
-              previous_wp.server_id = fs.server_id
-              and (
-                coalesce(ps.server_id, '') = ''
-                or player_fs.server_id is null
-                or ps.server_id <> fs.server_id
-              )
-            )
-          )
-            and (
-              ps.online_status <> 'Offline'
-              or (
-                ps.reconnect_grace_period_end is not null
-                and ps.reconnect_grace_period_end > (current_timestamp at time zone 'UTC')
-              )
-              or (
-                ps.last_avatar_activity is not null
-                and ps.last_avatar_activity > (current_timestamp - make_interval(secs => ${IDLE_SECONDS}))
-              )
-            )
-        )
+        or ($(dune_game_player_count_sql "$IDLE_SECONDS")) > 0
       );
   "
 }
@@ -1974,6 +1945,21 @@ handle_demand() {
   }
 }
 
+ensure_isolated_story_spare() {
+  local map="$1" assigned="$2" occupied="$3" maximum
+  [[ "$assigned" =~ ^[0-9]+$ && "$occupied" =~ ^[0-9]+$ ]] || return 0
+  [ "$occupied" -gt 0 ] && [ "$assigned" -le "$occupied" ] || return 0
+  map_requires_isolated_party_dimension "$map" || return 0
+  map_requires_fresh_process "$map" && return 0
+  [ "$(map_uses_dedicated_scaling "$map")" = "1" ] || return 0
+  map_is_dynamic "$map" || map_is_overmap_active "$map" || return 0
+  maximum="$(max_dimensions_for_map "$map")" || return 0
+  [[ "$maximum" =~ ^[1-9][0-9]*$ ]] && [ "$maximum" -gt "$occupied" ] || return 0
+  # Reuse the normal allocator's cap, warming-container count and host-memory
+  # admission. Do not reset demand/grace while a free instance already exists.
+  handle_demand "$map" 1 "" spare ClassicalInstancing
+}
+
 handle_idle_row() {
   local map="$1"
   local partition_id="$2"
@@ -1982,6 +1968,7 @@ handle_idle_row() {
   local effective_players="$5"
   local ready="$6"
   local alive="$7"
+  local spare_partition="${8:-0}" occupied_siblings="${9:-0}"
 
   case "$map" in
     Survival_1|Overmap)
@@ -2018,6 +2005,21 @@ handle_idle_row() {
     return 0
   fi
 
+  # Keep exactly one free, ready instance while an isolated sibling is busy.
+  # Fresh-process activities must still be retired after each completed run.
+  if [ "$partition_id" = "$spare_partition" ] \
+    && [[ "$occupied_siblings" =~ ^[0-9]+$ ]] && [ "$occupied_siblings" -gt 0 ] \
+    && map_requires_isolated_party_dimension "$map" \
+    && [ "$(map_uses_dedicated_scaling "$map")" = "1" ] \
+    && ! map_requires_fresh_process "$map"; then
+    local maximum
+    maximum="$(max_dimensions_for_map "$map")" || maximum=0
+    if [[ "$maximum" =~ ^[1-9][0-9]*$ ]] && [ "$maximum" -gt "$occupied_siblings" ]; then
+      clear_idle_since "$key"
+      return 0
+    fi
+  fi
+
   local now since age
   now="$(date +%s)"
 
@@ -2052,7 +2054,7 @@ handle_idle_row() {
 
   if [ "$age" -ge "$idle_seconds" ]; then
     echo "DESPAWN idle map=$map server=$server_id idle=${age}s"
-    runtime/scripts/despawn-server.sh "$partition_id" || true
+    runtime/scripts/despawn-server.sh "$partition_id" --idle-confirmed || true
     clear_idle_since "$key"
   fi
 }
@@ -2749,7 +2751,7 @@ deepdesert_partition_spawn_in_progress() {
 
 scan_idle_servers() {
   local scope="${1:-standard}"
-  local map_filter
+  local map_filter spare_demand_map=""
 
   case "$scope" in
     fresh-process) map_filter="and fs.map in ('CB_Overland_S_06', 'CB_Story_DestroyedZanovar', 'CB_Story_OrbitalMonitor')" ;;
@@ -2765,51 +2767,30 @@ scan_idle_servers() {
       fs.connected_players,
       coalesce(ep.effective_players, 0) as effective_players,
       fs.ready,
-      fs.alive
+      fs.alive,
+      coalesce(min(wp.partition_id) filter (
+        where fs.connected_players = 0 and ep.effective_players = 0 and fs.ready and fs.alive
+      ) over (partition by fs.map), 0) as spare_partition,
+      count(*) filter (where fs.connected_players > 0 or ep.effective_players > 0)
+        over (partition by fs.map) as occupied_siblings,
+      count(*) over (partition by fs.map) as assigned_siblings
     from dune.farm_state fs
     left join dune.world_partition wp on wp.server_id = fs.server_id
-    left join lateral (
-      select count(*) as effective_players
-      from dune.player_state ps
-      left join dune.actors pawn on pawn.id = ps.player_pawn_id
-      left join dune.farm_state pfs on pfs.server_id = ps.server_id
-      where (
-        ps.server_id = fs.server_id
-        or (
-          wp.partition_id is not null
-          and pawn.partition_id = wp.partition_id
-        )
-        or (
-          wp.partition_id is not null
-          and ps.previous_server_partition_id = wp.partition_id
-          and (
-            coalesce(ps.server_id, '') = ''
-            or pfs.server_id is null
-            or ps.server_id <> fs.server_id
-          )
-        )
-      )
-        and (
-          ps.online_status <> 'Offline'
-          or (
-            ps.reconnect_grace_period_end is not null
-            and ps.reconnect_grace_period_end > (current_timestamp at time zone 'UTC')
-          )
-          or (
-            ps.last_avatar_activity is not null
-            and ps.last_avatar_activity > (current_timestamp - make_interval(secs => ${IDLE_SECONDS}))
-          )
-        )
-    ) ep on true
+    left join lateral ($(dune_game_player_count_sql "$IDLE_SECONDS")) ep on true
     where fs.map not in ('Survival_1', 'Overmap')
       $map_filter
       and coalesce(fs.server_id, '') <> ''
-    order by map;
-  " | while IFS='|' read -r map partition_id server_id connected_players effective_players ready alive; do
+      and wp.partition_id is not null
+    order by fs.map, wp.partition_id;
+  " | while IFS='|' read -r map partition_id server_id connected_players effective_players ready alive spare_partition occupied_siblings assigned_siblings; do
     [ -z "${map:-}" ] && continue
     [ -z "${partition_id:-}" ] && continue
     remember_server_id_map "$map" "$server_id"
-    handle_idle_row "$map" "$partition_id" "$server_id" "$connected_players" "$effective_players" "$ready" "$alive"
+    if [ "${spare_demand_map:-}" != "$map" ]; then
+      ensure_isolated_story_spare "$map" "$assigned_siblings" "$occupied_siblings"
+      spare_demand_map="$map"
+    fi
+    handle_idle_row "$map" "$partition_id" "$server_id" "$connected_players" "$effective_players" "$ready" "$alive" "$spare_partition" "$occupied_siblings"
   done
 }
 

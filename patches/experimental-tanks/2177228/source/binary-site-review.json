@@ -1,0 +1,21 @@
+{
+  "oldBuild": "2168446-0-shipping",
+  "previousSupportedBuild": "2173753-0-shipping",
+  "newBuild": "2177228-0-shipping",
+  "steamBuild": "26442326",
+  "cleanSha256": "416fe9656878ffd213584d88df8930905c46fc7401233d12448bba1a6e3a7e3e",
+  "moduleIdSites": ["0xf2e2de0", "0xf6ddb4e", "0xf6e34a4"],
+  "initializationBranches": [
+    {"address": "0xf2f4f10", "target": "0xf2f5028", "vehicleField": "0xed0"},
+    {"address": "0xf6dd511", "target": "0xf6dd6b4"}
+  ],
+  "overlayLoaderRegistration": "0xd6f09ea",
+  "overlayLoaderCallback": "0xd6e9cb0",
+  "fnameDecoder": "0xf9c0804",
+  "fnameDecoderBytes": "4489f0c1e810488d0daf460b07488b44c168410fb7ce0fb73c48",
+  "fnamePool": "0x16a74ec0",
+  "fnamePoolReady": "0x16a74e91",
+  "executablePadding": {"address": "0x14228819", "size": 231, "precededByReturn": true},
+  "instructionGeneratorUnchanged": true,
+  "review": "Independent byte-window matching and native disassembly against retained, checksum-verified stock 2168446 identify each new site separately. Module-record registers, initialization field and branch targets, loader callback registration, FName block/header layout and SEED_ofb128_encrypt trailing executable padding retain their contracts. Address changes are not uniform. The unchanged Tank-only generator rebuilds detours and references; ordinary vehicle IDs remain native."
+}

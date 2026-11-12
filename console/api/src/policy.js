@@ -492,6 +492,9 @@ const CROWN_JEWEL_DENY_ACTIONS = [
   "backups:download-system",
   "backups:import-system",
   "backups:restore-system",
+  // Choosing the key for every future scheduled archive is the same
+  // custody decision as the three above, even though it is never read back.
+  "backups:set-system-passphrase",
   "database:export",                                // full DB dump = whole-database exfiltration
   "admin:transfer-settings:write",                  // character/server-transfer policy (identity + economy)
   "updates:apply", "updates:fix", "updates:repair", // deploying / altering the running code

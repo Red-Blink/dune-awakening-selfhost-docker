@@ -16,6 +16,7 @@ Usage:
   dune shutdown-protection enable
   dune shutdown-protection disable
   dune shutdown-protection remove
+  dune shutdown-protection refresh
   dune shutdown-protection status
   dune shutdown-protection run-stop
 EOF
@@ -72,18 +73,19 @@ can_manage_host_systemd_with_docker() {
   docker image inspect "$(docker_helper_image)" >/dev/null 2>&1 || return 1
 }
 
-write_unit_to() {
-  local systemd_dir="$1"
-  local exec_root="$2"
-
-  mkdir -p "$systemd_dir"
-  cat > "$systemd_dir/$SERVICE_NAME" <<EOF
+# DefaultDependencies=no drops the implicit Conflicts=shutdown.target, and
+# without it systemd never queues a stop job, so ExecStop would not run before
+# the final SIGTERM sweep. Before= alone only orders; it does not stop the unit.
+unit_content() {
+  local exec_root="$1"
+  cat <<EOF
 [Unit]
 Description=Dune Docker Console clean shutdown protection
 Documentation=https://github.com/Red-Blink/dune-awakening-selfhost-docker
 DefaultDependencies=no
 Wants=docker.service
 After=docker.service
+Conflicts=shutdown.target
 Before=shutdown.target reboot.target halt.target kexec.target
 
 [Service]
@@ -100,7 +102,8 @@ EOF
 }
 
 install_unit() {
-  write_unit_to "/etc/systemd/system" "$HOST_ROOT_DIR"
+  mkdir -p /etc/systemd/system
+  unit_content "$HOST_ROOT_DIR" > "$SERVICE_FILE"
 }
 
 install_unit_via_docker_host() {
@@ -109,33 +112,14 @@ install_unit_via_docker_host() {
 
   can_manage_host_systemd_with_docker || return 1
   docker run --rm --user 0:0 --privileged --pid=host --network=host \
-    -e DUNE_HOST_REPO_ROOT="$HOST_ROOT_DIR" \
+    -e DUNE_SHUTDOWN_UNIT_CONTENT="$(unit_content "$HOST_ROOT_DIR")" \
     -v /:/host \
     --entrypoint bash \
     "$image" -lc '
       set -euo pipefail
       systemd_dir=/host/etc/systemd/system
       mkdir -p "$systemd_dir"
-      cat > "$systemd_dir/dune-awakening-shutdown-protection.service" <<EOF
-[Unit]
-Description=Dune Docker Console clean shutdown protection
-Documentation=https://github.com/Red-Blink/dune-awakening-selfhost-docker
-DefaultDependencies=no
-Wants=docker.service
-After=docker.service
-Before=shutdown.target reboot.target halt.target kexec.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=${DUNE_HOST_REPO_ROOT}
-ExecStart=/bin/true
-ExecStop=${DUNE_HOST_REPO_ROOT}/runtime/scripts/shutdown-protection.sh run-stop
-TimeoutStopSec=240
-
-[Install]
-WantedBy=multi-user.target
-EOF
+      printf "%s\n" "$DUNE_SHUTDOWN_UNIT_CONTENT" > "$systemd_dir/dune-awakening-shutdown-protection.service"
       chroot /host /bin/systemctl daemon-reload
       chroot /host /bin/systemctl enable --now dune-awakening-shutdown-protection.service
     '
@@ -230,6 +214,30 @@ enable_protection() {
 
   echo "Shutdown protection enabled."
   echo "Service: $SERVICE_NAME"
+}
+
+# Rewrites the unit on hosts that already have protection on, so a unit fix
+# reaches them on update. Never touches the state file: a failure here must
+# not silently turn protection off.
+refresh_protection() {
+  read_state
+  if [ "${DUNE_SHUTDOWN_PROTECTION_ENABLED:-0}" != "1" ]; then
+    return 0
+  fi
+
+  if command -v systemctl >/dev/null 2>&1 && can_manage_systemd_units; then
+    install_unit
+    systemctl daemon-reload
+    systemctl enable "$SERVICE_NAME"
+    echo "Shutdown protection service refreshed."
+  elif install_unit_via_docker_host; then
+    echo "Shutdown protection service refreshed."
+  else
+    echo "Shutdown protection service could not be refreshed from this environment."
+    echo "Run this command with sudo/root on the Linux host:"
+    echo "  runtime/scripts/shutdown-protection.sh refresh"
+    return 1
+  fi
 }
 
 disable_protection() {
@@ -356,6 +364,9 @@ case "$cmd" in
     ;;
   remove|uninstall)
     remove_protection
+    ;;
+  refresh)
+    refresh_protection
     ;;
   status)
     show_status

@@ -14,6 +14,8 @@ test("validates known service names and aliases", () => {
   assert.equal(validateServiceName("sgw"), "gateway");
   assert.equal(validateServiceName("coriolis"), "coriolis");
   assert.equal(dockerContainerForLogService("coriolis"), "dune-coriolis-coordinator");
+  assert.equal(dockerContainerForLogService("console"), "redblink-dune-docker-console");
+  assert.throws(() => validateServiceName("console"), "Console log access must not grant generic service control");
   assert.equal(validateServiceName("dune-server-survival-1-43"), "dune-server-survival-1-43");
   assert.throws(() => validateServiceName("gateway; rm -rf /"));
 });
