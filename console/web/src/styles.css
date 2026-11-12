@@ -6877,10 +6877,25 @@ td .inline-action-result-wrap { flex: 1 0 100%; justify-content: flex-start; min
 .backup-number-unit input { min-width: 90px; flex: 1; }
 .backup-number-unit > span { flex: none; }
 .backup-auto-controls .inline-task-result { margin-left: 4px; }
+.backup-system-schedule { margin: 4px 0 14px; }
+.backup-schedule-block { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid #39332c; }
+.backup-schedule-block .panel-title { gap: 10px; justify-content: flex-start; }
+.backup-schedule-block h5 { margin: 0; }
+/* A div, not a label (it holds two buttons), so it misses the label rule's grid, gap and colour. */
+.backup-keep-field { display: grid; gap: 6px; color: #ceb894; }
+.backup-keep-stepper { display: flex; align-items: center; gap: 6px; }
+.backup-keep-stepper input { width: 72px; min-width: 0; text-align: center; }
+.backup-keep-stepper button { min-width: 36px; padding-inline: 0; }
+.backup-keep-preview { margin: 0; }
+/* .backup-select-checkbox centres its content for the table's select column. */
+.backup-use-saved { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-start; justify-self: start; }
 /* This panel's sections are direct children of .panel, so they get none of the
    .action-sections grid gap -- each needs its own separation, including
    Automatic Backups, which previously had none at all. */
-.backups-panel > .action-section { margin-top: 18px; }
+.backups-panel > .action-section,
+.backups-tab-group > .action-section { margin-top: 18px; }
+.segmented-control.backups-view-tabs { margin-top: 4px; }
+.segmented-control.backups-view-tabs .segmented-control-segment { padding: 0 20px; font-size: 13px; }
 .backup-group-title { margin-top: 0; }
 /* margin intentionally omitted: .action-section p { margin: 0 } (0-1-1) always wins over this (0-1-0), and the parent grid's 10px gap already spaces this from what follows. */
 .backup-group-note { color: #ad9f89; }

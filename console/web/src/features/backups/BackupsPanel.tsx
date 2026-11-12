@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { backupIdentityDiffers, backupsApi, defaultBackupIdentityMode } from "../../api/backups";
+import { backupIdentityDiffers, backupsApi, defaultBackupIdentityMode, formatSavedAt } from "../../api/backups";
 import type { SystemImportConflict } from "../../api/backups";
 import { apiUpload } from "../../api/client";
 import { serverApi } from "../../api/server";
-import type { SystemBackupRow } from "../../api/backups";
+import type { SystemAutoStatus, SystemBackupRow } from "../../api/backups";
 import type { Task } from "../../api/setup";
 import { DataTable } from "../../components/common/DataTable";
 import { KeyValueGrid, StatusPill, TechnicalDetails } from "../../components/common/DisplayPrimitives";
 import { formatUiSentence } from "../../lib/display";
 import { conciseTaskError, funcomTokenMismatchDetected } from "../../lib/taskDisplay";
 import { gameAssetsMissingInText } from "../updates/updateUtils";
+import { SystemBackupScheduleCard } from "./SystemBackupScheduleCard";
+import { SegmentedControl, type SegmentOption } from "../../components/common/SegmentedControl";
 
 type BackupResult = { status: "running" | "succeeded" | "failed"; title: string; message?: string; details?: string; detailsOpen?: boolean; detailsTitle?: string; tone?: "danger" | "attention"; action?: { label: string; onClick: () => void } };
 type ConfirmAction = (message: string, options?: { title?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; details?: { label: string; value: string; tone?: "accent" | "success" | "danger" }[] }) => Promise<boolean>;
@@ -37,6 +39,32 @@ type BackupsPanelProps = {
   isTerminalTask: (status: string) => boolean;
 };
 
+type BackupsView = "funcom" | "system";
+const BACKUPS_VIEW_KEY = "dune-console.backups.view";
+const BACKUPS_VIEW_OPTIONS: SegmentOption<BackupsView>[] = [
+  { value: "funcom", label: "Funcom Backups" },
+  { value: "system", label: "System Backups" }
+];
+
+// A per-browser convenience only, so a blocked or empty storage just means
+// starting on Funcom Backups.
+function readBackupsView(): BackupsView {
+  try {
+    const view: BackupsView = localStorage.getItem(BACKUPS_VIEW_KEY) === "system" ? "system" : "funcom";
+    return view;
+  } catch {
+    return "funcom";
+  }
+}
+
+function storeBackupsView(view: BackupsView) {
+  try {
+    localStorage.setItem(BACKUPS_VIEW_KEY, view);
+  } catch {
+    // Not remembered; nothing else depends on it.
+  }
+}
+
 function formatResultTitle(value: unknown, pending = false) {
   return formatUiSentence(value, pending);
 }
@@ -46,6 +74,11 @@ function formatResultMessage(value: unknown) {
 }
 
 export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError, confirmAction, chooseBackupIdentity, chooseAuditLogAction, onInstallGameFiles, chooseImportConflict, waitForTask, waitForTaskWithUpdates, withTimeout, toHourMinuteTime, sanitizeTimeInput, isValidHourMinuteTime, commandStatusSummary, taskTechnicalDetails, isTerminalTask }: BackupsPanelProps) {
+  const [backupsView, setBackupsView] = useState<BackupsView>(readBackupsView);
+  function chooseBackupsView(view: BackupsView) {
+    setBackupsView(view);
+    storeBackupsView(view);
+  }
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [selectedBackups, setSelectedBackups] = useState<Set<string>>(new Set());
   const [currentBattlegroupId, setCurrentBattlegroupId] = useState("Unknown");
@@ -69,17 +102,19 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
   const systemResultRef = useRef<HTMLElement | null>(null);
   const [systemPassphrase, setSystemPassphrase] = useState("");
   const [systemPassphraseConfirm, setSystemPassphraseConfirm] = useState("");
+  const [systemSchedule, setSystemSchedule] = useState<SystemAutoStatus>({});
+  const [useSavedPassphrase, setUseSavedPassphrase] = useState(true);
   const [selectedSystemBackups, setSelectedSystemBackups] = useState<Set<string>>(new Set());
   // The restore passphrase has to survive from preview to apply, so it stays in
   // state between the two calls -- cleared as soon as either finishes, and
   // invalidated the moment it is edited so an apply can never run under a
   // passphrase the preview did not prove.
-  // Import and restore share one panel slot: both act on a single archive and
-  // are mutually exclusive in practice, so opening either closes the other
-  // rather than leaving two forms competing above the table.
+  // Create and restore share one panel slot above the table, so opening either
+  // closes the other. Import has its own section, like the Funcom import.
   const [createOpen, setCreateOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [systemImportResult, setSystemImportResult] = useState<BackupResult | null>(null);
+  const systemImportInputRef = useRef<HTMLInputElement | null>(null);
   const [importProgress, setImportProgress] = useState(-1);
   const [restoreTarget, setRestoreTarget] = useState<SystemBackupRow | null>(null);
   const [restorePassphrase, setRestorePassphrase] = useState("");
@@ -139,6 +174,23 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
   }
 
   async function createSystemBackup() {
+    if (useSavedPassphrase && systemSchedule.passphraseSaved) {
+      setBusyAction("createSystem");
+      setSystemResult({ status: "running", title: "Creating System Backup" });
+      try {
+        const final = await waitForTask((await backupsApi.createSystemWithSavedPassphrase()).task);
+        setSystemResult(summarizeBackupTask(final, "System Backup Created", "System Backup Failed"));
+        if (final.status === "succeeded") {
+          setCreateOpen(false);
+          await refreshSystemBackups();
+        }
+      } catch (error) {
+        setSystemResult({ status: "failed", title: "System Backup Failed", message: error instanceof Error ? error.message : String(error) });
+      } finally {
+        setBusyAction("");
+      }
+      return;
+    }
     // Double entry mirrors the CLI prompt: a mistyped passphrase produces an
     // archive nobody can ever decrypt, and the archive is the only copy.
     if (systemPassphrase.length < 12) {
@@ -187,7 +239,6 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
     setCreateOpen(true);
     setSystemPassphrase("");
     setSystemPassphraseConfirm("");
-    setImportOpen(false);
     setRestoreTarget(null);
     setSystemResult(null);
   }
@@ -198,19 +249,9 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
     setSystemPassphraseConfirm("");
   }
 
-  function openSystemImport() {
-    setImportOpen(true);
-    setCreateOpen(false);
+  function clearSystemImportFile() {
     setImportFile(null);
-    setImportProgress(-1);
-    setRestoreTarget(null);
-    setSystemResult(null);
-  }
-
-  function closeSystemImport() {
-    setImportOpen(false);
-    setImportFile(null);
-    setImportProgress(-1);
+    if (systemImportInputRef.current) systemImportInputRef.current.value = "";
   }
 
   // Upload goes through the shared client so it carries the CSRF header and
@@ -224,7 +265,7 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
     if (!importFile) return;
     setBusyAction("importSystem");
     setImportProgress(0);
-    setSystemResult({ status: "running", title: "Uploading System Backup" });
+    setSystemImportResult({ status: "running", title: "Uploading System Backup" });
     try {
       let result = await uploadSystemBackup(importFile);
       // 409 is the server refusing to guess. Ask, then send the answer back --
@@ -233,14 +274,14 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
         const existing = String(result.body.conflict || importFile.name);
         const choice = await chooseImportConflict(existing);
         if (choice === "cancel") {
-          setSystemResult(null);
+          setSystemImportResult(null);
           return;
         }
         setImportProgress(0);
         result = await uploadSystemBackup(importFile, choice);
       }
       if (result.status !== 200) {
-        setSystemResult({ status: "failed", title: "Import Failed", message: String(result.body.error || `Upload failed (${result.status}).`) });
+        setSystemImportResult({ status: "failed", title: "Import Failed", message: String(result.body.error || `Upload failed (${result.status}).`) });
         return;
       }
       const stored = String(result.body.backup || "");
@@ -251,12 +292,12 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
         noSidecar ? "No .yaml sidecar was included, so Created, Server Title and Battlegroup ID read Unknown." : "",
         "Nothing has been applied. Restore it when you are ready."
       ].filter(Boolean);
-      setSystemResult({ status: "succeeded", title: "System Backup Imported", message: notes.join(" ") });
-      closeSystemImport();
+      setSystemImportResult({ status: "succeeded", title: "System Backup Imported", message: notes.join(" ") });
+      clearSystemImportFile();
       await refreshSystemBackups();
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      setSystemResult({ status: "failed", title: "Import Failed", message: reason });
+      setSystemImportResult({ status: "failed", title: "Import Failed", message: reason });
     } finally {
       setImportProgress(-1);
       setBusyAction("");
@@ -264,7 +305,6 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
   }
 
   function openSystemRestore(row: SystemBackupRow) {
-    setImportOpen(false);
     setCreateOpen(false);
     setRestoreTarget(row);
     setRestorePassphrase("");
@@ -607,7 +647,17 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
   return (
     <section className="panel backups-panel">
       <div className="panel-title"><h2>Backups</h2></div>
+      <SegmentedControl
+        name="backups-view"
+        ariaLabel="Backup type"
+        value={backupsView}
+        options={BACKUPS_VIEW_OPTIONS}
+        onChange={chooseBackupsView}
+        groupClassName="segmented-control backups-view-tabs"
+      />
       {backupRestoreTask ? <BackupResultCard result={backupRestoreTaskResult(backupRestoreTask)} /> : backupResult && <BackupResultCard result={backupResult} />}
+      {/* Hidden, not unmounted, so half-typed edits on the other tab survive a switch. */}
+      <div className="backups-tab-group" hidden={backupsView !== "funcom"}>
       <section className="action-section backup-funcom-backups">
         <div className="panel-title backup-group-title"><h4>Funcom Backups</h4></div>
         <p className="backup-group-note">A snapshot of the game database only &mdash; characters, bases, vehicles, inventories and world state. These contain no console configuration and no credentials, so restoring one onto a fresh host still leaves every setting to re-enter by hand. Use a System Backup below to move a server to new hardware.</p>
@@ -685,14 +735,17 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
           </span>}
         </div>
       </section>
+      </div>
+      <div className="backups-tab-group" hidden={backupsView !== "system"}>
       <section className="action-section backup-system-backups">
         <div className="panel-title"><h4>System Backups (Encrypted)</h4></div>
         <p className="backup-group-note backup-note-warning">A system backup bundles the database together with <code>.env</code>, <code>runtime/generated</code> and every file in <code>runtime/secrets</code> &mdash; the Funcom token, admin console password, RMQ credentials, sietch join password and IAM policies. It is encrypted with the passphrase you set here, and <strong>there is no way to recover it without that passphrase</strong>. Store the passphrase somewhere durable and separate from the archive.</p>
-        <div className="action-line backup-import-controls">
-          <div className="backup-import-actions">
-            <button disabled={Boolean(busyAction)} onClick={openSystemCreate}>Create System Backup</button>
-            <button disabled={Boolean(busyAction)} onClick={openSystemImport}>Import Backup</button>
-            <button className="danger" disabled={Boolean(busyAction) || !selectedSystemBackups.size} onClick={() => run(async () => {
+        {/* Same action row as Funcom Backups above; import and the schedule are
+            their own sections below, mirroring that group. */}
+        <div className="action-row backup-group-actions">
+          <button disabled={Boolean(busyAction)} onClick={() => run(refreshSystemBackups)}>Refresh Backups</button>
+          <button disabled={Boolean(busyAction)} onClick={openSystemCreate}>Create System Backup</button>
+          <button className="danger" disabled={Boolean(busyAction) || !selectedSystemBackups.size} onClick={() => run(async () => {
             const names = [...selectedSystemBackups];
             if (!(await confirmAction(`Delete ${names.length} selected system backup${names.length === 1 ? "" : "s"}? Each one is the only copy of the credentials it contains, and this cannot be undone.`, { title: "Delete System Backups", confirmLabel: "Delete", danger: true }))) return;
             await runSystemBackupTask("deleteSystemSelected", () => backupsApi.deleteSystemSelected(names), "Deleting System Backups...", "System Backups Deleted", "System Backup Delete Failed");
@@ -700,36 +753,26 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
           <button className="danger" disabled={Boolean(busyAction) || !systemRows.length} onClick={() => run(async () => {
             if (!(await confirmAction("Delete every system backup? These archives are the only copy of the credentials they contain, and this cannot be undone.", { title: "Delete All System Backups", confirmLabel: "Delete All", danger: true }))) return;
             await runSystemBackupTask("deleteSystemAll", backupsApi.deleteSystemAll, "Deleting System Backups...", "System Backups Deleted", "System Backup Delete Failed");
-          })}>Delete All</button>
-          </div>
+          })}>Delete All Backups</button>
         </div>
         {createOpen && <div className="action-section backup-system-restore">
           <div className="panel-title"><h4>Create System Backup</h4></div>
-          <p className="backup-group-note backup-note-warning">
-            Set a passphrase for the new archive. It is entered twice because a typo produces an archive <strong>nobody can ever decrypt</strong>, and this is the only copy of what is inside it.
-          </p>
-          <label className="wide-field">Passphrase<input type="password" autoComplete="new-password" value={systemPassphrase} onChange={(event) => setSystemPassphrase(event.target.value)} /></label>
-          <label className="wide-field">Confirm Passphrase<input type="password" autoComplete="new-password" value={systemPassphraseConfirm} onChange={(event) => setSystemPassphraseConfirm(event.target.value)} /></label>
+          {systemSchedule.passphraseSaved && <label className="backup-select-checkbox backup-use-saved">
+            <input type="checkbox" checked={useSavedPassphrase} disabled={Boolean(busyAction)} onChange={(event) => setUseSavedPassphrase(event.target.checked)} />
+            <span>Use Saved Passphrase</span>
+          </label>}
+          {systemSchedule.passphraseSaved && useSavedPassphrase ? <p className="backup-group-note">
+            The archive is encrypted with the passphrase saved under Automatic System Backups. You need that passphrase to restore it.
+          </p> : <>
+            <p className="backup-group-note backup-note-warning">
+              Set a passphrase for the new archive. It is entered twice because a typo produces an archive <strong>nobody can ever decrypt</strong>, and this is the only copy of what is inside it.
+            </p>
+            <label className="wide-field">Passphrase<input type="password" autoComplete="new-password" value={systemPassphrase} onChange={(event) => setSystemPassphrase(event.target.value)} /></label>
+            <label className="wide-field">Confirm Passphrase<input type="password" autoComplete="new-password" value={systemPassphraseConfirm} onChange={(event) => setSystemPassphraseConfirm(event.target.value)} /></label>
+          </>}
           <div className="action-row backup-group-actions">
             <button disabled={Boolean(busyAction)} onClick={closeSystemCreate}>Cancel</button>
-            <button aria-label="Create the system backup" disabled={Boolean(busyAction) || !systemPassphrase || !systemPassphraseConfirm} onClick={() => run(createSystemBackup)}>Create</button>
-          </div>
-        </div>}
-        {importOpen && <div className="action-section backup-system-restore">
-          <div className="panel-title"><h4>Import System Backup</h4></div>
-          <p className="backup-group-note backup-note-warning">
-            Upload the <code>.tar</code> a download produced, or a bare <code>.tar.gz.enc</code>. It is <strong>stored, not applied</strong> — restore it afterwards, with its passphrase.
-          </p>
-          <label className="wide-field">Backup file
-            <input type="file" accept=".tar,.enc,application/x-tar,application/octet-stream" disabled={Boolean(busyAction)} onChange={(event) => setImportFile(event.target.files?.[0] || null)} />
-          </label>
-          {importProgress >= 0 && <div className="backup-import-progress" role="status" aria-label={`Upload ${importProgress}% complete`}>
-            <div className="backup-import-progress-bar" style={{ width: `${importProgress}%` }} />
-            <span>{importProgress}%</span>
-          </div>}
-          <div className="action-row backup-group-actions">
-            <button disabled={Boolean(busyAction)} onClick={closeSystemImport}>Cancel</button>
-            <button aria-label="Import system backup" disabled={Boolean(busyAction) || !importFile} onClick={() => run(importSystemBackup)}>Import</button>
+            <button aria-label="Create the system backup" disabled={Boolean(busyAction) || (!(systemSchedule.passphraseSaved && useSavedPassphrase) && (!systemPassphrase || !systemPassphraseConfirm))} onClick={() => run(createSystemBackup)}>Create</button>
           </div>
         </div>}
         {restoreTarget && <div className="action-section backup-system-restore">
@@ -737,6 +780,8 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
           <p className="backup-group-note backup-note-warning">
             Restoring <code>{restoreTarget.name}</code> replaces this server's <code>.env</code>, <code>runtime/generated</code>, <code>runtime/secrets</code> and <strong>the entire database</strong>. What is replaced is copied to <code>runtime/backups/</code> first. <strong>Nothing changes until you apply.</strong>
           </p>
+          {restoreTarget.passphraseSource === "saved" && <p className="backup-group-note">This archive was encrypted with the saved scheduled-backup passphrase.</p>}
+          {restoreTarget.passphraseSource === "saved" && restoreTarget.passphraseSavedAt && <p className="muted">Saved <span data-no-translate>{formatSavedAt(restoreTarget.passphraseSavedAt)}</span></p>}
           <label className="wide-field">Passphrase<input type="password" autoComplete="off" aria-label="Restore passphrase" value={restorePassphrase} onChange={(event) => { setRestorePassphrase(event.target.value); setRestorePreviewed(false); }} /></label>
           <div className="action-row backup-group-actions">
             <button disabled={Boolean(busyAction)} onClick={closeSystemRestore}>Cancel</button>
@@ -778,6 +823,32 @@ export function BackupsPanel({ backupRestoreTask, setBackupRestoreTask, onError,
           actionClassName="backup-table-actions"
         />}
       </section>
+      <section className="action-section backup-system-import">
+        <div className="panel-title"><h4>Import System Backup</h4></div>
+        <p className="backup-group-note">Upload the <code>.tar</code> a download produced, or a bare <code>.tar.gz.enc</code>. It is <strong>stored, not applied</strong> — restore it afterwards, with its passphrase.</p>
+        <div className="action-line backup-import-controls">
+          <label className="wide-field">System Backup File (.tar or .tar.gz.enc)<input ref={systemImportInputRef} type="file" accept=".tar,.enc,application/x-tar,application/octet-stream" disabled={Boolean(busyAction)} onChange={(event) => setImportFile(event.target.files?.[0] || null)} /></label>
+          <div className="backup-import-actions">
+            <button aria-label="Import system backup" disabled={Boolean(busyAction) || !importFile} onClick={() => run(importSystemBackup)}>Import</button>
+          </div>
+        </div>
+        {importProgress >= 0 && <div className="backup-import-progress" role="status" aria-label={`Upload ${importProgress}% complete`}>
+          <div className="backup-import-progress-bar" style={{ width: `${importProgress}%` }} />
+          <span>{importProgress}%</span>
+        </div>}
+        {systemImportResult && <BackupResultCard result={systemImportResult} />}
+      </section>
+      <SystemBackupScheduleCard
+        disabled={Boolean(busyAction) && busyAction !== "systemSchedule"}
+        setBusy={(busy) => setBusyAction(busy ? "systemSchedule" : "")}
+        waitForTask={waitForTask}
+        toHourMinuteTime={toHourMinuteTime}
+        sanitizeTimeInput={sanitizeTimeInput}
+        isValidHourMinuteTime={isValidHourMinuteTime}
+        refreshToken={systemRows}
+        onStatus={setSystemSchedule}
+      />
+      </div>
     </section>
   );
 }

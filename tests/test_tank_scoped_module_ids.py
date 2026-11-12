@@ -17,6 +17,33 @@ SPEC.loader.exec_module(scoped)
 
 @unittest.skipUnless(platform.machine() == 'x86_64' and shutil.which('gcc'), 'requires x86-64 assembler')
 class ScopedModuleTests(unittest.TestCase):
+    def test_rebased_handlers_match_the_pinned_new_build(self):
+        for build in ('2177228', '2180427', '2181988'):
+            with self.subTest(build=build):
+                self.check_rebased_handlers(build)
+
+    def check_rebased_handlers(self, build):
+        directory = ROOT / 'patches/experimental-tanks' / build
+        spec = importlib.util.spec_from_file_location(f'scoped_{build}_test', directory / 'source/scoped_module_ids.py')
+        rebased = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(rebased)
+        manifest = json.loads((directory / 'manifest.json').read_text())
+        with tempfile.TemporaryDirectory() as temporary:
+            symbols, payloads = rebased.compile_payload(Path(temporary))
+        patches = {offset: (bytes.fromhex(before), bytes.fromhex(after))
+                   for offset, before, after in manifest['sites']}
+        address, payload = payloads[0]
+        self.assertEqual(patches[address], (b'\xcc' * len(payload), payload))
+        self.assertLessEqual(len(payload), 231)
+        self.assertEqual(rebased.CLEAN_SHA, manifest['cleanSha256'])
+        for i, (offset, before, _, _) in enumerate(rebased.SITES):
+            original, detour = patches[offset]
+            self.assertEqual(original.hex(), before)
+            self.assertEqual(offset + 5 + struct.unpack('<i', detour[1:5])[0], symbols[f'site_{i}'])
+        for offset, before, after in rebased.BASE_SITES:
+            self.assertEqual(patches[offset], (bytes.fromhex(before), bytes.fromhex(after)))
+        self.assertEqual(len(patches), 7)
+
     def test_compiled_handlers_fit_reviewed_padding(self):
         with tempfile.TemporaryDirectory() as directory:
             symbols, payloads = scoped.compile_payload(Path(directory))
@@ -197,6 +224,16 @@ class Build2173753ScopedModuleTests(UpdatedBuildScopedModuleTests):
         self.previous = scoped
         spec = importlib.util.spec_from_file_location('scoped_2173753',
             ROOT / 'patches/experimental-tanks/2173753/source/scoped_module_ids.py')
+        scoped = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(scoped)
+
+
+class Build2181988ScopedModuleTests(UpdatedBuildScopedModuleTests):
+    def setUp(self):
+        global scoped
+        self.previous = scoped
+        spec = importlib.util.spec_from_file_location('scoped_2181988',
+            ROOT / 'patches/experimental-tanks/2181988/source/scoped_module_ids.py')
         scoped = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(scoped)
 

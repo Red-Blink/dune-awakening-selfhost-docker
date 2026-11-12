@@ -10,6 +10,7 @@ import { actionForRoute } from "../src/actions.js";
 import { buildDuneArgs } from "../src/runner.js";
 import { isReadAction } from "../src/apiKeyScopes.js";
 import { withSecurityHeaders } from "../src/auth.js";
+import { systemBackupPassphraseProblem } from "../src/services/systemBackupSchedule.js";
 
 const ARCHIVE = "dune-system-20260830-120000-4711-9931.tar.gz.enc";
 const TRAVERSAL_NAME = ["..", "..", "etc", "passwd"].join("/");
@@ -192,11 +193,72 @@ test("the delete gate rejects sidecar names the download gate accepts", () => {
 // The archive is downloadable, so a degenerate passphrase is trivially
 // crackable offline regardless of the KDF. This is a floor, not a policy.
 test("the passphrase floor rejects degenerate input but allows real passphrases", () => {
-  const distinct = (value) => new Set(value).size;
-  assert.ok(distinct("aaaaaaaaaaaa") < 5, "twelve of one character must fail the floor");
-  assert.ok(distinct("abababababab") < 5, "a two-character cycle must fail the floor");
-  assert.ok(distinct("correct horse battery staple") >= 5);
-  assert.ok(distinct("Tr0ub4dor&3xyz") >= 5);
+  assert.match(systemBackupPassphraseProblem("aaaaaaaaaaaa"), /5 different characters/);
+  assert.match(systemBackupPassphraseProblem("abababababab"), /5 different characters/);
+  assert.match(systemBackupPassphraseProblem("short1234"), /at least 12/);
+  assert.match(systemBackupPassphraseProblem("x".repeat(1025)), /too long/);
+  // gpg's --passphrase-fd stops at a line break, so the rest would be ignored.
+  assert.match(systemBackupPassphraseProblem("correct horse\nbattery staple"), /line breaks/);
+  assert.match(systemBackupPassphraseProblem(undefined), /at least 12/);
+  assert.equal(systemBackupPassphraseProblem("correct horse battery staple"), "");
+  assert.equal(systemBackupPassphraseProblem("Tr0ub4dor&3xyz"), "");
+});
+
+test("the schedule and passphrase routes carry the intended actions", () => {
+  assert.equal(actionForRoute("/api/backups/system/auto", "GET"), "backups:read");
+  assert.equal(actionForRoute("/api/backups/system/auto", "POST"), "backups:write-config");
+  for (const method of ["PUT", "DELETE"]) {
+    const action = actionForRoute("/api/backups/system/passphrase", method);
+    assert.equal(action, "backups:set-system-passphrase");
+    assert.equal(isReadAction(action), false);
+  }
+  // The archive-delete regex must not swallow the passphrase route.
+  assert.notEqual(actionForRoute("/api/backups/system/passphrase", "DELETE"), "backups:delete-system");
+});
+
+test("scheduled system backup operations build the right dune arguments", () => {
+  assert.deepEqual(
+    buildDuneArgs("backupSystemAutoEnable", { time: "03:15", intervalHours: 12, keep: 9 }),
+    ["db", "auto-system", "enable", "03:15", "12", "9"]
+  );
+  // Defaults are explicit too: omitted CLI arguments would keep the saved policy.
+  assert.deepEqual(buildDuneArgs("backupSystemAutoEnable", {}), ["db", "auto-system", "enable", "04:30", "24", "7"]);
+  // A bare disable keeps the saved policy; one with fields saves them while off.
+  assert.deepEqual(buildDuneArgs("backupSystemAutoDisable", {}), ["db", "auto-system", "disable"]);
+  assert.deepEqual(
+    buildDuneArgs("backupSystemAutoDisable", { time: "02:00", intervalHours: 48, keep: 3 }),
+    ["db", "auto-system", "disable", "02:00", "48", "3"]
+  );
+  assert.throws(() => buildDuneArgs("backupSystemAutoDisable", { time: "02:00", intervalHours: 24, keep: 0 }));
+  assert.deepEqual(buildDuneArgs("backupSystemAutoStatus", {}), ["db", "auto-system", "status"]);
+  for (const bad of [{ keep: 0 }, { keep: 366 }, { intervalHours: 0 }, { intervalHours: 169 }, { time: "25:00" }]) {
+    assert.throws(() => buildDuneArgs("backupSystemAutoEnable", bad), undefined, JSON.stringify(bad));
+  }
+});
+
+test("listSystemBackups reports which passphrase opens each archive", () => {
+  const { directory, config } = makeHost();
+  writeFileSync(join(directory, ARCHIVE), "x");
+  writeFileSync(join(directory, `${ARCHIVE}.yaml`), "backup_origin: automatic\npassphrase_source: saved\npassphrase_saved_at: 2026-11-09T10:00:00.000Z\n");
+  const older = "dune-system-20260801-120000-1-2.tar.gz.enc";
+  writeFileSync(join(directory, older), "x");
+  writeFileSync(join(directory, `${older}.yaml`), "backup_origin: manual\n");
+
+  const [scheduled, legacy] = listSystemBackups(config);
+  assert.equal(scheduled.type, "Automatic Backup");
+  assert.equal(scheduled.passphraseSource, "saved");
+  assert.equal(scheduled.passphraseSavedAt, "2026-11-09T10:00:00.000Z");
+  assert.equal(legacy.passphraseSource, "");
+  assert.equal(legacy.passphraseSavedAt, "");
+});
+
+// db.sh backup_is_automatic falls back to an `origin:` key; the listing must
+// agree, or the keep preview and the prune would count different archives.
+test("listSystemBackups reads a legacy origin key the way the prune does", () => {
+  const { directory, config } = makeHost();
+  writeFileSync(join(directory, ARCHIVE), "x");
+  writeFileSync(join(directory, `${ARCHIVE}.yaml`), "origin: automatic\n");
+  assert.equal(listSystemBackups(config)[0].type, "Automatic Backup");
 });
 
 test("system backup downloads carry the standard security headers", () => {

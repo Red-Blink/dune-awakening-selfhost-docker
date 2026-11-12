@@ -1,9 +1,11 @@
 import { spawn } from "node:child_process";
+import { performance } from "node:perf_hooks";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { buildDuneArgs, runDune } from "../runner.js";
 import { parseMemoryStatusRows } from "../statusParsers.js";
 import { redact } from "../redact.js";
+import { writeDiagnostic } from "./diagnosticLog.js";
 
 const MEMORY_BALANCER_INTERVAL_MS = 10000;
 const MEMORY_BALANCER_HIGH_WATERMARK = 90;
@@ -138,9 +140,11 @@ function unsupportedSwapStats() {
   return { supported: false, cgroupVersion: 0, usedBytes: 0, limitBytes: 0 };
 }
 
-export function createMemoryBalancer(config) {
+export function createMemoryBalancer(config, options = {}) {
   const persisted = readMemoryBalancerSettings(config);
-  const liveMemorySampler = createDockerStatsSampler(config);
+  const liveMemorySampler = options.sampler || createDockerStatsSampler(config);
+  const applyMemoryLimit = options.applyMemoryLimit || ((container, limitBytes) => dockerUpdateMemoryLimit(config, container, limitBytes));
+  const write = options.writeDiagnostic || writeDiagnostic;
   const state = {
     enabled: persisted.enabled,
     running: false,
@@ -150,6 +154,27 @@ export function createMemoryBalancer(config) {
     lastError: "",
     updatedAt: null
   };
+
+  async function changeMemoryLimit(container, limitBytes, reason, previousLimitBytes = null) {
+    const started = performance.now();
+    const record = (outcome) => {
+      try {
+        write({ at: new Date().toISOString(), event: "memory.limit", container,
+          previousLimitBytes, limitBytes, reason, outcome,
+          durationMs: Math.round((performance.now() - started) * 100) / 100 });
+      } catch {
+        // A diagnostic sink failure must never prevent a memory operation.
+      }
+    };
+    record("requested");
+    try {
+      await applyMemoryLimit(container, limitBytes);
+      record("applied");
+    } catch (error) {
+      record("failed");
+      throw error;
+    }
+  }
 
   async function readLiveSnapshot(options = {}) {
     return liveMemorySampler.read(options);
@@ -176,7 +201,7 @@ export function createMemoryBalancer(config) {
     }
     for (const [container, limitBytes] of restoreTargets.entries()) {
       if (limitBytes > 0) {
-        await dockerUpdateMemoryLimit(config, container, limitBytes).catch((error) => {
+        await changeMemoryLimit(container, limitBytes, "restore-configured").catch((error) => {
           state.lastError = redact(error?.message || "Unexpected error.");
         });
       }
@@ -213,8 +238,8 @@ export function createMemoryBalancer(config) {
 
       const donorLimit = donor.limitBytes - MEMORY_BALANCER_CHUNK_BYTES;
       const targetLimit = target.limitBytes + MEMORY_BALANCER_CHUNK_BYTES;
-      await dockerUpdateMemoryLimit(config, target.container, targetLimit);
-      await dockerUpdateMemoryLimit(config, donor.container, donorLimit);
+      await changeMemoryLimit(target.container, targetLimit, "rebalance-receiver", target.limitBytes);
+      await changeMemoryLimit(donor.container, donorLimit, "rebalance-donor", donor.limitBytes);
       state.lastMessage = `Moved 1 GB from ${donor.map} to ${target.map}`;
       state.lastAction = `${donor.container} -> ${target.container}`;
       state.lastError = "";

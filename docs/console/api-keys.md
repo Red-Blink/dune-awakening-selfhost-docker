@@ -148,9 +148,13 @@ runs a grant cycle. The verb-shaped name is not the test; what the route does is
 
 ### Actions no level ever grants
 
-`backups:download-system`, `backups:import-system`, `backups:restore-system`,
 `bases:import-backup`, `bases:edit-backup`, `bases:export-backup`, `bases:delete-backup` and `vehicles:stored-delete` are reachable **only** by naming them in a
-key's explicit action list. A key stored as `{"backups": "write"}`, `{"bases": "write"}` or `{"vehicles": "write"}` does not get them.
+key's explicit action list. A key stored as `{"bases": "write"}` or `{"vehicles": "write"}` does not get them.
+
+`backups:download-system`, `backups:import-system`, `backups:restore-system` and
+`backups:set-system-passphrase` are stricter in this fork: they are crown-jewel actions (owner-only), so
+**no** key can hold them, not even by naming them. Upstream lets an explicit list name them; this fork
+refuses, because the archive carries every credential the console has.
 
 Levels otherwise auto-cover actions added later, so a key keeps working as routes are
 added. That is right for a namespace whose blast radius is stable, and wrong for this
@@ -164,6 +168,10 @@ nothing for the operator to review.
 `create-system` and `delete-system` are not excluded: neither reads an archive back nor
 writes one into the host.
 
+`set-system-passphrase` is excluded although it is never read back: it chooses the key
+every future scheduled archive is encrypted with, so a key holding it could replace that
+key with one its owner knows and then wait for the next run.
+
 `bases:import-backup`, `bases:edit-backup`, `bases:export-backup` and `bases:delete-backup` are excluded on the
 same grounds. Import creates a whole base, with every item stored in it, from an uploaded
 file. Edit can hand an existing picked-up base to another player or move it to another map.
@@ -176,7 +184,7 @@ Recovery -- one a player can still get back. A `vehicles: write` key was minted 
 was possible. The route also requires `vehicles:delete`, so a key needs both: `vehicles:delete`
 (from the write level or named) and `vehicles:stored-delete` named explicitly.
 
-The `admin` tier is denied the three `backups` actions above for the same reason — see
+The `admin` tier is denied the four `backups` actions above for the same reason — see
 `policy.js`. It keeps the four `bases` actions through `bases:*`.
 
 `backups:create-system` and `backups:download-system` are write-classified and
@@ -207,8 +215,15 @@ database backups:
   only copy of the credentials inside it, so destroying one should be grantable
   independently of pruning database backups.
 
+- **`backups:set-system-passphrase`** — `PUT` and `DELETE /api/backups/system/passphrase`.
+  Saves, replaces or removes the passphrase scheduled system backups encrypt with. No
+  route returns it. Owner only: the `admin` tier is denied it alongside the three above.
+
 Listing system backups (`GET /api/backups/system`) is a genuine read and stays on
-`backups:read` — the listing exposes only the non-secret sidecar fields.
+`backups:read` — the listing exposes only the non-secret sidecar fields. So does the
+scheduled-backup status (`GET /api/backups/system/auto`), which says whether a passphrase
+is saved but never returns it; changing the schedule (`POST /api/backups/system/auto`) is
+`backups:write-config`, like the database backup timer.
 
 ### What a key can never reach
 

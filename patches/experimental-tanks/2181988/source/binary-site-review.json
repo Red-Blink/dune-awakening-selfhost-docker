@@ -1,0 +1,37 @@
+{
+  "oldBuild": "2168446-0-shipping",
+  "previousSupportedBuild": "2180427-0-shipping",
+  "newBuild": "2181988-0-shipping",
+  "steamBuild": "26591491",
+  "cleanSha256": "5dac1f8e3ab3972e471a981d39318cbbfdd5192078b6096635827d4bedd6189a",
+  "moduleIdSites": [
+    "0xf2e32c0",
+    "0xf6de02e",
+    "0xf6e3984"
+  ],
+  "initializationBranches": [
+    {
+      "address": "0xf2f53f0",
+      "target": "0xf2f5508",
+      "vehicleField": "0xed0"
+    },
+    {
+      "address": "0xf6dd9f1",
+      "target": "0xf6ddb94"
+    }
+  ],
+  "overlayLoaderRegistration": "0xd6f0eba",
+  "overlayLoaderCallback": "0xd6ea180",
+  "fnameDecoder": "0xf9c0ce4",
+  "fnameDecoderBytes": "4489f0c1e810488d0dcf420b07488b44c168410fb7ce0fb73c48",
+  "fnamePool": "0x16a74fc0",
+  "fnamePoolReady": "0x16a74f91",
+  "executablePadding": {
+    "address": "0x14228819",
+    "size": 231,
+    "precededByReturn": true
+  },
+  "instructionGeneratorUnchanged": true,
+  "review": "Independent unique byte-window matches against checksum-verified stock 2168446 and new native disassembly locate every module-ID site, both initialization branches and loader registration. Registers, branch destinations, callback and the 0xed0 vehicle field retain their contracts. Primary native FName decoder at 0xf9c0ce4 confirms pool/ready globals, block offset 0x68, two-byte indexing and string header layout. SEED_ofb128_encrypt ends with ret before all 231 executable padding bytes. All patch locations retain their 2180427 addresses and guarded bytes, despite a changed executable checksum. Detours are regenerated with the unchanged Tank-only generator; ordinary vehicle IDs remain native.",
+  "vendorStartupSha256": "a15e40134601470ca0ad8be424fadaa46deb4e6c7a3e9e7fdea671f7128e562d"
+}
