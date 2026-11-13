@@ -3415,7 +3415,7 @@
     "Yes",
     "You have the option to enter and use your own personal DeepL API key here if you own one. Otherwise, please leave this setting untouched — the console already includes a pre-populated 53-language database, automatic fallback translation, and Dune-Docker peer synchronization.",
     "You will need your",
-    "You'll see a QR code to scan, then be asked to sign back in once it's confirmed.",
+    "You'll see a QR code to scan, then 10 recovery codes to save. This session stays signed in; your other sessions are signed out.",
     "Your Correction",
     "Your DeepL API key has been encrypted with AES-256-GCM (scrypt) and stored in the local host vault.",
     "Your PvP Statistics",
@@ -19955,7 +19955,7 @@
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
         "line": 629,
         "nearby": [
-          "You'll see a QR code to scan, then be asked to sign back in once it's confirmed.",
+          "You'll see a QR code to scan, then 10 recovery codes to save. This session stays signed in; your other sessions are signed out.",
           "Starting...",
           "Collapse API Keys",
           "Expand API Keys"
@@ -34941,7 +34941,7 @@
           "Disable Two-Factor Authentication",
           "Off by default. Turn it on to require an authenticator app code (plus 10 one-time recovery codes as backup) in addition to your password at sign-in.",
           "Your login password",
-          "You'll see a QR code to scan, then be asked to sign back in once it's confirmed."
+          "You'll see a QR code to scan, then 10 recovery codes to save. This session stays signed in; your other sessions are signed out."
         ]
       }
     ],
@@ -48192,7 +48192,7 @@
         "line": 629,
         "nearby": [
           "Your login password",
-          "You'll see a QR code to scan, then be asked to sign back in once it's confirmed.",
+          "You'll see a QR code to scan, then 10 recovery codes to save. This session stays signed in; your other sessions are signed out.",
           "Enable Two-Factor Authentication",
           "Collapse API Keys"
         ]
@@ -55743,7 +55743,7 @@
         ]
       }
     ],
-    "You'll see a QR code to scan, then be asked to sign back in once it's confirmed.": [
+    "You'll see a QR code to scan, then 10 recovery codes to save. This session stays signed in; your other sessions are signed out.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
         "line": 627,
@@ -55842,7 +55842,7 @@
         "nearby": [
           "Off by default. Turn it on to require an authenticator app code (plus 10 one-time recovery codes as backup) in addition to your password at sign-in.",
           "Password (to confirm it's you)",
-          "You'll see a QR code to scan, then be asked to sign back in once it's confirmed.",
+          "You'll see a QR code to scan, then 10 recovery codes to save. This session stays signed in; your other sessions are signed out.",
           "Starting..."
         ]
       }
