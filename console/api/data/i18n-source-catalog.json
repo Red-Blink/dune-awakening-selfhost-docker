@@ -808,6 +808,7 @@
     "Deep Desert (Default, 0 Online)",
     "Deep Desert Layout",
     "Deep Desert instances",
+    "Deep evergreen with silver sage and sunlit brass.",
     "Deep forest with fresh mint and soft brass.",
     "Deep petrol with aqua and sunlit gold.",
     "DeepDesert_1",
@@ -885,6 +886,7 @@
     "Deployment stopped.",
     "Deployment was successful.",
     "Description",
+    "Desert slate with spice blue and woven sand.",
     "Destination",
     "Destination base",
     "Destination player",
@@ -1375,6 +1377,7 @@
     "IgwTravel.AllowPassengerToUseTaxi",
     "Image Cleanup Failed",
     "Impact",
+    "Imperial plum with pale orchid and antique gold.",
     "Import",
     "Import Anyway",
     "Import Backup",
@@ -1433,6 +1436,7 @@
     "Inventory Check Failed",
     "Inventory type",
     "Inventory view",
+    "Iron charcoal with pale crimson and cold steel.",
     "Italian",
     "Item",
     "Item ID",
@@ -10147,18 +10151,6 @@
         ]
       }
     ],
-    "Brutalist industrial: cold blues and purples on near-black.": [
-      {
-        "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 28,
-        "nearby": [
-          "Warm dark stone with sky blue and sand, from the Tabr save editor.",
-          "Dark aubergine with honey gold and rose.",
-          "Cold blue-gray with glacial blue and pale mint.",
-          "Ink blue with periwinkle and peach."
-        ]
-      }
-    ],
     "Buggy": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
@@ -10527,17 +10519,6 @@
           "Buyback Sweeps",
           "Schedule",
           "Interval (Minutes)"
-        ]
-      }
-    ],
-    "Caladan: deep ocean blues, sea green and silver.": [
-      {
-        "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 20,
-        "nearby": [
-          "Warm charcoal with amber and muted turquoise.",
-          "Volcanic gray with soft silver and warm copper.",
-          "Dark umber with burnished copper and sage."
         ]
       }
     ],
@@ -13098,7 +13079,7 @@
         "line": 29,
         "nearby": [
           "Dark aubergine with honey gold and rose.",
-          "Brutalist industrial: cold blues and purples on near-black.",
+          "Iron charcoal with pale crimson and cold steel.",
           "Ink blue with periwinkle and peach.",
           "Dark teal with jade and misty blue."
         ]
@@ -15714,8 +15695,8 @@
         "line": 27,
         "nearby": [
           "Deep forest with fresh mint and soft brass.",
-          "Warm dark stone with sky blue and sand, from the Tabr save editor.",
-          "Brutalist industrial: cold blues and purples on near-black.",
+          "Desert slate with spice blue and woven sand.",
+          "Iron charcoal with pale crimson and cold steel.",
           "Cold blue-gray with glacial blue and pale mint."
         ]
       }
@@ -15737,7 +15718,7 @@
         "file": "console/web/src/themes/consolePalettes.ts",
         "line": 22,
         "nearby": [
-          "Caladan: deep ocean blues, sea green and silver.",
+          "Deep evergreen with silver sage and sunlit brass.",
           "Volcanic gray with soft silver and warm copper.",
           "Quiet brown-black with sand gold and clear sky blue.",
           "Smoky slate with pale apricot and lavender."
@@ -16135,6 +16116,17 @@
         ]
       }
     ],
+    "Deep evergreen with silver sage and sunlit brass.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 20,
+        "nearby": [
+          "Warm charcoal with amber and muted turquoise.",
+          "Volcanic gray with soft silver and warm copper.",
+          "Dark umber with burnished copper and sage."
+        ]
+      }
+    ],
     "Deep forest with fresh mint and soft brass.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
@@ -16142,7 +16134,7 @@
         "nearby": [
           "Quiet brown-black with sand gold and clear sky blue.",
           "Smoky slate with pale apricot and lavender.",
-          "Warm dark stone with sky blue and sand, from the Tabr save editor.",
+          "Desert slate with spice blue and woven sand.",
           "Dark aubergine with honey gold and rose."
         ]
       }
@@ -17315,6 +17307,18 @@
           "Deployment complete.",
           "Starting game services.",
           "Refreshing generated map catalogs."
+        ]
+      }
+    ],
+    "Desert slate with spice blue and woven sand.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 26,
+        "nearby": [
+          "Smoky slate with pale apricot and lavender.",
+          "Deep forest with fresh mint and soft brass.",
+          "Dark aubergine with honey gold and rose.",
+          "Iron charcoal with pale crimson and cold steel."
         ]
       }
     ],
@@ -19044,7 +19048,7 @@
           "Deep petrol with aqua and sunlit gold.",
           "Dark wine with dusty rose and pearl blue.",
           "Soft dark taupe with limestone and sage blue.",
-          "The Emperor's elite: imperial purple and gold on command black."
+          "Imperial plum with pale orchid and antique gold."
         ]
       }
     ],
@@ -23717,7 +23721,7 @@
         "line": 39,
         "nearby": [
           "Soft dark taupe with limestone and sage blue.",
-          "The Emperor's elite: imperial purple and gold on command black.",
+          "Imperial plum with pale orchid and antique gold.",
           "Roasted brown with spice orange and cool turquoise.",
           "Neutral charcoal with pale blue and warm ivory."
         ]
@@ -24518,6 +24522,18 @@
         ]
       }
     ],
+    "Imperial plum with pale orchid and antique gold.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 38,
+        "nearby": [
+          "Earthy charcoal with saffron and olive silver.",
+          "Soft dark taupe with limestone and sage blue.",
+          "Graphite blue with steel silver and sea green.",
+          "Roasted brown with spice orange and cool turquoise."
+        ]
+      }
+    ],
     "Import": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
@@ -25013,7 +25029,7 @@
         "file": "console/web/src/themes/consolePalettes.ts",
         "line": 30,
         "nearby": [
-          "Brutalist industrial: cold blues and purples on near-black.",
+          "Iron charcoal with pale crimson and cold steel.",
           "Cold blue-gray with glacial blue and pale mint.",
           "Dark teal with jade and misty blue.",
           "Smoky violet with pearl lavender and sand."
@@ -25511,6 +25527,18 @@
           "Saving IP Monitor",
           "IP Monitor Saved Successfully",
           "IP Monitor Save Failed"
+        ]
+      }
+    ],
+    "Iron charcoal with pale crimson and cold steel.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 28,
+        "nearby": [
+          "Desert slate with spice blue and woven sand.",
+          "Dark aubergine with honey gold and rose.",
+          "Cold blue-gray with glacial blue and pale mint.",
+          "Ink blue with periwinkle and peach."
         ]
       }
     ],
@@ -41815,7 +41843,7 @@
         "file": "console/web/src/themes/consolePalettes.ts",
         "line": 40,
         "nearby": [
-          "The Emperor's elite: imperial purple and gold on command black.",
+          "Imperial plum with pale orchid and antique gold.",
           "Graphite blue with steel silver and sea green.",
           "Neutral charcoal with pale blue and warm ivory."
         ]
@@ -46836,7 +46864,7 @@
           "Dark umber with burnished copper and sage.",
           "Quiet brown-black with sand gold and clear sky blue.",
           "Deep forest with fresh mint and soft brass.",
-          "Warm dark stone with sky blue and sand, from the Tabr save editor."
+          "Desert slate with spice blue and woven sand."
         ]
       }
     ],
@@ -46870,7 +46898,7 @@
         "nearby": [
           "Dark wine with dusty rose and pearl blue.",
           "Earthy charcoal with saffron and olive silver.",
-          "The Emperor's elite: imperial purple and gold on command black.",
+          "Imperial plum with pale orchid and antique gold.",
           "Graphite blue with steel silver and sea green."
         ]
       }
@@ -49596,18 +49624,6 @@
           "Change Database Password",
           "New Password",
           "New password"
-        ]
-      }
-    ],
-    "The Emperor's elite: imperial purple and gold on command black.": [
-      {
-        "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 38,
-        "nearby": [
-          "Earthy charcoal with saffron and olive silver.",
-          "Soft dark taupe with limestone and sage blue.",
-          "Graphite blue with steel silver and sea green.",
-          "Roasted brown with spice orange and cool turquoise."
         ]
       }
     ],
@@ -54109,7 +54125,7 @@
         "line": 21,
         "nearby": [
           "Warm charcoal with amber and muted turquoise.",
-          "Caladan: deep ocean blues, sea green and silver.",
+          "Deep evergreen with silver sage and sunlit brass.",
           "Dark umber with burnished copper and sage.",
           "Quiet brown-black with sand gold and clear sky blue."
         ]
@@ -54333,20 +54349,8 @@
         "file": "console/web/src/themes/consolePalettes.ts",
         "line": 19,
         "nearby": [
-          "Caladan: deep ocean blues, sea green and silver.",
+          "Deep evergreen with silver sage and sunlit brass.",
           "Volcanic gray with soft silver and warm copper."
-        ]
-      }
-    ],
-    "Warm dark stone with sky blue and sand, from the Tabr save editor.": [
-      {
-        "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 26,
-        "nearby": [
-          "Smoky slate with pale apricot and lavender.",
-          "Deep forest with fresh mint and soft brass.",
-          "Dark aubergine with honey gold and rose.",
-          "Brutalist industrial: cold blues and purples on near-black."
         ]
       }
     ],

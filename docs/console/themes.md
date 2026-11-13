@@ -16,6 +16,10 @@ Indigo, Jade, Moonstone, Nightfall, Oasis, Rosewood, Saffron, Sandstone, Slate,
 Spice and Steel) and four Dune faction palettes (Atreides, Fremen, Harkonnen and
 Sardaukar Imperial), plus the 42 swatch palettes below.
 
+The four faction palettes use original Dune Docker colour combinations. Their
+existing IDs remain stable for browser preferences; they do not restore the
+third-party palette packs removed from the project.
+
 The picker lists them in four sections, each sorted by name: Console palettes
 (with Default), Dune factions, Houses and Outfits and dyes. A filter box matches
 the palette or section name and shows `N of 66 palettes`; the applied palette

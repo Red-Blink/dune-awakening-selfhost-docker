@@ -167,9 +167,23 @@ try{
   if(!['Players','Bases','Vehicles'].includes(name))await roleTabs(name);
  }
  console.log('MISSING '+JSON.stringify(await page.evaluate(()=>[...new Set(window.__missingPreviewData)])));
- await page.locator('.language-shortcut').click();await page.getByRole('dialog').getByRole('button',{name:/Deutsch/}).click();await page.waitForFunction(()=>document.documentElement.lang==='de');
- await page.locator('.language-shortcut').click();await page.getByRole('dialog').getByRole('button',{name:/العربية/}).click();await page.waitForFunction(()=>document.documentElement.dir==='rtl');
- await page.locator('.language-shortcut').click();await page.getByRole('dialog').getByRole('button',{name:/English/}).click();await page.waitForFunction(()=>document.documentElement.dir==='ltr');
+ await page.getByRole('button',{name:'Console Theme',exact:true}).click();
+ const picker=page.getByRole('dialog',{name:'Console Theme'});
+ await picker.waitFor();
+ assert.equal(await picker.getByRole('radio').count(),66);
+ for(const width of [320,390,768,1440]){
+  await page.setViewportSize({width,height:900});
+  assert.ok(await picker.evaluate(node=>node.scrollWidth<=node.clientWidth+1),'theme picker has no horizontal scroll at '+width);
+ }
+ await picker.getByRole('searchbox',{name:'Filter palettes'}).fill('sardaukar');
+ assert.equal(await picker.getByRole('radio').count(),3);
+ await page.keyboard.press('Escape');
+ assert.equal(await picker.getByRole('searchbox').inputValue(),'');
+ await page.keyboard.press('Escape');
+ const languageButton=page.locator('button.language-shortcut').filter({has:page.locator('svg.lucide-globe')});
+ await languageButton.click();await page.getByRole('dialog').getByRole('button',{name:/Deutsch/}).click();await page.waitForFunction(()=>document.documentElement.lang==='de');
+ await languageButton.click();await page.getByRole('dialog').getByRole('button',{name:/العربية/}).click();await page.waitForFunction(()=>document.documentElement.dir==='rtl');
+ await languageButton.click();await page.getByRole('dialog').getByRole('button',{name:/English/}).click();await page.waitForFunction(()=>document.documentElement.dir==='ltr');
  for(const width of [390,768,1440]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'responsive layout at '+width);}
  console.log('ERRORS '+JSON.stringify(errors));
  assert.deepEqual(await page.evaluate(()=>[...new Set(window.__missingPreviewData)]),[],'all visited views have explicit fixtures');

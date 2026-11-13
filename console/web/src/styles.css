@@ -8063,11 +8063,11 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
 .theme-filter-count { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
 .theme-group { margin: 0 0 16px; }
 .theme-group h3 { margin: 0 0 8px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; }
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 6px; }
 .theme-card { scroll-margin-top: 130px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; text-align: left; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-soft); color: var(--text); cursor: pointer; }
 .theme-card:hover { border-color: var(--border-strong); }
 .theme-card:focus-visible { outline: 2px solid var(--text-strong); outline-offset: 2px; }
 .theme-card.selected { border-color: var(--title); box-shadow: 0 0 0 1px var(--title); }
 .theme-swatches { display: flex; gap: 4px; flex: 0 0 auto; }
 .theme-swatches i { width: 20px; height: 20px; border-radius: 3px; border: 1px solid rgba(255, 255, 255, .25); }
-.theme-card-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.theme-card-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
