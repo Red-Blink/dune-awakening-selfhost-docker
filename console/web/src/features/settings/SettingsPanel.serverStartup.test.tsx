@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import { SettingsPanel } from "./SettingsPanel";
 
@@ -25,6 +25,29 @@ function settings(autoStartBattlegroup: boolean) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockedApi.mockResolvedValue(settings(true));
+});
+
+test("groups Discord controls and keeps password two-factor protection in Account Security", async () => {
+  mockedApi.mockResolvedValue({ ...settings(true), config: { port: 8088, consoleTotpEnabled: true } });
+  render(<SettingsPanel onPasswordChanged={vi.fn()} onTotpEnrollmentStarted={vi.fn()} confirmAction={vi.fn()} />);
+  const discord = await screen.findByRole("region", { name: "Discord" });
+  expect(within(discord).getByRole("button", { name: "Expand Discord Sign In" })).toBeVisible();
+  // Hosted-bot management belongs to the stacked #215 implementation.
+  expect(within(discord).queryByRole("button", { name: "Expand Server Bot" })).toBeNull();
+  const security = screen.getByRole("region", { name: "Account Security" });
+  expect(await within(security).findByRole("button", { name: "Expand Two Factor Authentication" })).toBeVisible();
+  expect(within(security).getByText("Off")).toBeVisible();
+  expect(within(discord).queryByText("Two Factor Authentication")).toBeNull();
+});
+
+test("keeps the requested Settings section order", async () => {
+  const { container } = render(<SettingsPanel onPasswordChanged={vi.fn()} onTotpEnrollmentStarted={vi.fn()} confirmAction={vi.fn()} />);
+  await screen.findByRole("button", { name: "Expand Server Startup" });
+  const stack = container.querySelector(".settings-section-stack")!;
+  expect([...stack.querySelectorAll("h4")].slice(0, 2).map(node => node.textContent)).toEqual(["Files Checklist", "Runtime Configuration"]);
+  expect(stack.firstElementChild).toContainElement(screen.getByRole("heading", { name: "Files Checklist" }));
+  const titles = [...stack.children].map(node => node.querySelector("h3, .playerAdmin_toggleHeader")?.textContent).filter(Boolean);
+  expect(titles.slice(0, 7)).toEqual(["Account Security", "Discord", "Server Startup", "Web Console Port", "API Keys", "Encrypted API Access", "Experimental Features"]);
 });
 
 test("shows the saved automatic Battlegroup startup choice", async () => {

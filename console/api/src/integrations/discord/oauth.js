@@ -52,7 +52,7 @@ export function createPendingStateStore({
   // fetch identity only, mint nothing, hand the guild list back to the owner
   // session identified by `sessionId`). It travels with the pending state so a
   // login-purpose callback can never be replayed as setup or vice versa.
-  function issue(random = randomBytes, { purpose = "login", sessionId = "", owner = "" } = {}) {
+  function issue(random = randomBytes, { purpose = "login", sessionId = "", owner = "", applicationVersion = "" } = {}) {
     // Evict used and expired entries before the size check. Without this, an
     // unauthenticated flood of /discord/start requests that never complete a
     // callback fills the table permanently (entries are only marked used /
@@ -94,7 +94,7 @@ export function createPendingStateStore({
     const state = random(16).toString("base64url");
     const verifier = random(32).toString("base64url");
     const challenge = createHash("sha256").update(verifier).digest("base64url");
-    pending.set(state, { createdAt: now(), used: false, verifier, challenge, purpose, sessionId, owner });
+    pending.set(state, { createdAt: now(), used: false, verifier, challenge, purpose, sessionId, owner, applicationVersion });
     return { state, challenge };
   }
 
@@ -112,13 +112,13 @@ export function createPendingStateStore({
     if (!constantTimeStringEqual(state, cookieValue)) return { ok: false, reason: "state_cookie_mismatch" };
     if (timestamp - entry.createdAt > ttlMs) return { ok: false, reason: "stale_state" };
     entry.used = true;
-    return { ok: true, verifier: entry.verifier, purpose: entry.purpose || "login", sessionId: entry.sessionId || "" };
+    return { ok: true, verifier: entry.verifier, purpose: entry.purpose || "login", sessionId: entry.sessionId || "", ...(entry.applicationVersion ? { applicationVersion: entry.applicationVersion } : {}) };
   }
 
   return { issue, consume, size: () => pending.size };
 }
 
-function constantTimeStringEqual(left, right) {
+export function constantTimeStringEqual(left, right) {
   const a = Buffer.from(String(left || ""));
   const b = Buffer.from(String(right || ""));
   if (a.length === 0) return false;
@@ -144,6 +144,7 @@ async function discordJsonRequest(url, init, { fetchImpl, label }) {
   if (!response.ok) {
     const rejected = oauthError("oauth_upstream_error", `Discord rejected the ${label} request (HTTP ${response.status}).`, 502);
     rejected.upstreamStatus = response.status; // callers may treat 403/404 as "not a member", never as "sign-in failed"
+    rejected.upstreamOperation = label;
     throw rejected;
   }
   let payload;
@@ -156,6 +157,30 @@ async function discordJsonRequest(url, init, { fetchImpl, label }) {
     throw oauthError("oauth_bad_response", `Discord returned a malformed ${label} response.`, 502);
   }
   return payload;
+}
+
+// Callback failures are browser pages, not gateway failures. In particular,
+// a rejected application credential must not become a 502 that a tunnel can
+// replace with its own error page. Never expose a raw provider body or token.
+export function oauthCallbackFailure(error, { setup = false } = {}) {
+  if (error?.code === "oauth_upstream_error" && error.upstreamOperation === "token" && error.upstreamStatus === 401) {
+    return {
+      status: 400,
+      reason: "discord_client_rejected",
+      message: setup
+        ? "Discord did not accept the saved application credentials. In Settings, open Discord Sign In and choose Change Application Credentials. Copy the Client ID and the current Client Secret from the same Discord application, save them, and restart the Console before trying again."
+        : "Discord sign in is unavailable because the application credentials need updating. Use your Console password or contact your server administrator."
+    };
+  }
+  if (error?.code === "oauth_upstream_error" && error.upstreamOperation === "token" && error.upstreamStatus === 400) {
+    return { status: 400, reason: "discord_authorization_rejected", message: "Discord could not accept this authorization request. Return to the Console and start again. If this continues, check the application's credentials and redirect address." };
+  }
+  const status = Number(error?.statusCode);
+  return {
+    status: status >= 500 && status <= 599 ? 503 : status >= 400 && status < 500 ? status : 400,
+    reason: typeof error?.code === "string" ? error.code : "oauth_error",
+    message: status >= 500 ? "Discord could not complete this connection. Try again shortly, or use your Console password." : "Discord sign in could not be completed. Return to the Console and try again."
+  };
 }
 
 export async function exchangeDiscordAuthCode({

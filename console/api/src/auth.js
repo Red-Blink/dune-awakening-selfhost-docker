@@ -65,7 +65,7 @@ export function createAuth(config) {
       persistenceCredential = config.adminPassword;
       persistenceSecret = config.sessionSecret;
     }
-    return createHmac("sha256", persistenceKey).update(JSON.stringify([entry.id, entry.csrf, entry.expiresAt, entry.tier || "owner", entry.userId || "", entry.username || "", entry.guildId || "", Boolean(config.adminPasswordEnvManaged)])).digest("base64url");
+    return createHmac("sha256", persistenceKey).update(JSON.stringify([entry.id, entry.csrf, entry.expiresAt, entry.tier || "owner", entry.userId || "", entry.username || "", entry.guildId || "", Boolean(config.adminPasswordEnvManaged), ...(entry.displayName ? [String(entry.displayName)] : [])])).digest("base64url");
   }
 
   function constantTimeStringEqual(left, right) {
@@ -93,6 +93,7 @@ export function createAuth(config) {
           tier: entry.tier || "owner",
           userId: entry.userId || "",
           username: entry.username || "",
+          displayName: entry.displayName || entry.username || "",
           guildId: entry.guildId || ""
         });
       }
@@ -124,6 +125,7 @@ export function createAuth(config) {
           tier: session.tier || "owner",
           userId: session.userId || "",
           username: session.username || "",
+          ...(session.displayName ? { displayName: session.displayName } : {}),
           guildId: session.guildId || "",
           mac: sessionMac(session)
         });
@@ -260,6 +262,7 @@ export function createAuth(config) {
       sessions.delete(id);
       count++;
     }
+    if (count) persistSessions(true);
     return count;
   }
 

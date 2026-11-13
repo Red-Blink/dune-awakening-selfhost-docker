@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
@@ -40,6 +40,18 @@ function stubSession(discordOAuthConfigured: boolean) {
 }
 
 describe("Access Control nav visibility depends on Discord OAuth actually being configured", () => {
+  it("separates the account name and access role and provides a working Sign Out button", async () => {
+    window.sessionStorage.setItem("dune-console:active-tab", "Settings");
+    stubSession(false);
+    render(<App />);
+    const account = await screen.findByRole("region", { name: "Signed-in Account" });
+    expect(within(account).queryByText("Signed In As")).toBeNull();
+    expect(within(account).getByText("Owner")).toBeVisible();
+    expect(within(account).getByText("Role: Owner")).toBeVisible();
+    fireEvent.click(within(account).getByRole("button", { name: "Sign Out" }));
+    expect(await screen.findByLabelText("Admin password")).toBeVisible();
+    expect(screen.queryByRole("region", { name: "Signed-in Account" })).toBeNull();
+  });
   it("hides Access Control for a password/TOTP-only owner session with no Discord OAuth configured", async () => {
     // Land on Settings, not the default Home tab -- Home's panel makes many
     // real-server-status calls unrelated to what this test checks (nav

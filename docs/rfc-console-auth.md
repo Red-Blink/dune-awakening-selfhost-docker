@@ -1,7 +1,7 @@
 # RFC: Console Layered Authentication — Discord OAuth (Fixed), Optional Passkeys, Hardened Password Fallback
 
 **Date:** 2026-08-17 (revised 2026-08-20)
-**Status:** Historical record — design proposal accepted as an RFC via PR #170 (2026-08-18); none of Tiers 1-3 is implemented in this repository. Not maintained.
+**Status:** Historical design reference, accepted via PR #170 (2026-08-18). This development branch includes Tier 1 Discord sign-in and owner-initiated Tier 3 TOTP from PRs #202 and #201, plus the local integration work. Tier 2 passkeys remain unimplemented. The shipped development behavior and recovery procedures are documented in the Console authentication guides; this RFC is not a current implementation specification.
 **Audit:** Three Layer 1 Eight-Hat passes (two full, one targeted), upstream identity/recovery-code/upgrade-path corrections at merge review, and a 2026-08-20 four-lens post-merge validation (Technical Writer, Security Architect, UI/UX, GRC); findings summary in §8.
 
 **Dependency note (updated for the split submission):** §2.1 (Tier 1) and part of §2.2 (Tier 2) reference `console/api/src/integrations/discord/oauth.js` and `handoff.js` — the Discord OAuth sign-in + signed-handoff tier-resolution system. That code is submitted alongside this RFC as its own stacked draft PR (base: this Tier 3 PR); §2.3 (Tier 3), the mandatory-TOTP change this RFC section otherwise documents, has no dependency on it and can be reviewed and merged independently. Sequencing is left to the maintainer's judgment.
@@ -91,7 +91,7 @@ This is the entire authorization fix — no cache, no grace window, no new persi
 
 **Why this amendment exists.** §2.1 as accepted resolves a Discord user's tier through a signed handoff to the operator's own bot, with a static owner allowlist as the only alternative. §1.2 of this same document names the operator with no bot as a first-class case — and for that operator, §2.1 gives "sign in with Discord as owner, if allowlisted" and nothing else. That is Discord *authentication* without Discord *authorization*, and it is not what an operator means by role-based access. This amendment adds a third tier source that the console evaluates itself, from the Discord roles the signed-in member actually holds.
 
-**What the operator configures.** The same information the companion-bot setup already gathers, as manual entries in the console's Discord OAuth settings (Settings → Discord OAuth):
+**What the operator configures.** The same information the companion-bot setup already gathers, as manual entries in the console's Discord OAuth settings (Settings → Discord → Discord Sign-In):
 
 | Field | Required | Stored as |
 |---|---|---|
@@ -128,7 +128,7 @@ role from one does not revoke it from the other
 
 **Owner is the Discord server's owner — derived, not configured.** `GET /users/@me/guilds` (the `guilds` scope already requested) marks the guild the signing-in user owns with `owner: true`, and Discord permits exactly one owner per server. The console therefore grants **owner** to whoever Discord says owns the home guild, with no configuration and no way to misassign it — which is also the strongest form of the separation-of-duties invariant above, since no role can ever confer owner. The former "owner user IDs" allowlist (`DISCORD_OAUTH_OWNER_ALLOWLIST`) is retained env-only, for back-compatibility and for the rare install that wants additional owners; it is no longer in the settings form. Precedence: guild owner > allowlisted owner > highest mapped role.
 
-**First-run setup is a guided flow, not a settings section.** An unconfigured console shows *Set up Discord sign-in* on the sign-in page. **The admin password comes first** — only the console owner may connect Discord, because otherwise anyone who owns some Discord server could complete a round-trip and point this console at their server. The Discord application itself (client ID, secret, redirect URI) is deployment configuration, as it is for a bot: set in `.env` as a one-time deployment step (client id, secret, redirect); the setup screen shows the exact redirect URI to register and, for an install that has none, the `.env` keys to set -- it does not collect the client secret in the first-run flow. (Rotation later is available in Settings.) Then:
+**First-run setup is a guided flow in Settings → Discord → Discord Sign-In.** Sign in with the admin password first: only an authenticated console owner may configure Discord access. An unconfigured console keeps its password-only sign-in page; it does not offer a setup action there. The Settings wizard guides the owner through application configuration and the Discord authorization round-trip. Then:
 
 1. **Continue with Discord** — a real OAuth round-trip in *setup mode*: `/api/auth/discord/start?setup=1` is reachable only from an owner session and issues a pending state tagged `setup`; the callback, seeing that tag, fetches identity but **mints no tiered session and resolves no tier** — it records the operator's Discord identity and the servers they **own** (id, name; other servers are discarded) on the owner session that started it and returns to the wizard.
 2. **Everything Discord can tell the console is pre-filled** — who the operator is and the server(s) they own, the single one preselected, and therefore who the Owner is. Only a server the operator **owns** is offered or can be connected.
@@ -302,12 +302,15 @@ see §2.3's correction note for what actually ships.** An in-place upgrade to
 a build with `CONSOLE_TOTP_ENABLED=1` is now invisible at the login surface:
 an existing single-factor install keeps logging in with the password alone,
 exactly as before, and the operator opts into everything described below
-(the 10-minute enrollment session, the acknowledgment-gated recovery-code
-display, the forced re-login afterward) from Settings, on their own
-schedule, via `POST /api/auth/2fa/enable`. The mechanics of the enrollment
-session itself — its scope, TTL, and the confirm/acknowledge/re-login
-sequence — are unchanged; only the sentence "on first password
-authentication after upgrade" is no longer true.
+(the 10-minute enrollment session and acknowledgment-gated recovery-code
+display) from Settings, on their own
+schedule, via `POST /api/auth/2fa/enable`. Settings enrollment uses a popup
+and retains the restricted, non-renewable session and recovery-code acknowledgment.
+After confirmation, a still-valid initiating owner receives a newly rotated
+normal session. Other password sessions are revoked. Cancellation rotates the
+initiating owner back into Settings only while that parent session remains valid
+and no factor has been configured. Recovery re-setup has no parent session and
+continues to require a fresh password+TOTP login.
 
 - **Tier 1 fix has no upgrade-path complexity**: it's a behavior correction to already-optional, already-Discord-OAuth-configured installs only. An operator who has never configured Discord OAuth is completely unaffected.
 - **`WEBAUTHN_RP_ID` and `WEBAUTHN_ORIGIN` both unset (default) is byte-identical to today**: no new routes registered, no new file created, zero behavior change for any operator who doesn't opt in. A partial pair is rejected at boot.

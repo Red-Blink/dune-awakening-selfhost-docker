@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PermissionGate } from "../../lib/consoleAccess";
 import { basesApi, type WaterContainerEntry } from "../../api/bases";
 import { InfoTooltip } from "../../components/common/DisplayPrimitives";
 
@@ -96,7 +97,7 @@ export function BaseWaterTab({ baseId, autoRefill, refreshToken }: BaseWaterTabP
               </p>
             : <div className="memory-feature-toggle">
                 <InfoTooltip id={`auto-refill-water-help-${baseId}`} label="About Auto-Refill">{autoRefill.tooltip}</InfoTooltip>
-                <label className={`switch-checkbox bases-auto-refill-toggle ${autoRefill.enabled ? "enabled" : "disabled"}`}>
+                <PermissionGate action="bases:mutate"><label className={`switch-checkbox bases-auto-refill-toggle ${autoRefill.enabled ? "enabled" : "disabled"}`}>
                   <input
                     type="checkbox"
                     checked={autoRefill.enabled}
@@ -105,7 +106,7 @@ export function BaseWaterTab({ baseId, autoRefill, refreshToken }: BaseWaterTabP
                   />
                   <span className="switch-label">Auto-Refill</span>
                   <strong className="switch-state">{autoRefill.saving ? "Saving" : autoRefill.enabled ? "ON" : "OFF"}</strong>
-                </label>
+                </label></PermissionGate>
               </div>}
           {autoRefill.stalledAt && <p className="bases-auto-refill-stalled" role="alert">
             Paused after {autoRefill.consecutiveQueues} refills that did not raise the water. Refill manually to check why, or turn auto-refill off and on to resume.

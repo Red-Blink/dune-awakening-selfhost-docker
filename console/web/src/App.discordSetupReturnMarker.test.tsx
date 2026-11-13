@@ -2,12 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App, loadPersistedTab } from "./App";
 
-// #643 §4.1 (Eight Hats Architect CRITICAL, #676's own L1 audit): an operator
-// RECONFIGURING Discord from an already-authenticated Settings session sets
-// a sessionStorage marker before the setup-mode OAuth round-trip, so App.tsx
-// can tell that return apart from the pre-login first-run flow -- both land
-// on the identical "/?discordSetup=done" URL, but only the pre-login flow
-// may still force a logout via the standalone wizard's onDone.
+// Both marked OAuth returns and older setup links resume inside Settings.
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -31,7 +26,7 @@ function stubAuthenticatedOwner() {
     const path = String(input instanceof Request ? input.url : input);
     if (path.includes("/api/auth/logout")) { logoutCalls.push(path); return jsonResponse({ ok: true }); }
     if (path.includes("/api/auth/state")) return jsonResponse({ authenticated: true, csrfToken: "t", scope: null, config: { discordOAuthConfigured: true } });
-    if (path.includes("/api/auth/me")) return jsonResponse({ tier: "owner", username: "owner", displayName: "Owner", secondFactorEnrolled: false });
+    if (path.includes("/api/auth/me")) return jsonResponse({ user: { tier: "owner", username: "owner", displayName: "Owner" }, allowedActions: ["*"], secondFactorEnrolled: false });
     // Broad catch-all for the many other endpoints an authenticated dashboard
     // mount probes (status, actions, updates, etc.) -- none of them are what
     // this test is about; a generic empty success keeps them from hanging or
@@ -43,6 +38,25 @@ function stubAuthenticatedOwner() {
 }
 
 describe("App: discordSetupReturnMarker (#643 §4.1)", () => {
+  it("waits for the owner session before displaying an OAuth return instead of flashing the password login", async () => {
+    stubDiscordSetupDoneUrl();
+    let finish!: (value: Response) => void;
+    const pending = new Promise<Response>(resolve => { finish = resolve; });
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((input: string | URL | Request) => {
+      const path = String(input instanceof Request ? input.url : input);
+      if (path.includes("/api/auth/state")) return pending.then(response => response.clone());
+      if (path.includes("/api/auth/me")) return jsonResponse({ user: { id: "local-owner", tier: "owner", username: "owner", displayName: "Owner" }, allowedActions: ["*"], secondFactorEnrolled: false });
+      if (path.includes("/api/setup/state")) return jsonResponse({ files: { complete: true } });
+      return jsonResponse({});
+    }));
+    render(<App />);
+    expect(screen.getByText("Checking Your Session")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Sign In" })).toBeNull();
+    finish(new Response(JSON.stringify({ authenticated: true, csrfToken: "t", config: { discordOAuthConfigured: true } }), { headers: { "content-type": "application/json" } }));
+    await waitFor(() => expect(screen.queryByText("Checking Your Session")).toBeNull());
+    expect(loadPersistedTab()).toBe("Settings");
+    expect(screen.queryByRole("button", { name: "Sign In" })).toBeNull();
+  });
   it("marker present: redirects to the Settings tab and never calls /api/auth/logout", async () => {
     window.sessionStorage.setItem("dune-console:discord-setup-return", "1");
     stubDiscordSetupDoneUrl();
@@ -66,18 +80,13 @@ describe("App: discordSetupReturnMarker (#643 §4.1)", () => {
     await waitFor(() => expect(window.sessionStorage.getItem("dune-console:discord-setup-return")).toBeNull());
   });
 
-  it("marker ABSENT (pre-login first-run flow): the standalone wizard mount is unaffected -- tab is not silently forced to Settings", async () => {
-    // No marker set at all -- this is the original, unchanged pre-login path.
+  it("an older setup return without a marker also resumes in Settings without signing out", async () => {
     stubDiscordSetupDoneUrl();
-    stubAuthenticatedOwner();
+    const logoutCalls = stubAuthenticatedOwner();
 
     render(<App />);
 
-    // The pre-login flow's own discordSetupOpen/wantDiscordSetup derivation
-    // (from the bare ?discordSetup URL param) is untouched by this feature --
-    // it must not be redirected into Settings by the marker-consumption effect,
-    // since there was no marker to consume.
-    await new Promise((r) => setTimeout(r, 0));
-    expect(loadPersistedTab()).not.toBe("Settings");
+    await waitFor(() => expect(loadPersistedTab()).toBe("Settings"));
+    expect(logoutCalls).toEqual([]);
   });
 });

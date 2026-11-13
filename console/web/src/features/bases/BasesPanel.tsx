@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Boxes, ChevronDown, ChevronUp, Download, Droplet, Fuel, Grid3X3, KeyRound, Lock, Settings, Trash2, Users, X, Zap } from "lucide-react";
 import { BaseInventoryTab } from "./BaseInventoryTab";
@@ -1404,12 +1405,12 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
               and these settings are global -- and hidden without a refill
               queue, matching the per-base toggles. */}
           {!playerId && (canQueue || canQueueWater) && (
-            <button
+            <PermissionGate action="bases:write-config"><button
               className="bases-settings-button"
               title="Auto-refill settings"
               aria-label="Auto-refill settings"
               onClick={() => setAutoRefillSettingsOpen(true)}
-            ><Settings size={16} /></button>
+            ><Settings size={16} /></button></PermissionGate>
           )}
           {playerId && <PlayerAccessSelect value={access} onChange={changeAccess} selectRef={accessSelectRef} />}
           <button onClick={() => void load({ q: submittedQ, page, pageSize, sortColumn, sortDirection })}>Refresh</button>
@@ -1484,7 +1485,7 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
                       <span className="spinner" aria-hidden="true" />
                       <span className="loading-dots" role="status">Restarting</span>
                     </span>
-                  : <button onClick={() => void handleRestartForCombinedQueue(group)}>{target.label}</button>}
+                  : <PermissionGate action="server:restart-service"><button onClick={() => void handleRestartForCombinedQueue(group)}>{target.label}</button></PermissionGate>}
             </li>;
           })}
         </ul>
@@ -1575,58 +1576,58 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
             {queuedBaseIds.has(id)
               ? <span className="bases-queued-refill" title="Refill queued — applies when this map next restarts or stops">
                   <Fuel size={16} aria-label="Refill queued for this base" />
-                  <button
+                  <PermissionGate action="bases:mutate"><button
                     className="icon-toggle-button bases-queued-refill-cancel"
                     title="Cancel Queued Refill"
                     aria-label="Cancel Queued Refill"
                     disabled={cancelingId === id}
                     onClick={(event) => { event.stopPropagation(); void handleCancelQueuedRefill(base); }}
-                  ><X size={14} /></button>
+                  ><X size={14} /></button></PermissionGate>
                 </span>
-              : <button
+              : <PermissionGate action="bases:mutate"><button
                   className={`icon-toggle-button${autoRefillStalled ? " bases-auto-refill-stalled-icon" : autoRefillOn ? " bases-auto-refill-on" : ""}`}
                   title={deletePending ? "Blocked while a delete is queued for this base" : refillTitle}
                   aria-label={autoRefillStalled ? "Refill Generators (auto-refill stalled)" : autoRefillOn ? "Refill Generators (auto-refill on)" : "Refill Generators"}
                   disabled={deletePending || !refillable || refillingId === id}
                   onClick={(event) => { event.stopPropagation(); void handleRefillGenerators(base); }}
-                ><Fuel size={16} /></button>}
+                ><Fuel size={16} /></button></PermissionGate>}
             {queuedWaterBaseIds.has(id)
               ? <span className="bases-queued-refill" title="Water refill queued — applies when this map next restarts or stops">
                   <Droplet size={16} aria-label="Water refill queued for this base" />
-                  <button
+                  <PermissionGate action="bases:mutate"><button
                     className="icon-toggle-button bases-queued-refill-cancel"
                     title="Cancel Queued Refill"
                     aria-label="Cancel Queued Water Refill"
                     disabled={cancelingWaterId === id}
                     onClick={(event) => { event.stopPropagation(); void handleCancelQueuedWaterRefill(base); }}
-                  ><X size={14} /></button>
+                  ><X size={14} /></button></PermissionGate>
                 </span>
-              : <button
+              : <PermissionGate action="bases:mutate"><button
                   className={`icon-toggle-button${autoRefillWaterStalled ? " bases-auto-refill-stalled-icon" : autoRefillWaterOn ? " bases-auto-refill-on" : ""}`}
                   title={deletePending ? "Blocked while a delete is queued for this base" : refillWaterTitle}
                   aria-label={autoRefillWaterStalled ? "Refill Water (auto-refill stalled)" : autoRefillWaterOn ? "Refill Water (auto-refill on)" : "Refill Water"}
                   disabled={deletePending || !canRefillWater || refillingWaterId === id}
                   onClick={(event) => { event.stopPropagation(); void handleRefillWater(base); }}
-                ><Droplet size={16} /></button>}
-            <button className="icon-toggle-button" title="Download Base" aria-label="Download Base" onClick={(event) => { event.stopPropagation(); setDownloadTarget({ id, name: String(base.name || ""), ownerName: String(base.owner_name || "") }); }}><Download size={16} /></button>
+                ><Droplet size={16} /></button></PermissionGate>}
+            <PermissionGate action="blueprints:export"><button className="icon-toggle-button" title="Download Base" aria-label="Download Base" onClick={(event) => { event.stopPropagation(); setDownloadTarget({ id, name: String(base.name || ""), ownerName: String(base.owner_name || "") }); }}><Download size={16} /></button></PermissionGate>
             {canDeleteBase && (deletePending
               ? <span className="bases-queued-delete" title="Delete queued — applies when this map next restarts or stops">
                   <Trash2 size={16} aria-label="Delete queued for this base" />
-                  <button
+                  <PermissionGate action="bases:mutate"><button
                     className="icon-toggle-button bases-queued-delete-cancel"
                     title="Cancel Queued Delete"
                     aria-label="Cancel Queued Delete"
                     disabled={cancelingDeleteId === id}
                     onClick={(event) => { event.stopPropagation(); void handleCancelQueuedDelete(base); }}
-                  ><X size={14} /></button>
+                  ><X size={14} /></button></PermissionGate>
                 </span>
-              : <button
+              : <PermissionGate action="bases:delete"><button
                   className="icon-toggle-button danger"
                   title="Delete Base"
                   aria-label="Delete Base"
                   disabled={deletingId === id}
                   onClick={(event) => { event.stopPropagation(); void handleDeleteBase(base); }}
-                ><Trash2 size={16} /></button>)}
+                ><Trash2 size={16} /></button></PermissionGate>)}
             {/* Unlike the four controls above, this one has no always-present
                 button: permissions are edited inside the expanded row, not
                 from here. It appears only while something is queued, so it
@@ -1636,13 +1637,13 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
               title={`${queuedChildAccessBaseIds.get(id)} permission change(s) queued — applies when this map next restarts or stops`}
             >
               <KeyRound size={16} aria-label="Permission changes queued for this base" />
-              <button
+              <PermissionGate action="bases:mutate"><button
                 className="icon-toggle-button bases-queued-permission-cancel"
                 title="Discard Queued Permission Changes"
                 aria-label="Discard Queued Permission Changes"
                 disabled={cancelingChildAccessId === id}
                 onClick={(event) => { event.stopPropagation(); void handleCancelQueuedChildAccess(base); }}
-              ><X size={14} /></button>
+              ><X size={14} /></button></PermissionGate>
             </span>}
           </span>;
         }}
@@ -1792,12 +1793,12 @@ export function BasesPanel({ onError, confirmAction, restartGate, formatMutation
                     : <div className="memory-feature-toggle">
                         <InfoTooltip id={`auto-refill-help-${id}`} label="About Auto-Refill">{autoRefillTooltip}</InfoTooltip>
                         <label className={`switch-checkbox bases-auto-refill-toggle ${autoRefillEntry ? "enabled" : "disabled"}`}>
-                          <input
+                          <PermissionGate action="bases:mutate"><input
                             type="checkbox"
                             checked={Boolean(autoRefillEntry)}
                             disabled={savingAutoRefill || !canRefill}
                             onChange={(event) => { void handleToggleAutoRefill(base, event.target.checked); }}
-                          />
+                          /></PermissionGate>
                           <span className="switch-label">Auto-Refill</span>
                           <strong className="switch-state">{savingAutoRefill ? "Saving" : autoRefillEntry ? "ON" : "OFF"}</strong>
                         </label>

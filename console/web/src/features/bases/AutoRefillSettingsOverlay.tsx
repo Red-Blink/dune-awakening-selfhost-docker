@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { basesApi } from "../../api/bases";
@@ -230,9 +231,9 @@ export function AutoRefillSettingsOverlay({ onClose, onSaved, onError }: AutoRef
 
         <div className="confirm-modal-actions">
           <button onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="primary" onClick={() => void save()} disabled={!canSave}>
+          <PermissionGate action="bases:write-config"><button className="primary" onClick={() => void save()} disabled={!canSave}>
             {saving ? "Saving…" : "Save"}
-          </button>
+          </button></PermissionGate>
         </div>
       </section>
     </div>

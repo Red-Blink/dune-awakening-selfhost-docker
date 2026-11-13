@@ -76,6 +76,7 @@ describe("sidebar version badge", () => {
     const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }));
     vi.stubGlobal("fetch", vi.fn().mockImplementation((path: string) => {
       if (String(path).includes("/api/auth/state")) return json({ authenticated: true, csrfToken: "t" });
+      if (String(path).includes("/api/auth/me")) return json({ user: { username: "owner", tier: "owner" }, allowedActions: ["*"] });
       if (String(path).includes("/api/setup/state")) return json({ files: { complete: true }, config: {} });
       return json({ error: "unavailable" }, 500);
     }));
@@ -95,6 +96,7 @@ describe("sidebar version badge", () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation((path: string) => {
       const url = String(path);
       if (url.includes("/api/auth/state")) return json({ authenticated: true, csrfToken: "t", config: { version: "1.4.44" } });
+      if (url.includes("/api/auth/me")) return json({ user: { username: "owner", tier: "owner" }, allowedActions: ["*"] });
       if (url.includes("/api/setup/state")) return json({ files: { complete: true }, config: {} });
       return json({ error: "unavailable" }, 500);
     }));
@@ -113,6 +115,7 @@ describe("sidebar version badge", () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation((path: string) => {
       const url = String(path);
       if (url.includes("/api/auth/state")) return json({ authenticated: true, csrfToken: "t", config: { version: "1.4.43" } });
+      if (url.includes("/api/auth/me")) return json({ user: { username: "owner", tier: "owner" }, allowedActions: ["*"] });
       if (url.includes("/api/setup/state")) return json({ files: { complete: true }, config: {} });
       if (url.includes("/api/updates/check-stack")) {
         stackChecks += 1;

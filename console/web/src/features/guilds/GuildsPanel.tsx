@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronsDown, ChevronsUp, Trash2 } from "lucide-react";
 import { guildsApi } from "../../api/guilds";
@@ -362,13 +363,13 @@ export function GuildsPanel({ onError, confirmAction }: GuildsPanelProps) {
         action={(row) => {
           const guildId = String(row.guild_id || "");
           return (
-            <button
+            <PermissionGate action="guilds:disband"><button
               className="icon-toggle-button danger"
               disabled={disbandingId === guildId}
               title="Disband guild"
               aria-label={`Disband ${String(row.guild_name || "guild")}`}
               onClick={(event) => { event.stopPropagation(); void handleDisband(row); }}
-            ><Trash2 size={16} /></button>
+            ><Trash2 size={16} /></button></PermissionGate>
           );
         }}
       />
@@ -396,7 +397,7 @@ export function GuildsPanel({ onError, confirmAction }: GuildsPanelProps) {
               {membersLoading && <span className="muted"> (refreshing...)</span>}
             </h3>
             <div className="action-row">
-              <button onClick={openAddModal}>Add Member</button>
+              <PermissionGate action="guilds:membership"><button onClick={openAddModal}>Add Member</button></PermissionGate>
               <button onClick={() => { setSelectedGuild(null); setMemberRows([]); }}>Close</button>
             </div>
           </div>
@@ -420,27 +421,27 @@ export function GuildsPanel({ onError, confirmAction }: GuildsPanelProps) {
               const name = String(row.character_name || "member");
               return (
                 <span className="icon-toggle-group guild-member-actions">
-                  <button
+                  <PermissionGate action="guilds:rank"><button
                     className="icon-toggle-button success"
                     disabled={isLeader || promotingId === playerId}
                     title={isLeader ? "Already the guild leader" : (isOfficer ? "Promote to Leader" : "Promote to Officer")}
                     aria-label={isLeader ? "Cannot promote the leader further" : `Promote ${name} to ${isOfficer ? "Leader" : "Officer"}`}
                     onClick={(event) => { event.stopPropagation(); void handlePromote(row); }}
-                  ><ChevronsUp size={16} /></button>
-                  <button
+                  ><ChevronsUp size={16} /></button></PermissionGate>
+                  <PermissionGate action="guilds:rank"><button
                     className="icon-toggle-button warning"
                     disabled={isLeader || isMember || demotingId === playerId}
                     title={isLeader ? "Promote another member before demoting the leader" : (isMember ? "Already the lowest rank" : "Demote to Member")}
                     aria-label={isLeader ? "Cannot demote the leader" : (isMember ? `Cannot demote ${name} further` : `Demote ${name} to Member`)}
                     onClick={(event) => { event.stopPropagation(); void handleDemote(row); }}
-                  ><ChevronsDown size={16} /></button>
-                  <button
+                  ><ChevronsDown size={16} /></button></PermissionGate>
+                  <PermissionGate action="guilds:membership"><button
                     className="icon-toggle-button danger"
                     disabled={isLeader || removingId === playerId}
                     title={isLeader ? "Promote another member before removing the leader" : "Remove from guild"}
                     aria-label={isLeader ? "Cannot remove the leader" : `Remove ${name} from guild`}
                     onClick={(event) => { event.stopPropagation(); void handleRemove(row); }}
-                  ><Trash2 size={16} /></button>
+                  ><Trash2 size={16} /></button></PermissionGate>
                 </span>
               );
             }}
@@ -448,7 +449,7 @@ export function GuildsPanel({ onError, confirmAction }: GuildsPanelProps) {
         </div>
       )}
       {addOpen && selectedGuild && (
-        <div className="modal-overlay" role="presentation" onMouseDown={closeAddModal}>
+        <PermissionGate action="guilds:membership"><div className="modal-overlay" role="presentation" onMouseDown={closeAddModal}>
           <section className="confirm-modal guild-add-member-modal" role="dialog" aria-modal="true" aria-labelledby="guild-add-member-title" onMouseDown={(event) => event.stopPropagation()}>
             <div className="confirm-modal-title">
               <h3 id="guild-add-member-title">Add Member to {String(selectedGuild.guild_name || "Guild")}</h3>
@@ -496,10 +497,10 @@ export function GuildsPanel({ onError, confirmAction }: GuildsPanelProps) {
             {addError && <p className="danger-note">{addError}</p>}
             <div className="confirm-modal-actions">
               <button onClick={closeAddModal}>Cancel</button>
-              <button className="success" disabled={!addSelected || addBusy} onClick={() => void handleAddMember()}>{addBusy ? "Adding..." : "Add to Guild"}</button>
+              <PermissionGate action="guilds:membership"><button className="success" disabled={!addSelected || addBusy} onClick={() => void handleAddMember()}>{addBusy ? "Adding..." : "Add to Guild"}</button></PermissionGate>
             </div>
           </section>
-        </div>
+        </div></PermissionGate>
       )}
     </section>
   );

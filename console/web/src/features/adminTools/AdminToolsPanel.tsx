@@ -1,3 +1,4 @@
+import { PermissionGate, PermissionFields, useConsoleAccess } from "../../lib/consoleAccess";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { adminApi } from "../../api/admin";
@@ -32,6 +33,7 @@ const DEFAULT_PLAYER_JOIN_MESSAGE = "{playerName} has entered {mapName}, their t
 const DEFAULT_PLAYER_LEAVE_MESSAGE = "{playerName} has vanished from {mapName}, their tracks swallowed by the dunes.";
 
 export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps) {
+  const access = useConsoleAccess();
   const [players, setPlayers] = useState<Record<string, unknown>[]>([]);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [restartSchedule, setRestartSchedule] = useState<{ stdout?: string; stderr?: string; exitCode?: number } | null>(null);
@@ -154,6 +156,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
   }
 
   async function loadHistory(open = false) {
+    if (!access.can("admin:history:read")) return;
     setHistory((await adminApi.history()).stdout || "");
     if (open) setHistoryOpen(true);
   }
@@ -177,6 +180,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
   }
 
   async function loadRestartSchedule() {
+    if (!access.can("server:read") || !access.can("server:write-config")) return;
     setScheduleLoading(true);
     try {
       const result = await serverApi.restartSchedule();
@@ -231,6 +235,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
   }
 
   async function loadDeferredRestartPending() {
+    if (!access.can("maps:read")) return;
     try {
       setDeferredRestartPending(await mapsApi.deferredRestartPending());
     } catch {
@@ -240,6 +245,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
   }
 
   async function loadRestartQueue(options: { showLoading?: boolean; syncControls?: boolean } = {}) {
+    if (!access.can("server:read") || !access.any(["server:restart", "server:write-config"])) return;
     const showLoading = options.showLoading ?? true;
     const syncControls = options.syncControls ?? true;
     if (showLoading) setQueueLoading(true);
@@ -327,6 +333,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
   }
 
   async function loadIpChangeRestart(options: { showLoading?: boolean; syncControls?: boolean } = {}) {
+    if (!access.can("server:read") || !access.can("server:write-credentials")) return;
     const showLoading = options.showLoading ?? true;
     const syncControls = options.syncControls ?? true;
     if (showLoading) setIpChangeLoading(true);
@@ -403,6 +410,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
   }
 
   async function loadShutdownProtection() {
+    if (!access.can("server:read") || !access.can("server:write-config")) return;
     setShutdownProtectionLoading(true);
     try {
       const result = await serverApi.shutdownProtection();
@@ -460,6 +468,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
   }
 
   async function loadTransferSettings() {
+    if (!access.can("admin:transfer-settings:read")) return;
     setTransferLoading(true);
     try {
       const result = await adminApi.characterTransferSettings();
@@ -474,6 +483,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
   }
 
   async function loadMessageOfTheDay() {
+    if (!access.can("admin:motd:read")) return;
     const result = await adminApi.messageOfTheDay();
     setMessageOfTheDay(result.settings);
     setMessageOfTheDayOriginal(result.settings);
@@ -481,6 +491,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
   }
 
   async function loadPlayerAnnouncements() {
+    if (!access.can("admin:announcements:read")) return;
     const result = await adminApi.playerAnnouncements();
     setPlayerAnnouncements(result.settings);
     setPlayerAnnouncementsOriginal(result.settings);
@@ -524,7 +535,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
   }
 
   useEffect(() => {
-    playersApi.listAll().then((result) => setPlayers(result.rows || [])).catch(() => undefined);
+    if (access.can("players:read")) playersApi.listAll().then((result) => setPlayers(result.rows || [])).catch(() => undefined);
     loadMapChatOptions().catch(() => undefined);
     loadMessageOfTheDay().catch(() => undefined);
     loadPlayerAnnouncements().catch(() => undefined);
@@ -538,7 +549,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
     return () => {
       if (resultTimer.current) window.clearTimeout(resultTimer.current);
     };
-  }, []);
+  }, [access]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -546,7 +557,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
       loadIpChangeRestart({ showLoading: false, syncControls: false }).catch(() => undefined);
     }, 30000);
     return () => window.clearInterval(id);
-  }, [ipChangeResult?.status]);
+  }, [access, ipChangeResult?.status]);
 
   useEffect(() => {
     if (!scheduleResult || scheduleResult.status === "running") return;
@@ -562,7 +573,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
       loadDeferredRestartPending().catch(() => undefined);
     }, 10000);
     return () => window.clearInterval(id);
-  }, [scheduleOpen, queueResult?.status]);
+  }, [access, scheduleOpen, queueResult?.status]);
 
   useEffect(() => {
     if (!queueEntries.length) return undefined;
@@ -694,6 +705,7 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
   }
 
   async function loadMapChatOptions() {
+    if (!access.can("server:read") || !access.can("admin:map-chat")) return;
     const result = await liveMapApi.services();
     const options = await buildNamedMapChatOptions(result.rows || []);
     if (!options.length) return;
@@ -707,51 +719,48 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
     return <label className="character-transfer-row character-transfer-boolean-row">
       <span>{label}</span>
       <strong>{value ? "True" : "False"}</strong>
-      <input type="checkbox" disabled={transferSaving} checked={value} onChange={(event) => updateTransferSetting(key, event.target.checked as CharacterTransferSettings[typeof key])} />
+      <input type="checkbox" disabled={transferSaving || !access.can("admin:transfer-settings:write")} checked={value} onChange={(event) => updateTransferSetting(key, event.target.checked as CharacterTransferSettings[typeof key])} />
     </label>;
   };
 
   return <section className="panel admin-tools-panel">
     <h2>Admin Tools</h2>
-    <div className={`playerAdmin_toggle ${liveToolsOpen ? "open" : ""}`}>
+    <PermissionGate anyOf={["players:kick-all","players:give-item","admin:motd:read","admin:broadcast","admin:map-chat","admin:announcements:read"]}><div className={`playerAdmin_toggle ${liveToolsOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={liveToolsOpen ? "Collapse Global Live Tools" : "Expand Global Live Tools"} onClick={() => setLiveToolsOpen(!liveToolsOpen)}>{liveToolsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Global Live Tools</span></button>
       {liveToolsOpen && <div className="playerAdmin_toggleBody"><div className="global-live-tools">
-        <div className="action-line admin-global-actions">
-          <button className="danger" onClick={() => run(kickAllPlayers)}>Kick All</button>
-          <button className="success" onClick={() => run(hydrateOnlinePlayers)}>Hydrate All</button>
+        <PermissionGate anyOf={["players:kick-all", "players:give-item"]}><div className="action-line admin-global-actions">
+          <PermissionGate action="players:kick-all"><button className="danger" onClick={() => run(kickAllPlayers)}>Kick All</button></PermissionGate>
+          <PermissionGate action="players:give-item"><button className="success" onClick={() => run(hydrateOnlinePlayers)}>Hydrate All</button></PermissionGate>
           <InlineActionResult result={actionResult} resultKey="global" />
-        </div>
-        <div className="section-divider" />
-        <div className="action-line broadcast-line motd-line">
+        </div></PermissionGate>
+        <PermissionGate action="admin:motd:read"><div className="action-line broadcast-line motd-line">
           <div className="panel-title schedule-panel-title motd-panel-title">
             <h4>Message of the Day</h4>
-            <label className={`switch-checkbox ${messageOfTheDay.enabled ? "enabled" : "disabled"}`}><input type="checkbox" checked={messageOfTheDay.enabled} onChange={(event) => run(() => toggleMessageOfTheDay(event.target.checked))} /><span className="switch-label">MOTD</span><strong className="switch-state">{messageOfTheDay.enabled ? "ON" : "OFF"}</strong></label>
+            <label className={`switch-checkbox ${messageOfTheDay.enabled ? "enabled" : "disabled"}`}><PermissionGate action="admin:motd:write"><input type="checkbox" checked={messageOfTheDay.enabled} onChange={(event) => run(() => toggleMessageOfTheDay(event.target.checked))} /></PermissionGate><span className="switch-label">MOTD</span><strong className="switch-state">{messageOfTheDay.enabled ? "ON" : "OFF"}</strong></label>
           </div>
           {messageOfTheDayDirty && <p className="dirty-note">Unsaved changes: Message of the Day</p>}
           <p className="muted">Shown as a private in-game message {messageOfTheDayDeliveryDescription(messageOfTheDay.deliveryMode)}. Use <code>{"{playerName}"}</code> to include the recipient's character name. Funcom chat does not support manual line breaks, so messages are saved and sent as a single line. Saving does not send it immediately to players who are already online.</p>
           {messageOfTheDayStatus.lastScanError && <p className="danger-note">Last MOTD scan was interrupted: {messageOfTheDayStatus.lastScanAt ? new Date(messageOfTheDayStatus.lastScanAt).toLocaleString() : "time unavailable"} ({messageOfTheDayStatus.lastScanError}). It will retry automatically.</p>}
           {messageOfTheDayStatus.lastAttemptAt && <p className={messageOfTheDayStatus.lastFailed > 0 ? "danger-note" : "muted"}>Last delivery attempt: {new Date(messageOfTheDayStatus.lastAttemptAt).toLocaleString()} — sent {messageOfTheDayStatus.lastSent}, failed {messageOfTheDayStatus.lastFailed}{messageOfTheDayStatus.lastError ? ` (${messageOfTheDayStatus.lastError})` : ""}.</p>}
-          <label className="compact-select motd-delivery-field">Delivery<select value={messageOfTheDay.deliveryMode} onChange={(event) => setMessageOfTheDay((current) => ({ ...current, deliveryMode: event.target.value as MessageOfTheDaySettings["deliveryMode"] }))}><option value="login">Once Per Login</option><option value="daily">Once Per Day</option><option value="map">Every Map Transfer</option></select></label>
+          <PermissionFields writeAction="admin:motd:write"><label className="compact-select motd-delivery-field">Delivery<select value={messageOfTheDay.deliveryMode} onChange={(event) => setMessageOfTheDay((current) => ({ ...current, deliveryMode: event.target.value as MessageOfTheDaySettings["deliveryMode"] }))}><option value="login">Once Per Login</option><option value="daily">Once Per Day</option><option value="map">Every Map Transfer</option></select></label>
           <label className="broadcast-message">Message<textarea rows={3} value={messageOfTheDay.message} onChange={(event) => setMessageOfTheDay((current) => ({ ...current, message: event.target.value }))} placeholder="Message shown to players" /></label>
-          <div className="broadcast-controls-row">
-            <button disabled={!messageOfTheDayDirty} onClick={() => run(saveMessageOfTheDay)}>Save MOTD</button>
-            <button onClick={() => run(restoreMessageOfTheDay)}>Restore Defaults</button>
+          </PermissionFields><div className="broadcast-controls-row">
+            <PermissionGate action="admin:motd:write"><button disabled={!messageOfTheDayDirty} onClick={() => run(saveMessageOfTheDay)}>Save MOTD</button></PermissionGate>
+            <PermissionGate action="admin:motd:write"><button onClick={() => run(restoreMessageOfTheDay)}>Restore Defaults</button></PermissionGate>
             <InlineActionResult result={actionResult} resultKey="message-of-the-day" />
           </div>
-        </div>
-        <div className="section-divider" />
-        <div className="action-line broadcast-line">
+        </div></PermissionGate>
+        <PermissionGate action="admin:broadcast"><div className="action-line broadcast-line">
           <h4 className="live-tool-section-title">Send Server Broadcast</h4>
           <label className="broadcast-title">Broadcast Title<input value={broadcastTitle} onChange={(event) => setBroadcastTitle(event.target.value)} placeholder="Title shown in-game" /></label>
           <label className="broadcast-message">Broadcast Body<textarea rows={3} value={broadcastBody} onChange={(event) => setBroadcastBody(event.target.value)} placeholder="Message shown to online players" /></label>
           <div className="broadcast-controls-row">
             <label className="inline-field">Duration Seconds<input type="number" min="1" max="3600" value={broadcastDuration} onChange={(event) => setBroadcastDuration(event.target.value)} /></label>
-            <button onClick={() => run(sendBroadcast)}>Send Broadcast</button>
+            <PermissionGate action="admin:broadcast"><button onClick={() => run(sendBroadcast)}>Send Broadcast</button></PermissionGate>
             <InlineActionResult result={actionResult} resultKey="broadcast" />
           </div>
-        </div>
-        <div className="section-divider" />
-        <div className="action-line broadcast-line map-chat-line">
+        </div></PermissionGate>
+        <PermissionGate action="admin:map-chat"><div className="action-line broadcast-line map-chat-line">
           <h4 className="live-tool-section-title">Send Map Message</h4>
           <div className="settings-tabs map-message-tabs"><button className={mapChatMode === "send" ? "active" : ""} onClick={() => setMapChatMode("send")}>Send Now</button><button className={mapChatMode === "schedules" ? "active" : ""} onClick={() => setMapChatMode("schedules")}>Schedules</button></div>
           {mapChatMode === "send" ? <div className="map-message-send-now">
@@ -760,19 +769,18 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
             </select></label>
             <label className="broadcast-message">Message<textarea rows={3} value={mapChatBody} onChange={(event) => setMapChatBody(event.target.value)} placeholder="Message shown in this map chat" /></label>
             <div className="broadcast-controls-row">
-              <button onClick={() => run(sendMapChat)}>Send Message</button>
+              <PermissionGate action="admin:map-chat"><button onClick={() => run(sendMapChat)}>Send Message</button></PermissionGate>
               <InlineActionResult result={actionResult} resultKey="map-chat" />
             </div>
           </div> : <ScheduledMapMessages mapOptions={mapChatOptions} confirmAction={confirmAction} onDelivery={() => loadHistory(true)} />}
-        </div>
-        <div className="section-divider" />
-        <div className="action-line broadcast-line player-announcements-line">
+        </div></PermissionGate>
+        <PermissionGate action="admin:announcements:read"><div className="action-line broadcast-line player-announcements-line">
           <div className="panel-title schedule-panel-title">
             <h4>Player Arrival & Departure Messages</h4>
           </div>
           <p className="muted">Funcom chat does not support manual line breaks. Join and leave messages are saved and sent as a single line.</p>
           {playerAnnouncementsDirty && <p className="dirty-note">Unsaved changes: Player announcements</p>}
-          <label className="checkbox-line">
+          <PermissionFields writeAction="admin:announcements:write"><label className="checkbox-line">
             <input type="checkbox" checked={playerAnnouncements.joinEnabled} onChange={(event) => setPlayerAnnouncements((current) => ({ ...current, joinEnabled: event.target.checked }))} />
             <span>Enable Join Announcements</span>
           </label>
@@ -782,35 +790,37 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
             <span>Enable Leave Announcements</span>
           </label>
           <label className="broadcast-message">Leave Message<textarea rows={2} value={playerAnnouncements.leaveMessage} onChange={(event) => setPlayerAnnouncements((current) => ({ ...current, leaveMessage: event.target.value }))} placeholder={DEFAULT_PLAYER_LEAVE_MESSAGE} /></label>
-          <div className="broadcast-controls-row">
-            <button disabled={!playerAnnouncementsDirty} onClick={() => run(savePlayerAnnouncements)}>Save</button>
-            <button onClick={() => run(restorePlayerAnnouncements)}>Restore Defaults</button>
+          </PermissionFields><div className="broadcast-controls-row">
+            <PermissionGate action="admin:announcements:write"><button disabled={!playerAnnouncementsDirty} onClick={() => run(savePlayerAnnouncements)}>Save</button></PermissionGate>
+            <PermissionGate action="admin:announcements:write"><button onClick={() => run(restorePlayerAnnouncements)}>Restore Defaults</button></PermissionGate>
             <InlineActionResult result={actionResult} resultKey="player-announcements" />
           </div>
-        </div>
+        </div></PermissionGate>
       </div></div>}
-    </div>
-    <div className={`playerAdmin_toggle ${scheduleOpen ? "open" : ""}`}>
+    </div></PermissionGate>
+    <PermissionGate anyOf={["server:write-config","server:write-credentials","server:restart"]}><div className={`playerAdmin_toggle ${scheduleOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={scheduleOpen ? "Collapse Schedule Server Restart" : "Expand Schedule Server Restart"} onClick={() => setScheduleOpen(!scheduleOpen)}>{scheduleOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Schedule Server Restart</span></button>
       {scheduleOpen && <div className="playerAdmin_toggleBody">
+        <PermissionGate action="server:write-config">
         <div className="panel-title schedule-panel-title">
           <h4>Daily Restart</h4>
-          <label className={`switch-checkbox ${restartEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={scheduleLoading || scheduleSaving} checked={restartEnabled} onChange={(event) => run(() => saveSchedule(event.target.checked))} /><span className="switch-label">Service Status</span><strong className="switch-state">{restartEnabled ? "ON" : "OFF"}</strong></label>
+          <label className={`switch-checkbox ${restartEnabled ? "enabled" : "disabled"}`}><PermissionGate action="server:write-config"><input type="checkbox" disabled={scheduleLoading || scheduleSaving} checked={restartEnabled} onChange={(event) => run(() => saveSchedule(event.target.checked))} /></PermissionGate><span className="switch-label">Service Status</span><strong className="switch-state">{restartEnabled ? "ON" : "OFF"}</strong></label>
         </div>
         <KeyValueGrid items={[["Current Status", scheduleStatusLabel], ["Restart Time (Local Server Time)", toHourMinuteTime(restartScheduleValues.restart_time || restartTime)], ["In-Game Notice Before", `${restartNotifyMinutes} minutes`], ["Timer", scheduleDisplayTimerLabel]]} />
         {commandStatusSummary(restartSchedule).reason && <p className="danger-note">{commandStatusSummary(restartSchedule).reason}</p>}
         <div className="action-line schedule-action-line">
           <label className="compact-select">Daily Restart Time<input type="time" step="60" pattern="[0-2][0-9]:[0-5][0-9]" disabled={scheduleSaving} value={restartTime} onChange={(event) => setRestartTime(sanitizeTimeInput(event.target.value))} placeholder="05:00" /></label>
           <label className="compact-select schedule-notify-field">In-Game Notice Before (Min)<input type="number" min="1" max="1440" step="1" disabled={scheduleSaving} value={restartNotifyMinutes} onChange={(event) => setRestartNotifyMinutes(event.target.value)} /></label>
-          <button disabled={scheduleSaving || scheduleLoading} onClick={() => saveSchedule()}>Save Schedule</button>
+          <PermissionGate action="server:write-config"><button disabled={scheduleSaving || scheduleLoading} onClick={() => saveSchedule()}>Save Schedule</button></PermissionGate>
           {scheduleResult && <span className={`inline-task-result result-${scheduleResult.status === "succeeded" ? "ok" : scheduleResult.status === "failed" ? "fail" : "running"}`}>
             <strong className={scheduleResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(scheduleResult.title, scheduleResult.status === "running")}</strong>
           </span>}
         </div>
-        <div className="section-divider" />
+        </PermissionGate>
+        <PermissionGate anyOf={["server:restart", "server:write-config"]}>
         <div className="panel-title schedule-panel-title">
           <h4>Restart Queue</h4>
-          <label className={`switch-checkbox ${queueEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={queueLoading || queueSaving} checked={queueEnabled} onChange={(event) => run(() => saveRestartQueue(event.target.checked))} /><span className="switch-label">Queue Status</span><strong className="switch-state">{queueEnabled ? "ON" : "OFF"}</strong></label>
+          <label className={`switch-checkbox ${queueEnabled ? "enabled" : "disabled"}`}><PermissionGate action="server:write-config"><input type="checkbox" disabled={queueLoading || queueSaving} checked={queueEnabled} onChange={(event) => run(() => saveRestartQueue(event.target.checked))} /></PermissionGate><span className="switch-label">Queue Status</span><strong className="switch-state">{queueEnabled ? "ON" : "OFF"}</strong></label>
         </div>
         <p className="muted">When enabled and players are online, restart requests hold in a countdown queue with in-game warnings before the server cycles. Restarts requested while no players are online run immediately.</p>
         {queueEntries.length
@@ -834,22 +844,23 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
                 <p className="muted">{subtext}</p>
                 <KeyValueGrid items={[["Players Online", queuePlayersLabel], ["Warnings Sent", warningsSent], ["Requested By", entry.requestedBy || "Unknown"]]} />
                 <div className="action-line schedule-action-line">
-                  <button disabled={entry.status === "restarting"} onClick={() => restartQueueEntryNow(entry.id)}>Restart Now</button>
-                  <button className="danger" disabled={entry.status === "restarting"} onClick={() => cancelQueueEntry(entry.id)}>Cancel Restart</button>
+                  <PermissionGate action="server:restart"><button disabled={entry.status === "restarting"} onClick={() => restartQueueEntryNow(entry.id)}>Restart Now</button></PermissionGate>
+                  <PermissionGate action="server:restart"><button className="danger" disabled={entry.status === "restarting"} onClick={() => cancelQueueEntry(entry.id)}>Cancel Restart</button></PermissionGate>
                 </div>
               </div>;
             })}</div>
           : <KeyValueGrid items={[["Current Status", queueStatusLabel], ["Players Online", queuePlayersLabel], ["Active Queue", "None"], ["Default Countdown", queueDefaultCountdownLabel], ["Broadcast At", queueCheckpointsLabel], ["Settings Pending", deferredRestartPending.pending ? `Yes — ${deferredRestartPending.label || "settings"} awaiting restart` : "No"]]} />}
-        <div className="action-line schedule-action-line">
+        <PermissionGate action="server:write-config"><div className="action-line schedule-action-line">
           <label className="compact-select schedule-notify-field">Default Countdown (Min)<input type="number" min="1" max="1440" step="1" disabled={queueSaving} value={queueCountdownMinutes} onChange={(event) => setQueueCountdownMinutes(event.target.value)} /></label>
           <label className="compact-select schedule-checkpoints-field">Broadcast Checkpoints (Min)<input type="text" disabled={queueSaving} value={queueCheckpoints} onChange={(event) => setQueueCheckpoints(event.target.value)} placeholder="15, 10, 5, 1" /></label>
-          <button disabled={queueSaving || queueLoading} onClick={() => saveRestartQueue()}>Save Queue</button>
+          <PermissionGate action="server:write-config"><button disabled={queueSaving || queueLoading} onClick={() => saveRestartQueue()}>Save Queue</button></PermissionGate>
           <button disabled={queueLoading || !queueSettings} onClick={() => setQueueMessagesOpen(true)}>Edit Messages</button>
           {queueResult && <span className={`inline-task-result result-${queueResult.status === "succeeded" ? "ok" : queueResult.status === "failed" ? "fail" : "running"}`}>
             <strong className={queueResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(queueResult.title, queueResult.status === "running")}</strong>
           </span>}
         </div>
-        {queueMessagesOpen && queueSettings && restartQueue?.defaults && <RestartMessagesModal
+        </PermissionGate>
+        {access.can("server:write-config") && queueMessagesOpen && queueSettings && restartQueue?.defaults && <RestartMessagesModal
           messages={queueSettings.messages}
           defaults={restartQueue.defaults.messages}
           durationSec={queueSettings.broadcastDurationSec}
@@ -859,10 +870,11 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
           onSave={saveRestartMessages}
           onClose={() => { setQueueMessagesOpen(false); setQueueMessagesError(""); }}
         />}
-        <div className="section-divider" />
+        </PermissionGate>
+        <PermissionGate action="server:write-credentials">
         <div className="panel-title schedule-panel-title">
           <h4>Restart On Public IP Change</h4>
-          <label className={`switch-checkbox ${ipChangeEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={ipChangeLoading || ipChangeSaving} checked={ipChangeEnabled} onChange={(event) => run(() => saveIpChangeRestart(event.target.checked))} /><span className="switch-label">IP Monitor</span><strong className="switch-state">{ipChangeEnabled ? "ON" : "OFF"}</strong></label>
+          <label className={`switch-checkbox ${ipChangeEnabled ? "enabled" : "disabled"}`}><PermissionGate action="server:write-credentials"><input type="checkbox" disabled={ipChangeLoading || ipChangeSaving} checked={ipChangeEnabled} onChange={(event) => run(() => saveIpChangeRestart(event.target.checked))} /></PermissionGate><span className="switch-label">IP Monitor</span><strong className="switch-state">{ipChangeEnabled ? "ON" : "OFF"}</strong></label>
         </div>
         <KeyValueGrid items={[["Current Status", ipChangeStatusLabel], ["Check Interval", `${ipChangeIntervalMinutes} minutes`], ["In-Game Notice", `${ipChangeNotifyMinutes} minutes`], ["Last Public IP", ipChangeValues.last_known_public_ip || "Unavailable"], ["Last Check", ipChangeValues.last_check || "Unavailable"], ["Last Restart", ipChangeValues.last_restart || "Unavailable"], ["Timer", ipChangeDisplayTimerLabel]]} />
         {commandStatusSummary(ipChangeRestart).reason && <p className="danger-note">{commandStatusSummary(ipChangeRestart).reason}</p>}
@@ -870,30 +882,32 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
         <div className="action-line schedule-action-line">
           <label className="compact-select schedule-notify-field">Check Every (Min)<input type="number" min="1" max="1440" step="1" disabled={ipChangeSaving} value={ipChangeIntervalMinutes} onChange={(event) => setIpChangeIntervalMinutes(event.target.value)} /></label>
           <label className="compact-select schedule-notify-field">In-Game Notice (Min)<input type="number" min="0" max="60" step="1" disabled={ipChangeSaving} value={ipChangeNotifyMinutes} onChange={(event) => setIpChangeNotifyMinutes(event.target.value)} /></label>
-          <button disabled={ipChangeSaving || ipChangeLoading} onClick={() => saveIpChangeRestart()}>Save IP Monitor</button>
-          <button disabled={ipChangeSaving || ipChangeLoading} onClick={() => checkIpChangeNow()}>Check Now</button>
+          <PermissionGate action="server:write-credentials"><button disabled={ipChangeSaving || ipChangeLoading} onClick={() => saveIpChangeRestart()}>Save IP Monitor</button></PermissionGate>
+          <PermissionGate action="server:write-credentials"><button disabled={ipChangeSaving || ipChangeLoading} onClick={() => checkIpChangeNow()}>Check Now</button></PermissionGate>
           {ipChangeResult && <span className={`inline-task-result result-${ipChangeResult.status === "succeeded" ? "ok" : ipChangeResult.status === "failed" ? "fail" : "running"}`}>
             <strong className={ipChangeResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(ipChangeResult.title, ipChangeResult.status === "running")}</strong>
           </span>}
         </div>
-        <div className="section-divider" />
+        </PermissionGate>
+        <PermissionGate action="server:write-config">
         <div className="panel-title schedule-panel-title">
           <h4>Host Shutdown Protection</h4>
-          <label className={`switch-checkbox ${shutdownProtectionEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={shutdownProtectionLoading || shutdownProtectionSaving} checked={shutdownProtectionEnabled} onChange={(event) => run(() => saveShutdownProtection(event.target.checked))} /><span className="switch-label">Clean Stop</span><strong className="switch-state">{shutdownProtectionEnabled ? "ON" : "OFF"}</strong></label>
+          <label className={`switch-checkbox ${shutdownProtectionEnabled ? "enabled" : "disabled"}`}><PermissionGate action="server:write-config"><input type="checkbox" disabled={shutdownProtectionLoading || shutdownProtectionSaving} checked={shutdownProtectionEnabled} onChange={(event) => run(() => saveShutdownProtection(event.target.checked))} /></PermissionGate><span className="switch-label">Clean Stop</span><strong className="switch-state">{shutdownProtectionEnabled ? "ON" : "OFF"}</strong></label>
         </div>
         <KeyValueGrid items={[["Current Status", shutdownProtectionStatusLabel], ["Systemd Service", shutdownProtectionServiceLabel], ["Systemd Enabled", shutdownProtectionEnabledValue ? formatTimerStatus(shutdownProtectionEnabledValue) : "Not Installed"], ["Timeout", shutdownProtectionValues.timeout || "240 seconds"]]} />
         {commandStatusSummary(shutdownProtection).reason && <p className="danger-note">{commandStatusSummary(shutdownProtection).reason}</p>}
         <p className="muted">Optional Linux host integration. When the host shuts down or reboots, systemd runs the console clean-stop flow before Docker terminates containers. This is not required for Unraid, WSL, or custom environments that manage shutdown another way.</p>
         <div className="action-line schedule-action-line">
-          {shutdownProtectionInstalled && <button className="danger" disabled={shutdownProtectionSaving || shutdownProtectionLoading} onClick={() => removeShutdownProtection()}>Remove Service</button>}
+          {shutdownProtectionInstalled && <PermissionGate action="server:write-config"><button className="danger" disabled={shutdownProtectionSaving || shutdownProtectionLoading} onClick={() => removeShutdownProtection()}>Remove Service</button></PermissionGate>}
           {shutdownProtectionResult && <span className={`inline-task-result result-${shutdownProtectionResult.status === "succeeded" ? "ok" : shutdownProtectionResult.status === "failed" ? "fail" : "running"}`}>
             <strong className={shutdownProtectionResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(shutdownProtectionResult.title, shutdownProtectionResult.status === "running")}</strong>
           </span>}
         </div>
         {shutdownProtectionResult?.status === "failed" && shutdownProtectionValues.manual_install_command && <p className="danger-note">If automatic install is not available in this environment, run this on the Linux host: <code>{shutdownProtectionValues.manual_install_command}</code></p>}
+        </PermissionGate>
       </div>}
-    </div>
-    <div className={`playerAdmin_toggle ${transferOpen ? "open" : ""}`}>
+    </div></PermissionGate>
+    <PermissionGate action="admin:transfer-settings:read"><div className={`playerAdmin_toggle ${transferOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={transferOpen ? "Collapse Character Transfer Settings" : "Expand Character Transfer Settings"} onClick={() => setTransferOpen(!transferOpen)}>{transferOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Character Transfer Settings</span></button>
       {transferOpen && <div className="playerAdmin_toggleBody">
         {transferDirty && <p className="dirty-note">Unsaved changes: Character Transfer Settings</p>}
@@ -901,34 +915,34 @@ export function AdminToolsPanel({ onError, confirmAction }: AdminToolsPanelProps
         {transferNeedsApply && !transferSaving && !transferDirty && <p className="dirty-note">Live settings are not confirmed. Save to apply the saved settings again.</p>}
         {transferSettings && <div className="character-transfer-grid">
           {transferBooleanRow("ShouldDeleteOriginCharactersDuringTransfers", "Delete origin character after transfer")}
-          <label className="character-transfer-row"><span>Incoming character transfer policy</span><select disabled={transferSaving} value={transferSettings.IncomingCharacterTransfers} onChange={(event) => updateTransferSetting("IncomingCharacterTransfers", Number(event.target.value))}>{transferPolicies.map((policy) => <option key={policy.value} value={policy.value}>{policy.label}</option>)}</select><span className="character-transfer-spacer" /></label>
+          <label className="character-transfer-row"><span>Incoming character transfer policy</span><select disabled={transferSaving || !access.can("admin:transfer-settings:write")} value={transferSettings.IncomingCharacterTransfers} onChange={(event) => updateTransferSetting("IncomingCharacterTransfers", Number(event.target.value))}>{transferPolicies.map((policy) => <option key={policy.value} value={policy.value}>{policy.label}</option>)}</select><span className="character-transfer-spacer" /></label>
           {transferBooleanRow("AcceptOutgoingCharacterTransfers", "Accept outgoing character transfers")}
-          <label className="character-transfer-row"><span>Export timeout, seconds</span><input type="number" min="1" step="1" disabled={transferSaving} value={transferSettings.ExportCharacterTimeout} onChange={(event) => updateTransferSetting("ExportCharacterTimeout", Number(event.target.value))} /><span className="character-transfer-spacer" /></label>
-          <label className="character-transfer-row"><span>Import timeout, seconds</span><input type="number" min="1" step="1" disabled={transferSaving} value={transferSettings.ImportCharacterTimeout} onChange={(event) => updateTransferSetting("ImportCharacterTimeout", Number(event.target.value))} /><span className="character-transfer-spacer" /></label>
+          <label className="character-transfer-row"><span>Export timeout, seconds</span><input type="number" min="1" step="1" disabled={transferSaving || !access.can("admin:transfer-settings:write")} value={transferSettings.ExportCharacterTimeout} onChange={(event) => updateTransferSetting("ExportCharacterTimeout", Number(event.target.value))} /><span className="character-transfer-spacer" /></label>
+          <label className="character-transfer-row"><span>Import timeout, seconds</span><input type="number" min="1" step="1" disabled={transferSaving || !access.can("admin:transfer-settings:write")} value={transferSettings.ImportCharacterTimeout} onChange={(event) => updateTransferSetting("ImportCharacterTimeout", Number(event.target.value))} /><span className="character-transfer-spacer" /></label>
           {transferBooleanRow("FreeToTransferCharactersFrom", "Free transfers from this server")}
           {transferBooleanRow("FreeToTransferCharactersTo", "Free transfers to this server")}
-          <label className="character-transfer-row"><span>Validate-before-import timeout, seconds</span><input type="number" min="1" step="1" disabled={transferSaving} value={transferSettings.ValidateBeforeImportCharacterTimeout} onChange={(event) => updateTransferSetting("ValidateBeforeImportCharacterTimeout", Number(event.target.value))} /><span className="character-transfer-spacer" /></label>
+          <label className="character-transfer-row"><span>Validate-before-import timeout, seconds</span><input type="number" min="1" step="1" disabled={transferSaving || !access.can("admin:transfer-settings:write")} value={transferSettings.ValidateBeforeImportCharacterTimeout} onChange={(event) => updateTransferSetting("ValidateBeforeImportCharacterTimeout", Number(event.target.value))} /><span className="character-transfer-spacer" /></label>
           {transferBooleanRow("ForceIsWorldClosed", "Force world closed")}
           {transferBooleanRow("ForceIsWorldClosingSoon", "Force world closing soon")}
         </div>}
         <div className="action-line schedule-action-line">
-          <button disabled={transferLoading || transferSaving || !transferSettings || (!transferDirty && !transferNeedsApply)} onClick={() => saveTransferSettings()}>Save</button>
-          <button disabled={transferLoading || transferSaving || !transferDefaults} onClick={() => restoreTransferDefaults()}>Restore Defaults</button>
+          <PermissionGate action="admin:transfer-settings:write"><button disabled={transferLoading || transferSaving || !transferSettings || (!transferDirty && !transferNeedsApply)} onClick={() => saveTransferSettings()}>Save</button></PermissionGate>
+          <PermissionGate action="admin:transfer-settings:write"><button disabled={transferLoading || transferSaving || !transferDefaults} onClick={() => restoreTransferDefaults()}>Restore Defaults</button></PermissionGate>
           {transferResult && <span className={`inline-task-result result-${transferResult.status === "succeeded" ? "ok" : transferResult.status === "failed" ? "fail" : "running"}`}>
             <strong className={transferResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(transferResult.title, transferResult.status === "running")}</strong>
           </span>}
         </div>
         {transferResult?.status === "failed" && transferResult.details && <p className="danger-note" role="alert">{transferResult.details}</p>}
       </div>}
-    </div>
-    <div className={`playerAdmin_toggle admin-history-toggle-panel ${historyOpen ? "open" : ""}`}>
+    </div></PermissionGate>
+    <PermissionGate action="admin:history:read"><div className={`playerAdmin_toggle admin-history-toggle-panel ${historyOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={historyOpen ? "Collapse Command History" : "Expand Command History"} onClick={() => setHistoryOpen(!historyOpen)}>{historyOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Command History</span></button>
       {historyOpen && <div className="playerAdmin_toggleBody"><div className="admin-history-content">
-        {historyRows.length > 0 && <div className="action-row admin-history-actions"><button onClick={() => run(clearHistory)}>Clear</button></div>}
+        {historyRows.length > 0 && <div className="action-row admin-history-actions"><PermissionGate action="admin:history:clear"><button onClick={() => run(clearHistory)}>Clear</button></PermissionGate></div>}
         {historyRows.length ? <div className="admin-history-table"><DataTable rows={historyRows} columns={["time", "action", "target", "status", "summary"]} tableClassName="admin-history-grid" /></div> : <div className="admin-history-empty">Command history will appear here after an admin action runs.</div>}
         {history && <TechnicalDetails title="Advanced history output" text={history} />}
       </div></div>}
-    </div>
+    </div></PermissionGate>
   </section>;
 }
 

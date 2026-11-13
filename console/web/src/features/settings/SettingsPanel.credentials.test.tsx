@@ -123,14 +123,14 @@ describe("SettingsPanel credential controls", () => {
       render(<SettingsPanel onPasswordChanged={onPasswordChanged} confirmAction={vi.fn()} onTotpEnrollmentStarted={vi.fn()} />);
       await screen.findByLabelText("Expand Login Password");
 
-      expect(screen.queryByLabelText("Expand Two-Factor Authentication")).toBeNull();
+      expect(screen.queryByLabelText("Expand Two Factor Authentication")).toBeNull();
     });
 
     it("posts password + code, then shows the new codes behind an acknowledgment gate", async () => {
       mockBackend({ enrolled: true });
       mockPost.mockResolvedValue({ ok: true, recoveryCodes: ["aaaa-bbbb", "cccc-dddd"] } as never);
       render(<SettingsPanel onPasswordChanged={onPasswordChanged} confirmAction={vi.fn()} onTotpEnrollmentStarted={vi.fn()} />);
-      fireEvent.click(await screen.findByLabelText("Expand Two-Factor Authentication"));
+      fireEvent.click(await screen.findByLabelText("Expand Two Factor Authentication"));
 
       fireEvent.change(screen.getByPlaceholderText("Your login password"), { target: { value: "old-password" } });
       fireEvent.change(screen.getByPlaceholderText("Current 6-digit code"), { target: { value: "654321" } });
@@ -154,7 +154,7 @@ describe("SettingsPanel credential controls", () => {
       mockBackend({ enrolled: true });
       mockPost.mockRejectedValue(new Error("Current password is incorrect."));
       render(<SettingsPanel onPasswordChanged={onPasswordChanged} confirmAction={vi.fn()} onTotpEnrollmentStarted={vi.fn()} />);
-      fireEvent.click(await screen.findByLabelText("Expand Two-Factor Authentication"));
+      fireEvent.click(await screen.findByLabelText("Expand Two Factor Authentication"));
 
       fireEvent.change(screen.getByPlaceholderText("Your login password"), { target: { value: "wrong" } });
       fireEvent.change(screen.getByPlaceholderText("Current 6-digit code"), { target: { value: "654321" } });
@@ -231,7 +231,7 @@ describe("credential-state robustness (, , )", () => {
     mockBackend({ enrolled: true });
     mockPost.mockResolvedValue({ ok: true, recoveryCodes: ["aaaa-bbbb", "cccc-dddd"] } as never);
     render(<SettingsPanel onPasswordChanged={onPasswordChanged} confirmAction={vi.fn()} onTotpEnrollmentStarted={vi.fn()} />);
-    fireEvent.click(await screen.findByLabelText("Expand Two-Factor Authentication"));
+    fireEvent.click(await screen.findByLabelText("Expand Two Factor Authentication"));
 
     fireEvent.change(screen.getByPlaceholderText("Your login password"), { target: { value: "old-password" } });
     fireEvent.change(screen.getByPlaceholderText("Current 6-digit code"), { target: { value: "654321" } });
@@ -264,7 +264,7 @@ describe("the two credential forms are distinguishable", () => {
     mockBackend({ enrolled: true });
     render(<SettingsPanel onPasswordChanged={onPasswordChanged} confirmAction={vi.fn()} onTotpEnrollmentStarted={vi.fn()} />);
     await openLoginPasswordSection();
-    fireEvent.click(screen.getByLabelText("Expand Two-Factor Authentication"));
+    fireEvent.click(screen.getByLabelText("Expand Two Factor Authentication"));
 
     // Would throw "Found multiple elements" if the two sections still shared
     // placeholder text -- which is precisely the regression being pinned.
@@ -286,7 +286,7 @@ describe("the two credential forms are distinguishable", () => {
     mockBackend({ enrolled: true });
     render(<SettingsPanel onPasswordChanged={onPasswordChanged} confirmAction={vi.fn()} onTotpEnrollmentStarted={vi.fn()} />);
     await openLoginPasswordSection();
-    fireEvent.click(screen.getByLabelText("Expand Two-Factor Authentication"));
+    fireEvent.click(screen.getByLabelText("Expand Two Factor Authentication"));
 
     fireEvent.change(screen.getByPlaceholderText("Current 6-digit code"), { target: { value: "111111" } });
     expect((screen.getByPlaceholderText("Current 6-digit code") as HTMLInputElement).value).toBe("111111");
@@ -306,7 +306,7 @@ describe("recovery-codes heading level", () => {
     mockBackend({ enrolled: true });
     mockPost.mockResolvedValue({ ok: true, recoveryCodes: ["aaaa-bbbb"] } as never);
     render(<SettingsPanel onPasswordChanged={onPasswordChanged} confirmAction={vi.fn()} onTotpEnrollmentStarted={vi.fn()} />);
-    fireEvent.click(await screen.findByLabelText("Expand Two-Factor Authentication"));
+    fireEvent.click(await screen.findByLabelText("Expand Two Factor Authentication"));
 
     fireEvent.change(screen.getByPlaceholderText("Your login password"), { target: { value: "pw" } });
     fireEvent.change(screen.getByPlaceholderText("Current 6-digit code"), { target: { value: "654321" } });
@@ -335,7 +335,7 @@ describe("stale credential state after a transient /me failure", () => {
     mockBackend({ enrolled: true });
     render(<SettingsPanel onPasswordChanged={onPasswordChanged} confirmAction={vi.fn()} onTotpEnrollmentStarted={vi.fn()} />);
     // Prime it: the Two-Factor section is present because /me said enrolled.
-    expect(await screen.findByLabelText("Expand Two-Factor Authentication")).toBeTruthy();
+    expect(await screen.findByLabelText("Expand Two Factor Authentication")).toBeTruthy();
 
     // /me now fails transiently (rate limit, network blip) on a Refresh.
     mockApi.mockImplementation((path: string) => {
@@ -346,6 +346,6 @@ describe("stale credential state after a transient /me failure", () => {
 
     await waitFor(() => expect(screen.queryByText(/two-factor state could not be read/i)).toBeTruthy());
     // The contradiction: the section must NOT still be offering itself.
-    expect(screen.queryByLabelText("Expand Two-Factor Authentication")).toBeNull();
+    expect(screen.queryByLabelText("Expand Two Factor Authentication")).toBeNull();
   });
 });

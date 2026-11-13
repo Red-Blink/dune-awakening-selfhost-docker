@@ -50,7 +50,7 @@ describe("Login: transitioning to the TOTP step is not shown as a failure", () =
     await screen.findByLabelText("Authenticator code");
     // ...with a neutral confirmation, not the shared red .error paragraph.
     expect(document.querySelector("p.error")).toBeNull();
-    expect(screen.getByText(/password accepted/i)).toBeTruthy();
+    expect(screen.getByText("Enter the code from your authenticator app to finish signing in.")).toBeTruthy();
   });
 
   it("shows a real, red-styled error when an actually-wrong authenticator code is submitted", async () => {

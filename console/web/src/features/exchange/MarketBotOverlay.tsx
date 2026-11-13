@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import {
@@ -657,12 +658,12 @@ export function MarketBotOverlay({ onClose, onError, confirmAction }: MarketBotO
                   {status.plan.available === false ? " The bot cannot seed until an available plan is active." : ""}
                 </p>
                 <div className="confirm-modal-actions market-bot-actions market-bot-plan-actions">
-                  <button type="button" onClick={() => void setActivePlan()} disabled={Boolean(busy) || !selectedPlan || selectedIsActive}>{busy === "set-active-plan" ? "Setting…" : "Set as Active Plan"}</button>
-                  <button type="button" onClick={() => void savePlanName()} disabled={Boolean(busy) || selectedIsReadOnly || !planNameDraft.trim()}>{busy === "rename-plan" ? "Saving…" : "Save Plan Name"}</button>
+                  <PermissionGate action="exchange:market-write"><button type="button" onClick={() => void setActivePlan()} disabled={Boolean(busy) || !selectedPlan || selectedIsActive}>{busy === "set-active-plan" ? "Setting…" : "Set as Active Plan"}</button></PermissionGate>
+                  <PermissionGate action="exchange:market-write"><button type="button" onClick={() => void savePlanName()} disabled={Boolean(busy) || selectedIsReadOnly || !planNameDraft.trim()}>{busy === "rename-plan" ? "Saving…" : "Save Plan Name"}</button></PermissionGate>
                   <button type="button" onClick={() => void downloadPlanCsv()} disabled={Boolean(busy) || !selectedPlan}>{busy === "download-csv" ? "Downloading…" : "Download CSV"}</button>
                   <label className="button-link">
                     {busy === "upload-csv" ? "Uploading…" : "Upload CSV"}
-                    <input
+                    <PermissionGate action="exchange:market-write"><input
                       ref={csvInputRef}
                       className="hidden-file-input"
                       type="file"
@@ -670,7 +671,7 @@ export function MarketBotOverlay({ onClose, onError, confirmAction }: MarketBotO
                       aria-label="Upload CSV"
                       disabled={Boolean(busy)}
                       onChange={(event) => void uploadPlanCsv(event.target.files?.[0] || null)}
-                    />
+                    /></PermissionGate>
                   </label>
                 </div>
               </div>
@@ -689,7 +690,7 @@ export function MarketBotOverlay({ onClose, onError, confirmAction }: MarketBotO
               <div className="market-bot-backups-row">
                 <SectionTitle title={safetyBackups ? "Safety Backups" : "Safety Backups Off"} id="market-bot-backups-help" help="When on, the console takes a full database backup before every Market Bot write: buyback sweeps, reseeds, and NPC listing removals, scheduled or manual. Only the newest Market Bot backups are kept (DUNE_MARKET_BOT_BACKUP_KEEP, default 5). Turning this off skips those backups; existing backups are kept." />
                 <label className="market-bot-toggle">
-                  <input aria-label="Back Up the Database Before Every Write" type="checkbox" checked={safetyBackups} disabled={Boolean(busy)} onChange={(event) => void setSafetyBackups(event.target.checked)} />
+                  <PermissionGate action="exchange:market-write"><input aria-label="Back Up the Database Before Every Write" type="checkbox" checked={safetyBackups} disabled={Boolean(busy)} onChange={(event) => void setSafetyBackups(event.target.checked)} /></PermissionGate>
                   <span>Back Up Before Every Write</span>
                 </label>
               </div>
@@ -742,9 +743,9 @@ export function MarketBotOverlay({ onClose, onError, confirmAction }: MarketBotO
               <details className="market-bot-advanced"><summary>Category Price Tuning</summary><div className="market-bot-grid"><CategoryMultiplierInputs section="Buyback" values={buybackCategoryMultipliers} onChange={setBuybackCategoryMultipliers} /></div></details>
               <p className="muted market-bot-run-summary">{runSummary(status.buyback)}{savedBuybackExchange ? ` | Saved exchange ${savedBuybackExchange}` : ""}</p>
               <div className="confirm-modal-actions market-bot-actions">
-                <button onClick={() => void saveBuyback()} disabled={Boolean(busy)}>{busy === "save-buyback" ? "Saving…" : "Save Buyback Schedule"}</button>
-                <button onClick={() => void probe()} disabled={Boolean(busy)}>{busy === "probe" ? "Probing…" : "Probe Eligibility"}</button>
-                <button className="danger" onClick={() => void runBuybackNow()} disabled={Boolean(busy) || !savedBuybackExchange}>{busy === "run-buyback" ? "Running…" : "Run Sweep Now"}</button>
+                <PermissionGate action="exchange:market-write"><button onClick={() => void saveBuyback()} disabled={Boolean(busy)}>{busy === "save-buyback" ? "Saving…" : "Save Buyback Schedule"}</button></PermissionGate>
+                <PermissionGate action="exchange:market"><button onClick={() => void probe()} disabled={Boolean(busy)}>{busy === "probe" ? "Probing…" : "Probe Eligibility"}</button></PermissionGate>
+                <PermissionGate action="exchange:market-write"><button className="danger" onClick={() => void runBuybackNow()} disabled={Boolean(busy) || !savedBuybackExchange}>{busy === "run-buyback" ? "Running…" : "Run Sweep Now"}</button></PermissionGate>
               </div>
               {probeResult && (
                 <div className="market-bot-diagnostics" aria-label="Buyback Diagnostics">
@@ -795,9 +796,9 @@ export function MarketBotOverlay({ onClose, onError, confirmAction }: MarketBotO
               {commodityCatalog.length > 0 && <details className="market-bot-advanced market-bot-commodity-panel"><summary>Commodity Stack Quantities</summary><CommodityStackInputs catalog={commodityCatalog} groups={commodityGroups} values={commodityStacks} onChange={setCommodityStacks} /></details>}
               <p className="muted market-bot-run-summary">{runSummary(status.seed)}{savedSeedExchange ? ` | Saved exchange ${savedSeedExchange}` : ""}</p>
               <div className="confirm-modal-actions market-bot-actions">
-                <button onClick={() => void saveSeed()} disabled={Boolean(busy)}>{busy === "save-seed" ? "Saving…" : "Save Reseed Schedule"}</button>
-                <button className="danger" onClick={() => void runSeedNow()} disabled={Boolean(busy) || !savedSeedExchange}>{busy === "run-seed" ? "Running…" : "Run Reseed Now"}</button>
-                <button className="danger" onClick={() => void runUnseedNow()} disabled={Boolean(busy) || !exchangeId}>{busy === "unseed" ? "Removing…" : "Remove NPC Listings"}</button>
+                <PermissionGate action="exchange:market-write"><button onClick={() => void saveSeed()} disabled={Boolean(busy)}>{busy === "save-seed" ? "Saving…" : "Save Reseed Schedule"}</button></PermissionGate>
+                <PermissionGate action="exchange:market-write"><button className="danger" onClick={() => void runSeedNow()} disabled={Boolean(busy) || !savedSeedExchange}>{busy === "run-seed" ? "Running…" : "Run Reseed Now"}</button></PermissionGate>
+                <PermissionGate action="exchange:market-write"><button className="danger" onClick={() => void runUnseedNow()} disabled={Boolean(busy) || !exchangeId}>{busy === "unseed" ? "Removing…" : "Remove NPC Listings"}</button></PermissionGate>
               </div>
             </div>}
 

@@ -150,7 +150,7 @@ control itself is stale.
 Proposals and audits kept for their reasoning. Each one's status line says how
 much of it shipped; none is a description of current behavior.
 
-- [rfc-console-auth.md](rfc-console-auth.md) — Historical record. Layered Console authentication proposal; none of it is implemented here.
+- [rfc-console-auth.md](rfc-console-auth.md) — Historical design reference. This development branch implements Discord sign-in and opt-in password TOTP; passkeys remain a proposal. Use the Console authentication guides for the implemented flows.
 - [rfc-command-discovery.md](rfc-command-discovery.md) — Historical record. Discord command discovery from Core; Phase 1 shipped.
 - [rw-architecture.md](rw-architecture.md) — Historical record. Discord write-command design that was never built.
 - [spice-fields-per-map-scoping-l1-design-2026-09-21.md](design/spice-fields-per-map-scoping-l1-design-2026-09-21.md) — Historical record. Per-map scoping design for spice field settings.

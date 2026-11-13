@@ -19,6 +19,46 @@ test("non-renewable and setup sessions never become normal sessions after restar
   for (const session of sessions) assert.equal(restarted.readSession(request(session)), null);
 });
 
+test("restart preserves complete Discord sessions but never enrollment or recovery sessions", t => {
+  const dir = mkdtempSync(join(tmpdir(), "auth-dev-rebase-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const config = { sessionSecret: "synthetic-rebase-key", adminPassword: "synthetic-password", sessionStoreFile: join(dir, "sessions.json") };
+  const auth = createAuth(config);
+  const request = session => ({ headers: { cookie: `asc_session=${session.cookie}` } });
+  const discord = auth.makeSession({ tier: "player", userId: "example-user", username: "example", displayName: "Example Player" });
+  const enroll = auth.makeSession({ scope: "enroll", renewable: false });
+  const resetup = auth.makeSession({ scope: "resetup", renewable: false, expectedFactorVersion: 2 });
+  const restarted = createAuth(config);
+  assert.equal(restarted.readSession(request(discord))?.displayName, "Example Player");
+  assert.equal(restarted.readSession(request(enroll)), null);
+  assert.equal(restarted.readSession(request(resetup)), null);
+  const store = JSON.parse(readFileSync(config.sessionStoreFile, "utf8"));
+  assert.equal(store.sessions.length, 1);
+  store.sessions[0].displayName = "Changed Name";
+  writeFileSync(config.sessionStoreFile, JSON.stringify(store));
+  assert.equal(createAuth(config).readSession(request(discord)), null);
+});
+
+test("development auth invalidations remain effective after restart", t => {
+  const dir = mkdtempSync(join(tmpdir(), "auth-dev-revocation-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const config = { sessionSecret: "synthetic-revocation-key", adminPassword: "synthetic-password", sessionStoreFile: join(dir, "sessions.json") };
+  const auth = createAuth(config);
+  const request = session => ({ headers: { cookie: `asc_session=${session.cookie}` } });
+  const owner = auth.makeSession();
+  const other = auth.makeSession();
+  const discord = auth.makeSession({ tier: "player", userId: "example-user" });
+  assert.equal(auth.invalidatePasswordSessions(owner.id), 1);
+  let restarted = createAuth(config);
+  assert.equal(restarted.readSession(request(other)), null);
+  assert.ok(restarted.readSession(request(owner)));
+  assert.ok(restarted.readSession(request(discord)));
+  auth.invalidateSession(owner.id);
+  restarted = createAuth(config);
+  assert.equal(restarted.readSession(request(owner)), null);
+  assert.ok(restarted.readSession(request(discord)));
+});
+
 test("persisted sessions reject tampering, password changes and cross-instance contamination", t => {
   const dir = mkdtempSync(join(tmpdir(), "auth-persistence-test-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));

@@ -4,6 +4,8 @@ import { pipeline } from "node:stream/promises";
 import { createGzip } from "node:zlib";
 import { createServer as createNetServer } from "node:net";
 import { totalmem } from "node:os";
+import { createHash, randomUUID } from "node:crypto";
+import { filterMapAccess } from "./services/mapAccess.js";
 import { spawn } from "node:child_process";
 import { existsSync, writeFileSync, chmodSync, mkdirSync, createReadStream, createWriteStream, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
@@ -33,7 +35,7 @@ import { API_ROUTE_DOMAINS, createExactRouteIndex } from "./http/routeTable.js";
 import { audit, installAuditShutdownHooks, recordAdminHistory } from "./audit.js";
 import { createSecondFactorStore } from "./auth/secondFactorStore.js";
 import { generateTotpSecret, provisioningUri, provisioningQrDataUri, verifyTotpMatch } from "./auth/totp.js";
-import { createPendingStateStore, exchangeDiscordAuthCode, fetchDiscordIdentity, createOAuthTierResolver, buildAuthorizeUrl, oauthStateCookie, clearOAuthStateCookie } from "./integrations/discord/oauth.js";
+import { createPendingStateStore, exchangeDiscordAuthCode, fetchDiscordIdentity, createOAuthTierResolver, buildAuthorizeUrl, oauthStateCookie, clearOAuthStateCookie, constantTimeStringEqual, oauthCallbackFailure } from "./integrations/discord/oauth.js";
 import { createHandoff } from "./integrations/discord/handoff.js";
 import { roleTiersConfigured, roleTierConflicts, describeRoleTierConflicts, parseRoleIdList } from "./integrations/discord/roleTiers.js";
 import { redact } from "./redact.js";
@@ -57,6 +59,7 @@ import { collectContainerHealth } from "./services/containerHealth.js";
 import { createRealtime, parseObjectFilter, RealtimeError } from "./services/realtime.js";
 import { createEncryptedApi, EncryptedApiError } from "./services/encryptedApi.js";
 import { createRealtimeAgent, RealtimeAgentError } from "./services/realtimeAgent.js";
+import { createConsoleHttps } from "./services/consoleHttps.js";
 import { tlsClientAddress } from "./services/tlsClientAddress.js";
 import { createConsoleAccess } from "./services/consoleAccess.js";
 import { parseMemorySwapStatus } from "./services/memorySwap.js";
@@ -129,6 +132,7 @@ import { playerListSettingsView, resolvePlayerInactiveWeeks, savePlayerListSetti
 import { resolveAutoStartBattlegroup, saveServerStartupSettings, serverStartupSettingsView } from "./services/serverStartupSettings.js";
 
 const config = loadConfig();
+const consoleInstanceId = randomUUID();
 const consoleAccess = createConsoleAccess({
   repoRoot: config.repoRoot,
   configured: process.env.DUNE_CONFIGURED_ADMIN_ALLOWED_IPS,
@@ -470,6 +474,7 @@ const apiKeys = createApiKeyStore({ file: config.apiKeysFile });
 const realtime = createRealtime();
 const realtimeAgent = createRealtimeAgent({ repoRoot: config.repoRoot, health: () => realtime.health() });
 const encryptedApi = createEncryptedApi({ repoRoot: config.repoRoot });
+const consoleHttps = createConsoleHttps({ repoRoot: config.repoRoot, host: config.host, port: config.port });
 // Proof that a restore was previewed, for the apply that follows it. In memory
 // beside the sessions it is keyed by -- see the module header for why it is not
 // persisted.
@@ -640,6 +645,7 @@ createServer(async (req, res) => {
     json(res, payload.status, payload.body);
   }
 }).listen(config.port, config.host, () => {
+  void consoleHttps.resume();
   console.log(`${config.appName} API listening on http://${config.host}:${config.port}`);
   if (config.host === "0.0.0.0") {
     console.warn("Warning: ADMIN_BIND_HOST is 0.0.0.0 — the Web Console is reachable on all network interfaces.");
@@ -1008,7 +1014,7 @@ async function handleApi(req, res) {
     // `scope` lets a reloaded page tell an enrollment/re-setup session apart
     // from a normal one: without it the client treated the restricted session
     // as signed in and rendered a console where every route is 403.
-    return json(res, 200, { authenticated: Boolean(session), csrfToken: session?.csrf || null, scope: session?.scope || null, config: {
+    return json(res, 200, { instanceId: consoleInstanceId, authenticated: Boolean(session), csrfToken: session?.csrf || null, scope: session?.scope || null, config: {
       ...publicConfig(config),
       discordSetupPendingRestart,
       discordOAuthConfigured: config.discordOAuthConfigured && !discordOAuthSoftDisabledInProcess,
@@ -1431,7 +1437,8 @@ async function handleApi(req, res) {
       // round-trips through this exact URL during the disable/forget
       // restart window, defeating the "immediate, no-window cutoff"
       // guarantee for this one path specifically.
-      if (!config.discordOAuthAppConfigured || discordOAuthSoftDisabledInProcess) {
+      const setupApplication = readDiscordSetupApplication();
+      if (!setupApplication.ready || config.discordOAuthDisabled || discordOAuthSoftDisabledInProcess || discordOAuthForgottenInProcess) {
         return json(res, 400, { error: "This console has no Discord application yet. Set DISCORD_OAUTH_CLIENT_ID, DISCORD_OAUTH_CLIENT_SECRET and DISCORD_OAUTH_REDIRECT_URI in .env (like a bot's), or enter them on the setup screen." });
       }
       // Setup mode requires an authenticated owner session, but that owner
@@ -1445,10 +1452,10 @@ async function handleApi(req, res) {
         return json(res, 429, { error: "Too many Discord sign-in attempts from this address. Wait a minute, then try again." }, { "retry-after": String(setupStartRate.retryAfterSeconds) });
       }
       oauthStartRateLimiter.record(setupKey);
-      const pending = oauthPendingStates.issue(undefined, { purpose: "setup", sessionId: ownerSession.id, owner: setupKey });
+      const pending = oauthPendingStates.issue(undefined, { purpose: "setup", sessionId: ownerSession.id, owner: setupKey, applicationVersion: setupApplication.version });
       if (!pending) return json(res, 429, { error: "Too many Discord sign-in sessions in progress. Try again in a moment." });
       res.setHeader("Set-Cookie", oauthStateCookie(pending.state));
-      res.writeHead(302, { Location: buildAuthorizeUrl({ clientId: config.discordOAuthClientId, redirectUri: config.discordOAuthRedirectUri, state: pending.state, codeChallenge: pending.challenge, prompt: "none" }) });
+      res.writeHead(302, { Location: buildAuthorizeUrl({ clientId: setupApplication.clientId, redirectUri: setupApplication.redirectUri, state: pending.state, codeChallenge: pending.challenge, prompt: "none" }) });
       res.end();
       audit(config, sanitizedUrl(req, "/api/auth/discord/start"), "auth.oauth.start", { ok: true, purpose: "setup" });
       return;
@@ -1496,7 +1503,7 @@ async function handleApi(req, res) {
     return;
   }
   if (path === "/api/auth/discord/callback") {
-    if (!config.discordOAuthAppConfigured || discordOAuthSoftDisabledInProcess) {
+    if ((!config.discordOAuthAppConfigured && !readDiscordSetupApplication().ready) || config.discordOAuthDisabled || discordOAuthSoftDisabledInProcess || discordOAuthForgottenInProcess) {
       return json(res, 404, { error: "Discord sign-in is not configured for this console. Sign in with the admin password." });
     }
     return handleOAuthCallback(req, res);
@@ -1587,7 +1594,7 @@ async function handleApi(req, res) {
     // gate above.
     audit(config, sanitizedUrl(req, "/api/setup/discord-restart"), "setup.discord-restart", { ok: true, ...({ tier: session.tier || "owner" }) });
     scheduleConsoleRestart(config.port);
-    return json(res, 202, { ok: true, message: "The console is restarting. This page will reconnect in about 10-20 seconds." });
+    return json(res, 202, { ok: true, instanceId: consoleInstanceId, message: "Rebuilding the Console. This page will reconnect when the new Console is ready." });
   }
   if (path === "/api/setup/discord-identity" && req.method === "GET") {
     // The wizard's server picker. Only ever the identity captured by THIS
@@ -1865,6 +1872,26 @@ async function handleApi(req, res) {
   if (path === "/api/settings/realtime-agent" && req.method === "GET") return realtimeAgentRoute(res, () => realtimeAgent.status());
   if (path === "/api/settings/realtime-agent" && req.method === "POST") return realtimeAgentToggleRoute(req, res);
   if (path === "/api/settings/encrypted-api" && req.method === "GET") return encryptedApiRoute(res, () => encryptedApi.status());
+  if (path === "/api/settings/console-https") {
+    // Public exposure is always an owner decision, even with customized IAM.
+    if (session.tier !== "owner" || bearer) return json(res, 403, { error: "Only the Console owner can manage HTTPS connections." });
+    if (req.method === "GET") return json(res, 200, await consoleHttps.status(), { "cache-control": "no-store" });
+    if (req.method === "POST") {
+      const body = await readJson(req);
+      if (body.action === "start") {
+        const result = consoleHttps.start(body);
+        audit(config, req, "settings.console-https-start", { provider: body.provider });
+        return json(res, 202, result, { "cache-control": "no-store" });
+      }
+      if (body.action === "stop") {
+        await consoleHttps.stop();
+        audit(config, req, "settings.console-https-stop", {});
+        return json(res, 200, { ok: true });
+      }
+      if (body.action === "detect") return json(res, 200, { providers: await consoleHttps.discover(true) });
+      return json(res, 400, { error: "Choose Start, Stop, or Check again." });
+    }
+  }
   if (path === "/api/settings/console-access/confirm" && req.method === "POST") {
     const body = await readJson(req);
     try {
@@ -2228,17 +2255,17 @@ async function handleApi(req, res) {
   if (path === "/api/care-package/disable" && req.method === "POST") return carePackageEnableRoute(req, res, false);
 
   if (path === "/api/map/status") return mapStatusRoute(res, url);
-  if (path === "/api/map/capabilities") return dbJson(res, () => duneDb.liveMapCapabilities(db));
+  if (path === "/api/map/capabilities") return dbJson(res, async () => filterMapAccess({ capabilities: await duneDb.liveMapCapabilities(db) }, action => principalMay(req, action)).capabilities);
   if (path === "/api/map/teleport-player" && req.method === "POST") return liveMapTeleportPlayerRoute(req, res);
   if (path === "/api/map/partitions") return dbJson(res, () => duneDb.liveMapPartitions(db));
-  if (path === "/api/map/markers") return liveMapMarkersRoute(res, url);
+  if (path === "/api/map/markers") return liveMapMarkersRoute(req, res, url);
   if (path === "/api/map/players") return dbJson(res, () => duneDb.liveMapPlayers(db, url.searchParams.get("map") || ""));
   if (path === "/api/map/bases") return dbJson(res, () => duneDb.liveMapBases(db, url.searchParams.get("map") || ""));
   if (path === "/api/map/storage") return dbJson(res, () => duneDb.liveMapStorage(db, url.searchParams.get("map") || ""));
   if (path === "/api/map/services") return dbJson(res, () => duneDb.liveMapServices(db, url.searchParams.get("map") || ""));
   if (path === "/api/map/spice") return dbJson(res, () => liveMapSpice(db, config, url.searchParams.get("map") || "", { partitionId: url.searchParams.get("partitionId") || "" }));
   if (path === "/api/map/poi") return dbJson(res, () => liveMapPoi(db, url.searchParams.get("map") || ""));
-  if (path === "/api/map/overlays") return dbJson(res, () => duneDb.liveMapMarkers(db, url.searchParams.get("map") || ""));
+  if (path === "/api/map/overlays") return dbJson(res, async () => filterMapAccess(await duneDb.liveMapMarkers(db, url.searchParams.get("map") || ""), action => principalMay(req, action)));
   if (path === "/api/maps/mode" && req.method === "POST") return confirmedTask(req, res, "maps", "mapsSetMode", {}, "SET MAP MODE");
   if (path === "/api/maps/settings" && req.method === "POST") return mapSettingsRoute(req, res);
   if (path === "/api/maps/runtime-settings" && req.method === "POST") return mapsRuntimeSettingsRoute(req, res);
@@ -2428,7 +2455,7 @@ async function addonBridgeRoute(req, res, path) {
   // Same trusted-proxy resolution as the login limiter (/code-review high
   // finding, 2026-09-24) -- otherwise every addon-bridge caller behind a
   // reverse proxy shares one rate-limit bucket keyed to the proxy's own IP.
-  const clientIp = resolveClientIp(req, config.trustedProxyIps);
+  const clientIp = remoteIpOf(req);
   const key = `${id}:${clientIp}`;
   const limit = bridgeRateLimiter.check(key);
   if (!limit.allowed) {
@@ -2760,7 +2787,7 @@ function addonContentRoute(req, res, path) {
   createReadStream(target).pipe(res);
 }
 
-async function liveMapMarkersRoute(res, url) {
+async function liveMapMarkersRoute(req, res, url) {
   return dbJson(res, async () => {
     const configPayload = duneDb.liveMapConfigPayload(url.searchParams.get("map") || "");
     const activeMap = configPayload.map.actorMap || configPayload.map.key;
@@ -2782,7 +2809,7 @@ async function liveMapMarkersRoute(res, url) {
       liveMapSpice(db, config, activeMap, { partitionId, includeStaticPool: includeStatic, resolveCycle: async () => cycle }).catch(() => ({ capabilities: { ...(includeStatic ? { spice: false } : {}), spice_active: false, flour_sand: false }, rows: [] })),
       includeStatic ? liveMapPoi(db, activeMap).catch(() => ({ capabilities: {}, rows: [] })) : Promise.resolve({ capabilities: {}, rows: [] })
     ]);
-    return {
+    return filterMapAccess({
       ...markers,
       ...configPayload,
       capabilities: { ...markers.capabilities, ...spice.capabilities, ...poi.capabilities },
@@ -2807,7 +2834,7 @@ async function liveMapMarkersRoute(res, url) {
       // image rather than guessing. ?? not ||: layout 0 is valid.
       coriolisLayout: cycle.layout ?? null,
       partitions: partitions.rows || []
-    };
+    }, action => principalMay(req, action));
   });
 }
 
@@ -4148,6 +4175,10 @@ async function totpEnableRoute(req, res) {
     auditUrl, action: ACTION, actor, requireEnrolled: false,
   });
   if (!proof.ok) return;
+  // Preserve the owner's availability choice across host/Console restarts.
+  // Do this before enrollment starts so a failed config write cannot hide
+  // recovery codes after a factor has already been activated.
+  await updateEnvFileValue("CONSOLE_TOTP_ENABLED", "1");
   const enrollSession = auth.makeSession({ tier: "enroll", scope: "enroll", ttlMs: config.enrollmentSessionTtlMs, renewable: false });
   // Bind completion/cancellation to the still-valid owner that proved the
   // password; revoked or expired owners cannot be restored by an old QR.
@@ -4505,7 +4536,10 @@ async function webPortRoute(req, res) {
   const port = validateWebPort(body.port);
   if (port !== config.port) await assertWebPortAvailable(port);
   const host = webConsoleDisplayHost(req);
-  const url = `http://${host}:${port}`;
+  // A managed tunnel keeps its own address; its local relay follows the new
+  // listener on startup. Never send that browser to a public hostname:LAN-port.
+  const managedHttps = req.headers["x-dune-console-proxy"] === "1" && typeof req.headers["x-dune-tls-signature"] === "string";
+  const url = managedHttps ? `https://${host}` : `http://${host}:${port}`;
   await updateEnvFileValue("ADMIN_BIND_PORT", String(port));
   process.env.ADMIN_BIND_PORT = String(port);
   audit(config, req, "settings.change-web-port", { port });
@@ -4560,7 +4594,7 @@ function scheduleConsoleRestart(port) {
       `echo "[$(date -Is)] Restarting Dune Docker Console on port ${port}" >> runtime/generated/console-restart.log`,
       "docker compose -f docker-compose.web.yml build redblink-dune-docker-console >> runtime/generated/console-restart.log 2>&1",
       "docker rm -f redblink-dune-docker-console >> runtime/generated/console-restart.log 2>&1 || true",
-      "docker compose -f docker-compose.web.yml up -d redblink-dune-docker-console >> runtime/generated/console-restart.log 2>&1",
+      "docker compose -f docker-compose.web.yml up -d --no-deps redblink-dune-docker-console >> runtime/generated/console-restart.log 2>&1",
       "if [ -x runtime/scripts/tls-front.sh ]; then runtime/scripts/tls-front.sh reconcile >> runtime/generated/console-restart.log 2>&1; fi",
       `echo "[$(date -Is)] Dune Docker Console restart command finished" >> runtime/generated/console-restart.log`
     ].join("\n");
@@ -4572,7 +4606,7 @@ function scheduleConsoleRestart(port) {
       hostUid,
       hostGid,
       dockerSocketGid,
-      extraEnv: [`ADMIN_BIND_PORT=${port}`],
+      extraEnv: [`ADMIN_BIND_PORT=${port}`, `CONSOLE_TOTP_ENABLED=${config.consoleTotpEnabled ? "1" : "0"}`],
       command: script
     }), {
       cwd: config.repoRoot,
@@ -8212,7 +8246,7 @@ async function setupState(clientIp) {
   const battlegroup = existsSync(resolve(config.generatedDir, "battlegroup.env"));
   const initialized = await isInitializedStackPresent();
   return {
-    config: publicConfig(config),
+    config: { ...publicConfig(config), discordSetupApplicationReady: readDiscordSetupApplication().ready },
     serverConfig: readSetupConfigValues(),
     publicDirectory: publicDirectorySettings(),
     serverStartup: serverStartupSettingsView(config.repoRoot),
@@ -8226,6 +8260,21 @@ async function setupState(clientIp) {
       duneScript: existsSync(config.duneScript)
     }
   };
+}
+
+// Owner setup can use newly saved credentials without changing public login.
+// The version binds authorization and role selection to the same application.
+function readDiscordSetupApplication() {
+  const saved = readSetupConfigValues();
+  const clientId = String(saved.DISCORD_OAUTH_CLIENT_ID ?? config.discordOAuthClientId ?? "").trim();
+  const redirectUri = String(saved.DISCORD_OAUTH_REDIRECT_URI ?? config.discordOAuthRedirectUri ?? "").trim();
+  let clientSecret = config.discordOAuthClientSecretEnvManaged ? config.discordOAuthClientSecret : "";
+  if (!config.discordOAuthClientSecretEnvManaged) {
+    try { clientSecret = readFileSync(discordOAuthSecretFile(), "utf8").trim(); } catch { /* Not saved yet. */ }
+  }
+  const ready = Boolean(clientId && clientSecret && redirectUri);
+  const version = ready ? createHash("sha256").update(JSON.stringify([clientId, redirectUri, clientSecret])).digest("hex") : "";
+  return { clientId, redirectUri, clientSecret, ready, version };
 }
 
 function publicDirectorySettings() {
@@ -8260,6 +8309,10 @@ async function discordSetupFinalize(req, res, session) {
   if (!config.authDisabled && req.headers["x-csrf-token"] !== session.csrf) return deny(403, { error: "Your setup session expired. Start Discord setup again." }, "csrf");
   const captured = session.pendingDiscordSetup;
   if (!captured) return deny(400, { error: "Continue with Discord first." }, "no_identity");
+  if (captured.applicationVersion && captured.applicationVersion !== readDiscordSetupApplication().version) {
+    delete session.pendingDiscordSetup;
+    return deny(409, { error: "The application settings changed. Connect with Discord again before saving access roles.", requiresAuthorization: true }, "application_changed");
+  }
   const guildId = String(body.guildId || "").trim();
   const guild = captured.guilds.find((g) => g.id === guildId);
   if (!guild) return deny(400, { error: "Choose one of your Discord servers." }, "guild_not_in_list");
@@ -8880,7 +8933,7 @@ function oauthReturnPage() {
 function oauthErrorPage(message) {
   const safe = String(message)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Sign-in failed</title></head><body><p>${safe}</p><p><a href="/">Return to the console sign-in</a></p></body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Discord Could Not Connect</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#101113;color:#e7dfd2;font:16px/1.6 system-ui,sans-serif}main{box-sizing:border-box;width:min(480px,calc(100% - 32px));padding:28px;border:1px solid #494034;border-radius:10px;background:#191a1c}h1{margin:0 0 14px;color:#d4b57e;font-size:22px}p{margin:0 0 22px;overflow-wrap:anywhere}a{display:inline-block;padding:9px 14px;border-radius:6px;background:#c6a56e;color:#1b1712;font-weight:600;text-decoration:none}a:focus-visible{outline:2px solid #fff;outline-offset:4px}</style></head><body><main><h1>Discord Could Not Connect</h1><p>${safe}</p><a href="/">Back To Console</a></main></body></html>`;
 }
 
 // html/sessionCookieValue: local helpers for the OAuth callback route,
@@ -8974,6 +9027,15 @@ async function handleOAuthCallback(req, res) {
     return html(res, 400, oauthErrorPage("Discord sign-in could not be completed. The request was invalid or expired — return to the console and start again."));
   }
   const isSetupCallback = consumed.purpose === "setup";
+  const application = isSetupCallback ? readDiscordSetupApplication() : {
+    clientId: config.discordOAuthClientId, clientSecret: config.discordOAuthClientSecret,
+    redirectUri: config.discordOAuthRedirectUri
+  };
+  if (isSetupCallback && (!application.ready || (consumed.applicationVersion && consumed.applicationVersion !== application.version))) {
+    oauthCallbackRateLimiter.recordFailure(rateKey);
+    audit(config, sanitizedUrl(req, "/api/auth/discord/callback"), "auth.oauth.callback", { ok: false, reason: "application_changed" });
+    return html(res, 400, oauthErrorPage("The application settings changed during authorization. Return to the Console and connect with Discord again."));
+  }
   if (!isSetupCallback && handoff.misconfigured) {
     oauthCallbackRateLimiter.recordFailure(rateKey);
     audit(config, sanitizedUrl(req, "/api/auth/discord/callback"), "auth.oauth.callback", { ok: false, reason: "handoff_misconfigured" });
@@ -9000,18 +9062,22 @@ async function handleOAuthCallback(req, res) {
   try {
     token = await exchangeDiscordAuthCode({
       code,
-      redirectUri: config.discordOAuthRedirectUri,
-      clientId: config.discordOAuthClientId,
-      clientSecret: config.discordOAuthClientSecret,
+      redirectUri: application.redirectUri,
+      clientId: application.clientId,
+      clientSecret: application.clientSecret,
       codeVerifier: consumed.verifier,
       apiBaseUrl: config.discordOAuthApiBaseUrl
     });
     identity = await fetchDiscordIdentity({ accessToken: token.access_token, homeGuildId: config.discordHomeGuildId, apiBaseUrl: config.discordOAuthApiBaseUrl });
   } catch (error) {
     oauthCallbackRateLimiter.recordFailure(rateKey);
-    audit(config, sanitizedUrl(req, "/api/auth/discord/callback"), "auth.oauth.callback", { ok: false, reason: error.code || "oauth_error" });
-    const status = error.statusCode && error.statusCode >= 400 && error.statusCode < 600 ? error.statusCode : 400;
-    return html(res, status, oauthErrorPage("Discord sign-in failed. Please try again, or sign in with the admin password."));
+    const failure = oauthCallbackFailure(error, { setup: isSetupCallback });
+    audit(config, sanitizedUrl(req, "/api/auth/discord/callback"), "auth.oauth.callback", {
+      ok: false, reason: failure.reason,
+      upstreamStatus: error.upstreamStatus,
+      upstreamOperation: error.upstreamOperation
+    });
+    return html(res, failure.status, oauthErrorPage(failure.message));
   }
   if (consumed.purpose === "setup") {
     // Setup mode: no tier, no session. Hand the operator's identity and guild
@@ -9022,7 +9088,7 @@ async function handleOAuthCallback(req, res) {
       // Only servers this person OWNS. Owner tier is derived from ownership and
       // finalize refuses any other server, so the rest are noise -- and the
       // console has no reason to hold a list of every guild the operator is in.
-      guilds: identity.guilds.filter((g) => g.owner), capturedAt: Date.now()
+      guilds: identity.guilds.filter((g) => g.owner), capturedAt: Date.now(), applicationVersion: consumed.applicationVersion
     };
     const ownerSession = consumed.sessionId ? auth.readSessionById(consumed.sessionId) : null;
     if (!ownerSession) {

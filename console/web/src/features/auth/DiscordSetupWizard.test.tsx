@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { api, post } from "../../api/client";
+import { ApiError, api, post } from "../../api/client";
 import { DiscordSetupWizard } from "./DiscordSetupWizard";
 
 // #641 (guided Discord app-creation flow + hard HTTPS gate). Real Eight Hats
@@ -17,7 +17,7 @@ import { DiscordSetupWizard } from "./DiscordSetupWizard";
 //     raw window.open() call, which this suite asserts directly (the href).
 //   - QA MEDIUM: the HTTPS gate line had zero test coverage even in its
 //     original warning-only form.
-vi.mock("../../api/client", () => ({ api: vi.fn(), post: vi.fn() }));
+vi.mock("../../api/client", async (importOriginal) => ({ ...await importOriginal<typeof import("../../api/client")>(), api: vi.fn(), post: vi.fn() }));
 const mockApi = vi.mocked(api);
 const mockPost = vi.mocked(post);
 
@@ -40,17 +40,19 @@ describe("DiscordSetupWizard: hard HTTPS gate", () => {
   beforeEach(() => { vi.clearAllMocks(); stubHttps(true); });
   afterEach(() => { stubHttps(true); });
 
-  it("blocks the connect step entirely and shows free HTTPS options when not loaded over HTTPS", async () => {
+  it("blocks insecure setup and keeps HTTPS guidance in an optional disclosure", async () => {
     stubHttps(false);
     stubNotYetConfigured();
     render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
 
     expect(await screen.findByText(/requires https/i)).toBeTruthy();
-    expect(screen.getByText(/Cloudflare Tunnel/i)).toBeTruthy();
+    expect(screen.getByText("Cloudflare Tunnel", { exact: true })).not.toBeVisible();
+    fireEvent.click(screen.getByText("HTTPS Connection Options"));
+    expect(screen.getByText("Cloudflare Tunnel", { exact: true })).toBeVisible();
     expect(screen.getAllByText(/Tailscale/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/ngrok/i).length).toBeGreaterThan(0);
     // The connect-step branch buttons must not appear while blocked.
-    expect(screen.queryByText("I already have a Discord application")).toBeNull();
+    expect(screen.queryByText("Existing App")).toBeNull();
   });
 
   it("does not block, and shows the normal connect step, when loaded over HTTPS", async () => {
@@ -58,7 +60,7 @@ describe("DiscordSetupWizard: hard HTTPS gate", () => {
     stubNotYetConfigured();
     render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
 
-    expect(await screen.findByText("I already have a Discord application")).toBeTruthy();
+    expect(await screen.findByText("Existing App")).toBeTruthy();
     expect(screen.queryByText(/requires https/i)).toBeNull();
   });
 });
@@ -69,21 +71,21 @@ describe("DiscordSetupWizard: guided app-creation branch", () => {
   it("shows the branch question before either path is chosen", async () => {
     stubNotYetConfigured();
     render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
-    expect(await screen.findByText("I already have a Discord application")).toBeTruthy();
-    expect(screen.getByText("I need to create one")).toBeTruthy();
+    expect(await screen.findByText("Existing App")).toBeTruthy();
+    expect(screen.getByText("Create App")).toBeTruthy();
     expect(screen.queryByLabelText(/client id/i)).toBeNull();
   });
 
-  // Live-testing finding: "I need to create one" used the same tiny,
+  // Live-testing finding: "Create App" used the same tiny,
   // muted-text-link class as "Cancel" -- a real, weighted either/or choice
   // (arguably the MORE common path for a first-time operator) looked like a
   // throwaway escape hatch next to the bold primary button. It needs its own
   // real, visually-distinct secondary-button styling, not .login-password-
   // toggle (reserved for genuine tertiary/escape actions like Cancel).
-  it("'I need to create one' is a real secondary button, not styled the same as Cancel", async () => {
+  it("'Create App' is a real secondary button, not styled the same as Cancel", async () => {
     stubNotYetConfigured();
     render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
-    const needAppButton = await screen.findByText("I need to create one");
+    const needAppButton = await screen.findByText("Create App");
     const cancelButton = screen.getByText("Cancel");
     expect(needAppButton.className).not.toBe(cancelButton.className);
     expect(needAppButton.className).toContain("login-secondary-button");
@@ -92,16 +94,16 @@ describe("DiscordSetupWizard: guided app-creation branch", () => {
   it("'I already have one' reveals the form directly, with the dedicated-app warning co-located", async () => {
     stubNotYetConfigured();
     render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
-    fireEvent.click(await screen.findByText("I already have a Discord application"));
+    fireEvent.click(await screen.findByText("Existing App"));
     expect(await screen.findByLabelText(/client id/i)).toBeTruthy();
     expect(screen.getByLabelText(/client secret/i)).toBeTruthy();
-    expect(screen.getByText(/dedicated/i)).toBeTruthy();
+    expect(screen.getByText(/application just for your Console/i)).toBeTruthy();
   });
 
-  it("'I need to create one' opens Discord's portal via a safe <a rel=noreferrer> link, shows a numbered checklist, and the same form", async () => {
+  it("'Create App' opens Discord's portal via a safe <a rel=noreferrer> link, shows a numbered checklist, and the same form", async () => {
     stubNotYetConfigured();
     render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
-    fireEvent.click(await screen.findByText("I need to create one"));
+    fireEvent.click(await screen.findByText("Create App"));
 
     const link = await screen.findByRole("link", { name: /developer portal/i });
     expect(link.getAttribute("href")).toBe("https://discord.com/developers/applications");
@@ -110,17 +112,17 @@ describe("DiscordSetupWizard: guided app-creation branch", () => {
 
     expect(screen.getByText("OAuth2")).toBeTruthy();
     expect(await screen.findByLabelText(/client id/i)).toBeTruthy();
-    expect(screen.getByText(/dedicated/i)).toBeTruthy();
+    expect(screen.getByText(/application just for your Console/i)).toBeTruthy();
   });
 
   it("shows a welcome-back nudge once the window regains focus after choosing 'need to create one'", async () => {
     stubNotYetConfigured();
     render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
-    fireEvent.click(await screen.findByText("I need to create one"));
-    expect(screen.queryByText(/welcome back/i)).toBeNull();
+    fireEvent.click(await screen.findByText("Create App"));
+    expect(screen.queryByText(/your application is ready/i)).toBeNull();
 
     fireEvent(window, new Event("focus"));
-    expect(await screen.findByText(/welcome back/i)).toBeTruthy();
+    expect(await screen.findByText(/your application is ready/i)).toBeTruthy();
   });
 });
 
@@ -134,9 +136,10 @@ describe("DiscordSetupWizard: saving the connect-step form", () => {
       return Promise.reject(new Error(`unexpected post: ${path}`));
     });
     render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
-    fireEvent.click(await screen.findByText("I already have a Discord application"));
+    fireEvent.click(await screen.findByText("Existing App"));
 
     fireEvent.change(await screen.findByLabelText(/client id/i), { target: { value: "123456789012345678" } });
+    fireEvent.change(screen.getByLabelText(/client secret/i), { target: { value: "synthetic-test-secret" } });
     fireEvent.click(screen.getByText(/save/i));
 
     await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/api/setup/write-oauth-config", expect.anything()));
@@ -153,7 +156,7 @@ describe("DiscordSetupWizard: saving the connect-step form", () => {
       return Promise.reject(new Error(`unexpected post: ${path}`));
     });
     render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
-    fireEvent.click(await screen.findByText("I already have a Discord application"));
+    fireEvent.click(await screen.findByText("Existing App"));
 
     fireEvent.change(await screen.findByLabelText(/client id/i), { target: { value: "123456789012345678" } });
     fireEvent.change(screen.getByLabelText(/client secret/i), { target: { value: "shh-its-a-secret" } });
@@ -162,96 +165,36 @@ describe("DiscordSetupWizard: saving the connect-step form", () => {
     await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/api/setup/save-oauth-secret", { secret: "shh-its-a-secret", overwrite: false }));
   });
 
-  it("does not call save-oauth-secret at all when no secret was entered", async () => {
+  it("requires a secret for a new application without writing incomplete configuration", async () => {
     stubNotYetConfigured();
     mockPost.mockImplementation((path: string) => {
       if (path === "/api/setup/write-oauth-config") return Promise.resolve({ ok: true } as never);
       return Promise.reject(new Error(`unexpected post: ${path}`));
     });
     render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
-    fireEvent.click(await screen.findByText("I already have a Discord application"));
+    fireEvent.click(await screen.findByText("Existing App"));
     fireEvent.change(await screen.findByLabelText(/client id/i), { target: { value: "123456789012345678" } });
     fireEvent.click(screen.getByText(/save/i));
 
-    await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/api/setup/write-oauth-config", expect.anything()));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/client secret/i);
+    expect(mockPost).not.toHaveBeenCalled();
     expect(mockPost).not.toHaveBeenCalledWith("/api/setup/save-oauth-secret", expect.anything());
   });
 });
 
-// Live-testing finding: "entered both values, clicked save and the secret
-// input went away and nothing else [happened]". Root cause (confirmed against
-// real server code, not guessed): writeOAuthConfig/saveOAuthClientSecret only
-// write .env / the secret file -- config.discordOAuthAppConfigured is computed
-// once from process.env at loadConfig() (server.js:81) and is never hot-reloaded,
-// so a successful save is real but invisible until the console restarts. This
-// exact "wrote config the running process hasn't loaded" problem already has a
-// solved pattern in this same component for the later finalize step (the "done"
-// step's restartNow() + poll-until-config-flips) -- the connect step's save
-// never wired into it. publicConfig() already exposes discordOAuthAppConfigured
-// (config.js:527), so /api/auth/state carries exactly the field needed to poll;
-// this is a frontend-only fix.
-describe("DiscordSetupWizard: a restart is required after saving (the process only reads .env at boot)", () => {
+describe("DiscordSetupWizard: one final restart", () => {
   beforeEach(() => { vi.clearAllMocks(); stubHttps(true); });
-  afterEach(() => { vi.useRealTimers(); });
-
-  function stubLocationReplace() {
-    const replace = vi.fn();
-    Object.defineProperty(window, "location", {
-      value: { ...window.location, protocol: "https:", origin: "https://console.example.org", search: "", replace },
-      writable: true,
-    });
-    return replace;
-  }
-
-  it("shows a 'restart required' prompt instead of silently doing nothing once the save succeeds", async () => {
+  it("saves the application and continues to authorization without an intermediate restart", async () => {
     stubNotYetConfigured();
-    mockPost.mockImplementation((path: string) => {
-      if (path === "/api/setup/write-oauth-config") return Promise.resolve({ ok: true } as never);
-      if (path === "/api/setup/save-oauth-secret") return Promise.resolve({ ok: true } as never);
-      return Promise.reject(new Error(`unexpected post: ${path}`));
-    });
-    render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
-    fireEvent.click(await screen.findByText("I already have a Discord application"));
-    fireEvent.change(await screen.findByLabelText(/client id/i), { target: { value: "123456789012345678" } });
-    fireEvent.change(screen.getByLabelText(/client secret/i), { target: { value: "shh-its-a-secret" } });
-    fireEvent.click(screen.getByText(/save/i));
-
-    expect(await screen.findByText("Restart the console now")).toBeTruthy();
-    // The stale, now-emptied form must not still be the only thing on screen --
-    // that is exactly what read as "went away and nothing else".
-    expect(screen.queryByLabelText(/client secret/i)).toBeNull();
-  });
-
-  it("clicking 'Restart the console now' restarts and polls for discordOAuthAppConfigured -- not discordOAuthConfigured, which also needs a home guild not set yet at this step -- before reloading", async () => {
-    stubNotYetConfigured();
-    mockPost.mockImplementation((path: string) => {
-      if (path === "/api/setup/write-oauth-config") return Promise.resolve({ ok: true } as never);
-      if (path === "/api/setup/discord-restart") return Promise.resolve({ ok: true } as never);
-      return Promise.reject(new Error(`unexpected post: ${path}`));
-    });
-    const replace = stubLocationReplace();
-
-    render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
-    fireEvent.click(await screen.findByText("I already have a Discord application"));
-    fireEvent.change(await screen.findByLabelText(/client id/i), { target: { value: "123456789012345678" } });
-    fireEvent.click(screen.getByText(/save/i));
-    const restartButton = await screen.findByText("Restart the console now");
-
-    // Fake timers only go on now -- findBy above relies on real-timer polling,
-    // same precedent as features/players/PlayerSummary.test.tsx's 30s-refresh test.
-    let pollCount = 0;
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => {
-      pollCount++;
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ config: { discordOAuthAppConfigured: pollCount > 1, discordOAuthConfigured: false } }) });
-    }));
-    vi.useFakeTimers();
-
-    fireEvent.click(restartButton);
-    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
-
-    expect(mockPost).toHaveBeenCalledWith("/api/setup/discord-restart", {});
-    expect(replace).toHaveBeenCalledWith("/");
+    mockPost.mockResolvedValue({ ok: true } as never);
+    render(<DiscordSetupWizard embedded onDone={() => {}} onCancel={() => {}} />);
+    fireEvent.click(await screen.findByText("Existing App"));
+    fireEvent.change(screen.getByLabelText(/client id/i), { target: { value: "123456789012345678" } });
+    fireEvent.change(screen.getByLabelText(/client secret/i), { target: { value: "synthetic-test-secret" } });
+    fireEvent.click(screen.getByText(/^save$/i));
+    expect(await screen.findByRole("link", { name: /continue with discord/i })).toHaveAttribute("href", "/api/auth/discord/start?setup=1");
+    expect(screen.queryByText("Restart Console")).toBeNull();
+    expect(mockPost).not.toHaveBeenCalledWith("/api/setup/discord-restart", expect.anything());
   });
 });
 
@@ -294,7 +237,7 @@ describe("DiscordSetupWizard: embedded mode structural difference", () => {
   it("standalone (not embedded): renders the full-page login-screen wrapper, no embedded wrapper", async () => {
     stubNotYetConfigured();
     const { container } = render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
-    await screen.findByText("I already have a Discord application");
+    await screen.findByText("Existing App");
     expect(container.querySelector("main.login-screen")).not.toBeNull();
     expect(container.querySelector(".discord-setup-panel-embedded")).toBeNull();
   });
@@ -302,7 +245,7 @@ describe("DiscordSetupWizard: embedded mode structural difference", () => {
   it("embedded: renders the embedded wrapper, never the full-page login-screen wrapper", async () => {
     stubNotYetConfigured();
     const { container } = render(<DiscordSetupWizard embedded onDone={() => {}} onCancel={() => {}} />);
-    await screen.findByText("I already have a Discord application");
+    await screen.findByText("Existing App");
     expect(container.querySelector(".discord-setup-panel-embedded")).not.toBeNull();
     expect(container.querySelector("main.login-screen")).toBeNull();
   });
@@ -333,14 +276,14 @@ describe("DiscordSetupWizard: change application credentials (§4.2)", () => {
   it("is not shown before the application is configured", async () => {
     stubNotYetConfigured();
     render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
-    await screen.findByText("I already have a Discord application");
-    expect(screen.queryByText("Change application credentials")).toBeNull();
+    await screen.findByText("Existing App");
+    expect(screen.queryByText("Edit App")).toBeNull();
   });
 
   it("once configured (authorize step), offers a way back to the credential-entry form, pre-filled with the saved Client ID", async () => {
     stubAlreadyConfiguredNoIdentity();
     render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
-    fireEvent.click(await screen.findByText("Change application credentials"));
+    fireEvent.click(await screen.findByText("Edit App"));
     const clientIdInput = await screen.findByLabelText(/client id/i) as HTMLInputElement;
     expect(clientIdInput.value).toBe("123456789012345678");
   });
@@ -371,18 +314,20 @@ describe("DiscordSetupWizard: change application credentials (§4.2)", () => {
       return Promise.reject(new Error(`unexpected api call: ${path}`));
     });
     mockPost.mockImplementation((path: string) => {
-      if (path === "/api/setup/write-oauth-config") return Promise.resolve({ ok: true } as never);
+      if (path === "/api/setup/write-oauth-config" || path === "/api/setup/save-oauth-secret") return Promise.resolve({ ok: true } as never);
       return Promise.reject(new Error(`unexpected post: ${path}`));
     });
     render(<DiscordSetupWizard embedded onDone={() => {}} onCancel={() => {}} />);
 
-    fireEvent.click(await screen.findByText("Change application credentials"));
+    fireEvent.click(await screen.findByText("Edit App"));
     fireEvent.change(await screen.findByLabelText(/client id/i), { target: { value: "999999999999999999" } });
+    fireEvent.change(screen.getByLabelText(/client secret/i), { target: { value: "synthetic-new-secret" } });
     fireEvent.click(screen.getByText(/^save$/i));
 
-    expect(await screen.findByText(/a restart is needed before Discord sign-in can continue/i)).toBeTruthy();
+    expect(await screen.findByText(/Application Saved. Continue with Discord/i)).toBeTruthy();
+    expect(screen.queryByText("Restart Console")).toBeNull();
     expect(screen.queryByText(/connected and active for this server/i)).toBeNull();
-    expect(screen.queryByRole("link", { name: /sign in with discord to update server or role mapping/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Edit Access/i })).toBeNull();
   });
 });
 
@@ -416,7 +361,7 @@ describe("DiscordSetupWizard: already-active state, no identity for this session
   it("shows an active summary, not the 'Set up Discord sign-in' authorize prompt, when mapping is already finalized", async () => {
     stubFullyActiveNoIdentity();
     render(<DiscordSetupWizard embedded onDone={() => {}} onCancel={() => {}} />);
-    expect(await screen.findByText(/connected and active for this server/i)).toBeTruthy();
+    expect(await screen.findByText(/Members can sign in with Discord/i)).toBeTruthy();
     expect(screen.queryByText("Set up Discord sign-in")).toBeNull();
     expect(screen.queryByRole("link", { name: /^continue with discord$/i })).toBeNull();
   });
@@ -424,15 +369,28 @@ describe("DiscordSetupWizard: already-active state, no identity for this session
   it("still offers a way to update server/role mapping and to change application credentials", async () => {
     stubFullyActiveNoIdentity();
     render(<DiscordSetupWizard embedded onDone={() => {}} onCancel={() => {}} />);
-    expect(await screen.findByRole("link", { name: /sign in with discord to update server or role mapping/i })).toBeTruthy();
-    expect(screen.getByText("Change application credentials")).toBeTruthy();
+    expect(await screen.findByRole("link", { name: /Edit Access/i })).toBeTruthy();
+    expect(screen.getByText("Edit App")).toBeTruthy();
+  });
+
+  it("groups the three short actions together and cancels without starting Discord authorization", async () => {
+    stubFullyActiveNoIdentity();
+    const onCancel = vi.fn();
+    render(<DiscordSetupWizard embedded onDone={() => {}} onCancel={onCancel} />);
+    const actions = await screen.findByRole("group", { name: "Discord Settings Actions" });
+    expect([...actions.querySelectorAll("a,button")].map(element => element.textContent)).toEqual(["Edit Access", "Edit App", "Cancel"]);
+    expect(screen.getAllByRole("button", { name: "Cancel" })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Edit Access" })).toHaveAttribute("href", "/api/auth/discord/start?setup=1");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(mockPost).not.toHaveBeenCalled();
   });
 
   it("the mapping-update link still sets the embedded return marker like the authorize step's own link does", async () => {
     window.sessionStorage.clear();
     stubFullyActiveNoIdentity();
     render(<DiscordSetupWizard embedded onDone={() => {}} onCancel={() => {}} />);
-    fireEvent.click(await screen.findByRole("link", { name: /sign in with discord to update server or role mapping/i }));
+    fireEvent.click(await screen.findByRole("link", { name: /Edit Access/i }));
     expect(window.sessionStorage.getItem("dune-console:discord-setup-return")).toBe("1");
     window.sessionStorage.clear();
   });
@@ -458,13 +416,13 @@ describe("DiscordSetupWizard: password-awareness checkbox on the map step (#676 
     });
   }
 
-  it("\"Turn on Discord sign-in\" stays disabled until the password-awareness checkbox is checked, even with a valid guild and role", async () => {
+  it("\"Enable Discord Sign In\" stays disabled until the password-awareness checkbox is checked, even with a valid guild and role", async () => {
     stubReadyToFinalize();
     render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
     await screen.findByText("My Server", { exact: false });
     fireEvent.change(await screen.findByLabelText(/admin role/i), { target: { value: "400000000000000002" } });
 
-    const finalizeButton = screen.getByText("Turn on Discord sign-in");
+    const finalizeButton = screen.getByText("Enable Discord Sign In");
     expect(finalizeButton).toBeDisabled();
 
     fireEvent.click(screen.getByLabelText(/I know this console's admin password/i));
@@ -475,6 +433,18 @@ describe("DiscordSetupWizard: password-awareness checkbox on the map step (#676 
     stubReadyToFinalize();
     render(<DiscordSetupWizard onDone={() => {}} onCancel={() => {}} />);
     expect(await screen.findByText(/runtime\/secrets\/admin-web-password\.txt/i)).toBeTruthy();
+  });
+
+  it("returns to authorization when credentials changed after the captured Discord identity", async () => {
+    stubReadyToFinalize();
+    mockPost.mockRejectedValueOnce(new ApiError("Connect with Discord again.", 409, { requiresAuthorization: true }));
+    render(<DiscordSetupWizard embedded onDone={() => {}} onCancel={() => {}} />);
+    fireEvent.change(await screen.findByLabelText(/Admin Role ID/i), { target: { value: "400000000000000002" } });
+    fireEvent.click(screen.getByLabelText(/I know this console's admin password/i));
+    fireEvent.click(screen.getByRole("button", { name: "Enable Discord Sign In" }));
+    expect(await screen.findByRole("link", { name: /Continue With Discord/i })).toBeTruthy();
+    expect(screen.queryByLabelText(/Admin Role ID/i)).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent("Connect with Discord again.");
   });
 });
 
@@ -509,8 +479,8 @@ describe("DiscordSetupWizard: the offer-step marker (#676 §7)", () => {
     await screen.findByText("My Server", { exact: false });
     fireEvent.change(await screen.findByLabelText(/admin role/i), { target: { value: "400000000000000002" } });
     fireEvent.click(screen.getByLabelText(/I know this console's admin password/i));
-    fireEvent.click(screen.getByText("Turn on Discord sign-in"));
-    return screen.findByText("Restart the console now");
+    fireEvent.click(screen.getByText("Enable Discord Sign In"));
+    return screen.findByText("Restart Console");
   }
 
   it("sets the marker when this is a first-time configuration (not already configured) with TOTP already enrolled", async () => {
@@ -547,8 +517,8 @@ describe("DiscordSetupWizard: the offer-step marker (#676 §7)", () => {
     await screen.findByText("My Server", { exact: false });
     fireEvent.change(await screen.findByLabelText(/admin role/i), { target: { value: "400000000000000002" } });
     fireEvent.click(screen.getByLabelText(/I know this console's admin password/i));
-    fireEvent.click(screen.getByText("Turn on Discord sign-in"));
-    fireEvent.click(await screen.findByText("Restart the console now"));
+    fireEvent.click(screen.getByText("Enable Discord Sign In"));
+    fireEvent.click(await screen.findByText("Restart Console"));
 
     expect(window.sessionStorage.getItem("dune-console:discord-oauth-just-configured")).toBeNull();
   });
@@ -556,7 +526,7 @@ describe("DiscordSetupWizard: the offer-step marker (#676 §7)", () => {
   it("does NOT set the marker when the restart button is never clicked (e.g. \"Back to Settings\" instead)", async () => {
     window.sessionStorage.clear();
     await driveToRestartButtonOnDoneStep({ secondFactorEnrolled: true });
-    // Deliberately not clicking "Restart the console now" -- the marker must
+    // Deliberately not clicking "Restart Console" -- the marker must
     // only ever be set at the moment the restart is actually invoked.
     expect(window.sessionStorage.getItem("dune-console:discord-oauth-just-configured")).toBeNull();
   });
@@ -595,7 +565,7 @@ describe("DiscordSetupWizard: role/MFA pre-fill on the map step (§4.3)", () => 
     expect(playerInput.value).toBe("222222222222222222");
     // Saved config had no MFA requirement -- the checkbox must reflect that,
     // not silently default to checked (the real bug this pre-fill fixes).
-    const mfaCheckbox = screen.getByLabelText(/require.*two-factor for owner and admin/i) as HTMLInputElement;
+    const mfaCheckbox = screen.getByLabelText(/Require Discord 2FA For Owners And Admins/i) as HTMLInputElement;
     expect(mfaCheckbox.checked).toBe(false);
   });
 });
