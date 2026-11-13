@@ -46,6 +46,18 @@ describe("LazyTabBoundary", () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
+  it("offers Close on a failed load only when the caller can dismiss it", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const storage = memoryStorage({ [lazyTabBoundaryInternals.CHUNK_RELOAD_KEY]: "90000" });
+    const onDismiss = vi.fn();
+    const { unmount } = render(<LazyTabBoundary reload={vi.fn()} storage={storage} now={() => 100_000}><Bomb /></LazyTabBoundary>);
+    expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+    unmount();
+    render(<LazyTabBoundary onDismiss={onDismiss} reload={vi.fn()} storage={storage} now={() => 100_000}><Bomb /></LazyTabBoundary>);
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
   it("does not auto-reload an ordinary render error", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const reload = vi.fn();

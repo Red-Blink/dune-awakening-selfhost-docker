@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_THEME_ID, getThemes, THEME_STORAGE_KEY, applyTheme, buildThemeTokens, contrast, ensureContrast, initTheme, loadSelectedTheme, parseHex, parseJsonc, saveSelectedTheme } from "./themeEngine";
+import { THEME_CACHE_KEY } from "./themeBoot";
+import { DEFAULT_THEME_ID, getThemes, THEME_STORAGE_KEY, applyTheme, buildThemeTokens, contrast, ensureContrast, loadSelectedTheme, parseHex, parseJsonc, saveSelectedTheme } from "./themeEngine";
 
 const THEMES = getThemes();
 
@@ -80,12 +81,6 @@ describe("apply and persistence", () => {
     applyTheme(DEFAULT_THEME_ID);
   });
 
-  it("default sets no overrides", () => {
-    initTheme();
-    expect(document.documentElement.style.getPropertyValue("--bg")).toBe("");
-    expect(document.documentElement.dataset.theme).toBeUndefined();
-  });
-
   it("saves, applies, restores and then resets cleanly", () => {
     const theme = THEMES.find((t) => t.id === "tabr-fremen")!;
     saveSelectedTheme("tabr-fremen");
@@ -101,18 +96,21 @@ describe("apply and persistence", () => {
     expect(document.documentElement.dataset.theme).toBeUndefined();
   });
 
+  it("keeps the boot cache in step with the choice", () => {
+    saveSelectedTheme("tabr-fremen");
+    const cached = JSON.parse(window.localStorage.getItem(THEME_CACHE_KEY)!);
+    expect(cached.id).toBe("tabr-fremen");
+    expect(cached.tokens).toEqual(THEMES.find((t) => t.id === "tabr-fremen")!.tokens);
+    saveSelectedTheme(DEFAULT_THEME_ID);
+    expect(window.localStorage.getItem(THEME_CACHE_KEY)).toBeNull();
+  });
+
   it("switching from one theme to another leaves nothing of the first behind", () => {
     saveSelectedTheme("tabr-fremen");
     saveSelectedTheme("tabr-sietch");
     const sietch = THEMES.find((t) => t.id === "tabr-sietch")!;
     for (const [name, value] of Object.entries(sietch.tokens)) expect(document.documentElement.style.getPropertyValue(name), name).toBe(value);
     expect(document.documentElement.dataset.theme).toBe("tabr-sietch");
-  });
-
-  it("restores the saved theme at boot", () => {
-    window.localStorage.setItem(THEME_STORAGE_KEY, "tabr-awakening");
-    initTheme();
-    expect(document.documentElement.dataset.theme).toBe("tabr-awakening");
   });
 
   it("applyTheme with an unknown id clears any theme", () => {
@@ -130,24 +128,6 @@ describe("apply and persistence", () => {
       expect(() => saveSelectedTheme("tabr-fremen")).not.toThrow();
       expect(document.documentElement.dataset.theme).toBe("tabr-fremen");
     } finally { get.mockRestore(); set.mockRestore(); }
-  });
-
-  it("follows a theme chosen in another tab", () => {
-    initTheme();
-    window.localStorage.setItem(THEME_STORAGE_KEY, "tabr-sietch");
-    window.dispatchEvent(new StorageEvent("storage", { key: THEME_STORAGE_KEY }));
-    expect(document.documentElement.dataset.theme).toBe("tabr-sietch");
-    window.localStorage.removeItem(THEME_STORAGE_KEY);
-    window.dispatchEvent(new StorageEvent("storage", { key: THEME_STORAGE_KEY }));
-    expect(document.documentElement.dataset.theme).toBeUndefined();
-  });
-
-  it("follows another tab clearing storage entirely", () => {
-    initTheme();
-    saveSelectedTheme("tabr-fremen");
-    window.localStorage.clear();
-    window.dispatchEvent(new StorageEvent("storage", { key: null }));
-    expect(document.documentElement.dataset.theme).toBeUndefined();
   });
 
   it("ignores a stored id that no longer exists", () => {

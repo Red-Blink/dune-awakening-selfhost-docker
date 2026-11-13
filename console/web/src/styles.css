@@ -548,6 +548,8 @@ main { padding: 22px; min-width: 0; }
   padding: 0;
 }
 .language-shortcut[aria-expanded="true"] { outline: 2px solid var(--title); outline-offset: 2px; }
+@media (max-width: 760px) { .topbar-links .community-button.support { grid-column: 1 / -1; } }
+.theme-launcher-status { position: fixed; right: 16px; bottom: 16px; z-index: 1001; max-width: min(420px, calc(100vw - 32px)); }
 .language-picker-overlay { z-index: 1000; padding: 16px; }
 .language-picker { width: min(640px,100%); max-height: min(85dvh,850px); overflow-y: auto; box-sizing: border-box; }
 .language-picker-heading,.language-picker-heading>div { display:flex;align-items:center;gap:10px; }
@@ -7379,7 +7381,7 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   .app-shell > main { padding: clamp(10px, 3vw, 18px); }
   .sidebar-nav.mobile-open { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .topbar { gap: 12px; margin-bottom: 14px; padding-bottom: 12px; }
-  .topbar .topbar-links { display: grid !important; grid-template-columns: 44px repeat(2, minmax(0, 1fr)); }
+  .topbar .topbar-links { display: grid !important; grid-template-columns: 44px 44px minmax(0, 1fr); }
   .listing-claim-badge { grid-column: 1 / -1; min-height: 40px; }
   .community-button { width: 100%; min-height: 44px; }
   .panel, .drawer, .action-section { padding: clamp(11px, 3vw, 16px); }
@@ -7543,7 +7545,7 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .sidebar-nav.mobile-open .sidebar-nav-heading { grid-column: 1 / -1; }
-  .topbar .topbar-links { grid-template-columns: 44px repeat(2, minmax(0, 1fr)); }
+  .topbar .topbar-links { grid-template-columns: 44px 44px minmax(0, 1fr); }
   .community-button { font-size: 13px; padding: 8px; gap: 6px; }
   .community-button { grid-column: auto; }
   .confirm-modal-details { grid-template-columns: 1fr; row-gap: 3px; }

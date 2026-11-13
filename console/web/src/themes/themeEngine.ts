@@ -3,11 +3,13 @@
 // theme sets nothing, so an operator who never opens the picker sees exactly
 // the stylesheet's own :root values.
 import tabrLooks from "./tabr/looks.json";
+import { DEFAULT_THEME_ID, THEME_CACHE_KEY, THEME_STORAGE_KEY, type ThemeCache } from "./themeBoot";
+
+// The boot module (the only theme code in the entry chunk) owns the storage keys.
+export { DEFAULT_THEME_ID, THEME_STORAGE_KEY };
 
 const paletteSources = import.meta.glob("./palettes/dune-*.jsonc", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
 
-export const DEFAULT_THEME_ID = "default";
-export const THEME_STORAGE_KEY = "dune-console-theme";
 // Palettes keep their upstream // comments, hence .jsonc (the release gate parses every *.json strictly).
 // Light palettes are vendored and the engine supports them (color-scheme and all),
 // but the stylesheet still has many hardcoded dark surfaces, so a light theme
@@ -201,7 +203,7 @@ function loadThemes(): ThemeInfo[] {
 }
 
 let catalogue: ThemeInfo[] | null = null;
-/** Parsed on first use. Note the palette source itself is bundled eagerly (import.meta.glob above), so the default path still downloads it (~60 KB raw, ~11 KB gzipped). */
+/** Built on first use. This module is only reachable from the lazy picker chunk and from themeBoot's dynamic import, so the default look never downloads the palettes. */
 export function getThemes(): ThemeInfo[] {
   catalogue ??= loadThemes();
   return catalogue;
@@ -215,6 +217,13 @@ export function loadSelectedTheme(): string {
   } catch { return DEFAULT_THEME_ID; }
 }
 
+function writeThemeCache(theme: ThemeInfo | null): void {
+  try {
+    if (!theme) window.localStorage.removeItem(THEME_CACHE_KEY);
+    else window.localStorage.setItem(THEME_CACHE_KEY, JSON.stringify({ id: theme.id, appearance: theme.appearance, tokens: theme.tokens } satisfies ThemeCache));
+  } catch { /* the cache only avoids a flash at boot; the choice itself still applies */ }
+}
+
 export function applyTheme(id: string, root: HTMLElement = document.documentElement): void {
   if (id === DEFAULT_THEME_ID && !root.dataset.theme) return;
   const themes = getThemes();
@@ -223,29 +232,21 @@ export function applyTheme(id: string, root: HTMLElement = document.documentElem
   if (!theme) {
     root.style.removeProperty("color-scheme");
     delete root.dataset.theme;
+    writeThemeCache(null);
     return;
   }
+  writeThemeCache(theme);
   Object.entries(theme.tokens).forEach(([name, value]) => root.style.setProperty(name, value));
   root.style.setProperty("color-scheme", theme.appearance);
   root.dataset.theme = theme.id;
 }
 
 export function saveSelectedTheme(id: string): void {
+  // The cache is written first, so another tab reacting to the id change finds both.
+  writeThemeCache(getThemes().find((t) => t.id === id) ?? null);
   try {
     if (id === DEFAULT_THEME_ID) window.localStorage.removeItem(THEME_STORAGE_KEY);
     else window.localStorage.setItem(THEME_STORAGE_KEY, id);
   } catch { /* storage unavailable: the choice lasts for this page view only */ }
   applyTheme(id);
-}
-
-let storageListening = false;
-
-export function initTheme(): void {
-  applyTheme(loadSelectedTheme());
-  if (storageListening) return;
-  storageListening = true;
-  // Another console tab picked a theme: follow it.
-  window.addEventListener("storage", (event) => {
-    if (event.key === THEME_STORAGE_KEY || event.key === null) applyTheme(loadSelectedTheme());
-  });
 }

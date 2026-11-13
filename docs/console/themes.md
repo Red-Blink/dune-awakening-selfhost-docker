@@ -26,6 +26,10 @@ first render so there is no flash. Text colours are pulled toward white or black
 for the console is corrected rather than shipped unreadable. Colours that are hardcoded in the stylesheet
 (for example the Discord and Support buttons, map and status colours, and some dialog surfaces) are not themed, so even a dark theme shows a few stock-coloured surfaces. Tokenising them is a follow-up.
 
+## Loading
+
+The palettes (about 60 KB of source) are not in the console's entry chunk. `themes/themeBoot.ts` is the only theme code loaded at start: with the default look it does nothing, and with a saved theme it re-applies that theme's tokens from a small cache in `localStorage` (`dune-console-theme-cache`, written by the engine) so there is no flash, then loads the engine to check the choice against the real catalogue (a changed palette refreshes the cache; an id that no longer exists falls back to Default). The cache is only trusted if every entry is a custom property set to a hex colour or the one `rgba()` glow the engine emits; anything else is ignored. The picker itself (`ThemeLauncher.tsx`) is a lazy chunk; if that chunk cannot be fetched after a console update, the recovery panel offers Refresh Now and Close.
+
 ## Keyboard
 
 Arrow keys, Home and End move focus between the cards without changing anything; Space or Enter chooses the focused card. Escape closes the picker.
