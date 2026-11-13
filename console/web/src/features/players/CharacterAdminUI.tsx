@@ -97,7 +97,7 @@ function playerAdmin_effectiveGrade(value: unknown, item?: { itemId?: string; id
 export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId, playerName, onError, onRefresh, onClose, confirmAction, waitForTask, formatMutationResult, restartGate }: { detail: Record<string, unknown> | null; fallback: Record<string, unknown>; dbPlayerId: string; actionPlayerId: string; playerName: string; onError: (text: string) => void; onRefresh: () => void; onClose: () => void; confirmAction: ConfirmAction; waitForTask: (task: Task) => Promise<Task>; formatMutationResult: (result: unknown) => string; restartGate: RestartGate }) {
   const access = useConsoleAccess();
   const tabRequirements: Record<string, readonly string[]> = {
-    Character: ["players:read"], Crafting: ["players:read", "admin:items:read"], Research: ["players:read", "admin:items:read"],
+    Character: ["players:read"], Combat: ["players:read"], Crafting: ["players:read", "admin:items:read"], Research: ["players:read", "admin:items:read"],
     "Building Sets": ["players:read", "admin:items:read"], Customizations: ["players:read", "admin:items:read"],
     Skills: ["players:read", "admin:skills:read"], Specialization: ["players:read"], Journey: ["players:read"],
     Blueprints: ["blueprints:read"], Bases: ["bases:read"], Vehicles: ["vehicles:read"]
@@ -117,7 +117,7 @@ export function CharacterAdminUI({ detail, fallback, dbPlayerId, actionPlayerId,
     { label: "Bases", icon: House },
     { label: "Vehicles", icon: Car },
     { label: "Admin", icon: ShieldCheck }
-  ].filter(tab => tab.label === "Admin" ? access.any(adminActions) : tabRequirements[tab.label].every(access.can));
+  ].filter(tab => tab.label === "Admin" ? access.any(adminActions) : tabRequirements[tab.label]?.every(access.can) === true);
   const [playerAdmin_requestedTab, playerAdmin_setActiveTab] = useState("Character");
   const playerAdmin_activeTab = playerAdmin_tabs.some(tab => tab.label === playerAdmin_requestedTab) ? playerAdmin_requestedTab : playerAdmin_tabs[0]?.label || "";
   const [playerAdmin_openToggles, playerAdmin_setOpenToggles] = useState<Record<string, boolean>>({ quick_rewards: true });

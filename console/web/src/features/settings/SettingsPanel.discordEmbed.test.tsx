@@ -41,14 +41,14 @@ describe("SettingsPanel: embedded Discord OAuth wizard (#643)", () => {
   it("Discord OAuth accordion is collapsed by default -- the wizard is not mounted until expanded", async () => {
     mockBackend();
     render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={vi.fn()} onTotpEnrollmentStarted={vi.fn()} />);
-    await screen.findByLabelText("Expand Discord OAuth");
+    await screen.findByLabelText("Expand Discord Sign In");
     expect(screen.queryByTestId("discord-setup-wizard-stub")).toBeNull();
   });
 
   it("expanding the accordion mounts the wizard, passed embedded=true", async () => {
     mockBackend();
     render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={vi.fn()} onTotpEnrollmentStarted={vi.fn()} />);
-    fireEvent.click(await screen.findByLabelText("Expand Discord OAuth"));
+    fireEvent.click(await screen.findByLabelText("Expand Discord Sign In"));
     expect(await screen.findByTestId("discord-setup-wizard-stub")).toBeTruthy();
     expect(lastEmbeddedProp).toBe(true);
   });
@@ -56,7 +56,7 @@ describe("SettingsPanel: embedded Discord OAuth wizard (#643)", () => {
   it("the wizard's onCancel collapses the accordion", async () => {
     mockBackend();
     render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={vi.fn()} onTotpEnrollmentStarted={vi.fn()} />);
-    fireEvent.click(await screen.findByLabelText("Expand Discord OAuth"));
+    fireEvent.click(await screen.findByLabelText("Expand Discord Sign In"));
     await screen.findByTestId("discord-setup-wizard-stub");
 
     mockOnCancel();
@@ -66,7 +66,7 @@ describe("SettingsPanel: embedded Discord OAuth wizard (#643)", () => {
   it("the wizard's onDone collapses the accordion AND re-runs Settings' own config probe", async () => {
     const getSettingsCalls = mockBackend();
     render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={vi.fn()} onTotpEnrollmentStarted={vi.fn()} />);
-    fireEvent.click(await screen.findByLabelText("Expand Discord OAuth"));
+    fireEvent.click(await screen.findByLabelText("Expand Discord Sign In"));
     await screen.findByTestId("discord-setup-wizard-stub");
     const callsBeforeDone = getSettingsCalls();
 
@@ -87,7 +87,7 @@ describe("SettingsPanel: embedded Discord OAuth wizard (#643)", () => {
     mockBackend();
     const onAutoOpened = vi.fn();
     render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={vi.fn()} onTotpEnrollmentStarted={vi.fn()} onDiscordSetupAutoOpened={onAutoOpened} />);
-    await screen.findByLabelText("Expand Discord OAuth");
+    await screen.findByLabelText("Expand Discord Sign In");
     expect(screen.queryByTestId("discord-setup-wizard-stub")).toBeNull();
     expect(onAutoOpened).not.toHaveBeenCalled();
   });
