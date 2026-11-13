@@ -297,6 +297,7 @@ export const DEFAULT_POLICIES = {
         "setup:*",
         "server:*",
         "logs:*",
+        "chat:read",
         "backups:*",
         "database:read",
         "database:query",

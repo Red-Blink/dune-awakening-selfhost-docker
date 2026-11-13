@@ -116,7 +116,7 @@ test("denied namespaces are absent from the selectable catalog entirely", () => 
     assert.ok(!namespaces.includes(denied), `${denied} must never be offered as a key scope`);
     assert.ok(!actionsByNamespace().has(denied));
   }
-  assert.equal(namespaces.length, 19);
+  assert.equal(namespaces.length, 20);
 });
 
 test("scopeCatalog reports write support for the UI", () => {

@@ -115,6 +115,10 @@ namespace" rule, so Create stays disabled until something is selected.
 | `carepackage` | `carepackage:read` | `clear-history`, `grant`, `scan`, `write-config` |
 | `addons` | `addons:read` | *nothing — write actions are denied to keys* |
 | `admin` | `admin:announcements:read`, `admin:history:read`, `admin:items:read`, `admin:motd:read`, `admin:skills:read`, `admin:transfer-settings:read`, `admin:vehicles:read` | `announcements:write`, `broadcast`, `broadcast-shutdown`, `history:clear`, `map-chat`, `motd:write`, `transfer-settings:write` |
+| `chat` | `chat:read` | `configure` |
+
+Private whispers are never collected and have no history endpoint or permission.
+Collection settings and history deletion require `chat:configure`.
 
 `logs`, `realtime`, `updates` and `addons` render a two-segment control (None / Read), not
 three. `logs` and `realtime` have no write action at all; the other two have several, but they
