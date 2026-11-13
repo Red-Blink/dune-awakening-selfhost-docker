@@ -336,7 +336,7 @@ test("POST /api/auth/2fa/confirm's store-failure path audits exactly once, under
   }
 });
 
-test("a second enrollment that loses the race gets 409 already_configured", async () => {
+test("a second enrollment cannot continue after its owner session is revoked", async () => {
   const port = await getFreePort();
   const tempDir = mkdtempSync(join(tmpdir(), "enroll-e2e-race-"));
   const console = startConsole(port, tempDir);
@@ -355,9 +355,9 @@ test("a second enrollment that loses the race gets 409 already_configured", asyn
     // A enrolls first -> 200
     const confA = await api(port, "/api/auth/2fa/confirm", { cookie: ca, csrf: sa, body: { code: codeFor(setupA.secret) } });
     assert.equal(confA.status, 200);
-    // B's confirm now loses -> 409, and B's session is ended
+    // A's enrollment revoked B's original password session as well.
     const confB = await api(port, "/api/auth/2fa/confirm", { cookie: cb, csrf: sb, body: { code: codeFor(setupB.secret) } });
-    assert.equal(confB.status, 409, "the losing enrollment gets already_configured");
+    assert.equal(confB.status, 403, "the losing enrollment cannot revive its revoked owner session");
     assert.equal((await api(port, "/api/auth/2fa/setup", { cookie: cb, csrf: sb })).status, 403, "loser's session is invalidated");
   } finally {
     await stopProcess(console.child);

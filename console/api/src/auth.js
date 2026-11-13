@@ -116,7 +116,7 @@ export function createAuth(config) {
         // Enrollment / resetup sessions (scope set) are short-lived, non-renewable and
         // memory-only: restoring one after a restart without its scope would hand back
         // a full session, so they are never written to the store.
-        if (session.scope) continue;
+        if (session.scope || session.renewable === false) continue;
         active.push({
           id: session.id,
           csrf: session.csrf,
@@ -192,6 +192,15 @@ export function createAuth(config) {
     if (!id || !sig || !constantTimeStringEqual(sign(id), sig)) return null;
     const session = sessions.get(id);
     return session && session.expiresAt >= now() ? session : null;
+  }
+
+  function readSessionById(id) {
+    const session = sessions.get(id);
+    if (!session || session.expiresAt < now()) {
+      sessions.delete(id);
+      return null;
+    }
+    return session;
   }
 
   function invalidateSession(id) {
@@ -287,7 +296,7 @@ export function createAuth(config) {
     return session;
   }
 
-  return { makeSession, readSession, revokeSession, peekSession, passwordMatches, requireAuth, invalidateSession, invalidatePasswordSessions, invalidateResetupSessions };
+  return { makeSession, readSession, revokeSession, peekSession, readSessionById, passwordMatches, requireAuth, invalidateSession, invalidatePasswordSessions, invalidateResetupSessions };
 }
 
 export function setSessionCookie(res, session, config = {}, { maxAgeSeconds = 43200 } = {}) {

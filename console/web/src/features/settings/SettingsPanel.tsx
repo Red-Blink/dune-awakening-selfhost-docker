@@ -50,9 +50,10 @@ type SettingsPanelProps = {
   // same TotpSetupScreen the old forced-enrollment login flow used -- this
   // panel doesn't own that top-level view state.
   onTotpEnrollmentStarted: () => void;
+  credentialRevision?: number;
 };
 
-export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmAction, onTotpEnrollmentStarted }: SettingsPanelProps) {
+export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmAction, onTotpEnrollmentStarted, credentialRevision = 0 }: SettingsPanelProps) {
   const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   // Tier 3 credential state. secondFactorEnrolled is read from /api/auth/me,
@@ -116,6 +117,7 @@ export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmActi
       setSecondFactorUnavailable(true);
     }
   }
+  useEffect(() => { if (credentialRevision) void refreshCredentialState(); }, [credentialRevision]);
   const [apiKeysOpen, setApiKeysOpen] = useState(false);
   const [encryptedApiOpen, setEncryptedApiOpen] = useState(false);
   const [serverStartupOpen, setServerStartupOpen] = useState(false);

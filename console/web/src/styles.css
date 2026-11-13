@@ -7957,6 +7957,14 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
 .login-password-toggle:hover { color: #c6a56e; }
 .login-password-fields { display: grid; gap: 10px; margin-top: 8px; }
 .totp-setup-qr { width: 200px; height: 200px; justify-self: center; border-radius: 6px; background: #fff; padding: 8px; }
+.totp-enrollment-overlay { z-index: 1200; padding: 20px; overflow-y: auto; }
+.totp-enrollment-dialog { width: min(520px, 100%); max-height: calc(100dvh - 40px); overflow-y: auto; }
+.totp-dialog-content { display: grid; gap: 16px; min-width: 0; text-align: left; }
+.totp-dialog-content :is(h3, p) { margin: 0; line-height: 1.5; }
+.totp-dialog-content .totp-setup-qr { justify-self: center; }
+.totp-dialog-content .totp-setup-secret { justify-self: stretch; text-align: center; overflow-wrap: anywhere; }
+.totp-dialog-content .totp-ack-checkbox { justify-content: flex-start; }
+.totp-dialog-content .login-password-toggle { justify-self: start; }
 .totp-setup-secret-label { margin: 0; font-size: .78rem; color: #817763; }
 .totp-setup-secret { justify-self: center; padding: 6px 10px; border-radius: 4px; background: rgba(0, 0, 0, .35); font-size: .95rem; letter-spacing: .06em; word-break: break-all; }
 .totp-recovery-codes-panel { width: min(480px, calc(100vw - 32px)); }

@@ -468,6 +468,8 @@ export function App() {
   const [recoveryAvailable, setRecoveryAvailable] = useState(false);
   const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const [setupMode, setSetupMode] = useState<"enroll" | "resetup" | null>(null);
+  const [settingsTotpOpen, setSettingsTotpOpen] = useState(false);
+  const [credentialRevision, setCredentialRevision] = useState(0);
   const [tab, setTab] = useActiveTab();
   // Bumped when a failure elsewhere (a restore that needs the game images)
   // sends the operator to Updates to install them. A nonce rather than a
@@ -548,6 +550,7 @@ export function App() {
       setUseRecoveryCode(false);
       setRecoveryAvailable(false);
       setSetupMode(null);
+      setSettingsTotpOpen(false);
     };
     window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
     return () => window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
@@ -1145,12 +1148,22 @@ export function App() {
           onPasswordChanged={logoutAfterPasswordChange}
           publicListingUrl={publicDirectoryStatus?.serverId ? publicServerListingUrl(publicDirectoryStatus.serverId) : undefined}
           confirmAction={confirmDialog}
-          onTotpEnrollmentStarted={() => setSetupMode("enroll")}
+          onTotpEnrollmentStarted={() => setSettingsTotpOpen(true)}
+          credentialRevision={credentialRevision}
         /></LazyTabBoundary>}
         {!redeploySetupOpen && tab !== "Maps" && <TaskProgress task={task} onDismiss={() => setTask(null)} />}
         <AppFooter />
       </main>
       <ConfirmDialog request={confirmRequest} onClose={closeConfirmDialog} />
+      {settingsTotpOpen && <TotpSetupScreen mode="enroll" presentation="dialog" onComplete={continued => {
+        setSettingsTotpOpen(false);
+        if (continued) setCredentialRevision(value => value + 1);
+        else afterTotpSetup();
+      }} onCancel={continued => {
+        setSettingsTotpOpen(false);
+        if (continued) setCredentialRevision(value => value + 1);
+        else afterTotpSetup();
+      }} />}
     </div>
   );
 }
