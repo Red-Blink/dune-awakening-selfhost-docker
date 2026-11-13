@@ -51,6 +51,16 @@ function parseStatements(text: string): PolicyStatement[] | null {
 // "server:restart-service" -> "Restart Service", "admin:motd:write" ->
 // "Motd Write"). The grid is action-centric: one row per grantable action,
 // not per HTTP route (many routes share one action).
+// Mirrors missingPrerequisites() in console/api/src/policy.js: the read action of
+// an action's own area (`players:moderate` -> `players:read`,
+// `admin:motd:write` -> `admin:motd:read`), when that read action exists.
+export function readPrerequisite(action: string, known: ReadonlySet<string>): string | null {
+  const cut = action.lastIndexOf(":");
+  if (cut < 0) return null;
+  const read = `${action.slice(0, cut)}:read`;
+  return read !== action && known.has(read) ? read : null;
+}
+
 function actionLabel(action: string): string {
   const rest = action.includes(":") ? action.slice(action.indexOf(":") + 1) : action;
   return rest.split(/[:-]/).map(w => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(" ");
@@ -278,6 +288,7 @@ export function IamPolicyEditor() {
   // only current for the last completed render, so a second toggle in the
   // same tick would branch on stale state and could re-grant an action it
   // just revoked (or vice versa) instead of no-op'ing or reverting.
+  const knownActions = new Set(distinctActions(catalog).filter((a): a is string => typeof a === "string"));
   const toggleAction = (iamAction: string) => {
     setJsonText((currentJsonText) => {
       const stmts = parseStatements(currentJsonText);
@@ -299,6 +310,13 @@ export function IamPolicyEditor() {
           setToggleHint(`${iamAction} is granted by a wildcard rule, not a single permission. Edit the JSON tab to change wildcard grants.`);
           return currentJsonText;
         }
+        // Removing an area's read grant would strand every other grant in that
+        // area, so the dependents have to be removed first.
+        const dependents = [...knownActions].filter(other => readPrerequisite(other, knownActions) === iamAction && actionGrantedByStatements(stmts, other));
+        if (dependents.length) {
+          setToggleHint(`${iamAction} is needed by ${dependents.slice(0, 4).join(", ")}${dependents.length > 4 ? ` and ${dependents.length - 4} more` : ""}. Remove those first.`);
+          return currentJsonText;
+        }
         updated = stmts.map(st => {
           if (st.Effect !== "Allow") return st;
           return { ...st, Action: st.Action.filter(a => a !== iamAction) };
@@ -310,6 +328,14 @@ export function IamPolicyEditor() {
         const denyBlocked = stmts.some(st => st.Effect === "Deny" && iamActionAllowed(iamAction, st.Action));
         if (denyBlocked) {
           setToggleHint(`${iamAction} is blocked by a Deny rule. Remove that Deny in the JSON tab first.`);
+          return currentJsonText;
+        }
+        // A role cannot be given actions in an area it cannot open: the API
+        // refuses the save (policy.js missingPrerequisites), so stop here with
+        // the same rule instead of letting the owner build a draft that fails.
+        const needed = readPrerequisite(iamAction, knownActions);
+        if (needed && !actionGrantedByStatements(stmts, needed)) {
+          setToggleHint(`${iamAction} needs ${needed} first. Grant ${needed}, then this.`);
           return currentJsonText;
         }
         updated = [...stmts];

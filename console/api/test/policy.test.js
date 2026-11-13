@@ -445,7 +445,7 @@ test("setPolicies refuses an action pattern outside the IAM vocabulary and names
   // wildcard also reaches the crown-jewel server:write-credentials with no
   // Deny to stop it, which the crown-jewel guard below now correctly refuses;
   // that guard has its own dedicated tests.)
-  const ok = setPolicies({ ...docs, admin: { version: 1, tier: "admin", statements: [{ Effect: "Allow", Action: ["server:read", "admin:transfer-settings:read", "players:kick-all"] }] } });
+  const ok = setPolicies({ ...docs, admin: { version: 1, tier: "admin", statements: [{ Effect: "Allow", Action: ["server:read", "admin:transfer-settings:read", "players:read", "players:kick-all"] }] } });
   assert.equal(ok.ok, true);
 });
 
