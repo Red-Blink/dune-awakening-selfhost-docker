@@ -11,6 +11,7 @@ import { SetupWizard } from "./components/SetupWizard";
 import { TaskProgress } from "./components/TaskProgress";
 import { ConfirmDialog, type ConfirmDialogDetail, type ConfirmDialogOutcome, type ConfirmDialogRequest } from "./components/common/ConfirmDialog";
 import { LazyTabBoundary } from "./components/common/LazyTabBoundary";
+import { ThemeLauncher } from "./themes/ThemeLauncher";
 import type { RestartGateChoice } from "./features/server/restartQueueGuard";
 import { loadPinnedAddons, savePinnedAddons, type PinnedAddon } from "./features/addons/pinnedAddons";
 import { hasAddonUpdates } from "./features/addons/addonVersions";
@@ -938,6 +939,7 @@ export function App() {
                 closeMobileNav();
               }}
             ><Globe size={19} aria-hidden="true" /></button>
+            <ThemeLauncher onOpen={closeMobileNav} />
             <a className="community-button discord" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer" title="Join Discord"><span>Join Discord</span><DiscordLogo size={19} /></a>
             <a className="community-button support" href={REDBLINK_KOFI_URL} target="_blank" rel="noreferrer" title="Support Project"><span>Support Project</span><KofiLogo size={19} /></a>
           </div>

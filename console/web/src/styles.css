@@ -47,7 +47,7 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top left, rgba(170, 111, 45, .18), transparent 38%), var(--bg); }
+body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top left, var(--bg-glow, rgba(170, 111, 45, .18)), transparent 38%), var(--bg); }
 button, input, select, textarea { font: inherit; }
 button, .button-link, input, select { line-height: 1.25; }
 button, .button-link {
@@ -548,6 +548,8 @@ main { padding: 22px; min-width: 0; }
   padding: 0;
 }
 .language-shortcut[aria-expanded="true"] { outline: 2px solid var(--title); outline-offset: 2px; }
+@media (max-width: 760px) { .topbar-links .community-button.support { grid-column: 1 / -1; } }
+.theme-launcher-status { position: fixed; right: 16px; bottom: 16px; z-index: 1001; max-width: min(420px, calc(100vw - 32px)); }
 .language-picker-overlay { z-index: 1000; padding: 16px; }
 .language-picker { width: min(640px,100%); max-height: min(85dvh,850px); overflow-y: auto; box-sizing: border-box; }
 .language-picker-heading,.language-picker-heading>div { display:flex;align-items:center;gap:10px; }
@@ -7379,7 +7381,7 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   .app-shell > main { padding: clamp(10px, 3vw, 18px); }
   .sidebar-nav.mobile-open { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .topbar { gap: 12px; margin-bottom: 14px; padding-bottom: 12px; }
-  .topbar .topbar-links { display: grid !important; grid-template-columns: 44px repeat(2, minmax(0, 1fr)); }
+  .topbar .topbar-links { display: grid !important; grid-template-columns: 44px 44px minmax(0, 1fr); }
   .listing-claim-badge { grid-column: 1 / -1; min-height: 40px; }
   .community-button { width: 100%; min-height: 44px; }
   .panel, .drawer, .action-section { padding: clamp(11px, 3vw, 16px); }
@@ -7543,7 +7545,7 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .sidebar-nav.mobile-open .sidebar-nav-heading { grid-column: 1 / -1; }
-  .topbar .topbar-links { grid-template-columns: 44px repeat(2, minmax(0, 1fr)); }
+  .topbar .topbar-links { grid-template-columns: 44px 44px minmax(0, 1fr); }
   .community-button { font-size: 13px; padding: 8px; gap: 6px; }
   .community-button { grid-column: auto; }
   .confirm-modal-details { grid-template-columns: 1fr; row-gap: 3px; }
@@ -8047,3 +8049,20 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   .combat-secondary-metrics { padding: 14px; gap: 12px 18px; }
   .combat-kill-feed { padding: 0 14px; }
 }
+
+/* Console theme picker (src/themes). Swatch fills are the theme's own colours, set inline. */
+.theme-picker-overlay { z-index: 1000; padding: 16px; }
+.theme-picker { background: var(--panel); width: min(680px, 100%); max-height: min(85dvh, 850px); overflow-y: auto; box-sizing: border-box; }
+.theme-picker-heading, .theme-picker-heading > div { display: flex; align-items: center; gap: 10px; }
+.theme-picker-heading { justify-content: space-between; margin-bottom: 8px; position: sticky; top: 0; z-index: 1; background: inherit; padding-bottom: 6px; }
+.theme-picker-heading h2 { font-size: 20px; margin: 0; }
+.theme-picker-heading > button { width: 40px; min-height: 40px; padding: 6px; flex: 0 0 auto; }
+.theme-picker .theme-picker-note { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.theme-card { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px; text-align: left; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-soft); color: var(--text); cursor: pointer; }
+.theme-card:hover { border-color: var(--border-strong); }
+.theme-card:focus-visible { outline: 2px solid var(--text-strong); outline-offset: 2px; }
+.theme-card.selected { border-color: var(--title); box-shadow: 0 0 0 1px var(--title); }
+.theme-swatches { display: flex; width: 100%; height: 22px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+.theme-swatches i { flex: 1; }
+.theme-card-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
