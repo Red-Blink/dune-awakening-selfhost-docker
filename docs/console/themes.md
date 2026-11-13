@@ -9,11 +9,24 @@ reopening the picker reflects the applied choice.
 
 ## Palettes
 
-The Console includes 19 original Dune Docker palettes: Amber Dunes, Basalt,
+The Console includes 23 palettes: Amber Dunes, Basalt,
 Copper, Deep Desert, Dust Storm, Emerald, Golden Dusk, Ice Blue, Indigo,
 Jade, Moonstone, Nightfall, Oasis, Rosewood, Saffron, Sandstone, Slate,
-Spice and Steel. Their colour combinations are maintained in
+Spice, Steel, Harkonnen, Atreides, Sardaukar Imperial and Fremen. Their colour combinations are maintained in
 `console/web/src/themes/consolePalettes.ts`.
+
+### House swatch palettes
+
+One palette per in-game armour swatch (42: all 25 Houses plus Harkonnen and Atreides, and the
+15 others such as Sunset Dye, Dusk Rider, Blue Dasher, CHOAM, Smuggler and Hot Zone) uses that
+swatch's four armour-dye colours. The dyes are in
+`console/web/src/themes/houseSwatches.ts`, taken from the community wiki data
+module <https://awakening.wiki/Module:Swatches/data> (colour values only; the
+wiki's text is CC BY-NC-SA 4.0). The engine derives the palette: the darkest dye,
+darkened, becomes the page; a lift toward the second-darkest dye becomes the
+panel; the most vivid light dyes become the accents. Text and accent contrast
+are enforced exactly as for the other palettes, so a pale House (for example
+Kenola) still gets a dark page.
 
 All offered palettes use dark surfaces to match the existing Console controls.
 The picker, browser persistence, cross-tab updates and keyboard controls work

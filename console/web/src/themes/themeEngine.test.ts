@@ -16,12 +16,12 @@ function wcag(a: string, b: string): number {
 }
 
 describe("palette catalogue", () => {
-  it("offers the project's 19 dark palettes with unique ids and colour combinations", () => {
-    expect(THEMES).toHaveLength(19);
-    expect(new Set(THEMES.map((t) => t.id)).size).toBe(19);
+  it("offers the project's 23 palettes plus every House swatch theme with unique ids and colour combinations", () => {
+    expect(THEMES).toHaveLength(65);
+    expect(new Set(THEMES.map((t) => t.id)).size).toBe(65);
     expect(THEMES.every((t) => t.appearance === "dark")).toBe(true);
-    expect(THEMES.map((t) => t.id)).toEqual(CONSOLE_PALETTES.map((p) => p.id));
-    expect(new Set(THEMES.map((t) => [t.tokens["--bg"], t.tokens["--panel"], t.tokens["--accent"]].join())).size).toBe(19);
+    expect(THEMES.map((t) => t.id)).toEqual(expect.arrayContaining(CONSOLE_PALETTES.map((p) => p.id)));
+    expect(new Set(THEMES.map((t) => [t.tokens["--bg"], t.tokens["--panel"], t.tokens["--accent"]].join())).size).toBe(65);
   });
 
   it("emits a full, valid token set for every palette", () => {

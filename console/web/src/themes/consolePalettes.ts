@@ -30,4 +30,8 @@ export const CONSOLE_PALETTES: readonly ConsolePalette[] = [
   { id: "dd-slate", name: "Slate", description: "Graphite blue with steel silver and sea green.", background: "#15191e", panel: "#272f38", accent: "#acc3dc", secondary: "#8cc7ba" },
   { id: "dd-spice", name: "Spice", description: "Roasted brown with spice orange and cool turquoise.", background: "#1c1410", panel: "#33251d", accent: "#f2a76b", secondary: "#8ec5ca" },
   { id: "dd-steel", name: "Steel", description: "Neutral charcoal with pale blue and warm ivory.", background: "#17191b", panel: "#2b3034", accent: "#b5d1e1", secondary: "#dfcbb1" },
+  { id: "dune-harkonnen", name: "Harkonnen", description: "Brutalist industrial: cold blues and purples on near-black.", background: "#090a0c", panel: "#1a1b21", accent: "#6b8ebd", secondary: "#8fa9d0" },
+  { id: "dune-house-atreides", name: "Atreides", description: "Caladan: deep ocean blues, sea green and silver.", background: "#11161c", panel: "#191f27", accent: "#3b82f6", secondary: "#10b981" },
+  { id: "dune-sardaukar-imperial", name: "Sardaukar Imperial", description: "The Emperor's elite: imperial purple and gold on command black.", background: "#0c0c0e", panel: "#141418", accent: "#9d6fcc", secondary: "#ffd700" },
+  { id: "tabr-fremen", name: "Fremen", description: "Warm dark stone with sky blue and sand, from the Tabr save editor.", background: "#1c1b1a", panel: "#282726", accent: "#7bb6ff", secondary: "#d9c3a0" },
 ];

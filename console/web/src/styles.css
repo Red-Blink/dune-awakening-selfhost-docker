@@ -8052,17 +8052,21 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
 
 /* Console theme picker (src/themes). Swatch fills are the theme's own colours, set inline. */
 .theme-picker-overlay { z-index: 1000; padding: 16px; }
-.theme-picker { background: var(--panel); width: min(680px, 100%); max-height: min(85dvh, 850px); overflow-y: auto; box-sizing: border-box; }
+.theme-picker { background: var(--panel); width: min(860px, 100%); max-height: min(85dvh, 850px); overflow-y: auto; box-sizing: border-box; }
 .theme-picker-heading, .theme-picker-heading > div { display: flex; align-items: center; gap: 10px; }
 .theme-picker-heading { justify-content: space-between; margin-bottom: 8px; position: sticky; top: 0; z-index: 1; background: inherit; padding-bottom: 6px; }
 .theme-picker-heading h2 { font-size: 20px; margin: 0; }
 .theme-picker-heading > button { width: 40px; min-height: 40px; padding: 6px; flex: 0 0 auto; }
 .theme-picker .theme-picker-note { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
-.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
-.theme-card { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px; text-align: left; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-soft); color: var(--text); cursor: pointer; }
+.theme-filter { width: 100%; box-sizing: border-box; margin: 0 0 6px; }
+.theme-filter-count { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+.theme-group { margin: 0 0 16px; }
+.theme-group h3 { margin: 0 0 8px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; }
+.theme-card { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; text-align: left; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-soft); color: var(--text); cursor: pointer; }
 .theme-card:hover { border-color: var(--border-strong); }
 .theme-card:focus-visible { outline: 2px solid var(--text-strong); outline-offset: 2px; }
 .theme-card.selected { border-color: var(--title); box-shadow: 0 0 0 1px var(--title); }
-.theme-swatches { display: flex; width: 100%; height: 22px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
-.theme-swatches i { flex: 1; }
+.theme-swatches { display: flex; gap: 4px; flex: 0 0 auto; }
+.theme-swatches i { width: 20px; height: 20px; border-radius: 3px; border: 1px solid rgba(255, 255, 255, .25); }
 .theme-card-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }

@@ -9,7 +9,7 @@ describe("ThemePanel", () => {
 
   it("lists Default plus every palette and marks the current one", () => {
     render(<ThemePanel />);
-    expect(screen.getAllByRole("radio")).toHaveLength(20);
+    expect(screen.getAllByRole("radio")).toHaveLength(66);
     expect(screen.getByRole("radio", { name: /Default/ })).toHaveAttribute("aria-checked", "true");
   });
 
@@ -107,5 +107,22 @@ describe("ThemePanel", () => {
     window.localStorage.setItem(THEME_STORAGE_KEY, "dd-oasis");
     fireEvent(window, new StorageEvent("storage", { key: THEME_STORAGE_KEY }));
     expect(screen.getByRole("radio", { name: /Oasis/ })).toHaveAttribute("aria-checked", "true");
+  });
+  it("groups the palettes under headings", () => {
+    render(<ThemePanel />);
+    expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Console palettes", "Dune factions", "Houses", "Outfits and dyes"]);
+    expect(screen.getByRole("group", { name: "Houses" })).toContainElement(screen.getByRole("radio", { name: /House Kenola/ }));
+    expect(screen.getByRole("group", { name: "Outfits and dyes" })).toContainElement(screen.getByRole("radio", { name: /Sunset Dye/ }));
+  });
+
+  it("filters by name, keeps the applied choice listed, and reports no matches", () => {
+    render(<ThemePanel />);
+    const filter = screen.getByRole("searchbox", { name: "Filter palettes" });
+    fireEvent.change(filter, { target: { value: "sardaukar" } });
+    expect(screen.getAllByRole("radio").map((r) => r.textContent)).toEqual(["Default✓".replace("✓", ""), "Sardaukar Imperial", "Sardaukar Tactical"]);
+    expect(screen.getByRole("status")).toHaveTextContent("2 palettes");
+    fireEvent.change(filter, { target: { value: "zzzz" } });
+    expect(screen.getByRole("status")).toHaveTextContent("No palettes match.");
+    expect(screen.getAllByRole("radio")).toHaveLength(1);
   });
 });

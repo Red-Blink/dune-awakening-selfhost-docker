@@ -400,6 +400,7 @@
     "Broadcast checkpoints must not exceed the default countdown",
     "Browse Blueprints",
     "Browse public designs from DuneDocker Base Builder and install one directly for",
+    "Brutalist industrial: cold blues and purples on near-black.",
     "Buggy",
     "Build Cache Cleaned",
     "Build Cache Cleanup Failed",
@@ -446,6 +447,7 @@
     "CSV contains binary data and cannot be imported.",
     "CSV must include a template_id column.",
     "Cached in Database",
+    "Caladan: deep ocean blues, sea green and silver.",
     "Cancel",
     "Cancel Delete",
     "Cancel Import",
@@ -1179,6 +1181,7 @@
     "Filter items…",
     "Filter modifiers",
     "Filter names, arguments, return types, or languages",
+    "Filter palettes",
     "Filter settings",
     "Filter table or loaded column names",
     "Filters Queued",
@@ -1861,6 +1864,7 @@
     "No modifiers match your filter.",
     "No offline players were found.",
     "No output.",
+    "No palettes match.",
     "No partitions available",
     "No permissions match your search.",
     "No player sell listings on this exchange.",
@@ -2972,6 +2976,7 @@
     "The Console update was cancelled. Review the update log before retrying.",
     "The Console will start after the Linux host boots, but the Battlegroup will remain stopped until you start it.",
     "The Custom PvP Mode written to disk is",
+    "The Emperor's elite: imperial purple and gold on command black.",
     "The Funcom token was changed successfully and the server is up and running.",
     "The Market Board is unsupported by the detected database schema.",
     "The Market Bot is unsupported by the detected database schema.",
@@ -3319,6 +3324,7 @@
     "Waiting for the game to save the character position",
     "Waiting for the update helper to start.",
     "Warm charcoal with amber and muted turquoise.",
+    "Warm dark stone with sky blue and sand, from the Tabr save editor.",
     "Warming",
     "Warn",
     "Warn players before restart",
@@ -7169,11 +7175,11 @@
     "Applies to this browser only. Choose Default to restore the standard look.": [
       {
         "file": "console/web/src/themes/ThemePanel.tsx",
-        "line": 70,
+        "line": 80,
         "nearby": [
           "Console Theme",
           "Close",
-          "Console theme"
+          "Filter palettes"
         ]
       }
     ],
@@ -10130,6 +10136,18 @@
         ]
       }
     ],
+    "Brutalist industrial: cold blues and purples on near-black.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 33,
+        "nearby": [
+          "Roasted brown with spice orange and cool turquoise.",
+          "Neutral charcoal with pale blue and warm ivory.",
+          "Caladan: deep ocean blues, sea green and silver.",
+          "The Emperor's elite: imperial purple and gold on command black."
+        ]
+      }
+    ],
     "Buggy": [
       {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
@@ -10498,6 +10516,18 @@
           "Buyback Sweeps",
           "Schedule",
           "Interval (Minutes)"
+        ]
+      }
+    ],
+    "Caladan: deep ocean blues, sea green and silver.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 34,
+        "nearby": [
+          "Neutral charcoal with pale blue and warm ivory.",
+          "Brutalist industrial: cold blues and purples on near-black.",
+          "The Emperor's elite: imperial purple and gold on command black.",
+          "Warm dark stone with sky blue and sand, from the Tabr save editor."
         ]
       }
     ],
@@ -14098,17 +14128,17 @@
     "Console theme": [
       {
         "file": "console/web/src/themes/ThemePanel.tsx",
-        "line": 71,
+        "line": 90,
         "nearby": [
-          "Close",
-          "Applies to this browser only. Choose Default to restore the standard look."
+          "Filter palettes",
+          "No palettes match."
         ]
       }
     ],
     "Console Theme": [
       {
         "file": "console/web/src/themes/ThemePanel.tsx",
-        "line": 67,
+        "line": 77,
         "nearby": [
           "The standard console look.",
           "Close",
@@ -21421,6 +21451,26 @@
           "Functions & Procedures",
           "Filter table or loaded column names",
           "Clear schema filter"
+        ]
+      }
+    ],
+    "Filter palettes": [
+      {
+        "file": "console/web/src/themes/ThemePanel.tsx",
+        "line": 85,
+        "nearby": [
+          "Close",
+          "Applies to this browser only. Choose Default to restore the standard look.",
+          "No palettes match."
+        ]
+      },
+      {
+        "file": "console/web/src/themes/ThemePanel.tsx",
+        "line": 86,
+        "nearby": [
+          "Applies to this browser only. Choose Default to restore the standard look.",
+          "No palettes match.",
+          "Console theme"
         ]
       }
     ],
@@ -30244,7 +30294,9 @@
         "line": 32,
         "nearby": [
           "Graphite blue with steel silver and sea green.",
-          "Roasted brown with spice orange and cool turquoise."
+          "Roasted brown with spice orange and cool turquoise.",
+          "Brutalist industrial: cold blues and purples on near-black.",
+          "Caladan: deep ocean blues, sea green and silver."
         ]
       }
     ],
@@ -31448,6 +31500,16 @@
           "Owner",
           "Save or revert roster changes first",
           "Transfer to Custodian"
+        ]
+      }
+    ],
+    "No palettes match.": [
+      {
+        "file": "console/web/src/themes/ThemePanel.tsx",
+        "line": 89,
+        "nearby": [
+          "Filter palettes",
+          "Console theme"
         ]
       }
     ],
@@ -41756,7 +41818,8 @@
         "nearby": [
           "Soft dark taupe with limestone and sage blue.",
           "Graphite blue with steel silver and sea green.",
-          "Neutral charcoal with pale blue and warm ivory."
+          "Neutral charcoal with pale blue and warm ivory.",
+          "Brutalist industrial: cold blues and purples on near-black."
         ]
       }
     ],
@@ -49538,6 +49601,17 @@
         ]
       }
     ],
+    "The Emperor's elite: imperial purple and gold on command black.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 35,
+        "nearby": [
+          "Brutalist industrial: cold blues and purples on near-black.",
+          "Caladan: deep ocean blues, sea green and silver.",
+          "Warm dark stone with sky blue and sand, from the Tabr save editor."
+        ]
+      }
+    ],
     "The encrypted archive this console produced on the old server, downloaded from its Backups page.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
@@ -50109,7 +50183,7 @@
     "The standard console look.": [
       {
         "file": "console/web/src/themes/ThemePanel.tsx",
-        "line": 43,
+        "line": 46,
         "nearby": [
           "Console Theme",
           "Close"
@@ -54261,6 +54335,16 @@
         "nearby": [
           "Volcanic gray with soft silver and warm copper.",
           "Dark umber with burnished copper and sage."
+        ]
+      }
+    ],
+    "Warm dark stone with sky blue and sand, from the Tabr save editor.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 36,
+        "nearby": [
+          "Caladan: deep ocean blues, sea green and silver.",
+          "The Emperor's elite: imperial purple and gold on command black."
         ]
       }
     ],
