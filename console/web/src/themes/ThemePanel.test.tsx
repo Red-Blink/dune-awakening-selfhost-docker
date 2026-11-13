@@ -24,6 +24,20 @@ describe("ThemePanel", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("keeps full names available and reserves a checkmark for every palette", () => {
+    render(<ThemePanel />);
+    for (const radio of screen.getAllByRole("radio")) {
+      const label = radio.querySelector(".theme-card-label");
+      expect(label).toHaveAttribute("title", label?.textContent);
+      expect(radio.querySelector(".theme-card-check")).toBeInTheDocument();
+    }
+    const option = screen.getByRole("radio", { name: /Water Shipper Utility/ });
+    const check = option.querySelector(".theme-card-check");
+    fireEvent.click(option);
+    expect(option.querySelector(".theme-card-check")).toBe(check);
+    expect(option.querySelector(".theme-card-label")).toHaveTextContent("Water Shipper Utility");
+  });
+
   it("arrow keys move focus without applying; Space/Enter-click chooses; Home/End jump", () => {
     render(<ThemePanel />);
     const radios = screen.getAllByRole("radio");

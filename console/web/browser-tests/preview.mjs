@@ -174,7 +174,19 @@ try{
  for(const width of [320,390,768,1440]){
   await page.setViewportSize({width,height:900});
   assert.ok(await picker.evaluate(node=>node.scrollWidth<=node.clientWidth+1),'theme picker has no horizontal scroll at '+width);
+  for(const radio of await picker.getByRole('radio').all()){
+   const dimensions=()=>radio.evaluate(node=>{
+    const label=node.querySelector('.theme-card-label');
+    const range=document.createRange();range.selectNodeContents(label);
+    return {height:node.getBoundingClientRect().height,labelWidth:label.clientWidth,lines:new Set([...range.getClientRects()].map(rect=>rect.top)).size};
+   });
+   const before=await dimensions();
+   await radio.click();
+   assert.deepEqual(await dimensions(),before,'selecting a palette preserves its single-line layout at '+width);
+   assert.equal(before.lines,1,'palette name stays on one line at '+width);
+  }
  }
+ await picker.getByRole('radio',{name:'Default',exact:true}).click();
  await picker.getByRole('searchbox',{name:'Filter palettes'}).fill('sardaukar');
  assert.equal(await picker.getByRole('radio').count(),3);
  await page.keyboard.press('Escape');
