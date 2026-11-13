@@ -1180,7 +1180,7 @@ install_qa_commit() {
   remove_backed_up_project_files "$backup_dir"
   (
     cd "$src"
-    tar --exclude='.git' -cf - .
+    tar --owner="$DUNE_HOST_UID" --group="$DUNE_HOST_GID" --exclude='.git' -cf - .
   ) | (
     cd "$ROOT_DIR"
     tar -xf -
@@ -1239,7 +1239,9 @@ running_console_env_value() {
 
 host_repo_owner_id() {
   local field="$1"
-  local path="${HOST_ROOT_DIR:-$ROOT_DIR}"
+  # HOST_ROOT_DIR is for Docker bind sources, not local filesystem access.
+  # The update helper sees this checkout at /repo, not at its host pathname.
+  local path="$ROOT_DIR"
 
   if command -v stat >/dev/null 2>&1; then
     case "$field" in
@@ -1254,19 +1256,73 @@ host_repo_owner_id() {
 }
 
 normalize_host_owner_env() {
-  local owner_uid owner_gid
+  local owner_uid owner_gid saved_uid saved_gid incoming_uid identity_gid
 
   owner_uid="$(host_repo_owner_id uid)"
   owner_gid="$(host_repo_owner_id gid)"
+  saved_uid="$(read_env_file_value DUNE_HOST_UID 2>/dev/null || true)"
+  saved_gid="$(read_env_file_value DUNE_HOST_GID 2>/dev/null || true)"
+  incoming_uid="${DUNE_HOST_UID:-}"
+  identity_gid="$owner_gid"
 
-  if [ -z "${DUNE_HOST_UID:-}" ] || { [ "${DUNE_HOST_UID:-}" = "0" ] && [ -n "$owner_uid" ] && [ "$owner_uid" != "0" ]; }; then
-    DUNE_HOST_UID="${owner_uid:-$(id -u)}"
+  if [ -z "$incoming_uid" ] || [ "$incoming_uid" = "0" ]; then
+    if [[ "$saved_uid" =~ ^[0-9]+$ ]] && [ "$saved_uid" != "0" ]; then
+      DUNE_HOST_UID="$saved_uid"
+      identity_gid="${saved_gid:-$owner_gid}"
+    else
+      DUNE_HOST_UID="${owner_uid:-$(id -u)}"
+    fi
+  elif [ "$saved_uid" = "$incoming_uid" ]; then
+    identity_gid="${saved_gid:-$owner_gid}"
   fi
-  if [ -z "${DUNE_HOST_GID:-}" ] || { [ "${DUNE_HOST_GID:-}" = "0" ] && [ -n "$owner_gid" ] && [ "$owner_gid" != "0" ]; }; then
-    DUNE_HOST_GID="${owner_gid:-$(id -g)}"
+  # Treat an inherited root UID/GID as a pair. A non-root identity may
+  # legitimately have GID 0; do not silently change that explicit group.
+  if [ -z "${DUNE_HOST_GID:-}" ] || { [ "${DUNE_HOST_GID:-}" = "0" ] && { [ -z "$incoming_uid" ] || [ "$incoming_uid" = "0" ]; }; }; then
+    DUNE_HOST_GID="${identity_gid:-$(id -g)}"
+  fi
+  if ! [[ "$DUNE_HOST_UID" =~ ^[0-9]+$ && "$DUNE_HOST_GID" =~ ^[0-9]+$ ]]; then
+    echo "Invalid host identity. Set numeric DUNE_HOST_UID and DUNE_HOST_GID before updating." >&2
+    return 1
   fi
 
   export DUNE_HOST_UID DUNE_HOST_GID
+}
+
+run_update_as_host_owner() {
+  normalize_host_owner_env
+  [ "$(id -u)" = "0" ] && [ "$DUNE_HOST_UID" != "0" ] || return 0
+
+  # Older automatic-update units run as root. Drop privileges before creating
+  # locks, backups or source files, rather than repairing their ownership later.
+  # Python is already required for the update's local-state snapshot.
+  echo "Running Console update as installation owner $DUNE_HOST_UID:$DUNE_HOST_GID."
+  exec python3 - "$ROOT_DIR/runtime/scripts/self-update.sh" "$@" <<'PY'
+import os
+import pwd
+import sys
+
+uid, gid = int(os.environ['DUNE_HOST_UID']), int(os.environ['DUNE_HOST_GID'])
+groups = {gid}
+try:
+    account = pwd.getpwuid(uid)
+except KeyError:
+    account = None
+if account is not None:
+    groups.update(os.getgrouplist(account.pw_name, gid))
+    os.environ['HOME'] = account.pw_dir
+    os.environ['USER'] = os.environ['LOGNAME'] = account.pw_name
+try:
+    groups.add(os.stat('/var/run/docker.sock').st_gid)
+except FileNotFoundError:
+    pass
+try:
+    os.setgroups(sorted(groups))
+    os.setgid(gid)
+    os.setuid(uid)
+except OSError as error:
+    sys.exit(f'Cannot run update as installation owner: {error}. No update files were installed.')
+os.execv('/bin/bash', ['bash', *sys.argv[1:]])
+PY
 }
 
 restore_local_state_ownership() {
@@ -1563,7 +1619,7 @@ install_release_tag_from_archive() {
   remove_backed_up_project_files "$backup_dir"
   (
     cd "$src"
-    tar --exclude='.git' -cf - .
+    tar --owner="$DUNE_HOST_UID" --group="$DUNE_HOST_GID" --exclude='.git' -cf - .
   ) | (
     cd "$ROOT_DIR"
     tar -xf -
@@ -1596,6 +1652,7 @@ tag="${2:-}"
 
 case "$cmd" in
   rebuild-web-console)
+    run_update_as_host_owner "$@"
     dune_persist_compose_project_name "$ROOT_DIR" "$DUNE_COMPOSE_PROJECT_NAME"
     service="${tag:-}"
     if [ -z "$service" ]; then
@@ -1645,6 +1702,7 @@ case "$cmd" in
     ;;
 
   install|apply)
+    run_update_as_host_owner "$@"
     acquire_self_update_lock
     dune_persist_compose_project_name "$ROOT_DIR" "$DUNE_COMPOSE_PROJECT_NAME"
     if [ -z "$tag" ] || [ "$tag" = "latest" ]; then
@@ -1679,6 +1737,7 @@ case "$cmd" in
     ;;
 
   install-qa)
+    run_update_as_host_owner "$@"
     acquire_self_update_lock
     dune_persist_compose_project_name "$ROOT_DIR" "$DUNE_COMPOSE_PROJECT_NAME"
     validate_commit_sha "$tag" || {

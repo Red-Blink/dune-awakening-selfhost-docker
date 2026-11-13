@@ -39,7 +39,7 @@ interval, timeout and retries; the broker's own scheduler configuration is
 unchanged. Existing brokers acquire the healthcheck change when recreated through
 the normal RabbitMQ startup path. Updating repository files alone does not modify
 a running container's healthcheck. This reduces probe overhead on large hosts;
-it is not a fix for the unproven cross-map freeze.
+the reporter's comparison ruled these probes out as the cause of the cross-map freeze.
 
 `memory.limit` records describe Memory Balancer requests and their applied/failed
 outcomes, with previous/new byte limits, reason and elapsed time. A previous limit
@@ -91,6 +91,13 @@ also a change, so the report does not prove the exact native memory signal or
 that every live limit change requires a restart. See the
 [reporter's follow-up](https://github.com/Red-Blink/dune-awakening-selfhost-docker/issues/291#issuecomment-6803023359).
 
+The reporter's [dated overnight follow-up](https://github.com/Red-Blink/dune-awakening-selfhost-docker/issues/291#issuecomment-6812930738)
+confirmed that the improvement held for more than 15 hours: GC ran at roughly
+five-minute intervals from November 11 at 20:36 to November 12 at 13:00, 2026.
+An apparent return to 30-second GC came from mixing undated entries from the
+previous evening. Ordinary single-map catch-up messages remained; this resolved
+the frequent-GC symptom, not every possible hitch or replication bottleneck.
+
 To test the hypothesis, use the existing per-map **Memory** controls during a
 planned maintenance window. Save the original limits, ensure the host can safely
 support the higher limit, then restart only the affected map so the new native
@@ -115,6 +122,38 @@ CPU, native GC/hitch logs and Console timing. Native userspace stacks should
 include module-relative addresses and the exact image/build so they can be
 compared even without vendor symbols. Correlated `futex`/`munmap` activity alone
 does not identify the caller or establish a repository defect.
+
+### Confirmed host cause in the 63-second stall report
+
+In [issue #290](https://github.com/Red-Blink/dune-awakening-selfhost-docker/issues/290),
+host tracing identified a Proxmox host's `ksmtuned` service launching `ps` to
+measure QEMU memory every 60 seconds. The command's run time accounted for the
+roughly 63-second cadence. Its `show_smaps_rollup` scan held QEMU's `mmap_lock`
+while guest vCPU threads waited during memory faults. The full queued-writer
+sequence was not identified; the measurements do not explain every quiet interval.
+
+KSM already reported `run=0`, but its tuning service was still polling. The
+operator stopped that host service and measured no long lock holds in a short
+trace. Their [longer follow-up](https://github.com/Red-Blink/dune-awakening-selfhost-docker/issues/290#issuecomment-6828090407)
+then found zero catch-up events of one second or more across six maps during a
+15-hour window from November 11 at 22:00 to November 12 at 13:00, 2026. Most of
+the window had low player counts, so it was not a full-load stress test. Separate
+startup and map-loading hitches were not established as recurrences.
+
+This is a measured host configuration cause for that report, not a reason to
+disable KSM or services on every host. Dune Docker does not change hypervisor
+services. On a similar recurrence, have the host administrator correlate guest
+stalls with QEMU lock waits and host process activity before changing settings.
+Keep frequent GC and isolated gameplay hitches separate from synchronized pauses.
+
+### Story ejections
+
+Since v1.4.64, the Autoscaler retains one empty ready spare for an occupied
+single-party story map and requests another instance when all assigned instances
+are occupied. Configured dimension caps, warming instances and memory admission
+still apply. Fresh-process activities keep their existing retirement behavior.
+This addresses idle recycling of the spare; it does not establish how the native
+Director selects a destination or guarantee admission when capacity is exhausted.
 
 For story ejections, correlate the Director's exact travel request and refusal,
 source/target server and partition, destination ready/alive state and Autoscaler

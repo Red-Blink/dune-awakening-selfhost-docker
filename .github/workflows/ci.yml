@@ -134,6 +134,8 @@ jobs:
         run: |
           bash tests/ready-current-start-test.sh
           python3 tests/test_admin_login_queue.py
+      - name: Test self-update installation identity
+        run: python3 tests/test_self_update_identity.py
       - name: Test experimental Tank image policy and spawn safety
         run: |
           python3 tests/test_experimental_tanks.py
@@ -194,6 +196,7 @@ jobs:
           runtime/tests/test-game-epic-config-permissions.sh
           tests/fls-signals-test.sh
           tests/steamcmd-signals-test.sh
+          python3 tests/update-check-retry-test.py
           tests/storage-cleanup-test.sh
           tests/fake-k8s-serviceaccount-cleanup-test.sh
           tests/runtime-permission-helper-rebuild-test.sh

@@ -107,6 +107,69 @@ function resolveRmqGameHttpBaseUrl() {
   return `http://127.0.0.1:${port}`;
 }
 
+// Shared management connection for the opt-in chat recorder. Never include
+// broker responses, URLs or credentials in caller-visible errors.
+export async function requestRmqGameHttp(config, method, path, body, { fetchImpl = globalThis.fetch, now = Date.now } = {}) {
+  if (process.env.DUNE_RMQ_TRANSPORT === "exec") throw new Error("Chat collection needs the RabbitMQ management connection.");
+  const key = transportKey(config);
+  let creds = resolveRmqAdminCreds(config?.repoRoot, key, now());
+  // The publisher's director-current.log is a rotating tail: startup credentials
+  // can scroll out. Use the same bounded, streamed director-log fallback as
+  // runtime/scripts/lib/rabbitmq.sh; never send its output to logs or errors.
+  if (!creds) {
+    creds = await readDirectorRmqCredentials();
+    if (creds) rememberTransport(cachedRmqCreds, key, { credentials: creds, expiresAt: now() + 60_000 });
+  }
+  if (!creds) throw new Error("Chat collection needs the RabbitMQ management connection.");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetchImpl(`${resolveRmqGameHttpBaseUrl()}${path}`, {
+      method, redirect: "error", signal: controller.signal,
+      headers: { Authorization: `Basic ${Buffer.from(`${creds.user}:${creds.pass}`).toString("base64")}`, "Content-Type": "application/json" },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) })
+    });
+    if ([401, 403].includes(response.status)) cachedRmqCreds.delete(key);
+    if (!response.ok) throw Object.assign(new Error("Chat collection could not reach its RabbitMQ queue."), { statusCode: response.status });
+    if (response.status === 204 || method === "DELETE") return null;
+    // Poll responses are bounded by count/truncate at the broker as well.
+    let bytes = 0;
+    const chunks = [];
+    for await (const chunk of response.body) {
+      bytes += chunk.length;
+      if (bytes > 2 * 1024 * 1024) throw new Error("Chat response exceeded its size limit.");
+      chunks.push(chunk);
+    }
+    const text = Buffer.concat(chunks).toString("utf8");
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    throw Object.assign(new Error("Chat collection is unavailable. Check the RabbitMQ management connection."), { brokerStatus: error.statusCode });
+  } finally { clearTimeout(timer); }
+}
+
+export function readDirectorRmqCredentials({ spawnImpl = spawn } = {}) {
+  return new Promise(resolveResult => {
+    let child, text = "", finished = false;
+    const timer = setTimeout(() => finish(null), 3000);
+    function finish(value) {
+      if (finished) return;
+      finished = true; clearTimeout(timer);
+      child?.kill("SIGTERM"); resolveResult(value);
+    }
+    try {
+      child = spawnImpl("docker", ["logs", "dune-director"], { stdio: ["ignore", "pipe", "ignore"] });
+      child.on("error", () => finish(null));
+      child.on("close", () => finish(null));
+      child.stdout.on("data", chunk => {
+        text += chunk.toString("utf8");
+        const match = /Generated new admin credentials:\s*(bgd\.[^/\s]{1,180}\.admin)\s*\/\s*([A-Za-z0-9+/=]{1,512})(?=\s|$)/.exec(text);
+        if (match && /\s/.test(text.slice(match.index + match[0].length, match.index + match[0].length + 1))) finish({ user: match[1], pass: match[2] });
+        else if (Buffer.byteLength(text) >= 1024 * 1024) finish(null);
+      });
+    } catch { finish(null); }
+  });
+}
+
 async function tryRmqGameHttpGet(config, path, key, now, fetchImpl) {
   if (globalThis.__testSpawn || process.env.DUNE_RMQ_TRANSPORT === "exec") return null;
   const creds = resolveRmqAdminCreds(config?.repoRoot, key, now);

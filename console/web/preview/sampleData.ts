@@ -29,6 +29,14 @@ export function sampleResponse(url:URL):unknown {
  }
  if(path==='/api/players/list-settings')return {settings:{inactiveWeeks:null},limits:{inactiveWeeks:{min:1,max:8}},canConfigure:false};
  if(path==='/api/logs/services')return {services:[...containers.map(name=>name.replace(/^dune-/,'')),'autoscaler']};
+ if(path==='/api/chat/history'){
+  const all=[{id:'preview-map-chat',capturedAt:new Date().toISOString(),channel:'Map',sender:'Preview Sender',senderName:'Aster Vale',recipient:'',context:'HaggaBasin.1',text:'Sandstorm has passed. The trading post is open.'},
+   {id:'preview-guild-chat',capturedAt:new Date().toISOString(),channel:'Guild',sender:'Preview Guildmate',senderName:'Kestrel',recipient:'',context:'Dawnspire',text:'Meet at the guild base before heading into the desert.'}];
+  const q=(url.searchParams.get('q')||'').toLowerCase(),channel=url.searchParams.get('channel')||'',context=(url.searchParams.get('context')||'').toLowerCase();
+  const filtered=all.filter(row=>(!channel||row.channel===channel)&&row.context.toLowerCase().includes(context)&&[row.text,row.sender,row.senderName].some(value=>value.toLowerCase().includes(q)));
+  const page=Math.max(0,Number(url.searchParams.get('page')||0)),limit=Number(url.searchParams.get('limit')||50);
+  return {settings:{enabled:false,retentionDays:7},state:'disabled',lastCheckedAt:null,maxRows:5000,maxBytes:10485760,channels:['Map','Guild','Proximity'],canConfigure:false,rows:filtered.slice(page*limit,(page+1)*limit),total:filtered.length,page,limit};
+ }
  if(path.startsWith('/api/logs'))return output(sampleLogs);
  if(path==='/api/setup/tasks')return {tasks:[previewVersionTask('stack'),previewVersionTask('game')]};
  if(path.startsWith('/api/setup/tasks/preview-check'))return {task:previewVersionTask(path.includes('game')?'game':'stack')};

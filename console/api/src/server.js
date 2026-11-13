@@ -59,6 +59,7 @@ import { createConsoleAccess } from "./services/consoleAccess.js";
 import { parseMemorySwapStatus } from "./services/memorySwap.js";
 import { createDeathPoller } from "./deathPoller.js";
 import { createCombatHistory, combatScope } from "./services/combatHistory.js";
+import { createChatHistory } from "./services/chatHistory.js";
 import { createCombatAvailability } from "./services/combatAvailability.js";
 import { updateEnvFileValue as updateEnvValue } from "./services/envFile.js";
 import { funcomAuthMismatchDetected, matchingFuncomAuthLines, saveFuncomTokenValue as writeFuncomToken, validDockerSince } from "./services/funcomAuth.js";
@@ -468,6 +469,7 @@ const journeyTagsData = loadJourneyTagsData();
 const memoryBalancer = createMemoryBalancer(config);
 const deathPoller = createDeathPoller(config);
 const combatHistory = createCombatHistory(db, { mockMode: config.mockMode });
+const chatHistory = createChatHistory(config);
 const combatAvailability = createCombatAvailability(config, db);
 const POSTGRES_UNAVAILABLE_MESSAGE = "Postgres is not running or is restarting. Wait for the database service to come back online, then refresh.";
 const DEFAULT_ALWAYS_ON_STARTUP_PARALLELISM = 1;
@@ -581,6 +583,7 @@ createServer(async (req, res) => {
 
 runBackgroundTick("Combat history", () => combatHistory.tick());
 setInterval(() => { void combatHistory.tick(); }, 30_000).unref?.();
+setInterval(() => { void chatHistory.tick(); }, 5000).unref?.();
 
 // Reconcile periodically because a Funcom database migration can recreate the
 // fulfilled-orders table and thereby remove third-party triggers. The service
@@ -1594,6 +1597,20 @@ async function handleApi(req, res) {
     });
   }
 
+  if (path === "/api/chat/history" && req.method === "GET") {
+    return json(res, 200, { ...chatHistory.read(Object.fromEntries(url.searchParams)),
+      canConfigure: evaluate(session, "chat:configure") && (!bearer || apiKeys.allows(bearer.key, "chat:configure")) });
+  }
+  if (path === "/api/chat/settings" && req.method === "POST") {
+    const result = await chatHistory.save(await readJson(req));
+    audit(config, req, "chat.settings", result.settings);
+    return json(res, 200, result);
+  }
+  if (path === "/api/chat/history" && req.method === "DELETE") {
+    const result = await chatHistory.clear();
+    audit(config, req, "chat.history-cleared");
+    return json(res, 200, result);
+  }
   if (path === "/api/players/combat" && req.method === "GET") {
     const controllerId = combatScope(url.searchParams.get("controllerId"));
     return dbJson(res, () => combatHistory.read({ controllerId,
