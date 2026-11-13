@@ -334,6 +334,37 @@ export function unknownActions(docs) {
   return dead;
 }
 
+// An area's other actions are only usable by a role that can already open the
+// area, so a grant like server:stop without server:read is a dead end: the role
+// gets a control on an area whose status it cannot read. The rule is
+// mechanical, not a hand-kept table: for every action `<area>:<verb>` (or
+// `<area>:<sub>:<verb>`) that is allowed, `<area>:read` must be allowed too
+// WHEN that read action exists. Areas with no read action (community,
+// admin:broadcast) are unaffected. It runs through the same evaluate() the
+// engine uses, so Deny statements and wildcards are honoured.
+//
+// Checked on SAVE only, like deprecatedActions(): a stored document keeps
+// working through an upgrade; the operator fixes it on their next edit.
+export function missingPrerequisites(docs) {
+  const known = [...allKnownActions()];
+  const knownSet = new Set(known);
+  const missing = [];
+  for (const tier of Object.keys(docs || {})) {
+    const byRead = new Map();
+    for (const action of known) {
+      const cut = action.lastIndexOf(":");
+      if (cut < 0) continue;
+      const read = `${action.slice(0, cut)}:read`;
+      if (read === action || !knownSet.has(read)) continue;
+      if (!evaluate({ tier }, action, docs) || evaluate({ tier }, read, docs)) continue;
+      if (!byRead.has(read)) byRead.set(read, []);
+      byRead.get(read).push(action);
+    }
+    for (const [read, actions] of byRead) missing.push({ tier, read, actions });
+  }
+  return missing;
+}
+
 export function setPolicies(docs, repoRoot = null) {
   const badPattern = invalidActionPattern(docs);
   if (badPattern !== null) {
@@ -399,6 +430,18 @@ export function setPolicies(docs, repoRoot = null) {
       ok: false,
       error: `These actions do not exist and would have no effect: ${listed}. Check GET /api/settings/iam/policies for the full list of valid actions.`,
       unknownActions: dead
+    };
+  }
+
+  const unmet = missingPrerequisites(docs);
+  if (unmet.length) {
+    const listed = unmet
+      .map(({ tier, read, actions }) => `${tier}: grant ${read} first, or remove ${actions.slice(0, 4).join(", ")}${actions.length > 4 ? ` and ${actions.length - 4} more` : ""}`)
+      .join("; ");
+    return {
+      ok: false,
+      error: `A role cannot be given actions in an area it cannot open. ${listed}.`,
+      missingPrerequisites: unmet
     };
   }
 
