@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { createServer as createTcpServer } from "node:net";
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync, readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { signPayload } from "../src/integrations/discord/handoff.js";
+import { DEFAULT_POLICIES } from "../src/policy.js";
 
 const apiRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
 const repoRoot = dirname(dirname(apiRoot));
@@ -39,6 +40,11 @@ function startFakeDiscord(port) {
       req.on("data", (chunk) => { body += chunk; });
       req.on("end", () => {
         const code = new URLSearchParams(body).get("code") || "";
+        if (code === "invalid-client") {
+          res.writeHead(401, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "invalid_client", error_description: "synthetic-private-provider-diagnostic" }));
+          return;
+        }
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ access_token: `token-${code}`, token_type: "Bearer", expires_in: 604800 }));
       });
@@ -57,6 +63,7 @@ function startFakeDiscord(port) {
       const roles = auth.includes("token-moderator") ? [MOD_ROLE]
         : auth.includes("token-admin") ? [ADMIN_ROLE, PLAYER_ROLE]
         : auth.includes("token-mfa") ? [ADMIN_ROLE]
+        : auth.includes("token-player") ? [PLAYER_ROLE]
         : auth.includes("token-norole") ? ["999999999999999999"]
         : [];
       res.writeHead(200, { "content-type": "application/json" });
@@ -427,6 +434,33 @@ const ROLE_ENV = {
   DISCORD_CONSOLE_PLAYER_ROLE_IDS: PLAYER_ROLE,
 };
 
+test("a map-only Player cannot fetch private map layers, hidden pages, or perform server operations", async () => {
+  const consolePort = await getFreePort(); const discordPort = await getFreePort();
+  const tempDir = mkdtempSync(join(tmpdir(), "oauth-component-access-"));
+  mkdirSync(join(tempDir, "runtime", "generated"), { recursive: true });
+  writeFileSync(join(tempDir, "runtime", "generated", "iam-policies.json"), JSON.stringify({ ...structuredClone(DEFAULT_POLICIES), player: { version: 1, tier: "player", statements: [{ Effect: "Allow", Action: ["maps:read"] }] } }));
+  const console = startConsole(consolePort, discordPort, tempDir, { ...ROLE_ENV, ADMIN_MOCK_MODE: "1", DISCORD_OAUTH_ALLOW_OWNER_BOOTSTRAP: "0" });
+  const discordServer = await startFakeDiscord(discordPort);
+  try {
+    await waitForHealth(consolePort);
+    const login = await signInWithCode(consolePort, "player");
+    assert.equal(login.status, 200);
+    const base = `http://127.0.0.1:${consolePort}`;
+    const headers = { cookie: `asc_session=${login.sessionValue}` };
+    const me = await (await fetch(`${base}/api/auth/me`, { headers })).json();
+    assert.equal(me.user.tier, "player");
+    assert.deepEqual(me.allowedActions, ["maps:read"]);
+    for (const path of ["/api/map/players", "/api/map/bases", "/api/map/storage", "/api/map/services", "/api/settings", "/api/database/tables", "/api/bases", "/api/vehicles"]) {
+      const response = await fetch(base + path, { headers });
+      assert.equal(response.status, 403, `${path} must require its own permission`);
+    }
+    const authState = await (await fetch(`${base}/api/auth/state`, { headers })).json();
+    const deniedStart = await fetch(`${base}/api/server/start`, { method: "POST", headers: { ...headers, "content-type": "application/json", "x-csrf-token": authState.csrfToken }, body: "{}" });
+    assert.equal(deniedStart.status, 403);
+    assert.match((await deniedStart.json()).error, /permission/i);
+  } finally { await stopProcess(console.child); await closeDiscordServer(discordServer); rmSync(tempDir, { recursive: true, force: true }); }
+});
+
 test("roles: a member holding the mapped moderator role signs in as moderator, and the policy gate holds", async () => {
   const consolePort = await getFreePort(); const discordPort = await getFreePort();
   const tempDir = mkdtempSync(join(tmpdir(), "oauth-roles-"));
@@ -620,6 +654,40 @@ async function passwordOwnerSession(consolePort) {
   return { cookie: `asc_session=${sessionCookieValue(login.headers.getSetCookie(), "asc_session")}`, csrfToken };
 }
 
+test("invalid Discord client credentials show an owner repair message without a 502 or a new session", async () => {
+  const consolePort = await getFreePort(); const discordPort = await getFreePort();
+  const tempDir = mkdtempSync(join(tmpdir(), "oauth-invalid-client-"));
+  const console = startConsole(consolePort, discordPort, tempDir, ROLE_ENV);
+  const discordServer = await startFakeDiscord(discordPort);
+  try {
+    await waitForHealth(consolePort);
+    const owner = await passwordOwnerSession(consolePort);
+    const start = await fetch(`http://127.0.0.1:${consolePort}/api/auth/discord/start?setup=1`, { headers: { cookie: owner.cookie }, redirect: "manual" });
+    assert.equal(start.status, 302);
+    const state = new URL(start.headers.get("location")).searchParams.get("state");
+    const pending = sessionCookieValue(start.headers.getSetCookie(), "discord_oauth_state");
+    const response = await fetch(`http://127.0.0.1:${consolePort}/api/auth/discord/callback?code=invalid-client&state=${encodeURIComponent(state)}`, { headers: { cookie: `${owner.cookie}; discord_oauth_state=${pending}` }, redirect: "manual" });
+    assert.equal(response.status, 400, "a credential rejection must not turn into a Cloudflare gateway page");
+    assert.match(response.headers.get("content-type"), /text\/html/);
+    const body = await response.text();
+    assert.match(body, /Change Application Credentials/);
+    assert.match(body, /same Discord application/);
+    assert.match(body, /Back To Console/);
+    assert.doesNotMatch(body, /synthetic-private-provider-diagnostic|client-secret/);
+    assert.equal(sessionCookieValue(response.headers.getSetCookie(), "asc_session"), null);
+    const audit = readFileSync(join(tempDir, "runtime/generated/web-admin-audit.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+    const failure = audit.findLast((entry) => entry.action === "auth.oauth.callback");
+    assert.equal(failure.detail.reason, "discord_client_rejected");
+    assert.equal(failure.detail.upstreamStatus, 401);
+    assert.equal(failure.detail.upstreamOperation, "token");
+    assert.equal((await fetch(`http://127.0.0.1:${consolePort}/api/auth/me`, { headers: { cookie: owner.cookie } })).status, 200, "the owner can return to Settings and correct the application");
+    const normal = await signInWithCode(consolePort, "invalid-client");
+    assert.equal(normal.status, 400);
+    assert.match(normal.body, /Console password/);
+    assert.equal(normal.sessionValue, null);
+  } finally { await stopProcess(console.child); await closeDiscordServer(discordServer); rmSync(tempDir, { recursive: true, force: true }); }
+});
+
 test("guided setup: an owner's setup-mode round-trip captures identity + guilds, mints NO session, and only an owner may start it", async () => {
   const consolePort = await getFreePort(); const discordPort = await getFreePort();
   const tempDir = mkdtempSync(join(tmpdir(), "oauth-setup-"));
@@ -765,6 +833,66 @@ test("iam/policies returns the action catalog (policies + actions + actionMap + 
     // IamPolicyEditor.tsx), so this just pins that every entry is a real,
     // known action.
     for (const action of body.actions) assert.ok(body.allActions.includes(action), `${action} is a known action`);
+  } finally { await stopProcess(console.child); await closeDiscordServer(discordServer); rmSync(tempDir, { recursive: true, force: true }); }
+});
+
+test("guided setup saves credentials, authorizes the owner, and maps roles without an intermediate restart", async () => {
+  const consolePort = await getFreePort(); const discordPort = await getFreePort();
+  const tempDir = mkdtempSync(join(tmpdir(), "oauth-single-restart-"));
+  const console = startConsole(consolePort, discordPort, tempDir, {
+    DISCORD_OAUTH_CLIENT_ID: "", DISCORD_OAUTH_CLIENT_SECRET: "", DISCORD_OAUTH_REDIRECT_URI: "",
+    DISCORD_HOME_GUILD_ID: "", DISCORD_OAUTH_ALLOW_OWNER_BOOTSTRAP: "0", DISCORD_OAUTH_OWNER_ALLOWLIST: ""
+  });
+  const discordServer = await startFakeDiscord(discordPort);
+  try {
+    await waitForHealth(consolePort);
+    const base = `http://127.0.0.1:${consolePort}`;
+    const owner = await passwordOwnerSession(consolePort);
+    const headers = { cookie: owner.cookie, "x-csrf-token": owner.csrfToken, "content-type": "application/json" };
+    const stateBefore = await (await fetch(`${base}/api/auth/state`)).json();
+    assert.ok(stateBefore.instanceId);
+    assert.equal(stateBefore.config.discordOAuthAppConfigured, false);
+    const post = (path, body) => fetch(base + path, { method: "POST", headers, body: JSON.stringify(body) });
+    const save = await post("/api/setup/write-oauth-config", {
+      DISCORD_OAUTH_CLIENT_ID: "123456789012345678", DISCORD_OAUTH_REDIRECT_URI: `${base}/api/auth/discord/callback`
+    });
+    assert.equal(save.status, 200, await save.text());
+    const secret = await post("/api/setup/save-oauth-secret", { secret: "synthetic-single-restart-client-secret" });
+    assert.equal(secret.status, 200, await secret.text());
+    const settings = await (await fetch(`${base}/api/settings`, { headers })).json();
+    assert.equal(settings.config.discordSetupApplicationReady, true);
+    assert.equal((await fetch(`${base}/api/auth/discord/start`, { redirect: "manual" })).status, 404, "saving a draft must not enable public login");
+    const start = await fetch(`${base}/api/auth/discord/start?setup=1`, { redirect: "manual", headers });
+    assert.equal(start.status, 302);
+    assert.equal(new URL(start.headers.get("location")).searchParams.get("client_id"), "123456789012345678");
+    const state = sessionCookieValue(start.headers.getSetCookie(), "discord_oauth_state");
+    const cb = await fetch(`${base}/api/auth/discord/callback?code=guildowner-mfa&state=${encodeURIComponent(state)}`, {
+      redirect: "manual", headers: { cookie: `${owner.cookie}; discord_oauth_state=${state}` }
+    });
+    assert.equal(cb.status, 200);
+    assert.equal((await fetch(`${base}/api/auth/me`, { headers })).status, 200, "setup preserves the owner's authenticated session");
+    const finish = await post("/api/setup/discord-finalize", { guildId: HOME_GUILD, adminRoleIds: ADMIN_ROLE, requireMfa: true });
+    assert.equal(finish.status, 200, await finish.text());
+    const stateAfter = await (await fetch(`${base}/api/auth/state`)).json();
+    assert.equal(stateAfter.instanceId, stateBefore.instanceId, "all setup completes in the original process");
+    assert.equal(stateAfter.config.discordOAuthConfigured, false, "public access awaits the final restart");
+    const nextStart = await fetch(`${base}/api/auth/discord/start?setup=1`, { redirect: "manual", headers });
+    const nextState = sessionCookieValue(nextStart.headers.getSetCookie(), "discord_oauth_state");
+    await post("/api/setup/save-oauth-secret", { secret: "synthetic-rotated-client-secret", overwrite: true });
+    const staleCallback = await fetch(`${base}/api/auth/discord/callback?code=guildowner-mfa&state=${encodeURIComponent(nextState)}`, {
+      redirect: "manual", headers: { cookie: `${owner.cookie}; discord_oauth_state=${nextState}` }
+    });
+    assert.equal(staleCallback.status, 400, "an OAuth response cannot be reused after application credentials change");
+    const freshStart = await fetch(`${base}/api/auth/discord/start?setup=1`, { redirect: "manual", headers });
+    const freshState = sessionCookieValue(freshStart.headers.getSetCookie(), "discord_oauth_state");
+    const freshCallback = await fetch(`${base}/api/auth/discord/callback?code=guildowner-mfa&state=${encodeURIComponent(freshState)}`, {
+      redirect: "manual", headers: { cookie: `${owner.cookie}; discord_oauth_state=${freshState}` }
+    });
+    assert.equal(freshCallback.status, 200);
+    await post("/api/setup/save-oauth-secret", { secret: "synthetic-single-restart-client-secret", overwrite: true });
+    const staleFinalize = await post("/api/setup/discord-finalize", { guildId: HOME_GUILD, adminRoleIds: ADMIN_ROLE, requireMfa: true });
+    assert.equal(staleFinalize.status, 409);
+    assert.equal((await staleFinalize.json()).requiresAuthorization, true);
   } finally { await stopProcess(console.child); await closeDiscordServer(discordServer); rmSync(tempDir, { recursive: true, force: true }); }
 });
 

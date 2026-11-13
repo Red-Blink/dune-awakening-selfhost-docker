@@ -1,35 +1,37 @@
-import { post } from "../api/client";
+import { ApiError, post } from "../api/client";
 
-// #676 §6.3: disable/enable/forget must restart the console immediately and
-// non-skippably -- unlike DiscordSetupWizard's own optional "restart later"
-// pattern for a benign credential rotation, presenting "disabled" as fait
-// accompli before the restart actually happens is misleading specifically
-// during the scenario (suspected compromise) the disable/forget actions
-// exist for. This mirrors the polling technique DiscordSetupWizard's own
-// restartNow() already uses -- keying on the NEW process reporting the
-// awaited condition, never on the connection dropping, which is what makes
-// it correct behind a reverse proxy/tunnel (a mid-recreate 502 is a
-// resolved fetch response, not a thrown error).
+type ConsoleState = { instanceId?: string; config?: Record<string, unknown> };
+async function readState(): Promise<ConsoleState> {
+  const response = await fetch("/api/auth/state", { cache: "no-store", signal: AbortSignal.timeout(5000) });
+  if (!response.ok) throw new Error("The Console is reconnecting.");
+  return response.json();
+}
+
+// A restart is ready only when a different API process reports the saved
+// configuration. The old process and proxy error pages cannot complete it.
 export async function restartConsoleAndReload(
   matchConfig: (config: Record<string, unknown>) => boolean,
   { onRestarting, onTimeout }: { onRestarting?: () => void; onTimeout?: (message: string) => void } = {}
 ): Promise<void> {
+  const before = await readState();
+  if (!before.instanceId) throw new Error("Reload the Console before restarting it.");
   onRestarting?.();
   try {
     await post("/api/setup/discord-restart", {});
-  } catch { /* the container may drop the connection mid-response; expected */ }
-  for (let i = 0; i < 90; i++) {
+  } catch (error) {
+    if (error instanceof ApiError && error.status < 500) throw error;
+    // The helper may have started even if its response was interrupted.
+  }
+  const deadline = Date.now() + 10 * 60 * 1000;
+  for (let i = 0; i < 300 && Date.now() < deadline; i++) {
     await new Promise((r) => setTimeout(r, 2000));
     try {
-      const res = await fetch("/api/auth/state", { cache: "no-store" });
-      if (res.ok) {
-        const body = await res.json();
-        if (matchConfig((body as { config?: Record<string, unknown> }).config || {})) {
-          window.location.replace("/");
-          return;
-        }
+      const state = await readState();
+      if (state.instanceId && state.instanceId !== before.instanceId && matchConfig(state.config || {})) {
+        window.location.replace("/");
+        return;
       }
     } catch { /* container mid-recreate; keep polling */ }
   }
-  onTimeout?.("The console is taking longer than expected to restart. Give it another minute and reload this page, or run `dune console restart` on the host.");
+  onTimeout?.("The Console is taking longer than expected to rebuild. Check the server, then reload this page when the Console is ready.");
 }

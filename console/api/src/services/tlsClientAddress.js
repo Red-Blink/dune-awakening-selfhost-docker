@@ -19,7 +19,8 @@ export function tlsClientAddress(req, repoRoot, now = Date.now()) {
     || Math.abs(now - Number(timestamp) * 1000) > 60_000
     || typeof signature !== "string" || !/^[a-f0-9]{64}$/.test(signature)) return null;
   try {
-    const key = readFileSync(join(repoRoot, "runtime/generated/tls-front/proxy-key"));
+    const key = readFileSync(join(repoRoot, req.headers["x-dune-console-proxy"] === "1"
+      ? "runtime/secrets/console-https-proxy-key.bin" : "runtime/generated/tls-front/proxy-key"));
     if (key.length !== 32) return null;
     const expected = createHmac("sha256", key)
       .update(`${timestamp}\n${ip}\n${req.method}\n${req.url}`).digest();

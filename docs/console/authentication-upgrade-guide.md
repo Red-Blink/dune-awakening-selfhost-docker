@@ -103,13 +103,13 @@ yourself, whenever you're ready.)
 
 ## Step 3 — turn it on from Settings, when you're ready
 
-Sign in as usual, then open **Settings → Two-Factor Authentication → Enable
-Two-Factor Authentication**. Do this when you are sitting in front of the
+Sign in as usual, then open **Settings → Account Security → Two-Factor
+Authentication → Enable 2FA**. Do this when you are sitting in front of the
 console with your phone in hand and somewhere to save the codes — not as
 part of an unattended session, because of what happens next.
 
-Enter your current login password and click **Enable Two-Factor
-Authentication**. You land on a setup screen. You have **10 minutes**; if it
+Enter your current login password and click **Enable 2FA**.
+A popup opens over Settings. You have **10 minutes**; if it
 expires, open the Settings control again to start over.
 
 **Scan the QR code** with your authenticator app. If you cannot scan, the
@@ -121,13 +121,12 @@ manually:* — type it into the app instead.
 **Save your recovery codes.** The next screen says *Save your recovery codes*
 and shows ten of them. This is the moment from the checklist: they are shown
 once, right now, and never again. Each works only once. Store all ten, then
-tick the acknowledgement and click *Continue to sign in*.
+tick the acknowledgement and click **Done**.
 
-**Sign in again** with your password **and a fresh code** from the app. The
-code you used to confirm the pairing will not work here — wait for the app to
-show the next one. That is deliberate.
-
-You are in. Setup is finished.
+You return to Settings and stay signed in with a new verified session.
+Other existing password sessions are revoked. **Cancel** before confirmation
+returns to Settings without enabling 2FA. Authenticator recovery still requires
+signing in again after replacing the lost authenticator.
 
 ## Every sign-in from now on
 
@@ -386,13 +385,13 @@ unset and use the file (Settings writes it for you on first save).
 The setup screen shows you the exact redirect URI to register (with a copy
 button) if you have not done it yet. The first-run sign-in flow never asks for
 the client ID or secret — the application is deployment config. (Once set up,
-**Settings → Discord OAuth** does expose a Client ID and Client Secret field,
+**Settings → Discord → Discord Sign-In** does expose a Client ID and Client Secret field,
 for rotation; see below.)
 
 **Rotating the Discord client secret.** If the secret ever leaks (in `.env`, a
 screenshot, a paste), reset it in the Discord Developer Portal, then put the new
 value on the console — either replace `runtime/secrets/discord-oauth-client-secret.txt`
-(mode 0600) on the host, or paste it into **Settings → Discord OAuth → Client
+(mode 0600) on the host, or paste it into **Settings → Discord → Discord Sign-In → Client
 Secret**. **A restart is required**: the console reads the secret only at
 startup, so run `dune console restart` (or the in-app restart) after replacing
 it, or token exchanges keep using the old secret and you will believe the
@@ -400,9 +399,9 @@ rotation took effect when it has not.
 
 **Then, the guided part** (the console owner, in a browser):
 
-1. On the sign-in page, click **Set up Discord sign-in** and enter the admin
-   password. Only the console owner can connect Discord — without this step,
-   anyone who owns some Discord server could point your console at it.
+1. Sign in with the admin password, then open **Settings → Discord → Discord Sign-In**.
+   Only the authenticated console owner can connect Discord. Setup is managed
+   here, rather than on the sign-in page.
 2. Click **Continue with Discord**. Discord asks you to authorize the
    application; nothing is signed in yet. You come back with everything Discord
    can tell the console already filled in: who you are and the server you own —
@@ -432,11 +431,11 @@ Signing in with Discord never asks for the console password; the two are
 independent methods, not a password-plus-Discord combination.
 
 You can change the role mapping or the two-factor option later under
-**Settings → Discord OAuth**, or run the guided setup again from there.
+**Settings → Discord → Discord Sign-In**, or run the guided setup again from there.
 
 ### Managing access afterwards
 
-- **Settings → Discord OAuth** — change which Discord role maps to Admin,
+- **Settings → Discord → Discord Sign-In** — change which Discord role maps to Admin,
   Moderator or Player, or the two-factor requirement, after setup. (There is no
   owner field: the owner is always the Discord server's owner.) Changes take a
   `dune console restart` to load.

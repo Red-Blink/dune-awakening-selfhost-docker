@@ -10,6 +10,7 @@ import { withTimeout } from "./services/withTimeout.js";
 import { clampInt } from "./jsonStore.js";
 import { redactDbError } from "./db.js";
 import { recordTaskRestart } from "./services/restartHistory.js";
+import { resolveHostIdentity } from "./services/hostIdentity.js";
 import { downloadFailureMessage } from "./services/downloadFailure.js";
 
 // Operations that leave a map down with the database still reachable, so
@@ -211,14 +212,16 @@ export class TaskManager {
     const helperImage = process.env.DUNE_SYSTEMD_HELPER_IMAGE || "redblink-dune-docker-console:dev";
     const hostRepoRoot = process.env.DUNE_HOST_REPO_ROOT || this.config.hostRepoRoot || this.config.repoRoot;
 
+    const { uid: hostUid, gid: hostGid } = resolveHostIdentity(this.config);
+
     this.append(task, "Starting a detached helper to recreate the Console container.", "stdout");
     await this.runDockerCommand(buildSelfUpdateHelperDockerArgs({
       helperName: `dune-console-reload-${Date.now()}`,
       hostRepoRoot,
       composeProjectName,
       helperImage,
-      hostUid: process.env.DUNE_HOST_UID || String(process.getuid?.() ?? 0),
-      hostGid: process.env.DUNE_HOST_GID || String(process.getgid?.() ?? 0),
+      hostUid,
+      hostGid,
       dockerSocketGid: process.env.DOCKER_SOCKET_GID || detectDockerSocketGid(),
       command: "runtime/scripts/dune console reload"
     }), this.config.repoRoot);
@@ -239,8 +242,7 @@ export class TaskManager {
     if (!composeProjectName) throw new Error("Main Dune Compose project name was not provided to the Console.");
     const helperImage = process.env.DUNE_SYSTEMD_HELPER_IMAGE || "redblink-dune-docker-console:dev";
     const hostRepoRoot = process.env.DUNE_HOST_REPO_ROOT || this.config.hostRepoRoot || this.config.repoRoot;
-    const hostUid = process.env.DUNE_HOST_UID || String(process.getuid?.() ?? 0);
-    const hostGid = process.env.DUNE_HOST_GID || String(process.getgid?.() ?? 0);
+    const { uid: hostUid, gid: hostGid } = resolveHostIdentity(this.config);
     const dockerSocketGid = process.env.DOCKER_SOCKET_GID || detectDockerSocketGid();
     const extraEnv = [
       `DUNE_SELF_UPDATE_RUN_ID=${task.id}`,

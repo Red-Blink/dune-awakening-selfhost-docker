@@ -2,6 +2,7 @@ import { type ComponentProps, useEffect, useState } from "react";
 import { SegmentedControl } from "../../components/common/SegmentedControl";
 import { BasesPanel } from "./BasesPanel";
 import { BaseBackupsView } from "./BaseBackupsView";
+import { useConsoleAccess } from "../../lib/consoleAccess";
 
 // The Bases tab: live bases, or the bases players have picked up with the
 // in-game base backup tool. Backups are not live bases (they are hidden from
@@ -25,7 +26,10 @@ function storedView(): BasesView {
 }
 
 export function BasesPage(props: ComponentProps<typeof BasesPanel>) {
-  const [view, setView] = useState<BasesView>(storedView);
+  const access = useConsoleAccess();
+  const [requestedView, setView] = useState<BasesView>(storedView);
+  const views = VIEWS.filter(option => access.can(option.value === "bases" ? "bases:read" : "blueprints:read"));
+  const view = views.some(option => option.value === requestedView) ? requestedView : views[0]?.value;
 
   // Opening a base from elsewhere (Players, Live Map) must land on the list.
   useEffect(() => {
@@ -42,12 +46,13 @@ export function BasesPage(props: ComponentProps<typeof BasesPanel>) {
   const viewSwitch = <SegmentedControl
     name="bases-view"
     ariaLabel="Bases view"
-    value={view}
-    options={VIEWS}
+    value={view || "bases"}
+    options={views}
     onChange={changeView}
     groupClassName="segmented-control players-view-segments"
   />;
 
+  if (!view) return null;
   return view === "backups"
     ? <BaseBackupsView onError={props.onError} confirmAction={props.confirmAction} viewSwitch={viewSwitch} />
     : <BasesPanel {...props} viewSwitch={viewSwitch} />;

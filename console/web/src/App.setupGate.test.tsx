@@ -54,10 +54,11 @@ describe("App first-run setup gate respects the session's permissions", () => {
     expect(calls.some((p) => p.includes("/api/setup/state"))).toBe(false); // never even asked
   });
 
-  it("renders the console, not the setup wizard, when /api/auth/me itself fails (review finding)", async () => {
+  it("offers retry without mounting the console or setup when the permission lookup fails", async () => {
     stubSessionMeFails();
     render(<App />);
-    await waitFor(() => expect(document.getElementById("console-navigation")).toBeInTheDocument());
+    await screen.findByRole("button", { name: "Try Again" });
+    expect(document.getElementById("console-navigation")).not.toBeInTheDocument();
     expect(screen.queryByText(/Finish the first-time setup to unlock the console/)).not.toBeInTheDocument();
     const calls = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0]));
     expect(calls.some((p) => p.includes("/api/setup/state"))).toBe(false); // never even asked

@@ -1199,11 +1199,11 @@ if [ "$steamcmd_rc" -ne 0 ]; then
     echo "SteamCMD metadata check timed out after ${STEAM_CHECK_TIMEOUT_SECONDS}s."
     echo "SteamCMD could not retrieve the current app information."
     tail -n 80 "$APPINFO" || true
-    exit 2
+    exit 75
   else
     echo "SteamCMD could not retrieve the current app information."
     tail -n 80 "$APPINFO" || true
-    exit 2
+    exit 75
   fi
 fi
 
@@ -1211,7 +1211,7 @@ if [ -z "$remote_build" ]; then
   echo "Could not parse remote build id from SteamCMD output."
   echo "Last SteamCMD output:"
   tail -n 80 "$APPINFO" || true
-  exit 2
+  exit 75
 fi
 
 local_build="none"
@@ -1249,7 +1249,10 @@ exit 100
 
     append_new_steamcmd_content_log "$steam_check_content_lines" "$steam_check_log"
 
-    if ! steamcmd_log_has_content_host_failure "$steam_check_log"; then
+    # EX_TEMPFAIL is private to the metadata subprocess: empty responses,
+    # Steam failures and timeouts can all recover on the next attempt. Keep
+    # setup/container failures fatal and preserve public check exit codes.
+    if [ "$steam_check_rc" -ne 75 ] && ! steamcmd_log_has_content_host_failure "$steam_check_log"; then
       rm -f "$steam_check_log"
       exit "$steam_check_rc"
     fi
@@ -1261,7 +1264,9 @@ exit 100
     steamcmd_log_has_dns_failure "$steam_check_log" && steam_check_was_dns=1
     rm -f "$steam_check_log"
     echo
-    if [ "$steam_check_was_dns" = "1" ] && [ -n "$steam_check_dns_host" ]; then
+    if [ "$steam_check_rc" -eq 75 ]; then
+      echo "Steam did not return usable app information."
+    elif [ "$steam_check_was_dns" = "1" ] && [ -n "$steam_check_dns_host" ]; then
       echo "Steam selected a content host that DNS cannot currently resolve: $steam_check_dns_host"
     elif [ "$steam_check_was_dns" = "1" ]; then
       echo "Steam selected a content host that DNS cannot currently resolve."
@@ -1274,7 +1279,7 @@ exit 100
     [ "$steam_check_interface_count" -eq 0 ] || echo "Steam download interfaces created: $steam_check_interface_count"
 
     if [ "$steam_check_attempt" -ge "$steam_check_max_attempts" ]; then
-      echo "Steam update check failed after $steam_check_max_attempts content-host retries. No local files were changed."
+      echo "Steam update check failed after $steam_check_max_attempts attempts. No local game files were changed."
       echo "Retry later; Steam may select a different content host on the next request."
       exit 2
     fi

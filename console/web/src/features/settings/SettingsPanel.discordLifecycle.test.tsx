@@ -25,30 +25,30 @@ function mockBackend(config: Record<string, unknown>, { enrolled = false }: { en
   });
 }
 
-describe("SettingsPanel: Discord OAuth tri-state ordering (#676 §3, superseded for render order by the 2026-09-11 alphabetical sort -- the tri-state CONTENT/labeling below is still #676 §3, only the fixed Discord-OAuth-before-Login-Password order is new)", () => {
+describe("SettingsPanel: Account Security precedes Discord for each connection state", () => {
   beforeEach(() => { vi.clearAllMocks(); confirmAction.mockResolvedValue(true); });
 
-  it("not configured: the Discord OAuth accordion renders before Login Password (always-alphabetical order)", async () => {
+  it("not configured: Login Password renders before Discord Sign In", async () => {
     mockBackend({});
     const { container } = render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={confirmAction} onTotpEnrollmentStarted={vi.fn()} />);
     await screen.findByLabelText("Expand Login Password");
     const headers = [...container.querySelectorAll(".playerAdmin_toggleHeader span:first-of-type, .playerAdmin_toggleHeader span")].map((el) => el.textContent);
     const loginIndex = headers.findIndex((t) => t === "Login Password");
-    const discordIndex = headers.findIndex((t) => t === "Discord OAuth");
+    const discordIndex = headers.findIndex((t) => t === "Discord Sign In");
     expect(loginIndex).toBeGreaterThanOrEqual(0);
     expect(discordIndex).toBeGreaterThanOrEqual(0);
-    expect(discordIndex).toBeLessThan(loginIndex);
+    expect(loginIndex).toBeLessThan(discordIndex);
   });
 
-  it("configured and active: the Discord OAuth accordion renders before Login Password, open by default", async () => {
+  it("configured and active: Login Password precedes the expanded Discord Sign In section", async () => {
     mockBackend({ discordOAuthConfigured: true });
     const { container } = render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={confirmAction} onTotpEnrollmentStarted={vi.fn()} />);
     await screen.findByTestId("discord-setup-wizard-stub");
     const headers = [...container.querySelectorAll(".playerAdmin_toggleHeader span")].map((el) => el.textContent);
     const loginIndex = headers.findIndex((t) => t?.startsWith("Login Password"));
-    const discordIndex = headers.findIndex((t) => t === "Discord OAuth");
+    const discordIndex = headers.findIndex((t) => t === "Discord Sign In");
     expect(discordIndex).toBeGreaterThanOrEqual(0);
-    expect(loginIndex).toBeGreaterThan(discordIndex);
+    expect(loginIndex).toBeLessThan(discordIndex);
     // Open by default -- the wizard stub is already rendered without a click.
     expect(screen.getByTestId("discord-setup-wizard-stub")).toBeTruthy();
   });
@@ -57,8 +57,9 @@ describe("SettingsPanel: Discord OAuth tri-state ordering (#676 §3, superseded 
     mockBackend({ discordOAuthConfigured: true });
     render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={confirmAction} onTotpEnrollmentStarted={vi.fn()} />);
     await screen.findByTestId("discord-setup-wizard-stub");
-    expect(await screen.findByText("Login Password (fallback)")).toBeTruthy();
-    expect(screen.getByText(/break-glass fallback/i)).toBeTruthy();
+    expect(await screen.findByText("Login Password")).toBeTruthy();
+    expect(screen.queryByText("Login Password (fallback)")).toBeNull();
+    expect(screen.getByText(/Keep your Console password available/i)).toBeTruthy();
   });
 
   it("not configured: no (fallback) label and no reminder", async () => {
@@ -70,16 +71,16 @@ describe("SettingsPanel: Discord OAuth tri-state ordering (#676 §3, superseded 
     expect(screen.queryByText(/break-glass fallback/i)).toBeNull();
   });
 
-  it("soft-disabled: the disabled banner still renders before Login Password (always-alphabetical order)", async () => {
+  it("soft-disabled: Login Password precedes the disabled Discord banner", async () => {
     mockBackend({ discordOAuthDisabled: true });
     const { container } = render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={confirmAction} onTotpEnrollmentStarted={vi.fn()} />);
-    await screen.findByText("Discord Sign-In (disabled)");
+    await screen.findByText("Discord Sign In");
     const headers = [...container.querySelectorAll(".playerAdmin_toggleHeader span, .settings-discord-disabled-banner strong")].map((el) => el.textContent);
     const loginIndex = headers.findIndex((t) => t?.startsWith("Login Password"));
-    const disabledIndex = headers.findIndex((t) => t === "Discord Sign-In (disabled)");
+    const disabledIndex = headers.findIndex((t) => t === "Discord Sign In");
     expect(loginIndex).toBeGreaterThanOrEqual(0);
     expect(disabledIndex).toBeGreaterThanOrEqual(0);
-    expect(disabledIndex).toBeLessThan(loginIndex);
+    expect(loginIndex).toBeLessThan(disabledIndex);
     // The wizard itself must not render in this state.
     expect(screen.queryByTestId("discord-setup-wizard-stub")).toBeNull();
   });
@@ -92,15 +93,15 @@ describe("SettingsPanel: Discord OAuth disable/enable/forget (#676 §6)", () => 
     mockBackend({ discordOAuthDisabled: true });
     mockPost.mockResolvedValue({ ok: true } as never);
     render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={confirmAction} onTotpEnrollmentStarted={vi.fn()} />);
-    fireEvent.click(await screen.findByText("Re-enable Discord Sign-In"));
+    fireEvent.click(await screen.findByText("Enable Discord Sign In"));
     await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/api/settings/discord-oauth/enable", {}));
   });
 
   it("Forget stays disabled until \"forget\" is typed exactly, and requires a password", async () => {
     mockBackend({ discordOAuthDisabled: true });
     render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={confirmAction} onTotpEnrollmentStarted={vi.fn()} />);
-    fireEvent.click(await screen.findByText("Forget this configuration entirely"));
-    const forgetButton = await screen.findByText("Forget This Configuration Entirely");
+    fireEvent.click(await screen.findByText("Remove Discord Connection"));
+    const forgetButton = screen.getByRole("button", { name: "Remove Discord Connection" });
     expect(forgetButton).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText(/type.*forget.*to confirm/i), { target: { value: "not quite" } });
@@ -109,7 +110,7 @@ describe("SettingsPanel: Discord OAuth disable/enable/forget (#676 §6)", () => 
     fireEvent.change(screen.getByLabelText(/type.*forget.*to confirm/i), { target: { value: "forget" } });
     expect(forgetButton).toBeDisabled(); // still needs a password
 
-    fireEvent.change(screen.getByLabelText(/password \(to confirm it's you\)/i), { target: { value: "the-password" } });
+    fireEvent.change(screen.getByLabelText(/Current Console Password/i), { target: { value: "the-password" } });
     expect(forgetButton).not.toBeDisabled();
   });
 
@@ -117,25 +118,25 @@ describe("SettingsPanel: Discord OAuth disable/enable/forget (#676 §6)", () => 
     mockBackend({ discordOAuthDisabled: true });
     mockPost.mockResolvedValue({ ok: true } as never);
     render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={confirmAction} onTotpEnrollmentStarted={vi.fn()} />);
-    fireEvent.click(await screen.findByText("Forget this configuration entirely"));
+    fireEvent.click(await screen.findByText("Remove Discord Connection"));
     fireEvent.change(screen.getByLabelText(/type.*forget.*to confirm/i), { target: { value: "forget" } });
-    fireEvent.change(screen.getByLabelText(/password \(to confirm it's you\)/i), { target: { value: "the-password" } });
-    fireEvent.click(screen.getByText("Forget This Configuration Entirely"));
+    fireEvent.change(screen.getByLabelText(/Current Console Password/i), { target: { value: "the-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "Remove Discord Connection" }));
 
     await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/api/settings/discord-oauth/forget", { currentPassword: "the-password" }));
   });
 
-  it("Disable Discord Sign-In (active state) shows a danger confirmation before posting, and is disabled until a password is entered", async () => {
+  it("Disable Discord Sign In (active state) shows a danger confirmation before posting, and is disabled until a password is entered", async () => {
     mockBackend({ discordOAuthConfigured: true });
     mockPost.mockResolvedValue({ ok: true } as never);
     render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={confirmAction} onTotpEnrollmentStarted={vi.fn()} />);
     await screen.findByTestId("discord-setup-wizard-stub"); // Discord is primary/open by default
-    fireEvent.click(screen.getByText("Disable Discord Sign-In"));
-    const disableButtons = screen.getAllByText("Disable Discord Sign-In");
+    fireEvent.click(screen.getByText("Disable Discord Sign In"));
+    const disableButtons = screen.getAllByText("Disable Discord Sign In");
     const submitButton = disableButtons[disableButtons.length - 1];
     expect(submitButton).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText(/password \(to confirm it's you\)/i), { target: { value: "the-password" } });
+    fireEvent.change(screen.getByLabelText(/Current Console Password/i), { target: { value: "the-password" } });
     expect(submitButton).not.toBeDisabled();
 
     fireEvent.click(submitButton);
@@ -149,10 +150,10 @@ describe("SettingsPanel: zero-2FA guard UI (#676 §7)", () => {
 
   async function openTwoFactorDisable() {
     render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={confirmAction} onTotpEnrollmentStarted={vi.fn()} />);
-    fireEvent.click(await screen.findByLabelText("Expand Two-Factor Authentication"));
+    fireEvent.click(await screen.findByLabelText("Expand Two Factor Authentication"));
     fireEvent.change(screen.getByPlaceholderText("Your login password (to disable)"), { target: { value: "the-password" } });
     fireEvent.change(screen.getByPlaceholderText("Current 6-digit code (to disable)"), { target: { value: "123456" } });
-    fireEvent.click(screen.getByRole("button", { name: "Disable Two-Factor Authentication" }));
+    fireEvent.click(screen.getByRole("button", { name: "Disable Two Factor Authentication" }));
   }
 
   it("a 409 zeroFactorWarning response shows the inline warning with an override, not a plain failure toast", async () => {
@@ -196,15 +197,15 @@ describe("SettingsPanel: contextual copy for a Discord-authenticated session (#6
       return Promise.reject(new Error(`unexpected api call: ${path}`));
     });
     render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={confirmAction} onTotpEnrollmentStarted={vi.fn()} />);
-    fireEvent.click(await screen.findByLabelText("Expand Two-Factor Authentication"));
+    fireEvent.click(await screen.findByLabelText("Expand Two Factor Authentication"));
     expect(await screen.findByText(/runtime\/secrets\/admin-web-password\.txt/i)).toBeTruthy();
   });
 
   it("does not show that copy for a plain password session", async () => {
     mockBackend({ consoleTotpEnabled: true });
     render(<SettingsPanel onPasswordChanged={vi.fn()} confirmAction={confirmAction} onTotpEnrollmentStarted={vi.fn()} />);
-    fireEvent.click(await screen.findByLabelText("Expand Two-Factor Authentication"));
-    await screen.findByText("Enable Two-Factor Authentication");
+    fireEvent.click(await screen.findByLabelText("Expand Two Factor Authentication"));
+    await screen.findByText("Enable 2FA");
     expect(screen.queryByText(/runtime\/secrets\/admin-web-password\.txt/i)).toBeNull();
   });
 });

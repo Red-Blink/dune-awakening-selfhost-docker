@@ -33,6 +33,7 @@ export const NAMESPACES = {
   SETUP:       "setup",
   SERVER:      "server",
   LOGS:        "logs",
+  CHAT:        "chat",
   BACKUPS:     "backups",
   DATABASE:    "database",
   UPDATES:     "updates",
@@ -62,6 +63,9 @@ export const NAMESPACES = {
 // against the normalized path.
 
 export const ROUTE_ACTIONS = {
+  "GET /api/chat/history":                     "chat:read",
+  "POST /api/chat/settings":                   "chat:configure",
+  "DELETE /api/chat/history":                  "chat:configure",
   // --- Setup ---
   "GET /api/setup/state":                      "setup:read",
   "GET /api/setup/tasks":                      "setup:read",
@@ -187,6 +191,8 @@ export const ROUTE_ACTIONS = {
   "POST /api/settings/discord-oauth/enable":      "settings:enable-discord-oauth",
   "POST /api/settings/discord-oauth/forget":      "settings:forget-discord-oauth",
   "POST /api/settings/web-port":               "settings:change-port",
+  "GET /api/settings/console-https":            "settings:read",
+  "POST /api/settings/console-https":           "settings:write",
   "GET /api/settings/iam/policies":            "settings:read",
   "PUT /api/settings/iam/policy":              "settings:write",
   "POST /api/settings/iam/policy/test":        "settings:read",
@@ -489,10 +495,10 @@ export const ROUTE_ACTIONS = {
   "GET /api/map/capabilities":                 "maps:read",
   "GET /api/map/partitions":                   "maps:read",
   "GET /api/map/markers":                      "maps:read",
-  "GET /api/map/players":                      "maps:read",
-  "GET /api/map/bases":                        "maps:read",
-  "GET /api/map/storage":                      "maps:read",
-  "GET /api/map/services":                     "maps:read",
+  "GET /api/map/players":                      "players:read",
+  "GET /api/map/bases":                        "bases:read",
+  "GET /api/map/storage":                      "storage:read",
+  "GET /api/map/services":                     "server:read",
   "GET /api/map/spice":                        "maps:read",
   "GET /api/map/poi":                          "maps:read",
   "GET /api/map/overlays":                     "maps:read",

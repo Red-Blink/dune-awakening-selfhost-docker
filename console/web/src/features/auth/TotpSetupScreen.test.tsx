@@ -1,9 +1,9 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TotpSetupScreen } from "./TotpSetupScreen";
-import { post } from "../../api/client";
+import { post, setCsrfToken } from "../../api/client";
 
-vi.mock("../../api/client", () => ({ post: vi.fn() }));
+vi.mock("../../api/client", () => ({ post: vi.fn(), setCsrfToken: vi.fn() }));
 
 const SETUP_RESPONSE = { secret: "AAAAAAAAAAAAAAAA", otpauthUri: "otpauth://totp/x", qrCodeDataUri: "data:image/png;base64,AA==" };
 
@@ -25,6 +25,40 @@ async function submitCode(value: string) {
 }
 
 describe("TotpSetupScreen", () => {
+  it("keeps enrollment in a dialog and completes with a verified session after saving recovery codes", async () => {
+    const onComplete = vi.fn();
+    vi.mocked(post).mockResolvedValueOnce(SETUP_RESPONSE);
+    render(<TotpSetupScreen mode="enroll" presentation="dialog" onComplete={onComplete} onCancel={vi.fn()} />);
+    await screen.findByAltText(/authenticator qr code/i);
+    expect(screen.getByText("Replace any authenticator entry from an earlier setup attempt with the QR code shown here.")).toBeVisible();
+    expect(screen.getByRole("dialog", { name: "Enable 2FA" })).toBeVisible();
+    vi.mocked(post).mockRejectedValueOnce(new Error("That code was not accepted."));
+    await submitCode("000000");
+    await screen.findByText("That code was not accepted.");
+    expect(screen.getByRole("dialog")).toBeVisible();
+    vi.mocked(post).mockResolvedValueOnce({ authenticated: true, csrfToken: "rotated", recoveryCodes: ["test-recovery-code"] });
+    await submitCode("123456");
+    const done = await screen.findByRole("button", { name: "Done" });
+    expect(done).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Cancel 2FA setup" })).toBeNull();
+    fireEvent.click(screen.getByLabelText(/i have saved these codes/i));
+    fireEvent.click(done);
+    expect(setCsrfToken).toHaveBeenCalledWith("rotated");
+    expect(onComplete).toHaveBeenCalledWith(true);
+  });
+
+  it("cancels the restricted enrollment and resumes Settings with a rotated session", async () => {
+    const onCancel = vi.fn();
+    vi.mocked(post).mockResolvedValueOnce(SETUP_RESPONSE);
+    render(<TotpSetupScreen mode="enroll" presentation="dialog" onComplete={vi.fn()} onCancel={onCancel} />);
+    await screen.findByAltText(/authenticator qr code/i);
+    vi.mocked(post).mockResolvedValueOnce({ authenticated: true, csrfToken: "cancel-rotated" });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(onCancel).toHaveBeenCalledWith(true));
+    expect(post).toHaveBeenLastCalledWith("/api/auth/2fa/cancel");
+    expect(setCsrfToken).toHaveBeenCalledWith("cancel-rotated");
+  });
+
   it("calls /api/auth/2fa/setup on mount and shows the QR + manual secret", async () => {
     await renderReadyScreen();
     expect(screen.getByText("AAAAAAAAAAAAAAAA")).toBeInTheDocument();

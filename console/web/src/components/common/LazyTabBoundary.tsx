@@ -7,6 +7,8 @@ type ReloadStorage = Pick<Storage, "getItem" | "setItem">;
 type LazyTabBoundaryProps = {
   children: ReactNode;
   label?: string;
+  // When set, a failed load also offers Close, so an overlay opened from a button is never stuck on screen.
+  onDismiss?: () => void;
   // Injection points keep reload/cooldown behavior testable without replacing
   // jsdom's non-configurable Location object. App callers use the defaults.
   reload?: () => void;
@@ -81,14 +83,15 @@ class LazyTabErrorBoundary extends Component<LazyTabBoundaryProps, LazyTabErrorB
           ? "The console may have been updated since this page was loaded. Refresh to load the current version."
           : "This section encountered an unexpected error. Refresh and try again."}</p>
         <button onClick={this.props.reload || browserReload}>Refresh Now</button>
+        {this.props.onDismiss && <button type="button" onClick={this.props.onDismiss}>Close</button>}
       </section>;
     }
     return this.props.children;
   }
 }
 
-export function LazyTabBoundary({ children, label = "Loading Section", reload, storage, now }: LazyTabBoundaryProps) {
-  return <LazyTabErrorBoundary label={label} reload={reload} storage={storage} now={now}>
+export function LazyTabBoundary({ children, label = "Loading Section", onDismiss, reload, storage, now }: LazyTabBoundaryProps) {
+  return <LazyTabErrorBoundary label={label} onDismiss={onDismiss} reload={reload} storage={storage} now={now}>
     <Suspense fallback={<section className="panel loading-panel tab-loading-panel"><span className="spinner" aria-hidden="true" /><strong className="loading-dots">{label}</strong></section>}>
       {children}
     </Suspense>

@@ -19,6 +19,7 @@ export const API_ROUTE_DOMAINS = Object.freeze({
   liveMap: ["/api/live-map/markers", "/api/live-map/teleport", "/api/live-map/realtime"],
   addons: ["/api/addons/community", "/api/addons/installed", "/api/addons/install"],
   logs: ["/api/logs/services"],
+  chat: ["/api/chat/history", "/api/chat/settings"],
   backups: ["/api/backups", "/api/backups/system"]
 });
 

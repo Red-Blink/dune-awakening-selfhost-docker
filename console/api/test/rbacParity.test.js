@@ -92,13 +92,13 @@ function isCovered(route) {
   if (route.path.startsWith(DISCORD_PREFIX)) return true;
   // Deliberate local shadow of the module-level PUBLIC_EXACT above (kept
   // during the 2026-09-21 upstream rebase, not a duplication mistake): the
-  // two /2fa/* entries are not public at all -- they require an
+  // These /2fa/* entries are not public at all -- they require an
   // enrollment-scope session AND membership in server.js's ENROLL_ALLOWED.
   // They sit here only because the central gate does not cover them, and the
   // separate test below pins that distinction so "add it to the module-level
   // PUBLIC_EXACT to make the parity test green" -- the remedy actions.js
   // itself suggests -- cannot silently ship an ungated route.
-  const PUBLIC_EXACT = ["/api/health", "/api/auth/state", "/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/auth/characters", "/api/auth/discord/start", "/api/auth/discord/callback", "/api/auth/discord/exchange", "/api/auth/2fa/setup", "/api/auth/2fa/confirm"];
+  const PUBLIC_EXACT = ["/api/health", "/api/auth/state", "/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/auth/characters", "/api/auth/discord/start", "/api/auth/discord/callback", "/api/auth/discord/exchange", "/api/auth/2fa/setup", "/api/auth/2fa/confirm", "/api/auth/2fa/cancel"];
   if (PUBLIC_EXACT.includes(route.path)) return true;
 
   for (const method of methodsToCheck(route)) {
@@ -147,7 +147,7 @@ test("parity: all IAM actions reference known namespaces", () => {
     "setup", "server", "logs", "backups", "database", "updates", "settings",
     "players", "guilds", "bases", "maps", "sietches", "deepdesert", "admin",
     "landsraad", "addons", "carepackage", "storage", "blueprints", "vehicles",
-    "exchange", "realtime", "community"
+    "exchange", "realtime", "community", "chat"
   ]);
   for (const action of Object.values(ROUTE_ACTIONS)) {
     if (typeof action !== "string") continue;

@@ -73,6 +73,7 @@ by nature, so it gets its own.
 - [two-factor-recovery.md](console/two-factor-recovery.md) — Current. The lockout cases for authenticator sign-in, including the host-side reset when both the phone and the recovery codes are gone.
 - [authentication-qa-checklist.md](console/authentication-qa-checklist.md) — Current. Manual end-user test plan for authenticator and Discord sign-in: 36 cases a person runs in a real browser with a real phone, with expected on-screen text and a results table.
 - [api-keys.md](console/api-keys.md) — Current. Named, revocable API keys for external callers: scopes that default to no access, given per namespace as Read/Read+write or as an explicit list of actions, the `settings`/`database`/`setup` namespaces no key can ever reach and the write-denied `updates` and `addons`, hash-only storage with a one-time reveal, and per-key expiry, disable and rate limits.
+- [themes.md](console/themes.md) — Current. The per-browser Console Theme picker: what is offered (16 Fedaykin dark palettes, 3 Tabr looks), why light themes are hidden, how themes map onto the console's CSS variables, the contrast guard, and how to add a palette.
 - [blueprints.md](console/blueprints.md) — Current. Blueprint import/export developer documentation.
 - [PRE-AUGMENTED-GEAR.md](console/PRE-AUGMENTED-GEAR.md) — Current. API reference for granting gear with augments pre-applied.
 - [generator-fuel-burn-rates.md](console/generator-fuel-burn-rates.md) — Current. Per-generator fuel burn constants and where they live in code.
@@ -149,7 +150,7 @@ control itself is stale.
 Proposals and audits kept for their reasoning. Each one's status line says how
 much of it shipped; none is a description of current behavior.
 
-- [rfc-console-auth.md](rfc-console-auth.md) — Historical record. Layered Console authentication proposal; none of it is implemented here.
+- [rfc-console-auth.md](rfc-console-auth.md) — Historical design reference. This development branch implements Discord sign-in and opt-in password TOTP; passkeys remain a proposal. Use the Console authentication guides for the implemented flows.
 - [rfc-command-discovery.md](rfc-command-discovery.md) — Historical record. Discord command discovery from Core; Phase 1 shipped.
 - [rw-architecture.md](rw-architecture.md) — Historical record. Discord write-command design that was never built.
 - [spice-fields-per-map-scoping-l1-design-2026-09-21.md](design/spice-fields-per-map-scoping-l1-design-2026-09-21.md) — Historical record. Per-map scoping design for spice field settings.

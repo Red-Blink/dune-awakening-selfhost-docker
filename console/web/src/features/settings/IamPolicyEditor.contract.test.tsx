@@ -68,7 +68,7 @@ describe("IamPolicyEditor: a failed initial load shows Retry instead of crashing
     render(<IamPolicyEditor />);
     // Before the fix, this render throws ("Rendered fewer hooks than
     // expected") instead of ever reaching this text.
-    expect(await screen.findByText("Failed to load IAM policies")).toBeTruthy();
+    expect(await screen.findByText("Could Not Load Access Rules")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
   });
 });
@@ -76,18 +76,35 @@ describe("IamPolicyEditor: a failed initial load shows Retry instead of crashing
 describe("IamPolicyEditor server contracts", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("keeps each access level's draft while switching levels and hides technical action names by default", async () => {
+    mockLoad();
+    render(<IamPolicyEditor />);
+    await screen.findByRole("button", { name: "Admin" });
+    expect(screen.queryByText("players:kick")).toBeNull();
+    fireEvent.click(screen.getByLabelText("Show Technical Names"));
+    expect(screen.getByText("players:kick")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Advanced JSON" }));
+    const editor = document.querySelector("textarea.iam-json-textarea") as HTMLTextAreaElement;
+    const draft = '[{"Effect":"Allow","Action":["players:kick"]}]';
+    fireEvent.change(editor, { target: { value: draft } });
+    fireEvent.click(screen.getByRole("button", { name: "Moderator" }));
+    fireEvent.click(screen.getByRole("button", { name: "Admin" }));
+    expect(editor.value).toBe(draft);
+    expect(mockApi).not.toHaveBeenCalledWith("/api/settings/iam/policy", expect.anything());
+  });
+
   it("renders a checkbox for a parameterized-route action present only in allActions (players:kick)", async () => {
     mockLoad();
     render(<IamPolicyEditor />);
     // players:kick has no actionMap route key; before the fix the grid iterated
     // only actionMap values and this action never appeared (raw-JSON only).
-    expect(await screen.findByText("players:kick")).toBeTruthy();
+    expect(await screen.findByRole("checkbox", { name: /Kick/ })).toBeTruthy();
   });
 
   it("#5 save PUTs the whole tier-keyed store, not POST {tier, statements}", async () => {
     mockLoad();
     render(<IamPolicyEditor />);
-    fireEvent.click(await screen.findByText("Save admin policy"));
+    fireEvent.click(await screen.findByText("Save Admin Access"));
 
     await waitFor(() =>
       expect(mockApi).toHaveBeenCalledWith(
@@ -107,12 +124,12 @@ describe("IamPolicyEditor server contracts", () => {
   it("Test tab evaluates the draft locally and honors Deny, with no /policy/test call", async () => {
     mockLoad();
     render(<IamPolicyEditor />);
-    fireEvent.click(await screen.findByText("Test"));
+    fireEvent.click(await screen.findByText("Preview"));
 
     // admin: server:* -> server:restart + server:read allowed (2); settings:* Deny -> change-password
     // denied, and players:kick is neither allowed nor denied so it default-denies too (2 denied).
-    expect(await screen.findByText("2 allowed")).toBeTruthy();
-    expect(screen.getByText("2 denied")).toBeTruthy();
+    expect(await screen.findByText("2 Allowed")).toBeTruthy();
+    expect(screen.getByText("2 Denied")).toBeTruthy();
     expect(mockApi).not.toHaveBeenCalledWith("/api/settings/iam/policy/test", expect.anything());
   });
 
@@ -125,7 +142,7 @@ describe("IamPolicyEditor server contracts", () => {
     // before the fix, toggleAction's s.Action.filter on the string "*" threw.
     const checkboxes = await screen.findAllByRole("checkbox");
     expect(checkboxes.length).toBeGreaterThan(0);
-    fireEvent.click(checkboxes[0]); // wildcard-granted: cannot be toggled off by checkbox
+    fireEvent.click(checkboxes[1]); // wildcard-granted: cannot be toggled off by checkbox
     expect(await screen.findByText(/granted by a wildcard rule/i)).toBeTruthy();
   });
 
@@ -156,7 +173,7 @@ describe("IamPolicyEditor server contracts", () => {
     // Unchecking Read removes only server:read; save PUTs moderator without it.
     const readRow = screen.getByText("Read").closest("label")!;
     fireEvent.click(readRow.querySelector('input[type="checkbox"]')!);
-    fireEvent.click(screen.getByText("Save moderator policy"));
+    fireEvent.click(screen.getByText("Save Moderator Access"));
     await waitFor(() => expect(mockApi).toHaveBeenCalledWith("/api/settings/iam/policy", expect.objectContaining({ method: "PUT" })));
     const put = mockApi.mock.calls.find(([p, o]) => p === "/api/settings/iam/policy" && (o as RequestInit)?.method === "PUT")!;
     const body = JSON.parse(String((put[1] as RequestInit).body));
@@ -241,19 +258,19 @@ describe("IamPolicyEditor: the Permissions grid is read-only while the JSON tab 
     mockLoad();
     render(<IamPolicyEditor />);
     fireEvent.click(await screen.findByText("Admin"));
-    fireEvent.click(await screen.findByText("JSON"));
+    fireEvent.click(await screen.findByText("Advanced JSON"));
     const textarea = document.querySelector("textarea.iam-json-textarea") as HTMLTextAreaElement;
     const broken = '[{"Effect":"Allow","Action":["server:*"]},{"Effect":"Deny","Action":["settings:*"]},]'; // trailing comma
     fireEvent.change(textarea, { target: { value: broken } });
     fireEvent.click(screen.getByText("Permissions"));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/invalid JSON/i);
-    const boxes = document.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
+    const boxes = document.querySelectorAll('.iam-perm-row input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
     expect(boxes.length).toBeGreaterThan(0);
     for (const box of boxes) expect(box).toBeDisabled();
     fireEvent.click(boxes[0]);
 
-    fireEvent.click(screen.getByText("JSON"));
+    fireEvent.click(screen.getByText("Advanced JSON"));
     const after = document.querySelector("textarea.iam-json-textarea") as HTMLTextAreaElement;
     expect(after.value).toBe(broken); // the operator's draft -- Deny block included -- is untouched
     expect(mockApi).not.toHaveBeenCalledWith("/api/settings/iam/policy", expect.objectContaining({ method: "PUT" }));

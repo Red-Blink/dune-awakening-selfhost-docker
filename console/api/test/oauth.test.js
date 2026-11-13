@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createPendingStateStore, exchangeDiscordAuthCode, fetchDiscordIdentity, resolveBootstrapTier, parseDiscordAllowlist, buildAuthorizeUrl, oauthError, createOAuthTierResolver, oauthStateCookie, clearOAuthStateCookie } from "../src/integrations/discord/oauth.js";
+import { createPendingStateStore, exchangeDiscordAuthCode, fetchDiscordIdentity, resolveBootstrapTier, parseDiscordAllowlist, buildAuthorizeUrl, oauthError, createOAuthTierResolver, oauthStateCookie, clearOAuthStateCookie, oauthCallbackFailure } from "../src/integrations/discord/oauth.js";
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), { status, headers: { "content-type": "application/json" } });
@@ -72,6 +72,25 @@ test("token exchange: upstream non-2xx yields oauth_upstream_error", async () =>
     exchangeDiscordAuthCode({ code: "c", redirectUri: "u", clientId: "id", clientSecret: "sec", fetchImpl: () => jsonResponse({ error: "bad" }, 400) }),
     (error) => error.code === "oauth_upstream_error"
   );
+});
+
+test("rejected application credentials produce an actionable callback page instead of a gateway error", async () => {
+  let rejected;
+  try {
+    await exchangeDiscordAuthCode({ code: "synthetic", redirectUri: "https://console.example/cb", clientId: "id", clientSecret: "synthetic-private-value", fetchImpl: () => jsonResponse({ error: "invalid_client", error_description: "provider-private-diagnostic" }, 401) });
+  } catch (error) { rejected = error; }
+  const owner = oauthCallbackFailure(rejected, { setup: true });
+  assert.equal(owner.status, 400);
+  assert.equal(owner.reason, "discord_client_rejected");
+  assert.match(owner.message, /Change Application Credentials/);
+  assert.match(owner.message, /same Discord application/);
+  assert.doesNotMatch(JSON.stringify(owner), /synthetic-private-value|provider-private-diagnostic/);
+  const login = oauthCallbackFailure(rejected);
+  assert.equal(login.status, 400);
+  assert.match(login.message, /Console password/);
+  assert.doesNotMatch(login.message, /Change Application Credentials/);
+  assert.equal(oauthCallbackFailure({ code: "oauth_upstream_error", upstreamOperation: "identity", upstreamStatus: 401, statusCode: 502 }).status, 503, "identity failures must not be misclassified as a rejected client");
+  assert.equal(oauthCallbackFailure({ code: "oauth_upstream_error", upstreamOperation: "token", upstreamStatus: 400, statusCode: 502 }).reason, "discord_authorization_rejected");
 });
 
 test("token exchange: unreachable host yields tied-down error, not a throw", async () => {

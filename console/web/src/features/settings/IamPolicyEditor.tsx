@@ -1,4 +1,6 @@
-import { useEffect, useState, useMemo } from "react";
+import { PermissionGate } from "../../lib/consoleAccess";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { CheckCircle2, Code2, LockKeyhole, Save, Search, ShieldCheck } from "lucide-react";
 import { actionGrantedByStatements, iamActionAllowed } from "./iamPolicy";
 import { api } from "../../api/client";
 
@@ -24,6 +26,12 @@ function distinctActions(catalog?: PolicyCatalog | null): string[] {
 }
 
 const TIERS = ["owner", "admin", "moderator", "player"] as const;
+const TIER_DESCRIPTIONS: Record<string, string> = {
+  owner: "Granted automatically to the connected Discord server owner. Signing in with the Console password also grants Owner access.",
+  admin: "Assigned to members with your configured Admin role. Choose their permissions below. Sensitive settings remain restricted to the Owner.",
+  moderator: "Help players and moderate the community without changing server configuration.",
+  player: "Give community members limited access to the Console."
+};
 
 function parseStatements(text: string): PolicyStatement[] | null {
   try {
@@ -56,17 +64,17 @@ function actionLabel(action: string): string {
 // genuinely ambiguous get an entry.
 const ACTION_DESCRIPTIONS: Record<string, string> = {
   "players:give-item": "Gives items, vehicles, or augments into the world (economy-inflation risk).",
-  "players:grant": "Grants currency, XP, reputation, unlocks, or skill points -- progression handed out rather than earned.",
-  "players:reset": "Destroys a player's progression (full reset, journey, keystones) -- irreversible from their side.",
+  "players:grant": "Grants currency, XP, reputation, unlocks, or skill points. Changes progression without gameplay.",
+  "players:reset": "Destroys a player's progression (full reset, journey, keystones). The player cannot undo this.",
   "players:delete-item": "Destroys one row of a player's inventory.",
   "players:edit-item": "Edits one row of a player's inventory in place.",
   "players:repair": "Repairs gear, decayed vehicles, a stuck login queue, or refills water/fuel.",
   "players:recover": "Restores or rewrites a player character.",
-  "settings:*": "IAM policies, the admin password, the console port, and 2FA recovery codes.",
+  "settings:*": "Console access rules, the admin password, the Console port, and 2FA recovery codes.",
   "server:write-credentials": "The Funcom game-server token and the server's public IP.",
   "database:write-config": "The database password.",
   "database:mutate": "Direct edits to database tables.",
-  "database:export": "A full database dump (whole-database exfiltration risk).",
+  "database:export": "Downloads the full database, including sensitive server and player data.",
   "admin:transfer-settings:write": "Character/server-transfer policy (identity + economy impact).",
   "updates:apply": "Deploys new code to the running server.",
   "updates:fix": "Alters the running code to repair a failed update.",
@@ -76,12 +84,12 @@ const ACTION_DESCRIPTIONS: Record<string, string> = {
   "addons:install": "Installs third-party code into the console process.",
   "addons:update": "Updates third-party code running in the console process.",
   "setup:write": "First-run provisioning of the console itself.",
-  "carepackage:grant": "Mints an in-game care package (creates value from nothing).",
+  "carepackage:grant": "Creates an in-game care package and its contents.",
   "carepackage:write-config": "Changes care package economy configuration.",
   "exchange:market": "Seeds or alters the player-market economy.",
   "exchange:market-write": "Seeds or alters the player-market economy.",
-  "admin:items:read": "Reference item-type catalog used by Character Admin's give-item tool -- not a live inventory.",
-  "admin:vehicles:read": "Reference vehicle-type catalog used by Character Admin -- not the same as the separate \"Vehicles: Read\" permission, which covers the live in-game Vehicles panel.",
+  "admin:items:read": "Reference item-type catalog used by Character Admin's give-item tool. This does not show live inventory.",
+  "admin:vehicles:read": "Reference vehicle-type catalog used by Character Admin. Use \"Vehicles: Read\" for vehicles in the game world.",
   "admin:skills:read": "Reference skill-module catalog used by Character Admin's skill editor.",
 };
 
@@ -134,6 +142,9 @@ export function IamPolicyEditor() {
   const [testError, setTestError] = useState("");
   const [toggleHint, setToggleHint] = useState("");
   const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("all");
+  const [showTechnicalNames, setShowTechnicalNames] = useState(false);
+  const drafts = useRef<Record<string, string>>({});
 
   useEffect(() => {
     api<PolicyCatalog>("/api/settings/iam/policies").then((data) => {
@@ -144,6 +155,7 @@ export function IamPolicyEditor() {
   }, []);
 
   const selectTier = (tier: string) => {
+    drafts.current[selectedTier] = jsonText;
     setSelectedTier(tier);
     setSaved(false);
     setTestResults(null);
@@ -151,7 +163,7 @@ export function IamPolicyEditor() {
     setToggleHint("");
     if (catalog) {
       const doc = catalog.policies[tier];
-      setJsonText(doc ? JSON.stringify(doc.statements, null, 2) : "[]");
+      setJsonText(drafts.current[tier] ?? (doc ? JSON.stringify(doc.statements, null, 2) : "[]"));
     }
   };
 
@@ -190,8 +202,8 @@ export function IamPolicyEditor() {
   const lockReason = (iamAction: string): string => {
     const desc = actionDescription(iamAction);
     const prefix = desc ? `${desc} ` : "";
-    if (iamActionAllowed(iamAction, denyPatterns)) return `${prefix}Blocked by a Deny rule — edit in the JSON tab.`;
-    if (allowedActions.has(iamAction) && !allowLiterals.has(iamAction)) return `${prefix}Granted by a wildcard rule — edit in the JSON tab.`;
+    if (iamActionAllowed(iamAction, denyPatterns)) return `${prefix}Blocked by a Deny rule. Edit Advanced JSON to change it.`;
+    if (allowedActions.has(iamAction) && !allowLiterals.has(iamAction)) return `${prefix}Granted by a wildcard rule. Edit Advanced JSON to change it.`;
     return "";
   };
 
@@ -225,17 +237,17 @@ export function IamPolicyEditor() {
   }, [catalog]);
 
   const filteredGroups = useMemo(() => {
-    if (!search.trim()) return groupedActions;
     const q = search.toLowerCase();
     const result: Record<string, string[]> = {};
     for (const [ns, actions] of Object.entries(groupedActions)) {
+      if (category !== "all" && ns !== category) continue;
       const matching = actions.filter(a =>
         a.toLowerCase().includes(q) || actionLabel(a).toLowerCase().includes(q)
       );
       if (matching.length) result[ns] = matching;
     }
     return result;
-  }, [groupedActions, search]);
+  }, [groupedActions, search, category]);
 
   // Both early returns live here, AFTER every Hook above (review finding,
   // upstream PR #202, 2026-09-06): this function previously returned the
@@ -252,7 +264,7 @@ export function IamPolicyEditor() {
   // and groupedActions's own guard both do), so keeping them unconditional
   // and moving ONLY the conditional JSX returns down here fixes this without
   // changing what either branch renders.
-  if (!catalog && loadError) return <section className="iam-editor-error"><h3>Failed to load IAM policies</h3><button onClick={() => { setLoadError(false); window.location.reload(); }}>Retry</button></section>;
+  if (!catalog && loadError) return <section className="iam-editor-error"><h3>Could Not Load Access Rules</h3><button onClick={() => { setLoadError(false); window.location.reload(); }}>Retry</button></section>;
   if (!catalog) return <section className="iam-editor-loading"><p className="loading-dots">Loading policies</p></section>;
 
   // Reads the live jsonText via a functional setJsonText update rather than
@@ -378,24 +390,27 @@ export function IamPolicyEditor() {
 
   return (
     <section className="iam-policy-editor">
+      <header className="iam-page-heading"><ShieldCheck size={24} aria-hidden="true" /><div><h2>Access Control</h2><p>Choose what each access level can do. Assign people to these levels using Discord roles.</p></div></header>
       <div className="iam-tier-selector" role="group" aria-label="Policy tier">
         {TIERS.map((tier) => (
-          <button key={tier} className={`iam-tier-btn ${selectedTier === tier ? "active" : ""}`} aria-pressed={selectedTier === tier} onClick={() => selectTier(tier)}>
+          <button key={tier} disabled={saving} className={`iam-tier-btn ${selectedTier === tier ? "active" : ""}`} aria-pressed={selectedTier === tier} onClick={() => selectTier(tier)}>
             {capitalize(tier)}
           </button>
         ))}
       </div>
+      <div className="iam-tier-summary"><div><h3>{capitalize(selectedTier)} Access</h3><p>{TIER_DESCRIPTIONS[selectedTier]}</p></div><span className="iam-summary-count">{allowedActions.size} {allowedActions.size === 1 ? "Permission" : "Permissions"} Allowed</span></div>
 
       <div className="iam-editor-tabs" role="tablist" aria-label="Policy editor view">
         <button role="tab" id="iam-tab-builder" aria-selected={editorTab === "builder"} aria-controls="iam-panel-builder" className={editorTab === "builder" ? "active" : ""} onClick={() => setEditorTab("builder")}>Permissions</button>
-        <button role="tab" id="iam-tab-json" aria-selected={editorTab === "json"} aria-controls="iam-panel-json" className={editorTab === "json" ? "active" : ""} onClick={() => setEditorTab("json")}>JSON</button>
-        <button role="tab" id="iam-tab-test" aria-selected={editorTab === "test"} aria-controls="iam-panel-test" className={editorTab === "test" ? "active" : ""} onClick={() => { runTest(); setEditorTab("test"); }}>Test</button>
+        <button role="tab" id="iam-tab-json" aria-selected={editorTab === "json"} aria-controls="iam-panel-json" className={editorTab === "json" ? "active" : ""} onClick={() => setEditorTab("json")}>Advanced JSON</button>
+        <button role="tab" id="iam-tab-test" aria-selected={editorTab === "test"} aria-controls="iam-panel-test" className={editorTab === "test" ? "active" : ""} onClick={() => { runTest(); setEditorTab("test"); }}>Preview</button>
       </div>
 
       <div className="iam-editor-body">
         {editorTab === "builder" && (
           <div id="iam-panel-builder" role="tabpanel" aria-labelledby="iam-tab-builder">
             <div className="iam-search-bar">
+              <Search size={17} aria-hidden="true" />
               <input
                 type="text"
                 aria-label="Search permissions"
@@ -403,11 +418,13 @@ export function IamPolicyEditor() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
+              <select aria-label="Permission Category" value={category} onChange={(event) => setCategory(event.target.value)}><option value="all">All Categories</option>{Object.keys(groupedActions).map((ns) => <option key={ns} value={ns}>{namespaceLabel(ns)}</option>)}</select>
               {search && (
                 <button className="iam-search-clear" aria-label="Clear search" onClick={() => setSearch("")}>×</button>
               )}
             </div>
-            {draftInvalid && <p className="iam-toggle-hint iam-draft-invalid" role="alert">The JSON tab contains invalid JSON. Fix it there before changing permissions here -- the grid is read-only until it parses.</p>}
+            <label className="iam-technical-toggle"><input type="checkbox" checked={showTechnicalNames} onChange={(event) => setShowTechnicalNames(event.target.checked)} /><Code2 size={15} aria-hidden="true" />Show Technical Names</label>
+            {draftInvalid && <p className="iam-toggle-hint iam-draft-invalid" role="alert">Advanced JSON contains invalid JSON. Correct it before changing permissions.</p>}
             {toggleHint && <p className="iam-toggle-hint" role="status">{toggleHint}</p>}
             <div className="iam-permission-grid">
               {Object.keys(filteredGroups).length === 0 && (
@@ -418,7 +435,7 @@ export function IamPolicyEditor() {
                   <div className="iam-ns-header">
                     <span className="iam-ns-name">{namespaceLabel(ns)}</span>
                     <span className="iam-ns-count">
-                      {actions.filter(a => allowedActions.has(a)).length}/{actions.length} allowed
+                      {actions.filter(a => allowedActions.has(a)).length}/{actions.length} Allowed
                     </span>
                   </div>
                   <div className="iam-ns-actions">
@@ -429,14 +446,16 @@ export function IamPolicyEditor() {
                           <input
                             type="checkbox"
                             checked={allowedActions.has(action)}
-                            disabled={draftInvalid}
+                            aria-label={`${namespaceLabel(ns)}: ${ACTION_LABEL_OVERRIDES[action] || actionLabel(action)}`}
+                            disabled={draftInvalid || saving}
                             onChange={() => toggleAction(action)}
                           />
                           <span className="iam-perm-label" title={actionDescription(action) || undefined}>
                             {ACTION_LABEL_OVERRIDES[action] || actionLabel(action)}
+                            {actionDescription(action) && <small className="iam-perm-description">{actionDescription(action)}</small>}
                           </span>
-                          {lock && <span className="iam-perm-lock" aria-hidden="true">🔒</span>}
-                          <span className="iam-perm-action" title={action}>{action}</span>
+                          {lock && <LockKeyhole className="iam-perm-lock" size={14} aria-hidden="true" />}
+                          {showTechnicalNames && <span className="iam-perm-action" title={action}>{action}</span>}
                         </label>
                       );
                     })}
@@ -455,6 +474,7 @@ export function IamPolicyEditor() {
               onChange={(e) => { setJsonText(e.target.value); setSaved(false); setJsonError(""); }}
               rows={16}
               spellCheck={false}
+              disabled={saving}
             />
             {jsonError && <p className="iam-json-error">{jsonError}</p>}
           </div>
@@ -464,13 +484,13 @@ export function IamPolicyEditor() {
           <div className="iam-test-panel" id="iam-panel-test" role="tabpanel" aria-labelledby="iam-tab-test">
             {testError && <p className="error">{testError}</p>}
             {!testResults && (
-              <button className="stable-action-button" onClick={runTest}>Run test</button>
+              <button className="stable-action-button" onClick={runTest}>Check Permissions</button>
             )}
             {testResults && (
               <>
                 <div className="iam-test-summary">
-                  <span className="test-count-allowed">{Object.values(testResults).filter(Boolean).length} allowed</span>
-                  <span className="test-count-denied">{Object.values(testResults).filter(v => !v).length} denied</span>
+                  <span className="test-count-allowed">{Object.values(testResults).filter(Boolean).length} Allowed</span>
+                  <span className="test-count-denied">{Object.values(testResults).filter(v => !v).length} Denied</span>
                 </div>
                 <div className="iam-test-table">
                   {Object.entries(testResults).sort(([, a], [, b]) => (a === b ? 0 : a ? -1 : 1)).map(([action, allowed]) => (
@@ -480,7 +500,7 @@ export function IamPolicyEditor() {
                     </div>
                   ))}
                 </div>
-                <button className="stable-action-button" onClick={runTest} style={{marginTop: "0.75rem"}}>Re-run test</button>
+                <button className="stable-action-button" onClick={runTest}>Check Again</button>
               </>
             )}
           </div>
@@ -488,10 +508,11 @@ export function IamPolicyEditor() {
       </div>
 
       <div className="iam-editor-footer">
+        <p className="muted">Changes apply to everyone with {capitalize(selectedTier)} access.</p>
         {jsonError && <p className="iam-json-error" style={{ marginBottom: "8px" }}>{jsonError}</p>}
-        <button className="stable-action-button" onClick={savePolicy} disabled={saving || (editorTab === "json" && !!jsonError)}>
-          {saving ? "Saving..." : saved ? "Saved" : `Save ${selectedTier} policy`}
-        </button>
+        <PermissionGate action="settings:write"><button className="stable-action-button" onClick={savePolicy} disabled={saving || (editorTab === "json" && !!jsonError)}>
+          {saved ? <CheckCircle2 size={16} aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}{saving ? "Saving..." : saved ? "Saved" : `Save ${capitalize(selectedTier)} Access`}
+        </button></PermissionGate>
       </div>
     </section>
   );

@@ -47,7 +47,7 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top left, rgba(170, 111, 45, .18), transparent 38%), var(--bg); }
+body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top left, var(--bg-glow, rgba(170, 111, 45, .18)), transparent 38%), var(--bg); }
 button, input, select, textarea { font: inherit; }
 button, .button-link, input, select { line-height: 1.25; }
 button, .button-link {
@@ -548,6 +548,8 @@ main { padding: 22px; min-width: 0; }
   padding: 0;
 }
 .language-shortcut[aria-expanded="true"] { outline: 2px solid var(--title); outline-offset: 2px; }
+@media (max-width: 760px) { .topbar-links .community-button.support { grid-column: 1 / -1; } }
+.theme-launcher-status { position: fixed; right: 16px; bottom: 16px; z-index: 1001; max-width: min(420px, calc(100vw - 32px)); }
 .language-picker-overlay { z-index: 1000; padding: 16px; }
 .language-picker { width: min(640px,100%); max-height: min(85dvh,850px); overflow-y: auto; box-sizing: border-box; }
 .language-picker-heading,.language-picker-heading>div { display:flex;align-items:center;gap:10px; }
@@ -655,6 +657,7 @@ main { padding: 22px; min-width: 0; }
 .login-panel { position: relative; z-index: 1; width: min(440px, calc(100vw - 32px)); display: grid; gap: 14px; background: rgba(17, 19, 22, .84); backdrop-filter: blur(8px); text-align: center; }
 .login-logo { display: block; width: clamp(100px, 24vw, 136px); height: auto; margin: 0 auto; object-fit: contain; }
 .login-panel > button[type="submit"] { width: 160px; justify-self: center; }
+.login-panel .login-submit-button { width: 160px; justify-self: center; }
 .loading-panel { display: flex; align-items: center; gap: 16px; }
 .spinner { width: 28px; height: 28px; border: 3px solid #4d4032; border-top-color: #ffd08a; border-radius: 50%; animation: spin 1s linear infinite; flex: 0 0 auto; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -7392,7 +7395,7 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
   .app-shell > main { padding: clamp(10px, 3vw, 18px); }
   .sidebar-nav.mobile-open { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .topbar { gap: 12px; margin-bottom: 14px; padding-bottom: 12px; }
-  .topbar .topbar-links { display: grid !important; grid-template-columns: 44px repeat(2, minmax(0, 1fr)); }
+  .topbar .topbar-links { display: grid !important; grid-template-columns: 44px 44px minmax(0, 1fr); }
   .listing-claim-badge { grid-column: 1 / -1; min-height: 40px; }
   .community-button { width: 100%; min-height: 44px; }
   .panel, .drawer, .action-section { padding: clamp(11px, 3vw, 16px); }
@@ -7556,7 +7559,7 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .sidebar-nav.mobile-open .sidebar-nav-heading { grid-column: 1 / -1; }
-  .topbar .topbar-links { grid-template-columns: 44px repeat(2, minmax(0, 1fr)); }
+  .topbar .topbar-links { grid-template-columns: 44px 44px minmax(0, 1fr); }
   .community-button { font-size: 13px; padding: 8px; gap: 6px; }
   .community-button { grid-column: auto; }
   .confirm-modal-details { grid-template-columns: 1fr; row-gap: 3px; }
@@ -7677,7 +7680,8 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
 .totp-recovery-codes-panel { width: min(480px, calc(100vw - 32px)); }
 .totp-recovery-codes-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .totp-recovery-codes-list code { display: block; padding: 6px 8px; border-radius: 4px; background: rgba(0, 0, 0, .35); font-size: .85rem; }
-.totp-ack-checkbox { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: .85rem; margin-top: 4px; }
+.totp-ack-checkbox { display: flex; align-items: center; gap: 8px; justify-content: flex-start; font-size: .85rem; margin-top: 4px; }
+.totp-ack-checkbox input[type="checkbox"] { flex: 0 0 16px; width: 16px; height: 16px; min-height: 0; margin: 0; align-self: center; }
 /* The recovery-codes block is rendered in two places with different chrome
    On the login screen .login-panel supplies the grid, gap and centring;
    the settings section had none of that -- .totp-recovery-codes-panel set only
@@ -7713,6 +7717,33 @@ button.login-discord-button { border: none; cursor: pointer; font: inherit; font
 .login-primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 260px; justify-self: center; padding: 12px 18px; border: none; border-radius: 6px; background: #c6a56e; color: #1b1712; font: inherit; font-weight: 600; font-size: 1rem; cursor: pointer; }
 .login-primary-button:hover:not(:disabled) { background: #d4b57e; }
 .login-primary-button:disabled { opacity: .5; cursor: default; }
+
+/* HTTPS setup shares the surrounding Settings spacing and action sizes. */
+.console-https-setup { width: min(100%, 680px); min-width: 0; justify-self: start; }
+.console-https-content { display: grid; gap: 12px; margin-top: 12px; min-width: 0; }
+.console-https-content p { margin: 0; }
+.console-https-content code { overflow-wrap: anywhere; white-space: normal; }
+.console-https-choices { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.console-https-choices > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 10px; min-height: 36px; width: auto; text-align: center; white-space: nowrap; font-size: 13px; }
+.console-https-choices > button[aria-pressed="true"] { border-color: #c6a56e; background: rgba(198, 165, 110, .12); }
+.console-https-choices > button:disabled { opacity: .7; }
+.console-https-choices > button > svg { flex: 0 0 16px; }
+.console-https-choices > button > span { min-width: 0; }
+.console-https-choices small { font-weight: normal; line-height: 1.45; }
+.console-https-token, .console-https-existing label { display: grid; gap: 8px; }
+.console-https-token input, .console-https-existing input { width: 100%; min-width: 0; }
+.console-https-content .console-https-confirm { display: flex; align-items: center; justify-content: flex-start; gap: 8px; }
+.console-https-confirm input[type="checkbox"] { flex: 0 0 16px; width: 16px; height: 16px; min-height: 0; margin: 0; }
+.console-https-detected, .console-https-state { display: grid; gap: 10px; border: 1px solid var(--border-strong); padding: 14px; border-radius: 8px; min-width: 0; }
+.console-https-state > strong { color: #c6a56e; }
+.console-https-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.console-https-actions button, .console-https-open { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 8px 12px; width: auto; }
+.console-https-open { justify-self: start; border: 1px solid #c6a56e; border-radius: 6px; color: #c6a56e; }
+.console-https-existing { border-top: 1px solid var(--border-strong); padding-top: 12px; }
+.console-https-existing[open] > :not(summary) { margin-top: 12px; }
+.settings-account-group .playerAdmin_toggleBody .console-https-confirm,
+.settings-account-group .playerAdmin_toggleBody .totp-ack-checkbox { display: flex; align-items: center; justify-content: flex-start; gap: 8px; }
+.settings-account-group .playerAdmin_toggleBody :is(.console-https-confirm, .totp-ack-checkbox) input[type="checkbox"] { flex: 0 0 16px; width: 16px; height: 16px; min-height: 0; margin: 0; }
 /* A real, clearly-clickable secondary choice -- for an either/or pair where
    neither option is a throwaway escape hatch (unlike .login-password-toggle,
    reserved for Cancel/toggle actions). Bordered, not just a muted text link,
@@ -7879,18 +7910,117 @@ button.login-discord-button { border: none; cursor: pointer; font: inherit; font
 .iam-perm-row.perm-locked input[type="checkbox"] { accent-color: var(--muted); }
 .iam-perm-lock { flex: 0 0 auto; font-size: 11px; opacity: .7; }
 
-/* Signed-in user chip + logout, in the sidebar under the title.
-   Username is the prominent element; the role echoes the nav section-heading
-   style; Sign out is a small secondary ghost button, not a full-width one. */
-.sidebar-user { display: flex; flex-direction: column; gap: 5px; padding: 10px 12px 12px; margin-bottom: 4px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.sidebar-user-identity { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* Compact two-line account identity with an accessible Sign Out action. */
+.sidebar-user { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 20px 20px; gap: 3px 8px; padding: 10px 0; margin: 4px 0 10px; border-bottom: 1px solid var(--border); min-width: 0; }
+.sidebar-user-identity { display: flex; grid-column: 1; grid-row: 1; align-items: center; gap: 8px; min-width: 0; }
 .sidebar-user-identity > svg { flex: 0 0 auto; color: #f0c760; }
-.sidebar-user-name { flex: 1 1 auto; min-width: 0; font-weight: 700; font-size: 14px; color: #f0c760; text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sidebar-user-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-left: 24px; }
-.sidebar-user-tier { padding: 3px 7px; border: 1px solid rgba(240, 199, 96, .42); border-radius: 999px; background: rgba(240, 199, 96, .08); color: #ffe095; font-size: 11px; font-weight: 700; line-height: 1; text-transform: capitalize; letter-spacing: .02em; }
-.sidebar-user-tier.tier-owner { border-color: rgba(240, 199, 96, .7); color: #ffe9b0; }
-.sidebar-logout { display: inline-flex; align-items: center; border: 0; background: transparent; color: var(--muted); padding: 2px 2px; font-size: 12px; gap: 6px; min-width: 0; }
-.sidebar-logout:hover { color: var(--accent-strong); border-color: transparent; background: transparent; }
+.sidebar-user-details { display: grid; min-width: 0; gap: 3px; }
+.sidebar-user-name { display: block; min-width: 0; font-weight: 700; font-size: 14px; color: var(--title); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-user-meta { display: flex; grid-column: 1; grid-row: 2; align-items: center; gap: 8px; min-width: 0; }
+.sidebar-user-tier { color: var(--muted-warm); font-size: 11px; white-space: nowrap; }
+.sidebar-logout { grid-column: 2; grid-row: 1 / span 2; align-self: center; min-height: 36px; border: 1px solid var(--border-strong); border-radius: 6px; background: transparent; color: #f7e7c7; padding: 6px 8px; gap: 5px; font-size: 11px; }
+.sidebar-logout:hover { border-color: var(--accent); background: #30271d; }
+.totp-enrollment-overlay { z-index: 1200; padding: 20px; overflow-y: auto; }
+.totp-enrollment-dialog { width: min(520px, 100%); max-height: calc(100dvh - 40px); overflow-y: auto; }
+.totp-dialog-content { display: grid; gap: 16px; min-width: 0; text-align: left; }
+.totp-dialog-content :is(h3, p) { margin: 0; line-height: 1.5; }
+.totp-dialog-content .totp-setup-qr { justify-self: center; }
+.totp-dialog-content .totp-setup-secret { justify-self: stretch; text-align: center; overflow-wrap: anywhere; }
+.totp-dialog-content .totp-ack-checkbox { justify-content: flex-start; }
+.totp-dialog-content .login-password-toggle { justify-self: start; }
+
+/* Group related account controls without adding another navigation layer. */
+.settings-account-group { display: grid; gap: 14px; min-width: 0; padding: 18px; border: 1px solid var(--border-strong); border-radius: 10px; background: #151719; }
+.settings-account-group-heading { display: flex; align-items: flex-start; gap: 10px; }
+.settings-account-group-heading > svg { color: var(--accent-strong); flex-shrink: 0; margin-top: 2px; }
+.settings-account-group-heading h3 { margin: 0; font-size: 16px; color: var(--title); }
+.settings-account-group-heading p { margin: 5px 0 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.settings-account-group-options { display: grid; gap: 10px; min-width: 0; }
+.settings-account-group-options > .playerAdmin_toggle { margin: 0; }
+.settings-account-group .playerAdmin_toggleHeader { padding: 14px; text-align: left; }
+.settings-account-group .playerAdmin_toggleHeader > svg { flex-shrink: 0; }
+.settings-account-group .playerAdmin_toggleBody { display: grid; gap: 16px; padding: 18px; min-width: 0; }
+.settings-account-group .playerAdmin_toggleBody p { margin: 0; line-height: 1.6; }
+.settings-account-group .playerAdmin_toggleBody h4 { margin: 4px 0 0; font-size: 14px; }
+.settings-account-group .playerAdmin_toggleBody label { display: grid; align-content: start; gap: 8px; font-size: 13px; min-width: 0; }
+.settings-account-group .playerAdmin_toggleBody :is(input, select) { width: 100%; min-width: 0; }
+.settings-account-group .settings-password-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); margin-top: 0; gap: 16px; }
+.settings-account-group .action-row { gap: 10px; align-items: center; flex-wrap: wrap; }
+.settings-account-group :is(.settings-wizard, .settings-wizard-step, .settings-hosted-bot-oauth-config, .settings-hosted-guild-picker, .settings-auto-invite, .settings-self-hosted-handoff, .settings-discord-disable-form) { display: grid; gap: 14px; min-width: 0; }
+.settings-account-group :is(.settings-token-reveal, .settings-hosted-bot-advanced, .settings-zero-factor-warning, .settings-discord-forget-form) { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--border-strong); border-radius: 8px; }
+.settings-account-group :is(.settings-zero-factor-warning, .settings-discord-forget-form) { border-color: var(--danger-strong); }
+.settings-account-group .settings-token-reveal input { font-family: monospace; }
+.settings-account-group .settings-bot-role-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 16px; }
+.settings-account-group .settings-wizard-step-indicator { width: fit-content; font-size: 12px; padding: 5px 9px; color: var(--muted-warm); border: 1px solid var(--border-strong); border-radius: 999px; }
+.bot-hosting-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; }
+.bot-hosting-options > button { display: flex; align-items: flex-start; gap: 12px; padding: 16px; min-width: 0; text-align: left; justify-content: flex-start; background: #191b1d; border: 1px solid var(--border-strong); }
+.bot-hosting-options > button[aria-pressed="true"] { background: rgba(198, 139, 74, .12); border-color: var(--accent); }
+.bot-hosting-options > button > svg { flex-shrink: 0; color: var(--accent-strong); }
+.bot-hosting-options > button > span { display: grid; gap: 6px; }
+.bot-hosting-options strong { font-size: 13px; color: var(--title); }
+.bot-hosting-options small { font-size: 12px; line-height: 1.5; color: var(--muted); }
+.settings-account-group .settings-wizard-current-choice { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; background: #1b1d1f; border-radius: 8px; }
+.settings-account-group .settings-wizard-step > p:first-child { color: var(--title); font-size: 14px; font-weight: 700; }
+.settings-account-group .bot-manual-connection { display: grid; gap: 16px; min-width: 0; }
+.settings-account-group fieldset.settings-hosted-bot-oauth-config { margin: 0; padding: 16px; border: 1px solid var(--border-strong); border-radius: 8px; min-inline-size: 0; }
+.settings-account-group fieldset.settings-hosted-bot-oauth-config legend { padding: 0 6px; color: var(--title); font-size: 13px; font-weight: 700; }
+.settings-account-group :is(.settings-auto-invite, .settings-auto-invite-waiting, .settings-hosted-bot-oauth-config, .settings-hosted-guild-picker, .settings-wizard-step) > :is(button, a.button-link) { width: fit-content; max-width: 100%; justify-self: start; }
+.settings-account-group .settings-auto-invite-waiting { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--border-strong); border-radius: 8px; }
+.settings-account-group .settings-hosted-guild-picker ul { display: grid; gap: 8px; padding: 0; list-style: none; }
+.settings-account-group .settings-self-hosted-handoff { padding: 16px; border: 1px solid var(--border-strong); border-radius: 8px; }
+@media(max-width: 760px) { .bot-hosting-options { grid-template-columns: minmax(0, 1fr); } }
+.settings-account-group .settings-https-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px; border: 1px solid var(--border-strong); border-radius: 8px; width: fit-content; max-width: min(100%, 640px); justify-self: start; }
+.settings-https-notice > svg { flex: 0 0 18px; color: var(--accent-strong); }
+.settings-https-notice > p { display: grid; gap: 3px; flex: 1 1 240px; font-size: 13px; }
+.settings-https-notice > p > span { color: var(--muted); }
+.settings-https-notice > button { width: auto; flex: 0 0 auto; min-height: 36px; padding: 7px 10px; }
+.settings-account-group .settings-https-notice details[open] { display: grid; gap: 12px; }
+.settings-account-group details > summary { cursor: pointer; color: var(--title); font-size: 13px; }
+.settings-account-group .settings-wizard-step > button, .settings-account-group .settings-server-bot-body > button { justify-self: start; max-width: 100%; }
+.settings-account-group .playerAdmin_toggleBody :is(.discord-mfa-option, .settings-wizard-invite-ack, .totp-ack-checkbox) { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--border-strong); border-radius: 8px; }
+.settings-account-group input[type="checkbox"] { flex: 0 0 16px; width: 16px; height: 16px; margin-top: 2px; }
+.settings-account-group .discord-setup-panel-embedded { display: grid; gap: 14px; width: 100%; min-width: 0; max-width: none; }
+.settings-account-group .discord-setup-panel-embedded > h2 { font-size: 16px; }
+.settings-account-group .discord-setup-panel-embedded :is(.login-primary-button, .login-secondary-button, .login-discord-button) { width: fit-content; max-width: 100%; justify-self: start; white-space: normal; text-align: center; padding: 10px 14px; font-size: 13px; }
+.settings-account-group .discord-setup-panel-embedded .login-password-toggle { justify-self: start; color: var(--muted-warm); font-size: 12px; padding: 6px 0; }
+.discord-setup-paths { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; width: 100%; }
+.discord-setup-panel .discord-setup-paths > button,
+.settings-account-group .discord-setup-panel-embedded .discord-setup-paths > button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: auto; min-height: 38px; margin: 0; padding: 8px 12px; border: 1px solid transparent; font-size: 13px; line-height: 20px; white-space: nowrap; }
+.discord-setup-panel .discord-setup-paths > .login-secondary-button,
+.settings-account-group .discord-setup-panel-embedded .discord-setup-paths > .login-secondary-button { border-color: #4d4032; }
+.discord-setup-panel .discord-setup-result { display: grid; gap: 12px; padding: 16px; width: min(100%, 560px); border: 1px solid var(--border-strong); border-radius: 8px; justify-self: start; text-align: left; }
+.discord-setup-result-heading { display: flex; align-items: center; gap: 8px; color: var(--accent-strong); }
+.discord-setup-result-heading h3 { margin: 0; font-size: 15px; }
+.discord-setup-result > p { margin: 0; line-height: 1.5; }
+.discord-setup-result > button { justify-self: start; width: auto; }
+.discord-setup-terminal { font-size: 12px; color: var(--muted); }
+.discord-setup-terminal code { display: block; margin-top: 8px; overflow-wrap: anywhere; }
+.login-panel .login-password-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.login-panel .login-discord-button-primary { max-width: 100%; }
+.settings-account-group code { overflow-wrap: anywhere; }
+.settings-account-group .settings-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.settings-account-group .settings-choice > p { width: 100%; }
+.settings-account-group .settings-wizard-step .settings-choice { display: grid; gap: 12px; }
+.settings-web-port-toggle .playerAdmin_toggleBody, .settings-public-profile-toggle .playerAdmin_toggleBody { display: grid; gap: 16px; padding: 18px; }
+.settings-web-port-toggle .playerAdmin_toggleBody p, .settings-public-profile-toggle .playerAdmin_toggleBody p { margin: 0; line-height: 1.6; }
+.settings-web-port-toggle .settings-web-port-grid { grid-template-columns: minmax(0, 260px); margin: 0; }
+.settings-web-port-toggle label, .settings-public-profile-toggle label { display: grid; gap: 8px; }
+.settings-runtime-details .key-value-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+.settings-panel .experimental-features-section { padding: 18px; border: 1px solid var(--border-strong); border-radius: 10px; }
+.settings-option-copy { display: grid; flex: 1; min-width: 0; gap: 5px; }
+.settings-option-copy small { font-size: 12px; line-height: 1.5; color: var(--muted); font-weight: 400; }
+.settings-option-status { display: inline-flex; flex: 0 0 auto; align-items: center; width: fit-content; padding: 4px 8px; border: 1px solid var(--border-strong); border-radius: 999px; font-size: 11px; line-height: 1.3; color: var(--muted-warm); background: #282827; }
+.settings-option-status.is-on { color: #d8f0c8; background: rgba(61, 139, 98, .16); border-color: #3d8b62; }
+.settings-disabled-heading { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.settings-disabled-heading .settings-option-status { margin-left: auto; }
+@media (max-width: 600px) {
+  .settings-account-group { padding: 12px; }
+  .settings-account-group .playerAdmin_toggleHeader { gap: 8px; padding: 12px; flex-wrap: wrap; }
+  .settings-account-group .settings-option-copy { flex-basis: calc(100% - 34px); }
+  .settings-account-group .settings-option-status { margin-left: 28px; }
+  .settings-account-group .playerAdmin_toggleHeader > svg:last-child { margin-left: auto; }
+  .settings-account-group .playerAdmin_toggleBody { padding: 12px; }
+}
 /* --- API Keys (Settings) --------------------------------------------------
    Generic segmented control, same visual spec as .bases-rank-segments. That
    one is left alone deliberately: it is load-bearing for base and vehicle
@@ -8192,12 +8322,20 @@ button.login-discord-button { border: none; cursor: pointer; font: inherit; font
 .login-password-toggle:hover { color: #c6a56e; }
 .login-password-fields { display: grid; gap: 10px; margin-top: 8px; }
 .totp-setup-qr { width: 200px; height: 200px; justify-self: center; border-radius: 6px; background: #fff; padding: 8px; }
+.totp-enrollment-overlay { z-index: 1200; padding: 20px; overflow-y: auto; }
+.totp-enrollment-dialog { width: min(520px, 100%); max-height: calc(100dvh - 40px); overflow-y: auto; }
+.totp-dialog-content { display: grid; gap: 16px; min-width: 0; text-align: left; }
+.totp-dialog-content :is(h3, p) { margin: 0; line-height: 1.5; }
+.totp-dialog-content .totp-setup-qr { justify-self: center; }
+.totp-dialog-content .totp-setup-secret { justify-self: stretch; text-align: center; overflow-wrap: anywhere; }
+.totp-dialog-content .totp-ack-checkbox { justify-content: flex-start; }
+.totp-dialog-content .login-password-toggle { justify-self: start; }
 .totp-setup-secret-label { margin: 0; font-size: .78rem; color: #817763; }
 .totp-setup-secret { justify-self: center; padding: 6px 10px; border-radius: 4px; background: rgba(0, 0, 0, .35); font-size: .95rem; letter-spacing: .06em; word-break: break-all; }
 .totp-recovery-codes-panel { width: min(480px, calc(100vw - 32px)); }
 .totp-recovery-codes-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .totp-recovery-codes-list code { display: block; padding: 6px 8px; border-radius: 4px; background: rgba(0, 0, 0, .35); font-size: .85rem; }
-.totp-ack-checkbox { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: .85rem; margin-top: 4px; }
+.totp-ack-checkbox { display: flex; align-items: center; gap: 8px; justify-content: flex-start; font-size: .85rem; margin-top: 4px; }
 /* The recovery-codes block is rendered in two places with different chrome
    On the login screen .login-panel supplies the grid, gap and centring;
    the settings section had none of that -- .totp-recovery-codes-panel set only
@@ -8315,4 +8453,115 @@ button.login-discord-button { border: none; cursor: pointer; font: inherit; font
   .combat-metrics dt svg { width: 12px; }
   .combat-secondary-metrics { padding: 14px; gap: 12px 18px; }
   .combat-kill-feed { padding: 0 14px; }
+}
+
+/* Console theme picker (src/themes). Swatch fills are the theme's own colours, set inline. */
+.theme-picker-overlay { z-index: 1000; padding: 16px; }
+.theme-picker { background: var(--panel); width: min(680px, 100%); max-height: min(85dvh, 850px); overflow-y: auto; box-sizing: border-box; }
+.theme-picker-heading, .theme-picker-heading > div { display: flex; align-items: center; gap: 10px; }
+.theme-picker-heading { justify-content: space-between; margin-bottom: 8px; position: sticky; top: 0; z-index: 1; background: inherit; padding-bottom: 6px; }
+.theme-picker-heading h2 { font-size: 20px; margin: 0; }
+.theme-picker-heading > button { width: 40px; min-height: 40px; padding: 6px; flex: 0 0 auto; }
+.theme-picker .theme-picker-note { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.theme-card { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px; text-align: left; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-soft); color: var(--text); cursor: pointer; }
+.theme-card:hover { border-color: var(--border-strong); }
+.theme-card:focus-visible { outline: 2px solid var(--text-strong); outline-offset: 2px; }
+.theme-card.selected { border-color: var(--title); box-shadow: 0 0 0 1px var(--title); }
+.theme-swatches { display: flex; width: 100%; height: 22px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+.theme-swatches i { flex: 1; }
+.theme-card-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+/* Account and community settings share one compact form language. */
+.permission-fields { display: contents; border: 0; margin: 0; padding: 0; min-inline-size: 0; }
+.discord-setup-actions { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; width: 100%; }
+.discord-setup-panel .discord-setup-actions > :is(a, button),
+.settings-account-group .discord-setup-panel-embedded .discord-setup-actions > :is(a, button) { display: inline-flex; align-items: center; justify-content: center; width: auto; min-width: 0; min-height: 36px; margin: 0; padding: 8px 10px; white-space: nowrap; font-size: 13px; line-height: 18px; }
+@media (max-width: 560px) {
+  .discord-setup-actions { gap: 6px; }
+  .discord-setup-panel .discord-setup-actions > :is(a, button),
+  .settings-account-group .discord-setup-panel-embedded .discord-setup-actions > :is(a, button) { padding: 7px 6px; font-size: 12px; }
+}
+.discord-role-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.discord-role-fields label { min-width: 0; }
+.discord-role-fields label > span { display: flex; flex-wrap: wrap; gap: 5px; align-items: baseline; }
+.discord-role-fields small { color: var(--muted); font-size: 11px; font-weight: normal; }
+@media (max-width: 900px) { .discord-role-fields { grid-template-columns: 1fr; } }
+.settings-link-action, .settings-discord-manage-action { justify-self: start; width: auto; color: #d4b57e; background: rgba(198,165,110,.08); border: 1px solid #6a553a; border-radius: 6px; padding: 8px 12px; min-height: 36px; font: inherit; font-size: 13px; cursor: pointer; }
+.settings-link-action:hover, .settings-discord-manage-action:hover { background: rgba(198,165,110,.16); border-color: #c6a56e; }
+.settings-section-separator { height: 1px; width: 100%; background: var(--border-strong); margin: 2px 0; }
+.settings-access-link { display: flex; align-items: flex-start; gap: 10px; padding: 14px; border: 1px solid var(--border-strong); border-radius: 8px; }
+.settings-access-link > svg { flex: 0 0 18px; color: var(--accent-strong); margin-top: 2px; }
+.settings-access-link p { color: var(--muted); margin: 4px 0 8px; font-size: 13px; }
+.settings-access-link a { color: #d4b57e; font-weight: 600; text-underline-offset: 3px; }
+.settings-inline-success { display: flex; align-items: center; gap: 8px; color: var(--accent-strong); }
+.settings-inline-success > svg { flex: 0 0 16px; }
+.settings-account-group .playerAdmin_toggleBody .discord-mfa-option { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--border-strong); border-radius: 8px; }
+.settings-account-group .playerAdmin_toggleBody .discord-mfa-option input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; flex: 0 0 16px; margin: 3px 0 0; }
+.settings-account-group .discord-mfa-text { display: grid; gap: 6px; min-width: 0; flex: 1; }
+.settings-account-group .discord-mfa-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 600; line-height: 1.5; }
+.settings-account-group .discord-mfa-tag { display: inline-flex; width: fit-content; padding: 1px 6px; font-size: 10px; border-radius: 4px; border: 1px solid #6a553a; color: #d4b57e; }
+.settings-account-group .discord-mfa-option .muted { font-size: 12px; line-height: 1.6; }
+.settings-account-group .settings-discord-forget-form, .settings-account-group .settings-discord-disable-form { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--border-strong); border-radius: 8px; background: #18191b; }
+.settings-account-group .settings-discord-forget-form { border-color: #6b3d3d; }
+.settings-account-group .settings-discord-forget-form label, .settings-account-group .settings-discord-disable-form label { margin: 0; }
+.settings-account-group .settings-discord-disabled-banner .login-password-toggle { justify-self: start; width: auto; padding: 8px 12px; border: 1px solid #6b3d3d; border-radius: 6px; color: #efb6b6; font-size: 13px; }
+.settings-account-group .bot-hosting-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.settings-account-group .bot-hosting-options > button { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; width: auto; padding: 8px 12px; font-size: 13px; }
+.settings-account-group .bot-hosting-options > button > svg { flex: 0 0 16px; margin: 0; }
+.settings-wizard-progress { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); list-style: none; padding: 0; margin: 0; gap: 6px; }
+.settings-wizard-progress > li { display: flex; align-items: center; gap: 6px; padding: 8px; border-bottom: 2px solid var(--border-strong); font-size: 12px; color: var(--muted); min-width: 0; }
+.settings-wizard-progress > li > span { display: grid; place-items: center; flex: 0 0 20px; height: 20px; border: 1px solid var(--border-strong); border-radius: 50%; font-size: 11px; }
+.settings-wizard-progress > li[aria-current="step"] { border-color: #c6a56e; color: #d4b57e; }
+.settings-account-group .settings-token-reveal > label { display: grid; gap: 8px; }
+.settings-account-group .settings-token-reveal button { width: fit-content; }
+.settings-account-group .bot-manual-connection { display: grid; gap: 14px; min-width: 0; }
+.settings-account-group .settings-hosted-guild-picker ul { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0; }
+
+/* Access Control uses the same panels, accents and control sizes as Settings. */
+.iam-policy-editor { display: grid; gap: 16px; min-width: 0; padding: 22px; background: var(--panel); border: 1px solid var(--border-strong); border-radius: 10px; }
+.iam-page-heading { display: flex; align-items: flex-start; gap: 10px; }
+.iam-page-heading > svg { flex: 0 0 24px; color: var(--accent-strong); margin-top: 3px; }
+.iam-page-heading h2 { margin: 0; color: var(--title); font-size: 22px; }
+.iam-page-heading p, .iam-tier-summary p { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.iam-policy-editor .iam-tier-selector { display: flex; flex-wrap: wrap; gap: 6px; padding: 0; background: transparent; border: 0; }
+.iam-policy-editor .iam-tier-btn { min-height: 38px; padding: 8px 16px; width: auto; border: 1px solid var(--border-strong); border-radius: 6px; background: #191b1d; color: var(--text); }
+.iam-policy-editor .iam-tier-btn.active { border-color: #c6a56e; background: rgba(198,165,110,.12); color: #d4b57e; }
+.iam-tier-summary { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 14px; border: 1px solid var(--border-strong); border-radius: 8px; }
+.iam-tier-summary > div { flex: 1 1 260px; }
+.iam-tier-summary h3 { margin: 0; font-size: 15px; color: var(--title); }
+.iam-summary-count { padding: 4px 8px; border-radius: 5px; background: rgba(198,165,110,.08); color: #d4b57e; font-size: 12px; white-space: nowrap; }
+.iam-policy-editor .iam-editor-tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 0 10px; border-bottom: 1px solid var(--border-strong); background: transparent; }
+.iam-policy-editor .iam-editor-tabs button { padding: 8px 12px; min-height: 36px; border-radius: 6px; border: 1px solid transparent; color: var(--muted); }
+.iam-policy-editor .iam-editor-tabs button.active { color: #d4b57e; background: rgba(198,165,110,.1); border-color: #6a553a; }
+.iam-policy-editor .iam-search-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; width: 100%; margin: 0 0 10px; }
+.iam-search-bar > svg { color: var(--muted); flex: 0 0 17px; }
+.iam-policy-editor .iam-search-bar input { flex: 1 1 220px; width: auto; min-width: 0; height: 38px; padding: 8px 10px; }
+.iam-policy-editor .iam-search-bar select { flex: 0 1 200px; min-width: 0; height: 38px; padding: 8px 10px; }
+.iam-policy-editor .iam-technical-toggle { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+.iam-technical-toggle input { width: 15px; height: 15px; flex: 0 0 15px; margin: 0; }
+.iam-policy-editor .iam-permission-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,310px),1fr)); align-items: start; gap: 12px; }
+.iam-policy-editor .iam-ns-card { border: 1px solid var(--border-strong); border-radius: 8px; background: #151719; min-width: 0; overflow: hidden; }
+.iam-policy-editor .iam-ns-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; padding: 12px; background: rgba(198,165,110,.04); border-bottom: 1px solid var(--border-strong); }
+.iam-policy-editor .iam-ns-name { color: var(--title); font-size: 14px; font-weight: 600; }
+.iam-policy-editor .iam-ns-count { font-size: 11px; color: var(--muted); }
+.iam-policy-editor .iam-ns-actions { display: grid; gap: 2px; padding: 7px; }
+.iam-policy-editor .iam-perm-row { display: flex; align-items: center; gap: 9px; min-height: 36px; padding: 7px; margin: 0; }
+.iam-policy-editor .iam-perm-label { display: grid; gap: 4px; font-size: 13px; }
+.iam-policy-editor .iam-perm-description { color: var(--muted); font-size: 11px; line-height: 1.5; font-weight: normal; }
+.iam-policy-editor .iam-perm-row input[type="checkbox"], .iam-policy-editor .iam-perm-lock { align-self: flex-start; margin-top: 2px; }
+.iam-policy-editor .iam-editor-footer > p { margin: 0; flex: 1 1 230px; font-size: 12px; }
+.iam-policy-editor .iam-perm-action { max-width: 45%; white-space: normal; overflow-wrap: anywhere; font-size: 10px; }
+.iam-policy-editor .iam-perm-lock { color: var(--muted); flex: 0 0 14px; }
+.iam-policy-editor .iam-json-textarea { box-sizing: border-box; width: 100%; min-width: 0; border-radius: 8px; padding: 14px; }
+.iam-policy-editor .iam-editor-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border-strong); }
+.iam-policy-editor .iam-editor-footer > button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; width: auto; padding: 8px 12px; border: 1px solid #6a553a; border-radius: 6px; color: #d4b57e; }
+@media (max-width: 560px) {
+  .iam-policy-editor { padding: 14px; }
+  .iam-policy-editor .iam-tier-selector { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .iam-policy-editor .iam-tier-selector button { width: 100%; min-width: 0; }
+  .iam-policy-editor .iam-editor-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .iam-policy-editor .iam-editor-tabs button { min-width: 0; min-height: 46px; padding: 5px; font-size: 12px; }
+  .iam-policy-editor .iam-search-bar input, .iam-policy-editor .iam-search-bar select { flex: 1 1 100%; }
+  .iam-search-bar > svg { display: none; }
+  .settings-wizard-progress > li { flex-direction: column; text-align: center; padding: 6px 3px; gap: 5px; }
 }

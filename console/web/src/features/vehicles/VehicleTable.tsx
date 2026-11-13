@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { PermissionGate, useConsoleAccess } from "../../lib/consoleAccess";
 import { Boxes, ChevronDown, ChevronUp, Trash2, X } from "lucide-react";
 import type { VehicleModule, VehicleRow, VehicleSharedEntry } from "../../api/vehicles";
 import { DataTable, type SortDirection } from "../../components/common/DataTable";
@@ -212,6 +213,7 @@ export function VehicleTable({
   canEditPermissions = false, onPermissionsSaved, focusVehicleId, focusNonce, confirmAction,
   canDeleteVehicle = false, canDeleteStoredVehicle = false, storageSupported = false, onError, queuedDeleteVehicleIds, deletingId, cancelingDeleteId, onDeleteVehicle, onCancelQueuedDelete
 }: VehicleTableProps) {
+  const access = useConsoleAccess();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedTab, setExpandedTab] = useState<"components" | "permissions">("components");
   // The open contents overlay's vehicle, or null. Held here rather than in
@@ -313,7 +315,7 @@ export function VehicleTable({
       sortDirection={sortDirection}
       onSort={onSort}
       actionClassName="actions-column vehicles-actions-column"
-      action={canDeleteVehicle ? (row) => {
+      action={canDeleteVehicle && access.any(["vehicles:delete", "vehicles:mutate"]) ? (row) => {
         const vehicle = row as VehicleRow;
         const id = String(vehicle.id);
         const label = vehicle.name || `vehicle ${id}`;
@@ -323,15 +325,15 @@ export function VehicleTable({
         return queued
           ? <span className="vehicles-queued-delete" title="Delete queued — applies when this map next restarts or stops">
               <Trash2 size={16} aria-label={`Delete queued for ${label}`} />
-              <button
+              <PermissionGate action="vehicles:mutate"><button
                 className="icon-toggle-button vehicles-queued-delete-cancel"
                 title="Cancel Queued Delete"
                 aria-label={`Cancel queued delete for ${label}`}
                 disabled={cancelingDeleteId === id}
                 onClick={(event) => { event.stopPropagation(); onCancelQueuedDelete?.(vehicle); }}
-              ><X size={14} /></button>
+              ><X size={14} /></button></PermissionGate>
             </span>
-          : <button
+          : <PermissionGate allOf={storedDelete ? ["vehicles:delete", "vehicles:stored-delete"] : ["vehicles:delete"]}><button
               className="icon-toggle-button danger"
               title={blockedReason || (storedDelete ? "Delete Stored Vehicle" : "Delete Vehicle")}
               aria-label={blockedReason ? `Cannot delete ${label}: ${blockedReason}` : `Delete ${storedDelete ? "stored vehicle " : ""}${label}`}
@@ -340,7 +342,7 @@ export function VehicleTable({
               aria-disabled={blockedReason ? true : undefined}
               disabled={deletingId === id}
               onClick={(event) => { event.stopPropagation(); if (!blockedReason) onDeleteVehicle?.(vehicle); }}
-            ><Trash2 size={16} /></button>;
+            ><Trash2 size={16} /></button></PermissionGate>;
       } : undefined}
       secondaryActionPosition="start"
       secondaryActionLabel=""

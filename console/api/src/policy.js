@@ -636,7 +636,7 @@ export const DEFAULT_POLICIES = {
         "admin:transfer-settings:read", "admin:items:read",
         "admin:vehicles:read", "admin:skills:read",
         // Read-only visibility across the console
-        "logs:read",
+        "logs:read", "chat:read",
         "bases:read", "blueprints:read", "carepackage:read", "deepdesert:read", "exchange:read",
         "guilds:read", "landsraad:read", "sietches:read", "storage:read", "vehicles:read",
         "database:read", "database:query",   // query is read-only-enforced in the handler

@@ -85,19 +85,19 @@ Run Parts 1 and 2 in order — this is the path every upgrading operator takes. 
 1. Reload the sign-in page.
 
 **Expected**
-- Sign-in page looks the same: one password field, one Sign In button (plus
-  the secondary **Set up Discord sign-in** button if Discord is not yet
-  configured — unrelated to this feature).
+- Sign-in page looks the same: one password field and one Sign In button.
+  Discord setup is available to the owner under **Settings → Discord → Discord Sign-In**.
 
-### T04 · First sign-in lands on setup, not the console
-1. Enter the correct password. Sign In.
+### T04 · Settings starts enrollment in a popup
+1. Sign in normally. Open Settings → Account Security → Two-Factor Authentication.
+2. Enter the current password and click **Enable 2FA**.
 
 **Expected**
-- A setup screen appears instead of the console, with a QR code, the text
+- A popup appears over Settings, with a QR code, the text
   secret printed beneath it under *Can't scan? Enter this code manually:*,
-  a 6-digit code field, a **Confirm** button, and *Back to sign in*.
-- Nothing else in the console is reachable (try the browser Back button or
-  typing a console URL — you land back on setup or sign-in).
+  a 6-digit code field, a **Confirm** button, and **Cancel**.
+- Focus stays in the popup. Its temporary session permits enrollment only.
+- Cancel closes the popup and restores authenticated Settings without enabling 2FA.
 
 ### T05 · Real phone scan
 1. Scan the QR with the authenticator app on the phone.
@@ -127,17 +127,19 @@ Run Parts 1 and 2 in order — this is the path every upgrading operator takes. 
 **Expected**
 - Screen headed *Save your recovery codes* with **exactly 10** codes and the
   text that they are shown once.
-- An acknowledgement checkbox and a *Continue to sign in* button.
-2. Click *Continue to sign in* **without** ticking the box.
+- An acknowledgement checkbox and a **Done** button.
+2. Try **Done** **without** ticking the box.
 
 **Expected**
 - Nothing happens (button disabled or a prompt) — you cannot skip the acknowledgement.
 3. Record all 10 codes in your chosen place. Tick the box. Continue.
 
 **Expected**
-- Back at the sign-in page. Setup is not repeated.
+- Back at Settings, still signed in, with Two-Factor Authentication **On**.
+- Old password sessions are revoked; this browser receives a new authenticated session.
 
 ### T09 · The confirmation code cannot be reused to sign in
+Sign out before this test.
 1. Password + **the same code you just used to confirm**. Sign In.
 
 **Expected**
@@ -150,12 +152,12 @@ Run Parts 1 and 2 in order — this is the path every upgrading operator takes. 
 ### T10 · Abandoned setup restarts with a fresh QR
 *Host:* remove `runtime/generated/console-second-factor.json` (this is the
 break-glass reset, see T17) and `dune console restart`, so setup runs again.
-1. Password → setup screen. **Do not scan.** Click *Back to sign in*.
-2. Password again → setup screen.
+1. Start **Enable 2FA** from Settings. **Do not scan.** Click **Cancel**.
+2. Start **Enable 2FA** again with the current password.
 
 **Expected**
 - The QR / manual code is **different** from the first one (compare the manual code text).
-3. Scan the **new** one, confirm, save codes, sign in with password + next code.
+3. Scan the **new** one, confirm, save codes, and click **Done**.
 
 **Expected**
 - Signed in. The phone entry from step 1 (if you scanned it) does **not** work.
@@ -389,15 +391,15 @@ Discord identities with different role assignments, one account with Discord
 substitute for. Results below are still blank pending that pass.
 
 ### T26 · Guided setup, as an operator would
-*Host precondition:* the Discord application is in `.env` (`DISCORD_OAUTH_CLIENT_ID`, `DISCORD_OAUTH_CLIENT_SECRET` or the secret file, `DISCORD_OAUTH_REDIRECT_URI`), console restarted. (If it is not, the setup screen shows the `.env` keys to set and restart — there is **no** client-ID/secret form in the browser; worth a pass too.)
-1. On the sign-in page click **Set up Discord sign-in**.
+*Host precondition:* the Discord application is configured (`DISCORD_OAUTH_CLIENT_ID`, `DISCORD_OAUTH_CLIENT_SECRET` or the secret file, `DISCORD_OAUTH_REDIRECT_URI`), console restarted. If it is not configured, complete the application step in the Settings wizard before continuing to authorization.
+1. Sign in with the admin password.
 
 **Expected**
-- The password field remains, with *Enter the admin password above to set up Discord sign-in.* and a *cancel* link. Nothing goes to Discord yet.
-2. Enter the admin password.
+- Normal console opens without starting Discord setup. Nothing goes to Discord yet.
+2. Open **Settings → Discord → Discord Sign-In**.
 
 **Expected**
-- The setup screen with a single **Continue with Discord** button (no application step).
+- The embedded setup wizard shows **Continue with Discord** when the application is already configured.
 3. Click it.
 
 **Expected**
@@ -444,10 +446,10 @@ substitute for. Results below are still blank pending that pass.
 
 **Expected**
 - Owner: Settings visible; `/api/auth/me` says `tier: owner`. This holds even if your account also has the admin role.
-3. Settings → Discord OAuth.
+3. Settings → Discord → Discord Sign-In.
 
 **Expected**
-- **Corrected (#643/#676):** the manual Client ID/Redirect URI/Client Secret/Discord Server ID form described here no longer exists — Settings embeds the same guided wizard the sign-in page uses. Since Discord OAuth is already fully active and this browser session hasn't itself done the setup OAuth round-trip, the section shows a calm **"Discord Sign-In" (active)** summary ("Discord sign-in is connected and active for this server…") rather than a form, with **"Change application credentials"** and a link to re-authenticate for updating server/role mapping. No owner field anywhere, in the wizard's map step or here — ownership is never editable.
+- **Corrected (#643/#676):** the manual Client ID/Redirect URI/Client Secret/Discord Server ID form described here no longer exists — Settings embeds the guided setup wizard. Since Discord OAuth is already fully active and this browser session hasn't itself done the setup OAuth round-trip, the section shows a calm **"Discord Sign-In" (active)** summary ("Discord sign-in is connected and active for this server…") rather than a form, with **"Change application credentials"** and a link to re-authenticate for updating server/role mapping. No owner field anywhere, in the wizard's map step or here — ownership is never editable.
 
 ### T30 · Demotion takes effect at next sign-in
 1. While A is signed in, remove A's Admin role in Discord. A keeps clicking around.
@@ -467,7 +469,7 @@ substitute for. Results below are still blank pending that pass.
 **Expected**: admitted as Admin.
 
 ### T32 · Server chosen, no roles mapped
-1. Settings → Discord OAuth: clear all three role fields, save, restart. Account A (admin role) signs in with Discord.
+1. Settings → Discord → Discord Sign-In: clear all three role fields, save, restart. Account A (admin role) signs in with Discord.
 
 **Expected**
 - Refused: *…not authorized to sign in…* (no mapped role). The server owner still signs in as Owner. Restore the mapping afterwards.
@@ -485,7 +487,7 @@ substitute for. Results below are still blank pending that pass.
 - Discord shows the authorization screen again (one extra permission: roles in a server). After Authorize, sign-in proceeds. Existing owner list / bootstrap behaviour unchanged.
 
 ### T35 · Separation of duties — one role, one tier
-1. Settings → Discord OAuth: put the **same** role ID in *Admin Role* and *Moderator Role*.
+1. Settings → Discord → Discord Sign-In: put the **same** role ID in *Admin Role* and *Moderator Role*.
 
 **Expected**
 - An inline message: *Each Discord role can map to only one access level — role <id> is mapped to admin and moderator. Owner is never a role…*; **Save Discord OAuth** is disabled.
@@ -506,11 +508,11 @@ substitute for. Results below are still blank pending that pass.
 Needs: an install with Discord OAuth already fully configured and active (T26 done). All four cases below were run live against a real dev deployment (not a mocked/local run) — see Results for the exact evidence.
 
 ### T37 · Disable, verify the cutoff, re-enable
-1. Settings → Discord OAuth (active) → **Disable Discord Sign-In**, enter the admin password, confirm.
+1. Settings → Discord → Discord Sign-In (active) → **Disable Discord Sign-In**, enter the admin password, confirm.
 
 **Expected**
-- The console restarts (own progress state shown: "Disabling…" then "Restarting the console…"). After it reconnects, the sign-in page shows the password field only, with a secondary **Set up Discord sign-in** link — not **Sign in with Discord**. `/api/auth/state` reports `discordOAuthConfigured: false, discordOAuthDisabled: true`.
-2. Sign in with the admin password. Settings → Discord OAuth.
+- The console restarts (own progress state shown: "Disabling…" then "Restarting the console…"). After it reconnects, the sign-in page shows the password field and Sign In button, without Discord sign-in or setup actions. `/api/auth/state` reports `discordOAuthConfigured: false, discordOAuthDisabled: true`.
+2. Sign in with the admin password. Settings → Discord → Discord Sign-In.
 
 **Expected**
 - A compact **"Discord Sign-In (disabled)"** banner: *"Your Discord application's settings are kept, not deleted — re-enable any time."*, a **Re-enable Discord Sign-In** button, and a secondary **"Forget this configuration entirely"** link (collapsed).
@@ -531,13 +533,13 @@ Requires the password tier's own TOTP (`CONSOLE_TOTP_ENABLED=1`) enrolled for th
 - A 409 warning inline: *"Disabling this will leave your console with no two-factor authentication anywhere — Discord sign-in doesn't require Discord's own two-factor for your role."*, with a pointer back to the Discord OAuth section's MFA-requirement toggle, and a **"Disable anyway"** button that proceeds only on a second, explicit click.
 
 ### T39 · Forget: the destructive path
-1. Settings → Discord OAuth (active or disabled) → **"Forget this configuration entirely"** → type `forget` to confirm, enter the admin password (+ authenticator code if TOTP is enrolled).
+1. Settings → Discord → Discord Sign-In (active or disabled) → **"Forget this configuration entirely"** → type `forget` to confirm, enter the admin password (+ authenticator code if TOTP is enrolled).
 
 **Expected**
-- The confirm button stays disabled until `forget` is typed exactly. After confirming: the console restarts; afterward the sign-in page shows password-only with **Set up Discord sign-in**, exactly as if Discord OAuth had never been configured — the Client Secret file is gone from disk and every Discord OAuth `.env` field is cleared (guild ID, role mappings, MFA requirement). Re-running T26 from scratch is the only way back.
+- The confirm button stays disabled until `forget` is typed exactly. After confirming: the console restarts; afterward the sign-in page shows password-only, exactly as if Discord OAuth had never been configured — the Client Secret file is gone from disk and every Discord OAuth `.env` field is cleared (guild ID, role mappings, MFA requirement). Re-running T26 from Settings is the way to configure it again.
 
 ### T40 · Already-active summary, wrong session
-1. As an admin who signed in with the console **password** (never did the wizard's own OAuth round-trip this session), open Settings → Discord OAuth on an install where Discord sign-in is already fully configured and active.
+1. As an admin who signed in with the console **password** (never did the wizard's own OAuth round-trip this session), open Settings → Discord → Discord Sign-In on an install where Discord sign-in is already fully configured and active.
 
 **Expected**
 - **Fixed as a direct result of this UAT pass (was a real bug before this fix):** the section shows the calm **"Discord Sign-In" (active)** summary, never **"Set up Discord sign-in"** / a big **"Continue with Discord"** primary button — that combination previously read as broken or unconfigured for an integration that was demonstrably working. A **"Sign in with Discord to update server or role mapping"** link and **"Change application credentials"** remain available for reconfiguration.

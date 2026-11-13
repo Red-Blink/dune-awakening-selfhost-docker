@@ -538,7 +538,7 @@ test("setPolicies still saves a non-owner tier whose Deny keeps every crown-jewe
       // guard refuses any save naming a removed action outright (a separate,
       // earlier check than this one), so a Deny using the removed alias
       // would never reach the crown-jewel check this test exercises.
-      { Effect: "Deny", Action: ["settings:*", "players:give-item", "players:grant", "players:reset", "players:delete-item", "players:edit-item", "players:repair", "players:recover", "players:unclassified", "database:mutate", "database:execute", "database:export", "database:write-config", "server:write-credentials", "admin:transfer-settings:write", "updates:apply", "updates:fix", "updates:repair", "backups:download-system", "backups:import-system", "backups:restore-system", "backups:restore", "backups:import", "backups:delete", "addons:install", "addons:update", "setup:write", "carepackage:grant", "carepackage:write-config", "exchange:market-write"] },
+      { Effect: "Deny", Action: ["settings:*", "players:give-item", "players:grant", "players:reset", "players:delete-item", "players:edit-item", "players:repair", "players:recover", "players:unclassified", "database:mutate", "database:execute", "database:export", "database:write-config", "server:write-credentials", "admin:transfer-settings:write", "updates:apply", "updates:fix", "updates:repair", "backups:download-system", "backups:import-system", "backups:restore-system", "backups:set-system-passphrase", "backups:restore", "backups:import", "backups:delete", "addons:install", "addons:update", "setup:write", "carepackage:grant", "carepackage:write-config", "exchange:market-write"] },
     ] },
   };
   assert.equal(setPolicies(docs).ok, true);
