@@ -194,6 +194,7 @@ jobs:
           runtime/tests/test-game-epic-config-permissions.sh
           tests/fls-signals-test.sh
           tests/steamcmd-signals-test.sh
+          python3 tests/update-check-retry-test.py
           tests/storage-cleanup-test.sh
           tests/fake-k8s-serviceaccount-cleanup-test.sh
           tests/runtime-permission-helper-rebuild-test.sh
