@@ -5631,7 +5631,7 @@
     "Access": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 401,
+        "line": 427,
         "nearby": [
           "Choose what each access level can do. Assign people to these levels using Discord roles.",
           "Policy tier",
@@ -5663,7 +5663,7 @@
       },
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 393,
+        "line": 419,
         "nearby": [
           "Retry",
           "Loading policies",
@@ -5675,7 +5675,7 @@
     "access.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 511,
+        "line": 537,
         "nearby": [
           "Check Again",
           "Changes apply to everyone with",
@@ -6934,7 +6934,7 @@
     "Advanced JSON": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 405,
+        "line": 431,
         "nearby": [
           "Policy editor view",
           "Permissions",
@@ -6946,7 +6946,7 @@
     "Advanced JSON contains invalid JSON. Correct it before changing permissions.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 427,
+        "line": 453,
         "nearby": [
           "Clear search",
           "Show Technical Names",
@@ -7129,7 +7129,7 @@
     "All Categories": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 421,
+        "line": 447,
         "nearby": [
           "Search permissions...",
           "Permission Category",
@@ -7411,7 +7411,7 @@
     "Allowed": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 401,
+        "line": 427,
         "nearby": [
           "Permission",
           "Permissions",
@@ -7420,7 +7420,7 @@
       },
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 438,
+        "line": 464,
         "nearby": [
           "Advanced JSON contains invalid JSON. Correct it before changing permissions.",
           "No permissions match your search.",
@@ -7429,7 +7429,7 @@
       },
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 492,
+        "line": 518,
         "nearby": [
           "Check Permissions",
           "Denied",
@@ -7560,7 +7560,7 @@
     "Alters the running code to repair a failed update.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 80,
+        "line": 90,
         "nearby": [
           "Character/server-transfer policy (identity + economy impact).",
           "Deploys new code to the running server.",
@@ -7569,7 +7569,7 @@
       },
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 81,
+        "line": 91,
         "nearby": [
           "Deploys new code to the running server.",
           "Overwrites the live database from a backup (irreversible).",
@@ -12156,7 +12156,7 @@
     "Changes apply to everyone with": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 511,
+        "line": 537,
         "nearby": [
           "Denied",
           "Check Again",
@@ -12180,7 +12180,7 @@
     "Changes care package economy configuration.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 88,
+        "line": 98,
         "nearby": [
           "First-run provisioning of the console itself.",
           "Creates an in-game care package and its contents.",
@@ -12397,7 +12397,7 @@
     "Character/server-transfer policy (identity + economy impact).": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 78,
+        "line": 88,
         "nearby": [
           "Direct edits to database tables.",
           "Downloads the full database, including sensitive server and player data.",
@@ -12536,7 +12536,7 @@
     "Check Again": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 503,
+        "line": 529,
         "nearby": [
           "Allowed",
           "Denied",
@@ -12660,7 +12660,7 @@
     "Check Permissions": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 487,
+        "line": 513,
         "nearby": [
           "No permissions match your search.",
           "Allowed",
@@ -13337,7 +13337,7 @@
     "Choose what each access level can do. Assign people to these levels using Discord roles.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 393,
+        "line": 419,
         "nearby": [
           "Loading policies",
           "Access Control",
@@ -13766,7 +13766,7 @@
     "Clear search": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 423,
+        "line": 449,
         "nearby": [
           "Permission Category",
           "All Categories",
@@ -15305,7 +15305,7 @@
     "Console access rules, the admin password, the Console port, and 2FA recovery codes.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 73,
+        "line": 83,
         "nearby": [
           "Repairs gear, decayed vehicles, a stuck login queue, or refills water/fuel.",
           "Restores or rewrites a player character.",
@@ -16153,7 +16153,7 @@
     "Could Not Load Access Rules": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 267,
+        "line": 277,
         "nearby": [
           "Reference vehicle-type catalog used by Character Admin. Use \"Vehicles: Read\" for vehicles in the game world.",
           "Reference skill-module catalog used by Character Admin's skill editor.",
@@ -16519,7 +16519,7 @@
     "Creates an in-game care package and its contents.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 87,
+        "line": 97,
         "nearby": [
           "Updates third-party code running in the console process.",
           "First-run provisioning of the console itself.",
@@ -18639,7 +18639,7 @@
     "Denied": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 493,
+        "line": 519,
         "nearby": [
           "Check Permissions",
           "Allowed",
@@ -18819,7 +18819,7 @@
     "Deploys new code to the running server.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 79,
+        "line": 89,
         "nearby": [
           "Downloads the full database, including sensitive server and player data.",
           "Character/server-transfer policy (identity + economy impact).",
@@ -18875,7 +18875,7 @@
     "Destroys a player's progression (full reset, journey, keystones). The player cannot undo this.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 68,
+        "line": 78,
         "nearby": [
           "Gives items, vehicles, or augments into the world (economy-inflation risk).",
           "Grants currency, XP, reputation, unlocks, or skill points. Changes progression without gameplay.",
@@ -18887,7 +18887,7 @@
     "Destroys one row of a player's inventory.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 69,
+        "line": 79,
         "nearby": [
           "Grants currency, XP, reputation, unlocks, or skill points. Changes progression without gameplay.",
           "Destroys a player's progression (full reset, journey, keystones). The player cannot undo this.",
@@ -19076,7 +19076,7 @@
     "Direct edits to database tables.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 76,
+        "line": 86,
         "nearby": [
           "The Funcom game-server token and the server's public IP.",
           "The database password.",
@@ -20685,7 +20685,7 @@
     "Downloads the full database, including sensitive server and player data.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 77,
+        "line": 87,
         "nearby": [
           "The database password.",
           "Direct edits to database tables.",
@@ -21311,7 +21311,7 @@
     "Edits one row of a player's inventory in place.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 70,
+        "line": 80,
         "nearby": [
           "Destroys a player's progression (full reset, journey, keystones). The player cannot undo this.",
           "Destroys one row of a player's inventory.",
@@ -24054,7 +24054,7 @@
     "First-run provisioning of the console itself.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 86,
+        "line": 96,
         "nearby": [
           "Installs third-party code into the console process.",
           "Updates third-party code running in the console process.",
@@ -25477,7 +25477,7 @@
     "Gives items, vehicles, or augments into the world (economy-inflation risk).": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 66,
+        "line": 76,
         "nearby": [
           "Help players and moderate the community without changing server configuration.",
           "Give community members limited access to the Console.",
@@ -26064,7 +26064,7 @@
     "Grants currency, XP, reputation, unlocks, or skill points. Changes progression without gameplay.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 67,
+        "line": 77,
         "nearby": [
           "Give community members limited access to the Console.",
           "Gives items, vehicles, or augments into the world (economy-inflation risk).",
@@ -27816,7 +27816,7 @@
     "Installs third-party code into the console process.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 84,
+        "line": 94,
         "nearby": [
           "Overwrites the live database from a backup (irreversible).",
           "Loads an untrusted backup file into the live database.",
@@ -30495,7 +30495,7 @@
     "Loading policies": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 268,
+        "line": 278,
         "nearby": [
           "Could Not Load Access Rules",
           "Retry",
@@ -30952,7 +30952,7 @@
     "Loads an untrusted backup file into the live database.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 83,
+        "line": 93,
         "nearby": [
           "Alters the running code to repair a failed update.",
           "Overwrites the live database from a backup (irreversible).",
@@ -34398,7 +34398,7 @@
     "No permissions match your search.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 431,
+        "line": 457,
         "nearby": [
           "Show Technical Names",
           "Advanced JSON contains invalid JSON. Correct it before changing permissions.",
@@ -36745,7 +36745,7 @@
     "Overwrites the live database from a backup (irreversible).": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 82,
+        "line": 92,
         "nearby": [
           "Alters the running code to repair a failed update.",
           "Loads an untrusted backup file into the live database.",
@@ -37925,7 +37925,7 @@
     "Permission": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 401,
+        "line": 427,
         "nearby": [
           "Policy tier",
           "Access",
@@ -37942,7 +37942,7 @@
     "Permission Category": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 421,
+        "line": 447,
         "nearby": [
           "Search permissions",
           "Search permissions...",
@@ -37964,7 +37964,7 @@
     "Permissions": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 401,
+        "line": 427,
         "nearby": [
           "Access",
           "Permission",
@@ -37974,7 +37974,7 @@
       },
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 404,
+        "line": 430,
         "nearby": [
           "Allowed",
           "Policy editor view",
@@ -38798,7 +38798,7 @@
     "Policy editor view": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 403,
+        "line": 429,
         "nearby": [
           "Permissions",
           "Allowed",
@@ -38809,7 +38809,7 @@
     "Policy tier": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 394,
+        "line": 420,
         "nearby": [
           "Access Control",
           "Choose what each access level can do. Assign people to these levels using Discord roles.",
@@ -39250,7 +39250,7 @@
     "Preview": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 406,
+        "line": 432,
         "nearby": [
           "Permissions",
           "Advanced JSON",
@@ -41341,7 +41341,7 @@
     "Reference item-type catalog used by Character Admin's give-item tool. This does not show live inventory.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 91,
+        "line": 101,
         "nearby": [
           "Seeds or alters the player-market economy.",
           "Reference vehicle-type catalog used by Character Admin. Use \"Vehicles: Read\" for vehicles in the game world.",
@@ -41352,7 +41352,7 @@
     "Reference skill-module catalog used by Character Admin's skill editor.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 93,
+        "line": 103,
         "nearby": [
           "Reference item-type catalog used by Character Admin's give-item tool. This does not show live inventory.",
           "Reference vehicle-type catalog used by Character Admin. Use \"Vehicles: Read\" for vehicles in the game world.",
@@ -41364,7 +41364,7 @@
     "Reference vehicle-type catalog used by Character Admin. Use \"Vehicles: Read\" for vehicles in the game world.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 92,
+        "line": 102,
         "nearby": [
           "Seeds or alters the player-market economy.",
           "Reference item-type catalog used by Character Admin's give-item tool. This does not show live inventory.",
@@ -43013,7 +43013,7 @@
     "Repairs gear, decayed vehicles, a stuck login queue, or refills water/fuel.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 71,
+        "line": 81,
         "nearby": [
           "Destroys one row of a player's inventory.",
           "Edits one row of a player's inventory in place.",
@@ -44814,7 +44814,7 @@
     "Restores or rewrites a player character.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 72,
+        "line": 82,
         "nearby": [
           "Edits one row of a player's inventory in place.",
           "Repairs gear, decayed vehicles, a stuck login queue, or refills water/fuel.",
@@ -45035,7 +45035,7 @@
     "Retry": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 267,
+        "line": 277,
         "nearby": [
           "Reference skill-module catalog used by Character Admin's skill editor.",
           "Could Not Load Access Rules",
@@ -46806,7 +46806,7 @@
     "Saved": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 514,
+        "line": 540,
         "nearby": [
           "access.",
           "Saving..."
@@ -47228,7 +47228,7 @@
     "Saving...": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 514,
+        "line": 540,
         "nearby": [
           "Changes apply to everyone with",
           "access.",
@@ -48101,7 +48101,7 @@
     "Search permissions": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 416,
+        "line": 442,
         "nearby": [
           "Advanced JSON",
           "Preview",
@@ -48123,7 +48123,7 @@
     "Search permissions...": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 417,
+        "line": 443,
         "nearby": [
           "Preview",
           "Search permissions",
@@ -48362,7 +48362,7 @@
     "Seeds or alters the player-market economy.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 89,
+        "line": 99,
         "nearby": [
           "Creates an in-game care package and its contents.",
           "Changes care package economy configuration.",
@@ -48371,7 +48371,7 @@
       },
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 90,
+        "line": 100,
         "nearby": [
           "Changes care package economy configuration.",
           "Reference item-type catalog used by Character Admin's give-item tool. This does not show live inventory.",
@@ -50008,7 +50008,7 @@
     "Show Technical Names": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 426,
+        "line": 452,
         "nearby": [
           "All Categories",
           "Clear search",
@@ -53675,7 +53675,7 @@
     "The database password.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 75,
+        "line": 85,
         "nearby": [
           "Console access rules, the admin password, the Console port, and 2FA recovery codes.",
           "The Funcom game-server token and the server's public IP.",
@@ -53759,7 +53759,7 @@
     "The Funcom game-server token and the server's public IP.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 74,
+        "line": 84,
         "nearby": [
           "Restores or rewrites a player character.",
           "Console access rules, the admin password, the Console port, and 2FA recovery codes.",
@@ -57347,7 +57347,7 @@
     "Updates third-party code running in the console process.": [
       {
         "file": "console/web/src/features/settings/IamPolicyEditor.tsx",
-        "line": 85,
+        "line": 95,
         "nearby": [
           "Loads an untrusted backup file into the live database.",
           "Installs third-party code into the console process.",
