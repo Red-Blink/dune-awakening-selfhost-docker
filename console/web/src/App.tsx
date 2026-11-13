@@ -17,6 +17,7 @@ import { SetupWizard } from "./components/SetupWizard";
 import { TaskProgress } from "./components/TaskProgress";
 import { ConfirmDialog, type ConfirmDialogDetail, type ConfirmDialogOutcome, type ConfirmDialogRequest } from "./components/common/ConfirmDialog";
 import { LazyTabBoundary } from "./components/common/LazyTabBoundary";
+import { ThemeLauncher } from "./themes/ThemeLauncher";
 import type { RestartGateChoice } from "./features/server/restartQueueGuard";
 import { loadPinnedAddons, savePinnedAddons, type PinnedAddon } from "./features/addons/pinnedAddons";
 import { hasAddonUpdates } from "./features/addons/addonVersions";
@@ -47,7 +48,7 @@ import { ConsoleLanguageObserver } from "./features/language/ConsoleLanguageObse
 // The array is the source of truth (not just a type-level union) so restoring
 // a persisted tab (see loadPersistedTab below) can validate against the real,
 // current list at runtime instead of a hand-duplicated copy that could drift.
-export const ALL_TABS = ["Home", "Server Control", "Services", "Players", "Guilds", "Bases", "Vehicles", "Exchange", "Landsraad", "Admin Tools", "Live Map", "Maps", "Care Package", "Addons", "Language", "Database", "Storage", "Backups", "Logs", "Updates", "Settings", "Access Control"] as const;
+export const ALL_TABS = ["Home", "Server Control", "Services", "Players", "Guilds", "Bases", "Vehicles", "Exchange", "Landsraad", "Admin Tools", "Live Map", "Maps", "Care Package", "Addons", "Language", "Database", "Storage", "Backups", "Logs", "Chat", "Updates", "Settings", "Access Control"] as const;
 // Exported so a panel routing to another tab types its destination against the
 // real list rather than `string`. Type-only, so a panel importing it back does
 // not create a runtime cycle.
@@ -113,6 +114,7 @@ const CarePackagePanel = lazy(() => import("./features/carePackage/CarePackagePa
 const DatabasePanel = lazy(() => import("./features/database/DatabasePanel").then((module) => ({ default: module.DatabasePanel })));
 const GuildsPanel = lazy(() => import("./features/guilds/GuildsPanel").then((module) => ({ default: module.GuildsPanel })));
 const LogsPanel = lazy(() => import("./features/logs/LogsPanel").then((module) => ({ default: module.LogsPanel })));
+const ChatPanel = lazy(() => import("./features/chat/ChatPanel").then((module) => ({ default: module.ChatPanel })));
 const LiveMapPanel = lazy(() => import("./features/liveMap/LiveMapPanel").then((module) => ({ default: module.LiveMapPanel })));
 const LandsraadPanel = lazy(() => import("./features/landsraad/LandsraadPanel").then((module) => ({ default: module.LandsraadPanel })));
 const MapsPanel = lazy(() => import("./features/maps/MapsPanel").then((module) => ({ default: module.MapsPanel })));
@@ -344,6 +346,7 @@ const navGroups: { title: string; items: { tab: Tab; icon: React.ReactNode }[] }
       { tab: "Database", icon: <Database size={18} /> },
       { tab: "Updates", icon: <RefreshCw size={18} /> },
       { tab: "Logs", icon: <FileText size={18} /> },
+      { tab: "Chat", icon: <MessageCircle size={18} /> },
       { tab: "Settings", icon: <Settings size={18} /> },
       { tab: "Access Control", icon: <Shield size={18} /> }
     ]
@@ -473,6 +476,8 @@ export function App() {
   const [recoveryAvailable, setRecoveryAvailable] = useState(false);
   const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const [setupMode, setSetupMode] = useState<"enroll" | "resetup" | null>(null);
+  const [settingsTotpOpen, setSettingsTotpOpen] = useState(false);
+  const [credentialRevision, setCredentialRevision] = useState(0);
   // Tier 1 (Discord sign-in). Available only when the server reports the
   // OAuth application is fully configured; the button is otherwise absent.
   const [discordSignInAvailable, setDiscordSignInAvailable] = useState(false);
@@ -660,6 +665,7 @@ export function App() {
       setUseRecoveryCode(false);
       setRecoveryAvailable(false);
       setSetupMode(null);
+      setSettingsTotpOpen(false);
     };
     window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
     return () => window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
@@ -1314,6 +1320,7 @@ export function App() {
                 closeMobileNav();
               }}
             ><Globe size={19} aria-hidden="true" /></button>
+            <ThemeLauncher onOpen={closeMobileNav} />
             <a className="community-button discord" href={REDBLINK_DISCORD_URL} target="_blank" rel="noreferrer" title="Join Discord"><span>Join Discord</span><DiscordLogo size={19} /></a>
             <a className="community-button support" href={REDBLINK_KOFI_URL} target="_blank" rel="noreferrer" title="Support Project"><span>Support Project</span><KofiLogo size={19} /></a>
           </div>
@@ -1367,6 +1374,7 @@ export function App() {
             isTerminalTask={isTerminalTask}
           /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Logs" && <LazyTabBoundary label="Loading Logs"><LogsPanel selectedService={selectedLogService} setSelectedService={setSelectedLogService} text={logs} setText={setLogs} onError={setError} /></LazyTabBoundary>}
+        {!redeploySetupOpen && tab === "Chat" && <LazyTabBoundary label="Loading Chat"><ChatPanel onError={setError} /></LazyTabBoundary>}
         {!redeploySetupOpen && tab === "Updates" && <LazyTabBoundary label="Loading Updates"><UpdatesPanel
             installGameFilesRequest={installGameFilesRequest}
             onInstallGameFilesHandled={() => setInstallGameFilesRequest(0)}
@@ -1386,7 +1394,8 @@ export function App() {
           onPasswordChanged={logoutAfterPasswordChange}
           publicListingUrl={publicDirectoryStatus?.serverId ? publicServerListingUrl(publicDirectoryStatus.serverId) : undefined}
           confirmAction={confirmDialog}
-          onTotpEnrollmentStarted={() => setSetupMode("enroll")}
+          onTotpEnrollmentStarted={() => setSettingsTotpOpen(true)}
+          credentialRevision={credentialRevision}
           autoOpenDiscordSetup={autoOpenDiscordSetup}
           onDiscordSetupAutoOpened={() => setAutoOpenDiscordSetup(false)}
           autoOpenTwoFactor={autoOpenTwoFactorSetting}
@@ -1396,6 +1405,15 @@ export function App() {
         <AppFooter />
       </main>
       <ConfirmDialog request={confirmRequest} onClose={closeConfirmDialog} />
+      {settingsTotpOpen && <TotpSetupScreen mode="enroll" presentation="dialog" onComplete={continued => {
+        setSettingsTotpOpen(false);
+        if (continued) setCredentialRevision(value => value + 1);
+        else afterTotpSetup();
+      }} onCancel={continued => {
+        setSettingsTotpOpen(false);
+        if (continued) setCredentialRevision(value => value + 1);
+        else afterTotpSetup();
+      }} />}
     </div>
   );
 }

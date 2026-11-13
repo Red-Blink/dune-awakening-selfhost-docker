@@ -116,7 +116,7 @@ export function createAuth(config) {
         // Enrollment / resetup sessions (scope set) are short-lived, non-renewable and
         // memory-only: restoring one after a restart without its scope would hand back
         // a full session, so they are never written to the store.
-        if (session.scope) continue;
+        if (session.scope || session.renewable === false) continue;
         active.push({
           id: session.id,
           csrf: session.csrf,

@@ -62,6 +62,7 @@ import { createConsoleAccess } from "./services/consoleAccess.js";
 import { parseMemorySwapStatus } from "./services/memorySwap.js";
 import { createDeathPoller } from "./deathPoller.js";
 import { createCombatHistory, combatScope } from "./services/combatHistory.js";
+import { createChatHistory } from "./services/chatHistory.js";
 import { createCombatAvailability } from "./services/combatAvailability.js";
 import { updateEnvFileValue as updateEnvValue, updateEnvFileValues as updateEnvValues } from "./services/envFile.js";
 import { funcomAuthMismatchDetected, matchingFuncomAuthLines, saveFuncomTokenValue as writeFuncomToken, validDockerSince } from "./services/funcomAuth.js";
@@ -223,6 +224,7 @@ const SETUP_SCOPES = new Set(["enroll", "resetup"]);
 const ENROLL_ALLOWED = new Set([
   "/api/auth/2fa/setup",
   "/api/auth/2fa/confirm",
+  "/api/auth/2fa/cancel",
   "/api/auth/logout",
   "/api/auth/me",
 ]);
@@ -560,6 +562,7 @@ const journeyTagsData = loadJourneyTagsData();
 const memoryBalancer = createMemoryBalancer(config);
 const deathPoller = createDeathPoller(config);
 const combatHistory = createCombatHistory(db, { mockMode: config.mockMode });
+const chatHistory = createChatHistory(config);
 const combatAvailability = createCombatAvailability(config, db);
 const POSTGRES_UNAVAILABLE_MESSAGE = "Postgres is not running or is restarting. Wait for the database service to come back online, then refresh.";
 const DEFAULT_ALWAYS_ON_STARTUP_PARALLELISM = 1;
@@ -673,6 +676,7 @@ createServer(async (req, res) => {
 
 runBackgroundTick("Combat history", () => combatHistory.tick());
 setInterval(() => { void combatHistory.tick(); }, 30_000).unref?.();
+setInterval(() => { void chatHistory.tick(); }, 5000).unref?.();
 
 // Reconcile periodically because a Funcom database migration can recreate the
 // fulfilled-orders table and thereby remove third-party triggers. The service
@@ -1214,6 +1218,24 @@ async function handleApi(req, res) {
     audit(config, sanitizedUrl(req, "/api/auth/2fa/setup"), "auth.2fa.setup", { ok: true });
     return json(res, 200, { secret: base32, otpauthUri, qrCodeDataUri }, { "cache-control": "no-cache, no-store, must-revalidate", pragma: "no-cache", expires: "0" });
   }
+  if (path === "/api/auth/2fa/cancel" && req.method === "POST") {
+    const session = requireEnrollmentSession(req, res);
+    if (!session) return;
+    const parent = session.enrollmentParentId && auth.readSessionById(session.enrollmentParentId);
+    session.confirmingTotp = true;
+    let configured;
+    try { configured = await secondFactor.isConfigured(); }
+    finally { session.confirmingTotp = false; }
+    if (!parent || configured || !auth.readSessionById(session.id) || !auth.readSessionById(parent.id)) {
+      return json(res, 409, { error: "Two-factor setup changed. Sign in again to continue." });
+    }
+    auth.invalidateSession(session.id);
+    auth.invalidateSession(parent.id);
+    const resumed = auth.makeSession(parent);
+    setSessionCookie(res, resumed, config);
+    audit(config, req, "auth.2fa.cancel", { ok: true });
+    return json(res, 200, { authenticated: true, csrfToken: resumed.csrf }, { "cache-control": "no-store" });
+  }
   if (path === "/api/auth/2fa/confirm" && req.method === "POST") {
     const session = requireEnrollmentSession(req, res);
     if (!session) return;
@@ -1233,6 +1255,7 @@ async function handleApi(req, res) {
       return json(res, 429, { error: "Too many attempts. Wait a few minutes, then try again." }, { "retry-after": String(confirmRate.retryAfterSeconds) });
     }
     const body = (await readJson(req)) || {}; // guard: readJson returns null for a literal `null` body
+    if (!requireEnrollmentSession(req, res)) return;
     const code = String(body.code || "").trim();
     const confirmMatch = verifyTotpMatch(session.pendingTotpSecret, code, nowSeconds());
     if (!confirmMatch.valid) {
@@ -1251,11 +1274,13 @@ async function handleApi(req, res) {
     // seed makes the store reject it as a replay (UI copy: wait for the next
     // code).
     let result;
+    session.confirmingTotp = true;
     try {
       result = isResetup
         ? await secondFactor.commit(session.pendingTotpSecret, { initialCounter: confirmMatch.counter, expectedFactorVersion: session.expectedFactorVersion })
         : await secondFactor.enroll(session.pendingTotpSecret, { initialCounter: confirmMatch.counter });
     } catch (err) {
+      session.confirmingTotp = false;
       // A corrupt or newer-than-supported store surfacing here must fail closed
       // (never "healed" by overwriting), exactly as the login path does -- not
       // fall through to a generic 500. commit() re-throws these now; enroll()
@@ -1286,8 +1311,9 @@ async function handleApi(req, res) {
         : "Two-factor was already set up on this console. Sign in again with your authenticator.";
       return json(res, 409, { error: message });
     }
-    // Succeeded: show the recovery codes ONCE, end the setup session, and require
-    // a fresh password+TOTP login.
+    // Show recovery codes once and revoke sessions predating the new factor.
+    // Settings enrollment rotates its freshly proven owner into a new session;
+    // recovery re-setup still requires a fresh password+TOTP login.
     //
     // Every OTHER standing password/TOTP session is revoked here too (review
     // finding, upstream PR #201, 2026-09-08): a session created under the OLD
@@ -1302,9 +1328,19 @@ async function handleApi(req, res) {
     // reached only through an enroll/resetup-scope session, which
     // invalidateSession() below already ends), there is no "acting session"
     // to except.
+    // Only Settings enrollment has a fresh-password-proven owner to resume.
+    // Recovery setup keeps its existing requirement for a fresh login.
+    const parent = session.enrollmentParentId && auth.readSessionById(session.enrollmentParentId);
     const sessionsRevoked = auth.invalidatePasswordSessions();
     auth.invalidateSession(session.id);
-    clearSessionCookie(res, config);
+    let resumed;
+    if (parent) {
+      auth.invalidateSession(parent.id);
+      resumed = auth.makeSession(parent);
+      setSessionCookie(res, resumed, config);
+    } else {
+      clearSessionCookie(res, config);
+    }
     if (isResetup) {
       // Any OTHER outstanding recovery session is now definitely stale -- its
       // own confirm would be caught by commit()'s expectedFactorVersion check
@@ -1316,7 +1352,7 @@ async function handleApi(req, res) {
     audit(config, sanitizedUrl(req, "/api/auth/2fa/confirm"), "auth.2fa.confirm", { ok: true, resetup: isResetup });
     audit(config, sanitizedUrl(req, "/api/auth/2fa/confirm"), "auth.2fa-confirmed.sessions-revoked", { resetup: isResetup, count: sessionsRevoked });
     audit(config, sanitizedUrl(req, "/api/auth/2fa/confirm"), isResetup ? "settings.totp-regenerated" : "settings.totp-setup", { ok: true });
-    return json(res, 200, { [isResetup ? "reconfigured" : "enrolled"]: true, recoveryCodes: result.codes }, { "cache-control": "no-cache, no-store, must-revalidate", pragma: "no-cache", expires: "0" });
+    return json(res, 200, { [isResetup ? "reconfigured" : "enrolled"]: true, recoveryCodes: result.codes, ...(resumed ? { authenticated: true, csrfToken: resumed.csrf } : {}) }, { "cache-control": "no-cache, no-store, must-revalidate", pragma: "no-cache", expires: "0" });
   }
   // Authenticated second-factor state for the settings UI. The client needs
   // this BEFORE it submits a credential action -- inferring enrollment
@@ -1859,6 +1895,20 @@ async function handleApi(req, res) {
     });
   }
 
+  if (path === "/api/chat/history" && req.method === "GET") {
+    return json(res, 200, { ...chatHistory.read(Object.fromEntries(url.searchParams)),
+      canConfigure: evaluate(session, "chat:configure") && (!bearer || apiKeys.allows(bearer.key, "chat:configure")) });
+  }
+  if (path === "/api/chat/settings" && req.method === "POST") {
+    const result = await chatHistory.save(await readJson(req));
+    audit(config, req, "chat.settings", result.settings);
+    return json(res, 200, result);
+  }
+  if (path === "/api/chat/history" && req.method === "DELETE") {
+    const result = await chatHistory.clear();
+    audit(config, req, "chat.history-cleared");
+    return json(res, 200, result);
+  }
   if (path === "/api/players/combat" && req.method === "GET") {
     const controllerId = combatScope(url.searchParams.get("controllerId"));
     return dbJson(res, () => combatHistory.read({ controllerId,
@@ -4099,6 +4149,9 @@ async function totpEnableRoute(req, res) {
   });
   if (!proof.ok) return;
   const enrollSession = auth.makeSession({ tier: "enroll", scope: "enroll", ttlMs: config.enrollmentSessionTtlMs, renewable: false });
+  // Bind completion/cancellation to the still-valid owner that proved the
+  // password; revoked or expired owners cannot be restored by an old QR.
+  auth.readSessionById(enrollSession.id).enrollmentParentId = session.id;
   setSessionCookie(res, enrollSession, config, { maxAgeSeconds: Math.floor(config.enrollmentSessionTtlMs / 1000) });
   audit(config, auditUrl, ACTION, { ok: true, ...actor });
   return json(res, 200, { enrollmentRequired: true, csrfToken: enrollSession.csrf });
@@ -8800,6 +8853,17 @@ function requireEnrollmentSession(req, res) {
   if (!config.authDisabled && req.headers["x-csrf-token"] !== session.csrf) {
     json(res, 403, { error: "Your setup session expired. Sign in again to restart two-factor setup." });
     return null;
+  }
+  if (session.confirmingTotp) {
+    json(res, 409, { error: "Authenticator confirmation is already in progress." });
+    return null;
+  }
+  if (session.enrollmentParentId) {
+    const parent = auth.readSessionById(session.enrollmentParentId);
+    if (!parent || parent.scope || parent.tier !== "owner") {
+      json(res, 403, { error: "The account that started setup is no longer signed in. Sign in again to continue." });
+      return null;
+    }
   }
   return session;
 }

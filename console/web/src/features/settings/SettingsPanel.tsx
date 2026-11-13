@@ -52,6 +52,7 @@ type SettingsPanelProps = {
   // same TotpSetupScreen the old forced-enrollment login flow used -- this
   // panel doesn't own that top-level view state.
   onTotpEnrollmentStarted: () => void;
+  credentialRevision?: number;
   // #643: true exactly once, when this mount follows a reconfiguration
   // Discord OAuth round-trip (App's own discordSetupReturnMarker) -- auto-
   // expands the Discord OAuth accordion below. onDiscordSetupAutoOpened must
@@ -65,7 +66,7 @@ type SettingsPanelProps = {
   onTwoFactorAutoOpened?: () => void;
 };
 
-export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmAction, onTotpEnrollmentStarted, autoOpenDiscordSetup, onDiscordSetupAutoOpened, autoOpenTwoFactor, onTwoFactorAutoOpened }: SettingsPanelProps) {
+export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmAction, onTotpEnrollmentStarted, credentialRevision = 0, autoOpenDiscordSetup, onDiscordSetupAutoOpened, autoOpenTwoFactor, onTwoFactorAutoOpened }: SettingsPanelProps) {
   const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   // Tier 3 credential state. secondFactorEnrolled is read from /api/auth/me,
@@ -182,6 +183,7 @@ export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmActi
       setSecondFactorUnavailable(true);
     }
   }
+  useEffect(() => { if (credentialRevision) void refreshCredentialState(); }, [credentialRevision]);
   const [apiKeysOpen, setApiKeysOpen] = useState(false);
   const [encryptedApiOpen, setEncryptedApiOpen] = useState(false);
   const [serverStartupOpen, setServerStartupOpen] = useState(false);

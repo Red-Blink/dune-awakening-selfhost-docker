@@ -6,6 +6,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAuth, clearSessionCookie, setSessionCookie, json, serializeJsonResponse } from "../src/auth.js";
 
+test("non-renewable and setup sessions never become normal sessions after restart", t => {
+  const dir = mkdtempSync(join(tmpdir(), "auth-scoped-persistence-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const config = { sessionSecret: "fixture-session-key", adminPassword: "fixture-password", sessionStoreFile: join(dir, "sessions.json") };
+  const auth = createAuth(config);
+  const ordinary = auth.makeSession();
+  const sessions = [auth.makeSession({ renewable: false }), auth.makeSession({ scope: "enroll", renewable: false }), auth.makeSession({ scope: "resetup", renewable: false })];
+  const restarted = createAuth(config);
+  const request = session => ({ headers: { cookie: `asc_session=${session.cookie}` } });
+  assert.ok(restarted.readSession(request(ordinary)));
+  for (const session of sessions) assert.equal(restarted.readSession(request(session)), null);
+});
+
 test("persisted sessions reject tampering, password changes and cross-instance contamination", t => {
   const dir = mkdtempSync(join(tmpdir(), "auth-persistence-test-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));

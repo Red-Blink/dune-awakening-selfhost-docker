@@ -173,6 +173,7 @@
     "All",
     "All Categories",
     "All Categories ({count0})",
+    "All Channels",
     "All Groups",
     "All Languages",
     "All Listings",
@@ -206,11 +207,13 @@
     "An export includes the base's pieces, placeables, land claim and everything stored in it. Importing creates a new backup for the receiving player, who redeploys it with the in-game base backup tool. The original backup is not changed.",
     "Anonymous Count:",
     "Another Player",
+    "Any map or guild",
     "Appends to the next free slot. Existing stacks are never topped up — this always creates a new slot.",
     "Applied Successfully",
     "Applied To Term",
     "Applies to Always-On map startup only. Dynamic maps remain available on demand.",
     "Applies to every enrolled base. Stored in the console only — no game data is changed, and the change applies without a restart.",
+    "Applies to this browser only. Choose Default to restore the standard look.",
     "Apply",
     "Apply And Restart Hagga",
     "Apply Augments",
@@ -452,6 +455,7 @@
     "Cached in Database",
     "Can't scan? Enter this code manually:",
     "Cancel",
+    "Cancel 2FA setup",
     "Cancel Delete",
     "Cancel Import",
     "Cancel Queued Delete",
@@ -465,6 +469,7 @@
     "Cannot promote the leader further",
     "Cannot remove the leader",
     "Cap",
+    "Captured",
     "Care Package",
     "Care Package Configuration",
     "Care Package Result",
@@ -493,6 +498,8 @@
     "Changing Docker to use the backup battlegroup ID.",
     "Changing Login Password...",
     "Changing Password...",
+    "Channel",
+    "Channel / Location",
     "Character",
     "Character Name",
     "Character State",
@@ -503,6 +510,12 @@
     "Character Transfer Settings Applied",
     "Character.WeaponSpecificQuickMelee.Enabled",
     "Characters deleted from this server that still hold bases or vehicles. Deleting a character removes its ownership rows, so assets are matched back through the respawn points the character had set.",
+    "Chat",
+    "Chat Collection",
+    "Chat channel",
+    "Chat collection cannot connect to RabbitMQ. It will retry automatically.",
+    "Chat rows",
+    "Chat storage needs attention. Existing data has been preserved.",
     "Cheaper Than Patterns",
     "Check Director logs if readiness is unhealthy.",
     "Check Every (Min)",
@@ -561,6 +574,7 @@
     "Cleaning...",
     "Clear",
     "Clear All",
+    "Clear History",
     "Clear Log",
     "Clear Search",
     "Clear Selection",
@@ -578,6 +592,7 @@
     "Co-owned",
     "Co-owner",
     "Code",
+    "Cold blue-gray with glacial blue and pale mint.",
     "Collapse",
     "Collapse API Keys",
     "Collapse Advanced SQL Console",
@@ -598,6 +613,12 @@
     "Collapse Server Startup",
     "Collapse Two-Factor Authentication",
     "Collapse Web Console Port",
+    "Collect new chat messages",
+    "Collecting",
+    "Collection",
+    "Collection Off",
+    "Collection includes map, guild and proximity messages. Private whispers never reach the recorder.",
+    "Collection is off. An owner can enable it under Collection. Previously stored history remains available until it expires or is cleared.",
     "Column",
     "Columns",
     "Combat",
@@ -642,18 +663,22 @@
     "Connect DBeaver to PostgreSQL",
     "Connected",
     "Connected Players",
+    "Connecting",
     "Connecting To Steam",
+    "Connection Unavailable",
     "Console",
     "Console Access Review",
     "Console Language",
     "Console Password",
     "Console Port",
+    "Console Theme",
     "Console Update",
     "Console Update Already Running",
     "Console Update Cancelled",
     "Console Update Complete",
     "Console Update Failed",
     "Console files were updated. Refresh this page to load the new Web UI. You may need to sign in again.",
+    "Console theme",
     "Console update completed successfully.",
     "Console update failed.",
     "Construction",
@@ -764,6 +789,10 @@
     "Daily restart time must be a valid 24-hour time, for example 05:00 or 23:30.",
     "Danger Zone",
     "Danish",
+    "Dark aubergine with honey gold and rose.",
+    "Dark teal with jade and misty blue.",
+    "Dark umber with burnished copper and sage.",
+    "Dark wine with dusty rose and pearl blue.",
     "DarkDante",
     "Database",
     "Database Browser",
@@ -790,6 +819,8 @@
     "Deep Desert (Default, 0 Online)",
     "Deep Desert Layout",
     "Deep Desert instances",
+    "Deep forest with fresh mint and soft brass.",
+    "Deep petrol with aqua and sunlit gold.",
     "DeepDesert_1",
     "DeepL API Key",
     "DeepL API Key (e.g. xxxx-xxxx:fx)",
@@ -807,6 +838,7 @@
     "Delete",
     "Delete All",
     "Delete All Backups",
+    "Delete All History",
     "Delete All Items",
     "Delete All System Backups",
     "Delete Auto Grant rule",
@@ -826,6 +858,7 @@
     "Delete System Backups",
     "Delete Timed Out",
     "Delete Vehicle",
+    "Delete all stored chat history? This cannot be undone.",
     "Delete backup",
     "Delete base backup",
     "Delete blueprint",
@@ -986,6 +1019,7 @@
     "ENABLE MEMORY SWAP",
     "Each active map or Sietch runs in its own game-server container. This is the maximum emergency swap each one may use; it is not a limit for the whole physical server.",
     "Each one is written when its map next restarts.",
+    "Earthy charcoal with saffron and olive silver.",
     "Edit",
     "Edit Base Backup",
     "Edit Inventory Item",
@@ -1009,6 +1043,7 @@
     "Empty Server Policy",
     "Empty for none",
     "Enable",
+    "Enable 2FA",
     "Enable All Items on This Page",
     "Enable Encrypted API Access",
     "Enable Failed",
@@ -1301,6 +1336,7 @@
     "Granted",
     "Granting...",
     "Grants",
+    "Graphite blue with steel silver and sea green.",
     "Greek",
     "Grid",
     "Grid view",
@@ -1322,6 +1358,7 @@
     "Hide Inactive Players After",
     "Highlights",
     "Hindi",
+    "History is limited to 5,000 messages and 10 MiB. The oldest messages are removed first. Collection starts with new messages; earlier chat cannot be recovered.",
     "Home",
     "Horizontal Claim",
     "Horizontal Segments",
@@ -1389,6 +1426,7 @@
     "Incoming character transfer policy",
     "Indonesian",
     "Info",
+    "Ink blue with periwinkle and peach.",
     "Install",
     "Install Blocked",
     "Install Community Blueprint",
@@ -1446,6 +1484,7 @@
     "Keep Newest",
     "Keep all placeholders exactly as shown in the original phrase.",
     "Keep current owner",
+    "Keep history for",
     "Keep must be a whole number from 1 to 365.",
     "Keep one fewer",
     "Keep one more",
@@ -1535,6 +1574,7 @@
     "Loading Bases",
     "Loading Bot Items",
     "Loading Care Package",
+    "Loading Chat",
     "Loading Combat History",
     "Loading Community Blueprints",
     "Loading Console",
@@ -1560,6 +1600,7 @@
     "Loading Settings",
     "Loading Steam Metadata",
     "Loading Storage",
+    "Loading Themes",
     "Loading Transactions",
     "Loading Updates",
     "Loading Vehicles",
@@ -1569,6 +1610,7 @@
     "Loading base permissions…",
     "Loading blueprints...",
     "Loading building sets...",
+    "Loading chat...",
     "Loading columns...",
     "Loading community addons...",
     "Loading customizations...",
@@ -1622,6 +1664,7 @@
     "Manual Template",
     "Manual Vehicle ID",
     "Map",
+    "Map / Guild",
     "Map Change Failed",
     "Map Changes Applied",
     "Map Command Result",
@@ -1633,6 +1676,7 @@
     "Map list could not be loaded.",
     "Map mode guide",
     "Map mode saved successfully.",
+    "Map or guild",
     "Map, autoscaler, memory, Sietch, or Deep Desert state is loading or unavailable.",
     "MapViewer3D",
     "Maps",
@@ -1685,6 +1729,7 @@
     "Message of the Day saved. Players already online will become eligible again after 24 hours.",
     "Message of the Day saved. Players already online will receive it after their next login.",
     "Message of the Day saved. Players already online will receive it after their next map transfer or login.",
+    "Message or sender",
     "Message shown in this map chat",
     "Message shown to online players",
     "Message shown to players",
@@ -1733,11 +1778,13 @@
     "Name, creator, or tag",
     "Named seed plans are CSV-backed lists the Market Bot can stock. The bundled catalog stays read-only. Set one plan as active to use it for reseeds and buyback price caps. Download CSV exports the selected plan; Upload CSV imports a UTF-8 CSV of names and numbers only (no extra columns, SQL, JSON, or formulas).",
     "National Languages Cached",
+    "Near-black navy with electric blue and lilac.",
     "Needs Review",
     "Network / Ports",
     "Network Note",
     "Neural Fallback Active (Key Optional)",
     "Neutral",
+    "Neutral charcoal with pale blue and warm ivory.",
     "Never",
     "New",
     "New Automatic Backup Passphrase",
@@ -1747,6 +1794,7 @@
     "New Schedule",
     "New UI text is auto-translated & stored across all DB languages",
     "New UI text is automatically detected, translated via DeepL, and cached in the local translation database to save API traffic.",
+    "New messages will appear here after collection is enabled.",
     "New package",
     "New password",
     "New password and confirmation do not match.",
@@ -1769,6 +1817,7 @@
     "No Matching Languages",
     "No Matching Phrases",
     "No Matching Restarts",
+    "No Messages Found",
     "No NPC listings to remove; no backup was taken.",
     "No Owner set",
     "No Partitions Available",
@@ -2127,6 +2176,7 @@
     "Promote to Officer",
     "Protection",
     "Protocol",
+    "Proximity",
     "Public",
     "Public IP Check Complete",
     "Public IP Check Failed",
@@ -2159,6 +2209,7 @@
     "Queued base writes are applied while this is down",
     "Queued for this map's next restart",
     "Queued in the player's inventory. Dune will process it on the next login.",
+    "Quiet brown-black with sand gold and clear sky blue.",
     "RAM usage",
     "RabbitMQ",
     "RabbitMQ Admin",
@@ -2259,6 +2310,7 @@
     "Refresh Status",
     "Refresh Storage",
     "Refresh Tables",
+    "Refresh chat",
     "Refreshing",
     "Refreshing generated map catalogs.",
     "Refreshing...",
@@ -2316,6 +2368,7 @@
     "Repairs recognized stuck Landsraad quest states. A safety backup is created when needed.",
     "Repeat Every",
     "Replace Passphrase",
+    "Replace any authenticator entry from an earlier setup attempt with the QR code shown here.",
     "Replaces",
     "Replaces only the bot's NPC sell listings from the active seed plan. Each write run creates a backup (when Safety Backups are on), clears the bot listings on the selected exchange, and seeds fresh stock; player listings are never touched. Augments use bottom-of-range rolls, with either discounted or original plan pricing.",
     "Replacing it does not re-encrypt older archives. They still need the passphrase they were made with.",
@@ -2420,6 +2473,7 @@
     "Result",
     "Results were capped. Some deleted characters or orphaned assets are not shown.",
     "Resume",
+    "Retention days",
     "Retry",
     "Retry Console Update",
     "Retry Game Update",
@@ -2442,6 +2496,7 @@
     "Reward levels will appear after the current Landsraad term generates its milestones.",
     "Rewards Grant",
     "Right-drag to tilt and rotate.",
+    "Roasted brown with spice orange and cool turquoise.",
     "Romanian",
     "Routine",
     "Row Save Failed",
@@ -2507,6 +2562,7 @@
     "Save Auto Updates",
     "Save Buyback Schedule",
     "Save Changes",
+    "Save Collection Settings",
     "Save Custom Settings",
     "Save Encrypted Key",
     "Save Enrollment Secret",
@@ -2567,6 +2623,7 @@
     "Saving...",
     "Saving…",
     "Scan & Translate Current View",
+    "Scan the QR code with your authenticator app, then enter its current 6-digit code.",
     "Scanning",
     "Schedule",
     "Schedule Name",
@@ -2598,6 +2655,7 @@
     "Search a player to add",
     "Search by current translation or English phrase",
     "Search character name",
+    "Search chat",
     "Search columns, or column='value' and/or ...",
     "Search for a character to add.",
     "Search for the new owner",
@@ -2608,6 +2666,7 @@
     "Search name, type, owner, or map",
     "Search permissions",
     "Search permissions...",
+    "Search published in-game messages. Captured messages may be filtered before players receive them.",
     "Search table names",
     "Search tables or columns",
     "Searches player names and marker names, plus base and vehicle owners.",
@@ -2657,6 +2716,7 @@
     "Send On",
     "Send Server Broadcast",
     "Send recurring announcements using each schedule’s timezone.",
+    "Sender",
     "Sending...",
     "Serbian",
     "Server",
@@ -2754,6 +2814,7 @@
     "Sietch settings saved successfully. Changes may take a short time to appear in-game.",
     "Sietches",
     "Sign In",
+    "Sign In Again",
     "Sign in again to continue.",
     "Sign in with the console password configured during setup.",
     "Sign out",
@@ -2773,7 +2834,10 @@
     "Slots used",
     "Slovak",
     "Slovenian",
+    "Smoky slate with pale apricot and lavender.",
+    "Smoky violet with pearl lavender and sand.",
     "Smuggler's Run stays Dynamic so its instance is retired as soon as it becomes empty and the next visit starts with fresh vehicle permissions.",
+    "Soft dark taupe with limestone and sage blue.",
     "Solari",
     "Solari Coin",
     "Solari Credit",
@@ -2847,6 +2911,7 @@
     "Stopping game servers before replacing server files.",
     "Stopping services, then starting them again.",
     "Storage",
+    "Storage Needs Attention",
     "Stored",
     "Stored Items",
     "Stored as",
@@ -2989,6 +3054,7 @@
     "The map stays offline and will not auto-start, even if travel demand appears in-world.",
     "The maximum request rate for this key.",
     "The metadata file must end with .yaml or .yml.",
+    "The newest page refreshes every five seconds. Whispers are never collected. Faction and party are not supported yet.",
     "The passphrase must be at least 12 characters.",
     "The passphrase must use at least 5 different characters.",
     "The passphrase opened the archive. Review what it would replace below, then apply.",
@@ -3007,6 +3073,7 @@
     "The saved UserGame combat selection could not be determined.",
     "The saved position could not be loaded.",
     "The server was installed successfully. The full console is ready to open.",
+    "The standard console look.",
     "The system backup was restored. This host now carries the archive's configuration, credentials and database.",
     "The token was saved, but the server did not become fully ready. Check Server Control status and logs.",
     "The token was saved, but the server restart failed. Check the task details and try again.",
@@ -3131,6 +3198,7 @@
     "Trooper starter skills",
     "True",
     "Try again",
+    "Try another search or channel.",
     "Turkish",
     "Turn On",
     "Turn off automatic system backups first",
@@ -3281,6 +3349,7 @@
     "View Patch Notes",
     "Visible",
     "Vitals",
+    "Volcanic gray with soft silver and warm copper.",
     "Volume Used",
     "Volume used",
     "Voting Period",
@@ -3296,6 +3365,7 @@
     "Waiting for Updated Console",
     "Waiting for the game to save the character position",
     "Waiting for the update helper to start.",
+    "Warm charcoal with amber and muted turquoise.",
     "Warming",
     "Warn",
     "Warn players before restart",
@@ -3887,7 +3957,7 @@
     "— see the sign-in page's error for recovery guidance.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 644,
+        "line": 646,
         "nearby": [
           "Change Password",
           "This console's two-factor state could not be read, so password changes and recovery-code regeneration are unavailable right now. Do not delete",
@@ -3983,7 +4053,7 @@
     ", then paste it below.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 854,
+        "line": 856,
         "nearby": [
           "[Your Server Page]",
           "Generated Claim Code",
@@ -4111,7 +4181,7 @@
     ". Open the new address shown in the result message.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 909,
+        "line": 911,
         "nearby": [
           "Change the browser port used by this web console.",
           "After saving, this page will stop responding on port",
@@ -4171,7 +4241,7 @@
     ". Update the environment value to change it.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 588,
+        "line": 590,
         "nearby": [
           "Change the password used to sign in to this web console.",
           "The login password is managed by",
@@ -4327,7 +4397,7 @@
     "(fallback)": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 585,
+        "line": 587,
         "nearby": [
           "Expand Login Password",
           "Login Password",
@@ -4339,7 +4409,7 @@
     "(off)": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 650,
+        "line": 652,
         "nearby": [
           "Expand Two-Factor Authentication",
           "Two-Factor Authentication",
@@ -4491,7 +4561,7 @@
     "[Your Server Page]": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 854,
+        "line": 856,
         "nearby": [
           "Public Listing Profile",
           "Public descriptions, community links, recruitment details, and Player Portal settings are managed on DuneDocker.app. Generate a claim code from",
@@ -4500,7 +4570,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 853,
+        "line": 855,
         "nearby": [
           "Public descriptions, community links, recruitment details, and Player Portal settings are managed on DuneDocker.app. Generate a claim code from",
           ", then paste it below.",
@@ -4922,7 +4992,7 @@
     "6-digit code": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 601,
+        "line": 603,
         "nearby": [
           "Confirm new password",
           "Authenticator Code",
@@ -4932,10 +5002,10 @@
       },
       {
         "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
-        "line": 128,
+        "line": 178,
         "nearby": [
-          "Authenticator QR code",
           "Can't scan? Enter this code manually:",
+          "Authenticator Code",
           "Confirm",
           "Loading setup"
         ]
@@ -5179,7 +5249,7 @@
     "A system backup with that name is already stored on this host. Keep both by storing the upload under a new name, or replace the stored one.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 217,
+        "line": 219,
         "nearby": [
           "Backup",
           "Backup Already Exists",
@@ -5191,7 +5261,7 @@
     "ABCD-EF12-3456": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 861,
+        "line": 863,
         "nearby": [
           ", then paste it below.",
           "Generated Claim Code",
@@ -5215,7 +5285,7 @@
     "About Anonymous Count": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 818,
+        "line": 820,
         "nearby": [
           "Disable Discord Sign-In",
           "Settings",
@@ -5450,9 +5520,9 @@
     "Access Control": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 348,
+        "line": 351,
         "nearby": [
-          "Logs",
+          "Chat",
           "Settings",
           "Arrakis Management",
           "Maps"
@@ -5528,7 +5598,7 @@
     "Action completed after creating a database backup.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1514,
+        "line": 1532,
         "nearby": [
           "Unset",
           "Action completed.",
@@ -5539,7 +5609,7 @@
     "Action completed.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1506,
+        "line": 1524,
         "nearby": [
           "Loading Settings",
           "Unset",
@@ -5548,7 +5618,7 @@
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 1515,
+        "line": 1533,
         "nearby": [
           "Action completed after creating a database backup.",
           "Not Installed"
@@ -6401,7 +6471,7 @@
     "Addon Update Available": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 426,
+        "line": 429,
         "nearby": [
           "Community",
           "Addons",
@@ -6424,7 +6494,7 @@
     "Addons": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 370,
+        "line": 373,
         "nearby": [
           "Care Package",
           "Community",
@@ -6555,7 +6625,7 @@
     "Admin password": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1100,
+        "line": 1106,
         "nearby": [
           "Use your authenticator instead",
           "Lost access to your authenticator?",
@@ -6567,7 +6637,7 @@
     "Admin Password": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1100,
+        "line": 1106,
         "nearby": [
           "Lost access to your authenticator?",
           "Admin password",
@@ -6591,7 +6661,7 @@
     "Admin Tools": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 363,
+        "line": 366,
         "nearby": [
           "Live Map",
           "Landsraad",
@@ -6613,7 +6683,7 @@
     "Adopt Backup History": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 191,
+        "line": 193,
         "nearby": [
           "Choose Admin Audit History",
           "This archive and this host each have their own admin audit history. Adopt the backup's history when moving the same server to new hardware. Keep this host's own history when restoring into a different server or rolling back a mistake.",
@@ -6625,7 +6695,7 @@
     "Adopt Backup ID": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 159,
+        "line": 161,
         "nearby": [
           "Choose Battlegroup Identity",
           "This backup belongs to a different Battlegroup. Adopt the backup identity when moving the same server to new hardware. Keep the current identity only when intentionally importing data into this different server.",
@@ -6744,7 +6814,7 @@
     "After saving, this page will stop responding on port": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 909,
+        "line": 911,
         "nearby": [
           "Web Console Port",
           "Change the browser port used by this web console.",
@@ -6877,6 +6947,18 @@
           "Choose Category",
           "Filter Items",
           "Item catalog view"
+        ]
+      }
+    ],
+    "All Channels": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 83,
+        "nearby": [
+          "Channel",
+          "Chat channel",
+          "Map",
+          "Guild"
         ]
       }
     ],
@@ -7160,7 +7242,7 @@
     "Already stored": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 223,
+        "line": 225,
         "nearby": [
           "Overwrite",
           "Overwriting destroys the only copy of the credentials inside the stored archive. There is no undo and no other copy on this host.",
@@ -7392,7 +7474,7 @@
     "Anonymous Count:": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 826,
+        "line": 828,
         "nearby": [
           "About Anonymous Count",
           "Helps us understand how many Dune Docker servers are in use, including local and unlisted installations. Only anonymous server presence is reported—never your server name, IP address, players, or configuration. These statistics help demonstrate project usage and guide future development.",
@@ -7413,10 +7495,22 @@
         ]
       }
     ],
+    "Any map or guild": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 85,
+        "nearby": [
+          "Map / Guild",
+          "Map or guild",
+          "Search",
+          "Collection is off. An owner can enable it under Collection. Previously stored history remains available until it expires or is cleared."
+        ]
+      }
+    ],
     "API Keys": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 930,
+        "line": 932,
         "nearby": [
           "Collapse API Keys",
           "Expand API Keys",
@@ -7482,6 +7576,17 @@
           "Close",
           "Try again",
           "Loading…"
+        ]
+      }
+    ],
+    "Applies to this browser only. Choose Default to restore the standard look.": [
+      {
+        "file": "console/web/src/themes/ThemePanel.tsx",
+        "line": 70,
+        "nearby": [
+          "Console Theme",
+          "Close",
+          "Console theme"
         ]
       }
     ],
@@ -7831,7 +7936,7 @@
     "Arrakis Management": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 352,
+        "line": 355,
         "nearby": [
           "Settings",
           "Access Control",
@@ -7924,7 +8029,7 @@
     "At Least 13 Characters": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 591,
+        "line": 593,
         "nearby": [
           "Current password",
           "New Password",
@@ -7934,7 +8039,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 954,
+        "line": 956,
         "nearby": [
           "Expand API Keys",
           "API Keys",
@@ -8249,7 +8354,7 @@
     "Authenticator code": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1078,
+        "line": 1084,
         "nearby": [
           "Recovery code",
           "Sign In"
@@ -8257,7 +8362,7 @@
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 1083,
+        "line": 1089,
         "nearby": [
           "Recovery code",
           "Sign In",
@@ -8268,19 +8373,29 @@
     "Authenticator Code": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 593,
+        "line": 595,
         "nearby": [
           "Passwords do not match",
           "Confirm new password",
           "6-digit code",
           "Two-factor is enabled, so changing the password needs a current code from your authenticator as well."
         ]
+      },
+      {
+        "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
+        "line": 174,
+        "nearby": [
+          "Authenticator QR code",
+          "Can't scan? Enter this code manually:",
+          "6-digit code",
+          "Confirm"
+        ]
       }
     ],
     "Authenticator Code (to confirm it's you)": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 657,
+        "line": 659,
         "nearby": [
           "Password (to confirm it's you)",
           "Your login password",
@@ -8290,7 +8405,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 688,
+        "line": 690,
         "nearby": [
           "Password (to confirm it's you)",
           "Your login password (to disable)",
@@ -8300,7 +8415,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 747,
+        "line": 749,
         "nearby": [
           "Password (to confirm it's you)",
           "Your login password",
@@ -8310,7 +8425,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 792,
+        "line": 794,
         "nearby": [
           "Password (to confirm it's you)",
           "Your login password",
@@ -8322,12 +8437,12 @@
     "Authenticator QR code": [
       {
         "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
-        "line": 120,
+        "line": 167,
         "nearby": [
-          "This console now requires an authenticator app. Scan the code below with an app like Google Authenticator or Authy, then enter the 6-digit code it shows.",
-          "If you scanned a QR code for this console before, delete that entry from your authenticator now -- it is no longer valid.",
+          "Scan the QR code with your authenticator app, then enter its current 6-digit code.",
+          "Replace any authenticator entry from an earlier setup attempt with the QR code shown here.",
           "Can't scan? Enter this code manually:",
-          "6-digit code"
+          "Authenticator Code"
         ]
       }
     ],
@@ -8711,7 +8826,7 @@
     "Automatic Startup:": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 893,
+        "line": 895,
         "nearby": [
           "Start Battlegroup Automatically",
           "The Console always starts with Docker. When this is disabled, the Battlegroup remains stopped after the Linux host boots until you start it manually.",
@@ -8898,10 +9013,11 @@
       },
       {
         "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
-        "line": 137,
+        "line": 187,
         "nearby": [
-          "Confirm",
-          "Loading setup"
+          "Loading setup",
+          "Cancel",
+          "Sign In Again"
         ]
       }
     ],
@@ -8988,7 +9104,7 @@
     "Backup": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 165,
+        "line": 167,
         "nearby": [
           "Keep Current ID",
           "Choosing the wrong identity can make restored characters unavailable in game. Adoption will be blocked unless the current Funcom token matches the backup Battlegroup.",
@@ -8998,7 +9114,7 @@
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 197,
+        "line": 199,
         "nearby": [
           "Keep Current History",
           "Whichever history is not kept is still saved to the pre-restore safety copy, not deleted -- but it stops being the live record.",
@@ -9030,7 +9146,7 @@
     "Backup Already Exists": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 216,
+        "line": 218,
         "nearby": [
           "Whichever history is not kept is still saved to the pre-restore safety copy, not deleted -- but it stops being the live record.",
           "Backup",
@@ -9076,7 +9192,7 @@
     "Backup ID": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 167,
+        "line": 169,
         "nearby": [
           "Backup",
           "Current ID",
@@ -9260,7 +9376,7 @@
     "Backups": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 343,
+        "line": 345,
         "nearby": [
           "Home",
           "Server Control",
@@ -9620,7 +9736,7 @@
     "Base Builder": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 456,
+        "line": 459,
         "nearby": [
           "Community Contributors",
           "Public Server Directory",
@@ -9711,7 +9827,7 @@
     "Bases": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 357,
+        "line": 360,
         "nearby": [
           "Players",
           "Guilds",
@@ -9961,7 +10077,7 @@
     "Battlegroup Restarted Successfully": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 984,
+        "line": 990,
         "nearby": [
           "Documentation",
           "Battlegroup Stopped",
@@ -10007,7 +10123,7 @@
     "Battlegroup Started Successfully": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 990,
+        "line": 996,
         "nearby": [
           "Battlegroup Stopped",
           "Battlegroup Restarted Successfully",
@@ -10053,7 +10169,7 @@
     "Battlegroup Stopped": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 978,
+        "line": 984,
         "nearby": [
           "Base Builder",
           "Documentation",
@@ -10113,7 +10229,7 @@
     "Beyond the Dunes, Every Choice Shapes the Future": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1110,
+        "line": 1116,
         "nearby": [
           "Dune Docker Console",
           "Dune Docker Console logo",
@@ -10962,19 +11078,19 @@
     "Can't scan? Enter this code manually:": [
       {
         "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
-        "line": 121,
+        "line": 168,
         "nearby": [
-          "If you scanned a QR code for this console before, delete that entry from your authenticator now -- it is no longer valid.",
+          "Replace any authenticator entry from an earlier setup attempt with the QR code shown here.",
           "Authenticator QR code",
-          "6-digit code",
-          "Confirm"
+          "Authenticator Code",
+          "6-digit code"
         ]
       }
     ],
     "cancel": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1134,
+        "line": 1140,
         "nearby": [
           "Sign In",
           "to continue setting up Discord sign-in.",
@@ -11045,6 +11161,16 @@
         ]
       },
       {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 78,
+        "nearby": [
+          "Delete all stored chat history? This cannot be undone.",
+          "Delete All History",
+          "Search",
+          "Search chat"
+        ]
+      },
+      {
         "file": "console/web/src/features/guilds/GuildsPanel.tsx",
         "line": 498,
         "nearby": [
@@ -11091,15 +11217,17 @@
           "Back to Settings",
           "Back to sign in"
         ]
-      },
+      }
+    ],
+    "Cancel 2FA setup": [
       {
-        "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 683,
+        "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
+        "line": 97,
         "nearby": [
-          "Disabling...",
-          "Disable anyway",
-          "Password (to confirm it's you)",
-          "Your login password (to disable)"
+          "That code was not accepted, and this has failed a few times in a row -- the most common cause is your device's clock being out of sync. Check that your phone or authenticator app has automatic time set on, then try the current code again.",
+          "Enable 2FA",
+          "Set up a new authenticator",
+          "Set up two-factor authentication"
         ]
       }
     ],
@@ -11339,10 +11467,31 @@
         ]
       }
     ],
+    "Captured": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 91,
+        "nearby": [
+          "Chat storage needs attention. Existing data has been preserved.",
+          "Chat collection cannot connect to RabbitMQ. It will retry automatically.",
+          "Channel / Location",
+          "Sender"
+        ]
+      },
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 93,
+        "nearby": [
+          "Sender",
+          "Message",
+          "Channel / Location"
+        ]
+      }
+    ],
     "Care Package": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 364,
+        "line": 367,
         "nearby": [
           "Landsraad",
           "Admin Tools",
@@ -11688,7 +11837,7 @@
     "Change Password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 612,
+        "line": 614,
         "nearby": [
           "Password requirements",
           "Saving...",
@@ -11720,7 +11869,7 @@
     "Change the browser port used by this web console.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 908,
+        "line": 910,
         "nearby": [
           "Expand Web Console Port",
           "Web Console Port",
@@ -11744,7 +11893,7 @@
     "Change the password used to sign in to this web console.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 587,
+        "line": 589,
         "nearby": [
           "Login Password",
           "(fallback)",
@@ -11815,7 +11964,7 @@
     "Changing Login Password...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 256,
+        "line": 258,
         "nearby": [
           "Password Change Failed",
           "Enter your current authenticator code.",
@@ -11832,6 +11981,39 @@
           "Password Change Failed",
           "Passwords do not match.",
           "Restarting Server..."
+        ]
+      }
+    ],
+    "Channel": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 82,
+        "nearby": [
+          "Search chat",
+          "Message or sender",
+          "Chat channel",
+          "All Channels"
+        ]
+      }
+    ],
+    "Channel / Location": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 91,
+        "nearby": [
+          "Chat collection cannot connect to RabbitMQ. It will retry automatically.",
+          "Captured",
+          "Sender",
+          "Message"
+        ]
+      },
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 93,
+        "nearby": [
+          "Message",
+          "Captured",
+          "Sender"
         ]
       }
     ],
@@ -11994,6 +12176,98 @@
           "character holds",
           "base",
           "bases"
+        ]
+      }
+    ],
+    "Chat": [
+      {
+        "file": "console/web/src/App.tsx",
+        "line": 349,
+        "nearby": [
+          "Updates",
+          "Logs",
+          "Settings",
+          "Access Control"
+        ]
+      },
+      {
+        "file": "console/web/src/api/apiKeys.ts",
+        "line": 154,
+        "nearby": [
+          "Maps",
+          "Realtime Data",
+          "Players",
+          "Server"
+        ]
+      },
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 63,
+        "nearby": [
+          "Connection Unavailable",
+          "Storage Needs Attention",
+          "Search published in-game messages. Captured messages may be filtered before players receive them.",
+          "Unavailable"
+        ]
+      }
+    ],
+    "Chat channel": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 82,
+        "nearby": [
+          "Message or sender",
+          "Channel",
+          "All Channels",
+          "Map"
+        ]
+      }
+    ],
+    "Chat Collection": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 71,
+        "nearby": [
+          "Refresh",
+          "Collection",
+          "Collect new chat messages",
+          "Collection includes map, guild and proximity messages. Private whispers never reach the recorder."
+        ]
+      }
+    ],
+    "Chat collection cannot connect to RabbitMQ. It will retry automatically.": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 89,
+        "nearby": [
+          "Collection is off. An owner can enable it under Collection. Previously stored history remains available until it expires or is cleared.",
+          "Chat storage needs attention. Existing data has been preserved.",
+          "Captured",
+          "Channel / Location"
+        ]
+      }
+    ],
+    "Chat rows": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 101,
+        "nearby": [
+          "of",
+          "Rows",
+          "First",
+          "Previous"
+        ]
+      }
+    ],
+    "Chat storage needs attention. Existing data has been preserved.": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 89,
+        "nearby": [
+          "Search",
+          "Collection is off. An owner can enable it under Collection. Previously stored history remains available until it expires or is cleared.",
+          "Chat collection cannot connect to RabbitMQ. It will retry automatically.",
+          "Captured"
         ]
       }
     ],
@@ -12594,7 +12868,7 @@
     "Choose Admin Audit History": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 189,
+        "line": 191,
         "nearby": [
           "Current ID",
           "Backup ID",
@@ -12616,7 +12890,7 @@
     "Choose Battlegroup Identity": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 157,
+        "line": 159,
         "nearby": [
           "Continue?",
           "Yes",
@@ -12743,7 +13017,7 @@
     "Choosing the wrong identity can make restored characters unavailable in game. Adoption will be blocked unless the current Funcom token matches the backup Battlegroup.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 163,
+        "line": 165,
         "nearby": [
           "Adopt Backup ID",
           "Keep Current ID",
@@ -12755,7 +13029,7 @@
     "Claimed Listing": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1304,
+        "line": 1310,
         "nearby": [
           "Community links",
           "Open Public Server Listing",
@@ -13083,6 +13357,18 @@
         "line": 108,
         "nearby": [
           "selected"
+        ]
+      }
+    ],
+    "Clear History": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 77,
+        "nearby": [
+          "History is limited to 5,000 messages and 10 MiB. The oldest messages are removed first. Collection starts with new messages; earlier chat cannot be recovered.",
+          "Save Collection Settings",
+          "Delete all stored chat history? This cannot be undone.",
+          "Delete All History"
         ]
       }
     ],
@@ -13448,7 +13734,7 @@
     "Close navigation": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1215,
+        "line": 1221,
         "nearby": [
           "Open Home",
           "Dune Docker Console",
@@ -13545,6 +13831,18 @@
         ]
       }
     ],
+    "Cold blue-gray with glacial blue and pale mint.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 21,
+        "nearby": [
+          "Deep forest with fresh mint and soft brass.",
+          "Dark aubergine with honey gold and rose.",
+          "Ink blue with periwinkle and peach.",
+          "Dark teal with jade and misty blue."
+        ]
+      }
+    ],
     "Collapse": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
@@ -13611,7 +13909,7 @@
     "Collapse API Keys": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 930,
+        "line": 932,
         "nearby": [
           "Saving...",
           "Save And Restart Console",
@@ -13671,7 +13969,7 @@
     "Collapse Discord OAuth": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 776,
+        "line": 778,
         "nearby": [
           "Forgetting...",
           "Forget This Configuration Entirely",
@@ -13719,7 +14017,7 @@
     "Collapse Login Password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 585,
+        "line": 587,
         "nearby": [
           "This password is Discord sign-in's break-glass fallback if it's ever unavailable — make sure whoever manages Discord access also knows it.",
           "Discord sign-in already requires its own two-factor for your role, you can safely turn off this password-based two-factor below any time.",
@@ -13743,7 +14041,7 @@
     "Collapse Public Listing Profile": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 847,
+        "line": 849,
         "nearby": [
           "Refresh",
           "Server listing issue:",
@@ -13779,7 +14077,7 @@
     "Collapse Server Startup": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 877,
+        "line": 879,
         "nearby": [
           "Verifying...",
           "Verify Generated Code",
@@ -13791,7 +14089,7 @@
     "Collapse Two-Factor Authentication": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 648,
+        "line": 650,
         "nearby": [
           "This console's two-factor state could not be read, so password changes and recovery-code regeneration are unavailable right now. Do not delete",
           "— see the sign-in page's error for recovery guidance.",
@@ -13803,12 +14101,82 @@
     "Collapse Web Console Port": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 906,
+        "line": 908,
         "nearby": [
           "Enabled",
           "Disabled",
           "Expand Web Console Port",
           "Web Console Port"
+        ]
+      }
+    ],
+    "Collect new chat messages": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 72,
+        "nearby": [
+          "Collection",
+          "Chat Collection",
+          "Collection includes map, guild and proximity messages. Private whispers never reach the recorder.",
+          "Keep history for"
+        ]
+      }
+    ],
+    "Collecting": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 6,
+        "nearby": [
+          "Collection Off",
+          "Connecting",
+          "Connection Unavailable",
+          "Storage Needs Attention"
+        ]
+      }
+    ],
+    "Collection": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 67,
+        "nearby": [
+          "Refresh chat",
+          "Refresh",
+          "Chat Collection",
+          "Collect new chat messages"
+        ]
+      }
+    ],
+    "Collection includes map, guild and proximity messages. Private whispers never reach the recorder.": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 73,
+        "nearby": [
+          "Chat Collection",
+          "Collect new chat messages",
+          "Keep history for",
+          "Retention days"
+        ]
+      }
+    ],
+    "Collection is off. An owner can enable it under Collection. Previously stored history remains available until it expires or is cleared.": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 88,
+        "nearby": [
+          "Any map or guild",
+          "Search",
+          "Chat storage needs attention. Existing data has been preserved.",
+          "Chat collection cannot connect to RabbitMQ. It will retry automatically."
+        ]
+      }
+    ],
+    "Collection Off": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 6,
+        "nearby": [
+          "Connecting",
+          "Collecting"
         ]
       }
     ],
@@ -13966,7 +14334,7 @@
     "Community": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 368,
+        "line": 371,
         "nearby": [
           "Admin Tools",
           "Care Package",
@@ -14034,7 +14402,7 @@
     "Community Contributors": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 450,
+        "line": 453,
         "nearby": [
           "Addon Update Available",
           "Created with love by RedBlink ·",
@@ -14046,7 +14414,7 @@
     "Community links": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1297,
+        "line": 1303,
         "nearby": [
           "Report Issues",
           "Get Help",
@@ -14235,19 +14603,19 @@
       },
       {
         "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
-        "line": 131,
+        "line": 181,
         "nearby": [
-          "Can't scan? Enter this code manually:",
+          "Authenticator Code",
           "6-digit code",
           "Loading setup",
-          "Back to sign in"
+          "Cancel"
         ]
       }
     ],
     "Confirm Action": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 136,
+        "line": 138,
         "nearby": [
           "Home",
           "Continue?",
@@ -14280,7 +14648,7 @@
     "Confirm new password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 592,
+        "line": 594,
         "nearby": [
           "Matches",
           "Passwords do not match",
@@ -14292,7 +14660,7 @@
     "Confirm New Password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 592,
+        "line": 594,
         "nearby": [
           "New Password",
           "At Least 13 Characters",
@@ -14340,7 +14708,7 @@
     "Confirm restart": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 259,
+        "line": 261,
         "nearby": [
           "Overwriting destroys the only copy of the credentials inside the stored archive. There is no undo and no other copy on this host.",
           "Already stored",
@@ -14411,6 +14779,15 @@
     ],
     "Connecting": [
       {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 6,
+        "nearby": [
+          "Collection Off",
+          "Collecting",
+          "Connection Unavailable"
+        ]
+      },
+      {
         "file": "console/web/src/features/auth/DiscordSetupWizard.tsx",
         "line": 440,
         "nearby": [
@@ -14430,6 +14807,18 @@
           "Downloading Server Files",
           "Loading Steam Metadata",
           "Logging In To Steam"
+        ]
+      }
+    ],
+    "Connection Unavailable": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 6,
+        "nearby": [
+          "Connecting",
+          "Collecting",
+          "Storage Needs Attention",
+          "Chat"
         ]
       }
     ],
@@ -14480,7 +14869,7 @@
     "Console Language": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1308,
+        "line": 1314,
         "nearby": [
           "Claimed Listing",
           "Unclaimed Listing",
@@ -14489,7 +14878,7 @@
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 1309,
+        "line": 1315,
         "nearby": [
           "Unclaimed Listing",
           "Join Discord"
@@ -14508,12 +14897,47 @@
     "Console Port": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 911,
+        "line": 913,
         "nearby": [
           "After saving, this page will stop responding on port",
           ". Open the new address shown in the result message.",
           "Saving...",
           "Save And Restart Console"
+        ]
+      }
+    ],
+    "Console theme": [
+      {
+        "file": "console/web/src/themes/ThemePanel.tsx",
+        "line": 71,
+        "nearby": [
+          "Close",
+          "Applies to this browser only. Choose Default to restore the standard look."
+        ]
+      }
+    ],
+    "Console Theme": [
+      {
+        "file": "console/web/src/themes/ThemePanel.tsx",
+        "line": 67,
+        "nearby": [
+          "The standard console look.",
+          "Close",
+          "Applies to this browser only. Choose Default to restore the standard look."
+        ]
+      },
+      {
+        "file": "console/web/src/themes/ThemeLauncher.tsx",
+        "line": 14,
+        "nearby": [
+          "Loading Themes"
+        ]
+      },
+      {
+        "file": "console/web/src/themes/ThemeLauncher.tsx",
+        "line": 15,
+        "nearby": [
+          "Loading Themes"
         ]
       }
     ],
@@ -14863,7 +15287,7 @@
     "Continue?": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 136,
+        "line": 138,
         "nearby": [
           "Home",
           "Confirm Action",
@@ -15258,7 +15682,7 @@
     "Could not load this section.": [
       {
         "file": "console/web/src/components/common/LazyTabBoundary.tsx",
-        "line": 79,
+        "line": 81,
         "nearby": [
           "The console may have been updated since this page was loaded. Refresh to load the current version.",
           "This section encountered an unexpected error. Refresh and try again."
@@ -15280,7 +15704,7 @@
     "Could Not Start Setup": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 310,
+        "line": 312,
         "nearby": [
           "Generating New Recovery Codes...",
           "Regeneration Failed",
@@ -15290,7 +15714,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 324,
+        "line": 326,
         "nearby": [
           "Enter your current login password.",
           "Starting Two-Factor Setup...",
@@ -15555,7 +15979,7 @@
     "Created with love by RedBlink ·": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 449,
+        "line": 452,
         "nearby": [
           "Addon Update Available",
           "Community Contributors",
@@ -15732,7 +16156,7 @@
     "Current 6-digit code": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 665,
+        "line": 667,
         "nearby": [
           "Your login password",
           "Authenticator Code (to confirm it's you)",
@@ -15742,7 +16166,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 755,
+        "line": 757,
         "nearby": [
           "Your login password",
           "Authenticator Code (to confirm it's you)",
@@ -15752,7 +16176,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 800,
+        "line": 802,
         "nearby": [
           "Your login password",
           "Authenticator Code (to confirm it's you)",
@@ -15764,7 +16188,7 @@
     "Current 6-digit code (to disable)": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 696,
+        "line": 698,
         "nearby": [
           "Your login password (to disable)",
           "Authenticator Code (to confirm it's you)",
@@ -15797,7 +16221,7 @@
     "Current ID": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 166,
+        "line": 168,
         "nearby": [
           "Choosing the wrong identity can make restored characters unavailable in game. Adoption will be blocked unless the current Funcom token matches the backup Battlegroup.",
           "Backup",
@@ -15809,7 +16233,7 @@
     "Current password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 590,
+        "line": 592,
         "nearby": [
           ". Update the environment value to change it.",
           "Current Password",
@@ -15821,7 +16245,7 @@
     "Current Password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 590,
+        "line": 592,
         "nearby": [
           "The login password is managed by",
           ". Update the environment value to change it.",
@@ -15959,7 +16383,7 @@
     "Custom settings": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 316,
+        "line": 318,
         "nearby": [
           "Players online",
           "UserEngine settings",
@@ -16177,10 +16601,58 @@
         ]
       }
     ],
+    "Dark aubergine with honey gold and rose.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 20,
+        "nearby": [
+          "Smoky slate with pale apricot and lavender.",
+          "Deep forest with fresh mint and soft brass.",
+          "Cold blue-gray with glacial blue and pale mint.",
+          "Ink blue with periwinkle and peach."
+        ]
+      }
+    ],
+    "Dark teal with jade and misty blue.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 23,
+        "nearby": [
+          "Cold blue-gray with glacial blue and pale mint.",
+          "Ink blue with periwinkle and peach.",
+          "Smoky violet with pearl lavender and sand.",
+          "Near-black navy with electric blue and lilac."
+        ]
+      }
+    ],
+    "Dark umber with burnished copper and sage.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 16,
+        "nearby": [
+          "Warm charcoal with amber and muted turquoise.",
+          "Volcanic gray with soft silver and warm copper.",
+          "Quiet brown-black with sand gold and clear sky blue.",
+          "Smoky slate with pale apricot and lavender."
+        ]
+      }
+    ],
+    "Dark wine with dusty rose and pearl blue.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 27,
+        "nearby": [
+          "Near-black navy with electric blue and lilac.",
+          "Deep petrol with aqua and sunlit gold.",
+          "Earthy charcoal with saffron and olive silver.",
+          "Soft dark taupe with limestone and sage blue."
+        ]
+      }
+    ],
     "Database": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 344,
+        "line": 346,
         "nearby": [
           "Server Control",
           "Backups",
@@ -16377,6 +16849,18 @@
         ]
       }
     ],
+    "days": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 74,
+        "nearby": [
+          "Keep history for",
+          "Retention days",
+          "History is limited to 5,000 messages and 10 MiB. The oldest messages are removed first. Collection starts with new messages; earlier chat cannot be recovered.",
+          "Save Collection Settings"
+        ]
+      }
+    ],
     "Days": [
       {
         "file": "console/web/src/features/backups/BackupsPanel.tsx",
@@ -16553,6 +17037,30 @@
           "Force Despawn",
           "Choose how many independent Deep Desert instances this battlegroup provides.",
           "Active"
+        ]
+      }
+    ],
+    "Deep forest with fresh mint and soft brass.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 19,
+        "nearby": [
+          "Quiet brown-black with sand gold and clear sky blue.",
+          "Smoky slate with pale apricot and lavender.",
+          "Dark aubergine with honey gold and rose.",
+          "Cold blue-gray with glacial blue and pale mint."
+        ]
+      }
+    ],
+    "Deep petrol with aqua and sunlit gold.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 26,
+        "nearby": [
+          "Smoky violet with pearl lavender and sand.",
+          "Near-black navy with electric blue and lilac.",
+          "Dark wine with dusty rose and pearl blue.",
+          "Earthy charcoal with saffron and olive silver."
         ]
       }
     ],
@@ -16872,6 +17380,18 @@
         ]
       }
     ],
+    "Delete All History": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 78,
+        "nearby": [
+          "Clear History",
+          "Delete all stored chat history? This cannot be undone.",
+          "Cancel",
+          "Search"
+        ]
+      }
+    ],
     "Delete All Items": [
       {
         "file": "console/web/src/features/vehicles/VehicleStorageOverlay.tsx",
@@ -16890,6 +17410,18 @@
           "Items",
           "Delete All",
           "Base"
+        ]
+      }
+    ],
+    "Delete all stored chat history? This cannot be undone.": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 78,
+        "nearby": [
+          "Save Collection Settings",
+          "Clear History",
+          "Delete All History",
+          "Cancel"
         ]
       }
     ],
@@ -18022,7 +18554,7 @@
     "Disable": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 344,
+        "line": 346,
         "nearby": [
           "Enter your current authenticator code.",
           "Disable two-factor authentication?",
@@ -18032,7 +18564,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 386,
+        "line": 388,
         "nearby": [
           "Enter your current login password.",
           "Disable Discord sign-in?",
@@ -18066,7 +18598,7 @@
     "Disable anyway": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 682,
+        "line": 684,
         "nearby": [
           "You can turn on &ldquo;Require Discord two-factor for Owner and Admin&rdquo; from the Discord OAuth section above (Change application credentials) if you'd like to keep two-factor active another way.",
           "Disabling...",
@@ -18102,7 +18634,7 @@
     "Disable Discord Sign-In": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 787,
+        "line": 789,
         "nearby": [
           "Discord OAuth",
           "Hide",
@@ -18112,7 +18644,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 804,
+        "line": 806,
         "nearby": [
           "Current 6-digit code",
           "Disabling...",
@@ -18124,7 +18656,7 @@
     "Disable Discord sign-in?": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 386,
+        "line": 388,
         "nearby": [
           "Disable Failed",
           "Enter your current login password.",
@@ -18146,7 +18678,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 334,
+        "line": 336,
         "nearby": [
           "Starting Two-Factor Setup...",
           "Could Not Start Setup",
@@ -18155,7 +18687,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 338,
+        "line": 340,
         "nearby": [
           "Enter your current login password.",
           "Enter your current authenticator code.",
@@ -18164,7 +18696,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 369,
+        "line": 371,
         "nearby": [
           "Disabling Two-Factor Authentication...",
           "Two-Factor Authentication Disabled",
@@ -18173,7 +18705,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 381,
+        "line": 383,
         "nearby": [
           "Two-Factor Authentication Disabled",
           "Enter your current login password.",
@@ -18182,7 +18714,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 403,
+        "line": 405,
         "nearby": [
           "Restarting the console...",
           "Restart taking longer than expected",
@@ -18270,7 +18802,7 @@
     "Disable Two-Factor Authentication": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 676,
+        "line": 678,
         "nearby": [
           "Generating...",
           "Regenerate Recovery Codes",
@@ -18280,7 +18812,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 700,
+        "line": 702,
         "nearby": [
           "Current 6-digit code (to disable)",
           "Disabling...",
@@ -18292,7 +18824,7 @@
     "Disable two-factor authentication?": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 344,
+        "line": 346,
         "nearby": [
           "Disable Failed",
           "Enter your current authenticator code.",
@@ -18419,7 +18951,7 @@
     "Disabling Discord sign-in...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 390,
+        "line": 392,
         "nearby": [
           "Disable Discord sign-in?",
           "Disable",
@@ -18450,7 +18982,7 @@
     "Disabling this will leave your console with no two-factor authentication anywhere — Discord sign-in doesn't require Discord's own two-factor for your role.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 679,
+        "line": 681,
         "nearby": [
           "Disable Two-Factor Authentication",
           "Turns two-factor off entirely and deletes every remaining recovery code. Signing in goes back to password-only until you enable it again.",
@@ -18462,7 +18994,7 @@
     "Disabling Two-Factor Authentication...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 350,
+        "line": 352,
         "nearby": [
           "Disable two-factor authentication?",
           "Disable",
@@ -18474,7 +19006,7 @@
     "Disabling...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 682,
+        "line": 684,
         "nearby": [
           "Disabling this will leave your console with no two-factor authentication anywhere — Discord sign-in doesn't require Discord's own two-factor for your role.",
           "You can turn on &ldquo;Require Discord two-factor for Owner and Admin&rdquo; from the Discord OAuth section above (Change application credentials) if you'd like to keep two-factor active another way.",
@@ -18484,7 +19016,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 700,
+        "line": 702,
         "nearby": [
           "Authenticator Code (to confirm it's you)",
           "Current 6-digit code (to disable)",
@@ -18494,7 +19026,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 804,
+        "line": 806,
         "nearby": [
           "Authenticator Code (to confirm it's you)",
           "Current 6-digit code",
@@ -18784,7 +19316,7 @@
     "Discord OAuth": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 776,
+        "line": 778,
         "nearby": [
           "Collapse Discord OAuth",
           "Expand Discord OAuth",
@@ -18838,7 +19370,7 @@
     "Discord Sign-In (disabled)": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 732,
+        "line": 734,
         "nearby": [
           "Starting...",
           "Enable Two-Factor Authentication",
@@ -18850,7 +19382,7 @@
     "Discord sign-in already requires its own two-factor for your role, you can safely turn off this password-based two-factor below any time.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 582,
+        "line": 584,
         "nearby": [
           "Listing Claim Failed",
           "This password is Discord sign-in's break-glass fallback if it's ever unavailable — make sure whoever manages Discord access also knows it.",
@@ -18896,7 +19428,7 @@
     "Discord sign-in is set up — restart the console to switch it on.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1132,
+        "line": 1138,
         "nearby": [
           "Hide the admin password",
           "Use the admin password instead",
@@ -18920,7 +19452,7 @@
     "Discord sign-in will stop working as soon as the console restarts. Your application's settings are kept, not deleted.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 789,
+        "line": 791,
         "nearby": [
           "Hide",
           "Disable Discord Sign-In",
@@ -19195,7 +19727,7 @@
     "Documentation": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 458,
+        "line": 461,
         "nearby": [
           "Public Server Directory",
           "Base Builder",
@@ -19684,7 +20216,7 @@
     "Dune Docker Console": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1108,
+        "line": 1114,
         "nearby": [
           "Admin Password",
           "Sign In",
@@ -19694,7 +20226,7 @@
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 1155,
+        "line": 1161,
         "nearby": [
           "Your browser login session expired.",
           "Sign in again to continue.",
@@ -19704,7 +20236,7 @@
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 1207,
+        "line": 1213,
         "nearby": [
           "Run and manage your self-hosted Dune server from the browser.",
           "Open Home",
@@ -19738,7 +20270,7 @@
     "Dune Docker Console logo": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1109,
+        "line": 1115,
         "nearby": [
           "Sign In",
           "Dune Docker Console",
@@ -19896,6 +20428,18 @@
           "queued",
           "Restart this map from the Maps tab",
           "Restarting"
+        ]
+      }
+    ],
+    "Earthy charcoal with saffron and olive silver.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 28,
+        "nearby": [
+          "Deep petrol with aqua and sunlit gold.",
+          "Dark wine with dusty rose and pearl blue.",
+          "Soft dark taupe with limestone and sage blue.",
+          "Graphite blue with steel silver and sea green."
         ]
       }
     ],
@@ -20302,6 +20846,17 @@
         ]
       }
     ],
+    "Enable 2FA": [
+      {
+        "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
+        "line": 97,
+        "nearby": [
+          "That code was not accepted, and this has failed a few times in a row -- the most common cause is your device's clock being out of sync. Check that your phone or authenticator app has automatic time set on, then try the current code again.",
+          "Cancel 2FA setup",
+          "Set up a new authenticator"
+        ]
+      }
+    ],
     "Enable all {count0} matching items": [
       {
         "file": "console/web/src/features/exchange/BotItemsTab.tsx",
@@ -20454,7 +21009,7 @@
     "Enable Two-Factor Authentication": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 717,
+        "line": 719,
         "nearby": [
           "You'll see a QR code to scan, then be asked to sign back in once it's confirmed.",
           "Starting...",
@@ -20682,7 +21237,7 @@
     "Enter a port number between 1 and 65535.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 464,
+        "line": 466,
         "nearby": [
           "Forget Failed",
           "Port Change Failed",
@@ -20773,7 +21328,7 @@
     "Enter one of your saved recovery codes.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1058,
+        "line": 1064,
         "nearby": [
           "Battlegroup Restarted Successfully",
           "Battlegroup Started Successfully",
@@ -20821,7 +21376,7 @@
     "Enter your current authenticator code.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 252,
+        "line": 254,
         "nearby": [
           "New password and confirmation do not match.",
           "Password Change Failed",
@@ -20831,7 +21386,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 284,
+        "line": 286,
         "nearby": [
           "Enter your current login password.",
           "Regeneration Failed",
@@ -20840,7 +21395,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 338,
+        "line": 340,
         "nearby": [
           "Enter your current login password.",
           "Disable Failed",
@@ -20852,7 +21407,7 @@
     "Enter your current login password.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 237,
+        "line": 239,
         "nearby": [
           "Password Change Failed",
           "New password must meet all password requirements."
@@ -20860,7 +21415,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 280,
+        "line": 282,
         "nearby": [
           "Password Change Failed",
           "Regeneration Failed",
@@ -20869,7 +21424,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 310,
+        "line": 312,
         "nearby": [
           "Regeneration Failed",
           "Could Not Start Setup",
@@ -20878,7 +21433,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 334,
+        "line": 336,
         "nearby": [
           "Could Not Start Setup",
           "Disable Failed",
@@ -20887,7 +21442,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 381,
+        "line": 383,
         "nearby": [
           "Disable Failed",
           "Disable Discord sign-in?",
@@ -20896,7 +21451,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 437,
+        "line": 439,
         "nearby": [
           "Type \"forget\" to confirm.",
           "Forget Failed",
@@ -21111,7 +21666,7 @@
     "Exchange": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 360,
+        "line": 363,
         "nearby": [
           "Vehicles",
           "Storage",
@@ -21352,7 +21907,7 @@
     "Expand API Keys": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 930,
+        "line": 932,
         "nearby": [
           "Save And Restart Console",
           "Collapse API Keys",
@@ -21412,7 +21967,7 @@
     "Expand Discord OAuth": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 776,
+        "line": 778,
         "nearby": [
           "Forget This Configuration Entirely",
           "Collapse Discord OAuth",
@@ -21460,7 +22015,7 @@
     "Expand Login Password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 585,
+        "line": 587,
         "nearby": [
           "Discord sign-in already requires its own two-factor for your role, you can safely turn off this password-based two-factor below any time.",
           "Collapse Login Password",
@@ -21484,7 +22039,7 @@
     "Expand Public Listing Profile": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 847,
+        "line": 849,
         "nearby": [
           "Server listing issue:",
           "Collapse Public Listing Profile",
@@ -21520,7 +22075,7 @@
     "Expand Server Startup": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 877,
+        "line": 879,
         "nearby": [
           "Verify Generated Code",
           "Collapse Server Startup",
@@ -21532,7 +22087,7 @@
     "Expand Two-Factor Authentication": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 648,
+        "line": 650,
         "nearby": [
           "— see the sign-in page's error for recovery guidance.",
           "Collapse Two-Factor Authentication",
@@ -21544,7 +22099,7 @@
     "Expand Web Console Port": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 906,
+        "line": 908,
         "nearby": [
           "Disabled",
           "Collapse Web Console Port",
@@ -22019,7 +22574,7 @@
     "Files Checklist": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 980,
+        "line": 982,
         "nearby": [
           "Special Character",
           "Runtime Configuration",
@@ -22583,7 +23138,7 @@
     "Finish the first-time setup to unlock the console.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1174,
+        "line": 1180,
         "nearby": [
           "Loading Console",
           "Setup",
@@ -22623,6 +23178,16 @@
         "nearby": [
           "rows.",
           "Rows",
+          "Previous",
+          "Page"
+        ]
+      },
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 102,
+        "nearby": [
+          "Rows",
+          "Chat rows",
           "Previous",
           "Page"
         ]
@@ -23133,7 +23698,7 @@
     "forget": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 757,
+        "line": 759,
         "nearby": [
           "Current 6-digit code",
           "Type &ldquo;forget&rdquo; to confirm",
@@ -23145,7 +23710,7 @@
     "Forget Failed": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 437,
+        "line": 439,
         "nearby": [
           "Not Confirmed",
           "Type \"forget\" to confirm.",
@@ -23155,7 +23720,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 455,
+        "line": 457,
         "nearby": [
           "Restarting the console...",
           "Restart taking longer than expected",
@@ -23167,7 +23732,7 @@
     "Forget this configuration entirely": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 742,
+        "line": 744,
         "nearby": [
           "Re-enable Discord Sign-In",
           "Hide",
@@ -23179,7 +23744,7 @@
     "Forget This Configuration Entirely": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 760,
+        "line": 762,
         "nearby": [
           "forget",
           "Forgetting...",
@@ -23191,7 +23756,7 @@
     "Forgetting Discord configuration...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 441,
+        "line": 443,
         "nearby": [
           "Forget Failed",
           "Enter your current login password.",
@@ -23203,7 +23768,7 @@
     "Forgetting...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 760,
+        "line": 762,
         "nearby": [
           "Type &ldquo;forget&rdquo; to confirm",
           "forget",
@@ -23226,7 +23791,7 @@
     "Found": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 981,
+        "line": 983,
         "nearby": [
           "Runtime Configuration",
           "Files Checklist",
@@ -23892,7 +24457,7 @@
     "Generate a fresh set of 10 recovery codes. Your authenticator is unchanged, and you stay signed in everywhere.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 653,
+        "line": 655,
         "nearby": [
           "Two-Factor Authentication",
           "(off)",
@@ -23904,7 +24469,7 @@
     "Generated Claim Code": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 856,
+        "line": 858,
         "nearby": [
           "[Your Server Page]",
           ", then paste it below.",
@@ -23916,7 +24481,7 @@
     "Generating New Recovery Codes...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 288,
+        "line": 290,
         "nearby": [
           "Regeneration Failed",
           "Enter your current authenticator code.",
@@ -23927,7 +24492,7 @@
     "Generating...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 669,
+        "line": 671,
         "nearby": [
           "Authenticator Code (to confirm it's you)",
           "Current 6-digit code",
@@ -24009,7 +24574,7 @@
     "Get Help": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1278,
+        "line": 1284,
         "nearby": [
           "Requests",
           "Report Issues",
@@ -24831,6 +25396,18 @@
         ]
       }
     ],
+    "Graphite blue with steel silver and sea green.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 30,
+        "nearby": [
+          "Earthy charcoal with saffron and olive silver.",
+          "Soft dark taupe with limestone and sage blue.",
+          "Roasted brown with spice orange and cool turquoise.",
+          "Neutral charcoal with pale blue and warm ivory."
+        ]
+      }
+    ],
     "Grid": [
       {
         "file": "console/web/src/features/vehicles/VehicleStorageOverlay.tsx",
@@ -24926,6 +25503,16 @@
     ],
     "Guild": [
       {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 83,
+        "nearby": [
+          "All Channels",
+          "Map",
+          "Proximity",
+          "Map / Guild"
+        ]
+      },
+      {
         "file": "console/web/src/features/bases/BaseChildPermissionsTab.tsx",
         "line": 33,
         "nearby": [
@@ -24959,7 +25546,7 @@
     "Guilds": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 356,
+        "line": 359,
         "nearby": [
           "Maps",
           "Players",
@@ -25096,7 +25683,7 @@
     "Helps us understand how many Dune Docker servers are in use, including local and unlisted installations. Only anonymous server presence is reported—never your server name, IP address, players, or configuration. These statistics help demonstrate project usage and guide future development.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 818,
+        "line": 820,
         "nearby": [
           "Settings",
           "About Anonymous Count",
@@ -25120,7 +25707,7 @@
     "Hide": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 742,
+        "line": 744,
         "nearby": [
           "Re-enabling...",
           "Re-enable Discord Sign-In",
@@ -25130,7 +25717,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 787,
+        "line": 789,
         "nearby": [
           "Expand Discord OAuth",
           "Discord OAuth",
@@ -25154,7 +25741,7 @@
     "Hide the admin password": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1123,
+        "line": 1129,
         "nearby": [
           "Beyond the Dunes, Every Choice Shapes the Future",
           "Sign in with Discord",
@@ -25174,22 +25761,34 @@
         ]
       }
     ],
+    "History is limited to 5,000 messages and 10 MiB. The oldest messages are removed first. Collection starts with new messages; earlier chat cannot be recovered.": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 75,
+        "nearby": [
+          "Retention days",
+          "days",
+          "Save Collection Settings",
+          "Clear History"
+        ]
+      }
+    ],
     "Home": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 67,
+        "line": 68,
         "nearby": []
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 70,
+        "line": 71,
         "nearby": [
           "Confirm Action"
         ]
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 72,
+        "line": 73,
         "nearby": [
           "Confirm Action",
           "Continue?"
@@ -25197,7 +25796,7 @@
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 341,
+        "line": 343,
         "nearby": [
           "Restart later leaves the servers running as-is; the change applies at the next battlegroup restart, manual or automatic.",
           "Server Operations",
@@ -25627,18 +26226,6 @@
           "Refill",
           "Refill writes water straight to the database. A running game server will not show the new water in-game until the map server restarts. Blood is never touched -- only water.",
           "Cancel Queued Refill"
-        ]
-      }
-    ],
-    "If you scanned a QR code for this console before, delete that entry from your authenticator now -- it is no longer valid.": [
-      {
-        "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
-        "line": 115,
-        "nearby": [
-          "Your previous authenticator and recovery codes no longer work. Scan the new code below with your authenticator app, then enter the 6-digit code it shows.",
-          "This console now requires an authenticator app. Scan the code below with an app like Google Authenticator or Authy, then enter the 6-digit code it shows.",
-          "Authenticator QR code",
-          "Can't scan? Enter this code manually:"
         ]
       }
     ],
@@ -26204,6 +26791,18 @@
           "Order",
           "No additional detail was recorded.",
           "No player sell listings on this exchange."
+        ]
+      }
+    ],
+    "Ink blue with periwinkle and peach.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 22,
+        "nearby": [
+          "Dark aubergine with honey gold and rose.",
+          "Cold blue-gray with glacial blue and pale mint.",
+          "Dark teal with jade and misty blue.",
+          "Smoky violet with pearl lavender and sand."
         ]
       }
     ],
@@ -27245,7 +27844,7 @@
     "Join Discord": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1317,
+        "line": 1324,
         "nearby": [
           "Console Language",
           "Support Project"
@@ -27361,7 +27960,7 @@
     "Keep Both": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 218,
+        "line": 220,
         "nearby": [
           "Backup Already Exists",
           "A system backup with that name is already stored on this host. Keep both by storing the upload under a new name, or replace the stored one.",
@@ -27373,7 +27972,7 @@
     "Keep Current History": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 192,
+        "line": 194,
         "nearby": [
           "This archive and this host each have their own admin audit history. Adopt the backup's history when moving the same server to new hardware. Keep this host's own history when restoring into a different server or rolling back a mistake.",
           "Adopt Backup History",
@@ -27385,7 +27984,7 @@
     "Keep Current ID": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 160,
+        "line": 162,
         "nearby": [
           "This backup belongs to a different Battlegroup. Adopt the backup identity when moving the same server to new hardware. Keep the current identity only when intentionally importing data into this different server.",
           "Adopt Backup ID",
@@ -27403,6 +28002,18 @@
           "Unknown",
           "Search for the new owner",
           "Map"
+        ]
+      }
+    ],
+    "Keep history for": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 74,
+        "nearby": [
+          "Collect new chat messages",
+          "Collection includes map, guild and proximity messages. Private whispers never reach the recorder.",
+          "Retention days",
+          "days"
         ]
       }
     ],
@@ -27674,7 +28285,7 @@
     "Landsraad": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 362,
+        "line": 365,
         "nearby": [
           "Exchange",
           "Live Map",
@@ -27755,6 +28366,15 @@
         "nearby": [
           "of",
           "Next"
+        ]
+      },
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 106,
+        "nearby": [
+          "of",
+          "Next",
+          "The newest page refreshes every five seconds. Whispers are never collected. Faction and party are not supported yet."
         ]
       },
       {
@@ -28320,7 +28940,7 @@
     "Listing Claim Failed": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 547,
+        "line": 549,
         "nearby": [
           "Verifying Listing Claim...",
           "Public Listing Claimed",
@@ -28344,7 +28964,7 @@
     "Live Map": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 361,
+        "line": 364,
         "nearby": [
           "Storage",
           "Exchange",
@@ -28486,9 +29106,9 @@
     "Loading Access Control": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1384,
+        "line": 1392,
         "nearby": [
-          "Loading Logs",
+          "Loading Chat",
           "Loading Updates",
           "Loading Settings",
           "Unset"
@@ -28510,7 +29130,7 @@
     "Loading Addons": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1345,
+        "line": 1352,
         "nearby": [
           "Loading Maps",
           "Loading Care Package",
@@ -28522,7 +29142,7 @@
     "Loading Admin Tools": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1341,
+        "line": 1348,
         "nearby": [
           "Loading Market Board",
           "Loading Landsraad",
@@ -28546,12 +29166,12 @@
     "Loading Backups": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1350,
+        "line": 1357,
         "nearby": [
           "Loading Database",
           "Loading Storage",
           "Loading Logs",
-          "Loading Updates"
+          "Loading Chat"
         ]
       }
     ],
@@ -28606,7 +29226,7 @@
     "Loading Bases": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1336,
+        "line": 1343,
         "nearby": [
           "Loading Player Details",
           "Loading Guilds",
@@ -28672,12 +29292,36 @@
     "Loading Care Package": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1344,
+        "line": 1351,
         "nearby": [
           "Loading Live Map",
           "Loading Maps",
           "Loading Addons",
           "Loading Language"
+        ]
+      }
+    ],
+    "Loading Chat": [
+      {
+        "file": "console/web/src/App.tsx",
+        "line": 1377,
+        "nearby": [
+          "Loading Backups",
+          "Loading Logs",
+          "Loading Updates",
+          "Loading Access Control"
+        ]
+      }
+    ],
+    "Loading chat...": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 98,
+        "nearby": [
+          "Sender",
+          "Message",
+          "No Messages Found",
+          "Try another search or channel."
         ]
       }
     ],
@@ -28730,7 +29374,7 @@
     "Loading Console": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1156,
+        "line": 1162,
         "nearby": [
           "Sign in again to continue.",
           "Dune Docker Console",
@@ -28766,7 +29410,7 @@
     "Loading Database": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1347,
+        "line": 1354,
         "nearby": [
           "Loading Addons",
           "Loading Language",
@@ -28824,7 +29468,7 @@
     "Loading Guilds": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1334,
+        "line": 1341,
         "nearby": [
           "Loading Players",
           "Loading Player Details",
@@ -28871,7 +29515,7 @@
     "Loading Landsraad": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1340,
+        "line": 1347,
         "nearby": [
           "Loading Vehicles",
           "Loading Market Board",
@@ -28895,7 +29539,7 @@
     "Loading Language": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1346,
+        "line": 1353,
         "nearby": [
           "Loading Care Package",
           "Loading Addons",
@@ -28929,7 +29573,7 @@
     "Loading Live Map": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1342,
+        "line": 1349,
         "nearby": [
           "Loading Landsraad",
           "Loading Admin Tools",
@@ -28941,12 +29585,12 @@
     "Loading Logs": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1369,
+        "line": 1376,
         "nearby": [
           "Loading Storage",
           "Loading Backups",
-          "Loading Updates",
-          "Loading Access Control"
+          "Loading Chat",
+          "Loading Updates"
         ]
       }
     ],
@@ -28977,7 +29621,7 @@
     "Loading Maps": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1343,
+        "line": 1350,
         "nearby": [
           "Loading Admin Tools",
           "Loading Live Map",
@@ -28999,7 +29643,7 @@
     "Loading Market Board": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1339,
+        "line": 1346,
         "nearby": [
           "Loading Bases",
           "Loading Vehicles",
@@ -29066,7 +29710,7 @@
     "Loading Player Details": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1332,
+        "line": 1339,
         "nearby": [
           "Loading Services",
           "Loading Players",
@@ -29078,7 +29722,7 @@
     "Loading Players": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1332,
+        "line": 1339,
         "nearby": [
           "Support Project",
           "Loading Services",
@@ -29150,7 +29794,7 @@
     "Loading Services": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1330,
+        "line": 1337,
         "nearby": [
           "Support Project",
           "Loading Players",
@@ -29161,7 +29805,7 @@
     "Loading Settings": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1385,
+        "line": 1393,
         "nearby": [
           "Loading Updates",
           "Loading Access Control",
@@ -29173,10 +29817,11 @@
     "Loading setup": [
       {
         "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
-        "line": 134,
+        "line": 184,
         "nearby": [
           "6-digit code",
           "Confirm",
+          "Cancel",
           "Back to sign in"
         ]
       }
@@ -29219,7 +29864,7 @@
     "Loading Storage": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1349,
+        "line": 1356,
         "nearby": [
           "Loading Language",
           "Loading Database",
@@ -29237,6 +29882,15 @@
           "No table selected. Select a table to preview and edit rows.",
           "Preview failed:",
           "Search columns, or column='value' and/or ..."
+        ]
+      }
+    ],
+    "Loading Themes": [
+      {
+        "file": "console/web/src/themes/ThemeLauncher.tsx",
+        "line": 25,
+        "nearby": [
+          "Console Theme"
         ]
       }
     ],
@@ -29267,10 +29921,10 @@
     "Loading Updates": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1370,
+        "line": 1378,
         "nearby": [
-          "Loading Backups",
           "Loading Logs",
+          "Loading Chat",
           "Loading Access Control",
           "Loading Settings"
         ]
@@ -29279,7 +29933,7 @@
     "Loading Vehicles": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1338,
+        "line": 1345,
         "nearby": [
           "Loading Guilds",
           "Loading Bases",
@@ -29370,6 +30024,15 @@
         ]
       },
       {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 65,
+        "nearby": [
+          "Search published in-game messages. Captured messages may be filtered before players receive them.",
+          "Unavailable",
+          "Refresh chat"
+        ]
+      },
+      {
         "file": "console/web/src/features/landsraad/LandsraadPanel.tsx",
         "line": 331,
         "nearby": [
@@ -29427,16 +30090,6 @@
           "All Sets",
           "Reload",
           "Loading customizations..."
-        ]
-      },
-      {
-        "file": "console/web/src/features/database/DatabaseSchemaBrowser.tsx",
-        "line": 204,
-        "nearby": [
-          "Functions",
-          "Procedures",
-          "Refresh",
-          "shown"
         ]
       }
     ],
@@ -29648,7 +30301,7 @@
     "Log out": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1227,
+        "line": 1233,
         "nearby": [
           "Close navigation",
           "Open navigation",
@@ -29672,7 +30325,7 @@
     "Login Password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 585,
+        "line": 587,
         "nearby": [
           "Collapse Login Password",
           "Expand Login Password",
@@ -29684,7 +30337,7 @@
     "Login Password Changed": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 265,
+        "line": 267,
         "nearby": [
           "Enter your current authenticator code.",
           "Changing Login Password...",
@@ -29696,7 +30349,7 @@
     "Logout": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1228,
+        "line": 1234,
         "nearby": [
           "Open navigation",
           "Log out",
@@ -29718,12 +30371,12 @@
     "Logs": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 346,
+        "line": 348,
         "nearby": [
           "Database",
           "Updates",
-          "Settings",
-          "Access Control"
+          "Chat",
+          "Settings"
         ]
       },
       {
@@ -29756,7 +30409,7 @@
     "Lost access to your authenticator?": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1094,
+        "line": 1100,
         "nearby": [
           "Sign In",
           "Use your authenticator instead",
@@ -29780,7 +30433,7 @@
     "Lowercase Letter": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 955,
+        "line": 957,
         "nearby": [
           "API Keys",
           "At Least 13 Characters",
@@ -29967,6 +30620,16 @@
         ]
       },
       {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 83,
+        "nearby": [
+          "Chat channel",
+          "All Channels",
+          "Guild",
+          "Proximity"
+        ]
+      },
+      {
         "file": "console/web/src/features/liveMap/LiveMapPanel.tsx",
         "line": 1075,
         "nearby": [
@@ -30004,6 +30667,18 @@
           "Solari Coin",
           "Guild",
           "Level"
+        ]
+      }
+    ],
+    "Map / Guild": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 85,
+        "nearby": [
+          "Guild",
+          "Proximity",
+          "Map or guild",
+          "Any map or guild"
         ]
       }
     ],
@@ -30118,6 +30793,18 @@
         ]
       }
     ],
+    "Map or guild": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 85,
+        "nearby": [
+          "Proximity",
+          "Map / Guild",
+          "Any map or guild",
+          "Search"
+        ]
+      }
+    ],
     "Map Restart": [
       {
         "file": "console/web/src/features/adminTools/RestartMessagesModal.tsx",
@@ -30190,7 +30877,7 @@
     "Maps": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 354,
+        "line": 357,
         "nearby": [
           "Access Control",
           "Arrakis Management",
@@ -30224,7 +30911,7 @@
           "Landsraad",
           "Logs",
           "Realtime Data",
-          "Players"
+          "Chat"
         ]
       }
     ],
@@ -30396,7 +31083,7 @@
     "Matches": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 592,
+        "line": 594,
         "nearby": [
           "At Least 13 Characters",
           "Confirm New Password",
@@ -30787,6 +31474,25 @@
         ]
       },
       {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 91,
+        "nearby": [
+          "Channel / Location",
+          "Sender",
+          "Captured"
+        ]
+      },
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 95,
+        "nearby": [
+          "Channel / Location",
+          "Sender",
+          "Loading chat...",
+          "No Messages Found"
+        ]
+      },
+      {
         "file": "console/web/src/features/adminTools/ScheduledMapMessages.tsx",
         "line": 167,
         "nearby": [
@@ -30842,6 +31548,18 @@
           "Message of the Day saved. Players already online will become eligible again after 24 hours.",
           "Message of the Day saved. Players already online will receive it after their next login.",
           "at most once per player every 24 hours"
+        ]
+      }
+    ],
+    "Message or sender": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 81,
+        "nearby": [
+          "Search",
+          "Search chat",
+          "Channel",
+          "Chat channel"
         ]
       }
     ],
@@ -30966,7 +31684,7 @@
     "Missing": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 981,
+        "line": 983,
         "nearby": [
           "Files Checklist",
           "Found",
@@ -31429,6 +32147,18 @@
         ]
       }
     ],
+    "Near-black navy with electric blue and lilac.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 25,
+        "nearby": [
+          "Dark teal with jade and misty blue.",
+          "Smoky violet with pearl lavender and sand.",
+          "Deep petrol with aqua and sunlit gold.",
+          "Dark wine with dusty rose and pearl blue."
+        ]
+      }
+    ],
     "Needs Review": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
@@ -31585,6 +32315,16 @@
         ]
       }
     ],
+    "Neutral charcoal with pale blue and warm ivory.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 32,
+        "nearby": [
+          "Graphite blue with steel silver and sea green.",
+          "Roasted brown with spice orange and cool turquoise."
+        ]
+      }
+    ],
     "Never": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
@@ -31665,6 +32405,18 @@
         ]
       }
     ],
+    "New messages will appear here after collection is enabled.": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 98,
+        "nearby": [
+          "No Messages Found",
+          "Try another search or channel.",
+          "Showing",
+          "of"
+        ]
+      }
+    ],
     "New Owner": [
       {
         "file": "console/web/src/features/bases/BasePermissionsTab.tsx",
@@ -31726,7 +32478,7 @@
     "New Password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 591,
+        "line": 593,
         "nearby": [
           "Current Password",
           "Current password",
@@ -31748,7 +32500,7 @@
     "New password and confirmation do not match.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 245,
+        "line": 247,
         "nearby": [
           "New password must meet all password requirements.",
           "Password Change Failed",
@@ -31759,7 +32511,7 @@
     "New password must meet all password requirements.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 241,
+        "line": 243,
         "nearby": [
           "Enter your current login password.",
           "Password Change Failed",
@@ -31811,6 +32563,16 @@
           "Page",
           "of",
           "Last"
+        ]
+      },
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 105,
+        "nearby": [
+          "Page",
+          "of",
+          "Last",
+          "The newest page refreshes every five seconds. Whispers are never collected. Faction and party are not supported yet."
         ]
       },
       {
@@ -31945,7 +32707,7 @@
     "No access": [
       {
         "file": "console/web/src/api/apiKeys.ts",
-        "line": 168,
+        "line": 169,
         "nearby": [
           "Updates",
           "Vehicles"
@@ -32702,6 +33464,18 @@
           "Search",
           "Collapse Database Objects",
           "Expand Database Objects"
+        ]
+      }
+    ],
+    "No Messages Found": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 98,
+        "nearby": [
+          "Message",
+          "Loading chat...",
+          "Try another search or channel.",
+          "New messages will appear here after collection is enabled."
         ]
       }
     ],
@@ -33489,7 +34263,7 @@
     "Not Confirmed": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 433,
+        "line": 435,
         "nearby": [
           "Restart taking longer than expected",
           "Re-enable Failed",
@@ -33525,7 +34299,7 @@
     "Not Installed": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1521,
+        "line": 1539,
         "nearby": [
           "Action completed after creating a database backup.",
           "Action completed."
@@ -33826,7 +34600,7 @@
     "Number": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 957,
+        "line": 959,
         "nearby": [
           "Lowercase Letter",
           "Uppercase Letter",
@@ -33889,6 +34663,26 @@
         ]
       },
       {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 100,
+        "nearby": [
+          "New messages will appear here after collection is enabled.",
+          "Showing",
+          "Rows",
+          "Chat rows"
+        ]
+      },
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 104,
+        "nearby": [
+          "Previous",
+          "Page",
+          "Next",
+          "Last"
+        ]
+      },
+      {
         "file": "console/web/src/features/blueprints/CommunityBlueprintBrowser.tsx",
         "line": 200,
         "nearby": [
@@ -33945,26 +34739,6 @@
           "Disband guild",
           "Showing",
           "rows.",
-          "Rows"
-        ]
-      },
-      {
-        "file": "console/web/src/features/guilds/GuildsPanel.tsx",
-        "line": 386,
-        "nearby": [
-          "Previous",
-          "Page",
-          "Next",
-          "Last"
-        ]
-      },
-      {
-        "file": "console/web/src/features/vehicles/VehiclesPanel.tsx",
-        "line": 460,
-        "nearby": [
-          "No vehicles match this filter.",
-          "Showing",
-          "vehicles.",
           "Rows"
         ]
       }
@@ -34106,7 +34880,7 @@
     "Off by default. Turn it on to require an authenticator app code (plus 10 one-time recovery codes as backup) in addition to your password at sign-in.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 707,
+        "line": 709,
         "nearby": [
           "Disabling...",
           "Disable Two-Factor Authentication",
@@ -34404,7 +35178,7 @@
     "on the host, or ask whoever manages the server.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 711,
+        "line": 713,
         "nearby": [
           "Off by default. Turn it on to require an authenticator app code (plus 10 one-time recovery codes as backup) in addition to your password at sign-in.",
           "This protects the console's separate password login. Don't know it? Check",
@@ -34619,7 +35393,7 @@
     "Open Home": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1206,
+        "line": 1212,
         "nearby": [
           "Update setup values and redeploy your Dune server.",
           "Run and manage your self-hosted Dune server from the browser.",
@@ -34667,7 +35441,7 @@
     "Open navigation": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1215,
+        "line": 1221,
         "nearby": [
           "Dune Docker Console",
           "Close navigation",
@@ -34679,7 +35453,7 @@
     "Open Public Server Listing": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1303,
+        "line": 1309,
         "nearby": [
           "Get Help",
           "Community links",
@@ -35090,7 +35864,7 @@
     "Overwrite": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 219,
+        "line": 221,
         "nearby": [
           "A system backup with that name is already stored on this host. Keep both by storing the upload under a new name, or replace the stored one.",
           "Keep Both",
@@ -35113,7 +35887,7 @@
     "Overwriting destroys the only copy of the credentials inside the stored archive. There is no undo and no other copy on this host.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 222,
+        "line": 224,
         "nearby": [
           "Keep Both",
           "Overwrite",
@@ -35494,6 +36268,16 @@
         ]
       },
       {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 104,
+        "nearby": [
+          "First",
+          "Previous",
+          "of",
+          "Next"
+        ]
+      },
+      {
         "file": "console/web/src/features/blueprints/CommunityBlueprintBrowser.tsx",
         "line": 205,
         "nearby": [
@@ -35838,7 +36622,7 @@
     "Password (to confirm it's you)": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 656,
+        "line": 658,
         "nearby": [
           "Generate a fresh set of 10 recovery codes. Your authenticator is unchanged, and you stay signed in everywhere.",
           "Your existing recovery codes stop working the moment new ones are issued.",
@@ -35848,7 +36632,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 687,
+        "line": 689,
         "nearby": [
           "Disable anyway",
           "Cancel",
@@ -35858,7 +36642,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 713,
+        "line": 715,
         "nearby": [
           "This protects the console's separate password login. Don't know it? Check",
           "on the host, or ask whoever manages the server.",
@@ -35868,7 +36652,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 746,
+        "line": 748,
         "nearby": [
           "Forget this configuration entirely",
           "Permanently deletes the Client Secret and every saved field (guild, role mapping, MFA requirement). This cannot be undone from here — you would need to reconfigure from scratch, including generating a new Client Secret in Discord's Developer Portal.",
@@ -35878,7 +36662,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 791,
+        "line": 793,
         "nearby": [
           "Disable Discord Sign-In",
           "Discord sign-in will stop working as soon as the console restarts. Your application's settings are kept, not deleted.",
@@ -35890,7 +36674,7 @@
     "Password accepted — enter your authenticator code.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1058,
+        "line": 1064,
         "nearby": [
           "Battlegroup Started Successfully",
           "Enter one of your saved recovery codes.",
@@ -35901,14 +36685,14 @@
     "Password Change Failed": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 237,
+        "line": 239,
         "nearby": [
           "Enter your current login password."
         ]
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 241,
+        "line": 243,
         "nearby": [
           "Enter your current login password.",
           "New password must meet all password requirements."
@@ -35916,7 +36700,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 245,
+        "line": 247,
         "nearby": [
           "New password must meet all password requirements.",
           "New password and confirmation do not match."
@@ -35924,7 +36708,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 252,
+        "line": 254,
         "nearby": [
           "New password and confirmation do not match.",
           "Enter your current authenticator code.",
@@ -35933,7 +36717,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 273,
+        "line": 275,
         "nearby": [
           "Login Password Changed",
           "Signing you out so you can log back in with the new password.",
@@ -35998,7 +36782,7 @@
     "Password requirements": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 607,
+        "line": 609,
         "nearby": [
           "Two-factor is enabled, so changing the password needs a current code from your authenticator as well.",
           "Password Requirements",
@@ -36010,7 +36794,7 @@
     "Password Requirements": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 606,
+        "line": 608,
         "nearby": [
           "6-digit code",
           "Two-factor is enabled, so changing the password needs a current code from your authenticator as well.",
@@ -36034,7 +36818,7 @@
     "Passwords do not match": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 592,
+        "line": 594,
         "nearby": [
           "Confirm New Password",
           "Matches",
@@ -36299,7 +37083,7 @@
     "Permanently deletes the Client Secret and every saved field (guild, role mapping, MFA requirement). This cannot be undone from here — you would need to reconfigure from scratch, including generating a new Client Secret in Discord's Developer Portal.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 744,
+        "line": 746,
         "nearby": [
           "Hide",
           "Forget this configuration entirely",
@@ -37010,7 +37794,7 @@
     "Players": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 355,
+        "line": 358,
         "nearby": [
           "Arrakis Management",
           "Maps",
@@ -37020,10 +37804,10 @@
       },
       {
         "file": "console/web/src/api/apiKeys.ts",
-        "line": 154,
+        "line": 155,
         "nearby": [
-          "Maps",
           "Realtime Data",
+          "Chat",
           "Server",
           "Sietches"
         ]
@@ -37069,7 +37853,7 @@
     "Players are online": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 276,
+        "line": 278,
         "nearby": [
           "Confirm restart",
           "Restart Now",
@@ -37093,7 +37877,7 @@
     "Players online": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 286,
+        "line": 288,
         "nearby": [
           "Queue Restart ({count0} min)",
           "Restart Immediately",
@@ -37212,7 +37996,7 @@
     "Port Change Failed": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 464,
+        "line": 466,
         "nearby": [
           "Restart taking longer than expected",
           "Forget Failed",
@@ -37222,7 +38006,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 484,
+        "line": 486,
         "nearby": [
           "Saving Web Console Port...",
           "Web Console Port Saved",
@@ -37712,6 +38496,16 @@
         ]
       },
       {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 103,
+        "nearby": [
+          "Chat rows",
+          "First",
+          "Page",
+          "of"
+        ]
+      },
+      {
         "file": "console/web/src/features/blueprints/CommunityBlueprintBrowser.tsx",
         "line": 204,
         "nearby": [
@@ -38033,6 +38827,18 @@
         ]
       }
     ],
+    "Proximity": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 83,
+        "nearby": [
+          "Map",
+          "Guild",
+          "Map / Guild",
+          "Map or guild"
+        ]
+      }
+    ],
     "Public": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
@@ -38068,7 +38874,7 @@
     "Public descriptions, community links, recruitment details, and Player Portal settings are managed on DuneDocker.app. Generate a claim code from": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 852,
+        "line": 854,
         "nearby": [
           "Expand Public Listing Profile",
           "Public Listing Profile",
@@ -38122,7 +38928,7 @@
     "Public Listing Claimed": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 540,
+        "line": 542,
         "nearby": [
           "Server Startup Save Failed",
           "Verifying Listing Claim...",
@@ -38134,7 +38940,7 @@
     "Public Listing Profile": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 849,
+        "line": 851,
         "nearby": [
           "Collapse Public Listing Profile",
           "Expand Public Listing Profile",
@@ -38170,7 +38976,7 @@
     "Public Server Directory": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 454,
+        "line": 457,
         "nearby": [
           "Created with love by RedBlink ·",
           "Community Contributors",
@@ -38508,7 +39314,7 @@
     "Queue Restart ({count0} min)": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 280,
+        "line": 282,
         "nearby": [
           "Restart Now",
           "Players are online",
@@ -38646,6 +39452,18 @@
           "them",
           "Gateway",
           "Director"
+        ]
+      }
+    ],
+    "Quiet brown-black with sand gold and clear sky blue.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 17,
+        "nearby": [
+          "Volcanic gray with soft silver and warm copper.",
+          "Dark umber with burnished copper and sage.",
+          "Smoky slate with pale apricot and lavender.",
+          "Deep forest with fresh mint and soft brass."
         ]
       }
     ],
@@ -38853,7 +39671,7 @@
     "Re-enable Discord Sign-In": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 735,
+        "line": 737,
         "nearby": [
           "Your Discord application's settings are kept, not deleted — re-enable any time.",
           "Re-enabling...",
@@ -38865,7 +39683,7 @@
     "Re-enable Failed": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 421,
+        "line": 423,
         "nearby": [
           "Restarting the console...",
           "Restart taking longer than expected",
@@ -38877,7 +39695,7 @@
     "Re-enabling Discord sign-in...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 413,
+        "line": 415,
         "nearby": [
           "Restart taking longer than expected",
           "Disable Failed",
@@ -38888,7 +39706,7 @@
     "Re-enabling...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 735,
+        "line": 737,
         "nearby": [
           "Discord Sign-In (disabled)",
           "Your Discord application's settings are kept, not deleted — re-enable any time.",
@@ -39099,8 +39917,8 @@
         "nearby": [
           "Logs",
           "Maps",
-          "Players",
-          "Server"
+          "Chat",
+          "Players"
         ]
       }
     ],
@@ -39463,7 +40281,7 @@
     "Recovery code": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1066,
+        "line": 1072,
         "nearby": [
           "Enter one of your saved recovery codes.",
           "Password accepted — enter your authenticator code.",
@@ -39472,7 +40290,7 @@
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 1070,
+        "line": 1076,
         "nearby": [
           "Password accepted — enter your authenticator code.",
           "Authenticator code"
@@ -39526,7 +40344,7 @@
     "Redeploy": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1194,
+        "line": 1200,
         "nearby": [
           "Setup",
           "Finish the first-time setup to unlock the console.",
@@ -39965,6 +40783,16 @@
         ]
       },
       {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 66,
+        "nearby": [
+          "Unavailable",
+          "Refresh chat",
+          "Collection",
+          "Chat Collection"
+        ]
+      },
+      {
         "file": "console/web/src/features/exchange/ExchangePanel.tsx",
         "line": 295,
         "nearby": [
@@ -40033,16 +40861,6 @@
           "Search Character, FLS ID, Account ID, or Actor ID",
           "Search"
         ]
-      },
-      {
-        "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 840,
-        "nearby": [
-          "Enabled",
-          "Disabled",
-          "Server listing issue:",
-          "Collapse Public Listing Profile"
-        ]
       }
     ],
     "Refresh Addons": [
@@ -40076,6 +40894,18 @@
           ". Store the passphrase somewhere durable and separate from the archive.",
           "Create System Backup",
           "Delete System Backups"
+        ]
+      }
+    ],
+    "Refresh chat": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 66,
+        "nearby": [
+          "Loading...",
+          "Unavailable",
+          "Refresh",
+          "Collection"
         ]
       }
     ],
@@ -40171,10 +41001,11 @@
       },
       {
         "file": "console/web/src/components/common/LazyTabBoundary.tsx",
-        "line": 83,
+        "line": 85,
         "nearby": [
           "The console may have been updated since this page was loaded. Refresh to load the current version.",
-          "This section encountered an unexpected error. Refresh and try again."
+          "This section encountered an unexpected error. Refresh and try again.",
+          "Close"
         ]
       }
     ],
@@ -40314,7 +41145,7 @@
     "Regenerate Recovery Codes": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 669,
+        "line": 671,
         "nearby": [
           "Current 6-digit code",
           "Generating...",
@@ -40326,7 +41157,7 @@
     "Regeneration Failed": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 280,
+        "line": 282,
         "nearby": [
           "Signing you out so you can log back in with the new password.",
           "Password Change Failed",
@@ -40335,7 +41166,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 284,
+        "line": 286,
         "nearby": [
           "Enter your current login password.",
           "Enter your current authenticator code.",
@@ -40344,7 +41175,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 303,
+        "line": 305,
         "nearby": [
           "Enter your current authenticator code.",
           "Generating New Recovery Codes...",
@@ -41266,6 +42097,18 @@
         ]
       }
     ],
+    "Replace any authenticator entry from an earlier setup attempt with the QR code shown here.": [
+      {
+        "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
+        "line": 163,
+        "nearby": [
+          "Your previous authenticator and recovery codes no longer work. Scan the new code below with your authenticator app, then enter the 6-digit code it shows.",
+          "Scan the QR code with your authenticator app, then enter its current 6-digit code.",
+          "Authenticator QR code",
+          "Can't scan? Enter this code manually:"
+        ]
+      }
+    ],
     "Replace Passphrase": [
       {
         "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
@@ -41329,7 +42172,7 @@
     "Report Issues": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1277,
+        "line": 1283,
         "nearby": [
           "Logout",
           "Requests",
@@ -41359,7 +42202,7 @@
     "Requests": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1276,
+        "line": 1282,
         "nearby": [
           "Log out",
           "Logout",
@@ -41952,7 +42795,7 @@
     "Restart Immediately": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 282,
+        "line": 284,
         "nearby": [
           "Players are online",
           "Queue Restart ({count0} min)",
@@ -41964,7 +42807,7 @@
     "Restart later": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 324,
+        "line": 326,
         "nearby": [
           "Custom settings",
           "UserGame settings",
@@ -41976,7 +42819,7 @@
     "Restart later leaves the servers running as-is; the change applies at the next battlegroup restart, manual or automatic.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 325,
+        "line": 327,
         "nearby": [
           "UserGame settings",
           "Restart later",
@@ -41999,7 +42842,7 @@
     "Restart Now": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 265,
+        "line": 267,
         "nearby": [
           "Already stored",
           "Confirm restart",
@@ -42260,7 +43103,7 @@
     "Restart taking longer than expected": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 400,
+        "line": 402,
         "nearby": [
           "Disabling Discord sign-in...",
           "Restarting the console...",
@@ -42270,7 +43113,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 418,
+        "line": 420,
         "nearby": [
           "Re-enabling Discord sign-in...",
           "Restarting the console...",
@@ -42280,7 +43123,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 452,
+        "line": 454,
         "nearby": [
           "Forgetting Discord configuration...",
           "Restarting the console...",
@@ -42562,7 +43405,7 @@
     "Restarting the console...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 399,
+        "line": 401,
         "nearby": [
           "Disable",
           "Disabling Discord sign-in...",
@@ -42572,7 +43415,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 417,
+        "line": 419,
         "nearby": [
           "Disable Failed",
           "Re-enabling Discord sign-in...",
@@ -42582,7 +43425,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 451,
+        "line": 453,
         "nearby": [
           "Enter your current login password.",
           "Forgetting Discord configuration...",
@@ -43279,6 +44122,18 @@
         ]
       }
     ],
+    "Retention days": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 74,
+        "nearby": [
+          "Collection includes map, guild and proximity messages. Private whispers never reach the recorder.",
+          "Keep history for",
+          "days",
+          "History is limited to 5,000 messages and 10 MiB. The oldest messages are removed first. Collection starts with new messages; earlier chat cannot be recovered."
+        ]
+      }
+    ],
     "Retry": [
       {
         "file": "console/web/src/features/bases/BasesPanel.tsx",
@@ -43691,6 +44546,17 @@
         ]
       }
     ],
+    "Roasted brown with spice orange and cool turquoise.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 31,
+        "nearby": [
+          "Soft dark taupe with limestone and sage blue.",
+          "Graphite blue with steel silver and sea green.",
+          "Neutral charcoal with pale blue and warm ivory."
+        ]
+      }
+    ],
     "Roster": [
       {
         "file": "console/web/src/features/player/PlayerPages.tsx",
@@ -43766,6 +44632,16 @@
           "rows.",
           "First",
           "Previous"
+        ]
+      },
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 101,
+        "nearby": [
+          "Showing",
+          "of",
+          "Chat rows",
+          "First"
         ]
       },
       {
@@ -43942,7 +44818,7 @@
     "Run and manage your self-hosted Dune server from the browser.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1197,
+        "line": 1203,
         "nearby": [
           "Redeploy",
           "Update setup values and redeploy your Dune server.",
@@ -44211,7 +45087,7 @@
     "Runtime Configuration": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 967,
+        "line": 969,
         "nearby": [
           "Number",
           "Special Character",
@@ -44223,7 +45099,7 @@
     "Runtime file checks have not loaded yet.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 982,
+        "line": 984,
         "nearby": [
           "Found",
           "Missing",
@@ -44615,7 +45491,7 @@
     "Save And Restart Console": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 914,
+        "line": 916,
         "nearby": [
           "Console Port",
           "Saving...",
@@ -44727,6 +45603,18 @@
         "nearby": [
           "Discard Changes",
           "Saving…"
+        ]
+      }
+    ],
+    "Save Collection Settings": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 76,
+        "nearby": [
+          "days",
+          "History is limited to 5,000 messages and 10 MiB. The oldest messages are removed first. Collection starts with new messages; earlier chat cannot be recovered.",
+          "Clear History",
+          "Delete all stored chat history? This cannot be undone."
         ]
       }
     ],
@@ -45116,7 +46004,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 827,
+        "line": 829,
         "nearby": [
           "Helps us understand how many Dune Docker servers are in use, including local and unlisted installations. Only anonymous server presence is reported—never your server name, IP address, players, or configuration. These statistics help demonstrate project usage and guide future development.",
           "Anonymous Count:",
@@ -45126,7 +46014,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 838,
+        "line": 840,
         "nearby": [
           "Disabled",
           "Server Listing:",
@@ -45135,7 +46023,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 894,
+        "line": 896,
         "nearby": [
           "The Console always starts with Docker. When this is disabled, the Battlegroup remains stopped after the Linux host boots until you start it manually.",
           "Automatic Startup:",
@@ -45350,7 +46238,7 @@
     "Saving Server Startup...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 515,
+        "line": 517,
         "nearby": [
           "Web Console Port Saved",
           "Port Change Failed",
@@ -45407,7 +46295,7 @@
     "Saving Web Console Port...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 470,
+        "line": 472,
         "nearby": [
           "Port Change Failed",
           "Enter a port number between 1 and 65535.",
@@ -45504,7 +46392,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 612,
+        "line": 614,
         "nearby": [
           "Password Requirements",
           "Password requirements",
@@ -45514,7 +46402,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 914,
+        "line": 916,
         "nearby": [
           ". Open the new address shown in the result message.",
           "Console Port",
@@ -45646,6 +46534,18 @@
           "Revert",
           "Save changes",
           "Saving writes to the live database and notifies the running map server. An online player may need to reopen the vehicle's interaction panel to see the change."
+        ]
+      }
+    ],
+    "Scan the QR code with your authenticator app, then enter its current 6-digit code.": [
+      {
+        "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
+        "line": 157,
+        "nearby": [
+          "Set up two-factor authentication",
+          "Your previous authenticator and recovery codes no longer work. Scan the new code below with your authenticator app, then enter the 6-digit code it shows.",
+          "Replace any authenticator entry from an earlier setup attempt with the QR code shown here.",
+          "Authenticator QR code"
         ]
       }
     ],
@@ -45958,6 +46858,26 @@
         ]
       },
       {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 81,
+        "nearby": [
+          "Delete All History",
+          "Cancel",
+          "Search chat",
+          "Message or sender"
+        ]
+      },
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 86,
+        "nearby": [
+          "Map or guild",
+          "Any map or guild",
+          "Collection is off. An owner can enable it under Collection. Previously stored history remains available until it expires or is cleared.",
+          "Chat storage needs attention. Existing data has been preserved."
+        ]
+      },
+      {
         "file": "console/web/src/features/blueprints/CommunityBlueprintBrowser.tsx",
         "line": 169,
         "nearby": [
@@ -46036,26 +46956,6 @@
           "Clear",
           "Showing"
         ]
-      },
-      {
-        "file": "console/web/src/features/database/DatabasePanel.tsx",
-        "line": 586,
-        "nearby": [
-          "Search Tables and Columns",
-          "Search tables or columns",
-          "No matching tables or columns found.",
-          "Collapse Database Objects"
-        ]
-      },
-      {
-        "file": "console/web/src/features/bases/BaseInventoryTab.tsx",
-        "line": 1079,
-        "nearby": [
-          "Filter items…",
-          "Filter containers…",
-          "Clear",
-          "No items match this filter."
-        ]
       }
     ],
     "Search a player to add": [
@@ -46133,6 +47033,18 @@
           "Refresh",
           "Search",
           "Clear"
+        ]
+      }
+    ],
+    "Search chat": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 81,
+        "nearby": [
+          "Cancel",
+          "Search",
+          "Message or sender",
+          "Channel"
         ]
       }
     ],
@@ -46329,6 +47241,18 @@
           "Search permissions",
           "Clear search",
           "The JSON tab contains invalid JSON. Fix it there before changing permissions here -- the grid is read-only until it parses."
+        ]
+      }
+    ],
+    "Search published in-game messages. Captured messages may be filtered before players receive them.": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 63,
+        "nearby": [
+          "Storage Needs Attention",
+          "Chat",
+          "Unavailable",
+          "Loading..."
         ]
       }
     ],
@@ -47053,6 +47977,27 @@
         ]
       }
     ],
+    "Sender": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 91,
+        "nearby": [
+          "Captured",
+          "Channel / Location",
+          "Message"
+        ]
+      },
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 94,
+        "nearby": [
+          "Captured",
+          "Channel / Location",
+          "Message",
+          "Loading chat..."
+        ]
+      }
+    ],
     "Sending...": [
       {
         "file": "console/web/src/features/adminTools/ScheduledMapMessages.tsx",
@@ -47067,9 +48012,9 @@
     "Server": [
       {
         "file": "console/web/src/api/apiKeys.ts",
-        "line": 155,
+        "line": 156,
         "nearby": [
-          "Realtime Data",
+          "Chat",
           "Players",
           "Sietches",
           "Storage"
@@ -47091,7 +48036,7 @@
     "Server Control": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 342,
+        "line": 344,
         "nearby": [
           "Server Operations",
           "Home",
@@ -47246,7 +48191,7 @@
     "Server listing issue:": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 844,
+        "line": 846,
         "nearby": [
           "Disabled",
           "Refresh",
@@ -47258,7 +48203,7 @@
     "Server Listing:": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 837,
+        "line": 839,
         "nearby": [
           "Enabled",
           "Disabled",
@@ -47269,7 +48214,7 @@
     "Server Operations": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 339,
+        "line": 341,
         "nearby": [
           "Restart later",
           "Restart later leaves the servers running as-is; the change applies at the next battlegroup restart, manual or automatic.",
@@ -47293,7 +48238,7 @@
     "Server Startup": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 879,
+        "line": 881,
         "nearby": [
           "Collapse Server Startup",
           "Expand Server Startup",
@@ -47305,7 +48250,7 @@
     "Server Startup Save Failed": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 527,
+        "line": 529,
         "nearby": [
           "The Battlegroup will start automatically after the Linux host boots.",
           "The Console will start after the Linux host boots, but the Battlegroup will remain stopped until you start it.",
@@ -47317,7 +48262,7 @@
     "Server Startup Saved": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 521,
+        "line": 523,
         "nearby": [
           "Port Change Failed",
           "Saving Server Startup...",
@@ -47703,9 +48648,10 @@
     "Set up a new authenticator": [
       {
         "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
-        "line": 105,
+        "line": 153,
         "nearby": [
-          "That code was not accepted, and this has failed a few times in a row -- the most common cause is your device's clock being out of sync. Check that your phone or authenticator app has automatic time set on, then try the current code again.",
+          "Enable 2FA",
+          "Cancel 2FA setup",
           "Set up two-factor authentication",
           "Your previous authenticator and recovery codes no longer work. Scan the new code below with your authenticator app, then enter the 6-digit code it shows."
         ]
@@ -47726,7 +48672,7 @@
     "Set up Discord sign-in": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1137,
+        "line": 1143,
         "nearby": [
           "to continue setting up Discord sign-in.",
           "cancel",
@@ -47757,12 +48703,12 @@
     "Set up two-factor authentication": [
       {
         "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
-        "line": 105,
+        "line": 153,
         "nearby": [
-          "That code was not accepted, and this has failed a few times in a row -- the most common cause is your device's clock being out of sync. Check that your phone or authenticator app has automatic time set on, then try the current code again.",
+          "Cancel 2FA setup",
           "Set up a new authenticator",
           "Your previous authenticator and recovery codes no longer work. Scan the new code below with your authenticator app, then enter the 6-digit code it shows.",
-          "This console now requires an authenticator app. Scan the code below with an app like Google Authenticator or Authy, then enter the 6-digit code it shows."
+          "Scan the QR code with your authenticator app, then enter its current 6-digit code."
         ]
       }
     ],
@@ -47817,10 +48763,10 @@
     "Settings": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 347,
+        "line": 350,
         "nearby": [
-          "Updates",
           "Logs",
+          "Chat",
           "Access Control",
           "Arrakis Management"
         ]
@@ -47857,7 +48803,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 816,
+        "line": 818,
         "nearby": [
           "Disabling...",
           "Disable Discord Sign-In",
@@ -47953,7 +48899,7 @@
     "Setup": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1173,
+        "line": 1179,
         "nearby": [
           "Dune Docker Console",
           "Loading Console",
@@ -48145,6 +49091,16 @@
           "of",
           "No bases have been found yet.",
           "rows."
+        ]
+      },
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 100,
+        "nearby": [
+          "Try another search or channel.",
+          "New messages will appear here after collection is enabled.",
+          "of",
+          "Rows"
         ]
       },
       {
@@ -48513,7 +49469,7 @@
     "Sietches": [
       {
         "file": "console/web/src/api/apiKeys.ts",
-        "line": 156,
+        "line": 157,
         "nearby": [
           "Players",
           "Server",
@@ -48535,7 +49491,7 @@
     "Sign In": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1087,
+        "line": 1093,
         "nearby": [
           "Authenticator code",
           "Use your authenticator instead",
@@ -48544,7 +49500,7 @@
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 1101,
+        "line": 1107,
         "nearby": [
           "Admin password",
           "Admin Password",
@@ -48554,7 +49510,7 @@
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 1134,
+        "line": 1140,
         "nearby": [
           "Discord sign-in is set up — restart the console to switch it on.",
           "Type your admin password above, then select",
@@ -48563,10 +49519,20 @@
         ]
       }
     ],
+    "Sign In Again": [
+      {
+        "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
+        "line": 188,
+        "nearby": [
+          "Cancel",
+          "Back to sign in"
+        ]
+      }
+    ],
     "Sign in again to continue.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1144,
+        "line": 1150,
         "nearby": [
           "Set up Discord sign-in",
           "Your browser login session expired.",
@@ -48578,7 +49544,7 @@
     "Sign in with Discord": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1120,
+        "line": 1126,
         "nearby": [
           "Dune Docker Console logo",
           "Beyond the Dunes, Every Choice Shapes the Future",
@@ -48634,7 +49600,7 @@
     "Signing you out so you can log back in with the new password.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 265,
+        "line": 267,
         "nearby": [
           "Changing Login Password...",
           "Login Password Changed",
@@ -48880,6 +49846,30 @@
         ]
       }
     ],
+    "Smoky slate with pale apricot and lavender.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 18,
+        "nearby": [
+          "Dark umber with burnished copper and sage.",
+          "Quiet brown-black with sand gold and clear sky blue.",
+          "Deep forest with fresh mint and soft brass.",
+          "Dark aubergine with honey gold and rose."
+        ]
+      }
+    ],
+    "Smoky violet with pearl lavender and sand.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 24,
+        "nearby": [
+          "Ink blue with periwinkle and peach.",
+          "Dark teal with jade and misty blue.",
+          "Near-black navy with electric blue and lilac.",
+          "Deep petrol with aqua and sunlit gold."
+        ]
+      }
+    ],
     "Smuggler's Run stays Dynamic so its instance is retired as soon as it becomes empty and the next visit starts with fresh vehicle permissions.": [
       {
         "file": "console/web/src/features/maps/MapsPanel.tsx",
@@ -48888,6 +49878,18 @@
           "Edit",
           "This story map stays Dynamic so its completed instance is retired and the next visit starts in a fresh server process.",
           "Vehicle-deploy Overland maps use Overmap Active instead of Always On by default to avoid vehicle ownership restore races during startup."
+        ]
+      }
+    ],
+    "Soft dark taupe with limestone and sage blue.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 29,
+        "nearby": [
+          "Dark wine with dusty rose and pearl blue.",
+          "Earthy charcoal with saffron and olive silver.",
+          "Graphite blue with steel silver and sea green.",
+          "Roasted brown with spice orange and cool turquoise."
         ]
       }
     ],
@@ -49086,7 +50088,7 @@
     "Special Character": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 958,
+        "line": 960,
         "nearby": [
           "Uppercase Letter",
           "Number",
@@ -49314,7 +50316,7 @@
     "Start Battlegroup Automatically": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 883,
+        "line": 885,
         "nearby": [
           "Expand Server Startup",
           "Server Startup",
@@ -49536,7 +50538,7 @@
     "Starting Two-Factor Setup...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 314,
+        "line": 316,
         "nearby": [
           "Could Not Start Setup",
           "Enter your current login password.",
@@ -49547,7 +50549,7 @@
     "Starting...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 717,
+        "line": 719,
         "nearby": [
           "Your login password",
           "You'll see a QR code to scan, then be asked to sign back in once it's confirmed.",
@@ -49973,7 +50975,7 @@
     "Storage": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 359,
+        "line": 362,
         "nearby": [
           "Bases",
           "Vehicles",
@@ -49983,7 +50985,7 @@
       },
       {
         "file": "console/web/src/api/apiKeys.ts",
-        "line": 157,
+        "line": 158,
         "nearby": [
           "Server",
           "Sietches",
@@ -50006,6 +51008,18 @@
         "line": 55,
         "nearby": [
           "Refresh Storage"
+        ]
+      }
+    ],
+    "Storage Needs Attention": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 6,
+        "nearby": [
+          "Collecting",
+          "Connection Unavailable",
+          "Chat",
+          "Search published in-game messages. Captured messages may be filtered before players receive them."
         ]
       }
     ],
@@ -50260,7 +51274,7 @@
     "Support Project": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1318,
+        "line": 1325,
         "nearby": [
           "Join Discord",
           "Loading Services"
@@ -51354,10 +52368,10 @@
     "That code was not accepted, and this has failed a few times in a row -- the most common cause is your device's clock being out of sync. Check that your phone or authenticator app has automatic time set on, then try the current code again.": [
       {
         "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
-        "line": 44,
+        "line": 48,
         "nearby": [
-          "Set up a new authenticator",
-          "Set up two-factor authentication"
+          "Enable 2FA",
+          "Cancel 2FA setup"
         ]
       }
     ],
@@ -51519,7 +52533,7 @@
     "The Battlegroup will start automatically after the Linux host boots.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 523,
+        "line": 525,
         "nearby": [
           "Saving Server Startup...",
           "Server Startup Saved",
@@ -51555,7 +52569,7 @@
     "The Console always starts with Docker. When this is disabled, the Battlegroup remains stopped after the Linux host boots until you start it manually.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 884,
+        "line": 886,
         "nearby": [
           "Server Startup",
           "Start Battlegroup Automatically",
@@ -51602,7 +52616,7 @@
     "The console may have been updated since this page was loaded. Refresh to load the current version.": [
       {
         "file": "console/web/src/components/common/LazyTabBoundary.tsx",
-        "line": 81,
+        "line": 83,
         "nearby": [
           "Could not load this section.",
           "This section encountered an unexpected error. Refresh and try again.",
@@ -51637,7 +52651,7 @@
     "The Console will start after the Linux host boots, but the Battlegroup will remain stopped until you start it.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 524,
+        "line": 526,
         "nearby": [
           "Server Startup Saved",
           "The Battlegroup will start automatically after the Linux host boots.",
@@ -51944,7 +52958,7 @@
     "The login password is managed by": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 588,
+        "line": 590,
         "nearby": [
           "(fallback)",
           "Change the password used to sign in to this web console.",
@@ -52078,6 +53092,16 @@
           "Import Failed",
           "Importing Backup",
           "Backup Imported Successfully"
+        ]
+      }
+    ],
+    "The newest page refreshes every five seconds. Whispers are never collected. Faction and party are not supported yet.": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 108,
+        "nearby": [
+          "Next",
+          "Last"
         ]
       }
     ],
@@ -52316,6 +53340,16 @@
           "The system backup was restored. This host now carries the archive's configuration, credentials and database.",
           "Setup completed successfully. The server has been redeployed and the full console is still available.",
           "Restarting the console in"
+        ]
+      }
+    ],
+    "The standard console look.": [
+      {
+        "file": "console/web/src/themes/ThemePanel.tsx",
+        "line": 43,
+        "nearby": [
+          "Console Theme",
+          "Close"
         ]
       }
     ],
@@ -52633,7 +53667,7 @@
     "This archive and this host each have their own admin audit history. Adopt the backup's history when moving the same server to new hardware. Keep this host's own history when restoring into a different server or rolling back a mistake.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 190,
+        "line": 192,
         "nearby": [
           "Backup ID",
           "Choose Admin Audit History",
@@ -52657,7 +53691,7 @@
     "This backup belongs to a different Battlegroup. Adopt the backup identity when moving the same server to new hardware. Keep the current identity only when intentionally importing data into this different server.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 158,
+        "line": 160,
         "nearby": [
           "Yes",
           "Choose Battlegroup Identity",
@@ -52759,22 +53793,10 @@
         ]
       }
     ],
-    "This console now requires an authenticator app. Scan the code below with an app like Google Authenticator or Authy, then enter the 6-digit code it shows.": [
-      {
-        "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
-        "line": 109,
-        "nearby": [
-          "Set up two-factor authentication",
-          "Your previous authenticator and recovery codes no longer work. Scan the new code below with your authenticator app, then enter the 6-digit code it shows.",
-          "If you scanned a QR code for this console before, delete that entry from your authenticator now -- it is no longer valid.",
-          "Authenticator QR code"
-        ]
-      }
-    ],
     "This console's two-factor state could not be read, so password changes and recovery-code regeneration are unavailable right now. Do not delete": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 642,
+        "line": 644,
         "nearby": [
           "Saving...",
           "Change Password",
@@ -53015,7 +54037,7 @@
     "This password is Discord sign-in's break-glass fallback if it's ever unavailable — make sure whoever manages Discord access also knows it.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 581,
+        "line": 583,
         "nearby": [
           "Public Listing Claimed",
           "Listing Claim Failed",
@@ -53097,7 +54119,7 @@
     "This protects the console's separate password login. Don't know it? Check": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 711,
+        "line": 713,
         "nearby": [
           "Disable Two-Factor Authentication",
           "Off by default. Turn it on to require an authenticator app code (plus 10 one-time recovery codes as backup) in addition to your password at sign-in.",
@@ -53121,11 +54143,12 @@
     "This section encountered an unexpected error. Refresh and try again.": [
       {
         "file": "console/web/src/components/common/LazyTabBoundary.tsx",
-        "line": 82,
+        "line": 84,
         "nearby": [
           "Could not load this section.",
           "The console may have been updated since this page was loaded. Refresh to load the current version.",
-          "Refresh Now"
+          "Refresh Now",
+          "Close"
         ]
       }
     ],
@@ -53424,7 +54447,7 @@
     "to continue setting up Discord sign-in.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1134,
+        "line": 1140,
         "nearby": [
           "Type your admin password above, then select",
           "Sign In",
@@ -54026,6 +55049,18 @@
         ]
       }
     ],
+    "Try another search or channel.": [
+      {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 98,
+        "nearby": [
+          "Loading chat...",
+          "No Messages Found",
+          "New messages will appear here after collection is enabled.",
+          "Showing"
+        ]
+      }
+    ],
     "Turn off automatic system backups first": [
       {
         "file": "console/web/src/features/backups/SystemBackupScheduleCard.tsx",
@@ -54083,7 +55118,7 @@
     "Turns two-factor off entirely and deletes every remaining recovery code. Signing in goes back to password-only until you enable it again.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 677,
+        "line": 679,
         "nearby": [
           "Regenerate Recovery Codes",
           "Disable Two-Factor Authentication",
@@ -54095,7 +55130,7 @@
     "Two-Factor Authentication": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 649,
+        "line": 651,
         "nearby": [
           "Collapse Two-Factor Authentication",
           "Expand Two-Factor Authentication",
@@ -54107,7 +55142,7 @@
     "Two-Factor Authentication Disabled": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 365,
+        "line": 367,
         "nearby": [
           "Disable",
           "Disabling Two-Factor Authentication...",
@@ -54130,7 +55165,7 @@
     "Two-factor is enabled, so changing the password needs a current code from your authenticator as well.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 604,
+        "line": 606,
         "nearby": [
           "Authenticator Code",
           "6-digit code",
@@ -54233,7 +55268,7 @@
     "Type \"forget\" to confirm.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 433,
+        "line": 435,
         "nearby": [
           "Re-enable Failed",
           "Not Confirmed",
@@ -54245,7 +55280,7 @@
     "Type &ldquo;forget&rdquo; to confirm": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 757,
+        "line": 759,
         "nearby": [
           "Authenticator Code (to confirm it's you)",
           "Current 6-digit code",
@@ -54281,7 +55316,7 @@
     "Type your admin password above, then select": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1134,
+        "line": 1140,
         "nearby": [
           "Use the admin password instead",
           "Discord sign-in is set up — restart the console to switch it on.",
@@ -54397,6 +55432,15 @@
         ]
       },
       {
+        "file": "console/web/src/features/chat/ChatPanel.tsx",
+        "line": 65,
+        "nearby": [
+          "Chat",
+          "Search published in-game messages. Captured messages may be filtered before players receive them.",
+          "Loading..."
+        ]
+      },
+      {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
         "line": 502,
         "nearby": [
@@ -54470,7 +55514,7 @@
     "Unclaimed Listing": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1304,
+        "line": 1310,
         "nearby": [
           "Open Public Server Listing",
           "Claimed Listing",
@@ -55030,7 +56074,7 @@
     "Unset": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1470,
+        "line": 1488,
         "nearby": [
           "Loading Access Control",
           "Loading Settings",
@@ -55318,7 +56362,7 @@
     "Update setup values and redeploy your Dune server.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1196,
+        "line": 1202,
         "nearby": [
           "Finish the first-time setup to unlock the console.",
           "Redeploy",
@@ -55399,17 +56443,17 @@
     "Updates": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 345,
+        "line": 347,
         "nearby": [
           "Backups",
           "Database",
           "Logs",
-          "Settings"
+          "Chat"
         ]
       },
       {
         "file": "console/web/src/api/apiKeys.ts",
-        "line": 158,
+        "line": 159,
         "nearby": [
           "Sietches",
           "Storage",
@@ -55620,7 +56664,7 @@
     "Uppercase Letter": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 956,
+        "line": 958,
         "nearby": [
           "At Least 13 Characters",
           "Lowercase Letter",
@@ -55769,7 +56813,7 @@
     "Use the admin password instead": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1123,
+        "line": 1129,
         "nearby": [
           "Sign in with Discord",
           "Hide the admin password",
@@ -55793,7 +56837,7 @@
     "Use your authenticator instead": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1094,
+        "line": 1100,
         "nearby": [
           "Authenticator code",
           "Sign In",
@@ -55839,7 +56883,7 @@
     "UserEngine settings": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 316,
+        "line": 318,
         "nearby": [
           "Restart Immediately",
           "Players online",
@@ -55896,7 +56940,7 @@
     "UserGame settings": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 316,
+        "line": 318,
         "nearby": [
           "UserEngine settings",
           "Custom settings",
@@ -56122,7 +57166,7 @@
     "Vehicles": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 358,
+        "line": 361,
         "nearby": [
           "Guilds",
           "Bases",
@@ -56132,7 +57176,7 @@
       },
       {
         "file": "console/web/src/api/apiKeys.ts",
-        "line": 159,
+        "line": 160,
         "nearby": [
           "Storage",
           "Updates",
@@ -56245,7 +57289,7 @@
     "Verify Generated Code": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 867,
+        "line": 869,
         "nearby": [
           "ABCD-EF12-3456",
           "Verifying...",
@@ -56281,7 +57325,7 @@
     "Verifying Listing Claim...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 534,
+        "line": 536,
         "nearby": [
           "The Console will start after the Linux host boots, but the Battlegroup will remain stopped until you start it.",
           "Server Startup Save Failed",
@@ -56339,7 +57383,7 @@
     "Verifying...": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 867,
+        "line": 869,
         "nearby": [
           "Generated Claim Code",
           "ABCD-EF12-3456",
@@ -56502,6 +57546,17 @@
           "Available Intel",
           "Health",
           "Hydration"
+        ]
+      }
+    ],
+    "Volcanic gray with soft silver and warm copper.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 15,
+        "nearby": [
+          "Warm charcoal with amber and muted turquoise.",
+          "Dark umber with burnished copper and sage.",
+          "Quiet brown-black with sand gold and clear sky blue."
         ]
       }
     ],
@@ -56718,6 +57773,16 @@
         ]
       }
     ],
+    "Warm charcoal with amber and muted turquoise.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 14,
+        "nearby": [
+          "Volcanic gray with soft silver and warm copper.",
+          "Dark umber with burnished copper and sage."
+        ]
+      }
+    ],
     "Warming": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
@@ -56927,7 +57992,7 @@
     "Web Console Port": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 906,
+        "line": 908,
         "nearby": [
           "Collapse Web Console Port",
           "Expand Web Console Port",
@@ -56939,7 +58004,7 @@
     "Web Console Port Saved": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 478,
+        "line": 480,
         "nearby": [
           "Enter a port number between 1 and 65535.",
           "Saving Web Console Port...",
@@ -57115,7 +58180,7 @@
     "Whichever history is not kept is still saved to the pre-restore safety copy, not deleted -- but it stops being the live record.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 195,
+        "line": 197,
         "nearby": [
           "Adopt Backup History",
           "Keep Current History",
@@ -57371,7 +58436,7 @@
     "Yes": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 138,
+        "line": 140,
         "nearby": [
           "Confirm Action",
           "Continue?",
@@ -57400,7 +58465,7 @@
     "You can turn on &ldquo;Require Discord two-factor for Owner and Admin&rdquo; from the Discord OAuth section above (Change application credentials) if you'd like to keep two-factor active another way.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 680,
+        "line": 682,
         "nearby": [
           "Turns two-factor off entirely and deletes every remaining recovery code. Signing in goes back to password-only until you enable it again.",
           "Disabling this will leave your console with no two-factor authentication anywhere — Discord sign-in doesn't require Discord's own two-factor for your role.",
@@ -57447,7 +58512,7 @@
     "You'll see a QR code to scan, then be asked to sign back in once it's confirmed.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 715,
+        "line": 717,
         "nearby": [
           "Password (to confirm it's you)",
           "Your login password",
@@ -57471,7 +58536,7 @@
     "Your browser login session expired.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1144,
+        "line": 1150,
         "nearby": [
           "cancel",
           "Set up Discord sign-in",
@@ -57550,7 +58615,7 @@
     "Your Discord application's settings are kept, not deleted — re-enable any time.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 733,
+        "line": 735,
         "nearby": [
           "Enable Two-Factor Authentication",
           "Discord Sign-In (disabled)",
@@ -57574,7 +58639,7 @@
     "Your existing recovery codes stop working the moment new ones are issued.": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 654,
+        "line": 656,
         "nearby": [
           "(off)",
           "Generate a fresh set of 10 recovery codes. Your authenticator is unchanged, and you stay signed in everywhere.",
@@ -57598,7 +58663,7 @@
     "Your login password": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 656,
+        "line": 658,
         "nearby": [
           "Your existing recovery codes stop working the moment new ones are issued.",
           "Password (to confirm it's you)",
@@ -57608,7 +58673,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 713,
+        "line": 715,
         "nearby": [
           "on the host, or ask whoever manages the server.",
           "Password (to confirm it's you)",
@@ -57618,7 +58683,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 746,
+        "line": 748,
         "nearby": [
           "Permanently deletes the Client Secret and every saved field (guild, role mapping, MFA requirement). This cannot be undone from here — you would need to reconfigure from scratch, including generating a new Client Secret in Discord's Developer Portal.",
           "Password (to confirm it's you)",
@@ -57628,7 +58693,7 @@
       },
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 791,
+        "line": 793,
         "nearby": [
           "Discord sign-in will stop working as soon as the console restarts. Your application's settings are kept, not deleted.",
           "Password (to confirm it's you)",
@@ -57640,7 +58705,7 @@
     "Your login password (to disable)": [
       {
         "file": "console/web/src/features/settings/SettingsPanel.tsx",
-        "line": 687,
+        "line": 689,
         "nearby": [
           "Cancel",
           "Password (to confirm it's you)",
@@ -57664,12 +58729,12 @@
     "Your previous authenticator and recovery codes no longer work. Scan the new code below with your authenticator app, then enter the 6-digit code it shows.": [
       {
         "file": "console/web/src/features/auth/TotpSetupScreen.tsx",
-        "line": 108,
+        "line": 156,
         "nearby": [
           "Set up a new authenticator",
           "Set up two-factor authentication",
-          "This console now requires an authenticator app. Scan the code below with an app like Google Authenticator or Authy, then enter the 6-digit code it shows.",
-          "If you scanned a QR code for this console before, delete that entry from your authenticator now -- it is no longer valid."
+          "Scan the QR code with your authenticator app, then enter its current 6-digit code.",
+          "Replace any authenticator entry from an earlier setup attempt with the QR code shown here."
         ]
       }
     ],

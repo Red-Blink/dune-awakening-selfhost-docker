@@ -52,7 +52,7 @@ export function RecoveryCodesPanel({
           checked={acknowledged}
           onChange={(event) => onAcknowledgedChange(event.target.checked)}
         />
-        I have saved these codes somewhere safe
+        <span>I have saved these codes somewhere safe</span>
       </label>
       <button type="button" disabled={!acknowledged} onClick={onConfirm}>{confirmLabel}</button>
     </>
