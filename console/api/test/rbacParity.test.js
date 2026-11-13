@@ -98,7 +98,7 @@ function isCovered(route) {
   // separate test below pins that distinction so "add it to the module-level
   // PUBLIC_EXACT to make the parity test green" -- the remedy actions.js
   // itself suggests -- cannot silently ship an ungated route.
-  const PUBLIC_EXACT = ["/api/health", "/api/auth/state", "/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/auth/characters", "/api/auth/discord/start", "/api/auth/discord/callback", "/api/auth/discord/exchange", "/api/auth/2fa/setup", "/api/auth/2fa/confirm"];
+  const PUBLIC_EXACT = ["/api/health", "/api/auth/state", "/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/auth/characters", "/api/auth/discord/start", "/api/auth/discord/callback", "/api/auth/discord/exchange", "/api/auth/2fa/setup", "/api/auth/2fa/confirm", "/api/auth/2fa/cancel"];
   if (PUBLIC_EXACT.includes(route.path)) return true;
 
   for (const method of methodsToCheck(route)) {
