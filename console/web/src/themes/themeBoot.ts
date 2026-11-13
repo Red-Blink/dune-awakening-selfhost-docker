@@ -16,6 +16,10 @@ export const THEME_TOKEN_NAMES = [
   "--danger-strong", "--danger-text", "--danger-signal", "--state-motion", "--warning", "--bg-glow",
 ] as const;
 const TOKEN_NAMES = new Set<string>(THEME_TOKEN_NAMES);
+// Role colours (themeRoles.ts) are the stylesheet's recurring literals, one custom property each.
+// They are recognised by shape so this entry module does not carry the whole table.
+const ROLE_TOKEN_NAME = /^--(ink|surface|line|tint)(-[a-z]+)?-[a-z]{1,2}$/;
+const knownTokenName = (name: string) => TOKEN_NAMES.has(name) || ROLE_TOKEN_NAME.test(name);
 
 export interface ThemeCache { id: string; appearance: "dark" | "light"; tokens: Record<string, string> }
 
@@ -33,8 +37,8 @@ export function readThemeCache(id: string): ThemeCache | null {
     const tokens = cache.tokens;
     if (!tokens || typeof tokens !== "object") return null;
     const entries = Object.entries(tokens);
-    if (entries.length === 0 || entries.length > 64) return null;
-    if (!entries.every(([name, value]) => TOKEN_NAMES.has(name) && typeof value === "string" && TOKEN_VALUE.test(value))) return null;
+    if (entries.length === 0 || entries.length > 512) return null;
+    if (!entries.every(([name, value]) => knownTokenName(name) && typeof value === "string" && TOKEN_VALUE.test(value))) return null;
     return { id, appearance: cache.appearance, tokens: tokens as Record<string, string> };
   } catch { return null; }
 }

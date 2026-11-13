@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { THEME_CACHE_KEY, THEME_TOKEN_NAMES } from "./themeBoot";
+import { ROLE_TOKENS } from "./themeRoles";
 import { DEFAULT_THEME_ID, getThemes, THEME_STORAGE_KEY, applyTheme, buildThemeTokens, contrast, ensureContrast, loadSelectedTheme, parseHex, saveSelectedTheme } from "./themeEngine";
 import { CONSOLE_PALETTES } from "./consolePalettes";
 
@@ -28,11 +29,11 @@ describe("palette catalogue", () => {
 
   it("emits a full, valid token set for every palette", () => {
     const keys = Object.keys(THEMES[0].tokens).sort();
-    expect(keys).toEqual([...THEME_TOKEN_NAMES].sort());
+    expect(keys).toEqual([...THEME_TOKEN_NAMES, ...ROLE_TOKENS.map((role) => role.name)].sort());
     for (const theme of THEMES) {
       expect(Object.keys(theme.tokens).sort(), theme.id).toEqual(keys);
       for (const [name, value] of Object.entries(theme.tokens)) {
-        if (name !== "--bg-glow") expect(parseHex(value), `${theme.id} ${name}`).not.toBeNull();
+        if (name !== "--bg-glow" && !value.startsWith("rgba(")) expect(parseHex(value), `${theme.id} ${name}`).not.toBeNull();
       }
     }
   });

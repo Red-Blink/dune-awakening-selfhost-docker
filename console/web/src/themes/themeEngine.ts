@@ -4,6 +4,7 @@
 // the stylesheet's own :root values.
 import { CONSOLE_PALETTES, type ConsolePalette } from "./consolePalettes";
 import { HOUSE_SWATCHES, type HouseSwatch } from "./houseSwatches";
+import { ROLE_TOKENS } from "./themeRoles";
 import { DEFAULT_THEME_ID, THEME_CACHE_KEY, THEME_STORAGE_KEY, THEME_TOKEN_NAMES, type ThemeCache } from "./themeBoot";
 
 // The boot module (the only theme code in the entry chunk) owns the storage keys.
@@ -71,6 +72,24 @@ interface ThemeColors {
   title: Rgb; accent: Rgb; accentStrong: Rgb; success: Rgb; warning: Rgb; danger: Rgb; info: Rgb;
 }
 
+/**
+ * Role colours: the stylesheet's recurring literals (themeRoles.ts), re-derived from the palette's own
+ * tokens so the sidebar, cards, tables, borders and secondary text follow the palette too. Each role was
+ * measured against the Default tokens once: `mix` is how far from `from` toward `to` it sat.
+ */
+function deriveRoleTokens(base: ThemeTokens): ThemeTokens {
+  const at = (name: string): Rgb => parseHex(base[`--${name}`] ?? "") ?? [128, 128, 128];
+  const surfaces = [at("bg"), at("panel")];
+  const out: ThemeTokens = {};
+  for (const role of ROLE_TOKENS) {
+    const from = at(role.from);
+    let color = role.to ? mix(from, at(role.to), role.mix) : from;
+    if (role.kind === "ink") color = ensureContrast(color, surfaces, 4.6); // a little over AA so rounding to hex cannot dip below it
+    out[role.name] = role.alpha === undefined ? toHex(color) : `rgba(${color.map(Math.round).join(", ")}, ${String(role.alpha).replace(/^0/, "")})`;
+  }
+  return out;
+}
+
 /** Console token overrides. Text tokens are held to AA on the surfaces they sit on. */
 function deriveTokens(c: ThemeColors): ThemeTokens {
   const { bg, panel } = c;
@@ -79,13 +98,13 @@ function deriveTokens(c: ThemeColors): ThemeTokens {
   const muted = ensureContrast(c.muted, surfaces, 4.5);
   const accent = ensureContrast(c.accent, surfaces, 3);
   const readable = (color: Rgb) => toHex(ensureContrast(color, surfaces, 4.5));
-  return {
+  const base: ThemeTokens = {
     "--bg": toHex(bg),
     "--panel": toHex(panel),
     "--panel-soft": toHex(mix(bg, panel, 0.6)),
     "--panel-muted": toHex(mix(bg, panel, 0.25)),
     "--border": toHex(c.border),
-    "--border-strong": toHex(mix(c.border, text, 0.35)),
+    "--border-strong": toHex(mix(c.border, text, 0.2)),
     "--text": toHex(text),
     "--text-strong": toHex(ensureContrast(c.strong, surfaces, 9)),
     "--muted": toHex(muted),
@@ -105,6 +124,7 @@ function deriveTokens(c: ThemeColors): ThemeTokens {
     "--warning": toHex(ensureContrast(c.warning, surfaces, 3)),
     "--bg-glow": `rgba(${accent.map(Math.round).join(", ")}, .18)`,
   };
+  return { ...base, ...deriveRoleTokens(base) };
 }
 
 /** Four project-authored colours define a palette; the shared roles stay consistent. */
@@ -200,6 +220,7 @@ export function applyTheme(id: string, root: HTMLElement = document.documentElem
   if (id === DEFAULT_THEME_ID && !root.dataset.theme) return;
   const themes = getThemes();
   THEME_TOKEN_NAMES.forEach((name) => root.style.removeProperty(name));
+  ROLE_TOKENS.forEach((role) => root.style.removeProperty(role.name));
   const theme = themes.find((t) => t.id === id);
   if (!theme) {
     root.style.removeProperty("color-scheme");

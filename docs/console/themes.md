@@ -49,8 +49,24 @@ back to Default, including selections from a previous preview.
 `themeEngine.ts` derives the Console's existing CSS custom properties from
 each palette's background, panel, accent and secondary colours. Shared text
 and status colours keep the interface consistent, and contrast checks adjust
-text against the page and panel surfaces. Hardcoded colours in existing
-controls, map markers and some dialogs retain their standard appearance.
+text against the page and panel surfaces.
+
+### Role colours
+
+Most of the stylesheet's surfaces, borders and secondary text used fixed
+colours rather than those properties, so a palette used to recolour only a few
+elements. The recurring colours are now **role colours** (`--ink-*`,
+`--surface-*`, `--line-*`, `--tint-*`, listed in `themes/themeRoles.ts`).
+`styles.css` reads each as `var(--surface-b, #151719)`: the fallback is the
+colour that was there before, so **Default renders exactly as it did** (the
+role is never declared in `:root`). A palette sets every role from its own
+tokens, at the same relative position the original colour had between two
+console tokens, and text roles are held to 4.6:1 on the page and panel. The
+sidebar, header, cards, tables, tabs and most controls follow the palette.
+Remaining fixed colours are one-off decorations, pure black and white
+overlays and shadows, map markers and a few status illustrations. To theme a
+new colour, use `var(--role, <colour>)` with an existing role, or add one to
+`themeRoles.ts` (a test fails if the stylesheet and the table disagree).
 
 The catalogue and engine load lazily. The small `themeBoot.ts` entry module
 does nothing for Default. For a saved selection it restores a validated cache
