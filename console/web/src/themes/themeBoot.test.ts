@@ -74,7 +74,7 @@ describe("initTheme", () => {
 
   it("drops a stored id that no longer exists", async () => {
     window.localStorage.setItem(THEME_STORAGE_KEY, "gone");
-    window.localStorage.setItem(THEME_CACHE_KEY, JSON.stringify({ id: "gone", appearance: "dark", tokens: { "--bg": "#010203" } }));
+    window.localStorage.setItem(THEME_CACHE_KEY, JSON.stringify({ id: "gone", appearance: "dark", tokens: { "--bg": "#010203", "--surface-a": "#040506" } }));
     initTheme();
     expect(root.dataset.theme).toBe("gone");
     await expect.poll(() => root.dataset.theme).toBeUndefined();
@@ -106,14 +106,25 @@ describe("initTheme", () => {
 
 describe("readThemeCache rejects anything the engine could not have written", () => {
   const put = (value: unknown) => window.localStorage.setItem(THEME_CACHE_KEY, typeof value === "string" ? value : JSON.stringify(value));
-  const ok = { id: "x", appearance: "dark", tokens: { "--bg": "#0d0f12", "--bg-glow": "rgba(198, 139, 74, .18)" } };
+  const ok = { id: "x", appearance: "dark", tokens: { "--bg": "#0d0f12", "--bg-glow": "rgba(198, 139, 74, .18)", "--surface-a": "#151719", "--line-tint-a": "rgba(214, 185, 140, .15)" } };
 
   it("accepts the engine's own shapes", () => {
     put(ok);
     expect(readThemeCache("x")?.tokens["--bg"]).toBe("#0d0f12");
   });
 
+  it("accepts role colours by shape and keeps their values", () => {
+    put(ok);
+    expect(readThemeCache("x")?.tokens["--surface-a"]).toBe("#151719");
+    expect(readThemeCache("x")?.tokens["--line-tint-a"]).toBe("rgba(214, 185, 140, .15)");
+  });
+
   it.each([
+    ["a cache with no role colours (written before they existed)", { ...ok, tokens: { "--bg": "#0d0f12" } }],
+    ["a role-shaped name with a bad value", { ...ok, tokens: { ...ok.tokens, "--ink-b": "red" } }],
+    ["a name that only looks like a role", { ...ok, tokens: { ...ok.tokens, "--ink-b-c-d": "#000000" } }],
+    ["a role name with the wrong prefix", { ...ok, tokens: { ...ok.tokens, "--shadow-a": "#000000" } }],
+    ["more than 512 tokens", { ...ok, tokens: Object.fromEntries(Array.from({ length: 513 }, (_, i) => [`--ink-${String.fromCharCode(97 + Math.floor(i / 26))}${String.fromCharCode(97 + (i % 26))}`, "#000000"])) }],
     ["a value that is not a hex colour or the glow", { ...ok, tokens: { "--bg": "url(https://evil.example/x)" } }],
     ["an expression in a value", { ...ok, tokens: { "--bg": "#0d0f12; background: red" } }],
     ["a property name that is not a custom property", { ...ok, tokens: { "background-image": "#0d0f12" } }],
@@ -122,7 +133,6 @@ describe("readThemeCache rejects anything the engine could not have written", ()
     ["an id that differs from the stored choice", { ...ok, id: "other" }],
     ["a bad appearance", { ...ok, appearance: "sepia" }],
     ["no tokens", { ...ok, tokens: {} }],
-    ["too many tokens", { ...ok, tokens: Object.fromEntries(Array.from({ length: 65 }, (_, i) => [`--t${String.fromCharCode(97 + (i % 26))}${String.fromCharCode(97 + Math.floor(i / 26))}`, "#000000"])) }],
     ["not JSON", "{nope"],
     ["JSON null", "null"],
   ])("rejects %s", (_label, value) => {
