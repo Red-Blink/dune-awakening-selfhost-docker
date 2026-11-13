@@ -54,19 +54,27 @@ text against the page and panel surfaces.
 ### Role colours
 
 Most of the stylesheet's surfaces, borders and secondary text used fixed
-colours rather than those properties, so a palette used to recolour only a few
-elements. The recurring colours are now **role colours** (`--ink-*`,
-`--surface-*`, `--line-*`, `--tint-*`, listed in `themes/themeRoles.ts`).
-`styles.css` reads each as `var(--surface-b, #151719)`: the fallback is the
-colour that was there before, so **Default renders exactly as it did** (the
-role is never declared in `:root`). A palette sets every role from its own
-tokens, at the same relative position the original colour had between two
-console tokens, and text roles are held to 4.6:1 on the page and panel. The
-sidebar, header, cards, tables, tabs and most controls follow the palette.
-Remaining fixed colours are one-off decorations, pure black and white
-overlays and shadows, map markers and a few status illustrations. To theme a
-new colour, use `var(--role, <colour>)` with an existing role, or add one to
-`themeRoles.ts` (a test fails if the stylesheet and the table disagree).
+colours rather than the palette properties, so a palette used to recolour
+only a few elements. The recurring colours are now **role colours**
+(`--ink-*`, `--surface-*`, `--line-*`, `--tint-*`, listed in
+`themes/themeRoles.ts`). `styles.css` reads each as
+`var(--surface-b, #151719)`: the fallback is the colour that was there
+before, so **Default renders exactly as it did** (the roles are never
+declared in `:root`). A palette sets every role from its own tokens, at the
+same relative position the original colour had between two console tokens.
+Text roles are held to at least 4.5:1 (derived with a small margin) against
+the surface they sit on: the page and panel by default, or the fill named by
+the role (`on`) for text on an accent, status or tint fill.
+
+The sidebar, header, cards, tables, tabs and most controls follow the
+palette. These stay fixed on purpose: the "Join Discord" and "Support
+Project" gradient buttons, map markers, legends and other data colours
+(categories must stay distinguishable), pure black and white overlays and
+shadows, and SVG fills and strokes. Because `--border-strong` is now derived
+closer to `--border` (as it is in Default), borders in every palette are a
+little subtler than before. To theme another colour, use
+`var(--role, <colour>)` with an existing role, or add one to `themeRoles.ts`;
+tests fail if the stylesheet and the table disagree.
 
 The catalogue and engine load lazily. The small `themeBoot.ts` entry module
 does nothing for Default. For a saved selection it restores a validated cache

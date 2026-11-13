@@ -58,12 +58,17 @@ export function ensureContrast(fg: Rgb, surfaces: Rgb[], ratio: number): Rgb {
   const worst = (c: Rgb) => Math.min(...surfaces.map((s) => contrast(c, s)));
   if (worst(fg) >= ratio) return fg;
   const lightSurfaces = surfaces.reduce((sum, s) => sum + luminance(s), 0) / surfaces.length > 0.4;
-  const target: Rgb = lightSurfaces ? [0, 0, 0] : [255, 255, 255];
-  for (let step = 1; step <= 20; step += 1) {
-    const candidate = mix(fg, target, step / 20);
-    if (worst(candidate) >= ratio) return candidate;
-  }
-  return target;
+  const pull = (target: Rgb): Rgb | null => {
+    for (let step = 1; step <= 20; step += 1) {
+      const candidate = mix(fg, target, step / 20);
+      if (worst(candidate) >= ratio) return candidate;
+    }
+    return null;
+  };
+  const preferred: Rgb = lightSurfaces ? [0, 0, 0] : [255, 255, 255];
+  const other: Rgb = lightSurfaces ? [255, 255, 255] : [0, 0, 0];
+  // Mid-tone fills (e.g. a mid accent) can be out of reach in the usual direction; try the other end before giving up.
+  return pull(preferred) ?? pull(other) ?? (worst(preferred) >= worst(other) ? preferred : other);
 }
 
 /** The few colours every source theme has to supply; everything else is derived from them. */
@@ -79,13 +84,28 @@ interface ThemeColors {
  */
 function deriveRoleTokens(base: ThemeTokens): ThemeTokens {
   const at = (name: string): Rgb => parseHex(base[`--${name}`] ?? "") ?? [128, 128, 128];
-  const surfaces = [at("bg"), at("panel")];
   const out: ThemeTokens = {};
-  for (const role of ROLE_TOKENS) {
+  const color = (role: (typeof ROLE_TOKENS)[number]): Rgb => {
     const from = at(role.from);
-    let color = role.to ? mix(from, at(role.to), role.mix) : from;
-    if (role.kind === "ink") color = ensureContrast(color, surfaces, 4.6); // a little over AA so rounding to hex cannot dip below it
-    out[role.name] = role.alpha === undefined ? toHex(color) : `rgba(${color.map(Math.round).join(", ")}, ${String(role.alpha).replace(/^0/, "")})`;
+    return role.to ? mix(from, at(role.to), role.mix) : from;
+  };
+  const byName = new Map(ROLE_TOKENS.map((role) => [role.name, role]));
+  /** What a role paints against: a console token, or another role (a translucent tint is laid over the panel). */
+  const fill = (name: string): Rgb => {
+    const role = name.startsWith("--") ? byName.get(name) : undefined;
+    if (!role) return at(name);
+    const c = color(role);
+    return role.alpha === undefined ? c : mix(at("panel"), c, role.alpha);
+  };
+  const surfaces = [at("bg"), at("panel")];
+  const emit = (role: (typeof ROLE_TOKENS)[number], c: Rgb) => {
+    out[role.name] = role.alpha === undefined ? toHex(c) : `rgba(${c.map(Math.round).join(", ")}, ${String(role.alpha).replace(/^0/, "")})`;
+  };
+  for (const role of ROLE_TOKENS) if (role.kind !== "ink") emit(role, color(role));
+  for (const role of ROLE_TOKENS) {
+    if (role.kind !== "ink") continue;
+    // A little over AA (4.5) so rounding to hex and tint blending cannot dip below it. Text on a fill is held against that fill, not the page.
+    emit(role, ensureContrast(color(role), role.on ? [fill(role.on)] : surfaces, 4.7));
   }
   return out;
 }
@@ -104,7 +124,7 @@ function deriveTokens(c: ThemeColors): ThemeTokens {
     "--panel-soft": toHex(mix(bg, panel, 0.6)),
     "--panel-muted": toHex(mix(bg, panel, 0.25)),
     "--border": toHex(c.border),
-    "--border-strong": toHex(mix(c.border, text, 0.2)),
+    "--border-strong": toHex(mix(c.border, text, 0.1)),
     "--text": toHex(text),
     "--text-strong": toHex(ensureContrast(c.strong, surfaces, 9)),
     "--muted": toHex(muted),

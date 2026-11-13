@@ -39,6 +39,8 @@ export function readThemeCache(id: string): ThemeCache | null {
     const entries = Object.entries(tokens);
     if (entries.length === 0 || entries.length > 512) return null;
     if (!entries.every(([name, value]) => knownTokenName(name) && typeof value === "string" && TOKEN_VALUE.test(value))) return null;
+    // A cache written before role colours existed would paint base tokens over fixed surfaces; let Default paint and the engine apply the theme.
+    if (!entries.some(([name]) => ROLE_TOKEN_NAME.test(name))) return null;
     return { id, appearance: cache.appearance, tokens: tokens as Record<string, string> };
   } catch { return null; }
 }

@@ -30,13 +30,30 @@ describe("role colours", () => {
     }
   });
 
-  it("keep secondary text readable on the page and panel for every palette", () => {
+  it("keep text readable against the fill it sits on (the page and panel unless the role names a fill)", () => {
+    const rgbOf = (value: string, panel: Rgb): Rgb => {
+      const rgba = /^rgba\((\d+), (\d+), (\d+), (\.\d+)\)$/.exec(value);
+      if (!rgba) return parseHex(value) as Rgb;
+      const alpha = Number(rgba[4]);
+      return [0, 1, 2].map((i) => panel[i] + (Number(rgba[i + 1]) - panel[i]) * alpha) as Rgb;
+    };
     for (const theme of getThemes()) {
       const bg = parseHex(theme.tokens["--bg"]) as Rgb;
       const panel = parseHex(theme.tokens["--panel"]) as Rgb;
       for (const role of ROLE_TOKENS.filter((entry) => entry.kind === "ink")) {
         const fg = parseHex(theme.tokens[role.name]) as Rgb;
-        expect(Math.min(contrast(fg, bg), contrast(fg, panel)), `${theme.id} ${role.name}`).toBeGreaterThanOrEqual(4.5);
+        const against = role.on ? [rgbOf(role.on.startsWith("--") ? theme.tokens[role.on] : theme.tokens[`--${role.on}`], panel)] : [bg, panel];
+        expect(Math.min(...against.map((surface) => contrast(fg, surface))), `${theme.id} ${role.name} on ${role.on ?? "page"}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it("have text on a bright accent fill that is readable on it, in every palette", () => {
+    const onAccent = ROLE_TOKENS.filter((role) => role.kind === "ink" && role.on === "accent");
+    expect(onAccent.length).toBeGreaterThan(0);
+    for (const theme of getThemes()) {
+      for (const role of onAccent) {
+        expect(contrast(parseHex(theme.tokens[role.name]) as Rgb, parseHex(theme.tokens["--accent"]) as Rgb), `${theme.id} ${role.name}`).toBeGreaterThanOrEqual(4.5);
       }
     }
   });
@@ -56,7 +73,8 @@ describe("role colours", () => {
     for (const role of ROLE_TOKENS) expect(root.style.getPropertyValue(role.name), role.name).toBe(theme.tokens[role.name]);
     expect(JSON.parse(window.localStorage.getItem(THEME_CACHE_KEY) ?? "{}").id).toBe(theme.id);
     window.localStorage.setItem(THEME_STORAGE_KEY, theme.id);
-    expect(readThemeCache(theme.id)?.tokens["--surface-a"] ?? readThemeCache(theme.id)?.tokens[ROLE_TOKENS[0].name]).toBeTruthy();
+    const cached = readThemeCache(theme.id);
+    expect(Object.keys(cached?.tokens ?? {}).filter((name) => ROLE_TOKENS.some((role) => role.name === name))).toHaveLength(ROLE_TOKENS.length);
     applyTheme(DEFAULT_THEME_ID, root);
     expect(root.getAttribute("style") ?? "").toBe("");
   });
