@@ -3,6 +3,7 @@
 // theme sets nothing, so an operator who never opens the picker sees exactly
 // the stylesheet's own :root values.
 import { CONSOLE_PALETTES, type ConsolePalette } from "./consolePalettes";
+import { HOUSE_SWATCHES, type HouseSwatch } from "./houseSwatches";
 import { DEFAULT_THEME_ID, THEME_CACHE_KEY, THEME_STORAGE_KEY, THEME_TOKEN_NAMES, type ThemeCache } from "./themeBoot";
 
 // The boot module (the only theme code in the entry chunk) owns the storage keys.
@@ -16,6 +17,10 @@ export interface ThemeInfo {
   description: string;
   appearance: "dark" | "light";
   tokens: ThemeTokens;
+  /** Picker section heading; not persisted. */
+  group?: string;
+  /** The source dye colours, shown in the picker for swatch palettes; not persisted. */
+  dyes?: readonly string[];
 }
 
 export function parseHex(value: string): Rgb | null {
@@ -124,14 +129,44 @@ export function buildThemeTokens(colors: Partial<Pick<ConsolePalette, "backgroun
   });
 }
 
+/** A console palette from a House's four dye colours: darkest dye, darkened, is the page; the next lift is the panel; the most vivid light dyes are the accents. */
+export function paletteFromSwatch(swatch: HouseSwatch): Pick<ConsolePalette, "background" | "panel" | "accent" | "secondary"> {
+  const dyes = swatch.colors.map((hex) => parseHex(hex) ?? [43, 43, 43] as Rgb);
+  const byLight = [...dyes].sort((a, b) => luminance(a) - luminance(b));
+  const black: Rgb = [0, 0, 0];
+  let bg = byLight[0];
+  for (let t = 0.3; luminance(bg) > 0.012 && t <= 0.9; t += 0.1) bg = mix(byLight[0], black, t);
+  let panel = mix(bg, byLight[1], 0.5);
+  for (let t = 0.3; luminance(panel) < 0.025 && t <= 0.9; t += 0.1) panel = mix(bg, byLight[1], t);
+  panel = mix(panel, [255, 255, 255], luminance(panel) < 0.02 ? 0.06 : 0);
+  const chroma = (c: Rgb) => Math.max(...c) - Math.min(...c);
+  const bright = dyes.filter((c) => luminance(c) >= 0.08);
+  const pool = (bright.length >= 2 ? bright : byLight.slice(-2)).sort((a, b) => chroma(b) - chroma(a) || luminance(b) - luminance(a));
+  const accent = pool[0];
+  // Prefer a dye that visibly differs from the accent; fall back to any different dye, then the accent itself.
+  const secondary = pool.find((c) => contrast(c, accent) >= 1.3) ?? pool.find((c) => toHex(c) !== toHex(accent)) ?? accent;
+  return { background: toHex(bg), panel: toHex(panel), accent: toHex(accent), secondary: toHex(secondary) };
+}
+
 function loadThemes(): ThemeInfo[] {
-  return CONSOLE_PALETTES.map((palette): ThemeInfo => ({
+  const palettes: ThemeInfo[] = CONSOLE_PALETTES.map((palette): ThemeInfo => ({
     id: palette.id,
     name: palette.name,
     description: palette.description,
     appearance: "dark",
     tokens: buildThemeTokens(palette),
-  })).sort((a, b) => a.name.localeCompare(b.name));
+    group: palette.group,
+  }));
+  const houses: ThemeInfo[] = HOUSE_SWATCHES.map((swatch): ThemeInfo => ({
+    id: swatch.id,
+    name: swatch.name,
+    description: `The armour dye colours of ${swatch.name}.`,
+    appearance: "dark",
+    tokens: buildThemeTokens(paletteFromSwatch(swatch)),
+    group: swatch.group,
+    dyes: swatch.colors,
+  }));
+  return [...palettes, ...houses].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 let catalogue: ThemeInfo[] | null = null;
