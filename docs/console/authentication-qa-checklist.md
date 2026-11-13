@@ -161,6 +161,19 @@ break-glass reset, see T17) and `dune console restart`, so setup runs again.
 
 **Expected**
 - Signed in. The phone entry from step 1 (if you scanned it) does **not** work.
+4. Unhappy paths: double-click **Confirm** quickly; and open Settings in a
+   second tab, start **Enable 2FA** in both, and confirm in one.
+
+**Expected**
+- Exactly one factor is created. The other tab's attempt must end in a message
+  that says what to do next, not a stuck popup. Record the exact text.
+5. On the **recovery-codes** screen (after a correct Confirm), press **Escape**
+   and click outside the popup.
+
+**Expected**
+- The codes stay on screen until you tick the box and click **Done**. If
+  Escape or an outside click closes the popup and the codes are gone, that is
+  a finding: the codes are shown only once.
 
 ---
 
