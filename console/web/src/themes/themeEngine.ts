@@ -179,7 +179,10 @@ export function loadSelectedTheme(): string {
   try {
     const id = window.localStorage.getItem(THEME_STORAGE_KEY);
     if (!id) return DEFAULT_THEME_ID;
-    return getThemes().some((t) => t.id === id) ? id : DEFAULT_THEME_ID;
+    if (getThemes().some((t) => t.id === id)) return id;
+    // A saved id the catalogue no longer has would send every later boot down the non-default path.
+    window.localStorage.removeItem(THEME_STORAGE_KEY);
+    return DEFAULT_THEME_ID;
   } catch {
     // A blocked storage API still allows a choice for this page view. Reopening
     // the picker must reflect that applied choice instead of claiming Default.

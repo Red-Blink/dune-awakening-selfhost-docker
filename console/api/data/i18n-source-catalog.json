@@ -1863,8 +1863,8 @@
     "No modifiers available for this target.",
     "No modifiers match your filter.",
     "No offline players were found.",
+    "No other palettes match.",
     "No output.",
-    "No palettes match.",
     "No partitions available",
     "No permissions match your search.",
     "No player sell listings on this exchange.",
@@ -3511,6 +3511,7 @@
     "{count0} distinct",
     "{count0} fields",
     "{count0} of {count1}",
+    "{count0} palettes",
     "{count0} rows",
     "{count0} warnings",
     "{count0}d {count1}h",
@@ -4389,6 +4390,18 @@
           "Clear",
           "Research Entr",
           "ies"
+        ]
+      }
+    ],
+    "{count0} palettes": [
+      {
+        "file": "console/web/src/themes/ThemePanel.tsx",
+        "line": 98,
+        "nearby": [
+          "Filter palettes",
+          "No other palettes match.",
+          "Applies to this browser only. Choose Default to restore the standard look.",
+          "Console theme"
         ]
       }
     ],
@@ -7175,11 +7188,11 @@
     "Applies to this browser only. Choose Default to restore the standard look.": [
       {
         "file": "console/web/src/themes/ThemePanel.tsx",
-        "line": 80,
+        "line": 100,
         "nearby": [
-          "Console Theme",
-          "Close",
-          "Filter palettes"
+          "No other palettes match.",
+          "{count0} palettes",
+          "Console theme"
         ]
       }
     ],
@@ -10139,12 +10152,12 @@
     "Brutalist industrial: cold blues and purples on near-black.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 33,
+        "line": 23,
         "nearby": [
-          "Roasted brown with spice orange and cool turquoise.",
-          "Neutral charcoal with pale blue and warm ivory.",
-          "Caladan: deep ocean blues, sea green and silver.",
-          "The Emperor's elite: imperial purple and gold on command black."
+          "Warm dark stone with sky blue and sand, from the Tabr save editor.",
+          "Dark aubergine with honey gold and rose.",
+          "Cold blue-gray with glacial blue and pale mint.",
+          "Ink blue with periwinkle and peach."
         ]
       }
     ],
@@ -10522,12 +10535,11 @@
     "Caladan: deep ocean blues, sea green and silver.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 34,
+        "line": 15,
         "nearby": [
-          "Neutral charcoal with pale blue and warm ivory.",
-          "Brutalist industrial: cold blues and purples on near-black.",
-          "The Emperor's elite: imperial purple and gold on command black.",
-          "Warm dark stone with sky blue and sand, from the Tabr save editor."
+          "Warm charcoal with amber and muted turquoise.",
+          "Volcanic gray with soft silver and warm copper.",
+          "Dark umber with burnished copper and sage."
         ]
       }
     ],
@@ -13085,10 +13097,10 @@
     "Cold blue-gray with glacial blue and pale mint.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 21,
+        "line": 24,
         "nearby": [
-          "Deep forest with fresh mint and soft brass.",
           "Dark aubergine with honey gold and rose.",
+          "Brutalist industrial: cold blues and purples on near-black.",
           "Ink blue with periwinkle and peach.",
           "Dark teal with jade and misty blue."
         ]
@@ -14128,21 +14140,21 @@
     "Console theme": [
       {
         "file": "console/web/src/themes/ThemePanel.tsx",
-        "line": 90,
+        "line": 101,
         "nearby": [
-          "Filter palettes",
-          "No palettes match."
+          "{count0} palettes",
+          "Applies to this browser only. Choose Default to restore the standard look."
         ]
       }
     ],
     "Console Theme": [
       {
         "file": "console/web/src/themes/ThemePanel.tsx",
-        "line": 77,
+        "line": 87,
         "nearby": [
           "The standard console look.",
           "Close",
-          "Applies to this browser only. Choose Default to restore the standard look."
+          "Filter palettes"
         ]
       },
       {
@@ -15711,19 +15723,19 @@
     "Dark aubergine with honey gold and rose.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 20,
+        "line": 22,
         "nearby": [
-          "Smoky slate with pale apricot and lavender.",
           "Deep forest with fresh mint and soft brass.",
-          "Cold blue-gray with glacial blue and pale mint.",
-          "Ink blue with periwinkle and peach."
+          "Warm dark stone with sky blue and sand, from the Tabr save editor.",
+          "Brutalist industrial: cold blues and purples on near-black.",
+          "Cold blue-gray with glacial blue and pale mint."
         ]
       }
     ],
     "Dark teal with jade and misty blue.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 23,
+        "line": 26,
         "nearby": [
           "Cold blue-gray with glacial blue and pale mint.",
           "Ink blue with periwinkle and peach.",
@@ -15735,9 +15747,9 @@
     "Dark umber with burnished copper and sage.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 16,
+        "line": 17,
         "nearby": [
-          "Warm charcoal with amber and muted turquoise.",
+          "Caladan: deep ocean blues, sea green and silver.",
           "Volcanic gray with soft silver and warm copper.",
           "Quiet brown-black with sand gold and clear sky blue.",
           "Smoky slate with pale apricot and lavender."
@@ -15747,7 +15759,7 @@
     "Dark wine with dusty rose and pearl blue.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 27,
+        "line": 30,
         "nearby": [
           "Near-black navy with electric blue and lilac.",
           "Deep petrol with aqua and sunlit gold.",
@@ -16138,19 +16150,19 @@
     "Deep forest with fresh mint and soft brass.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 19,
+        "line": 20,
         "nearby": [
           "Quiet brown-black with sand gold and clear sky blue.",
           "Smoky slate with pale apricot and lavender.",
-          "Dark aubergine with honey gold and rose.",
-          "Cold blue-gray with glacial blue and pale mint."
+          "Warm dark stone with sky blue and sand, from the Tabr save editor.",
+          "Dark aubergine with honey gold and rose."
         ]
       }
     ],
     "Deep petrol with aqua and sunlit gold.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 26,
+        "line": 29,
         "nearby": [
           "Smoky violet with pearl lavender and sand.",
           "Near-black navy with electric blue and lilac.",
@@ -19039,12 +19051,12 @@
     "Earthy charcoal with saffron and olive silver.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 28,
+        "line": 31,
         "nearby": [
           "Deep petrol with aqua and sunlit gold.",
           "Dark wine with dusty rose and pearl blue.",
           "Soft dark taupe with limestone and sage blue.",
-          "Graphite blue with steel silver and sea green."
+          "The Emperor's elite: imperial purple and gold on command black."
         ]
       }
     ],
@@ -21457,20 +21469,20 @@
     "Filter palettes": [
       {
         "file": "console/web/src/themes/ThemePanel.tsx",
-        "line": 85,
+        "line": 94,
         "nearby": [
+          "Console Theme",
           "Close",
-          "Applies to this browser only. Choose Default to restore the standard look.",
-          "No palettes match."
+          "No other palettes match."
         ]
       },
       {
         "file": "console/web/src/themes/ThemePanel.tsx",
-        "line": 86,
+        "line": 95,
         "nearby": [
-          "Applies to this browser only. Choose Default to restore the standard look.",
-          "No palettes match.",
-          "Console theme"
+          "Close",
+          "No other palettes match.",
+          "{count0} palettes"
         ]
       }
     ],
@@ -23714,10 +23726,10 @@
     "Graphite blue with steel silver and sea green.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 30,
+        "line": 34,
         "nearby": [
-          "Earthy charcoal with saffron and olive silver.",
           "Soft dark taupe with limestone and sage blue.",
+          "The Emperor's elite: imperial purple and gold on command black.",
           "Roasted brown with spice orange and cool turquoise.",
           "Neutral charcoal with pale blue and warm ivory."
         ]
@@ -25011,9 +25023,9 @@
     "Ink blue with periwinkle and peach.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 22,
+        "line": 25,
         "nearby": [
-          "Dark aubergine with honey gold and rose.",
+          "Brutalist industrial: cold blues and purples on near-black.",
           "Cold blue-gray with glacial blue and pale mint.",
           "Dark teal with jade and misty blue.",
           "Smoky violet with pearl lavender and sand."
@@ -30123,7 +30135,7 @@
     "Near-black navy with electric blue and lilac.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 25,
+        "line": 28,
         "nearby": [
           "Dark teal with jade and misty blue.",
           "Smoky violet with pearl lavender and sand.",
@@ -30291,12 +30303,10 @@
     "Neutral charcoal with pale blue and warm ivory.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 32,
+        "line": 36,
         "nearby": [
           "Graphite blue with steel silver and sea green.",
-          "Roasted brown with spice orange and cool turquoise.",
-          "Brutalist industrial: cold blues and purples on near-black.",
-          "Caladan: deep ocean blues, sea green and silver."
+          "Roasted brown with spice orange and cool turquoise."
         ]
       }
     ],
@@ -31479,6 +31489,17 @@
         ]
       }
     ],
+    "No other palettes match.": [
+      {
+        "file": "console/web/src/themes/ThemePanel.tsx",
+        "line": 98,
+        "nearby": [
+          "Filter palettes",
+          "{count0} palettes",
+          "Applies to this browser only. Choose Default to restore the standard look."
+        ]
+      }
+    ],
     "No output.": [
       {
         "file": "console/web/src/lib/display.ts",
@@ -31500,16 +31521,6 @@
           "Owner",
           "Save or revert roster changes first",
           "Transfer to Custodian"
-        ]
-      }
-    ],
-    "No palettes match.": [
-      {
-        "file": "console/web/src/themes/ThemePanel.tsx",
-        "line": 89,
-        "nearby": [
-          "Filter palettes",
-          "Console theme"
         ]
       }
     ],
@@ -37091,7 +37102,7 @@
     "Quiet brown-black with sand gold and clear sky blue.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 17,
+        "line": 18,
         "nearby": [
           "Volcanic gray with soft silver and warm copper.",
           "Dark umber with burnished copper and sage.",
@@ -41814,12 +41825,11 @@
     "Roasted brown with spice orange and cool turquoise.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 31,
+        "line": 35,
         "nearby": [
-          "Soft dark taupe with limestone and sage blue.",
+          "The Emperor's elite: imperial purple and gold on command black.",
           "Graphite blue with steel silver and sea green.",
-          "Neutral charcoal with pale blue and warm ivory.",
-          "Brutalist industrial: cold blues and purples on near-black."
+          "Neutral charcoal with pale blue and warm ivory."
         ]
       }
     ],
@@ -46833,19 +46843,19 @@
     "Smoky slate with pale apricot and lavender.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 18,
+        "line": 19,
         "nearby": [
           "Dark umber with burnished copper and sage.",
           "Quiet brown-black with sand gold and clear sky blue.",
           "Deep forest with fresh mint and soft brass.",
-          "Dark aubergine with honey gold and rose."
+          "Warm dark stone with sky blue and sand, from the Tabr save editor."
         ]
       }
     ],
     "Smoky violet with pearl lavender and sand.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 24,
+        "line": 27,
         "nearby": [
           "Ink blue with periwinkle and peach.",
           "Dark teal with jade and misty blue.",
@@ -46868,12 +46878,12 @@
     "Soft dark taupe with limestone and sage blue.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 29,
+        "line": 32,
         "nearby": [
           "Dark wine with dusty rose and pearl blue.",
           "Earthy charcoal with saffron and olive silver.",
-          "Graphite blue with steel silver and sea green.",
-          "Roasted brown with spice orange and cool turquoise."
+          "The Emperor's elite: imperial purple and gold on command black.",
+          "Graphite blue with steel silver and sea green."
         ]
       }
     ],
@@ -49604,11 +49614,12 @@
     "The Emperor's elite: imperial purple and gold on command black.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 35,
+        "line": 33,
         "nearby": [
-          "Brutalist industrial: cold blues and purples on near-black.",
-          "Caladan: deep ocean blues, sea green and silver.",
-          "Warm dark stone with sky blue and sand, from the Tabr save editor."
+          "Earthy charcoal with saffron and olive silver.",
+          "Soft dark taupe with limestone and sage blue.",
+          "Graphite blue with steel silver and sea green.",
+          "Roasted brown with spice orange and cool turquoise."
         ]
       }
     ],
@@ -50183,7 +50194,7 @@
     "The standard console look.": [
       {
         "file": "console/web/src/themes/ThemePanel.tsx",
-        "line": 46,
+        "line": 50,
         "nearby": [
           "Console Theme",
           "Close"
@@ -54107,9 +54118,10 @@
     "Volcanic gray with soft silver and warm copper.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 15,
+        "line": 16,
         "nearby": [
           "Warm charcoal with amber and muted turquoise.",
+          "Caladan: deep ocean blues, sea green and silver.",
           "Dark umber with burnished copper and sage.",
           "Quiet brown-black with sand gold and clear sky blue."
         ]
@@ -54333,18 +54345,20 @@
         "file": "console/web/src/themes/consolePalettes.ts",
         "line": 14,
         "nearby": [
-          "Volcanic gray with soft silver and warm copper.",
-          "Dark umber with burnished copper and sage."
+          "Caladan: deep ocean blues, sea green and silver.",
+          "Volcanic gray with soft silver and warm copper."
         ]
       }
     ],
     "Warm dark stone with sky blue and sand, from the Tabr save editor.": [
       {
         "file": "console/web/src/themes/consolePalettes.ts",
-        "line": 36,
+        "line": 21,
         "nearby": [
-          "Caladan: deep ocean blues, sea green and silver.",
-          "The Emperor's elite: imperial purple and gold on command black."
+          "Smoky slate with pale apricot and lavender.",
+          "Deep forest with fresh mint and soft brass.",
+          "Dark aubergine with honey gold and rose.",
+          "Brutalist industrial: cold blues and purples on near-black."
         ]
       }
     ],

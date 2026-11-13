@@ -21,6 +21,8 @@ describe("palette catalogue", () => {
     expect(new Set(THEMES.map((t) => t.id)).size).toBe(65);
     expect(THEMES.every((t) => t.appearance === "dark")).toBe(true);
     expect(THEMES.map((t) => t.id)).toEqual(expect.arrayContaining(CONSOLE_PALETTES.map((p) => p.id)));
+    expect(CONSOLE_PALETTES.map((p) => p.name)).toEqual([...CONSOLE_PALETTES.map((p) => p.name)].sort((a, b) => a.localeCompare(b)));
+    for (const id of ["dd-amber-dunes", "dune-harkonnen", "dune-house-atreides", "dune-sardaukar-imperial", "tabr-fremen", "house-kenola", "swatch-sunset-dye"]) expect(THEMES.map((t) => t.id), id).toContain(id);
     expect(new Set(THEMES.map((t) => [t.tokens["--bg"], t.tokens["--panel"], t.tokens["--accent"]].join())).size).toBe(65);
   });
 
@@ -131,5 +133,7 @@ describe("apply and persistence", () => {
   it("ignores a stored id that no longer exists", () => {
     window.localStorage.setItem(THEME_STORAGE_KEY, "gone");
     expect(loadSelectedTheme()).toBe(DEFAULT_THEME_ID);
+    // The dead id is dropped so later boots take the default path instead of loading the engine each time.
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
   });
 });

@@ -11,6 +11,8 @@ const GROUP_ORDER = ["Console palettes", "Dune factions", "Houses", "Outfits and
 export function ThemePanel({ onClose = () => {} }: { onClose?: () => void }) {
   const [selected, setSelected] = useState(loadSelectedTheme);
   const [filter, setFilter] = useState("");
+  const filterRef = useRef("");
+  filterRef.current = filter;
   const modal = useRef<HTMLDivElement>(null);
   const radios = useRef<(HTMLButtonElement | null)[]>([]);
   const closeRef = useRef(onClose);
@@ -23,6 +25,8 @@ export function ThemePanel({ onClose = () => {} }: { onClose?: () => void }) {
     const onEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.stopPropagation();
+      // Escape in the filter box first clears what was typed; the next Escape closes the dialog.
+      if (filterRef.current && (event.target as HTMLElement | null)?.tagName === "INPUT") { setFilter(""); return; }
       closeRef.current();
     };
     // Another tab changed the theme: keep the checked card truthful.
@@ -48,9 +52,14 @@ export function ThemePanel({ onClose = () => {} }: { onClose?: () => void }) {
   ];
   const query = filter.trim().toLowerCase();
   // The applied choice stays listed while filtering, so the radio group always has a checked card.
-  const options = all.filter((option) => !query || option.name.toLowerCase().includes(query) || option.id === selected);
-  const groups = GROUP_ORDER.map((group) => ({ group, items: options.filter((option) => option.group === group) })).filter((entry) => entry.items.length > 0);
-  const matches = query ? options.filter((option) => option.name.toLowerCase().includes(query)).length : all.length;
+  const matching = (option: (typeof all)[number]) => !query || option.name.toLowerCase().includes(query) || option.group.toLowerCase().includes(query);
+  const options = all.filter((option) => matching(option) || option.id === selected);
+  // Known sections first, in order; a section the catalogue adds later still renders, after them.
+  const groupNames = [...GROUP_ORDER, ...new Set(all.map((option) => option.group).filter((group) => !GROUP_ORDER.includes(group)))];
+  const groups = groupNames.map((group) => ({ group, items: options.filter((option) => option.group === group) })).filter((entry) => entry.items.length > 0);
+  // Keyboard order is the rendered order, not the catalogue's alphabetical order.
+  const ordered = groups.flatMap((entry) => entry.items);
+  const matches = all.filter(matching).length;
   return createPortal(
     <div className="modal-overlay theme-picker-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) closeRef.current(); }}>
       <div
@@ -73,11 +82,11 @@ export function ThemePanel({ onClose = () => {} }: { onClose?: () => void }) {
           }
         }}
       >
+        <div className="theme-picker-sticky">
         <header className="theme-picker-heading">
           <div><Palette size={22} aria-hidden="true" /><h2 id="theme-picker-title">Console Theme</h2></div>
           <button type="button" aria-label="Close" onClick={() => closeRef.current()}><X size={18} aria-hidden="true" /></button>
         </header>
-        <p className="theme-picker-note">Applies to this browser only. Choose Default to restore the standard look.</p>
         <input
           className="theme-filter"
           type="search"
@@ -86,14 +95,16 @@ export function ThemePanel({ onClose = () => {} }: { onClose?: () => void }) {
           aria-label="Filter palettes"
           onChange={(event) => setFilter(event.target.value)}
         />
-        <p className="theme-filter-count" role="status" aria-live="polite">{matches === 0 ? "No palettes match." : `${matches} palettes`}</p>
+        <p className="theme-filter-count" role="status" aria-live="polite">{query ? (matches === 0 ? "No other palettes match." : `${matches} of ${all.length} palettes`) : `${all.length} palettes`}</p>
+        </div>
+        <p className="theme-picker-note">Applies to this browser only. Choose Default to restore the standard look.</p>
         <div role="radiogroup" aria-label="Console theme">
           {groups.map(({ group, items }) => (
-            <section key={group} role="group" className="theme-group" aria-labelledby={`theme-group-${group.replace(/\W+/g, "-")}`}>
+            <div key={group} role="presentation" className="theme-group">
               <h3 id={`theme-group-${group.replace(/\W+/g, "-")}`}>{group}</h3>
               <div className="theme-grid">
                 {items.map((option) => {
-                  const index = options.indexOf(option);
+                  const index = ordered.indexOf(option);
                   return (
                     <button
                       key={option.id}
@@ -101,11 +112,13 @@ export function ThemePanel({ onClose = () => {} }: { onClose?: () => void }) {
                       type="button"
                       role="radio"
                       aria-checked={selected === option.id}
+                      aria-posinset={index + 1}
+                      aria-setsize={ordered.length}
                       tabIndex={selected === option.id ? 0 : -1}
                       onKeyDown={(event) => {
                         // Arrows only move focus; Space/Enter chooses, so browsing does not repaint the whole console.
                         const keys: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
-                        const target = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : event.key in keys ? (index + keys[event.key] + options.length) % options.length : -1;
+                        const target = event.key === "Home" ? 0 : event.key === "End" ? ordered.length - 1 : event.key in keys ? (index + keys[event.key] + ordered.length) % ordered.length : -1;
                         if (target < 0) return;
                         event.preventDefault();
                         radios.current[target]?.focus();
@@ -123,7 +136,7 @@ export function ThemePanel({ onClose = () => {} }: { onClose?: () => void }) {
                   );
                 })}
               </div>
-            </section>
+            </div>
           ))}
         </div>
         <div hidden>{all.map((option) => <span key={option.id} id={`theme-desc-${option.id}`}>{option.description}</span>)}</div>

@@ -9,11 +9,18 @@ reopening the picker reflects the applied choice.
 
 ## Palettes
 
-The Console includes 23 palettes: Amber Dunes, Basalt,
-Copper, Deep Desert, Dust Storm, Emerald, Golden Dusk, Ice Blue, Indigo,
-Jade, Moonstone, Nightfall, Oasis, Rosewood, Saffron, Sandstone, Slate,
-Spice, Steel, Harkonnen, Atreides, Sardaukar Imperial and Fremen. Their colour combinations are maintained in
-`console/web/src/themes/consolePalettes.ts`.
+The Console includes 23 palettes defined in
+`console/web/src/themes/consolePalettes.ts`: the 19 Console palettes (Amber
+Dunes, Basalt, Copper, Deep Desert, Dust Storm, Emerald, Golden Dusk, Ice Blue,
+Indigo, Jade, Moonstone, Nightfall, Oasis, Rosewood, Saffron, Sandstone, Slate,
+Spice and Steel) and four Dune faction palettes (Atreides, Fremen, Harkonnen and
+Sardaukar Imperial), plus the 42 swatch palettes below.
+
+The picker lists them in four sections, each sorted by name: Console palettes
+(with Default), Dune factions, Houses and Outfits and dyes. A filter box matches
+the palette or section name and shows `N of 66 palettes`; the applied palette
+always stays listed so the choice is never hidden. Escape clears the filter
+first and closes the picker on the next press.
 
 ### House swatch palettes
 
@@ -50,14 +57,16 @@ recovery panel.
 
 ## Keyboard
 
-Arrow keys, Home and End move focus between cards without applying a theme.
+Arrow keys, Home and End move focus between cards in the order they appear on screen (section by section) without applying a theme.
 Space or Enter selects the focused card. Escape closes the picker and returns
 focus to its header button.
 
 ## Adding a palette
 
-Add a `ConsolePalette` entry to `consolePalettes.ts` with a unique `dd-` ID,
-name, description, background, panel, accent and secondary colour. Use hex
+Add a `ConsolePalette` entry to `consolePalettes.ts` with a unique ID,
+name, description, background, panel, accent and secondary colour. The ID
+prefix decides the picker section: `dd-` is a Console palette, any other prefix
+(`dune-`, `tabr-`) a Dune faction. Use hex
 colours; the engine derives the remaining tokens. Keep the catalogue sorted
 by display name. Theme tests check distinct choices, complete tokens,
 readable contrast, persistence and resetting to Default.

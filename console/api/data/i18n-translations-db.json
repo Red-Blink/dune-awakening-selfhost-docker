@@ -3583,11 +3583,12 @@
     "Delete all stored chat history? This cannot be undone.",
     "The newest page refreshes every five seconds. Whispers are never collected. Faction and party are not supported yet.",
     "Filter palettes",
-    "No palettes match.",
+    "No other palettes match.",
     "Brutalist industrial: cold blues and purples on near-black.",
     "Caladan: deep ocean blues, sea green and silver.",
     "The Emperor's elite: imperial purple and gold on command black.",
-    "Warm dark stone with sky blue and sand, from the Tabr save editor."
+    "Warm dark stone with sky blue and sand, from the Tabr save editor.",
+    "{count0} palettes"
   ],
   "translations": {
     "FR": {
