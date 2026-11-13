@@ -3,7 +3,7 @@
 // theme sets nothing, so an operator who never opens the picker sees exactly
 // the stylesheet's own :root values.
 import tabrLooks from "./tabr/looks.json";
-import { DEFAULT_THEME_ID, THEME_CACHE_KEY, THEME_STORAGE_KEY, type ThemeCache } from "./themeBoot";
+import { DEFAULT_THEME_ID, THEME_CACHE_KEY, THEME_STORAGE_KEY, THEME_TOKEN_NAMES, type ThemeCache } from "./themeBoot";
 
 // The boot module (the only theme code in the entry chunk) owns the storage keys.
 export { DEFAULT_THEME_ID, THEME_STORAGE_KEY };
@@ -214,7 +214,12 @@ export function loadSelectedTheme(): string {
     const id = window.localStorage.getItem(THEME_STORAGE_KEY);
     if (!id) return DEFAULT_THEME_ID;
     return getThemes().some((t) => t.id === id) ? id : DEFAULT_THEME_ID;
-  } catch { return DEFAULT_THEME_ID; }
+  } catch {
+    // A blocked storage API still allows a choice for this page view. Reopening
+    // the picker must reflect that applied choice instead of claiming Default.
+    const applied = document.documentElement.dataset.theme;
+    return getThemes().some((t) => t.id === applied) ? applied! : DEFAULT_THEME_ID;
+  }
 }
 
 function writeThemeCache(theme: ThemeInfo | null): void {
@@ -227,7 +232,7 @@ function writeThemeCache(theme: ThemeInfo | null): void {
 export function applyTheme(id: string, root: HTMLElement = document.documentElement): void {
   if (id === DEFAULT_THEME_ID && !root.dataset.theme) return;
   const themes = getThemes();
-  Object.keys(themes[0]?.tokens ?? {}).forEach((name) => root.style.removeProperty(name));
+  THEME_TOKEN_NAMES.forEach((name) => root.style.removeProperty(name));
   const theme = themes.find((t) => t.id === id);
   if (!theme) {
     root.style.removeProperty("color-scheme");

@@ -117,6 +117,7 @@ describe("readThemeCache rejects anything the engine could not have written", ()
     ["a value that is not a hex colour or the glow", { ...ok, tokens: { "--bg": "url(https://evil.example/x)" } }],
     ["an expression in a value", { ...ok, tokens: { "--bg": "#0d0f12; background: red" } }],
     ["a property name that is not a custom property", { ...ok, tokens: { "background-image": "#0d0f12" } }],
+    ["a custom property outside the theme contract", { ...ok, tokens: { "--bg": "#0d0f12", "--retired-theme-color": "#ffffff" } }],
     ["a non-string value", { ...ok, tokens: { "--bg": 5 } }],
     ["an id that differs from the stored choice", { ...ok, id: "other" }],
     ["a bad appearance", { ...ok, appearance: "sepia" }],

@@ -7,12 +7,21 @@ export const DEFAULT_THEME_ID = "default";
 export const THEME_STORAGE_KEY = "dune-console-theme";
 export const THEME_CACHE_KEY = "dune-console-theme-cache";
 
+// Keep cache application and reset limited to the properties this feature owns.
+// A stale cache must not install unrelated properties that Default cannot undo.
+export const THEME_TOKEN_NAMES = [
+  "--bg", "--panel", "--panel-soft", "--panel-muted", "--border", "--border-strong",
+  "--text", "--text-strong", "--muted", "--muted-warm", "--text-subtle", "--text-faint",
+  "--title", "--accent", "--accent-strong", "--success", "--success-text", "--danger",
+  "--danger-strong", "--danger-text", "--danger-signal", "--state-motion", "--warning", "--bg-glow",
+] as const;
+const TOKEN_NAMES = new Set<string>(THEME_TOKEN_NAMES);
+
 export interface ThemeCache { id: string; appearance: "dark" | "light"; tokens: Record<string, string> }
 
 // The cache is plain storage anyone with page access can edit, so only the exact
 // shapes the engine emits are accepted: custom-property names, hex colours and
 // the one rgba() glow. Anything else makes the whole cache count as absent.
-const TOKEN_NAME = /^--[a-z][a-z-]*$/;
 const TOKEN_VALUE = /^(#[0-9a-f]{6}|rgba\(\d{1,3}, \d{1,3}, \d{1,3}, \.\d{1,2}\))$/i;
 
 export function readThemeCache(id: string): ThemeCache | null {
@@ -25,7 +34,7 @@ export function readThemeCache(id: string): ThemeCache | null {
     if (!tokens || typeof tokens !== "object") return null;
     const entries = Object.entries(tokens);
     if (entries.length === 0 || entries.length > 64) return null;
-    if (!entries.every(([name, value]) => TOKEN_NAME.test(name) && typeof value === "string" && TOKEN_VALUE.test(value))) return null;
+    if (!entries.every(([name, value]) => TOKEN_NAMES.has(name) && typeof value === "string" && TOKEN_VALUE.test(value))) return null;
     return { id, appearance: cache.appearance, tokens: tokens as Record<string, string> };
   } catch { return null; }
 }

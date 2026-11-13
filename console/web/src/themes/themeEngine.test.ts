@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { THEME_CACHE_KEY } from "./themeBoot";
+import { THEME_CACHE_KEY, THEME_TOKEN_NAMES } from "./themeBoot";
 import { DEFAULT_THEME_ID, getThemes, THEME_STORAGE_KEY, applyTheme, buildThemeTokens, contrast, ensureContrast, loadSelectedTheme, parseHex, parseJsonc, saveSelectedTheme } from "./themeEngine";
 
 const THEMES = getThemes();
@@ -30,6 +30,7 @@ describe("palette catalogue", () => {
 
   it("emits a full, valid token set for every palette", () => {
     const keys = Object.keys(THEMES[0].tokens).sort();
+    expect(keys).toEqual([...THEME_TOKEN_NAMES].sort());
     for (const theme of THEMES) {
       expect(Object.keys(theme.tokens).sort(), theme.id).toEqual(keys);
       for (const [name, value] of Object.entries(theme.tokens)) {
@@ -127,6 +128,7 @@ describe("apply and persistence", () => {
       expect(loadSelectedTheme()).toBe(DEFAULT_THEME_ID);
       expect(() => saveSelectedTheme("tabr-fremen")).not.toThrow();
       expect(document.documentElement.dataset.theme).toBe("tabr-fremen");
+      expect(loadSelectedTheme()).toBe("tabr-fremen");
     } finally { get.mockRestore(); set.mockRestore(); }
   });
 

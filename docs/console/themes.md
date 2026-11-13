@@ -6,7 +6,8 @@ The palette button in the console header (next to the language button) opens **C
 The choice applies to the browser you made it in and is stored in that browser's local storage
 (`dune-console-theme`). Nothing is stored on the server, so each operator and each device picks
 independently. **Default** is the standard console look and sets no overrides at all; clearing the
-choice, or choosing Default, restores it exactly.
+choice, or choosing Default, restores it exactly. If browser storage is blocked, the current
+page can still use a theme and reopening the picker reflects the applied choice.
 
 ## What is offered
 
