@@ -10,7 +10,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer as createTcpServer } from "node:net";
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -131,6 +131,51 @@ test("POST /api/settings/discord-bot/oauth-config persists client ID and redirec
     assert.ok(rows.find((r) => r.action === "settings.discord-bot.oauth-secret-updated"), "secret write must be audited");
     const secretRow = rows.find((r) => r.action === "settings.discord-bot.oauth-secret-updated");
     assert.equal(secretRow.detail.secret, "<redacted>", "the secret value must never appear in the audit log");
+  } finally {
+    await stopProcess(console_.child);
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+// #1338 (Layer 3 review): the route used to call updateEnvFileValue()
+// without await, mutate `config` immediately, and return 200 regardless of
+// whether the write actually landed. Making the .env write fail (a read-only
+// directory) proves the fix: the route must surface the failure as a 500
+// and must NOT have mutated the running config, instead of lying that the
+// setting was saved.
+test("POST /api/settings/discord-bot/oauth-config returns 500 and does not mutate config when the .env write fails", async () => {
+  const port = await getFreePort();
+  const tempDir = mkdtempSync(join(tmpdir(), "discordbot-oauth-config-writefail-"));
+  const console_ = startConsole(port, tempDir);
+  try {
+    await waitForHealth(port);
+    const session = await login(port, ADMIN_PASSWORD);
+    assert.equal(session.status, 200);
+
+    const before = await api(port, "/api/settings/discord-bot", { method: "GET", cookie: session.cookie });
+    const beforeBody = await before.json();
+
+    // Make .env a directory instead of a file. envFile.js's writer does
+    // `existsSync(envPath) ? readFileSync(envPath, ...) : []` -- readFileSync
+    // on a directory throws EISDIR synchronously, a deterministic failure
+    // that doesn't depend on DAC permissions (this test suite runs as root,
+    // where a chmod-based read-only directory would not actually block the
+    // write).
+    mkdirSync(join(tempDir, ".env"));
+    const write = await api(port, "/api/settings/discord-bot/oauth-config", {
+      method: "POST",
+      cookie: session.cookie,
+      csrf: session.csrf,
+      body: { clientId: "999999999999999999", redirectUri: "https://console.example.com/api/integrations/discord/hosted-bot/oauth/callback" }
+    });
+    assert.equal(write.status, 500);
+
+    const after = await api(port, "/api/settings/discord-bot", { method: "GET", cookie: session.cookie });
+    const afterBody = await after.json();
+    assert.deepEqual(afterBody, beforeBody, "a failed write must not change what the running config reports");
+
+    const rows = auditRows(tempDir).trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+    assert.ok(!rows.find((r) => r.action === "settings.discord-bot.oauth-config-updated"), "a failed write must not be audited as a success");
   } finally {
     await stopProcess(console_.child);
     rmSync(tempDir, { recursive: true, force: true });

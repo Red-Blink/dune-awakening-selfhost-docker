@@ -2613,13 +2613,24 @@ async function handleApi(req, res) {
     // settings without a container recreate at all (see the removed
     // recreate_discord_adapter_env() for the full history of why a
     // recreate was never actually the right fix).
-    if (body.clientId !== undefined) {
-      updateEnvFileValue("DISCORD_HOSTED_BOT_OAUTH_CLIENT_ID", String(body.clientId));
-      config.discordHostedBotOAuthClientId = String(body.clientId);
-    }
-    if (body.redirectUri !== undefined) {
-      updateEnvFileValue("DISCORD_HOSTED_BOT_OAUTH_REDIRECT_URI", String(body.redirectUri));
-      config.discordHostedBotOAuthRedirectUri = String(body.redirectUri);
+    // #1338 (Layer 3 review): both writes are awaited and `config` is only
+    // mutated after each write actually lands -- the previous, unawaited
+    // form mutated `config` and returned 200 immediately, so a rejected
+    // write (EACCES, ENOSPC, read-only mount) was silently dropped (only
+    // seen by the global unhandledRejection handler) while the operator was
+    // told it saved; the credential then reverted on the next restart with
+    // no error ever surfaced.
+    try {
+      if (body.clientId !== undefined) {
+        await updateEnvFileValue("DISCORD_HOSTED_BOT_OAUTH_CLIENT_ID", String(body.clientId));
+        config.discordHostedBotOAuthClientId = String(body.clientId);
+      }
+      if (body.redirectUri !== undefined) {
+        await updateEnvFileValue("DISCORD_HOSTED_BOT_OAUTH_REDIRECT_URI", String(body.redirectUri));
+        config.discordHostedBotOAuthRedirectUri = String(body.redirectUri);
+      }
+    } catch {
+      return json(res, 500, { error: "Failed to save the Discord Bot OAuth configuration. Check the console's filesystem permissions and try again." });
     }
     audit(config, req, "settings.discord-bot.oauth-config-updated", {});
     return json(res, 200, { ok: true });
@@ -9735,11 +9746,28 @@ async function handleOAuthCallback(req, res) {
       // always tries prompt=none first -- into a shared, unattributed
       // bucket, defeating that per-owner eviction guarantee for the one
       // call site nearly every real sign-in passes through.
-      const retry = oauthPendingStates.issue(undefined, { purpose: consumed.purpose, sessionId: consumed.sessionId, owner: rateKey });
+      // #1336 (Layer 3 review): purpose "setup" must retry against the
+      // SAME application /start used (readDiscordSetupApplication(), which
+      // can be a just-saved-but-not-yet-restarted credential set, not the
+      // boot-time config.discordOAuth*), and must re-carry applicationVersion
+      // so the one-application binding (checked above and in
+      // discordSetupFinalize) still holds on the retried attempt. Using
+      // config.discordOAuth* here broke exactly the common first-run path:
+      // a first-time Discord user always gets consent_required from the
+      // prompt=none attempt, so this retry branch is not an edge case for
+      // setup, it is the normal path.
+      const isSetupRetry = consumed.purpose === "setup";
+      const retryApplication = isSetupRetry ? readDiscordSetupApplication() : null;
+      const retry = oauthPendingStates.issue(undefined, { purpose: consumed.purpose, sessionId: consumed.sessionId, owner: rateKey, applicationVersion: consumed.applicationVersion });
       if (!retry) return html(res, 429, oauthErrorPage("Too many Discord sign-in sessions in progress. Try again in a moment."));
       res.setHeader("Set-Cookie", oauthStateCookie(retry.state));
       audit(config, sanitizedUrl(req, "/api/auth/discord/callback"), "auth.oauth.callback", { ok: false, reason: `silent_${oauthError}`, retry: "interactive", purpose: consumed.purpose });
-      res.writeHead(302, { Location: buildAuthorizeUrl({ clientId: config.discordOAuthClientId, redirectUri: config.discordOAuthRedirectUri, state: retry.state, codeChallenge: retry.challenge }) });
+      res.writeHead(302, { Location: buildAuthorizeUrl({
+        clientId: isSetupRetry ? retryApplication.clientId : config.discordOAuthClientId,
+        redirectUri: isSetupRetry ? retryApplication.redirectUri : config.discordOAuthRedirectUri,
+        state: retry.state,
+        codeChallenge: retry.challenge
+      }) });
       res.end();
       return;
     }

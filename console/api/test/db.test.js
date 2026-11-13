@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertIdentifier, bigintParam, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
+import { assertIdentifier, bigintParam, discoverDbConfig, intParam, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
 import {
   _resetRefillPartitionDwellForTests,
   baseRefillTarget,
@@ -34,6 +34,16 @@ test("bigint parameters preserve identifiers beyond JavaScript's safe integer ra
   assert.equal(bigintParam("9223372036854775807", "item id"), "9223372036854775807");
   assert.throws(() => bigintParam("9223372036854775808", "item id"), /Invalid item id/);
   assert.throws(() => bigintParam("1.5", "item id"), /Invalid item id/);
+});
+
+// #1346 (Layer 3 pentest finding): a bad caller-supplied id is a client
+// input-validation failure. Before this fix, intParam/bigintParam threw a
+// plain Error with no statusCode, so apiErrorPayload() fell back to 500 --
+// confirmed live on dune-dev against /api/players/<bad-id>/teleport-destinations
+// and .../character-recovery, both routing through intParam().
+test("intParam and bigintParam flag an invalid value as a 400, not a server fault", () => {
+  assert.throws(() => intParam("not-a-number", "player id"), (error) => error.statusCode === 400 && /Invalid player id/.test(error.message));
+  assert.throws(() => bigintParam("not-a-number", "item id"), (error) => error.statusCode === 400 && /Invalid item id/.test(error.message));
 });
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
@@ -8578,6 +8588,20 @@ test("offline teleport rejects unknown players before moving them", async () => 
   );
   assert.equal(calls.length, 1);
   assert.doesNotMatch(calls.map((call) => call.text).join("\n"), /admin_move_offline_player_to_partition/);
+});
+
+// #1346 (Layer 3 pentest finding): validatePlayerIdForDb used to throw a
+// plain Error, falling back to apiErrorPayload()'s 500 for a malformed id --
+// this must be a 400, and must reject before any query runs.
+test("offline teleport rejects a malformed player id with a 400, before querying", async () => {
+  const calls = [];
+  const db = { query: async (text, values = []) => { calls.push({ text, values }); throw new Error("must not query for a malformed id"); } };
+
+  await assert.rejects(
+    () => teleportOfflinePlayerToCoords(db, "not an fls id!!", { x: 1, y: 2, z: 3, partitionId: 1 }),
+    (error) => error.statusCode === 400 && /Invalid player id/.test(error.message)
+  );
+  assert.equal(calls.length, 0);
 });
 
 test("offline teleport moves existing players through the supported function", async () => {

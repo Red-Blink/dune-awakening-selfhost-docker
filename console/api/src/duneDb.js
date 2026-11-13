@@ -15412,7 +15412,11 @@ function validActorPartitionClause(hasWorldPartition, alias) {
 function validatePlayerIdForDb(value) {
   const raw = String(value || "");
   if (/^[A-Za-z0-9_:#.-]{1,128}$/.test(raw)) return raw;
-  throw new Error("Invalid player id");
+  // #1346: client input validation, not a server fault -- see db.js's
+  // intParam/bigintParam for the same fix applied to the same error class.
+  const error = new Error("Invalid player id");
+  error.statusCode = 400;
+  throw error;
 }
 
 async function resolveTeleportPartition(db, playerId, partitionId) {
