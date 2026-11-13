@@ -624,7 +624,7 @@ export function SettingsPanel({ onPasswordChanged, publicListingUrl, confirmActi
           <div className="settings-password-grid">
             <label htmlFor="settings-totp-enable-password">Password (to confirm it&apos;s you)<SecretInput id="settings-totp-enable-password" name="settings-totp-enable-password" disabled={totpEnableSaving} value={totpEnablePassword} onChange={(event) => setTotpEnablePassword(event.target.value)} placeholder="Your login password" /></label>
           </div>
-          <p className="muted">You&apos;ll see a QR code to scan, then be asked to sign back in once it&apos;s confirmed.</p>
+          <p className="muted">You&apos;ll see a QR code to scan, then 10 recovery codes to save. This session stays signed in; your other sessions are signed out.</p>
           <div className="action-row">
             <button disabled={totpEnableSaving || !totpEnablePassword} onClick={() => { void enableTwoFactor(); }}>{totpEnableSaving ? "Starting..." : "Enable Two-Factor Authentication"}</button>
             {totpEnableResult && <span className={`inline-task-result result-${totpEnableResult.status === "succeeded" ? "ok" : totpEnableResult.status === "failed" ? "fail" : "running"}`}>

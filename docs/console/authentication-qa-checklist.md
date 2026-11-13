@@ -85,16 +85,25 @@ Run Parts 1 and 2 in order — this is the path every upgrading operator takes. 
 
 **Expected**
 - Sign-in page looks the same: one password field, one Sign In button.
+- Signing in with the password alone still works and lands in the console.
+  Setting the flag only makes two-factor *available*; it never forces setup.
+- Settings → **Two-Factor Authentication** now exists, collapsed, with the
+  text *Off by default…* when expanded.
 
-### T04 · First sign-in lands on setup, not the console
-1. Enter the correct password. Sign In.
+### T04 · Enrollment starts from Settings, in a focused dialog
+1. Settings → **Two-Factor Authentication** → expand.
+2. Enter the Console password under *Password (to confirm it's you)*. The
+   **Enable Two-Factor Authentication** button stays disabled until you type it.
+   Click it.
 
 **Expected**
-- A setup screen appears instead of the console, with a QR code, the text
-  secret printed beneath it under *Can't scan? Enter this code manually:*,
-  a 6-digit code field, a **Confirm** button, and *Back to sign in*.
-- Nothing else in the console is reachable (try the browser Back button or
-  typing a console URL — you land back on setup or sign-in).
+- A modal dialog titled **Enable 2FA** opens over Settings, with a QR code,
+  the text secret under *Can't scan? Enter this code manually:*, a 6-digit
+  *Authenticator Code* field, a **Confirm** button, and **Cancel** (also an
+  X button labelled *Cancel 2FA setup*).
+- Focus moves into the dialog. **Escape** behaves like Cancel (see T10).
+- You are still signed in; nothing is enforced yet. Tab cycles within the
+  dialog only (focus does not escape to the page behind it).
 
 ### T05 · Real phone scan
 1. Scan the QR with the authenticator app on the phone.
@@ -124,15 +133,19 @@ Run Parts 1 and 2 in order — this is the path every upgrading operator takes. 
 **Expected**
 - Screen headed *Save your recovery codes* with **exactly 10** codes and the
   text that they are shown once.
-- An acknowledgement checkbox and a *Continue to sign in* button.
-2. Click *Continue to sign in* **without** ticking the box.
+- An acknowledgement checkbox and a **Done** button.
+2. Click **Done** **without** ticking the box.
 
 **Expected**
 - Nothing happens (button disabled or a prompt) — you cannot skip the acknowledgement.
 3. Record all 10 codes in your chosen place. Tick the box. Continue.
 
 **Expected**
-- Back at the sign-in page. Setup is not repeated.
+- The dialog closes and you are **back in Settings, still signed in**, now
+  showing two-factor as enabled. You are not sent to the sign-in page.
+- Your **other** browser sessions (the private window from the environment
+  table) are signed out. Reload there: it asks for sign-in.
+- Setup is not repeated.
 
 ### T09 · The confirmation code cannot be reused to sign in
 1. Password + **the same code you just used to confirm**. Sign In.
@@ -144,18 +157,40 @@ Run Parts 1 and 2 in order — this is the path every upgrading operator takes. 
 **Expected**
 - Signed in. Console loads.
 
-### T10 · Abandoned setup restarts with a fresh QR
+### T10 · Cancelled or abandoned setup restarts with a fresh QR
 *Host:* remove `runtime/generated/console-second-factor.json` (this is the
-break-glass reset, see T17) and `dune console restart`, so setup runs again.
-1. Password → setup screen. **Do not scan.** Click *Back to sign in*.
-2. Password again → setup screen.
+break-glass reset, see T17) and `dune console restart`, so setup can run again.
+Sign in with the password only.
+1. Settings → Two-Factor Authentication → password → **Enable**. **Do not
+   scan.** Click **Cancel** (or press Escape).
 
 **Expected**
-- The QR / manual code is **different** from the first one (compare the manual code text).
-3. Scan the **new** one, confirm, save codes, sign in with password + next code.
+- The dialog closes and you are back in Settings, still signed in, with
+  two-factor **not** enabled. Signing out and in again needs the password only.
+2. Enable again (password → **Enable**).
+
+**Expected**
+- The QR / manual code is **different** from the first one (compare the manual
+  code text). The dialog says: *Replace any authenticator entry from an earlier
+  setup attempt with the QR code shown here.*
+3. Scan the **new** one, confirm, save codes, press **Done**, then sign out and
+   sign in with password + next code.
 
 **Expected**
 - Signed in. The phone entry from step 1 (if you scanned it) does **not** work.
+4. Also try: double-click **Confirm** quickly, and open Settings in a second
+   tab, start setup in both, and confirm in one.
+
+**Expected**
+- Exactly one factor is created. The other tab's attempt must end in a message
+  that says what to do next, not a stuck dialog — record the exact text.
+5. On the **recovery-codes** screen (after a correct Confirm), press **Escape**
+   and click outside the dialog.
+
+**Expected**
+- The codes stay on screen until you tick the box and press **Done**. If
+  Escape or an outside click closes the dialog and the codes are gone, that is
+  a finding: the codes are shown only once.
 
 ---
 
@@ -277,7 +312,7 @@ break-glass reset, see T17) and `dune console restart`, so setup runs again.
 rm runtime/generated/console-second-factor.json     # leave the .watermark file alone
 dune console restart
 ```
-1. Password → setup screen (as T04). Complete setup: scan, confirm, **save the 10 codes**, sign in.
+1. Enable from Settings (as T04). Complete setup: scan, confirm, **save the 10 codes**, press **Done**, then sign out and sign in with password + code.
 2. Sign out. *Lost access to your authenticator?* → password + one of the codes you just saved.
 
 **Expected**

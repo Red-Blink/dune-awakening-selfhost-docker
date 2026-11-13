@@ -3617,7 +3617,7 @@
     "Yes",
     "You have the option to enter and use your own personal DeepL API key here if you own one. Otherwise, please leave this setting untouched — the console already includes a pre-populated 53-language database, automatic fallback translation, and Dune-Docker peer synchronization.",
     "You will need your",
-    "You'll see a QR code to scan, then be asked to sign back in once it's confirmed.",
+    "You'll see a QR code to scan, then 10 recovery codes to save. This session stays signed in; your other sessions are signed out.",
     "Your browser login session expired.",
     "Your browser login session expired. Sign in again to continue.",
     "Your Correction",
