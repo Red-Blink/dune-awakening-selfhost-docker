@@ -7090,8 +7090,7 @@
         "nearby": [
           "Console Theme",
           "Close",
-          "Console theme",
-          "Palettes: Fedaykin Dune Themes and Tabr (MIT)."
+          "Console theme"
         ]
       }
     ],
@@ -13755,8 +13754,7 @@
         "line": 71,
         "nearby": [
           "Close",
-          "Applies to this browser only. Choose Default to restore the standard look.",
-          "Palettes: Fedaykin Dune Themes and Tabr (MIT)."
+          "Applies to this browser only. Choose Default to restore the standard look."
         ]
       }
     ],
@@ -33402,16 +33400,6 @@
           "Previous",
           "of",
           "Next"
-        ]
-      }
-    ],
-    "Palettes: Fedaykin Dune Themes and Tabr (MIT).": [
-      {
-        "file": "console/web/src/themes/ThemePanel.tsx",
-        "line": 101,
-        "nearby": [
-          "Applies to this browser only. Choose Default to restore the standard look.",
-          "Console theme"
         ]
       }
     ],

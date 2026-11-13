@@ -98,7 +98,6 @@ export function ThemePanel({ onClose = () => {} }: { onClose?: () => void }) {
           ))}
         </div>
         <div hidden>{options.map((option) => <span key={option.id} id={`theme-desc-${option.id}`}>{option.description}</span>)}</div>
-        <p className="theme-picker-credit">Palettes: Fedaykin Dune Themes and Tabr (MIT).</p>
       </div>
     </div>,
     document.body,

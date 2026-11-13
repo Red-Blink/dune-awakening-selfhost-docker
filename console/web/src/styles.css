@@ -8058,7 +8058,6 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
 .theme-picker-heading h2 { font-size: 20px; margin: 0; }
 .theme-picker-heading > button { width: 40px; min-height: 40px; padding: 6px; flex: 0 0 auto; }
 .theme-picker .theme-picker-note { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
-.theme-picker .theme-picker-credit { margin: 14px 0 0; color: var(--text-faint); font-size: 12px; }
 .theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
 .theme-card { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px; text-align: left; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-soft); color: var(--text); cursor: pointer; }
 .theme-card:hover { border-color: var(--border-strong); }
