@@ -119,13 +119,15 @@ describe("ThemePanel", () => {
     expect(houses).toHaveLength(27);
   });
 
-  it("numbers every radio in the order it appears", () => {
+  it("labels each section as its own radio group by its heading", () => {
     render(<ThemePanel />);
-    const radios = screen.getAllByRole("radio");
-    radios.forEach((radio, index) => {
-      expect(radio).toHaveAttribute("aria-posinset", String(index + 1));
-      expect(radio).toHaveAttribute("aria-setsize", String(radios.length));
-    });
+    const groups = screen.getAllByRole("radiogroup");
+    expect(groups.map((g) => g.getAttribute("aria-labelledby"))).toHaveLength(4);
+    expect(screen.getByRole("radiogroup", { name: "Houses" })).toContainElement(screen.getByRole("radio", { name: /House Kenola/ }));
+    expect(screen.getByRole("radiogroup", { name: "Outfits and dyes" })).toContainElement(screen.getByRole("radio", { name: /Sunset Dye/ }));
+    // Headings are labels, not children of a radiogroup.
+    for (const group of groups) expect(group.querySelector("h3")?.id).toBe(group.getAttribute("aria-labelledby"));
+    expect(screen.getAllByRole("radio").filter((radio) => radio.getAttribute("aria-checked") === "true")).toHaveLength(1);
   });
 
   it("arrow keys follow the on-screen order across section boundaries", () => {
@@ -150,7 +152,7 @@ describe("ThemePanel", () => {
     expect(screen.getByRole("status")).toHaveTextContent("66 palettes");
     fireEvent.change(filter, { target: { value: "sardaukar" } });
     expect(screen.getAllByRole("radio").map((r) => r.textContent)).toEqual(["Default", "Sardaukar Imperial", "Sardaukar Tactical"]);
-    expect(screen.getByRole("status")).toHaveTextContent("2 of 66 palettes");
+    expect(screen.getByRole("status")).toHaveTextContent("2 of 66 palettes, plus the applied one");
     fireEvent.change(filter, { target: { value: "outfits" } });
     expect(screen.getAllByRole("radio")).toHaveLength(16);
     fireEvent.change(filter, { target: { value: "zzzz" } });
@@ -176,6 +178,7 @@ describe("ThemePanel", () => {
     fireEvent.click(screen.getByRole("radio", { name: /Sunset Dye/ }));
     fireEvent.change(screen.getByRole("searchbox", { name: "Filter palettes" }), { target: { value: "alexin" } });
     expect(screen.getAllByRole("radio").map((r) => r.textContent)).toEqual(["House Alexin", "Sunset Dye"]);
+    expect(screen.getByRole("status")).toHaveTextContent("1 of 66 palettes, plus the applied one");
     expect(screen.getByRole("radio", { name: /Sunset Dye/ })).toHaveAttribute("aria-checked", "true");
   });
 

@@ -133,7 +133,7 @@ describe("apply and persistence", () => {
   it("ignores a stored id that no longer exists", () => {
     window.localStorage.setItem(THEME_STORAGE_KEY, "gone");
     expect(loadSelectedTheme()).toBe(DEFAULT_THEME_ID);
-    // The dead id is dropped so later boots take the default path instead of loading the engine each time.
-    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+    // Reading never deletes the stored id: a tab on an older bundle must not wipe a newer tab's choice.
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("gone");
   });
 });

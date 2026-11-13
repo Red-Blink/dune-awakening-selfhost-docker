@@ -8052,9 +8052,9 @@ td :where(.service-actions, .action-row, .map-action-buttons) { max-width: 100%;
 
 /* Console theme picker (src/themes). Swatch fills are the theme's own colours, set inline. */
 .theme-picker-overlay { z-index: 1000; padding: 16px; }
-.theme-picker { background: var(--panel); width: min(860px, 100%); max-height: min(85dvh, 850px); overflow-y: auto; box-sizing: border-box; }
+.theme-picker { --theme-picker-pad: 18px; padding: var(--theme-picker-pad); background: var(--panel); width: min(860px, 100%); max-height: min(85dvh, 850px); overflow-y: auto; box-sizing: border-box; }
 .theme-picker-heading, .theme-picker-heading > div { display: flex; align-items: center; gap: 10px; }
-.theme-picker-sticky { position: sticky; top: -18px; z-index: 1; background: var(--panel); margin-top: -18px; padding-top: 18px; padding-bottom: 4px; }
+.theme-picker-sticky { position: sticky; top: calc(-1 * var(--theme-picker-pad)); z-index: 1; background: var(--panel); margin-top: calc(-1 * var(--theme-picker-pad)); padding-top: var(--theme-picker-pad); padding-bottom: 4px; }
 .theme-picker-heading { justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; }
 .theme-picker-heading h2 { font-size: 20px; margin: 0; }
 .theme-picker-heading > button { width: 40px; min-height: 40px; padding: 6px; flex: 0 0 auto; }

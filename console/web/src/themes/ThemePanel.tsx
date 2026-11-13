@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Palette, X } from "lucide-react";
+import { PALETTE_GROUPS } from "./consolePalettes";
 import { DEFAULT_THEME_ID, THEME_STORAGE_KEY, getThemes, loadSelectedTheme, saveSelectedTheme } from "./themeEngine";
 
 // One line per palette: its name and four colour boxes. Swatch palettes show their source dyes; the others show page, panel, accent and secondary.
 const SWATCH_TOKENS = ["--bg", "--panel", "--accent", "--accent-strong"] as const;
 const DEFAULT_SWATCHES = ["#0d0f12", "#171a1d", "#c68b4a", "#d8a05c"];
-const GROUP_ORDER = ["Console palettes", "Dune factions", "Houses", "Outfits and dyes"];
+const GROUP_ORDER: readonly string[] = PALETTE_GROUPS;
 
 export function ThemePanel({ onClose = () => {} }: { onClose?: () => void }) {
   const [selected, setSelected] = useState(loadSelectedTheme);
@@ -46,10 +47,10 @@ export function ThemePanel({ onClose = () => {} }: { onClose?: () => void }) {
     saveSelectedTheme(id);
     setSelected(id);
   }
-  const all = [
+  const all = useMemo(() => [
     { id: DEFAULT_THEME_ID, name: "Default", description: "The standard console look.", group: GROUP_ORDER[0], swatches: DEFAULT_SWATCHES as readonly string[] },
     ...getThemes().map((theme) => ({ id: theme.id, name: theme.name, description: theme.description, group: theme.group ?? GROUP_ORDER[0], swatches: theme.dyes ?? (SWATCH_TOKENS.map((token) => theme.tokens[token]) as readonly string[]) })),
-  ];
+  ], []);
   const query = filter.trim().toLowerCase();
   // The applied choice stays listed while filtering, so the radio group always has a checked card.
   const matching = (option: (typeof all)[number]) => !query || option.name.toLowerCase().includes(query) || option.group.toLowerCase().includes(query);
@@ -60,6 +61,8 @@ export function ThemePanel({ onClose = () => {} }: { onClose?: () => void }) {
   // Keyboard order is the rendered order, not the catalogue's alphabetical order.
   const ordered = groups.flatMap((entry) => entry.items);
   const matches = all.filter(matching).length;
+  const pinnedExtra = options.length - matches;
+  const position = new Map(ordered.map((option, index) => [option.id, index]));
   return createPortal(
     <div className="modal-overlay theme-picker-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) closeRef.current(); }}>
       <div
@@ -95,16 +98,16 @@ export function ThemePanel({ onClose = () => {} }: { onClose?: () => void }) {
           aria-label="Filter palettes"
           onChange={(event) => setFilter(event.target.value)}
         />
-        <p className="theme-filter-count" role="status" aria-live="polite">{query ? (matches === 0 ? "No other palettes match." : `${matches} of ${all.length} palettes`) : `${all.length} palettes`}</p>
+        <p className="theme-filter-count" role="status" aria-live="polite">{query ? (matches === 0 ? "No other palettes match." : `${matches} of ${all.length} palettes${pinnedExtra > 0 ? ", plus the applied one" : ""}`) : `${all.length} palettes`}</p>
         </div>
         <p className="theme-picker-note">Applies to this browser only. Choose Default to restore the standard look.</p>
-        <div role="radiogroup" aria-label="Console theme">
+        <div>
           {groups.map(({ group, items }) => (
-            <div key={group} role="presentation" className="theme-group">
+            <div key={group} role="radiogroup" aria-labelledby={`theme-group-${group.replace(/\W+/g, "-")}`} className="theme-group">
               <h3 id={`theme-group-${group.replace(/\W+/g, "-")}`}>{group}</h3>
               <div className="theme-grid">
                 {items.map((option) => {
-                  const index = ordered.indexOf(option);
+                  const index = position.get(option.id) ?? 0;
                   return (
                     <button
                       key={option.id}
@@ -112,8 +115,6 @@ export function ThemePanel({ onClose = () => {} }: { onClose?: () => void }) {
                       type="button"
                       role="radio"
                       aria-checked={selected === option.id}
-                      aria-posinset={index + 1}
-                      aria-setsize={ordered.length}
                       tabIndex={selected === option.id ? 0 : -1}
                       onKeyDown={(event) => {
                         // Arrows only move focus; Space/Enter chooses, so browsing does not repaint the whole console.

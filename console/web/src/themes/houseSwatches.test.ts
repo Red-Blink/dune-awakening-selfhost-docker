@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PALETTE_GROUPS } from "./consolePalettes";
 import { HOUSE_SWATCHES } from "./houseSwatches";
 import { contrast, getThemes, parseHex, paletteFromSwatch, type Rgb } from "./themeEngine";
 
@@ -43,11 +44,27 @@ describe("House swatch palettes", () => {
   });
 
   it("handles degenerate dye sets without throwing and keeps surfaces apart", () => {
-    const mk = (colors: [string, string, string, string]) => paletteFromSwatch({ id: "x", name: "x", colors });
+    const mk = (colors: [string, string, string, string]) => paletteFromSwatch({ id: "x", name: "x", group: "Houses", colors });
     for (const colors of [["#808080", "#808080", "#808080", "#808080"], ["#ffffff", "#ffffff", "#ffffff", "#ffffff"], ["#000000", "#000000", "#000000", "#000000"], ["nope", "nope", "nope", "nope"]] as [string, string, string, string][]) {
       const palette = mk(colors);
       expect(Object.values(palette).every((value) => /^#[0-9a-f]{6}$/.test(value)), colors.join()).toBe(true);
       expect(palette.background).not.toBe(palette.panel);
     }
+  });
+
+  it("prefers a secondary dye that visibly differs from the accent over a near-identical one", () => {
+    // After the chroma sort the pool is [accent, near-copy, distinct]; the near-copy must be skipped.
+    const palette = paletteFromSwatch({ id: "x", name: "x", group: "Houses", colors: ["#d0a030", "#cfa030", "#6080c0", "#202020"] });
+    expect(palette.accent).toBe("#d0a030");
+    expect(palette.secondary).toBe("#6080c0");
+  });
+
+  it("assigns every palette an explicit section, with the expected members", () => {
+    const themes = getThemes();
+    for (const theme of themes) expect(PALETTE_GROUPS, theme.id).toContain(theme.group);
+    const count = (group: string) => themes.filter((t) => t.group === group).length;
+    expect([count("Console palettes"), count("Dune factions"), count("Houses"), count("Outfits and dyes")]).toEqual([19, 4, 27, 15]);
+    expect(themes.find((t) => t.id === "dune-harkonnen")?.group).toBe("Dune factions");
+    expect(themes.find((t) => t.id === "house-harkonnen")?.group).toBe("Houses");
   });
 });

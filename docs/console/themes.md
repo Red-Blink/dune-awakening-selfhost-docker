@@ -63,10 +63,9 @@ focus to its header button.
 
 ## Adding a palette
 
-Add a `ConsolePalette` entry to `consolePalettes.ts` with a unique ID,
-name, description, background, panel, accent and secondary colour. The ID
-prefix decides the picker section: `dd-` is a Console palette, any other prefix
-(`dune-`, `tabr-`) a Dune faction. Use hex
+Add a `ConsolePalette` entry to `consolePalettes.ts` with a unique ID, a
+`group` (the picker section: one of `PALETTE_GROUPS`), name, description,
+background, panel, accent and secondary colour. Use hex
 colours; the engine derives the remaining tokens. Keep the catalogue sorted
 by display name. Theme tests check distinct choices, complete tokens,
 readable contrast, persistence and resetting to Default.

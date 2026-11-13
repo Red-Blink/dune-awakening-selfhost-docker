@@ -143,7 +143,8 @@ export function paletteFromSwatch(swatch: HouseSwatch): Pick<ConsolePalette, "ba
   const bright = dyes.filter((c) => luminance(c) >= 0.08);
   const pool = (bright.length >= 2 ? bright : byLight.slice(-2)).sort((a, b) => chroma(b) - chroma(a) || luminance(b) - luminance(a));
   const accent = pool[0];
-  const secondary = pool.find((c) => contrast(c, accent) >= 1.3 || toHex(c) !== toHex(accent)) ?? accent;
+  // Prefer a dye that visibly differs from the accent; fall back to any different dye, then the accent itself.
+  const secondary = pool.find((c) => contrast(c, accent) >= 1.3) ?? pool.find((c) => toHex(c) !== toHex(accent)) ?? accent;
   return { background: toHex(bg), panel: toHex(panel), accent: toHex(accent), secondary: toHex(secondary) };
 }
 
@@ -154,7 +155,7 @@ function loadThemes(): ThemeInfo[] {
     description: palette.description,
     appearance: "dark",
     tokens: buildThemeTokens(palette),
-    group: palette.id.startsWith("dd-") ? "Console palettes" : "Dune factions",
+    group: palette.group,
   }));
   const houses: ThemeInfo[] = HOUSE_SWATCHES.map((swatch): ThemeInfo => ({
     id: swatch.id,
@@ -162,7 +163,7 @@ function loadThemes(): ThemeInfo[] {
     description: `The armour dye colours of ${swatch.name}.`,
     appearance: "dark",
     tokens: buildThemeTokens(paletteFromSwatch(swatch)),
-    group: swatch.id.startsWith("house-") ? "Houses" : "Outfits and dyes",
+    group: swatch.group,
     dyes: swatch.colors,
   }));
   return [...palettes, ...houses].sort((a, b) => a.name.localeCompare(b.name));
@@ -179,10 +180,7 @@ export function loadSelectedTheme(): string {
   try {
     const id = window.localStorage.getItem(THEME_STORAGE_KEY);
     if (!id) return DEFAULT_THEME_ID;
-    if (getThemes().some((t) => t.id === id)) return id;
-    // A saved id the catalogue no longer has would send every later boot down the non-default path.
-    window.localStorage.removeItem(THEME_STORAGE_KEY);
-    return DEFAULT_THEME_ID;
+    return getThemes().some((t) => t.id === id) ? id : DEFAULT_THEME_ID;
   } catch {
     // A blocked storage API still allows a choice for this page view. Reopening
     // the picker must reflect that applied choice instead of claiming Default.
