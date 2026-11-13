@@ -1,0 +1,60 @@
+{
+    "name": "Dune Arrakis Incandescent",
+    "description": "A desert-inspired theme with warm, glowing incandescent tones - golden spice, sunset rose, and ember oranges",
+    "colors": {
+        // Core backgrounds
+        "color_01": "#151313", // Primary canvas (editor, sidebar, activity bar, tabs, panel)
+        "color_02": "#1C1B1A", // Status bar, peek view backgrounds
+        "color_03": "#282726", // Elevated surfaces (line highlight, active tab, widgets, inputs, dropdowns, lists, breadcrumb picker, quick input)
+        "color_04": "#343331", // Hover states (list hover, inactive selection)
+        "color_05": "#403E3C", // Selection backgrounds
+        "color_06": "#575653", // Active selections (autocomplete, quick input focus)
+        // Borders and dividers
+        "color_07": "#343331", // Primary borders (whitespace, ruler, widget borders, input borders)
+        "color_08": "#878580", // Line numbers, activity bar icons, terminal bright black, brackets
+        // Text hierarchy
+        "color_09": "#CECDC3", // Primary text (editor, cursor, sidebar, active elements, variable semantic)
+        "color_10": "#B7B5AC", // Secondary text (status bar, inactive tabs, breadcrumb, descriptions, language methods)
+        "color_11": "#878580", // Tertiary text (comments, placeholders)
+        "color_12": "#6F6E69", // Git ignored files
+        "color_13": "#dfd8b3", // Special variable color (TextMate only)
+        // Syntax highlighting
+        "color_14": "#7FB069", // Strings, bracket pair 5 - Sietch green (oasis)
+        "color_15": "#e2ad4a", // Numbers, constants, parameters, tags, bracket pair 6 - Golden spice
+        "color_16": "#CC6B49", // Keywords, operators, built-in variables/functions, bracket pair 3 - Sandworm orange
+        "color_17": "#5A96BC", // Functions, methods, decorators, git conflicts, bracket pair 4 - Fremen blue (eyes of Ibad)
+        "color_18": "#e0a98eff", // Types, classes, interfaces, bracket pair 2 - Desert rock
+        "color_19": "#de956a", // Properties, regex, attributes, bracket pair 1 - Dune sand
+        // Semantic state colors
+        "color_20": "#C15849", // Errors (squiggles, icons, rulers, mismatched brackets) - Desert storm red
+        "color_21": "#E8B04B", // Warnings (squiggles, icons, rulers, git modified) - Spice glow
+        "color_22": "#5A96BC", // Info (squiggles, icons, rulers) - Fremen blue
+        "color_23": "#7FB069", // Success, git added, terminal bright green, JS string literals - Oasis green
+        "color_24": "#6B8FA3", // Git untracked - Twilight blue
+        // UI accent colors
+        "color_25": "#5A96BC", // Primary accent (badges, buttons, links, peek borders, settings modified) - Fremen blue
+        "color_26": "#4A7A9A", // Button hover - Deep Fremen blue
+        // Terminal special
+        "color_27": "#C17B8D", // Terminal bright magenta - Sunset rose
+        "color_28": "#6B8FA3", // Terminal bright cyan - Twilight blue
+        "color_29": "#E6DCC6", // Terminal bright white - Bleached sand
+        // Transparencies and overlays
+        "color_30": "#00000000", // Invisible borders
+        "color_31": "#00000001", // Transparent line highlight border
+        "color_32": "#34333150", // Semi-transparent borders
+        "color_33": "#403E3C80", // Selection highlight inactive
+        "color_34": "#403E3C40", // Scrollbar track, bracket match background
+        "color_35": "#57565360", // Scrollbar hover
+        "color_36": "#57565380", // Scrollbar active
+        "color_37": "#343331", // Active tab border
+        "color_38": "#00000040", // Shadow
+        "color_39": "#1C1B1A", // Markdown fenced code block
+        "color_40": "#57565340", // Find range highlight
+        "color_41": "#57565360", // Word highlight, focus border
+        "color_42": "#D0A21540", // Find match highlight
+        "color_43": "#D0A21560", // Find match current
+        "color_44": "#87858080", // Bracket match border
+        "color_45": "#879A3920", // Diff inserted background
+        "color_46": "#D14D4120" // Diff removed background
+    }
+}

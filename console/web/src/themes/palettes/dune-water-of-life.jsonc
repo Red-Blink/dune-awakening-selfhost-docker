@@ -1,0 +1,60 @@
+{
+    "name": "Dune Water of Life",
+    "description": "The sacred poison that transforms - luminous blues, ethereal whites, and transcendent purples",
+    "colors": {
+        // Core backgrounds - Ethereal gradient
+        "color_01": "#0a0e14", // Deep mystic void
+        "color_02": "#111621", // Sacred depth
+        "color_03": "#181f2c", // Twilight blue
+        "color_04": "#202938", // Spirit shadow
+        "color_05": "#283345", // Dream state
+        "color_06": "#303d52", // Vision mist
+        // Borders and dividers - Mystical edges
+        "color_07": "#3f4e66", // Ethereal boundary
+        "color_08": "#5a6b88", // Spirit line
+        // Text hierarchy - Transcendent
+        "color_09": "#e8f0ff", // Pure light (primary)
+        "color_10": "#c8d8f0", // Ethereal white (secondary)
+        "color_11": "#8a9bb8", // Mystic gray (comments)
+        "color_12": "#5a6b88", // Faded vision (disabled)
+        "color_13": "#f0f8ff", // Sacred white (variables)
+        // Syntax highlighting - Mystical palette
+        "color_14": "#87ceeb", // Luminous aqua (strings)
+        "color_15": "#ffd700", // Pale gold (numbers/constants)
+        "color_16": "#9b88d3", // Deep mystical purple (keywords)
+        "color_17": "#5eb3ff", // Transcendent blue (functions)
+        "color_18": "#7aa2e3", // Spirit blue (types)
+        "color_19": "#66e0ce", // Green undertone (properties)
+        // Semantic state colors
+        "color_20": "#ff6b9d", // Vision warning (errors)
+        "color_21": "#feca57", // Golden caution (warnings)
+        "color_22": "#54a0ff", // Clear sight (info)
+        "color_23": "#48dbfb", // Life water (success)
+        "color_24": "#8395a7", // Dormant state (untracked)
+        // UI accent colors
+        "color_25": "#5eb3ff", // Sacred blue (primary accent)
+        "color_26": "#4a9fee", // Deep water blue (hover)
+        // Terminal special
+        "color_27": "#c792ea", // Mystical violet
+        "color_28": "#80deea", // Water cyan
+        "color_29": "#ffffff", // Pure transcendence
+        // Transparencies and overlays
+        "color_30": "#00000000", // Invisible
+        "color_31": "#00000001", // Transparent border
+        "color_32": "#3f4e6650", // Disabled overlay
+        "color_33": "#28334580", // Predictive overlay
+        "color_34": "#303d5240", // Scrollbar thumb
+        "color_35": "#3f4e6660", // Scrollbar thumb hover
+        "color_36": "#20293830", // Ghost element
+        "color_37": "#e8f0ff40", // Text selection
+        "color_38": "#5eb3ff30", // Accent overlay
+        "color_39": "#87ceeb30", // String overlay
+        "color_40": "#9b88d330", // Keyword overlay
+        "color_41": "#5eb3ff60", // Focus border
+        "color_42": "#feca5750", // Search match
+        "color_43": "#48dbfb30", // Diff added
+        "color_44": "#8a9bb880", // Bracket match
+        "color_45": "#48dbfb20", // Created background
+        "color_46": "#ff6b9d20" // Deleted background
+    }
+}

@@ -209,6 +209,7 @@
     "Applied To Term",
     "Applies to Always-On map startup only. Dynamic maps remain available on demand.",
     "Applies to every enrolled base. Stored in the console only — no game data is changed, and the change applies without a restart.",
+    "Applies to this browser only. Choose Default to restore the standard look.",
     "Apply",
     "Apply And Restart Hagga",
     "Apply Augments",
@@ -639,12 +640,14 @@
     "Console Language",
     "Console Password",
     "Console Port",
+    "Console Theme",
     "Console Update",
     "Console Update Already Running",
     "Console Update Cancelled",
     "Console Update Complete",
     "Console Update Failed",
     "Console files were updated. Refresh this page to load the new Web UI. You may need to sign in again.",
+    "Console theme",
     "Console update completed successfully.",
     "Console update failed.",
     "Construction",
@@ -1537,6 +1540,7 @@
     "Loading Settings",
     "Loading Steam Metadata",
     "Loading Storage",
+    "Loading Themes",
     "Loading Transactions",
     "Loading Updates",
     "Loading Vehicles",
@@ -1957,6 +1961,7 @@
     "Package name is required.",
     "Package was saved successfully.",
     "Page",
+    "Palettes: Fedaykin Dune Themes and Tabr (MIT).",
     "Parallel Map Warmup",
     "Parallel Starts",
     "Partial",
@@ -2972,6 +2977,7 @@
     "The saved UserGame combat selection could not be determined.",
     "The saved position could not be loaded.",
     "The server was installed successfully. The full console is ready to open.",
+    "The standard console look.",
     "The system backup was restored. This host now carries the archive's configuration, credentials and database.",
     "The token was saved, but the server did not become fully ready. Check Server Control status and logs.",
     "The token was saved, but the server restart failed. Check the task details and try again.",
@@ -4883,7 +4889,7 @@
     "A system backup with that name is already stored on this host. Keep both by storing the upload under a new name, or replace the stored one.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 210,
+        "line": 211,
         "nearby": [
           "Backup",
           "Backup Already Exists",
@@ -5220,7 +5226,7 @@
     "Action completed after creating a database backup.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1126,
+        "line": 1141,
         "nearby": [
           "Unset",
           "Action completed.",
@@ -5231,7 +5237,7 @@
     "Action completed.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1118,
+        "line": 1133,
         "nearby": [
           "Loading Settings",
           "Unset",
@@ -5240,7 +5246,7 @@
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 1127,
+        "line": 1142,
         "nearby": [
           "Action completed after creating a database backup.",
           "Not Installed"
@@ -6069,7 +6075,7 @@
     "Addon Update Available": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 417,
+        "line": 418,
         "nearby": [
           "Community",
           "Addons",
@@ -6092,7 +6098,7 @@
     "Addons": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 361,
+        "line": 362,
         "nearby": [
           "Care Package",
           "Community",
@@ -6223,7 +6229,7 @@
     "Admin Password": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 796,
+        "line": 798,
         "nearby": [
           "Dune Docker Console logo",
           "Beyond the Dunes, Every Choice Shapes the Future",
@@ -6235,7 +6241,7 @@
     "Admin Tools": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 354,
+        "line": 355,
         "nearby": [
           "Live Map",
           "Landsraad",
@@ -6257,7 +6263,7 @@
     "Adopt Backup History": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 184,
+        "line": 185,
         "nearby": [
           "Choose Admin Audit History",
           "This archive and this host each have their own admin audit history. Adopt the backup's history when moving the same server to new hardware. Keep this host's own history when restoring into a different server or rolling back a mistake.",
@@ -6269,7 +6275,7 @@
     "Adopt Backup ID": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 152,
+        "line": 153,
         "nearby": [
           "Choose Battlegroup Identity",
           "This backup belongs to a different Battlegroup. Adopt the backup identity when moving the same server to new hardware. Keep the current identity only when intentionally importing data into this different server.",
@@ -6784,7 +6790,7 @@
     "Already stored": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 216,
+        "line": 217,
         "nearby": [
           "Overwrite",
           "Overwriting destroys the only copy of the credentials inside the stored archive. There is no undo and no other copy on this host.",
@@ -7074,6 +7080,18 @@
           "Close",
           "Try again",
           "Loading…"
+        ]
+      }
+    ],
+    "Applies to this browser only. Choose Default to restore the standard look.": [
+      {
+        "file": "console/web/src/themes/ThemePanel.tsx",
+        "line": 70,
+        "nearby": [
+          "Console Theme",
+          "Close",
+          "Console theme",
+          "Palettes: Fedaykin Dune Themes and Tabr (MIT)."
         ]
       }
     ],
@@ -7423,7 +7441,7 @@
     "Arrakis Management": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 344,
+        "line": 345,
         "nearby": [
           "Logs",
           "Settings",
@@ -8442,7 +8460,7 @@
     "Backup": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 158,
+        "line": 159,
         "nearby": [
           "Keep Current ID",
           "Choosing the wrong identity can make restored characters unavailable in game. Adoption will be blocked unless the current Funcom token matches the backup Battlegroup.",
@@ -8452,7 +8470,7 @@
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 190,
+        "line": 191,
         "nearby": [
           "Keep Current History",
           "Whichever history is not kept is still saved to the pre-restore safety copy, not deleted -- but it stops being the live record.",
@@ -8484,7 +8502,7 @@
     "Backup Already Exists": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 209,
+        "line": 210,
         "nearby": [
           "Whichever history is not kept is still saved to the pre-restore safety copy, not deleted -- but it stops being the live record.",
           "Backup",
@@ -8530,7 +8548,7 @@
     "Backup ID": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 160,
+        "line": 161,
         "nearby": [
           "Backup",
           "Current ID",
@@ -8714,7 +8732,7 @@
     "Backups": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 336,
+        "line": 337,
         "nearby": [
           "Home",
           "Server Control",
@@ -9074,7 +9092,7 @@
     "Base Builder": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 447,
+        "line": 448,
         "nearby": [
           "Community Contributors",
           "Public Server Directory",
@@ -9165,7 +9183,7 @@
     "Bases": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 349,
+        "line": 350,
         "nearby": [
           "Players",
           "Guilds",
@@ -9415,7 +9433,7 @@
     "Battlegroup Restarted Successfully": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 734,
+        "line": 736,
         "nearby": [
           "Documentation",
           "Battlegroup Stopped",
@@ -9461,7 +9479,7 @@
     "Battlegroup Started Successfully": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 740,
+        "line": 742,
         "nearby": [
           "Battlegroup Stopped",
           "Battlegroup Restarted Successfully",
@@ -9507,7 +9525,7 @@
     "Battlegroup Stopped": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 728,
+        "line": 730,
         "nearby": [
           "Base Builder",
           "Documentation",
@@ -9567,7 +9585,7 @@
     "Beyond the Dunes, Every Choice Shapes the Future": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 795,
+        "line": 797,
         "nearby": [
           "Dune Docker Console",
           "Dune Docker Console logo",
@@ -10761,7 +10779,7 @@
     "Care Package": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 355,
+        "line": 356,
         "nearby": [
           "Landsraad",
           "Admin Tools",
@@ -11946,7 +11964,7 @@
     "Choose Admin Audit History": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 182,
+        "line": 183,
         "nearby": [
           "Current ID",
           "Backup ID",
@@ -11968,7 +11986,7 @@
     "Choose Battlegroup Identity": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 150,
+        "line": 151,
         "nearby": [
           "Continue?",
           "Yes",
@@ -12083,7 +12101,7 @@
     "Choosing the wrong identity can make restored characters unavailable in game. Adoption will be blocked unless the current Funcom token matches the backup Battlegroup.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 156,
+        "line": 157,
         "nearby": [
           "Adopt Backup ID",
           "Keep Current ID",
@@ -12095,7 +12113,7 @@
     "Claimed Listing": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 928,
+        "line": 930,
         "nearby": [
           "Community links",
           "Open Public Server Listing",
@@ -12551,6 +12569,16 @@
         ]
       },
       {
+        "file": "console/web/src/themes/ThemePanel.tsx",
+        "line": 68,
+        "nearby": [
+          "The standard console look.",
+          "Console Theme",
+          "Applies to this browser only. Choose Default to restore the standard look.",
+          "Console theme"
+        ]
+      },
+      {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
         "line": 625,
         "nearby": [
@@ -12623,16 +12651,6 @@
           "Sietch",
           "Unallocated",
           "Edit"
-        ]
-      },
-      {
-        "file": "console/web/src/features/maps/MapsPanel.tsx",
-        "line": 2768,
-        "nearby": [
-          "Install",
-          "Set the position this trade post's terminals install at",
-          "Set Position",
-          "Direction the terminal faces, in degrees"
         ]
       }
     ],
@@ -12708,7 +12726,7 @@
     "Close navigation": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 870,
+        "line": 872,
         "nearby": [
           "Open Home",
           "Dune Docker Console",
@@ -13202,7 +13220,7 @@
     "Community": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 359,
+        "line": 360,
         "nearby": [
           "Admin Tools",
           "Care Package",
@@ -13270,7 +13288,7 @@
     "Community Contributors": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 441,
+        "line": 442,
         "nearby": [
           "Addon Update Available",
           "Created with love by RedBlink ·",
@@ -13282,7 +13300,7 @@
     "Community links": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 921,
+        "line": 923,
         "nearby": [
           "Report Issues",
           "Get Help",
@@ -13473,7 +13491,7 @@
     "Confirm Action": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 129,
+        "line": 130,
         "nearby": [
           "Home",
           "Continue?",
@@ -13566,7 +13584,7 @@
     "Confirm restart": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 252,
+        "line": 253,
         "nearby": [
           "Overwriting destroys the only copy of the credentials inside the stored archive. There is no undo and no other copy on this host.",
           "Already stored",
@@ -13694,19 +13712,19 @@
     "Console Language": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 932,
+        "line": 934,
         "nearby": [
           "Claimed Listing",
           "Unclaimed Listing",
-          "Join Discord"
+          "Console Theme"
         ]
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 933,
+        "line": 935,
         "nearby": [
           "Unclaimed Listing",
-          "Join Discord"
+          "Console Theme"
         ]
       },
       {
@@ -13728,6 +13746,44 @@
           ". Open the new address shown in the result message.",
           "Saving...",
           "Save And Restart Console"
+        ]
+      }
+    ],
+    "Console theme": [
+      {
+        "file": "console/web/src/themes/ThemePanel.tsx",
+        "line": 71,
+        "nearby": [
+          "Close",
+          "Applies to this browser only. Choose Default to restore the standard look.",
+          "Palettes: Fedaykin Dune Themes and Tabr (MIT)."
+        ]
+      }
+    ],
+    "Console Theme": [
+      {
+        "file": "console/web/src/App.tsx",
+        "line": 946,
+        "nearby": [
+          "Console Language",
+          "Join Discord"
+        ]
+      },
+      {
+        "file": "console/web/src/App.tsx",
+        "line": 947,
+        "nearby": [
+          "Console Language",
+          "Join Discord"
+        ]
+      },
+      {
+        "file": "console/web/src/themes/ThemePanel.tsx",
+        "line": 67,
+        "nearby": [
+          "The standard console look.",
+          "Close",
+          "Applies to this browser only. Choose Default to restore the standard look."
         ]
       }
     ],
@@ -14066,7 +14122,7 @@
     "Continue?": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 129,
+        "line": 130,
         "nearby": [
           "Home",
           "Confirm Action",
@@ -14701,7 +14757,7 @@
     "Created with love by RedBlink ·": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 440,
+        "line": 441,
         "nearby": [
           "Addon Update Available",
           "Community Contributors",
@@ -14899,7 +14955,7 @@
     "Current ID": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 159,
+        "line": 160,
         "nearby": [
           "Choosing the wrong identity can make restored characters unavailable in game. Adoption will be blocked unless the current Funcom token matches the backup Battlegroup.",
           "Backup",
@@ -15061,7 +15117,7 @@
     "Custom settings": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 309,
+        "line": 310,
         "nearby": [
           "Players online",
           "UserEngine settings",
@@ -15282,7 +15338,7 @@
     "Database": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 337,
+        "line": 338,
         "nearby": [
           "Server Control",
           "Backups",
@@ -17807,7 +17863,7 @@
     "Documentation": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 449,
+        "line": 450,
         "nearby": [
           "Public Server Directory",
           "Base Builder",
@@ -18284,7 +18340,7 @@
     "Dune Docker Console": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 793,
+        "line": 795,
         "nearby": [
           "Battlegroup Restarted Successfully",
           "Battlegroup Started Successfully",
@@ -18294,7 +18350,7 @@
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 810,
+        "line": 812,
         "nearby": [
           "Your browser login session expired.",
           "Sign in again to continue.",
@@ -18304,7 +18360,7 @@
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 862,
+        "line": 864,
         "nearby": [
           "Run and manage your self-hosted Dune server from the browser.",
           "Open Home",
@@ -18338,7 +18394,7 @@
     "Dune Docker Console logo": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 794,
+        "line": 796,
         "nearby": [
           "Battlegroup Started Successfully",
           "Dune Docker Console",
@@ -19610,7 +19666,7 @@
     "Exchange": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 351,
+        "line": 352,
         "nearby": [
           "Bases",
           "Vehicles",
@@ -21058,7 +21114,7 @@
     "Finish the first-time setup to unlock the console.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 829,
+        "line": 831,
         "nearby": [
           "Loading Console",
           "Setup",
@@ -22331,7 +22387,7 @@
     "Get Help": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 902,
+        "line": 904,
         "nearby": [
           "Requests",
           "Report Issues",
@@ -23260,7 +23316,7 @@
     "Guilds": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 348,
+        "line": 349,
         "nearby": [
           "Maps",
           "Players",
@@ -23464,7 +23520,7 @@
       },
       {
         "file": "console/web/src/App.tsx",
-        "line": 334,
+        "line": 335,
         "nearby": [
           "Restart later leaves the servers running as-is; the change applies at the next battlegroup restart, manual or automatic.",
           "Server Operations",
@@ -25373,9 +25429,9 @@
     "Join Discord": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 941,
+        "line": 955,
         "nearby": [
-          "Console Language",
+          "Console Theme",
           "Support Project"
         ]
       }
@@ -25489,7 +25545,7 @@
     "Keep Both": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 211,
+        "line": 212,
         "nearby": [
           "Backup Already Exists",
           "A system backup with that name is already stored on this host. Keep both by storing the upload under a new name, or replace the stored one.",
@@ -25501,7 +25557,7 @@
     "Keep Current History": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 185,
+        "line": 186,
         "nearby": [
           "This archive and this host each have their own admin audit history. Adopt the backup's history when moving the same server to new hardware. Keep this host's own history when restoring into a different server or rolling back a mistake.",
           "Adopt Backup History",
@@ -25513,7 +25569,7 @@
     "Keep Current ID": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 153,
+        "line": 154,
         "nearby": [
           "This backup belongs to a different Battlegroup. Adopt the backup identity when moving the same server to new hardware. Keep the current identity only when intentionally importing data into this different server.",
           "Adopt Backup ID",
@@ -25802,7 +25858,7 @@
     "Landsraad": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 353,
+        "line": 354,
         "nearby": [
           "Exchange",
           "Live Map",
@@ -26472,7 +26528,7 @@
     "Live Map": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 352,
+        "line": 353,
         "nearby": [
           "Vehicles",
           "Exchange",
@@ -26626,19 +26682,19 @@
     "Loading Addons": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 964,
+        "line": 978,
         "nearby": [
           "Loading Maps",
           "Loading Care Package",
-          "Loading Language",
-          "Loading Database"
+          "Loading Themes",
+          "Loading Language"
         ]
       }
     ],
     "Loading Admin Tools": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 960,
+        "line": 974,
         "nearby": [
           "Loading Market Board",
           "Loading Landsraad",
@@ -26662,7 +26718,7 @@
     "Loading Backups": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 968,
+        "line": 983,
         "nearby": [
           "Loading Database",
           "Loading Storage",
@@ -26722,7 +26778,7 @@
     "Loading Bases": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 956,
+        "line": 970,
         "nearby": [
           "Loading Player Details",
           "Loading Guilds",
@@ -26788,12 +26844,12 @@
     "Loading Care Package": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 963,
+        "line": 977,
         "nearby": [
           "Loading Live Map",
           "Loading Maps",
           "Loading Addons",
-          "Loading Language"
+          "Loading Themes"
         ]
       }
     ],
@@ -26846,7 +26902,7 @@
     "Loading Console": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 811,
+        "line": 813,
         "nearby": [
           "Sign in again to continue.",
           "Dune Docker Console",
@@ -26882,9 +26938,9 @@
     "Loading Database": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 966,
+        "line": 981,
         "nearby": [
-          "Loading Addons",
+          "Loading Themes",
           "Loading Language",
           "Loading Storage",
           "Loading Backups"
@@ -26940,7 +26996,7 @@
     "Loading Guilds": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 955,
+        "line": 969,
         "nearby": [
           "Loading Players",
           "Loading Player Details",
@@ -26987,7 +27043,7 @@
     "Loading Landsraad": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 959,
+        "line": 973,
         "nearby": [
           "Loading Vehicles",
           "Loading Market Board",
@@ -27011,10 +27067,10 @@
     "Loading Language": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 965,
+        "line": 980,
         "nearby": [
-          "Loading Care Package",
           "Loading Addons",
+          "Loading Themes",
           "Loading Database",
           "Loading Storage"
         ]
@@ -27045,7 +27101,7 @@
     "Loading Live Map": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 961,
+        "line": 975,
         "nearby": [
           "Loading Landsraad",
           "Loading Admin Tools",
@@ -27057,7 +27113,7 @@
     "Loading Logs": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 987,
+        "line": 1002,
         "nearby": [
           "Loading Storage",
           "Loading Backups",
@@ -27093,7 +27149,7 @@
     "Loading Maps": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 962,
+        "line": 976,
         "nearby": [
           "Loading Admin Tools",
           "Loading Live Map",
@@ -27115,7 +27171,7 @@
     "Loading Market Board": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 958,
+        "line": 972,
         "nearby": [
           "Loading Bases",
           "Loading Vehicles",
@@ -27182,7 +27238,7 @@
     "Loading Player Details": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 954,
+        "line": 968,
         "nearby": [
           "Loading Services",
           "Loading Players",
@@ -27194,7 +27250,7 @@
     "Loading Players": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 954,
+        "line": 968,
         "nearby": [
           "Support Project",
           "Loading Services",
@@ -27242,7 +27298,7 @@
     "Loading Services": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 953,
+        "line": 967,
         "nearby": [
           "Support Project",
           "Loading Players",
@@ -27253,7 +27309,7 @@
     "Loading Settings": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1002,
+        "line": 1017,
         "nearby": [
           "Loading Logs",
           "Loading Updates",
@@ -27300,7 +27356,7 @@
     "Loading Storage": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 967,
+        "line": 982,
         "nearby": [
           "Loading Language",
           "Loading Database",
@@ -27318,6 +27374,18 @@
           "No table selected. Select a table to preview and edit rows.",
           "Preview failed:",
           "Search columns, or column='value' and/or ..."
+        ]
+      }
+    ],
+    "Loading Themes": [
+      {
+        "file": "console/web/src/App.tsx",
+        "line": 979,
+        "nearby": [
+          "Loading Care Package",
+          "Loading Addons",
+          "Loading Language",
+          "Loading Database"
         ]
       }
     ],
@@ -27348,7 +27416,7 @@
     "Loading Updates": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 988,
+        "line": 1003,
         "nearby": [
           "Loading Backups",
           "Loading Logs",
@@ -27360,7 +27428,7 @@
     "Loading Vehicles": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 957,
+        "line": 971,
         "nearby": [
           "Loading Guilds",
           "Loading Bases",
@@ -27745,7 +27813,7 @@
     "Logs": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 339,
+        "line": 340,
         "nearby": [
           "Database",
           "Updates",
@@ -28195,7 +28263,7 @@
     "Maps": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 346,
+        "line": 347,
         "nearby": [
           "Settings",
           "Arrakis Management",
@@ -31416,7 +31484,7 @@
     "Not Installed": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1133,
+        "line": 1148,
         "nearby": [
           "Action completed after creating a database backup.",
           "Action completed."
@@ -32420,7 +32488,7 @@
     "Open Home": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 861,
+        "line": 863,
         "nearby": [
           "Update setup values and redeploy your Dune server.",
           "Run and manage your self-hosted Dune server from the browser.",
@@ -32468,7 +32536,7 @@
     "Open navigation": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 870,
+        "line": 872,
         "nearby": [
           "Dune Docker Console",
           "Close navigation",
@@ -32480,7 +32548,7 @@
     "Open Public Server Listing": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 927,
+        "line": 929,
         "nearby": [
           "Get Help",
           "Community links",
@@ -32879,7 +32947,7 @@
     "Overwrite": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 212,
+        "line": 213,
         "nearby": [
           "A system backup with that name is already stored on this host. Keep both by storing the upload under a new name, or replace the stored one.",
           "Keep Both",
@@ -32891,7 +32959,7 @@
     "Overwriting destroys the only copy of the credentials inside the stored archive. There is no undo and no other copy on this host.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 215,
+        "line": 216,
         "nearby": [
           "Keep Both",
           "Overwrite",
@@ -33339,6 +33407,16 @@
           "Previous",
           "of",
           "Next"
+        ]
+      }
+    ],
+    "Palettes: Fedaykin Dune Themes and Tabr (MIT).": [
+      {
+        "file": "console/web/src/themes/ThemePanel.tsx",
+        "line": 101,
+        "nearby": [
+          "Applies to this browser only. Choose Default to restore the standard look.",
+          "Console theme"
         ]
       }
     ],
@@ -34662,7 +34740,7 @@
     "Players": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 347,
+        "line": 348,
         "nearby": [
           "Arrakis Management",
           "Maps",
@@ -34721,7 +34799,7 @@
     "Players are online": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 269,
+        "line": 270,
         "nearby": [
           "Confirm restart",
           "Restart Now",
@@ -34745,7 +34823,7 @@
     "Players online": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 279,
+        "line": 280,
         "nearby": [
           "Queue Restart ({count0} min)",
           "Restart Immediately",
@@ -35766,7 +35844,7 @@
     "Public Server Directory": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 445,
+        "line": 446,
         "nearby": [
           "Created with love by RedBlink ·",
           "Community Contributors",
@@ -36104,7 +36182,7 @@
     "Queue Restart ({count0} min)": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 273,
+        "line": 274,
         "nearby": [
           "Restart Now",
           "Players are online",
@@ -37032,7 +37110,7 @@
     "Redeploy": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 849,
+        "line": 851,
         "nearby": [
           "Setup",
           "Finish the first-time setup to unlock the console.",
@@ -38724,7 +38802,7 @@
     "Report Issues": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 901,
+        "line": 903,
         "nearby": [
           "Open navigation",
           "Requests",
@@ -38754,7 +38832,7 @@
     "Requests": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 900,
+        "line": 902,
         "nearby": [
           "Close navigation",
           "Open navigation",
@@ -39323,7 +39401,7 @@
     "Restart Immediately": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 275,
+        "line": 276,
         "nearby": [
           "Players are online",
           "Queue Restart ({count0} min)",
@@ -39335,7 +39413,7 @@
     "Restart later": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 317,
+        "line": 318,
         "nearby": [
           "Custom settings",
           "UserGame settings",
@@ -39347,7 +39425,7 @@
     "Restart later leaves the servers running as-is; the change applies at the next battlegroup restart, manual or automatic.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 318,
+        "line": 319,
         "nearby": [
           "UserGame settings",
           "Restart later",
@@ -39370,7 +39448,7 @@
     "Restart Now": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 258,
+        "line": 259,
         "nearby": [
           "Already stored",
           "Confirm restart",
@@ -41170,7 +41248,7 @@
     "Run and manage your self-hosted Dune server from the browser.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 852,
+        "line": 854,
         "nearby": [
           "Redeploy",
           "Update setup values and redeploy your Dune server.",
@@ -44219,7 +44297,7 @@
     "Server Control": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 335,
+        "line": 336,
         "nearby": [
           "Server Operations",
           "Home",
@@ -44397,7 +44475,7 @@
     "Server Operations": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 332,
+        "line": 333,
         "nearby": [
           "Restart later",
           "Restart later leaves the servers running as-is; the change applies at the next battlegroup restart, manual or automatic.",
@@ -44873,7 +44951,7 @@
     "Settings": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 340,
+        "line": 341,
         "nearby": [
           "Updates",
           "Logs",
@@ -45009,7 +45087,7 @@
     "Setup": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 828,
+        "line": 830,
         "nearby": [
           "Dune Docker Console",
           "Loading Console",
@@ -45591,7 +45669,7 @@
     "Sign In": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 797,
+        "line": 799,
         "nearby": [
           "Beyond the Dunes, Every Choice Shapes the Future",
           "Admin Password",
@@ -45603,7 +45681,7 @@
     "Sign in again to continue.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 799,
+        "line": 801,
         "nearby": [
           "Sign In",
           "Your browser login session expired.",
@@ -47177,7 +47255,7 @@
     "Support Project": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 942,
+        "line": 956,
         "nearby": [
           "Join Discord",
           "Loading Services"
@@ -49142,6 +49220,16 @@
         ]
       }
     ],
+    "The standard console look.": [
+      {
+        "file": "console/web/src/themes/ThemePanel.tsx",
+        "line": 43,
+        "nearby": [
+          "Console Theme",
+          "Close"
+        ]
+      }
+    ],
     "The system backup was restored. This host now carries the archive's configuration, credentials and database.": [
       {
         "file": "console/web/src/components/SetupWizard.tsx",
@@ -49444,7 +49532,7 @@
     "This archive and this host each have their own admin audit history. Adopt the backup's history when moving the same server to new hardware. Keep this host's own history when restoring into a different server or rolling back a mistake.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 183,
+        "line": 184,
         "nearby": [
           "Backup ID",
           "Choose Admin Audit History",
@@ -49468,7 +49556,7 @@
     "This backup belongs to a different Battlegroup. Adopt the backup identity when moving the same server to new hardware. Keep the current identity only when intentionally importing data into this different server.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 151,
+        "line": 152,
         "nearby": [
           "Yes",
           "Choose Battlegroup Identity",
@@ -51043,7 +51131,7 @@
     "Unclaimed Listing": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 928,
+        "line": 930,
         "nearby": [
           "Open Public Server Listing",
           "Claimed Listing",
@@ -51603,7 +51691,7 @@
     "Unset": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 1082,
+        "line": 1097,
         "nearby": [
           "Loading Updates",
           "Loading Settings",
@@ -51891,7 +51979,7 @@
     "Update setup values and redeploy your Dune server.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 851,
+        "line": 853,
         "nearby": [
           "Finish the first-time setup to unlock the console.",
           "Redeploy",
@@ -51972,7 +52060,7 @@
     "Updates": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 338,
+        "line": 339,
         "nearby": [
           "Backups",
           "Database",
@@ -52368,7 +52456,7 @@
     "UserEngine settings": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 309,
+        "line": 310,
         "nearby": [
           "Restart Immediately",
           "Players online",
@@ -52425,7 +52513,7 @@
     "UserGame settings": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 309,
+        "line": 310,
         "nearby": [
           "UserEngine settings",
           "Custom settings",
@@ -52651,7 +52739,7 @@
     "Vehicles": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 350,
+        "line": 351,
         "nearby": [
           "Guilds",
           "Bases",
@@ -53620,7 +53708,7 @@
     "Whichever history is not kept is still saved to the pre-restore safety copy, not deleted -- but it stops being the live record.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 188,
+        "line": 189,
         "nearby": [
           "Adopt Backup History",
           "Keep Current History",
@@ -53864,7 +53952,7 @@
     "Yes": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 131,
+        "line": 132,
         "nearby": [
           "Confirm Action",
           "Continue?",
@@ -53905,7 +53993,7 @@
     "Your browser login session expired.": [
       {
         "file": "console/web/src/App.tsx",
-        "line": 799,
+        "line": 801,
         "nearby": [
           "Admin Password",
           "Sign In",

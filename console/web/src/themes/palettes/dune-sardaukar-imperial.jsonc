@@ -1,0 +1,60 @@
+{
+    "name": "Dune Sardaukar Imperial",
+    "description": "The Emperor's elite military forces - imperial purple and gold, stark military grays, and crimson ruthlessness",
+    "colors": {
+        // Core backgrounds - Military gradient
+        "color_01": "#0c0c0e", // Command black
+        "color_02": "#141418", // Military base
+        "color_03": "#1c1c22", // Barracks gray
+        "color_04": "#26262e", // Armor shadow
+        "color_05": "#30303a", // Steel gray
+        "color_06": "#3a3a46", // Officer quarters
+        // Borders and dividers - Disciplined edges
+        "color_07": "#4a4a58", // Military line
+        "color_08": "#6a6a7c", // Silver armor
+        // Text hierarchy - Imperial command
+        "color_09": "#e8e8f0", // Imperial white (primary)
+        "color_10": "#c8c8d8", // Command gray (secondary)
+        "color_11": "#9090a8", // Military gray (comments)
+        "color_12": "#6a6a7c", // Inactive guard (disabled)
+        "color_13": "#f0f0f8", // Pure command (variables)
+        // Syntax highlighting - Imperial palette
+        "color_14": "#9d6fcc", // Imperial purple (strings)
+        "color_15": "#ffd700", // Imperial gold (numbers/constants)
+        "color_16": "#dc143c", // Crimson ruthless (keywords)
+        "color_17": "#8b72c7", // Royal purple (functions)
+        "color_18": "#7c6ca4", // Deep purple (types)
+        "color_19": "#c0c0c0", // Silver discipline (properties)
+        // Semantic state colors
+        "color_20": "#ff3838", // Blood red (errors)
+        "color_21": "#ffaa40", // Warning gold (warnings)
+        "color_22": "#8b72c7", // Imperial info (info)
+        "color_23": "#6b9e6b", // Victory green (success)
+        "color_24": "#9090a8", // Neutral stance (untracked)
+        // UI accent colors
+        "color_25": "#9d6fcc", // Imperial purple (primary accent)
+        "color_26": "#8b5fc0", // Deep imperial (hover)
+        // Terminal special
+        "color_27": "#ff79c6", // Royal pink
+        "color_28": "#68d4ff", // Sky blue
+        "color_29": "#ffffff", // Pure white
+        // Transparencies and overlays
+        "color_30": "#00000000", // Invisible
+        "color_31": "#00000001", // Transparent border
+        "color_32": "#4a4a5850", // Disabled overlay
+        "color_33": "#30303a80", // Predictive overlay
+        "color_34": "#3a3a4640", // Scrollbar thumb
+        "color_35": "#4a4a5860", // Scrollbar thumb hover
+        "color_36": "#26262e30", // Ghost element
+        "color_37": "#e8e8f040", // Text selection
+        "color_38": "#9d6fcc30", // Accent overlay
+        "color_39": "#9d6fcc30", // String overlay
+        "color_40": "#dc143c30", // Keyword overlay
+        "color_41": "#9d6fcc60", // Focus border
+        "color_42": "#ffaa4050", // Search match
+        "color_43": "#6b9e6b30", // Diff added
+        "color_44": "#9090a880", // Bracket match
+        "color_45": "#6b9e6b20", // Created background
+        "color_46": "#ff383820" // Deleted background
+    }
+}

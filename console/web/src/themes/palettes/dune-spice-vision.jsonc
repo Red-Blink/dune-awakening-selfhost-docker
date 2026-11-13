@@ -1,0 +1,60 @@
+{
+    "name": "Dune Spice Vision",
+    "description": "Prescient visions and spice trance - golden amber base, electric blue flashes, mystical purples, and shifting oranges",
+    "colors": {
+        // Core backgrounds - Spice trance gradient
+        "color_01": "#140f0a", // Deep spice trance
+        "color_02": "#1c1611", // Melange shadow
+        "color_03": "#241d18", // Spice amber dark
+        "color_04": "#2e251f", // Trance state
+        "color_05": "#382d26", // Vision depth
+        "color_06": "#42362d", // Spice haze
+        // Borders and dividers - Vision edges
+        "color_07": "#524438", // Prescient boundary
+        "color_08": "#6e5a48", // Golden frame
+        // Text hierarchy - Clarity through spice
+        "color_09": "#ffedc6", // Vision gold (primary)
+        "color_10": "#e6d4a8", // Spice cream (secondary)
+        "color_11": "#a08968", // Muted amber (comments)
+        "color_12": "#7a6548", // Faded vision (disabled)
+        "color_13": "#fff5e0", // Pure prescience (variables)
+        // Syntax highlighting - Vision palette
+        "color_14": "#ff9500", // Shifting orange (strings)
+        "color_15": "#ffd700", // Pure gold spice (numbers/constants)
+        "color_16": "#ff6b35", // Burning vision (keywords)
+        "color_17": "#00bfff", // Electric blue flash (functions)
+        "color_18": "#9b59b6", // Mystical purple (types)
+        "color_19": "#ffb347", // Amber glow (properties)
+        // Semantic state colors
+        "color_20": "#ff4757", // Vision warning (errors)
+        "color_21": "#ffa502", // Spice alert (warnings)
+        "color_22": "#00bfff", // Prescient info (info)
+        "color_23": "#26de81", // Life sign (success)
+        "color_24": "#a08968", // Dormant sight (untracked)
+        // UI accent colors
+        "color_25": "#00bfff", // Electric vision (primary accent)
+        "color_26": "#00ace6", // Deep prescience (hover)
+        // Terminal special
+        "color_27": "#c56cf0", // Vision purple
+        "color_28": "#18dcff", // Prescient cyan
+        "color_29": "#ffffff", // Pure clarity
+        // Transparencies and overlays
+        "color_30": "#00000000", // Invisible
+        "color_31": "#00000001", // Transparent border
+        "color_32": "#52443850", // Disabled overlay
+        "color_33": "#382d2680", // Predictive overlay
+        "color_34": "#42362d40", // Scrollbar thumb
+        "color_35": "#52443860", // Scrollbar thumb hover
+        "color_36": "#2e251f30", // Ghost element
+        "color_37": "#ffedc640", // Text selection
+        "color_38": "#00bfff30", // Accent overlay
+        "color_39": "#ff950030", // String overlay
+        "color_40": "#ff6b3530", // Keyword overlay
+        "color_41": "#00bfff60", // Focus border
+        "color_42": "#ffa50250", // Search match
+        "color_43": "#26de8130", // Diff added
+        "color_44": "#a0896880", // Bracket match
+        "color_45": "#26de8120", // Created background
+        "color_46": "#ff475720" // Deleted background
+    }
+}

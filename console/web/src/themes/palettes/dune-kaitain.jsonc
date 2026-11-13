@@ -1,0 +1,60 @@
+{
+    "name": "Dune Kaitain",
+    "description": "The Imperial capital planet - deep oceanic backgrounds with vibrant yet grounded syntax highlighting",
+    "colors": {
+        // Core backgrounds
+        "color_01": "#0f191c", // Primary canvas (editor, sidebar, activity bar, tabs, panel)
+        "color_02": "#021015", // Status bar, peek view backgrounds
+        "color_03": "#04181F", // Elevated surfaces (line highlight, active tab, widgets, inputs, dropdowns, lists, breadcrumb picker, quick input)
+        "color_04": "#081E26", // Hover states (list hover, inactive selection)
+        "color_05": "#0E242C", // Selection backgrounds
+        "color_06": "#152B33", // Active selections (autocomplete, quick input focus)
+        // Borders and dividers
+        "color_07": "#1B3743", // Primary borders (whitespace, ruler, widget borders, input borders)
+        "color_08": "#5e8c80", // Line numbers, activity bar icons, terminal bright black, brackets
+        // Text hierarchy
+        "color_09": "#A8BCC9", // Primary text (editor, cursor, sidebar, active elements, variable semantic)
+        "color_10": "#8299AC", // Secondary text (status bar, inactive tabs, breadcrumb, descriptions, language methods)
+        "color_11": "#3e515d", // Tertiary text (comments, placeholders)
+        "color_12": "#425862", // Git ignored files
+        "color_13": "#7A94A0", // Special variable color (TextMate only)
+        // Syntax highlighting
+        "color_14": "#869900", // Strings, bracket pair 5
+        "color_15": "#D4A52A", // Numbers, constants, parameters, tags, bracket pair 6
+        "color_16": "#CB4C16", // Keywords, operators, built-in variables/functions, bracket pair 3
+        "color_17": "#268BD2", // Functions, methods, decorators, git conflicts, bracket pair 4
+        "color_18": "#A15DA1", // Types, classes, interfaces, bracket pair 2
+        "color_19": "#2DA198", // Properties, regex, attributes, bracket pair 1
+        // Semantic state colors
+        "color_20": "#CC5555", // Errors (squiggles, icons, rulers, mismatched brackets)
+        "color_21": "#CCAD31", // Warnings (squiggles, icons, rulers, git modified)
+        "color_22": "#55A2C2", // Info (squiggles, icons, rulers)
+        "color_23": "#4A9A4A", // Success, git added, terminal bright green, JS string literals
+        "color_24": "#8AB370", // Git untracked
+        // UI accent colors
+        "color_25": "#3F9ACA", // Primary accent (badges, buttons, links, peek borders, settings modified)
+        "color_26": "#2E88BF", // Button hover
+        // Terminal special
+        "color_27": "#D33682", // Terminal bright magenta
+        "color_28": "#2AA198", // Terminal bright cyan
+        "color_29": "#C7D1D6", // Terminal bright white
+        // Transparencies and overlays
+        "color_30": "#00151A00", // Invisible borders
+        "color_31": "#1B374320", // Transparent line highlight border
+        "color_32": "#2B475330", // Semi-transparent borders
+        "color_33": "#0E242C40", // Selection highlight inactive
+        "color_34": "#1B374340", // Scrollbar track, bracket match background
+        "color_35": "#2B475350", // Scrollbar hover
+        "color_36": "#3B576360", // Scrollbar active
+        "color_37": "#268BD280", // Active tab border
+        "color_38": "#00000040", // Shadow
+        "color_39": "#04181F80", // Markdown fenced code block
+        "color_40": "#D4A52A30", // Find range highlight
+        "color_41": "#268BD240", // Word highlight, focus border
+        "color_42": "#D4A52A50", // Find match highlight
+        "color_43": "#D4A52A80", // Find match current
+        "color_44": "#268BD260", // Bracket match border
+        "color_45": "#86990030", // Diff inserted background
+        "color_46": "#CB4C1630" // Diff removed background
+    }
+}

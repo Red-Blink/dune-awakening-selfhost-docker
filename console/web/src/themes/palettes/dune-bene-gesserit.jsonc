@@ -1,0 +1,60 @@
+{
+    "name": "Dune Bene Gesserit",
+    "description": "The mystical sisterhood and their ancient knowledge - midnight blues, silver robes, and subtle gold wisdom",
+    "colors": {
+        // Core backgrounds - Mystical gradient
+        "color_01": "#08090d", // Midnight void
+        "color_02": "#101318", // Deep night
+        "color_03": "#181c24", // Shadow blue
+        "color_04": "#20252e", // Dark mystery
+        "color_05": "#282e38", // Ancient stone
+        "color_06": "#303742", // Temple shadow
+        // Borders and dividers - Sacred edges
+        "color_07": "#404854", // Stone boundary
+        "color_08": "#606878", // Silver thread
+        // Text hierarchy - Wisdom hierarchy
+        "color_09": "#e0e4e8", // Silver robe white (primary)
+        "color_10": "#c0c8d0", // Wisdom gray (secondary)
+        "color_11": "#8890a0", // Ancient text (comments)
+        "color_12": "#606878", // Faded scripture (disabled)
+        "color_13": "#e8ecf0", // Pure knowledge (variables)
+        // Syntax highlighting - Bene Gesserit palette
+        "color_14": "#4a7c9e", // Deep wisdom blue (strings)
+        "color_15": "#c9934e", // Subtle gold (numbers/constants)
+        "color_16": "#6b5b8c", // Mystical purple (keywords)
+        "color_17": "#2c5f8d", // Midnight blue (functions)
+        "color_18": "#4e5d7a", // Deep blue-gray (types)
+        "color_19": "#7a8c6e", // Earth wisdom green (properties)
+        // Semantic state colors
+        "color_20": "#a65353", // Blood warning (errors)
+        "color_21": "#c9934e", // Caution gold (warnings)
+        "color_22": "#4a7c9e", // Knowledge blue (info)
+        "color_23": "#6b8c5f", // Life green (success)
+        "color_24": "#8890a0", // Neutral stance (untracked)
+        // UI accent colors
+        "color_25": "#2c5f8d", // Midnight blue (primary accent)
+        "color_26": "#1e4f7d", // Deep midnight (hover)
+        // Terminal special
+        "color_27": "#8c6bae", // Reverend Mother purple
+        "color_28": "#5ca8ce", // Water of Life cyan
+        "color_29": "#f0f4f8", // Pure silver
+        // Transparencies and overlays
+        "color_30": "#00000000", // Invisible
+        "color_31": "#00000001", // Transparent border
+        "color_32": "#40485450", // Disabled overlay
+        "color_33": "#282e3880", // Predictive overlay
+        "color_34": "#30374240", // Scrollbar thumb
+        "color_35": "#40485460", // Scrollbar thumb hover
+        "color_36": "#20252e30", // Ghost element
+        "color_37": "#e0e4e840", // Text selection
+        "color_38": "#2c5f8d30", // Accent overlay
+        "color_39": "#4a7c9e30", // String overlay
+        "color_40": "#6b5b8c30", // Keyword overlay
+        "color_41": "#2c5f8d60", // Focus border
+        "color_42": "#c9934e50", // Search match
+        "color_43": "#6b8c5f30", // Diff added
+        "color_44": "#8890a080", // Bracket match
+        "color_45": "#6b8c5f20", // Created background
+        "color_46": "#a6535320" // Deleted background
+    }
+}

@@ -1,0 +1,61 @@
+{
+    "name": "Dune Mentat",
+    "description": "Human computers and logical analysis - clean whites, Sapho juice reds, precise blues, and sharp contrasts",
+    "appearance": "light",
+    "colors": {
+        // Core backgrounds - Clean gradient
+        "color_01": "#fafafa", // Pure white base
+        "color_02": "#f4f4f4", // Light gray
+        "color_03": "#eeeeee", // Soft gray
+        "color_04": "#e8e8e8", // Medium gray
+        "color_05": "#dedede", // Darker gray
+        "color_06": "#d4d4d4", // Deep gray
+        // Borders and dividers - Precise edges
+        "color_07": "#c0c0c0", // Sharp border
+        "color_08": "#909090", // Strong divider
+        // Text hierarchy - High contrast
+        "color_09": "#1a1a1a", // Deep black (primary)
+        "color_10": "#404040", // Dark gray (secondary)
+        "color_11": "#606060", // Medium gray (comments)
+        "color_12": "#909090", // Light gray (disabled)
+        "color_13": "#0a0a0a", // Pure black (variables)
+        // Syntax highlighting - Mentat palette
+        "color_14": "#0969da", // Precise blue (strings)
+        "color_15": "#8250df", // Logic purple (numbers/constants)
+        "color_16": "#cf222e", // Sapho red (keywords)
+        "color_17": "#0550ae", // Computational blue (functions)
+        "color_18": "#6639ba", // Deep purple (types)
+        "color_19": "#116329", // Analysis green (properties)
+        // Semantic state colors
+        "color_20": "#a40e26", // Deep Sapho red (errors)
+        "color_21": "#9a6700", // Warning amber (warnings)
+        "color_22": "#0969da", // Logic blue (info)
+        "color_23": "#1a7f37", // Success green
+        "color_24": "#656d76", // Neutral gray (untracked)
+        // UI accent colors
+        "color_25": "#0550ae", // Computational blue (primary accent)
+        "color_26": "#033d8b", // Deep logic blue (hover)
+        // Terminal special
+        "color_27": "#8250df", // Logic violet
+        "color_28": "#0598d3", // Clear cyan
+        "color_29": "#0a0a0a", // Pure black
+        // Transparencies and overlays
+        "color_30": "#00000000", // Invisible
+        "color_31": "#00000001", // Transparent border
+        "color_32": "#c0c0c050", // Disabled overlay
+        "color_33": "#dedede80", // Predictive overlay
+        "color_34": "#d4d4d440", // Scrollbar thumb
+        "color_35": "#c0c0c060", // Scrollbar thumb hover
+        "color_36": "#e8e8e830", // Ghost element
+        "color_37": "#1a1a1a20", // Text selection
+        "color_38": "#0550ae30", // Accent overlay
+        "color_39": "#0969da30", // String overlay
+        "color_40": "#cf222e30", // Keyword overlay
+        "color_41": "#0550ae60", // Focus border
+        "color_42": "#9a670050", // Search match
+        "color_43": "#1a7f3730", // Diff added
+        "color_44": "#60606080", // Bracket match
+        "color_45": "#1a7f3720", // Created background
+        "color_46": "#a40e2620" // Deleted background
+    }
+}

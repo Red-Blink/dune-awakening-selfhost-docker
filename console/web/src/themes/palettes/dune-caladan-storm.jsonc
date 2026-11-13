@@ -1,0 +1,60 @@
+{
+    "name": "Dune Caladan Storm",
+    "description": "The tempestuous weather of House Atreides' homeworld - storm grays, ocean navy, and lightning blues",
+    "colors": {
+        // Core backgrounds - Storm gradient
+        "color_01": "#0d1117", // Deep ocean night
+        "color_02": "#161b22", // Storm cloud base
+        "color_03": "#1e252e", // Heavy rain gray
+        "color_04": "#272e38", // Thunder cloud
+        "color_05": "#303843", // Storm front
+        "color_06": "#3a424e", // Rain mist
+        // Borders and dividers - Wet stone
+        "color_07": "#484f5b", // Wet granite
+        "color_08": "#6e7681", // Rain-washed stone
+        // Text hierarchy - Silver rain
+        "color_09": "#e6edf3", // Lightning white (primary)
+        "color_10": "#c9d1d9", // Silver rain (secondary)
+        "color_11": "#8b949e", // Storm gray (comments)
+        "color_12": "#6e7681", // Fog gray (disabled)
+        "color_13": "#f0f6fc", // Pure lightning (variables)
+        // Syntax highlighting - Storm palette
+        "color_14": "#7ee787", // Rain-washed green (strings)
+        "color_15": "#79c0ff", // Electric blue (numbers/constants)
+        "color_16": "#ff9b54", // Lightning orange (keywords)
+        "color_17": "#a5d6ff", // Sky blue (functions)
+        "color_18": "#2f5d8a", // Deep ocean navy (types)
+        "color_19": "#58a6ff", // Wave blue (properties)
+        // Semantic state colors
+        "color_20": "#ff7b72", // Storm warning red (errors)
+        "color_21": "#ffa657", // Lightning amber (warnings)
+        "color_22": "#79c0ff", // Clear sky blue (info)
+        "color_23": "#7ee787", // Sea green (success)
+        "color_24": "#8b949e", // Mist gray (untracked)
+        // UI accent colors
+        "color_25": "#58a6ff", // Ocean blue (primary accent)
+        "color_26": "#4493e6", // Deep water blue (hover)
+        // Terminal special
+        "color_27": "#bb9af7", // Storm violet
+        "color_28": "#56d4dd", // Sea foam cyan
+        "color_29": "#f0f6fc", // Lightning white
+        // Transparencies and overlays
+        "color_30": "#00000000", // Invisible
+        "color_31": "#00000001", // Transparent border
+        "color_32": "#484f5b50", // Disabled overlay
+        "color_33": "#30384380", // Predictive overlay
+        "color_34": "#3a424e40", // Scrollbar thumb
+        "color_35": "#484f5b60", // Scrollbar thumb hover
+        "color_36": "#272e3830", // Ghost element
+        "color_37": "#e6edf340", // Text selection
+        "color_38": "#58a6ff30", // Accent overlay
+        "color_39": "#7ee78730", // String overlay
+        "color_40": "#ff9b5430", // Keyword overlay
+        "color_41": "#58a6ff60", // Focus border
+        "color_42": "#ffa65750", // Search match
+        "color_43": "#7ee78730", // Diff added
+        "color_44": "#8b949e80", // Bracket match
+        "color_45": "#7ee78720", // Created background
+        "color_46": "#ff7b7220" // Deleted background
+    }
+}

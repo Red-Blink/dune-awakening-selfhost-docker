@@ -1,0 +1,60 @@
+{
+    "name": "Dune Spacing Guild",
+    "description": "Interstellar commerce and heighliners - corporate steel grays, gold accents for wealth, and deep space blacks",
+    "colors": {
+        // Core backgrounds - Corporate steel gradient
+        "color_01": "#0a0b0d", // Deep space black
+        "color_02": "#12141a", // Heighliner hull
+        "color_03": "#1a1d24", // Corporate steel
+        "color_04": "#24272e", // Business gray
+        "color_05": "#2e3238", // Executive suite
+        "color_06": "#383d44", // Conference room
+        // Borders and dividers - Corporate edges
+        "color_07": "#484e58", // Steel frame
+        "color_08": "#68707c", // Silver accent
+        // Text hierarchy - Professional
+        "color_09": "#e8ecf4", // Corporate white (primary)
+        "color_10": "#c8d0dc", // Business gray (secondary)
+        "color_11": "#909aa8", // Muted steel (comments)
+        "color_12": "#68707c", // Inactive gray (disabled)
+        "color_13": "#f0f4fc", // Clean white (variables)
+        // Syntax highlighting - Guild palette
+        "color_14": "#4a90e2", // Corporate blue (strings)
+        "color_15": "#ffd700", // Gold wealth (numbers/constants)
+        "color_16": "#ff9940", // Muted spice orange (keywords)
+        "color_17": "#6bb6ff", // Technology blue (functions)
+        "color_18": "#8899b4", // Steel blue (types)
+        "color_19": "#a8b8d0", // Silver highlight (properties)
+        // Semantic state colors
+        "color_20": "#e85855", // Trade dispute (errors)
+        "color_21": "#ffaa40", // Spice dependency (warnings)
+        "color_22": "#5ca7ff", // Guild info (info)
+        "color_23": "#6bc46d", // Profitable (success)
+        "color_24": "#909aa8", // Neutral zone (untracked)
+        // UI accent colors
+        "color_25": "#4a90e2", // Guild blue (primary accent)
+        "color_26": "#3a80d2", // Deep guild blue (hover)
+        // Terminal special
+        "color_27": "#b794f6", // Royal purple
+        "color_28": "#68d4ff", // Space cyan
+        "color_29": "#ffffff", // Pure white
+        // Transparencies and overlays
+        "color_30": "#00000000", // Invisible
+        "color_31": "#00000001", // Transparent border
+        "color_32": "#484e5850", // Disabled overlay
+        "color_33": "#2e323880", // Predictive overlay
+        "color_34": "#383d4440", // Scrollbar thumb
+        "color_35": "#484e5860", // Scrollbar thumb hover
+        "color_36": "#24272e30", // Ghost element
+        "color_37": "#e8ecf440", // Text selection
+        "color_38": "#4a90e230", // Accent overlay
+        "color_39": "#4a90e230", // String overlay
+        "color_40": "#ff994030", // Keyword overlay
+        "color_41": "#4a90e260", // Focus border
+        "color_42": "#ffaa4050", // Search match
+        "color_43": "#6bc46d30", // Diff added
+        "color_44": "#909aa880", // Bracket match
+        "color_45": "#6bc46d20", // Created background
+        "color_46": "#e8585520" // Deleted background
+    }
+}

@@ -57,12 +57,18 @@
     "ZH-HANT"
   ],
   "sourceStrings": [
+    "Applies to this browser only. Choose Default to restore the standard look.",
     "Choose how many rows to show in each panel. All includes every available recorded entry.",
+    "Console Theme",
+    "Console theme",
     "Kills Shown",
     "Latest First",
     "Leaderboard Rows",
+    "Loading Themes",
+    "Palettes: Fedaykin Dune Themes and Tabr (MIT).",
     "Players Shown",
     "Recent Kills Rows",
+    "The standard console look.",
     "Top 10",
     "Top 20",
     "Top 50",

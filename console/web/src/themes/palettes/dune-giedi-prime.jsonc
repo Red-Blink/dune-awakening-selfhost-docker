@@ -1,0 +1,60 @@
+{
+    "name": "Dune Giedi Prime",
+    "description": "A stark, industrial monochrome theme inspired by the brutalist world of House Harkonnen",
+    "colors": {
+        // Core backgrounds
+        "color_01": "#0a0a0a", // Primary canvas (editor, sidebar, activity bar, tabs, panel)
+        "color_02": "#121212", // Status bar, peek view backgrounds
+        "color_03": "#1a1a1a", // Elevated surfaces (line highlight, active tab, widgets, inputs, dropdowns, lists, breadcrumb picker, quick input)
+        "color_04": "#252525", // Hover states (list hover, inactive selection)
+        "color_05": "#303030", // Selection backgrounds
+        "color_06": "#3d3d3d", // Active selections (autocomplete, quick input focus)
+        // Borders and dividers
+        "color_07": "#2a2a2a", // Primary borders (whitespace, ruler, widget borders, input borders)
+        "color_08": "#7c7c7c", // Line numbers, activity bar icons, terminal bright black, brackets
+        // Text hierarchy
+        "color_09": "#d4d4d4", // Primary text (editor, cursor, sidebar, active elements, variable semantic)
+        "color_10": "#bebebe", // Secondary text (status bar, inactive tabs, breadcrumb, descriptions, language methods)
+        "color_11": "#8c8c8c", // Tertiary text (comments, placeholders)
+        "color_12": "#5a5a5a", // Git ignored files
+        "color_13": "#f4f5ee", // Special variable color (TextMate only)
+        // Syntax highlighting - brighter industrial tones for better readability
+        "color_14": "#b6d8e6ff", // Strings, bracket pair 5 - industrial teal
+        "color_15": "#e3bdadff", // Numbers, constants, parameters, tags, bracket pair 6 - industrial amber
+        "color_16": "#dccdbeff", // Keywords, operators, built-in variables/functions, bracket pair 3 - industrial taupe
+        "color_17": "#a2bee8", // Functions, methods, decorators, git conflicts, bracket pair 4 - industrial blue
+        "color_18": "#edcbb8ff", // Types, classes, interfaces, bracket pair 2 - industrial rust
+        "color_19": "#c0dcc0ff", // Properties, regex, attributes, bracket pair 1 - industrial sage
+        // Semantic state colors - muted industrial tones, but clearly visible
+        "color_20": "#9e6a6a", // Errors (squiggles, icons, rulers, mismatched brackets) - industrial red
+        "color_21": "#9e8a6a", // Warnings (squiggles, icons, rulers, git modified) - industrial orange
+        "color_22": "#6a7e9e", // Info (squiggles, icons, rulers) - industrial blue
+        "color_23": "#6a8e6a", // Success, git added, terminal bright green, JS string literals - industrial green
+        "color_24": "#8ea4b8", // Git untracked - industrial cyan-gray
+        // UI accent colors
+        "color_25": "#969696", // Primary accent (badges, buttons, links, peek borders, settings modified)
+        "color_26": "#7c7c7c", // Button hover
+        // Terminal special
+        "color_27": "#a5a5a5", // Terminal bright magenta
+        "color_28": "#adadad", // Terminal bright cyan
+        "color_29": "#f6f6f6", // Terminal bright white
+        // Transparencies and overlays
+        "color_30": "#00000000", // Invisible borders
+        "color_31": "#00000001", // Transparent line highlight border
+        "color_32": "#2a2a2a50", // Semi-transparent borders
+        "color_33": "#30303080", // Selection highlight inactive
+        "color_34": "#30303040", // Scrollbar track, bracket match background
+        "color_35": "#3d3d3d60", // Scrollbar hover
+        "color_36": "#3d3d3d80", // Scrollbar active
+        "color_37": "#2a2a2a", // Active tab border
+        "color_38": "#00000040", // Shadow
+        "color_39": "#121212", // Markdown fenced code block
+        "color_40": "#3d3d3d40", // Find range highlight
+        "color_41": "#3d3d3d60", // Word highlight, focus border
+        "color_42": "#8b7d5240", // Find match highlight
+        "color_43": "#8b7d5260", // Find match current
+        "color_44": "#7c7c7c80", // Bracket match border
+        "color_45": "#52764d20", // Diff inserted background
+        "color_46": "#8b525220" // Diff removed background
+    }
+}

@@ -1,0 +1,60 @@
+{
+    "name": "Dune Guild Navigator",
+    "description": "Spice-mutated navigators and space folding - deep space blacks, nebula purples, and bright orange spice gas",
+    "colors": {
+        // Core backgrounds - Deep space gradient
+        "color_01": "#050308", // Void black
+        "color_02": "#0d0a14", // Deep space
+        "color_03": "#15121c", // Nebula shadow
+        "color_04": "#1e1a26", // Space dust
+        "color_05": "#272230", // Dark matter
+        "color_06": "#302a3a", // Nebula edge
+        // Borders and dividers - Tank edges
+        "color_07": "#3f3848", // Metal seal
+        "color_08": "#5e5468", // Copper tank
+        // Text hierarchy - Transcendent
+        "color_09": "#f0e8ff", // Ethereal white (primary)
+        "color_10": "#d8cce8", // Prescient gray (secondary)
+        "color_11": "#9888b0", // Spice haze (comments)
+        "color_12": "#6e5e88", // Faded vision (disabled)
+        "color_13": "#fff8f0", // Pure transcendence (variables)
+        // Syntax highlighting - Navigator palette
+        "color_14": "#ff8c42", // Bright orange spice (strings)
+        "color_15": "#c8884c", // Metallic copper (numbers/constants)
+        "color_16": "#9b72d4", // Nebula purple (keywords)
+        "color_17": "#4ca8ff", // Electric prescient blue (functions)
+        "color_18": "#7c6ca4", // Deep space purple (types)
+        "color_19": "#ff9d5c", // Spice gas orange (properties)
+        // Semantic state colors
+        "color_20": "#ff6b6b", // Navigation error (errors)
+        "color_21": "#ffa94d", // Course warning (warnings)
+        "color_22": "#5ca7ff", // Prescient info (info)
+        "color_23": "#69db7c", // Safe passage (success)
+        "color_24": "#9c88b0", // Dormant state (untracked)
+        // UI accent colors
+        "color_25": "#4ca8ff", // Navigation blue (primary accent)
+        "color_26": "#3c98ef", // Deep navigation (hover)
+        // Terminal special
+        "color_27": "#c678dd", // Spice vision purple
+        "color_28": "#56b6c2", // Tank fluid cyan
+        "color_29": "#ffffff", // Pure white
+        // Transparencies and overlays
+        "color_30": "#00000000", // Invisible
+        "color_31": "#00000001", // Transparent border
+        "color_32": "#3f384850", // Disabled overlay
+        "color_33": "#27223080", // Predictive overlay
+        "color_34": "#302a3a40", // Scrollbar thumb
+        "color_35": "#3f384860", // Scrollbar thumb hover
+        "color_36": "#1e1a2630", // Ghost element
+        "color_37": "#f0e8ff40", // Text selection
+        "color_38": "#4ca8ff30", // Accent overlay
+        "color_39": "#ff8c4230", // String overlay
+        "color_40": "#9b72d430", // Keyword overlay
+        "color_41": "#4ca8ff60", // Focus border
+        "color_42": "#ffa94d50", // Search match
+        "color_43": "#69db7c30", // Diff added
+        "color_44": "#9888b080", // Bracket match
+        "color_45": "#69db7c20", // Created background
+        "color_46": "#ff6b6b20" // Deleted background
+    }
+}

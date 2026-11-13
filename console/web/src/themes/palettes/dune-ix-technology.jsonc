@@ -1,0 +1,60 @@
+{
+    "name": "Dune Ix Technology",
+    "description": "The machine planet and forbidden technology - sleek metallics, circuit greens, and holographic purples",
+    "colors": {
+        // Core backgrounds - Metallic gradient
+        "color_01": "#0a0c0f", // Deep tech black
+        "color_02": "#121517", // Machine core
+        "color_03": "#1a1e22", // Circuit board dark
+        "color_04": "#242930", // Steel shadow
+        "color_05": "#2e343c", // Brushed metal
+        "color_06": "#383f48", // Light metallic
+        // Borders and dividers - Tech edges
+        "color_07": "#4a5361", // Chrome edge
+        "color_08": "#6b7585", // Silver line
+        // Text hierarchy - Holographic
+        "color_09": "#e8ecf0", // Hologram white (primary)
+        "color_10": "#c8d0da", // Silver text (secondary)
+        "color_11": "#9099a8", // Metal gray (comments)
+        "color_12": "#6b7585", // Dim display (disabled)
+        "color_13": "#f0f4f8", // Pure light (variables)
+        // Syntax highlighting - Tech palette
+        "color_14": "#50fa7b", // Circuit green (strings)
+        "color_15": "#ffb86c", // Warning amber (numbers/constants)
+        "color_16": "#bd93f9", // Holographic purple (keywords)
+        "color_17": "#6272a4", // Deep tech blue (functions)
+        "color_18": "#8897b4", // Steel blue (types)
+        "color_19": "#66d9ef", // Cyan circuit (properties)
+        // Semantic state colors
+        "color_20": "#ff5555", // System error red
+        "color_21": "#f1b644", // Warning amber
+        "color_22": "#6272a4", // Info blue
+        "color_23": "#50fa7b", // Success green
+        "color_24": "#9099a8", // Inactive gray
+        // UI accent colors
+        "color_25": "#6272a4", // Tech blue (primary accent)
+        "color_26": "#526394", // Deep tech blue (hover)
+        // Terminal special
+        "color_27": "#ff79c6", // Neon pink
+        "color_28": "#8be9fd", // Electric cyan
+        "color_29": "#f8f8f2", // Bright hologram
+        // Transparencies and overlays
+        "color_30": "#00000000", // Invisible
+        "color_31": "#00000001", // Transparent border
+        "color_32": "#4a536150", // Disabled overlay
+        "color_33": "#2e343c80", // Predictive overlay
+        "color_34": "#383f4840", // Scrollbar thumb
+        "color_35": "#4a536160", // Scrollbar thumb hover
+        "color_36": "#24293030", // Ghost element
+        "color_37": "#e8ecf040", // Text selection
+        "color_38": "#627aa430", // Accent overlay
+        "color_39": "#50fa7b30", // String overlay
+        "color_40": "#bd93f930", // Keyword overlay
+        "color_41": "#6272a460", // Focus border
+        "color_42": "#f1b64450", // Search match
+        "color_43": "#50fa7b30", // Diff added
+        "color_44": "#9099a880", // Bracket match
+        "color_45": "#50fa7b20", // Created background
+        "color_46": "#ff555520" // Deleted background
+    }
+}

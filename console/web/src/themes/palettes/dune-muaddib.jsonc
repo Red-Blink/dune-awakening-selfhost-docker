@@ -1,0 +1,60 @@
+{
+    "name": "Dune Muad'Dib",
+    "description": "Paul's desert mouse persona and leadership - desert camouflage, fierce blue eyes, royal purples, and golden spice",
+    "colors": {
+        // Core backgrounds - Desert camouflage
+        "color_01": "#0f0e0c", // Desert night
+        "color_02": "#181614", // Dune shadow
+        "color_03": "#211f1b", // Sand hollow
+        "color_04": "#2a2822", // Desert stone
+        "color_05": "#34312a", // Camouflage brown
+        "color_06": "#3e3a32", // Light earth
+        // Borders and dividers - Natural edges
+        "color_07": "#4e4a40", // Rock edge
+        "color_08": "#6e6858", // Sand ridge
+        // Text hierarchy - Leadership presence
+        "color_09": "#e8e2d0", // Command white (primary)
+        "color_10": "#d0c8b0", // Desert tan (secondary)
+        "color_11": "#988e78", // Mouse brown (comments)
+        "color_12": "#6e6858", // Shadow sand (disabled)
+        "color_13": "#f0ead8", // Vision white (variables)
+        // Syntax highlighting - Muad'Dib palette
+        "color_14": "#88b068", // Survival green (strings)
+        "color_15": "#d4a85c", // Golden spice (numbers/constants)
+        "color_16": "#9b7ac4", // Royal purple (keywords)
+        "color_17": "#4a9eff", // Fierce Fremen blue (functions)
+        "color_18": "#a08458", // Desert tan (types)
+        "color_19": "#c89c5c", // Spice gold (properties)
+        // Semantic state colors
+        "color_20": "#d67e60", // Desert warning (errors)
+        "color_21": "#e8a85c", // Spice alert (warnings)
+        "color_22": "#5ca8e8", // Vision blue (info)
+        "color_23": "#7ca668", // Adaptation green (success)
+        "color_24": "#9b8e7c", // Desert dust (untracked)
+        // UI accent colors
+        "color_25": "#4a9eff", // Fremen blue eyes (primary accent)
+        "color_26": "#3a8eef", // Deep blue (hover)
+        // Terminal special
+        "color_27": "#b088d0", // Royal violet
+        "color_28": "#6cbce8", // Desert sky
+        "color_29": "#f8f4e8", // Pure vision
+        // Transparencies and overlays
+        "color_30": "#00000000", // Invisible
+        "color_31": "#00000001", // Transparent border
+        "color_32": "#4e4a4050", // Disabled overlay
+        "color_33": "#34312a80", // Predictive overlay
+        "color_34": "#3e3a3240", // Scrollbar thumb
+        "color_35": "#4e4a4060", // Scrollbar thumb hover
+        "color_36": "#2a282230", // Ghost element
+        "color_37": "#e8e2d040", // Text selection
+        "color_38": "#4a9eff30", // Accent overlay
+        "color_39": "#88b06830", // String overlay
+        "color_40": "#9b7ac430", // Keyword overlay
+        "color_41": "#4a9eff60", // Focus border
+        "color_42": "#e8a85c50", // Search match
+        "color_43": "#7ca66830", // Diff added
+        "color_44": "#988e7880", // Bracket match
+        "color_45": "#7ca66820", // Created background
+        "color_46": "#d67e6020" // Deleted background
+    }
+}

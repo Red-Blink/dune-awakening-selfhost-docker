@@ -1,0 +1,60 @@
+{
+    "name": "Dune Salusa Secundus",
+    "description": "The prison planet that forged the Sardaukar - volcanic reds, ash grays, and molten metal highlights",
+    "colors": {
+        // Core backgrounds - Volcanic ash gradient
+        "color_01": "#0f0d0d", // Obsidian black
+        "color_02": "#1a1616", // Volcanic rock
+        "color_03": "#241f1f", // Ash gray
+        "color_04": "#2e2828", // Charcoal dust
+        "color_05": "#383131", // Scorched earth
+        "color_06": "#423a3a", // Burnt umber
+        // Borders and dividers - Molten edges
+        "color_07": "#524848", // Cooled lava
+        "color_08": "#726565", // Iron oxide
+        // Text hierarchy - Ash to metal
+        "color_09": "#e8d6d6", // Ash white (primary)
+        "color_10": "#d4c0c0", // Smoke gray (secondary)
+        "color_11": "#9e8585", // Dust (comments)
+        "color_12": "#6b5858", // Deep ash (disabled)
+        "color_13": "#f0e0e0", // Hot metal white (variables)
+        // Syntax highlighting - Volcanic palette
+        "color_14": "#ff9d5c", // Molten orange (strings)
+        "color_15": "#ffb86c", // Lava glow (numbers/constants)
+        "color_16": "#ff5555", // Harsh red (keywords)
+        "color_17": "#ff7979", // Crimson flame (functions)
+        "color_18": "#8b4a4a", // Scorched brown (types)
+        "color_19": "#cc6666", // Ember red (properties)
+        // Semantic state colors
+        "color_20": "#ff3838", // Brutal crimson (errors)
+        "color_21": "#ffa500", // Molten warning (warnings)
+        "color_22": "#ff8c42", // Forge fire (info)
+        "color_23": "#c78860", // Rust success (success)
+        "color_24": "#9b7c7c", // Ash cloud (untracked)
+        // UI accent colors
+        "color_25": "#ff6b6b", // Blood red (primary accent)
+        "color_26": "#e85555", // Deep crimson (hover)
+        // Terminal special
+        "color_27": "#ff79c6", // Plasma pink
+        "color_28": "#ffb86c", // Molten copper
+        "color_29": "#f4e8e8", // Hot ash white
+        // Transparencies and overlays
+        "color_30": "#00000000", // Invisible
+        "color_31": "#00000001", // Transparent border
+        "color_32": "#52484850", // Disabled overlay
+        "color_33": "#38313180", // Predictive overlay
+        "color_34": "#423a3a40", // Scrollbar thumb
+        "color_35": "#52484860", // Scrollbar thumb hover
+        "color_36": "#2e282830", // Ghost element
+        "color_37": "#e8d6d640", // Text selection
+        "color_38": "#ff6b6b30", // Accent overlay
+        "color_39": "#ff9d5c30", // String overlay
+        "color_40": "#ff555530", // Keyword overlay
+        "color_41": "#ff6b6b60", // Focus border
+        "color_42": "#ffa50050", // Search match
+        "color_43": "#c7886030", // Diff added
+        "color_44": "#9b7c7c80", // Bracket match
+        "color_45": "#c7886020", // Created background
+        "color_46": "#ff383820" // Deleted background
+    }
+}

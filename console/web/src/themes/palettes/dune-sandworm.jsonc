@@ -1,0 +1,60 @@
+{
+    "name": "Dune Sandworm",
+    "description": "Inspired by the great makers of Arrakis - sandy beiges, deep earth browns, and electric spice blue",
+    "colors": {
+        // Core backgrounds - Desert sands gradient
+        "color_01": "#1a1611", // Deep desert night
+        "color_02": "#221e17", // Pre-dawn sand
+        "color_03": "#2a251c", // Early morning dunes
+        "color_04": "#342d22", // Shadow sand
+        "color_05": "#3e3528", // Warm sand shadow
+        "color_06": "#483d2e", // Deep dune valley
+        // Borders and dividers - Earth tones
+        "color_07": "#5a4a36", // Desert rock
+        "color_08": "#7a6548", // Sandstone
+        // Text hierarchy - Sand to bone
+        "color_09": "#e8dcc4", // Bone white (primary text)
+        "color_10": "#d4c4a8", // Desert cream (secondary)
+        "color_11": "#9e8b6f", // Dusty tan (comments)
+        "color_12": "#6b5d4a", // Deep sand (disabled)
+        "color_13": "#f0e6d2", // Maker hook white (variables)
+        // Syntax highlighting - Desert palette
+        "color_14": "#d4a574", // Sandy beige (strings)
+        "color_15": "#e8b88c", // Desert tan (numbers/constants)
+        "color_16": "#ce7e4a", // Warm orange heat (keywords)
+        "color_17": "#5ca7e8", // Electric spice blue (functions)
+        "color_18": "#8b6239", // Deep worm brown (types)
+        "color_19": "#a68860", // Earth brown (properties)
+        // Semantic state colors
+        "color_20": "#d67c5c", // Desert storm red (errors)
+        "color_21": "#e8a85c", // Sun warning (warnings)
+        "color_22": "#6cb4ee", // Spice blow blue (info)
+        "color_23": "#8ca674", // Oasis green (success)
+        "color_24": "#9b8e7c", // Dust cloud (untracked)
+        // UI accent colors
+        "color_25": "#5ca7e8", // Electric spice blue (primary accent)
+        "color_26": "#4a94d6", // Deep spice blue (hover)
+        // Terminal special
+        "color_27": "#c88a6a", // Sunset orange
+        "color_28": "#7ac0d8", // Desert sky cyan
+        "color_29": "#f4ede4", // Crystalline white
+        // Transparencies and overlays
+        "color_30": "#00000000", // Invisible
+        "color_31": "#00000001", // Transparent border
+        "color_32": "#5a4a3650", // Disabled overlay
+        "color_33": "#3e352880", // Predictive overlay
+        "color_34": "#483d2e40", // Scrollbar thumb
+        "color_35": "#5a4a3660", // Scrollbar thumb hover
+        "color_36": "#342d2230", // Ghost element
+        "color_37": "#e8dcc440", // Text selection
+        "color_38": "#5ca7e830", // Accent overlay
+        "color_39": "#d4a57430", // String overlay
+        "color_40": "#ce7e4a30", // Keyword overlay
+        "color_41": "#5ca7e860", // Focus border
+        "color_42": "#e8a85c50", // Search match
+        "color_43": "#8ca67430", // Diff added
+        "color_44": "#9b8e7c80", // Bracket match
+        "color_45": "#8ca67420", // Created background
+        "color_46": "#d67c5c20" // Deleted background
+    }
+}

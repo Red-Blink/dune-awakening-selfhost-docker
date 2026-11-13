@@ -2,6 +2,9 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./styles.css";
+import { initTheme } from "./themes/themeEngine";
+
+initTheme();
 
 async function boot() {
   if (import.meta.env.VITE_CONSOLE_PREVIEW === "true") {

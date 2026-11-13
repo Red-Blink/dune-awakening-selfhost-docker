@@ -1,0 +1,60 @@
+{
+    "name": "Dune House Atreides",
+    "description": "The noble house from oceanic Caladan - deep ocean blues, sea greens, silver nobility, and misty grays",
+    "colors": {
+        // Core backgrounds - Ocean depths to mist
+        "color_01": "#11161c", // Deep ocean trench
+        "color_02": "#191f27", // Midnight water
+        "color_03": "#202931", // Dark sea blue
+        "color_04": "#28333d", // Storm sea
+        "color_05": "#303d49", // Shallow ocean
+        "color_06": "#394755", // Misty sea
+        // Borders and dividers - Silver nobility
+        "color_07": "#3f4d5c", // Wet stone
+        "color_08": "#5a6b7e", // Silver seal
+        // Text hierarchy - Noble clarity
+        "color_09": "#e4edf7", // Noble silver (primary)
+        "color_10": "#c5d3e0", // Pearl gray (secondary)
+        "color_11": "#8b9cae", // Misty text (comments)
+        "color_12": "#6a7b8e", // Fog gray (disabled)
+        "color_13": "#f0f6fc", // Pure noble white (variables)
+        // Syntax highlighting - Atreides palette
+        "color_14": "#4a9fa5", // Caladan sea-green (strings)
+        "color_15": "#60a5fa", // Ocean blue (numbers/constants)
+        "color_16": "#22d3ee", // Sea foam cyan (keywords)
+        "color_17": "#3b82f6", // Noble blue (functions)
+        "color_18": "#94a3b8", // Silver gray (types)
+        "color_19": "#10b981", // Emerald (properties)
+        // Semantic state colors
+        "color_20": "#ef4444", // Alert red (errors)
+        "color_21": "#f59e0b", // Caution amber (warnings)
+        "color_22": "#3b82f6", // Noble info (info)
+        "color_23": "#10b981", // Success green (success)
+        "color_24": "#8b9cae", // Neutral gray (untracked)
+        // UI accent colors
+        "color_25": "#3b82f6", // Atreides blue (primary accent)
+        "color_26": "#2563eb", // Deep Atreides blue (hover)
+        // Terminal special
+        "color_27": "#a78bfa", // Royal purple
+        "color_28": "#06b6d4", // Aqua cyan
+        "color_29": "#ffffff", // Pure white
+        // Transparencies and overlays
+        "color_30": "#00000000", // Invisible
+        "color_31": "#00000001", // Transparent border
+        "color_32": "#3f4d5c50", // Disabled overlay
+        "color_33": "#2a364180", // Predictive overlay
+        "color_34": "#33404d40", // Scrollbar thumb
+        "color_35": "#3f4d5c60", // Scrollbar thumb hover
+        "color_36": "#222c3530", // Ghost element
+        "color_37": "#e4edf740", // Text selection
+        "color_38": "#3b82f630", // Accent overlay
+        "color_39": "#4a9fa530", // String overlay
+        "color_40": "#22d3ee30", // Keyword overlay
+        "color_41": "#3b82f660", // Focus border
+        "color_42": "#f59e0b50", // Search match
+        "color_43": "#10b98130", // Diff added
+        "color_44": "#8b9cae80", // Bracket match
+        "color_45": "#10b98120", // Created background
+        "color_46": "#ef444420" // Deleted background
+    }
+}

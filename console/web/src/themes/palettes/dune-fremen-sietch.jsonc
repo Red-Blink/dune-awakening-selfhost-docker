@@ -1,0 +1,61 @@
+{
+    "name": "Dune Fremen Sietch",
+    "description": "Underground cave dwellings and desert survival - warm light beige backgrounds with earth tones and precious water blues",
+    "appearance": "light",
+    "colors": {
+        // Core backgrounds - Sunny desert sand gradient (light theme)
+        "color_01": "#faf8f3", // Light desert sand (main background)
+        "color_02": "#f5f2ea", // Warm beige
+        "color_03": "#efe9dd", // Sandy beige
+        "color_04": "#e8e0d0", // Light ochre
+        "color_05": "#ded4c0", // Medium sand
+        "color_06": "#d4c8b0", // Deeper sand
+        // Borders and dividers - Cave stone
+        "color_07": "#b8a890", // Stone edge
+        "color_08": "#8b7355", // Rock wall
+        // Text hierarchy - High contrast for light theme
+        "color_09": "#2c2416", // Deep brown (primary text)
+        "color_10": "#4a3f2e", // Dark earth (secondary)
+        "color_11": "#6b5d48", // Medium brown (comments)
+        "color_12": "#8b7355", // Light brown (disabled)
+        "color_13": "#1a1511", // Very dark brown (variables)
+        // Syntax highlighting - Desert oasis palette
+        "color_14": "#2a7f9e", // Precious water blue (strings)
+        "color_15": "#8b6239", // Earth brown (numbers/constants)
+        "color_16": "#a0522d", // Sienna brown (keywords)
+        "color_17": "#1e6b8c", // Deep water blue (functions)
+        "color_18": "#6b4226", // Dark ochre (types)
+        "color_19": "#4a7c59", // Hidden plant green (properties)
+        // Semantic state colors
+        "color_20": "#c2410c", // Desert warning (errors)
+        "color_21": "#b45309", // Sun alert (warnings)
+        "color_22": "#2a7f9e", // Water info (info)
+        "color_23": "#4a7c59", // Oasis success (success)
+        "color_24": "#7c6f64", // Neutral earth (untracked)
+        // UI accent colors
+        "color_25": "#1e6b8c", // Water blue (primary accent)
+        "color_26": "#165a7a", // Deep water (hover)
+        // Terminal special
+        "color_27": "#8b4a8c", // Desert flower purple
+        "color_28": "#3c9fbc", // Sky reflection cyan
+        "color_29": "#1a1511", // Deep earth black
+        // Transparencies and overlays
+        "color_30": "#00000000", // Invisible
+        "color_31": "#00000001", // Transparent border
+        "color_32": "#b8a89050", // Disabled overlay
+        "color_33": "#ded4c080", // Predictive overlay
+        "color_34": "#d4c8b040", // Scrollbar thumb
+        "color_35": "#b8a89060", // Scrollbar thumb hover
+        "color_36": "#e8e0d030", // Ghost element
+        "color_37": "#2c241620", // Text selection
+        "color_38": "#1e6b8c30", // Accent overlay
+        "color_39": "#2a7f9e30", // String overlay
+        "color_40": "#a0522d30", // Keyword overlay
+        "color_41": "#1e6b8c60", // Focus border
+        "color_42": "#b4530950", // Search match
+        "color_43": "#4a7c5930", // Diff added
+        "color_44": "#6b5d4880", // Bracket match
+        "color_45": "#4a7c5920", // Created background
+        "color_46": "#c2410c20" // Deleted background
+    }
+}
