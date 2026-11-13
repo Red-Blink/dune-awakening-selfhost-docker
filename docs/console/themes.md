@@ -1,43 +1,50 @@
 # Console themes
 
-Status: Current (verified 2026-11-12 against upstream v1.4.64 with this change applied).
+The palette button beside the language button opens **Console Theme**.
+The choice applies to this browser and is stored in its local storage
+(`dune-console-theme`). Each operator and device can choose independently.
+**Default** preserves the standard Console appearance without overrides.
+If browser storage is blocked, the current page can still use a theme and
+reopening the picker reflects the applied choice.
 
-The palette button in the console header (next to the language button) opens **Console Theme**.
-The choice applies to the browser you made it in and is stored in that browser's local storage
-(`dune-console-theme`). Nothing is stored on the server, so each operator and each device picks
-independently. **Default** is the standard console look and sets no overrides at all; clearing the
-choice, or choosing Default, restores it exactly. If browser storage is blocked, the current
-page can still use a theme and reopening the picker reflects the applied choice.
+## Palettes
 
-## What is offered
+The Console includes 19 original Dune Docker palettes: Amber Dunes, Basalt,
+Copper, Deep Desert, Dust Storm, Emerald, Golden Dusk, Ice Blue, Indigo,
+Jade, Moonstone, Nightfall, Oasis, Rosewood, Saffron, Sandstone, Slate,
+Spice and Steel. Their colour combinations are maintained in
+`console/web/src/themes/consolePalettes.ts`.
 
-- 16 dark palettes from [Fedaykin Dune Themes](https://github.com/btriapitsyn/zed-fedaykin-themes) (MIT). The 18 vendored palette files and `palettes/LICENSE` were checked byte-identical to upstream commit `f0be575142b784d4b8728ab036ae1cfdf9279cab` on 2026-11-12 (only the file extension differs: `.json` became `.jsonc` so the release gate's strict JSON check ignores them).
-- Three looks from [Tabr](https://github.com/Project-Arrakis/tabr-tau) (MIT): Tabr Fremen, Tabr Awakening, Tabr Sietch.
+All offered palettes use dark surfaces to match the existing Console controls.
+The picker, browser persistence, cross-tab updates and keyboard controls work
+for every palette. A saved selection that is no longer in the catalogue falls
+back to Default, including selections from a previous preview.
 
-Light palettes (Fedaykin Mentat and Fremen Sietch, the Tabr "Dayside" variants) are vendored and the
-engine supports them, but they are **not offered**: the stylesheet still has many hardcoded dark
-surfaces, so a light theme shows pale text on dark cards. They return once those surfaces use tokens.
+## Readability and loading
 
-## How it works
+`themeEngine.ts` derives the Console's existing CSS custom properties from
+each palette's background, panel, accent and secondary colours. Shared text
+and status colours keep the interface consistent, and contrast checks adjust
+text against the page and panel surfaces. Hardcoded colours in existing
+controls, map markers and some dialogs retain their standard appearance.
 
-`console/web/src/themes/themeEngine.ts` maps each source palette onto the console's existing CSS custom
-properties (`--bg`, `--panel`, `--text`, `--accent`, ...) by setting them on `<html>` at runtime, before the
-first render so there is no flash. Text colours are pulled toward white or black until they reach WCAG AA
-(4.5:1, 7:1 for body text) on the page and panel surfaces, so a palette whose own text colours are too dim
-for the console is corrected rather than shipped unreadable. Colours that are hardcoded in the stylesheet
-(for example the Discord and Support buttons, map and status colours, and some dialog surfaces) are not themed, so even a dark theme shows a few stock-coloured surfaces. Tokenising them is a follow-up.
-
-## Loading
-
-The palettes (about 60 KB of source) are not in the console's entry chunk. `themes/themeBoot.ts` is the only theme code loaded at start: with the default look it does nothing, and with a saved theme it re-applies that theme's tokens from a small cache in `localStorage` (`dune-console-theme-cache`, written by the engine) so there is no flash, then loads the engine to check the choice against the real catalogue (a changed palette refreshes the cache; an id that no longer exists falls back to Default). The cache is only trusted if every entry is a custom property set to a hex colour or the one `rgba()` glow the engine emits; anything else is ignored. The picker itself (`ThemeLauncher.tsx`) is a lazy chunk; if that chunk cannot be fetched after a console update, the recovery panel offers Refresh Now and Close.
+The catalogue and engine load lazily. The small `themeBoot.ts` entry module
+does nothing for Default. For a saved selection it restores a validated cache
+before rendering, then reconciles the selection against the current catalogue.
+Only the engine's supported colour properties are accepted from the cache.
+An unavailable picker chunk offers Refresh Now and Close through the existing
+recovery panel.
 
 ## Keyboard
 
-Arrow keys, Home and End move focus between the cards without changing anything; Space or Enter chooses the focused card. Escape closes the picker.
+Arrow keys, Home and End move focus between cards without applying a theme.
+Space or Enter selects the focused card. Escape closes the picker and returns
+focus to its header button.
 
 ## Adding a palette
 
-Drop a Fedaykin-format `dune-<name>.jsonc` into `console/web/src/themes/palettes/` (slots `color_01`..`color_46`,
-see the template in the Fedaykin repo) and it appears in the picker. `npm test` in `console/web` checks that every
-palette yields a complete token set and meets the contrast floor. Keep each source's licence next to its files
-(`palettes/LICENSE`, `tabr/LICENSE`).
+Add a `ConsolePalette` entry to `consolePalettes.ts` with a unique `dd-` ID,
+name, description, background, panel, accent and secondary colour. Use hex
+colours; the engine derives the remaining tokens. Keep the catalogue sorted
+by display name. Theme tests check distinct choices, complete tokens,
+readable contrast, persistence and resetting to Default.

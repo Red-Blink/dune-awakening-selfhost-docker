@@ -6,8 +6,8 @@ import appSource from "../App.tsx?raw";
 import { DEFAULT_THEME_ID, THEME_CACHE_KEY, THEME_STORAGE_KEY, initTheme, readThemeCache } from "./themeBoot";
 
 const root = document.documentElement;
-const fremen = getThemes().find((t) => t.id === "tabr-fremen")!;
-const sietch = getThemes().find((t) => t.id === "tabr-sietch")!;
+const amber = getThemes().find((t) => t.id === "dd-amber-dunes")!;
+const oasis = getThemes().find((t) => t.id === "dd-oasis")!;
 const cacheOf = (theme: { id: string; appearance: string; tokens: Record<string, string> }) =>
   JSON.stringify({ id: theme.id, appearance: theme.appearance, tokens: theme.tokens });
 
@@ -47,29 +47,29 @@ describe("initTheme", () => {
   });
 
   it("re-applies the cached tokens synchronously, before the catalogue loads", () => {
-    window.localStorage.setItem(THEME_STORAGE_KEY, fremen.id);
-    window.localStorage.setItem(THEME_CACHE_KEY, cacheOf(fremen));
+    window.localStorage.setItem(THEME_STORAGE_KEY, amber.id);
+    window.localStorage.setItem(THEME_CACHE_KEY, cacheOf(amber));
     initTheme();
-    expect(root.dataset.theme).toBe(fremen.id);
-    expect(root.style.getPropertyValue("--bg")).toBe(fremen.tokens["--bg"]);
+    expect(root.dataset.theme).toBe(amber.id);
+    expect(root.style.getPropertyValue("--bg")).toBe(amber.tokens["--bg"]);
     expect(root.style.getPropertyValue("color-scheme")).toBe("dark");
   });
 
   it("reconciles a stale cache with the real catalogue", async () => {
-    const stale = { ...fremen, tokens: { ...fremen.tokens, "--bg": "#123456" } };
-    window.localStorage.setItem(THEME_STORAGE_KEY, fremen.id);
+    const stale = { ...amber, tokens: { ...amber.tokens, "--bg": "#123456" } };
+    window.localStorage.setItem(THEME_STORAGE_KEY, amber.id);
     window.localStorage.setItem(THEME_CACHE_KEY, cacheOf(stale));
     initTheme();
     expect(root.style.getPropertyValue("--bg")).toBe("#123456");
-    await expect.poll(() => root.style.getPropertyValue("--bg")).toBe(fremen.tokens["--bg"]);
-    expect(JSON.parse(window.localStorage.getItem(THEME_CACHE_KEY)!).tokens["--bg"]).toBe(fremen.tokens["--bg"]);
+    await expect.poll(() => root.style.getPropertyValue("--bg")).toBe(amber.tokens["--bg"]);
+    expect(JSON.parse(window.localStorage.getItem(THEME_CACHE_KEY)!).tokens["--bg"]).toBe(amber.tokens["--bg"]);
   });
 
   it("applies a theme from the catalogue when there is no cache (first boot after an upgrade)", async () => {
-    window.localStorage.setItem(THEME_STORAGE_KEY, sietch.id);
+    window.localStorage.setItem(THEME_STORAGE_KEY, oasis.id);
     initTheme();
     expect(root.dataset.theme).toBeUndefined();
-    await expect.poll(() => root.dataset.theme).toBe(sietch.id);
+    await expect.poll(() => root.dataset.theme).toBe(oasis.id);
   });
 
   it("drops a stored id that no longer exists", async () => {
@@ -84,10 +84,10 @@ describe("initTheme", () => {
 
   it("follows another tab choosing, then clearing, a theme", async () => {
     initTheme();
-    window.localStorage.setItem(THEME_CACHE_KEY, cacheOf(sietch));
-    window.localStorage.setItem(THEME_STORAGE_KEY, sietch.id);
+    window.localStorage.setItem(THEME_CACHE_KEY, cacheOf(oasis));
+    window.localStorage.setItem(THEME_STORAGE_KEY, oasis.id);
     window.dispatchEvent(new StorageEvent("storage", { key: THEME_STORAGE_KEY }));
-    expect(root.dataset.theme).toBe(sietch.id);
+    expect(root.dataset.theme).toBe(oasis.id);
     window.localStorage.removeItem(THEME_STORAGE_KEY);
     window.dispatchEvent(new StorageEvent("storage", { key: THEME_STORAGE_KEY }));
     await expect.poll(() => root.dataset.theme).toBeUndefined();
@@ -95,8 +95,8 @@ describe("initTheme", () => {
   });
 
   it("follows another tab clearing storage entirely", async () => {
-    window.localStorage.setItem(THEME_STORAGE_KEY, fremen.id);
-    window.localStorage.setItem(THEME_CACHE_KEY, cacheOf(fremen));
+    window.localStorage.setItem(THEME_STORAGE_KEY, amber.id);
+    window.localStorage.setItem(THEME_CACHE_KEY, cacheOf(amber));
     initTheme();
     window.localStorage.clear();
     window.dispatchEvent(new StorageEvent("storage", { key: null }));

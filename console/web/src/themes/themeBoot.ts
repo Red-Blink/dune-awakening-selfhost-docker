@@ -1,5 +1,5 @@
 // Boot-time half of the console themes. main.tsx imports only this file, so the
-// palette catalogue (themeEngine.ts, ~60 KB of palette source) stays out of the
+// palette catalogue (consolePalettes.ts, loaded by themeEngine.ts) stays out of the
 // entry chunk. The engine records the tokens of the chosen theme in a small
 // cache; this module re-applies them synchronously (no flash of the default
 // look) and loads the engine afterwards to reconcile against the real catalogue.

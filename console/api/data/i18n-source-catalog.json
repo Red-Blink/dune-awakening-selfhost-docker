@@ -571,6 +571,7 @@
     "Co-owned",
     "Co-owner",
     "Code",
+    "Cold blue-gray with glacial blue and pale mint.",
     "Collapse",
     "Collapse API Keys",
     "Collapse Advanced SQL Console",
@@ -755,6 +756,10 @@
     "Daily restart time must be a valid 24-hour time, for example 05:00 or 23:30.",
     "Danger Zone",
     "Danish",
+    "Dark aubergine with honey gold and rose.",
+    "Dark teal with jade and misty blue.",
+    "Dark umber with burnished copper and sage.",
+    "Dark wine with dusty rose and pearl blue.",
     "DarkDante",
     "Database",
     "Database Browser",
@@ -781,6 +786,8 @@
     "Deep Desert (Default, 0 Online)",
     "Deep Desert Layout",
     "Deep Desert instances",
+    "Deep forest with fresh mint and soft brass.",
+    "Deep petrol with aqua and sunlit gold.",
     "DeepDesert_1",
     "DeepL API Key",
     "DeepL API Key (e.g. xxxx-xxxx:fx)",
@@ -974,6 +981,7 @@
     "ENABLE MEMORY SWAP",
     "Each active map or Sietch runs in its own game-server container. This is the maximum emergency swap each one may use; it is not a limit for the whole physical server.",
     "Each one is written when its map next restarts.",
+    "Earthy charcoal with saffron and olive silver.",
     "Edit",
     "Edit Base Backup",
     "Edit Inventory Item",
@@ -1283,6 +1291,7 @@
     "Granted",
     "Granting...",
     "Grants",
+    "Graphite blue with steel silver and sea green.",
     "Greek",
     "Grid",
     "Grid view",
@@ -1369,6 +1378,7 @@
     "Incoming character transfer policy",
     "Indonesian",
     "Info",
+    "Ink blue with periwinkle and peach.",
     "Install",
     "Install Blocked",
     "Install Community Blueprint",
@@ -1712,11 +1722,13 @@
     "Name, creator, or tag",
     "Named seed plans are CSV-backed lists the Market Bot can stock. The bundled catalog stays read-only. Set one plan as active to use it for reseeds and buyback price caps. Download CSV exports the selected plan; Upload CSV imports a UTF-8 CSV of names and numbers only (no extra columns, SQL, JSON, or formulas).",
     "National Languages Cached",
+    "Near-black navy with electric blue and lilac.",
     "Needs Review",
     "Network / Ports",
     "Network Note",
     "Neural Fallback Active (Key Optional)",
     "Neutral",
+    "Neutral charcoal with pale blue and warm ivory.",
     "Never",
     "New",
     "New Automatic Backup Passphrase",
@@ -1961,7 +1973,6 @@
     "Package name is required.",
     "Package was saved successfully.",
     "Page",
-    "Palettes: Fedaykin Dune Themes and Tabr (MIT).",
     "Parallel Map Warmup",
     "Parallel Starts",
     "Partial",
@@ -2137,6 +2148,7 @@
     "Queued base writes are applied while this is down",
     "Queued for this map's next restart",
     "Queued in the player's inventory. Dune will process it on the next login.",
+    "Quiet brown-black with sand gold and clear sky blue.",
     "RAM usage",
     "RabbitMQ",
     "RabbitMQ Admin",
@@ -2417,6 +2429,7 @@
     "Reward levels will appear after the current Landsraad term generates its milestones.",
     "Rewards Grant",
     "Right-drag to tilt and rotate.",
+    "Roasted brown with spice orange and cool turquoise.",
     "Romanian",
     "Routine",
     "Row Save Failed",
@@ -2746,7 +2759,10 @@
     "Slots used",
     "Slovak",
     "Slovenian",
+    "Smoky slate with pale apricot and lavender.",
+    "Smoky violet with pearl lavender and sand.",
     "Smuggler's Run stays Dynamic so its instance is retired as soon as it becomes empty and the next visit starts with fresh vehicle permissions.",
+    "Soft dark taupe with limestone and sage blue.",
     "Solari",
     "Solari Coin",
     "Solari Credit",
@@ -3245,6 +3261,7 @@
     "View Patch Notes",
     "Visible",
     "Vitals",
+    "Volcanic gray with soft silver and warm copper.",
     "Volume Used",
     "Volume used",
     "Voting Period",
@@ -3260,6 +3277,7 @@
     "Waiting for Updated Console",
     "Waiting for the game to save the character position",
     "Waiting for the update helper to start.",
+    "Warm charcoal with amber and muted turquoise.",
     "Warming",
     "Warn",
     "Warn players before restart",
@@ -12810,6 +12828,18 @@
         ]
       }
     ],
+    "Cold blue-gray with glacial blue and pale mint.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 21,
+        "nearby": [
+          "Deep forest with fresh mint and soft brass.",
+          "Dark aubergine with honey gold and rose.",
+          "Ink blue with periwinkle and peach.",
+          "Dark teal with jade and misty blue."
+        ]
+      }
+    ],
     "Collapse": [
       {
         "file": "console/web/src/features/players/CharacterAdminUI.tsx",
@@ -15331,6 +15361,54 @@
         ]
       }
     ],
+    "Dark aubergine with honey gold and rose.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 20,
+        "nearby": [
+          "Smoky slate with pale apricot and lavender.",
+          "Deep forest with fresh mint and soft brass.",
+          "Cold blue-gray with glacial blue and pale mint.",
+          "Ink blue with periwinkle and peach."
+        ]
+      }
+    ],
+    "Dark teal with jade and misty blue.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 23,
+        "nearby": [
+          "Cold blue-gray with glacial blue and pale mint.",
+          "Ink blue with periwinkle and peach.",
+          "Smoky violet with pearl lavender and sand.",
+          "Near-black navy with electric blue and lilac."
+        ]
+      }
+    ],
+    "Dark umber with burnished copper and sage.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 16,
+        "nearby": [
+          "Warm charcoal with amber and muted turquoise.",
+          "Volcanic gray with soft silver and warm copper.",
+          "Quiet brown-black with sand gold and clear sky blue.",
+          "Smoky slate with pale apricot and lavender."
+        ]
+      }
+    ],
+    "Dark wine with dusty rose and pearl blue.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 27,
+        "nearby": [
+          "Near-black navy with electric blue and lilac.",
+          "Deep petrol with aqua and sunlit gold.",
+          "Earthy charcoal with saffron and olive silver.",
+          "Soft dark taupe with limestone and sage blue."
+        ]
+      }
+    ],
     "Database": [
       {
         "file": "console/web/src/App.tsx",
@@ -15695,6 +15773,30 @@
           "Force Despawn",
           "Choose how many independent Deep Desert instances this battlegroup provides.",
           "Active"
+        ]
+      }
+    ],
+    "Deep forest with fresh mint and soft brass.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 19,
+        "nearby": [
+          "Quiet brown-black with sand gold and clear sky blue.",
+          "Smoky slate with pale apricot and lavender.",
+          "Dark aubergine with honey gold and rose.",
+          "Cold blue-gray with glacial blue and pale mint."
+        ]
+      }
+    ],
+    "Deep petrol with aqua and sunlit gold.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 26,
+        "nearby": [
+          "Smoky violet with pearl lavender and sand.",
+          "Near-black navy with electric blue and lilac.",
+          "Dark wine with dusty rose and pearl blue.",
+          "Earthy charcoal with saffron and olive silver."
         ]
       }
     ],
@@ -18548,6 +18650,18 @@
           "queued",
           "Restart this map from the Maps tab",
           "Restarting"
+        ]
+      }
+    ],
+    "Earthy charcoal with saffron and olive silver.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 28,
+        "nearby": [
+          "Deep petrol with aqua and sunlit gold.",
+          "Dark wine with dusty rose and pearl blue.",
+          "Soft dark taupe with limestone and sage blue.",
+          "Graphite blue with steel silver and sea green."
         ]
       }
     ],
@@ -23184,6 +23298,18 @@
         ]
       }
     ],
+    "Graphite blue with steel silver and sea green.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 30,
+        "nearby": [
+          "Earthy charcoal with saffron and olive silver.",
+          "Soft dark taupe with limestone and sage blue.",
+          "Roasted brown with spice orange and cool turquoise.",
+          "Neutral charcoal with pale blue and warm ivory."
+        ]
+      }
+    ],
     "Grid": [
       {
         "file": "console/web/src/features/vehicles/VehicleStorageOverlay.tsx",
@@ -24444,6 +24570,18 @@
           "Order",
           "No additional detail was recorded.",
           "No player sell listings on this exchange."
+        ]
+      }
+    ],
+    "Ink blue with periwinkle and peach.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 22,
+        "nearby": [
+          "Dark aubergine with honey gold and rose.",
+          "Cold blue-gray with glacial blue and pale mint.",
+          "Dark teal with jade and misty blue.",
+          "Smoky violet with pearl lavender and sand."
         ]
       }
     ],
@@ -29438,6 +29576,18 @@
         ]
       }
     ],
+    "Near-black navy with electric blue and lilac.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 25,
+        "nearby": [
+          "Dark teal with jade and misty blue.",
+          "Smoky violet with pearl lavender and sand.",
+          "Deep petrol with aqua and sunlit gold.",
+          "Dark wine with dusty rose and pearl blue."
+        ]
+      }
+    ],
     "Needs Review": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
@@ -29591,6 +29741,16 @@
           "Current:",
           "No guild membership required.",
           "New Faction"
+        ]
+      }
+    ],
+    "Neutral charcoal with pale blue and warm ivory.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 32,
+        "nearby": [
+          "Graphite blue with steel silver and sea green.",
+          "Roasted brown with spice orange and cool turquoise."
         ]
       }
     ],
@@ -36306,6 +36466,18 @@
         ]
       }
     ],
+    "Quiet brown-black with sand gold and clear sky blue.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 17,
+        "nearby": [
+          "Volcanic gray with soft silver and warm copper.",
+          "Dark umber with burnished copper and sage.",
+          "Smoky slate with pale apricot and lavender.",
+          "Deep forest with fresh mint and soft brass."
+        ]
+      }
+    ],
     "RabbitMQ Admin": [
       {
         "file": "console/web/src/features/server/ServerPanels.tsx",
@@ -40990,6 +41162,17 @@
           "Drag to Pan. Mouse Wheel Zooms. Double-click to pick a location.",
           "Loading Map",
           "Picked location"
+        ]
+      }
+    ],
+    "Roasted brown with spice orange and cool turquoise.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 31,
+        "nearby": [
+          "Soft dark taupe with limestone and sage blue.",
+          "Graphite blue with steel silver and sea green.",
+          "Neutral charcoal with pale blue and warm ivory."
         ]
       }
     ],
@@ -45923,6 +46106,30 @@
         ]
       }
     ],
+    "Smoky slate with pale apricot and lavender.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 18,
+        "nearby": [
+          "Dark umber with burnished copper and sage.",
+          "Quiet brown-black with sand gold and clear sky blue.",
+          "Deep forest with fresh mint and soft brass.",
+          "Dark aubergine with honey gold and rose."
+        ]
+      }
+    ],
+    "Smoky violet with pearl lavender and sand.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 24,
+        "nearby": [
+          "Ink blue with periwinkle and peach.",
+          "Dark teal with jade and misty blue.",
+          "Near-black navy with electric blue and lilac.",
+          "Deep petrol with aqua and sunlit gold."
+        ]
+      }
+    ],
     "Smuggler's Run stays Dynamic so its instance is retired as soon as it becomes empty and the next visit starts with fresh vehicle permissions.": [
       {
         "file": "console/web/src/features/maps/MapsPanel.tsx",
@@ -45931,6 +46138,18 @@
           "Edit",
           "This story map stays Dynamic so its completed instance is retired and the next visit starts in a fresh server process.",
           "Vehicle-deploy Overland maps use Overmap Active instead of Always On by default to avoid vehicle ownership restore races during startup."
+        ]
+      }
+    ],
+    "Soft dark taupe with limestone and sage blue.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 29,
+        "nearby": [
+          "Dark wine with dusty rose and pearl blue.",
+          "Earthy charcoal with saffron and olive silver.",
+          "Graphite blue with steel silver and sea green.",
+          "Roasted brown with spice orange and cool turquoise."
         ]
       }
     ],
@@ -53107,6 +53326,17 @@
         ]
       }
     ],
+    "Volcanic gray with soft silver and warm copper.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 15,
+        "nearby": [
+          "Warm charcoal with amber and muted turquoise.",
+          "Dark umber with burnished copper and sage.",
+          "Quiet brown-black with sand gold and clear sky blue."
+        ]
+      }
+    ],
     "Volume used": [
       {
         "file": "console/web/src/features/bases/BaseInventoryTab.tsx",
@@ -53317,6 +53547,16 @@
           "Console Update Complete",
           "The update helper finished successfully. Waiting for the updated web console to answer.",
           "Waiting for the update helper to start."
+        ]
+      }
+    ],
+    "Warm charcoal with amber and muted turquoise.": [
+      {
+        "file": "console/web/src/themes/consolePalettes.ts",
+        "line": 14,
+        "nearby": [
+          "Volcanic gray with soft silver and warm copper.",
+          "Dark umber with burnished copper and sage."
         ]
       }
     ],

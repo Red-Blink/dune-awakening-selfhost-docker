@@ -16,10 +16,10 @@ describe("ThemePanel", () => {
   it("applies and stores a theme when chosen, and Escape closes", () => {
     const onClose = vi.fn();
     render(<ThemePanel onClose={onClose} />);
-    fireEvent.click(screen.getByRole("radio", { name: /Tabr Fremen/ }));
-    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("tabr-fremen");
-    expect(document.documentElement.dataset.theme).toBe("tabr-fremen");
-    expect(screen.getByRole("radio", { name: /Tabr Fremen/ })).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(screen.getByRole("radio", { name: /Amber Dunes/ }));
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("dd-amber-dunes");
+    expect(document.documentElement.dataset.theme).toBe("dd-amber-dunes");
+    expect(screen.getByRole("radio", { name: /Amber Dunes/ })).toHaveAttribute("aria-checked", "true");
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
   });
@@ -46,7 +46,7 @@ describe("ThemePanel", () => {
 
   it("gives each card an accessible description", () => {
     render(<ThemePanel />);
-    const radio = screen.getByRole("radio", { name: /Tabr Fremen/ });
+    const radio = screen.getByRole("radio", { name: /Amber Dunes/ });
     expect(radio).toHaveAccessibleDescription(/\S/);
   });
 
@@ -104,8 +104,8 @@ describe("ThemePanel", () => {
 
   it("follows a theme chosen in another tab while open", () => {
     render(<ThemePanel />);
-    window.localStorage.setItem(THEME_STORAGE_KEY, "tabr-sietch");
+    window.localStorage.setItem(THEME_STORAGE_KEY, "dd-oasis");
     fireEvent(window, new StorageEvent("storage", { key: THEME_STORAGE_KEY }));
-    expect(screen.getByRole("radio", { name: /Tabr Sietch/ })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: /Oasis/ })).toHaveAttribute("aria-checked", "true");
   });
 });

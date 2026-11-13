@@ -1,20 +1,12 @@
-// Console themes: maps the Fedaykin Dune palettes (MIT, see palettes/LICENSE)
-// onto the console's existing CSS custom properties at runtime. The default
+// Console themes: maps the project's original palettes onto the existing
+// CSS custom properties at runtime. The default
 // theme sets nothing, so an operator who never opens the picker sees exactly
 // the stylesheet's own :root values.
-import tabrLooks from "./tabr/looks.json";
+import { CONSOLE_PALETTES, type ConsolePalette } from "./consolePalettes";
 import { DEFAULT_THEME_ID, THEME_CACHE_KEY, THEME_STORAGE_KEY, THEME_TOKEN_NAMES, type ThemeCache } from "./themeBoot";
 
 // The boot module (the only theme code in the entry chunk) owns the storage keys.
 export { DEFAULT_THEME_ID, THEME_STORAGE_KEY };
-
-const paletteSources = import.meta.glob("./palettes/dune-*.jsonc", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
-
-// Palettes keep their upstream // comments, hence .jsonc (the release gate parses every *.json strictly).
-// Light palettes are vendored and the engine supports them (color-scheme and all),
-// but the stylesheet still has many hardcoded dark surfaces, so a light theme
-// renders pale text on dark cards. Hidden until the stylesheet is tokenised.
-const OFFERED_APPEARANCE: ThemeInfo["appearance"] = "dark";
 
 export type Rgb = [number, number, number];
 export type ThemeTokens = Record<string, string>;
@@ -24,22 +16,6 @@ export interface ThemeInfo {
   description: string;
   appearance: "dark" | "light";
   tokens: ThemeTokens;
-}
-
-/** Palette files are JSON with // comments; strip them without touching strings. */
-export function parseJsonc(source: string): unknown {
-  let out = "";
-  let inString = false;
-  for (let i = 0; i < source.length; i += 1) {
-    const ch = source[i];
-    if (inString) {
-      out += ch;
-      if (ch === "\\") { out += source[i + 1] ?? ""; i += 1; } else if (ch === '"') inString = false;
-    } else if (ch === '"') { inString = true; out += ch; }
-    else if (ch === "/" && source[i + 1] === "/") { while (i < source.length && source[i] !== "\n") i += 1; out += "\n"; }
-    else out += ch;
-  }
-  return JSON.parse(out);
 }
 
 export function parseHex(value: string): Rgb | null {
@@ -84,8 +60,6 @@ export function ensureContrast(fg: Rgb, surfaces: Rgb[], ratio: number): Rgb {
   return target;
 }
 
-const slot = (colors: Record<string, string>, n: number, fallback: Rgb): Rgb => parseHex(colors[`color_${String(n).padStart(2, "0")}`] ?? "") ?? fallback;
-
 /** The few colours every source theme has to supply; everything else is derived from them. */
 interface ThemeColors {
   bg: Rgb; panel: Rgb; border: Rgb; text: Rgb; strong: Rgb; muted: Rgb; faint: Rgb;
@@ -128,78 +102,36 @@ function deriveTokens(c: ThemeColors): ThemeTokens {
   };
 }
 
-/** Tokens for a Fedaykin editor palette (color_NN slots). */
-export function buildThemeTokens(colors: Record<string, string>): ThemeTokens {
-  const bg = slot(colors, 1, [13, 15, 18]);
-  const panel = slot(colors, 2, bg);
-  const text = slot(colors, 9, [243, 239, 231]);
-  const muted = slot(colors, 10, text);
-  const accent = slot(colors, 25, [198, 139, 74]);
+/** Four project-authored colours define a palette; the shared roles stay consistent. */
+export function buildThemeTokens(colors: Partial<Pick<ConsolePalette, "background" | "panel" | "accent" | "secondary">>): ThemeTokens {
+  const bg: Rgb = parseHex(colors.background ?? "") ?? [13, 15, 18];
+  const panel: Rgb = parseHex(colors.panel ?? "") ?? [23, 26, 29];
+  const text: Rgb = [245, 241, 233];
+  const accent: Rgb = parseHex(colors.accent ?? "") ?? [198, 139, 74];
+  const secondary: Rgb = parseHex(colors.secondary ?? "") ?? [149, 189, 207];
   return deriveTokens({
-    bg, panel, text, muted, accent,
-    border: slot(colors, 7, mix(bg, text, 0.15)),
-    strong: slot(colors, 29, text),
-    faint: slot(colors, 11, muted),
-    title: slot(colors, 15, accent),
-    accentStrong: slot(colors, 26, accent),
-    success: slot(colors, 23, [155, 230, 189]),
-    warning: slot(colors, 21, [169, 121, 50]),
-    danger: slot(colors, 20, [224, 90, 79]),
-    info: slot(colors, 22, accent),
-  });
-}
-
-/** Tokens for a Tabr look (--c-* variables of one theme variant). */
-export function buildTabrTokens(vars: Record<string, string>): ThemeTokens {
-  const get = (name: string, fallback: Rgb) => parseHex(vars[name] ?? "") ?? fallback;
-  const text = get("text", [243, 239, 231]);
-  const spice = get("spice", [198, 139, 74]);
-  return deriveTokens({
-    bg: get("ground", [13, 15, 18]),
-    panel: get("panel", [23, 26, 29]),
-    border: get("hair", mix(get("ground", [13, 15, 18]), text, 0.15)),
-    text,
-    strong: text,
-    muted: get("dim", text),
-    faint: get("dim", text),
-    title: get("gold", spice),
-    accent: spice,
-    accentStrong: get("blue", get("focus", spice)),
-    success: get("ok", [155, 230, 189]),
-    warning: get("warn", [169, 121, 50]),
-    danger: get("bad", [224, 90, 79]),
-    info: get("sky", spice),
+    bg, panel, text, accent,
+    strong: [255, 252, 246],
+    muted: mix(text, panel, 0.35),
+    faint: mix(text, panel, 0.45),
+    border: mix(panel, text, 0.16),
+    title: mix(accent, text, 0.2),
+    accentStrong: secondary,
+    success: [137, 214, 169],
+    warning: [230, 187, 95],
+    danger: [247, 120, 112],
+    info: secondary,
   });
 }
 
 function loadThemes(): ThemeInfo[] {
-  const themes: ThemeInfo[] = [];
-  for (const [path, source] of Object.entries(paletteSources)) {
-    try {
-      const palette = parseJsonc(source) as { name?: string; description?: string; appearance?: string; colors?: Record<string, string> };
-      if (!palette.colors) continue;
-      themes.push({
-        id: path.replace(/^.*\/dune-/, "").replace(/\.jsonc$/, ""),
-        name: (palette.name ?? path).replace(/^Dune\s+/, ""),
-        description: palette.description ?? "",
-        appearance: palette.appearance === "light" ? "light" : "dark",
-        tokens: buildThemeTokens(palette.colors),
-      });
-    } catch { /* a malformed vendored palette is skipped, never fatal to the console */ }
-  }
-  const tabrNames: Record<string, string> = { fremen: "Fremen", awakening: "Awakening", sietch: "Sietch" };
-  for (const [look, variants] of Object.entries(tabrLooks as Record<string, Record<"dark" | "light", Record<string, string>>>)) {
-    for (const appearance of ["dark", "light"] as const) {
-      themes.push({
-        id: `tabr-${look}${appearance === "light" ? "-dayside" : ""}`,
-        name: `Tabr ${tabrNames[look] ?? look}${appearance === "light" ? " Dayside" : ""}`,
-        description: `The ${tabrNames[look] ?? look} look from the Tabr save editor${appearance === "light" ? ", light variant" : ""}.`,
-        appearance,
-        tokens: buildTabrTokens(variants[appearance]),
-      });
-    }
-  }
-  return themes.filter((t) => t.appearance === OFFERED_APPEARANCE).sort((a, b) => a.name.localeCompare(b.name));
+  return CONSOLE_PALETTES.map((palette): ThemeInfo => ({
+    id: palette.id,
+    name: palette.name,
+    description: palette.description,
+    appearance: "dark",
+    tokens: buildThemeTokens(palette),
+  })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 let catalogue: ThemeInfo[] | null = null;
