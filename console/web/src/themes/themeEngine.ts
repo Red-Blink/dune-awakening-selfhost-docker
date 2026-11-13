@@ -201,7 +201,7 @@ function loadThemes(): ThemeInfo[] {
 }
 
 let catalogue: ThemeInfo[] | null = null;
-/** Built on first use, so an operator who never leaves the default pays nothing at startup. */
+/** Parsed on first use. Note the palette source itself is bundled eagerly (import.meta.glob above), so the default path still downloads it (~60 KB raw, ~11 KB gzipped). */
 export function getThemes(): ThemeInfo[] {
   catalogue ??= loadThemes();
   return catalogue;
