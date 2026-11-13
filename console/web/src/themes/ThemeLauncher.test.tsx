@@ -16,7 +16,7 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("ThemeLauncher", () => {
-  it("opens the lazy picker from the header button and closes it again", { timeout: 30_000 }, async () => {
+  it("opens the lazy picker from the header button and closes it again", async () => {
     const onOpen = vi.fn();
     render(<ThemeLauncher onOpen={onOpen} />);
     const button = screen.getByRole("button", { name: "Console Theme" });
@@ -34,7 +34,7 @@ describe("ThemeLauncher", () => {
     expect(button).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("choosing a theme through the launcher changes the page and Default restores it", { timeout: 30_000 }, async () => {
+  it("choosing a theme through the launcher changes the page and Default restores it", async () => {
     render(<ThemeLauncher />);
     fireEvent.click(screen.getByRole("button", { name: "Console Theme" }));
     const radios = await screen.findAllByRole("radio", {}, SLOW);

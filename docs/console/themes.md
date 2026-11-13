@@ -70,9 +70,7 @@ The sidebar, header, cards, tables, tabs and most controls follow the
 palette. These stay fixed on purpose: the "Join Discord" and "Support
 Project" gradient buttons, map markers, legends and other data colours
 (categories must stay distinguishable), pure black and white overlays and
-shadows, and SVG fills and strokes. Because `--border-strong` is now derived
-closer to `--border` (as it is in Default), borders in every palette are a
-little subtler than before. To theme another colour, use
+shadows, and SVG fills and strokes. To theme another colour, use
 `var(--role, <colour>)` with an existing role, or add one to `themeRoles.ts`;
 tests fail if the stylesheet and the table disagree.
 

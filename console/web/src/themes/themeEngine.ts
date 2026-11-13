@@ -5,7 +5,7 @@
 import { CONSOLE_PALETTES, type ConsolePalette } from "./consolePalettes";
 import { HOUSE_SWATCHES, type HouseSwatch } from "./houseSwatches";
 import { ROLE_TOKENS } from "./themeRoles";
-import { DEFAULT_THEME_ID, THEME_CACHE_KEY, THEME_STORAGE_KEY, THEME_TOKEN_NAMES, type ThemeCache } from "./themeBoot";
+import { DEFAULT_THEME_ID, ROLE_TOKEN_NAME, THEME_CACHE_KEY, THEME_STORAGE_KEY, THEME_TOKEN_NAMES, type ThemeCache } from "./themeBoot";
 
 // The boot module (the only theme code in the entry chunk) owns the storage keys.
 export { DEFAULT_THEME_ID, THEME_STORAGE_KEY };
@@ -18,6 +18,8 @@ export interface ThemeInfo {
   description: string;
   appearance: "dark" | "light";
   tokens: ThemeTokens;
+  /** The console tokens without role colours: cheap, what the picker previews. `tokens` adds the role colours on first use. */
+  base: ThemeTokens;
   /** Picker section heading; not persisted. */
   group?: string;
   /** The source dye colours, shown in the picker for swatch palettes; not persisted. */
@@ -82,7 +84,7 @@ interface ThemeColors {
  * tokens so the sidebar, cards, tables, borders and secondary text follow the palette too. Each role was
  * measured against the Default tokens once: `mix` is how far from `from` toward `to` it sat.
  */
-function deriveRoleTokens(base: ThemeTokens): ThemeTokens {
+export function deriveRoleTokens(base: ThemeTokens): ThemeTokens {
   const at = (name: string): Rgb => parseHex(base[`--${name}`] ?? "") ?? [128, 128, 128];
   const out: ThemeTokens = {};
   const color = (role: (typeof ROLE_TOKENS)[number]): Rgb => {
@@ -99,9 +101,21 @@ function deriveRoleTokens(base: ThemeTokens): ThemeTokens {
   };
   const surfaces = [at("bg"), at("panel")];
   const emit = (role: (typeof ROLE_TOKENS)[number], c: Rgb) => {
-    out[role.name] = role.alpha === undefined ? toHex(c) : `rgba(${c.map(Math.round).join(", ")}, ${String(role.alpha).replace(/^0/, "")})`;
+    const channel = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+    out[role.name] = role.alpha === undefined ? toHex(c) : `rgba(${c.map(channel).join(", ")}, ${String(role.alpha).replace(/^0/, "")})`;
   };
-  for (const role of ROLE_TOKENS) if (role.kind !== "ink") emit(role, color(role));
+  for (const role of ROLE_TOKENS) {
+    if (role.kind === "ink") continue;
+    // A fill that carries one of the console's text tokens is kept readable against that token (selected tabs, chips).
+    let c = color(role);
+    if (role.host && role.alpha === undefined) c = ensureContrast(c, [at(role.host)], 4.7);
+    else if (role.host) {
+      // A tint is laid over the panel: darken it until the text token stays readable on the blend.
+      const target = at(role.host);
+      for (let step = 0; step <= 20 && contrast(mix(at("panel"), c, role.alpha!), target) < 4.7; step += 1) c = mix(color(role), at("bg"), Math.min(1, (step + 1) / 20));
+    }
+    emit(role, c);
+  }
   for (const role of ROLE_TOKENS) {
     if (role.kind !== "ink") continue;
     // A little over AA (4.5) so rounding to hex and tint blending cannot dip below it. Text on a fill is held against that fill, not the page.
@@ -124,7 +138,7 @@ function deriveTokens(c: ThemeColors): ThemeTokens {
     "--panel-soft": toHex(mix(bg, panel, 0.6)),
     "--panel-muted": toHex(mix(bg, panel, 0.25)),
     "--border": toHex(c.border),
-    "--border-strong": toHex(mix(c.border, text, 0.1)),
+    "--border-strong": toHex(mix(c.border, text, 0.35)),
     "--text": toHex(text),
     "--text-strong": toHex(ensureContrast(c.strong, surfaces, 9)),
     "--muted": toHex(muted),
@@ -144,7 +158,7 @@ function deriveTokens(c: ThemeColors): ThemeTokens {
     "--warning": toHex(ensureContrast(c.warning, surfaces, 3)),
     "--bg-glow": `rgba(${accent.map(Math.round).join(", ")}, .18)`,
   };
-  return { ...base, ...deriveRoleTokens(base) };
+  return base;
 }
 
 /** Four project-authored colours define a palette; the shared roles stay consistent. */
@@ -188,24 +202,28 @@ export function paletteFromSwatch(swatch: HouseSwatch): Pick<ConsolePalette, "ba
   return { background: toHex(bg), panel: toHex(panel), accent: toHex(accent), secondary: toHex(secondary) };
 }
 
+/** Role colours are derived on first use of `tokens`, so booting with one saved theme does not derive all of them. */
+function makeTheme(info: Omit<ThemeInfo, "tokens" | "base">, base: ThemeTokens): ThemeInfo {
+  let full: ThemeTokens | null = null;
+  return { ...info, base, get tokens() { return (full ??= { ...base, ...deriveRoleTokens(base) }); } };
+}
+
 function loadThemes(): ThemeInfo[] {
-  const palettes: ThemeInfo[] = CONSOLE_PALETTES.map((palette): ThemeInfo => ({
+  const palettes: ThemeInfo[] = CONSOLE_PALETTES.map((palette) => makeTheme({
     id: palette.id,
     name: palette.name,
     description: palette.description,
     appearance: "dark",
-    tokens: buildThemeTokens(palette),
     group: palette.group,
-  }));
-  const houses: ThemeInfo[] = HOUSE_SWATCHES.map((swatch): ThemeInfo => ({
+  }, buildThemeTokens(palette)));
+  const houses: ThemeInfo[] = HOUSE_SWATCHES.map((swatch) => makeTheme({
     id: swatch.id,
     name: swatch.name,
     description: `The armour dye colours of ${swatch.name}.`,
     appearance: "dark",
-    tokens: buildThemeTokens(paletteFromSwatch(swatch)),
     group: swatch.group,
     dyes: swatch.colors,
-  }));
+  }, buildThemeTokens(paletteFromSwatch(swatch))));
   return [...palettes, ...houses].sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -240,7 +258,8 @@ export function applyTheme(id: string, root: HTMLElement = document.documentElem
   if (id === DEFAULT_THEME_ID && !root.dataset.theme) return;
   const themes = getThemes();
   THEME_TOKEN_NAMES.forEach((name) => root.style.removeProperty(name));
-  ROLE_TOKENS.forEach((role) => root.style.removeProperty(role.name));
+  // Every role-shaped property, not only today's table: a cache from another build may have set others.
+  [...root.style].filter((name) => ROLE_TOKEN_NAME.test(name)).forEach((name) => root.style.removeProperty(name));
   const theme = themes.find((t) => t.id === id);
   if (!theme) {
     root.style.removeProperty("color-scheme");

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { THEME_CACHE_KEY, THEME_TOKEN_NAMES } from "./themeBoot";
 import { ROLE_TOKENS } from "./themeRoles";
+import type { Rgb } from "./themeEngine";
 import { DEFAULT_THEME_ID, getThemes, THEME_STORAGE_KEY, applyTheme, buildThemeTokens, contrast, ensureContrast, loadSelectedTheme, parseHex, saveSelectedTheme } from "./themeEngine";
 import { CONSOLE_PALETTES } from "./consolePalettes";
 
@@ -137,4 +138,25 @@ describe("apply and persistence", () => {
     // Reading never deletes the stored id: a tab on an older bundle must not wipe a newer tab's choice.
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("gone");
   });
+
+describe("ensureContrast", () => {
+  it("meets the ratio in the usual direction when it can", () => {
+    const fg = ensureContrast([60, 60, 60], [[20, 20, 20]], 4.5);
+    expect(contrast(fg, [20, 20, 20])).toBeGreaterThanOrEqual(4.5);
+    expect(fg[0]).toBeGreaterThan(60);
+  });
+
+  it("tries the other end for a mid-tone surface the usual end cannot reach", () => {
+    const accent: Rgb = [135, 112, 62];
+    const fg = ensureContrast([200, 180, 150], [accent], 4.7);
+    expect(contrast(fg, accent)).toBeGreaterThanOrEqual(4.7);
+  });
+
+  it("returns the better of black and white when the ratio is out of reach", () => {
+    const surface: Rgb = [119, 119, 119];
+    const fg = ensureContrast([119, 119, 119], [surface], 20);
+    expect([0, 255]).toContain(fg[0]);
+    expect(contrast(fg, surface)).toBeGreaterThan(4);
+  });
+});
 });

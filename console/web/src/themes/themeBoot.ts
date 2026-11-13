@@ -18,7 +18,7 @@ export const THEME_TOKEN_NAMES = [
 const TOKEN_NAMES = new Set<string>(THEME_TOKEN_NAMES);
 // Role colours (themeRoles.ts) are the stylesheet's recurring literals, one custom property each.
 // They are recognised by shape so this entry module does not carry the whole table.
-const ROLE_TOKEN_NAME = /^--(ink|surface|line|tint)(-[a-z]+)?-[a-z]{1,2}$/;
+export const ROLE_TOKEN_NAME = /^--(ink|surface|line|tint)(-[a-z]+)?-[a-z]{1,2}$/;
 const knownTokenName = (name: string) => TOKEN_NAMES.has(name) || ROLE_TOKEN_NAME.test(name);
 
 export interface ThemeCache { id: string; appearance: "dark" | "light"; tokens: Record<string, string> }

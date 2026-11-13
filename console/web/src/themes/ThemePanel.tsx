@@ -49,7 +49,7 @@ export function ThemePanel({ onClose = () => {} }: { onClose?: () => void }) {
   }
   const all = useMemo(() => [
     { id: DEFAULT_THEME_ID, name: "Default", description: "The standard console look.", group: GROUP_ORDER[0], swatches: DEFAULT_SWATCHES as readonly string[] },
-    ...getThemes().map((theme) => ({ id: theme.id, name: theme.name, description: theme.description, group: theme.group ?? GROUP_ORDER[0], swatches: theme.dyes ?? (SWATCH_TOKENS.map((token) => theme.tokens[token]) as readonly string[]) })),
+    ...getThemes().map((theme) => ({ id: theme.id, name: theme.name, description: theme.description, group: theme.group ?? GROUP_ORDER[0], swatches: theme.dyes ?? (SWATCH_TOKENS.map((token) => theme.base[token]) as readonly string[]) })),
   ], []);
   const query = filter.trim().toLowerCase();
   // The applied choice stays listed while filtering, so the radio group always has a checked card.

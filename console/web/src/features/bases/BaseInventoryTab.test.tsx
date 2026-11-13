@@ -12,6 +12,7 @@ import { BaseInventoryTab } from "./BaseInventoryTab";
 // colour) -- not actual pixel geometry (rendered widths, "does the header
 // visually stay put while scrolling"), which stays a live-browser check.
 import "../../styles.css";
+import stylesheet from "../../styles.css?raw";
 
 vi.mock("../../api/bases", () => ({
   basesApi: {
@@ -1462,8 +1463,9 @@ describe("BaseInventoryTab", () => {
       // reviewer at rgb(77, 64, 50), matching --border-strong.
       expect(inPanel.padding).toBe("10px 12px");
       // Like border-color above, the background is a role colour, var(--surface-b, #151719),
-      // which jsdom does not resolve; the Default pixels are checked against the unchanged
-      // stylesheet in a real browser (see the PR) rather than here.
+      // which jsdom does not resolve. Pin the declaration itself, scoped to this panel, so a wrong
+      // override or a leak of the rule is still caught.
+      expect(stylesheet).toMatch(/\.bases-inventory-add-panel \.augment-dropdown-control\s*\{[^}]*background:\s*var\(--surface-[a-z]+,\s*#151719\)/);
 
       // Same class, no .bases-inventory-add-panel ancestor: must fall back to
       // the component's own stock styling, proving the override cannot leak.

@@ -4,6 +4,8 @@ import { readThemeCache, THEME_CACHE_KEY, THEME_STORAGE_KEY } from "./themeBoot"
 import { DEFAULT_THEME_ID, applyTheme, contrast, getThemes, parseHex, type Rgb } from "./themeEngine";
 import { ROLE_TOKENS } from "./themeRoles";
 
+const rootVals: Record<string, string> = Object.fromEntries([...css.slice(0, css.indexOf("}", css.indexOf(":root")) + 1).matchAll(/(--[a-z-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+
 const rootBlock = css.slice(0, css.indexOf("}", css.indexOf(":root")) + 1);
 const ROLE_USE = /var\((--(?:ink|surface|line|tint)[a-z-]*-[a-z]{1,2})(,[^()]*(?:\([^()]*\))?[^()]*)?\)/g;
 
@@ -77,5 +79,45 @@ describe("role colours", () => {
     expect(Object.keys(cached?.tokens ?? {}).filter((name) => ROLE_TOKENS.some((role) => role.name === name))).toHaveLength(ROLE_TOKENS.length);
     applyTheme(DEFAULT_THEME_ID, root);
     expect(root.getAttribute("style") ?? "").toBe("");
+  });
+
+  it("never leave a rule's text harder to read than the same palette without role colours", () => {
+    const body = css.slice(css.indexOf("}", css.indexOf(":root")) + 1);
+    const colorOf = (value: string, tokens: Record<string, string>, panel: Rgb): Rgb | null => {
+      const ref = /var\((--[a-z-]+)\s*(?:,\s*([^()]*(?:\([^()]*\))?[^()]*))?\)/.exec(value);
+      if (ref) {
+        const known = tokens[ref[1]] ?? rootVals[ref[1]];
+        if (tokens[ref[1]] !== undefined || (ref[2] === undefined && known !== undefined)) return parseColor(tokens[ref[1]] ?? known, panel);
+        return ref[2] !== undefined ? colorOf(ref[2], tokens, panel) : null;
+      }
+      const literal = /#[0-9a-fA-F]{6}\b|rgba\([^)]*\)/.exec(value);
+      return literal ? parseColor(literal[0], panel) : null;
+    };
+    const parseColor = (value: string, panel: Rgb): Rgb | null => {
+      const v = value.trim();
+      if (/^#[0-9a-f]{6}$/i.test(v)) return parseHex(v);
+      const rgba = /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\.\d+)\s*\)$/.exec(v);
+      return rgba ? ([0, 1, 2].map((i) => panel[i] + (Number(rgba[i + 1]) - panel[i]) * Number(rgba[4])) as Rgb) : null;
+    };
+    const pairs: { selector: string; color: string; background: string }[] = [];
+    for (const rule of body.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+      const decls = Object.fromEntries([...rule[2].matchAll(/([a-z-]+)\s*:\s*([^;{}]*);/g)].map((d) => [d[1], d[2]]));
+      const background = decls["background"] ?? decls["background-color"];
+      if (decls["color"] && background && !/gradient\(/.test(background)) pairs.push({ selector: rule[1].trim().replace(/\s+/g, " ").slice(0, 80), color: decls["color"], background });
+    }
+    expect(pairs.length).toBeGreaterThan(100);
+    const regressions: string[] = [];
+    for (const theme of getThemes()) {
+      const panel = parseHex(theme.tokens["--panel"]) as Rgb;
+      for (const pair of pairs) {
+        const withRoles = [colorOf(pair.color, theme.tokens, panel), colorOf(pair.background, theme.tokens, panel)];
+        const without = [colorOf(pair.color, theme.base, panel), colorOf(pair.background, theme.base, panel)];
+        if (withRoles.includes(null) || without.includes(null)) continue;
+        const after = contrast(withRoles[0] as Rgb, withRoles[1] as Rgb);
+        const before = contrast(without[0] as Rgb, without[1] as Rgb);
+        if (after < Math.min(4.5, before - 0.3)) regressions.push(`${theme.id}: ${pair.selector} ${before.toFixed(2)} -> ${after.toFixed(2)}`);
+      }
+    }
+    expect(regressions.slice(0, 10)).toEqual([]);
   });
 });
