@@ -6,6 +6,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAuth, clearSessionCookie, setSessionCookie, json, serializeJsonResponse } from "../src/auth.js";
 
+test("non-renewable and setup sessions never become normal sessions after restart", t => {
+  const dir = mkdtempSync(join(tmpdir(), "auth-scoped-persistence-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const config = { sessionSecret: "fixture-session-key", adminPassword: "fixture-password", sessionStoreFile: join(dir, "sessions.json") };
+  const auth = createAuth(config);
+  const ordinary = auth.makeSession();
+  const sessions = [auth.makeSession({ renewable: false }), auth.makeSession({ scope: "enroll", renewable: false }), auth.makeSession({ scope: "resetup", renewable: false })];
+  const restarted = createAuth(config);
+  const request = session => ({ headers: { cookie: `asc_session=${session.cookie}` } });
+  assert.ok(restarted.readSession(request(ordinary)));
+  for (const session of sessions) assert.equal(restarted.readSession(request(session)), null);
+});
+
 test("persisted sessions reject tampering, password changes and cross-instance contamination", t => {
   const dir = mkdtempSync(join(tmpdir(), "auth-persistence-test-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -22,6 +35,44 @@ test("persisted sessions reject tampering, password changes and cross-instance c
   assert.equal(createAuth({ ...config, sessionStoreFile: undefined }).readSession(req), null);
   first.revokeSession(req);
   assert.equal(createAuth(config).readSession(req), null);
+});
+
+test("scoped (enroll/resetup) sessions are never persisted, so a restart cannot turn one into a full session", t => {
+  const dir = mkdtempSync(join(tmpdir(), "auth-scoped-persistence-test-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const config = { sessionSecret: "synthetic-secret", adminPassword: "synthetic-password", sessionStoreFile: join(dir, "sessions.json") };
+  const first = createAuth(config);
+  const enroll = first.makeSession({ tier: "owner", scope: "enroll", ttlMs: 600000, renewable: false });
+  const resetup = first.makeSession({ tier: "owner", scope: "resetup", ttlMs: 600000, renewable: false });
+  // Created last: this write sees the scoped sessions already in memory.
+  const normal = first.makeSession({ tier: "owner" });
+  const reqOf = (s) => ({ headers: { cookie: `asc_session=${s.cookie}` } });
+  assert.equal(first.readSession(reqOf(enroll))?.scope, "enroll");
+  const stored = JSON.parse(readFileSync(config.sessionStoreFile, "utf8")).sessions.map((e) => e.id);
+  assert.deepEqual(stored, [normal.id]);
+  const second = createAuth(config);
+  assert.ok(second.readSession(reqOf(normal)));
+  assert.equal(second.readSession(reqOf(enroll)), null);
+  assert.equal(second.readSession(reqOf(resetup)), null);
+});
+
+test("invalidating password sessions and single sessions also removes them from the persisted store", t => {
+  const dir = mkdtempSync(join(tmpdir(), "auth-invalidate-persistence-test-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const config = { sessionSecret: "synthetic-secret", adminPassword: "synthetic-password", sessionStoreFile: join(dir, "sessions.json") };
+  const auth = createAuth(config);
+  const keep = auth.makeSession({ tier: "owner" });
+  const other = auth.makeSession({ tier: "owner" });
+  const discord = auth.makeSession({ tier: "player", userId: "u1" });
+  const reqOf = (s) => ({ headers: { cookie: `asc_session=${s.cookie}` } });
+  assert.equal(auth.invalidatePasswordSessions(keep.id), 1);
+  let fresh = createAuth(config);
+  assert.ok(fresh.readSession(reqOf(keep)));
+  assert.equal(fresh.readSession(reqOf(other)), null, "the other password session must not come back after a restart");
+  assert.ok(fresh.readSession(reqOf(discord)), "Discord-authenticated sessions are untouched");
+  assert.equal(auth.invalidateSession(keep.id), true);
+  fresh = createAuth(config);
+  assert.equal(fresh.readSession(reqOf(keep)), null, "a logged-out session must not come back after a restart");
 });
 
 test("auth creates readable signed sessions", async () => {
