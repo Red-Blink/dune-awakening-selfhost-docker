@@ -185,4 +185,3 @@ function liveHandoff(config) {
 
   return { enabled: true, resolveTier };
 }
-
