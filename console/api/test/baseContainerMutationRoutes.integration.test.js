@@ -33,11 +33,12 @@ import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pgConnectionConfig, withIsolatedDatabase } from "../test-support/pgIntegrationDb.js";
+import { getFreePort } from "../test-support/consoleHarness.js";
 
 const API_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO_ROOT = resolve(API_ROOT, "../..");
-const PORT = 21000 + ((process.pid + 2) % 20000);
-const BASE = `http://127.0.0.1:${PORT}`;
+let PORT;
+let BASE;
 
 const CLAIM_ACTOR = 40001;
 const BUILDING_ACTOR = 40002;
@@ -222,6 +223,11 @@ async function withServer(t, fn) {
     await pool.query(SEED);
 
     const repoRoot = makeRepoRoot();
+    // A PID-derived port can collide with a parallel HTTP fixture or an
+    // ephemeral PostgreSQL client connection. Allocate a real free port for
+    // each server instead of failing every case on the same occupied port.
+    PORT = await getFreePort();
+    BASE = `http://127.0.0.1:${PORT}`;
     const { child, ready, getOutput } = startServer(repoRoot, database);
     try {
       await ready;

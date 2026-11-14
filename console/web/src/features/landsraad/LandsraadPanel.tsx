@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { adminApi, type LandsraadMilestonePreset, type LandsraadOverview, type LandsraadReward, type LandsraadTask } from "../../api/admin";
 import { mapsApi } from "../../api/maps";
@@ -341,7 +342,7 @@ export function LandsraadPanel({ confirmAction, onError, restartGate }: Landsraa
       </div>}
       {overview && !overview.term && <p className="empty">No Landsraad term found in the database.</p>}
 
-      <section className="landsraad-persistent-settings">
+      <PermissionGate action="landsraad:write"><section className="landsraad-persistent-settings">
         <div className="landsraad-persistent-heading">
           <div className="landsraad-persistent-copy">
             <h4>Landsraad Modifiers</h4>
@@ -367,15 +368,15 @@ export function LandsraadPanel({ confirmAction, onError, restartGate }: Landsraa
         <div className="landsraad-persistent-actions">
           <span className="muted">Changes apply to every map after a battlegroup restart.</span>
           <div>
-            {persistentRestartPending && <button className="secondary" disabled={Boolean(result?.pending)} onClick={() => void restartForPersistentRules()}>Restart Battlegroup</button>}
+            {persistentRestartPending && <PermissionGate action="server:restart"><button className="secondary" disabled={Boolean(result?.pending)} onClick={() => void restartForPersistentRules()}>Restart Battlegroup</button></PermissionGate>}
             <button disabled={persistentLoading || !persistentDraftChanged(persistentRules, persistentDraft) || (result?.key === "persistent-rules" && Boolean(result.pending))} onClick={() => void savePersistentRules()}>{persistentLoading ? "Loading..." : "Save Changes"}</button>
           </div>
         </div>
-      </section>
+      </section></PermissionGate>
 
       <div className="section-divider landsraad-section-divider" />
 
-      <section className="landsraad-milestone-preset">
+      <PermissionGate action="landsraad:write"><section className="landsraad-milestone-preset">
         <div className="landsraad-milestone-heading">
           <div>
             <h4>Milestone Preset</h4>
@@ -394,18 +395,18 @@ export function LandsraadPanel({ confirmAction, onError, restartGate }: Landsraa
           <div className="landsraad-milestone-actions">
             <label className={`switch-checkbox landsraad-cycle-toggle ${milestoneDraft.enabled ? "enabled" : "disabled"}`}><input type="checkbox" checked={milestoneDraft.enabled} onChange={(event) => setMilestoneDraft((current) => ({ ...current, enabled: event.target.checked }))} /><span className="switch-label">Apply Automatically Each Cycle</span><strong className="switch-state">{milestoneDraft.enabled ? "ON" : "OFF"}</strong></label>
             <div className="landsraad-milestone-result"><InlineActionResult result={result} resultKey="milestone-preset" format={false} /></div>
-            <button onClick={() => void saveMilestonePreset()}>Save And Apply</button>
+            <PermissionGate action="landsraad:write"><button onClick={() => void saveMilestonePreset()}>Save And Apply</button></PermissionGate>
           </div>
         </> : <p className="empty">Reward levels will appear after the current Landsraad term generates its milestones.</p>}
-      </section>
+      </section></PermissionGate>
 
       <div className="section-divider landsraad-section-divider" />
 
-      {overview?.term && <div className="landsraad-bulk-row">
+      {overview?.term && <PermissionGate action="landsraad:write"><div className="landsraad-bulk-row">
         <label className="compact-select">Set All Current Goals<input type="number" min="0" step="1" value={bulkGoal} onChange={(event) => setBulkGoal(event.target.value)} /></label>
-        <button onClick={() => void saveAllGoals()}>Apply To Term</button>
+        <PermissionGate action="landsraad:write"><button onClick={() => void saveAllGoals()}>Apply To Term</button></PermissionGate>
         <InlineActionResult result={result} resultKey="bulk-goal" format={false} />
-      </div>}
+      </div></PermissionGate>}
 
       {overview?.tasks?.length ? <DataTable
         rows={overview.tasks as unknown as Record<string, unknown>[]}
@@ -415,7 +416,7 @@ export function LandsraadPanel({ confirmAction, onError, restartGate }: Landsraa
         actionClassName="landsraad-actions-cell"
         action={(row) => {
           const task = row as unknown as LandsraadTask;
-          return <div className="landsraad-row-actions"><button onClick={() => void saveGoal(task)}>Save</button><InlineActionResult result={result} resultKey={`goal:${task.task_id}`} format={false} /></div>;
+          return <div className="landsraad-row-actions"><PermissionGate action="landsraad:write"><button onClick={() => void saveGoal(task)}>Save</button></PermissionGate><InlineActionResult result={result} resultKey={`goal:${task.task_id}`} format={false} /></div>;
         }}
       /> : overview && <div className="empty">No current Landsraad tasks found.</div>}
 
@@ -430,7 +431,7 @@ export function LandsraadPanel({ confirmAction, onError, restartGate }: Landsraa
           actionClassName="landsraad-actions-cell"
           action={(row) => {
             const reward = row as unknown as LandsraadReward;
-            return <div className="landsraad-row-actions"><button onClick={() => void saveReward(reward)}>Save</button><InlineActionResult result={result} resultKey={`reward:${rewardKey(reward)}`} format={false} /></div>;
+            return <div className="landsraad-row-actions"><PermissionGate action="landsraad:write"><button onClick={() => void saveReward(reward)}>Save</button></PermissionGate><InlineActionResult result={result} resultKey={`reward:${rewardKey(reward)}`} format={false} /></div>;
           }}
         /> : <div className="empty">No current reward milestones found.</div>}
       </div>}
@@ -446,7 +447,7 @@ export function LandsraadPanel({ confirmAction, onError, restartGate }: Landsraa
             {taskOptions.map((task) => <option key={task.task_id} value={task.task_id}>{task.display_name || task.house_name || `Task ${task.task_id}`}</option>)}
           </select></label>
           <label className="landsraad-contribution-amount">Contribution<input type="number" min="0" step="1" value={contributionAmount} onChange={(event) => setContributionAmount(event.target.value)} /></label>
-          <button onClick={() => void saveContribution()}>Save</button>
+          <PermissionGate action="landsraad:write"><button onClick={() => void saveContribution()}>Save</button></PermissionGate>
           <InlineActionResult result={result} resultKey="contribution" format={false} />
         </div>
       </div>}

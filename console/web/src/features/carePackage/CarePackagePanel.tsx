@@ -1,3 +1,4 @@
+import { PermissionGate, useConsoleAccess } from "../../lib/consoleAccess";
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { playersApi } from "../../api/players";
@@ -55,7 +56,9 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
   const [manualKitId, setManualKitId] = useState("");
   const [eligibleByRule, setEligibleByRule] = useState<Record<string, Record<string, unknown>[]>>({});
   const [history, setHistory] = useState<Record<string, unknown>[]>([]);
-  const [carePackageGrantTab, setCarePackageGrantTab] = useState<"auto" | "manual">("auto");
+  const access = useConsoleAccess();
+  const [requestedGrantTab, setCarePackageGrantTab] = useState<"auto" | "manual">("auto");
+  const carePackageGrantTab = access.can(requestedGrantTab === "auto" ? "carepackage:write-config" : "carepackage:grant") ? requestedGrantTab : access.can("carepackage:grant") ? "manual" : "auto";
   const [carePackageTab, setCarePackageTab] = useState<"create" | "configure">("create");
   const [packageItemsOpen, setPackageItemsOpen] = useState(false);
   const [kitSaveResult, setKitSaveResult] = useState<HomeTaskResult | null>(null);
@@ -86,7 +89,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
     setManualKitId(lastKit?.id || normalized.activeKitId || "");
     setItemsText((lastKit?.items || normalized.items || []).map(carePackageItemTextLine).join("\n"));
     setHistory((await carePackageApi.history()).rows || []);
-    setPlayers((await playersApi.listAll()).rows || []);
+    setPlayers(access.can("players:read") ? (await playersApi.listAll()).rows || [] : []);
   }
   useEffect(() => {
     run(load);
@@ -319,14 +322,14 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
   return <section className="panel">
     <div className="panel-title"><h2>Care Package</h2></div>
     <div className="action-sections">
-      <section className="action-section care-package-configuration">
-        <div className="panel-title care-package-configuration-header">
+      <PermissionGate action="carepackage:write-config"><section className="action-section care-package-configuration">
+        <PermissionGate action="carepackage:write-config"><div className="panel-title care-package-configuration-header">
           <h4>Care Package Configuration</h4>
           <button className={`switch-toggle care-package-toggle ${config.enabled ? "enabled" : "disabled"}`} onClick={() => run(async () => {
             const confirmation = config.enabled ? "DISABLE CARE PACKAGE" : "ENABLE CARE PACKAGE";
             setConfig(normalizeCarePackageConfig(await carePackageApi[config.enabled ? "disable" : "enable"](confirmation)));
           })}><span className="switch-label">Care Package</span><strong className="switch-state">{config.enabled ? "ON" : "OFF"}</strong></button>
-        </div>
+        </div></PermissionGate>
         <div className="settings-tabs" role="tablist" aria-label="Care Package setup">
           <button className={carePackageTab === "create" ? "active" : ""} role="tab" aria-selected={carePackageTab === "create"} onClick={() => setCarePackageTab("create")}>Create</button>
           <button className={carePackageTab === "configure" ? "active" : ""} role="tab" aria-selected={carePackageTab === "configure"} disabled={!config.kits.length} onClick={() => setCarePackageTab("configure")}>Configure</button>
@@ -337,11 +340,11 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
         </div>
         {carePackageTab === "create" ? <div className="care-package-builder care-package-create">
           <label className="care-package-new-field">New Package Name<input value={newKitName} onChange={(event) => setNewKitName(event.target.value)} placeholder="New package" /></label>
-          <button onClick={addCarePackage}>Add Package</button>
+          <PermissionGate action="carepackage:write-config"><button onClick={addCarePackage}>Add Package</button></PermissionGate>
         </div> : <>
         <div className="care-package-builder">
           <label className="compact-select">Select Package<select value={activeKit.id} onChange={(event) => setActiveKitId(event.target.value)}>{config.kits.map((kit) => <option key={kit.id} value={kit.id}>{kit.name || "Name Required"}</option>)}</select></label>
-          <button className="danger" onClick={deleteActiveKit}>Delete Package</button>
+          <PermissionGate action="carepackage:write-config"><button className="danger" onClick={deleteActiveKit}>Delete Package</button></PermissionGate>
         </div>
         <label className="care-package-name-field">Package Name<input value={activeKit.name} onChange={(event) => updateActiveKit({ name: event.target.value })} placeholder="Enter package name" /></label>
         <div className="package-xp-row">
@@ -377,7 +380,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
         })}</tbody></table></div> : null}
         <details className="technical-details"><summary>Developer raw package item textarea</summary><p>One item per line: item name or raw item ID, quantity. Extra legacy grade or augment columns are ignored for Care Packages.</p><label>Package Items<textarea value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder="Plant Fiber,10&#10;cup of water,1" /></label></details>
         <div className="action-line">
-          <button onClick={() => run(async () => {
+          <PermissionGate action="carepackage:write-config"><button onClick={() => run(async () => {
             if (!(await confirmAction("These settings will be saved.", {
               title: "Save Package",
               confirmLabel: "Save",
@@ -393,20 +396,20 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
             } catch (error) {
               setKitSaveResult({ status: "failed", title: "Package Save Failed.", message: formatCarePackageError(error instanceof Error ? error.message : String(error)) });
             }
-          })}>Save Package</button>
+          })}>Save Package</button></PermissionGate>
           {kitSaveResult && <span className={`inline-task-result result-${kitSaveResult.status === "succeeded" ? "ok" : kitSaveResult.status === "failed" ? "fail" : "running"}`}>
             <strong className={kitSaveResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(kitSaveResult.title, kitSaveResult.status === "running")}</strong>
             {kitSaveResult.message && <span className="inline-task-message">{formatResultMessage(kitSaveResult.message)}</span>}
           </span>}
         </div>
         </>}
-      </section>
+      </section></PermissionGate>
 
-      <section className="action-section">
+      <PermissionGate anyOf={["carepackage:write-config","carepackage:grant"]}><section className="action-section">
         <div className="care-package-grant-header">
           <div className="settings-tabs" role="tablist" aria-label="Care Package grants">
-            <button className={carePackageGrantTab === "auto" ? "active" : ""} role="tab" aria-selected={carePackageGrantTab === "auto"} onClick={() => setCarePackageGrantTab("auto")}>Auto Grant</button>
-            <button className={carePackageGrantTab === "manual" ? "active" : ""} role="tab" aria-selected={carePackageGrantTab === "manual"} onClick={() => setCarePackageGrantTab("manual")}>Manual Grant</button>
+            <PermissionGate action="carepackage:write-config"><button className={carePackageGrantTab === "auto" ? "active" : ""} role="tab" aria-selected={carePackageGrantTab === "auto"} onClick={() => setCarePackageGrantTab("auto")}>Auto Grant</button></PermissionGate>
+            <PermissionGate action="carepackage:grant"><button className={carePackageGrantTab === "manual" ? "active" : ""} role="tab" aria-selected={carePackageGrantTab === "manual"} onClick={() => setCarePackageGrantTab("manual")}>Manual Grant</button></PermissionGate>
             {manualGrantResult && <span className="inline-task-result result-running">
               <strong className="loading-dots">{formatResultTitle(manualGrantResult.title, true)}</strong>
             </span>}
@@ -422,7 +425,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
             <label className="compact-select">Package<select value={newAutoRule.kitId} onChange={(event) => setNewAutoRule({ ...newAutoRule, kitId: event.target.value })}>{config.kits.map((kit) => <option key={kit.id} value={kit.id}>{kit.name || "Name Required"}</option>)}</select></label>
             <label className="compact-select">Grant When<select value={newAutoRule.grantWhen} onChange={(event) => setNewAutoRule({ ...newAutoRule, grantWhen: event.target.value as CarePackageAutoGrantRule["grantWhen"] })}><option value="first_online">First Online</option><option value="last_seen">Last Seen</option></select></label>
             {newAutoRule.grantWhen === "last_seen" && <label className="compact-field">Days Ago<input type="number" min="1" max="3650" value={String(newAutoRule.lastSeenDays)} onChange={(event) => setNewAutoRule({ ...newAutoRule, lastSeenDays: Number(event.target.value) })} /></label>}
-            <button disabled={!config.kits.length} onClick={addAutoGrantRule}>Create Rule</button>
+            <PermissionGate action="carepackage:write-config"><button disabled={!config.kits.length} onClick={addAutoGrantRule}>Create Rule</button></PermissionGate>
           </div>
           <div className="package-auto-rules">
             {config.autoGrantRules.map((rule) => {
@@ -431,9 +434,9 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
               const expanded = Boolean(expandedRuleIds[rule.id]);
               const showEligibility = rule.grantWhen === "last_seen";
               return <article className="package-auto-rule" key={rule.id}>
-                <button className={`switch-toggle package-rule-toggle ${rule.enabled ? "enabled" : "disabled"}`} onClick={() => updateAutoGrantRule(rule.id, { enabled: !rule.enabled })}><span className="switch-label">Rule</span><strong className="switch-state">{rule.enabled ? "ON" : "OFF"}</strong></button>
+                <PermissionGate action="carepackage:write-config"><button className={`switch-toggle package-rule-toggle ${rule.enabled ? "enabled" : "disabled"}`} onClick={() => updateAutoGrantRule(rule.id, { enabled: !rule.enabled })}><span className="switch-label">Rule</span><strong className="switch-state">{rule.enabled ? "ON" : "OFF"}</strong></button></PermissionGate>
                 <span className="package-rule-summary">Grants <span className="package-rule-package-name">{carePackageGrantSummary(kit)}</span> based on {carePackageConditionLabel(rule)}</span>
-            <button className="icon-toggle-button danger package-rule-delete" aria-label="Delete Auto Grant rule" title="Delete" onClick={() => deleteAutoGrantRule(rule.id)}><X size={18} /></button>
+            <PermissionGate action="carepackage:write-config"><button className="icon-toggle-button danger package-rule-delete" aria-label="Delete Auto Grant rule" title="Delete" onClick={() => deleteAutoGrantRule(rule.id)}><X size={18} /></button></PermissionGate>
                 {showEligibility && <button className={`icon-toggle-button ${expanded ? "active" : ""}`} aria-label={expanded ? "Collapse Eligibility" : "Expand Eligibility"} title={expanded ? "Collapse" : "Expand"} onClick={() => toggleRuleEligible(rule.id)}>{expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</button>}
                 {showEligibility && expanded && <div className="package-rule-eligible"><h5>Eligibility</h5>{ruleEligible.length ? <DataTable rows={carePackageEligibleRows(ruleEligible)} /> : <div className="empty package-history-empty">No eligible players were found for this rule.</div>}</div>}
               </article>;
@@ -450,7 +453,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
                 </option>;
               })}
             </select></label>
-            <button disabled={!grantPlayerId || !manualKit.id || manualGrantResult?.status === "running"} onClick={() => run(async () => {
+            <PermissionGate action="carepackage:grant"><button disabled={!grantPlayerId || !manualKit.id || manualGrantResult?.status === "running"} onClick={() => run(async () => {
               if (!(await confirmAction("This package will be sent to the selected player.", {
                 title: "Grant Package",
                 confirmLabel: "Grant",
@@ -471,7 +474,7 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
               } finally {
                 setManualGrantResult(null);
               }
-            })}>Grant Package</button>
+            })}>Grant Package</button></PermissionGate>
           </div>
           {selected && !selected.action_player_id && <p className="danger-note">Selected player has no Admin action ID, so CLI-backed grants are disabled.</p>}
           <details className="technical-details">
@@ -480,19 +483,19 @@ export function CarePackagePanel({ onError, confirmAction }: { onError: (text: s
           </details>
           <CarePackageResult output={outputScope === "grant" ? output : ""} technicalOutput={outputScope === "grant" ? technicalOutput : ""} />
         </>}
-      </section>
+      </section></PermissionGate>
 
       <section className="action-section">
         <div className="panel-title">
           <h4>Grant History</h4>
-          <button disabled={!historyRows.length} onClick={() => run(async () => {
+          <PermissionGate action="carepackage:clear-history"><button disabled={!historyRows.length} onClick={() => run(async () => {
             if (!(await confirmAction("Clear Care Package grant history?"))) return;
             await carePackageApi.clearHistory();
             setHistory([]);
             setOutputScope("history");
             setOutput("");
             setTechnicalOutput("");
-          })}>Clear</button>
+          })}>Clear</button></PermissionGate>
         </div>
         <CarePackageResult output={outputScope === "history" ? output : ""} technicalOutput={outputScope === "history" ? technicalOutput : ""} />
         <div className="package-history-table">

@@ -80,8 +80,8 @@ Every bot request to an actor-taking route (see Design Requirements) must includ
 | Tier | Intended Use |
 | --- | --- |
 | public | Basic non-sensitive status only. |
-| observer | Status, readiness, services and infrastructure checks. |
-| moderator | Observer plus population, map state, announcements, player link and linked-player inventory, storage and guild routes. |
+| player | Status, readiness, services and infrastructure checks. |
+| moderator | Player plus population, map state, announcements, player link and linked-player inventory, storage and guild routes. |
 | admin | Everything, including diagnostic status, logs, `ops/*` and broadcast. |
 | owner | Same capabilities as admin. |
 
@@ -94,8 +94,8 @@ Defined in `console/api/src/integrations/discord/policy.js`.
 | Capability | Description | Minimum Tier |
 | --- | --- | --- |
 | `status:read` | Basic status | public |
-| `readiness:read` | Readiness checks, maintenance route | observer |
-| `services:read` | Service list/status, `servers`, `ports`, `db` | observer |
+| `readiness:read` | Readiness checks, maintenance route | player |
+| `services:read` | Service list/status, `servers`, `ports`, `db` | player |
 | `population:read` | Population summary and online count | moderator |
 | `maps:read` | Map state and announcements | moderator |
 | `backups:read` | Backup list metadata (the route itself is bearer-only) | moderator |

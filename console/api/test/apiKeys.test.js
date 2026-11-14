@@ -14,6 +14,7 @@ import {
   publicKey
 } from "../src/apiKeys.js";
 import { selectableNamespaces } from "../src/apiKeyScopes.js";
+import { allKnownActions, isCrownJewelAction } from "../src/policy.js";
 
 function withStore(run, options = {}) {
   const dir = mkdtempSync(join(tmpdir(), "api-keys-"));
@@ -98,6 +99,23 @@ test("a hand-edited store granting a denied namespace is still denied", () => {
   assert.equal(keyAllows(forged, "database:mutate"), false);
   // The legitimate part of the same record still works.
   assert.equal(keyAllows(forged, "players:read"), true);
+});
+
+// #710: every crown-jewel action (policy.js's CROWN_JEWEL_DENY_ACTIONS,
+// owner-only for every tiered/Discord session) must stay unreachable via
+// ANY API-key scope, mirroring policy.test.js's own tiered-policy
+// crown-jewel tests. The broadest possible key -- every selectable
+// namespace at "write" -- is the strongest adversarial case: it exercises
+// the real production path (keyAllows), not just the catalog builder.
+test("keyAllows denies every crown-jewel action even under the broadest possible key scope", () => {
+  const broadest = { scopes: Object.fromEntries(selectableNamespaces().map((namespace) => [namespace, "write"])) };
+  let checked = 0;
+  for (const action of allKnownActions()) {
+    if (!isCrownJewelAction(action)) continue;
+    checked += 1;
+    assert.equal(keyAllows(broadest, action), false, `${action} is crown-jewel but reachable via the broadest possible key scope`);
+  }
+  assert.ok(checked > 0, "sanity: the catalog must contain at least one crown-jewel action for this test to mean anything");
 });
 
 test("a key created with no scopes reaches nothing, in any namespace", async () => {

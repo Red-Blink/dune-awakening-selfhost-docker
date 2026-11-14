@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { PermissionGate } from "../../lib/consoleAccess";
 import { HomeHighlights } from "./HomeHighlights";
 import type { Dispatch, SetStateAction } from "react";
 import type { Tab } from "../../App";
@@ -633,16 +634,16 @@ export function HomePanel({ status, readiness, taskResult, setTaskResult, funcom
         </dl>
         <div className="action-row">
           <button className={loading ? "refresh-status-button refreshing" : "refresh-status-button"} disabled={refreshDisabled} onClick={() => refresh(undefined, { fresh: true })}>{loading ? <span className="loading-dots">Refreshing</span> : "Refresh Status"}</button>
-          <button disabled={startDisabled} title={controlsState.running ? "Battlegroup is already running." : ""} onClick={() => runServerAction("start")}><Play size={16} /> Start</button>
-          <button className="danger-button" disabled={stopDisabled} onClick={() => runServerAction("stop")}>Stop</button>
-          <button disabled={restartDisabled} onClick={() => runServerAction("restart")}>Restart Battlegroup</button>
+          <PermissionGate action="server:start"><PermissionGate action="server:start"><button disabled={startDisabled} title={controlsState.running ? "Battlegroup is already running." : ""} onClick={() => runServerAction("start")}><Play size={16} /> Start</button></PermissionGate></PermissionGate>
+          <PermissionGate action="server:stop"><PermissionGate action="server:stop"><button disabled={stopDisabled} onClick={() => runServerAction("stop")}>Stop</button></PermissionGate></PermissionGate>
+          <PermissionGate action="server:restart"><PermissionGate action="server:restart"><button disabled={restartDisabled} onClick={() => runServerAction("restart")}>Restart Battlegroup</button></PermissionGate></PermissionGate>
         </div>
         <StatusFreshness sampledAtMs={sampledAtMs} />
         <PendingRefillNote />
         {taskResult && taskResult.status !== "running" && <HomeTaskResultCard result={taskResult} />}
         {localError && <p className="error">{localError}</p>}
       </article>
-      <HomeHighlights />
+      <PermissionGate action="settings:read"><HomeHighlights /></PermissionGate>
       <HomeSubsystemList items={summary.health} details={homeRowDetails(status, readiness, funcomTokenAuthFailure)} onNavigate={onNavigate} />
       <HomePerformance performance={performance} error={performanceError} />
     </section>
@@ -1428,7 +1429,7 @@ export function ServerPanel(props: {
   return (
     <section className="panel server-control-panel">
       <h2>Server Controls</h2>
-      <section className="action-section server-title-section">
+      <PermissionGate action="server:write-config" ><section className="action-section server-title-section">
         <h4>Server Configurations</h4>
         <div className="action-line title-action-line">
           <label>Current Server Title<input value={serverTitle} onChange={(event) => setServerTitle(event.target.value)} /></label>
@@ -1437,17 +1438,17 @@ export function ServerPanel(props: {
             <option value="local">Local</option>
           </select></label>
           <ServerHostnameSetting hostname={hostname} disabled={actionRunning || serviceRestartRunning || titleSaving} />
-          <button disabled={actionRunning || serviceRestartRunning || titleSaving || !hostname.ready || !hostname.valid} onClick={saveServerConfig}>Save Settings</button>
+          <PermissionGate action="server:write-config"><button disabled={actionRunning || serviceRestartRunning || titleSaving || !hostname.ready || !hostname.valid} onClick={saveServerConfig}>Save Settings</button></PermissionGate>
           {titleResult && <span className={`inline-task-result result-${titleResult.status === "succeeded" ? "ok" : titleResult.status === "failed" ? "fail" : "running"}`}>
             <strong className={titleResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(titleResult.title, titleResult.status === "running")}</strong>
           </span>}
         </div>
-      </section>
+      </section></PermissionGate>
       <div className="action-row">
-        <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || serverState.running || serverState.starting} onClick={() => runServerAction("start")}><Play size={16} /> Start</button>
-        <button disabled={titleSaving || funcomTokenSaving || scheduleSaving || serviceRestartRunning || runningAction === "stop" || (!actionRunning && serverState.stopped)} onClick={() => runServerAction("stop")}>Stop</button>
-        <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || serverState.stopped} onClick={() => runServerAction("restart")}>Restart Battlegroup</button>
-        <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving} onClick={props.onRedeploy}>Redeploy</button>
+        <PermissionGate action="server:start"><PermissionGate action="server:start"><button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || serverState.running || serverState.starting} onClick={() => runServerAction("start")}><Play size={16} /> Start</button></PermissionGate></PermissionGate>
+        <PermissionGate action="server:stop"><PermissionGate action="server:stop"><button disabled={titleSaving || funcomTokenSaving || scheduleSaving || serviceRestartRunning || runningAction === "stop" || (!actionRunning && serverState.stopped)} onClick={() => runServerAction("stop")}>Stop</button></PermissionGate></PermissionGate>
+        <PermissionGate action="server:restart"><PermissionGate action="server:restart"><button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving || serverState.stopped} onClick={() => runServerAction("restart")}>Restart Battlegroup</button></PermissionGate></PermissionGate>
+        <PermissionGate action="setup:write" ><button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving} onClick={props.onRedeploy}>Redeploy</button></PermissionGate>
       </div>
       <PendingRefillNote />
       {taskResult && <HomeTaskResultCard result={taskResult} />}
@@ -1455,7 +1456,7 @@ export function ServerPanel(props: {
         <label className="compact-select">Restart Service<select value={service} onChange={(event) => setService(event.target.value)}>
           {RESTARTABLE_SERVICES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select></label>
-        <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving} onClick={restartSelectedService}>Restart Service</button>
+        <PermissionGate action="server:restart-service"><button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving} onClick={restartSelectedService}>Restart Service</button></PermissionGate>
         {serviceRestartResult && <span className={`inline-task-result result-${serviceRestartResult.status === "succeeded" ? "ok" : serviceRestartResult.status === "failed" ? "fail" : "running"}`}>
           <strong className={serviceRestartResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(serviceRestartResult.title, serviceRestartResult.status === "running")}</strong>
         </span>}
@@ -1463,17 +1464,17 @@ export function ServerPanel(props: {
       <RestartHistoryPanel refreshKey={`${taskResult?.status || ""}:${serviceRestartResult?.status || ""}`} />
       <ReadinessTimeline text={props.readiness} statusText={props.status} />
       <PortChecklist text={props.ports} statusText={props.status} />
-      <section className="action-section">
+      <PermissionGate action="server:write-credentials" ><section className="action-section">
         <div className="panel-title"><h4>Change Funcom Token</h4></div>
         <div className="action-line funcom-token-action-line">
           <label className="funcom-token-field"><SecretInput aria-label="Funcom token" value={funcomToken} onChange={(event) => setFuncomToken(event.target.value)} placeholder="Paste new token" /></label>
-          <button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving} onClick={saveFuncomToken}>Save Token</button>
+          <PermissionGate action="server:write-credentials"><button disabled={actionRunning || serviceRestartRunning || titleSaving || funcomTokenSaving || scheduleSaving} onClick={saveFuncomToken}>Save Token</button></PermissionGate>
           {funcomTokenResult && <span className={`inline-task-result result-${funcomTokenResult.status === "succeeded" ? "ok" : funcomTokenResult.status === "failed" ? "fail" : "running"}`}>
             <strong className={funcomTokenResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(funcomTokenResult.title, funcomTokenResult.status === "running")}</strong>
             {funcomTokenResult.message && <span className="inline-task-message">{formatResultMessage(funcomTokenResult.message)}</span>}
           </span>}
         </div>
-      </section>
+      </section></PermissionGate>
       <DoctorSummary
         text={props.doctor}
         readiness={props.readiness}
@@ -1760,15 +1761,15 @@ function DoctorSummary({ text, readiness, loading, error, onFixBinding, onCleanu
           <strong>{advice.title}</strong>
           <p>{advice.message}</p>
           {advice.nextStep && <span className="muted">{advice.nextStep}</span>}
-          {canFixBinding && <div className="action-row compact-action-row">
+          {canFixBinding && <PermissionGate action="server:network-fix"><div className="action-row compact-action-row">
             <button disabled={fixingBinding || fixDisabled} onClick={onFixBinding}>{fixingBinding ? "Fixing..." : "Fix Binding"}</button>
-          </div>}
-          {canCleanupImages && <div className="action-row compact-action-row">
+          </div></PermissionGate>}
+          {canCleanupImages && <PermissionGate action="server:storage-cleanup"><div className="action-row compact-action-row">
             <button disabled={Boolean(cleanupOperation) || fixDisabled} onClick={onCleanupImages}><Trash2 size={15} /> {cleanupOperation === "images" ? "Cleaning..." : "Clean Images"}</button>
-          </div>}
-          {canCleanupBuildCache && <div className="action-row compact-action-row">
+          </div></PermissionGate>}
+          {canCleanupBuildCache && <PermissionGate action="server:storage-cleanup"><div className="action-row compact-action-row">
             <button disabled={Boolean(cleanupOperation) || fixDisabled} onClick={onCleanupBuildCache}><Trash2 size={15} /> {cleanupOperation === "build-cache" ? "Cleaning..." : "Clean Build Cache"}</button>
-          </div>}
+          </div></PermissionGate>}
         </div>
         <StatusPill value="WARN" />
       </article>;

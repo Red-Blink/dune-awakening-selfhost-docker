@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect, useRef, useState } from "react";
 import { KeyRound, RotateCcw, Trophy, Zap } from "lucide-react";
 import { playersApi } from "../../api/players";
@@ -319,21 +320,21 @@ export function SpecializationTab({
           >
             {loading ? "Loading..." : "Reload"}
           </button>
-          <button
+          <PermissionGate action="players:grant"><button
             disabled={!canAct || anyBusy}
             onClick={() => void grantAllKeystones()}
             aria-label="Grant All Keystones"
           >
             <KeyRound size={14} /> Grant All Keystones
-          </button>
-          <button
+          </button></PermissionGate>
+          <PermissionGate action="players:reset"><button
             className="danger"
             disabled={!canAct || anyBusy}
             onClick={() => void resetAllKeystones()}
             aria-label="Reset All Keystones"
           >
             <RotateCcw size={14} /> Reset All Keystones
-          </button>
+          </button></PermissionGate>
           <InlineActionResult result={actionResults[KEYSTONE_RESULT_KEY] ?? null} resultKey={KEYSTONE_RESULT_KEY} />
         </div>
         <p className="specialization-offline-notice">
@@ -397,31 +398,31 @@ export function SpecializationTab({
                       disabled={!canAct || rowBusy}
                       aria-label={`XP amount for ${row.trackType}`}
                     />
-                    <button
+                    <PermissionGate action="players:grant"><button
                       disabled={!canAct || rowBusy}
                       onClick={() => void addXp(row.trackType)}
                       aria-label={`Add XP to ${row.trackType}`}
                     >
                       Add
-                    </button>
+                    </button></PermissionGate>
                   </div>
                 </td>
                 <td className="playerAdmin_actionCell">
-                  <button
+                  <PermissionGate action="players:grant"><button
                     disabled={!canAct || rowBusy}
                     onClick={() => void grantMax(row.trackType)}
                     aria-label={`Grant Max for ${row.trackType}`}
                   >
                     Grant Max
-                  </button>
-                  <button
+                  </button></PermissionGate>
+                  <PermissionGate action="players:reset"><button
                     className="danger"
                     disabled={!canAct || rowBusy}
                     onClick={() => void resetTrack(row.trackType)}
                     aria-label={`Reset ${row.trackType}`}
                   >
                     Reset
-                  </button>
+                  </button></PermissionGate>
                 </td>
               </tr>
               );

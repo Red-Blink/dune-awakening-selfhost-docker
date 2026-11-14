@@ -741,7 +741,7 @@ test("Cycling all 53 languages via public GET /api/i18n/translations does not pi
         headers: { "x-csrf-token": "csrf-tok" },
         body: { lang: code, source: "Home", translation: "Start", credit: "Tester" }
       });
-      suggestCall.req.authSession = { id: "s1", csrf: "csrf-tok", tier: "observer" };
+      suggestCall.req.authSession = { id: "s1", csrf: "csrf-tok", tier: "player" };
       await handleI18nRoute({
         ...suggestCall,
         config,
@@ -878,6 +878,12 @@ test("Partial or invalid seed language slice is not treated as 100% coverage in 
     };
     const allReviewed = getReviewedSourcePhrases();
     assert.ok(allReviewed.length > 100);
+
+    // This is the complete-language control fixture. New reviewed UI phrases
+    // may legitimately be awaiting real translations in the shipped seed.
+    setSeedLanguageSliceOverride("DE", Object.fromEntries(
+      allReviewed.map(phrase => [phrase, `[DE] ${phrase.replace(/[<>]/g, "")}`])
+    ));
 
     // Simulate FR having a seed slice with only 1 valid reviewed phrase ("Home") and 1 invalid XSS entry ("Settings")
     setSeedLanguageSliceOverride("FR", {

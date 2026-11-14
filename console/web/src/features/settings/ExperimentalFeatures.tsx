@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect, useState } from "react";
 import { Power } from "lucide-react";
 import { api, post } from "../../api/client";
@@ -63,7 +64,7 @@ export function ExperimentalFeatures({ confirmAction }: { confirmAction: Confirm
         <div className="experimental-feature-heading"><h4 id="regis-tanks-title">Regis Tanks</h4><InfoTooltip id="experimental-tanks-help" label="About Regis Tanks">Unofficial, build-specific patch. Disable before updating the game server. Disabling restores the original image. All Tanks in Hagga Basin will be deleted.</InfoTooltip></div>
         <div className="experimental-feature-status" role="status">{queuedEntry ? "Restart Queued" : busy ? <span className="loading-dots">Applying Changes</span> : !status ? "Loading…" : status.enabled ? "Enabled" : "Disabled"}</div>
         {queuedEntry && <p className="attention-text">Hagga will restart after the countdown. See Restart Queue in Admin Tools.</p>}
-        <button type="button" className="experimental-feature-button" disabled={!status || busy || (!status.supported && !status.enabled)} onClick={() => { void change(!status?.enabled); }}><Power size={16} aria-hidden="true" />{busy ? displayedEnabled ? "Enabling..." : "Disabling..." : status?.enabled ? "Disable Regis Tanks" : "Enable Regis Tanks"}</button>
+        <PermissionGate action="settings:write"><button type="button" className="experimental-feature-button" disabled={!status || busy || (!status.supported && !status.enabled)} onClick={() => { void change(!status?.enabled); }}><Power size={16} aria-hidden="true" />{busy ? displayedEnabled ? "Enabling..." : "Disabling..." : status?.enabled ? "Disable Regis Tanks" : "Enable Regis Tanks"}</button></PermissionGate>
         {status && !status.supported && <p className="attention-text">This game build is not supported. Tanks cannot be enabled until a compatible patch is available.</p>}
       {errorMessage && <p role="alert" className="attention-text">{errorMessage}</p>}
       {task && <details className="technical-details"><summary>Operation Log</summary><pre>{task.logLines.map((line) => line.line).join("\n")}</pre></details>}

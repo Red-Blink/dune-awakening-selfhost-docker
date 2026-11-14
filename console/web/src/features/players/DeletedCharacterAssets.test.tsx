@@ -5,6 +5,7 @@ import { vehiclesApi } from "../../api/vehicles";
 import { mapsApi } from "../../api/maps";
 import { invalidateInstanceNames } from "../maps/instanceNames";
 import { DeletedCharacterAssets, deletionLabel } from "./DeletedCharacterAssets";
+import { setConsoleAccess } from "../../lib/consoleAccess";
 
 vi.mock("../../api/players", () => ({ playersApi: { deletedCharacters: vi.fn() } }));
 vi.mock("../../api/vehicles", () => ({ vehiclesApi: { deleteVehicle: vi.fn(), pendingDeletes: vi.fn() } }));
@@ -98,6 +99,17 @@ describe("DeletedCharacterAssets", () => {
     invalidateInstanceNames();
     vi.mocked(vehiclesApi.pendingDeletes).mockResolvedValue({ supported: true, total: 0, pending: [], byTarget: [] });
     vi.mocked(mapsApi.sietchDimensions).mockResolvedValue({ stdout: "", exitCode: 1 } as never);
+  });
+
+  it("shows only the permitted asset component without delete controls for a read-only account", async () => {
+    setConsoleAccess("ready", { username: "viewer", displayName: "Viewer", tier: "moderator" }, ["players:read", "vehicles:read"]);
+    deletedCharacters.mockResolvedValue(result({ characters: [kitty] }));
+    render(<DeletedCharacterAssets confirmAction={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Show Assets Held By kitty" }));
+    expect(await screen.findByRole("heading", { name: "Vehicles" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Bases" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Delete / })).toBeNull();
+    expect(vehiclesApi.deleteVehicle).not.toHaveBeenCalled();
   });
 
   it("lists a deleted character and expands to its bases and vehicles", async () => {
