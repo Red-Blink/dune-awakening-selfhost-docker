@@ -107,6 +107,29 @@ test("resolveTier: invalid tier / malformed body / non-2xx / unreachable all den
   assert.equal((await hThrow.resolveTier({ userId: USER })).reason, "unreachable");
 });
 
+// #1339 (Layer 3 review): the abort timer used to be cleared as soon as
+// fetchImpl() resolved HEADERS, leaving response.json() -- the body read --
+// with no bound. A response whose body stalls must still be aborted and
+// reported as "unreachable" (not "malformed_response" -- the bot never
+// actually sent a bad body, this request just gave up waiting).
+test("resolveTier: a response whose body stalls is aborted and reported unreachable, not malformed", async () => {
+  let aborted = false;
+  const hStall = createHandoff({
+    secret: SECRET, botUrl: "http://bot.test", homeGuildId: GUILD, now: () => NOW,
+    fetchImpl: (url, init) => {
+      init.signal.addEventListener("abort", () => { aborted = true; });
+      return Promise.resolve({
+        ok: true,
+        json: () => new Promise((resolve, reject) => {
+          init.signal.addEventListener("abort", () => reject(Object.assign(new Error("body read aborted"), { name: "AbortError" })));
+        })
+      });
+    }
+  });
+  assert.equal((await hStall.resolveTier({ userId: USER })).reason, "unreachable");
+  assert.equal(aborted, true);
+});
+
 test("resolveTier: every denial returns tier:'' (never falls through to a tier)", async () => {
   for (const bodyFor of [
     () => signedBody(goodPayload(), "wrong"),

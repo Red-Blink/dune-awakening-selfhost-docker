@@ -982,6 +982,58 @@ test("Discord sign-in attempts silently (prompt=none) and, when interaction is n
   } finally { await stopProcess(console.child); await closeDiscordServer(discordServer); rmSync(tempDir, { recursive: true, force: true }); }
 });
 
+// #1336 (Layer 3 review): the silent->interactive retry used config.discordOAuth*
+// (the LOGIN application's boot-time config) even for a purpose="setup" retry,
+// instead of readDiscordSetupApplication() -- the setup application, which can
+// be a just-saved-but-not-restarted credential set. This is the common path,
+// not an edge case: a first-time Discord user always gets consent_required
+// from the prompt=none attempt /start?setup=1 always tries first.
+test("guided setup's silent->interactive retry uses the SAVED setup application, not the (empty) boot-time login config", async () => {
+  const consolePort = await getFreePort(); const discordPort = await getFreePort();
+  const tempDir = mkdtempSync(join(tmpdir(), "oauth-setup-retry-"));
+  const console = startConsole(consolePort, discordPort, tempDir, {
+    DISCORD_OAUTH_CLIENT_ID: "", DISCORD_OAUTH_CLIENT_SECRET: "", DISCORD_OAUTH_REDIRECT_URI: "",
+    DISCORD_HOME_GUILD_ID: "", DISCORD_OAUTH_ALLOW_OWNER_BOOTSTRAP: "0", DISCORD_OAUTH_OWNER_ALLOWLIST: ""
+  });
+  const discordServer = await startFakeDiscord(discordPort);
+  try {
+    await waitForHealth(consolePort);
+    const base = `http://127.0.0.1:${consolePort}`;
+    const owner = await passwordOwnerSession(consolePort);
+    const headers = { cookie: owner.cookie, "x-csrf-token": owner.csrfToken, "content-type": "application/json" };
+    const post = (path, body) => fetch(base + path, { method: "POST", headers, body: JSON.stringify(body) });
+    // Saved, not restarted: config.discordOAuthClientId stays "" (the boot
+    // value) the whole test, exactly the gap the old retry code fell into.
+    await post("/api/setup/write-oauth-config", {
+      DISCORD_OAUTH_CLIENT_ID: "123456789012345678", DISCORD_OAUTH_REDIRECT_URI: `${base}/api/auth/discord/callback`
+    });
+    await post("/api/setup/save-oauth-secret", { secret: "synthetic-setup-retry-client-secret" });
+
+    const start = await fetch(`${base}/api/auth/discord/start?setup=1`, { redirect: "manual", headers });
+    assert.equal(start.status, 302);
+    assert.equal(new URL(start.headers.get("location")).searchParams.get("client_id"), "123456789012345678", "the initial silent attempt already uses the saved setup app");
+    const state = sessionCookieValue(start.headers.getSetCookie(), "discord_oauth_state");
+
+    const retry = await fetch(`${base}/api/auth/discord/callback?error=consent_required&state=${encodeURIComponent(state)}`,
+      { redirect: "manual", headers: { ...headers, cookie: `${owner.cookie}; discord_oauth_state=${state}` } });
+    assert.equal(retry.status, 302, "needs-interaction error retries, not errors out");
+    const retryUrl = new URL(retry.headers.get("location"));
+    assert.match(retryUrl.href, /oauth2\/authorize/, "retry goes back to Discord");
+    assert.doesNotMatch(retryUrl.href, /prompt=none/, "retry is interactive");
+    assert.equal(retryUrl.searchParams.get("client_id"), "123456789012345678", "retry must use the SAVED setup app, not the empty boot-time login client id");
+    assert.equal(retryUrl.searchParams.get("redirect_uri"), `${base}/api/auth/discord/callback`);
+
+    // The retried flow must still complete setup end to end (proves
+    // applicationVersion survived the retry, not just the client id/redirect).
+    const retryState = sessionCookieValue(retry.headers.getSetCookie(), "discord_oauth_state");
+    const cb = await fetch(`${base}/api/auth/discord/callback?code=guildowner-mfa&state=${encodeURIComponent(retryState)}`,
+      { redirect: "manual", headers: { cookie: `${owner.cookie}; discord_oauth_state=${retryState}` } });
+    assert.equal(cb.status, 200);
+    const finish = await post("/api/setup/discord-finalize", { guildId: HOME_GUILD, adminRoleIds: ADMIN_ROLE, requireMfa: true });
+    assert.equal(finish.status, 200, await finish.text());
+  } finally { await stopProcess(console.child); await closeDiscordServer(discordServer); rmSync(tempDir, { recursive: true, force: true }); }
+});
+
 // ---- review finding: /start was unmetered (the login limiter only counts
 // failures, which /start never records), so a loop could fill the pending-state
 // table. It is now metered per client. ----

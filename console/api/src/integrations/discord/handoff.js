@@ -116,52 +116,63 @@ function liveHandoff(config) {
       return { tier: "", reason: "invalid_user_id" };
     }
 
-    let response;
+    // #1339 (Layer 3 review): the timer used to be cleared in `finally` as
+    // soon as fetchImpl() resolved HEADERS, leaving response.json() below --
+    // the actual body read -- with no bound. The timer now stays live
+    // (cleared exactly once, in the outer `finally`) across the whole
+    // request, headers AND body.
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), HTTP_TIMEOUT_MS);
     try {
-      response = await fetchImpl(`${botUrl}/resolve-console-tier`, {
-        method: "POST",
-        headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ userId, guildId: homeGuildId }),
-        signal: controller.signal
-      });
-    } catch {
-      return { tier: "", reason: "unreachable" };
+      let response;
+      try {
+        response = await fetchImpl(`${botUrl}/resolve-console-tier`, {
+          method: "POST",
+          headers: { "content-type": "application/json", accept: "application/json" },
+          body: JSON.stringify({ userId, guildId: homeGuildId }),
+          signal: controller.signal
+        });
+      } catch {
+        return { tier: "", reason: "unreachable" };
+      }
+
+      if (!response.ok) return { tier: "", reason: `http_${response.status}` };
+
+      let body;
+      try {
+        body = await response.json();
+      } catch (error) {
+        // A body-read cut off by this request's own timeout is the same
+        // "unreachable" condition as a stalled connection, not a peer that
+        // genuinely sent garbage -- keep the audit reason accurate.
+        return { tier: "", reason: error?.name === "AbortError" ? "unreachable" : "malformed_response" };
+      }
+
+      if (!body || typeof body !== "object") return { tier: "", reason: "malformed_response" };
+      const { signature, ...payload } = body;
+
+      const payloadCheck = validatePayload(payload);
+      if (!payloadCheck.ok) return { tier: "", reason: payloadCheck.reason };
+
+      if (!verifyPayload(payloadCheck.payload, body.signature, secret)) {
+        return { tier: "", reason: "bad_signature" };
+      }
+
+      if (!isFresh(payloadCheck.payload, MAX_HANDOFF_AGE_MS, now)) {
+        return { tier: "", reason: "stale_handoff" };
+      }
+
+      if (payloadCheck.payload.userId !== userId) return { tier: "", reason: "user_mismatch" };
+      if (payloadCheck.payload.guildId !== homeGuildId) return { tier: "", reason: "guild_mismatch" };
+
+      return { tier: payloadCheck.payload.tier, reason: "" };
     } finally {
-      // Always clear -- on the reject path too, or the abort timer lingers ~5s
-      // (a no-op abort on a settled controller) and keeps the event loop alive;
-      // during a bot outage every failed login would leak another dangling timer.
+      // Always clear -- on every path, or the abort timer lingers ~5s (a
+      // no-op abort on a settled controller) and keeps the event loop
+      // alive; during a bot outage every failed login would leak another
+      // dangling timer.
       clearTimeout(timer);
     }
-
-    if (!response.ok) return { tier: "", reason: `http_${response.status}` };
-
-    let body;
-    try {
-      body = await response.json();
-    } catch {
-      return { tier: "", reason: "malformed_response" };
-    }
-
-    if (!body || typeof body !== "object") return { tier: "", reason: "malformed_response" };
-    const { signature, ...payload } = body;
-
-    const payloadCheck = validatePayload(payload);
-    if (!payloadCheck.ok) return { tier: "", reason: payloadCheck.reason };
-
-    if (!verifyPayload(payloadCheck.payload, body.signature, secret)) {
-      return { tier: "", reason: "bad_signature" };
-    }
-
-    if (!isFresh(payloadCheck.payload, MAX_HANDOFF_AGE_MS, now)) {
-      return { tier: "", reason: "stale_handoff" };
-    }
-
-    if (payloadCheck.payload.userId !== userId) return { tier: "", reason: "user_mismatch" };
-    if (payloadCheck.payload.guildId !== homeGuildId) return { tier: "", reason: "guild_mismatch" };
-
-    return { tier: payloadCheck.payload.tier, reason: "" };
   }
 
   return { enabled: true, resolveTier };
