@@ -131,6 +131,41 @@ test("real PostgreSQL: the unredacted base row does carry the other player (so r
   });
 });
 
+// #1343 (Layer 3 review): redactSharedWith blanks shared_with in the OUTPUT
+// rows, but the row ORDER for sortColumn=shared_with still comes straight
+// from the real share count -- a player can infer which of their bases has
+// more co-owners from the order alone, even with the field itself empty.
+// server.js's /api/players/<id>/bases route now forces sortColumn to "name"
+// for a player session (ownedListOptions, used by the sibling top-level
+// /api/bases route, already did this) -- this proves both the leak this
+// guards against, and that forcing "name" removes it.
+test("real PostgreSQL: sortColumn=shared_with on an owner-only list orders by the real share count, even though shared_with is redacted to []", async (t) => {
+  await withDatabase(t, async (db) => {
+    // Two bases Duncan solely owns (rank 1, no co-owner), differing only in
+    // how many OTHER players share rank on them.
+    await db.query(`
+      ${base(5, "Solus Quiet")}
+      ${base(6, "Solus Popular")}
+      insert into dune.permission_actor_rank (permission_actor_id, player_id, rank) values
+        (1005, ${DUNCAN.controller}, 1),
+        (1006, ${DUNCAN.controller}, 1),
+        (1006, ${GURNEY.controller}, 2),
+        (1006, 77, 2);
+    `);
+    const options = { playerId: DUNCAN.pawn, access: "owner", q: "", page: 0, pageSize: 50, sortDirection: "asc" };
+    const byShared = redactSharedWith(await listBases(db, { ...options, sortColumn: "shared_with" }));
+    const ids = byShared.rows.map((r) => r.base_id);
+    assert.ok(ids.indexOf("1005") < ids.indexOf("1006"), "the unshared base must sort before the shared one -- the real share count, not a coin flip");
+    assert.deepEqual(byShared.rows.find((r) => r.base_id === "1006").shared_with, [], "the field itself is still redacted");
+
+    // The fix: forcing "name" instead removes the correlation with share count.
+    const byName = redactSharedWith(await listBases(db, { ...options, sortColumn: "name" }));
+    assert.deepEqual(byName.rows.map((r) => r.base_id).sort(), ids.sort(), "same rows");
+    const sortedByActualName = [...byName.rows].sort((a, b) => a.name.localeCompare(b.name)).map((r) => r.base_id);
+    assert.deepEqual(byName.rows.map((r) => r.base_id), sortedByActualName, "order now follows name, not share count");
+  });
+});
+
 test("real PostgreSQL: owned storage excludes co-owned, associate and other players' chests", async (t) => {
   await withDatabase(t, async (db) => {
     const duncan = await listOwnedStorage(db, DUNCAN.controller);

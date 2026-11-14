@@ -15,7 +15,13 @@
 // The console calls the bot anew on every login; the timestamp prevents
 // replays within the window.
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac } from "node:crypto";
+// #1345 (Layer 3 review): this file used to re-implement constantTimeStringEqual
+// verbatim -- oauth.js already exports it, and hostedBotOAuth.js/autoInvite.js
+// already import it from there. Three independently-maintained copies of a
+// security-sensitive comparison is exactly how a future hardening lands in
+// one and not the others.
+import { constantTimeStringEqual } from "./oauth.js";
 
 const VALID_TIERS = new Set(["owner", "admin", "moderator", "player"]);
 const USER_SNOWFLAKE_RE = /^\d{17,19}$/;
@@ -149,12 +155,14 @@ function liveHandoff(config) {
       }
 
       if (!body || typeof body !== "object") return { tier: "", reason: "malformed_response" };
+      // #1345: use the already-destructured `signature`, not a redundant
+      // re-read of `body.signature` -- same value, one source of truth.
       const { signature, ...payload } = body;
 
       const payloadCheck = validatePayload(payload);
       if (!payloadCheck.ok) return { tier: "", reason: payloadCheck.reason };
 
-      if (!verifyPayload(payloadCheck.payload, body.signature, secret)) {
+      if (!verifyPayload(payloadCheck.payload, signature, secret)) {
         return { tier: "", reason: "bad_signature" };
       }
 
@@ -178,9 +186,3 @@ function liveHandoff(config) {
   return { enabled: true, resolveTier };
 }
 
-function constantTimeStringEqual(left, right) {
-  const a = Buffer.from(String(left || ""));
-  const b = Buffer.from(String(right || ""));
-  if (a.length === 0) return false;
-  return a.length === b.length && timingSafeEqual(a, b);
-}

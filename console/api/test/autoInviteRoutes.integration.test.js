@@ -775,6 +775,35 @@ test("GET .../auto-invite/confirmation-status does NOT persist a malformed (non-
   }
 });
 
+// #1344 (Layer 3 review): the OLD check reused validateDiscordRoleIds(),
+// which is built for comma-separated role-ID LISTS -- "11111111111111111,
+// 22222222222222222" (two valid-looking snowflakes) passed it, even though
+// a guildId must be exactly one. The malformed-non-digit test above would
+// NOT have caught this (that string fails even the old check); this is the
+// actual gap.
+test("GET .../auto-invite/confirmation-status does NOT persist a comma-separated guildId from mentat-link", async () => {
+  const port = await getFreePort();
+  const mentatLinkPort = await getFreePort();
+  const tempDir = mkdtempSync(join(tmpdir(), "auto-invite-routes-e2e-confirmation-status-comma-guildid-"));
+  const console_ = startConsole(port, tempDir, {
+    MENTAT_LINK_CONFIRMATION_STATUS_URL: `http://127.0.0.1:${mentatLinkPort}/api/consoles/auto-invite/confirmation-status`
+  });
+  const mentatLink = await startFakeMentatLinkConfirmationStatus(mentatLinkPort, { body: { status: "confirmed", guildId: "111111111111111111,222222222222222222", guildName: "Fleetyard" } });
+  try {
+    await waitForHealth(port);
+    const session = await loginAsOwner(port);
+    const res = await api(port, "/api/integrations/discord/hosted-bot/auto-invite/confirmation-status?confirmationId=abc123", { cookie: session.cookie, extraCookie: "auto_invite_confirmation_id=abc123" });
+    assert.equal(res.status, 200, "the poll response itself is still returned normally to the frontend");
+
+    const settings = await (await api(port, "/api/settings/discord-bot", { cookie: session.cookie })).json();
+    assert.equal(settings.hostedBotConnectedGuildId, null, "a comma-separated guildId must never be persisted -- a guildId is exactly one snowflake, not a list");
+  } finally {
+    await stopProcess(console_.child);
+    await closeServer(mentatLink.server);
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("GET .../auto-invite/confirmation-status does NOT persist anything when the status is denied/pending/not_found", async () => {
   const port = await getFreePort();
   const mentatLinkPort = await getFreePort();

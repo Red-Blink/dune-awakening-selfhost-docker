@@ -4,7 +4,7 @@
 // (oauth.js's own fetchDiscordIdentity() discards it, since console-login
 // only ever needs guild-membership, not ownership), and needs its own cookie
 // names/paths so the two flows can never be confused mid-flight.
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { constantTimeStringEqual } from "./oauth.js";
 
 export const HOSTED_BOT_DISCORD_API_BASE_URL = "https://discord.com/api/v10";
@@ -52,14 +52,37 @@ async function discordJsonRequest(url, init, { fetchImpl, label }) {
 // console-login flow's fetchDiscordIdentity() discards it, since login only
 // ever needs membership, not ownership. Discord's `owner: true` means the
 // literal Discord "Server Owner" for that guild, not merely an admin.
+// #1340 (Layer 3 review, same bug as oauth.js's fetchDiscordIdentity): a
+// single, unpaginated call caps out at Discord's own 200-guild default/max
+// `limit`, so a user who owns a guild past the first 200 would silently be
+// missing from the hosted-bot wizard's own-guild picker. See
+// oauth.js's fetchAllDiscordGuilds for the pagination mechanics.
+const DISCORD_GUILDS_PAGE_LIMIT = 200;
+const DISCORD_GUILDS_MAX_PAGES = 50;
+async function fetchAllDiscordGuilds({ apiBaseUrl, accessToken, fetchImpl }) {
+  const guilds = [];
+  let after = "";
+  for (let page = 0; page < DISCORD_GUILDS_MAX_PAGES; page++) {
+    const qs = after ? `?limit=${DISCORD_GUILDS_PAGE_LIMIT}&after=${encodeURIComponent(after)}` : `?limit=${DISCORD_GUILDS_PAGE_LIMIT}`;
+    const pageGuilds = await discordJsonRequest(`${apiBaseUrl}/users/@me/guilds${qs}`, {
+      headers: { authorization: `Bearer ${accessToken}`, accept: "application/json" }
+    }, { fetchImpl, label: "guilds" });
+    const list = Array.isArray(pageGuilds) ? pageGuilds : [];
+    guilds.push(...list);
+    if (list.length < DISCORD_GUILDS_PAGE_LIMIT) break;
+    const lastId = String(list[list.length - 1]?.id || "");
+    if (!lastId) break;
+    after = lastId;
+  }
+  return guilds;
+}
+
 export async function fetchOwnedDiscordGuilds({ accessToken, apiBaseUrl = HOSTED_BOT_DISCORD_API_BASE_URL, fetchImpl = globalThis.fetch }) {
   const [user, guilds] = await Promise.all([
     discordJsonRequest(`${apiBaseUrl}/users/@me`, {
       headers: { authorization: `Bearer ${accessToken}`, accept: "application/json" }
     }, { fetchImpl, label: "identity" }),
-    discordJsonRequest(`${apiBaseUrl}/users/@me/guilds`, {
-      headers: { authorization: `Bearer ${accessToken}`, accept: "application/json" }
-    }, { fetchImpl, label: "guilds" })
+    fetchAllDiscordGuilds({ apiBaseUrl, accessToken, fetchImpl })
   ]);
   const userId = String(user?.id || "");
   const ownedGuilds = Array.isArray(guilds)

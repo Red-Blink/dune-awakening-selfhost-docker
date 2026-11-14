@@ -26,6 +26,28 @@ test("fetchOwnedDiscordGuilds returns an empty guilds array when the operator ow
   assert.deepEqual(result.guilds, []);
 });
 
+// #1340 (Layer 3 review, same bug as oauth.js's fetchDiscordIdentity): an
+// owned guild past the first 200 would be silently missing from the
+// hosted-bot wizard's own-guild picker. 250 synthetic guilds (owned one at
+// index 220, past the first page) proves pagination finds it.
+test("fetchOwnedDiscordGuilds finds an owned guild past the first page of 200", async () => {
+  const TOTAL = 250;
+  const allIds = Array.from({ length: TOTAL }, (_, i) => String(300000000000000000n + BigInt(i)));
+  const ownedIndex = 220;
+  const fetchImpl = async (url) => {
+    if (url.includes("/users/@me/guilds")) {
+      const m = /after=(\d+)/.exec(url);
+      const after = m?.[1];
+      const startIndex = after ? allIds.indexOf(after) + 1 : 0;
+      const page = allIds.slice(startIndex, startIndex + 200);
+      return { ok: true, json: async () => page.map((id, i) => ({ id, name: `Guild ${startIndex + i}`, owner: startIndex + i === ownedIndex })) };
+    }
+    return { ok: true, json: async () => ({ id: "999999999999999999", username: "someone" }) };
+  };
+  const result = await fetchOwnedDiscordGuilds({ accessToken: "tok", fetchImpl });
+  assert.deepEqual(result.guilds.map((g) => g.id), [allIds[ownedIndex]]);
+});
+
 test("pending-registration store is single-use, TTL-bound, and capacity-capped", () => {
   let clock = 1000;
   const store = createPendingRegistrationStore({ now: () => clock, ttlMs: 5000, maxEntries: 2 });

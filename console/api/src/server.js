@@ -2229,7 +2229,13 @@ async function handleApi(req, res) {
     page: 0,
     pageSize: 5000,
     access: effectiveAccess(session, playerAccessParam(url)),
-    sortColumn: url.searchParams.get("sortColumn") || "name",
+    // #1343 (Layer 3 review): a player session's result is redacted to
+    // shared_with: [] below (ownedViewForSession -> redactSharedWith), but
+    // the SQL itself still ORDERS by the real shared_count for
+    // sortColumn=shared_with -- the row order leaks exactly the ranking the
+    // redaction exists to hide. Force the default sort for a player
+    // session; every other tier keeps the requested column unchanged.
+    sortColumn: session?.tier === "player" ? "name" : (url.searchParams.get("sortColumn") || "name"),
     sortDirection: url.searchParams.get("sortDirection") || "asc"
   })));
   if (path.match(/^\/api\/players\/[^/]+\/currency$/)) return dbPlayerRoute(req, res, path, duneDb.playerCurrency);
@@ -3132,9 +3138,13 @@ async function handleApi(req, res) {
       // compromised, MITM'd, or simply buggy, an unvalidated guildId
       // string would reach the same .env-write/shell-source path #870's
       // CRITICAL fix hardened guildName against. Reuses
-      // validateDiscordRoleIds() -- a single, non-comma value is exactly
-      // one snowflake-pattern check -- rather than duplicating the regex.
-      if (guildId && validateDiscordRoleIds(guildId).ok) {
+      // #1344 (Layer 3 review): validateDiscordRoleIds() accepts a
+      // COMMA-SEPARATED LIST of snowflakes (it's built for role-ID env
+      // values), so "111...,222..." passed this check and got persisted as
+      // a single guildId -- the opposite of "exactly one snowflake" this
+      // comment used to claim. Use DISCORD_SNOWFLAKE_RE directly, which is
+      // already the single-value check this file uses elsewhere.
+      if (guildId && DISCORD_SNOWFLAKE_RE.test(guildId)) {
         await persistHostedBotConnectedGuild(config, { guildId, guildName });
       } else if (guildId) {
         audit(config, sanitizedUrl(req, "/api/integrations/discord/hosted-bot/auto-invite/confirmation-status"), "hosted-bot.auto-invite.confirmation-status", { ok: false, reason: "invalid_guild_id_from_mentat" });
@@ -5221,7 +5231,18 @@ async function discordOAuthForgetRoute(req, res) {
     unlinkSync(discordOAuthSecretFile());
   } catch (error) {
     if (error.code !== "ENOENT") {
-      return deny(500, { error: "Failed to delete the stored Discord Client Secret file. Discord OAuth configuration was not cleared -- check the console's filesystem permissions and try again." }, { reason: "secret_file_delete_failed" });
+      // #1337 (Layer 3 review): by this point .env is ALREADY wiped and both
+      // in-process forgotten flags are already set -- this is not a clean
+      // "nothing happened" failure, it's a half-destroyed config. The
+      // `recoverable` pre-wipe values (guildId, role mappings) are the
+      // entire point of #676 §6.4's recoverability guarantee; omitting them
+      // from THIS specific audit entry (as the bare `deny()` call used to)
+      // loses the one record that guarantee exists to produce, exactly when
+      // it's needed most. The error text also now says what's actually
+      // true: it's an unknown, recovered-via-audit-log state, not "was not
+      // cleared" (that line was accurate before this fix added the wipe
+      // ahead of the unlink; it is not accurate about THIS code today).
+      return deny(500, { error: "Failed to delete the stored Discord Client Secret file. The rest of the Discord OAuth configuration was already cleared -- check the console's filesystem permissions, then use Settings -> Discord OAuth to re-enter the guild and role mapping from the audit log if needed." }, { reason: "secret_file_delete_failed", recoverable });
     }
   }
   audit(config, auditUrl, ACTION, { ok: true, ...actor, recoverable });
