@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowUp, DatabaseBackup, RefreshCw } from "lucide-react";
 import { basesApi, type BaseLandClaim } from "../../api/bases";
@@ -240,7 +241,7 @@ export function BaseLandClaimTab({ baseId, baseName, confirmAction, onError }: P
           </select></label>
           <p className="muted">Vertical expansion grows equally upward and downward. The game hard-caps it at level 5.</p>
           <dl><dt>Pending Horizontal</dt><dd>{selected.size}</dd><dt>Pending Vertical</dt><dd>{verticalLevel === claim.verticalLevel ? "No Change" : `${claim.verticalLevel} → ${verticalLevel}`}</dd></dl>
-          <button className="primary-action" disabled={!canSave} onClick={() => void save()}>{saving ? "Applying…" : "Apply Changes"}</button>
+          <PermissionGate action="bases:mutate"><button className="primary-action" disabled={!canSave} onClick={() => void save()}>{saving ? "Applying…" : "Apply Changes"}</button></PermissionGate>
           {selected.size > 0 && <button className="secondary-action" disabled={saving || loading} onClick={() => setSelected(new Set())}>Clear Selection</button>}
           <p className="land-claim-backup-note"><DatabaseBackup size={16} />A full database backup is created before every save.</p>
           <p className="land-claim-restart-note"><RefreshCw size={16} />Restart {claim.map || "the affected game server"} after saving to load the changes.</p>

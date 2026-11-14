@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useConsoleAccess } from "./consoleAccess";
 import { basesApi, type PendingChildAccess, type PendingRefills } from "../api/bases";
 import { vehiclesApi, type PendingVehicleDeletes } from "../api/vehicles";
 
@@ -227,10 +228,18 @@ export function vehicleDeleteCountForMap(pending: PendingVehicleDeletes | null, 
 // omit one queue -- which is exactly how the Server battlegroup note once
 // ended up showing fuel and water but not every destructive or permission write.
 export function usePendingQueues(enabled = true) {
-  const fuel = usePendingRefills(enabled);
-  const water = usePendingWaterRefills(enabled);
-  const deletes = usePendingBaseDeletes(enabled);
-  const vehicleDeletes = usePendingVehicleDeletes(enabled);
-  const permissions = usePendingChildAccess(enabled);
-  return { fuel, water, deletes, vehicleDeletes, permissions };
+  const access = useConsoleAccess();
+  const baseReads = enabled && access.can("bases:read");
+  const fuel = usePendingRefills(baseReads);
+  const water = usePendingWaterRefills(baseReads);
+  const deletes = usePendingBaseDeletes(baseReads);
+  const vehicleDeletes = usePendingVehicleDeletes(enabled && access.can("vehicles:read"));
+  const permissions = usePendingChildAccess(baseReads);
+  return {
+    fuel: { ...fuel, pending: baseReads ? fuel.pending : null },
+    water: { ...water, pending: baseReads ? water.pending : null },
+    deletes: { ...deletes, pending: baseReads ? deletes.pending : null },
+    vehicleDeletes: { ...vehicleDeletes, pending: enabled && access.can("vehicles:read") ? vehicleDeletes.pending : null },
+    permissions: { ...permissions, pending: baseReads ? permissions.pending : null }
+  };
 }

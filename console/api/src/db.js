@@ -260,9 +260,21 @@ export function quoteQualified(schema, table) {
   return `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
 }
 
+// #1346 (Layer 3 pentest finding): a bad caller-supplied id/limit/offset is a
+// client input-validation failure, not a server fault -- flagging it with
+// statusCode 400 (the same convention server.js/duneDb.js already use for
+// this) lets apiErrorPayload() return 400 instead of its 500 fallback. Found
+// live: /api/players/<bad-id>/teleport-destinations and .../character-recovery
+// returned 500 for a nonexistent player id with no route-specific validation
+// of its own, both routing through this same intParam() call with no error
+// body leak either way -- just the wrong status.
 export function intParam(value, label, min = 0, max = Number.MAX_SAFE_INTEGER) {
   const n = Number(value);
-  if (!Number.isInteger(n) || n < min || n > max) throw new Error(`Invalid ${label}`);
+  if (!Number.isInteger(n) || n < min || n > max) {
+    const error = new Error(`Invalid ${label}`);
+    error.statusCode = 400;
+    throw error;
+  }
   return n;
 }
 
@@ -271,9 +283,17 @@ export function intParam(value, label, min = 0, max = Number.MAX_SAFE_INTEGER) {
 // make a destructive request target a different row.
 export function bigintParam(value, label, min = 1n, max = 9223372036854775807n) {
   const raw = String(value ?? "").trim();
-  if (!/^[0-9]+$/.test(raw)) throw new Error(`Invalid ${label}`);
+  if (!/^[0-9]+$/.test(raw)) {
+    const error = new Error(`Invalid ${label}`);
+    error.statusCode = 400;
+    throw error;
+  }
   const n = BigInt(raw);
-  if (n < min || n > max) throw new Error(`Invalid ${label}`);
+  if (n < min || n > max) {
+    const error = new Error(`Invalid ${label}`);
+    error.statusCode = 400;
+    throw error;
+  }
   return n.toString();
 }
 

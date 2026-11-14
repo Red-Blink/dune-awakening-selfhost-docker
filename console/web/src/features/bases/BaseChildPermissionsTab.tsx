@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { basesApi, type BaseAccessLevel, type BaseChildAccessGroup, type BaseChildAccessRow } from "../../api/bases";
 import { usePendingChildAccess } from "../../lib/usePendingRefills";
@@ -287,7 +288,7 @@ export function BaseChildPermissionsTab({ baseId, baseName, queueSupported = fal
           for this base and will be written when its map next restarts. The levels below are what the game
           enforces right now.
           {" "}
-          <button className="link-button" disabled={saving} onClick={() => void cancelQueued()}>Discard queued changes</button>
+          <PermissionGate action="bases:mutate"><button className="link-button" disabled={saving} onClick={() => void cancelQueued()}>Discard queued changes</button></PermissionGate>
         </p>}
 
         {!supported && <p className="muted">{reason || "Base permission auditing is unavailable for this database."}</p>}
@@ -379,9 +380,9 @@ export function BaseChildPermissionsTab({ baseId, baseName, queueSupported = fal
         {supported && rows.length > 0 && <div className="bases-permissions-actions">
           <span className="muted">{dirty ? "Unsaved changes" : ""}</span>
           <button disabled={!dirty || saving} onClick={() => setDraft(saved)}>Revert</button>
-          <button className="update-action" disabled={!dirty || saving} onClick={() => void save()}>
+          <PermissionGate action="bases:mutate"><button className="update-action" disabled={!dirty || saving} onClick={() => void save()}>
             {saving ? "Saving…" : "Save changes"}
-          </button>
+          </button></PermissionGate>
         </div>}
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bot, Settings } from "lucide-react";
 import { exchangeApi, type ExchangeItem, type ExchangeOwner } from "../../api/exchange";
@@ -250,13 +251,13 @@ export function ExchangePanel({ onError, confirmAction }: ExchangePanelProps) {
       <div className="panel-title">
         <h2>Market Board</h2>
         <div className="action-row">
-          <button className="exchange-config-button" title="Configure bots and blacklist" aria-label="Configure bots and blacklist" onClick={() => setConfigOpen(true)}>
+          <PermissionGate action="exchange:write-config"><button className="exchange-config-button" title="Configure bots and blacklist" aria-label="Configure bots and blacklist" onClick={() => setConfigOpen(true)}>
             <Settings size={16} />
-          </button>
+          </button></PermissionGate>
           {marketBotAvailable && (
-            <button className="exchange-config-button" title="Market Bot: NPC market seeding and buyback" aria-label="Market Bot settings" onClick={() => setMarketBotOpen(true)}>
+            <PermissionGate action="exchange:market"><button className="exchange-config-button" title="Market Bot: NPC market seeding and buyback" aria-label="Market Bot settings" onClick={() => setMarketBotOpen(true)}>
               <Bot size={16} />
-            </button>
+            </button></PermissionGate>
           )}
         </div>
       </div>
@@ -323,18 +324,18 @@ export function ExchangePanel({ onError, confirmAction }: ExchangePanelProps) {
       {activeTab === "bot-items" && <BotItemsTab onError={onError} onDirtyChange={setBotItemsDirty} />}
       {activeTab === "transactions" && <ExchangeTransactionsTab onError={onError} />}
       {configOpen && (
-        <ExchangeConfigOverlay
+        <PermissionGate action="exchange:write-config"><ExchangeConfigOverlay
           onClose={() => setConfigOpen(false)}
           onError={onError}
           onSaved={() => { exchangeCache = null; void load(currentView()); }}
-        />
+        /></PermissionGate>
       )}
       {marketBotOpen && (
-        <MarketBotOverlay
+        <PermissionGate action="exchange:market"><MarketBotOverlay
           onClose={() => { setMarketBotOpen(false); exchangeCache = null; void load(currentView(), { silent: true }); }}
           onError={onError}
           confirmAction={confirmAction}
-        />
+        /></PermissionGate>
       )}
     </section>
   );

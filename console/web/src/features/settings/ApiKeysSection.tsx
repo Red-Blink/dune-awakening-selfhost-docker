@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Ban, Clock3, Copy, KeyRound, LoaderCircle, Plus, Search, Trash2 } from "lucide-react";
 import {
@@ -259,7 +260,7 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
     const state = key.expired ? "expired" : key.enabled ? "enabled" : "disabled";
     const text = pending ? "Updating" : key.expired ? "Expired" : key.enabled ? "Enabled" : "Disabled";
     const Icon = pending ? LoaderCircle : key.expired ? Clock3 : key.enabled ? KeyRound : Ban;
-    return <button type="button" className={`api-key-state-button is-${state}`} disabled={Boolean(busyId) || key.expired}
+    return <PermissionGate action="settings:write"><button type="button" className={`api-key-state-button is-${state}`} disabled={Boolean(busyId) || key.expired}
       aria-busy={pending}
       aria-label={key.expired ? `Expired ${key.name}` : `${key.enabled ? "Disable" : "Enable"} ${key.name}`}
       title={key.expired ? "This key has expired. Create a new key to restore access." : `${key.enabled ? "Disable" : "Enable"} this key`}
@@ -267,7 +268,7 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
       <Icon size={16} aria-hidden="true" />
       <span className="api-key-state-name">{key.name}</span>
       <span className="api-key-state-label">{text}</span>
-    </button>;
+    </button></PermissionGate>;
   }
 
   // Realtime Data needs the position agent: true while an active key, or the key
@@ -278,9 +279,9 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
   return <div className="api-keys-section">
     <div className="api-keys-header">
       <p className="muted">Give external tools their own API keys, with only the permissions they need. You can disable or revoke a key at any time.</p>
-      {!formOpen && <button onClick={() => { resetForm(); setFormOpen(true); }}>
+      {!formOpen && <PermissionGate action="settings:write"><button onClick={() => { resetForm(); setFormOpen(true); }}>
         <Plus size={16} aria-hidden="true" /> Create Key
-      </button>}
+      </button></PermissionGate>}
     </div>
 
     {/* role="alert" + aria-live: the secret cannot be recovered, so its
@@ -333,13 +334,13 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
           const key = keyById.get(String(row.id));
           if (!key) return null;
           return <div className="icon-toggle-group">
-            <button
+            <PermissionGate action="settings:write"><button
               className="icon-toggle-button danger"
               disabled={Boolean(busyId)}
               title="Revoke this key"
               aria-label={`Revoke ${key.name}`}
               onClick={(event) => { event.stopPropagation(); void revokeKey(key); }}
-            ><Trash2 size={16} /></button>
+            ><Trash2 size={16} /></button></PermissionGate>
           </div>;
         }}
       />}
@@ -357,7 +358,7 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
 
     <RealtimeAgentNotice needed={realtimeNeeded} confirmAction={confirmAction} />
 
-    {formOpen && <div className="api-key-form">
+    {formOpen && <PermissionGate action="settings:write"><div className="api-key-form">
       <div className="api-key-form-heading"><h3>Create API Key</h3><p className="muted">Name the key, choose its limits, then select its permissions.</p></div>
       <div className="settings-password-grid api-key-form-grid">
         <div className="api-key-form-field"><label>Name<input aria-describedby="api-key-name-help" value={name} disabled={creating} maxLength={64} placeholder="e.g. Map Viewer" onChange={(event) => setName(event.target.value)} /></label><p id="api-key-name-help" className="muted">The tool or service that will use this key.</p></div>
@@ -428,13 +429,13 @@ export function ApiKeysSection({ confirmAction }: { confirmAction: ConfirmAction
       {scopeQuery.trim() && !visibleCatalog.length && <div className="api-key-scope-empty"><p className="muted">No permissions match your search.</p><button disabled={creating} onClick={() => setScopeQuery("")}>Clear Search</button></div>}
 
       <div className="action-row api-key-form-footer">
-        <button disabled={creating || !name.trim() || !grants} onClick={() => { void createKey(); }}>
+        <PermissionGate action="settings:write"><button disabled={creating || !name.trim() || !grants} onClick={() => { void createKey(); }}>
           {creating ? "Creating..." : "Create Key"}
-        </button>
+        </button></PermissionGate>
         <button disabled={creating} onClick={() => { setFormOpen(false); resetForm(); }}>Cancel</button>
         {!grants && <span className="muted">Choose at least one permission to continue.</span>}
         <InlineActionResult result={result} resultKey="create" />
       </div>
-    </div>}
+    </div></PermissionGate>}
   </div>;
 }

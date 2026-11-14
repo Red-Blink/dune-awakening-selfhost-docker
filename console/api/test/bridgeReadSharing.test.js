@@ -55,7 +55,10 @@ function bridgeFixture() {
     json: (_res, status, body) => ({ status, body }),
     hasExecutableStatement: () => true,
     isReadOnlySql: () => false,
-    applyMutationRateLimit: () => true
+    applyMutationRateLimit: () => true,
+    // The integration uses the shared resolver so signed TLS identities retain
+    // precedence over optional trusted-proxy headers.
+    remoteIpOf: () => "127.0.0.1"
   };
   const route = new Function(...Object.keys(dependencies), `${routeSource}\nreturn addonBridgeRoute;`)(...Object.values(dependencies));
   function request(action, id = "allowed") {

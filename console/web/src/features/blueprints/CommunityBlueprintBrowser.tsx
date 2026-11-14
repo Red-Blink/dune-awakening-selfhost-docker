@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { ChevronDown, ExternalLink, Search, SendToBack } from "lucide-react";
 import { api } from "../../api/client";
@@ -186,7 +187,7 @@ export function CommunityBlueprintBrowser({ dbPlayerId, playerName, confirmActio
               <td>{row.ownerName}</td><td>{row.buildingSet}</td>
               <td><strong>{row.pieces.toLocaleString()}</strong><small>{row.placeables.toLocaleString()} placeables</small></td>
               <td><span>♥ {row.likes.toLocaleString()}</span><small>↓ {row.downloads.toLocaleString()}</small></td>
-              <td><div className="community-blueprint-actions"><button type="button" className="secondary" aria-expanded={expanded === row.id} onClick={() => setExpanded((current) => current === row.id ? "" : row.id)}>Details <ChevronDown size={15} /></button><button type="button" disabled={!dbPlayerId || Boolean(installing)} onClick={() => void install(row)}><SendToBack size={15} /> {installing === row.id ? "Installing..." : "Install"}</button></div></td>
+              <td><div className="community-blueprint-actions"><button type="button" className="secondary" aria-expanded={expanded === row.id} onClick={() => setExpanded((current) => current === row.id ? "" : row.id)}>Details <ChevronDown size={15} /></button><PermissionGate action="blueprints:import"><button type="button" disabled={!dbPlayerId || Boolean(installing)} onClick={() => void install(row)}><SendToBack size={15} /> {installing === row.id ? "Installing..." : "Install"}</button></PermissionGate></div></td>
             </tr>
             {expanded === row.id && <tr className="community-blueprint-detail-row"><td colSpan={7}><div className="community-blueprint-details"><div>{row.hasPreview ? <img src={previewUrl(row)} alt={`Large preview of ${row.title}`} /> : <span className="community-blueprint-no-preview">No Preview Available</span>}</div><section><h5>{row.title}</h5><p>{row.description || "No description was provided."}</p>{row.tags.length > 0 && <div className="community-blueprint-tags">{row.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>}<a href={`https://blueprints.dunedocker.app/blueprint/${encodeURIComponent(row.id)}`} target="_blank" rel="noreferrer">View Full 3D Blueprint <ExternalLink size={14} /></a></section></div></td></tr>}
           </Fragment>)}
