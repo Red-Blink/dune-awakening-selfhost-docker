@@ -129,6 +129,26 @@ test("fetchOwnedDiscordGuilds requests carry a real AbortSignal, so a hung Disco
   }
 });
 
+// #1339 (Layer 3 review, found on the near-identical oauth.js helper and
+// confirmed to be the same bug here): discordJsonRequest()'s timer used to
+// be cleared as soon as fetchImpl() resolved HEADERS, leaving response.json()
+// -- the actual body read -- with no bound. A Discord response that sends
+// headers but stalls the body must still be cut off at the timeout.
+test("fetchOwnedDiscordGuilds aborts a response whose body stalls, not just one whose headers stall", async () => {
+  let abortedCount = 0;
+  const fetchImpl = (url, init) => {
+    init.signal.addEventListener("abort", () => { abortedCount += 1; });
+    return Promise.resolve({
+      ok: true,
+      json: () => new Promise((resolve, reject) => {
+        init.signal.addEventListener("abort", () => reject(Object.assign(new Error("body read aborted"), { name: "AbortError" })));
+      })
+    });
+  };
+  await assert.rejects(() => fetchOwnedDiscordGuilds({ accessToken: "tok", fetchImpl }), /body read aborted/);
+  assert.equal(abortedCount, 1, "the identity call's body-read stall must trigger its own abort");
+});
+
 test("hostedBotOAuthReturnPage embeds the owned-guilds list as JSON the SPA can read via sessionStorage, and never embeds a token", () => {
   const guilds = [{ id: "111111111111111111", name: "Test Guild", owner: true }];
   const page = hostedBotOAuthReturnPage(guilds);

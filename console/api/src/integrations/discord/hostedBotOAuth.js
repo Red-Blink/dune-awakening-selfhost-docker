@@ -22,21 +22,28 @@ export const HOSTED_BOT_MAX_PENDING_REGISTRATIONS = 256;
 // Error+code/statusCode convention kept rather than switching to oauth.js's
 // oauthError() helper.
 const DISCORD_HTTP_TIMEOUT_MS = 5_000;
+// #1339 (Layer 3 review, same bug as oauth.js's discordJsonRequest): the
+// timer/controller used to be cleared right after fetchImpl() resolved
+// headers, leaving response.json() -- the body read -- with no bound at all.
+// Both stay live across the full request now, cleared once in `finally`
+// after the body read, not before it.
 async function discordJsonRequest(url, init, { fetchImpl, label }) {
-  let response;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DISCORD_HTTP_TIMEOUT_MS);
   try {
-    response = await fetchImpl(url, { ...init, signal: controller.signal });
-  } catch {
-    throw Object.assign(new Error(`Discord ${label} request failed.`), { code: "discord_unreachable", statusCode: 502 });
+    let response;
+    try {
+      response = await fetchImpl(url, { ...init, signal: controller.signal });
+    } catch {
+      throw Object.assign(new Error(`Discord ${label} request failed.`), { code: "discord_unreachable", statusCode: 502 });
+    }
+    if (!response.ok) {
+      throw Object.assign(new Error(`Discord rejected the ${label} request (HTTP ${response.status}).`), { code: "oauth_upstream_error", statusCode: 502 });
+    }
+    return await response.json();
   } finally {
     clearTimeout(timer);
   }
-  if (!response.ok) {
-    throw Object.assign(new Error(`Discord rejected the ${label} request (HTTP ${response.status}).`), { code: "oauth_upstream_error", statusCode: 502 });
-  }
-  return response.json();
 }
 
 // fetchOwnedDiscordGuilds: a sibling to oauth.js's fetchDiscordIdentity(),

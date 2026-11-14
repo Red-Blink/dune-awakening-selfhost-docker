@@ -128,35 +128,49 @@ export function constantTimeStringEqual(left, right) {
 // ---- Discord HTTP helpers (injected fetchImpl for tests) ----
 const DISCORD_HTTP_TIMEOUT_MS = 5_000;
 async function discordJsonRequest(url, init, { fetchImpl, label }) {
-  let response;
   // Bound every outbound Discord call (parity with handoff.js). Without this a
   // discord.com brownout or an operator's egress-drop firewall hangs the whole
   // request for undici's multi-minute default -- a real DoS on the auth path.
+  //
+  // #1339 (Layer 3 review): the timer used to be cleared as soon as fetchImpl()
+  // resolved headers, leaving response.json() with no bound at all -- a peer
+  // that sends headers then stalls the body hangs the body read for undici's
+  // default, defeating the bound this function's own comment claims to
+  // provide. The timer -- and the SAME AbortController -- now stays live
+  // across the whole request, fetch AND body read, and is cleared exactly
+  // once in `finally` regardless of which step threw.
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DISCORD_HTTP_TIMEOUT_MS);
   try {
-    response = await fetchImpl(url, { ...init, signal: controller.signal });
+    let response;
+    try {
+      response = await fetchImpl(url, { ...init, signal: controller.signal });
+    } catch {
+      throw oauthError("discord_unreachable", `Discord ${label} request failed.`, 502);
+    }
+    if (!response.ok) {
+      const rejected = oauthError("oauth_upstream_error", `Discord rejected the ${label} request (HTTP ${response.status}).`, 502);
+      rejected.upstreamStatus = response.status; // callers may treat 403/404 as "not a member", never as "sign-in failed"
+      rejected.upstreamOperation = label;
+      throw rejected;
+    }
+    let payload;
+    try {
+      payload = await response.json();
+    } catch (error) {
+      // A body read cut off by this SAME request's timeout must be reported
+      // as unreachable, not as "the server sent us garbage" -- those are
+      // different, real conditions callers can react to differently.
+      if (error?.name === "AbortError") throw oauthError("discord_unreachable", `Discord ${label} request failed.`, 502);
+      throw oauthError("oauth_bad_response", `Discord returned a malformed ${label} response.`, 502);
+    }
+    if (payload === null || payload === undefined || (typeof payload !== "object")) {
+      throw oauthError("oauth_bad_response", `Discord returned a malformed ${label} response.`, 502);
+    }
+    return payload;
+  } finally {
     clearTimeout(timer);
-  } catch {
-    clearTimeout(timer);
-    throw oauthError("discord_unreachable", `Discord ${label} request failed.`, 502);
   }
-  if (!response.ok) {
-    const rejected = oauthError("oauth_upstream_error", `Discord rejected the ${label} request (HTTP ${response.status}).`, 502);
-    rejected.upstreamStatus = response.status; // callers may treat 403/404 as "not a member", never as "sign-in failed"
-    rejected.upstreamOperation = label;
-    throw rejected;
-  }
-  let payload;
-  try {
-    payload = await response.json();
-  } catch {
-    throw oauthError("oauth_bad_response", `Discord returned a malformed ${label} response.`, 502);
-  }
-  if (payload === null || payload === undefined || (typeof payload !== "object")) {
-    throw oauthError("oauth_bad_response", `Discord returned a malformed ${label} response.`, 502);
-  }
-  return payload;
 }
 
 // Callback failures are browser pages, not gateway failures. In particular,

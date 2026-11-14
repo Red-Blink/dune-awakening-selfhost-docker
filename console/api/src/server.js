@@ -73,7 +73,7 @@ import { readCharacterTransferSettingsStatus, saveAndApplyCharacterTransferSetti
 import { handleDiscordAdapterRoute, isDiscordAdapterRoute, readDiscordBotApiToken } from "./integrations/discord/routes.js";
 import { fetchOwnedDiscordGuilds, createPendingRegistrationStore, hostedBotOAuthStateCookie, clearHostedBotOAuthStateCookie, hostedBotRegistrationHandleCookie, clearHostedBotRegistrationHandleCookie, hostedBotOAuthReturnPage } from "./integrations/discord/hostedBotOAuth.js";
 import { buildAutoInviteAuthorizeUrl, createAutoInvitePendingStateStore, autoInviteStateCookie, clearAutoInviteStateCookie, autoInviteCompletePage, autoInviteConfirmationIdCookie, clearAutoInviteConfirmationIdCookie } from "./integrations/discord/autoInvite.js";
-import { fetchWithTimeoutAndRetry } from "./services/httpWithRetry.js";
+import { fetchJsonWithTimeoutAndRetry } from "./services/httpWithRetry.js";
 import { handleI18nRoute, isPublicOrMeshI18nRoute } from "./services/i18nService.js";
 import { discordAdapterEnabled } from "./integrations/discord/adapter.js";
 import { initializeDiscordAdapterSchema } from "./integrations/discord/schema.js";
@@ -2865,7 +2865,13 @@ async function handleApi(req, res) {
     const adapterToken = readDiscordAdapterTokenForHostedBot(config);
     let mentatResponse;
     try {
-      mentatResponse = await fetchWithTimeoutAndRetry(
+      // #1339 (Layer 3 review): fetchJsonWithTimeoutAndRetry() keeps the
+      // request's abort bound alive until the body is actually read (or
+      // safely discarded unread, as here) -- fetchWithTimeoutAndRetry()
+      // alone cleared its timer as soon as headers resolved, leaving an
+      // unbounded body read/drain for every caller that reads .status after
+      // it returns.
+      ({ response: mentatResponse } = await fetchJsonWithTimeoutAndRetry(
         config.mentatBackendRegisterUrl,
         {
           method: "POST",
@@ -2881,7 +2887,7 @@ async function handleApi(req, res) {
           })
         },
         { timeoutMs: 15000 }
-      );
+      ));
     } catch {
       res.setHeader("Set-Cookie", clearHostedBotRegistrationHandleCookie(config.secureCookies));
       audit(config, req, "hosted-bot.register", { ok: false, reason: "mentat_unreachable" });
@@ -2965,9 +2971,13 @@ async function handleApi(req, res) {
     // /register above) -- mentat-link's proxyRequest() attaches the
     // X-Mentat-Proxy-Secret hop-auth header automatically; Core itself
     // never needs to hold MENTAT_PROXY_SHARED_SECRET.
-    let mentatLinkResponse;
+    let mentatLinkResponse, mentatLinkJson;
     try {
-      mentatLinkResponse = await fetchWithTimeoutAndRetry(
+      // #1339 (Layer 3 review): see the /register call site above for why
+      // this is fetchJsonWithTimeoutAndRetry(), not fetchWithTimeoutAndRetry()
+      // followed by a later .json() -- the abort bound must stay live for
+      // the body read, which happens below.
+      ({ response: mentatLinkResponse, json: mentatLinkJson } = await fetchJsonWithTimeoutAndRetry(
         config.mentatLinkAutoInviteStartUrl,
         {
           method: "POST",
@@ -2975,7 +2985,7 @@ async function handleApi(req, res) {
           body: JSON.stringify({ consoleUrl, adapterToken })
         },
         { timeoutMs: 15000 }
-      );
+      ));
     } catch {
       audit(config, req, "hosted-bot.auto-invite.start", { ok: false, reason: "mentat_unreachable" });
       return json(res, 502, { error: "Couldn't reach the hosted bot service. Try again in a moment." });
@@ -2984,13 +2994,7 @@ async function handleApi(req, res) {
       audit(config, req, "hosted-bot.auto-invite.start", { ok: false, reason: "mentat_rejected", status: mentatLinkResponse.status });
       return json(res, 502, { error: "Could not start the connection. Try again in a moment." });
     }
-    let mentatState;
-    try {
-      const mentatBody = await mentatLinkResponse.json();
-      mentatState = String(mentatBody?.state || "");
-    } catch {
-      mentatState = "";
-    }
+    const mentatState = String(mentatLinkJson?.state || "");
     if (!mentatState) {
       audit(config, req, "hosted-bot.auto-invite.start", { ok: false, reason: "mentat_bad_response" });
       return json(res, 502, { error: "Could not start the connection. Try again in a moment." });
@@ -3091,13 +3095,14 @@ async function handleApi(req, res) {
       audit(config, sanitizedUrl(req, "/api/integrations/discord/hosted-bot/auto-invite/confirmation-status"), "hosted-bot.auto-invite.confirmation-status", { ok: false, reason: "confirmation_id_cookie_mismatch" });
       return json(res, 403, { error: "This connection request could not be verified. Start over from the settings page." });
     }
-    let mentatLinkResponse;
+    let mentatLinkResponse, statusBody;
     try {
-      mentatLinkResponse = await fetchWithTimeoutAndRetry(
+      // #1339 (Layer 3 review): see the /register call site above.
+      ({ response: mentatLinkResponse, json: statusBody } = await fetchJsonWithTimeoutAndRetry(
         `${config.mentatLinkConfirmationStatusUrl}?confirmationId=${encodeURIComponent(confirmationId)}`,
         { method: "GET" },
         { timeoutMs: 15000 }
-      );
+      ));
     } catch {
       audit(config, sanitizedUrl(req, "/api/integrations/discord/hosted-bot/auto-invite/confirmation-status"), "hosted-bot.auto-invite.confirmation-status", { ok: false, reason: "mentat_unreachable" });
       return json(res, 502, { error: "Couldn't reach the hosted bot service. Try again in a moment." });
@@ -3105,12 +3110,6 @@ async function handleApi(req, res) {
     if (!mentatLinkResponse.ok) {
       audit(config, sanitizedUrl(req, "/api/integrations/discord/hosted-bot/auto-invite/confirmation-status"), "hosted-bot.auto-invite.confirmation-status", { ok: false, reason: "mentat_rejected", status: mentatLinkResponse.status });
       return json(res, 502, { error: "Could not check the connection status. Try again in a moment." });
-    }
-    let statusBody;
-    try {
-      statusBody = await mentatLinkResponse.json();
-    } catch {
-      statusBody = null;
     }
     const status = String(statusBody?.status || "not_found");
     // On "confirmed", persist the connection locally -- the same function

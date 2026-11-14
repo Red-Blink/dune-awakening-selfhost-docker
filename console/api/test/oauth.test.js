@@ -138,6 +138,26 @@ test("identity: /users/@me + guilds resolve cleanly", async () => {
   assert.deepEqual(identity.guildIds, ["987654321098765432"]);
 });
 
+// #1339 (Layer 3 review): discordJsonRequest()'s timer used to be cleared as
+// soon as fetchImpl() resolved HEADERS, leaving response.json() -- the body
+// read -- with no bound. A real DISCORD_HTTP_TIMEOUT_MS wait (not injectable
+// here) is the only way to prove the abort still fires for a stalled body,
+// not just a stalled connection.
+test("identity: a response whose body stalls is aborted, not left to hang past the timeout", async () => {
+  let aborted = false;
+  const fetchImpl = (url, init) => {
+    init.signal.addEventListener("abort", () => { aborted = true; });
+    return Promise.resolve({
+      ok: true,
+      json: () => new Promise((resolve, reject) => {
+        init.signal.addEventListener("abort", () => reject(Object.assign(new Error("body read aborted"), { name: "AbortError" })));
+      })
+    });
+  };
+  await assert.rejects(() => fetchDiscordIdentity({ accessToken: "tok", fetchImpl }), /request failed/);
+  assert.equal(aborted, true);
+});
+
 test("identity: malformed user payload rejected", async () => {
   await assert.rejects(
     fetchDiscordIdentity({ accessToken: "tok", fetchImpl: () => jsonResponse({ id: "abc", username: "nope" }) }),
