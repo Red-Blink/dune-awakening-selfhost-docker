@@ -257,6 +257,53 @@ describe("Discord OAuth disable / enable / forget (#676 §6)", { concurrency: 4 
     }
   });
 
+  // #1337 (Layer 3 review): by the time the secret-file unlink can fail,
+  // .env is already wiped and both in-process forgotten flags are already
+  // set -- this is a half-destroyed config, not a clean no-op refusal. The
+  // `recoverable` pre-wipe values (the whole point of #676 §6.4's
+  // recoverability guarantee) must be on THIS failure's own audit entry too,
+  // not only on the success path.
+  test("forget surfaces recoverable config in its audit entry even when deleting the secret file fails", async () => {
+    const port = await getFreePort();
+    const tempDir = mkdtempSync(join(tmpdir(), "discord-forget-unlink-fail-"));
+    writeDiscordEnvFile(tempDir);
+    // Boot with a REAL secret file, so config.discordOAuthAppConfigured
+    // reads true at startup (the route's first precondition check would
+    // otherwise refuse with 400 before ever reaching the unlink).
+    writeDiscordSecretFile(tempDir, "a-real-saved-secret-value");
+    const consoleProc = startConsole(port, tempDir, DISCORD_ENV_FILE_SECRET);
+    try {
+      await waitForHealth(port, 20000, consoleProc.logs);
+      const password = readGeneratedPassword(tempDir);
+      const session = await login(port, { password });
+
+      // Now swap the file for a directory: unlinkSync throws EISDIR (not
+      // ENOENT) regardless of the runner's uid, unlike a permissions-based
+      // approach, which root would simply bypass.
+      const secretPath = join(tempDir, "runtime", "secrets", "discord-oauth-client-secret.txt");
+      rmSync(secretPath);
+      mkdirSync(secretPath, { recursive: true });
+
+      const res = await api(port, "/api/settings/discord-oauth/forget", {
+        cookie: session.cookie, csrf: session.csrf, body: { currentPassword: password },
+      });
+      assert.equal(res.status, 500);
+
+      // .env was already wiped by this point -- the failure is not "nothing happened."
+      const env = readFileSync(join(tempDir, ".env"), "utf8");
+      assert.match(env, /^DISCORD_HOME_GUILD_ID=""?$/m);
+
+      const entries = readAuditEntries(tempDir);
+      const entry = entries.find((e) => e.action === "settings.discord-oauth-forgotten" && e.detail?.reason === "secret_file_delete_failed");
+      assert.ok(entry, "expected a secret_file_delete_failed audit entry");
+      assert.equal(entry.detail.recoverable.guildId, "111111111111111111", "the recovery record must survive THIS failure, not just a clean success");
+      assert.equal(entry.detail.recoverable.adminRoleIds, "400000000000000002");
+    } finally {
+      await stopProcess(consoleProc.child);
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test("forget refuses when nothing is configured or disabled", async () => {
     const port = await getFreePort();
     const tempDir = mkdtempSync(join(tmpdir(), "discord-forget-unconfigured-"));

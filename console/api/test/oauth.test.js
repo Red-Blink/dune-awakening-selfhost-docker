@@ -129,13 +129,41 @@ test("identity: /users/@me + guilds resolve cleanly", async () => {
     accessToken: "tok",
     fetchImpl: async (url) => {
       if (String(url).endsWith("/users/@me")) return jsonResponse({ id: "123456789012345678", username: "operator" });
-      if (String(url).endsWith("/users/@me/guilds")) return jsonResponse([{ id: "987654321098765432" }, { id: "555", bad: true }]);
+      if (/\/users\/@me\/guilds(\?|$)/.test(String(url))) return jsonResponse([{ id: "987654321098765432" }, { id: "555", bad: true }]);
       throw new Error("unexpected fetch");
     }
   });
   assert.equal(identity.userId, "123456789012345678");
   assert.equal(identity.username, "operator");
   assert.deepEqual(identity.guildIds, ["987654321098765432"]);
+});
+
+// #1340 (Layer 3 review): a single /users/@me/guilds call caps out at
+// Discord's own 200-guild max `limit` -- a user in more than 200 servers
+// could be missing the home guild or an owned guild entirely. 450 synthetic
+// guilds (3 full pages, the last partial) proves the loop pages through
+// every one of them via `after=<last id>`, not just the first page.
+test("identity: a user in more than 200 guilds gets ALL of them, via pagination", async () => {
+  const TOTAL = 450;
+  const allIds = Array.from({ length: TOTAL }, (_, i) => String(300000000000000000n + BigInt(i)));
+  const calls = [];
+  const identity = await fetchDiscordIdentity({
+    accessToken: "tok",
+    fetchImpl: async (url) => {
+      calls.push(String(url));
+      if (String(url).endsWith("/users/@me")) return jsonResponse({ id: "123456789012345678", username: "operator" });
+      const m = /\/users\/@me\/guilds\?limit=200(?:&after=(\d+))?$/.exec(String(url));
+      if (!m) throw new Error(`unexpected fetch: ${url}`);
+      const after = m[1];
+      const startIndex = after ? allIds.indexOf(after) + 1 : 0;
+      const page = allIds.slice(startIndex, startIndex + 200);
+      return jsonResponse(page.map((id) => ({ id })));
+    }
+  });
+  assert.equal(calls.filter((u) => u.includes("/guilds")).length, 3, "3 pages: 200 + 200 + 50");
+  assert.equal(identity.guildIds.length, TOTAL);
+  assert.equal(identity.guildIds[0], allIds[0]);
+  assert.equal(identity.guildIds[TOTAL - 1], allIds[TOTAL - 1], "the last guild (e.g. an owned/home guild past #200) must not be dropped");
 });
 
 // #1339 (Layer 3 review): discordJsonRequest()'s timer used to be cleared as
@@ -287,7 +315,7 @@ test("fetchDiscordIdentity reads member roles and mfa_enabled; a 404 member is s
   const fetchImpl = async (url) => {
     calls.push(String(url));
     if (String(url).endsWith("/users/@me")) return new Response(JSON.stringify({ id: "200000000000000001", username: "op", mfa_enabled: true }), { status: 200, headers: { "content-type": "application/json" } });
-    if (String(url).endsWith("/users/@me/guilds")) return new Response(JSON.stringify([{ id: HOME }]), { status: 200, headers: { "content-type": "application/json" } });
+    if (/\/users\/@me\/guilds(\?|$)/.test(String(url))) return new Response(JSON.stringify([{ id: HOME }]), { status: 200, headers: { "content-type": "application/json" } });
     if (String(url).endsWith(`/users/@me/guilds/${HOME}/member`)) return new Response(JSON.stringify({ roles: ["400000000000000002", "bad"] }), { status: 200, headers: { "content-type": "application/json" } });
     return new Response("{}", { status: 500 });
   };
@@ -312,7 +340,7 @@ test("fetchDiscordIdentity reads member roles and mfa_enabled; a 404 member is s
 test("fetchDiscordIdentity degrades to no roles, not a thrown error, when the member endpoint 5xx's or the network fails", async () => {
   const identityOnly = async (url) => {
     if (String(url).endsWith("/users/@me")) return new Response(JSON.stringify({ id: "200000000000000001", username: "op", mfa_enabled: true }), { status: 200, headers: { "content-type": "application/json" } });
-    if (String(url).endsWith("/users/@me/guilds")) return new Response(JSON.stringify([{ id: HOME }]), { status: 200, headers: { "content-type": "application/json" } });
+    if (/\/users\/@me\/guilds(\?|$)/.test(String(url))) return new Response(JSON.stringify([{ id: HOME }]), { status: 200, headers: { "content-type": "application/json" } });
     throw new Error("unexpected fetch");
   };
 
@@ -357,7 +385,7 @@ test("pending state carries its purpose: a setup state is consumed as setup, a l
 test("fetchDiscordIdentity marks owned guilds and keeps guild names for the setup picker", async () => {
   const fetchImpl = async (url) => {
     if (String(url).endsWith("/users/@me")) return new Response(JSON.stringify({ id: "200000000000000001", username: "op" }), { status: 200, headers: { "content-type": "application/json" } });
-    if (String(url).endsWith("/users/@me/guilds")) return new Response(JSON.stringify([{ id: HOME, name: "Fleetyard", owner: true }, { id: "300000000000000009", name: "Other", owner: false }]), { status: 200, headers: { "content-type": "application/json" } });
+    if (/\/users\/@me\/guilds(\?|$)/.test(String(url))) return new Response(JSON.stringify([{ id: HOME, name: "Fleetyard", owner: true }, { id: "300000000000000009", name: "Other", owner: false }]), { status: 200, headers: { "content-type": "application/json" } });
     return new Response(JSON.stringify({ roles: [] }), { status: 200, headers: { "content-type": "application/json" } });
   };
   const id = await fetchDiscordIdentity({ accessToken: "t", homeGuildId: HOME, apiBaseUrl: "https://api.test", fetchImpl });

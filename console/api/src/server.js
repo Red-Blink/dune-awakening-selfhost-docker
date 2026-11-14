@@ -2207,7 +2207,13 @@ async function handleApi(req, res) {
     page: 0,
     pageSize: 5000,
     access: effectiveAccess(session, playerAccessParam(url)),
-    sortColumn: url.searchParams.get("sortColumn") || "name",
+    // #1343 (Layer 3 review): a player session's result is redacted to
+    // shared_with: [] below (ownedViewForSession -> redactSharedWith), but
+    // the SQL itself still ORDERS by the real shared_count for
+    // sortColumn=shared_with -- the row order leaks exactly the ranking the
+    // redaction exists to hide. Force the default sort for a player
+    // session; every other tier keeps the requested column unchanged.
+    sortColumn: session?.tier === "player" ? "name" : (url.searchParams.get("sortColumn") || "name"),
     sortDirection: url.searchParams.get("sortDirection") || "asc"
   })));
   if (path.match(/^\/api\/players\/[^/]+\/currency$/)) return dbPlayerRoute(req, res, path, duneDb.playerCurrency);
@@ -4472,7 +4478,18 @@ async function discordOAuthForgetRoute(req, res) {
     unlinkSync(discordOAuthSecretFile());
   } catch (error) {
     if (error.code !== "ENOENT") {
-      return deny(500, { error: "Failed to delete the stored Discord Client Secret file. Discord OAuth configuration was not cleared -- check the console's filesystem permissions and try again." }, { reason: "secret_file_delete_failed" });
+      // #1337 (Layer 3 review): by this point .env is ALREADY wiped and both
+      // in-process forgotten flags are already set -- this is not a clean
+      // "nothing happened" failure, it's a half-destroyed config. The
+      // `recoverable` pre-wipe values (guildId, role mappings) are the
+      // entire point of #676 §6.4's recoverability guarantee; omitting them
+      // from THIS specific audit entry (as the bare `deny()` call used to)
+      // loses the one record that guarantee exists to produce, exactly when
+      // it's needed most. The error text also now says what's actually
+      // true: it's an unknown, recovered-via-audit-log state, not "was not
+      // cleared" (that line was accurate before this fix added the wipe
+      // ahead of the unlink; it is not accurate about THIS code today).
+      return deny(500, { error: "Failed to delete the stored Discord Client Secret file. The rest of the Discord OAuth configuration was already cleared -- check the console's filesystem permissions, then use Settings -> Discord OAuth to re-enter the guild and role mapping from the audit log if needed." }, { reason: "secret_file_delete_failed", recoverable });
     }
   }
   audit(config, auditUrl, ACTION, { ok: true, ...actor, recoverable });

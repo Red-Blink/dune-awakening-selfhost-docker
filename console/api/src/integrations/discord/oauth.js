@@ -228,14 +228,42 @@ export async function exchangeDiscordAuthCode({
   return token;
 }
 
+// #1340 (Layer 3 review): a single, unpaginated /users/@me/guilds call caps
+// out at Discord's own 200-guild default/max `limit`, so a user in more than
+// 200 servers -- including a server owner or the configured home-guild
+// member -- could be missing from the list, silently denying sign-in
+// (inHomeGuild false) or breaking the setup wizard's own-guild picker.
+// Pages forward via `after=<last id>` (Discord returns guilds ordered by id)
+// until a page comes back short of the requested limit; a hard cap (50
+// pages = 10,000 guilds) exists only to guarantee this can never loop
+// forever against a misbehaving/compromised endpoint, not because any real
+// account is expected to approach it.
+const DISCORD_GUILDS_PAGE_LIMIT = 200;
+const DISCORD_GUILDS_MAX_PAGES = 50;
+async function fetchAllDiscordGuilds({ apiBaseUrl, accessToken, fetchImpl }) {
+  const guilds = [];
+  let after = "";
+  for (let page = 0; page < DISCORD_GUILDS_MAX_PAGES; page++) {
+    const qs = after ? `?limit=${DISCORD_GUILDS_PAGE_LIMIT}&after=${encodeURIComponent(after)}` : `?limit=${DISCORD_GUILDS_PAGE_LIMIT}`;
+    const pageGuilds = await discordJsonRequest(`${apiBaseUrl}/users/@me/guilds${qs}`, {
+      headers: { authorization: `Bearer ${accessToken}`, accept: "application/json" }
+    }, { fetchImpl, label: "guilds" });
+    const list = Array.isArray(pageGuilds) ? pageGuilds : [];
+    guilds.push(...list);
+    if (list.length < DISCORD_GUILDS_PAGE_LIMIT) break;
+    const lastId = String(list[list.length - 1]?.id || "");
+    if (!lastId) break; // malformed last entry -- stop rather than loop on an empty cursor
+    after = lastId;
+  }
+  return guilds;
+}
+
 export async function fetchDiscordIdentity({ accessToken, homeGuildId = "", apiBaseUrl = DISCORD_OAUTH_BASE_URL, fetchImpl = globalThis.fetch }) {
   const [user, guilds] = await Promise.all([
     discordJsonRequest(`${apiBaseUrl}/users/@me`, {
       headers: { authorization: `Bearer ${accessToken}`, accept: "application/json" }
     }, { fetchImpl, label: "identity" }),
-    discordJsonRequest(`${apiBaseUrl}/users/@me/guilds`, {
-      headers: { authorization: `Bearer ${accessToken}`, accept: "application/json" }
-    }, { fetchImpl, label: "guilds" })
+    fetchAllDiscordGuilds({ apiBaseUrl, accessToken, fetchImpl })
   ]);
   const userId = String(user?.id || "");
   const username = String(user?.username || "");
