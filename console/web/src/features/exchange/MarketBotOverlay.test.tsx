@@ -356,6 +356,21 @@ describe("MarketBotOverlay", () => {
     expect(await screen.findByText(/removed 180 NPC listing\(s\) from exchange 42/)).toBeInTheDocument();
   });
 
+  it("refreshes the exchange order counts after removing NPC listings", async () => {
+    vi.mocked(marketBotApi.unseed).mockResolvedValue({ status: "unseeded", removedListings: "30", removedItems: "30", exchangeId: "42" });
+    renderOverlay();
+    expect(await screen.findByRole("option", { name: "Exchange 42 — 2 Access Points — 30 Bot / 10 Player Orders" })).toBeInTheDocument();
+    vi.mocked(marketBotApi.exchanges).mockResolvedValue({
+      ...EXCHANGES,
+      rows: [{ ...EXCHANGES.rows[0], orderCount: 10, botOrders: 0 }, EXCHANGES.rows[1]]
+    });
+    await selectTab("Reseed");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Remove NPC Listings" }));
+
+    expect(await screen.findByRole("option", { name: "Exchange 42 — 2 Access Points — 0 Bot / 10 Player Orders" })).toBeInTheDocument();
+  });
+
   it("reports an empty market without claiming anything was removed", async () => {
     vi.mocked(marketBotApi.unseed).mockResolvedValue({
       status: "empty", removedListings: "0", removedItems: "0", exchangeId: "42",
