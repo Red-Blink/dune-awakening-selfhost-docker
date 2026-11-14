@@ -1747,6 +1747,17 @@ case "$cmd" in
     ensure_self_update_preflight
     install_qa_commit "$tag"
     install_cli_command_after_update
+    # #1341 (Layer 3 review): this call was present in the install|apply
+    # branch above (Finding 1, CRITICAL) but missing here. A real operator
+    # upgrading via install|apply from a release that predates this
+    # migration runs the OLD, already-running script, which never migrates
+    # DISCORD_OBSERVER_ROLE_IDS -- install-qa's own script invocation is
+    # always fresh (it is downloaded/checked out, then run directly, never
+    # an already-running process), so an operator testing a QA build gets
+    # no belt-and-braces migration either, unlike install|apply's eventual
+    # second call once a release that HAS this fix is installed. Calling it
+    # here too closes that gap for the QA path.
+    migrate_discord_role_ids_env
     refresh_shutdown_protection_after_update
     rebuild_web_console_after_update
     self_update_finish_success
