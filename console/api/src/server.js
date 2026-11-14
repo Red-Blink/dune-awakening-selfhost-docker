@@ -5533,7 +5533,7 @@ function databaseTableRoute(req, res, path, action, url) {
 async function requireOwnPlayerAccess(req, res, playerId) {
   const session = req.authSession;
   if (session.tier !== "player") return true;
-  const scope = await resolveOwnPlayerScope(session.userId);
+  const scope = await resolveOwnPlayerControllerId(session.userId);
   if (!scope.linked) {
     json(res, 200, { notLinked: true, reason: PLAYER_LINK_INSTRUCTIONS.reason, linkInstructions: PLAYER_LINK_INSTRUCTIONS });
     return false;
@@ -6344,6 +6344,20 @@ async function playerIdentityForBan(playerId) {
 // for how a player actually establishes that link, an in-game whisper with a
 // one-time code proving ownership, not something this route invents) and, if
 // linked, which guild that character currently belongs to.
+// #1342 (Layer 3 review, perf): resolveOwnPlayerScope always resolves the
+// caller's guild too (getPlayerGuildId), but requireOwnPlayerAccess and
+// playerProfileRoute only ever read .linked/.playerControllerId from it --
+// a player session opening their profile page fans out roughly 15
+// /api/players/<id>/<resource> GETs, each re-running a guild lookup neither
+// caller uses. This skips that query for exactly those two callers; the
+// other resolveOwnPlayerScope callers (which DO need guildId) are
+// unchanged.
+async function resolveOwnPlayerControllerId(discordUserId) {
+  const linked = await duneDb.getLinkedPlayer(db, discordUserId);
+  if (!linked) return { linked: false, playerControllerId: null };
+  return { linked: true, playerControllerId: linked.player_controller_id };
+}
+
 async function resolveOwnPlayerScope(discordUserId) {
   const linked = await duneDb.getLinkedPlayer(db, discordUserId);
   if (!linked) return { linked: false, playerControllerId: null, guildId: null };
@@ -6382,7 +6396,7 @@ async function playerProfileRoute(req, res, path) {
   // action_player_id resolution (fls_id, else owner_account_id) rather than
   // re-deriving the identifier scheme independently, so the two can't drift.
   if (session.tier === "player") {
-    const scope = await resolveOwnPlayerScope(session.userId);
+    const scope = await resolveOwnPlayerControllerId(session.userId);
     if (!scope.linked) return json(res, 200, { notLinked: true, reason: PLAYER_LINK_INSTRUCTIONS.reason, linkInstructions: PLAYER_LINK_INSTRUCTIONS });
     const own = await duneDb.listPlayers(db, { onlyPlayerControllerId: scope.playerControllerId, pageSize: 1, includeTotals: false });
     const ownPlayerId = own.rows[0]?.action_player_id;
