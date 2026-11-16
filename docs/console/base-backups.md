@@ -155,6 +155,15 @@ segments, tax invoices, and everything stored in the base (inventories, items,
 sinkcharts, stored blueprints). The owning player is a placeholder mapped to the
 receiving player on import.
 
+A stored building blueprint may have been renamed by another player, including
+a deleted character. When that editor is outside the export, the game's
+exporting-player fallback points the reference at the owner placeholder, which
+becomes the receiving player on import. A temporary `Character` helper supplies
+that fallback during export and is removed before the file is rendered. No
+character record is downloaded or accepted on import, and unrelated unresolved
+references still fail validation. Both stored-backup and live-base downloads use
+this same export path.
+
 **What it does not carry** (same as the game's own transfer): the base's BaseTotem
 respawn point, and inventories that belong to an item (a weapon's own internal
 inventory) — none held items on a live server when checked.

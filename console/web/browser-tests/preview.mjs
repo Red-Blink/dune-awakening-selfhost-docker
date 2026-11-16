@@ -171,19 +171,20 @@ try{
  const picker=page.getByRole('dialog',{name:'Console Theme'});
  await picker.waitFor();
  assert.equal(await picker.getByRole('radio').count(),66);
- for(const width of [320,390,768,1440]){
+ for(const width of [320,390,420,421,768,1024,1192,1440]){
   await page.setViewportSize({width,height:900});
   assert.ok(await picker.evaluate(node=>node.scrollWidth<=node.clientWidth+1),'theme picker has no horizontal scroll at '+width);
   for(const radio of await picker.getByRole('radio').all()){
    const dimensions=()=>radio.evaluate(node=>{
     const label=node.querySelector('.theme-card-label');
     const range=document.createRange();range.selectNodeContents(label);
-    return {height:node.getBoundingClientRect().height,labelWidth:label.clientWidth,lines:new Set([...range.getClientRects()].map(rect=>rect.top)).size};
+    return {height:node.getBoundingClientRect().height,labelWidth:label.clientWidth,labelScrollWidth:label.scrollWidth,lines:new Set([...range.getClientRects()].map(rect=>rect.top)).size};
    });
    const before=await dimensions();
    await radio.click();
    assert.deepEqual(await dimensions(),before,'selecting a palette preserves its single-line layout at '+width);
    assert.equal(before.lines,1,'palette name stays on one line at '+width);
+   assert.ok(before.labelScrollWidth<=before.labelWidth,'full palette name fits without truncation at '+width+': '+await radio.innerText());
   }
  }
  await picker.getByRole('radio',{name:'Default',exact:true}).click();
