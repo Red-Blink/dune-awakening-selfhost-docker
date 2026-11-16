@@ -184,7 +184,8 @@ create type dune._charactertransferentrykind as enum (
   'act', 'fgl', 'inv', 'itm', 'bbp', 'acc',
   'PermissionActor', 'PermissionActorRank', 'ActorInventory', 'Building', 'BuildingInstance',
   'Placeable', 'Totem', 'BaseBackup', 'BaseBackupLinkedActor', 'LandclaimSegment', 'TaxInvoice',
-  'Sinkchart', 'BuildingBlueprintInstance', 'BuildingBlueprintPlaceable', 'BuildingBlueprintPentashield'
+  'Sinkchart', 'BuildingBlueprintInstance', 'BuildingBlueprintPlaceable', 'BuildingBlueprintPentashield',
+  'Character'
 );
 
 create table dune._stub_transfer_filter (
@@ -279,6 +280,15 @@ create function dune._stub_not_exported_is_expected(path text) returns boolean l
   ]);
 $$;
 
+-- Paths whose not-exported reference stands for "the exporting player": the
+-- game reads that player's controller (a transfer id) from the export's
+-- Character entry and fails with sbMG2$ when there is none. The game's list.
+create function dune._stub_not_exported_maps_to_exporting_player(path text) returns boolean language sql as $$
+  select path = any(array[
+    '.stats.FBuildingBlueprintItemStats.*.BlueprintNameLastEditedByPlayerId'
+  ]);
+$$;
+
 create function dune._character_transfer_replace_local_id_with_transfer_id_in_json(data jsonb, path text)
 returns jsonb language plpgsql as $$
 declare k text; v jsonb; result jsonb; s text; v_id bigint; v_transfer bigint;
@@ -302,8 +312,14 @@ begin
     select transfer_id into v_transfer from pg_temp.export_data
       where kind = substr(s, 3, 3)::dune._charactertransferentrykind and id = v_id;
     if v_transfer is null then
-      if dune._stub_not_exported_is_expected(path) then return to_jsonb('!!' || substr(s, 3, 3) || '@0'); end if;
-      raise exception 'Id % by % was not exported', s, path;
+      if dune._stub_not_exported_maps_to_exporting_player(path) then
+        v_transfer := (select (e.data ->> 'player_controller_id')::bigint from pg_temp.export_data e where e.kind = 'Character');
+        if v_transfer is null then raise exception 'sbMG2$ - No exported player controller to replace % by %', s, path; end if;
+      elsif dune._stub_not_exported_is_expected(path) then
+        return to_jsonb('!!' || substr(s, 3, 3) || '@0');
+      else
+        raise exception 'Id % by % was not exported', s, path;
+      end if;
     end if;
     return to_jsonb('!!' || substr(s, 3, 3) || '@' || v_transfer);
   end if;

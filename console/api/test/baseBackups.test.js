@@ -160,7 +160,7 @@ const SUMMARY_ROW = {
 
 const ALL_KINDS = ["act", "fgl", "inv", "itm", "bbp", "PermissionActor", "PermissionActorRank", "ActorInventory", "Building",
   "BuildingInstance", "Placeable", "Totem", "BaseBackup", "BaseBackupLinkedActor", "LandclaimSegment", "TaxInvoice", "Sinkchart",
-  "BuildingBlueprintInstance", "BuildingBlueprintPlaceable", "BuildingBlueprintPentashield"];
+  "BuildingBlueprintInstance", "BuildingBlueprintPlaceable", "BuildingBlueprintPentashield", "Character"];
 
 function fakeDb({
   online = false, failOn = null, failWith = null, missingFunction = null, kinds = ALL_KINDS,
@@ -319,6 +319,15 @@ test("listBaseBackups reports unsupported when any helper function is missing", 
   assert.equal(result.supported, false);
   assert.deepEqual(result.rows, []);
   assert.ok(result.missing.includes(signature));
+});
+
+test("a game build without the temporary Character export helper reads as unsupported", async () => {
+  const db = fakeDb({ kinds: ALL_KINDS.filter((kind) => kind !== "Character") });
+  const result = await listBaseBackups(db);
+  assert.equal(result.supported, false);
+  assert.ok(result.missing.includes("dune._charactertransferentrykind 'Character'"));
+  await assert.rejects(exportLiveBase(db, 201), /not supported by this game database/);
+  assert.equal(db.calls.transaction, 0);
 });
 
 test("steam build id is read from the appmanifest and fails soft to null", async () => {

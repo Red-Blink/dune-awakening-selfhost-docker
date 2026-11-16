@@ -187,6 +187,60 @@ test("real PostgreSQL: importing a base backup recreates it exactly for the rece
   });
 });
 
+// The game's rewrite points .stats.FBuildingBlueprintItemStats.*.BlueprintNameLastEditedByPlayerId
+// at "the exporting player" when the id is not in the export. Here: a deleted
+// character's leftover controller (no player_state), and the owner's own rename.
+const RENAMED_BY = ["FBuildingBlueprintItemStats", "1", "BlueprintNameLastEditedByPlayerId"];
+async function renameStoredBlueprint(pool, itemId, controllerId) {
+  await pool.query(`update dune.items set stats = jsonb_set(stats, $2::text[], to_jsonb($3::text)) where id = $1`,
+    [itemId, RENAMED_BY, `!!act#${controllerId}`]);
+}
+
+for (const [who, controller] of [["a player outside the base", 30], ["the owner", SOURCE.controller]]) {
+  test(`real PostgreSQL: a stored blueprint last renamed by ${who} exports and imports as the receiving player's`, async (t) => {
+    await withDatabase(t, async (pool, db) => {
+      await pool.query("insert into dune.actors (id, class) values (30, 'BP_DunePlayerController_C')");
+      await renameStoredBlueprint(pool, 801, controller);
+
+      const text = await exportText(db);
+      const file = JSON.parse(text);
+      const stored = file.entries.find((e) => e.kind === "itm" && e.data.template_id === "BuildingBlueprint_CopyDevice");
+      assert.equal(stored.data.stats.FBuildingBlueprintItemStats[1].BlueprintNameLastEditedByPlayerId,
+        `!!act@${file.ownerPlaceholderTransferId}`, "the reference points at the owner placeholder");
+      assert.equal(file.entries.some((e) => e.kind === "Character"), false, "the helper entry is never shipped");
+
+      const result = await importBaseBackup(db, TARGET.pawn, text, { serverBuild: "2036754" });
+      const renamedBy = (await pool.query(`
+        select it.stats #>> $2::text[] as v
+        from dune.items it
+        join dune.inventories inv on inv.id = it.inventory_id
+        join dune.base_backup_linked_actors l on l.actor_id = inv.actor_id
+        where l.id = $1 and it.template_id = 'BuildingBlueprint_CopyDevice'`, [result.backupId, RENAMED_BY])).rows[0].v;
+      assert.equal(renamedBy, `!!act#${TARGET.controller}`);
+    });
+  });
+}
+
+test("real PostgreSQL: a live base holding a blueprint renamed by a player outside the base exports", async (t) => {
+  await withDatabase(t, async (pool, db) => {
+    await pool.query("insert into dune.actors (id, class) values (30, 'BP_DunePlayerController_C')");
+    await pool.query(`update dune.items set stats = stats || '{"FBuildingBlueprintItemStats": [[], {"BlueprintNameLastEditedByPlayerId": "!!act#30"}]}' where id = 810`);
+    const { text } = await exportLiveBase(db, LIVE.building, { gameBuild: "2036754", consoleVersion: "test" });
+    const file = JSON.parse(text);
+    const item = file.entries.find((e) => e.kind === "itm" && e.data.template_id === "Water_Item");
+    assert.equal(item.data.stats.FBuildingBlueprintItemStats[1].BlueprintNameLastEditedByPlayerId, `!!act@${file.ownerPlaceholderTransferId}`);
+    assert.equal(file.entries.some((e) => e.kind === "Character"), false);
+  });
+});
+
+test("real PostgreSQL: the owner fallback does not allow unrelated outside-player references", async (t) => {
+  await withDatabase(t, async (pool, db) => {
+    await pool.query("insert into dune.actors (id, class) values (30, 'BP_DunePlayerController_C')");
+    await pool.query(`update dune.items set stats = stats || '{"UnreviewedPlayerReference":"!!act#30"}' where id = 801`);
+    await assert.rejects(exportText(db), /was not exported/);
+  });
+});
+
 test("real PostgreSQL: importing the same file twice creates two independent backups", async (t) => {
   await withDatabase(t, async (pool, db) => {
     const text = await exportText(db);
