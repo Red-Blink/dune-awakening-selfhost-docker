@@ -5060,7 +5060,7 @@
     "% threshold using the": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 753,
+        "line": 760,
         "nearby": [
           "Read-only probe for exchange",
           "at the",
@@ -5570,7 +5570,7 @@
     "About Exchange Selection": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 679,
+        "line": 686,
         "nearby": [
           "Upload CSV",
           "Exchange",
@@ -5628,7 +5628,7 @@
     "About Market Bot": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 625,
+        "line": 632,
         "nearby": [
           "Market Bot Settings",
           "Market Bot",
@@ -5735,7 +5735,7 @@
     "Above Price Threshold": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 759,
+        "line": 766,
         "nearby": [
           "Eligible to Buy",
           "Waiting Beyond Sweep Limit",
@@ -6251,7 +6251,7 @@
     "Activity": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 703,
+        "line": 710,
         "nearby": [
           "Buyback",
           "Reseed",
@@ -8564,7 +8564,7 @@
     "at the": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 753,
+        "line": 760,
         "nearby": [
           "Why Listings Were Not Bought",
           "Read-only probe for exchange",
@@ -8682,7 +8682,7 @@
     "Augment Pricing": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 787,
+        "line": 794,
         "nearby": [
           "Price Multiplier",
           "Seed Price Multiplier",
@@ -8691,7 +8691,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 788,
+        "line": 795,
         "nearby": [
           "Seed Price Multiplier",
           "Cheaper Than Patterns",
@@ -9565,7 +9565,7 @@
     "Back Up Before Every Write": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 694,
+        "line": 701,
         "nearby": [
           "When on, the console takes a full database backup before every Market Bot write: buyback sweeps, reseeds, and NPC listing removals, scheduled or manual. Only the newest Market Bot backups are kept (DUNE_MARKET_BOT_BACKUP_KEEP, default 5). Turning this off skips those backups; existing backups are kept.",
           "Back Up the Database Before Every Write",
@@ -9577,7 +9577,7 @@
     "Back Up the Database Before Every Write": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 693,
+        "line": 700,
         "nearby": [
           "Safety Backups Off",
           "When on, the console takes a full database backup before every Market Bot write: buyback sweeps, reseeds, and NPC listing removals, scheduled or manual. Only the newest Market Bot backups are kept (DUNE_MARKET_BOT_BACKUP_KEEP, default 5). Turning this off skips those backups; existing backups are kept.",
@@ -11479,7 +11479,7 @@
     "Buyback": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 701,
+        "line": 708,
         "nearby": [
           "Market Bot writes run without a restore point. Scheduled and manual runs are affected.",
           "Market Bot Sections",
@@ -11491,7 +11491,7 @@
     "Buyback Diagnostics": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 751,
+        "line": 758,
         "nearby": [
           "Running…",
           "Run Sweep Now",
@@ -11503,7 +11503,7 @@
     "Buyback Interval Minutes": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 714,
+        "line": 721,
         "nearby": [
           "Schedule",
           "Interval (Minutes)",
@@ -11515,7 +11515,7 @@
     "Buyback Percent": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 728,
+        "line": 735,
         "nearby": [
           "Price Multiplier",
           "Buyback Price Multiplier",
@@ -11524,7 +11524,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 729,
+        "line": 736,
         "nearby": [
           "Buyback Price Multiplier",
           "Price Basis",
@@ -11535,7 +11535,7 @@
     "Buyback Price Basis": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 732,
+        "line": 739,
         "nearby": [
           "Buyback Percent",
           "Price Basis",
@@ -11547,7 +11547,7 @@
     "Buyback Price Multiplier": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 726,
+        "line": 733,
         "nearby": [
           "Pricing and Limits",
           "Price Multiplier",
@@ -11558,7 +11558,7 @@
     "Buyback schedule saved (disabled).": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 426,
+        "line": 433,
         "nearby": [
           "No additional detail was recorded.",
           "No player sell listings on this exchange.",
@@ -11592,7 +11592,7 @@
     "Buyback sweep log cleared.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 500,
+        "line": 507,
         "nearby": [
           "Run Sweep",
           "Nothing eligible; no backup was taken.",
@@ -11604,7 +11604,7 @@
     "Buyback Sweeps": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 709,
+        "line": 716,
         "nearby": [
           "Reseed",
           "Activity",
@@ -11616,7 +11616,7 @@
     "Buys complete player-listed stacks when the per-unit ask is within the configured percentage of the selected price basis. A sweep checks eligibility first and, with Safety Backups on, creates a backup only when something qualifies. Seeded pricing follows the reseed augment-pricing choice; category multipliers may be tuned independently.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 709,
+        "line": 716,
         "nearby": [
           "Activity",
           "Buyback Sweeps",
@@ -12237,7 +12237,7 @@
     "Category Price Tuning": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 743,
+        "line": 750,
         "nearby": [
           "Max Buys Per Sweep",
           "Saving…",
@@ -12246,7 +12246,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 795,
+        "line": 802,
         "nearby": [
           "Cheaper Than Patterns",
           "Original Plan Prices",
@@ -12804,7 +12804,7 @@
     "Cheaper Than Patterns": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 789,
+        "line": 796,
         "nearby": [
           "Augment Pricing",
           "Original Plan Prices",
@@ -14281,7 +14281,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 626,
+        "line": 633,
         "nearby": [
           "Market Bot",
           "About Market Bot",
@@ -14291,7 +14291,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 814,
+        "line": 821,
         "nearby": [
           "Removing…",
           "Remove NPC Listings"
@@ -15071,7 +15071,7 @@
     "Commodity Stack Quantities": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 796,
+        "line": 803,
         "nearby": [
           "Original Plan Prices",
           "Category Price Tuning",
@@ -19760,7 +19760,7 @@
     "Disable Backups": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 463,
+        "line": 470,
         "nearby": [
           "Reseed schedule saved (disabled).",
           "Disable Safety Backups",
@@ -19962,7 +19962,7 @@
     "Disable Safety Backups": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 463,
+        "line": 470,
         "nearby": [
           "Buyback schedule saved (disabled).",
           "Reseed schedule saved (disabled).",
@@ -21153,7 +21153,7 @@
     "Download CSV": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 663,
+        "line": 670,
         "nearby": [
           "Save Plan Name",
           "Downloading…",
@@ -21324,7 +21324,7 @@
     "Downloading…": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 663,
+        "line": 670,
         "nearby": [
           "Saving…",
           "Save Plan Name",
@@ -22017,7 +22017,7 @@
     "Eligible to Buy": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 757,
+        "line": 764,
         "nearby": [
           "Player Listings Checked",
           "Recognized in Seed Plan",
@@ -23120,7 +23120,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 679,
+        "line": 686,
         "nearby": [
           "Upload CSV",
           "About Exchange Selection",
@@ -23129,7 +23129,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 680,
+        "line": 687,
         "nearby": [
           "About Exchange Selection",
           "Exchanges with access points appear first because players can reach them in game. Saving a schedule binds it to the exchange selected here.",
@@ -23193,7 +23193,7 @@
     "Exchanges with access points appear first because players can reach them in game. Saving a schedule binds it to the exchange selected here.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 679,
+        "line": 686,
         "nearby": [
           "Exchange",
           "About Exchange Selection",
@@ -25215,7 +25215,7 @@
     "Friendly name": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 652,
+        "line": 659,
         "nearby": [
           "Seed Plan Name",
           "Name for a new imported plan",
@@ -28702,7 +28702,7 @@
     "Interval (Minutes)": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 713,
+        "line": 720,
         "nearby": [
           "Buys complete player-listed stacks when the per-unit ask is within the configured percentage of the selected price basis. A sweep checks eligibility first and, with Safety Backups on, creates a backup only when something qualifies. Seeded pricing follows the reseed augment-pricing choice; category multipliers may be tuned independently.",
           "Schedule",
@@ -28712,7 +28712,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 772,
+        "line": 779,
         "nearby": [
           "Replaces only the bot's NPC sell listings from the active seed plan. Each write run creates a backup (when Safety Backups are on), clears the bot listings on the selected exchange, and seeds fresh stock; player listings are never touched. Augments use bottom-of-range rolls, with either discounted or original plan pricing.",
           "Schedule",
@@ -28724,7 +28724,7 @@
     "Invalid Price or Empty Stack": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 761,
+        "line": 768,
         "nearby": [
           "Above Price Threshold",
           "Unknown Template",
@@ -30586,7 +30586,7 @@
     "Live Market Average": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 734,
+        "line": 741,
         "nearby": [
           "Buyback Price Basis",
           "Seeded NPC Price",
@@ -30598,7 +30598,7 @@
     "Live Market Lowest": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 735,
+        "line": 742,
         "nearby": [
           "Seeded NPC Price",
           "Live Market Average",
@@ -31696,7 +31696,7 @@
     "Loading…": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 628,
+        "line": 635,
         "nearby": [
           "About Market Bot",
           "Close",
@@ -32601,7 +32601,7 @@
     "Market Bot": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 625,
+        "line": 632,
         "nearby": [
           "No NPC listings to remove; no backup was taken.",
           "Market Bot Settings",
@@ -32624,7 +32624,7 @@
     "Market Bot Sections": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 700,
+        "line": 707,
         "nearby": [
           "Back Up Before Every Write",
           "Market Bot writes run without a restore point. Scheduled and manual runs are affected.",
@@ -32648,7 +32648,7 @@
     "Market Bot Settings": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 622,
+        "line": 629,
         "nearby": [
           "The reseed schedule is enabled: the next scheduled run will repopulate this market. Disable the schedule to keep it unseeded.",
           "No NPC listings to remove; no backup was taken.",
@@ -32660,7 +32660,7 @@
     "Market Bot writes run without a restore point. Scheduled and manual runs are affected.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 697,
+        "line": 704,
         "nearby": [
           "Back Up the Database Before Every Write",
           "Back Up Before Every Write",
@@ -32695,7 +32695,7 @@
     "Market Reseed": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 768,
+        "line": 775,
         "nearby": [
           "Unknown Template",
           "Invalid Price or Empty Stack",
@@ -32731,7 +32731,7 @@
     "Max Buys Per Sweep": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 738,
+        "line": 745,
         "nearby": [
           "Live Market Average",
           "Live Market Lowest",
@@ -32740,7 +32740,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 739,
+        "line": 746,
         "nearby": [
           "Live Market Lowest",
           "Category Price Tuning",
@@ -33704,7 +33704,7 @@
     "Name for a new imported plan": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 652,
+        "line": 659,
         "nearby": [
           "Plan Name",
           "Seed Plan Name",
@@ -33784,7 +33784,7 @@
     "Named seed plans are CSV-backed lists the Market Bot can stock. The bundled catalog stays read-only. Set one plan as active to use it for reseeds and buyback price caps. Download CSV exports the selected plan; Upload CSV imports a UTF-8 CSV of names and numbers only (no extra columns, SQL, JSON, or formulas).": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 636,
+        "line": 643,
         "nearby": [
           "The active seed plan could not be read. Choose another plan or upload a CSV.",
           "Seed Plans",
@@ -34869,7 +34869,7 @@
     "No Exchanges Found": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 681,
+        "line": 688,
         "nearby": [
           "Exchanges with access points appear first because players can reach them in game. Saving a schedule binds it to the exchange selected here.",
           "Exchange",
@@ -35221,7 +35221,7 @@
     "No NPC listings to remove; no backup was taken.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 529,
+        "line": 536,
         "nearby": [
           "Remove Listings",
           "The reseed schedule is enabled: the next scheduled run will repopulate this market. Disable the schedule to keep it unseeded.",
@@ -35618,7 +35618,7 @@
     "No seed plan selected.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 657,
+        "line": 664,
         "nearby": [
           "Name for a new imported plan",
           "Friendly name",
@@ -35630,7 +35630,7 @@
     "No Seed Plans": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 640,
+        "line": 647,
         "nearby": [
           "Seed Plan",
           "Plan Name",
@@ -36243,7 +36243,7 @@
     "Nothing eligible; no backup was taken.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 484,
+        "line": 491,
         "nearby": [
           "Run Buyback Sweep",
           "Run Sweep",
@@ -37434,7 +37434,7 @@
     "Original Plan Prices": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 790,
+        "line": 797,
         "nearby": [
           "Augment Pricing",
           "Cheaper Than Patterns",
@@ -39130,7 +39130,7 @@
     "Plan Name": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 646,
+        "line": 653,
         "nearby": [
           "Seed Plan",
           "No Seed Plans",
@@ -39436,7 +39436,7 @@
     "Player Listings Checked": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 755,
+        "line": 762,
         "nearby": [
           "% threshold using the",
           "price basis.",
@@ -40422,7 +40422,7 @@
     "Price Basis": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 731,
+        "line": 738,
         "nearby": [
           "Buyback Percent",
           "Buyback Price Basis",
@@ -40433,7 +40433,7 @@
     "price basis.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 753,
+        "line": 760,
         "nearby": [
           "at the",
           "% threshold using the",
@@ -40445,7 +40445,7 @@
     "Price Multiplier": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 725,
+        "line": 732,
         "nearby": [
           "Run Automatically",
           "Pricing and Limits",
@@ -40455,7 +40455,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 784,
+        "line": 791,
         "nearby": [
           "Run Automatically",
           "Pricing",
@@ -40467,7 +40467,7 @@
     "Pricing": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 782,
+        "line": 789,
         "nearby": [
           "Run Reseed on a Schedule",
           "Run Automatically",
@@ -40479,7 +40479,7 @@
     "Pricing and Limits": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 723,
+        "line": 730,
         "nearby": [
           "Run Buyback on a Schedule",
           "Run Automatically",
@@ -40503,7 +40503,7 @@
     "Probe Eligibility": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 747,
+        "line": 754,
         "nearby": [
           "Save Buyback Schedule",
           "Probing…",
@@ -40515,7 +40515,7 @@
     "Probing…": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 747,
+        "line": 754,
         "nearby": [
           "Saving…",
           "Save Buyback Schedule",
@@ -41553,7 +41553,7 @@
     "Read-only probe for exchange": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 753,
+        "line": 760,
         "nearby": [
           "Buyback Diagnostics",
           "Why Listings Were Not Bought",
@@ -41928,7 +41928,7 @@
     "Recognized in Seed Plan": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 756,
+        "line": 763,
         "nearby": [
           "price basis.",
           "Player Listings Checked",
@@ -43556,7 +43556,7 @@
     "Remove Listings": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 521,
+        "line": 528,
         "nearby": [
           "Run Reseed",
           "Remove NPC Listings",
@@ -43580,7 +43580,7 @@
     "Remove NPC Listings": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 520,
+        "line": 527,
         "nearby": [
           "Run Market Reseed",
           "Run Reseed",
@@ -43590,7 +43590,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 801,
+        "line": 808,
         "nearby": [
           "Run Reseed Now",
           "Removing…",
@@ -43760,7 +43760,7 @@
     "Removing…": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 801,
+        "line": 808,
         "nearby": [
           "Running…",
           "Run Reseed Now",
@@ -44115,7 +44115,7 @@
     "Replaces only the bot's NPC sell listings from the active seed plan. Each write run creates a backup (when Safety Backups are on), clears the bot listings on the selected exchange, and seeds fresh stock; player listings are never touched. Augments use bottom-of-range rolls, with either discounted or original plan pricing.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 768,
+        "line": 775,
         "nearby": [
           "Invalid Price or Empty Stack",
           "Market Reseed",
@@ -44360,7 +44360,7 @@
     "Reseed": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 702,
+        "line": 709,
         "nearby": [
           "Market Bot Sections",
           "Buyback",
@@ -44372,7 +44372,7 @@
     "Reseed schedule saved (disabled).": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 443,
+        "line": 450,
         "nearby": [
           "No player sell listings on this exchange.",
           "Buyback schedule saved (disabled).",
@@ -46759,7 +46759,7 @@
     "Run Automatically": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 718,
+        "line": 725,
         "nearby": [
           "Buyback Interval Minutes",
           "Run Buyback on a Schedule",
@@ -46769,7 +46769,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 777,
+        "line": 784,
         "nearby": [
           "Seed Interval Minutes",
           "Run Reseed on a Schedule",
@@ -46781,7 +46781,7 @@
     "Run Buyback on a Schedule": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 717,
+        "line": 724,
         "nearby": [
           "Interval (Minutes)",
           "Buyback Interval Minutes",
@@ -46793,7 +46793,7 @@
     "Run Buyback Sweep": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 476,
+        "line": 483,
         "nearby": [
           "Safety backups are on.",
           "Safety backups are off.",
@@ -46817,7 +46817,7 @@
     "Run Market Reseed": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 507,
+        "line": 514,
         "nearby": [
           "Nothing eligible; no backup was taken.",
           "Buyback sweep log cleared.",
@@ -46852,7 +46852,7 @@
     "Run Reseed": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 507,
+        "line": 514,
         "nearby": [
           "Buyback sweep log cleared.",
           "Run Market Reseed",
@@ -46864,7 +46864,7 @@
     "Run Reseed Now": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 800,
+        "line": 807,
         "nearby": [
           "Save Reseed Schedule",
           "Running…",
@@ -46876,7 +46876,7 @@
     "Run Reseed on a Schedule": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 776,
+        "line": 783,
         "nearby": [
           "Interval (Minutes)",
           "Seed Interval Minutes",
@@ -46888,7 +46888,7 @@
     "Run Sweep": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 476,
+        "line": 483,
         "nearby": [
           "Safety backups are off.",
           "Run Buyback Sweep",
@@ -46900,7 +46900,7 @@
     "Run Sweep Now": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 748,
+        "line": 755,
         "nearby": [
           "Probe Eligibility",
           "Running…",
@@ -46994,7 +46994,7 @@
     "Running…": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 748,
+        "line": 755,
         "nearby": [
           "Probing…",
           "Probe Eligibility",
@@ -47004,7 +47004,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 800,
+        "line": 807,
         "nearby": [
           "Saving…",
           "Save Reseed Schedule",
@@ -47119,7 +47119,7 @@
     "Safety Backups": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 691,
+        "line": 698,
         "nearby": [
           "Exchange",
           "No Exchanges Found",
@@ -47131,7 +47131,7 @@
     "Safety backups are off.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 469,
+        "line": 476,
         "nearby": [
           "Disable Backups",
           "Safety backups are on.",
@@ -47143,7 +47143,7 @@
     "Safety backups are on.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 469,
+        "line": 476,
         "nearby": [
           "Disable Safety Backups",
           "Disable Backups",
@@ -47155,7 +47155,7 @@
     "Safety Backups Off": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 691,
+        "line": 698,
         "nearby": [
           "No Exchanges Found",
           "Safety Backups",
@@ -47456,7 +47456,7 @@
     "Save Buyback Schedule": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 746,
+        "line": 753,
         "nearby": [
           "Category Price Tuning",
           "Saving…",
@@ -47713,7 +47713,7 @@
     "Save Plan Name": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 662,
+        "line": 669,
         "nearby": [
           "Set as Active Plan",
           "Saving…",
@@ -47761,7 +47761,7 @@
     "Save Reseed Schedule": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 799,
+        "line": 806,
         "nearby": [
           "Commodity Stack Quantities",
           "Saving…",
@@ -48425,7 +48425,7 @@
     "Saving…": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 662,
+        "line": 669,
         "nearby": [
           "Setting…",
           "Set as Active Plan",
@@ -48435,7 +48435,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 746,
+        "line": 753,
         "nearby": [
           "Max Buys Per Sweep",
           "Category Price Tuning",
@@ -48445,7 +48445,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 799,
+        "line": 806,
         "nearby": [
           "Category Price Tuning",
           "Commodity Stack Quantities",
@@ -48559,7 +48559,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 711,
+        "line": 718,
         "nearby": [
           "Buyback Sweeps",
           "Buys complete player-listed stacks when the per-unit ask is within the configured percentage of the selected price basis. A sweep checks eligibility first and, with Safety Backups on, creates a backup only when something qualifies. Seeded pricing follows the reseed augment-pricing choice; category multipliers may be tuned independently.",
@@ -48569,7 +48569,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 770,
+        "line": 777,
         "nearby": [
           "Market Reseed",
           "Replaces only the bot's NPC sell listings from the active seed plan. Each write run creates a backup (when Safety Backups are on), clears the bot listings on the selected exchange, and seeds fresh stock; player listings are never touched. Augments use bottom-of-range rolls, with either discounted or original plan pricing.",
@@ -49360,7 +49360,7 @@
     "Seed Interval Minutes": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 773,
+        "line": 780,
         "nearby": [
           "Schedule",
           "Interval (Minutes)",
@@ -49372,7 +49372,7 @@
     "Seed Plan": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 638,
+        "line": 645,
         "nearby": [
           "Seed Plans",
           "Named seed plans are CSV-backed lists the Market Bot can stock. The bundled catalog stays read-only. Set one plan as active to use it for reseeds and buyback price caps. Download CSV exports the selected plan; Upload CSV imports a UTF-8 CSV of names and numbers only (no extra columns, SQL, JSON, or formulas).",
@@ -49381,7 +49381,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 639,
+        "line": 646,
         "nearby": [
           "Named seed plans are CSV-backed lists the Market Bot can stock. The bundled catalog stays read-only. Set one plan as active to use it for reseeds and buyback price caps. Download CSV exports the selected plan; Upload CSV imports a UTF-8 CSV of names and numbers only (no extra columns, SQL, JSON, or formulas).",
           "No Seed Plans",
@@ -49392,7 +49392,7 @@
     "Seed Plan Name": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 648,
+        "line": 655,
         "nearby": [
           "No Seed Plans",
           "Plan Name",
@@ -49414,7 +49414,7 @@
     "Seed Plans": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 636,
+        "line": 643,
         "nearby": [
           "The bundled market seed plan is missing. Repair or reinstall the console release.",
           "The active seed plan could not be read. Choose another plan or upload a CSV.",
@@ -49426,7 +49426,7 @@
     "Seed Price Multiplier": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 785,
+        "line": 792,
         "nearby": [
           "Pricing",
           "Price Multiplier",
@@ -49437,7 +49437,7 @@
     "Seeded NPC Price": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 733,
+        "line": 740,
         "nearby": [
           "Price Basis",
           "Buyback Price Basis",
@@ -50533,7 +50533,7 @@
     "Set as Active Plan": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 661,
+        "line": 668,
         "nearby": [
           "The bot cannot seed until an available plan is active.",
           "Setting…",
@@ -50804,7 +50804,7 @@
     "Setting…": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 661,
+        "line": 668,
         "nearby": [
           "No seed plan selected.",
           "The bot cannot seed until an available plan is active.",
@@ -54534,7 +54534,7 @@
     "The active seed plan could not be read. Choose another plan or upload a CSV.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 631,
+        "line": 638,
         "nearby": [
           "The Market Bot is unsupported by the detected database schema.",
           "The bundled market seed plan is missing. Repair or reinstall the console release.",
@@ -54653,7 +54653,7 @@
     "The bot cannot seed until an available plan is active.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 658,
+        "line": 665,
         "nearby": [
           "Friendly name",
           "No seed plan selected.",
@@ -54665,7 +54665,7 @@
     "The bundled market seed plan is missing. Repair or reinstall the console release.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 630,
+        "line": 637,
         "nearby": [
           "Loading…",
           "The Market Bot is unsupported by the detected database schema.",
@@ -55148,7 +55148,7 @@
     "The Market Bot is unsupported by the detected database schema.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 629,
+        "line": 636,
         "nearby": [
           "Close",
           "Loading…",
@@ -55375,7 +55375,7 @@
     "The reseed schedule is enabled: the next scheduled run will repopulate this market. Disable the schedule to keep it unseeded.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 523,
+        "line": 530,
         "nearby": [
           "Remove NPC Listings",
           "Remove Listings",
@@ -57998,7 +57998,7 @@
     "Unknown Template": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 760,
+        "line": 767,
         "nearby": [
           "Waiting Beyond Sweep Limit",
           "Above Price Threshold",
@@ -58762,7 +58762,7 @@
     "Upload CSV": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 665,
+        "line": 672,
         "nearby": [
           "Download CSV",
           "Uploading…",
@@ -58771,7 +58771,7 @@
       },
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 671,
+        "line": 678,
         "nearby": [
           "Uploading…",
           "Exchange",
@@ -58818,7 +58818,7 @@
     "Uploading…": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 665,
+        "line": 672,
         "nearby": [
           "Downloading…",
           "Download CSV",
@@ -59898,7 +59898,7 @@
     "Waiting Beyond Sweep Limit": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 758,
+        "line": 765,
         "nearby": [
           "Recognized in Seed Plan",
           "Eligible to Buy",
@@ -60404,7 +60404,7 @@
     "When on, the console takes a full database backup before every Market Bot write: buyback sweeps, reseeds, and NPC listing removals, scheduled or manual. Only the newest Market Bot backups are kept (DUNE_MARKET_BOT_BACKUP_KEEP, default 5). Turning this off skips those backups; existing backups are kept.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 691,
+        "line": 698,
         "nearby": [
           "Safety Backups",
           "Safety Backups Off",
@@ -60462,7 +60462,7 @@
     "Why Listings Were Not Bought": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
-        "line": 752,
+        "line": 759,
         "nearby": [
           "Run Sweep Now",
           "Buyback Diagnostics",
