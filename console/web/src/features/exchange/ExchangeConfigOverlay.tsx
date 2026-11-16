@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { exchangeApi, type ExchangeConfig } from "../../api/exchange";
@@ -126,7 +127,7 @@ export function ExchangeConfigOverlay({ onClose, onSaved, onError }: ExchangeCon
           </>}
         <div className="confirm-modal-actions">
           <button onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="primary" onClick={() => void save()} disabled={saving || loading}>{saving ? "Saving…" : "Save"}</button>
+          <PermissionGate action="exchange:write-config"><button className="primary" onClick={() => void save()} disabled={saving || loading}>{saving ? "Saving…" : "Save"}</button></PermissionGate>
         </div>
       </div>
     </div>

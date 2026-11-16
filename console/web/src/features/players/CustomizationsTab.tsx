@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect, useMemo, useState } from "react";
 import { playersApi } from "../../api/players";
 import { DataTable, useSortableRows } from "../../components/common/DataTable";
@@ -163,7 +164,7 @@ export function CustomizationsTab({ dbPlayerId, playerName, confirmAction, onAct
           <h4>Customizations</h4>
           <p>Grant complete cosmetic sets or choose individual variants and swatches.</p>
         </div>
-        <button disabled={!dbPlayerId || loading || Boolean(busyKey)} onClick={() => void grant({ groupId: "all", label: "all customization sets", count: rows.length })}>Grant All Sets</button>
+        <PermissionGate action="players:grant"><button disabled={!dbPlayerId || loading || Boolean(busyKey)} onClick={() => void grant({ groupId: "all", label: "all customization sets", count: rows.length })}>Grant All Sets</button></PermissionGate>
       </div>
       <p className="playerAdmin_note">Halloween 2026 cosmetics unlock directly while the player is offline. Other cosmetics use tokens; token delivery does not grant or verify DLC or account entitlements. Available means no matching token is currently pending.</p>
       <div className="playerAdmin_customizationCards">
@@ -177,7 +178,7 @@ export function CustomizationsTab({ dbPlayerId, playerName, confirmAction, onAct
               <strong>{group.name}</strong>
               <span>{group.count} Cosmetics{requirement ? ` · ${requirement}` : ""}{pending ? ` · ${pending} Pending` : ""}</span>
             </button>
-            <button disabled={!dbPlayerId || Boolean(busyKey) || groupRows.length === 0} onClick={() => void grant({ groupId: group.id, label: group.name, count: groupRows.length })}>{busyKey === `group:${group.id}` ? "Granting..." : "Grant Set"}</button>
+            <PermissionGate action="players:grant"><button disabled={!dbPlayerId || Boolean(busyKey) || groupRows.length === 0} onClick={() => void grant({ groupId: group.id, label: group.name, count: groupRows.length })}>{busyKey === `group:${group.id}` ? "Granting..." : "Grant Set"}</button></PermissionGate>
           </article>;
         })}
       </div>
@@ -215,7 +216,7 @@ export function CustomizationsTab({ dbPlayerId, playerName, confirmAction, onAct
           const row = item as unknown as CustomizationRow;
           const disabled = row.status !== "Available" || Boolean(busyKey);
           const label = busyKey === `item:${row.itemId}` ? "Granting..." : row.status === "Available" ? "Grant" : row.status === "Pending" ? "Pending" : row.status === "Unlocked" ? "Unlocked" : "Delivered";
-          return <button className="playerAdmin_stateActionButton" disabled={disabled} onClick={() => void grant({ itemId: row.itemId, label: row.name, count: 1 })}>{label}</button>;
+          return <PermissionGate action="players:grant"><button className="playerAdmin_stateActionButton" disabled={disabled} onClick={() => void grant({ itemId: row.itemId, label: row.name, count: 1 })}>{label}</button></PermissionGate>;
         }}
       />}
     </section>

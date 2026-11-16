@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
@@ -245,7 +246,7 @@ export function BasePermissionsTab({ baseId, baseName, onSaved, confirmAction }:
           />
         </div>
 
-        <div className="bases-permissions-toolbar">
+        <PermissionGate action="bases:mutate"><div className="bases-permissions-toolbar">
           <div className="bases-permissions-add">
             <div className="action-row bases-permissions-search-row">
               <input
@@ -284,14 +285,14 @@ export function BasePermissionsTab({ baseId, baseName, onSaved, confirmAction }:
           <div className="bases-permissions-actions">
             <span className="muted">{dirty ? "Unsaved changes" : ""}</span>
             <button disabled={!dirty || saving} onClick={() => setDraft(saved)}>Revert</button>
-            <button
+            <PermissionGate action="bases:mutate"><button
               className="update-action"
               disabled={!dirty || !owner || saving || Boolean(unclaimed)}
               title={unclaimed || `Save permissions for ${baseName}`}
               onClick={() => void save()}
-            >{saving ? "Saving…" : "Save changes"}</button>
+            >{saving ? "Saving…" : "Save changes"}</button></PermissionGate>
           </div>
-        </div>
+        </div></PermissionGate>
 
         {/* Do not reserve an empty message area. Warnings and results appear
             only when they have useful information, matching the compact action
@@ -339,13 +340,13 @@ export function BasePermissionsTab({ baseId, baseName, onSaved, confirmAction }:
                 disabled={saving || Boolean(unclaimed)}
                 onChange={(rank) => changeRank(entry.playerId, rank)}
               />
-              <button
+              <PermissionGate action="bases:mutate"><button
                 className="icon-toggle-button bases-permissions-remove"
                 disabled={saving || Boolean(unclaimed)}
                 title={unclaimed || `Remove ${entry.name || entry.playerId}`}
                 aria-label={`Remove ${entry.name || entry.playerId}`}
                 onClick={() => removeEntry(entry.playerId)}
-              ><Trash2 size={15} /></button>
+              ><Trash2 size={15} /></button></PermissionGate>
             </div>
           ))}
           {!nonOwners.length && <p className="muted">This base is not shared with anyone else.</p>}

@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect, useRef, useState } from "react";
 import { playersApi } from "../../api/players";
 import { setupApi } from "../../api/setup";
@@ -166,7 +167,7 @@ export function PlayerTeleportControls({ playerId, playerName, isOnline, confirm
         <input value={coords.z} onChange={(event) => setCoords({ ...coords, z: event.target.value })} placeholder="Z" aria-label="Teleport Z coordinate" />
         <button disabled={!playerId || loading} onClick={() => void useCurrentPosition()}>Use Current Position</button>
       </div>}
-      <button disabled={!canTeleport || Boolean(result?.pending)} onClick={() => void teleport()}>Teleport</button>
+      <PermissionGate action="players:teleport"><button disabled={!canTeleport || Boolean(result?.pending)} onClick={() => void teleport()}>Teleport</button></PermissionGate>
       <button className="secondary" disabled={loading || !playerId} onClick={() => void loadDestinations()}>{loading ? "Loading…" : "Reload"}</button>
     </div>
     <p className={!effectiveOnline ? "action-help-note warning" : "action-help-note"}>{effectiveOnline

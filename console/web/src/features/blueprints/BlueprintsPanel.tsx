@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect, useRef, useState } from "react";
 import { Download, FileJson, FolderOpen, Library, Trash2, Upload } from "lucide-react";
 import { api, apiDownload } from "../../api/client";
@@ -336,9 +337,9 @@ export function BlueprintsPanel({ onError, confirmAction, dbPlayerId = "", playe
       <button type="button" disabled={busy} onClick={() => fileInputRef.current?.click()}>
         <FolderOpen size={16} /> Select
       </button>
-      <button disabled={!importFiles.length || !dbPlayerId || busy} onClick={() => void handleImport()}>
+      <PermissionGate action="blueprints:import"><button disabled={!importFiles.length || !dbPlayerId || busy} onClick={() => void handleImport()}>
         <Upload size={16} /> {importing ? "Importing..." : "Import"}
-      </button>
+      </button></PermissionGate>
       {importFiles.length > 0 && <button disabled={busy} onClick={clearFiles}>Clear</button>}
     </div>
 
@@ -374,7 +375,7 @@ export function BlueprintsPanel({ onError, confirmAction, dbPlayerId = "", playe
         const blueprint = row as BlueprintRow;
         return <span className="icon-toggle-group">
           <button className="icon-toggle-button success" title="Download blueprint" aria-label="Download blueprint" disabled={busy} onClick={(event) => { event.stopPropagation(); void handleExportSingle(blueprint); }}><Download size={16} /></button>
-          <button className="icon-toggle-button danger" title="Delete blueprint" aria-label="Delete blueprint" disabled={busy} onClick={(event) => { event.stopPropagation(); void handleDeleteSingle(blueprint); }}><Trash2 size={16} /></button>
+          <PermissionGate action="blueprints:delete"><button className="icon-toggle-button danger" title="Delete blueprint" aria-label="Delete blueprint" disabled={busy} onClick={(event) => { event.stopPropagation(); void handleDeleteSingle(blueprint); }}><Trash2 size={16} /></button></PermissionGate>
         </span>;
       }}
       sortColumn={blueprintSort.sortColumn}
@@ -390,15 +391,15 @@ export function BlueprintsPanel({ onError, confirmAction, dbPlayerId = "", playe
           <span>{selectedCount ? `${selectedCount} selected` : "Select all"}</span>
         </label>
         <div className="service-actions">
-          <button disabled={!selectedCount || busy} onClick={() => void exportRows(rows.filter((row) => selected.has(Number(row.id))), `${selectedCount} selected blueprint${selectedCount === 1 ? "" : "s"}`)}>
+          <PermissionGate action="blueprints:export"><button disabled={!selectedCount || busy} onClick={() => void exportRows(rows.filter((row) => selected.has(Number(row.id))), `${selectedCount} selected blueprint${selectedCount === 1 ? "" : "s"}`)}>
             <Download size={16} /> Export Selected
-          </button>
-          <button className="danger" disabled={!selectedCount || busy} onClick={() => void handleDeleteSelected()}>
+          </button></PermissionGate>
+          <PermissionGate action="blueprints:delete"><button className="danger" disabled={!selectedCount || busy} onClick={() => void handleDeleteSelected()}>
             <Trash2 size={16} /> Delete Selected
-          </button>
-          <button disabled={busy} onClick={() => void exportRows(rows, `${rows.length} blueprint${rows.length === 1 ? "" : "s"}`, true)}>
+          </button></PermissionGate>
+          <PermissionGate action="blueprints:export"><button disabled={busy} onClick={() => void exportRows(rows, `${rows.length} blueprint${rows.length === 1 ? "" : "s"}`, true)}>
             <Download size={16} /> Export All
-          </button>
+          </button></PermissionGate>
         </div>
       </div>
     )}

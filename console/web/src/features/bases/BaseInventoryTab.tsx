@@ -1,3 +1,4 @@
+import { PermissionGate, useConsoleAccess } from "../../lib/consoleAccess";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Boxes, ChevronDown, ChevronRight, LayoutGrid, List, Plus, Trash2, TriangleAlert, X } from "lucide-react";
 import {
@@ -62,6 +63,7 @@ function containerLabel(container: { name: string; typeName: string; placeableId
 }
 
 export function BaseInventoryTab({ baseId, baseName, onError, confirmAction }: BaseInventoryTabProps) {
+  const access = useConsoleAccess();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [data, setData] = useState<BaseInventory | null>(null);
@@ -177,7 +179,8 @@ export function BaseInventoryTab({ baseId, baseName, onError, confirmAction }: B
   // input, a Give/Fill mode toggle, and each mode's own secondary
   // affordance (Give's batch queue, Fill's capacity sentinel) revealed only
   // while that mode is selected, rather than both shown at once.
-  const [addFillMode, setAddFillMode] = useState<"give" | "fill">("give");
+  const [requestedAddFillMode, setAddFillMode] = useState<"give" | "fill">("give");
+  const addFillMode = access.can(`bases:${requestedAddFillMode}-item`) ? requestedAddFillMode : access.can("bases:fill-item") ? "fill" : "give";
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [quantityText, setQuantityText] = useState("1");
   const [addRunning, setAddRunning] = useState(false);
@@ -458,11 +461,11 @@ export function BaseInventoryTab({ baseId, baseName, onError, confirmAction }: B
   // toggle's own "an operator who only wants to view a container's
   // contents should not have to see a destructive control" purpose for
   // every container that permitted deletion at all.
-  const bulkDeleteAllowed = deleteAllowed && destructiveControlsVisible;
+  const bulkDeleteAllowed = access.can("bases:bulk-delete-items") && deleteAllowed && destructiveControlsVisible;
 
   // Same shape and the same fail-closed default as the delete gate above. The
   // server re-checks this immediately before the write regardless.
-  const addAllowed = slots?.group === "storage" && slots?.addSafety?.safe === true;
+  const addAllowed = access.can("bases:add-item") && slots?.group === "storage" && slots?.addSafety?.safe === true;
   const addUnavailableReason = slots?.found && !addAllowed
     ? slots.group !== "storage"
       ? "Adding items is available only for Storage containers. Crafting and Refining contents are read-only to protect active jobs."
@@ -1426,13 +1429,13 @@ export function BaseInventoryTab({ baseId, baseName, onError, confirmAction }: B
                         {slot.positionIndex === null ? "—" : `#${slot.positionIndex}`}
                       </span>
                       <span className="bases-inventory-contents-qty">{slot.quantity.toLocaleString()}</span>
-                      <button
+                      <PermissionGate action="bases:delete-item"><button
                         className="icon-toggle-button danger"
                         title="Delete this stack"
                         aria-label={`Delete ${slot.name} from slot ${slot.positionIndex ?? "unknown"}`}
                         disabled={!deleteAllowed || deletingItemId === slot.itemId}
                         onClick={() => void deleteSlot(slot, slot.quantity, containerLabel(openContainer))}
-                      ><Trash2 size={15} /></button>
+                      ><Trash2 size={15} /></button></PermissionGate>
                     </div>
                   ))}
                 </div>}
@@ -1507,26 +1510,26 @@ export function BaseInventoryTab({ baseId, baseName, onError, confirmAction }: B
             {containerFull && <p className="bases-inventory-amount-error" role="status">{containerFullReason}</p>}
 
             <div className="bases-inventory-add-actions">
-              <button
+              <PermissionGate action="bases:add-item"><button
                 className="primary"
                 disabled={!addAllowed || containerFull || !addItem || !addQuantityValid || adding}
                 onClick={() => void addToContainer(containerLabel(openContainer))}
-              >{adding ? "Adding…" : "Add to container"}</button>
+              >{adding ? "Adding…" : "Add to container"}</button></PermissionGate>
               <button onClick={() => { setAddOpen(false); resetAddForm(); }}>Cancel</button>
             </div>
           </div>}
 
           {bulkDeleteAllowed && openContainer.itemCount > 0 && <div className="bases-inventory-bulk-actions">
-            <button
+            <PermissionGate action="bases:bulk-delete-items"><button
               className="danger"
               disabled={checkedItemIds.size === 0 || bulkDeleteRunning}
               onClick={() => void deleteCheckedItems(containerLabel(openContainer))}
-            >{bulkDeleteRunning ? "Deleting…" : `Delete Selected (${checkedItemIds.size})`}</button>
-            <button
+            >{bulkDeleteRunning ? "Deleting…" : `Delete Selected (${checkedItemIds.size})`}</button></PermissionGate>
+            <PermissionGate action="bases:bulk-delete-items"><button
               className="danger"
               disabled={bulkDeleteRunning}
               onClick={() => void deleteAllItems(containerLabel(openContainer), openContainer.itemCount)}
-            >{bulkDeleteRunning ? "Deleting…" : "Delete All"}</button>
+            >{bulkDeleteRunning ? "Deleting…" : "Delete All"}</button></PermissionGate>
           </div>}
 
           {selectedSlot && <div className="bases-inventory-slot-detail">
@@ -1558,11 +1561,11 @@ export function BaseInventoryTab({ baseId, baseName, onError, confirmAction }: B
                 onChange={(event) => setAmount(event.target.value)}
               />
             </label>
-            <button
+            <PermissionGate action="bases:delete-item"><button
               className="danger"
               disabled={!deleteAllowed || !amountValid || deletingItemId === selectedSlot.itemId}
               onClick={() => void deleteSlot(selectedSlot, Number(amount), containerLabel(openContainer))}
-            >{Number(amount) >= selectedSlot.quantity ? "Delete stack" : `Remove ${Number(amount).toLocaleString()}`}</button>
+            >{Number(amount) >= selectedSlot.quantity ? "Delete stack" : `Remove ${Number(amount).toLocaleString()}`}</button></PermissionGate>
           </div>}
           {selectedSlot && !amountValid && <p className="bases-inventory-amount-error" role="alert">
             Enter an amount between 1 and {selectedSlot.quantity.toLocaleString()}.
@@ -1586,7 +1589,7 @@ export function BaseInventoryTab({ baseId, baseName, onError, confirmAction }: B
               merely being unusable -- matching how deleteAllowed-gated
               controls elsewhere in this file stay visible-but-disabled
               rather than vanishing. */}
-          <label className={`switch-checkbox bases-inventory-givefill-toggle ${destructiveControlsVisible ? "enabled" : "disabled"}`}>
+          <PermissionGate anyOf={["bases:give-item","bases:fill-item","bases:bulk-delete-items"]}><label className={`switch-checkbox bases-inventory-givefill-toggle ${destructiveControlsVisible ? "enabled" : "disabled"}`}>
             <input
               type="checkbox"
               checked={destructiveControlsVisible}
@@ -1596,9 +1599,9 @@ export function BaseInventoryTab({ baseId, baseName, onError, confirmAction }: B
             />
             <span className="switch-label">Give / Fill / Delete Controls</span>
             <strong className="switch-state">{destructiveControlsVisible ? "ON" : "OFF"}</strong>
-          </label>
+          </label></PermissionGate>
 
-          {giveFillAllowed && destructiveControlsVisible && <div className="bases-inventory-givefill-panel">
+          {giveFillAllowed && destructiveControlsVisible && <PermissionGate anyOf={["bases:give-item","bases:fill-item"]}><div className="bases-inventory-givefill-panel">
             {/* Consolidated 2026-08-19 (per the UI/UX hat's dispatched design
                 review, "Alternative A") from two separately-stacked
                 panels -- one full combobox+quantity+button row for Give,
@@ -1660,18 +1663,18 @@ export function BaseInventoryTab({ baseId, baseName, onError, confirmAction }: B
               </p>
 
               <div className="bases-inventory-views" role="group" aria-label="Give or Fill">
-                <button
+                <PermissionGate action="bases:give-item"><button
                   type="button"
                   className={`bases-inventory-view${addFillMode === "give" ? " active" : ""}`}
                   aria-pressed={addFillMode === "give"}
                   onClick={() => selectAddFillMode("give")}
-                >Give</button>
-                <button
+                >Give</button></PermissionGate>
+                <PermissionGate action="bases:fill-item"><button
                   type="button"
                   className={`bases-inventory-view${addFillMode === "fill" ? " active" : ""}`}
                   aria-pressed={addFillMode === "fill"}
                   onClick={() => selectAddFillMode("fill")}
-                >Fill</button>
+                >Fill</button></PermissionGate>
               </div>
             </div>
 
@@ -1739,19 +1742,19 @@ export function BaseInventoryTab({ baseId, baseName, onError, confirmAction }: B
                   disabled={!selectedItem || addRunning}
                   onClick={queueAddItem}
                 >Add to Batch</button>
-                <button
+                <PermissionGate action="bases:give-item"><button
                   disabled={(!selectedItem && addBatch.length === 0) || addRunning}
                   onClick={() => void giveItems(containerLabel(openContainer))}
-                >{addRunning ? "Giving…" : addBatch.length > 0 ? `Give ${addBatch.length + (selectedItem ? 1 : 0)} Items` : "Give Item"}</button>
+                >{addRunning ? "Giving…" : addBatch.length > 0 ? `Give ${addBatch.length + (selectedItem ? 1 : 0)} Items` : "Give Item"}</button></PermissionGate>
               </> : <>
-                <button
+                <PermissionGate action="bases:fill-item"><button
                   disabled={!selectedItem || fillRunning}
                   onClick={() => void submitFill(containerLabel(openContainer))}
-                >{fillRunning ? "Filling…" : "Fill Amount"}</button>
-                <button
+                >{fillRunning ? "Filling…" : "Fill Amount"}</button></PermissionGate>
+                <PermissionGate action="bases:fill-item"><button
                   disabled={!selectedItem || fillRunning}
                   onClick={() => void submitFill(containerLabel(openContainer), true)}
-                >{fillRunning ? "Filling…" : "Fill to Capacity"}</button>
+                >{fillRunning ? "Filling…" : "Fill to Capacity"}</button></PermissionGate>
               </>}
             </div>
             {addFillMode === "give" && addBatch.length > 0 && <ul className="bases-inventory-add-batch">
@@ -1764,7 +1767,7 @@ export function BaseInventoryTab({ baseId, baseName, onError, confirmAction }: B
                 </li>
               ))}
             </ul>}
-          </div>}
+          </div></PermissionGate>}
 
           {/* Hidden entirely while the add panel is open, not just disabled:
               its own action row (Add to container / Cancel) is the footer in

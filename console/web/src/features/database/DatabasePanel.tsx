@@ -1,3 +1,4 @@
+import { PermissionGate, useConsoleAccess } from "../../lib/consoleAccess";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { databaseApi, type ColumnFilterTerm, type ColumnFilterTree } from "../../api/database";
@@ -141,6 +142,7 @@ async function pollDatabasePasswordRestart(
 }
 
 export function DatabasePanel() {
+  const access = useConsoleAccess();
   const [schema, setSchema] = useState("dune");
   const [tables, setTables] = useState<Record<string, unknown>[]>([]);
   const [selected, setSelected] = useState("");
@@ -452,20 +454,20 @@ export function DatabasePanel() {
     <p className="database-browser-note">
       Database edits may require relog or map/server restart.
     </p>
-    <div className="action-row"><button onClick={loadTables}>Refresh Tables</button><button onClick={() => setPasswordPanelOpen((open) => !open)}>Change Password</button><button disabled={databaseStatusLoading} onClick={() => void loadDatabaseStatus(true)}>{databaseStatusLoading && databaseStatusVisible ? "Checking..." : "Status"}</button><button onClick={toggleTunnelPanel}>SSH Tunnel Access</button></div>
-    {passwordPanelOpen && <section className="result-panel database-password-panel">
+    <div className="action-row"><button onClick={loadTables}>Refresh Tables</button><PermissionGate action="database:write-config" ><button onClick={() => setPasswordPanelOpen((open) => !open)}>Change Password</button></PermissionGate><button disabled={databaseStatusLoading} onClick={() => void loadDatabaseStatus(true)}>{databaseStatusLoading && databaseStatusVisible ? "Checking..." : "Status"}</button><button onClick={toggleTunnelPanel}>SSH Tunnel Access</button></div>
+    {passwordPanelOpen && <PermissionGate action="database:write-config" ><section className="result-panel database-password-panel">
       <div className="panel-title database-status-title"><strong>Change Database Password</strong><StatusPill value={databasePasswordResult?.status === "failed" ? "Failed" : databasePasswordResult?.status === "succeeded" ? "Saved" : "Info"} /></div>
       {showDefaultDatabasePasswordNote && <p className="muted">The default password is "dune".</p>}
       <div className="action-line">
         <label className="wide-field">New Password<SecretInput value={databasePassword} onChange={(event) => setDatabasePassword(event.target.value)} placeholder="New password" /></label>
         <label className="wide-field">Confirm Password<SecretInput value={databasePasswordConfirm} onChange={(event) => setDatabasePasswordConfirm(event.target.value)} placeholder="Confirm password" /></label>
-        <button disabled={databasePasswordResult?.status === "running"} onClick={changeDatabasePassword}>Save Password</button>
+        <PermissionGate action="database:write-config"><button disabled={databasePasswordResult?.status === "running"} onClick={changeDatabasePassword}>Save Password</button></PermissionGate>
       </div>
       {databasePasswordResult && <span className={`inline-task-result result-${databasePasswordResult.status === "succeeded" ? "ok" : databasePasswordResult.status === "failed" ? "fail" : "running"}`}>
         <strong className={databasePasswordResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(databasePasswordResult.title, databasePasswordResult.status === "running")}</strong>
         {databasePasswordResult.message && <span className="inline-task-message">{formatResultMessage(databasePasswordResult.message)}</span>}
       </span>}
-    </section>}
+    </section></PermissionGate>}
     {databaseStatusVisible && (databaseStatus || databaseStatusError || databaseStatusLoading) && <section className={`result-panel database-status-result ${databaseStatusError ? "result-fail" : "result-ok"}`}>
       <div className="panel-title database-status-title"><strong>Database Status</strong><StatusPill value={databaseStatusLoading ? "Checking" : databaseStatusError ? "Failed" : "Connected"} /></div>
       {databaseStatusLoading ? <p className="muted">Checking the database connection...</p> : databaseStatusError ? <p>{databaseStatusError}</p> : <KeyValueGrid items={[
@@ -478,7 +480,7 @@ export function DatabasePanel() {
       ]} />}
       {!databaseStatusLoading && !databaseStatusError && Boolean(databaseServer?.version) && <TechnicalDetails title="Postgres version" text={String(databaseServer?.version)} />}
     </section>}
-    {tunnelPanelOpen && <section className="result-panel database-tunnel-panel">
+    {tunnelPanelOpen && <PermissionGate action="database:read" ><section className="result-panel database-tunnel-panel">
       <div className="panel-title database-status-title"><strong>SSH Tunnel Access</strong><StatusPill value={databaseStatusLoading ? "Checking" : tunnelAccess?.available ? "Loopback Only" : "Unavailable"} /></div>
       <p>Connect DBeaver or another PostgreSQL application without exposing the database to your network. PostgreSQL remains bound to the server loopback interface, and the encrypted SSH connection carries database traffic.</p>
       {databaseStatusLoading && <p className="muted">Checking the database listener...</p>}
@@ -509,7 +511,7 @@ export function DatabasePanel() {
         {tunnelCopyResult && <span className="muted" role="status">{tunnelCopyResult}</span>}
       </>}
       {!databaseStatusLoading && !databaseStatusError && tunnelAccess?.available !== true && <p className="danger-note">The console is using a non-loopback database connection, so tunnel instructions are unavailable. No public binding will be created automatically.</p>}
-    </section>}
+    </section></PermissionGate>}
     <h3>Tables</h3>
     <div className="action-row database-table-search-row">
       <input value={tableSearch} onChange={(event) => setTableSearch(event.target.value)} placeholder="Search table names" />
@@ -548,13 +550,13 @@ export function DatabasePanel() {
         <DataTable rows={columnsSort.sortedRows} emptyMessage={columnSearchTerm ? "No matching columns found." : "No columns found."} sortColumn={columnsSort.sortColumn} sortDirection={columnsSort.sortDirection} onSort={columnsSort.onSort} />
       </details>
       {!previewLoading && !previewError && (previewRows.length
-        ? <DataTable rows={previewSort.sortedRows} columns={previewColumns} action={(row) => <button onClick={(event) => { event.stopPropagation(); startEdit(row); }}>Edit</button>} actionClassName="database-preview-actions" tableClassName="database-preview-table" sortColumn={previewSort.sortColumn} sortDirection={previewSort.sortDirection} onSort={previewSort.onSort} rowKey={(row) => String(row.__rowid)} />
+        ? <DataTable rows={previewSort.sortedRows} columns={previewColumns} action={access.can("database:mutate") ? (row) => <button onClick={(event) => { event.stopPropagation(); startEdit(row); }}>Edit</button> : undefined} actionClassName="database-preview-actions" tableClassName="database-preview-table" sortColumn={previewSort.sortColumn} sortDirection={previewSort.sortDirection} onSort={previewSort.onSort} rowKey={(row) => String(row.__rowid)} />
         : <div className="empty database-empty">{previewFilter ? "No matching rows found." : "This table has no rows to preview."}</div>)}
       {!editRow && editResult && <section className={`result-panel ${editResult.status === "running" ? "" : "transient-result"} ${editResult.status === "succeeded" ? "result-ok" : editResult.status === "failed" ? "result-fail" : "result-running"}`}>
         <div className="panel-title"><strong>{formatResultTitle(editResult.title, editResult.status === "running")}</strong><StatusPill value={editResult.status === "succeeded" ? "Saved" : editResult.status === "failed" ? "Failed" : "Saving"} /></div>
         {editResult.message && <p>{formatResultMessage(editResult.message)}</p>}
       </section>}
-      {editRow && <section ref={editRef} className="result-panel database-edit-panel">
+      {editRow && <PermissionGate action="database:mutate" ><section ref={editRef} className="result-panel database-edit-panel">
         <div className="panel-title"><strong>Edit Row</strong><StatusPill value={editResult?.status === "failed" ? "Failed" : editResult?.status === "succeeded" ? "Saved" : "Editing"} /></div>
         <div className="database-edit-grid">
           {previewColumns.map((column) => {
@@ -567,14 +569,14 @@ export function DatabasePanel() {
           })}
         </div>
         <div className="action-line">
-          <button disabled={editResult?.status === "running"} onClick={saveEditedRow}>Save Row</button>
+          <PermissionGate action="database:mutate"><button disabled={editResult?.status === "running"} onClick={saveEditedRow}>Save Row</button></PermissionGate>
           <button onClick={() => setEditRow(null)}>Cancel</button>
         </div>
         {editResult && <span className={`inline-task-result result-${editResult.status === "succeeded" ? "ok" : editResult.status === "failed" ? "fail" : "running"}`}>
           <strong className={editResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(editResult.title, editResult.status === "running")}</strong>
           {editResult.message && <span className="inline-task-message">{formatResultMessage(editResult.message)}</span>}
         </span>}
-      </section>}
+      </section></PermissionGate>}
       {jsonEditorColumn && <JsonValueEditor
         column={jsonEditorColumn}
         value={editValues[jsonEditorColumn] || ""}
@@ -591,17 +593,17 @@ export function DatabasePanel() {
         <DatabaseSchemaBrowser schema={schema} tables={tables} onCreateQuery={createSqlQuery} />
       </div>}
     </div>
-    <div className={`playerAdmin_toggle database-advanced-section ${advancedSqlOpen ? "open" : ""}`}>
+    <PermissionGate action="database:query" ><div className={`playerAdmin_toggle database-advanced-section ${advancedSqlOpen ? "open" : ""}`}>
       <button className="playerAdmin_toggleHeader" aria-label={advancedSqlOpen ? "Collapse Advanced SQL Console" : "Expand Advanced SQL Console"} onClick={() => setAdvancedSqlOpen(!advancedSqlOpen)}>{advancedSqlOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Advanced SQL Console</span></button>
       {advancedSqlOpen && <div className="playerAdmin_toggleBody">
         <textarea ref={sqlEditorRef} value={sql} onChange={(event) => setSql(event.target.value)} rows={5} />
-        <div className="action-row"><button onClick={runQuery}>Run Query</button><button onClick={exportQueryJson}>Export Query JSON</button></div>
+        <div className="action-row"><PermissionGate action="database:query"><button onClick={runQuery}>Run Query</button></PermissionGate><PermissionGate action="database:export"><button onClick={exportQueryJson}>Export Query JSON</button></PermissionGate></div>
         {queryRan && queryError && <div className="empty database-empty danger-note">{formatResultMessage(`Query failed: ${queryError}`)}</div>}
         {queryRan && !queryError && queryResult && (queryRows.length
           ? <DataTable rows={querySort.sortedRows} columns={queryColumns} sortColumn={querySort.sortColumn} sortDirection={querySort.sortDirection} onSort={querySort.onSort} />
           : <div className="result-panel transient-result result-ok database-query-result">Query completed. Rows affected: {queryAffectedRows}.</div>)}
       </div>}
-    </div>
+    </div></PermissionGate>
   </section>;
 }
 

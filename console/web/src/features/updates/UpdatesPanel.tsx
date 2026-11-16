@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect, useState } from "react";
 import { BookOpen, ChevronDown, ChevronUp, LogIn, LogOut, RotateCcw, ShieldCheck } from "lucide-react";
 import { fetchConsoleAuthState } from "../../api/client";
@@ -506,11 +507,11 @@ export function UpdatesPanel({
   const qaAuthenticated = qaStatus?.authenticated === true;
   const qaApplyReason = !qaBuild ? "Checking the latest QA build." : !qaBuild.ready ? qaBuild.reason || "The latest main build has not passed all checks." : !qaBuild.updateAvailable ? "This Console already has the latest QA build." : "";
   const latestConsoleValue = qaAuthenticated
-    ? <span className="qa-version-value"><span>{updateDisplayValue(stackStatus, "latest", formatStackVersionLabel)}</span><button type="button" className="icon-button qa-release-reinstall" aria-label="Reinstall latest public release" title="Reinstall latest public release" disabled={stackUpdateRunning} onClick={() => void reinstallPublicRelease()}><RotateCcw size={16} aria-hidden="true" /></button></span>
+    ? <span className="qa-version-value"><span>{updateDisplayValue(stackStatus, "latest", formatStackVersionLabel)}</span><PermissionGate action="updates:apply"><button type="button" className="icon-button qa-release-reinstall" aria-label="Reinstall latest public release" title="Reinstall latest public release" disabled={stackUpdateRunning} onClick={() => void reinstallPublicRelease()}><RotateCcw size={16} aria-hidden="true" /></button></PermissionGate></span>
     : updateDisplayValue(stackStatus, "latest", formatStackVersionLabel);
 
   return <section className="panel updates-panel">
-    <div className="panel-title updates-page-title"><h2>Updates</h2><div className="qa-login-actions">{qaAuthenticated ? <><span className="qa-authenticated"><ShieldCheck size={17} aria-hidden="true" /><span>{qaStatus.user?.username || "Discord User"}</span><span className="qa-auth-role">{qaStatus.user?.role || "QA Tester"}</span></span><button disabled={qaBusy || stackUpdateRunning} onClick={() => void logoutQa()}><LogOut size={16} aria-hidden="true" />Logout</button></> : <button className="qa-login-button" disabled={qaBusy} onClick={() => void loginQa()}><LogIn size={14} aria-hidden="true" />{qaBusy || qaStatus?.status === "pending" ? "Waiting for Discord..." : "QA Tester Login"}</button>}</div></div>
+    <div className="panel-title updates-page-title"><h2>Updates</h2><div className="qa-login-actions">{qaAuthenticated ? <><span className="qa-authenticated"><ShieldCheck size={17} aria-hidden="true" /><span>{qaStatus.user?.username || "Discord User"}</span><span className="qa-auth-role">{qaStatus.user?.role || "QA Tester"}</span></span><PermissionGate action="updates:apply"><button disabled={qaBusy || stackUpdateRunning} onClick={() => void logoutQa()}><LogOut size={16} aria-hidden="true" />Logout</button></PermissionGate></> : <PermissionGate action="updates:apply"><button className="qa-login-button" disabled={qaBusy} onClick={() => void loginQa()}><LogIn size={14} aria-hidden="true" />{qaBusy || qaStatus?.status === "pending" ? "Waiting for Discord..." : "QA Tester Login"}</button></PermissionGate>}</div></div>
     {qaError && <div className="qa-login-feedback"><p className="danger-note qa-login-error">{qaError}</p></div>}
     <div className="action-sections">
       <section className="action-section">
@@ -520,14 +521,14 @@ export function UpdatesPanel({
         {gameStatus.status === "Version details unavailable" && <p className="muted">{gameStatus.reason}</p>}
         {assetsMissing && <p className="danger-note">The game files are not installed on this host, so nothing that needs the database or the game images can run. Install them to continue.</p>}
         <div className="action-line">
-          <button disabled={gameUpdateRunning} onClick={() => checkGame({ fresh: true })}>Refresh Game Check</button>
-          {gameCanApply && <button className="update-action" onClick={applyGameUpdate}>Apply Game Update</button>}
+          <PermissionGate action="updates:check"><button disabled={gameUpdateRunning} onClick={() => checkGame({ fresh: true })}>Refresh Game Check</button></PermissionGate>
+          {gameCanApply && <PermissionGate action="updates:apply"><button className="update-action" onClick={applyGameUpdate}>Apply Game Update</button></PermissionGate>}
           {/* Never gated on an update being available: the case this exists for
               is a host with no game files at all, where the Steam check itself
               fails and every "Update Available" condition is false. */}
-          <button className={assetsMissing ? "update-action" : ""} disabled={gameUpdateRunning} onClick={installGameAssets}>
+          <PermissionGate action="updates:install-assets"><button className={assetsMissing ? "update-action" : ""} disabled={gameUpdateRunning} onClick={installGameAssets}>
             {assetsMissing ? "Install Game Files" : "Reinstall Game Files"}
-          </button>
+          </button></PermissionGate>
         </div>
         {gameUpdateTask && <GameUpdateProgress task={gameUpdateTask} repairTask={gameSteamcmdFixTask} onDismiss={() => setGameUpdateTask(null)} onRetry={gameUpdateTask.operation === "updateInstallAssets" ? installGameAssets : applyGameUpdate} onFixSteamcmd={fixSteamcmd} formatResultTitle={formatResultTitle} formatResultMessage={formatResultMessage} />}
       </section>
@@ -538,17 +539,17 @@ export function UpdatesPanel({
         {stackStatus.status === "Check Failed" && stackStatus.reason && <p className="danger-note">{stackStatus.reason}</p>}
         {stackStatus.status === "Version details unavailable" && <p className="muted">{stackStatus.reason}</p>}
         <div className="action-line">
-          <button disabled={stackUpdateRunning} onClick={checkStack}>Refresh Console Check</button>
+          <PermissionGate action="updates:self-check"><button disabled={stackUpdateRunning} onClick={checkStack}>Refresh Console Check</button></PermissionGate>
           {stackReleaseNotes && <a className="button-link" href={stackReleaseNotes} target="_blank" rel="noreferrer"><BookOpen size={16} aria-hidden="true" />View Patch Notes</a>}
-          {stackCanApply && <button className="update-action" onClick={applyStackUpdate}>Apply Console Update</button>}
-          {qaAuthenticated && <button className="update-action qa-apply-button" disabled={stackUpdateRunning || !qaBuild?.ready || !qaBuild.updateAvailable} title={qaApplyReason} onClick={() => void applyQaUpdate()}>Apply Pre-Release</button>}
+          {stackCanApply && <PermissionGate action="updates:apply"><button className="update-action" onClick={applyStackUpdate}>Apply Console Update</button></PermissionGate>}
+          {qaAuthenticated && <PermissionGate action="updates:apply"><button className="update-action qa-apply-button" disabled={stackUpdateRunning || !qaBuild?.ready || !qaBuild.updateAvailable} title={qaApplyReason} onClick={() => void applyQaUpdate()}>Apply Pre-Release</button></PermissionGate>}
         </div>
         {stackUpdateTask && <StackUpdateProgress task={stackUpdateTask} helperProgress={stackHelperProgress} refreshCountdown={stackUpdateRefreshCountdown} onDismiss={() => setStackUpdateTask(null)} onRetry={stackUpdateTask.operation === "selfUpdateQaApply" ? applyQaUpdate : applyStackUpdate} formatResultTitle={formatResultTitle} formatResultMessage={formatResultMessage} />}
       </section>
       <div className={`playerAdmin_toggle auto-game-toggle ${autoGameOpen ? "open" : ""}`}>
           <button className="playerAdmin_toggleHeader" aria-label={autoGameOpen ? "Collapse Automatic Game Updates" : "Expand Automatic Game Updates"} onClick={() => setAutoGameOpen(!autoGameOpen)}>{autoGameOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}<span>Automatic Game Updates</span></button>
           {autoGameOpen && <div className="playerAdmin_toggleBody">
-        <div className="panel-title"><h4>Service Configuration</h4><label className={`switch-checkbox ${autoGameEnabled ? "enabled" : "disabled"}`}><input type="checkbox" disabled={autoGameLoading || autoGameSaving} checked={autoGameEnabled} onChange={(event) => saveAutoGame(event.target.checked)} /><span className="switch-label">Auto Updates</span><strong className="switch-state">{autoGameEnabled ? "ON" : "OFF"}</strong></label></div>
+        <div className="panel-title"><h4>Service Configuration</h4><label className={`switch-checkbox ${autoGameEnabled ? "enabled" : "disabled"}`}><PermissionGate action="updates:write-config"><input type="checkbox" disabled={autoGameLoading || autoGameSaving} checked={autoGameEnabled} onChange={(event) => saveAutoGame(event.target.checked)} /></PermissionGate><span className="switch-label">Auto Updates</span><strong className="switch-state">{autoGameEnabled ? "ON" : "OFF"}</strong></label></div>
         <KeyValueGrid items={[
           ["Current Status", autoGameStatusLabel],
           ["Check Interval", `Every ${autoGameValues.check_interval_minutes || autoGameIntervalMinutes} minutes`],
@@ -594,7 +595,7 @@ export function UpdatesPanel({
         </div>
         <div className="auto-update-settings-divider" />
         <div className="action-line schedule-action-line auto-game-action-line">
-          <button disabled={autoGameLoading || autoGameSaving} onClick={() => saveAutoGame()}>Save Auto Updates</button>
+          <PermissionGate action="updates:write-config"><button disabled={autoGameLoading || autoGameSaving} onClick={() => saveAutoGame()}>Save Auto Updates</button></PermissionGate>
           {autoGameResult && <span className={`inline-task-result result-${autoGameResult.status === "succeeded" ? "ok" : autoGameResult.status === "failed" ? "fail" : "running"}`}>
             <strong className={autoGameResult.status === "running" ? "loading-dots" : ""}>{formatResultTitle(autoGameResult.title, autoGameResult.status === "running")}</strong>
           </span>}

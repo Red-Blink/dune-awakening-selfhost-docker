@@ -12,7 +12,7 @@ export const DISCORD_ADAPTER_ROUTES = Object.freeze({
 
 const ROLE_TIERS = Object.freeze({
   public: 0,
-  observer: 1,
+  player: 1,
   admin: 2
 });
 
@@ -42,13 +42,13 @@ export async function handleDiscordAdapterRoute({ req, res, path, config, readJs
 
     if (path === DISCORD_ADAPTER_ROUTES.READINESS && req.method === "POST") {
       const body = await readJson(req).catch(() => ({}));
-      requireDiscordCapability(body.actor, "observer");
+      requireDiscordCapability(body.actor, "player");
       return json(res, 200, await discordCommandPayload(config, "readiness"));
     }
 
     if (path === DISCORD_ADAPTER_ROUTES.SERVICES && req.method === "POST") {
       const body = await readJson(req).catch(() => ({}));
-      requireDiscordCapability(body.actor, "observer");
+      requireDiscordCapability(body.actor, "player");
       return json(res, 200, await discordCommandPayload(config, "services"));
     }
 
@@ -121,19 +121,22 @@ export function requireDiscordCapability(actor, minimumTier) {
 }
 
 export function discordRoleMappingFromEnv(env = process.env) {
-  const observerRoleIds = csv(env.DISCORD_OBSERVER_ROLE_IDS);
+  // Renamed DISCORD_OBSERVER_ROLE_IDS -> DISCORD_PLAYER_ROLE_IDS -- see the
+  // matching comment in integrations/discord/adapter.js's own
+  // discordRoleMappingFromEnv for the fallback/collision-naming rationale.
+  const playerRoleIds = csv(env.DISCORD_PLAYER_ROLE_IDS || env.DISCORD_OBSERVER_ROLE_IDS);
   const adminRoleIds = [...csv(env.DISCORD_ADMIN_ROLE_IDS), ...csv(env.DISCORD_OWNER_ROLE_IDS)];
   return {
-    observerRoleIds,
+    playerRoleIds,
     adminRoleIds,
-    hasConfiguredRoles: observerRoleIds.length > 0 || adminRoleIds.length > 0
+    hasConfiguredRoles: playerRoleIds.length > 0 || adminRoleIds.length > 0
   };
 }
 
 export function discordActorTier(actor, mapping = discordRoleMappingFromEnv()) {
   const roleIds = new Set(Array.isArray(actor?.roleIds) ? actor.roleIds.map((roleId) => String(roleId)) : csv(actor?.roleIds));
   if (mapping.adminRoleIds.some((roleId) => roleIds.has(roleId))) return "admin";
-  if (mapping.observerRoleIds.some((roleId) => roleIds.has(roleId))) return "observer";
+  if (mapping.playerRoleIds.some((roleId) => roleIds.has(roleId))) return "player";
   return "public";
 }
 

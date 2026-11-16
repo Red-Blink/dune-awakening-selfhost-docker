@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { playersApi } from "../../api/players";
@@ -382,7 +383,7 @@ export function PlayersPanel({ onError, renderCharacterAdmin, onOpenBase, confir
           </label>
           <label className="inline-filter-label players-inactive-filter">
             Hide Inactive Players After
-            <select
+            <PermissionGate action="players:configure-list"><select
               value={inactiveWeeks === null ? "never" : String(inactiveWeeks)}
               disabled={visibilitySaving || !canConfigureVisibility || playerFilter === "banned"}
               onChange={(event) => void changeInactiveFilter(event.target.value)}
@@ -394,7 +395,7 @@ export function PlayersPanel({ onError, renderCharacterAdmin, onOpenBase, confir
               <option value="3">3 Weeks</option>
               <option value="4">1 Month</option>
               <option value="8">2 Months</option>
-            </select>
+            </select></PermissionGate>
           </label>
           <button onClick={() => void load({ q: submittedQ, page, pageSize, status: playerFilter, sortColumn, sortDirection, recentOnly: !showInactive })}>Refresh</button>
         </div>

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { backupsApi } from "../../api/backups";
 import { setCsrfToken } from "../../api/client";
 import { BackupsPanel } from "./BackupsPanel";
+import { setConsoleAccess } from "../../lib/consoleAccess";
 // The real stylesheet, so the preview's own output can be asserted to be
 // visible rather than merely present: .technical-details is display:none
 // outside body.debug, which hid the restore preview's replace list on a live
@@ -103,6 +104,19 @@ describe("system backups", () => {
     vi.mocked(backupsApi.listSystem).mockResolvedValue({ rows: [] });
     vi.mocked(backupsApi.createSystem).mockResolvedValue({ task: { id: "t1", status: "queued" } as never });
     vi.mocked(backupsApi.systemAutoStatus).mockResolvedValue({ status: { ok: true, enabled: false, passphraseSaved: false, automaticCount: 0, automaticBytes: 0 } });
+  });
+
+  it("allows system backup creation without exposing credential archive import, restore, or download", async () => {
+    setConsoleAccess("ready", { username: "admin", displayName: "Admin", tier: "admin" }, ["backups:read", "backups:create-system"]);
+    vi.mocked(backupsApi.listSystem).mockResolvedValue({ rows: [{ name: ARCHIVE, size: "2 KB", sizeBytes: 2048, createdAt: "2026-08-30T12:00:00Z", origin: "manual", type: "Manual Backup", source: "Local", encryption: "aes-256-ocb-gpg-aead", serverTitle: "Test", battlegroupId: "sh-test", hasSidecar: true, includesAuditLog: false }] });
+    renderPanel();
+    const section = await systemSection();
+    await section.findByText(ARCHIVE);
+    expect(section.getByRole("button", { name: "Create System Backup" })).toBeVisible();
+    expect(section.queryByRole("button", { name: "Import Backup" })).toBeNull();
+    expect(section.queryByRole("button", { name: /Restore system backup/ })).toBeNull();
+    expect(section.queryByRole("link", { name: /Download system backup/ })).toBeNull();
+    expect(section.queryByRole("button", { name: /Delete/ })).toBeNull();
   });
 
   it("uses the same column names as the database table, in the same order", async () => {

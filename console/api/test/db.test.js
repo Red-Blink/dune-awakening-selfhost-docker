@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertIdentifier, bigintParam, discoverDbConfig, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
+import { assertIdentifier, bigintParam, discoverDbConfig, intParam, isReadOnlySql, quoteQualified, redactDbError, rowsResult } from "../src/db.js";
 import {
   _resetRefillPartitionDwellForTests,
   baseRefillTarget,
@@ -34,6 +34,16 @@ test("bigint parameters preserve identifiers beyond JavaScript's safe integer ra
   assert.equal(bigintParam("9223372036854775807", "item id"), "9223372036854775807");
   assert.throws(() => bigintParam("9223372036854775808", "item id"), /Invalid item id/);
   assert.throws(() => bigintParam("1.5", "item id"), /Invalid item id/);
+});
+
+// #1346 (Layer 3 pentest finding): a bad caller-supplied id is a client
+// input-validation failure. Before this fix, intParam/bigintParam threw a
+// plain Error with no statusCode, so apiErrorPayload() fell back to 500 --
+// confirmed live on dune-dev against /api/players/<bad-id>/teleport-destinations
+// and .../character-recovery, both routing through intParam().
+test("intParam and bigintParam flag an invalid value as a 400, not a server fault", () => {
+  assert.throws(() => intParam("not-a-number", "player id"), (error) => error.statusCode === 400 && /Invalid player id/.test(error.message));
+  assert.throws(() => bigintParam("not-a-number", "item id"), (error) => error.statusCode === 400 && /Invalid item id/.test(error.message));
 });
 
 test("discovers RedBlink Postgres defaults and env overrides", () => {
@@ -1777,6 +1787,64 @@ test("players query uses parameterized search input", async () => {
   assert.equal(result.rows[0].action_player_id, "RedBlink#75570");
 });
 
+// Own-record scoping for the console's `player` IAM tier (Red-Blink PR #202
+// review) -- listPlayers()'s new onlyPlayerControllerId param.
+test("listPlayers with onlyPlayerControllerId scopes the WHERE clause to that exact player, parameterized", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [] };
+      return { rows: [{ actor_id: 82, total_count: 1 }] };
+    }
+  };
+  await listPlayers(db, { onlyPlayerControllerId: "9001" });
+  const playerQuery = calls.find((call) => call.text.includes("from dune.actors"));
+  assert.ok(playerQuery);
+  assert.match(playerQuery.text, /ps\.player_controller_id::text = \$2/);
+  assert.equal(playerQuery.values[1], "9001");
+});
+
+test("listPlayers without onlyPlayerControllerId adds no own-record filter (owner/admin/moderator sessions)", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [] };
+      return { rows: [{ actor_id: 82, total_count: 1 }] };
+    }
+  };
+  await listPlayers(db, {});
+  const playerQuery = calls.find((call) => call.text.includes("from dune.actors"));
+  assert.ok(playerQuery);
+  assert.doesNotMatch(playerQuery.text, /player_controller_id::text = \$/);
+});
+
+test("listPlayers combines own-record scoping with the optional inactivity filter", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) {
+        return { rows: ["online_status", "last_avatar_activity"].map((column_name) => ({ column_name })) };
+      }
+      if (text.includes("count(distinct dedupe_key)")) return { rows: [{ total_players: 1 }] };
+      return { rows: [{ actor_id: 82, total_count: 1 }] };
+    }
+  };
+
+  await listPlayers(db, { inactiveWeeks: 2, onlyPlayerControllerId: "9001" });
+  const playerQuery = calls.find((call) => call.text.includes("from dune.actors") && !call.text.includes("count(distinct dedupe_key)"));
+
+  assert.ok(playerQuery);
+  assert.match(playerQuery.text, /current_timestamp - \(\$2::int \* interval '1 week'\)/);
+  assert.match(playerQuery.text, /ps\.player_controller_id::text = \$3/);
+  assert.deepEqual(playerQuery.values.slice(0, 3), [[], 2, "9001"]);
+});
+
 test("players sorted by last online rank current players ahead of stored timestamps", async () => {
   const calls = [];
   const db = {
@@ -2880,6 +2948,110 @@ test("list guilds filters by name when a search query is given", async () => {
   assert.ok(guildQuery);
   assert.match(guildQuery.text, /ilike \$1/);
   assert.equal(guildQuery.values[0], "%Water%");
+});
+
+// Own-guild scoping for the console's `player` IAM tier (Red-Blink PR #202
+// review) -- listGuilds()'s new onlyGuildId param.
+test("listGuilds with onlyGuildId scopes the WHERE clause to that exact guild, parameterized", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: ["dune.guilds", "dune.guild_members"].includes(name) }] };
+      }
+      if (text.includes("information_schema.columns")) {
+        const table = String(values[1] || "");
+        if (table === "guilds") return { rows: ["guild_id", "guild_name"].map((column_name) => ({ column_name })) };
+        if (table === "guild_members") return { rows: ["player_id", "guild_id"].map((column_name) => ({ column_name })) };
+        return { rows: [] };
+      }
+      return { rows: [] };
+    }
+  };
+  await listGuilds(db, { onlyGuildId: "42" });
+  const guildQuery = calls.find((call) => call.text.includes("from dune.guilds g"));
+  assert.ok(guildQuery);
+  assert.match(guildQuery.text, /g\."guild_id"::text = \$1/);
+  assert.equal(guildQuery.values[0], "42");
+});
+
+test("listGuilds without onlyGuildId adds no own-guild filter (owner/admin/moderator sessions)", async () => {
+  const calls = [];
+  const db = {
+    query: async (text, values = []) => {
+      calls.push({ text, values });
+      if (text.includes("to_regclass")) {
+        const name = String(values[0] || "");
+        return { rows: [{ exists: ["dune.guilds", "dune.guild_members"].includes(name) }] };
+      }
+      if (text.includes("information_schema.columns")) {
+        const table = String(values[1] || "");
+        if (table === "guilds") return { rows: ["guild_id", "guild_name"].map((column_name) => ({ column_name })) };
+        if (table === "guild_members") return { rows: ["player_id", "guild_id"].map((column_name) => ({ column_name })) };
+        return { rows: [] };
+      }
+      return { rows: [] };
+    }
+  };
+  await listGuilds(db, {});
+  const guildQuery = calls.find((call) => call.text.includes("from dune.guilds g"));
+  assert.ok(guildQuery);
+  assert.doesNotMatch(guildQuery.text, /guild_id"::text = \$/);
+});
+
+// getPlayerGuildId() -- resolves which guild an actor/pawn id belongs to, used
+// to derive a `player`-tier session's own guild scope.
+test("getPlayerGuildId returns the guild id for a real actor, and null when unguilded or the table is missing", async () => {
+  const { getPlayerGuildId } = await import("../src/duneDb.js");
+  const guildedDb = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [{ column_name: "player_id" }, { column_name: "guild_id" }] };
+      if (text.includes("from dune.guild_members")) {
+        assert.equal(values[0], 82);
+        return { rows: [{ guild_id: "7" }] };
+      }
+      return { rows: [] };
+    }
+  };
+  assert.equal(await getPlayerGuildId(guildedDb, 82), "7");
+
+  const unguildedDb = {
+    query: async (text) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [{ column_name: "player_id" }, { column_name: "guild_id" }] };
+      return { rows: [] };
+    }
+  };
+  assert.equal(await getPlayerGuildId(unguildedDb, 82), null);
+
+  const missingTableDb = { query: async (text) => (text.includes("to_regclass") ? { rows: [{ exists: false }] } : { rows: [] }) };
+  assert.equal(await getPlayerGuildId(missingTableDb, 82), null);
+
+  // A real, differently-named install: guild_members has no literal
+  // "player_id" column, only "player_controller_id" -- the dynamic column
+  // resolution added in this same fix must still find and use it.
+  const differentColumnNameDb = {
+    query: async (text, values = []) => {
+      if (text.includes("to_regclass")) return { rows: [{ exists: true }] };
+      if (text.includes("information_schema.columns")) return { rows: [{ column_name: "player_controller_id" }, { column_name: "guild_id" }] };
+      if (text.includes("from dune.guild_members")) {
+        assert.match(text, /player_controller_id/);
+        assert.equal(values[0], 82);
+        return { rows: [{ guild_id: "9" }] };
+      }
+      return { rows: [] };
+    }
+  };
+  assert.equal(await getPlayerGuildId(differentColumnNameDb, 82), "9");
+
+  // Fails closed on a garbage id rather than passing it to the query as a
+  // bigint cast that could throw or, worse, coerce unexpectedly.
+  assert.equal(await getPlayerGuildId(guildedDb, "not-a-number"), null);
+  assert.equal(await getPlayerGuildId(guildedDb, 0), null);
+  assert.equal(await getPlayerGuildId(guildedDb, -1), null);
 });
 
 test("guild members returns capability response when required tables are missing", async () => {
@@ -8416,6 +8588,20 @@ test("offline teleport rejects unknown players before moving them", async () => 
   );
   assert.equal(calls.length, 1);
   assert.doesNotMatch(calls.map((call) => call.text).join("\n"), /admin_move_offline_player_to_partition/);
+});
+
+// #1346 (Layer 3 pentest finding): validatePlayerIdForDb used to throw a
+// plain Error, falling back to apiErrorPayload()'s 500 for a malformed id --
+// this must be a 400, and must reject before any query runs.
+test("offline teleport rejects a malformed player id with a 400, before querying", async () => {
+  const calls = [];
+  const db = { query: async (text, values = []) => { calls.push({ text, values }); throw new Error("must not query for a malformed id"); } };
+
+  await assert.rejects(
+    () => teleportOfflinePlayerToCoords(db, "not an fls id!!", { x: 1, y: 2, z: 3, partitionId: 1 }),
+    (error) => error.statusCode === 400 && /Invalid player id/.test(error.message)
+  );
+  assert.equal(calls.length, 0);
 });
 
 test("offline teleport moves existing players through the supported function", async () => {

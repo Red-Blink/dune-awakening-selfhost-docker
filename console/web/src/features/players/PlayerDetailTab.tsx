@@ -1,3 +1,4 @@
+import { PermissionGate, useConsoleAccess } from "../../lib/consoleAccess";
 import { useEffect, useState } from "react";
 import { Pencil, X } from "lucide-react";
 import { playersApi } from "../../api/players";
@@ -112,6 +113,7 @@ export function PlayerDetailTab({
   variant?: "standard" | "schematics";
 }) {
   const isSchematics = variant === "schematics";
+  const access = useConsoleAccess();
   const inventoryColumns = isSchematics ? SCHEMATIC_INVENTORY_COLUMNS : INVENTORY_COLUMNS;
   const editableColumns = isSchematics ? SCHEMATIC_EDITABLE_COLUMNS : EDITABLE_INVENTORY_COLUMNS;
   const [message, setMessage] = useState("");
@@ -127,6 +129,7 @@ export function PlayerDetailTab({
   const [augmentApplying, setAugmentApplying] = useState(false);
 
   useEffect(() => {
+    if (!access.can("admin:items:read") || !access.can("players:give-item")) return;
     adminApi.itemCatalog("", 10000).then((result) => {
       const augs = (result.rows || []).filter((item) =>
         (item.category || "").toLowerCase().includes("augment") ||
@@ -134,7 +137,7 @@ export function PlayerDetailTab({
       ).map((item) => ({ id: item.itemId || item.id, name: item.name }));
       setAugmentCatalog(augs);
     }).catch(() => setAugmentCatalog([]));
-  }, []);
+  }, [access]);
 
   useEffect(() => {
     if (!message) return undefined;
@@ -320,7 +323,7 @@ export function PlayerDetailTab({
     const canEditDurability = hasCurrentAtLoad && hasMaxAtLoad;
     return <div className="result-panel database-edit-panel">
       <div className="panel-title"><strong>Edit Inventory Item</strong></div>
-      <div className="database-edit-grid inventory-edit-grid">
+      <PermissionGate action="players:edit-item"><div className="database-edit-grid inventory-edit-grid">
         {editableColumns.map((column) => {
           const isDisabled = column === "current_durability" ? !canEditDurability : column === "max_durability";
           const isDurability = column === "current_durability" || column === "max_durability";
@@ -335,10 +338,10 @@ export function PlayerDetailTab({
             <input type="number" step="any" min={isDurability ? 0 : undefined} max={currentMaximum} value={editValues[column] || ""} disabled={isDisabled} placeholder={!hasMaxAtLoad && isDurability ? "N/A" : undefined} onChange={(event) => setEditValues({ ...editValues, [column]: event.target.value })} />
           </label>;
         })}
-      </div>
+      </div></PermissionGate>
       {hasMaxAtLoad && <p className="muted inventory-durability-note">Maximum durability is set by the game when the item is created. Current durability can be repaired up to that stored maximum.</p>}
       <div className="action-line">
-        <button disabled={editSaving} onClick={() => void saveEditItem()}>{editSaving ? "Saving..." : "Save Item"}</button>
+        <PermissionGate action="players:edit-item"><button disabled={editSaving} onClick={() => void saveEditItem()}>{editSaving ? "Saving..." : "Save Item"}</button></PermissionGate>
         <button onClick={closeEditItem}>Cancel</button>
       </div>
     </div>;
@@ -380,9 +383,9 @@ export function PlayerDetailTab({
       action={(row) => {
         const canUseAugments = !isSchematics && inventoryItemCanUseAugments(row);
         return <span className="icon-toggle-group">
-          <button className="icon-toggle-button success" title="Edit item" aria-label="Edit item" onClick={(event) => { event.stopPropagation(); startEditItem(row); }}><Pencil size={16} /></button>
-          {canUseAugments && <button className="icon-toggle-button accent" title={playerIsOnline ? "Player must be offline to apply augments" : "Apply Augments"} aria-label="Apply Augments" disabled={playerIsOnline} onClick={(event) => { event.stopPropagation(); startApplyAugments(row); }}>+A</button>}
-          <button className="icon-toggle-button danger" title="Delete item" aria-label="Delete item" onClick={(event) => { event.stopPropagation(); void deleteItem(row); }}><X size={16} /></button>
+          <PermissionGate action="players:edit-item"><button className="icon-toggle-button success" title="Edit item" aria-label="Edit item" onClick={(event) => { event.stopPropagation(); startEditItem(row); }}><Pencil size={16} /></button></PermissionGate>
+          {canUseAugments && <PermissionGate action="players:give-item"><button className="icon-toggle-button accent" title={playerIsOnline ? "Player must be offline to apply augments" : "Apply Augments"} aria-label="Apply Augments" disabled={playerIsOnline} onClick={(event) => { event.stopPropagation(); startApplyAugments(row); }}>+A</button></PermissionGate>}
+          <PermissionGate action="players:delete-item"><button className="icon-toggle-button danger" title="Delete item" aria-label="Delete item" onClick={(event) => { event.stopPropagation(); void deleteItem(row); }}><X size={16} /></button></PermissionGate>
         </span>;
       }}
       sortColumn={inventorySort.sortColumn}
@@ -421,7 +424,7 @@ export function PlayerDetailTab({
           </>;
           })()}
           <div className="action-line">
-            <button disabled={playerIsOnline || augmentSelected.length === 0 || augmentApplying} onClick={() => void applyAugments()}>{augmentApplying ? "Applying..." : `Apply ${augmentSelected.length} Augment(s)`}</button>
+            <PermissionGate action="players:give-item"><button disabled={playerIsOnline || augmentSelected.length === 0 || augmentApplying} onClick={() => void applyAugments()}>{augmentApplying ? "Applying..." : `Apply ${augmentSelected.length} Augment(s)`}</button></PermissionGate>
             <button onClick={closeApplyAugments}>Cancel</button>
           </div>
         </div>
