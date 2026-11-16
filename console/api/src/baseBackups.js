@@ -282,7 +282,8 @@ export async function baseBackupCapabilities(db) {
     select case when to_regtype('dune._charactertransferentrykind') is null then null
                 else (select array_agg(e::text) from unnest(enum_range(null::dune._charactertransferentrykind)) e) end as kinds`);
   const available = new Set(kinds.rows[0]?.kinds || []);
-  for (const kind of ALLOWED_KINDS) {
+  // Character is only a temporary export helper; it remains forbidden in files.
+  for (const kind of [...ALLOWED_KINDS, "Character"]) {
     if (!available.has(kind)) missing.push(`dune._charactertransferentrykind '${kind}'`);
   }
   return { supported: missing.length === 0, missing };
@@ -649,8 +650,15 @@ async function renderExport(db, versionInfo, steps, params, prepare, source) {
       const table = sql.match(/to_jsonb\((\w+)\)/)?.[1];
       await run(label, sql.replace("/*BOUNDS*/", table ? boundsExpression(table, columns) : ""), values);
     }
+    // The game's fallback for an unexported player reference reads the exporting
+    // controller from a Character entry. Base exports use the owner placeholder
+    // instead; this helper is transaction-local and never leaves in the file.
+    await run("mapping outside players to the owner",
+      "insert into pg_temp.export_data(id, kind, data) values (null, 'Character', jsonb_build_object('player_controller_id', $1::bigint))",
+      [placeholderTransferId]);
     await run("rewriting internal references",
       `update pg_temp.export_data set data = dune._character_transfer_replace_local_id_with_transfer_id_in_json(data, '') where ${HAS_TAGGED_ID}`);
+    await run("removing export helper", "delete from pg_temp.export_data where kind = 'Character'");
 
     const envelope = {
       format: BASE_BACKUP_FORMAT,

@@ -49,8 +49,30 @@ back to Default, including selections from a previous preview.
 `themeEngine.ts` derives the Console's existing CSS custom properties from
 each palette's background, panel, accent and secondary colours. Shared text
 and status colours keep the interface consistent, and contrast checks adjust
-text against the page and panel surfaces. Hardcoded colours in existing
-controls, map markers and some dialogs retain their standard appearance.
+text against the page and panel surfaces.
+
+### Role colours
+
+Most of the stylesheet's surfaces, borders and secondary text used fixed
+colours rather than the palette properties, so a palette used to recolour
+only a few elements. The recurring colours are now **role colours**
+(`--ink-*`, `--surface-*`, `--line-*`, `--tint-*`, listed in
+`themes/themeRoles.ts`). `styles.css` reads each as
+`var(--surface-b, #151719)`: the fallback is the colour that was there
+before, so **Default renders exactly as it did** (the roles are never
+declared in `:root`). A palette sets every role from its own tokens, at the
+same relative position the original colour had between two console tokens.
+Text roles are held to at least 4.5:1 (derived with a small margin) against
+the surface they sit on: the page and panel by default, or the fill named by
+the role (`on`) for text on an accent, status or tint fill.
+
+The sidebar, header, cards, tables, tabs and most controls follow the
+palette. These stay fixed on purpose: the "Join Discord" and "Support
+Project" gradient buttons, map markers, legends and other data colours
+(categories must stay distinguishable), pure black and white overlays and
+shadows, and SVG fills and strokes. To theme another colour, use
+`var(--role, <colour>)` with an existing role, or add one to `themeRoles.ts`;
+tests fail if the stylesheet and the table disagree.
 
 The catalogue and engine load lazily. The small `themeBoot.ts` entry module
 does nothing for Default. For a saved selection it restores a validated cache

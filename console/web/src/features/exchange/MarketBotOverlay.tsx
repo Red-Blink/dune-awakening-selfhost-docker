@@ -393,14 +393,21 @@ export function MarketBotOverlay({ onClose, onError, confirmAction }: MarketBotO
     }
   }
 
+  async function refreshExchanges() {
+    try {
+      setExchanges((await marketBotApi.exchanges()).rows || []);
+    } catch {
+      // Non-fatal: the action that triggered the refresh already reported.
+    }
+  }
+
   async function run(label: string, action: () => Promise<string>) {
     setBusy(label);
     setNotice("");
     onError("");
     try {
       setNotice(await action());
-      await refreshStatus();
-      await refreshLog();
+      await Promise.all([refreshStatus(), refreshLog(), refreshExchanges()]);
     } catch (error) {
       onError(errorText(error));
     } finally {
