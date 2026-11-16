@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Download, FileJson, FolderOpen, Pencil, Trash2, Upload } from "lucide-react";
 import { ApiError } from "../../api/client";
@@ -453,7 +454,7 @@ export function BaseBackupsView({ onError, confirmAction, playerId = "", playerN
     </div>}
     <p className="action-help-note">The current owner must be offline to change a backup. The game only lets a backup be redeployed on the map it was saved on, so moving it to another map changes where it can be placed.</p>
     <div className="base-backup-edit-actions">
-      <button disabled={!canSave} onClick={() => void saveEdit()}>{saving ? "Saving..." : "Save"}</button>
+      <PermissionGate action="bases:edit-backup"><button disabled={!canSave} onClick={() => void saveEdit()}>{saving ? "Saving..." : "Save"}</button></PermissionGate>
       <button type="button" disabled={saving} onClick={cancelEdit}>Cancel</button>
     </div>
   </div>;
@@ -502,9 +503,9 @@ export function BaseBackupsView({ onError, confirmAction, playerId = "", playerN
         <button type="button" disabled={busy} onClick={() => fileInputRef.current?.click()}>
           <FolderOpen size={16} /> Select
         </button>
-        <button disabled={!importFile || !importTarget || busy} onClick={() => void handleImport()}>
+        <PermissionGate action="bases:import-backup"><button disabled={!importFile || !importTarget || busy} onClick={() => void handleImport()}>
           <Upload size={16} /> {importing ? "Importing..." : "Import"}
-        </button>
+        </button></PermissionGate>
         {importFile && <button disabled={busy} onClick={clearFile}>Clear</button>}
       </div>
 
@@ -541,7 +542,7 @@ export function BaseBackupsView({ onError, confirmAction, playerId = "", playerN
           return <span className="icon-toggle-group">
             <button className="icon-toggle-button" title="Edit owner or name" aria-label={`Edit ${backup.name}`} disabled={busy} onClick={(event) => { event.stopPropagation(); startEdit(backup); }}><Pencil size={16} /></button>
             <button className="icon-toggle-button success" title="Export base backup" aria-label={`Export ${backup.name}`} disabled={busy} onClick={(event) => { event.stopPropagation(); void handleExport(backup); }}><Download size={16} /></button>
-            <button className="icon-toggle-button danger" title="Delete base backup" aria-label={`Delete ${backup.name}`} disabled={busy} onClick={(event) => { event.stopPropagation(); void handleDelete(backup); }}><Trash2 size={16} /></button>
+            <PermissionGate action="bases:delete-backup"><button className="icon-toggle-button danger" title="Delete base backup" aria-label={`Delete ${backup.name}`} disabled={busy} onClick={(event) => { event.stopPropagation(); void handleDelete(backup); }}><Trash2 size={16} /></button></PermissionGate>
           </span>;
         }}
         sortColumn={sort.sortColumn}

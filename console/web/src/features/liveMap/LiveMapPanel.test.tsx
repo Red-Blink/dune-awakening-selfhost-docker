@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { Task } from "../../api/setup";
 import { liveMapApi } from "../../api/liveMap";
 import { LiveMapPanel, liveMapMarkerMatchesSearch, mergeLiveMapRows } from "./LiveMapPanel";
+import { setConsoleAccess } from "../../lib/consoleAccess";
 
 function fakeTask(status: Task["status"]): Task {
   return {
@@ -133,6 +134,27 @@ it("uses centered vector plus/minus icons as layer sections toggle", async () =>
   expect(toggle.querySelector(".live-map-layer-expand > svg.lucide-plus")).toHaveAttribute("height", "12");
   fireEvent.click(toggle);
   expect(toggle).toHaveAttribute("aria-expanded", "true");
+});
+
+it("keeps denied resource layers and teleport controls out of a map-only view", async () => {
+  setConsoleAccess("ready", { username: "viewer", displayName: "Viewer", tier: "player" }, ["maps:read"]);
+  renderPanel();
+  await screen.findByRole("button", { name: /Active Small Spice/ });
+  for (const name of [/Desert Home/, /Second Base/, /Sandbike/, /Liet/, /Duncan/, /Teleport/]) {
+    expect(screen.queryByRole("button", { name })).toBeNull();
+  }
+  const search = screen.getByRole("searchbox", { name: "Search Map" });
+  fireEvent.change(search, { target: { value: "Chani" } });
+  expect(screen.queryByRole("button", { name: /Desert Home/ })).toBeNull();
+});
+
+it("removes a selected private marker when its resource permission is revoked", async () => {
+  renderPanel();
+  fireEvent.click(await screen.findByRole("button", { name: "Base: Desert Home" }));
+  expect(screen.getAllByText("Chani").length).toBeGreaterThan(0);
+  act(() => setConsoleAccess("ready", { username: "viewer", displayName: "Viewer", tier: "player" }, ["maps:read"]));
+  expect(screen.queryByText("Chani")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Base: Desert Home" })).toBeNull();
 });
 
 it("filters map markers by player, marker, and owner names", async () => {
@@ -1044,7 +1066,7 @@ it("shows a marker the terrain is covering once it is searched for", async () =>
   expect(screen.queryByRole("button", { name: "Base: Low" })).toBeNull();
 
   // A search asks where it is: behind the rock is an answer.
-  const search = screen.getByPlaceholderText(/player, owner, base/i);
+  const search = screen.getByRole("searchbox", { name: "Search Map" });
   fireEvent.change(search, { target: { value: "Low" } });
   expect(screen.getByRole("button", { name: "Base: Low" })).toBeInTheDocument();
 

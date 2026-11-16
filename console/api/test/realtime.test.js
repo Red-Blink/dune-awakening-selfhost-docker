@@ -287,7 +287,9 @@ test("the stock Compose file and .env.example pass the agent address through", (
 test("the stream recheck does not renew a browser session; the audit entry has no session id", () => {
   const server = readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
   const start = server.indexOf("function realtimeStreamRoute");
-  const body = server.slice(start, server.indexOf("async function apiKeyCreateRoute", start));
+  const end = server.indexOf("\n}\n", start);
+  assert.ok(start >= 0 && end > start, "stream route boundaries must be found");
+  const body = server.slice(start, end + 2);
   assert.doesNotMatch(body, /readSession/, "the recheck must not slide the session expiry");
   assert.match(body, /peekSession/);
   assert.doesNotMatch(body, /audit\([^)]*\{ principal \}/, "session id in the audit log");

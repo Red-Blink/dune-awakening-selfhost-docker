@@ -1,4 +1,5 @@
 import { TriangleAlert } from "lucide-react";
+import { PermissionGate, useConsoleAccess } from "../../lib/consoleAccess";
 
 export type SystemCustodian = { available: boolean; canCreate?: boolean; playerId?: string; name?: string; reason?: string };
 
@@ -156,7 +157,7 @@ export function OwnerHeroCard({ owner, isCustodian, systemCustodian, saving, dir
           ? <EntryName entry={owner} isSystemCustodian={isCustodian} className={`${classPrefix}-permissions-owner-name`} />
           : <span className={`${classPrefix}-permissions-owner-name ${classPrefix}-permissions-owner-none`}>No Owner set</span>}
       </div>
-      <button
+      <PermissionGate action={classPrefix === "vehicles" ? "vehicles:mutate" : "bases:mutate"}><button
         className="warning"
         // Still enabled on an ownerless base/vehicle that is *claimed*: that
         // state arrives from the server with a clean draft, so parking
@@ -174,7 +175,7 @@ export function OwnerHeroCard({ owner, isCustodian, systemCustodian, saving, dir
           ? `This ${subject} is already owned by the ${systemCustodian.name || "detected"} system custodian`
           : `Park ownership on the reserved ${systemCustodian.name || "detected"} system identity, preserving the current permission roster`}
         onClick={onTransfer}
-      >{ownedByCustodian ? `Owned by ${custodianName}` : (systemCustodian.available || systemCustodian.canCreate) ? `Transfer to ${custodianName}` : "Transfer to Custodian"}</button>
+      >{ownedByCustodian ? `Owned by ${custodianName}` : (systemCustodian.available || systemCustodian.canCreate) ? `Transfer to ${custodianName}` : "Transfer to Custodian"}</button></PermissionGate>
       {!systemCustodian.available && systemCustodian.reason &&
         <p className={`${classPrefix}-permissions-error ${classPrefix}-permissions-owner-note`}>{systemCustodian.reason}</p>}
     </div>
@@ -186,11 +187,12 @@ export function OwnerHeroCard({ owner, isCustodian, systemCustodian, saving, dir
 // roster costs five tab stops before Save instead of fifteen. aria-pressed would
 // also announce "toggle, pressed" with no set position, which is wrong for one
 // mutually exclusive value.
-export function RankSegments({ entry, scopeId, disabled, onChange, groupClassName = "bases-rank-segments", segmentClassName = "bases-rank-segment" }: {
+export function RankSegments({ entry, scopeId, disabled, onChange, permissionAction = "bases:mutate", groupClassName = "bases-rank-segments", segmentClassName = "bases-rank-segment" }: {
   entry: DraftEntry;
   scopeId: string;
   disabled: boolean;
   onChange: (rank: PermissionRank) => void;
+  permissionAction?: string;
   // Bases and vehicles style this control through separate class names (see
   // styles.css) even though the rules are identical today, so each feature can
   // diverge later without touching the other. Defaults keep the base tab's
@@ -198,7 +200,9 @@ export function RankSegments({ entry, scopeId, disabled, onChange, groupClassNam
   groupClassName?: string;
   segmentClassName?: string;
 }) {
+  const access = useConsoleAccess();
   const who = entry.name || entry.playerId;
+  if (!access.can(permissionAction)) return <span>{RANK_LABELS[entry.rank] || entry.label || `Rank ${entry.rank}`}</span>;
   // scopeId is in the group name so two rosters rendered at once (a base tab
   // and a vehicle tab, say) could never merge two players' radios into one
   // browser group, where selecting in one row would silently clear the other.

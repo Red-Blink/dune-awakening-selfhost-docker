@@ -1,3 +1,4 @@
+import { PermissionGate } from "../../lib/consoleAccess";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { adminApi, type ScheduledMapMessage, type ScheduledMapMessageDraft } from "../../api/admin";
 import { InlineActionResult, type InlineActionResultState } from "../../components/common/InlineActionResult";
@@ -167,7 +168,7 @@ export function ScheduledMapMessages({ mapOptions, confirmAction, onDelivery }: 
       <label className="map-message-schedule-body">Message<textarea rows={4} maxLength={500} value={draft.message} onChange={(event) => setDraft({ ...draft, message: event.target.value })} placeholder="Your message here..." /><span className="muted">{draft.message.length}/500 characters</span></label>
       <div className="map-message-schedule-editor-actions">
         <label className={`switch-checkbox ${draft.enabled ? "enabled" : "disabled"}`}><input type="checkbox" checked={draft.enabled} onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })} /><span className="switch-label">Schedule</span><strong className="switch-state">{draft.enabled ? "ON" : "OFF"}</strong></label>
-        <button disabled={Boolean(busyId) || !draft.message.trim()} onClick={() => void saveDraft()}>{busyId ? "Saving..." : "Save Schedule"}</button>
+        <PermissionGate action="admin:map-chat"><button disabled={Boolean(busyId) || !draft.message.trim()} onClick={() => void saveDraft()}>{busyId ? "Saving..." : "Save Schedule"}</button></PermissionGate>
         <button disabled={Boolean(busyId)} onClick={() => { setEditorOpen(false); setDraft(emptyDraft(mapOptions)); }}>Cancel</button>
         <InlineActionResult result={result} resultKey="editor" />
       </div>
@@ -188,9 +189,9 @@ export function ScheduledMapMessages({ mapOptions, confirmAction, onDelivery }: 
         {schedule.lastError && <span className="map-message-schedule-error">{schedule.lastError}</span>}
         <div className="map-message-schedule-actions">
           <button disabled={Boolean(busyId)} onClick={() => startEdit(schedule)}>Edit</button>
-          <button disabled={Boolean(busyId)} onClick={() => void runNow(schedule)}>Send Now</button>
-          <button disabled={Boolean(busyId)} onClick={() => void toggleSchedule(schedule)}>{schedule.enabled ? "Disable" : "Enable"}</button>
-          <button className="danger" disabled={Boolean(busyId)} onClick={() => void deleteSchedule(schedule)}>Delete</button>
+          <PermissionGate action="admin:map-chat"><button disabled={Boolean(busyId)} onClick={() => void runNow(schedule)}>Send Now</button></PermissionGate>
+          <PermissionGate action="admin:map-chat"><button disabled={Boolean(busyId)} onClick={() => void toggleSchedule(schedule)}>{schedule.enabled ? "Disable" : "Enable"}</button></PermissionGate>
+          <PermissionGate action="admin:map-chat"><button className="danger" disabled={Boolean(busyId)} onClick={() => void deleteSchedule(schedule)}>Delete</button></PermissionGate>
         </div>
       </article>)}
     </div>}

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { vehiclesApi, type VehiclePermissionEntry, type VehiclePermissionRank } from "../../api/vehicles";
 import { VehiclePermissionsTab } from "./VehiclePermissionsTab";
+import { setConsoleAccess } from "../../lib/consoleAccess";
 
 vi.mock("../../api/vehicles", () => ({
   vehiclesApi: {
@@ -62,6 +63,18 @@ beforeEach(() => {
 });
 
 describe("VehiclePermissionsTab layout", () => {
+  it("shows the roster without ownership or editing controls for a read-only account", async () => {
+    setConsoleAccess("ready", { username: "reader", displayName: "Reader", tier: "moderator" }, ["vehicles:read"]);
+    mockRoster(DEFAULT_ROSTER, { available: true, playerId: "99", name: "Custodian" });
+    renderTab();
+    await screen.findByText("DarkShark", { selector: ".vehicles-permissions-owner-name" });
+    expect(screen.getByText("Yaida")).toBeVisible();
+    expect(screen.queryAllByRole("radio")).toHaveLength(0);
+    expect(screen.queryByPlaceholderText("Search a player to add")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Remove|Transfer|Save changes|Revert/i })).toBeNull();
+    expect(vehiclesApi.setPermissions).not.toHaveBeenCalled();
+  });
+
   it("puts the Owner in the card and everyone else in the roster", async () => {
     mockRoster(DEFAULT_ROSTER);
     renderTab();

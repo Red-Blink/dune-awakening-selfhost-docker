@@ -26,6 +26,7 @@ import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { createTarArchive } from "../src/services/backups.js";
+import { getFreePort } from "../test-support/consoleHarness.js";
 
 // Mirrors system_backup_encryption_available()'s own preflight in db.sh: an
 // AEAD archive needs gpg 2.3+, and test-api.sh deliberately mirrors CI's
@@ -42,8 +43,8 @@ function aeadCapableGpgAvailable() {
 const SKIP_REASON = aeadCapableGpgAvailable() ? false : "this environment's gpg cannot do authenticated (AEAD/OCB) encryption -- needs GnuPG 2.3+";
 
 const API_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const PORT = 21000 + ((process.pid + 3) % 20000);
-const BASE = `http://127.0.0.1:${PORT}`;
+let PORT;
+let BASE;
 
 function makeRepoRoot() {
   const repoRoot = mkdtempSync(join(tmpdir(), "dune-system-import-http-"));
@@ -53,7 +54,9 @@ function makeRepoRoot() {
   return repoRoot;
 }
 
-function startServer(repoRoot) {
+async function startServer(repoRoot) {
+  PORT = await getFreePort();
+  BASE = `http://127.0.0.1:${PORT}`;
   const child = spawn(process.execPath, ["src/server.js"], {
     cwd: API_ROOT,
     env: {
@@ -119,7 +122,7 @@ function makeRealArchive(dir, passphrase) {
 test("POST /api/backups/system/import stores a real upload instead of throwing", { timeout: 30000, skip: SKIP_REASON }, async () => {
   const repoRoot = makeRepoRoot();
   const workDir = mkdtempSync(join(tmpdir(), "dune-system-import-fixture-"));
-  const { child, ready, getOutput } = startServer(repoRoot);
+  const { child, ready, getOutput } = await startServer(repoRoot);
   try {
     await ready;
 
@@ -153,7 +156,7 @@ test("POST /api/backups/system/import stores a real upload instead of throwing",
 
 test("POST /api/backups/system/import refuses a non-archive without a ReferenceError", { timeout: 30000, skip: SKIP_REASON }, async () => {
   const repoRoot = makeRepoRoot();
-  const { child, ready, getOutput } = startServer(repoRoot);
+  const { child, ready, getOutput } = await startServer(repoRoot);
   try {
     await ready;
     const response = await fetch(
@@ -173,7 +176,7 @@ test("POST /api/backups/system/import refuses a non-archive without a ReferenceE
 test("POST /api/backups/system/import accepts only the matching, bounded sidecar", { timeout: 30000, skip: SKIP_REASON }, async () => {
   const repoRoot = makeRepoRoot();
   const workDir = mkdtempSync(join(tmpdir(), "dune-system-import-bundle-"));
-  const { child, ready } = startServer(repoRoot);
+  const { child, ready } = await startServer(repoRoot);
   try {
     await ready;
     const archiveName = "dune-system-20260830-120000-4711-9931.tar.gz.enc";

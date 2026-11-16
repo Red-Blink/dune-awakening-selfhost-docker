@@ -3,9 +3,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
-# dune secrets -- Stage 2 of the age-based secrets library rollout:
-# wires the two lowest-blast-radius secrets (server-login-password-secret,
-# username-server-login-secret) to optional age-based at-rest encryption.
+# dune secrets -- Stage 2 wired the two lowest-blast-radius secrets
+# (server-login-password-secret, username-server-login-secret) to
+# optional age-based at-rest encryption; Stage 3 (dune-awakening-
+# selfhost-docker#901) adds discord-hosted-bot-oauth-client-secret --
+# the hosted-bot wizard's operator-supplied Discord Application client
+# secret (Advanced fallback, console/web's DiscordBotSection.tsx).
 # Strictly opt-in -- set DUNE_KEK_FILE and DUNE_AGE_IDENTITY_FILE to a
 # generated age identity/wrapped key to use it (see runtime/scripts/lib/
 # secrets.sh's own header comment for the exact key-hierarchy and file
@@ -22,10 +25,15 @@ cd "$(dirname "$0")/../.."
 # repo's own existing db.sh/db-manager.sh precedent for "two
 # related-but-distinct scripts get distinguishable names."
 #
-# Scope: exactly 2 secrets, hardcoded below, never derived from
+# Scope: exactly 3 secrets, hardcoded below, never derived from
 # config/user input. This is intentional -- see
 # _dune_secrets_require_stage2_name's own comment for why a broader
 # allow-list would be a real scope violation, not just tidiness.
+# Postgres/Funcom/RabbitMQ remain explicitly out of scope, per the
+# real, upstream-maintainer-set boundary Stage 2 was built under -- a
+# future stage that legitimately wires more secrets must keep making
+# that call deliberately, the same way Stage 3 does here, not treat
+# this allow-list as freely extensible.
 
 # shellcheck disable=SC1091
 source runtime/scripts/lib/secrets.sh
@@ -40,13 +48,13 @@ Usage:
   dune secrets migrate <name> [--dry-run]
   dune secrets cleanup-legacy <name>
 
-Stage 2 of the age-based secrets library: wires exactly 2 secrets
-(server-login-password-secret, username-server-login-secret) to
-optional age-based at-rest encryption. Strictly opt-in -- set both
-DUNE_KEK_FILE and DUNE_AGE_IDENTITY_FILE to use it; an operator who
-does neither sees zero behavior change.
+Wires exactly 3 secrets to optional age-based at-rest encryption:
+server-login-password-secret, username-server-login-secret (Stage 2),
+and discord-hosted-bot-oauth-client-secret (Stage 3). Strictly opt-in
+-- set both DUNE_KEK_FILE and DUNE_AGE_IDENTITY_FILE to use it; an
+operator who does neither sees zero behavior change.
 
-  status            Show migration state for one or both secrets.
+  status            Show migration state for one or more secrets.
   verify            Non-destructively confirm a migrated secret still
                     decrypts (does NOT delete anything -- safe to run
                     repeatedly).
@@ -56,37 +64,48 @@ does neither sees zero behavior change.
                     migrated secret, after re-verifying decryption
                     works. Refuses if verification fails.
 
+Note: discord-hosted-bot-oauth-client-secret is operator-supplied and
+optional (the hosted-bot wizard's Advanced fallback) -- if it was
+never configured, 'migrate' correctly refuses with "nothing to
+migrate," it is not auto-generated the way the other two secrets are.
+
 Scope: PostgreSQL, Funcom, and RabbitMQ secrets are explicitly out of
 scope for this stage and are rejected by name.
 EOF
 }
 
 # _dune_secrets_require_stage2_name <name>
-#   Enforces the hardcoded, Stage-2-specific 2-item allow-list. This
+#   Enforces the hardcoded, deliberately-scoped 3-item allow-list. This
 #   is IN ADDITION TO (not instead of) the library's own generic
 #   _dune_secrets_validate_name filesystem-safety check -- that check
-#   accepts any filesystem-safe name, not just these two, and using
+#   accepts any filesystem-safe name, not just these three, and using
 #   it alone would let this CLI silently touch Postgres/Funcom/RMQ
 #   secrets (e.g. `dune secrets migrate postgres-password` would
 #   otherwise succeed), directly conflicting with the upstream
 #   maintainer's explicit instruction to keep those three out of this
 #   first integration. A future stage that legitimately wires more
 #   secrets must extend this allow-list deliberately, not remove it.
+#   Name kept as "stage2" rather than renamed to something generic --
+#   this function enforces the CUMULATIVE allow-list across every
+#   stage shipped so far, not just the stage it was originally named
+#   for; renaming it each time a new stage lands would only add
+#   git-blame noise for a name that was never meant to describe "which
+#   stage," only "the currently enforced scope."
 _dune_secrets_require_stage2_name() {
   local name="$1"
   case "$name" in
-    server-login-password-secret|username-server-login-secret)
+    server-login-password-secret|username-server-login-secret|discord-hosted-bot-oauth-client-secret)
       return 0
       ;;
     *)
-      echo "dune secrets: '$name' is not in scope for this stage. Only server-login-password-secret and username-server-login-secret are wired so far -- PostgreSQL, Funcom, and RabbitMQ secrets are explicitly out of scope for now." >&2
+      echo "dune secrets: '$name' is not in scope. Only server-login-password-secret, username-server-login-secret, and discord-hosted-bot-oauth-client-secret are wired so far -- PostgreSQL, Funcom, and RabbitMQ secrets are explicitly out of scope for now." >&2
       return 1
       ;;
   esac
 }
 
 _dune_secrets_stage2_names() {
-  printf '%s\n%s\n' server-login-password-secret username-server-login-secret
+  printf '%s\n%s\n%s\n' server-login-password-secret username-server-login-secret discord-hosted-bot-oauth-client-secret
 }
 
 # _dune_secrets_stage2_state <name>

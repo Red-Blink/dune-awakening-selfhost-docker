@@ -1,12 +1,18 @@
-import { Fragment, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { Archive, Bug, Building2, Car, CircleHelp, Database, Download, ExternalLink, FileText, Gift, Globe, Heart, Home, Landmark, Map as MapIcon, Menu, MessageCircle, PackagePlus, RefreshCw, Server, Settings, Shield, Sparkles, Store, Users, X } from "lucide-react";
-import { api, AUTH_SESSION_EXPIRED_EVENT, AUTH_SESSION_EXPIRED_MESSAGE, post, setCsrfToken } from "./api/client";
+import { Fragment, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Archive, Bug, Building2, Car, CircleHelp, Database, Download, ExternalLink, FileText, Gift, Globe, Heart, Home, Landmark, LogOut, Map as MapIcon, Menu, MessageCircle, PackagePlus, RefreshCw, Server, Settings, Shield, ShieldCheck, Sparkles, Store, UserRound, Users, X } from "lucide-react";
+import { canOpenPage, setConsoleAccess, useConsoleAccess } from "./lib/consoleAccess";
+import { api, AUTH_SESSION_EXPIRED_EVENT, AUTH_SESSION_EXPIRED_MESSAGE, loginRequest, post, setCsrfToken } from "./api/client";
+import { TotpSetupScreen } from "./features/auth/TotpSetupScreen";
+import { DiscordMigrationOffer } from "./features/auth/DiscordMigrationOffer";
 import { setServerPorts, setAdminPort, type ServerPorts } from "./api/serverPorts";
 import { serverApi, type RestartQueueTarget } from "./api/server";
 import { updatesApi } from "./api/updates";
 import { addonsApi } from "./api/addons";
 import { playersApi } from "./api/players";
 import { setupApi, type Task } from "./api/setup";
+import { isPlayerTier, tabAllowedForTier } from "./lib/playerTabs";
+import { PlayerHome } from "./features/home/PlayerHome";
+import { PlayerAssetsPage, PlayerCharacterPage, PlayerGuildPage } from "./features/player/PlayerPages";
 import { SetupWizard } from "./components/SetupWizard";
 import { TaskProgress } from "./components/TaskProgress";
 import { ConfirmDialog, type ConfirmDialogDetail, type ConfirmDialogOutcome, type ConfirmDialogRequest } from "./components/common/ConfirmDialog";
@@ -42,7 +48,7 @@ import { ConsoleLanguageObserver } from "./features/language/ConsoleLanguageObse
 // The array is the source of truth (not just a type-level union) so restoring
 // a persisted tab (see loadPersistedTab below) can validate against the real,
 // current list at runtime instead of a hand-duplicated copy that could drift.
-export const ALL_TABS = ["Home", "Server Control", "Services", "Players", "Guilds", "Bases", "Vehicles", "Exchange", "Landsraad", "Admin Tools", "Live Map", "Maps", "Care Package", "Addons", "Language", "Database", "Storage", "Backups", "Logs", "Chat", "Updates", "Settings"] as const;
+export const ALL_TABS = ["Home", "Server Control", "Services", "Players", "Guilds", "Bases", "Vehicles", "Exchange", "Landsraad", "Admin Tools", "Live Map", "Maps", "Care Package", "Addons", "Language", "Database", "Storage", "Backups", "Logs", "Chat", "Updates", "Settings", "Access Control"] as const;
 // Exported so a panel routing to another tab types its destination against the
 // real list rather than `string`. Type-only, so a panel importing it back does
 // not create a runtime cycle.
@@ -61,6 +67,8 @@ function isTab(value: string): value is Tab {
 export function loadPersistedTab(): Tab {
   if (typeof window === "undefined") return "Home";
   try {
+    const linked = new URLSearchParams(window.location.search).get("tab");
+    if (linked && isTab(linked)) return linked;
     const raw = window.sessionStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || "";
     return isTab(raw) ? raw : "Home";
   } catch {
@@ -85,6 +93,13 @@ export function useActiveTab() {
   const [tab, setTabState] = useState<Tab>(() => loadPersistedTab());
   const setTab = useCallback((nextTab: Tab) => {
     persistActiveTab(nextTab);
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("tab")) {
+        url.searchParams.delete("tab");
+        window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+      }
+    } catch { /* Navigation still works when browser history is unavailable. */ }
     setTabState(nextTab);
   }, []);
   return [tab, setTab] as const;
@@ -102,6 +117,7 @@ const AddonsPanel = lazy(() => import("./features/addons/AddonsPanel").then((mod
 const LanguagePanel = lazy(() => import("./features/language/LanguagePanel").then((module) => ({ default: module.LanguagePanel })));
 const AdminToolsPanel = lazy(() => import("./features/adminTools/AdminToolsPanel").then((module) => ({ default: module.AdminToolsPanel })));
 const BasesPage = lazy(() => import("./features/bases/BasesPage").then((module) => ({ default: module.BasesPage })));
+const IamPolicyEditor = lazy(() => import("./features/settings/IamPolicyEditor").then((module) => ({ default: module.IamPolicyEditor })));
 const BackupsPanel = lazy(() => import("./features/backups/BackupsPanel").then((module) => ({ default: module.BackupsPanel })));
 const CarePackagePanel = lazy(() => import("./features/carePackage/CarePackagePanel").then((module) => ({ default: module.CarePackagePanel })));
 const DatabasePanel = lazy(() => import("./features/database/DatabasePanel").then((module) => ({ default: module.DatabasePanel })));
@@ -340,7 +356,8 @@ const navGroups: { title: string; items: { tab: Tab; icon: React.ReactNode }[] }
       { tab: "Updates", icon: <RefreshCw size={18} /> },
       { tab: "Logs", icon: <FileText size={18} /> },
       { tab: "Chat", icon: <MessageCircle size={18} /> },
-      { tab: "Settings", icon: <Settings size={18} /> }
+      { tab: "Settings", icon: <Settings size={18} /> },
+      { tab: "Access Control", icon: <Shield size={18} /> }
     ]
   },
   {
@@ -351,6 +368,7 @@ const navGroups: { title: string; items: { tab: Tab; icon: React.ReactNode }[] }
       { tab: "Guilds", icon: <Shield size={18} /> },
       { tab: "Bases", icon: <Building2 size={18} /> },
       { tab: "Vehicles", icon: <Car size={18} /> },
+      { tab: "Storage", icon: <Database size={18} /> },
       { tab: "Exchange", icon: <Store size={18} /> },
       { tab: "Live Map", icon: <MapIcon size={18} /> },
       { tab: "Landsraad", icon: <Landmark size={18} /> },
@@ -458,11 +476,76 @@ function AppFooter() {
 export function App() {
   const [auth, setAuth] = useState(false);
   const [password, setPassword] = useState("");
+  // Tier 3 second factor (RFC §2.3/§4). All inert unless the server actually
+  // asks for a code, so a console with CONSOLE_TOTP_ENABLED unset renders the
+  // same single password field it always has.
+  const [totpCode, setTotpCode] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [totpRequired, setTotpRequired] = useState(false);
+  const [recoveryAvailable, setRecoveryAvailable] = useState(false);
+  const [useRecoveryCode, setUseRecoveryCode] = useState(false);
+  const [setupMode, setSetupMode] = useState<"enroll" | "resetup" | null>(null);
+  const [settingsTotpOpen, setSettingsTotpOpen] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [credentialRevision, setCredentialRevision] = useState(0);
+  // Tier 1 (Discord sign-in). Available only when the server reports the
+  // OAuth application is fully configured; the button is otherwise absent.
+  const [discordSignInAvailable, setDiscordSignInAvailable] = useState(false);
+  const [discordPendingRestart, setDiscordPendingRestart] = useState(false);
+  // Consume the Settings wizard's OAuth return marker once. Setup always
+  // belongs in Settings, including returns from older setup links.
+  const [discordSetupReturnMarker] = useState(() => {
+    try {
+      const value = window.sessionStorage.getItem("dune-console:discord-setup-return");
+      if (value) window.sessionStorage.removeItem("dune-console:discord-setup-return");
+      return value;
+    } catch { return null; }
+  });
+  const [discordSetupRequested] = useState(() => Boolean(discordSetupReturnMarker) || new URLSearchParams(window.location.search).has("discordSetup"));
+  // #643: read once (see discordSetupReturnMarker above), passed to SettingsPanel
+  // to auto-expand its embedded Discord wizard on mount; SettingsPanel calls
+  // onDiscordSetupAutoOpened() once it has, so a later remount (navigate away
+  // from Settings and back) never re-triggers the auto-open.
+  const [autoOpenDiscordSetup, setAutoOpenDiscordSetup] = useState(discordSetupRequested);
+  const [showPasswordLogin, setShowPasswordLogin] = useState(false);
+  // The server's expanded action grants drive every page and component.
+  // Unknown, failed, and empty access never unlock the Console.
+  const access = useConsoleAccess();
+  const allowedActions = access.actions;
+  const [accessRevision, setAccessRevision] = useState(0);
+  // True once /api/auth/me has answered (success or failure). The first-run
+  // setup gate below must not run before it: a tier without setup:read gets a
+  // 403 from /api/setup/state, and treating that as "setup incomplete" traps
+  // the session in a wizard it cannot use and cannot leave.
+  const meLoaded = access.phase !== "loading";
+  // True when /api/auth/me itself failed (transient network blip, 500) rather
+  // than answered with zero actions (review finding). allowedActions.length is
+  // 0 in BOTH cases, so the setup-gate effect below cannot tell "we know this
+  // tier can reach nothing" from "we don't know anything" without this flag --
+  // conflating them fell through to calling setupApi.state() blindly on a
+  // read failure, 403'ing for exactly the moderator/player tiers the
+  // known-empty-actions branch exists to protect from that same trap.
+  const meFetchFailed = access.phase === "error";
+  const userInfo = access.user;
+  const allowedTabs = useMemo(() => ALL_TABS.filter(page => tabAllowedForTier(page, userInfo?.tier) && canOpenPage(page, access, discordSignInAvailable)), [access, discordSignInAvailable]);
+  // #676 §7: the guided offer screen. Shown at most once, consumed the
+  // moment a real Discord login (not password) lands with the marker
+  // DiscordSetupWizard's own "done" step set right before its restart --
+  // see the /api/auth/me effect below for where this actually fires.
+  const [discordOfferMode, setDiscordOfferMode] = useState(false);
+  const [autoOpenTwoFactorSetting, setAutoOpenTwoFactorSetting] = useState(false);
   const [tab, setTab] = useActiveTab();
   // Bumped when a failure elsewhere (a restore that needs the game images)
   // sends the operator to Updates to install them. A nonce rather than a
   // boolean so a second failure re-triggers it after the first was handled.
   const [installGameFilesRequest, setInstallGameFilesRequest] = useState(0);
+  // #643: the one-shot Settings redirect for a reconfiguration Discord round-trip
+  // (see discordSetupReturnMarker above) -- must run after useActiveTab so setTab
+  // is already defined; deliberately outside any other effect's deps.
+  useEffect(() => {
+    if (discordSetupRequested) setTab("Settings");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot on mount
+  }, []);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
   const [pinnedAddons, setPinnedAddons] = useState<PinnedAddon[]>(() => loadPinnedAddons());
@@ -492,7 +575,7 @@ export function App() {
   const [homeSampledAtMs, setHomeSampledAtMs] = useState(0);
   const [stackVersionStatus, setStackVersionStatus] = useState<Record<string, string>>({ status: "Checking", current: "", latest: "" });
   const [installedVersion, setInstalledVersion] = useState("");
-  const stackBadgeStatus = withInstalledVersion(stackVersionStatus, installedVersion);
+  const stackBadgeStatus = withInstalledVersion(access.can("updates:self-check") ? stackVersionStatus : { status: "Installed", current: "", latest: "" }, installedVersion);
   const stackActionStartedAt = useRef(0);
   const stackActionReadyPolls = useRef(0);
   const stackRestartLifecycle = useRef<RestartLifecycleState>(createRestartLifecycleState());
@@ -519,6 +602,58 @@ export function App() {
   useStaleBuildWatcher();
 
   useEffect(() => {
+    if (!auth) { setConsoleAccess("loading"); return; }
+    let cancelled = false;
+    let pending = false;
+    setConsoleAccess("loading");
+    const refreshAccess = () => {
+      if (pending) return;
+      pending = true;
+      return api<{ user: { id: string; username: string; displayName: string; tier: string; guildId: string }; allowedActions: string[] }>("/api/auth/me")
+      .then((res) => {
+        if (cancelled) return;
+        if (!res.user || !Array.isArray(res.allowedActions) || !res.allowedActions.every(action => typeof action === "string")) throw new Error("Invalid access response.");
+        setConsoleAccess("ready", { username: res.user.username, displayName: res.user.displayName || res.user.username, tier: res.user.tier }, res.allowedActions);
+        // #676 §7: consumed at most once, the first time a session lands
+        // here with the marker present. "local-owner" is the server's own
+        // literal fallback for a password/TOTP session's empty userId
+        // (server.js /api/auth/me route) -- anything else is a real Discord
+        // sign-in, which is what this offer specifically needs to have just
+        // verified. A password login while the marker happens to be present
+        // (an operator skipped Discord and used the fallback instead) just
+        // silently consumes and drops it -- the offer would make no sense
+        // there, since nothing about Discord was actually just proven live.
+        try {
+          const hasOfferMarker = window.sessionStorage.getItem("dune-console:discord-oauth-just-configured");
+          if (hasOfferMarker) {
+            window.sessionStorage.removeItem("dune-console:discord-oauth-just-configured");
+            if (res.user.id && res.user.id !== "local-owner") setDiscordOfferMode(true);
+          }
+        } catch { /* sessionStorage unavailable -- the offer just never fires, no functional loss */ }
+      })
+      .catch(() => { if (!cancelled) setConsoleAccess("error"); })
+      .finally(() => { pending = false; });
+    };
+    void refreshAccess();
+    const timer = window.setInterval(refreshAccess, 30000);
+    window.addEventListener("focus", refreshAccess);
+    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener("focus", refreshAccess); };
+  }, [auth, accessRevision]);
+
+  useEffect(() => {
+    if (access.phase === "ready" && allowedTabs.length && !allowedTabs.includes(tab)) {
+      setRedeploySetupOpen(false);
+      setTab(allowedTabs[0]);
+    }
+  }, [access.phase, allowedTabs, tab, setTab]);
+
+  // A player never lands on a page the API refuses: a persisted tab from an
+  // earlier session, or a deep link, falls back to Home once the tier is known.
+  useEffect(() => {
+    if (meLoaded && isPlayerTier(userInfo?.tier) && !tabAllowedForTier(tab, userInfo?.tier)) setTab("Home");
+  }, [meLoaded, userInfo?.tier, tab, setTab]);
+
+  useEffect(() => {
     const handleSessionExpired = () => {
       setCsrfToken(null);
       setAuth(false);
@@ -528,6 +663,17 @@ export function App() {
       setRedeploySetupOpen(false);
       setConfirmRequest(null);
       setError(AUTH_SESSION_EXPIRED_MESSAGE);
+      // Without this, an expiry landing while totpRequired/setupMode is set
+      // leaves the login screen stuck -- no password field (totpRequired keeps
+      // rendering the code/recovery field), or a dead-end setup screen with no
+      // way back to plain login.
+      setTotpRequired(false);
+      setTotpCode("");
+      setRecoveryCode("");
+      setUseRecoveryCode(false);
+      setRecoveryAvailable(false);
+      setSetupMode(null);
+      setSettingsTotpOpen(false);
     };
     window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
     return () => window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
@@ -538,18 +684,52 @@ export function App() {
   }, [pinnedAddons]);
 
   useEffect(() => {
-    api<{ authenticated: boolean; csrfToken: string | null; config?: { ports?: Partial<ServerPorts>; port?: number; version?: string } }>("/api/auth/state").then((state) => {
+    api<{ authenticated: boolean; csrfToken: string | null; scope?: string | null; config?: { discordOAuthConfigured?: boolean; discordSetupPendingRestart?: boolean; ports?: Partial<ServerPorts>; port?: number; version?: string } }>("/api/auth/state").then((state) => {
+      // A reload or second tab during two-factor setup: the enrollment-scope
+      // session is "authenticated" but can reach nothing except the setup
+      // routes, so resume the setup screen instead of rendering a console
+      // where every call is refused.
+      if (state.authenticated && (state.scope === "enroll" || state.scope === "resetup")) {
+        setCsrfToken(state.csrfToken);
+        setSetupMode(state.scope);
+        setServerPorts(state.config?.ports);
+        setAdminPort(state.config?.port);
+        setInstalledVersion(String(state.config?.version || ""));
+        return;
+      }
       setAuth(state.authenticated);
+      setDiscordSignInAvailable(Boolean(state.config?.discordOAuthConfigured));
+      setDiscordPendingRestart(Boolean(state.config?.discordSetupPendingRestart));
       setCsrfToken(state.csrfToken);
       setServerPorts(state.config?.ports);
       setAdminPort(state.config?.port);
       setInstalledVersion(String(state.config?.version || ""));
-    }).catch(() => undefined);
+    }).catch(() => undefined).finally(() => setAuthReady(true));
   }, []);
 
   useEffect(() => {
     persistFuncomTokenResult(funcomTokenResult);
   }, [funcomTokenResult]);
+
+  // Settings can enable or pause Discord after the initial bootstrap. Read
+  // the effective server capability again on logout and when returning to
+  // the login tab without changing authentication or enrollment state.
+  useEffect(() => {
+    if (auth) return;
+    let active = true;
+    async function refreshLoginMethods() {
+      try {
+        const state = await api<{ config?: { discordOAuthConfigured?: boolean; discordSetupPendingRestart?: boolean } }>("/api/auth/state");
+        if (active) {
+          setDiscordSignInAvailable(Boolean(state.config?.discordOAuthConfigured));
+          setDiscordPendingRestart(Boolean(state.config?.discordSetupPendingRestart));
+        }
+      } catch { /* Keep the last known methods while reconnecting. */ }
+    }
+    void refreshLoginMethods();
+    window.addEventListener("focus", refreshLoginMethods);
+    return () => { active = false; window.removeEventListener("focus", refreshLoginMethods); };
+  }, [auth]);
 
   useEffect(() => {
     if (!auth) {
@@ -558,6 +738,18 @@ export function App() {
       setAddonUpdatesAvailable(false);
       setOnlinePlayerCount(0);
       setPublicDirectoryStatus(null);
+      return;
+    }
+    if (!meLoaded) return;
+    // Only query setup for an explicit grant. Permission lookup failures use
+    // the access-error screen; they never unlock pages or first-run setup.
+    if (meFetchFailed || !access.can("setup:read")) {
+      // This tier can neither read nor run first-run setup (every /api/setup/*
+      // route would 403), so there is nothing to gate on: treat setup as done
+      // and render the console. The owner still sees the wizard on a fresh
+      // install because owner holds setup:read.
+      setSetupState({ files: { complete: true }, config: {} });
+      setSetupStateLoaded(true);
       return;
     }
     let cancelled = false;
@@ -572,10 +764,10 @@ export function App() {
       setSetupStateLoaded(true);
     });
     return () => { cancelled = true; };
-  }, [auth]);
+  }, [auth, meLoaded, meFetchFailed, allowedActions]);
 
   useEffect(() => {
-    if (!auth) return;
+    if (!auth || !meLoaded || isPlayerTier(userInfo?.tier) || !access.can("server:read")) return;
     let cancelled = false;
     const refreshDirectoryStatus = async () => {
       try {
@@ -593,10 +785,10 @@ export function App() {
       window.clearInterval(timer);
       window.removeEventListener("public-directory-claim-changed", refreshDirectoryStatus);
     };
-  }, [auth]);
+  }, [auth, meLoaded, userInfo?.tier, access]);
 
   useEffect(() => {
-    if (!auth) return;
+    if (!auth || !meLoaded || isPlayerTier(userInfo?.tier) || !access.can("addons:read")) return;
     let cancelled = false;
     const refreshAddonUpdates = async () => {
       try {
@@ -612,10 +804,10 @@ export function App() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [auth]);
+  }, [auth, meLoaded, userInfo?.tier, access]);
 
   useEffect(() => {
-    if (!auth) return;
+    if (!auth || !meLoaded || isPlayerTier(userInfo?.tier) || !access.can("players:read")) return;
     let cancelled = false;
     async function refreshOnlinePlayers() {
       try {
@@ -631,7 +823,7 @@ export function App() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [auth]);
+  }, [auth, meLoaded, userInfo?.tier, access]);
 
   useEffect(() => {
     openConfirmDialog = (request) => setConfirmRequest(request);
@@ -646,10 +838,100 @@ export function App() {
     request?.resolve(outcome);
   }
 
+  // Uses loginRequest, not post(), because every status this route returns
+  // (200 authenticated/enrollmentRequired/resetupRequired, 401 wrong-password/
+  // totpRequired/recoveryFailed, 429 rate-limited) is a real outcome to branch
+  // on -- there is no session yet at login time, so the shared
+  // session-expiry-on-401 handling used elsewhere would misrepresent all of them.
   async function login() {
-    const result = await post<{ authenticated: boolean; csrfToken: string }>("/api/auth/login", { password });
-    setCsrfToken(result.csrfToken);
-    setAuth(result.authenticated);
+    const body: Record<string, string> = { password };
+    let codeAttempted = false;
+    if (useRecoveryCode && recoveryCode) { body.recoveryCode = recoveryCode; codeAttempted = true; }
+    else if (totpRequired && totpCode) { body.totpCode = totpCode; codeAttempted = true; }
+    const { status, body: result } = await loginRequest(body);
+
+    if (status === 200 && result.authenticated) {
+      setCsrfToken(String(result.csrfToken || ""));
+      setAuth(true);
+      setTotpRequired(false);
+      setTotpCode("");
+      setRecoveryCode("");
+      setUseRecoveryCode(false);
+      setRecoveryAvailable(false);
+      return;
+    }
+    if (status === 200 && (result.enrollmentRequired || result.resetupRequired)) {
+      setCsrfToken(String(result.csrfToken || ""));
+      setSetupMode(result.enrollmentRequired ? "enroll" : "resetup");
+      return;
+    }
+    if (status === 401 && result.totpRequired) {
+      setTotpRequired(true);
+      setRecoveryAvailable(Boolean(result.recoveryAvailable));
+      // The server returns this identical shape both right after a correct
+      // password (no code submitted yet -- not a failure, just one more
+      // step) and after a WRONG code is submitted (a real failure) -- the
+      // only way to tell them apart is whether THIS request actually
+      // included a code. Throwing unconditionally rendered both through the
+      // same shared, red-styled .error paragraph used for genuine failures,
+      // which at a glance looked identical to the password having been
+      // rejected (live-testing finding). Only throw for the real failure;
+      // the neutral first-time prompt is shown by the login-totp-hint
+      // paragraph below instead.
+      if (codeAttempted) throw new Error(String(result.error || "That code was not accepted."));
+      setError("");
+      return;
+    }
+    if (status === 401 && result.recoveryFailed) {
+      throw new Error(String(result.error || "That recovery code was not accepted."));
+    }
+    throw new Error(String(result.error || "Sign-in failed."));
+  }
+
+  // After enrollment/re-setup the server invalidates that session and requires a
+  // fresh, normal password+TOTP login (RFC §4) -- return to the plain login form
+  // rather than assuming success.
+  function afterTotpSetup() {
+    // Also used as onCancel ("Back to sign in"): every OTHER terminal branch
+    // of this flow (a confirmed enrollment, a 409 already-configured) ends the
+    // server-side enrollment session; leaving via Cancel used to skip that,
+    // so the session (and any pending secret on it) stayed live for the rest
+    // of its TTL (review finding).
+    void post("/api/auth/logout").catch(() => { /* best effort -- proceed to login either way */ });
+    setSetupMode(null);
+    setPassword("");
+    setTotpCode("");
+    setRecoveryCode("");
+    setTotpRequired(false);
+    setUseRecoveryCode(false);
+    setCsrfToken(null);
+    // Owner-initiated enrollment (Settings -> Two-Factor Authentication, issue
+    // #665) reaches this function while `auth` is still true from the normal
+    // session it started in -- forced first-login enrollment never had this
+    // problem (auth was always false at this point). Without this, cancelling
+    // or completing setup left the app trying to render the authenticated
+    // shell against a session the server just invalidated above.
+    setAuth(false);
+  }
+
+  async function doLogout() {
+    setSettingsTotpOpen(false);
+    try {
+      await post("/api/auth/logout");
+    } catch {
+      // Return to the sign-in screen even if server-side session cleanup fails.
+    }
+    setCsrfToken(null);
+    setAuth(false);
+    setConsoleAccess("loading");
+    setPassword("");
+    setTab("Home");
+    setMobileNavOpen(false);
+    setTask(null);
+    setHomeTaskResult(null);
+    setFuncomTokenResult(null);
+    setLogs("");
+    setServices("");
   }
 
   async function logoutAfterPasswordChange() {
@@ -775,7 +1057,7 @@ export function App() {
   }, [homeTaskResult?.status, homeTaskResult?.title]);
 
   useEffect(() => {
-    if (!auth || !setupComplete) return;
+    if (!auth || !setupComplete || !meLoaded || isPlayerTier(userInfo?.tier) || !access.can("updates:self-check")) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -786,9 +1068,72 @@ export function App() {
       }
     })();
     return () => { cancelled = true; };
-  }, [auth, setupComplete]);
+  }, [auth, setupComplete, meLoaded, userInfo?.tier, access]);
+
+  if (setupMode) {
+    return <TotpSetupScreen mode={setupMode} onComplete={afterTotpSetup} onCancel={afterTotpSetup} />;
+  }
+
+  if (!authReady) return <main className="login-screen"><section className="login-panel"><h1>Dune Docker Console</h1><p className="loading-dots">Checking Your Session</p></section></main>;
+
+  if (auth && discordOfferMode && access.can("settings:read")) {
+    return <DiscordMigrationOffer
+      onReview={() => { setDiscordOfferMode(false); setTab("Settings"); setAutoOpenTwoFactorSetting(true); }}
+      onDismiss={() => setDiscordOfferMode(false)}
+    />;
+  }
 
   if (!auth) {
+    const passwordFields = totpRequired ? (
+      <div className="login-password-fields">
+        {!error && (
+          <p className="login-totp-hint muted">
+            {useRecoveryCode ? "Enter one of your saved recovery codes." : "Enter the code from your authenticator app to finish signing in."}
+          </p>
+        )}
+        {useRecoveryCode ? (
+          <input
+            type="text"
+            id="login-recovery-code"
+            name="login-recovery-code"
+            aria-label="Recovery code"
+            autoComplete="one-time-code"
+            value={recoveryCode}
+            onChange={(event) => setRecoveryCode(event.target.value)}
+            placeholder="Recovery code"
+            autoFocus
+          />
+        ) : (
+          <input
+            type="text"
+            id="login-totp-code"
+            name="login-totp-code"
+            aria-label="Authenticator code"
+            autoComplete="one-time-code"
+            inputMode="numeric"
+            value={totpCode}
+            onChange={(event) => setTotpCode(event.target.value)}
+            placeholder="Authenticator code"
+            autoFocus
+          />
+        )}
+        <button type="submit" className="login-submit-button">Sign In</button>
+        {recoveryAvailable && (
+          <button
+            type="button"
+            className="login-password-toggle"
+            onClick={() => { setUseRecoveryCode(!useRecoveryCode); setTotpCode(""); setRecoveryCode(""); }}
+          >
+            {useRecoveryCode ? "Use your authenticator instead" : "Lost access to your authenticator?"}
+          </button>
+        )}
+      </div>
+    ) : (
+      <div className="login-password-fields">
+        <input type="password" id="login-admin-password" name="login-admin-password" aria-label="Admin password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Admin Password" />
+        <button type="submit" className="login-submit-button">Sign In</button>
+      </div>
+    );
     return (
       <main className="login-screen">
         <ConsoleLanguageObserver />
@@ -796,8 +1141,24 @@ export function App() {
           <h1>Dune Docker Console</h1>
           <img className="login-logo" src="/dune-docker-logo.png" alt="Dune Docker Console logo" />
           <p>Beyond the Dunes, Every Choice Shapes the Future</p>
-          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Admin Password" />
-          <button type="submit">Sign In</button>
+          {/* Configured Discord sign-in remains available here. Configuration
+              itself is managed by the owner in Settings. */}
+          {discordSignInAvailable && !totpRequired ? (
+            <>
+              <a className="login-discord-button login-discord-button-primary" href="/api/auth/discord/start">
+                <DiscordLogo size={19} aria-hidden="true" /> Sign In With Discord
+              </a>
+              <button type="button" className="login-password-toggle" aria-expanded={showPasswordLogin} onClick={() => setShowPasswordLogin(!showPasswordLogin)}>
+                <ShieldCheck size={14} aria-hidden="true" />{showPasswordLogin ? "Hide Password Form" : "Use Console Password"}
+              </button>
+              {showPasswordLogin && passwordFields}
+            </>
+          ) : (
+            <>
+              {passwordFields}
+              {!totpRequired && discordPendingRestart && <p className="muted">Restart the Console to enable Discord sign in.</p>}
+            </>
+          )}
           {error && <p className="error">{error === AUTH_SESSION_EXPIRED_MESSAGE
             ? <>Your browser login session expired.<br />Sign in again to continue.</>
             : error}</p>}
@@ -816,6 +1177,8 @@ export function App() {
       </main>
     );
   }
+
+  if (!meLoaded || meFetchFailed) return <main className="login-screen"><section className="login-panel"><h1>Dune Docker Console</h1><p role="status">{meFetchFailed ? "Your access could not be loaded. Try again to continue." : "Checking Your Access"}</p>{meFetchFailed && <button type="button" onClick={() => setAccessRevision(value => value + 1)}>Try Again</button>}<button type="button" className="login-password-toggle" onClick={() => { void doLogout(); }}>Sign Out</button></section></main>;
 
   if (firstRunSetup) {
     return (
@@ -861,10 +1224,10 @@ export function App() {
       <ConsoleLanguageObserver />
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <button className="sidebar-home-button" type="button" onClick={() => { setRedeploySetupOpen(false); setTab("Home"); closeMobileNav(); }} title="Open Home">
+          <button disabled={!allowedTabs.includes("Home")} className="sidebar-home-button" type="button" onClick={() => { setRedeploySetupOpen(false); setTab("Home"); closeMobileNav(); }} title="Open Home">
             <h1>Dune Docker Console</h1>
           </button>
-          <button className="stack-version-button" title={stackVersionButtonTitle(stackBadgeStatus)} aria-label={stackVersionButtonTitle(stackBadgeStatus)} onClick={() => { setRedeploySetupOpen(false); setTab("Updates"); closeMobileNav(); }}>{stackVersionButtonLabel(stackBadgeStatus)}</button>
+          <button disabled={!allowedTabs.includes("Updates")} className="stack-version-button" title={stackVersionButtonTitle(stackBadgeStatus)} aria-label={stackVersionButtonTitle(stackBadgeStatus)} onClick={() => { setRedeploySetupOpen(false); setTab("Updates"); closeMobileNav(); }}>{stackVersionButtonLabel(stackBadgeStatus)}</button>
           <button
             className="sidebar-menu-toggle"
             type="button"
@@ -874,11 +1237,23 @@ export function App() {
             onClick={() => setMobileNavOpen((open) => !open)}
           >{mobileNavOpen ? <X size={20} /> : <Menu size={20} />}</button>
         </div>
+        {userInfo && (
+          <section className="sidebar-user" aria-label="Signed-in Account">
+            <span className="sidebar-user-identity">
+              <UserRound size={22} aria-hidden="true" />
+              <span className="sidebar-user-details"><span className="sidebar-user-name" title={userInfo.username}>{userInfo.displayName || userInfo.username || "Administrator"}</span></span>
+            </span>
+            <div className="sidebar-user-meta">
+              <span className={`sidebar-user-tier tier-${userInfo.tier}`}>Role: {userInfo.tier.charAt(0).toUpperCase() + userInfo.tier.slice(1)}</span>
+            </div>
+            <button className="sidebar-logout" type="button" title="Sign Out" onClick={() => { void doLogout(); }}><LogOut size={16} aria-hidden="true" /><span>Sign Out</span></button>
+          </section>
+        )}
         <nav id="console-navigation" className={`sidebar-nav ${mobileNavOpen ? "mobile-open" : ""}`}>
-          {navGroups.map((group) => (
+          {navGroups.filter(group => group.title === "Community" || group.items.some(item => allowedTabs.includes(item.tab))).map((group) => (
             <section className="sidebar-nav-group" key={group.title} aria-label={group.title}>
               <p className="sidebar-nav-heading">{group.title}</p>
-              {group.items.map((item) => (
+              {group.items.filter(item => allowedTabs.includes(item.tab) && (item.tab !== "Storage" || isPlayerTier(userInfo?.tier))).map((item) => (
                 <Fragment key={item.tab}>
                   <button className={tab === item.tab && (!selectedPinnedAddonId || item.tab !== "Addons") ? "active" : ""} onClick={() => {
                     setRedeploySetupOpen(false);
@@ -909,8 +1284,8 @@ export function App() {
           ))}
         </nav>
       </aside>
-      <main className={!redeploySetupOpen && tab === "Home" ? "home-main" : undefined}>
-        {!redeploySetupOpen && tab === "Home" && (
+      <main className={!redeploySetupOpen && allowedTabs.includes("Home") && tab === "Home" ? "home-main" : undefined}>
+        {!redeploySetupOpen && allowedTabs.includes("Home") && tab === "Home" && (
           <div className="home-backdrop" aria-hidden="true">
             <span className="home-sand-fine" />
             <span className="home-sand-near" />
@@ -947,29 +1322,36 @@ export function App() {
           </div>
         </header>
         {error && <div className="error-banner">{error}</div>}
-        {redeploySetupOpen && <SetupWizard initialStep={setupJump.step} jumpNonce={setupJump.nonce} mode="redeploy" onSetupComplete={async () => setSetupState(await setupApi.state())} />}
-        {!redeploySetupOpen && tab === "Home" && <HomePanel status={status} readiness={readiness} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onLoad={loadStackStatus} confirmAction={confirmDialog} restartGate={restartGateChoice} sampledAtMs={homeSampledAtMs} setSampledAtMs={setHomeSampledAtMs} onNavigate={(nextTab) => { setRedeploySetupOpen(false); setSelectedPinnedAddonId(""); setTab(nextTab); }} />}
-        {!redeploySetupOpen && tab === "Server Control" && <ServerPanel setTask={setTask} setStatus={setStatus} status={status} setReadiness={setReadiness} setPorts={setPorts} setDoctor={setDoctor} ports={ports} readiness={readiness} doctor={doctor} storageCleanupResult={storageCleanupResult} setStorageCleanupResult={setStorageCleanupResult} storageCleanupOperation={storageCleanupOperation} setStorageCleanupOperation={setStorageCleanupOperation} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} onRedeploy={() => {
+        {!allowedTabs.length && <section className="panel"><h2>No Pages Available</h2><p>Your access level has no pages enabled. Ask the Console owner to review your access.</p></section>}
+        {redeploySetupOpen && access.can("setup:write") && <SetupWizard initialStep={setupJump.step} jumpNonce={setupJump.nonce} mode="redeploy" onSetupComplete={async () => setSetupState(await setupApi.state())} />}
+        {!redeploySetupOpen && allowedTabs.includes("Home") && tab === "Home" && isPlayerTier(userInfo?.tier) && <PlayerHome />}
+        {!redeploySetupOpen && allowedTabs.includes("Home") && tab === "Home" && !isPlayerTier(userInfo?.tier) && <HomePanel status={status} readiness={readiness} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onLoad={loadStackStatus} confirmAction={confirmDialog} restartGate={restartGateChoice} sampledAtMs={homeSampledAtMs} setSampledAtMs={setHomeSampledAtMs} onNavigate={(nextTab) => { setRedeploySetupOpen(false); setSelectedPinnedAddonId(""); setTab(nextTab); }} />}
+        {!redeploySetupOpen && allowedTabs.includes("Server Control") && tab === "Server Control" && <ServerPanel setTask={setTask} setStatus={setStatus} status={status} setReadiness={setReadiness} setPorts={setPorts} setDoctor={setDoctor} ports={ports} readiness={readiness} doctor={doctor} storageCleanupResult={storageCleanupResult} setStorageCleanupResult={setStorageCleanupResult} storageCleanupOperation={storageCleanupOperation} setStorageCleanupOperation={setStorageCleanupOperation} taskResult={homeTaskResult} setTaskResult={setHomeTaskResult} funcomTokenResult={funcomTokenResult} setFuncomTokenResult={setFuncomTokenResult} runningAction={homeRunningAction} restartStartObserved={homeRestartStarted} setRunningAction={setHomeRunningAction} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} onRedeploy={() => {
           setSetupJump((current) => ({ step: 0, nonce: current.nonce + 1 }));
           setSelectedPinnedAddonId("");
           setRedeploySetupOpen(true);
         }} />}
-        {!redeploySetupOpen && tab === "Services" && <LazyTabBoundary label="Loading Services"><ServicesPanel services={services} setServices={setServices} setTask={setTask} openLogs={(service) => { setRedeploySetupOpen(false); setSelectedLogService(service); setTab("Logs"); }} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Players" && <LazyTabBoundary label="Loading Players"><PlayersPanel onError={setError} confirmAction={confirmDialog} onOpenBase={(baseId) => { setBaseFocusRequest((current) => ({ baseId, nonce: current.nonce + 1 })); setTab("Bases"); }} renderCharacterAdmin={(props) => <LazyTabBoundary label="Loading Player Details"><CharacterAdminUI {...props} onError={setError} confirmAction={confirmDialog} waitForTask={waitForTaskSilently} formatMutationResult={formatMutationResult} restartGate={restartGateChoice} /></LazyTabBoundary>} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Guilds" && <LazyTabBoundary label="Loading Guilds"><GuildsPanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Bases" && <LazyTabBoundary label="Loading Bases"><BasesPage onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} formatMutationResult={formatMutationResult} focusRequest={baseFocusRequest} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Vehicles" && <LazyTabBoundary label="Loading Vehicles"><VehiclesPanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} focusRequest={vehicleFocusRequest} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Exchange" && <LazyTabBoundary label="Loading Market Board"><ExchangePanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Landsraad" && <LazyTabBoundary label="Loading Landsraad"><LandsraadPanel onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Admin Tools" && <LazyTabBoundary label="Loading Admin Tools"><AdminToolsPanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Live Map" && <LazyTabBoundary label="Loading Live Map"><LiveMapPanel onError={setError} confirmAction={confirmDialog} waitForTask={waitForTaskSilently} taskTechnicalDetails={taskTechnicalDetails} onOpenBase={(baseId) => { setBaseFocusRequest((current) => ({ baseId, nonce: current.nonce + 1 })); setTab("Bases"); }} onOpenVehicle={(vehicleId) => { setVehicleFocusRequest((current) => ({ vehicleId, nonce: current.nonce + 1 })); setTab("Vehicles"); }} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Maps" && <LazyTabBoundary label="Loading Maps"><MapsPanel onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} confirmSettingsRestart={confirmSettingsRestart} waitForTaskWithUpdates={waitForTaskWithUpdates} taskTechnicalDetails={taskTechnicalDetails} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Care Package" && <LazyTabBoundary label="Loading Care Package"><CarePackagePanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Addons" && <LazyTabBoundary label="Loading Addons"><AddonsPanel pinnedAddons={pinnedAddons} setPinnedAddons={setPinnedAddons} selectedAddonId={selectedPinnedAddonId} clearSelectedAddon={() => setSelectedPinnedAddonId("")} setAddonUpdateAvailable={setAddonUpdatesAvailable} confirmAction={confirmDialog} /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Services") && tab === "Services" && <LazyTabBoundary label="Loading Services"><ServicesPanel services={services} setServices={setServices} setTask={setTask} openLogs={(service) => { setRedeploySetupOpen(false); setSelectedLogService(service); setTab("Logs"); }} onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Players") && tab === "Players" && isPlayerTier(userInfo?.tier) && <PlayerCharacterPage />}
+        {!redeploySetupOpen && allowedTabs.includes("Players") && tab === "Players" && !isPlayerTier(userInfo?.tier) && <LazyTabBoundary label="Loading Players"><PlayersPanel onError={setError} confirmAction={confirmDialog} onOpenBase={(baseId) => { setBaseFocusRequest((current) => ({ baseId, nonce: current.nonce + 1 })); setTab("Bases"); }} renderCharacterAdmin={(props) => <LazyTabBoundary label="Loading Player Details"><CharacterAdminUI {...props} onError={setError} confirmAction={confirmDialog} waitForTask={waitForTaskSilently} formatMutationResult={formatMutationResult} restartGate={restartGateChoice} /></LazyTabBoundary>} /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Guilds") && tab === "Guilds" && isPlayerTier(userInfo?.tier) && <PlayerGuildPage />}
+        {!redeploySetupOpen && allowedTabs.includes("Guilds") && tab === "Guilds" && !isPlayerTier(userInfo?.tier) && <LazyTabBoundary label="Loading Guilds"><GuildsPanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Bases") && tab === "Bases" && isPlayerTier(userInfo?.tier) && <PlayerAssetsPage kind="bases" />}
+        {!redeploySetupOpen && allowedTabs.includes("Bases") && tab === "Bases" && !isPlayerTier(userInfo?.tier) && <LazyTabBoundary label="Loading Bases"><BasesPage onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} formatMutationResult={formatMutationResult} focusRequest={baseFocusRequest} /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Vehicles") && tab === "Vehicles" && isPlayerTier(userInfo?.tier) && <PlayerAssetsPage kind="vehicles" />}
+        {!redeploySetupOpen && allowedTabs.includes("Vehicles") && tab === "Vehicles" && !isPlayerTier(userInfo?.tier) && <LazyTabBoundary label="Loading Vehicles"><VehiclesPanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} focusRequest={vehicleFocusRequest} /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Exchange") && tab === "Exchange" && <LazyTabBoundary label="Loading Market Board"><ExchangePanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Landsraad") && tab === "Landsraad" && <LazyTabBoundary label="Loading Landsraad"><LandsraadPanel onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Admin Tools") && tab === "Admin Tools" && <LazyTabBoundary label="Loading Admin Tools"><AdminToolsPanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Live Map") && tab === "Live Map" && <LazyTabBoundary label="Loading Live Map"><LiveMapPanel onError={setError} confirmAction={confirmDialog} waitForTask={waitForTaskSilently} taskTechnicalDetails={taskTechnicalDetails} onOpenBase={(baseId) => { setBaseFocusRequest((current) => ({ baseId, nonce: current.nonce + 1 })); setTab("Bases"); }} onOpenVehicle={(vehicleId) => { setVehicleFocusRequest((current) => ({ vehicleId, nonce: current.nonce + 1 })); setTab("Vehicles"); }} /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Maps") && tab === "Maps" && <LazyTabBoundary label="Loading Maps"><MapsPanel onError={setError} confirmAction={confirmDialog} restartGate={restartGateChoice} confirmSettingsRestart={confirmSettingsRestart} waitForTaskWithUpdates={waitForTaskWithUpdates} taskTechnicalDetails={taskTechnicalDetails} /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Care Package") && tab === "Care Package" && <LazyTabBoundary label="Loading Care Package"><CarePackagePanel onError={setError} confirmAction={confirmDialog} /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Addons") && tab === "Addons" && <LazyTabBoundary label="Loading Addons"><AddonsPanel pinnedAddons={pinnedAddons} setPinnedAddons={setPinnedAddons} selectedAddonId={selectedPinnedAddonId} clearSelectedAddon={() => setSelectedPinnedAddonId("")} setAddonUpdateAvailable={setAddonUpdatesAvailable} confirmAction={confirmDialog} /></LazyTabBoundary>}
         {(languagePickerOpen || tab === "Language") && <LazyTabBoundary label="Loading Language"><LanguagePanel onClose={() => {setLanguagePickerOpen(false);if(tab === "Language")setTab("Home");}} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Database" && <LazyTabBoundary label="Loading Database"><DatabasePanel /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Storage" && <LazyTabBoundary label="Loading Storage"><StoragePanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Backups" && <LazyTabBoundary label="Loading Backups"><BackupsPanel
+        {!redeploySetupOpen && allowedTabs.includes("Database") && tab === "Database" && <LazyTabBoundary label="Loading Database"><DatabasePanel /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Storage") && tab === "Storage" && isPlayerTier(userInfo?.tier) && <PlayerAssetsPage kind="storage" />}
+        {!redeploySetupOpen && allowedTabs.includes("Storage") && tab === "Storage" && !isPlayerTier(userInfo?.tier) && <LazyTabBoundary label="Loading Storage"><StoragePanel onError={setError} confirmAction={confirmDialog} formatMutationResult={formatMutationResult} /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Backups") && tab === "Backups" && <LazyTabBoundary label="Loading Backups"><BackupsPanel
             backupRestoreTask={backupRestoreTask}
             setBackupRestoreTask={setBackupRestoreTask}
             onError={setError}
@@ -988,9 +1370,9 @@ export function App() {
             taskTechnicalDetails={taskTechnicalDetails}
             isTerminalTask={isTerminalTask}
           /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Logs" && <LazyTabBoundary label="Loading Logs"><LogsPanel selectedService={selectedLogService} setSelectedService={setSelectedLogService} text={logs} setText={setLogs} onError={setError} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Chat" && <LazyTabBoundary label="Loading Chat"><ChatPanel onError={setError} /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Updates" && <LazyTabBoundary label="Loading Updates"><UpdatesPanel
+        {!redeploySetupOpen && allowedTabs.includes("Logs") && tab === "Logs" && <LazyTabBoundary label="Loading Logs"><LogsPanel selectedService={selectedLogService} setSelectedService={setSelectedLogService} text={logs} setText={setLogs} onError={setError} /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Chat") && tab === "Chat" && <LazyTabBoundary label="Loading Chat"><ChatPanel onError={setError} /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Updates") && tab === "Updates" && <LazyTabBoundary label="Loading Updates"><UpdatesPanel
             installGameFilesRequest={installGameFilesRequest}
             onInstallGameFilesHandled={() => setInstallGameFilesRequest(0)}
             onStackStatus={setStackVersionStatus}
@@ -1004,15 +1386,32 @@ export function App() {
             formatResultTitle={formatResultTitle}
             formatResultMessage={formatResultMessage}
           /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab === "Settings" && <LazyTabBoundary label="Loading Settings"><SettingsPanel
+        {!redeploySetupOpen && allowedTabs.includes("Access Control") && tab === "Access Control" && <LazyTabBoundary label="Loading Access Control"><IamPolicyEditor /></LazyTabBoundary>}
+        {!redeploySetupOpen && allowedTabs.includes("Settings") && tab === "Settings" && <LazyTabBoundary label="Loading Settings"><SettingsPanel
           onPasswordChanged={logoutAfterPasswordChange}
+          onOpenAccessControl={() => setTab("Access Control")}
           publicListingUrl={publicDirectoryStatus?.serverId ? publicServerListingUrl(publicDirectoryStatus.serverId) : undefined}
           confirmAction={confirmDialog}
+          onTotpEnrollmentStarted={() => setSettingsTotpOpen(true)}
+          credentialRevision={credentialRevision}
+          autoOpenDiscordSetup={autoOpenDiscordSetup}
+          onDiscordSetupAutoOpened={() => setAutoOpenDiscordSetup(false)}
+          autoOpenTwoFactor={autoOpenTwoFactorSetting}
+          onTwoFactorAutoOpened={() => setAutoOpenTwoFactorSetting(false)}
         /></LazyTabBoundary>}
-        {!redeploySetupOpen && tab !== "Maps" && <TaskProgress task={task} onDismiss={() => setTask(null)} />}
+        {!redeploySetupOpen && access.can("setup:read") && tab !== "Maps" && <TaskProgress task={task} onDismiss={() => setTask(null)} />}
         <AppFooter />
       </main>
       <ConfirmDialog request={confirmRequest} onClose={closeConfirmDialog} />
+      {settingsTotpOpen && <TotpSetupScreen mode="enroll" presentation="dialog" onComplete={continued => {
+        setSettingsTotpOpen(false);
+        if (continued) setCredentialRevision(value => value + 1);
+        else afterTotpSetup();
+      }} onCancel={continued => {
+        setSettingsTotpOpen(false);
+        if (continued) setCredentialRevision(value => value + 1);
+        else afterTotpSetup();
+      }} />}
     </div>
   );
 }

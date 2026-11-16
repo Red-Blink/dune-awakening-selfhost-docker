@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CarePackageGrantHistory } from "./CarePackageGrantHistory";
 import { CarePackagePanel } from "./CarePackagePanel";
+import { setConsoleAccess } from "../../lib/consoleAccess";
 
 vi.mock("../../api/carePackage", () => ({ carePackageApi: {
   config: vi.fn().mockResolvedValue({ enabled: false, kits: [], items: [], xp: 0, autoGrantRules: [] }),
@@ -26,6 +27,14 @@ function show(row = grant) {
 }
 
 describe("Care Package Grant History", () => {
+  it("keeps failed-grant details readable without exposing an unauthorized retry", () => {
+    setConsoleAccess("ready", { username: "reader", displayName: "Reader", tier: "player" }, ["carepackage:read"]);
+    const { onRetry } = show({ ...grant, status: "failed" });
+    fireEvent.click(screen.getByRole("button", { name: "Details" }));
+    expect(screen.getByRole("dialog")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(onRetry).not.toHaveBeenCalled();
+  });
   it("connects the Care Package page to structured item/XP results and actual failure reasons", async () => {
     render(<CarePackagePanel onError={vi.fn()} confirmAction={vi.fn()} />);
     fireEvent.click(await screen.findByRole("button", { name: "Details" }));
