@@ -751,6 +751,13 @@ main { padding: 22px; min-width: 0; }
 .summary-dungeons-table { font-size: 13px; }
 .summary-dungeons-show-all { justify-self: start; padding: 4px 0; background: transparent; border-color: transparent; color: var(--muted-warm); font-size: 12px; }
 .summary-dungeons-show-all:hover { color: var(--text-strong); }
+.dungeon-runs-panel { display: grid; gap: 4px; }
+.dungeon-runs-filters { flex-wrap: wrap; align-items: center; }
+.action-row.dungeon-runs-filters > select { flex: 0 1 200px; min-width: 150px; }
+.dungeon-runs-table :is(th, td):is([data-column="dungeon"], [data-column="difficulty"], [data-column="best"], [data-column="duration"], [data-column="runs"]) { white-space: nowrap; }
+.dungeon-runs-table :is(th, td)[data-column="party"] { min-width: 220px; }
+.dungeon-party-link { display: inline; width: auto; min-height: 0; padding: 0; border: 0; background: transparent; color: var(--accent); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.dungeon-party-link:hover { color: var(--text-strong); }
 .summary-dungeons-table :is(th, td):is([data-column="dungeon"], [data-column="difficulty"], [data-column="duration"]) { white-space: nowrap; }
 /* Below this width the wrapper scrolls sideways instead of stacking party names. */
 .summary-dungeons-table :is(th, td)[data-column="party"] { min-width: 180px; }

@@ -556,7 +556,7 @@ describe("PlayerSummary", () => {
   });
 
   describe("Dungeon Runs", () => {
-    const party = [{ controllerId: 23, characterName: "Aster" }, { controllerId: 36, characterName: "Brin" }];
+    const party = [{ controllerId: 23, actorId: 23, characterName: "Aster" }, { controllerId: 36, actorId: 36, characterName: "Brin" }];
 
     it("lists every run with best times, resolved names and formatted durations", async () => {
       vi.mocked(playersApi.dungeons).mockResolvedValue({
@@ -566,7 +566,7 @@ describe("PlayerSummary", () => {
         runs: [
           { completionId: 4, dungeonId: "DA_Dgn_999_Sand_Storm", difficulty: 2, durationMs: 992717, playerCount: 2, party },
           { completionId: 3, dungeonId: "DA_Dgn_999_Sand_Storm", difficulty: 2, durationMs: 1337938, playerCount: 2, party },
-          { completionId: 1, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 883053, playerCount: 1, party: [{ controllerId: 23, characterName: null }] }
+          { completionId: 1, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 883053, playerCount: 1, party: [{ controllerId: 23, actorId: 23, characterName: null }] }
         ]
       });
       render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);
@@ -585,8 +585,8 @@ describe("PlayerSummary", () => {
       vi.mocked(playersApi.dungeons).mockResolvedValue({
         capabilities: { dungeons: true }, totalRuns: 2, truncated: false,
         runs: [
-          { completionId: 2, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 1000, playerCount: 3, party: [{ controllerId: 1, characterName: "Aaron" }, { controllerId: 2, characterName: "Bea" }, { controllerId: 3, characterName: "Cy" }] },
-          { completionId: 1, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 2000, playerCount: 1, party: [{ controllerId: 4, characterName: "Zed" }] }
+          { completionId: 2, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 1000, playerCount: 3, party: [{ controllerId: 1, actorId: 1, characterName: "Aaron" }, { controllerId: 2, actorId: 2, characterName: "Bea" }, { controllerId: 3, actorId: 3, characterName: "Cy" }] },
+          { completionId: 1, dungeonId: "DA_Dgn_998_Dust", difficulty: 1, durationMs: 2000, playerCount: 1, party: [{ controllerId: 4, actorId: 4, characterName: "Zed" }] }
         ]
       });
       render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Zed" } }} fallback={{}} />);
@@ -600,7 +600,7 @@ describe("PlayerSummary", () => {
       // 12 runs over 12 difficulties of one dungeon; run N takes N minutes.
       const runs = Array.from({ length: 12 }, (_, index) => ({
         completionId: 100 - index, dungeonId: "DA_Dgn_998_Dust", difficulty: index + 1, durationMs: (index + 1) * 60_000,
-        playerCount: 1, party: [{ controllerId: 23, characterName: "Aster" }]
+        playerCount: 1, party: [{ controllerId: 23, actorId: 23, characterName: "Aster" }]
       }));
       vi.mocked(playersApi.dungeons).mockResolvedValue({ capabilities: { dungeons: true }, totalRuns: 12, truncated: false, runs });
       render(<PlayerSummary {...baseProps} detail={{ player: { character_name: "Aster" } }} fallback={{}} />);

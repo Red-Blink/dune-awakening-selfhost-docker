@@ -182,8 +182,11 @@
     "All Qualities",
     "All Recorded Time",
     "All Restarts",
+    "All Runs",
     "All Sets",
     "All Types",
+    "All difficulties",
+    "All dungeons",
     "All levels",
     "All routines",
     "All selected cosmetics are already pending or unlocked. No duplicates were added.",
@@ -361,6 +364,7 @@
     "Bene Gesserit",
     "Bene Gesserit starter skills",
     "Bengali",
+    "Best Time",
     "Best Times",
     "Best experience: run it directly on a Linux server.",
     "Beyond the Dunes, Every Choice Shapes the Future",
@@ -998,6 +1002,9 @@
     "Dune.GlobalVehicleMiningOutputMultiplier",
     "Dungeon",
     "Dungeon Runs",
+    "Dungeon runs aren't available on this database version.",
+    "Dungeon runs couldn't be loaded.",
+    "Dungeon runs view",
     "Durability",
     "Durability not reported",
     "Duration",
@@ -1174,6 +1181,7 @@
     "Filter Research Schematics",
     "Filter Spice Field Settings",
     "Filter base inventory",
+    "Filter by character name or actor ID",
     "Filter by container group",
     "Filter by map, size, or dimension",
     "Filter by name, ID, status, or dependency",
@@ -1601,6 +1609,7 @@
     "Loading community addons...",
     "Loading customizations...",
     "Loading definition...",
+    "Loading dungeon runs…",
     "Loading functions and procedures...",
     "Loading journey data...",
     "Loading land claim",
@@ -1739,6 +1748,7 @@
     "Modifier view",
     "Modules",
     "More",
+    "More than one player matches. Enter the full character name or actor ID.",
     "Most Downloaded",
     "Most Liked",
     "Movement / Vehicles",
@@ -1876,6 +1886,7 @@
     "No output.",
     "No partitions available",
     "No permissions match your search.",
+    "No player matches that name.",
     "No player sell listings on this exchange.",
     "No players are currently online.",
     "No players are online",
@@ -1888,6 +1899,7 @@
     "No research entries found for this filter.",
     "No results found.",
     "No results yet. Enter a name and press Search.",
+    "No runs match these filters.",
     "No runs yet.",
     "No scheduled messages yet",
     "No seed plan selected.",
@@ -2505,6 +2517,7 @@
     "Running database migrations for the updated build.",
     "Running, newly started, and rebalanced game servers now preserve the configured emergency swap allowance.",
     "Running…",
+    "Runs",
     "Runtime Configuration",
     "Runtime Location",
     "Runtime file checks have not loaded yet.",
@@ -2769,6 +2782,7 @@
     "Show all {count0} items",
     "Show fewer items",
     "Showing",
+    "Showing runs for",
     "Showing the latest {count0} runs.",
     "Showing up to 100 players and 50 recent kills.",
     "Showing {count0}-{count1} of {count2} item ({count3} total).",
@@ -3519,10 +3533,13 @@
     "with the server’s SSH username and",
     "{count0}",
     "{count0} distinct",
+    "{count0} dungeon and difficulty pairs · {count1} runs",
     "{count0} fields",
     "{count0} of {count1}",
+    "{count0} of {count1} runs · newest first",
     "{count0} palettes",
     "{count0} rows",
+    "{count0} runs · newest first",
     "{count0} warnings",
     "{count0}d {count1}h",
     "{count0}h ago",
@@ -4352,6 +4369,17 @@
         ]
       }
     ],
+    "{count0} dungeon and difficulty pairs · {count1} runs": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 233,
+        "nearby": [
+          "Showing runs for",
+          "Loading dungeon runs…",
+          "No runs match these filters."
+        ]
+      }
+    ],
     "{count0} fields": [
       {
         "file": "console/web/src/features/maps/MapsPanel.tsx",
@@ -4403,6 +4431,17 @@
         ]
       }
     ],
+    "{count0} of {count1} runs · newest first": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 250,
+        "nearby": [
+          "No dungeon runs recorded.",
+          "Loading dungeon runs…",
+          "{count0} runs · newest first"
+        ]
+      }
+    ],
     "{count0} palettes": [
       {
         "file": "console/web/src/themes/ThemePanel.tsx",
@@ -4423,6 +4462,17 @@
           "Unknown",
           "{count0} fields",
           "Map Change Failed"
+        ]
+      }
+    ],
+    "{count0} runs · newest first": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 251,
+        "nearby": [
+          "Loading dungeon runs…",
+          "{count0} of {count1} runs · newest first",
+          "No runs match these filters."
         ]
       }
     ],
@@ -4460,7 +4510,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 510,
+        "line": 534,
         "nearby": [
           "Currently Active",
           "Unavailable",
@@ -4504,7 +4554,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 511,
+        "line": 535,
         "nearby": [
           "Unavailable",
           "{count0}h {count1}m",
@@ -4650,7 +4700,7 @@
     "1 Month": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 395,
+        "line": 419,
         "nearby": [
           "2 Weeks",
           "3 Weeks",
@@ -4674,7 +4724,7 @@
     "1 Week": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 392,
+        "line": 416,
         "nearby": [
           "Never",
           "Weeks",
@@ -4697,7 +4747,7 @@
     "2 Months": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 396,
+        "line": 420,
         "nearby": [
           "3 Weeks",
           "1 Month",
@@ -4709,7 +4759,7 @@
     "2 Weeks": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 393,
+        "line": 417,
         "nearby": [
           "Weeks",
           "1 Week",
@@ -4721,7 +4771,7 @@
     "3 Weeks": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 394,
+        "line": 418,
         "nearby": [
           "1 Week",
           "2 Weeks",
@@ -5625,7 +5675,7 @@
     "Active Players": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 38,
+        "line": 39,
         "nearby": [
           "Deleted Characters",
           "PvP"
@@ -6641,6 +6691,30 @@
         ]
       }
     ],
+    "All difficulties": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 211,
+        "nearby": [
+          "All dungeons",
+          "Difficulty",
+          "Refresh",
+          "Filter by character name or actor ID"
+        ]
+      }
+    ],
+    "All dungeons": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 207,
+        "nearby": [
+          "Dungeon runs view",
+          "Dungeon",
+          "Difficulty",
+          "All difficulties"
+        ]
+      }
+    ],
     "All Groups": [
       {
         "file": "console/web/src/features/players/BuildingUnlocksTab.tsx",
@@ -6699,7 +6773,7 @@
     "All Players": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 377,
+        "line": 401,
         "nearby": [
           "Filter",
           "Status filtering isn't available on this database version",
@@ -6765,6 +6839,17 @@
           "Type",
           "Functions",
           "Procedures"
+        ]
+      }
+    ],
+    "All Runs": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 16,
+        "nearby": [
+          "Leaderboard",
+          "No player matches that name.",
+          "More than one player matches. Enter the full character name or actor ID."
         ]
       }
     ],
@@ -8901,7 +8986,7 @@
     "Banned": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 380,
+        "line": 404,
         "nearby": [
           "Online",
           "Offline",
@@ -15425,7 +15510,7 @@
     "Currently Active": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 500,
+        "line": 524,
         "nearby": [
           "Next",
           "Last",
@@ -16996,11 +17081,11 @@
     "Deleted Characters": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 39,
+        "line": 40,
         "nearby": [
           "Active Players",
           "PvP",
-          "No players are currently online."
+          "Dungeon Runs"
         ]
       }
     ],
@@ -17554,6 +17639,16 @@
       }
     ],
     "Difficulty": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 210,
+        "nearby": [
+          "Dungeon",
+          "All dungeons",
+          "All difficulties",
+          "Refresh"
+        ]
+      },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
         "line": 291,
@@ -18932,7 +19027,29 @@
         ]
       }
     ],
+    "Dungeon": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 206,
+        "nearby": [
+          "Refresh",
+          "Dungeon runs view",
+          "All dungeons",
+          "Difficulty"
+        ]
+      }
+    ],
     "Dungeon Runs": [
+      {
+        "file": "console/web/src/features/players/PlayersPanel.tsx",
+        "line": 42,
+        "nearby": [
+          "Deleted Characters",
+          "PvP",
+          "No players are currently online.",
+          "No offline players were found."
+        ]
+      },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
         "line": 282,
@@ -18941,6 +19058,42 @@
           "Currency",
           "No dungeon runs recorded.",
           "Total"
+        ]
+      }
+    ],
+    "Dungeon runs aren't available on this database version.": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 197,
+        "nearby": [
+          "No player matches that name.",
+          "More than one player matches. Enter the full character name or actor ID.",
+          "Dungeon runs couldn't be loaded.",
+          "Refresh"
+        ]
+      }
+    ],
+    "Dungeon runs couldn't be loaded.": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 199,
+        "nearby": [
+          "More than one player matches. Enter the full character name or actor ID.",
+          "Dungeon runs aren't available on this database version.",
+          "Refresh",
+          "Dungeon runs view"
+        ]
+      }
+    ],
+    "Dungeon runs view": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 205,
+        "nearby": [
+          "Dungeon runs couldn't be loaded.",
+          "Refresh",
+          "Dungeon",
+          "All dungeons"
         ]
       }
     ],
@@ -21211,7 +21364,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 375,
+        "line": 399,
         "nearby": [
           "Players",
           "Players view",
@@ -21241,6 +21394,26 @@
           "Filter by name, item ID, group, or status",
           "Clear",
           "of"
+        ]
+      }
+    ],
+    "Filter by character name or actor ID": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 221,
+        "nearby": [
+          "All difficulties",
+          "Refresh",
+          "Search"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 222,
+        "nearby": [
+          "Refresh",
+          "Search",
+          "Clear"
         ]
       }
     ],
@@ -21782,7 +21955,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 456,
+        "line": 480,
         "nearby": [
           "of",
           "Rows",
@@ -21805,6 +21978,16 @@
         "line": 546,
         "nearby": [
           "Showing {count0}-{count1} of {count2} items.",
+          "Rows",
+          "Previous",
+          "Page"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 270,
+        "nearby": [
+          "of",
           "Rows",
           "Previous",
           "Page"
@@ -24071,7 +24254,7 @@
     "Hide Inactive Players After": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 384,
+        "line": 408,
         "nearby": [
           "Offline",
           "Banned",
@@ -26649,7 +26832,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 460,
+        "line": 484,
         "nearby": [
           "of",
           "Next",
@@ -26675,6 +26858,14 @@
           "Next",
           "Unsaved Change",
           "Save or discard your changes before leaving Bot Items."
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 274,
+        "nearby": [
+          "of",
+          "Next"
         ]
       }
     ],
@@ -26909,6 +27100,14 @@
     ],
     "Leaderboard": [
       {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 15,
+        "nearby": [
+          "All Runs",
+          "No player matches that name."
+        ]
+      },
+      {
         "file": "console/web/src/features/players/CombatPanel.tsx",
         "line": 52,
         "nearby": [
@@ -26979,7 +27178,7 @@
     "Less than 1m": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 512,
+        "line": 536,
         "nearby": [
           "{count0}h {count1}m",
           "{count0}m"
@@ -27653,6 +27852,46 @@
           "Refresh",
           "deleted",
           "character holds"
+        ]
+      }
+    ],
+    "Loading dungeon runs…": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 232,
+        "nearby": [
+          "Clear",
+          "Showing runs for",
+          "{count0} dungeon and difficulty pairs · {count1} runs"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 243,
+        "nearby": [
+          "{count0} dungeon and difficulty pairs · {count1} runs",
+          "No runs match these filters.",
+          "No dungeon runs recorded."
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 248,
+        "nearby": [
+          "No runs match these filters.",
+          "No dungeon runs recorded.",
+          "{count0} of {count1} runs · newest first",
+          "{count0} runs · newest first"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 258,
+        "nearby": [
+          "{count0} of {count1} runs · newest first",
+          "{count0} runs · newest first",
+          "No runs match these filters.",
+          "No dungeon runs recorded."
         ]
       }
     ],
@@ -29940,6 +30179,18 @@
         ]
       }
     ],
+    "More than one player matches. Enter the full character name or actor ID.": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 34,
+        "nearby": [
+          "All Runs",
+          "No player matches that name.",
+          "Dungeon runs aren't available on this database version.",
+          "Dungeon runs couldn't be loaded."
+        ]
+      }
+    ],
     "Most Downloaded": [
       {
         "file": "console/web/src/features/blueprints/CommunityBlueprintBrowser.tsx",
@@ -30374,7 +30625,7 @@
     "Never": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 390,
+        "line": 414,
         "nearby": [
           "Banned",
           "Hide Inactive Players After",
@@ -30659,7 +30910,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 459,
+        "line": 483,
         "nearby": [
           "Page",
           "of",
@@ -30694,6 +30945,15 @@
           "of",
           "Last",
           "Unsaved Change"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 273,
+        "nearby": [
+          "Page",
+          "of",
+          "Last"
         ]
       }
     ],
@@ -30834,7 +31094,7 @@
     "No banned players were found.": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 306,
+        "line": 320,
         "nearby": [
           "No players are currently online.",
           "No offline players were found.",
@@ -31175,6 +31435,25 @@
       }
     ],
     "No dungeon runs recorded.": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 243,
+        "nearby": [
+          "Loading dungeon runs…",
+          "No runs match these filters.",
+          "{count0} of {count1} runs · newest first"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 258,
+        "nearby": [
+          "Loading dungeon runs…",
+          "No runs match these filters.",
+          "Showing",
+          "of"
+        ]
+      },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
         "line": 283,
@@ -31553,9 +31832,9 @@
     "No offline players were found.": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 304,
+        "line": 318,
         "nearby": [
-          "PvP",
+          "Dungeon Runs",
           "No players are currently online.",
           "No banned players were found.",
           "No players have been found yet."
@@ -31654,6 +31933,18 @@
         ]
       }
     ],
+    "No player matches that name.": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 34,
+        "nearby": [
+          "Leaderboard",
+          "All Runs",
+          "More than one player matches. Enter the full character name or actor ID.",
+          "Dungeon runs aren't available on this database version."
+        ]
+      }
+    ],
     "No player sell listings on this exchange.": [
       {
         "file": "console/web/src/features/exchange/MarketBotOverlay.tsx",
@@ -31669,10 +31960,10 @@
     "No players are currently online.": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 302,
+        "line": 316,
         "nearby": [
-          "Deleted Characters",
           "PvP",
+          "Dungeon Runs",
           "No offline players were found.",
           "No banned players were found."
         ]
@@ -31705,7 +31996,7 @@
     "No players have been found yet.": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 307,
+        "line": 321,
         "nearby": [
           "No offline players were found.",
           "No banned players were found.",
@@ -31887,6 +32178,27 @@
           "Search",
           "Change",
           "Rank"
+        ]
+      }
+    ],
+    "No runs match these filters.": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 243,
+        "nearby": [
+          "{count0} dungeon and difficulty pairs · {count1} runs",
+          "Loading dungeon runs…",
+          "No dungeon runs recorded."
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 258,
+        "nearby": [
+          "{count0} runs · newest first",
+          "Loading dungeon runs…",
+          "No dungeon runs recorded.",
+          "Showing"
         ]
       }
     ],
@@ -32912,7 +33224,7 @@
     "Offline": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 379,
+        "line": 403,
         "nearby": [
           "All Players",
           "Online",
@@ -33195,7 +33507,7 @@
     "Online": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 378,
+        "line": 402,
         "nearby": [
           "Status filtering isn't available on this database version",
           "All Players",
@@ -34218,7 +34530,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 458,
+        "line": 482,
         "nearby": [
           "First",
           "Previous",
@@ -34239,6 +34551,16 @@
       {
         "file": "console/web/src/features/exchange/BotItemsTab.tsx",
         "line": 548,
+        "nearby": [
+          "First",
+          "Previous",
+          "of",
+          "Next"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 272,
         "nearby": [
           "First",
           "Previous",
@@ -35597,7 +35919,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 346,
+        "line": 366,
         "nearby": [
           "No banned players were found.",
           "No players have been found yet.",
@@ -35606,7 +35928,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 364,
+        "line": 388,
         "nearby": [
           "Players view",
           "Filter"
@@ -35673,7 +35995,7 @@
     "Players view": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 349,
+        "line": 369,
         "nearby": [
           "No players have been found yet.",
           "Players"
@@ -35681,7 +36003,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 367,
+        "line": 391,
         "nearby": [
           "Players",
           "Filter",
@@ -36274,7 +36596,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 457,
+        "line": 481,
         "nearby": [
           "Rows",
           "First",
@@ -36295,6 +36617,16 @@
       {
         "file": "console/web/src/features/exchange/BotItemsTab.tsx",
         "line": 547,
+        "nearby": [
+          "Rows",
+          "First",
+          "Page",
+          "of"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 271,
         "nearby": [
           "Rows",
           "First",
@@ -36756,12 +37088,12 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 40,
+        "line": 41,
         "nearby": [
           "Active Players",
           "Deleted Characters",
-          "No players are currently online.",
-          "No offline players were found."
+          "Dungeon Runs",
+          "No players are currently online."
         ]
       },
       {
@@ -38434,7 +38766,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 399,
+        "line": 423,
         "nearby": [
           "1 Month",
           "2 Months",
@@ -42033,7 +42365,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 451,
+        "line": 475,
         "nearby": [
           "Showing",
           "of",
@@ -42062,13 +42394,13 @@
         ]
       },
       {
-        "file": "console/web/src/features/database/DatabaseSchemaBrowser.tsx",
-        "line": 133,
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 265,
         "nearby": [
-          "Clear schema filter",
-          "Table",
-          "Column",
-          "Type"
+          "Showing",
+          "of",
+          "First",
+          "Previous"
         ]
       }
     ],
@@ -44204,7 +44536,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 415,
+        "line": 439,
         "nearby": [
           "Refresh",
           "Search Character, FLS ID, Account ID, or Actor ID",
@@ -44292,7 +44624,7 @@
     "Search Character, FLS ID, Account ID, or Actor ID": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 413,
+        "line": 437,
         "nearby": [
           "2 Months",
           "Refresh",
@@ -46328,7 +46660,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 448,
+        "line": 472,
         "nearby": [
           "Search",
           "Clear",
@@ -46344,6 +46676,16 @@
           "Clear",
           "of",
           "rows."
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 262,
+        "nearby": [
+          "No runs match these filters.",
+          "No dungeon runs recorded.",
+          "of",
+          "Rows"
         ]
       }
     ],
@@ -46412,6 +46754,18 @@
           "New",
           "Rows",
           "First"
+        ]
+      }
+    ],
+    "Showing runs for": [
+      {
+        "file": "console/web/src/features/players/DungeonRunsPanel.tsx",
+        "line": 228,
+        "nearby": [
+          "Search",
+          "Clear",
+          "Loading dungeon runs…",
+          "{count0} dungeon and difficulty pairs · {count1} runs"
         ]
       }
     ],
@@ -47786,7 +48140,7 @@
     "Status filtering isn't available on this database version": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 376,
+        "line": 400,
         "nearby": [
           "Players view",
           "Filter",
@@ -52166,7 +52520,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 502,
+        "line": 526,
         "nearby": [
           "Last",
           "Currently Active",
@@ -54709,7 +55063,7 @@
     "Weeks": [
       {
         "file": "console/web/src/features/players/PlayersPanel.tsx",
-        "line": 391,
+        "line": 415,
         "nearby": [
           "Hide Inactive Players After",
           "Never",

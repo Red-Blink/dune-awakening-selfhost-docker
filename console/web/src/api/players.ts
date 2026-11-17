@@ -7,7 +7,7 @@ export type DungeonRun = {
   difficulty: number;
   durationMs: number;
   playerCount: number;
-  party: { controllerId: number; characterName: string | null }[];
+  party: { controllerId: number; actorId: number | null; characterName: string | null }[];
 };
 
 type PlayersListResult = { rows: Record<string, unknown>[]; totalCount: number; totalPlayers: number; capabilities: Record<string, unknown>; reason?: string };

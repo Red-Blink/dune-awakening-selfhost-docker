@@ -1515,7 +1515,7 @@ function dungeonDb({ runs = [], total = runs.length } = {}) {
 test("player dungeons lists runs keyed on the controller id with party names", async () => {
   const db = dungeonDb({ runs: [{
     completion_id: "4", dungeon_id: "DA_Dgn_089_Radiation", difficulty: 2, duration_ms: 992717, players_num: 2,
-    party: [{ controllerId: 301, characterName: "Aster" }, { controllerId: 36, characterName: null }]
+    party: [{ controllerId: 301, actorId: "91", characterName: "Aster" }, { controllerId: 36, actorId: null, characterName: null }]
   }] });
   const result = await playerDungeons(db, "91");
   assert.equal(result.capabilities.dungeons, true);
@@ -1523,7 +1523,7 @@ test("player dungeons lists runs keyed on the controller id with party names", a
   assert.equal(result.truncated, false);
   assert.deepEqual(result.runs, [{
     completionId: 4, dungeonId: "DA_Dgn_089_Radiation", difficulty: 2, durationMs: 992717, playerCount: 2,
-    party: [{ controllerId: 301, characterName: "Aster" }, { controllerId: 36, characterName: null }]
+    party: [{ controllerId: 301, actorId: 91, characterName: "Aster" }, { controllerId: 36, actorId: null, characterName: null }]
   }]);
 });
 
@@ -1591,7 +1591,7 @@ function serverDungeonDb({ pagedRows = [], totalRuns = 0, leaderboardRows = [], 
 
 const partyRow = (completionId, overrides = {}) => ({
   completion_id: String(completionId), dungeon_id: "DA_Dgn_089_Radiation", difficulty: 2, duration_ms: 992717, players_num: 1,
-  party: [{ controllerId: 23, characterName: "Aster" }], ...overrides
+  party: [{ controllerId: 23, actorId: 25, characterName: "Aster" }], ...overrides
 });
 
 test("listDungeonRuns pages server-wide runs with filtered and unfiltered totals", async () => {
@@ -1601,7 +1601,7 @@ test("listDungeonRuns pages server-wide runs with filtered and unfiltered totals
   assert.equal(result.totalCount, 3);
   assert.equal(result.totalRuns, 4);
   assert.deepEqual(result.runs.map((run) => run.completionId), [4, 3]);
-  assert.deepEqual(result.runs[0].party, [{ controllerId: 23, characterName: "Aster" }]);
+  assert.deepEqual(result.runs[0].party, [{ controllerId: 23, actorId: 25, characterName: "Aster" }]);
   const paged = db.calls.find((call) => call.text.includes("with matched as"));
   assert.match(paged.text, /where true/);
   assert.deepEqual(paged.values, [2, 0]);
@@ -1638,7 +1638,7 @@ test("dungeonLeaderboard returns the best run and run count per dungeon and diff
   const result = await dungeonLeaderboard(db, { difficulty: "2" });
   assert.deepEqual(result.entries, [{
     runCount: 5,
-    best: { completionId: 2, dungeonId: "DA_Dgn_136_Fire", difficulty: 2, durationMs: 872671, playerCount: 2, party: [{ controllerId: 23, characterName: "Aster" }] }
+    best: { completionId: 2, dungeonId: "DA_Dgn_136_Fire", difficulty: 2, durationMs: 872671, playerCount: 2, party: [{ controllerId: 23, actorId: 25, characterName: "Aster" }] }
   }]);
   const query = db.calls.find((call) => call.text.includes("with ranked as"));
   assert.match(query.text, /distinct on \(dc\.dungeon_id, dc\.difficulty\)/);

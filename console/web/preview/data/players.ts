@@ -1,8 +1,25 @@
 import skills from '../../../../runtime/data/admin-skill-modules.json';
 import { ago, baseRows, blueprints, capabilities, collection, inventoryForPlayer, people, vehicleRows } from './shared';
 
+function previewDungeonRuns() {
+ const party=(indexes:number[])=>indexes.map(index=>{const person=people[index%people.length];return {controllerId:1001+(index%people.length),actorId:Number(person.actor_id),characterName:person.character_name};});
+ const runs:[string,number,number,number[]][]=[['DA_Dgn_089_Radiation',2,992717,[0,1]],['DA_Dgn_152_Electric',3,1337938,[0,1,2]],['DA_Dgn_136_Fire',2,872671,[0,1]],['DA_Dgn_024_Darkness',1,883053,[0]],['DA_Dgn_Pit',3,581000,[1,2]],['DA_Dgn_152_Electric',1,309000,[2]],['DA_Dgn_136_Fire',2,941000,[3]],['DA_Dgn_195_Poison',1,1204000,[0,3]]];
+ return runs.map(([dungeonId,difficulty,durationMs,members],index)=>({completionId:runs.length-index,dungeonId,difficulty,durationMs,playerCount:members.length,party:party(members)}));
+}
+
+function previewDungeonData(url:URL):unknown|undefined {
+ const dungeonId=url.searchParams.get('dungeonId')||'',difficulty=url.searchParams.get('difficulty'),playerId=url.searchParams.get('playerId');
+ const all=previewDungeonRuns();
+ const runs=all.filter(run=>(!dungeonId||run.dungeonId===dungeonId)&&(difficulty===null||run.difficulty===Number(difficulty))&&(!playerId||run.party.some(member=>member.actorId===Number(playerId))));
+ const dungeonCapabilities={...capabilities,dungeons:true};
+ if(url.pathname==='/api/dungeons/runs'){const page=Number(url.searchParams.get('page')||0),pageSize=Number(url.searchParams.get('pageSize')||50);return {capabilities:dungeonCapabilities,page,pageSize,totalCount:runs.length,totalRuns:all.length,runs:runs.slice(page*pageSize,(page+1)*pageSize)};}
+ if(url.pathname==='/api/dungeons/leaderboard'){const groups=new Map<string,{runCount:number;best:typeof runs[number]}>();for(const run of runs){const key=run.dungeonId+':'+run.difficulty,group=groups.get(key);if(!group)groups.set(key,{runCount:1,best:run});else{group.runCount+=1;if(run.durationMs<group.best.durationMs)group.best=run;}}return {capabilities:dungeonCapabilities,entries:[...groups.values()].sort((a,b)=>a.best.dungeonId.localeCompare(b.best.dungeonId)||a.best.difficulty-b.best.difficulty)};}
+ return undefined;
+}
+
 export function playerData(url:URL):unknown|undefined {
  const path=url.pathname;
+ if(path.startsWith('/api/dungeons/'))return previewDungeonData(url);
  if(path==='/api/players/combat') {
   const requested=url.searchParams.get('controllerId');
   const rows=people.slice(0,5).map((p,index)=>({controllerId:String(1001+index),name:p.character_name,kills:12-index*2,deaths:3+index,kd:Number(((12-index*2)/(3+index)).toFixed(2)),selfDeaths:0,otherDeaths:2,unknownDeaths:0})).filter(p=>!requested||p.controllerId===requested);
@@ -24,7 +41,7 @@ export function playerData(url:URL):unknown|undefined {
  if(view==='intel')return {intel:185,maxIntel:2779,capabilities};
  if(view==='progression')return {level:person.level,xp:25190+(person.level-45)*600+200,totalSkillPoints:96,unspentSkillPoints:8,capabilities};
  if(view==='vitals')return {currentHealth:165,maxHealth:170,maxHealthEstimated:true,hydration:85,maxHydration:100,spiceAddictionLevel:2,maxSpiceAddictionLevel:10,capabilities};
- if(view==='dungeons'){const self={controllerId:1001+people.indexOf(person),characterName:person.character_name},mate={controllerId:1001+((people.indexOf(person)+1)%people.length),characterName:people[(people.indexOf(person)+1)%people.length].character_name};return {totalRuns:3,truncated:false,runs:[{completionId:3,dungeonId:'DA_Dgn_089_Radiation',difficulty:2,durationMs:992717,playerCount:2,party:[self,mate]},{completionId:2,dungeonId:'DA_Dgn_136_Fire',difficulty:2,durationMs:872671,playerCount:2,party:[self,mate]},{completionId:1,dungeonId:'DA_Dgn_024_Darkness',difficulty:1,durationMs:883053,playerCount:1,party:[self]}],capabilities:{...capabilities,dungeons:true}};}
+ if(view==='dungeons'){const runs=previewDungeonRuns().filter(run=>run.party.some(member=>member.actorId===Number(person.actor_id)));return {totalRuns:runs.length,truncated:false,runs,capabilities:{...capabilities,dungeons:true}};}
  if(view==='factions')return {rows:[{faction_id:person.faction_id,faction_name:person.faction,reputation_amount:4850,component_reputation_amount:4850,reputation_in_sync:true,estimated_rank:11,current_rank_limit:20}],capabilities};
  if(view==='position')return {map:person.map,partition_id:person.partition_id,x:person.x,y:person.y,z:0};
  if(view==='specs')return {rows:['Exploration','Combat','Crafting','Gathering','Sabotage'].map((track_type,index)=>({track_type,xp_amount:12500+index*3400,level:[46.4858,53.4382,59.6895,65.4967,71.0224][index],has_keystone:index===0,keystone_count:index===0?3:1,keystone_total:3})),unspentPoints:8,skillModules:skills.slice(0,18).map(skill=>({skillModule:skill.id,id:skill.id,level:1})),capabilities:{...capabilities,specs:true,keystones:true}};

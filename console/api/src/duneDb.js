@@ -3175,7 +3175,8 @@ export async function playerDungeons(db, id) {
 
 const DUNGEON_PARTY_LATERAL = `
   left join lateral (
-    select json_agg(json_build_object('controllerId', p.player_id, 'characterName', ps.character_name)
+    select json_agg(json_build_object('controllerId', p.player_id, 'actorId', ps.player_pawn_id,
+                                      'characterName', ps.character_name)
                     order by p.player_id) as members
     from dune.dungeon_completion_players p
     left join dune.player_state ps on ps.player_controller_id = p.player_id
@@ -3191,6 +3192,7 @@ function mapDungeonRun(row) {
     playerCount: Number(row.players_num),
     party: (Array.isArray(row.party) ? row.party : []).map((member) => ({
       controllerId: Number(member.controllerId),
+      actorId: member.actorId === null || member.actorId === undefined ? null : Number(member.actorId),
       characterName: member.characterName ?? null
     }))
   };
