@@ -1,6 +1,15 @@
 import { api, post } from "./client";
 import type { Task } from "./setup";
 
+export type DungeonRun = {
+  completionId: number;
+  dungeonId: string;
+  difficulty: number;
+  durationMs: number;
+  playerCount: number;
+  party: { controllerId: number; characterName: string | null }[];
+};
+
 type PlayersListResult = { rows: Record<string, unknown>[]; totalCount: number; totalPlayers: number; capabilities: Record<string, unknown>; reason?: string };
 
 export type PlayerListSettings = {
@@ -59,6 +68,7 @@ export const playersApi = {
   specs: (playerId: string) => api<{ rows: Record<string, unknown>[]; skillModules?: Record<string, unknown>[]; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/specs`),
   position: (playerId: string) => api<Record<string, unknown>>(`/api/players/${encodeURIComponent(playerId)}/position`),
   progression: (playerId: string) => api<{ level?: number; xp?: number; totalSkillPoints?: number; unspentSkillPoints?: number; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/progression`),
+  dungeons: (playerId: string) => api<{ runs?: DungeonRun[]; totalRuns?: number; truncated?: boolean; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/dungeons`),
   vitals: (playerId: string) => api<{ currentHealth?: number | null; maxHealth?: number; maxHealthEstimated?: boolean; hydration?: number | null; maxHydration?: number; spiceAddictionLevel?: number | null; maxSpiceAddictionLevel?: number; capabilities: Record<string, unknown>; reason?: string }>(`/api/players/${encodeURIComponent(playerId)}/vitals`),
   events: (playerId: string) => api<Record<string, unknown>>(`/api/players/${encodeURIComponent(playerId)}/events`),
   stats: (playerId: string) => api<Record<string, unknown>>(`/api/players/${encodeURIComponent(playerId)}/stats`),

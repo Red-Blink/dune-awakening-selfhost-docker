@@ -15,6 +15,7 @@ Complete reference for all HTTP API endpoints in the Dune Docker Console. All en
 - [Updates](#updates)
 - [Backups](#backups)
 - [Players](#players)
+- [Dungeons](#dungeons)
 - [Guilds](#guilds)
 - [Bases & Storage](#bases--storage)
 - [Vehicles](#vehicles)
@@ -258,6 +259,7 @@ Player rows include `total_playtime_seconds`. The console samples `player_state.
 | GET | `/api/players/{playerId}/position` | Get player position on map | `playerId` |
 | GET | `/api/players/{playerId}/progression` | Get level and progression | `playerId` |
 | GET | `/api/players/{playerId}/vitals` | Get health/hydration/addiction | `playerId` |
+| GET | `/api/players/{playerId}/dungeons` | List the dungeon runs the player took part in, from `dune.dungeon_completion` and `dune.dungeon_completion_players` (whose `player_id` is the Player Controller id). Returns `{ totalRuns, truncated, runs: [{ completionId, dungeonId, difficulty, durationMs, playerCount, party: [{ controllerId, characterName }] }] }`, newest first, at most 500 runs (`truncated` is true when there are more). The game stores no completion time, so order is by `completionId`. `difficulty` is the raw game integer. When either table is missing it returns `{ capabilities: { dungeons: false }, rows: [], reason }` instead. For every run on the server, see [Dungeons](#dungeons) | `playerId` |
 | GET | `/api/players/{playerId}/crafting-recipes` | Get unlocked recipes | `playerId` |
 | GET | `/api/players/{playerId}/research-items` | Get research progress | `playerId` |
 | GET | `/api/players/{playerId}/journey` | Get journey node completion | `playerId` |
@@ -355,6 +357,19 @@ These customization IDs are excluded from the general inventory catalog.
 | Method | Route | Description | Parameters |
 |--------|-------|-------------|------------|
 | POST | `/api/players/kick-all-online` | Kick all online players | `confirmation: "KICK ALL ONLINE PLAYERS"` |
+
+---
+
+## Dungeons
+
+Server-wide dungeon completions from `dune.dungeon_completion` and `dune.dungeon_completion_players`. Both routes need `players:read`. A run has the same shape as in `/api/players/{playerId}/dungeons`: `{ completionId, dungeonId, difficulty, durationMs, playerCount, party: [{ controllerId, characterName }] }`. The game stores no completion time, so recency is by `completionId`. `difficulty` is the raw game integer. `characterName` is null for a soft-deleted character, and a permanently deleted character's party rows are gone. Successful responses carry `capabilities: { dungeons: true }`. When either table is missing, both routes return `capabilities.dungeons: false` with a `reason`. A non-integer or out-of-range `page`, `pageSize`, `difficulty` or `playerId` is rejected with a 500 error, and a well-formed `playerId` that matches no player returns 404.
+
+Both routes take the same optional filters: `dungeonId` (exact asset id, e.g. `DA_Dgn_089_Radiation`), `difficulty` (integer), and `playerId` (a player actor id as used by `/api/players/{playerId}`, matched against the run's party through that player's controller id).
+
+| Method | Route | Description | Parameters |
+|--------|-------|-------------|------------|
+| GET | `/api/dungeons/runs` | Every run on the server, each listed once, newest first. Returns `{ page, pageSize, totalCount, totalRuns, runs }`: `totalCount` counts runs that match the filters, `totalRuns` counts every run on the server | `page?` (default 0), `pageSize?` (1-500, default 50), `dungeonId?`, `difficulty?`, `playerId?` |
+| GET | `/api/dungeons/leaderboard` | The fastest run per dungeon and difficulty (ties go to the earlier run), ordered by dungeon then difficulty. Returns `{ entries: [{ runCount, best }] }`, where `runCount` is the number of matching runs for that dungeon and difficulty and `best` is a run. With `playerId`, both `runCount` and `best` cover only that player's runs | `dungeonId?`, `difficulty?`, `playerId?` (the player's personal bests) |
 
 ---
 

@@ -361,6 +361,7 @@
     "Bene Gesserit",
     "Bene Gesserit starter skills",
     "Bengali",
+    "Best Times",
     "Best experience: run it directly on a Linux server.",
     "Beyond the Dunes, Every Choice Shapes the Future",
     "Binding Fixed",
@@ -899,6 +900,7 @@
     "Developer raw package item textarea",
     "Diagnostic Note",
     "Diagnostic Warning",
+    "Difficulty",
     "Dimension",
     "Direct Unlocks",
     "Direction the terminal faces, in degrees",
@@ -994,6 +996,8 @@
     "Dune.GiveDoubleDifficultyLoot",
     "Dune.GlobalMiningOutputMultiplier",
     "Dune.GlobalVehicleMiningOutputMultiplier",
+    "Dungeon",
+    "Dungeon Runs",
     "Durability",
     "Durability not reported",
     "Duration",
@@ -1844,6 +1848,7 @@
     "No database backups have been created yet.",
     "No deleted characters are holding bases or vehicles.",
     "No description was provided.",
+    "No dungeon runs recorded.",
     "No eligible players were found for this rule.",
     "No generators have queued fuel",
     "No generators or windtraps at this base",
@@ -2764,6 +2769,7 @@
     "Show all {count0} items",
     "Show fewer items",
     "Showing",
+    "Showing the latest {count0} runs.",
     "Showing up to 100 players and 50 recent kills.",
     "Showing {count0}-{count1} of {count2} item ({count3} total).",
     "Showing {count0}-{count1} of {count2} item.",
@@ -5251,7 +5257,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 139,
+        "line": 157,
         "nearby": [
           "FLS ID",
           "DB Player",
@@ -6499,7 +6505,7 @@
     "Alignment": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 187,
+        "line": 227,
         "nearby": [
           "Spice Addiction",
           "Faction",
@@ -8412,7 +8418,7 @@
     "Available Intel": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 172,
+        "line": 212,
         "nearby": [
           "XP",
           "Skill Points",
@@ -9682,6 +9688,18 @@
           "Run and manage your Dune: Awakening self-hosted Docker server from a browser. The console guides the first setup, then gives you the tools to manage maps, players, updates, backups, and admin work in one place.",
           "Also possible: Docker Desktop on Windows/WSL2 or a virtual machine.",
           "You will need your"
+        ]
+      }
+    ],
+    "Best Times": [
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 288,
+        "nearby": [
+          "Total",
+          "Showing the latest {count0} runs.",
+          "Difficulty",
+          "Show fewer items"
         ]
       }
     ],
@@ -15254,10 +15272,12 @@
     "Currency": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 229,
+        "line": 269,
         "nearby": [
           "Platform Identity",
-          "Database Identity"
+          "Database Identity",
+          "Dungeon Runs",
+          "No dungeon runs recorded."
         ]
       }
     ],
@@ -15786,11 +15806,12 @@
     "Database Identity": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 221,
+        "line": 261,
         "nearby": [
           "Repair Faction",
           "Platform Identity",
-          "Currency"
+          "Currency",
+          "Dungeon Runs"
         ]
       }
     ],
@@ -15976,7 +15997,7 @@
     "DB Player": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 138,
+        "line": 156,
         "nearby": [
           "Funcom ID",
           "FLS ID",
@@ -17532,6 +17553,18 @@
         ]
       }
     ],
+    "Difficulty": [
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 291,
+        "nearby": [
+          "Showing the latest {count0} runs.",
+          "Best Times",
+          "Show fewer items",
+          "Show all {count0} items"
+        ]
+      }
+    ],
     "Dimension": [
       {
         "file": "console/web/src/features/maps/MapsPanel.tsx",
@@ -18899,6 +18932,18 @@
         ]
       }
     ],
+    "Dungeon Runs": [
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 282,
+        "nearby": [
+          "Database Identity",
+          "Currency",
+          "No dungeon runs recorded.",
+          "Total"
+        ]
+      }
+    ],
     "duplicated coordinate": [
       {
         "file": "console/web/src/features/bases/BaseLandClaimTab.tsx",
@@ -20000,7 +20045,7 @@
     "Est. Rank": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 196,
+        "line": 236,
         "nearby": [
           "Faction Standings",
           "Rep",
@@ -20814,7 +20859,7 @@
     "Faction": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 185,
+        "line": 225,
         "nearby": [
           "Hydration",
           "Spice Addiction",
@@ -20860,7 +20905,7 @@
     "Faction Standings": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 190,
+        "line": 230,
         "nearby": [
           "Faction",
           "Alignment",
@@ -21961,7 +22006,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 135,
+        "line": 153,
         "nearby": [
           "Platform ID",
           "Funcom ID",
@@ -22303,7 +22348,7 @@
     "Funcom ID": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 134,
+        "line": 152,
         "nearby": [
           "Platform ID",
           "FLS ID",
@@ -23843,7 +23888,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 162,
+        "line": 202,
         "nearby": [
           "Solari Coin",
           "Map",
@@ -23968,7 +24013,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 179,
+        "line": 219,
         "nearby": [
           "Available Intel",
           "Vitals",
@@ -24332,7 +24377,7 @@
     "Hydration": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 180,
+        "line": 220,
         "nearby": [
           "Vitals",
           "Health",
@@ -26976,7 +27021,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 168,
+        "line": 208,
         "nearby": [
           "Map",
           "Guild",
@@ -28719,7 +28764,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 161,
+        "line": 201,
         "nearby": [
           "Solari Credit",
           "Solari Coin",
@@ -31126,6 +31171,18 @@
           "No Preview Available",
           "View Full 3D Blueprint",
           "No public Blueprints match these filters."
+        ]
+      }
+    ],
+    "No dungeon runs recorded.": [
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 283,
+        "nearby": [
+          "Currency",
+          "Dungeon Runs",
+          "Total",
+          "Showing the latest {count0} runs."
         ]
       }
     ],
@@ -35102,7 +35159,7 @@
     "Platform ID": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 129,
+        "line": 147,
         "nearby": [
           "Funcom ID",
           "FLS ID"
@@ -35112,7 +35169,7 @@
     "Platform Identity": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 215,
+        "line": 255,
         "nearby": [
           "Player Must Be Offline",
           "Repair Faction",
@@ -35338,7 +35395,7 @@
     "Player Controller": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 140,
+        "line": 158,
         "nearby": [
           "DB Player",
           "Account",
@@ -35385,7 +35442,7 @@
     "Player Must Be Offline": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 206,
+        "line": 246,
         "nearby": [
           "Restore earned faction progression and synchronize reputation.",
           "Repairing…",
@@ -35451,7 +35508,7 @@
     "Player State": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 141,
+        "line": 159,
         "nearby": [
           "Account",
           "Player Controller",
@@ -39264,7 +39321,7 @@
     "Rep": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 195,
+        "line": 235,
         "nearby": [
           "Alignment",
           "Faction Standings",
@@ -39310,7 +39367,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 206,
+        "line": 246,
         "nearby": [
           "Repairing…",
           "Player Must Be Offline",
@@ -39489,7 +39546,7 @@
     "Repairing…": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 206,
+        "line": 246,
         "nearby": [
           "The player must be fully offline before their faction state can be repaired.",
           "Restore earned faction progression and synchronize reputation.",
@@ -41081,7 +41138,7 @@
     "Restore earned faction progression and synchronize reputation.": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 204,
+        "line": 244,
         "nearby": [
           "Story Limit",
           "The player must be fully offline before their faction state can be repaired.",
@@ -46110,6 +46167,21 @@
           "No containers match this filter.",
           "No storage at this base."
         ]
+      },
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 299,
+        "nearby": [
+          "Difficulty",
+          "Show fewer items"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 320,
+        "nearby": [
+          "Show fewer items"
+        ]
       }
     ],
     "Show Bulk Delete Controls": [
@@ -46165,6 +46237,22 @@
           "View Contents",
           "Show all {count0} items",
           "No containers match this filter."
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 299,
+        "nearby": [
+          "Best Times",
+          "Difficulty",
+          "Show all {count0} items"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 320,
+        "nearby": [
+          "Show all {count0} items"
         ]
       }
     ],
@@ -46324,6 +46412,18 @@
           "New",
           "Rows",
           "First"
+        ]
+      }
+    ],
+    "Showing the latest {count0} runs.": [
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 287,
+        "nearby": [
+          "No dungeon runs recorded.",
+          "Total",
+          "Best Times",
+          "Difficulty"
         ]
       }
     ],
@@ -46716,7 +46816,7 @@
     "Skill Points": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 170,
+        "line": 210,
         "nearby": [
           "Level",
           "XP",
@@ -46918,7 +47018,7 @@
     "Solari Coin": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 148,
+        "line": 166,
         "nearby": [
           "Player State",
           "Solari Credit",
@@ -46940,7 +47040,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 147,
+        "line": 165,
         "nearby": [
           "Player Controller",
           "Player State",
@@ -47146,7 +47246,7 @@
     "Spice Addiction": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 181,
+        "line": 221,
         "nearby": [
           "Health",
           "Hydration",
@@ -48053,7 +48153,7 @@
     "Story Limit": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 198,
+        "line": 238,
         "nearby": [
           "Rep",
           "Est. Rank",
@@ -50052,7 +50152,7 @@
     "The player must be fully offline before their faction state can be repaired.": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 204,
+        "line": 244,
         "nearby": [
           "Est. Rank",
           "Story Limit",
@@ -51375,6 +51475,16 @@
           "Unit Price",
           "Party",
           "Exchange"
+        ]
+      },
+      {
+        "file": "console/web/src/features/players/PlayerSummary.tsx",
+        "line": 285,
+        "nearby": [
+          "Dungeon Runs",
+          "No dungeon runs recorded.",
+          "Showing the latest {count0} runs.",
+          "Best Times"
         ]
       },
       {
@@ -54110,7 +54220,7 @@
     "Vitals": [
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 177,
+        "line": 217,
         "nearby": [
           "Skill Points",
           "Available Intel",
@@ -54959,7 +55069,7 @@
       },
       {
         "file": "console/web/src/features/players/PlayerSummary.tsx",
-        "line": 169,
+        "line": 209,
         "nearby": [
           "Guild",
           "Level",

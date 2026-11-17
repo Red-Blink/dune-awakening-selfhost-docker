@@ -1117,6 +1117,18 @@ async function handleApi(req, res) {
   // Must stay above the /api/players/<id>/... routes further down, which would
   // otherwise capture "deleted-characters" as a player id.
   if (path === "/api/players/deleted-characters") return dbJson(res, () => duneDb.listDeletedCharacterAssets(db));
+  if (path === "/api/dungeons/runs" && req.method === "GET") return dbJson(res, () => duneDb.listDungeonRuns(db, {
+    page: url.searchParams.get("page") || 0,
+    pageSize: url.searchParams.get("pageSize") || 50,
+    dungeonId: url.searchParams.get("dungeonId") || "",
+    difficulty: url.searchParams.get("difficulty") ?? "",
+    playerId: url.searchParams.get("playerId") ?? ""
+  }));
+  if (path === "/api/dungeons/leaderboard" && req.method === "GET") return dbJson(res, () => duneDb.dungeonLeaderboard(db, {
+    dungeonId: url.searchParams.get("dungeonId") || "",
+    difficulty: url.searchParams.get("difficulty") ?? "",
+    playerId: url.searchParams.get("playerId") ?? ""
+  }));
   if (path === "/api/guilds") return dbJson(res, () => duneDb.listGuilds(db, {
     q: url.searchParams.get("q") || "",
     page: url.searchParams.get("page") || 0,
@@ -1324,6 +1336,7 @@ async function handleApi(req, res) {
   if (path.match(/^\/api\/players\/[^/]+\/position$/)) return dbPlayerRoute(res, path, duneDb.playerPosition);
   if (path.match(/^\/api\/players\/[^/]+\/progression$/)) return dbPlayerRoute(res, path, duneDb.playerProgression);
   if (path.match(/^\/api\/players\/[^/]+\/vitals$/)) return dbPlayerRoute(res, path, duneDb.playerVitals);
+  if (path.match(/^\/api\/players\/[^/]+\/dungeons$/) && req.method === "GET") return dbPlayerRoute(res, path, duneDb.playerDungeons);
   if (path.match(/^\/api\/players\/[^/]+\/events$/)) return dbPlayerUnsupported(res, path, "events");
   if (path.match(/^\/api\/players\/[^/]+\/stats$/)) return dbPlayerUnsupported(res, path, "stats");
   if (path.match(/^\/api\/players\/[^/]+\/history$/)) return dbPlayerUnsupported(res, path, "history");

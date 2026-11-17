@@ -5,6 +5,9 @@ import type { LucideIcon } from "lucide-react";
 import { PlayerStatusCell } from "../../components/common/DisplayPrimitives";
 import { firstDefined } from "../../lib/display";
 import { playersApi } from "../../api/players";
+import type { DungeonRun } from "../../api/players";
+import { DataTable, useSortableRows } from "../../components/common/DataTable";
+import { dungeonDisplayName, formatDungeonDuration } from "./dungeonNames";
 
 const currencyIcon = (label: string): LucideIcon => {
   if (label === "Solari Credit") return CircleDollarSign;
@@ -16,8 +19,11 @@ type CurrencyRow = { currency_id: number | string; balance: number; label?: stri
 type FactionRow = { faction_id: number; faction_name?: string; reputation_amount: number; component_reputation_amount?: number | null; reputation_in_sync?: boolean; estimated_rank?: number; current_rank_limit?: number | null; rank_limited_by_progression?: boolean; progression_repair_available?: boolean; progression_repair_target?: number | null };
 type FactionRepairResult = { tone: "success" | "danger" | "neutral"; text: string; pending?: boolean };
 type Progression = { level?: number; xp?: number; totalSkillPoints?: number; unspentSkillPoints?: number };
+type DungeonRuns = { runs: DungeonRun[]; totalRuns: number; truncated: boolean };
 type Vitals = { currentHealth: number | null; maxHealth: number; maxHealthEstimated: boolean; hydration: number | null; maxHydration: number; spiceAddictionLevel: number | null; maxSpiceAddictionLevel: number };
 const PLAYER_STATS_REFRESH_MS = 30_000;
+const BEST_TIMES_PREVIEW_LIMIT = 5;
+const DUNGEON_RUNS_PREVIEW_LIMIT = 10;
 
 export function PlayerSummary({
   detail,
@@ -48,6 +54,13 @@ export function PlayerSummary({
   const [intel, setIntel] = useState<number | null>(null);
   const [solarisCoinTotal, setSolarisCoinTotal] = useState<number | null>(null);
   const [vitals, setVitals] = useState<Vitals | null>(null);
+  const [dungeonRuns, setDungeonRuns] = useState<DungeonRuns | null>(null);
+  const [showAllBestTimes, setShowAllBestTimes] = useState(false);
+  const [showAllDungeonRuns, setShowAllDungeonRuns] = useState(false);
+  useEffect(() => {
+    setShowAllBestTimes(false);
+    setShowAllDungeonRuns(false);
+  }, [dbPlayerId]);
   const loadRequest = useRef(0);
 
   useEffect(() => {
@@ -58,6 +71,7 @@ export function PlayerSummary({
       setIntel(null);
       setSolarisCoinTotal(null);
       setVitals(null);
+      setDungeonRuns(null);
       return;
     }
     let active = true;
@@ -67,13 +81,14 @@ export function PlayerSummary({
       loading = true;
       const request = ++loadRequest.current;
       try {
-        const [currency, factions, progressionResult, intelResult, solarisCoinResult, vitalsResult] = await Promise.allSettled([
+        const [currency, factions, progressionResult, intelResult, solarisCoinResult, vitalsResult, dungeonsResult] = await Promise.allSettled([
           playersApi.currency(dbPlayerId),
           playersApi.factions(dbPlayerId),
           playersApi.progression(dbPlayerId),
           playersApi.intel(dbPlayerId),
           playersApi.solarisCoin(dbPlayerId),
-          playersApi.vitals(dbPlayerId)
+          playersApi.vitals(dbPlayerId),
+          playersApi.dungeons(dbPlayerId)
         ]);
         if (!active || request !== loadRequest.current) return;
         setCurrencyRows(currency.status === "fulfilled" ? ((currency.value.rows || []) as CurrencyRow[]) : []);
@@ -95,6 +110,9 @@ export function PlayerSummary({
               spiceAddictionLevel: vitalsResult.value.spiceAddictionLevel ?? null,
               maxSpiceAddictionLevel: vitalsResult.value.maxSpiceAddictionLevel ?? 0
             }
+          : null);
+        setDungeonRuns(dungeonsResult.status === "fulfilled" && dungeonsResult.value.capabilities?.dungeons
+          ? { runs: dungeonsResult.value.runs || [], totalRuns: dungeonsResult.value.totalRuns ?? 0, truncated: dungeonsResult.value.truncated === true }
           : null);
       } finally {
         loading = false;
@@ -150,6 +168,28 @@ export function PlayerSummary({
     .filter((row) => row.label !== "Solari Credit")
     .forEach((row) => currencyItems.push({ label: row.label || `Currency ${row.currency_id}`, value: Number(row.balance).toLocaleString() }));
   const currencyTiles = currencyItems.map((item) => ({ ...item, Icon: currencyIcon(item.label) }));
+
+  const dungeonRows = (dungeonRuns?.runs || []).map((run) => ({
+    completionId: run.completionId,
+    dungeonId: run.dungeonId,
+    dungeon: dungeonDisplayName(run.dungeonId),
+    difficulty: run.difficulty,
+    duration: run.durationMs,
+    party: run.playerCount,
+    partyNames: run.party.map((member) => member.characterName || `Controller ${member.controllerId}`).join(", ")
+  }));
+  const dungeonSort = useSortableRows(dungeonRows);
+  const bestDungeonTimes = Object.values(dungeonRows.reduce<Record<string, (typeof dungeonRows)[number]>>((best, row) => {
+    const key = `${row.dungeonId}:${row.difficulty}`;
+    if (!best[key] || row.duration < best[key].duration) best[key] = row;
+    return best;
+  }, {})).sort((a, b) => a.dungeon.localeCompare(b.dungeon) || a.difficulty - b.difficulty);
+  // Collapsed, Best Times keeps the 5 fastest (in the same name order) and the
+  // table keeps the first 10 rows of its current sort, newest first by default.
+  const fastestBestKeys = new Set([...bestDungeonTimes].sort((a, b) => a.duration - b.duration)
+    .slice(0, BEST_TIMES_PREVIEW_LIMIT).map((row) => `${row.dungeonId}:${row.difficulty}`));
+  const visibleBestTimes = showAllBestTimes ? bestDungeonTimes : bestDungeonTimes.filter((row) => fastestBestKeys.has(`${row.dungeonId}:${row.difficulty}`));
+  const visibleDungeonRows = showAllDungeonRuns ? dungeonSort.sortedRows : dungeonSort.sortedRows.slice(0, DUNGEON_RUNS_PREVIEW_LIMIT);
 
   return <section className="action-section player-summary">
     <div className="summary-hero">
@@ -236,6 +276,49 @@ export function PlayerSummary({
           </div>
         </div>)}
       </div>
+    </div>}
+
+    {dungeonRuns && <div className="summary-block summary-dungeons">
+      <div className="summary-block-label">Dungeon Runs</div>
+      {dungeonRuns.totalRuns === 0 ? <p className="summary-dungeons-empty">No dungeon runs recorded.</p> : <>
+        <table className="summary-kv summary-dungeons-kv"><tbody>
+          <tr><td>Total</td><td data-no-translate>{dungeonRuns.totalRuns.toLocaleString()}</td></tr>
+        </tbody></table>
+        {dungeonRuns.truncated && <p className="summary-dungeons-truncated">{`Showing the latest ${dungeonRows.length.toLocaleString()} runs.`}</p>}
+        <div className="summary-block-label summary-sublabel">Best Times</div>
+        <table className="summary-kv summary-dungeons-best"><tbody>
+          {visibleBestTimes.map((row) => <tr key={`${row.dungeonId}:${row.difficulty}`}>
+            <td title={row.dungeonId}><span data-no-translate>{row.dungeon}</span> <span className="summary-dungeons-difficulty">Difficulty <span data-no-translate>{row.difficulty}</span></span></td>
+            <td data-no-translate>{formatDungeonDuration(row.duration)}</td>
+          </tr>)}
+        </tbody></table>
+        {bestDungeonTimes.length > BEST_TIMES_PREVIEW_LIMIT && <button
+          type="button"
+          className="summary-dungeons-show-all"
+          onClick={() => setShowAllBestTimes(!showAllBestTimes)}
+        >{showAllBestTimes ? "Show fewer items" : `Show all ${bestDungeonTimes.length.toLocaleString()} items`}</button>}
+        <DataTable
+          rows={visibleDungeonRows}
+          columns={["dungeon", "difficulty", "duration", "party"]}
+          columnLabels={{ dungeon: "Dungeon", difficulty: "Difficulty", duration: "Duration", party: "Party" }}
+          sortColumn={dungeonSort.sortColumn}
+          sortDirection={dungeonSort.sortDirection}
+          onSort={dungeonSort.onSort}
+          tableClassName="summary-dungeons-table"
+          rowKey={(row) => String(row.completionId)}
+          renderCell={(row, col) =>
+            col === "dungeon" ? <span title={String(row.dungeonId)} data-no-translate>{String(row.dungeon)}</span> :
+            col === "duration" ? <span data-no-translate>{formatDungeonDuration(Number(row.duration))}</span> :
+            col === "party" ? <span data-no-translate>{`${row.party} · ${row.partyNames}`}</span> :
+            <span data-no-translate>{String(row[col])}</span>
+          }
+        />
+        {dungeonRows.length > DUNGEON_RUNS_PREVIEW_LIMIT && <button
+          type="button"
+          className="summary-dungeons-show-all"
+          onClick={() => setShowAllDungeonRuns(!showAllDungeonRuns)}
+        >{showAllDungeonRuns ? "Show fewer items" : `Show all ${dungeonRows.length.toLocaleString()} items`}</button>}
+      </>}
     </div>}
 
     {actions}
